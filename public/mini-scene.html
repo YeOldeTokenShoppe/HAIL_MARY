@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Three.js Scene</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #000;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #00ff41;
+            font-family: monospace;
+            font-size: 12px;
+            text-shadow: 0 0 5px #00ff41;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">DRAG TO ROTATE • SCROLL TO ZOOM</div>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a0a);
+        scene.fog = new THREE.Fog(0x0a0a0a, 1, 100);
+
+        // Camera
+        const camera = new THREE.PerspectiveCamera(
+            75,
+            window.innerWidth / window.innerHeight,
+            0.1,
+            1000
+        );
+        camera.position.set(5, 5, 5);
+
+        // Renderer
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        // Controls - fully functional!
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.enableZoom = true;
+        controls.enablePan = true;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 2;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+
+        const pointLight = new THREE.PointLight(0x00ff41, 2);
+        pointLight.position.set(5, 5, 5);
+        scene.add(pointLight);
+
+        const pointLight2 = new THREE.PointLight(0xff00ff, 1);
+        pointLight2.position.set(-5, -5, -5);
+        scene.add(pointLight2);
+
+        // Create geometries
+        const geometries = [];
+        
+        // Central glowing cube
+        const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
+        const cubeMaterial = new THREE.MeshPhongMaterial({
+            color: 0x00ff41,
+            emissive: 0x00ff41,
+            emissiveIntensity: 0.5,
+            wireframe: false
+        });
+        const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+        scene.add(cube);
+
+        // Orbiting spheres
+        for (let i = 0; i < 8; i++) {
+            const sphereGeometry = new THREE.SphereGeometry(0.3, 16, 16);
+            const sphereMaterial = new THREE.MeshPhongMaterial({
+                color: new THREE.Color().setHSL(i / 8, 1, 0.5),
+                emissive: new THREE.Color().setHSL(i / 8, 1, 0.5),
+                emissiveIntensity: 0.3
+            });
+            const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+            
+            const angle = (i / 8) * Math.PI * 2;
+            sphere.position.set(
+                Math.cos(angle) * 3,
+                Math.sin(angle * 2) * 1,
+                Math.sin(angle) * 3
+            );
+            
+            sphere.userData = { angle: angle, speed: 0.5 + Math.random() * 0.5 };
+            geometries.push(sphere);
+            scene.add(sphere);
+        }
+
+        // Grid helper
+        const gridHelper = new THREE.GridHelper(20, 20, 0x00ff41, 0x003300);
+        scene.add(gridHelper);
+
+        // Wireframe sphere
+        const wireGeometry = new THREE.SphereGeometry(8, 16, 8);
+        const wireMaterial = new THREE.MeshBasicMaterial({
+            color: 0x00ff41,
+            wireframe: true,
+            opacity: 0.2,
+            transparent: true
+        });
+        const wireSphere = new THREE.Mesh(wireGeometry, wireMaterial);
+        scene.add(wireSphere);
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Rotate central cube
+            cube.rotation.x += 0.01;
+            cube.rotation.y += 0.01;
+
+            // Animate orbiting spheres
+            geometries.forEach((sphere, index) => {
+                sphere.userData.angle += sphere.userData.speed * 0.02;
+                const radius = 3 + Math.sin(Date.now() * 0.001 + index) * 0.5;
+                
+                sphere.position.x = Math.cos(sphere.userData.angle) * radius;
+                sphere.position.z = Math.sin(sphere.userData.angle) * radius;
+                sphere.position.y = Math.sin(Date.now() * 0.001 + index * Math.PI / 4) * 1.5;
+                
+                sphere.rotation.x += 0.02;
+                sphere.rotation.y += 0.03;
+            });
+
+            // Rotate wireframe
+            wireSphere.rotation.y += 0.002;
+            wireSphere.rotation.x += 0.001;
+
+            // Update controls
+            controls.update();
+
+            // Render
+            renderer.render(scene, camera);
+        }
+
+        // Handle resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Start animation
+        animate();
+
+        // Interactive features
+        renderer.domElement.addEventListener('click', () => {
+            // Change colors on click
+            const hue = Math.random();
+            cubeMaterial.color.setHSL(hue, 1, 0.5);
+            cubeMaterial.emissive.setHSL(hue, 1, 0.5);
+        });
+
+        // Add info about clicking
+        setTimeout(() => {
+            const info = document.getElementById('info');
+            info.innerHTML += '<br>CLICK TO CHANGE COLORS';
+        }, 2000);
+    </script>
+</body>
+</html>

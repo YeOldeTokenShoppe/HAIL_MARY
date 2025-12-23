@@ -1,0 +1,3167 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Dunk Tank</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Lato&display=swap");
+      
+      /* Preloader styles */
+      #preloader {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        transition: opacity 0.5s ease-out;
+      }
+      
+      #preloader.fade-out {
+        opacity: 0;
+        pointer-events: none;
+      }
+      
+      .infinity-symbol {
+        width: 200px;
+        height: 100px;
+        animation: pulse 2s ease-in-out infinite;
+      }
+      
+      .infinity-symbol path {
+        stroke: #ff0066;
+        stroke-width: 84;
+        fill: none;
+        stroke-dasharray: 3000;
+        stroke-dashoffset: 3000;
+        animation: draw 3s ease-in-out forwards, glow 2s ease-in-out infinite 3s;
+      }
+      
+      @keyframes draw {
+        to {
+          stroke-dashoffset: 0;
+        }
+      }
+      
+      @keyframes glow {
+        0%, 100% {
+          filter: drop-shadow(0 0 10px #ff0066);
+          stroke: #ff0066;
+        }
+        50% {
+          filter: drop-shadow(0 0 20px #ff0066) drop-shadow(0 0 30px #ff0066);
+          stroke: #ff99cc;
+        }
+      }
+      
+      @keyframes pulse {
+        0%, 100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.05);
+        }
+      }
+      
+      .loading-text {
+        position: absolute;
+        bottom: 30%;
+        color: #ff0066;
+        font-family: 'Lato', sans-serif;
+        font-size: 1.2em;
+        letter-spacing: 2px;
+        animation: blink 1.5s ease-in-out infinite;
+      }
+      
+      @keyframes blink {
+        0%, 100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+      
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        overscroll-behavior-x: none;
+        overscroll-behavior-y: none;
+        scroll-behavior: smooth;
+      }
+      body {
+        font-family: "Lato", sans-serif;
+        position: relative;
+        width: 100%;
+        max-width: 100vw;
+        height: auto;
+        min-height: 100vh;
+        text-align: center;
+        overflow-x: hidden;
+
+        background: #1b1724;
+        color: #1b1724;
+      }
+      canvas {
+        -moz-user-select: none;
+        -webkit-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        position: fixed;
+        width: 100%;
+        max-width: 100vw;
+        height: auto;
+        min-height: 100vh;
+        top: 0;
+        left: 0;
+        z-index: 0;
+      }
+      main {
+        position: relative;
+      }
+      section {
+        position: relative;
+        width: 100vw;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+      }
+    </style>
+    <link rel="stylesheet" href="/moonRoom.css" />
+  </head>
+  <body>
+    <!-- Preloader -->
+    <div id="preloader">
+      <svg class="infinity-symbol" viewBox="0 0 1114 498" xmlns="http://www.w3.org/2000/svg">
+        <path d="M556.639,248.609c53.406,53.406 101.683,111.534 164.527,155.683c32.351,22.727 69.175,43.083 109.585,49.008c28.958,4.245 59.488,0.613 87.317,-7.576c26.905,-7.918 52.087,-20.892 73.811,-37.871c21.56,-16.851 39.677,-37.626 53.018,-60.895c10.19,-17.771 17.616,-36.957 21.888,-56.774c4.437,-20.585 5.532,-41.765 3.304,-62.666c-8.654,-81.211 -69.752,-151.815 -152.021,-176.024c-21.015,-6.185 -42.784,-9.169 -64.773,-9.286c-20.432,-0.109 -41.041,2.144 -60.735,7.389c-60.474,16.105 -104.752,61.37 -145.625,103.912c-25.822,26.876 -51.28,54.064 -76.924,81.093c-50.066,52.771 -98.707,107.45 -153.977,155.565c-26.704,23.247 -58.379,43.63 -92.848,54.868c-68.352,22.285 -146.537,6.002 -201.788,-37.182c-21.56,-16.851 -39.676,-37.626 -53.018,-60.895c-10.19,-17.771 -17.616,-36.957 -21.887,-56.774c-20.542,-95.293 34.073,-193.859 128.699,-231.746c26.53,-10.622 55.918,-16.645 84.79,-16.23c66.027,0.948 126.189,41.423 172.681,82.451c12.721,11.225 25.299,22.604 37.509,34.327c11.528,11.07 22.61,22.551 33.684,34.029c17.75,18.398 34.689,37.5 52.783,55.594Z" />
+      </svg>
+      <div class="loading-text">LOADING</div>
+    </div>
+    
+    <main>
+      <section></section>
+    </main>
+
+    <!-- Water shader scripts -->
+    <script id="smoothFragmentShader" type="x-shader/x-fragment">
+      uniform sampler2D smoothTexture;
+      void main() {
+        vec2 cellSize = 1.0 / resolution.xy;
+        vec2 uv = gl_FragCoord.xy * cellSize;
+        vec4 textureValue = texture2D( smoothTexture, uv );
+        textureValue += texture2D( smoothTexture, uv + vec2( 0.0, cellSize.y ) );
+        textureValue += texture2D( smoothTexture, uv + vec2( 0.0, - cellSize.y ) );
+        textureValue += texture2D( smoothTexture, uv + vec2( cellSize.x, 0.0 ) );
+        textureValue += texture2D( smoothTexture, uv + vec2( - cellSize.x, 0.0 ) );
+        textureValue /= 5.0;
+        gl_FragColor = textureValue;
+      }
+    </script>
+
+    <script
+      async
+      src="https://ga.jspm.io/npm:es-module-shims@1.6.3/dist/es-module-shims.js"
+    ></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.168.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.168.0/examples/jsm/"
+        }
+      }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.168.0/examples/jsm/libs/ammo.wasm.js"></script>
+
+    <script type="module">
+      import * as THREE from "three";
+      import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+      import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+      import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+      import * as BufferGeometryUtils from "three/addons/utils/BufferGeometryUtils.js";
+      import { GPUComputationRenderer } from "three/addons/misc/GPUComputationRenderer.js";
+      import { RGBELoader } from "three/addons/loaders/RGBELoader.js";
+      import { SimplexNoise } from "three/addons/math/SimplexNoise.js";
+
+      console.clear();
+      ("use strict");
+      const meshes = [];
+      let isDragging = false;
+      let selectedObject = null;
+      let previousMousePosition = new THREE.Vector2();
+      let dragStartPosition = new THREE.Vector3();
+      const mouse = new THREE.Vector2();
+      const dragPlane = new THREE.Plane();
+      const intersection = new THREE.Vector3();
+      const mousePosition = new THREE.Vector2();
+      const raycaster = new THREE.Raycaster();
+      const meshMap = new WeakMap();
+      const ballsInWater = new Set();  // Track balls in water for buoyancy
+      async function AmmoPhysics() {
+        if (!("Ammo" in window)) {
+          console.error("AmmoPhysics: Couldn't find Ammo.js");
+          return;
+        }
+
+        const Ammo = await window.Ammo();
+        const collisionConfiguration =
+          new Ammo.btDefaultCollisionConfiguration();
+        const dispatcher = new Ammo.btCollisionDispatcher(
+          collisionConfiguration
+        );
+        const broadphase = new Ammo.btDbvtBroadphase();
+        const solver = new Ammo.btSequentialImpulseConstraintSolver();
+        const world = new Ammo.btDiscreteDynamicsWorld(
+          dispatcher,
+          broadphase,
+          solver,
+          collisionConfiguration
+        );
+        world.setGravity(new Ammo.btVector3(0, -10, 0));
+
+        let transform = new Ammo.btTransform();
+        const worldTransform = new Ammo.btTransform();
+        let position,
+          quaternion = new Ammo.btVector3(0, 0, 0);
+        let quaternion_bt = new Ammo.btQuaternion(0, 0, 0, 0);
+        let vector = new Ammo.btVector3(0, 0, 0);
+
+        const meshes = [];
+        // const meshMap = new WeakMap();
+
+        let shootingShapeSaved = null;
+        let shootingShapeName = "";
+
+        function createConvexHullShape(geometry) {
+          let shape = null;
+          let vector = new Ammo.btVector3(0, 0, 0);
+          let positions = geometry.attributes.position.array;
+
+          shape = new Ammo.btConvexHullShape();
+          for (let i = 0, il = positions.length; i < il; i += 3) {
+            vector.setValue(positions[i], positions[i + 1], positions[i + 2]);
+            const lastOne = i >= il - 3;
+            shape.addPoint(vector, lastOne);
+          }
+
+          if (shape) shape.setMargin(0);
+          if (!shape) console.error("AmmoPhysics: Shape error.");
+          return shape;
+        }
+
+        function createTerrainShape(geometry) {
+          let shape = null;
+          const positions = geometry.attributes.position.array;
+          const indices = geometry.index.array;
+
+          const mesh = new Ammo.btTriangleMesh();
+
+          for (let i = 0; i < indices.length; i += 3) {
+            const v1 = new Ammo.btVector3(
+              positions[indices[i] * 3],
+              positions[indices[i] * 3 + 1],
+              positions[indices[i] * 3 + 2]
+            );
+            const v2 = new Ammo.btVector3(
+              positions[indices[i + 1] * 3],
+              positions[indices[i + 1] * 3 + 1],
+              positions[indices[i + 1] * 3 + 2]
+            );
+            const v3 = new Ammo.btVector3(
+              positions[indices[i + 2] * 3],
+              positions[indices[i + 2] * 3 + 1],
+              positions[indices[i + 2] * 3 + 2]
+            );
+            mesh.addTriangle(v1, v2, v3);
+          }
+
+          shape = new Ammo.btBvhTriangleMeshShape(mesh, true, true);
+          if (shape) shape.setMargin(0);
+
+          return shape;
+        }
+
+        function addRigidBody(threeObject, mass, shape, velocity = null) {
+          position = threeObject.position;
+          quaternion = threeObject.quaternion;
+
+          transform.setIdentity();
+          vector.setValue(position.x, position.y, position.z);
+          transform.setOrigin(vector);
+          transform.setRotation(
+            new Ammo.btQuaternion(
+              quaternion.x,
+              quaternion.y,
+              quaternion.z,
+              quaternion.w
+            )
+          );
+
+          const scale = threeObject.scale;
+          vector.setValue(scale.x, scale.y, scale.z);
+          shape.setLocalScaling(vector);
+          vector.setValue(0, 0, 0);
+
+          const motionState = new Ammo.btDefaultMotionState(transform);
+          const localInertia = vector;
+          if (mass > 0) shape.calculateLocalInertia(mass, localInertia);
+
+          const rbInfo = new Ammo.btRigidBodyConstructionInfo(
+            mass,
+            motionState,
+            shape,
+            localInertia
+          );
+          const body = new Ammo.btRigidBody(rbInfo);
+
+          if (threeObject.name === "pointLight") {
+            body.setFriction(0.1);
+            body.setRestitution(0.7);
+          } else if (threeObject.name === "floor") {
+            body.setFriction(1);
+            body.setRestitution(1);
+            body.setDamping(0, 0);
+          } else if (threeObject.name === "shootingBall") {
+            body.setFriction(0.3);
+            body.setRestitution(0.8);  // High bounce for projectiles
+            body.setDamping(0.1, 0.1);
+            body.setActivationState(4);  // Keep always active for buoyancy
+            // Enable continuous collision detection for fast moving balls
+            body.setCcdMotionThreshold(0.1);
+            body.setCcdSweptSphereRadius(0.5);
+          } else if (threeObject.name === "Target") {
+            body.setFriction(0.9);
+            body.setRestitution(0.6);  // Good bounce for target
+            body.setDamping(0, 0);
+          } else if (threeObject.name && (threeObject.name.startsWith("SM_Prop_Dunk_Tank_01") || 
+                     threeObject.name.startsWith("Mesh"))) {
+            body.setFriction(0.8);
+            body.setRestitution(0.5);  // Some bounce for dunk tank parts
+            body.setDamping(0, 0);
+          } else {
+            body.setFriction(0.5);
+            body.setRestitution(0.3);
+            body.setDamping(0, 0);
+          }
+
+          if (threeObject.name === "shootingBall" && velocity) {
+            vector.setValue(velocity.x, velocity.y, velocity.z);
+            body.setLinearVelocity(vector);
+          }
+
+          body.name = threeObject.name;
+          
+          // Set collision filtering for different object types
+          let group, mask;
+          if (threeObject.name === "shootingBall") {
+            group = 2;  // Shooting balls are group 2
+            mask = 1 | 2 | 4;  // Collide with default (1), other balls (2), and tank (4)
+          } else if (threeObject.name === "pointLight") {
+            group = 1;  // Moons are group 1 (default)
+            mask = 1 | 2 | 4 | 8;  // Collide with everything including shooting balls (2)
+          } else if (threeObject.name === "Cone") {
+            group = 8;  // Cone is group 8
+            mask = 1;  // Only collide with group 1 (moons), not shooting balls
+          } else if (threeObject.name === "DunkTankBody" || threeObject.name === "DunkTankBody001" || 
+                     threeObject.name === "DunkTankBody002" || threeObject.name === "DunkTankBody_1" || 
+                     threeObject.name === "DunkTankBody_2" || threeObject.name === "Hinge" || 
+                     (threeObject.name && (threeObject.name.startsWith("SM_Prop_Dunk_Tank_01") || 
+                     threeObject.name.startsWith("Mesh")))) {
+            group = 4;  // Tank parts are group 4
+            mask = 1 | 2;  // Collide with moons and shooting balls
+          } else {
+            group = 1;  // Default group
+            mask = -1;  // Collide with everything
+          }
+          
+          world.addRigidBody(body, group, mask);
+
+          if (mass > 0) {
+            meshes.push(threeObject);
+            meshMap.set(threeObject, body);
+          } else {
+            // Static bodies also need to be in the map for collision detection
+            meshMap.set(threeObject, body);
+            // Ensure static bodies are set up properly
+            if (threeObject.name === "Cone") {
+              body.setCollisionFlags(body.getCollisionFlags() | 1); // CF_STATIC_OBJECT flag
+              console.log("Cone static body added to physics with collision flags");
+            }
+          }
+        }
+
+        // Set up physics update interval
+        let lastTime = performance.now();
+        setInterval(function () {
+          const time = performance.now();
+          if (lastTime > 0) {
+            const delta = (time - lastTime) / 1000;
+            world.stepSimulation(delta, 10);
+          }
+          lastTime = time;
+
+          for (let i = 0, il = meshes.length; i < il; i++) {
+            const mesh = meshes[i];
+            if (!mesh || (isDragging && mesh === selectedObject)) continue;
+
+            if (mesh.isInstancedMesh) {
+              const array = mesh.instanceMatrix.array;
+              const bodies = meshMap.get(mesh);
+              for (let j = 0; j < bodies.length; j++) {
+                const body = bodies[j];
+                if (!body) continue;
+
+                body.getMotionState().getWorldTransform(worldTransform);
+                const origin = worldTransform.getOrigin();
+                const rotation = worldTransform.getRotation();
+                computeQuaternionFromMatrix(origin, rotation, array, j * 16);
+              }
+              mesh.instanceMatrix.needsUpdate = true;
+            } else if (mesh.isMesh) {
+              const body = meshMap.get(mesh);
+              if (!body) continue;
+
+              body.getMotionState().getWorldTransform(worldTransform);
+              const origin = worldTransform.getOrigin();
+              const rotation = worldTransform.getRotation();
+              mesh.position.set(origin.x(), origin.y(), origin.z());
+              mesh.quaternion.set(
+                rotation.x(),
+                rotation.y(),
+                rotation.z(),
+                rotation.w()
+              );
+            }
+          }
+        }, 1000 / 60);
+
+        return {
+          addMesh: function (mesh, mass = 0) {
+            const shape = createConvexHullShape(mesh.geometry);
+            if (!shape) {
+              console.error("AmmoPhysics: Shape is NULL.");
+              return false;
+            }
+            addRigidBody(mesh, mass, shape);
+          },
+
+          addTerrainMesh: function (mesh, mass = 0) {
+            const shape = createTerrainShape(mesh.geometry);
+            if (!shape) {
+              console.error("AmmoPhysics: Shape is NULL.");
+              return false;
+            }
+            addRigidBody(mesh, mass, shape);
+          },
+
+          addShootingMesh: function (mesh, mass = 0, velocity = null) {
+            if (!velocity) {
+              console.error("AmmoPhysics: Parameter is NULL.");
+              return false;
+            }
+
+            if (!mesh.name || (mesh.name && mesh.name !== shootingShapeName)) {
+              shootingShapeSaved = createConvexHullShape(mesh.geometry);
+              shootingShapeName = mesh.name;
+            }
+
+            if (!shootingShapeSaved) {
+              console.error("AmmoPhysics: Shape is NULL.");
+              return false;
+            }
+
+            console.log("Adding shooting ball physics:", mesh.position, "velocity:", velocity);
+            addRigidBody(mesh, mass, shootingShapeSaved, velocity);
+            // Body will be available in meshMap after physics update
+          },
+        };
+      }
+
+      function computeQuaternionFromMatrix(e, t, n, o) {
+        const i = t.x(),
+          a = t.y(),
+          r = t.z(),
+          s = t.w(),
+          l = i + i,
+          c = a + a,
+          d = r + r,
+          h = i * l,
+          m = i * c,
+          w = i * d,
+          E = a * c,
+          u = a * d,
+          p = r * d,
+          g = s * l,
+          M = s * c,
+          y = s * d;
+        (n[o + 0] = 1 - (E + p)),
+          (n[o + 1] = m + y),
+          (n[o + 2] = w - M),
+          (n[o + 3] = 0),
+          (n[o + 4] = m - y),
+          (n[o + 5] = 1 - (h + p)),
+          (n[o + 6] = u + g),
+          (n[o + 7] = 0),
+          (n[o + 8] = w + M),
+          (n[o + 9] = u - g),
+          (n[o + 10] = 1 - (h + E)),
+          (n[o + 11] = 0),
+          (n[o + 12] = e.x()),
+          (n[o + 13] = e.y()),
+          (n[o + 14] = e.z()),
+          (n[o + 15] = 1);
+      }
+
+      // Main initialization
+      (async function init() {
+        let physics = await AmmoPhysics();
+        let camera, scene, renderer, controls;
+        let sphereGeom, sphereMat, light, chair;
+        let dunkTankSeat = null;
+        let targetHitbox = null;
+        let seatDropped = false;
+        let intensity = 40;
+        let color = 0x1a1a3a;
+        const HEIGHT = 5;
+        const BOUND = 30;
+        
+        // Water variables
+        let gpuCompute;
+        let heightmapVariable;
+        let waterMesh;
+        let meshRay;
+        let simplex;
+        let waterUniforms;
+        const WIDTH = 128;
+        const WATER_BOUNDS = 11;  // Increased size
+        let dunkTankModel;
+
+        // Scene setup
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000033);
+
+        // Renderer setup
+        renderer = new THREE.WebGLRenderer({ 
+          antialias: true,
+          preserveDrawingBuffer: true // Enable this to allow canvas capture
+        });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        // Camera setup
+        camera = new THREE.PerspectiveCamera(
+          35, // Increase FOV to make the room appear larger
+          window.innerWidth / window.innerHeight,
+          0.01,
+          1000 // Increase far clipping plane
+        );
+        camera.position.set(0, 5, 40);
+        camera.lookAt(0, 2, 0);
+
+        // Controls setup
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.autoRotate = false;
+        controls.autoRotateSpeed = 1;
+        controls.enableDamping = true;
+        controls.enablePan = false;
+        controls.minDistance = 3;
+        controls.maxDistance = BOUND;
+        controls.minPolarAngle = 0;
+        controls.maxPolarAngle = (Math.PI / 2) * 0.9;
+        controls.target.set(0, HEIGHT, 0);
+        controls.update();
+
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+        scene.add(ambientLight);
+
+        // Load textures and models
+        const textureLoader = new THREE.TextureLoader();
+
+        Promise.all([
+          new Promise((resolve) => {
+            textureLoader.load(
+              "https://happy358.github.io/Images/textures/lunar_color.jpg",
+              resolve
+            );
+          }),
+          new Promise((resolve) => {
+            // Create GLTF loader WITHOUT DRACO for production stability
+            const gltfLoader = new GLTFLoader();
+            
+            // Model loading with fallback options
+            const models = [
+              "/models/DunkTank4.glb", // Try the re-exported version with WebP first
+   
+            ];
+            
+            let modelIndex = 0;
+            
+            const loadModel = () => {
+              if (modelIndex >= models.length) {
+                console.error("All model loading attempts failed");
+                resolve(null);
+                return;
+              }
+              
+              const modelPath = models[modelIndex];
+              console.log(`Loading model attempt ${modelIndex + 1}:`, modelPath);
+              
+              gltfLoader.load(
+                modelPath,
+                (gltf) => {
+                  console.log("Model loaded successfully:", modelPath);
+                  
+                  // Store animations from the GLB file globally
+                  if (gltf.animations && gltf.animations.length > 0) {
+                    window.characterAnimations = gltf.animations;
+                    console.log("Found GLB animations:", gltf.animations.map(a => a.name));
+                  }
+                  
+                  // Hide the Armature immediately to prevent T-pose
+                  gltf.scene.traverse((child) => {
+                    if (child.name === 'Armature001') {
+                      child.visible = false;
+                      console.log("Armature hidden immediately on load");
+                    }
+                    
+                    // Ensure textures are properly configured
+                    if (child.isMesh && child.material) {
+                      if (child.material.map) {
+                        child.material.map.encoding = THREE.sRGBEncoding;
+                      }
+                      child.material.needsUpdate = true;
+                    }
+                  });
+                  
+                  resolve(gltf);
+                },
+                // Progress callback
+                (xhr) => {
+                  if (xhr.total && xhr.total > 0) {
+                    const percentComplete = (xhr.loaded / xhr.total) * 100;
+                    console.log(`Loading model: ${Math.round(percentComplete)}%`);
+                  } else {
+                    console.log(`Loading model: ${xhr.loaded} bytes`);
+                  }
+                },
+                // Error callback
+                (error) => {
+                  console.error(`Error loading model ${modelPath}:`, error);
+                  modelIndex++;
+                  loadModel(); // Try next model
+                }
+              );
+            };
+            
+            loadModel();
+          }),
+        ]).then(([moonTexture, chairModel]) => {
+          // Create moon lamps
+          moonTexture.anisotropy = 16;
+
+          // Create the first lamp
+          sphereGeom = new THREE.SphereGeometry(2, 30, 30);
+          sphereMat = new THREE.MeshBasicMaterial({ color: color });
+          sphereMat.color.multiplyScalar(3);
+
+          let moonLamp = new THREE.Mesh(sphereGeom, sphereMat);
+          moonLamp.position.set(0, 1, 3);
+          moonLamp.name = "pointLight";
+
+          // Add point light
+          light = new THREE.PointLight(color, intensity, 10);
+          light.castShadow = true;
+          light.shadow.bias = -0.01;
+          moonLamp.add(light);
+
+          // Add glow effects
+          let glowMesh1 = new THREE.Mesh(
+            sphereGeom,
+            new THREE.MeshLambertMaterial({
+              color: "white",
+              transparent: true,
+              opacity: 0.3,
+            })
+          );
+          glowMesh1.scale.set;
+          glowMesh1.scale.set(1.02, 1.02, 1.02);
+          moonLamp.add(glowMesh1);
+
+          let glowMesh2 = new THREE.Mesh(
+            sphereGeom,
+            new THREE.MeshBasicMaterial({
+              color: "white",
+              transparent: true,
+              opacity: 0.05,
+            })
+          );
+          glowMesh2.scale.set(1.05, 1.05, 1.05);
+          moonLamp.add(glowMesh2);
+
+          // Create additional moon lamps
+          // for (let i = 0; i < 5; i++) {
+          //   let newLamp = moonLamp.clone();
+          //   color = new THREE.Color("#faf0e6");
+          //   sphereMat = new THREE.MeshPhongMaterial({
+          //     color: color,
+          //     map: moonTexture,
+          //     lightMap: moonTexture,
+          //     lightMapIntensity: 3,
+          //   });
+          //   newLamp.material = sphereMat;
+          //   newLamp.children[0].color.set(color);
+
+          //   if (i === 0) {
+          //     newLamp.position.set(0, 2 * HEIGHT, 3);
+          //   } else {
+          //     newLamp.position.set(
+          //       THREE.MathUtils.randInt(-2 * HEIGHT, 2 * HEIGHT),
+          //       THREE.MathUtils.randFloat(1.5 * HEIGHT, 4.0 * HEIGHT),
+          //       THREE.MathUtils.randInt(3 * HEIGHT, 1.3 * HEIGHT)
+          //     );
+          //     newLamp.rotation.set(
+          //       THREE.MathUtils.randFloat(-2 * Math.PI, 2 * Math.PI),
+          //       THREE.MathUtils.randFloat(-2 * Math.PI, 2 * Math.PI),
+          //       THREE.MathUtils.randFloat(3 * Math.PI, 2 * Math.PI)
+          //     );
+          //   }
+
+          //   scene.add(newLamp);
+          //   physics.addMesh(newLamp, 0.5);
+          //   const body = meshMap.get(newLamp);
+          //   if (body) {
+          //     body.setDamping(0.5, 0.5);
+          //     body.setFriction(0.2);
+          //     body.setActivationState(4); // Keep always active for collisions
+          //     // Enable continuous collision detection for moon lamps
+          //     body.setCcdMotionThreshold(0.1);
+          //     body.setCcdSweptSphereRadius(1.0); // Radius roughly matches moon lamp size
+          //     console.log("Moon lamp physics body created at:", newLamp.position, "with CCD enabled");
+          //     body.setRestitution(0.7);
+          //     body.setRollingFriction(0.1);
+          //   }
+          // }
+
+          // Create shooting balls
+          const ballGeometry = new THREE.IcosahedronGeometry(0.3, 1);
+          const ballMaterial = new THREE.MeshPhongMaterial({
+            color: 0x8888ff,
+            flatShading: true,
+            shininess: 100,
+          });
+          const shootBall = new THREE.Mesh(ballGeometry, ballMaterial);
+          shootBall.castShadow = true;
+          shootBall.name = "shootingBall";
+
+          // Shoot ball on click with water interaction
+          // const raycaster = new THREE.Raycaster();
+
+          const shootingForce = 45;
+          const ballMass = 10;
+          let mouseDown = false;
+          
+          window.addEventListener("pointerdown", (event) => {
+            mouse.set(
+              (event.clientX / window.innerWidth) * 2 - 1,
+              -(event.clientY / window.innerHeight) * 2 + 1
+            );
+
+            camera.updateMatrixWorld();
+            raycaster.setFromCamera(mouse, camera);
+            
+            // Always check for water interaction and set the flag
+            let clickedOnWater = false;
+            if (typeof waterMesh !== 'undefined' && waterMesh && meshRay) {
+              const waterIntersects = raycaster.intersectObject(meshRay);
+              if (waterIntersects.length > 0) {
+                mouseDown = true;
+                clickedOnWater = true;
+                const point = waterIntersects[0].point;
+                const waterWorldPos = new THREE.Vector3();
+                waterMesh.getWorldPosition(waterWorldPos);
+                
+                // Convert world position to water coordinates
+                const x = (point.x - waterWorldPos.x);
+                const y = -(point.z - waterWorldPos.z);
+                
+                if (heightmapVariable) {
+                  heightmapVariable.material.uniforms.mousePos.value.set(x, y);
+                  heightmapVariable.material.uniforms.mouseSize.value = 0.15;
+                  heightmapVariable.material.uniforms.deep.value = 0.02;
+                }
+                controls.enabled = false;
+              }
+            }
+
+            // Only proceed with shooting/grabbing if not clicking on water
+            if (!clickedOnWater) {
+              // Hold Shift to grab, normal click to shoot
+              if (event.shiftKey) {
+                // Shift + click for grabbing
+                const intersects = raycaster.intersectObjects(
+                  scene.children,
+                  true
+                );
+
+                for (let i = 0; i < intersects.length; i++) {
+                  let object = intersects[i].object;
+                  while (object.parent && object.parent !== scene) {
+                    object = object.parent;
+                  }
+
+                  if (object.name === "pointLight") {
+                    isDragging = true;
+                    selectedObject = object;
+                    dragStartPosition.copy(selectedObject.position);
+
+                    dragPlane.normal.copy(
+                      camera.getWorldDirection(dragPlane.normal)
+                    );
+                    dragPlane.constant = -selectedObject.position.dot(
+                      dragPlane.normal
+                    );
+
+                    previousMousePosition.set(event.clientX, event.clientY);
+                    controls.enabled = false;
+                    return;
+                  }
+                }
+              } else {
+                // Normal click for shooting
+                let shootingDirection = new THREE.Vector3();
+                shootingDirection.copy(raycaster.ray.direction);
+                shootingDirection.add(raycaster.ray.origin);
+
+                let ball = shootBall.clone();
+                ball.position.set(
+                  shootingDirection.x,
+                  shootingDirection.y,
+                  shootingDirection.z
+                );
+                ball.material = ball.material.clone();
+
+                let ballColor = new THREE.Color();
+                ballColor.setHSL(
+                  Math.abs(THREE.MathUtils.randInt(-1000, 1000) / 1000),
+                  1,
+                  THREE.MathUtils.randInt(500, 700) / 1000
+                );
+                ball.material.color.set(ballColor);
+
+                scene.add(ball);
+
+                shootingDirection.copy(raycaster.ray.direction);
+                shootingDirection.multiplyScalar(shootingForce);
+                physics.addShootingMesh(ball, ballMass, shootingDirection);
+              }
+            }
+          });
+
+          // Modify the pointermove event to include collision detection
+          window.addEventListener("pointermove", (event) => {
+            // Update mouse coordinates for water interaction
+            mouse.set(
+              (event.clientX / window.innerWidth) * 2 - 1,
+              -(event.clientY / window.innerHeight) * 2 + 1
+            );
+            
+            // Handle water dragging
+            if (mouseDown && !isDragging) {
+              raycaster.setFromCamera(mouse, camera);
+              if (typeof waterMesh !== 'undefined' && waterMesh && meshRay) {
+                const waterIntersects = raycaster.intersectObject(meshRay);
+                if (waterIntersects.length > 0) {
+                  const point = waterIntersects[0].point;
+                  const waterWorldPos = new THREE.Vector3();
+                  waterMesh.getWorldPosition(waterWorldPos);
+                  
+                  // Convert world position to water coordinates
+                  const x = (point.x - waterWorldPos.x);
+                  const y = -(point.z - waterWorldPos.z);
+                  
+                  if (heightmapVariable) {
+                    heightmapVariable.material.uniforms.mousePos.value.set(x, y);
+                  }
+                } else {
+                  // Mouse moved off water
+                  if (heightmapVariable) {
+                    heightmapVariable.material.uniforms.mousePos.value.set(10000, 10000);
+                  }
+                }
+              }
+            }
+            
+            if (isDragging && selectedObject) {
+              mousePosition.set(
+                (event.clientX / window.innerWidth) * 2 - 1,
+                -(event.clientY / window.innerHeight) * 2 + 1
+              );
+
+              raycaster.setFromCamera(mousePosition, camera);
+
+              // Create a plane that follows the camera view
+              dragPlane.normal.copy(camera.getWorldDirection(dragPlane.normal));
+              const cameraDistance = camera.position.distanceTo(
+                selectedObject.position
+              );
+              dragPlane.constant =
+                -selectedObject.position.dot(dragPlane.normal) +
+                cameraDistance * 0.5;
+
+              if (raycaster.ray.intersectPlane(dragPlane, intersection)) {
+                const body = meshMap.get(selectedObject);
+                if (body) {
+                  // Add some smoothing to the movement
+                  const smoothFactor = 0.3;
+                  const targetPosition = new THREE.Vector3(
+                    intersection.x,
+                    intersection.y,
+                    intersection.z
+                  );
+
+                  // Constrain movement
+                  const maxHeight = BOUND * 2;
+                  const minHeight = 2;
+                  targetPosition.y = Math.max(
+                    minHeight,
+                    Math.min(maxHeight, targetPosition.y)
+                  );
+
+                  // Keep within room bounds
+                  const distanceFromCenter = new THREE.Vector2(
+                    targetPosition.x,
+                    targetPosition.z
+                  ).length();
+                  if (distanceFromCenter > BOUND * 0.8) {
+                    const angle = Math.atan2(
+                      targetPosition.z,
+                      targetPosition.x
+                    );
+                    targetPosition.x = Math.cos(angle) * BOUND * 0.8;
+                    targetPosition.z = Math.sin(angle) * BOUND * 0.8;
+                  }
+
+                  // Update physics body
+                  let transform = new Ammo.btTransform();
+                  body.getMotionState().getWorldTransform(transform);
+
+                  // Smooth movement
+                  const currentPos = new THREE.Vector3(
+                    transform.getOrigin().x(),
+                    transform.getOrigin().y(),
+                    transform.getOrigin().z()
+                  );
+
+                  const smoothedPosition = new THREE.Vector3(
+                    currentPos.x +
+                      (targetPosition.x - currentPos.x) * smoothFactor,
+                    currentPos.y +
+                      (targetPosition.y - currentPos.y) * smoothFactor,
+                    currentPos.z +
+                      (targetPosition.z - currentPos.z) * smoothFactor
+                  );
+
+                  transform.setOrigin(
+                    new Ammo.btVector3(
+                      smoothedPosition.x,
+                      smoothedPosition.y,
+                      smoothedPosition.z
+                    )
+                  );
+
+                  body.getMotionState().setWorldTransform(transform);
+                  body.setLinearVelocity(new Ammo.btVector3(0, 0, 0));
+                  body.setAngularVelocity(new Ammo.btVector3(0, 0, 0));
+                  body.activate(true);
+
+                  // Update visual position
+                  selectedObject.position.copy(smoothedPosition);
+                }
+              }
+            }
+          });
+
+          // Add this to enable right-click dragging without showing context menu
+          window.addEventListener("contextmenu", (e) => e.preventDefault());
+
+          window.addEventListener("pointerup", (event) => {
+            // Reset water interaction
+            if (mouseDown) {
+              mouseDown = false;
+              if (heightmapVariable) {
+                heightmapVariable.material.uniforms.mousePos.value.set(10000, 10000);
+              }
+              controls.enabled = true;
+            }
+            
+            if (isDragging && selectedObject) {
+              const body = meshMap.get(selectedObject);
+              if (body) {
+                const deltaX = event.clientX - previousMousePosition.x;
+                const deltaY = event.clientY - previousMousePosition.y;
+                const throwForce = 0.7; // Increased throw force
+                const upwardBias = 5; // Add upward force to throws
+
+                // Calculate throw direction in world space
+                const throwDirection = new THREE.Vector3(
+                  deltaX * throwForce,
+                  -deltaY * throwForce + upwardBias,
+                  0
+                ).applyQuaternion(camera.quaternion);
+
+                // Apply velocity-based throwing
+                const velocity = throwDirection.multiplyScalar(0.1); // Scale down for better control
+                body.setLinearVelocity(
+                  new Ammo.btVector3(velocity.x, velocity.y, velocity.z)
+                );
+                body.activate(true);
+              }
+              
+              isDragging = false;
+              selectedObject = null;
+              controls.enabled = true;
+            }
+          });
+
+          // Create environment
+          // Wall
+          const wallGeometry = new THREE.CylinderGeometry(
+            BOUND,
+            BOUND,
+            4 * BOUND,
+            32,
+            1,
+            false
+          );
+          const wallMaterial = new THREE.MeshPhongMaterial({
+            color: 0x000033,
+            shininess: 10,
+            specular: 0x111111,
+            side: THREE.DoubleSide,
+          });
+          const wall = new THREE.Mesh(wallGeometry, wallMaterial);
+          wall.receiveShadow = true;
+          wall.name = "wall";
+          scene.add(wall);
+          physics.addTerrainMesh(wall, 0);
+
+
+          // Floor
+          const floorGeometry = new THREE.CircleGeometry(1.5 * BOUND, 8);
+          floorGeometry.rotateX(-Math.PI / 2);
+          const floor = new THREE.Mesh(floorGeometry, wallMaterial);
+          floor.receiveShadow = true;
+          floor.name = "floor";
+          scene.add(floor);
+          physics.addTerrainMesh(floor, 0);
+
+          // Add dunk tank model
+          dunkTankModel = chairModel.scene;
+          dunkTankModel.scale.set(10, 10, 10);
+          dunkTankModel.position.set(0, 0, -7);
+          dunkTankModel.castShadow = true;
+          dunkTankModel.receiveShadow = true;
+          scene.add(dunkTankModel);
+          
+          // Add spotlight over the dunk tank
+          const spotlight = new THREE.SpotLight(0xff0000, 200, 50, Math.PI / 6, 0.25, 1);
+          spotlight.position.set(dunkTankModel.position.x - 4, dunkTankModel.position.y + 25, dunkTankModel.position.z);
+          spotlight.target.position.set(dunkTankModel.position.x - 4, dunkTankModel.position.y, dunkTankModel.position.z);
+          spotlight.castShadow = true;
+          spotlight.shadow.mapSize.width = 1024;
+          spotlight.shadow.mapSize.height = 1024;
+          spotlight.shadow.camera.near = 1;
+          spotlight.shadow.camera.far = 50;
+          spotlight.shadow.camera.fov = 30;
+          scene.add(spotlight);
+          scene.add(spotlight.target);
+          
+          // Optional: Add a helper to visualize the spotlight cone (remove in production)
+          // const spotLightHelper = new THREE.SpotLightHelper(spotlight);
+          // scene.add(spotLightHelper);
+          
+          // Update matrix for proper physics
+          dunkTankModel.updateMatrixWorld(true);
+          
+          // Get the seat and target references
+          dunkTankSeat = dunkTankModel.getObjectByName("SeatBoard");
+          targetHitbox = dunkTankModel.getObjectByName("Target");
+          
+          // Ensure Target is properly set up for collision detection
+          if (targetHitbox) {
+            targetHitbox.updateMatrixWorld(true);
+            // Make sure Target has a name for collision detection
+            targetHitbox.name = "Target";
+          }
+          
+          // Setup target hitbox
+          if (targetHitbox) {
+            // Store original material for reset
+            const originalMaterial = targetHitbox.material ? targetHitbox.material.clone() : null;
+            
+            // Make target visible and interactive
+            targetHitbox.visible = true;
+            if (targetHitbox.material) {
+              targetHitbox.material = targetHitbox.material.clone();
+              targetHitbox.material.transparent = true;
+              targetHitbox.material.opacity = 0.8;
+              // Keep original color or set a target-like color
+              if (!targetHitbox.material.color) {
+                targetHitbox.material.color = new THREE.Color(0xff3333); // Red target color
+              }
+            }
+            
+            // Store materials for hit feedback
+            targetHitbox.userData.originalMaterial = originalMaterial;
+            
+            // Physics will be added in the traverse loop below
+            console.log("Target found and configured");
+          }
+          
+          // Store seat globally for animation
+          if (dunkTankSeat) {
+            window.dunkTankSeat = dunkTankSeat;
+            console.log("Dunk tank seat found");
+          }
+          
+          // Add physics to the dunk tank meshes
+          let dunkTankBodyMesh = null;
+          let targetMesh = null;
+          let targetWorldPos = null;
+          const processedMeshes = [];
+          
+          // First pass: find the Target position
+          dunkTankModel.traverse((child) => {
+            const parentName = child.parent ? child.parent.name : '';
+            if ((child.name === "Target" || parentName === "Target") && child.isMesh) {
+              targetMesh = child;
+              child.name = "Target";
+              targetWorldPos = new THREE.Vector3();
+              child.getWorldPosition(targetWorldPos);
+              console.log("Target position found at:", targetWorldPos);
+            }
+          });
+          
+          // Second pass: add physics
+          dunkTankModel.traverse((child) => {
+            // Check both the object and its parent for names
+            const parentName = child.parent ? child.parent.name : '';
+            
+            // Log ALL objects in the hierarchy for debugging
+            console.log(`[TRAVERSE] Object: "${child.name}", Type: ${child.type}, Parent: "${parentName}", isMesh: ${child.isMesh}, UUID: ${child.uuid.substring(0,8)}`);
+            
+            if (child.isMesh) {
+              child.updateMatrixWorld(true);
+              console.log(`[MESH FOUND] Processing mesh: "${child.name}", parent: "${parentName}", geometry vertices: ${child.geometry ? child.geometry.attributes.position.count : 0}`);
+              
+              // The actual Target mesh - NO PHYSICS so it can be hit
+              if (child.name === "Target" || parentName === "Target") {
+                console.log("✓ Target found - no physics collision (keeping it accessible for hits)");
+                
+              // The DunkTankBody meshes - use triangle mesh for accurate collision with holes
+              } else if ((child.name === "DunkTankBody" || child.name === "DunkTankBody001" || 
+                         child.name === "DunkTankBody002" || child.name === "DunkTankBody_1" || 
+                         child.name === "DunkTankBody_2" ||
+                         parentName === "DunkTankBody" || parentName === "DunkTankBody001" || 
+                         parentName === "DunkTankBody002") && 
+                         !processedMeshes.includes(child.uuid)) {
+                console.log(`[DUNKTANK MATCH] Processing DunkTank mesh: "${child.name}" (parent: "${parentName}")`);
+                dunkTankBodyMesh = child;
+                
+                // Get world transform
+                const worldPosition = new THREE.Vector3();
+                const worldQuaternion = new THREE.Quaternion();
+                const worldScale = new THREE.Vector3();
+                child.getWorldPosition(worldPosition);
+                child.getWorldQuaternion(worldQuaternion);
+                child.getWorldScale(worldScale);
+                
+                // Clone and transform geometry to world space
+                const transformedGeometry = child.geometry.clone();
+                const matrix = new THREE.Matrix4();
+                matrix.compose(worldPosition, worldQuaternion, worldScale);
+                transformedGeometry.applyMatrix4(matrix);
+                
+                // Create mesh for triangle mesh collision
+                const tankPhysicsMesh = new THREE.Mesh(
+                  transformedGeometry,
+                  new THREE.MeshBasicMaterial({ 
+                    color: 0x00ff00,
+                    wireframe: true,
+                    transparent: true,
+                    opacity: 0.3,
+                    visible: false  // Set to false to hide debug mesh
+                  })
+                );
+                tankPhysicsMesh.position.set(0, 0, 0);
+                tankPhysicsMesh.rotation.set(0, 0, 0);
+                tankPhysicsMesh.scale.set(1, 1, 1);
+                // Use specific name for each part - check both child and parent name
+                const partName = child.name.includes("002") || parentName.includes("002") ? "DunkTankBody002" : 
+                                child.name.includes("001") || parentName.includes("001") ? "DunkTankBody001" : 
+                                child.name.includes("_2") ? "DunkTankBody_2" :
+                                child.name.includes("_1") ? "DunkTankBody_1" : "DunkTankBody";
+                tankPhysicsMesh.name = partName;
+                
+                // Add to scene
+                scene.add(tankPhysicsMesh);
+                
+                // Use triangle mesh collision for accurate non-convex shape with holes
+                physics.addTerrainMesh(tankPhysicsMesh, 0);
+                
+                // Verify physics body was created
+                const tankBody = meshMap.get(tankPhysicsMesh);
+                if (tankBody) {
+                  tankBody.setFriction(0.8);
+                  tankBody.setRestitution(0.5);
+                  console.log(`✓ Physics body created for ${partName}`);
+                }
+                
+                processedMeshes.push(child.uuid);
+                console.log(`✓ Added ${child.name} (parent: ${parentName}) as ${tankPhysicsMesh.name} with triangle mesh collision`)
+                
+              // The Cone mesh - water cover to prevent moons landing in tank
+              } else if (child.name === "Cone" || parentName === "Cone") {
+                // Keep cone visible but transparent for debugging (set to false when working)
+                child.visible = true;
+                if (child.material) {
+                  child.material = child.material.clone();
+                  child.material.transparent = true;
+                  child.material.opacity = 0.0;  // Very transparent
+                  child.material.color = new THREE.Color(0x00ff00);  // Green tint for visibility
+                }
+                
+                // Get world transform
+                const worldPosition = new THREE.Vector3();
+                const worldQuaternion = new THREE.Quaternion();
+                const worldScale = new THREE.Vector3();
+                child.getWorldPosition(worldPosition);
+                child.getWorldQuaternion(worldQuaternion);
+                child.getWorldScale(worldScale);
+                
+                // Clone and transform geometry
+                const transformedGeometry = child.geometry.clone();
+                const matrix = new THREE.Matrix4();
+                matrix.compose(worldPosition, worldQuaternion, worldScale);
+                transformedGeometry.applyMatrix4(matrix);
+                
+                // Create invisible physics mesh
+                const conePhysicsMesh = new THREE.Mesh(
+                  transformedGeometry,
+                  new THREE.MeshBasicMaterial({ visible: false })
+                );
+                conePhysicsMesh.position.set(0, 0, 0);
+                conePhysicsMesh.rotation.set(0, 0, 0);
+                conePhysicsMesh.scale.set(1, 1, 1);
+                conePhysicsMesh.name = "Cone";
+                
+                // Add to scene and physics with convex hull collision
+                scene.add(conePhysicsMesh);
+                physics.addMesh(conePhysicsMesh, 0);
+                
+                // Ensure the Cone physics body has proper settings
+                const coneBody = meshMap.get(conePhysicsMesh);
+                if (coneBody) {
+                  coneBody.setFriction(0.5);
+                  coneBody.setRestitution(0.8); // Good bounce
+                  coneBody.setActivationState(4); // Keep always active
+                  console.log("Cone physics body configured for collision with moon lamps");
+                }
+                
+                processedMeshes.push(child.uuid);
+                console.log(`✓ Added ${child.name} (Cone) with convex hull collision - water cover`);
+                
+              // The Hinge mesh - also needs collision
+              } else if (child.name === "Hinge" || parentName === "Hinge") {
+                // Get world transform
+                const worldPosition = new THREE.Vector3();
+                const worldQuaternion = new THREE.Quaternion();
+                const worldScale = new THREE.Vector3();
+                child.getWorldPosition(worldPosition);
+                child.getWorldQuaternion(worldQuaternion);
+                child.getWorldScale(worldScale);
+                
+                // Clone and transform geometry
+                const transformedGeometry = child.geometry.clone();
+                const matrix = new THREE.Matrix4();
+                matrix.compose(worldPosition, worldQuaternion, worldScale);
+                transformedGeometry.applyMatrix4(matrix);
+                
+                // Create invisible physics mesh
+                const hingePhysicsMesh = new THREE.Mesh(
+                  transformedGeometry,
+                  new THREE.MeshBasicMaterial({ visible: false })
+                );
+                hingePhysicsMesh.position.set(0, 0, 0);
+                hingePhysicsMesh.rotation.set(0, 0, 0);
+                hingePhysicsMesh.scale.set(1, 1, 1);
+                hingePhysicsMesh.name = "Hinge";
+                
+                // Add to scene and physics
+                scene.add(hingePhysicsMesh);
+                physics.addMesh(hingePhysicsMesh, 0);
+                
+                processedMeshes.push(child.uuid);
+                console.log(`✓ Added ${child.name} (Hinge) with convex hull collision`);
+                
+              // Skip the SeatBoard mesh
+              } else if (parentName === "SeatBoard" || child.name === "SeatBoard") {
+                console.log(`[SEATBOARD] Skipping ${child.name} (SeatBoard - needs to animate)`);
+                
+              } else {
+                console.log(`[UNKNOWN MESH] "${child.name}" (parent: "${parentName}") - not matched by any condition`);
+                // Check if this might be a DunkTankBody that we're missing
+                if (child.name.includes("DunkTank") || parentName.includes("DunkTank")) {
+                  console.warn(`[WARNING] Possible DunkTank mesh not processed: "${child.name}" (parent: "${parentName}")`);
+                }
+              }
+            }
+          });
+          
+          console.log(`Physics setup complete. Processed ${processedMeshes.length} meshes`);
+          
+          // Log summary of DunkTankBody physics
+          console.log("[PHYSICS SUMMARY] Checking DunkTankBody collision bodies:");
+          ["DunkTankBody", "DunkTankBody001", "DunkTankBody002", "DunkTankBody_1", "DunkTankBody_2"].forEach(name => {
+            const found = scene.children.filter(child => child.name === name && meshMap.has(child));
+            if (found.length > 0) {
+              console.log(`  ✓ ${name}: Physics body exists`);
+            } else {
+              console.warn(`  ✗ ${name}: NO PHYSICS BODY FOUND`);
+            }
+          });
+
+          // Seat pivot setup and animation
+          let seatPivot = null;
+          let seatAxis = 'x'; // Try 'x', 'y', or 'z' based on your model orientation
+          
+          function setupSeatPivot() {
+            const seat = dunkTankModel.getObjectByName('SeatBoard');
+            const hingeRef = dunkTankModel.getObjectByName('Empty') 
+                          || dunkTankModel.getObjectByName('Hinge');
+            
+            if (!seat) {
+              console.error('SeatBoard not found');
+              return false;
+            }
+            
+            // Get the seat's bounding box to find the hinge edge
+            seat.updateMatrixWorld(true);
+            const seatBox = new THREE.Box3().setFromObject(seat);
+            const seatMin = seatBox.min;
+            const seatMax = seatBox.max;
+            const seatCenter = seatBox.getCenter(new THREE.Vector3());
+            
+            // The hinge should be at one edge of the seat
+            // Adjust these based on your model orientation:
+            // - If seat rotates forward/back: hinge is at back (min.z or max.z)
+            // - If seat rotates left/right: hinge is at side (min.x or max.x)
+            // - Vertically: usually at top (max.y)
+            const hingeWorld = new THREE.Vector3(
+              seatCenter.x,      // Center on X
+              seatMax.y,         // Top of seat (or use seatMin.y for bottom)
+              seatMin.z          // Back of seat (min.z is the back edge)
+            );
+            
+            console.log('Seat bounding box:', {min: seatMin, max: seatMax, center: seatCenter});
+            console.log('Calculated hinge position:', hingeWorld);
+            
+            // Create a runtime pivot under the same parent as the seat
+            const parent = seat.parent;
+            seatPivot = new THREE.Object3D();
+            seatPivot.name = 'SeatPivot';
+            parent.add(seatPivot);
+            
+            // Place pivot at the calculated hinge position
+            seatPivot.position.copy(parent.worldToLocal(hingeWorld.clone()));
+            
+            // Reparent seat under pivot while preserving world transform
+            // attach() keeps world transform for you (no manual math needed)
+            seatPivot.attach(seat);
+            
+            // Optional: visualize pivot to confirm position
+            // const axesHelper = new THREE.AxesHelper(5);
+            // seatPivot.add(axesHelper);
+            // console.log('Enable axes helper to see pivot location');
+            
+            console.log('Seat pivot setup complete at:', seatPivot.position);
+            return true;
+          }
+          
+          // Animation helpers
+          function rotateSeatTo(angleRad, durationMs = 800) {
+            if (!seatPivot) {
+              console.error('Seat pivot not initialized');
+              return;
+            }
+            
+            const start = {
+              x: seatPivot.rotation.x,
+              y: seatPivot.rotation.y,
+              z: seatPivot.rotation.z,
+            };
+            const startTime = performance.now();
+            
+            function tick(t) {
+              const k = Math.min((t - startTime) / durationMs, 1);
+              // easeInOutQuad
+              const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+              
+              // Set only the chosen axis
+              seatPivot.rotation[seatAxis] = start[seatAxis] + (angleRad - start[seatAxis]) * e;
+              
+              if (k < 1) requestAnimationFrame(tick);
+            }
+            requestAnimationFrame(tick);
+          }
+          
+          function openSeat() { 
+            seatDropped = true;
+            rotateSeatTo(Math.PI / 2, 1000); // 90° down; adjust sign if needed
+          }
+          
+          function closeSeat() { 
+            seatDropped = false;
+            rotateSeatTo(0, 1000);
+            
+            // Reset character to sitting position after seat closes
+            setTimeout(() => {
+              if (character && dunkTankSeat) {
+                // Remove from scene and re-attach to seat
+                if (character.parent === scene) {
+                  scene.remove(character);
+                  dunkTankSeat.add(character);
+                  
+                  // Reset LOCAL transform (relative to seat) to original values
+                  character.position.set(-0.43, 0.75, -0.2);
+                  character.rotation.set(0, 0, 0);
+                  character.scale.set(1, 1, 1);  // Reset scale to normal
+                  
+                  // Clear any quaternion rotation that might have been applied
+                  character.quaternion.identity();
+                  character.rotation.set(0, 0, 0);  // Reapply euler rotation
+                  
+                  // Switch back to sitting animation
+                  if (treadingAction && sittingAction) {
+                    treadingAction.fadeOut(0.3);
+                    sittingAction.reset().fadeIn(0.3).play();
+                    console.log("Character reset to sitting position");
+                  }
+                }
+              }
+            }, 1100); // Wait for seat to close first
+          }
+          
+          // Initialize seat pivot after model is loaded
+          setTimeout(() => {
+            if (setupSeatPivot()) {
+              console.log('Seat pivot ready for animation');
+            }
+          }, 100);
+          
+          // Function to create water splash at a specific position
+          function createWaterSplash(x = 0, z = 0, size = 0.3, depth = 0.04, duration = 200) {
+            if (!heightmapVariable || !waterMesh) {
+              console.log("Water not initialized for splash");
+              return;
+            }
+            
+            // If x or z are undefined/null, use center of water (0,0)
+            if (x === undefined || x === null) x = 0;
+            if (z === undefined || z === null) z = 0;
+            
+            // For water-relative splash, we just use the coordinates directly
+            // since the shader expects coordinates relative to water center
+            console.log("Creating splash at:", { 
+              inputPos: { x, z },
+              size, depth 
+            });
+            
+            activeSplash = true;  // Prevent interference
+            
+            // Create the splash - use coordinates directly for water-space
+            heightmapVariable.material.uniforms.mousePos.value.set(x, z);
+            heightmapVariable.material.uniforms.mouseSize.value = size;
+            heightmapVariable.material.uniforms.deep.value = depth;
+            
+            // Reset after duration
+            setTimeout(() => {
+              heightmapVariable.material.uniforms.mousePos.value.set(10000, 10000);
+              heightmapVariable.material.uniforms.mouseSize.value = 0.2;
+              heightmapVariable.material.uniforms.deep.value = 0.01;
+              activeSplash = false;  // Clear flag
+            }, duration);
+          }
+          
+          // Make createWaterSplash globally accessible for testing
+          window.createWaterSplash = createWaterSplash;
+          
+          // Debug function to check water system
+          window.debugWater = function() {
+            console.log("Water System Debug:");
+            console.log("- waterMesh exists:", !!waterMesh);
+            console.log("- heightmapVariable exists:", !!heightmapVariable);
+            console.log("- gpuCompute exists:", !!gpuCompute);
+            console.log("- WATER_BOUNDS:", WATER_BOUNDS);
+            if (waterMesh) {
+              console.log("- Water position:", waterMesh.position);
+              console.log("- Water scale:", waterMesh.scale);
+              console.log("- Water visible:", waterMesh.visible);
+            }
+            if (heightmapVariable) {
+              const uniforms = heightmapVariable.material.uniforms;
+              console.log("- Current mousePos:", uniforms.mousePos.value);
+              console.log("- Current mouseSize:", uniforms.mouseSize.value);
+              console.log("- Current deep:", uniforms.deep.value);
+              console.log("- Current viscosity:", uniforms.viscosity.value);
+            }
+          };
+          
+          // Simple test splash function for debugging
+          window.testSplash = function() {
+            if (heightmapVariable && waterMesh) {
+              console.log("TEST SPLASH TRIGGERED");
+              console.log("Current water bounds:", WATER_BOUNDS);
+              console.log("Water world position:", waterMesh.position);
+              activeSplash = true;
+              
+              // For shooting balls, we found that the water interaction works with:
+              // const x = (point.x - waterWorldPos.x);
+              // const y = -(point.z - waterWorldPos.z);
+              // So for center of water, we should use (0, 0) since we want center relative to water
+              
+              console.log("Creating BIG splash at water center");
+              
+              // Set very extreme values to make sure it's visible
+              heightmapVariable.material.uniforms.mousePos.value.set(0, 0);
+              heightmapVariable.material.uniforms.mouseSize.value = 2.0;  // Very large
+              heightmapVariable.material.uniforms.deep.value = 1.0;  // Maximum depth
+              
+              console.log("Splash params set:", {
+                pos: heightmapVariable.material.uniforms.mousePos.value,
+                size: heightmapVariable.material.uniforms.mouseSize.value,
+                deep: heightmapVariable.material.uniforms.deep.value
+              });
+              
+              // Keep it active for 2 seconds
+              setTimeout(() => {
+                heightmapVariable.material.uniforms.mousePos.value.set(10000, 10000);
+                heightmapVariable.material.uniforms.mouseSize.value = 0.2;
+                heightmapVariable.material.uniforms.deep.value = 0.01;
+                activeSplash = false;
+                console.log("TEST SPLASH CLEARED");
+              }, 2000);
+            } else {
+              console.log("Water not ready!");
+            }
+          };
+          
+          // Flag to track active splash
+          let activeSplash = false;
+          
+          // Splash particles array
+          const splashParticles = [];
+          
+          // Function to create water surface disturbance
+          function createWaterDisturbance(impactX, impactZ) {
+            if (!waterMesh || !waterMesh.geometry) return;
+            
+            console.log("Creating water disturbance at:", impactX, impactZ);
+            
+            // Store original Y positions of vertices
+            const positions = waterMesh.geometry.attributes.position;
+            const originalY = [];
+            for (let i = 0; i < positions.count; i++) {
+              originalY.push(positions.getY(i));
+            }
+            
+            // Get water world position
+            const waterWorldPos = new THREE.Vector3();
+            waterMesh.getWorldPosition(waterWorldPos);
+            
+            // Animation parameters
+            let waveTime = 0;
+            const waveSpeed = 0.15;
+            const waveHeight = 0.5;  // Maximum wave height
+            const waveRadius = 3.0;  // How far waves spread
+            const waveDuration = 6000; // 2 seconds
+            
+            const startTime = Date.now();
+            
+            const animateWaves = () => {
+              const elapsed = Date.now() - startTime;
+              if (elapsed > waveDuration) {
+                // Reset to original positions
+                for (let i = 0; i < positions.count; i++) {
+                  positions.setY(i, originalY[i]);
+                }
+                positions.needsUpdate = true;
+                return;
+              }
+              
+              waveTime += waveSpeed;
+              const fadeOut = 1 - (elapsed / waveDuration);
+              
+              // Update each vertex
+              for (let i = 0; i < positions.count; i++) {
+                const x = positions.getX(i);
+                const z = positions.getZ(i);
+                
+                // Calculate distance from impact point (in water-local space)
+                const dx = x - (impactX - waterWorldPos.x);
+                const dz = z - (impactZ - waterWorldPos.z);
+                const distance = Math.sqrt(dx * dx + dz * dz);
+                
+                // Create ripple effect
+                if (distance < waveRadius) {
+                  const ripple = Math.sin(distance * 3 - waveTime * 5) * 
+                                 Math.exp(-distance * 0.5) * 
+                                 waveHeight * fadeOut;
+                  positions.setY(i, originalY[i] + ripple);
+                } else {
+                  positions.setY(i, originalY[i]);
+                }
+              }
+              
+              positions.needsUpdate = true;
+              requestAnimationFrame(animateWaves);
+            };
+            
+            animateWaves();
+          }
+          
+          // Function to create visible splash particles
+          function createSplashParticles(x, y, z) {
+            console.log("Creating splash particles at:", x, y, z);
+            
+            const particleCount = 40;  // More particles
+            const particleGeometry = new THREE.SphereGeometry(0.3, 6, 6);  // Much bigger particles
+            const particleMaterial = new THREE.MeshBasicMaterial({ 
+              color: 0x9bd2ec,  // Water color to match
+              transparent: true,
+              opacity: 0.9
+            });
+            
+            for (let i = 0; i < particleCount; i++) {
+              const particle = new THREE.Mesh(particleGeometry, particleMaterial.clone());
+              particle.position.set(x, y, z);
+              
+              // Random velocity for each particle - bigger speeds for more dramatic effect
+              const angle = (Math.PI * 2 * i) / particleCount + Math.random() * 0.5;
+              const speed = 0.5 + Math.random() * 0.8;  // Much faster horizontal speed
+              const upSpeed = 1.0 + Math.random() * 0.5;  // Much higher upward speed
+              
+              particle.userData.velocity = new THREE.Vector3(
+                Math.cos(angle) * speed,
+                upSpeed,
+                Math.sin(angle) * speed
+              );
+              
+              particle.userData.life = 1.0;
+              scene.add(particle);
+              splashParticles.push(particle);
+            }
+            
+            // Animate particles
+            const animateParticles = () => {
+              for (let i = splashParticles.length - 1; i >= 0; i--) {
+                const particle = splashParticles[i];
+                
+                // Update position
+                particle.position.add(particle.userData.velocity);
+                
+                // Apply gravity - stronger for bigger particles
+                particle.userData.velocity.y -= 0.08;
+                
+                // Fade out slower
+                particle.userData.life -= 0.005;
+                particle.material.opacity = particle.userData.life * 0.9;
+                
+                // Scale down from bigger size
+                const scale = particle.userData.life * 1.5;  // Start bigger
+                particle.scale.set(scale, scale, scale);
+                
+                // Remove dead particles
+                if (particle.userData.life <= 0) {
+                  scene.remove(particle);
+                  splashParticles.splice(i, 1);
+                }
+              }
+              
+              // Continue animation if particles remain
+              if (splashParticles.length > 0) {
+                requestAnimationFrame(animateParticles);
+              }
+            };
+            
+            animateParticles();
+          }
+          
+          // Character animation variables
+          let character = null;
+          let characterMixer = null;
+          let sittingAction = null;
+          let treadingAction = null;
+          
+          // Function to load and setup character
+          function setupCharacter() {
+            // Safety check
+            if (!scene) {
+              console.log("Scene not ready, retrying...");
+              setTimeout(setupCharacter, 100);
+              return;
+            }
+            
+            // Find the armature/character in the scene
+            try {
+              scene.traverse((child) => {
+                if (child && child.name === 'Armature001') {
+                  character = child;
+                  console.log("Found armature:", child.name);
+                  
+                  // Hide character initially to avoid T-pose
+                  character.visible = false;
+                
+                // Use animations from the GLB file
+                if (window.characterAnimations && window.characterAnimations.length > 0) {
+                  console.log("Using GLB animations:", window.characterAnimations.length);
+                  characterMixer = new THREE.AnimationMixer(character);
+                  
+                  // List and setup all available animations
+                  window.characterAnimations.forEach((clip, index) => {
+                    console.log(`Animation ${index}: "${clip.name}"`);
+                    
+                    // Check for sitting animation (exact match first, then partial)
+                    if (clip.name === 'Squatting' || clip.name.toLowerCase().includes('Squatting') || 
+                        clip.name.toLowerCase().includes('sit')) {
+                      sittingAction = characterMixer.clipAction(clip);
+                      console.log("✓ Found sitting animation:", clip.name);
+                    } 
+                    // Check for treading animation
+                    else if (clip.name === 'Treading.001' || clip.name.toLowerCase().includes('treading') || 
+                             clip.name.toLowerCase().includes('tread') || clip.name.toLowerCase().includes('swim') ||
+                             clip.name.toLowerCase().includes('float') || clip.name.toLowerCase().includes('water')) {
+                      treadingAction = characterMixer.clipAction(clip);
+                      console.log("✓ Found treading animation:", clip.name);
+                    }
+                  });
+                  
+                  // If animations have different names, try to guess based on index
+                  if (!sittingAction && window.characterAnimations.length > 0) {
+                    console.log("Using first animation as sitting");
+                    sittingAction = characterMixer.clipAction(window.characterAnimations[0]);
+                  }
+                  if (!treadingAction && window.characterAnimations.length > 1) {
+                    console.log("Using second animation as treading");
+                    treadingAction = characterMixer.clipAction(window.characterAnimations[1]);
+                  }
+                  
+                  // Start with sitting animation if found
+                  if (sittingAction) {
+                    sittingAction.play();
+                    console.log("▶ Playing sitting animation");
+                    
+                    // Force an immediate update of the animation
+                    characterMixer.update(0);
+                    
+                    // Make character visible after animation has been applied
+                    // Longer delay to ensure animation is fully active
+                    setTimeout(() => {
+                      character.visible = true;
+                      console.log("Character now visible with sitting animation");
+                    }, 200);
+                  } else {
+                    console.log("⚠ WARNING: No sitting animation available!");
+                    // Still show character even without animation
+                    character.visible = true;
+                  }
+                } else {
+                  console.log("⚠ No animations found in GLB file!");
+                }
+                
+                // Parent character to seat
+                if (dunkTankSeat) {
+                  dunkTankSeat.add(character);
+                  // Position character on seat - adjust these values to center the character
+                  // X: left/right, Y: up/down, Z: forward/back
+                  character.position.set(-0.43, 0.75, -0.2);  // Adjust these values based on your model
+                  
+                  // You can also adjust rotation if needed
+                  // character.rotation.y = Math.PI;  // 180 degrees
+                  
+                  console.log("Character attached to seat at position:", character.position);
+                  console.log("Adjust character.position.set(x, y, z) values to position correctly");
+                  
+                  // Make position adjustable from console for testing
+                  window.adjustCharacterPosition = function(x, y, z) {
+                    if (character) {
+                      character.position.set(x, y, z);
+                      console.log("Character position updated to:", character.position);
+                    }
+                  };
+                  window.adjustCharacterRotation = function(y) {
+                    if (character) {
+                      character.rotation.y = y;
+                      console.log("Character rotation updated to:", character.rotation.y);
+                    }
+                  };
+                  console.log("Use adjustCharacterPosition(x, y, z) to test positions");
+                  console.log("Use adjustCharacterRotation(radians) to test rotation");
+                }
+                
+                return; // Exit once we find the Armature
+              }
+            });
+            } catch (error) {
+              console.error("Error in setupCharacter:", error);
+              // Retry after a delay
+              setTimeout(setupCharacter, 500);
+              return;
+            }
+            
+            if (!character) {
+              console.log("⚠ Armature not found in scene!");
+            }
+          }
+          
+          // Reptiles setup
+          let reptiles = null;
+          let reptilesMixer = null;
+          let swimAction = null;
+          let attackAction = null;
+          
+          // Volumetric blood effect for spreading in water
+          function createBloodCloud() {
+            // Get position near the character or reptiles
+            let bloodPosition = new THREE.Vector3();
+            if (character) {
+              character.getWorldPosition(bloodPosition);
+              bloodPosition.y += 1.5; // Position at mid-body
+            } else if (reptiles) {
+              reptiles.getWorldPosition(bloodPosition);
+              bloodPosition.y += 1.5;
+            }
+            
+            // Move blood position closer to attack point
+            bloodPosition.z += 0.5;
+            
+            console.log("[BLOOD] Creating volumetric effect at position:", bloodPosition);
+            
+            // Create multiple blood volumes for realistic spreading
+            const bloodVolumes = [];
+            const volumeCount = 12; // More volumes for bigger effect
+            
+            for (let i = 0; i < volumeCount; i++) {
+              // Create irregular sphere geometry for each blood volume - MUCH LARGER
+              const geometry = new THREE.SphereGeometry(0.5, 16, 16);
+              
+              // Deform vertices for organic shape
+              const positionAttribute = geometry.attributes.position;
+              for (let j = 0; j < positionAttribute.count; j++) {
+                const x = positionAttribute.getX(j);
+                const y = positionAttribute.getY(j);
+                const z = positionAttribute.getZ(j);
+                
+                // Add noise for organic shape
+                const noise = Math.random() * 0.3 + 0.85;
+                positionAttribute.setXYZ(j, x * noise, y * noise * 0.7, z * noise);
+              }
+              
+              // Custom shader material for translucent blood in water
+              const bloodMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                  time: { value: 0 },
+                  opacity: { value: 0.4 }, // More opaque for visibility
+                  scale: { value: 1.0 }
+                },
+                vertexShader: `
+                  uniform float time;
+                  uniform float scale;
+                  varying vec3 vPosition;
+                  varying vec3 vNormal;
+                  
+                  void main() {
+                    vPosition = position;
+                    vNormal = normal;
+                    
+                    // Animate vertex positions for flowing effect
+                    vec3 pos = position * scale;
+                    float displacement = sin(position.x * 10.0 + time) * 0.02;
+                    pos += normal * displacement;
+                    
+                    vec4 modelViewPosition = modelViewMatrix * vec4(pos, 1.0);
+                    gl_Position = projectionMatrix * modelViewPosition;
+                  }
+                `,
+                fragmentShader: `
+                  uniform float opacity;
+                  uniform float time;
+                  varying vec3 vPosition;
+                  varying vec3 vNormal;
+                  
+                  void main() {
+                    // Brighter red color that varies with position
+                    vec3 bloodColor = vec3(0.6 + sin(vPosition.x * 5.0 + time) * 0.2, 0.0, 0.0);
+                    
+                    // Fresnel effect for better volume appearance
+                    vec3 viewDirection = normalize(cameraPosition - vPosition);
+                    float fresnel = pow(1.0 - dot(viewDirection, vNormal), 2.0);
+                    
+                    // More opaque at edges, translucent in center
+                    float alpha = opacity * (0.5 + fresnel * 0.5);
+                    
+                    gl_FragColor = vec4(bloodColor, alpha);
+                  }
+                `,
+                transparent: true,
+                side: THREE.DoubleSide,
+                depthWrite: false,
+                blending: THREE.NormalBlending
+              });
+              
+              const bloodMesh = new THREE.Mesh(geometry, bloodMaterial);
+              
+              // Position each volume with wider spread
+              const angle = (i / volumeCount) * Math.PI * 2;
+              const radius = Math.random() * 0.1; // Wider initial spread
+              bloodMesh.position.set(
+                bloodPosition.x + Math.cos(angle) * radius,
+                bloodPosition.y + (Math.random() - 0.5) * 0.3,
+                bloodPosition.z + Math.sin(angle) * radius
+              );
+              
+              // Larger initial scale
+              const initialScale = 0.8 + Math.random() * 0.4; // Start bigger
+              bloodMesh.scale.set(initialScale, initialScale * 0.6, initialScale);
+              
+              scene.add(bloodMesh);
+              bloodVolumes.push({
+                mesh: bloodMesh,
+                material: bloodMaterial,
+                velocity: new THREE.Vector3(
+                  (Math.random() - 0.5) * 0.01,
+                  (Math.random() - 0.7) * 0.005, // Downward bias
+                  (Math.random() - 0.5) * 0.01
+                ),
+                rotationSpeed: (Math.random() - 0.5) * 0.01
+              });
+            }
+            
+            // Animate the blood volumes
+            const startTime = Date.now();
+            const duration = 8000; // 15 seconds animation
+            
+            function animateBloodVolumes() {
+              const elapsed = Date.now() - startTime;
+              const progress = Math.min(elapsed / duration, 1);
+              
+              bloodVolumes.forEach((volume, index) => {
+                // Update shader time
+                volume.material.uniforms.time.value = elapsed * 0.001;
+                
+                // Move and expand each volume
+                volume.mesh.position.add(volume.velocity);
+                
+                // Slow down movement over time (viscosity)
+                volume.velocity.multiplyScalar(0.98);
+                
+                // Gradual expansion - MUCH LARGER
+                const expansionFactor = 1 + progress * 4.7; // Grow to 5x size
+                volume.material.uniforms.scale.value = expansionFactor;
+                
+                // Rotate slowly for organic movement
+                volume.mesh.rotation.y += volume.rotationSpeed;
+                volume.mesh.rotation.x += volume.rotationSpeed * 0.5;
+                
+                // Keep blood visible - no fade out
+                volume.material.uniforms.opacity.value = 0.6;
+                
+                // Flatten as it spreads (like liquid spreading on surface)
+                volume.mesh.scale.y = volume.mesh.scale.x * (0.6 - progress * 0.4);
+              });
+              
+              if (elapsed < duration) {
+                requestAnimationFrame(animateBloodVolumes);
+              } else {
+                // Keep blood visible and fade screen to black
+                console.log("[BLOOD] Blood spread complete - fading to darkness...");
+                
+                // Create a black overlay that fades in
+                const blackOverlay = document.createElement('div');
+                blackOverlay.style.position = 'fixed';
+                blackOverlay.style.top = '0';
+                blackOverlay.style.left = '0';
+                blackOverlay.style.width = '100%';
+                blackOverlay.style.height = '100%';
+                blackOverlay.style.backgroundColor = 'black';
+                blackOverlay.style.opacity = '0';
+                blackOverlay.style.pointerEvents = 'none';
+                blackOverlay.style.zIndex = '9999';
+                blackOverlay.style.transition = 'opacity 5s ease-in';
+                document.body.appendChild(blackOverlay);
+                
+                // Start fading to black
+                setTimeout(() => {
+                  blackOverlay.style.opacity = '1';
+                }, 100);
+                
+                // Optional: Reload page after fade completes
+                setTimeout(() => {
+                  console.log("[DEATH] Reloading...");
+                  window.location.reload();
+                }, 6000);
+              }
+            }
+            
+            animateBloodVolumes();
+            console.log("[BLOOD] Created", volumeCount, "blood volumes");
+          }
+          
+          function setupReptiles() {
+            if (!scene) {
+              console.log("Scene not ready for reptiles, retrying...");
+              setTimeout(setupReptiles, 100);
+              return;
+            }
+            
+            console.log("[REPTILES] Searching for Reptiles object...");
+            
+            try {
+              let alligatorMesh = null;
+              let reptilesArmature = null;
+              
+              // First pass: find both the mesh and the armature
+              scene.traverse((child) => {
+                // Find the alligator mesh for visibility
+                if (child && child.name && (child.name === 'american_alligator' || 
+                    child.name.includes('alligator')) && (child.type === 'Group' || child.isMesh)) {
+                  console.log(`[REPTILES] Found alligator mesh: ${child.name}, type: ${child.type}`);
+                  alligatorMesh = child;
+                }
+                
+                // Find the Reptiles armature for animations
+                if (child && child.name === 'Reptiles' && child.type === 'Object3D') {
+                  console.log(`[REPTILES] Found Reptiles armature: ${child.name}, type: ${child.type}`);
+                  reptilesArmature = child;
+                }
+              });
+              
+              // Use the parent container (Empty001) if it exists, otherwise use the mesh
+              if (alligatorMesh && alligatorMesh.parent && 
+                  (alligatorMesh.parent.name === 'Empty.001' || alligatorMesh.parent.name === 'Empty001')) {
+                reptiles = alligatorMesh.parent;
+                console.log(`[REPTILES] Using parent container: ${reptiles.name}`);
+                reptiles.alligatorMesh = alligatorMesh;
+                reptiles.armature = reptilesArmature;
+              } else if (alligatorMesh) {
+                reptiles = alligatorMesh;
+                reptiles.armature = reptilesArmature;
+              }
+              
+              // After finding the reptiles object, set it up
+              if (reptiles) {
+                // Position in water
+                if (waterMesh) {
+                  const waterPos = waterMesh.position;
+                  reptiles.position.set(
+                    waterPos.x + 2,
+                    waterPos.y - 0.3,
+                    waterPos.z - 2
+                  );
+                  reptiles.scale.set(0.3, 0.3, 0.3);
+                  console.log("[REPTILES] Positioned in water");
+                }
+                
+                // Setup animation mixer on the parent container that has both mesh and armature
+                // This ensures the animations can find all the required bones
+                reptilesMixer = new THREE.AnimationMixer(reptiles);
+                console.log(`[REPTILES] Created AnimationMixer for: ${reptiles.name}`);
+                
+                // Make sure the mesh stays visible
+                if (reptiles.alligatorMesh) {
+                  reptiles.alligatorMesh.visible = true;
+                  reptiles.alligatorMesh.traverse((child) => {
+                    if (child.isMesh || child.isSkinnedMesh) {
+                      child.visible = true;
+                    }
+                  });
+                  console.log("[REPTILES] Ensured alligator mesh visibility");
+                }
+                
+                // Check for animations - they might be specific to this object
+                if (window.characterAnimations && window.characterAnimations.length > 0) {
+                  window.characterAnimations.forEach((clip) => {
+                    console.log(`[REPTILES] Available animation: "${clip.name}"`);
+                    // Check for swim animation
+                    if (clip.name === 'UnderwaterIdle' || clip.name === 'swim' || 
+                        clip.name.toLowerCase().includes('underwateridle') || 
+                        clip.name.toLowerCase().includes('swim')) {
+                      swimAction = reptilesMixer.clipAction(clip);
+                      swimAction.play();
+                      console.log(`[REPTILES] ✓ Found swim animation: ${clip.name}`);
+                    }
+                    // Check for attack animation
+                    else if (clip.name === 'Attack' || clip.name.toLowerCase().includes('attack')) {
+                      attackAction = reptilesMixer.clipAction(clip);
+                      attackAction.loop = THREE.LoopRepeat;  // Make sure it loops
+                      console.log(`[REPTILES] ✓ Found attack animation: ${clip.name}`);
+                    }
+                  });
+                  
+                  // If no swim animation found, try the third animation (index 2)
+                  if (!swimAction && window.characterAnimations.length > 2) {
+                    console.log("[REPTILES] Trying third animation as swim");
+                    swimAction = reptilesMixer.clipAction(window.characterAnimations[2]);
+                    swimAction.play();
+                    console.log(`[REPTILES] Playing animation at index 2: ${window.characterAnimations[2].name}`);
+                  }
+                }
+                
+                // Make everything visible
+                reptiles.visible = true;
+                if (reptiles.alligatorMesh) {
+                  reptiles.alligatorMesh.visible = true;
+                }
+                
+                // Keep mesh visible during animations
+                const originalUpdate = reptilesMixer.update.bind(reptilesMixer);
+                reptilesMixer.update = function(delta) {
+                  originalUpdate(delta);
+                  if (reptiles.alligatorMesh) {
+                    reptiles.alligatorMesh.visible = true;
+                  }
+                };
+                
+                console.log("[REPTILES] Setup complete!");
+              }
+            } catch (error) {
+              console.error("[REPTILES] Error:", error);
+              setTimeout(setupReptiles, 500);
+              return;
+            }
+            
+            if (!reptiles) {
+              console.log("[REPTILES] Not found, retrying...");
+              setTimeout(setupReptiles, 1000);
+            } else {
+              console.log("[REPTILES] Setup complete!");
+            }
+          }
+          
+          // Helper functions for adjusting reptiles
+          window.adjustReptilesPosition = function(x, y, z) {
+            if (reptiles) {
+              reptiles.position.set(x, y, z);
+              console.log("Reptiles repositioned to:", x, y, z);
+            }
+          };
+          
+          window.adjustReptilesScale = function(scale) {
+            if (reptiles) {
+              reptiles.scale.set(scale, scale, scale);
+              console.log("Reptiles scaled to:", scale);
+            }
+          };
+          
+          window.adjustReptilesRotation = function(angleInDegrees) {
+            if (reptiles) {
+              reptiles.rotation.y = THREE.MathUtils.degToRad(angleInDegrees);
+              console.log("Reptiles rotated to:", angleInDegrees, "degrees");
+            }
+          };
+          
+          window.makeReptilesFaceCharacter = function() {
+            if (reptiles && character) {
+              const characterPos = new THREE.Vector3();
+              character.getWorldPosition(characterPos);
+              
+              const reptilePos = new THREE.Vector3();
+              reptiles.getWorldPosition(reptilePos);
+              
+              const direction = new THREE.Vector3();
+              direction.subVectors(characterPos, reptilePos);
+              direction.y = 0;
+              direction.normalize();
+              
+              const targetAngle = Math.atan2(direction.x, direction.z);
+              reptiles.rotation.y = targetAngle;
+              console.log("Reptiles now facing character");
+            }
+          };
+          
+          // Call this after the dunk tank model is loaded
+          setTimeout(() => {
+            setupCharacter();
+            setupReptiles();
+          }, 1500);  // Increased delay to ensure everything is loaded
+          
+          // Update animation mixer in the animate loop
+          let lastAnimTime = 0;
+          function updateCharacterAnimation(time) {
+            const delta = time - lastAnimTime;
+            lastAnimTime = time;
+            
+            if (characterMixer) {
+              characterMixer.update(delta * 0.001);  // Convert to seconds
+            }
+            // Update reptiles animation
+            if (reptilesMixer) {
+              reptilesMixer.update(delta * 0.001);
+            }
+          }
+          
+          // Seat drop animation function
+          function dropSeat() {
+            if (seatDropped) return;
+            
+            console.log("Dropping the seat!");
+            openSeat();
+            
+            // Switch character animation to treading
+            if (sittingAction && treadingAction) {
+              sittingAction.fadeOut(0.3);
+              treadingAction.reset().fadeIn(0.3).play();
+              console.log("Switching to treading animation");
+            }
+            
+            // Switch reptiles to attack animation after 2 seconds
+            if (swimAction && attackAction) {
+              setTimeout(() => {
+                console.log("[REPTILES] Switching to attack animation!");
+                
+                // Store current position and rotate to face character
+                if (reptiles && character) {
+                  const currentPos = reptiles.position.clone();
+                  
+                  // HARDCODED ROTATION - Adjust this value as needed
+                  // Positive values rotate counter-clockwise, negative values rotate clockwise
+                  const rotationDegrees = -180; // Increased rotation for more visible effect
+                  const targetAngle = THREE.MathUtils.degToRad(rotationDegrees);
+                  
+                  // Find the Empty container in the scene
+                  let objectToRotate = null;
+                  
+                  // Search the entire scene for the Empty container
+                  scene.traverse((child) => {
+                    if (child.name && (child.name === 'Empty.001' || child.name === 'Empty001' || child.name === 'Empty')) {
+                      // Verify this Empty contains the alligator
+                      let hasAlligator = false;
+                      child.traverse((subchild) => {
+                        if (subchild.name && subchild.name.includes('alligator')) {
+                          hasAlligator = true;
+                        }
+                      });
+                      if (hasAlligator) {
+                        objectToRotate = child;
+                        console.log(`[REPTILES] Found Empty container to rotate: ${child.name}`);
+                      }
+                    }
+                  });
+                  
+                  // If no Empty found, check if reptiles is the Empty
+                  if (!objectToRotate && reptiles.name && reptiles.name.includes('Empty')) {
+                    objectToRotate = reptiles;
+                    console.log(`[REPTILES] Using reptiles as Empty: ${reptiles.name}`);
+                  }
+                  
+                  // Last resort: rotate the reptiles object directly
+                  if (!objectToRotate) {
+                    objectToRotate = reptiles;
+                    console.log(`[REPTILES] No Empty found, rotating reptiles directly: ${reptiles.name}`);
+                  }
+                  
+                  const startRotation = objectToRotate.rotation.y;
+                  const startX = objectToRotate.position.x;
+                  const moveDistance = -0.27; // Move 1.5 units to the left
+                  console.log(`[REPTILES] Rotating ${objectToRotate.name} by ${rotationDegrees} degrees and moving ${moveDistance} units left`);
+                  
+                  // Animate rotation and position over 0.5 seconds
+                  const rotationDuration = 500;
+                  const rotationStartTime = Date.now();
+                  
+                  const animateRotation = () => {
+                    const elapsed = Date.now() - rotationStartTime;
+                    const progress = Math.min(elapsed / rotationDuration, 1);
+                    
+                    // Smooth easing
+                    const easeProgress = 1 - Math.pow(1 - progress, 3);
+                    
+                    // Apply rotation to the selected object (Empty or reptiles)
+                    objectToRotate.rotation.y = startRotation + (targetAngle - startRotation) * easeProgress;
+                    
+                    // Also move the object to the left to keep tail in tank
+                    objectToRotate.position.x = startX + (moveDistance * easeProgress);
+                    
+                    if (progress < 1) {
+                      requestAnimationFrame(animateRotation);
+                    } else {
+                      console.log(`[REPTILES] Rotation and position adjustment complete`);
+                    }
+                  };
+                  
+                  animateRotation();
+                  console.log("[REPTILES] Rotating and repositioning...");
+                  
+                  // Switch animations
+                  swimAction.fadeOut(0.5);
+                  attackAction.reset().fadeIn(0.5).play();
+                  
+                  // Zoom camera in on the action
+                  if (camera && character) {
+                    const startPos = camera.position.clone();
+                    const startFOV = camera.fov;
+                    
+                    // Target position closer to character
+                    const targetPos = new THREE.Vector3(
+                      character.position.x + 8,
+                      character.position.y + 8,  // Above character
+                      character.position.z + 20  // Closer than default
+                    );
+                    const targetFOV = 30; // Zoom in (narrower FOV)
+                    
+                    const zoomDuration = 2000; // 2 seconds zoom
+                    const zoomStart = Date.now();
+                    
+                    function animateZoom() {
+                      const elapsed = Date.now() - zoomStart;
+                      const progress = Math.min(elapsed / zoomDuration, 1);
+                      
+                      // Smooth easing
+                      const eased = 1 - Math.pow(1 - progress, 3);
+                      
+                      // Interpolate camera position
+                      camera.position.lerpVectors(startPos, targetPos, eased);
+                      
+                      // Interpolate FOV for zoom effect
+                      camera.fov = startFOV + (targetFOV - startFOV) * eased;
+                      camera.updateProjectionMatrix();
+                      
+                      // Keep looking at the character
+                      camera.lookAt(character.position);
+                      
+                      if (progress < 1) {
+                        requestAnimationFrame(animateZoom);
+                      } else {
+                        console.log("[CAMERA] Zoom complete!");
+                      }
+                    }
+                    
+                    animateZoom();
+                    console.log("[CAMERA] Zooming in on attack!");
+                  }
+                  
+                  // Speed up character's treading animation during attack
+                  if (treadingAction) {
+                    treadingAction.timeScale = 3.0; // Triple speed for panic
+                    console.log("[CHARACTER] Treading faster during attack!");
+                    
+                    // Add panic bobbing motion
+                    if (character) {
+                      const baseY = character.position.y;
+                      const baseX = character.position.x;
+                      let bobTime = 0;
+                      
+                      const panicBobInterval = setInterval(() => {
+                        bobTime += 0.03; // Slower time progression
+                        
+                        // Smoother, more natural bobbing
+                        const mainBob = Math.sin(bobTime * 2.5) * 0.15; // Main rhythm
+                        const secondaryBob = Math.sin(bobTime * 4.2) * 0.05; // Slight variation
+                        
+                        // Very subtle random movement
+                        const gentleNoise = (Math.random() - 0.5) * 0.01;
+                        
+                        character.position.y = baseY + mainBob + secondaryBob + gentleNoise;
+                        
+                        // Gentle side-to-side sway
+                        const sway = Math.sin(bobTime * 1.8) * 0.01;
+                        character.position.x = baseX + sway;
+                      }, 16); // ~60fps
+                      
+                      // Store interval ID for potential cleanup
+                      character.panicBobInterval = panicBobInterval;
+                      console.log("[CHARACTER] Panic bobbing started!");
+                    }
+                  }
+                  
+                  // Create blood cloud effect 2 seconds after attack starts
+                  setTimeout(() => {
+                    createBloodCloud();
+                  }, 1000);
+                  
+                  // Keep position stable
+                  reptiles.position.copy(currentPos);
+                }
+                
+                // Optional: Move reptiles closer to the character for attack
+                // Only move if the reptiles object is not an Empty (which would have animations with movement)
+                if (character && reptiles && !reptiles.name.includes('Empty')) {
+                  const characterPos = new THREE.Vector3();
+                  character.getWorldPosition(characterPos);
+                  
+                  // Move reptiles toward the character
+                  const reptilesNewPos = new THREE.Vector3(
+                    characterPos.x + 1,  // Offset slightly to the side
+                    characterPos.y,      // Same height as character
+                    characterPos.z - 0.5 // Slightly in front
+                  );
+                  
+                  // Animate movement over time
+                  const startPos = reptiles.position.clone();
+                  const animationDuration = 1000; // 1 second
+                  const startTime = Date.now();
+                  
+                  const animateReptileApproach = () => {
+                    const elapsed = Date.now() - startTime;
+                    const progress = Math.min(elapsed / animationDuration, 1);
+                    
+                    // Smooth easing
+                    const easeProgress = 1 - Math.pow(1 - progress, 3);
+                    
+                    reptiles.position.lerpVectors(startPos, reptilesNewPos, easeProgress);
+                    
+                    if (progress < 1) {
+                      requestAnimationFrame(animateReptileApproach);
+                    }
+                  };
+                  
+                  animateReptileApproach();
+                  console.log("[REPTILES] Moving toward character for attack");
+                } else if (reptiles && reptiles.name.includes('Empty')) {
+                  console.log("[REPTILES] Using Empty parent - movement handled by animation");
+                }
+              }, 2000);  // 2 second delay after dunk
+            }
+            
+            // Detach character from seat so it falls
+            if (character && dunkTankSeat && character.parent === dunkTankSeat) {
+              // Get world position and rotation before detaching
+              const worldPos = new THREE.Vector3();
+              const worldQuat = new THREE.Quaternion();
+              const worldScale = new THREE.Vector3();
+              
+              character.getWorldPosition(worldPos);
+              character.getWorldQuaternion(worldQuat);
+              character.getWorldScale(worldScale);
+              
+              console.log("Character world position before detach:", worldPos);
+              
+              // Detach from seat and add back to scene
+              dunkTankSeat.remove(character);
+              scene.add(character);
+              
+              // Apply the world transform
+              character.position.copy(worldPos);
+              character.quaternion.copy(worldQuat);
+              character.scale.copy(worldScale);
+              
+              console.log("Character detached and repositioned at:", character.position);
+              
+              // Small delay to ensure position is settled
+              setTimeout(() => {
+                // Animate character falling into water
+                let fallSpeed = 0;
+                const gravity = 0.85;  // Reduced from 0.3 for slower acceleration
+                const waterLevel = 7; // Y position of water surface
+                const characterInWaterY = waterLevel - 4.2; // Character sits lower in water for treading
+                
+                // Store initial position
+                const startX = character.position.x;
+                const startY = character.position.y;  // Store starting Y
+                const startZ = character.position.z;
+                
+                console.log("Starting fall from Y:", startY, "to Y:", characterInWaterY);
+                
+                // Character must be facing backward, so reverse the Z direction
+                const targetX = startX;  // No X movement
+                const targetZ = startZ + 1.9;  // Negative Z to go forward for this character
+                
+                const fallInterval = setInterval(() => {
+                  if (character.position.y > characterInWaterY) {
+                    fallSpeed += gravity;
+                    character.position.y -= fallSpeed * 0.01;  // Reduced from 0.1 for slower fall
+                    
+                    // Make sure we never go above starting position
+                    if (character.position.y > startY) {
+                      character.position.y = startY;
+                    }
+                  
+                  // Move forward more aggressively at the start, creating an arc
+                  const totalFallDistance = startY - characterInWaterY;
+                  const currentFallDistance = startY - character.position.y;
+                  const fallProgress = currentFallDistance / totalFallDistance;
+                  
+                  // Use an easing function for forward movement - fast at start, slow at end
+                  // This creates a forward leap/dive effect
+                  const forwardEasing = 1 - Math.pow(1 - fallProgress, 3); // Cubic ease-out
+                  character.position.z = startZ + (targetZ - startZ) * forwardEasing;
+                  
+                } else {
+                  // Character plunges into water
+                  clearInterval(fallInterval);
+                  character.position.z = targetZ;  // Final Z position
+                  
+                  // Plunge deeper than treading position
+                  const plungeDepth = characterInWaterY - 1.0;  // Go 1 unit deeper
+                  character.position.y = plungeDepth;
+                  console.log("Character plunged to:", character.position.y);
+                  
+                  // Create visible splash effect with particles
+                  createSplashParticles(character.position.x, waterLevel, character.position.z);
+                  
+                  // Don't use createWaterDisturbance as it just makes the water vibrate
+                  // The GPU compute shader should handle ripples but it's not working with circular geometry
+                  
+                  // Try to trigger water shader splash (even if it's not visible, worth trying)
+                  if (heightmapVariable && waterMesh) {
+                    // Get position relative to water mesh
+                    const waterWorldPos = new THREE.Vector3();
+                    waterMesh.getWorldPosition(waterWorldPos);
+                    const relativeX = character.position.x - waterWorldPos.x;
+                    const relativeZ = -(character.position.z - waterWorldPos.z);
+                    
+                    console.log("Triggering water splash at:", relativeX, relativeZ);
+                    heightmapVariable.material.uniforms.mousePos.value.set(relativeX, relativeZ);
+                    heightmapVariable.material.uniforms.mouseSize.value = 0.8;
+                    heightmapVariable.material.uniforms.deep.value = 0.5;
+                    
+                    // Reset after splash
+                    setTimeout(() => {
+                      heightmapVariable.material.uniforms.mousePos.value.set(10000, 10000);
+                      heightmapVariable.material.uniforms.mouseSize.value = 0.2;
+                      heightmapVariable.material.uniforms.deep.value = 0.01;
+                    }, 500);
+                  }
+                  
+                  // Animate bobbing back up to treading position
+                  let riseSpeed = 0;
+                  const buoyancy = 0.1;  // Upward acceleration
+                  const waterResistance = 0.08;  // Damping factor
+                  
+                  const riseInterval = setInterval(() => {
+                    if (character.position.y < characterInWaterY) {
+                      // Accelerate upward with buoyancy
+                      riseSpeed += buoyancy;
+                      riseSpeed *= waterResistance;  // Apply water resistance
+                      character.position.y += riseSpeed;
+                      
+                      // Stop at treading position
+                      if (character.position.y >= characterInWaterY) {
+                        character.position.y = characterInWaterY;
+                        clearInterval(riseInterval);
+                        console.log("Character bobbed up to treading position:", character.position.y);
+                        
+                        // Start regular bobbing animation
+                        let bobTime = 0;
+                        const bobInterval = setInterval(() => {
+                          if (character.parent === scene) {
+                            bobTime += 0.05;
+                            character.position.y = characterInWaterY + Math.sin(bobTime) * 0.05; // Small bobbing
+                          } else {
+                            clearInterval(bobInterval); // Stop bobbing when character is back on seat
+                          }
+                        }, 16);
+                      }
+                    }
+                  }, 16);  // ~60fps
+                }
+              }, 16); // ~60fps
+              }, 50); // Small delay to let position settle
+            } else {
+              console.log("Character not attached to seat or not found");
+            }
+            
+            // Create a big splash in the water after a short delay (when person hits water)
+            setTimeout(() => {
+              console.log("Creating dunk splash!");
+              
+              if (heightmapVariable && gpuCompute && waterMesh) {
+                activeSplash = true;  // Set flag to prevent interference
+                
+                // Get water position
+                const waterPos = waterMesh.position;
+                console.log("Water is at:", waterPos);
+                
+                // Splash should be at center of water surface (water coordinates are already centered)
+                // So we just use 0,0 for center
+                console.log("Setting splash at center (0, 0)");
+                
+                // Create splash at center of water
+                heightmapVariable.material.uniforms.mousePos.value.set(0, 0);
+                heightmapVariable.material.uniforms.mouseSize.value = 1.0;  // Large splash
+                heightmapVariable.material.uniforms.deep.value = 0.3;  // Deep splash
+                
+                // Force GPU compute update
+                gpuCompute.compute();
+                if (waterMesh && gpuCompute.getCurrentRenderTarget) {
+                  waterMesh.material.heightmap = gpuCompute.getCurrentRenderTarget(heightmapVariable).texture;
+                }
+                
+                // Keep the splash active for a moment
+                let splashFrames = 0;
+                const splashInterval = setInterval(() => {
+                  splashFrames++;
+                  
+                  if (splashFrames < 10) {
+                    // Keep splash active for first 10 frames
+                    gpuCompute.compute();
+                    if (waterMesh) {
+                      waterMesh.material.heightmap = gpuCompute.getCurrentRenderTarget(heightmapVariable).texture;
+                    }
+                  } else if (splashFrames === 10) {
+                    // Start fading splash
+                    heightmapVariable.material.uniforms.mouseSize.value = 0.7;
+                    heightmapVariable.material.uniforms.deep.value = 0.08;
+                  } else if (splashFrames === 20) {
+                    // Further fade
+                    heightmapVariable.material.uniforms.mouseSize.value = 0.9;
+                    heightmapVariable.material.uniforms.deep.value = 0.04;
+                  } else if (splashFrames === 30) {
+                    // Reset to remove splash
+                    heightmapVariable.material.uniforms.mousePos.value.set(10000, 10000);
+                    heightmapVariable.material.uniforms.mouseSize.value = 0.2;
+                    heightmapVariable.material.uniforms.deep.value = 0.01;
+                    activeSplash = false;  // Clear flag
+                    clearInterval(splashInterval);
+                  }
+                }, 16); // ~60fps
+              } else {
+                console.log("Water system not ready for splash!");
+              }
+            }, 500);  // Delay for person to fall from seat to water
+            
+            // Don't reset - leave the seat down and character in water
+            // setTimeout(() => {
+            //   closeSeat();
+            // }, 3000);
+          }
+
+          // Check for collisions between projectiles and target
+          // Initialize water after tank is loaded (moved here after WaterMaterial is defined)
+          setTimeout(() => {
+            if (typeof WaterMaterial !== 'undefined') {
+              initWater();
+            }
+          }, 100);
+          
+          // Water shader changes for vertex shader modifications
+          const shaderChange = {
+            heightmap_frag: `
+            #include <common>
+            uniform vec2 mousePos;
+            uniform float mouseSize;
+            uniform float viscosity;
+            uniform float deep;
+            uniform float time;
+            uniform vec2 fallingWaterCenter;
+            uniform float fallingWaterSize;
+            uniform float fallingWaterDeep;
+            
+            float hash(vec2 p) {
+              return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453123);
+            }
+            
+            float noise(vec2 p) {
+              vec2 i = floor(p);
+              vec2 f = fract(p);
+              vec2 u = f * f * (3.0 - 2.0 * f);
+              return mix(mix(hash(i + vec2(0.0, 0.0)),
+                           hash(i + vec2(1.0, 0.0)), u.x),
+                       mix(hash(i + vec2(0.0, 1.0)),
+                           hash(i + vec2(1.0, 1.0)), u.x), u.y);
+            }
+            
+            void main() {
+              vec2 cellSize = 1.0 / resolution.xy;
+              vec2 uv = gl_FragCoord.xy * cellSize;
+              vec4 heightmapValue = texture2D( heightmap, uv );
+              
+              vec4 north = texture2D( heightmap, uv + vec2( 0.0, cellSize.y ) );
+              vec4 south = texture2D( heightmap, uv + vec2( 0.0, - cellSize.y ) );
+              vec4 east = texture2D( heightmap, uv + vec2( cellSize.x, 0.0 ) );
+              vec4 west = texture2D( heightmap, uv + vec2( - cellSize.x, 0.0 ) );
+              
+              float newHeight = ( ( north.x + south.x + east.x + west.x ) * 0.5 - heightmapValue.y ) * viscosity;
+              
+              float noiseFrequency = 3.0;  // Much larger scale for small tank
+              float noiseSpeed = 0.5;  // Slow gentle movement
+              float noiseStrength = 0.01;  // Subtle ripples
+              float noiseVal = noise(uv * noiseFrequency + vec2(time * noiseSpeed));
+              newHeight += (noiseVal * 2.0 - 1.0) * noiseStrength;
+              
+              vec2 mouseInfluencePos = vec2(mousePos.x, -mousePos.y);
+              float mousePhase = clamp( length( ( uv - vec2( 0.5 ) ) * BOUNDS - mouseInfluencePos ) * PI / mouseSize, 0.0, PI );
+              newHeight -= ( cos( mousePhase ) + 1.0 ) * deep;
+              
+              heightmapValue.y = heightmapValue.x;
+              heightmapValue.x = newHeight;
+              gl_FragColor = heightmapValue;
+            }
+            `,
+            common: `
+            #include <common>
+            uniform sampler2D heightmap;
+            `,
+            beginnormal_vertex: `
+            vec2 cellSize = vec2( 1.0 / WIDTH, 1.0 / WIDTH );
+            vec3 objectNormal = vec3(
+              ( texture2D( heightmap, uv + vec2( - cellSize.x, 0 ) ).x - texture2D( heightmap, uv + vec2( cellSize.x, 0 ) ).x ) * WIDTH / BOUNDS,
+              ( texture2D( heightmap, uv + vec2( 0, - cellSize.y ) ).x - texture2D( heightmap, uv + vec2( 0, cellSize.y ) ).x ) * WIDTH / BOUNDS,
+              1.0 );
+            #ifdef USE_TANGENT
+              vec3 objectTangent = vec3( tangent.xyz );
+            #endif
+            `,
+            begin_vertex: `
+            float heightValue = texture2D( heightmap, uv ).x;
+            vec3 transformed = vec3( position.x, position.y, heightValue );
+            #ifdef USE_ALPHAHASH
+              vPosition = vec3( position );
+            #endif
+            `,
+          };
+          
+          // Water Material class
+          class WaterMaterial extends THREE.MeshStandardMaterial {
+            constructor( parameters ) {
+              super();
+              this.defines = {
+                'STANDARD': '',
+                'USE_UV': '',
+                'WIDTH': WIDTH.toFixed( 1 ),
+                'BOUNDS': WATER_BOUNDS.toFixed( 1 ),
+              };
+              this.extra = {};
+              this.addParameter( 'heightmap', null );
+              this.setValues( parameters );
+            }
+            
+            addParameter( name, value ) {
+              this.extra[ name ] = value;
+              Object.defineProperty( this, name, {
+                get: () => ( this.extra[ name ] ),
+                set: ( v ) => {
+                  this.extra[ name ] = v;
+                  if ( this.userData.shader ) this.userData.shader.uniforms[ name ].value = this.extra[ name ];
+                }
+              } );
+            }
+            
+            onBeforeCompile( shader ) {
+              for ( const name in this.extra ) {
+                shader.uniforms[ name ] = { value: this.extra[ name ] };
+              }
+              shader.vertexShader = shader.vertexShader.replace( '#include <common>', shaderChange.common );
+              shader.vertexShader = shader.vertexShader.replace( '#include <beginnormal_vertex>', shaderChange.beginnormal_vertex );
+              shader.vertexShader = shader.vertexShader.replace( '#include <begin_vertex>', shaderChange.begin_vertex );
+              this.userData.shader = shader;
+            }
+          }
+          
+          // Initialize water function
+          async function initWater() {
+            // Get tank world position for water placement
+            const tankPos = dunkTankModel.position.clone();
+            
+            // Load HDR environment for water reflections (same as fountain.html)
+            const rgbeLoader = new RGBELoader();
+            try {
+              const env = await rgbeLoader.loadAsync('/blouberg_sunrise_2_1k.hdr');
+              env.mapping = THREE.EquirectangularReflectionMapping;
+              scene.environment = env;  // Set as scene environment for reflections
+              scene.environmentIntensity = 1.15;
+            } catch (error) {
+              console.log('HDR not found, using fallback environment');
+              // Fallback if HDR is not available
+              const pmremGenerator = new THREE.PMREMGenerator(renderer);
+              pmremGenerator.compileEquirectangularShader();
+              const envScene = new THREE.Scene();
+              envScene.background = new THREE.Color(0x001133);
+              const envMap = pmremGenerator.fromScene(envScene).texture;
+              scene.environment = envMap;
+            }
+            
+            // Create CIRCULAR water geometry with high resolution for detailed surface
+            const waterSegments = 256;  // Much higher resolution for surface detail
+            const waterGeometry = new THREE.CircleGeometry( WATER_BOUNDS / 2, waterSegments, 0, Math.PI * 2 );
+            
+            // Add vertices for wave simulation on the circle
+            const positions = waterGeometry.attributes.position.array;
+            const uvs = [];
+            for (let i = 0; i < positions.length; i += 3) {
+              const x = positions[i];
+              const z = positions[i + 1];  // Note: CircleGeometry is in XY plane
+              // Map to UV coordinates (0 to 1)
+              uvs.push((x / WATER_BOUNDS) + 6.5);
+              uvs.push((z / WATER_BOUNDS) + 6.5);
+            }
+            waterGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+            
+            // Load water normal map for subtle surface detail
+            const textureLoader = new THREE.TextureLoader();
+            const normalMap = textureLoader.load(
+              'https://threejs.org/examples/textures/waternormals.jpg',
+              function(texture) {
+                texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+                texture.repeat.set(0.5, 0.5);  // Much less tiling - larger features for small tank
+                // Animate the normal map slowly for gentle movement
+                function animateNormalMap() {
+                  texture.offset.x += 0.00005;  // Very slow drift
+                  texture.offset.y += 0.00003;
+                  requestAnimationFrame(animateNormalMap);
+                }
+                animateNormalMap();
+              }
+            );
+            
+            // Create water material with subtle normal map
+            const material = new WaterMaterial( {
+              color: 0x9bd2ec,  // Exact color from fountain
+              metalness: 0.9,
+              roughness: 0,
+              transparent: true,
+              opacity: 0.5,  // Higher opacity for better visibility
+              side: THREE.DoubleSide,
+              depthTest: true,
+              depthWrite: false,  // Disable depth writing for proper transparency
+              normalMap: normalMap,
+              normalScale: new THREE.Vector2(0.05, 0.05),  // Even subtler for small tank
+              alphaTest: 0.01  // Add alpha test to help with transparency sorting
+            } );
+            
+            // Create water mesh exactly like fountain.html
+            waterMesh = new THREE.Mesh( waterGeometry, material );
+            waterMesh.rotation.x = - Math.PI * 0.5;
+            // Position water inside the tank
+            waterMesh.position.set(tankPos.x - 4.05, tankPos.y + 7, tankPos.z + 0.25);
+            waterMesh.renderOrder = 0;  // Render last for proper transparency
+            waterMesh.matrixAutoUpdate = true;
+            waterMesh.updateMatrix();
+            waterMesh.receiveShadow = true;
+            waterMesh.castShadow = true;
+            
+            scene.add( waterMesh );
+            
+            // Create ray mesh for mouse interaction (also circular)
+            const meshRayGeometry = new THREE.CircleGeometry( WATER_BOUNDS / 2, 32 );
+            meshRay = new THREE.Mesh(
+              meshRayGeometry,
+              new THREE.MeshBasicMaterial( { color: 0xffffff, visible: false } )
+            );
+            meshRay.rotation.x = - Math.PI * 0.5;
+            meshRay.position.copy(waterMesh.position);
+            meshRay.matrixAutoUpdate = true;
+            meshRay.updateMatrix();
+            scene.add( meshRay );
+            
+            // Initialize GPU Compute
+            gpuCompute = new GPUComputationRenderer( WIDTH, WIDTH, renderer );
+            const heightmap0 = gpuCompute.createTexture();
+            fillTexture( heightmap0 );
+            
+            heightmapVariable = gpuCompute.addVariable( 'heightmap', shaderChange.heightmap_frag, heightmap0 );
+            gpuCompute.setVariableDependencies( heightmapVariable, [ heightmapVariable ] );
+            
+            heightmapVariable.material.uniforms[ 'mousePos' ] = { value: new THREE.Vector2( 10000, 10000 ) };
+            heightmapVariable.material.uniforms[ 'mouseSize' ] = { value: 0.2 };
+            heightmapVariable.material.uniforms[ 'viscosity' ] = { value: 0.93 };  // Match fountain.html
+            heightmapVariable.material.uniforms[ 'deep' ] = { value: 0.01 };  // Match fountain.html
+            heightmapVariable.material.uniforms[ 'time' ] = { value: 0.0 };
+            heightmapVariable.material.uniforms[ 'fallingWaterCenter' ] = { value: new THREE.Vector2( 0.0, 0.0 ) };
+            heightmapVariable.material.uniforms[ 'fallingWaterSize' ] = { value: 0.1 };
+            heightmapVariable.material.uniforms[ 'fallingWaterDeep' ] = { value: 0.001 };
+            heightmapVariable.material.defines.BOUNDS = WATER_BOUNDS.toFixed( 1 );
+            
+            const error = gpuCompute.init();
+            if ( error !== null ) console.error( error );
+            
+            // Create smooth shader
+            const smoothShader = gpuCompute.createShaderMaterial(
+              document.getElementById( 'smoothFragmentShader' ).textContent,
+              { smoothTexture: { value: null } }
+            );
+          }
+          
+          // Fill texture function with SimplexNoise - EXACTLY like fountain.html
+          function fillTexture( texture ) {
+            const simplex = new SimplexNoise();
+            const waterMaxHeight = 0.1;
+            
+            function noise( x, y ) {
+              let multR = waterMaxHeight;
+              let mult = 0.025;
+              let r = 0;
+              for ( let i = 0; i < 15; i++ ) {
+                r += multR * simplex.noise( x * mult, y * mult );
+                multR *= 0.53 + 0.025 * i;
+                mult *= 1.25;
+              }
+              return r;
+            }
+            
+            const pixels = texture.image.data;
+            let p = 0;
+            for ( let j = 0; j < WIDTH; j++ ) {
+              for ( let i = 0; i < WIDTH; i++ ) {
+                const x = i * 128 / WIDTH;
+                const y = j * 128 / WIDTH;
+                pixels[ p + 0 ] = noise( x, y );
+                pixels[ p + 1 ] = pixels[ p + 0 ];
+                pixels[ p + 2 ] = 0;
+                pixels[ p + 3 ] = 1;
+                p += 4;
+              }
+            }
+          }
+          
+          // Smooth water function
+          function smoothWater() {
+            if (!gpuCompute) return;
+            
+            const smoothShader = gpuCompute.createShaderMaterial(
+              document.getElementById( 'smoothFragmentShader' ).textContent,
+              { smoothTexture: { value: null } }
+            );
+            
+            const currentRenderTarget = gpuCompute.getCurrentRenderTarget( heightmapVariable );
+            const alternateRenderTarget = gpuCompute.getAlternateRenderTarget( heightmapVariable );
+            
+            for ( let i = 0; i < 5; i++ ) {
+              smoothShader.uniforms.smoothTexture.value = currentRenderTarget.texture;
+              gpuCompute.doRenderTarget( smoothShader, alternateRenderTarget );
+              smoothShader.uniforms.smoothTexture.value = alternateRenderTarget.texture;
+              gpuCompute.doRenderTarget( smoothShader, currentRenderTarget );
+            }
+          }
+          
+          function checkTargetCollision() {
+            if (!targetHitbox || seatDropped) return;
+            
+            // Create a bounding box for the target
+            const targetBox = new THREE.Box3().setFromObject(targetHitbox);
+            
+            // Make the hitbox smaller and more precise (shrink by 40%)
+            const center = new THREE.Vector3();
+            const size = new THREE.Vector3();
+            targetBox.getCenter(center);
+            targetBox.getSize(size);
+            
+            // Create a smaller hitbox (60% of original size for harder difficulty)
+            const smallerBox = new THREE.Box3();
+            const halfSize = size.multiplyScalar(0.3); // 0.3 = 60% of half-size
+            smallerBox.setFromCenterAndSize(center, halfSize);
+            
+            // Only check shooting balls (projectiles) for collision
+            scene.traverse((object) => {
+              if (object.name === "shootingBall" && object.isMesh) {
+                const ballBox = new THREE.Box3().setFromObject(object);
+                
+                // Use the smaller hitbox for detection
+                if (smallerBox.intersectsBox(ballBox)) {
+                  dropSeat();
+                  console.log("BULLSEYE! Direct hit on target center!");
+                  
+                  // Optional: Remove the ball after hit
+                  setTimeout(() => {
+                    scene.remove(object);
+                    // Remove from mesh map to stop physics updates
+                    if (meshMap.has(object)) {
+                      meshMap.delete(object);
+                    }
+                  }, 100);
+                }
+              }
+            });
+          }
+          
+          // Initialize water after all classes are defined
+          setTimeout(() => {
+            initWater();
+          }, 200);
+
+          // Hide preloader once everything is loaded
+          setTimeout(() => {
+            const preloader = document.getElementById('preloader');
+            if (preloader) {
+              preloader.classList.add('fade-out');
+              // Remove from DOM after fade animation
+              setTimeout(() => {
+                preloader.remove();
+              }, 500);
+              console.log("Scene loaded - preloader hidden");
+            }
+          }, 3000); // Wait 3 seconds to ensure everything is loaded
+
+          // Animation loop
+          function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            checkTargetCollision(); // Check for collisions each frame
+            updateCharacterAnimation(performance.now()); // Update character animations
+            
+            // Update water simulation
+            if (gpuCompute && waterMesh) {
+              // Update time uniform for continuous natural ripples from noise
+              const currentTime = performance.now() / 1000.0;
+              heightmapVariable.material.uniforms.time.value = currentTime;
+              
+              // Don't interfere with active splash
+              if (!activeSplash) {
+                // Create random small disturbances to keep water alive
+                if (Math.random() > 0.98) {  // 2% chance each frame
+                  const randomX = (Math.random() - 0.5) * WATER_BOUNDS;
+                  const randomY = (Math.random() - 0.5) * WATER_BOUNDS;
+                  heightmapVariable.material.uniforms.mousePos.value.set(randomX, randomY);
+                  heightmapVariable.material.uniforms.mouseSize.value = 0.1 + Math.random() * 0.2;
+                  heightmapVariable.material.uniforms.deep.value = 0.01 + Math.random() * 0.02;
+                } else {
+                  // Reset mouse position
+                  const mousePos = heightmapVariable.material.uniforms.mousePos.value;
+                  mousePos.x = 10000;
+                  mousePos.y = 10000;
+                }
+              }
+              
+              // Compute water height (this runs the shader with noise)
+              gpuCompute.compute();
+              
+              // Smooth water regularly for natural flow
+              if (Math.random() > 0.96) {
+                smoothWater();
+              }
+              
+              // Update water mesh with new heightmap
+              waterMesh.material.heightmap = gpuCompute.getCurrentRenderTarget(heightmapVariable).texture;
+              
+              // Check projectiles for water interaction and buoyancy
+              const waterWorldPos = new THREE.Vector3();
+              waterMesh.getWorldPosition(waterWorldPos);
+              const waterRadius = WATER_BOUNDS / 2;
+              
+              scene.traverse((object) => {
+                if (object.name === "shootingBall" && object.isMesh) {
+                  const ballPos = object.position;
+                  const body = meshMap.get(object);
+                  if (!body) return;
+                  
+                  // Check horizontal distance to water center
+                  const horizontalDist = new THREE.Vector2(
+                    ballPos.x - waterWorldPos.x,
+                    ballPos.z - waterWorldPos.z
+                  ).length();
+                  
+                  // Check if ball is within water cylinder bounds
+                  const isAboveWater = horizontalDist < waterRadius;
+                  const waterSurfaceY = waterWorldPos.y;
+                  const ballRadius = 0.8;  // Ball radius from geometry
+                  
+                  if (isAboveWater) {
+                    const submersionDepth = waterSurfaceY - (ballPos.y - ballRadius);
+                    
+                    // Ball is touching or in water
+                    if (submersionDepth > 0) {
+                      // Create splash effect on first entry
+                      if (!ballsInWater.has(object)) {
+                        ballsInWater.add(object);
+                        
+                        // Create splash at entry point
+                        const x = (ballPos.x - waterWorldPos.x) / WATER_BOUNDS + 0.5;
+                        const y = 1.0 - ((ballPos.z - waterWorldPos.z) / WATER_BOUNDS + 0.5);
+                        heightmapVariable.material.uniforms.mousePos.value.set(
+                          x * WATER_BOUNDS - WATER_BOUNDS/2,
+                          y * WATER_BOUNDS - WATER_BOUNDS/2
+                        );
+                      }
+                      
+                      // Calculate buoyancy force
+                      const maxSubmersion = ballRadius * 2;  // Full ball diameter
+                      const submersionRatio = Math.min(submersionDepth / maxSubmersion, 1.0);
+                      
+                      // Buoyancy force (Archimedes' principle)
+                      const waterDensity = 1000;  // kg/m³
+                      const ballVolume = (4/3) * Math.PI * Math.pow(ballRadius, 3);
+                      const displacedVolume = ballVolume * submersionRatio;
+                      const buoyancyForce = waterDensity * 10 * displacedVolume * 0.001;  // Scaled for game physics
+                      
+                      // Apply upward buoyancy force
+                      const vector = new Ammo.btVector3(0, buoyancyForce, 0);
+                      body.applyCentralForce(vector);
+                      
+                      // Apply water drag (resistance)
+                      const velocity = body.getLinearVelocity();
+                      const dragCoefficient = 0.47;  // Sphere drag coefficient
+                      const dragForce = dragCoefficient * submersionRatio * 2.0;
+                      
+                      // Apply drag opposing current velocity
+                      const dragVector = new Ammo.btVector3(
+                        -velocity.x() * dragForce,
+                        -velocity.y() * dragForce * 0.5,  // Less vertical drag for better floating
+                        -velocity.z() * dragForce
+                      );
+                      body.applyCentralForce(dragVector);
+                      
+                      // Additional damping for realistic water behavior
+                      body.setDamping(0.3 * submersionRatio, 0.3 * submersionRatio);
+                      
+                    } else {
+                      // Ball has left the water
+                      if (ballsInWater.has(object)) {
+                        ballsInWater.delete(object);
+                        // Reset damping to normal
+                        body.setDamping(0.1, 0.1);
+                      }
+                    }
+                  } else {
+                    // Ball is outside water radius
+                    if (ballsInWater.has(object)) {
+                      ballsInWater.delete(object);
+                      body.setDamping(0.1, 0.1);
+                    }
+                  }
+                }
+              });
+            }
+            
+            renderer.render(scene, camera);
+          }
+          animate();
+
+          window.addEventListener("resize", () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+          });
+        });
+      })();
+    </script>
+    <!-- <iframe
+      style="
+        border-radius: 12px;
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        z-index: 1;
+      "
+      src="https://open.spotify.com/embed/playlist/37i9dQZF1DWWEJlAGA9gs0?utm_source=generator"
+      width="25%"
+      height="152"
+      frameborder="0"
+      allowfullscreen=""
+      allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+      loading="lazy"
+    ></iframe> -->
+  </body>
+</html>

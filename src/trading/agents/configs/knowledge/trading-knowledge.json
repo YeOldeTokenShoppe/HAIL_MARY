@@ -1,0 +1,91 @@
+{
+  "tradingStrategies": {
+    "wyckoff": {
+      "phases": {
+        "accumulation": {
+          "signs": ["Spring", "Test of spring", "Sign of Strength", "Last Point of Support"],
+          "description": "Smart money accumulating while retail is bearish"
+        },
+        "markup": {
+          "signs": ["Higher highs", "Higher lows", "Increasing volume"],
+          "description": "Trending phase where profits are made"
+        },
+        "distribution": {
+          "signs": ["Upthrust", "Test of upthrust", "Sign of Weakness", "Last Point of Supply"],
+          "description": "Smart money distributing to retail at tops"
+        },
+        "markdown": {
+          "signs": ["Lower highs", "Lower lows", "Decreasing bounces"],
+          "description": "Downtrend where shorts profit"
+        }
+      }
+    },
+    "elliott_wave": {
+      "impulse": ["Wave 1 up", "Wave 2 correction", "Wave 3 strongest", "Wave 4 sideways", "Wave 5 final"],
+      "corrective": ["Wave A down", "Wave B bounce", "Wave C final leg"]
+    }
+  },
+  
+  "cryptoSpecific": {
+    "onChain": {
+      "bullish": [
+        "Exchange outflows increasing",
+        "Long-term holder accumulation",
+        "Miner selling decreasing",
+        "Stablecoin inflows to exchanges"
+      ],
+      "bearish": [
+        "Exchange inflows increasing",
+        "Long-term holders distributing",
+        "Miner selling increasing",
+        "Stablecoin outflows from exchanges"
+      ]
+    },
+    "defi": {
+      "metrics": ["TVL", "Active users", "Protocol revenue", "Token velocity"],
+      "risks": ["Smart contract bugs", "Rug pulls", "Impermanent loss", "Oracle manipulation"]
+    }
+  },
+  
+  "marketEvents": {
+    "scheduled": {
+      "2024": {
+        "April": "Bitcoin Halving",
+        "December": "Fed Meeting Dec 18"
+      },
+      "2025": {
+        "Q1": "Ethereum Prague upgrade",
+        "Q2": "Bitcoin ETF rebalancing"
+      }
+    },
+    "indicators": {
+      "macro": ["CPI releases", "FOMC meetings", "NFP reports", "GDP data"],
+      "crypto": ["Grayscale unlocks", "Options expiry", "Futures rollover", "Funding resets"]
+    }
+  },
+  
+  "riskManagement": {
+    "positionSizing": {
+      "kelly": "f = (p*b - q) / b where f=fraction, p=win prob, b=win/loss ratio, q=loss prob",
+      "fixed": "2% risk per trade",
+      "volatilityBased": "Position size = Risk / (ATR * multiplier)"
+    },
+    "stopLoss": {
+      "technical": "Below support/above resistance",
+      "atr": "2-3x ATR from entry",
+      "percentage": "5-10% depending on timeframe"
+    }
+  },
+  
+  "terminology": {
+    "slang": {
+      "bullish": ["moon", "pump", "send it", "green dildo", "face ripper"],
+      "bearish": ["dump", "nuke", "red wedding", "goblin town", "max pain"],
+      "neutral": ["crab market", "chop", "bart pattern", "paint drying"]
+    },
+    "technical": {
+      "patterns": ["Bull flag", "Bear flag", "Cup and handle", "Head and shoulders", "Double bottom"],
+      "indicators": ["RSI", "MACD", "Bollinger Bands", "Fibonacci", "Ichimoku"]
+    }
+  }
+}

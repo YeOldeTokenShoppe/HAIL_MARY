@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Magic 8 Ball with Links</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        display: flex;
+        align-items: center;
+        font-family: "HelveticaNeue-Light", "Helvetica Neue Light",
+          "Helvetica Neue", Helvetica, Arial, "Lucida Grande", sans-serif;
+        justify-content: center;
+        background-color: transparent !important;
+        background: transparent !important;
+        font-size: 0.8rem;
+        height: 100vh;
+        width: 100vw;
+        text-align: center;
+        letter-spacing: 1px;
+        margin: 0;
+        padding: 0;
+        overflow: hidden !important;
+        scrollbar-width: none; /* Firefox */
+        -ms-overflow-style: none; /* IE/Edge */
+      }
+      /* Webkit browsers */
+      body::-webkit-scrollbar {
+        display: none;
+      }
+
+      /* Add wrapper styling */
+      .eight-ball-wrapper {
+        position: relative;
+        width: 280px;
+        height: 280px;
+        background: transparent !important;
+      }
+
+      form {
+        margin: 0;
+        padding: 0;
+        background: transparent !important;
+        width: 100%;
+        height: 100%;
+        position: relative;
+      }
+
+      .eight {
+        overflow: hidden; /* Add this */
+        background: transparent !important;
+      }
+
+      form {
+        border-radius: 100%;
+        cursor: pointer;
+        height: 280px;
+        position: relative;
+        width: 280px;
+        background: transparent !important;
+        overflow: visible; /* Allow content to flow outside */
+      }
+
+      [type="radio"] {
+        display: none;
+        left: 100%;
+        position: absolute;
+        background: transparent !important;
+      }
+
+      [type="reset"] {
+        display: none;
+        height: 100%;
+        left: 0;
+        opacity: 0;
+        position: absolute;
+        top: 0;
+        width: 100%;
+        z-index: 6;
+        background: transparent !important;
+      }
+
+      li {
+        margin: 0;
+        padding: 0;
+        height: 280px;
+        width: 280px;
+        background: transparent !important;
+      }
+
+      label {
+        display: block;
+        height: 100%;
+        width: 100%;
+        background: transparent !important;
+      }
+
+      ul {
+        animation: scale 7s infinite steps(20);
+        left: 0;
+        margin: 0;
+        padding: 0;
+        position: absolute;
+        top: 0;
+        width: 100%;
+        z-index: 5;
+        list-style: none;
+        background: transparent !important;
+      }
+
+      .eight {
+        border-radius: 100%;
+        height: 100%;
+        overflow: hidden;
+        position: relative;
+        width: 100%;
+        z-index: 4;
+        background: transparent !important;
+      }
+
+      .eight__backdrop {
+        background: radial-gradient(circle at 5% 5%, #666, #222 50%), #222;
+        border-radius: 100%;
+        height: 100%;
+        left: 0;
+        position: absolute;
+        top: 0;
+        width: 100%;
+        overflow: hidden;
+        
+      }
+
+      .eight__number {
+        align-items: center;
+        background: white;
+        border-radius: 100%;
+        display: flex;
+        font-size: 110px;
+        font-weight: bold;
+        height: 50%;
+        justify-content: center;
+        left: 50%;
+        position: absolute;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 50%;
+      }
+
+      .eight__window {
+        background: radial-gradient(transparent, #000);
+        border: 10px double #555;
+        border-radius: 100%;
+        height: calc(50% + 20px);
+        left: 50%;
+        position: absolute;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: calc(50% + 20px);
+      }
+
+      .eight__fascia {
+        height: 280px;
+        position: relative;
+        width: 280px;
+        background: transparent !important;
+      }
+
+      .answer-container {
+        background: blue;
+        text-transform: uppercase;
+        color: #ffffff;
+        text-shadow: 1px 1px 0 #bfbfbf;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 45%;
+        height: 45%;
+        transform-origin: 50% 25%;
+        transform: translate(-50%, -50%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        animation: floaty 10s linear infinite;
+        z-index: 2;
+        font-size: 0.65rem;
+      }
+      .answer-container a {
+        color: #ffffff;
+        text-decoration: none;
+        cursor: pointer;
+        position: relative;
+        z-index: 10;
+        pointer-events: auto; /* Ensure link can receive clicks */
+      }
+
+      .answer-container a:hover {
+        color: #ffeb3b;
+        text-decoration: underline;
+      }
+
+      .answer-image {
+        position: relative;
+        top: 18%;
+        max-width: 110%;
+        max-height: 115%;
+        object-fit: contain;
+        filter: brightness(1.2) contrast(1.1);
+        transform: rotate(180deg); /* Make image right-side up since it's naturally upside down */
+      }
+
+      .answer-container.image-answer {
+        padding: 2%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* Make sure the container allows pointer events */
+      [type="radio"]:checked + .answer-container {
+        opacity: 1;
+        transition: opacity 1s 1.7s;
+        pointer-events: auto;
+      }
+
+      /* Reset pointer events for hidden answers */
+      .answer-container {
+        pointer-events: none;
+      }
+
+      /* Mode selector styles */
+      .mode-selector {
+        position: absolute;
+        bottom: 15px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 5px;
+        z-index: 100;
+        justify-content: center;
+      }
+
+      .mode-btn {
+        padding: 3px 8px;
+        background: rgba(0, 0, 0, 0.95);
+        border: 2px solid #c48901;
+        color: #ffffff;
+        cursor: pointer;
+        border-radius: 12px;
+        font-size: 0.55rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+
+      .mode-btn:hover {
+        background: rgba(196, 137, 1, 0.8);
+        border-color: #ffeb3b;
+        transform: scale(1.05);
+        box-shadow: 0 4px 15px rgba(196, 137, 1, 0.6);
+      }
+
+      .mode-btn.active {
+        background: #c48901;
+        border-color: #ffeb3b;
+        color: #000000;
+        box-shadow: 0 0 20px rgba(196, 137, 1, 0.8);
+        font-weight: 700;
+      }
+
+      .answer-container:nth-of-type(even) {
+        clip-path: polygon(0 100%, 50% 20%, 100% 100%);
+        align-items: flex-end;
+        padding-bottom: 5%;
+        top: 40%;
+      }
+
+      .answer-container:nth-of-type(odd) {
+        clip-path: polygon(0 0, 50% 80%, 100% 0);
+        align-items: flex-start;
+        padding-top: 5%;
+        top: 60%;
+      }
+
+      /* Special handling for image answers to fit both orientations */
+      .answer-container.image-answer:nth-of-type(even) {
+        align-items: center;
+        padding-bottom: 0%;
+        transform: translate(-50%, -50%) scale(0.8);
+      }
+
+      .answer-container.image-answer:nth-of-type(odd) {
+        align-items: center;
+        padding-top: 0%;
+        transform: translate(-50%, -50%) scale(0.8);
+      }
+
+      .answer-container.image-answer .answer-image {
+        transform: rotate(0deg); /* Always orient image upward */
+      }
+
+      [type="radio"]:checked + .answer-container {
+        opacity: 1;
+        transition: opacity 1s 1.7s;
+      }
+
+      [type="radio"]:checked ~ .eight,
+      [type="radio"]:checked ~ .eight__backdrop {
+        animation: shake 0.25s 4;
+      }
+
+      [type="radio"]:checked ~ .eight .eight__fascia {
+        transform: translate(0, -100%);
+        transition: transform 0.25s 1.25s ease;
+      }
+
+      [type="radio"]:checked ~ [type="reset"] {
+        display: block;
+      }
+      /* .mesh-name {
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 1.2rem;
+        color: white;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        z-index: 100;
+      } */
+      /* 
+      #closeBtn {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        background: none;
+        border: none;
+        color: white;
+        font-size: 1.5rem;
+        cursor: pointer;
+        z-index: 100;
+      }
+
+      #closeBtn:hover {
+        color: #ffeb3b;
+      } */
+
+      @keyframes modalFadeIn {
+        from {
+          opacity: 0;
+          transform: scale(0.8);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+      @keyframes scale {
+        to {
+          transform: translateY(-100%);
+        }
+      }
+
+      @keyframes floaty {
+        0%,
+        100% {
+          transform: translate(-50%, -50%);
+        }
+        25% {
+          transform: translate(-52%, -48%) rotate(2deg);
+        }
+        50% {
+          transform: translate(-48%, -52%) rotate(-2deg);
+        }
+        75% {
+          transform: translate(-49%, -49%) rotate(1deg);
+        }
+      }
+
+      @keyframes shake {
+        0%,
+        100% {
+          transform: translate(0, 0);
+        }
+        50% {
+          transform: translate(10px, 5px);
+        }
+        75% {
+          transform: translate(-10px, -5px);
+        }
+      }
+    </style>
+  </head>
+  <body style="background: transparent !important">
+    <!-- <div id="meshName" class="mesh-name"></div> -->
+    <!-- <button id="closeBtn">×</button> -->
+    <div class="eight-ball-container" style="position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%;">
+      <div class="eight-ball-wrapper">
+      <form style="background: transparent !important">
+        <input type="reset" style="background: transparent" />
+        <div class="eight__backdrop"></div>
+        <div class="eight">
+          <div class="eight__fascia">
+            <div class="eight__number">80</div>
+          </div>
+          <div class="eight__fascia">
+            <div class="eight__window"></div>
+          </div>
+          <ul>
+            <li><label for="answer1"></label></li>
+            <li><label for="answer2"></label></li>
+            <li><label for="answer3"></label></li>
+            <li><label for="answer4"></label></li>
+            <li><label for="answer5"></label></li>
+            <li><label for="answer6"></label></li>
+            <li><label for="answer7"></label></li>
+            <li><label for="answer8"></label></li>
+            <li><label for="answer9"></label></li>
+            <li><label for="answer10"></label></li>
+            <li><label for="answer11"></label></li>
+            <li><label for="answer12"></label></li>
+            <li><label for="answer13"></label></li>
+            <li><label for="answer14"></label></li>
+            <li><label for="answer15"></label></li>
+            <li><label for="answer16"></label></li>
+            <li><label for="answer17"></label></li>
+            <li><label for="answer18"></label></li>
+            <li><label for="answer19"></label></li>
+            <li><label for="answer20"></label></li>
+          </ul>
+        </div>
+      </form>
+    </div>
+    </div>
+    <script>
+      const possibilities = [
+        { type: 'image', content: "/illuminati.jpg" },
+        { type: 'text', content: "It is<br> decidedly<br> so" },
+        { type: 'text', content: "Without<br> a<br> doubt" },
+        { type: 'text', content: "Yes<br> definitely" },
+        { type: 'text', content: "You may<br> rely<br> on it" },
+        { type: 'text', content: "As I<br> see it,<br> yes" },
+        { type: 'text', content: "Most<br> likely" },
+        { type: 'text', content: "Outlook<br> good" },
+        { type: 'text', content: "Yes" },
+        { type: 'text', content: "Signs<br> point to<br> yes" },
+        { type: 'text', content: "Ask<br> again<br> later" },
+        { type: 'text', content: "Better not<br> tell you<br> now" },
+        { type: 'text', content: "Cannot<br> predict<br> now" },
+        // { type: 'text', content: "Concentrate<br> and ask<br> again" },
+        // { type: 'text', content: "Don't<br> count<br> on it" },
+        // { type: 'text', content: "My reply<br> is<br> no" },
+        // { type: 'text', content: "My<br> sources<br> say no" },
+        // { type: 'text', content: "Outlook<br> not so<br> good" },
+        // { type: 'text', content: "Very<br> doubtful" },
+      ];
+
+      const contractInfo = [
+        { type: 'text', content: "Launched <br/>on Base <br/>Chain" },
+        { type: 'text', content: "Total <br/>Supply:<br/> 80 Billion" },
+        { type: 'text', content: "Buy/Sell<br/> Tax:<br/> 5% --> 0%" },
+        { type: 'text', content: "Deflationary" },
+        { type: 'text', content: "Unique<br/>Candle<br/> Utility" },
+        { type: 'text', content: "80% to<br/>Liquidity" },
+        { type: 'text', content: "5% to<br/>Marketing" },
+        { type: 'text', content: "15% to<br/>Treasury<br/> & Commun80" },
+      ];
+
+      // State management
+      let currentMode = 'general';
+      let contractIndex = 0;
+      let currentAnswers = possibilities;
+
+      // Function to create radio buttons and containers
+      function createAnswerElements(answers) {
+        // Clear existing radio buttons and answer containers
+        const form = document.querySelector("form");
+        const existingRadios = form.querySelectorAll('[type="radio"]');
+        const existingContainers = form.querySelectorAll('.answer-container');
+        
+        existingRadios.forEach(radio => radio.remove());
+        existingContainers.forEach(container => container.remove());
+
+        // Create new elements
+        // Insert in reverse order so they appear in correct order in DOM
+        for (let i = answers.length - 1; i >= 0; i--) {
+          const answer = answers[i];
+          const radio = document.createElement("input");
+          radio.type = "radio";
+          radio.name = "answer";
+          radio.id = `answer${i + 1}`;
+          radio.value = typeof answer === 'string' ? answer : answer.content;
+          radio.checked = false;
+          // Store the original array index as a data attribute
+          radio.dataset.arrayIndex = i;
+
+          const container = document.createElement("div");
+          container.className = "answer-container";
+          
+          // Handle different answer types
+          if (typeof answer === 'string') {
+            // Legacy string format
+            container.innerHTML = answer;
+          } else if (answer.type === 'image') {
+            // Image answer - force to even position for upward-pointing triangle
+            container.classList.add('image-answer');
+            // Force even positioning by adding a class that targets even nth-child
+            if ((answers.length - i) % 2 !== 0) {
+              container.style.clipPath = 'polygon(0 100%, 50% 20%, 100% 100%)';
+              container.style.alignItems = 'flex-end';
+              container.style.paddingBottom = '5%';
+              container.style.top = '40%';
+            }
+            const img = document.createElement('img');
+            img.src = answer.content;
+            img.className = 'answer-image';
+            img.alt = 'Magic 8-ball answer';
+            container.appendChild(img);
+            console.log('Created image container for index:', i, 'with src:', answer.content);
+          } else {
+            // Text answer
+            container.innerHTML = answer.content;
+          }
+
+          // Insert radio and container as a pair - container immediately after radio
+          form.insertBefore(container, form.firstChild);
+          form.insertBefore(radio, container);
+        }
+      }
+
+      // Initialize with general mode
+      createAnswerElements(possibilities);
+
+      // Mode selector handlers
+      document.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          // Update active state
+          document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+          this.classList.add('active');
+
+          // Update current mode
+          currentMode = this.dataset.mode;
+          contractIndex = 0; // Reset contract index when switching modes
+          hasShownImage = false; // Reset image flag when switching modes
+
+          // Update answers based on mode
+          if (currentMode === 'general') {
+            currentAnswers = possibilities;
+          } else {
+            currentAnswers = contractInfo;
+          }
+
+          // Recreate answer elements
+          createAnswerElements(currentAnswers);
+          
+          // Reset the form
+          document.querySelector('form').reset();
+          hasShownImage = false; // Reset image flag when form resets
+        });
+      });
+
+      // Add a flag to prevent immediate animation
+      let isFirstClick = true;
+      let hasShownImage = false;
+
+      // Modify your form click handler:
+      document.querySelector("form").addEventListener("click", function (e) {
+        // Don't trigger 8-ball if clicking a link
+        if (e.target.tagName === "A") {
+          e.stopPropagation();
+          return;
+        }
+
+        // Don't trigger if clicking within an answer that's already shown
+        if (
+          e.target.closest(".answer-container") &&
+          e.target.closest(".answer-container").style.opacity === "0" &&
+          !isFirstClick
+        ) {
+          return;
+        }
+
+        if (e.target.tagName !== "INPUT") {
+          const radios = Array.from(this.querySelectorAll('[type="radio"]'));
+          
+          let selectedRadio;
+          if (currentMode === 'general') {
+            // Show image first if not shown yet
+            if (isFirstClick) {
+              // Find the radio that specifically corresponds to the image (array index 0)
+              console.log('Looking for image radio with arrayIndex 0');
+              selectedRadio = radios.find(radio => parseInt(radio.dataset.arrayIndex) === 0);
+              console.log('Found radio:', selectedRadio, 'with value:', selectedRadio?.value);
+              hasShownImage = true;
+            } else {
+              // Random selection for subsequent clicks
+              selectedRadio = radios[Math.floor(Math.random() * radios.length)];
+            }
+          } else {
+            // Sequential selection for contract mode
+            // Find the radio with the matching array index
+            selectedRadio = radios.find(radio => parseInt(radio.dataset.arrayIndex) === contractIndex);
+            contractIndex = (contractIndex + 1) % contractInfo.length;
+          }
+          
+          if (selectedRadio) {
+            console.log('Selecting radio:', selectedRadio.id, 'with value:', selectedRadio.value);
+            selectedRadio.checked = true;
+            console.log('Radio checked:', selectedRadio.checked);
+            
+            // Find and directly show the corresponding container
+            const allContainers = document.querySelectorAll('.answer-container');
+            const allRadios = document.querySelectorAll('[type="radio"]');
+            
+            // Find the index of the selected radio
+            const radioIndex = Array.from(allRadios).indexOf(selectedRadio);
+            console.log('Radio index in DOM:', radioIndex);
+            
+            // Show the corresponding container
+            if (allContainers[radioIndex]) {
+              // Hide all containers first
+              allContainers.forEach(container => {
+                container.style.opacity = '0';
+                container.style.transition = 'none';
+              });
+              
+              // Show the correct container
+              setTimeout(() => {
+                allContainers[radioIndex].style.opacity = '1';
+                allContainers[radioIndex].style.transition = 'opacity 1s 1.7s';
+                console.log('Showing container:', allContainers[radioIndex]);
+                console.log('Container content:', allContainers[radioIndex].innerHTML);
+              }, 100);
+            }
+          } else {
+            console.log('No radio selected!');
+          }
+        }
+
+        isFirstClick = false;
+      });
+    </script>
+  </body>
+</html>
