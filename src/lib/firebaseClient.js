@@ -49,17 +49,8 @@ const isBrowser = typeof window !== 'undefined';
 
 // Function to check if we have all required environment variables
 const hasRequiredEnvironmentVariables = () => {
-  // We'll use the explicit values to check existence since some could be empty strings
-  const requiredVars = [
-    process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-    process.env.NEXT_PUBLIC_FIREBASE_APP_ID
-  ];
-  
-  return requiredVars.every(v => v && v.trim() !== '');
+  const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
+  return requiredKeys.every(key => firebaseConfig[key] && String(firebaseConfig[key]).trim() !== '');
 };
 
 try {
