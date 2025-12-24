@@ -6,18 +6,25 @@ useGLTF.preload('/models/tinyVotiveOnly.glb');
 useGLTF.preload('/models/tinyJapCanOnly.glb');
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '@/lib/firebaseClient';
+import { db, storage } from '@/utilities/firebaseClient';
 import * as THREE from 'three';
+import { gsap } from 'gsap';
+import { ScrambleTextPlugin } from 'gsap/dist/ScrambleTextPlugin';
+import { encryptMessage, generateScrambledDisplay } from '@/utilities/encryption';
+import { generatePrayer, getRemainingPrayers, PRAYER_PROMPTS } from '@/utilities/aiPrayers';
 import { useUser } from '@clerk/nextjs';
 import './CompactCandleModal.css';
-import { useFirestoreResults } from '@/lib/useFirestoreResults';
+import { useFirestoreResults } from '@/utilities/useFirestoreResults';
 import CandleSnapshotRenderer from './CandleSnapshotRenderer';
-
+if (typeof window !== 'undefined') {
+  gsap.registerPlugin(ScrambleTextPlugin);
+}
 // Simple viewer component for displaying candle models with dynamic texture support
 function SimpleCandleViewer({ modelPath, customImageUrl, backgroundTexturePath, backgroundGradient, dedicationName, dedicationMessage, showPlaque, userAvatar, burnAmount, baseColor }) {
   const { scene, materials } = useGLTF(modelPath);
   const modelRef = useRef();
   const groupRef = useRef();
+  const cardDetailsRef = useRef();
   const textureLoader = new THREE.TextureLoader();
   const backgroundTextureRef = useRef(null);
   const currentBackgroundPath = useRef(null);
@@ -813,7 +820,15 @@ function SimpleCandleViewer({ modelPath, customImageUrl, backgroundTexturePath, 
   );
 }
 
-
+const LANGUAGE_NAMES = {
+  en: 'English',
+  es: 'Spanish',
+  pt: 'Portuguese',
+  fr: 'French',
+  it: 'Italian',
+  zh: 'Chinese',
+  hi: 'Hindi'
+};
 const getUserLanguage = () => {
   if (typeof window === 'undefined') {
     return 'en';
@@ -844,7 +859,7 @@ const PRAYERS_BY_LANGUAGE = {
     }, {
       id: 'chart',
       title: "Chart Mystic's Prayer",
-      text: "Oh Oracle of Eternal Candles, Our Lady of Perpetual Profit, guide my eyes as I read the sacred indicators. Grant me the gift of vision to see wedges before they break, triangles before they tighten, and golden crosses before they shine. Deliver me from false signals, and sanctify my trading view with holy confluence. Amen."
+      text: "Oh Oracle of Eternal Candles, Our Lady of Perpetual Profit, guide my eyes as I read the sacred indicators. Grant me the gift of vision to see wedges before they break, triangles before they tighten, and golden crosses before they shine. Deliver me from false signals, and sanctify my features/trading view with holy confluence. Amen."
     }]
   },
   es: {
@@ -868,7 +883,7 @@ const PRAYERS_BY_LANGUAGE = {
     }, {
       id: 'chart',
       title: "Oración del Místico de Gráficos",
-      text: "Oh Oráculo de las Velas Eternas, Nuestra Señora del Beneficio Perpetuo, guía mis ojos mientras leo los indicadores sagrados. Dame el don de ver cuñas antes de que rompan, triángulos antes de que se estrechen y cruces doradas antes de que brillen. Líbrame de señales falsas y santifica mi vista de trading con confluencia sagrada. Amén."
+      text: "Oh Oráculo de las Velas Eternas, Nuestra Señora del Beneficio Perpetuo, guía mis ojos mientras leo los indicadores sagrados. Dame el don de ver cuñas antes de que rompan, triángulos antes de que se estrechen y cruces doradas antes de que brillen. Líbrame de señales falsas y santifica mi vista de features/trading con confluencia sagrada. Amén."
     }]
   },
   pt: {
@@ -892,7 +907,7 @@ const PRAYERS_BY_LANGUAGE = {
     }, {
       id: 'chart',
       title: "Oração do Místico dos Gráficos",
-      text: "Ó Oráculo das Velas Eternas, Nossa Senhora do Lucro Perpétuo, guie meus olhos enquanto leio os indicadores sagrados. Dê-me o dom de ver cunhas antes que rompam, triângulos antes que apertem e cruzes douradas antes que brilhem. Livre-me de sinais falsos e santifique minha visão de trading com confluência sagrada. Amém."
+      text: "Ó Oráculo das Velas Eternas, Nossa Senhora do Lucro Perpétuo, guie meus olhos enquanto leio os indicadores sagrados. Dê-me o dom de ver cunhas antes que rompam, triângulos antes que apertem e cruzes douradas antes que brilhem. Livre-me de sinais falsos e santifique minha visão de features/trading com confluência sagrada. Amém."
     }]
   },
   fr: {
@@ -916,7 +931,7 @@ const PRAYERS_BY_LANGUAGE = {
     }, {
       id: 'chart',
       title: "Prière du Mystique des Graphiques",
-      text: "Ô Oracle des Bougies Éternelles, Notre Dame du Profit Perpétuel, guide mes yeux alors que je lis les indicateurs sacrés. Donne-moi le don de voir les biseaux avant qu'ils ne cassent, les triangles avant qu'ils ne se resserrent et les croix dorées avant qu'elles ne brillent. Délivre-moi des faux signaux et sanctifie ma vue de trading avec une confluence sacrée. Amen."
+      text: "Ô Oracle des Bougies Éternelles, Notre Dame du Profit Perpétuel, guide mes yeux alors que je lis les indicateurs sacrés. Donne-moi le don de voir les biseaux avant qu'ils ne cassent, les triangles avant qu'ils ne se resserrent et les croix dorées avant qu'elles ne brillent. Délivre-moi des faux signaux et sanctifie ma vue de features/trading avec une confluence sacrée. Amen."
     }]
   },
   zh: {
@@ -988,10 +1003,13 @@ const PRAYERS_BY_LANGUAGE = {
     }, {
       id: 'chart',
       title: "Preghiera del Mistico dei Grafici",
-      text: "O Oracolo delle Candele Eterne, Nostra Signora del Profitto Perpetuo, guida i miei occhi mentre leggo gli indicatori sacri. Dammi il dono di vedere i cunei prima che si rompano, i triangoli prima che si stringano e le croci d'oro prima che brillino. Liberami dai falsi segnali e santifica la mia vista di trading con la sacra confluenza. Amen."
+      text: "O Oracolo delle Candele Eterne, Nostra Signora del Profitto Perpetuo, guida i miei occhi mentre leggo gli indicatori sacri. Dammi il dono di vedere i cunei prima che si rompano, i triangoli prima che si stringano e le croci d'oro prima che brillino. Liberami dai falsi segnali e santifica la mia vista di features/trading con la sacra confluenza. Amen."
     }]
   }
 };
+const PRAYERS = PRAYERS_BY_LANGUAGE[getUserLanguage()]?.prayers || PRAYERS_BY_LANGUAGE.en.prayers;
+let cachedHandsImage = null;
+let handsImageCallbacks = [];
 function CandlePreview({
   imageUrl,
   message,
@@ -1918,7 +1936,8 @@ export default function CompactCandleModal({
     setIsGenerating(true);
     setError('');
     try {
-      const prompt = customPrompt || aiPrompt || 'Write a prayer for profitable crypto trading';
+      const prompt = customPrompt || aiPrompt || 'Write a prayer for profitable crypto features/trading';
+      const result = await generatePrayer(prompt, currentLanguage);
       setFormData(prev => ({
         ...prev,
         message: result.prayer
@@ -3996,6 +4015,90 @@ export default function CompactCandleModal({
                     </div>
                   </div>
 
+                  <div style={{
+                    marginTop: '12px'
+                  }}>
+                    <label style={{
+                      fontSize: '11px',
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      marginBottom: '6px',
+                      display: 'block'
+                    }}>
+                      Quick prayers:
+                    </label>
+                    <div style={{
+                      display: 'flex',
+                      gap: '6px',
+                      flexWrap: 'wrap'
+                    }}>
+                      <button type="button" onClick={() => handleAIGenerate(PRAYER_PROMPTS.diamondHands)} disabled={isGenerating || remainingPrayers === 0} style={{
+                        padding: '4px 10px',
+                        fontSize: '12px',
+                        borderRadius: '15px',
+                        backgroundColor: 'rgba(102, 126, 234, 0.2)',
+                        border: '1px solid rgba(102, 126, 234, 0.4)',
+                        color: '#fff',
+                        cursor: isGenerating || remainingPrayers === 0 ? 'not-allowed' : 'pointer'
+                      }}>
+                        💎 Diamond Hands
+                      </button>
+                      <button type="button" onClick={() => handleAIGenerate(PRAYER_PROMPTS.findGems)} disabled={isGenerating || remainingPrayers === 0} style={{
+                        padding: '4px 10px',
+                        fontSize: '12px',
+                        borderRadius: '15px',
+                        backgroundColor: 'rgba(102, 126, 234, 0.2)',
+                        border: '1px solid rgba(102, 126, 234, 0.4)',
+                        color: '#fff',
+                        cursor: isGenerating || remainingPrayers === 0 ? 'not-allowed' : 'pointer'
+                      }}>
+                        💎 Find 100x
+                      </button>
+                      <button type="button" onClick={() => handleAIGenerate(PRAYER_PROMPTS.bullRun)} disabled={isGenerating || remainingPrayers === 0} style={{
+                        padding: '4px 10px',
+                        fontSize: '12px',
+                        borderRadius: '15px',
+                        backgroundColor: 'rgba(102, 126, 234, 0.2)',
+                        border: '1px solid rgba(102, 126, 234, 0.4)',
+                        color: '#fff',
+                        cursor: isGenerating || remainingPrayers === 0 ? 'not-allowed' : 'pointer'
+                      }}>
+                        🚀 Bull Run
+                      </button>
+                      <button type="button" onClick={() => handleAIGenerate(PRAYER_PROMPTS.bearMarket)} disabled={isGenerating || remainingPrayers === 0} style={{
+                        padding: '4px 10px',
+                        fontSize: '12px',
+                        borderRadius: '15px',
+                        backgroundColor: 'rgba(102, 126, 234, 0.2)',
+                        border: '1px solid rgba(102, 126, 234, 0.4)',
+                        color: '#fff',
+                        cursor: isGenerating || remainingPrayers === 0 ? 'not-allowed' : 'pointer'
+                      }}>
+                        🐻 Bear Market
+                      </button>
+                      <button type="button" onClick={() => handleAIGenerate(PRAYER_PROMPTS.avoidLiquidation)} disabled={isGenerating || remainingPrayers === 0} style={{
+                        padding: '4px 10px',
+                        fontSize: '12px',
+                        borderRadius: '15px',
+                        backgroundColor: 'rgba(102, 126, 234, 0.2)',
+                        border: '1px solid rgba(102, 126, 234, 0.4)',
+                        color: '#fff',
+                        cursor: isGenerating || remainingPrayers === 0 ? 'not-allowed' : 'pointer'
+                      }}>
+                        🔥 No Liquidation
+                      </button>
+                      <button type="button" onClick={() => handleAIGenerate(PRAYER_PROMPTS.rugpull)} disabled={isGenerating || remainingPrayers === 0} style={{
+                        padding: '4px 10px',
+                        fontSize: '12px',
+                        borderRadius: '15px',
+                        backgroundColor: 'rgba(102, 126, 234, 0.2)',
+                        border: '1px solid rgba(102, 126, 234, 0.4)',
+                        color: '#fff',
+                        cursor: isGenerating || remainingPrayers === 0 ? 'not-allowed' : 'pointer'
+                      }}>
+                        🏃 Avoid Rugs
+                      </button>
+                    </div>
+                  </div>
 
                   {remainingPrayers === 0 && <div style={{
                     marginTop: '10px',

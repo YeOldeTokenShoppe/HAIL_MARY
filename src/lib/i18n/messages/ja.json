@@ -1,0 +1,29 @@
+{
+  "home": {
+    "welcome": "ようこそ",
+    "ourLady": "聖母",
+    "ofPerpetualProfit": "永続的な利益の",
+    "holdRL80": "RL80を保持",
+    "prosperity": "繁栄",
+    "forAll": "すべての人のために",
+    "humanity": "人類",
+    "behold": "見よ",
+    "buyNow": "今すぐ購入",
+    "learnMore": "詳しく見る",
+    "tokenomics": "トークノミクス",
+    "community": "コミュニティ",
+    "aboutUs": "私たちについて"
+  },
+  "navigation": {
+    "home": "ホーム",
+    "trading": "トレーディング",
+    "temple": "寺院",
+    "about": "概要",
+    "contact": "お問い合わせ"
+  },
+  "footer": {
+    "allRightsReserved": "全著作権所有",
+    "privacyPolicy": "プライバシーポリシー",
+    "termsOfService": "利用規約"
+  }
+}

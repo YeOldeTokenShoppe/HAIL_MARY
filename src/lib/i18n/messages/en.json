@@ -1,0 +1,29 @@
+{
+  "home": {
+    "welcome": "Welcome",
+    "ourLady": "Our Lady",
+    "ofPerpetualProfit": "of Perpetual Profit",
+    "holdRL80": "Hold RL80",
+    "prosperity": "PROSPERITY",
+    "forAll": "FOR ALL",
+    "humanity": "HUMANITY",
+    "behold": "BEHOLD",
+    "buyNow": "Buy Now",
+    "learnMore": "Learn More",
+    "tokenomics": "Tokenomics",
+    "community": "Community",
+    "aboutUs": "About Us"
+  },
+  "navigation": {
+    "home": "Home",
+    "trading": "Trading",
+    "temple": "Temple",
+    "about": "About",
+    "contact": "Contact"
+  },
+  "footer": {
+    "allRightsReserved": "All rights reserved",
+    "privacyPolicy": "Privacy Policy",
+    "termsOfService": "Terms of Service"
+  }
+}

@@ -3,7 +3,7 @@
 import React from 'react';
 import dynamic from 'next/dynamic';
 import { defineChain } from "thirdweb";
-import { client } from "@/client";
+import { client } from "@/lib/client";
 
 // Dynamically import BuyWidget to avoid SSR issues with test dependencies
 const BuyWidget = dynamic(

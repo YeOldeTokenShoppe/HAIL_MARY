@@ -15,7 +15,7 @@ import { useMusic } from '@/components/MusicContext';
 import { useUser, SignInButton, UserButton } from "@clerk/nextjs";
 import CyberNav from '@/components/CyberNav';
 import SimpleTextLoader from '@/components/SimpleTextLoader';
-import { TradingOverlay } from '@/trading';
+import { TradingOverlay } from '@/features/trading';
 // import { useLighterTrading } from '@/hooks/useLighterTrading'; // Direct Lighter integration
 import { useLighterAPI } from '@/hooks/useLighterAPI'; // API-based Lighter integration
 // import AgentChatDisplay from '@/components/AgentChatDisplay'; // Using existing Trading Team Chat instead
@@ -49,11 +49,11 @@ export default function CyborgTemple() {
   const [useAurora, setUseAurora] = useState(true); // Toggle between Aurora and StarField
   const [userHasInteracted, setUserHasInteracted] = useState(false); // Track if user has clicked around
   
-  // Connect to Lighter trading API
+  // Connect to Lighter features/trading API
   // Initial balance will be fetched from the actual account
   const { 
     isConnected, 
-    tradingData, 
+    features/tradingData, 
     initialize
   } = useLighterAPI({
     initialBalance: 0 // Will be replaced with actual balance from API
@@ -239,7 +239,7 @@ export default function CyborgTemple() {
     // console.log('ModelRef current:', modelRef.current);
     setModelLoaded(true);
     setLoadingProgress(70);
-    setLoadingMessage("Loading trading data");
+    setLoadingMessage("Loading features/trading data");
     
     // Only enable TickerDisplay3 on desktop
     if (!isMobileView) {
@@ -517,7 +517,7 @@ export default function CyborgTemple() {
                 paddingBottom: isMobileView ? "0.75rem" : "1rem",
                 borderBottom: "1px solid rgba(255, 255, 255, 0.2)",
               }}>
-                Live multi-agent AI trading on the<br/>
+                Live multi-agent AI features/trading on the<br/>
                 Lighter Perp DEX
               </p>
               
@@ -555,7 +555,7 @@ export default function CyborgTemple() {
                 marginBottom: isMobileView ? "0.75rem" : "1rem",
                 textAlign: isMobileView ? "center" : "left",
               }}>
-                {isMobileView ? "Tap agents to view more stats" : "Click on any agent to view their individual performance and trading philosophy."}
+                {isMobileView ? "Tap agents to view more stats" : "Click on any agent to view their individual performance and features/trading philosophy."}
               </p> */}
             </>
           )}
@@ -748,7 +748,7 @@ export default function CyborgTemple() {
      {/* <MemoryMonitor show={true} /> */}
         <TradingOverlay 
           show={showTrading} 
-          data={tradingData} 
+          data={features/tradingData} 
           isConnected={isConnected}
           modelRef={null}
           modelLoaded={modelLoaded}

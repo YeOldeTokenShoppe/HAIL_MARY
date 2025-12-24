@@ -11,7 +11,7 @@ import * as THREE from "three";
 // import { Leva } from "leva";
 import DarkClouds from "../../components/Clouds";
 import PostProcessingEffects from "../../components/PostProcessingEffects";
-import { useFirestoreResults } from '../../utilities/useFirestoreResults';
+import { useFirestoreResults } from '@/lib/useFirestoreResults';
 import { useMusic } from '../../components/MusicContext';
 import { useUser, SignInButton, UserButton } from "@clerk/nextjs";
 import CyberNav from '../../components/CyberNav';
@@ -21,13 +21,11 @@ import TranslatableDropInTitle from '../../components/TranslatableDropInTitle';
 // import Coin from '../../components/Coin';
 // import Link from 'next/link';
 import { motion, useInView } from 'framer-motion';
-// import RotatingText from '@/components/RotatingText';
-import '@/components/RotatingText.css';
+
 // import HandsGLTFScene from "@/components/HandsGLTFScene";
 import CompactCandleModal from '@/components/CompactCandleModal';
 // import CyberFAQSection from '@/components/CyberFAQSection';
 import CoinLoader from '@/components/CoinLoader';
-import CyberFloatingBar from '@/components/CyberFloatingBar';
 // import TokenomicsSection from '@/components/TokenomicsSection';
 // import CyberStatsSection from '@/components/CyberStatsSection';
 // import CyberTokenomicsSection from '@/components/CyberTokenomicsSection';
@@ -38,16 +36,13 @@ import CyberFloatingBar from '@/components/CyberFloatingBar';
 // import TubesCursor from '@/components/TubesCursor';
 // import CarouselWrapper from '@/components/CarouselWrapper';
 import BreathSmoke from "@/components/BreathSmoke";
-import SkewedHeading from "@/components/SkewedHeading";
-import AngelOfCurrencies from "@/components/AngelOfCurrencies";
 // import SlidingNav from "@/components/SlidingNav";
 import ThirdwebBuyModal from '@/components/ThirdwebBuyModal';
 // import CircularCTA from "@/components/CircularCTA";
 // import FeatureCarousel from "@/components/FeatureCarousel";
 // import { WatchlistSlide, Illumin80Slide, TradingDeskSlide, TokenomicsSlide } from "@/components/FeatureSlides";
 import Footer from "@/components/Footer";
-import AnnunciationIntro from '@/components/AnnunciationIntro';
-import { getDroneText } from '@/utils/droneTranslations';
+import { getDroneText } from '@/lib/utils/droneTranslations';
 import { useLanguage } from '@/components/LanguageProvider';
 
 // import VideoScreens from "@/components/VideoScreens";
@@ -4224,7 +4219,7 @@ export default function Home3() {
             slides={[
               <WatchlistSlide key="watchlist" />,
               <Illumin80Slide key="illumin80" />,
-              <TradingDeskSlide key="trading" />,
+              <TradingDeskSlide key="features/trading" />,
               <TokenomicsSlide key="tokenomics" />,
             ]}
             autoRotate={true}

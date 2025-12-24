@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import CoinLoader from '@/components/CoinLoader';
 import PalmTreeDrive from '@/components/PalmTreeDrive';
 import { useMusic } from '@/components/MusicContext';
 import Link from 'next/link';
 import CyberNav from '@/components/CyberNav';
+import CoinLoader from '@/components/CoinLoader';
 
 
 

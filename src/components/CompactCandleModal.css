@@ -1,0 +1,1059 @@
+@import url('https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&display=swap');
+
+.compact-modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: #000000 !important; /* Solid black for full-screen */
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 2147483647 !important; /* Maximum z-index value */
+  animation: fadeIn 0.3s ease;
+  overflow-x: hidden;
+  overflow-y: auto;
+  isolation: isolate;
+  pointer-events: all !important;
+}
+
+.compact-modal-content {
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  z-index: 2147483647; /* Maximum z-index value */
+  box-shadow: none !important;
+  animation: slideInFromBottom 0.4s ease;
+  overflow: hidden;
+  margin: 0 !important;
+  cursor: default;
+  pointer-events: all;
+}
+
+.compact-modal-close {
+  position: fixed; /* Fixed position for full-screen */
+  top: 20px;
+  right: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 24px;
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+  z-index: 100;
+  backdrop-filter: blur(10px);
+}
+
+.compact-modal-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.1);
+}
+
+.compact-modal-layout {
+  display: flex;
+  height: 100vh !important;
+  width: 100vw !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+}
+
+/* 3D Preview Section */
+.compact-candle-preview {
+  flex: 0 0 45%; /* Slightly wider for full-screen */
+  background: linear-gradient(135deg, #000000 0%, #0a0a0a 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.preview-label {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  text-transform: none;
+  letter-spacing: 0.5px;
+  z-index: 5;
+  font-family: 'UnifrakturMaguntia', serif;
+}
+
+.canvas-container {
+  width: 100%;
+  height: 100%;
+}
+
+/* Form Section */
+.compact-form-section {
+  flex: 1;
+  padding: 24px;
+  padding-bottom: 32px; /* Extra padding at bottom for buttons */
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  max-height: calc(85vh - 20px);
+}
+
+.compact-form-section h2 {
+  color: #ffffff;
+  margin: 0 0 24px 0;
+  font-size: 28px;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+  font-family: 'UnifrakturMaguntia', serif;
+}
+
+.compact-form-group {
+  margin-bottom: 16px;
+  position: relative;
+}
+
+.compact-form-group input[type="text"],
+.compact-form-group textarea,
+.compact-form-group select {
+  width: 100%;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.compact-form-group input[type="text"]:focus,
+.compact-form-group textarea:focus,
+.compact-form-group select:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.compact-form-group textarea {
+  resize: none;
+  font-family: inherit;
+}
+
+.message-input-wrapper {
+  position: relative;
+}
+
+.message-input-wrapper .compact-char-count {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 2px 6px;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.compact-form-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.compact-form-group.half {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.compact-file-label {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.compact-file-label:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.compact-file-input {
+  display: none;
+}
+
+.compact-error {
+  background: rgba(255, 59, 48, 0.1);
+  border: 1px solid rgba(255, 59, 48, 0.3);
+  color: #ff3b30;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.compact-form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.compact-btn-cancel,
+.compact-btn-submit {
+  flex: 1;
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.compact-btn-cancel {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.compact-btn-cancel:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.compact-btn-submit {
+  background: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%);
+  color: #000000;
+}
+
+.compact-btn-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+}
+
+.compact-btn-cancel:disabled,
+.compact-btn-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Mobile Responsive - Override any cached styles */
+/* Special layout for message input step on mobile */
+@media (max-width: 768px) {
+  .compact-candle-preview.message-step {
+    flex: 0 0 25vh !important;
+    height: 25vh !important;
+    max-height: 25vh !important;
+    min-height: 25vh !important;
+  }
+  
+  .compact-form-section.message-step {
+    flex: 1 1 75vh !important;
+    height: 75vh !important;
+    max-height: 75vh !important;
+    min-height: 75vh !important;
+  }
+}
+
+@media (max-width: 768px) {
+  /* CRITICAL: Force full viewport height, override any 80vh */
+  .compact-modal-layout {
+    height: 100vh !important;
+    min-height: 100vh !important;
+    max-height: 100vh !important;
+  }
+  
+  .compact-modal-overlay {
+    padding: 0 !important;
+  }
+  
+  .compact-modal-content {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+  
+  body .compact-modal-layout {
+    flex-direction: column !important;
+    height: 100vh !important;
+    min-height: 100vh !important;
+    max-height: 100vh !important; 
+    width: 100vw !important;
+    overflow: hidden !important;
+  }
+  
+  /* Fixed preview size for mobile */
+  .compact-candle-preview {
+    flex: 0 0 45vh !important;
+    height: 45vh !important;
+    width: 100vw !important;
+    border-right: none !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    overflow: hidden !important;
+    position: relative !important;
+  }
+  
+  /* Make canvas container fill the preview area and clip overflow */
+  .compact-candle-preview .canvas-container {
+    height: 100% !important;
+    width: 100% !important;
+    overflow: hidden !important;
+    position: relative !important;
+  }
+  
+  /* Ensure canvas doesn't overflow its container */
+  .compact-candle-preview canvas {
+    max-height: 100% !important;
+    max-width: 100% !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+  }
+  
+  /* Form section - compact with content at top */
+  .compact-form-section {
+    padding: 12px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    width: 100vw !important;
+    box-sizing: border-box !important;
+    flex: 1 !important;
+    height: 55vh !important;
+    max-height: 55vh !important;
+    max-width: 100vw !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    position: relative !important;
+    z-index: 10 !important;
+    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%) !important;
+  }
+  
+  /* Very compact headings */
+  .compact-form-section h2 {
+    font-size: 14px !important;
+    margin: 3px 0 !important;
+    line-height: 1 !important;
+    flex-shrink: 0 !important;
+  }
+  
+  /* Hide subtitle to save space */
+  .compact-form-section p {
+    font-size: 11px !important;
+    margin: 0 0 5px 0 !important;
+    line-height: 1.1 !important;
+  }
+  
+  /* Minimal step indicator */
+  .step-indicator {
+    padding: 4px 0 !important;
+    margin-bottom: 0 !important;
+    flex-shrink: 0 !important;
+  }
+  
+  /* Hide image preview on mobile - it's already on the candle */
+  .image-preview-container {
+    display: none !important;
+  }
+  
+  .compact-form-section img[alt="Preview"] {
+    display: none !important;
+  }
+  
+  /* Make template selector more compact */
+  .compact-form-section div[style*="gap"] {
+    gap: 4px !important;
+  }
+  
+  /* Compact the personalization section */
+  .compact-form-section h2 {
+    font-size: 14px !important;
+    margin: 5px 0 3px 0 !important;
+  }
+  
+  .compact-form-section h2 + p {
+    margin-bottom: 5px !important;
+    font-size: 10px !important;
+  }
+  
+  /* Make template buttons smaller */
+  .compact-form-section button[style*="width: '80px'"],
+  .compact-form-section button[style*="width: '100px'"] {
+    width: 70px !important;
+    height: 70px !important;
+    padding: 4px !important;
+  }
+  
+  .compact-form-section button[style*="width: '80px'"] img,
+  .compact-form-section button[style*="width: '100px'"] img {
+    width: 40px !important;
+    height: 40px !important;
+  }
+  
+  .compact-form-section button[style*="width: '80px'"] p,
+  .compact-form-section button[style*="width: '100px'"] p {
+    font-size: 9px !important;
+    margin: 2px 0 0 0 !important;
+  }
+  
+  /* Hide image adjustment section - now using floating panel instead */
+  .image-adjustment-section {
+    display: none !important;
+  }
+  
+  /* Alternative: make adjust controls very compact */
+  .compact-form-section input[type="range"] {
+    height: 20px !important;
+    margin: 3px 0 !important;
+  }
+  
+  .compact-form-section label[style*="fontSize: '11px'"] {
+    font-size: 9px !important;
+    margin: 2px 0 !important;
+  }
+  
+  .step-indicator .step-dot {
+    width: 8px !important;
+    height: 2px !important;
+  }
+  
+  /* Force candle selection to be horizontal on mobile */
+  .candle-selection-container {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+    overflow: visible !important;
+    justify-content: space-between !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    flex-shrink: 0 !important;
+  }
+  
+  /* Override inline styles on candle buttons */
+  .candle-selection-container button[style] {
+    width: 31% !important;
+    min-width: 95px !important;
+    max-width: 110px !important;
+    padding: 10px 6px !important;
+    margin: 0 !important;
+    flex: 0 0 31% !important;
+    height: auto !important;
+    min-height: 75px !important;
+    max-height: 85px !important;
+    word-wrap: break-word !important;
+  }
+  
+  /* Hide images in candle buttons - we have the preview! */
+  .candle-type-button img {
+    display: none !important;
+  }
+  
+  /* Compact text for candle buttons */
+  .candle-selection-container button h3 {
+    font-size: 14px !important;
+    margin: 0 0 2px 0 !important;
+    line-height: 1.2 !important;
+    font-weight: 600 !important;
+    white-space: normal !important;
+  }
+  
+  /* Very small descriptions */
+  .candle-selection-container button p {
+    font-size: 10px !important;
+    margin: 0 !important;
+    opacity: 0.7 !important;
+    line-height: 1.2 !important;
+    white-space: normal !important;
+  }
+  
+  /* Compact candle type buttons with more vertical space */
+  .candle-type-button {
+    min-height: 60px !important;
+    height: 60px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    padding: 10px 8px !important;
+    font-size: 13px !important;
+    line-height: 1.3 !important;
+  }
+  
+  .candle-type-button span {
+    font-size: 13px !important;
+    white-space: normal !important;
+    text-align: center !important;
+    max-width: 100% !important;
+  }
+  
+  /* Make candle selection buttons container more compact */
+  .candle-type-buttons {
+    gap: 8px !important;
+    padding: 10px !important;
+    margin-bottom: 10px !important;
+  }
+  
+  /* Hide scrollbars for template gallery */
+  .template-gallery::-webkit-scrollbar {
+    display: none !important;
+  }
+  
+  .template-gallery {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+    max-width: 100% !important;
+    margin: 0 -10px !important;
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+  }
+  
+  .compact-modal-close {
+    top: 15px !important;
+    right: 15px !important;
+    width: 36px !important;
+    height: 36px !important;
+    background: rgba(0, 0, 0, 0.8) !important;
+    backdrop-filter: blur(10px) !important;
+    z-index: 1000 !important;
+  }
+  
+  /* Ensure content doesn't overflow */
+  .compact-form-section > * {
+    flex-shrink: 0 !important;
+  }
+  
+  /* Hide any overflow content */
+  .compact-form-section > div {
+    max-height: 100% !important;
+  }
+  
+  /* Position navigation buttons just below content */
+  .compact-form-section > div:last-child {
+    position: relative !important;
+    margin-top: 20px !important;
+    left: 0 !important;
+    right: 0 !important;
+    display: flex !important;
+    justify-content: flex-end !important; /* Default: Next button on right */
+    gap: 15px !important;
+    z-index: 100 !important;
+    background: transparent !important;
+  }
+  
+  /* Style disabled buttons but keep them visible */
+  .compact-form-section button[disabled] {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+  }
+  
+  /* When Back button is visible, space buttons apart */
+  .compact-form-section > div:last-child:has(button:not([disabled]) + button) {
+    justify-content: space-between !important;
+  }
+  
+  /* Force all navigation buttons to use flexbox properly */
+  .compact-form-section div button[style*="background"] {
+    margin: 0 !important;
+  }
+  
+  /* Target Next button by matching the gradient colors exactly */
+  button[style*="255, 215, 0"],
+  button[style*="255, 237, 78"] {
+    margin-left: auto !important;
+    margin-right: 0 !important;
+  }
+  
+  /* Ensure form elements don't overflow */
+  .compact-form-group {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  
+  .compact-form-group input,
+  .compact-form-group textarea,
+  .compact-form-group select {
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+}
+
+/* Animation keyframes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromBottom {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes flameGlow {
+  0% {
+    background-position: 0% 50%;
+    filter: drop-shadow(0 0 20px rgba(255, 102, 0, 0.5)) brightness(1);
+  }
+  25% {
+    background-position: 50% 100%;
+    filter: drop-shadow(0 0 25px rgba(255, 153, 0, 0.7)) brightness(1.1);
+  }
+  50% {
+    background-position: 100% 50%;
+    filter: drop-shadow(0 0 30px rgba(255, 102, 0, 0.8)) brightness(1.2);
+  }
+  75% {
+    background-position: 50% 0%;
+    filter: drop-shadow(0 0 25px rgba(255, 51, 0, 0.6)) brightness(1.05);
+  }
+  100% {
+    background-position: 0% 50%;
+    filter: drop-shadow(0 0 20px rgba(255, 102, 0, 0.5)) brightness(1);
+  }
+}
+
+/* Prayer Selector Styles - removed, now using dropdown */
+
+/* Adjust textarea for longer prayers */
+.compact-form-group textarea {
+  min-height: 80px;
+}
+
+/* Message group with encryption button */
+.message-group {
+  position: relative;
+}
+
+.message-input-wrapper {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.message-input-wrapper textarea {
+  padding: 12px;
+}
+
+.message-input-wrapper textarea:disabled {
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(255, 255, 255, 0.8);
+  cursor: not-allowed;
+}
+
+/* Message controls section */
+.message-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+/* Bright, prominent encryption button */
+.encrypt-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #00ff88 0%, #00cc66 100%);
+  border: 2px solid #00ff88;
+  border-radius: 20px;
+  color: #000000;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+  animation: glowPulse 2s ease-in-out infinite;
+}
+
+.encrypt-button:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 4px 30px rgba(0, 255, 136, 0.6);
+  background: linear-gradient(135deg, #00ff88 0%, #00ff88 100%);
+}
+
+.encrypt-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  animation: none;
+  box-shadow: none;
+}
+
+.encrypt-button.is-encrypted {
+  background: linear-gradient(135deg, #ff6600 0%, #ff4400 100%);
+  border-color: #ff6600;
+  color: #ffffff;
+  box-shadow: 0 0 20px rgba(255, 102, 0, 0.5);
+  animation: encryptedPulse 1.5s ease-in-out infinite;
+}
+
+.encrypt-button.is-encrypted:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ff7700 0%, #ff5500 100%);
+  box-shadow: 0 4px 30px rgba(255, 102, 0, 0.7);
+}
+
+.encrypt-text {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  font-size: 14px;
+}
+
+/* Message status section */
+.message-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.encrypted-badge {
+  padding: 4px 8px;
+  background: rgba(255, 102, 0, 0.2);
+  border: 1px solid rgba(255, 102, 0, 0.4);
+  border-radius: 12px;
+  color: #ff6600;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  animation: fadeIn 0.3s ease;
+}
+
+/* Animations for the encrypt button */
+@keyframes glowPulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(0, 255, 136, 0.6);
+  }
+}
+
+@keyframes encryptedPulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(255, 102, 0, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(255, 102, 0, 0.7);
+  }
+}
+
+/* Password Dialog Styles */
+.encryption-password-dialog {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  backdrop-filter: blur(4px);
+}
+
+.password-dialog-content {
+  background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+  border: 1px solid rgba(255, 102, 0, 0.3);
+  border-radius: 12px;
+  padding: 24px;
+  width: 90%;
+  max-width: 320px;
+  box-shadow: 
+    0 10px 40px rgba(0, 0, 0, 0.6),
+    0 0 60px rgba(255, 102, 0, 0.1);
+}
+
+.password-dialog-content h3 {
+  color: #ff6600;
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  text-align: center;
+}
+
+.password-dialog-content p {
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0 0 16px 0;
+  font-size: 12px;
+  text-align: center;
+}
+
+.password-dialog-content input[type="password"] {
+  width: 100%;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: white;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.password-dialog-content input[type="password"]:focus {
+  outline: none;
+  border-color: #ff6600;
+  box-shadow: 0 0 10px rgba(255, 102, 0, 0.3);
+}
+
+.password-dialog-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.password-dialog-actions button {
+  flex: 1;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.password-dialog-actions button:first-child {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.password-dialog-actions button:first-child:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.password-dialog-actions button:last-child {
+  background: linear-gradient(135deg, #ff6600 0%, #ff8833 100%);
+  color: white;
+}
+
+.password-dialog-actions button:last-child:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 102, 0, 0.4);
+}
+
+.password-dialog-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Confirmation Dialog Styles */
+.confirmation-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.2s ease;
+}
+
+.confirmation-dialog {
+  background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+  border: 2px solid rgba(255, 102, 0, 0.5);
+  border-radius: 16px;
+  padding: 32px;
+  width: 90%;
+  max-width: 420px;
+  box-shadow: 
+    0 20px 60px rgba(0, 0, 0, 0.8),
+    0 0 120px rgba(255, 102, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  animation: slideUp 0.3s ease;
+}
+
+.confirmation-dialog h3 {
+  color: #ff6600;
+  margin: 0 0 20px 0;
+  font-size: 24px;
+  text-align: center;
+  text-shadow: 0 2px 4px rgba(255, 102, 0, 0.3);
+}
+
+.confirmation-details {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.confirmation-details p {
+  color: rgba(255, 255, 255, 0.9);
+  margin: 8px 0;
+  font-size: 14px;
+  word-wrap: break-word;
+}
+
+.confirmation-details strong {
+  color: #ff6600;
+  margin-right: 8px;
+}
+
+.encryption-notice {
+  color: #ffaa00 !important;
+  font-weight: 600;
+  text-align: center;
+  margin-top: 12px !important;
+}
+
+.confirmation-warning {
+  color: rgba(255, 100, 100, 0.9);
+  text-align: center;
+  font-size: 13px;
+  font-style: italic;
+  margin: 16px 0;
+  padding: 12px;
+  background: rgba(255, 0, 0, 0.05);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 0, 0, 0.2);
+}
+
+.confirmation-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.confirm-cancel,
+.confirm-save {
+  flex: 1;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.confirm-cancel {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.confirm-cancel:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.confirm-save {
+  background: linear-gradient(135deg, #ff6600 0%, #ff8833 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(255, 102, 0, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.confirm-save::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.confirm-save:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 102, 0, 0.5);
+}
+
+.confirm-save:hover:not(:disabled)::before {
+  left: 100%;
+}
+
+.confirm-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Update the submit button to be more cautious */
+.compact-btn-submit {
+  background: linear-gradient(135deg, #ff6600 0%, #ff8833 100%);
+  position: relative;
+}
+
+.compact-btn-submit:disabled {
+  background: linear-gradient(135deg, #666 0%, #888 100%);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

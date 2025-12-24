@@ -2,9 +2,9 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { storage } from "@/utilities/firebaseClient";
+import { storage } from "@/lib/firebaseClient";
 import { ref as storageRefUtil, getDownloadURL } from "firebase/storage";
-import globalAudioManager from "@/utilities/globalAudio";
+import globalAudioManager from "@/lib/globalAudio";
 
 // Create the music context
 export const MusicContext = createContext();

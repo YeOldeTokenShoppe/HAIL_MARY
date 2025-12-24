@@ -1,0 +1,29 @@
+{
+  "home": {
+    "welcome": "Bienvenido",
+    "ourLady": "Nuestra Señora",
+    "ofPerpetualProfit": "del Beneficio Perpetuo",
+    "holdRL80": "Mantén RL80",
+    "prosperity": "PROSPERIDAD",
+    "forAll": "PARA TODOS",
+    "humanity": "HUMANIDAD",
+    "behold": "CONTEMPLA",
+    "buyNow": "Comprar Ahora",
+    "learnMore": "Saber Más",
+    "tokenomics": "Tokenomics",
+    "community": "Comunidad",
+    "aboutUs": "Sobre Nosotros"
+  },
+  "navigation": {
+    "home": "Inicio",
+    "trading": "Trading",
+    "temple": "Templo",
+    "about": "Acerca",
+    "contact": "Contacto"
+  },
+  "footer": {
+    "allRightsReserved": "Todos los derechos reservados",
+    "privacyPolicy": "Política de Privacidad",
+    "termsOfService": "Términos de Servicio"
+  }
+}

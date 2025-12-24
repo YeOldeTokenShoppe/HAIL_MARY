@@ -1,0 +1,29 @@
+{
+  "home": {
+    "welcome": "Bienvenue",
+    "ourLady": "Notre Dame",
+    "ofPerpetualProfit": "du Profit Perpétuel",
+    "holdRL80": "Tenez RL80",
+    "prosperity": "PROSPÉRITÉ",
+    "forAll": "POUR TOUS",
+    "humanity": "HUMANITÉ",
+    "behold": "VOICI",
+    "buyNow": "Acheter Maintenant",
+    "learnMore": "En Savoir Plus",
+    "tokenomics": "Tokenomics",
+    "community": "Communauté",
+    "aboutUs": "À Propos"
+  },
+  "navigation": {
+    "home": "Accueil",
+    "trading": "Trading",
+    "temple": "Temple",
+    "about": "À Propos",
+    "contact": "Contact"
+  },
+  "footer": {
+    "allRightsReserved": "Tous droits réservés",
+    "privacyPolicy": "Politique de Confidentialité",
+    "termsOfService": "Conditions d'Utilisation"
+  }
+}

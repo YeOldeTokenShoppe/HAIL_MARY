@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import CircularCTA from './CircularCTA';
 
 const Footer = ({ isMobile = false }) => {
   // Helper function to get responsive values

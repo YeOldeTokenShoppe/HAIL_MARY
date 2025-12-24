@@ -5,7 +5,7 @@ import { ThirdwebProvider } from "thirdweb/react";
 import { LanguageProvider } from "@/components/LanguageProvider";
 
 import { dark, shadesOfPurple } from '@clerk/themes';
-import ConditionalIllumin80 from "@/components/ConditionalIllumin80"
+// import ConditionalIllumin80 from "@/components/ConditionalIllumin80"
 
 
 
@@ -302,7 +302,7 @@ export default function RootLayout({ children }) {
      
               <LanguageProvider>
                 <MusicProvider>
-                  <ConditionalIllumin80 />
+    
                   {children}
                 </MusicProvider>
               </LanguageProvider>

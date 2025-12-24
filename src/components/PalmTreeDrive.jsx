@@ -12,7 +12,8 @@ import { useMusic } from './MusicContext';
 import { useRouter } from 'next/navigation';
 // import SynthwaveText from './SynthwaveText';
 // import MorphingSynthwaveText from './MorphingSynthwaveText';
-import WebGLStandaloneText from './WebGLStandaloneText';
+import WebGLStandaloneText from '@/components/WebGLStandaloneText';
+
 
 
 // MusicPlayer3 removed - using global instance from _app.jsx
@@ -50,7 +51,7 @@ const textBlocks = [
   [
     // "Major listings on the horizon",
     // "taxes drop to zero",
-    // "frictionless trading",
+    // "frictionless features/trading",
     // "bridges to new ecosystems"
     "then",
         "success",

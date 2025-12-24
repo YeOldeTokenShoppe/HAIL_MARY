@@ -1,10 +1,10 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import en from '../../messages/en.json';
-import es from '../../messages/es.json';
-import fr from '../../messages/fr.json';
-import ja from '../../messages/ja.json';
+import en from '../lib/i18n/messages/en.json';
+import es from '../lib/i18n/messages/es.json';
+import fr from '../lib/i18n/messages/fr.json';
+import ja from '../lib/i18n/messages/ja.json';
 
 const translations = { en, es, fr, ja };
 

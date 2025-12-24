@@ -44,3 +44,6 @@ next-env.d.ts
 
 # API keys and secrets
 **/api-keys/*
+
+# clerk configuration (can include secrets)
+/.clerk/
