@@ -4,9 +4,16 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, useGLTF, useTexture, Html } from '@react-three/drei';
 useGLTF.preload('/models/tinyVotiveOnly.glb');
 useGLTF.preload('/models/tinyJapCanOnly.glb');
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '@/lib/firebaseClient';
+import { 
+  db, 
+  storage, 
+  collection, 
+  addDoc, 
+  serverTimestamp,
+  ref,
+  uploadBytes,
+  getDownloadURL
+} from '@/lib/firebaseClient';
 import * as THREE from 'three';
 import { useUser } from '@clerk/nextjs';
 import './CompactCandleModal.css';

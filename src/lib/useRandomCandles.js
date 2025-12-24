@@ -1,6 +1,13 @@
 import { useState, useEffect } from "react";
-import { collection, query, onSnapshot, where, getDocs, limit } from "firebase/firestore";
-import { db } from "./firebaseClient";
+import { 
+  db, 
+  collection, 
+  query, 
+  onSnapshot, 
+  where, 
+  getDocs, 
+  limit 
+} from "./firebaseClient";
 import { useUser } from "@clerk/nextjs";
 
 export function useRandomCandles(maxCandles = 20) {

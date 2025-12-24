@@ -4,21 +4,21 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, useGLTF, useTexture, Html } from '@react-three/drei';
 useGLTF.preload('/models/tinyVotiveOnly.glb');
 useGLTF.preload('/models/tinyJapCanOnly.glb');
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '@/utilities/firebaseClient';
+import { 
+  db, 
+  storage, 
+  collection, 
+  addDoc, 
+  serverTimestamp,
+  ref,
+  uploadBytes,
+  getDownloadURL
+} from '@/lib/firebaseClient';
 import * as THREE from 'three';
-import { gsap } from 'gsap';
-import { ScrambleTextPlugin } from 'gsap/dist/ScrambleTextPlugin';
-import { encryptMessage, generateScrambledDisplay } from '@/utilities/encryption';
-import { generatePrayer, getRemainingPrayers, PRAYER_PROMPTS } from '@/utilities/aiPrayers';
 import { useUser } from '@clerk/nextjs';
 import './CompactCandleModal.css';
-import { useFirestoreResults } from '@/utilities/useFirestoreResults';
+import { useFirestoreResults } from '@/lib/useFirestoreResults';
 import CandleSnapshotRenderer from './CandleSnapshotRenderer';
-if (typeof window !== 'undefined') {
-  gsap.registerPlugin(ScrambleTextPlugin);
-}
 // Simple viewer component for displaying candle models with dynamic texture support
 function SimpleCandleViewer({ modelPath, customImageUrl, backgroundTexturePath, backgroundGradient, dedicationName, dedicationMessage, showPlaque, userAvatar, burnAmount, baseColor }) {
   const { scene, materials } = useGLTF(modelPath);
@@ -1932,26 +1932,10 @@ export default function CompactCandleModal({
       }
     });
   };
+  // AI Prayer generation disabled - not needed for this app
   const handleAIGenerate = async (customPrompt = null) => {
-    setIsGenerating(true);
-    setError('');
-    try {
-      const prompt = customPrompt || aiPrompt || 'Write a prayer for profitable crypto features/trading';
-      const result = await generatePrayer(prompt, currentLanguage);
-      setFormData(prev => ({
-        ...prev,
-        message: result.prayer
-      }));
-      setSelectedPrayer(null);
-      setRemainingPrayers(result.remaining);
-      if (result.fromCache) {}
-      setShowAIPanel(false);
-      setAiPrompt('');
-    } catch (error) {
-      setError(error.message || 'Failed to generate prayer. Please try again.');
-    } finally {
-      setIsGenerating(false);
-    }
+    setError('AI prayer generation is not available');
+    return;
   };
   const uploadImage = async () => {
     let finalImageUrl = null;
@@ -2055,26 +2039,9 @@ export default function CompactCandleModal({
       const imageUrl = await uploadImage();
       let docData;
       if (isEncrypted && encryptionPassword) {
-        const encryptedData = await encryptMessage(trimmedMessage, encryptionPassword);
-        docData = {
-          messageType: formData.messageType,
-          candleType: formData.candleType,
-          candleHeight: formData.candleHeight || 'medium',
-          username: trimmedUsername,
-          createdBy: user?.id,
-          createdByUsername: user?.username || user?.firstName || user?.fullName,
-          userAvatar: clerkImageUrl || null,
-          encrypted: encryptedData.encrypted,
-          salt: encryptedData.salt,
-          iv: encryptedData.iv,
-          isEncrypted: true,
-          burnedAmount: parseInt(formData.burnedAmount) || 1000,
-          image: imageUrl,
-          background: formData.background || 'synthwave',
-          baseColor: formData.baseColor || '#ffffff',
-          staked: false,
-          createdAt: serverTimestamp()
-        };
+        // Encryption disabled - not needed for this app
+        setError('Message encryption is not available');
+        return;
       } else {
         docData = {
           messageType: formData.messageType,
@@ -3961,6 +3928,7 @@ export default function CompactCandleModal({
                   </div>;
                 })()}
 
+              {/* AI Panel disabled - not needed for this app
               {showAIPanel && <div style={{
                   margin: '15px 0',
                   padding: '15px',
@@ -4112,6 +4080,7 @@ export default function CompactCandleModal({
                       Daily limit reached. Try again tomorrow!
                     </div>}
                 </div>}
+              */}
 
               <div className="compact-form-group" style={{
                   display: 'flex',
@@ -4119,6 +4088,7 @@ export default function CompactCandleModal({
                   marginBottom: '12px'
                 }}>
                 
+                {/* Prayer selection disabled - not needed for this app
                 <select value={selectedPrayer || ''} onChange={e => {
                     const value = e.target.value;
                     if (value === '') {
@@ -4155,7 +4125,9 @@ export default function CompactCandleModal({
                             {currentLanguage === 'es' ? prayer.id === 'scalper' ? '⚡ Scalper' : prayer.id === 'leverage' ? '📊 Apalancado' : prayer.id === 'swing' ? '🌊 Swing' : prayer.id === 'hodler' ? '💎 Holdear' : prayer.id === 'chart' ? '📈 Gráficos' : prayer.title : currentLanguage === 'pt' ? prayer.id === 'scalper' ? '⚡ Scalper' : prayer.id === 'leverage' ? '📊 Alavancagem' : prayer.id === 'swing' ? '🌊 Swing' : prayer.id === 'hodler' ? '💎 Holder' : prayer.id === 'chart' ? '📈 Gráficos' : prayer.title : currentLanguage === 'fr' ? prayer.id === 'scalper' ? '⚡ Scalper' : prayer.id === 'leverage' ? '📊 Levier' : prayer.id === 'swing' ? '🌊 Swing' : prayer.id === 'hodler' ? '💎 Hodler' : prayer.id === 'chart' ? '📈 Graphiques' : prayer.title : currentLanguage === 'it' ? prayer.id === 'scalper' ? '⚡ Scalper' : prayer.id === 'leverage' ? '📊 Leva' : prayer.id === 'swing' ? '🌊 Swing' : prayer.id === 'hodler' ? '💎 Hodler' : prayer.id === 'chart' ? '📈 Grafici' : prayer.title : currentLanguage === 'zh' ? prayer.id === 'scalper' ? '⚡ 刷单' : prayer.id === 'leverage' ? '📊 杠杆' : prayer.id === 'swing' ? '🌊 波段' : prayer.id === 'hodler' ? '💎 囤币' : prayer.id === 'chart' ? '📈 图表' : prayer.title : currentLanguage === 'hi' ? prayer.id === 'scalper' ? '⚡ स्कैल्पर' : prayer.id === 'leverage' ? '📊 लीवरेज' : prayer.id === 'swing' ? '🌊 स्विंग' : prayer.id === 'hodler' ? '💎 होडलर' : prayer.id === 'chart' ? '📈 चार्ट' : prayer.title : prayer.id === 'scalper' ? '⚡ Scalper\'s Prayer' : prayer.id === 'leverage' ? '📊 Leverage Prayer' : prayer.id === 'swing' ? '🌊 Swing Trader\'s Prayer' : prayer.id === 'hodler' ? '💎 Hodler\'s Prayer' : prayer.id === 'chart' ? '📈 Chart Mystic\'s Prayer' : prayer.title}
                           </option>)}
                     </select>
+                    */}
                     
+                {/* AI Prayer Generator button disabled
                 <button type="button" onClick={() => setShowAIPanel(!showAIPanel)} title="AI Prayer Generator" style={{
                     padding: '10px 20px',
                     borderRadius: '8px',
@@ -4174,6 +4146,7 @@ export default function CompactCandleModal({
                   }} onMouseOver={e => e.currentTarget.style.transform = 'scale(1.05)'} onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}>
                   🤖 AI Prayer
                 </button>
+                */}
               </div>
                   
               <div className="compact-form-group message-group">
