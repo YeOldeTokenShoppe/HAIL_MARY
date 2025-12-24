@@ -5,10 +5,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useMusic } from '@/components/MusicContext';
 import CoinLoader from '@/components/CoinLoader';
-import BuyTokenFAB from '@/components/BuyTokenFAB';
-import CompactCandleModal from '@/components/CompactCandleModal';
 import CyberNav from '@/components/CyberNav';
-import SocialBar from '@/components/SocialBar';
 import { useUser, SignInButton, UserButton } from '@clerk/nextjs';
 
 // Dynamic import for the FountainFrame component
@@ -25,7 +22,6 @@ export default function FountainPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [fontLoaded, setFontLoaded] = useState(false);
   const [showMusicControls, setShowMusicControls] = useState(contextIsPlaying);
-  const [showCandleModal, setShowCandleModal] = useState(false);
   const [isMobileView, setIsMobileView] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const is80sMode = context80sMode;
@@ -67,12 +63,12 @@ export default function FountainPage() {
       try {
         await document.fonts.load("1em 'UnifrakturMaguntia'");
         setFontLoaded(true);
-        // Add fonts-loaded class to body to show the logo
-        document.body.classList.add('fonts-loaded');
+        // Add fonts-loaded class to html to show the logo
+        document.documentElement.classList.add('fonts-loaded');
       } catch (e) {
         setTimeout(() => {
           setFontLoaded(true);
-          document.body.classList.add('fonts-loaded');
+          document.documentElement.classList.add('fonts-loaded');
         }, 100);
       }
     };
@@ -207,7 +203,7 @@ export default function FountainPage() {
             cursor: "pointer",
           }}
         >
-          <Link href="/home3" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
+          <Link href="/home" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
             RL80
           </Link>
           {Array.from({ length: 100 }).map((_, i) => {

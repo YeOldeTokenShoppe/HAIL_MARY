@@ -14,6 +14,30 @@
     "community": "Community",
     "aboutUs": "About Us"
   },
+  "palmTreeDrive": {
+    "stage1": {
+      "line1": "join",
+      "line2": "the ride"
+    },
+    "stage2": {
+      "line1": "we're taking",
+      "line2": "the scenic",
+      "line3": "route"
+    },
+    "stage3": {
+      "line1": "if character",
+      "line2": "is destiny"
+    },
+    "stage4": {
+      "line1": "then",
+      "line2": "success",
+      "line3": "could be"
+    },
+    "stage5": {
+      "line1": "your",
+      "line2": "REAL80"
+    }
+  },
   "navigation": {
     "home": "Home",
     "trading": "Trading",

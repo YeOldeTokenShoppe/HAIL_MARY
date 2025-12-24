@@ -1,0 +1,237 @@
+/* Wrapper container */
+.focused-agent-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 10002;
+}
+
+/* Background blur overlay */
+.card-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  /* Desktop: no blur, just transparent background */
+  background: rgba(0, 0, 0, 0.3);
+  z-index: 10002;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.card-backdrop.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.focused-agent-card {
+  position: fixed;
+  top: 6rem; /* Desktop: below top controls */
+  right: 2rem;
+  transform: translateX(110%);
+  z-index: 10003;
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  max-height: calc(100vh - 8rem);
+  overflow: visible;
+}
+
+.focused-agent-card.visible {
+  transform: translateX(0);
+  pointer-events: all;
+}
+
+.card-container {
+  position: relative;
+  background: rgba(0, 0, 0, 0.9);
+  border: 0.125rem solid rgba(0, 255, 65, 0.3);
+  border-radius: 0.75rem;
+  padding: 1rem; /* Reduced padding */
+  backdrop-filter: blur(1.25rem);
+  box-shadow: 
+    0 1.25rem 3.125rem rgba(0, 0, 0, 0.8),
+    0 0 6.25rem rgba(0, 255, 65, 0.1);
+  width: 20rem; /* Smaller width for card proportions */
+  overflow-y: auto;
+  max-height: calc(100vh - 8rem);
+}
+
+.close-button {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: rgba(255, 0, 0, 0.8);
+  border: 0.125rem solid rgba(255, 255, 255, 0.3);
+  color: white;
+  display: none; /* Hidden by default on desktop */
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 100;
+}
+
+.close-button:hover {
+  background: rgba(255, 0, 0, 1);
+  transform: scale(1.1);
+}
+
+.card-header {
+  text-align: center;
+  margin-bottom: 0.5rem; /* Reduced margin */
+  padding-bottom: 0.5rem; /* Reduced padding */
+  border-bottom: 0.0625rem solid rgba(0, 255, 65, 0.2);
+}
+
+.card-header h3 {
+  margin: 0;
+  color: #00ff41;
+  font-size: 1.2rem; /* Smaller font */
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-shadow: 0 0 1.25rem rgba(0, 255, 65, 0.5);
+}
+
+.card-header p {
+  margin: 0.2rem 0 0; /* Less margin */
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.8rem; /* Smaller font */
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.focused-card {
+  margin: 0 auto;
+  transform: scale(1); /* Full scale to show card at actual size */
+}
+
+.card-description {
+  margin-top: 0.5rem; /* Reduced margin */
+  padding-top: 0.5rem; /* Reduced padding */
+  border-top: 0.0625rem solid rgba(0, 255, 65, 0.2);
+}
+
+.card-description p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* Mobile phones only - apply blur (excludes all tablets) */
+@media (max-width: 430px) {
+  .card-backdrop {
+    /* Fallback for browsers that don't support backdrop-filter */
+    background: rgba(0, 0, 0, 0.7);
+    /* Blur effect for supported browsers */
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    /* Add support for older Safari */
+    @supports (backdrop-filter: blur(12px)) or (-webkit-backdrop-filter: blur(12px)) {
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+  }
+}
+
+/* Mobile and tablet adjustments */
+@media (max-width: 768px) {
+  
+  .focused-agent-card {
+    /* Override desktop positioning for mobile centering */
+    top: 50%;
+    left: 50%;
+    right: auto;
+    transform: translate(-50%, -50%) scale(0);
+    width: 85vw;
+    max-width: 350px;
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .focused-agent-card.visible {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  
+  .card-container {
+    max-width: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.5rem;
+  }
+  
+  .focused-card {
+    transform: scale(1.2); /* Make the card bigger on mobile */
+    max-width: 100%;
+  }
+  
+  .close-button {
+    display: flex; /* Show on mobile */
+    position: absolute;
+    top: -0.5rem;
+    right: -0.5rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 1.5rem;
+    font-weight: bold;
+    background: rgba(0, 0, 0, 0.95);
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    z-index: 1001;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* Animation for card entrance */
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* Pulse effect for active state */
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 
+      0 1.25rem 3.125rem rgba(0, 0, 0, 0.8),
+      0 0 6.25rem rgba(0, 255, 65, 0.1);
+  }
+  50% {
+    box-shadow: 
+      0 1.25rem 3.125rem rgba(0, 0, 0, 0.8),
+      0 0 9.375rem rgba(0, 255, 65, 0.2);
+  }
+}
+
+.card-container {
+  animation: pulse 3s ease-in-out infinite;
+}

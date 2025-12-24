@@ -1,0 +1,327 @@
+/* Trading Cards Display Styles - Simple Horizontal Carousel */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+
+:root {
+  --bg-dark: #0a0c10;
+  --accent-green: #00ff41;
+  --accent-cyan: #00d9ff;
+  --accent-purple: #9945ff;
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.8);
+  --text-dim: rgba(255, 255, 255, 0.6);
+  --card-width: 300px;
+  --card-height: 420px;
+}
+
+.trading-cards-container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: transparent;
+  padding: 20px;
+  gap: 20px;
+}
+
+.cards-header {
+  text-align: center;
+  z-index: 1;
+}
+
+.cards-header h2 {
+  font-family: 'Orbitron', monospace;
+  font-size: 1.8rem;
+  font-weight: 900;
+  background: linear-gradient(90deg, 
+    var(--accent-green), 
+    var(--accent-cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0 0 5px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  filter: drop-shadow(0 0 15px rgba(0, 255, 65, 0.4));
+}
+
+.cards-header p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin: 0;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  opacity: 0.8;
+}
+
+/* Simple Horizontal Carousel */
+.carousel {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 1000px;
+  height: var(--card-height);
+  perspective: 1000px;
+}
+
+.card-container {
+  position: absolute;
+  width: var(--card-width);
+  height: var(--card-height);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Center card */
+.card-container.active {
+  transform: translateX(0) scale(1.05) translateZ(50px);
+  z-index: 10;
+  filter: none;
+}
+
+/* Left card */
+.card-container.prev {
+  transform: translateX(-80px) rotateY(15deg) scale(0.9) translateZ(-100px);
+  z-index: 5;
+  filter: brightness(0.8);
+  opacity: 0.9;
+}
+
+/* Right card */
+.card-container.next {
+  transform: translateX(80px) rotateY(-15deg) scale(0.9) translateZ(-100px);
+  z-index: 5;
+  filter: brightness(0.8);
+  opacity: 0.9;
+}
+
+/* Hidden cards */
+.card-container.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.carousel-card {
+  width: 100%;
+  height: 100%;
+}
+
+/* Navigation buttons */
+.nav {
+  color: white;
+  font-size: 3rem;
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 20;
+  cursor: pointer;
+  user-select: none;
+  background: linear-gradient(135deg, 
+    rgba(0, 217, 255, 0.2), 
+    rgba(153, 69, 255, 0.2));
+  border: 2px solid rgba(0, 217, 255, 0.3);
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.nav:hover {
+  background: linear-gradient(135deg, 
+    rgba(0, 217, 255, 0.4), 
+    rgba(153, 69, 255, 0.4));
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 20px rgba(0, 217, 255, 0.5);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.nav.left {
+  left: 50px;
+}
+
+.nav.right {
+  right: 50px;
+}
+
+/* Card indicators */
+.card-indicators {
+  display: flex;
+  gap: 10px;
+  z-index: 1;
+}
+
+.indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(0, 217, 255, 0.3);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.indicator::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(45deg, var(--accent-cyan), var(--accent-purple));
+  border-radius: 50%;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.indicator:hover {
+  background: rgba(0, 217, 255, 0.4);
+  transform: scale(1.3);
+}
+
+.indicator:hover::before {
+  opacity: 0.5;
+}
+
+.indicator.active {
+  background: linear-gradient(45deg, var(--accent-cyan), var(--accent-green));
+  border-color: transparent;
+  box-shadow: 0 0 15px rgba(0, 217, 255, 0.6);
+  animation: indicator-pulse 1.5s ease-in-out infinite;
+}
+
+.indicator.active::before {
+  opacity: 1;
+}
+
+@keyframes indicator-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+/* Council status */
+.council-status {
+  display: flex;
+  gap: 20px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, 
+    rgba(20, 25, 35, 0.9), 
+    rgba(25, 20, 40, 0.9));
+  border: 1px solid rgba(0, 217, 255, 0.2);
+  border-radius: 12px;
+  z-index: 1;
+  backdrop-filter: blur(15px);
+  position: relative;
+  overflow: hidden;
+}
+
+.council-status::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 10px,
+    rgba(0, 217, 255, 0.02) 10px,
+    rgba(0, 217, 255, 0.02) 20px
+  );
+  pointer-events: none;
+}
+
+.status-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.status-label {
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.status-value {
+  background: linear-gradient(45deg, 
+    var(--accent-cyan), 
+    var(--accent-green));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-family: 'Orbitron', monospace;
+  filter: drop-shadow(0 0 8px rgba(0, 217, 255, 0.4));
+}
+
+.status-value.active {
+  animation: blink 2s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  :root {
+    --card-width: 240px;
+    --card-height: 340px;
+  }
+  
+  .card-container.prev {
+    transform: translateX(-60px) rotateY(12deg) scale(0.85) translateZ(-80px);
+  }
+  
+  .card-container.next {
+    transform: translateX(60px) rotateY(-12deg) scale(0.85) translateZ(-80px);
+  }
+  
+  .nav {
+    font-size: 2rem;
+    width: 40px;
+    height: 40px;
+  }
+  
+  .nav.left {
+    left: 20px;
+  }
+  
+  .nav.right {
+    right: 20px;
+  }
+  
+  .council-status {
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+  }
+  
+  .status-item {
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --card-width: 200px;
+    --card-height: 280px;
+  }
+  
+  .card-container.prev {
+    transform: translateX(-50px) rotateY(10deg) scale(0.8) translateZ(-60px);
+  }
+  
+  .card-container.next {
+    transform: translateX(50px) rotateY(-10deg) scale(0.8) translateZ(-60px);
+  }
+}

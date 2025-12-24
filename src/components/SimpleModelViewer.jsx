@@ -559,24 +559,24 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
   // Add interaction to Pyramid object
   useEffect(() => {
     if (scene) {
-      console.log('Searching for Pyramid mesh in scene...');
+      // console.log('Searching for Pyramid mesh in scene...');
       
       // Find all pyramid-related meshes
       let pyramidMeshes = [];
       scene.traverse((child) => {
         if (child.isMesh && child.name.toLowerCase().includes('pyramid')) {
           pyramidMeshes.push(child);
-          console.log('Found pyramid mesh:', child.name, child);
+          // console.log('Found pyramid mesh:', child.name, child);
         }
       });
       
       if (pyramidMeshes.length > 0) {
-        console.log(`Found ${pyramidMeshes.length} pyramid mesh(es)`);
+        // console.log(`Found ${pyramidMeshes.length} pyramid mesh(es)`);
         
         // Add click handler
         const handlePyramidClick = (event) => {
           event.stopPropagation();
-          console.log('Pyramid clicked!');
+          // console.log('Pyramid clicked!');
           if (onPyramidClick) {
             onPyramidClick();
           }
@@ -584,7 +584,7 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
         
         // Apply to all pyramid meshes
         pyramidMeshes.forEach(pyramidMesh => {
-          console.log('Setting up pyramid mesh:', pyramidMesh.name);
+          // console.log('Setting up pyramid mesh:', pyramidMesh.name);
           
           // Store first mesh reference
           if (!pyramidMeshRef.current) {
@@ -597,7 +597,7 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
           pyramidMesh.userData.onClick = handlePyramidClick;
           
           if (pyramidMesh.material) {
-            console.log('Original material:', pyramidMesh.material);
+            // console.log('Original material:', pyramidMesh.material);
             
             // Clone the material to add glow effect
             const glowMaterial = pyramidMesh.material.clone();
@@ -615,11 +615,11 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
             }
             
             pyramidMesh.material = glowMaterial;
-            console.log('Applied glow material to', pyramidMesh.name);
+            // console.log('Applied glow material to', pyramidMesh.name);
           }
         });
       } else {
-        console.log('No pyramid meshes found in scene');
+        // console.log('No pyramid meshes found in scene');
       }
     }
   }, [scene, onPyramidClick]);
@@ -1147,7 +1147,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
         
         // console.log('UnifrakturCook font loaded successfully');
         setFontLoaded(true);
-        document.body.classList.add('fonts-loaded');
+        document.documentElement.classList.add('fonts-loaded');
       } catch (e) {
         console.error('Error during font loading:', e);
         // Fallback: just show the heading after a delay
@@ -1171,9 +1171,9 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
   
   // Hide loader only when everything is loaded
   useEffect(() => {
-    // console.log('SimpleModelViewer loading status:', { modelLoaded, fontLoaded, iframeLoaded, isDesktop });
+    console.log('SimpleModelViewer loading status:', { modelLoaded, fontLoaded, iframeLoaded, isDesktop });
     if (modelLoaded && fontLoaded && (iframeLoaded || !isDesktop)) {
-      // console.log('All conditions met, hiding loader');
+      console.log('All conditions met, hiding loader');
       // Add a small delay for smooth transition
       setTimeout(() => {
         setIsLoading(false);
@@ -1212,6 +1212,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
       )}
       
       {/* Heading - Show only after loading is complete */}
+      {console.log('Heading render check:', { isDesktop, isTablet, isLoading, shouldShow: (isDesktop || isTablet) && !isLoading })}
       {(isDesktop || isTablet) && !isLoading && (
         <div style={{
           position: 'absolute',
@@ -1229,7 +1230,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
         }}>
           <h1 style={{ 
             color: '#8e662b', // Golden brown color
-            fontFamily: 'Georgia, serif', // Georgia works reliably
+            fontFamily: 'UnifrakturCook, serif', // Use UnifrakturCook font
             textShadow: '3px 3px 5px #000, -1px -1px 5px pink',
             fontSize: '4rem',
             fontWeight: 700,
@@ -1262,7 +1263,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
         }}>
           <h1 style={{ 
             color: '#8e662b',
-            fontFamily: 'Georgia, serif', // Georgia works reliably
+            fontFamily: 'UnifrakturCook, serif', // Georgia works reliably
             textShadow: '3px 3px 5px #000, -1px -1px 5px pink',
             fontSize: windowWidth <= 480 ? '2.5rem' : '3rem',
             fontWeight: 700,

@@ -42,7 +42,7 @@ const Footer = ({ isMobile = false }) => {
           }}>
             {/* <CircularCTA
               text="• PREME EMERE • CLICK TO BUY • PREME EMERE • CLICK TO BUY • PREME EMERE • CLICK TO BUY"
-              href="/temple"
+              href="/trade"
               accentColor="#00ff00"
               bgColor="none"
               size={200}

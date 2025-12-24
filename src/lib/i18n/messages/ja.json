@@ -14,6 +14,30 @@
     "community": "コミュニティ",
     "aboutUs": "私たちについて"
   },
+  "palmTreeDrive": {
+    "stage1": {
+      "line1": "参加しよう",
+      "line2": "この旅に"
+    },
+    "stage2": {
+      "line1": "私たちは",
+      "line2": "景色の良い",
+      "line3": "道を行く"
+    },
+    "stage3": {
+      "line1": "もし性格が",
+      "line2": "運命なら"
+    },
+    "stage4": {
+      "line1": "それなら",
+      "line2": "成功は",
+      "line3": "きっと"
+    },
+    "stage5": {
+      "line1": "あなたの",
+      "line2": "REAL80"
+    }
+  },
   "navigation": {
     "home": "ホーム",
     "trading": "トレーディング",

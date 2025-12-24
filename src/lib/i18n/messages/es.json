@@ -14,6 +14,30 @@
     "community": "Comunidad",
     "aboutUs": "Sobre Nosotros"
   },
+  "palmTreeDrive": {
+    "stage1": {
+      "line1": "únete",
+      "line2": "al viaje"
+    },
+    "stage2": {
+      "line1": "estamos tomando",
+      "line2": "la ruta",
+      "line3": "panorámica"
+    },
+    "stage3": {
+      "line1": "si el carácter",
+      "line2": "es destino"
+    },
+    "stage4": {
+      "line1": "entonces",
+      "line2": "el éxito",
+      "line3": "podría ser"
+    },
+    "stage5": {
+      "line1": "tu",
+      "line2": "REAL80"
+    }
+  },
   "navigation": {
     "home": "Inicio",
     "trading": "Trading",

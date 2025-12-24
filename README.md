@@ -5,10 +5,10 @@ A Next.js project with selected pages and components from the pumpkinspice proje
 ## Pages Included
 
 - `/` - Root page with PalmTreeDrive scene
-- `/home3` - Main home page with 3D scenes and interactions
-- `/temple` - Temple page with Cyborg Temple scene
+- `/home` - Main home page with 3D scenes and interactions
+- `/trade` - Temple page with Cyborg Temple scene
 - `/fountain` - Fountain visualization page
-- `/model-viewer` - 3D model viewer
+- `/ethos` - 3D model viewer
 - `/tokenomics` - Tokenomics information page
 
 ## Getting Started

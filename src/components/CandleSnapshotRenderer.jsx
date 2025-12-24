@@ -13,9 +13,9 @@ const SKYBOX_TEXTURES = {
   gothicTokyo: '/gothicTokyo.webp',
   neoTokyo: '/neoTokyo.webp',
   aurora: '/aurora.webp',
-  templeScene: '/templeScene.webp',
+  tradeScene: '/tradeScene.webp',
   sunset: '/gradient-sunset.webp',
-  chart: '/chart.webp',
+  chart: '/images/chart.webp',
   collectibles: '/pokemon2.webp',
   dreams: '/gradient-dreams.webp'
 };

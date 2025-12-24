@@ -8,6 +8,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useMusic } from './MusicContext';
+import { useLanguage } from './LanguageProvider';
 // import { IconButton, div } from '@chakra-ui/react';
 import { useRouter } from 'next/navigation';
 // import SynthwaveText from './SynthwaveText';
@@ -21,52 +22,7 @@ import WebGLStandaloneText from '@/components/WebGLStandaloneText';
 // Register GSAP ScrollTrigger plugin
 gsap.registerPlugin(ScrollTrigger);
 
-// Define text blocks for transitions
-const textBlocks = [
-[
-    "join",
-  
-      "the ride"
-    // "stake your tokens",
-    // "rewards on autopilot",
-    // "tokenomics in motion"
-  ],
-  [
-    // "cruising toward 500k",
-    // "liquidity in the tank",
-    // "foundation for the journey",
-    // "we accelerate,"
-    "we're taking",
-    "the scenic",
-       "route"
-  ],
-  [
-    // "goals in the rearview",
-    // "buybacks engage",
-    // "smoothing the way",
-    // "through every dip and climb"
-    "if character",
-        "is destiny"
-  ],
-  [
-    // "Major listings on the horizon",
-    // "taxes drop to zero",
-    // "frictionless features/trading",
-    // "bridges to new ecosystems"
-    "then",
-        "success",
-        "could be"
-
-  ],
-  [
-    // "the road ahead:",
-    // "one thousand holders",
-    // "five thousand, ten..",
-    // "you're never alone",
-    "your new",
-    "REAL80",
-  ]
-];
+// Text blocks are now defined inside the component to use translations
 
 // Define SynthwaveText words for each stage (keeping for potential future use)
 // const synthwaveWords = [
@@ -123,6 +79,7 @@ const wavyFragmentShader = `
 `;
 
 const PalmsScene = ({ onLoadingChange }) => {
+  const { t } = useLanguage();
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
   const rendererRef = useRef(null);
@@ -136,6 +93,32 @@ const PalmsScene = ({ onLoadingChange }) => {
     sun: 'loading', 
     car: 'loading'
   });
+  
+  // Define text blocks for transitions using translations
+  const textBlocks = [
+    [
+      t('palmTreeDrive.stage1.line1'),
+      t('palmTreeDrive.stage1.line2')
+    ],
+    [
+      t('palmTreeDrive.stage2.line1'),
+      t('palmTreeDrive.stage2.line2'),
+      t('palmTreeDrive.stage2.line3')
+    ],
+    [
+      t('palmTreeDrive.stage3.line1'),
+      t('palmTreeDrive.stage3.line2')
+    ],
+    [
+      t('palmTreeDrive.stage4.line1'),
+      t('palmTreeDrive.stage4.line2'),
+      t('palmTreeDrive.stage4.line3')
+    ],
+    [
+      t('palmTreeDrive.stage5.line1'),
+      t('palmTreeDrive.stage5.line2')
+    ]
+  ];
 
   
   // Wrapper to update both internal state and parent
@@ -521,7 +504,7 @@ const PalmsScene = ({ onLoadingChange }) => {
         // console.log('Loading fallback triggered - forcing scene to show');
         setIsSceneLoading(false);
       }
-    }, 8000); // 8 seconds fallback to match home3
+    }, 8000); // 8 seconds fallback to match home
 
     // Noise shader function
     const noise = `
@@ -2104,7 +2087,7 @@ const PalmsScene = ({ onLoadingChange }) => {
         
         if (intersects.length > 0) {
           const isMobile = detectMobileDevice();
-          const destination = isMobile ? '/home3' : '/home3';
+          const destination = isMobile ? '/home' : '/home';
           
           // Add fade out transition before navigating
           gsap.to(mountRef.current, {
@@ -2130,7 +2113,7 @@ const PalmsScene = ({ onLoadingChange }) => {
             const distance = intersect.point.distanceTo(maryPos);
             if (distance < 2) { // Within 2 units of Mary's position
               const isMobile = detectMobileDevice();
-              const destination = isMobile ? '/home3' : '/home3';
+              const destination = isMobile ? '/home' : '/home';
 
               // Add fade out transition before navigating
               gsap.to(mountRef.current, {
@@ -2340,7 +2323,7 @@ const PalmsScene = ({ onLoadingChange }) => {
             {/* Using WebGL Standalone Text with textBlocks array */}
             <WebGLStandaloneText 
               textArray={textBlocks[currentCameraStage] || ["DRIFT"]}
-              fontSize={isMobile ? 1.6 : 1.8}
+              fontSize={isMobile ? 1.8 : 2.1}
               lineHeight={isMobile ? 1 : 1}
               color="#ff00ff"
               id={`palmtree-stage-${currentCameraStage}`}
@@ -2423,7 +2406,7 @@ const PalmsScene = ({ onLoadingChange }) => {
           <button
             onClick={() => {
               const isMobile = detectMobileDevice();
-              const destination = isMobile ? '/home3' : '/home3';
+              const destination = isMobile ? '/home' : '/home';
               router.push(destination);
             }}
             style={{

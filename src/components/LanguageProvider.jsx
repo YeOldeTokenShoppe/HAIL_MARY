@@ -12,34 +12,56 @@ const LanguageContext = createContext({
   locale: 'en',
   setLocale: () => {},
   t: (key) => key,
+  detectedLanguage: null,
+  isAutoDetected: false,
 });
 
 export function LanguageProvider({ children }) {
   const [locale, setLocale] = useState('en');
+  const [detectedLanguage, setDetectedLanguage] = useState(null);
+  const [isAutoDetected, setIsAutoDetected] = useState(false);
   
   // Detect browser language on mount
   useEffect(() => {
     const detectLanguage = () => {
-      // Check URL params first
+      // Store the browser's detected language
+      const browserLang = navigator.language || navigator.userLanguage;
+      const langCode = browserLang.split('-')[0].toLowerCase();
+      setDetectedLanguage(browserLang);
+      
+      // Check URL params first (manual override)
       const urlParams = new URLSearchParams(window.location.search);
       const urlLang = urlParams.get('lang');
       
       if (urlLang && translations[urlLang]) {
+        console.log('Language set from URL param:', urlLang);
         setLocale(urlLang);
+        setIsAutoDetected(false);
         return;
       }
       
-      // Check browser language
-      const browserLang = navigator.language || navigator.userLanguage;
-      const langCode = browserLang.split('-')[0].toLowerCase();
+      console.log('Browser language detected:', browserLang, '-> langCode:', langCode);
+      console.log('Available translations:', Object.keys(translations));
       
       if (translations[langCode]) {
+        console.log('Auto-setting locale to browser language:', langCode);
         setLocale(langCode);
+        setIsAutoDetected(true);
+      } else {
+        console.log('Language not supported, defaulting to English');
+        setLocale('en');
+        setIsAutoDetected(true);
       }
     };
     
     detectLanguage();
   }, []);
+  
+  // When manually changing locale, mark as not auto-detected
+  const handleSetLocale = (newLocale) => {
+    setLocale(newLocale);
+    setIsAutoDetected(false);
+  };
   
   // Translation function
   const t = (key) => {
@@ -54,7 +76,13 @@ export function LanguageProvider({ children }) {
   };
   
   return (
-    <LanguageContext.Provider value={{ locale, setLocale, t }}>
+    <LanguageContext.Provider value={{ 
+      locale, 
+      setLocale: handleSetLocale, 
+      t, 
+      detectedLanguage, 
+      isAutoDetected 
+    }}>
       {children}
     </LanguageContext.Provider>
   );

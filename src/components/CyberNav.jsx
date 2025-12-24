@@ -74,13 +74,13 @@ const CyberNav = ({ is80sMode = false, position = "fixed", musicButton = null, u
   }, [isMenuOpen]);
 
   const navItems = [
-    { id: '00', date: 'ICON ON I-80', title: "ROADMAP", path: '/', thumbnail: '/I80.png' },
-    { id: '01', date: 'DEFI GRAV80', title: 'SOMETHING ABOUT RL80', path: '/home3', thumbnail: '/darkSky.png' },
+    { id: '00', date: 'ICON ON I-80', title: "ROADMAP", path: '/', thumbnail: '/images/I80.png' },
+    { id: '01', date: 'DEFI GRAV80', title: 'SOMETHING ABOUT RL80', path: '/home', thumbnail: '/images/ROSE_TATTOO.png' },
     // { id: '02', date: 'LIGHT UTIL80', title: 'THE ILLUMIN80', path: '/gallery3', thumbnail: '/heart.png' },
-    { id: '02', date: 'PRAYER & PROBABIL80', title: 'TRADING DESK', path: '/temple', thumbnail: '/lightning.png' },
-    { id: '03', date: 'ETHICS & MORAL80', title: 'SCROLLS OF ST. GR80', path: '/model-viewer', thumbnail: '/stgr81.png' },
-    { id: '04', date: 'CHAR80 & LIQUID80', title: 'COIN FOUNTAIN', path: '/fountain', thumbnail: '/fountain2.png' },
-    { id: '05', date: 'QUANT80 & CURIOS80', title: 'TOKENOMICS & FAQ', path: '/tokenomics', thumbnail: '/coinFront.png' },
+    { id: '02', date: 'PRAYER & PROBABIL80', title: 'TRADING DESK', path: '/trade', thumbnail: '/images/3ACES_TATTOO.png' },
+    { id: '03', date: 'ETHICS & MORAL80', title: 'SCROLLS OF ST. GR80', path: '/ethos', thumbnail: '/images/ILLUMIN80_TATTOO.png' },
+    { id: '04', date: 'CHAR80 & LIQUID80', title: 'COIN FOUNTAIN', path: '/fountain', thumbnail: '/images/HEART_TATTOO.png' },
+    { id: '05', date: 'QUANT80 & CURIOS80', title: 'TOKENOMICS & FAQ', path: '/tokenomics', thumbnail: '/images/COIN_TATTOO.png' },
 
   ];
 
@@ -307,7 +307,7 @@ const CyberNav = ({ is80sMode = false, position = "fixed", musicButton = null, u
                       setHoveredItemPath('');
                     }}
                   >
-                    <div style={{ width: "50px", height: "50px", overflow: "hidden", borderRadius: "5px", flexShrink: "0" }}>
+                    <div style={{ width: "60px", height: "60px", overflow: "hidden", borderRadius: "5px", flexShrink: "0" }}>
                       <img
                         src={item.thumbnail}
                         alt={item.title}

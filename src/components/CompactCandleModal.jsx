@@ -1554,9 +1554,9 @@ const BACKGROUND_TEXTURES = [{
   name: 'Aurora',
   type: 'image'
 }, {
-  id: 'templeScene',
-  path: '/templeScene.webp',
-  name: 'Temple Scene',
+  id: 'tradeScene',
+  path: '/tradeScene.webp',
+  name: 'Trade Scene',
   type: 'image'
 }, {
   id: 'sunset',
@@ -1565,7 +1565,7 @@ const BACKGROUND_TEXTURES = [{
   type: 'image'
 }, {
   id: 'chart',
-  path: '/chart.webp',
+  path: '/images/chart.webp',
   name: 'Chart Patterns',
   type: 'image'
 }, {

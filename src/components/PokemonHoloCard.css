@@ -1,0 +1,636 @@
+/* Pokemon Holo Card Styles */
+:root {
+  /* Position and transformation variables */
+  --mx: 50%;
+  --my: 50%;
+  --s: 1;
+  --o: 0;
+  --tx: 0px;
+  --ty: 0px;
+  --rx: 0deg;
+  --ry: 0deg;
+  --pos: 50% 50%;
+  --posx: 50%;
+  --posy: 50%;
+  --hyp: 0;
+  
+  /* Color variables */
+  --red: hsl(345deg 100% 50%);
+  --vio: hsl(278deg 100% 50%);
+  --blu: hsl(215deg 100% 50%);
+  --gre: hsl(119deg 100% 47%);
+  --yel: hsl(40deg 100% 50%);
+}
+
+.pokemon-card-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 25rem;
+  perspective: 62.5rem;
+}
+
+.card {
+  --rotate-x: 0deg;
+  --rotate-y: 0deg;
+  --mx: 50%;
+  --my: 50%;
+  --posx: 50%;
+  --posy: 50%;
+  --hyp: 0;
+  --pos: 50% 50%;
+  --radius: 4.55% / 3.5%;
+  
+  width: 18rem;
+  height: 25rem;
+  position: relative;
+  border-radius: var(--radius);
+  transform-style: preserve-3d;
+  transition: transform 0.6s ease;
+  transform: rotateX(var(--rotate-x)) rotateY(var(--rotate-y));
+  cursor: pointer;
+  z-index: calc(var(--s) * 100);
+  will-change: transform, visibility;
+}
+
+/* Flip animation */
+.card.flipped {
+  transform: rotateY(180deg);
+}
+
+.card__content {
+  position: absolute;
+  inset: 0;
+  border-radius: 0.75rem;
+  border: 0.625rem solid hsl(0 0% 25%);
+  padding: 0.9375rem;
+  display: flex;
+  flex-direction: column;
+  z-index: 1;
+  box-shadow: 0 0.625rem 2.5rem rgba(0, 0, 0, 0.4);
+  backface-visibility: hidden;
+}
+
+/* Front face styling */
+.card__front {
+  background: linear-gradient(135deg, #ffd89b 0%, #ffcb6b 50%, #ffb347 100%);
+}
+
+/* Card face base styling */
+.card__face {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+}
+
+/* Back face styling */
+.card__back {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  transform: rotateY(180deg);
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Holographic Shine Layer */
+.card__shine {
+  --grain: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB3aWR0aD0iNTAwIiBoZWlnaHQ9IjUwMCI+CjxmaWx0ZXIgaWQ9Im4iPgo8ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iLjciIG51bU9jdGF2ZXM9IjEwIiBzdGl0Y2hUaWxlcz0ic3RpdGNoIj48L2ZlVHVyYnVsZW5jZT4KPC9maWx0ZXI+CjxyZWN0IHdpZHRoPSI1MDAiIGhlaWdodD0iNTAwIiBmaWxsPSIjMDAwIj48L3JlY3Q+CjxyZWN0IHdpZHRoPSI1MDAiIGhlaWdodD0iNTAwIiBmaWx0ZXI9InVybCgjbikiIG9wYWNpdHk9IjAuMyI+PC9yZWN0Pgo8L3N2Zz4=");
+  --space: 5%;
+  --angle: 133deg;
+  --imgsize: 500px;
+  
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+  z-index: 10;
+  pointer-events: none;
+  mix-blend-mode: color-dodge;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  transform-style: preserve-3d;
+}
+
+.card:hover .card__shine {
+  opacity: 0.2;
+}
+
+/* RARE HOLO EFFECT - Disabled for full card (we only want it in image area) */
+.card[data-rarity="rare holo"] .card__shine {
+  display: none;  /* Hide the full-card holographic effect */
+}
+
+
+/* Card Header */
+.card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.625rem;
+  position: relative;
+}
+
+.card__name {
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #222;
+  margin: 0;
+  font-family: 'Arial Black', sans-serif;
+}
+
+.card__hp {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.hp-label {
+  font-size: 0.625rem;
+  color: #ff0000;
+  font-weight: bold;
+}
+
+.hp-value {
+  font-size: 1.375rem;
+  font-weight: bold;
+  color: #ff0000;
+}
+
+.card__type {
+  position: absolute;
+  right: 0;
+  top: -0.3125rem;
+  width: 1.875rem;
+  height: 1.875rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.125rem;
+}
+
+.type-fire {
+  background: linear-gradient(135deg, #ff6b6b, #ff3333);
+  color: white;
+}
+
+.type-water {
+  background: linear-gradient(135deg, #4fc3f7, #2196f3);
+  color: white;
+}
+
+.type-grass {
+  background: linear-gradient(135deg, #81c784, #4caf50);
+  color: white;
+}
+
+.type-electric {
+  background: linear-gradient(135deg, #ffd54f, #ffeb3b);
+  color: #333;
+}
+
+/* Image Container - Layered structure */
+.card__image-container {
+  position: relative;
+  height: 7.5rem;
+  border: 0.1875rem solid #ffd700;
+  border-radius: 0.5rem;
+  margin-bottom: 0.625rem;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Holographic background wrapper - properly clipped */
+.card__holo-background {
+  position: absolute;
+  inset: 0.1875rem;  /* Inset by border width to stay inside frame */
+  width: calc(100% - 0.375rem);
+  height: calc(100% - 0.375rem);
+  z-index: 1;
+  overflow: hidden;
+  border-radius: 0.25rem;  /* Slightly smaller radius to fit inside border */
+}
+
+/* Layer 1: Background image */
+.card__image-background {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
+}
+
+/* Pokemon Image - removed from layer stack (optional middle layer) */
+.card__image {
+  position: relative;
+  width: 90%;
+  height: 90%;
+  object-fit: contain;
+  z-index: 4;  /* Above everything if you want Pokemon on top */
+  filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.5));
+}
+
+.card__image-placeholder {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+  color: #1976d2;
+  font-size: 24px;
+  font-weight: bold;
+  z-index: 4;
+}
+
+/* Holographic shine - applied ONLY within the background wrapper */
+.card__holo-background .card__shine--image {
+  position: absolute;
+  inset: 0;
+  z-index: 2;  /* Above background image but contained within wrapper */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  mix-blend-mode: screen;  /* Changed from color-dodge to screen for brighter effect */
+}
+
+.card:hover .card__holo-background .card__shine--image {
+  opacity: 0.5;  /* Full opacity for maximum effect */
+}
+
+/* Copy the holo effect for image-specific shine - EXACT ORIGINAL PATTERN */
+.card[data-rarity="rare holo"] .card__holo-background .card__shine--image {
+  --space: 0.125rem;
+  --h: 21;
+  --s: 70%;
+  --l: 50%;
+  --bars: 1.5rem;
+  --bar-color: rgba(255, 255, 255, 0.6);
+  --bar-bg: rgb(10, 10, 10);
+  
+  background-image: repeating-linear-gradient(
+      90deg,
+      hsl(calc(var(--h) * 0), var(--s), var(--l)) calc(var(--space) * 0),
+      hsl(calc(var(--h) * 0), var(--s), var(--l)) calc(var(--space) * 1),
+      transparent calc(var(--space) * 1.001),
+      transparent calc(var(--space) * 1.999),
+      hsl(calc(var(--h) * 1), var(--s), var(--l)) calc(var(--space) * 2),
+      hsl(calc(var(--h) * 1), var(--s), var(--l)) calc(var(--space) * 3),
+      transparent calc(var(--space) * 3.001),
+      transparent calc(var(--space) * 3.999),
+      hsl(calc(var(--h) * 2), var(--s), var(--l)) calc(var(--space) * 4),
+      hsl(calc(var(--h) * 2), var(--s), var(--l)) calc(var(--space) * 5),
+      transparent calc(var(--space) * 5.001),
+      transparent calc(var(--space) * 5.999),
+      hsl(calc(var(--h) * 3), var(--s), var(--l)) calc(var(--space) * 6),
+      hsl(calc(var(--h) * 3), var(--s), var(--l)) calc(var(--space) * 7),
+      transparent calc(var(--space) * 7.001),
+      transparent calc(var(--space) * 7.999),
+      hsl(calc(var(--h) * 4), var(--s), var(--l)) calc(var(--space) * 8),
+      hsl(calc(var(--h) * 4), var(--s), var(--l)) calc(var(--space) * 9),
+      transparent calc(var(--space) * 9.001),
+      transparent calc(var(--space) * 9.999),
+      hsl(calc(var(--h) * 5), var(--s), var(--l)) calc(var(--space) * 10),
+      hsl(calc(var(--h) * 5), var(--s), var(--l)) calc(var(--space) * 11),
+      transparent calc(var(--space) * 11.001),
+      transparent calc(var(--space) * 11.999),
+      hsl(calc(var(--h) * 6), var(--s), var(--l)) calc(var(--space) * 12),
+      hsl(calc(var(--h) * 6), var(--s), var(--l)) calc(var(--space) * 13),
+      transparent calc(var(--space) * 13.001),
+      transparent calc(var(--space) * 13.999),
+      hsl(calc(var(--h) * 7), var(--s), var(--l)) calc(var(--space) * 14),
+      hsl(calc(var(--h) * 7), var(--s), var(--l)) calc(var(--space) * 15),
+      transparent calc(var(--space) * 15.001),
+      transparent calc(var(--space) * 15.999),
+      hsl(calc(var(--h) * 8), var(--s), var(--l)) calc(var(--space) * 16),
+      hsl(calc(var(--h) * 8), var(--s), var(--l)) calc(var(--space) * 17),
+      transparent calc(var(--space) * 17.001),
+      transparent calc(var(--space) * 17.999),
+      hsl(calc(var(--h) * 9), var(--s), var(--l)) calc(var(--space) * 18),
+      hsl(calc(var(--h) * 9), var(--s), var(--l)) calc(var(--space) * 19),
+      transparent calc(var(--space) * 19.001),
+      transparent calc(var(--space) * 19.999),
+      hsl(calc(var(--h) * 10), var(--s), var(--l)) calc(var(--space) * 20),
+      hsl(calc(var(--h) * 10), var(--s), var(--l)) calc(var(--space) * 21),
+      transparent calc(var(--space) * 21.001),
+      transparent calc(var(--space) * 21.999),
+      hsl(calc(var(--h) * 11), var(--s), var(--l)) calc(var(--space) * 22),
+      hsl(calc(var(--h) * 11), var(--s), var(--l)) calc(var(--space) * 23),
+      transparent calc(var(--space) * 23.001),
+      transparent calc(var(--space) * 23.999),
+      hsl(calc(var(--h) * 12), var(--s), var(--l)) calc(var(--space) * 24),
+      hsl(calc(var(--h) * 12), var(--s), var(--l)) calc(var(--space) * 25),
+      transparent calc(var(--space) * 25.001),
+      transparent calc(var(--space) * 25.999),
+      hsl(calc(var(--h) * 13), var(--s), var(--l)) calc(var(--space) * 26),
+      hsl(calc(var(--h) * 13), var(--s), var(--l)) calc(var(--space) * 27),
+      transparent calc(var(--space) * 27.001),
+      transparent calc(var(--space) * 27.999),
+      hsl(calc(var(--h) * 14), var(--s), var(--l)) calc(var(--space) * 28),
+      hsl(calc(var(--h) * 14), var(--s), var(--l)) calc(var(--space) * 29),
+      transparent calc(var(--space) * 29.001),
+      transparent calc(var(--space) * 29.999),
+      hsl(calc(var(--h) * 15), var(--s), var(--l)) calc(var(--space) * 30),
+      hsl(calc(var(--h) * 15), var(--s), var(--l)) calc(var(--space) * 31),
+      transparent calc(var(--space) * 31.001),
+      transparent calc(var(--space) * 31.999)
+    ),
+    repeating-linear-gradient(
+      90deg,
+      var(--vio),
+      var(--blu),
+      var(--gre),
+      var(--yel),
+      var(--red),
+      var(--vio)
+    ),
+    repeating-linear-gradient(
+      90deg,
+      var(--bar-bg) calc(var(--bars) * 2),
+      var(--bar-color) calc(var(--bars) * 3),
+      var(--bar-bg) calc(var(--bars) * 3.5),
+      var(--bar-color) calc(var(--bars) * 4),
+      var(--bar-bg) calc(var(--bars) * 5),
+      var(--bar-bg) calc(var(--bars) * 12)
+    ),
+    repeating-linear-gradient(
+      90deg,
+      var(--bar-bg) calc(var(--bars) * 2),
+      var(--bar-color) calc(var(--bars) * 3),
+      var(--bar-bg) calc(var(--bars) * 3.5),
+      var(--bar-color) calc(var(--bars) * 4),
+      var(--bar-bg) calc(var(--bars) * 5),
+      var(--bar-bg) calc(var(--bars) * 9)
+    ),
+    radial-gradient(
+      farthest-corner circle at var(--mx) var(--my),
+      rgba(230, 230, 230, 0.85) 0%,
+      rgba(200, 200, 200, 0.1) 25%,
+      rgb(0, 0, 0) 90%
+    );
+
+  background-blend-mode: soft-light, soft-light, screen, overlay;
+  background-position: center, calc(((50% - var(--posx)) * 25) + 50%) center,
+    calc(var(--posx) * -1.2) var(--posy), var(--pos), center;
+  background-size: 100% 100%, 200% 200%, 237% 237%, 195% 195%, 120% 120%;
+
+  filter: brightness(1.5) contrast(1.2) saturate(1.5);  /* Brighter, more saturated colors */
+}
+
+/* Foreground overlay - TRULY above everything, also properly contained */
+.card__image-foreground {
+  position: absolute;
+  inset: 0.1875rem;  /* Match the holographic background inset */
+  width: calc(100% - 0.375rem);
+  height: calc(100% - 0.375rem);
+  object-fit: contain;  /* Show full image */
+  z-index: 10;  /* Way above the holo background wrapper (z-index: 1) */
+  pointer-events: none;
+  opacity: 1;
+  mix-blend-mode: normal;  /* Normal - no blending, sits on top */
+  border-radius: 0.25rem;  /* Match the inner radius */
+}
+
+/* Border/frame - topmost layer with enhanced edges */
+.card__image-border {
+  position: absolute;
+  inset: 0;
+  border: 0.1875rem solid #ffd700;
+  border-radius: 0.375rem;
+  pointer-events: none;
+  z-index: 20;
+  box-shadow: 
+    inset 0 0 0 0.0625rem rgba(0, 0, 0, 0.5),  /* Inner black line */
+    inset 0 0 0 0.125rem rgba(255, 255, 255, 0.8),  /* Inner white highlight */
+    inset 0 0 0.625rem rgba(255, 215, 0, 0.3),
+    inset 0 0 1.25rem rgba(255, 255, 255, 0.1),
+    0 0.125rem 0.3125rem rgba(0, 0, 0, 0.3);  /* Outer shadow */
+  background: linear-gradient(90deg, 
+    transparent 0.25rem,
+    rgba(255, 255, 255, 0.1) 0.25rem,
+    rgba(255, 255, 255, 0.1) calc(100% - 0.25rem),
+    transparent calc(100% - 0.25rem));
+}
+
+/* Description */
+.card__description {
+  font-size: 0.625rem;
+  line-height: 1.3;
+  margin-bottom: 0.625rem;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 0.25rem;
+  color: #333;
+  font-style: italic;
+  min-height: 2.5rem;
+}
+
+/* Attacks */
+.card__attacks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.625rem;
+  flex-grow: 1;
+}
+
+.attack {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.375rem;
+  background: linear-gradient(90deg, 
+    rgba(255, 255, 255, 0.8),
+    rgba(255, 255, 255, 0.6));
+  border-radius: 0.25rem;
+  border-left: 0.1875rem solid #ff6b6b;
+}
+
+.attack-cost {
+  font-size: 0.875rem;
+  display: flex;
+  gap: 0.125rem;
+}
+
+.attack-name {
+  font-weight: bold;
+  font-size: 0.75rem;
+  color: #222;
+}
+
+.attack-damage {
+  font-size: 1.125rem;
+  font-weight: bold;
+  color: #222;
+}
+
+/* Bottom Stats */
+.card__stats {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  padding: 0.375rem;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 0.25rem;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.125rem;
+}
+
+.stat-label {
+  font-size: 0.5rem;
+  color: #666;
+  text-transform: uppercase;
+}
+
+.stat-value {
+  font-size: 0.625rem;
+  font-weight: bold;
+  color: #222;
+}
+
+/* Footer */
+.card__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.5rem;
+  color: #666;
+  padding-top: 0.25rem;
+  border-top: 0.0625rem solid rgba(0, 0, 0, 0.1);
+}
+
+.card__artist {
+  font-style: italic;
+}
+
+.card__number {
+  font-weight: bold;
+}
+
+.card__rarity-icon {
+  font-size: 0.75rem;
+  color: #ffd700;
+}
+
+/* Hover Effects */
+.card:hover {
+  transform: rotateX(var(--rotate-x)) rotateY(var(--rotate-y)) scale(1.05);
+}
+
+.card:hover .card__content {
+  box-shadow: 
+    0 1.25rem 3.75rem rgba(0, 0, 0, 0.5),
+    0 0 2.5rem rgba(255, 215, 0, 0.3);
+}
+
+/* Card Back Elements */
+.backdrop {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  object-fit: cover;
+}
+
+.card__emboss {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wordmark {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  height: 5rem;
+}
+
+.wordmark text {
+  font-family: 'UnifrakturCook', 'Impact', sans-serif;
+  font-size: 3.4375rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  paint-order: stroke fill;
+  filter: drop-shadow(0.1875rem 0.1875rem 0 #FF6B00) 
+          drop-shadow(0.25rem 0.25rem 0 #D35400) 
+          drop-shadow(0.3125rem 0.3125rem 0.5rem rgba(0, 0, 0, 0.5));
+}
+
+.wordmark--top {
+  top: 18%;
+}
+
+.wordmark--bottom {
+  bottom: 18%;
+  transform: translateX(-50%) rotate(180deg);
+}
+
+.gemstone {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 50%;
+  height: auto;
+  translate: -50% -50%;
+}
+
+.spotlight {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at var(--mx, 50%) var(--my, 50%),
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.05) 30%,
+    transparent 70%
+  );
+  pointer-events: none;
+}
+
+.flip-hint {
+  position: absolute;
+  bottom: 0.625rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.625rem;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.0625rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .card {
+    width: 16rem;
+    height: 22rem;
+  }
+  
+  .card__name {
+    font-size: 1.125rem;
+  }
+  
+  .card__image-container {
+    height: 6.5rem;
+  }
+}
