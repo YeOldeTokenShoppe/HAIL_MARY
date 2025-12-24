@@ -1,0 +1,29 @@
+{
+  "rules": {
+    "moonRoom": {
+      ".read": true,
+      ".write": true,
+      "chat": {
+        ".indexOn": ["timestamp"],
+        "$messageId": {
+          ".validate": "newData.hasChildren(['from', 'message', 'timestamp'])"
+        }
+      },
+      "members": {
+        "$userId": {
+          ".validate": "newData.hasChildren(['address', 'nickname', 'joinedAt'])"
+        }
+      },
+      "moons": {
+        "$moonId": {
+          ".validate": "newData.hasChildren(['position', 'rotation'])"
+        }
+      },
+      "forces": {
+        "$forceId": {
+          ".validate": "newData.hasChildren(['x', 'y', 'z', 'from', 'timestamp'])"
+        }
+      }
+    }
+  }
+}

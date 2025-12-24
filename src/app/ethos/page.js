@@ -259,7 +259,7 @@ export default function ModelViewerPage() {
                   }}
                 />
               ) : (
-                <SignInButton mode="modal">
+                <SafeSignInButton mode="modal">
                   <button
                     style={{
                       width: isMobileDevice ? "3rem" : "3.5rem",
@@ -278,7 +278,7 @@ export default function ModelViewerPage() {
                   >
                     <span style={{ fontSize: "1.8rem" }}>{emoji}</span>
                   </button>
-                </SignInButton>
+                </SafeSignInButton>
               )
             }
             extra80sButton={

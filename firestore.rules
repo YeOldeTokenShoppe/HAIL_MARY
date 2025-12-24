@@ -1,0 +1,58 @@
+ rules_version = '2';
+  service cloud.firestore {
+    match /databases/{database}/documents {
+      // Public read access to market data
+      match /marketData/{document} {
+        allow read: if true;
+        allow write: if false;
+      }
+
+      // Optional: Restrict historical data
+      match /marketHistory/{document} {
+        allow read: if request.auth != null;
+        allow write: if false;
+      }
+
+      // Allow public read/write to candles collection (NEW)
+      match /candles/{document} {
+        allow read: if true;
+        allow write: if true;
+        // For production, you might want to add:
+        // allow write: if request.resource.data.username != null
+        //   && request.resource.data.message != null
+        //   && request.resource.data.message.size() <= 500;
+      }
+
+      // Allow public read/write to results collection (legacy candles)
+      match /results/{document} {
+        allow read: if true;
+        allow write: if true;
+      }
+
+      // Allow public read/write to fountain_coins collection
+      match /fountain_coins/{document} {
+        allow read: if true;
+        allow create: if true
+          && request.resource.data.keys().hasAll(['position', 'rotation',
+  'timestamp'])
+          && request.resource.data.position.keys().hasAll(['x', 'y', 'z'])
+          && request.resource.data.rotation.keys().hasAll(['x', 'y', 'z']);
+        allow update: if false;
+        allow delete: if true;
+      }
+
+      // Allow read and write access to fountain archives
+      match /fountain_archives/{document} {
+        allow read: if true;
+        allow create: if true;
+        allow update: if false;
+        allow delete: if false;
+      }
+
+      // Default rules for other documents
+      match /{document=**} {
+        allow read: if true;
+        allow write: if true;
+      }
+    }
+  }
