@@ -49,10 +49,6 @@ next-env.d.ts
 /.clerk/
 
 
-*.gguf
-*.onnx
-*.wav
-*.mp3
+
 
 cache/*
-models/*
