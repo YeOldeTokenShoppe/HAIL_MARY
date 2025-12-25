@@ -177,20 +177,20 @@ const PostProcessingEffects = ({ is80sMode = false }) => {
         />
       )} */}
       <Bloom
-        intensity={bloomIntensity * 0.5}  // Dynamically controlled, scaled for 80s mode
-        luminanceThreshold={0.3} // Lower threshold to catch more colors
-        luminanceSmoothing={0.6}  // Sharper, more pronounced bloom
-        height={512}              // Higher resolution for better quality
-        blendFunction={BlendFunction.ADD} // ADD for more intense glow
+        intensity={bloomIntensity * 0.9}  // Subtle bloom enhancement for 80s mode
+        luminanceThreshold={0.35} // Higher threshold - only catch bright emissives
+        luminanceSmoothing={0.6}  // Softer bloom edges
+        height={400}              // Standard resolution
+        blendFunction={BlendFunction.SCREEN} // SCREEN for softer glow
       />
       <ChromaticAberration
-        offset={[0.01, 0.01]}     // Doubled the chromatic aberration
+        offset={[0.005, 0.005]}     // Reduced chromatic aberration
         radialModulation={true}
-        modulationOffset={0.5}     // Increased modulation
+        modulationOffset={0.3}     // Less modulation
       />
       <Scanline
-        density={35.0}             // Much more visible scanlines
-        opacity={0.8}             // Increased opacity for stronger effect
+        density={20.0}             // More subtle scanlines
+        opacity={0.4}             // Lower opacity for subtler effect
         blendFunction={BlendFunction.OVERLAY}
       />
       <Glitch

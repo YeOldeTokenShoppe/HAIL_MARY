@@ -109,14 +109,14 @@ export default function TranslatableDropInTitle({
   }, [lines, language]);
   
   // Log for debugging
-  useEffect(() => {
-    console.log('TranslatableDropInTitle:', {
-      language,
-      originalLines: lines,
-      translatedLines,
-      shouldSplitCharacters
-    });
-  }, [language, lines, translatedLines, shouldSplitCharacters]);
+  // useEffect(() => {
+  //   console.log('TranslatableDropInTitle:', {
+  //     language,
+  //     originalLines: lines,
+  //     translatedLines,
+  //     shouldSplitCharacters
+  //   });
+  // }, [language, lines, translatedLines, shouldSplitCharacters]);
 
   const stableId = useMemo(() => {
     if (instanceId) return instanceId;

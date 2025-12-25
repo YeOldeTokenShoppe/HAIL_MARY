@@ -23,7 +23,7 @@ import TranslatableDropInTitle from '../../components/TranslatableDropInTitle';
 import { motion, useInView } from 'framer-motion';
 
 // import HandsGLTFScene from "@/components/HandsGLTFScene";
-import CompactCandleModal from '@/components/CompactCandleModal';
+// import CompactCandleModal from '@/components/CompactCandleModal';
 // import CyberFAQSection from '@/components/CyberFAQSection';
 import CoinLoader from '@/components/CoinLoader';
 // import TokenomicsSection from '@/components/TokenomicsSection';
@@ -217,21 +217,39 @@ const ClickHandler = () => {
 };
 
 // Scroll-responsive Model component with Ticker
-const Model = React.memo(function Model({ scrollY, scrollProgress, isMobile, onLoad }) {
+const Model = React.memo(function Model({ scrollY, scrollProgress, isMobile, onLoad, is80sMode }) {
   const { scene } = useGLTF('/models/ourlady_rider7.glb');
   const groupRef = useRef();
   const staticBreathRef = useRef();
   const hasLoadedRef = useRef(false);
+  const lineRef = useRef();
+  const originalLineMaterial = useRef();
+  const line2Ref = useRef();
+  const originalLine2Material = useRef();
 
   // Call onLoad when model is ready (prevent duplicate calls)
   useEffect(() => {
     if (scene && onLoad && !hasLoadedRef.current) {
       hasLoadedRef.current = true;
-      // Disable shadows on the model
+      // Disable shadows on the model and find Line meshes
       scene.traverse((object) => {
         if (object.isMesh) {
           object.castShadow = false;
           object.receiveShadow = false;
+          
+          // Find the Line mesh
+          if (object.name === 'Line') {
+            lineRef.current = object;
+            // Store original material
+            originalLineMaterial.current = object.material.clone();
+          }
+          
+          // Find Line2 mesh
+          if (object.name === 'Line2') {
+            line2Ref.current = object;
+            // Store original material
+            originalLine2Material.current = object.material.clone();
+          }
         }
       });
       onLoad();
@@ -269,6 +287,42 @@ const Model = React.memo(function Model({ scrollY, scrollProgress, isMobile, onL
       }
     };
   }, [scene]);
+  
+  // Lightning effect for Line meshes in 80s mode
+  useEffect(() => {
+    if (lineRef.current && is80sMode) {
+      // Create cyan emissive lightning material for Line
+      const lightningMaterial = new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#00ffff'),
+        emissive: new THREE.Color('#00ffff'),
+        emissiveIntensity: 3, // Moderate boost for nice bloom
+        metalness: 1.0,
+        roughness: 0,
+        toneMapped: false, // Disable tone mapping for pure emission
+      });
+      lineRef.current.material = lightningMaterial;
+    } else if (lineRef.current && originalLineMaterial.current) {
+      // Restore original material
+      lineRef.current.material = originalLineMaterial.current;
+    }
+    
+    // Red lightning for Line2
+    if (line2Ref.current && is80sMode) {
+      // Create red emissive lightning material for Line2
+      const redLightningMaterial = new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#ff0040'),
+        emissive: new THREE.Color('#ff0040'),
+        emissiveIntensity: 3, // Moderate boost for nice bloom
+        metalness: 1.0,
+        roughness: 0,
+        toneMapped: false, // Disable tone mapping for pure emission
+      });
+      line2Ref.current.material = redLightningMaterial;
+    } else if (line2Ref.current && originalLine2Material.current) {
+      // Restore original material
+      line2Ref.current.material = originalLine2Material.current;
+    }
+  }, [is80sMode]);
   
   // Track when we've reached the bottom (scroll drops from high to low)
   const scrollDroppedRef = useRef(false);
@@ -314,7 +368,7 @@ const Model = React.memo(function Model({ scrollY, scrollProgress, isMobile, onL
   // }, [scrollY, shouldHide, hideAtBottom]);
   
   // Animate based on scroll (from Simple3DScene)
-  useFrame(() => {
+  useFrame((state, delta) => {
     if (groupRef.current) {
       // Check for bottom condition right in the render loop
       // This catches the scroll drop immediately without waiting for state updates
@@ -349,6 +403,71 @@ const Model = React.memo(function Model({ scrollY, scrollProgress, isMobile, onL
         const calculatedY = baseY + effectiveScrollProgress * 350;
         groupRef.current.position.y = Math.min(calculatedY, maxY);
       }
+    }
+    
+    // Animate lightning flash in 80s mode - MUCH less frequent
+    if (lineRef.current && is80sMode) {
+      const time = state.clock.getElapsedTime();
+      
+      // Very intermittent flash pattern - every 6-8 seconds
+      const flashCycle = time % 8;
+      let intensity = 0.5; // Subtle base glow
+      
+      // Main lightning strike - very brief
+      if (flashCycle > 7.8 && flashCycle < 7.85) {
+        intensity = 8;
+        lineRef.current.material.color = new THREE.Color('#ffffff');
+        lineRef.current.material.emissive = new THREE.Color('#ffffff');
+      } else if (flashCycle > 7.85 && flashCycle < 7.9) {
+        // Afterglow
+        intensity = 4;
+        lineRef.current.material.color = new THREE.Color('#00ffff');
+        lineRef.current.material.emissive = new THREE.Color('#00ffff');
+      } else if (flashCycle > 4.5 && flashCycle < 4.55) {
+        // Secondary smaller flash
+        intensity = 5;
+        lineRef.current.material.color = new THREE.Color('#ff00ff');
+        lineRef.current.material.emissive = new THREE.Color('#ff00ff');
+      } else {
+        // Normal state - very subtle glow
+        lineRef.current.material.color = new THREE.Color('#00ffff');
+        lineRef.current.material.emissive = new THREE.Color('#00ffff');
+        intensity = 0.5 + Math.sin(time * 1.5) * 0.2; // Gentle pulse
+      }
+      
+      // Very rare random flash (1 in 500 chance per frame)
+      if (Math.random() > 0.998) {
+        intensity = 6;
+        lineRef.current.material.color = new THREE.Color('#ffff00');
+        lineRef.current.material.emissive = new THREE.Color('#ffff00');
+      }
+      
+      lineRef.current.material.emissiveIntensity = intensity;
+    }
+    
+    // Animate smooth pulsing glow for Line2
+    if (line2Ref.current && is80sMode) {
+      const time = state.clock.getElapsedTime();
+      
+      // Smooth continuous pulsing - no flashing
+      // Use multiple sine waves for more organic pulsing
+      const pulse1 = Math.sin(time * 1.5) * 0.5 + 0.5; // Main pulse
+      const pulse2 = Math.sin(time * 3.7) * 0.3 + 0.5; // Secondary faster pulse
+      const combinedPulse = (pulse1 * 0.7 + pulse2 * 0.3); // Combine pulses
+      
+      // Intensity ranges from 0.8 to 3.5 for visible but not overwhelming glow
+      const intensity = 0.8 + combinedPulse * 2.7;
+      
+      // Slowly cycle through red/orange/pink spectrum
+      const colorCycle = time * 0.2; // Very slow color shift
+      const r = 1.0;
+      const g = Math.sin(colorCycle) * 0.3 + 0.2; // Varies between 0.0 and 0.5
+      const b = Math.sin(colorCycle + 2) * 0.4 + 0.3; // Varies between 0.0 and 0.7
+      
+      const pulsingColor = new THREE.Color(r, g, b);
+      line2Ref.current.material.color = pulsingColor;
+      line2Ref.current.material.emissive = pulsingColor;
+      line2Ref.current.material.emissiveIntensity = intensity;
     }
   });
   
@@ -495,7 +614,7 @@ const CSS3DScreenManager = () => {
 };
 
 // Drone component with built-in hover animation and scroll-based appearance
-const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrollY, scrollProgress, isMobile = false, isSignedIn = false, onOpenBuyModal, language = 'en' }) {
+const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrollY, scrollProgress, isMobile = false, isSignedIn = false, onOpenBuyModal, language = 'en', is80sMode = false }) {
   const modelPath = isMobile ? '/models/drone_mobile.glb' : '/models/drone.glb';
   const { scene, animations } = useGLTF(modelPath);
   const groupRef = useRef();
@@ -546,12 +665,17 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
           
           // Set up interactive navigation/video system for Screen1
           if (object.isMesh) {
-            console.log('Setting up interactive screen on Screen1:', object.name);
+            // console.log('Setting up interactive screen on Screen1:', object.name);
             
             // Store language in userData so drawing functions can access it
             object.userData.language = language;
+            object.userData.is80sMode = is80sMode;
             
-            // CRT Terminal system (instead of video)
+            // Video element for 80s mode
+            let videoElement = null;
+            let videoTexture = null;
+            
+            // CRT Terminal system (for non-80s mode)
             let crtTerminal = null;
             let terminalAnimation = null;
             
@@ -623,19 +747,49 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
             let asciiLineIndex = 0;
             let showingAscii = false;
             
-            // Create canvas for custom UI
-            const canvas = document.createElement('canvas');
-            canvas.width = 512;
-            canvas.height = 512;
-            const ctx = canvas.getContext('2d');
+            // Create texture based on mode
+            let texture;
+            let canvas, ctx;
             
-            // Create texture from canvas
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.minFilter = THREE.LinearFilter;
-            texture.magFilter = THREE.LinearFilter;
-            // Rotate texture 90 degrees counter-clockwise
-            texture.center.set(0.5, 0.5);
-            texture.rotation = -Math.PI / 2;
+            if (is80sMode) {
+              // Create video element for 80s mode
+              videoElement = document.createElement('video');
+              videoElement.src = '/videos/synthosaur.mp4'; // Synthosaur 80s video!
+              videoElement.loop = true;
+              videoElement.muted = true; // Muted to allow autoplay
+              videoElement.playsInline = true;
+              videoElement.autoplay = true;
+              videoElement.crossOrigin = 'anonymous';
+              
+              // Create video texture
+              videoTexture = new THREE.VideoTexture(videoElement);
+              videoTexture.minFilter = THREE.LinearFilter;
+              videoTexture.magFilter = THREE.LinearFilter;
+              videoTexture.format = THREE.RGBFormat;
+              videoTexture.center.set(0.5, 0.5);
+              videoTexture.rotation = -Math.PI / 2; // Match the rotation
+              
+              texture = videoTexture;
+              
+              // Start playing the video
+              videoElement.play().catch(err => {
+                console.warn('Video autoplay failed:', err);
+              });
+            } else {
+              // Create canvas for custom UI (CRT terminal mode)
+              canvas = document.createElement('canvas');
+              canvas.width = 512;
+              canvas.height = 512;
+              ctx = canvas.getContext('2d');
+              
+              // Create texture from canvas
+              texture = new THREE.CanvasTexture(canvas);
+              texture.minFilter = THREE.LinearFilter;
+              texture.magFilter = THREE.LinearFilter;
+              // Rotate texture 90 degrees counter-clockwise
+              texture.center.set(0.5, 0.5);
+              texture.rotation = -Math.PI / 2;
+            }
             
             // Store original rotation for later
             const originalRotation = texture.rotation;
@@ -1990,8 +2144,8 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
             object.raycast = THREE.Mesh.prototype.raycast;
             object.visible = true;
             
-            console.log('Applied interactive screen material to Screen1');
-            console.log('Screen1 setup complete - name:', object.name, 'visible:', object.visible, 'geometry:', !!object.geometry);
+            // console.log('Applied interactive screen material to Screen1');
+            // console.log('Screen1 setup complete - name:', object.name, 'visible:', object.visible, 'geometry:', !!object.geometry);
             
             // Update texture in render loop
             object.userData.updateTexture = () => {
@@ -2875,7 +3029,7 @@ function ScrollingBreath({ scrollY, scrollProgress, isMobile }) {
 }
 
 // Scroll-responsive Clouds component wrapper
-function ScrollClouds({ scrollY, scrollProgress, onLoad }) {
+function ScrollClouds({ scrollY, scrollProgress, onLoad, is80sMode }) {
   const cloudGroupRef = useRef();
   
   // Animate clouds with scroll (from Simple3DScene)
@@ -2904,7 +3058,7 @@ function ScrollClouds({ scrollY, scrollProgress, onLoad }) {
   
   return (
     <group ref={cloudGroupRef}>
-      <DarkClouds onLoad={onLoad} />
+      <DarkClouds onLoad={onLoad} is80sMode={is80sMode} />
     </group>
   );
 }
@@ -3388,8 +3542,10 @@ export default function Home() {
     isPlaying: contextIsPlaying,
     nextTrack,
     currentTrack,
-    is80sMode
+    is80sMode: context80sMode,
+    setIs80sMode: setContext80sMode
   } = useMusic();
+  const is80sMode = context80sMode;
 
   // Helper function to get responsive values (from home/page)
   const getResponsiveValue = (mobile, tablet, tabletLandscape, desktop) => {
@@ -3766,7 +3922,7 @@ export default function Home() {
               // color="#d89d12ff"
               // intensity={1.5}
             />
-            <Model scrollY={scrollY} scrollProgress={scrollProgress} isMobile={isMobile} onLoad={() => setModelLoaded(true)} />
+            <Model scrollY={scrollY} scrollProgress={scrollProgress} isMobile={isMobile} onLoad={() => setModelLoaded(true)} is80sMode={is80sMode} />
             {/* <VideoScreens /> */}
             {/* Breath that follows the same scroll animation as the bull */}
             <ScrollingBreath scrollY={scrollY} scrollProgress={scrollProgress} isMobile={isMobile} />
@@ -3780,6 +3936,7 @@ export default function Home() {
               isSignedIn={isSignedIn}
               language={language}
               onOpenBuyModal={() => setShowBuyModal(true)}
+              is80sMode={is80sMode}
             />
             
             {/* Angel Model with playful swoop animation */}
@@ -3815,10 +3972,10 @@ export default function Home() {
               enableInteraction={true}
             /> */}
             
-            <ScrollClouds scrollY={scrollY} scrollProgress={scrollProgress} onLoad={() => setCloudsLoaded(true)} />
+            <ScrollClouds scrollY={scrollY} scrollProgress={scrollProgress} onLoad={() => setCloudsLoaded(true)} is80sMode={is80sMode} />
             {/* Additional point lights for desktop only */}
  
-            <PostProcessingEffects />
+            <PostProcessingEffects is80sMode={is80sMode} />
           </Suspense>
           {/* Performance Monitor - Shows FPS, MS, MB */}
           {/* <Stats className="perf-monitor" /> */}
@@ -3886,9 +4043,17 @@ export default function Home() {
               style={{ 
               position: "relative",
               left: isMobile ? "-10%" : "-25%",
-              color: "#d4af37",
+              color: is80sMode ? "#D946EF" : "#d4af37",
               fontFamily: 'UnifrakturCook, serif',
-              textShadow: `
+              textShadow: is80sMode ? `
+                0 0 10px rgba(217, 70, 239, 0.9),
+                0 0 20px rgba(103, 232, 249, 0.7),
+                0 0 30px rgba(217, 70, 239, 0.5),
+                0 0 40px rgba(0, 255, 65, 0.3),
+                6px 6px 16px rgba(0, 0, 0, 1),
+                -2px -2px 8px rgba(255, 0, 255, 0.7),
+                0 0 100px rgba(217, 70, 239, 0.2)
+              ` : `
                 0 0 10px rgba(212, 175, 55, 0.8),
                 0 0 20px rgba(212, 175, 55, 0.6),
                 0 0 30px rgba(212, 175, 55, 0.8),
@@ -3905,6 +4070,7 @@ export default function Home() {
               cursor: 'pointer',
               marginTop: isMobile ? '1rem' : '3rem',
               pointerEvents: 'auto',
+              transition: 'color 0.5s ease, text-shadow 0.5s ease',
             }}>
               <span className="title-line" style={{ display: 'block', position: 'relative' }}>{t('home.ourLady')}</span>
               <span className="title-line" style={{ display: 'block', position: 'relative' }}>
@@ -4112,6 +4278,53 @@ export default function Home() {
                   </button>
                 </SignInButton>
               )
+            }
+            extra80sButton={
+              <button
+                onClick={() => setContext80sMode(!is80sMode)}
+                style={{
+                  width: isMobile ? "3.5rem" : "3.5rem",
+                  height: isMobile ? "3.5rem" : "3.5rem",
+                  borderRadius: "0.5rem",
+                  backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.3)" : "rgba(0, 0, 0, 0.7)",
+                  border: is80sMode ? "2px solid #D946EF" : "2px solid rgba(255, 255, 255, 0.2)",
+                  color: is80sMode ? "#67e8f9" : "#ffffff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  transition: "all 0.3s ease",
+                  backdropFilter: "blur(10px)",
+                  boxShadow: is80sMode 
+                    ? "0 0 20px rgba(217, 70, 239, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3)" 
+                    : "0 2px 8px rgba(0, 0, 0, 0.3)",
+                }}
+                onMouseEnter={(e) => {
+                  if (is80sMode) {
+                    e.currentTarget.style.boxShadow = "0 0 30px rgba(217, 70, 239, 0.7), 0 2px 8px rgba(0, 0, 0, 0.3)";
+                  } else {
+                    e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.8)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (is80sMode) {
+                    e.currentTarget.style.boxShadow = "0 0 20px rgba(217, 70, 239, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3)";
+                  } else {
+                    e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
+                  }
+                }}
+                title={is80sMode ? "Disable 80s Mode" : "Enable 80s Mode"}
+              >
+                <span style={{
+                  fontSize: isMobile ? "18px" : "22px",
+                  fontWeight: "bold",
+                  color: is80sMode ? "#00ff41" : "#67e8f9",
+                  textShadow: is80sMode ? "0 0 10px #00ff41" : "none",
+                  fontFamily: "monospace"
+                }}>
+                  80s
+                </span>
+              </button>
             }
           />
         </div>
@@ -4613,7 +4826,7 @@ export default function Home() {
         /* Canvas pointer events handled inline */
       `}</style>
       
-      <CompactCandleModal 
+      {/* <CompactCandleModal 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onCandleCreated={() => {
@@ -4622,7 +4835,7 @@ export default function Home() {
             console.log('Memory:', (performance.memory.usedJSHeapSize / 1048576).toFixed(1) + 'MB');
           }
         }}
-      />
+      /> */}
       
       {/* Floating Action Bar - Only show after scrolling past halfway point */}
       {/* {scrollY > (isMobile ? 1800 : 2400) && (

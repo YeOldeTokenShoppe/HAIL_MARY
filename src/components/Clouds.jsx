@@ -12,7 +12,7 @@ import dynamic from "next/dynamic";
 // Create context for sharing lightning effects
 
 // Hemisphere Light without Helper
-function HemisphereLightComponent() {
+function HemisphereLightComponent({ is80sMode }) {
   // GUI Controls (commented out - uncomment to adjust lighting)
   // const cloudHemisphereLightControls = useControls('Cloud Hemisphere Light', {
   //   skyColor: {
@@ -33,11 +33,11 @@ function HemisphereLightComponent() {
   //   },
   // });
   
-  // Hard-coded values
+  // Hard-coded values with 80s mode variation
   const lightingValues = {
-    skyColor: "#f5f5f5",
-    groundColor: "#f2950b",
-    intensity: 1.5,
+    skyColor: is80sMode ? "#D946EF" : "#f5f5f5", // Purple sky in 80s mode
+    groundColor: is80sMode ? "#67e8f9" : "#f2950b", // Cyan ground glow in 80s mode
+    intensity: is80sMode ? 2.0 : 1.5,
     position: [0, -20, -5],
   };
   
@@ -52,13 +52,13 @@ function HemisphereLightComponent() {
 }
 
 // Define the component first
-const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
+const DarkCloudsComponent = React.forwardRef(({ onLoad, is80sMode, ...props }, ref) => {
   // Load texture only on client side
   const [cloudTexture, setCloudTexture] = useState(null);
   
-  // Hardcode pink color for all clouds
-  const whiteCloudColor = "#fbf6fc";
-  const pinkCloudColor = "#e61c9c";
+  // Cloud colors change in 80s mode
+  const whiteCloudColor = is80sMode ? "#ff00ff" : "#fbf6fc"; // Magenta tint in 80s mode
+  const pinkCloudColor = is80sMode ? "#00ffff" : "#e61c9c"; // Cyan accent in 80s mode
 
   // Call onLoad immediately since we're not loading textures
   useEffect(() => {
@@ -250,7 +250,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
         {/* {cloudTexture ? ( */}
           <group ref={cloudsGroupRef} frustumCulled={false}>
             {/* Hemisphere Light with Helper for Clouds */}
-  <HemisphereLightComponent />
+  <HemisphereLightComponent is80sMode={is80sMode} />
 
             <Clouds material={THREE.MeshStandardMaterial} limit={400} frustumCulled={false} receiveShadow={false} castShadow={false}>
               {/* Main large white cloud  that is DIRECTLY under the bull */}
@@ -266,7 +266,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
                 growth={0}
                 speed={0.00}
                 bounds={[15, 2, 2]}
-                // color={whiteCloudColor}
+                color={is80sMode ? pinkCloudColor : undefined}
                 position={[-40, -110, 0]}
                 texture={cloudTexture}
                 frustumCulled={false}
@@ -300,7 +300,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
                 growth={6}
                 speed={0.03}
                 bounds={[15, 8, 6]}
-
+                color={is80sMode ? whiteCloudColor : undefined}
                 position={[30, -25, 0]}
                 texture={cloudTexture}
               />
@@ -316,7 +316,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
                 growth={6}
                 speed={0.03}
                 bounds={[-10, 0, 6]}
-                // color={whiteCloudColor}
+                color={is80sMode ? pinkCloudColor : undefined}
                 position={[-40, 10, 0]}
                 texture={cloudTexture}
                 
@@ -333,7 +333,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
                 growth={5}
                 speed={0.02}
                 bounds={[14, 15, 5]}
-
+                color={is80sMode ? whiteCloudColor : undefined}
                 position={[0, -8, -20]}
                 texture={cloudTexture}
                 frustumCulled={false}
@@ -350,7 +350,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
                 growth={5}
                 speed={0.025}
                 bounds={[14, 1, 5]}
-                // color={whiteCloudColor}
+                color={is80sMode ? pinkCloudColor : undefined}
                 position={[60, -60, 15]}
                 texture={cloudTexture}
                 frustumCulled={false}
@@ -366,7 +366,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
                 growth={5}
                 speed={0.025}
                 bounds={[12, 10, 5]}
-
+                color={is80sMode ? whiteCloudColor : undefined}
                 position={[-20, -40, 10]}
                 texture={cloudTexture}
                 frustumCulled={false}
@@ -411,7 +411,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
                 growth={5}
                 speed={0.025}
                 bounds={[14, 15, 7]}
-     
+                color={is80sMode ? pinkCloudColor : undefined}
                 position={[20, 5, 20]}
                 texture={cloudTexture}
                 frustumCulled={false}
@@ -440,7 +440,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
                 growth={6}
                 speed={0.02}
                 bounds={[16, 18, 8]}
-                // color={whiteCloudColor}
+                color={is80sMode ? whiteCloudColor : undefined}
                 position={[35, -35, -25]}
                 texture={cloudTexture}
                 frustumCulled={false}
@@ -471,7 +471,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
                 growth={4}
                 speed={0.03}
                 bounds={[7, 20, 5]}
-                // color={whiteCloudColor}
+                color={is80sMode ? pinkCloudColor : undefined}
                 position={[-25, -15, 12]}
                 texture={cloudTexture}
                 frustumCulled={false}
@@ -505,6 +505,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
                 growth={5}
                 speed={0.02}
                 bounds={[16, 8, 6]}
+                color={is80sMode ? whiteCloudColor : undefined}
                 position={[-15, -75, 5]}
                 texture={cloudTexture}
                 frustumCulled={false}
@@ -520,7 +521,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
                 speed={0.025}
                 bounds={[-5, 10, 9]}
                 position={[-15, -110, -25]}
-                        //  color={'#ff00f0'}
+                color={is80sMode ? pinkCloudColor : undefined}
                 frustumCulled={false}
               />
               */above cloud is where the drone starts to appear /*
@@ -535,7 +536,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
                 speed={0.015}
                 bounds={[18, 10, -6]}
                 position={[20, -160, -20]}
-        
+                color={is80sMode ? whiteCloudColor : undefined}
                 frustumCulled={false}
               />
               
@@ -577,7 +578,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
                 speed={0.025}
                 bounds={[15, 9, 6]}
                 position={[-35, -190, 8]}
-            // color={'#ff00f0'}
+                color={is80sMode ? pinkCloudColor : undefined}
                 frustumCulled={false}
               />
               
@@ -592,7 +593,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
                 speed={0.02}
                 bounds={[22, 14, 8]}
                 position={[25, -120, -18]}
-                      // color={'#ff00f0'}
+                color={is80sMode ? whiteCloudColor : undefined}
                 frustumCulled={false}
               />
               
@@ -606,7 +607,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
                 speed={0.025}
                 bounds={[16, 10, 6]}
                 position={[-45, -140, -8]}
-                //  color={'#ff00f0'}
+                color={is80sMode ? pinkCloudColor : undefined}
                 frustumCulled={false}
               />
               
@@ -620,7 +621,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
                 speed={0.03}
                 bounds={[25, 12, 7]}
                 position={[15, -200, -22]}
-
+                color={is80sMode ? whiteCloudColor : undefined}
                 frustumCulled={false}
               />
               
@@ -634,7 +635,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
                 speed={0.02}
                 bounds={[14, 8, 5]}
                 position={[-10, -250, 0]}
-                // color={'#ff00f0'}
+                color={is80sMode ? pinkCloudColor : undefined}
                 frustumCulled={false}
               />
               
@@ -648,7 +649,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
                 speed={0.025}
                 bounds={[20, 15, 8]}
                 position={[30, -320, -15]}
-            // color={'#ff00f0'}
+                color={is80sMode ? whiteCloudColor : undefined}
                 frustumCulled={false}
               />
               
@@ -663,7 +664,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
                 speed={0.02}
                 bounds={[16, 12, 6]}
                 position={[2, -420, 8]}
-                //  color={'#ff00f0'}
+                color={is80sMode ? pinkCloudColor : undefined}
                 frustumCulled={false}
               />
               
@@ -720,7 +721,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
                 speed={0.025}
                 bounds={[22, 15, 8]}
                 position={[-5, -290, 12]}
-              // color={'#ff00f0'}
+                color={is80sMode ? whiteCloudColor : undefined}
                 frustumCulled={false}
               />
               */ bottom cloud /*
@@ -735,7 +736,7 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, ...props }, ref) => {
                 speed={0.025}
                 bounds={[22, 15, 8]}
                 position={[-5, -380, 12]}
-              // color={'#ff00f0'}
+                color={is80sMode ? pinkCloudColor : undefined}
                 frustumCulled={false}
               />
               

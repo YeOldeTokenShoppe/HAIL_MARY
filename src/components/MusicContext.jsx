@@ -71,8 +71,8 @@ export const MusicProvider = ({ children }) => {
   
   
   // Load and play track function
-  const loadTrack = useCallback(async (index, shouldAutoPlay = false) => {
-    console.log('[MusicContext] loadTrack called:', { index, shouldAutoPlay, is80sMode });
+  const loadTrack = useCallback(async (index, shouldAutoPlay = false, playImmediately = false) => {
+    console.log('[MusicContext] loadTrack called:', { index, shouldAutoPlay, is80sMode, playImmediately });
     const playlist = is80sMode ? eightyTracks : non80sTracks;
     
     if (index < 0 || index >= playlist.length) {
@@ -84,15 +84,23 @@ export const MusicProvider = ({ children }) => {
     setIsLoadingTrack(true);
     
     try {
+      // If playImmediately is true, start playing before loading to preserve user gesture
+      let playPromise = null;
+      if (playImmediately && audioRef.current) {
+        playPromise = audioRef.current.play().catch(e => {
+          console.log('[MusicContext] Initial play failed:', e);
+          return null;
+        });
+      }
+      
       const trackRef = storageRefUtil(storage, playlist[index].path);
       const url = await getDownloadURL(trackRef);
       
       if (audioRef.current) {
-        // Clear any existing source first
-        audioRef.current.pause();
-        audioRef.current.src = '';
+        // If we're already playing something, don't pause
+        const wasPlaying = playImmediately || (playPromise !== null) || !audioRef.current.paused;
         
-        // Set new source
+        // Set new source without pausing first
         audioRef.current.src = url;
         audioRef.current.load();
         
@@ -135,15 +143,22 @@ export const MusicProvider = ({ children }) => {
           });
         }
         
-        if (shouldAutoPlay) {
-          console.log('[MusicContext] Auto-playing track');
-          audioRef.current.play().then(() => {
+        if (shouldAutoPlay || wasPlaying || playImmediately) {
+          console.log('[MusicContext] Attempting to play track');
+          try {
+            await audioRef.current.play();
             console.log('[MusicContext] Playback started successfully');
             setIsPlaying(true);
-          }).catch(e => {
-            console.log('[MusicContext] Auto-play blocked:', e);
+          } catch (e) {
+            console.error('[MusicContext] Play blocked:', e.message);
+            console.log('[MusicContext] User interaction required - track loaded but not playing');
             setIsPlaying(false);
-          });
+            
+            // Track is loaded and ready, just needs user interaction to start
+            // The UI should show play button in paused state
+          }
+        } else {
+          console.log('[MusicContext] Track loaded, ready to play');
         }
       }
     } catch (error) {
@@ -172,11 +187,16 @@ export const MusicProvider = ({ children }) => {
           console.log('[MusicContext] Starting with random track:', startIndex);
         }
         
-        loadTrack(startIndex, true);
+        // Load track with playImmediately flag to preserve user gesture
+        loadTrack(startIndex, true, true);
       } else {
         audioRef.current.play().then(() => {
+          console.log('[MusicContext] Playback resumed');
           setIsPlaying(true);
-        }).catch(e => console.log('Play blocked:', e));
+        }).catch(e => {
+          console.log('[MusicContext] Play blocked:', e);
+          setIsPlaying(false);
+        });
       }
     }
   }, [loadTrack, is80sMode, isShuffled]);

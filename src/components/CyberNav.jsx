@@ -148,19 +148,19 @@ const CyberNav = ({ is80sMode = false, position = "fixed", musicButton = null, u
           document.body
         )}
         
-        {/* 80s Button - flies out below User Button from CyberNav origin */}
+        {/* 80s Button - always visible, positioned below the main nav button */}
         {extra80sButton && (
           <div
             style={{
               position: position === "relative" ? "relative" : position,
-              top: position === "relative" ? (showExtraButtons ? (isMobile ? "8.5rem" : "8rem") : "0") : (position === "absolute" ? (showExtraButtons ? (isMobile ? "10.5rem" : "11rem") : "10px") : (showExtraButtons ? (isMobile ? "10.5rem" : "11rem") : "20px")),
+              top: position === "relative" ? (isMobile ? "4.5rem" : "5rem") : (position === "absolute" ? (isMobile ? "5rem" : "5.5rem") : (isMobile ? "5.5rem" : "6rem")),
               right: position === "relative" ? "0" : "20px",
-              zIndex: position === "relative" ? 1 : 100000001,
-              opacity: showExtraButtons ? 1 : 0,
-              pointerEvents: showExtraButtons ? "auto" : "none",
-              transform: showExtraButtons ? "translateY(0) scale(1)" : "translateY(-200%) scale(0)",
+              zIndex: position === "relative" ? 1 : 9989,
+              opacity: 1,
+              pointerEvents: "auto",
+              transform: "translateY(0) scale(1)",
               transformOrigin: "center top",
-              transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s",
+              transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
             }}
           >
             {extra80sButton}
