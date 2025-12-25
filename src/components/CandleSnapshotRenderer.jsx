@@ -8,16 +8,18 @@ import PolaroidSnapshot from '@/components/PolaroidSnapshot';
 
 // Skybox textures configuration - includes gradient backgrounds as static images
 const SKYBOX_TEXTURES = {
-  cyberpunk: '/cyberpunk.webp',
-  synthwave: '/synthwave.webp',
-  gothicTokyo: '/gothicTokyo.webp',
-  neoTokyo: '/neoTokyo.webp',
-  aurora: '/aurora.webp',
-  tradeScene: '/tradeScene.webp',
-  sunset: '/gradient-sunset.webp',
+  cyberpunk: '/images/cyberpunk.webp',
+  synthwave: '/images/synthwave.webp',
+  gothicTokyo: '/images/gothicTokyo.webp',
+  neoTokyo: '/images/neoTokyo.webp',
+  aurora: '/images/aurora.webp',
+  sunset: '/images/gradient-sunset.webp',
+  dreams: '/images/gradient-dreams.webp',
+  tradingView: '/images/uattr.webp',
   chart: '/images/chart.webp',
-  collectibles: '/pokemon2.webp',
-  dreams: '/gradient-dreams.webp'
+  collectibles: '/images/pokemon2.webp',
+  alchemy: '/images/alchemy.gif',
+
 };
 
 // Preload models to prevent loading issues
@@ -100,6 +102,25 @@ function CandleScene({ userData, onReady }) {
             (texture) => {
               texture.colorSpace = THREE.SRGBColorSpace;
               texture.flipY = false;
+              
+              // Calculate aspect ratio and adjust texture repeat to maintain it
+              const imageAspect = texture.image.width / texture.image.height;
+              const targetAspect = 1.0; // Assuming the UV map is square
+              
+              if (imageAspect > targetAspect) {
+                // Image is wider than target, scale height
+                texture.repeat.set(1, imageAspect / targetAspect);
+              } else {
+                // Image is taller than target, scale width
+                texture.repeat.set(targetAspect / imageAspect, 1);
+              }
+              
+              // Center the texture
+              texture.offset.set(
+                (1 - texture.repeat.x) / 2,
+                (1 - texture.repeat.y) / 2
+              );
+              
               texture.wrapS = THREE.ClampToEdgeWrapping;
               texture.wrapT = THREE.ClampToEdgeWrapping;
               texture.needsUpdate = true;

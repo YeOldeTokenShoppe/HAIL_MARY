@@ -62,6 +62,15 @@ try {
   
   // First check if we have the required environment variables
   if (!hasRequiredEnvironmentVariables()) {
+    console.warn('⚠️ Firebase environment variables are missing!');
+    console.warn('Please add the following to your .env file:');
+    console.warn('NEXT_PUBLIC_FIREBASE_API_KEY=...');
+    console.warn('NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...');
+    console.warn('NEXT_PUBLIC_FIREBASE_PROJECT_ID=...');
+    console.warn('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=...');
+    console.warn('NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...');
+    console.warn('NEXT_PUBLIC_FIREBASE_APP_ID=...');
+    console.warn('See .env.example for the full list');
     throw new Error('Missing required Firebase environment variables');
   }
   

@@ -421,7 +421,7 @@ export default function CyborgTemple() {
         <div style={{
           position: "fixed",
           top: "20px", 
-          left: "20px",
+          left: "5rem",
           borderRadius: "8px",
           padding: "10px",
           pointerEvents: "auto",
@@ -517,8 +517,7 @@ export default function CyborgTemple() {
                 paddingBottom: isMobileView ? "0.75rem" : "1rem",
                 borderBottom: "1px solid rgba(255, 255, 255, 0.2)",
               }}>
-                Live multi-agent AI features/trading on the<br/>
-                Lighter Perp DEX
+                Live multi-agent AI trading
               </p>
               
               <p style={{
@@ -530,7 +529,7 @@ export default function CyborgTemple() {
                 textAlign: "center",
                 fontStyle: "italic",
               }}>
-                Featuring RL80 and 3 wise mechs
+                Featuring 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙
               </p>
               
               {!isMobileView && (
@@ -560,8 +559,8 @@ export default function CyborgTemple() {
             </>
           )}
 
-          {/* Mainnet Readiness Stats - Only show when user hasn't interacted */}
-          {!userHasInteracted && (
+          {/* Mainnet Readiness Stats - Only show when user hasn't interacted AND not on mobile */}
+          {!userHasInteracted && !isMobileView && (
           <div style={{
             backgroundColor: isMobileView ? "transparent" : "rgba(0, 0, 0, 0.3)",
             backdropFilter: isMobileView ? "none" : "blur(12px)",
@@ -722,7 +721,7 @@ export default function CyborgTemple() {
           </div>
           )}
           
-          {!userHasInteracted && (
+          {!userHasInteracted && !isMobileView && (
             <div style={{
               display: "flex",
               alignItems: "center",

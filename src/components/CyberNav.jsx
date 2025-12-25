@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ReactDOM from 'react-dom';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -94,7 +95,7 @@ const CyberNav = ({ is80sMode = false, position = "fixed", musicButton = null, u
               position: position === "relative" ? "relative" : position,
               top: position === "relative" ? "0" : (position === "absolute" ? "10px" : "20px"),
               right: position === "relative" ? (showExtraButtons ? (isMobile ? "8rem" : "9rem") : "0") : (showExtraButtons ? (isMobile ? "9rem" : "10rem") : "20px"),
-              zIndex: position === "relative" ? 1 : 9992,
+              zIndex: position === "relative" ? 1 : 100000001,
               opacity: showExtraButtons ? 1 : 0,
               pointerEvents: showExtraButtons ? "auto" : "none",
               transform: showExtraButtons ? "translateX(0) scale(1)" : "translateX(100%) scale(0)",
@@ -107,41 +108,43 @@ const CyberNav = ({ is80sMode = false, position = "fixed", musicButton = null, u
         )}
         
         {/* Music Button - flies out to the left from CyberNav */}
-        {musicButton && (
+        {musicButton && typeof document !== 'undefined' && showExtraButtons && ReactDOM.createPortal(
           <div
             style={{
-              position: position === "relative" ? "relative" : position,
-              top: position === "relative" ? "0" : (position === "absolute" ? "10px" : "20px"),
-              right: position === "relative" ? (showExtraButtons ? (isMobile ? "4.5rem" : "5rem") : "0") : (showExtraButtons ? (isMobile ? "5.5rem" : "6rem") : "20px"),
-              zIndex: position === "relative" ? 1 : 9992,
-              opacity: showExtraButtons ? 1 : 0,
-              pointerEvents: showExtraButtons ? "auto" : "none",
-              transform: showExtraButtons ? "translateX(0) scale(1)" : "translateX(100%) scale(0)",
+              position: "fixed",
+              top: position === "absolute" ? "10px" : "20px",
+              right: isMobile ? "5.5rem" : "6rem",
+              zIndex: 10001,
+              opacity: 1,
+              pointerEvents: "auto",
+              transform: "translateX(0) scale(1)",
               transformOrigin: "right center",
               transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) 0.05s",
             }}
           >
             {musicButton}
-          </div>
+          </div>,
+          document.body
         )}
         
         {/* User Button - flies out downward from CyberNav */}
-        {userButton && (
+        {userButton && typeof document !== 'undefined' && showExtraButtons && ReactDOM.createPortal(
           <div
             style={{
-              position: position === "relative" ? "relative" : position,
-              top: position === "relative" ? (showExtraButtons ? (isMobile ? "3.5rem" : "4rem") : "0") : (position === "absolute" ? (showExtraButtons ? (isMobile ? "4.5rem" : "5.5rem") : "10px") : (showExtraButtons ? (isMobile ? "5.5rem" : "6rem") : "20px")),
-              right: position === "relative" ? "0" : "20px",
-              zIndex: position === "relative" ? 1 : 9992,
-              opacity: showExtraButtons ? 1 : 0,
-              pointerEvents: showExtraButtons ? "auto" : "none",
-              transform: showExtraButtons ? "translateY(0) scale(1)" : "translateY(-100%) scale(0)",
+              position: "fixed",
+              top: position === "absolute" ? (isMobile ? "4.5rem" : "5.5rem") : (isMobile ? "5.5rem" : "6rem"),
+              right: "20px",
+              zIndex: 10001,
+              opacity: 1,
+              pointerEvents: "auto",
+              transform: "translateY(0) scale(1)",
               transformOrigin: "center top",
               transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s",
             }}
           >
             {userButton}
-          </div>
+          </div>,
+          document.body
         )}
         
         {/* 80s Button - flies out below User Button from CyberNav origin */}
@@ -151,7 +154,7 @@ const CyberNav = ({ is80sMode = false, position = "fixed", musicButton = null, u
               position: position === "relative" ? "relative" : position,
               top: position === "relative" ? (showExtraButtons ? (isMobile ? "8.5rem" : "8rem") : "0") : (position === "absolute" ? (showExtraButtons ? (isMobile ? "10.5rem" : "11rem") : "10px") : (showExtraButtons ? (isMobile ? "10.5rem" : "11rem") : "20px")),
               right: position === "relative" ? "0" : "20px",
-              zIndex: position === "relative" ? 1 : 9992,
+              zIndex: position === "relative" ? 1 : 100000001,
               opacity: showExtraButtons ? 1 : 0,
               pointerEvents: showExtraButtons ? "auto" : "none",
               transform: showExtraButtons ? "translateY(0) scale(1)" : "translateY(-200%) scale(0)",
@@ -208,7 +211,7 @@ const CyberNav = ({ is80sMode = false, position = "fixed", musicButton = null, u
           </svg>
         </button>
         
-        {isMenuOpen && (
+        {isMenuOpen && typeof document !== 'undefined' && ReactDOM.createPortal(
           <div
             style={{
               position: "fixed",
@@ -221,14 +224,15 @@ const CyberNav = ({ is80sMode = false, position = "fixed", musicButton = null, u
               backgroundColor: "rgba(0, 0, 0, 0.95)",
               backdropFilter: "blur(20px)",
               WebkitBackdropFilter: "blur(20px)",
-              zIndex: 9991,
+              zIndex: 9999,
               display: "flex",
               flexDirection: "column",
               justifyContent: "center",
               alignItems: "center",
               // gap: "15px",
               padding: "40px 20px",
-              isolation: "isolate"
+              isolation: "isolate",
+              transform: "translateZ(0)"
             }}
             onClick={(e) => {
               if (e.target === e.currentTarget) {
@@ -248,7 +252,7 @@ const CyberNav = ({ is80sMode = false, position = "fixed", musicButton = null, u
                 cursor: "pointer",
                 padding: "10px",
                 fontSize: "24px",
-                zIndex: 9992
+                zIndex: 10000
               }}
               onClick={() => setIsMenuOpen(false)}
               aria-label="Close menu"
@@ -347,7 +351,8 @@ const CyberNav = ({ is80sMode = false, position = "fixed", musicButton = null, u
                 </Link>
               );
             })}
-          </div>
+          </div>,
+          document.body
         )}
       </>
     );

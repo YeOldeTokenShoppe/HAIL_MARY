@@ -8,7 +8,13 @@ export function useRandomCandles(maxCandles = 20) {
   const { user, isSignedIn } = useUser();
   
   useEffect(() => {
-    if (!db) return;
+    // Check if Firebase is properly initialized
+    if (!db) {
+      // Silently return empty candles when Firebase is not initialized
+      // This is expected during server-side rendering
+      setCandles([]);
+      return;
+    }
     
     const fetchCandles = async () => {
       try {

@@ -536,6 +536,25 @@ body {
 }
 body {
   overflow-x: hidden;
+  /* iOS scrolling fixes */
+  -webkit-overflow-scrolling: touch;
+  touch-action: manipulation; /* Prevents double-tap zoom but allows scroll */
+}
+
+html, body {
+  /* Ensure proper height for iOS devices */
+  height: 100%;
+  position: relative;
+}
+
+/* iOS-specific scroll fix */
+@supports (-webkit-touch-callout: none) {
+  body {
+    /* iOS specific styles */
+    position: relative;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 * {

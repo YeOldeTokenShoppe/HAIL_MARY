@@ -4,7 +4,7 @@ import { OrbitControls, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { collection, getDocs, query, orderBy, limit, where, doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebaseClient';
-import { useUser } from '@clerk/nextjs';
+import { useUser, SignIn } from '@clerk/nextjs';
 
 
 // Helper function to decode HTML entities
@@ -107,12 +107,36 @@ function ModelViewer({ modelPath, candleData = null, showPlaque = true, isFlippe
               imageUrl: candleData.image
             });
             
+            // Set crossOrigin for URL-based images
+            if (candleData.image && (candleData.image.startsWith('http://') || candleData.image.startsWith('https://'))) {
+              textureLoader.crossOrigin = 'anonymous';
+            }
+            
             textureLoader.load(
               candleData.image,
               (texture) => {
                 console.log('[SingleCandleDisplay] Senora texture loaded successfully');
                 texture.colorSpace = THREE.SRGBColorSpace;
                 texture.flipY = false; // Fixed: Don't flip the senora image
+                
+                // Calculate aspect ratio and adjust texture repeat to maintain it
+                const imageAspect = texture.image.width / texture.image.height;
+                const targetAspect = 1.0; // Assuming the UV map is square
+                
+                if (imageAspect > targetAspect) {
+                  // Image is wider than target, scale height
+                  texture.repeat.set(1, imageAspect / targetAspect);
+                } else {
+                  // Image is taller than target, scale width
+                  texture.repeat.set(targetAspect / imageAspect, 1);
+                }
+                
+                // Center the texture
+                texture.offset.set(
+                  (1 - texture.repeat.x) / 2,
+                  (1 - texture.repeat.y) / 2
+                );
+                
                 texture.wrapS = THREE.ClampToEdgeWrapping;
                 texture.wrapT = THREE.ClampToEdgeWrapping;
                 
@@ -167,22 +191,32 @@ function ModelViewer({ modelPath, candleData = null, showPlaque = true, isFlippe
             
             // Map background IDs to texture paths
             const BACKGROUND_TEXTURES = {
-              'cyberpunk': '/cyberpunk.webp',
-              'synthwave': '/synthwave.webp',
-              'gothicTokyo': '/gothicTokyo.webp',
-              'neoTokyo': '/neoTokyo.webp',
-              'aurora': '/aurora.webp',
-              'tradeScene': '/tradeScene.webp',
-              'sunset': '/gradient-sunset.webp',
+              'cyberpunk': '/images/cyberpunk.webp',
+              'synthwave': '/images/synthwave.webp',
+              'gothicTokyo': '/images/gothicTokyo.webp',
+              'neoTokyo': '/images/neoTokyo.webp',
+              'aurora': '/images/aurora.webp',
+              'sunset': '/images/gradient-sunset.webp',
+              'dreams': '/images/gradient-dreams.webp',
+              'tradingView': '/images/uattr.webp',
               'chart': '/images/chart.webp',
-              'collectibles': '/pokemon2.webp',
-              'dreams': '/gradient-dreams.webp'
+              'collectibles': '/images/pokemon2.webp',
+              'dreams': '/images/gradient-dreams.webp',
+              'alchemy': '/images/alchemy.gif',
+      
+
+
             };
             
             const texturePath = BACKGROUND_TEXTURES[candleData.background];
             
             if (texturePath) {
               // console.log(`Loading background texture: ${texturePath} for background: ${candleData.background}`);
+              // Set crossOrigin for URL-based images
+              if (texturePath.startsWith('http://') || texturePath.startsWith('https://')) {
+                textureLoader.crossOrigin = 'anonymous';
+              }
+              
               textureLoader.load(
                 texturePath,
                 (texture) => {
@@ -296,6 +330,7 @@ export default function SingleCandleDisplay({ onOpenCompactModal, onClose }) {
     themes: []
   });
   const { user, isSignedIn } = useUser();
+  const [showSignInModal, setShowSignInModal] = useState(false);
   
   // Handle responsive behavior
   useEffect(() => {
@@ -818,10 +853,13 @@ Respond in JSON format like:
       maxWidth: isMobile ? '100%' : '26rem',
       maxHeight: isMobile ? '100vh' : '35rem',
       margin: isMobile ? 0 : 'auto',
-      background: '#1a1a1a',
-      borderRadius: isMobile ? '0' : '10px',
+      background: 'rgba(10, 10, 20, 0.1)',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
+      borderRadius: isMobile ? '0' : '20px',
+      border: !isMobile ? '1px solid rgba(255, 215, 0, 0.2)' : 'none',
       overflow: 'hidden',
-      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+      boxShadow: !isMobile ? 'inset 0 0 30px rgba(255, 215, 0, 0.05), 0 8px 32px rgba(0, 0, 0, 0.3)' : 'none',
       position: isMobile ? 'fixed' : 'relative',
       top: isMobile ? 0 : 'auto',
       left: isMobile ? 0 : 'auto',
@@ -835,8 +873,10 @@ Respond in JSON format like:
       <div style={{
         display: 'flex',
         flexDirection: 'column',
-        background: '#0a0a0a',
-        borderBottom: '1px solid #333',
+        background: 'linear-gradient(90deg, rgba(255, 215, 0, 0.05) 0%, transparent 100%)',
+        backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
+        borderBottom: '1px solid rgba(255, 215, 0, 0.2)',
         position: 'relative'
       }}>
         {/* Close button for mobile */}
@@ -850,9 +890,9 @@ Respond in JSON format like:
               width: '32px',
               height: '32px',
               borderRadius: '50%',
-              background: 'rgba(255, 255, 255, 0.1)',
-              border: '1px solid rgba(255, 255, 255, 0.3)',
-              color: '#fff',
+              background: 'rgba(255, 0, 0, 0.1)',
+              border: '1px solid rgba(255, 0, 0, 0.3)',
+              color: '#ff6666',
               fontSize: '18px',
               display: 'flex',
               alignItems: 'center',
@@ -862,12 +902,14 @@ Respond in JSON format like:
               transition: 'all 0.2s ease'
             }}
             onMouseEnter={(e) => {
-              e.target.style.background = 'rgba(255, 0, 0, 0.3)';
+              e.target.style.background = 'rgba(255, 0, 0, 0.2)';
               e.target.style.borderColor = 'rgba(255, 0, 0, 0.5)';
+              e.target.style.color = '#ff9999';
             }}
             onMouseLeave={(e) => {
-              e.target.style.background = 'rgba(255, 255, 255, 0.1)';
-              e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+              e.target.style.background = 'rgba(255, 0, 0, 0.1)';
+              e.target.style.borderColor = 'rgba(255, 0, 0, 0.3)';
+              e.target.style.color = '#ff6666';
             }}
           >
             ✕
@@ -879,14 +921,15 @@ Respond in JSON format like:
             style={{
               flex: 1,
               padding: '12px',
-              background: activeTab === 'all' ? '#1a1a1a' : 'transparent',
-              color: activeTab === 'all' ? '#00ff00' : '#666',
+              background: activeTab === 'all' ? 'rgba(255, 215, 0, 0.1)' : 'transparent',
+              color: activeTab === 'all' ? '#ffd700' : 'rgba(255, 255, 255, 0.6)',
               border: 'none',
-              borderBottom: activeTab === 'all' ? '2px solid #00ff00' : 'none',
+              borderBottom: activeTab === 'all' ? '2px solid #ffd700' : '2px solid transparent',
               cursor: 'pointer',
               fontSize: '14px',
               fontWeight: activeTab === 'all' ? 'bold' : 'normal',
-              transition: 'all 0.3s ease'
+              transition: 'all 0.3s ease',
+              textShadow: activeTab === 'all' ? '0 0 10px rgba(255, 215, 0, 0.5)' : 'none'
             }}
           >
             All Candles
@@ -896,14 +939,15 @@ Respond in JSON format like:
             style={{
               flex: 1,
               padding: '12px',
-              background: activeTab === 'my' ? '#1a1a1a' : 'transparent',
-              color: activeTab === 'my' ? '#00ff00' : '#666',
+              background: activeTab === 'my' ? 'rgba(255, 215, 0, 0.1)' : 'transparent',
+              color: activeTab === 'my' ? '#ffd700' : 'rgba(255, 255, 255, 0.6)',
               border: 'none',
-              borderBottom: activeTab === 'my' ? '2px solid #00ff00' : 'none',
+              borderBottom: activeTab === 'my' ? '2px solid #ffd700' : '2px solid transparent',
               cursor: 'pointer',
               fontSize: '14px',
               fontWeight: activeTab === 'my' ? 'bold' : 'normal',
-              transition: 'all 0.3s ease'
+              transition: 'all 0.3s ease',
+              textShadow: activeTab === 'my' ? '0 0 10px rgba(255, 215, 0, 0.5)' : 'none'
             }}
           >
             My Candle
@@ -913,14 +957,15 @@ Respond in JSON format like:
             style={{
               flex: 1,
               padding: '12px',
-              background: activeTab === 'summary' ? '#1a1a1a' : 'transparent',
-              color: activeTab === 'summary' ? '#00ff00' : '#666',
+              background: activeTab === 'summary' ? 'rgba(255, 215, 0, 0.1)' : 'transparent',
+              color: activeTab === 'summary' ? '#ffd700' : 'rgba(255, 255, 255, 0.6)',
               border: 'none',
-              borderBottom: activeTab === 'summary' ? '2px solid #00ff00' : 'none',
+              borderBottom: activeTab === 'summary' ? '2px solid #ffd700' : '2px solid transparent',
               cursor: 'pointer',
               fontSize: '14px',
               fontWeight: activeTab === 'summary' ? 'bold' : 'normal',
-              transition: 'all 0.3s ease'
+              transition: 'all 0.3s ease',
+              textShadow: activeTab === 'summary' ? '0 0 10px rgba(255, 215, 0, 0.5)' : 'none'
             }}
           >
             Summary
@@ -994,7 +1039,7 @@ Respond in JSON format like:
       <div style={{ 
         flex: 1,
         position: 'relative',
-        background: '#0f0f0f',
+        background: 'rgba(0, 0, 0, 0.3)',
         display: 'flex',
         width: '100%',
         minHeight: 0
@@ -1239,6 +1284,7 @@ Respond in JSON format like:
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            width: '100%',
             height: '100%',
             color: '#666',
             fontSize: '14px'
@@ -1249,6 +1295,7 @@ Respond in JSON format like:
           <div style={{
             display: 'flex',
             flexDirection: 'column',
+            width: '100%',
             alignItems: 'center',
             justifyContent: 'center',
             height: '100%',
@@ -1257,6 +1304,31 @@ Respond in JSON format like:
             <div style={{ color: '#666', fontSize: '14px' }}>
               Please sign in to view your candles
             </div>
+            <button
+              onClick={() => setShowSignInModal(true)}
+              style={{
+                padding: '10px 20px',
+                background: 'linear-gradient(135deg, #00ff88 0%, #00dd66 100%)',
+                border: '2px solid #00ff88',
+                borderRadius: '8px',
+                color: '#000',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 4px 15px rgba(0, 255, 136, 0.4)'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.transform = 'scale(1.05)';
+                e.target.style.boxShadow = '0 6px 20px rgba(0, 255, 136, 0.6)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = 'scale(1)';
+                e.target.style.boxShadow = '0 4px 15px rgba(0, 255, 136, 0.4)';
+              }}
+            >
+              Sign In
+            </button>
           </div>
         ) : activeTab === 'my' && myCandles.length === 0 ? (
           <div style={{
@@ -1347,20 +1419,40 @@ Respond in JSON format like:
               gap: '8px'
             }}>
               {currentCandle.userAvatar && (
-                <img 
-                  src={currentCandle.userAvatar} 
-                  alt="User" 
-                  style={{
-                    width: isMobile ? '3rem' : '3rem',
-                    height: isMobile ? '3rem' : '3rem',
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  position: 'relative',
+                  width: isMobile ? '3.5rem' : '3.5rem',
+                  height: isMobile ? '3.5rem' : '3.5rem',
+                  marginBottom: '8px'
+                }}>
+                  {/* Solid black circle background */}
+                  <div style={{
+                    position: 'absolute',
+                    width: '100%',
+                    height: '100%',
                     borderRadius: '50%',
+                    backgroundColor: 'rgba(0, 0, 0, 0.9)',
                     border: '2px solid #eaea0b',
-                    boxShadow: '0 0 8px rgba(234, 234, 11, 0.6)'
-                  }}
-                  onError={(e) => {
-                    e.target.style.display = 'none';
-                  }}
-                />
+                    boxShadow: '0 0 12px rgba(234, 234, 11, 0.5)'
+                  }} />
+                  <img 
+                    src={currentCandle.userAvatar} 
+                    alt="User" 
+                    style={{
+                      width: isMobile ? '3rem' : '3rem',
+                      height: isMobile ? '3rem' : '3rem',
+                      borderRadius: '50%',
+                      position: 'relative',
+                      zIndex: 1
+                    }}
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                </div>
               )}
               {currentCandle.username && (
                 <div style={{
@@ -1407,16 +1499,23 @@ Respond in JSON format like:
                 maxWidth: isMobile ? '280px' : '240px',
                 textAlign: 'center',
                 padding: '12px',
-                background: 'rgba(0, 0, 0, 0.4)',
-                borderRadius: '8px',
-                backdropFilter: 'blur(8px)'
+                borderRadius: '8px'
               }}>
                 <div style={{
-                  color: '#eaea0b',
+                  color: '#eaea0b',  // Yellow text for all
                   fontSize: isMobile ? '14px' : '12px',
                   fontStyle: 'italic',
+                  fontWeight: '800',  // Very bold
                   lineHeight: '1.4',
-                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.9)'
+                  // Subtle dark stroke with glow - same as CompactCandleModal
+                  textShadow: `
+                    -1px -1px 2px rgba(0, 0, 0, 0.9),
+                     1px -1px 2px rgba(0, 0, 0, 0.9),
+                    -1px  1px 2px rgba(0, 0, 0, 0.9),
+                     1px  1px 2px rgba(0, 0, 0, 0.9),
+                     0 0 6px rgba(0, 0, 0, 0.8),
+                     0 0 15px rgba(234, 234, 11, 0.9),
+                     0 0 25px rgba(234, 234, 11, 0.5)`
                 }}>
                   "{decodeHTMLEntities(currentCandle.message)}"
                 </div>
@@ -1743,7 +1842,11 @@ Respond in JSON format like:
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onOpenCompactModal();
+              if (!isSignedIn) {
+                setShowSignInModal(true);
+              } else {
+                onOpenCompactModal();
+              }
             }}
             style={{
               position: 'absolute',
@@ -1776,6 +1879,76 @@ Respond in JSON format like:
           </button>
         )}
       </div>
+      
+      {/* Clerk Sign-In Modal */}
+      {showSignInModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 100000,
+          backdropFilter: 'blur(10px)'
+        }}
+        onClick={() => setShowSignInModal(false)}
+        >
+          <div 
+            style={{
+              position: 'relative'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <SignIn 
+              routing="hash"
+              signUpUrl="#"
+              forceRedirectUrl={window.location.pathname}
+              appearance={{
+                elements: {
+                  rootBox: {
+                    borderRadius: '12px',
+                    overflow: 'hidden'
+                  }
+                }
+              }}
+            />
+            <button
+              onClick={() => setShowSignInModal(false)}
+              style={{
+                position: 'absolute',
+                top: '-40px',
+                right: '0',
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                color: '#fff',
+                fontSize: '18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = 'rgba(255, 255, 255, 0.2)';
+                e.target.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+                e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+              }}
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

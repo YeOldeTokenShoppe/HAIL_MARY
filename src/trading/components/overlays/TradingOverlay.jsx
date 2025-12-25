@@ -93,7 +93,11 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
   
   // Monitor Firestore for new candles
   useEffect(() => {
-    if (!db) return;
+    // Check if Firebase is properly initialized
+    if (!db || !db._delegate) {
+      console.warn("Firebase Firestore not properly initialized. Skipping candle listener.");
+      return;
+    }
     
     try {
       // Query to get the most recent candles

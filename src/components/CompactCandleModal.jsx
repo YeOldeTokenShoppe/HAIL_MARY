@@ -21,7 +21,7 @@ import { useFirestoreResults } from '@/lib/useFirestoreResults';
 import CandleSnapshotRenderer from './CandleSnapshotRenderer';
 
 // Simple viewer component for displaying candle models with dynamic texture support
-function SimpleCandleViewer({ modelPath, customImageUrl, backgroundTexturePath, backgroundGradient, dedicationName, dedicationMessage, showPlaque, userAvatar, burnAmount, baseColor }) {
+function SimpleCandleViewer({ modelPath, customImageUrl, backgroundTexturePath, backgroundGradient, dedicationName, dedicationMessage, showPlaque, userAvatar, burnAmount, baseColor, backgroundId }) {
   const { scene, materials } = useGLTF(modelPath);
   const modelRef = useRef();
   const groupRef = useRef();
@@ -117,17 +117,41 @@ function SimpleCandleViewer({ modelPath, customImageUrl, backgroundTexturePath, 
             // Only apply custom image if it's different from the default senora.png
             // If no custom image or it's the default, keep the original texture
             const shouldApplyCustomTexture = customImageUrl && 
-                                            customImageUrl !== '/senora.png' && 
+                                            customImageUrl !== '/images/nuestraSenora.webp' && 
                                             (modelPath.includes('tinyVotiveOnly') || modelPath.includes('tinyVotiveBox')) && 
                                             isSenoraObject;
             
             // If custom image URL is provided and this is the senora mesh (for votive)
             if (shouldApplyCustomTexture) {
+              // Only set crossOrigin for actual URLs, not local paths
+              if (customImageUrl && (customImageUrl.startsWith('http://') || customImageUrl.startsWith('https://'))) {
+                textureLoader.crossOrigin = 'anonymous';
+              }
+              
               textureLoader.load(
                 customImageUrl,
                 (texture) => {
                   texture.colorSpace = THREE.SRGBColorSpace;
                   texture.flipY = false; // Adjust based on your model
+                  
+                  // Calculate aspect ratio and adjust texture repeat to maintain it
+                  const imageAspect = texture.image.width / texture.image.height;
+                  const targetAspect = 1.0; // Assuming the UV map is square
+                  
+                  if (imageAspect > targetAspect) {
+                    // Image is wider than target, scale height
+                    texture.repeat.set(1, imageAspect / targetAspect);
+                  } else {
+                    // Image is taller than target, scale width
+                    texture.repeat.set(targetAspect / imageAspect, 1);
+                  }
+                  
+                  // Center the texture
+                  texture.offset.set(
+                    (1 - texture.repeat.x) / 2,
+                    (1 - texture.repeat.y) / 2
+                  );
+                  
                   texture.wrapS = THREE.ClampToEdgeWrapping;
                   texture.wrapT = THREE.ClampToEdgeWrapping;
                   texture.needsUpdate = true;
@@ -602,12 +626,19 @@ function SimpleCandleViewer({ modelPath, customImageUrl, backgroundTexturePath, 
       // Only load the texture if it's different from the current one
       if (currentBackgroundPath.current !== backgroundTexturePath) {
         console.log(`Applying background texture to Box mesh: ${backgroundTexturePath}`);
+        console.log('Box mesh exists:', !!boxMeshRef.current);
+        console.log('Model path:', modelPath);
         currentBackgroundPath.current = backgroundTexturePath;
         
         // Dispose of previous custom texture if exists (but not the original)
         if (backgroundTextureRef.current && backgroundTextureRef.current !== originalBoxTextureRef.current) {
           backgroundTextureRef.current.dispose();
           backgroundTextureRef.current = null;
+        }
+        
+        // Only set crossOrigin for actual URLs, not local paths
+        if (backgroundTexturePath.startsWith('http://') || backgroundTexturePath.startsWith('https://')) {
+          textureLoader.crossOrigin = 'anonymous';
         }
         
         textureLoader.load(
@@ -648,9 +679,25 @@ function SimpleCandleViewer({ modelPath, customImageUrl, backgroundTexturePath, 
               });
             }
           },
-          undefined,
+          (xhr) => {
+            // Progress callback
+            console.log(`Loading background: ${(xhr.loaded / xhr.total * 100).toFixed(0)}% complete`);
+          },
           (error) => {
             console.error('✗ Error loading background texture:', error);
+            console.error('Failed texture path:', backgroundTexturePath);
+            console.error('Error details:', {
+              message: error.message,
+              stack: error.stack,
+              type: error.type
+            });
+            
+            // Set fallback color if texture fails
+            if (boxMeshRef.current && boxMeshRef.current.material) {
+              boxMeshRef.current.material.map = null;
+              boxMeshRef.current.material.color.set(0x444444);
+              boxMeshRef.current.material.needsUpdate = true;
+            }
           }
         );
       }
@@ -728,11 +775,9 @@ function SimpleCandleViewer({ modelPath, customImageUrl, backgroundTexturePath, 
           }}
         >
           <div style={{
-            // background: 'linear-gradient(135deg, rgb(212, 175, 55), rgb(184, 134, 11))',
-            // border: '1px solid #b8860b',
-            borderRadius: '6px',
-            padding: '8px 12px',
-            // boxShadow: '0 2px 10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3)',
+            // Clean look without background overlay
+            borderRadius: '8px',
+            padding: '12px',
             minWidth: '120px',
             maxWidth: '180px',
             minHeight: '100px',
@@ -747,8 +792,23 @@ function SimpleCandleViewer({ modelPath, customImageUrl, backgroundTexturePath, 
               <div style={{
                 display: 'flex',
                 justifyContent: 'center',
-                marginBottom: '4px'
+                alignItems: 'center',
+                marginBottom: '4px',
+                position: 'relative',
+                width: '28px',
+                height: '28px',
+                margin: '0 auto 4px auto'
               }}>
+                {/* Solid black circle background */}
+                <div style={{
+                  position: 'absolute',
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                  border: '1px solid #eaea0b',
+                  boxShadow: '0 0 6px rgba(234, 234, 11, 0.4)'
+                }} />
                 <img 
                   src={userAvatar} 
                   alt="User" 
@@ -756,8 +816,8 @@ function SimpleCandleViewer({ modelPath, customImageUrl, backgroundTexturePath, 
                     width: '20px',
                     height: '20px',
                     borderRadius: '50%',
-                    border: '1px solid #eaea0b',
-                    boxShadow: '0 0 4px rgba(234, 234, 11, 0.5)'
+                    position: 'relative',
+                    zIndex: 1
                   }}
                   onError={(e) => {
                     e.target.style.display = 'none';
@@ -766,25 +826,43 @@ function SimpleCandleViewer({ modelPath, customImageUrl, backgroundTexturePath, 
               </div>
             )}
             <div style={{
-              color: '#eaea0b',
-              fontSize: '8px',
-              fontWeight: 'bold',
+              color: '#eaea0b',  // Yellow text
+              fontSize: '9px',
+              fontWeight: '900',  // Extra bold
               marginBottom: dedicationMessage ? '4px' : '0',
-              textShadow: '0 1px 1px rgba(255, 255, 255, 0.3)'
+              // Subtle dark stroke with glow
+              textShadow: `
+                -1px -1px 2px rgba(0, 0, 0, 0.9),
+                 1px -1px 2px rgba(0, 0, 0, 0.9),
+                -1px  1px 2px rgba(0, 0, 0, 0.9),
+                 1px  1px 2px rgba(0, 0, 0, 0.9),
+                 0 0 6px rgba(0, 0, 0, 0.8),
+                 0 0 15px rgba(234, 234, 11, 0.9),
+                 0 0 25px rgba(234, 234, 11, 0.5)`
             }}>
               {dedicationName}
             </div>
             {dedicationMessage && (
               <div style={{
-              color: '#eaea0b',
-                fontSize: '6px',
+                color: '#eaea0b',  // Yellow text
+                fontSize: '7px',
                 fontStyle: 'italic',
-                lineHeight: '1.2',
+                fontWeight: '800',  // Very bold
+                lineHeight: '1.4',
                 flex: 1,
                 overflow: 'auto',
                 wordWrap: 'break-word',
                 maxWidth: '100%',
-                paddingTop: '2px'
+                paddingTop: '2px',
+                // Subtle dark stroke with glow
+                textShadow: `
+                  -1px -1px 1px rgba(0, 0, 0, 0.8),
+                   1px -1px 1px rgba(0, 0, 0, 0.8),
+                  -1px  1px 1px rgba(0, 0, 0, 0.8),
+                   1px  1px 1px rgba(0, 0, 0, 0.8),
+                   0 0 4px rgba(0, 0, 0, 0.7),
+                   0 0 12px rgba(234, 234, 11, 0.8),
+                   0 0 20px rgba(234, 234, 11, 0.4)`
               }}>
                 "{dedicationMessage}"
               </div>
@@ -807,7 +885,7 @@ function SimpleCandleViewer({ modelPath, customImageUrl, backgroundTexturePath, 
                   color: '#ffb000',
                   fontSize: '7px',
                   fontWeight: 'bold',
-                  textShadow: '0 0 3px rgba(255, 176, 0, 0.5)'
+                  textShadow: '0 0 4px rgba(255, 176, 0, 0.6)'
                 }}>
                   {parseInt(burnAmount).toLocaleString()} RL80
                 </span>
@@ -999,537 +1077,537 @@ const PRAYERS_BY_LANGUAGE = {
     }]
   }
 };
-function CandlePreview({
-  imageUrl,
-  message,
-  isEncrypted,
-  username,
-  language = 'en',
-  template = null,
-  templatePosition = {
-    x: 50,
-    y: 50
-  },
-  templateScale = 100,
-  templateRotation = 0,
-  skinToneAdjustment = 0,
-  userImagePosition = {
-    x: 50,
-    y: 50
-  },
-  userImageScale = 100,
-  userImageRotation = 0,
-  candleModel = '/models/singleCandleAnimatedFlame.glb'
-}) {
-  const {
-    scene,
-    animations
-  } = useGLTF(candleModel);
-  const candleRef = useRef();
-  const clonedSceneRef = useRef(null);
-  const defaultTexture = useTexture('/defaultAvatar.png');
-  const mixerRef = useRef(null);
-  const [userTexture, setUserTexture] = useState(null);
-  const [textTexture, setTextTexture] = useState(null);
-  useEffect(() => {
-    if (defaultTexture) {
-      defaultTexture.wrapS = THREE.ClampToEdgeWrapping;
-      defaultTexture.wrapT = THREE.ClampToEdgeWrapping;
-      defaultTexture.repeat.set(1, -1);
-      defaultTexture.offset.set(0, 1);
-      defaultTexture.minFilter = THREE.LinearMipMapLinearFilter;
-      defaultTexture.magFilter = THREE.LinearFilter;
-      defaultTexture.anisotropy = 16;
-      defaultTexture.generateMipmaps = true;
-      defaultTexture.needsUpdate = true;
-    }
-  }, [defaultTexture]);
-  useEffect(() => {
-    if (userTexture) {
-      userTexture.dispose();
-      setUserTexture(null);
-    }
-    if (imageUrl && imageUrl !== '/defaultAvatar.png') {
-      const loader = new THREE.TextureLoader();
-      const finalUrl = imageUrl.startsWith('data:') ? imageUrl : `${imageUrl}${imageUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
-      loader.setCrossOrigin('anonymous');
-      loader.load(finalUrl, texture => {
-        texture.wrapS = THREE.ClampToEdgeWrapping;
-        texture.wrapT = THREE.ClampToEdgeWrapping;
-        texture.repeat.set(1, -1);
-        texture.offset.set(0, 1);
-        texture.minFilter = THREE.LinearMipMapLinearFilter;
-        texture.magFilter = THREE.LinearFilter;
-        texture.anisotropy = 16;
-        texture.generateMipmaps = true;
-        texture.needsUpdate = true;
-        setUserTexture(texture);
-      }, undefined, error => {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => {
-          const texture = new THREE.Texture(img);
-          texture.wrapS = THREE.ClampToEdgeWrapping;
-          texture.wrapT = THREE.ClampToEdgeWrapping;
-          texture.repeat.set(1, -1);
-          texture.offset.set(0, 1);
-          texture.needsUpdate = true;
-          setUserTexture(texture);
-        };
-        img.onerror = () => {
-          setUserTexture(null);
-        };
-        img.src = finalUrl;
-      });
-    } else {
-      setUserTexture(null);
-    }
-    return () => {
-      if (userTexture) {
-        userTexture.dispose();
-      }
-    };
-  }, [imageUrl]);
-  const label1MeshRef = useRef(null);
-  const label2MeshRef = useRef(null);
-  const lastSuccessfulImageUrl = useRef(null);
-  const lastTexture = useRef(null);
-  const effectActive = useRef(false);
-  useEffect(() => {
-    if (scene) {
-      clonedSceneRef.current = scene.clone();
-      if (animations && animations.length > 0) {
-        mixerRef.current = new THREE.AnimationMixer(clonedSceneRef.current);
-        animations.forEach(clip => {
-          const action = mixerRef.current.clipAction(clip);
-          action.play();
-        });
-      }
-    }
-    return () => {
-      if (mixerRef.current) {
-        mixerRef.current.stopAllAction();
-      }
-    };
-  }, [scene, animations]);
-  useEffect(() => {
-    if (clonedSceneRef.current) {
-      label1MeshRef.current = null;
-      label2MeshRef.current = null;
-      clonedSceneRef.current.traverse(child => {
-        if (child.isMesh) {
-          if (child.name === 'Label1' || child.name.includes('Label1')) {
-            label1MeshRef.current = child;
-            child.visible = true;
-          }
-          if (child.name === 'Label2' || child.name.includes('Label2')) {
-            label2MeshRef.current = child;
-          }
-        }
-      });
-    }
-  }, [clonedSceneRef.current]);
-  useEffect(() => {
-    if (!label1MeshRef.current) return;
-    const canvas = document.createElement('canvas');
-    canvas.width = 1024;
-    canvas.height = 1024;
-    const ctx = canvas.getContext('2d');
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.fillStyle = '#F4E8D0';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = '#e0e0e0';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
-    if (!message || !message.trim()) {
-      ctx.fillStyle = '#000000';
-      ctx.font = 'bold 42px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('Your message here', canvas.width / 2, canvas.height / 2);
-    } else {
-      const headingText = PRAYERS_BY_LANGUAGE[language]?.heading || PRAYERS_BY_LANGUAGE.en.heading;
-      ctx.fillStyle = '#000000';
-      ctx.font = 'bold 42px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(headingText[0], canvas.width / 2, 80);
-      ctx.fillText(headingText[1], canvas.width / 2, 130);
-      ctx.strokeStyle = '#333333';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(canvas.width * 0.2, 160);
-      ctx.lineTo(canvas.width * 0.8, 160);
-      ctx.stroke();
-      let displayMessage = message;
-      let headerHeight = 180;
-      if (isEncrypted) {
-        ctx.fillStyle = '#ff6600';
-        ctx.font = 'bold 36px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('This prayer has been encrypted:', canvas.width / 2, 210);
-        headerHeight = 250;
-      }
-      ctx.fillStyle = '#000000';
-      const fontSize = displayMessage.length > 200 ? 40 : displayMessage.length > 100 ? 48 : 56;
-      ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const wrapText = (text, maxWidth) => {
-        const isChinese = /[\u4e00-\u9fff]/.test(text);
-        if (isEncrypted && !text.includes(' ')) {
-          const lines = [];
-          const charsPerLine = Math.floor(maxWidth / (fontSize * 0.6));
-          for (let i = 0; i < text.length; i += charsPerLine) {
-            lines.push(text.substring(i, i + charsPerLine));
-          }
-          return lines;
-        }
-        if (isChinese) {
-          const lines = [];
-          let currentLine = '';
-          const charsPerLine = Math.floor(maxWidth / (fontSize * 0.9));
-          for (let i = 0; i < text.length; i++) {
-            currentLine += text[i];
-            if (ctx.measureText(currentLine).width > maxWidth || currentLine.length >= charsPerLine) {
-              const lastPunc = currentLine.search(/[，。！？；：、]/);
-              if (lastPunc > currentLine.length * 0.6) {
-                lines.push(currentLine.substring(0, lastPunc + 1));
-                currentLine = currentLine.substring(lastPunc + 1);
-              } else if (currentLine.length > 1) {
-                lines.push(currentLine.substring(0, currentLine.length - 1));
-                currentLine = text[i];
-              }
-            }
-          }
-          if (currentLine) {
-            lines.push(currentLine);
-          }
-          return lines;
-        }
-        const words = text.split(' ');
-        const lines = [];
-        let currentLine = '';
-        words.forEach(word => {
-          const testLine = currentLine + (currentLine ? ' ' : '') + word;
-          const metrics = ctx.measureText(testLine);
-          if (metrics.width > maxWidth && currentLine) {
-            lines.push(currentLine);
-            currentLine = word;
-            if (ctx.measureText(word).width > maxWidth) {
-              const chars = word.split('');
-              let tempWord = '';
-              for (let char of chars) {
-                if (ctx.measureText(tempWord + char).width > maxWidth && tempWord) {
-                  lines.push(tempWord);
-                  tempWord = char;
-                } else {
-                  tempWord += char;
-                }
-              }
-              currentLine = tempWord;
-            }
-          } else {
-            currentLine = testLine;
-          }
-        });
-        if (currentLine) {
-          lines.push(currentLine);
-        }
-        return lines;
-      };
-      const lines = wrapText(displayMessage, canvas.width - 120);
-      const lineHeight = displayMessage.length > 200 ? 60 : 80;
-      const startY = headerHeight + 40;
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
-      ctx.shadowBlur = 2;
-      ctx.shadowOffsetX = 1;
-      ctx.shadowOffsetY = 1;
-      lines.forEach((line, index) => {
-        ctx.fillText(line, canvas.width / 2, startY + index * lineHeight);
-      });
-    }
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.wrapS = THREE.ClampToEdgeWrapping;
-    texture.wrapT = THREE.ClampToEdgeWrapping;
-    texture.repeat.set(-1, -1);
-    texture.offset.set(1, 1);
-    texture.flipY = false;
-    texture.minFilter = THREE.LinearMipMapLinearFilter;
-    texture.magFilter = THREE.LinearFilter;
-    texture.anisotropy = 16;
-    texture.generateMipmaps = true;
-    texture.needsUpdate = true;
-    setTextTexture(texture);
-  }, [message, isEncrypted, language]);
-  useEffect(() => {
-    if (label1MeshRef.current && textTexture) {
-      label1MeshRef.current.material = new THREE.MeshStandardMaterial({
-        map: textTexture,
-        transparent: true,
-        side: THREE.DoubleSide,
-        color: 0xffffff
-      });
-      label1MeshRef.current.material.needsUpdate = true;
-      label1MeshRef.current.visible = true;
-    }
-  }, [textTexture]);
-  useEffect(() => {
-    if (!label2MeshRef.current) return;
-    const timeoutId = setTimeout(() => {
-      effectActive.current = true;
-      const currentImageUrl = imageUrl || lastSuccessfulImageUrl.current;
-      if (imageUrl && imageUrl !== '/defaultAvatar.png') {
-        lastSuccessfulImageUrl.current = imageUrl;
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = 1024;
-      canvas.height = 1024;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#f5f5f5';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      const drawImageWithTemplate = (img, templateImg = null, handsImg = null) => {
-        const imageHeight = username ? canvas.height * 0.9 : canvas.height;
-        if (templateImg) {
-          ctx.fillStyle = '#f5f5f5';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
-          ctx.save();
-          const scaleFactor = userImageScale / 100;
-          const baseSize = Math.min(canvas.width, canvas.height) * 0.4;
-          const actualWidth = img.width <= 10 ? 200 : img.width;
-          const actualHeight = img.height <= 10 ? 200 : img.height;
-          const aspectRatio = actualWidth / actualHeight;
-          const circleSize = baseSize * scaleFactor;
-          const radius = circleSize / 2;
-          let drawWidth, drawHeight;
-          if (aspectRatio > 1) {
-            drawHeight = circleSize;
-            drawWidth = circleSize * aspectRatio;
-          } else {
-            drawWidth = circleSize;
-            drawHeight = circleSize / aspectRatio;
-          }
-          if (userImageRotation !== 0) {
-            const centerX = userImagePosition.x / 100 * canvas.width;
-            const centerY = userImagePosition.y / 100 * canvas.height;
-            ctx.translate(centerX, centerY);
-            ctx.rotate(userImageRotation * Math.PI / 180);
-            ctx.translate(-centerX, -centerY);
-          }
-          ctx.save();
-          ctx.beginPath();
-          const centerX = userImagePosition.x / 100 * canvas.width;
-          const centerY = userImagePosition.y / 100 * canvas.height;
-          const yCompressionFactor = 0.7;
-          ctx.ellipse(centerX, centerY, radius, radius * yCompressionFactor, 0, 0, Math.PI * 2);
-          ctx.clip();
-          ctx.drawImage(img, centerX - drawWidth / 2, centerY - drawHeight * yCompressionFactor / 2, drawWidth, drawHeight * yCompressionFactor);
-          ctx.restore();
-          ctx.restore();
-          if (handsImg && handsImg.complete) {
-            const prevComposite = ctx.globalCompositeOperation;
-            ctx.globalCompositeOperation = 'source-over';
-            if (skinToneAdjustment !== 0) {
-              const tempCanvas = document.createElement('canvas');
-              tempCanvas.width = canvas.width;
-              tempCanvas.height = canvas.height;
-              const tempCtx = tempCanvas.getContext('2d');
-              tempCtx.drawImage(handsImg, 0, 0, canvas.width, canvas.height);
-              const imageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
-              const data = imageData.data;
-              for (let i = 0; i < data.length; i += 4) {
-                if (data[i + 3] > 0) {
-                  const r = data[i];
-                  const g = data[i + 1];
-                  const b = data[i + 2];
-                  let newR, newG, newB;
-                  if (skinToneAdjustment < 0) {
-                    const lightness = Math.abs(skinToneAdjustment) / 100;
-                    newR = Math.min(255, r + (255 - r) * lightness * 0.5);
-                    newG = Math.min(255, g + (255 - g) * lightness * 0.5);
-                    newB = Math.min(255, b + (255 - b) * lightness * 0.6);
-                  } else {
-                    const darkness = skinToneAdjustment / 100;
-                    newR = Math.max(0, r - r * darkness * 0.5);
-                    newG = Math.max(0, g - g * darkness * 0.6);
-                    newB = Math.max(0, b - b * darkness * 0.7);
-                  }
-                  data[i] = newR;
-                  data[i + 1] = newG;
-                  data[i + 2] = newB;
-                }
-              }
-              tempCtx.putImageData(imageData, 0, 0);
-              ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
-            } else {
-              ctx.drawImage(handsImg, 0, 0, canvas.width, canvas.height);
-            }
-            ctx.globalCompositeOperation = prevComposite;
-          }
-        } else {
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        }
-        if (username && username.trim()) {
-          const gradient = ctx.createLinearGradient(0, imageHeight, 0, canvas.height);
-          gradient.addColorStop(0, 'rgba(0, 0, 0, 0.7)');
-          gradient.addColorStop(1, 'rgba(0, 0, 0, 0.9)');
-          ctx.fillStyle = gradient;
-          ctx.fillRect(0, imageHeight, canvas.width, canvas.height - imageHeight);
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 42px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          const nameText = username;
-          const textY = imageHeight + (canvas.height - imageHeight) / 2;
-          ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-          ctx.shadowBlur = 4;
-          ctx.shadowOffsetX = 2;
-          ctx.shadowOffsetY = 2;
-          ctx.fillText(nameText, canvas.width / 2, textY);
-        }
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.wrapS = THREE.ClampToEdgeWrapping;
-        texture.wrapT = THREE.ClampToEdgeWrapping;
-        texture.repeat.set(1, -1);
-        texture.offset.set(0, 1);
-        texture.minFilter = THREE.LinearMipMapLinearFilter;
-        texture.magFilter = THREE.LinearFilter;
-        texture.anisotropy = 16;
-        texture.generateMipmaps = true;
-        texture.needsUpdate = true;
-        if (label2MeshRef.current && label2MeshRef.current.material) {
-          label2MeshRef.current.material.map = texture;
-          label2MeshRef.current.material.needsUpdate = true;
-          lastTexture.current = texture;
-        } else if (label2MeshRef.current) {
-          label2MeshRef.current.material = new THREE.MeshStandardMaterial({
-            map: texture,
-            emissive: new THREE.Color(0xff6600),
-            emissiveIntensity: 0.15,
-            roughness: 0.7,
-            metalness: 0.2,
-            envMapIntensity: 0.5,
-            side: THREE.FrontSide
-          });
-        }
-      };
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      if (template) {
-        const templateImg = new Image();
-        templateImg.crossOrigin = 'anonymous';
-        templateImg.onload = () => {
-          img.onload = () => {
-            if (!effectActive.current) return;
-            const userImg = img;
-            drawImageWithTemplate(userImg, templateImg, null);
-            if (template === '/images/face2.png') {
-              const handsImg = new Image();
-              handsImg.crossOrigin = 'anonymous';
-              handsImg.onload = () => {
-                if (effectActive.current) {
-                  drawImageWithTemplate(userImg, templateImg, handsImg);
-                }
-              };
-              handsImg.onerror = () => {};
-              handsImg.src = '/images/FeetHands.png';
-            }
-          };
-          img.onerror = () => {
-            const placeholderImg = new Image();
-            placeholderImg.crossOrigin = 'anonymous';
-            placeholderImg.onload = () => {
-              if (effectActive.current) {
-                drawImageWithTemplate(placeholderImg, templateImg, null);
-                if (template === '/images/face2.png') {
-                  const handsImg = new Image();
-                  handsImg.crossOrigin = 'anonymous';
-                  handsImg.onload = () => {
-                    if (effectActive.current) {
-                      drawImageWithTemplate(placeholderImg, templateImg, handsImg);
-                    }
-                  };
-                  handsImg.src = '/images/FeetHands.png';
-                }
-              }
-            };
-            placeholderImg.src = '/defaultAvatar.png';
-          };
-          if (currentImageUrl && currentImageUrl !== '/defaultAvatar.png') {
-            img.src = currentImageUrl;
-          } else {
-            img.src = '/defaultAvatar.png';
-          }
-        };
-        templateImg.onerror = () => {
-          if (effectActive.current) {
-            img.onload = () => {
-              if (effectActive.current) {
-                drawImageWithTemplate(img, null, null);
-              }
-            };
-            img.src = currentImageUrl || defaultTexture?.image?.src || '/defaultAvatar.png';
-          }
-        };
-        templateImg.src = template;
-      }
-      img.onerror = () => {
-        ctx.fillStyle = '#ff6600';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        if (username && username.trim()) {
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 72px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText(username, canvas.width / 2, canvas.height / 2);
-        }
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.wrapS = THREE.ClampToEdgeWrapping;
-        texture.wrapT = THREE.ClampToEdgeWrapping;
-        texture.repeat.set(1, -1);
-        texture.offset.set(0, 1);
-        texture.needsUpdate = true;
-        if (label2MeshRef.current.material) {
-          label2MeshRef.current.material.map = texture;
-          label2MeshRef.current.material.needsUpdate = true;
-        }
-      };
-      if (!template) {
-        img.onload = () => {
-          if (effectActive.current) {
-            drawImageWithTemplate(img, null, null);
-          }
-        };
-        img.onerror = () => {};
-        if (currentImageUrl && currentImageUrl !== '/defaultAvatar.png') {
-          img.src = currentImageUrl;
-        } else if (userTexture) {
-          img.src = userTexture.image.src;
-        } else if (defaultTexture) {
-          img.src = defaultTexture.image.src;
-        } else {
-          img.src = '/defaultAvatar.png';
-        }
-      }
-    }, 50);
-    return () => {
-      clearTimeout(timeoutId);
-      effectActive.current = false;
-    };
-  }, [userTexture, defaultTexture, username, template, templatePosition, templateScale, templateRotation, skinToneAdjustment, userImagePosition, userImageScale, userImageRotation, imageUrl]);
-  useFrame((state, delta) => {
-    if (mixerRef.current) {
-      mixerRef.current.update(delta);
-    }
-  });
-  return <>
-      {clonedSceneRef.current && <primitive ref={candleRef} object={clonedSceneRef.current} scale={[2, 2, 2]} position={[0, -1, 0]} />}
-      <OrbitControls enablePan={false} enableZoom={true} minDistance={2} maxDistance={8} minPolarAngle={Math.PI / 3} maxPolarAngle={Math.PI / 2} autoRotate={false} />
-    </>;
-}
+// function CandlePreview({
+//   imageUrl,
+//   message,
+//   isEncrypted,
+//   username,
+//   language = 'en',
+//   template = null,
+//   templatePosition = {
+//     x: 50,
+//     y: 50
+//   },
+//   templateScale = 100,
+//   templateRotation = 0,
+//   skinToneAdjustment = 0,
+//   userImagePosition = {
+//     x: 50,
+//     y: 50
+//   },
+//   userImageScale = 100,
+//   userImageRotation = 0,
+//   candleModel = '/models/singleCandleAnimatedFlame.glb'
+// }) {
+//   const {
+//     scene,
+//     animations
+//   } = useGLTF(candleModel);
+//   const candleRef = useRef();
+//   const clonedSceneRef = useRef(null);
+//   const defaultTexture = useTexture('/defaultAvatar.png');
+//   const mixerRef = useRef(null);
+//   const [userTexture, setUserTexture] = useState(null);
+//   const [textTexture, setTextTexture] = useState(null);
+//   useEffect(() => {
+//     if (defaultTexture) {
+//       defaultTexture.wrapS = THREE.ClampToEdgeWrapping;
+//       defaultTexture.wrapT = THREE.ClampToEdgeWrapping;
+//       defaultTexture.repeat.set(1, -1);
+//       defaultTexture.offset.set(0, 1);
+//       defaultTexture.minFilter = THREE.LinearMipMapLinearFilter;
+//       defaultTexture.magFilter = THREE.LinearFilter;
+//       defaultTexture.anisotropy = 16;
+//       defaultTexture.generateMipmaps = true;
+//       defaultTexture.needsUpdate = true;
+//     }
+//   }, [defaultTexture]);
+//   useEffect(() => {
+//     if (userTexture) {
+//       userTexture.dispose();
+//       setUserTexture(null);
+//     }
+//     if (imageUrl && imageUrl !== '/defaultAvatar.png') {
+//       const loader = new THREE.TextureLoader();
+//       const finalUrl = imageUrl.startsWith('data:') ? imageUrl : `${imageUrl}${imageUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+//       loader.setCrossOrigin('anonymous');
+//       loader.load(finalUrl, texture => {
+//         texture.wrapS = THREE.ClampToEdgeWrapping;
+//         texture.wrapT = THREE.ClampToEdgeWrapping;
+//         texture.repeat.set(1, -1);
+//         texture.offset.set(0, 1);
+//         texture.minFilter = THREE.LinearMipMapLinearFilter;
+//         texture.magFilter = THREE.LinearFilter;
+//         texture.anisotropy = 16;
+//         texture.generateMipmaps = true;
+//         texture.needsUpdate = true;
+//         setUserTexture(texture);
+//       }, undefined, error => {
+//         const img = new Image();
+//         img.crossOrigin = 'anonymous';
+//         img.onload = () => {
+//           const texture = new THREE.Texture(img);
+//           texture.wrapS = THREE.ClampToEdgeWrapping;
+//           texture.wrapT = THREE.ClampToEdgeWrapping;
+//           texture.repeat.set(1, -1);
+//           texture.offset.set(0, 1);
+//           texture.needsUpdate = true;
+//           setUserTexture(texture);
+//         };
+//         img.onerror = () => {
+//           setUserTexture(null);
+//         };
+//         img.src = finalUrl;
+//       });
+//     } else {
+//       setUserTexture(null);
+//     }
+//     return () => {
+//       if (userTexture) {
+//         userTexture.dispose();
+//       }
+//     };
+//   }, [imageUrl]);
+//   const label1MeshRef = useRef(null);
+//   const label2MeshRef = useRef(null);
+//   const lastSuccessfulImageUrl = useRef(null);
+//   const lastTexture = useRef(null);
+//   const effectActive = useRef(false);
+//   useEffect(() => {
+//     if (scene) {
+//       clonedSceneRef.current = scene.clone();
+//       if (animations && animations.length > 0) {
+//         mixerRef.current = new THREE.AnimationMixer(clonedSceneRef.current);
+//         animations.forEach(clip => {
+//           const action = mixerRef.current.clipAction(clip);
+//           action.play();
+//         });
+//       }
+//     }
+//     return () => {
+//       if (mixerRef.current) {
+//         mixerRef.current.stopAllAction();
+//       }
+//     };
+//   }, [scene, animations]);
+//   useEffect(() => {
+//     if (clonedSceneRef.current) {
+//       label1MeshRef.current = null;
+//       label2MeshRef.current = null;
+//       clonedSceneRef.current.traverse(child => {
+//         if (child.isMesh) {
+//           if (child.name === 'Label1' || child.name.includes('Label1')) {
+//             label1MeshRef.current = child;
+//             child.visible = true;
+//           }
+//           if (child.name === 'Label2' || child.name.includes('Label2')) {
+//             label2MeshRef.current = child;
+//           }
+//         }
+//       });
+//     }
+//   }, [clonedSceneRef.current]);
+//   useEffect(() => {
+//     if (!label1MeshRef.current) return;
+//     const canvas = document.createElement('canvas');
+//     canvas.width = 1024;
+//     canvas.height = 1024;
+//     const ctx = canvas.getContext('2d');
+//     ctx.imageSmoothingEnabled = true;
+//     ctx.imageSmoothingQuality = 'high';
+//     ctx.fillStyle = '#F4E8D0';
+//     ctx.fillRect(0, 0, canvas.width, canvas.height);
+//     ctx.strokeStyle = '#e0e0e0';
+//     ctx.lineWidth = 2;
+//     ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+//     if (!message || !message.trim()) {
+//       ctx.fillStyle = '#000000';
+//       ctx.font = 'bold 42px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+//       ctx.textAlign = 'center';
+//       ctx.textBaseline = 'middle';
+//       ctx.fillText('Your message here', canvas.width / 2, canvas.height / 2);
+//     } else {
+//       const headingText = PRAYERS_BY_LANGUAGE[language]?.heading || PRAYERS_BY_LANGUAGE.en.heading;
+//       ctx.fillStyle = '#000000';
+//       ctx.font = 'bold 42px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+//       ctx.textAlign = 'center';
+//       ctx.textBaseline = 'middle';
+//       ctx.fillText(headingText[0], canvas.width / 2, 80);
+//       ctx.fillText(headingText[1], canvas.width / 2, 130);
+//       ctx.strokeStyle = '#333333';
+//       ctx.lineWidth = 2;
+//       ctx.beginPath();
+//       ctx.moveTo(canvas.width * 0.2, 160);
+//       ctx.lineTo(canvas.width * 0.8, 160);
+//       ctx.stroke();
+//       let displayMessage = message;
+//       let headerHeight = 180;
+//       if (isEncrypted) {
+//         ctx.fillStyle = '#ff6600';
+//         ctx.font = 'bold 36px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+//         ctx.textAlign = 'center';
+//         ctx.textBaseline = 'middle';
+//         ctx.fillText('This prayer has been encrypted:', canvas.width / 2, 210);
+//         headerHeight = 250;
+//       }
+//       ctx.fillStyle = '#000000';
+//       const fontSize = displayMessage.length > 200 ? 40 : displayMessage.length > 100 ? 48 : 56;
+//       ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif`;
+//       ctx.textAlign = 'center';
+//       ctx.textBaseline = 'middle';
+//       const wrapText = (text, maxWidth) => {
+//         const isChinese = /[\u4e00-\u9fff]/.test(text);
+//         if (isEncrypted && !text.includes(' ')) {
+//           const lines = [];
+//           const charsPerLine = Math.floor(maxWidth / (fontSize * 0.6));
+//           for (let i = 0; i < text.length; i += charsPerLine) {
+//             lines.push(text.substring(i, i + charsPerLine));
+//           }
+//           return lines;
+//         }
+//         if (isChinese) {
+//           const lines = [];
+//           let currentLine = '';
+//           const charsPerLine = Math.floor(maxWidth / (fontSize * 0.9));
+//           for (let i = 0; i < text.length; i++) {
+//             currentLine += text[i];
+//             if (ctx.measureText(currentLine).width > maxWidth || currentLine.length >= charsPerLine) {
+//               const lastPunc = currentLine.search(/[，。！？；：、]/);
+//               if (lastPunc > currentLine.length * 0.6) {
+//                 lines.push(currentLine.substring(0, lastPunc + 1));
+//                 currentLine = currentLine.substring(lastPunc + 1);
+//               } else if (currentLine.length > 1) {
+//                 lines.push(currentLine.substring(0, currentLine.length - 1));
+//                 currentLine = text[i];
+//               }
+//             }
+//           }
+//           if (currentLine) {
+//             lines.push(currentLine);
+//           }
+//           return lines;
+//         }
+//         const words = text.split(' ');
+//         const lines = [];
+//         let currentLine = '';
+//         words.forEach(word => {
+//           const testLine = currentLine + (currentLine ? ' ' : '') + word;
+//           const metrics = ctx.measureText(testLine);
+//           if (metrics.width > maxWidth && currentLine) {
+//             lines.push(currentLine);
+//             currentLine = word;
+//             if (ctx.measureText(word).width > maxWidth) {
+//               const chars = word.split('');
+//               let tempWord = '';
+//               for (let char of chars) {
+//                 if (ctx.measureText(tempWord + char).width > maxWidth && tempWord) {
+//                   lines.push(tempWord);
+//                   tempWord = char;
+//                 } else {
+//                   tempWord += char;
+//                 }
+//               }
+//               currentLine = tempWord;
+//             }
+//           } else {
+//             currentLine = testLine;
+//           }
+//         });
+//         if (currentLine) {
+//           lines.push(currentLine);
+//         }
+//         return lines;
+//       };
+//       const lines = wrapText(displayMessage, canvas.width - 120);
+//       const lineHeight = displayMessage.length > 200 ? 60 : 80;
+//       const startY = headerHeight + 40;
+//       ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
+//       ctx.shadowBlur = 2;
+//       ctx.shadowOffsetX = 1;
+//       ctx.shadowOffsetY = 1;
+//       lines.forEach((line, index) => {
+//         ctx.fillText(line, canvas.width / 2, startY + index * lineHeight);
+//       });
+//     }
+//     const texture = new THREE.CanvasTexture(canvas);
+//     texture.wrapS = THREE.ClampToEdgeWrapping;
+//     texture.wrapT = THREE.ClampToEdgeWrapping;
+//     texture.repeat.set(-1, -1);
+//     texture.offset.set(1, 1);
+//     texture.flipY = false;
+//     texture.minFilter = THREE.LinearMipMapLinearFilter;
+//     texture.magFilter = THREE.LinearFilter;
+//     texture.anisotropy = 16;
+//     texture.generateMipmaps = true;
+//     texture.needsUpdate = true;
+//     setTextTexture(texture);
+//   }, [message, isEncrypted, language]);
+//   useEffect(() => {
+//     if (label1MeshRef.current && textTexture) {
+//       label1MeshRef.current.material = new THREE.MeshStandardMaterial({
+//         map: textTexture,
+//         transparent: true,
+//         side: THREE.DoubleSide,
+//         color: 0xffffff
+//       });
+//       label1MeshRef.current.material.needsUpdate = true;
+//       label1MeshRef.current.visible = true;
+//     }
+//   }, [textTexture]);
+//   useEffect(() => {
+//     if (!label2MeshRef.current) return;
+//     const timeoutId = setTimeout(() => {
+//       effectActive.current = true;
+//       const currentImageUrl = imageUrl || lastSuccessfulImageUrl.current;
+//       if (imageUrl && imageUrl !== '/defaultAvatar.png') {
+//         lastSuccessfulImageUrl.current = imageUrl;
+//       }
+//       const canvas = document.createElement('canvas');
+//       canvas.width = 1024;
+//       canvas.height = 1024;
+//       const ctx = canvas.getContext('2d');
+//       ctx.fillStyle = '#f5f5f5';
+//       ctx.fillRect(0, 0, canvas.width, canvas.height);
+//       const drawImageWithTemplate = (img, templateImg = null, handsImg = null) => {
+//         const imageHeight = username ? canvas.height * 0.9 : canvas.height;
+//         if (templateImg) {
+//           ctx.fillStyle = '#f5f5f5';
+//           ctx.fillRect(0, 0, canvas.width, canvas.height);
+//           ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
+//           ctx.save();
+//           const scaleFactor = userImageScale / 100;
+//           const baseSize = Math.min(canvas.width, canvas.height) * 0.4;
+//           const actualWidth = img.width <= 10 ? 200 : img.width;
+//           const actualHeight = img.height <= 10 ? 200 : img.height;
+//           const aspectRatio = actualWidth / actualHeight;
+//           const circleSize = baseSize * scaleFactor;
+//           const radius = circleSize / 2;
+//           let drawWidth, drawHeight;
+//           if (aspectRatio > 1) {
+//             drawHeight = circleSize;
+//             drawWidth = circleSize * aspectRatio;
+//           } else {
+//             drawWidth = circleSize;
+//             drawHeight = circleSize / aspectRatio;
+//           }
+//           if (userImageRotation !== 0) {
+//             const centerX = userImagePosition.x / 100 * canvas.width;
+//             const centerY = userImagePosition.y / 100 * canvas.height;
+//             ctx.translate(centerX, centerY);
+//             ctx.rotate(userImageRotation * Math.PI / 180);
+//             ctx.translate(-centerX, -centerY);
+//           }
+//           ctx.save();
+//           ctx.beginPath();
+//           const centerX = userImagePosition.x / 100 * canvas.width;
+//           const centerY = userImagePosition.y / 100 * canvas.height;
+//           const yCompressionFactor = 0.7;
+//           ctx.ellipse(centerX, centerY, radius, radius * yCompressionFactor, 0, 0, Math.PI * 2);
+//           ctx.clip();
+//           ctx.drawImage(img, centerX - drawWidth / 2, centerY - drawHeight * yCompressionFactor / 2, drawWidth, drawHeight * yCompressionFactor);
+//           ctx.restore();
+//           ctx.restore();
+//           if (handsImg && handsImg.complete) {
+//             const prevComposite = ctx.globalCompositeOperation;
+//             ctx.globalCompositeOperation = 'source-over';
+//             if (skinToneAdjustment !== 0) {
+//               const tempCanvas = document.createElement('canvas');
+//               tempCanvas.width = canvas.width;
+//               tempCanvas.height = canvas.height;
+//               const tempCtx = tempCanvas.getContext('2d');
+//               tempCtx.drawImage(handsImg, 0, 0, canvas.width, canvas.height);
+//               const imageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
+//               const data = imageData.data;
+//               for (let i = 0; i < data.length; i += 4) {
+//                 if (data[i + 3] > 0) {
+//                   const r = data[i];
+//                   const g = data[i + 1];
+//                   const b = data[i + 2];
+//                   let newR, newG, newB;
+//                   if (skinToneAdjustment < 0) {
+//                     const lightness = Math.abs(skinToneAdjustment) / 100;
+//                     newR = Math.min(255, r + (255 - r) * lightness * 0.5);
+//                     newG = Math.min(255, g + (255 - g) * lightness * 0.5);
+//                     newB = Math.min(255, b + (255 - b) * lightness * 0.6);
+//                   } else {
+//                     const darkness = skinToneAdjustment / 100;
+//                     newR = Math.max(0, r - r * darkness * 0.5);
+//                     newG = Math.max(0, g - g * darkness * 0.6);
+//                     newB = Math.max(0, b - b * darkness * 0.7);
+//                   }
+//                   data[i] = newR;
+//                   data[i + 1] = newG;
+//                   data[i + 2] = newB;
+//                 }
+//               }
+//               tempCtx.putImageData(imageData, 0, 0);
+//               ctx.drawImage(tempCanvas, 0, 0, canvas.width, canvas.height);
+//             } else {
+//               ctx.drawImage(handsImg, 0, 0, canvas.width, canvas.height);
+//             }
+//             ctx.globalCompositeOperation = prevComposite;
+//           }
+//         } else {
+//           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+//         }
+//         if (username && username.trim()) {
+//           const gradient = ctx.createLinearGradient(0, imageHeight, 0, canvas.height);
+//           gradient.addColorStop(0, 'rgba(0, 0, 0, 0.7)');
+//           gradient.addColorStop(1, 'rgba(0, 0, 0, 0.9)');
+//           ctx.fillStyle = gradient;
+//           ctx.fillRect(0, imageHeight, canvas.width, canvas.height - imageHeight);
+//           ctx.fillStyle = '#ffffff';
+//           ctx.font = 'bold 42px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+//           ctx.textAlign = 'center';
+//           ctx.textBaseline = 'middle';
+//           const nameText = username;
+//           const textY = imageHeight + (canvas.height - imageHeight) / 2;
+//           ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+//           ctx.shadowBlur = 4;
+//           ctx.shadowOffsetX = 2;
+//           ctx.shadowOffsetY = 2;
+//           ctx.fillText(nameText, canvas.width / 2, textY);
+//         }
+//         const texture = new THREE.CanvasTexture(canvas);
+//         texture.wrapS = THREE.ClampToEdgeWrapping;
+//         texture.wrapT = THREE.ClampToEdgeWrapping;
+//         texture.repeat.set(1, -1);
+//         texture.offset.set(0, 1);
+//         texture.minFilter = THREE.LinearMipMapLinearFilter;
+//         texture.magFilter = THREE.LinearFilter;
+//         texture.anisotropy = 16;
+//         texture.generateMipmaps = true;
+//         texture.needsUpdate = true;
+//         if (label2MeshRef.current && label2MeshRef.current.material) {
+//           label2MeshRef.current.material.map = texture;
+//           label2MeshRef.current.material.needsUpdate = true;
+//           lastTexture.current = texture;
+//         } else if (label2MeshRef.current) {
+//           label2MeshRef.current.material = new THREE.MeshStandardMaterial({
+//             map: texture,
+//             emissive: new THREE.Color(0xff6600),
+//             emissiveIntensity: 0.15,
+//             roughness: 0.7,
+//             metalness: 0.2,
+//             envMapIntensity: 0.5,
+//             side: THREE.FrontSide
+//           });
+//         }
+//       };
+//       const img = new Image();
+//       img.crossOrigin = 'anonymous';
+//       if (template) {
+//         const templateImg = new Image();
+//         templateImg.crossOrigin = 'anonymous';
+//         templateImg.onload = () => {
+//           img.onload = () => {
+//             if (!effectActive.current) return;
+//             const userImg = img;
+//             drawImageWithTemplate(userImg, templateImg, null);
+//             if (template === '/images/face2.png') {
+//               const handsImg = new Image();
+//               handsImg.crossOrigin = 'anonymous';
+//               handsImg.onload = () => {
+//                 if (effectActive.current) {
+//                   drawImageWithTemplate(userImg, templateImg, handsImg);
+//                 }
+//               };
+//               handsImg.onerror = () => {};
+//               handsImg.src = '/images/FeetHands.png';
+//             }
+//           };
+//           img.onerror = () => {
+//             const placeholderImg = new Image();
+//             placeholderImg.crossOrigin = 'anonymous';
+//             placeholderImg.onload = () => {
+//               if (effectActive.current) {
+//                 drawImageWithTemplate(placeholderImg, templateImg, null);
+//                 if (template === '/images/face2.png') {
+//                   const handsImg = new Image();
+//                   handsImg.crossOrigin = 'anonymous';
+//                   handsImg.onload = () => {
+//                     if (effectActive.current) {
+//                       drawImageWithTemplate(placeholderImg, templateImg, handsImg);
+//                     }
+//                   };
+//                   handsImg.src = '/images/FeetHands.png';
+//                 }
+//               }
+//             };
+//             placeholderImg.src = '/defaultAvatar.png';
+//           };
+//           if (currentImageUrl && currentImageUrl !== '/defaultAvatar.png') {
+//             img.src = currentImageUrl;
+//           } else {
+//             img.src = '/defaultAvatar.png';
+//           }
+//         };
+//         templateImg.onerror = () => {
+//           if (effectActive.current) {
+//             img.onload = () => {
+//               if (effectActive.current) {
+//                 drawImageWithTemplate(img, null, null);
+//               }
+//             };
+//             img.src = currentImageUrl || defaultTexture?.image?.src || '/defaultAvatar.png';
+//           }
+//         };
+//         templateImg.src = template;
+//       }
+//       img.onerror = () => {
+//         ctx.fillStyle = '#ff6600';
+//         ctx.fillRect(0, 0, canvas.width, canvas.height);
+//         if (username && username.trim()) {
+//           ctx.fillStyle = '#ffffff';
+//           ctx.font = 'bold 72px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+//           ctx.textAlign = 'center';
+//           ctx.textBaseline = 'middle';
+//           ctx.fillText(username, canvas.width / 2, canvas.height / 2);
+//         }
+//         const texture = new THREE.CanvasTexture(canvas);
+//         texture.wrapS = THREE.ClampToEdgeWrapping;
+//         texture.wrapT = THREE.ClampToEdgeWrapping;
+//         texture.repeat.set(1, -1);
+//         texture.offset.set(0, 1);
+//         texture.needsUpdate = true;
+//         if (label2MeshRef.current.material) {
+//           label2MeshRef.current.material.map = texture;
+//           label2MeshRef.current.material.needsUpdate = true;
+//         }
+//       };
+//       if (!template) {
+//         img.onload = () => {
+//           if (effectActive.current) {
+//             drawImageWithTemplate(img, null, null);
+//           }
+//         };
+//         img.onerror = () => {};
+//         if (currentImageUrl && currentImageUrl !== '/defaultAvatar.png') {
+//           img.src = currentImageUrl;
+//         } else if (userTexture) {
+//           img.src = userTexture.image.src;
+//         } else if (defaultTexture) {
+//           img.src = defaultTexture.image.src;
+//         } else {
+//           img.src = '/defaultAvatar.png';
+//         }
+//       }
+//     }, 50);
+//     return () => {
+//       clearTimeout(timeoutId);
+//       effectActive.current = false;
+//     };
+//   }, [userTexture, defaultTexture, username, template, templatePosition, templateScale, templateRotation, skinToneAdjustment, userImagePosition, userImageScale, userImageRotation, imageUrl]);
+//   useFrame((state, delta) => {
+//     if (mixerRef.current) {
+//       mixerRef.current.update(delta);
+//     }
+//   });
+//   return <>
+//       {clonedSceneRef.current && <primitive ref={candleRef} object={clonedSceneRef.current} scale={[2, 2, 2]} position={[0, -1, 0]} />}
+//       <OrbitControls enablePan={false} enableZoom={true} minDistance={2} maxDistance={8} minPolarAngle={Math.PI / 3} maxPolarAngle={Math.PI / 2} autoRotate={false} />
+//     </>;
+// }
 const BACKGROUND_TEXTURES = [{
   id: 'none',
   path: null,
@@ -1537,55 +1615,60 @@ const BACKGROUND_TEXTURES = [{
   type: 'none'
 }, {
   id: 'cyberpunk',
-  path: '/cyberpunk.webp',
+  path: '/images/cyberpunk.webp',
   name: 'Cyberpunk',
   type: 'image'
 }, {
   id: 'synthwave',
-  path: '/synthwave.webp',
+  path: '/images/synthwave.webp',
   name: 'Synthwave',
   type: 'image'
 }, {
   id: 'gothicTokyo',
-  path: '/gothicTokyo.webp',
+  path: '/images/gothicTokyo.webp',
   name: 'Gothic Tokyo',
   type: 'image'
 }, {
   id: 'neoTokyo',
-  path: '/neoTokyo.webp',
+  path: '/images/neoTokyo.webp',
   name: 'Neo Tokyo',
   type: 'image'
 }, {
   id: 'aurora',
-  path: '/aurora.webp',
+  path: '/images/aurora.webp',
   name: 'Aurora',
   type: 'image'
-}, {
-  id: 'tradeScene',
-  path: '/tradeScene.webp',
-  name: 'Trade Scene',
-  type: 'image'
-}, {
+},  {
   id: 'sunset',
-  path: '/gradient-sunset.webp',
+  path: '/images/gradient-sunset.webp',
   name: 'Sunset Sky',
   type: 'image'
 }, {
+  id: 'dreams',
+  path: '/images/gradient-dreams.webp',
+  name: 'Dream Waves',
+  type: 'image'
+},{
+  id: 'tradingView',
+  path: '/images/uattr.webp',
+  name: 'TradingView',
+  type: 'image'
+},{
   id: 'chart',
   path: '/images/chart.webp',
   name: 'Chart Patterns',
   type: 'image'
 }, {
   id: 'collectibles',
-  path: '/pokemon2.webp',
+  path: '/images/pokemon2.webp',
   name: 'Collectibles',
   type: 'image'
-}, {
-  id: 'dreams',
-  path: '/gradient-dreams.webp',
-  name: 'Dream Waves',
+},  {
+  id: 'alchemy',
+  path: '/images/alchemy.gif',
+  name: 'Alchemy Pattern',
   type: 'image'
-}];
+}, ];
 const sanitizeInput = (input, maxLength = 500) => {
   if (!input) return '';
   let sanitized = String(input);  // Don't trim here - it prevents typing spaces
@@ -1639,7 +1722,7 @@ export default function CompactCandleModal({
     baseColor: '#ffffff'  // Default white color for XBase meshes
   });
   const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState('/senora.png'); // Default to senora.png
+  const [imagePreview, setImagePreview] = useState('/images/nuestraSenora.webp'); // Default to senora.png
   const [selectedTemplate, setSelectedTemplate] = useState(null); // No template by default
   const [templatePosition, setTemplatePosition] = useState({
     x: 67,
@@ -1681,7 +1764,7 @@ export default function CompactCandleModal({
     if (formData.username || imagePreview) {
       setPreloadCandleData({
         username: formData.username || 'Anonymous',
-        imageUrl: imagePreview || '/defaultAvatar.png',
+        imageUrl: imagePreview || '/iamges/defaultAvatar.png',
         message: formData.message,
         burnedAmount: formData.burnedAmount
       });
@@ -1731,18 +1814,7 @@ export default function CompactCandleModal({
       setScrambledDisplay('');
     }
   };
-  const selectTemplate = template => {
-    setSelectedTemplate(template.id);
-    setTemplatePosition(template.position);
-    setTemplateScale(template.scale);
-    setTemplateRotation(template.rotation);
-    setUserImagePosition(template.userImagePosition);
-    setUserImageScale(template.userImageScale);
-    setUserImageRotation(template.userImageRotation);
-    if (template.id !== '/images/face2.png') {
-      setSkinToneAdjustment(0);
-    }
-  };
+
   const handleImageChange = e => {
     const file = e.target.files[0];
     if (file) {
@@ -1782,165 +1854,7 @@ export default function CompactCandleModal({
       setError('');
     }
   };
-  const applyTemplate = async (imageUrl, templatePath, position = templatePosition, scale = templateScale, rotation = templateRotation, skinTone = skinToneAdjustment, userImgPosition = userImagePosition, userImgScale = userImageScale, userImgRotation = userImageRotation) => {
-    return new Promise(resolve => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 1024;
-      canvas.height = 1024;
-      const ctx = canvas.getContext('2d');
-      const userImg = new Image();
-      const templateImg = new Image();
-      const handsImg = new Image();
-      let loadedImages = 0;
-      const totalImages = templatePath === '/images/face2.png' ? 3 : 2;
-      const checkAllLoaded = () => {
-        loadedImages++;
-        if (loadedImages === totalImages) {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.fillStyle = '#f5f5f5';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
-          ctx.save();
-          const scaleFactor = userImgScale / 100;
-          const baseSize = Math.min(canvas.width, canvas.height) * 0.4;
-          const aspectRatio = userImg.width / userImg.height;
-          let imgWidth, imgHeight;
-          if (aspectRatio > 1) {
-            imgWidth = baseSize * scaleFactor;
-            imgHeight = imgWidth / aspectRatio;
-          } else {
-            imgHeight = baseSize * scaleFactor;
-            imgWidth = imgHeight * aspectRatio;
-          }
-          const imgX = userImgPosition.x / 100 * canvas.width - imgWidth / 2;
-          const imgY = userImgPosition.y / 100 * canvas.height - imgHeight / 2;
-          if (userImgRotation !== 0) {
-            const centerX = userImgPosition.x / 100 * canvas.width;
-            const centerY = userImgPosition.y / 100 * canvas.height;
-            ctx.translate(centerX, centerY);
-            ctx.rotate(userImgRotation * Math.PI / 180);
-            ctx.translate(-centerX, -centerY);
-          }
-          ctx.drawImage(userImg, imgX, imgY, imgWidth, imgHeight);
-          ctx.restore();
-          if (templatePath === '/images/face2.png' && handsImg.complete) {
-            ctx.save();
-            if (skinTone !== 0) {
-              const tempCanvas = document.createElement('canvas');
-              tempCanvas.width = canvas.width;
-              tempCanvas.height = canvas.height;
-              const tempCtx = tempCanvas.getContext('2d');
-              tempCtx.drawImage(handsImg, 0, 0, canvas.width, canvas.height);
-              const imageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
-              const data = imageData.data;
-              for (let i = 0; i < data.length; i += 4) {
-                if (data[i + 3] > 0) {
-                  const r = data[i] / 255;
-                  const g = data[i + 1] / 255;
-                  const b = data[i + 2] / 255;
-                  const max = Math.max(r, g, b);
-                  const min = Math.min(r, g, b);
-                  let h,
-                    s,
-                    l = (max + min) / 2;
-                  if (max !== min) {
-                    const d = max - min;
-                    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-                    switch (max) {
-                      case r:
-                        h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
-                        break;
-                      case g:
-                        h = ((b - r) / d + 2) / 6;
-                        break;
-                      case b:
-                        h = ((r - g) / d + 4) / 6;
-                        break;
-                    }
-                    h = h + skinTone / 300;
-                    if (h < 0) h += 1;
-                    if (h > 1) h -= 1;
-                    if (skinTone < 0) {
-                      l = Math.min(1, l + Math.abs(skinTone) / 200);
-                      s = Math.max(0, s - Math.abs(skinTone) / 300);
-                    } else {
-                      l = Math.max(0, l - skinTone / 150);
-                      s = Math.min(1, s + skinTone / 300);
-                    }
-                    let r2, g2, b2;
-                    if (s === 0) {
-                      r2 = g2 = b2 = l;
-                    } else {
-                      const hue2rgb = (p, q, t) => {
-                        if (t < 0) t += 1;
-                        if (t > 1) t -= 1;
-                        if (t < 1 / 6) return p + (q - p) * 6 * t;
-                        if (t < 1 / 2) return q;
-                        if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
-                        return p;
-                      };
-                      const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-                      const p = 2 * l - q;
-                      r2 = hue2rgb(p, q, h + 1 / 3);
-                      g2 = hue2rgb(p, q, h);
-                      b2 = hue2rgb(p, q, h - 1 / 3);
-                    }
-                    data[i] = Math.round(r2 * 255);
-                    data[i + 1] = Math.round(g2 * 255);
-                    data[i + 2] = Math.round(b2 * 255);
-                  }
-                }
-              }
-              tempCtx.putImageData(imageData, 0, 0);
-              ctx.drawImage(tempCanvas, 0, 0);
-            } else {
-              ctx.drawImage(handsImg, 0, 0, canvas.width, canvas.height);
-            }
-            ctx.restore();
-          }
-          resolve(canvas.toDataURL('image/png'));
-        }
-      };
-      userImg.crossOrigin = 'anonymous';
-      userImg.onload = checkAllLoaded;
-      userImg.onerror = () => {
-        resolve(imageUrl);
-      };
-      userImg.src = imageUrl;
-      templateImg.onload = checkAllLoaded;
-      templateImg.onerror = () => {
-        resolve(imageUrl);
-      };
-      templateImg.src = templatePath;
-      if (templatePath === '/images/face2.png') {
-        handsImg.onload = checkAllLoaded;
-        handsImg.onerror = () => {
-          checkAllLoaded();
-        };
-        handsImg.src = '/images/FeetHands.png';
-      }
-    });
-  };
-  const handleAIGenerate = async (customPrompt = null) => {
-    setIsGenerating(true);
-    setError('');
-    try {
-      const prompt = customPrompt || aiPrompt || 'Write a prayer for profitable crypto trading';
-      setFormData(prev => ({
-        ...prev,
-        message: result.prayer
-      }));
-      setSelectedPrayer(null);
-      setRemainingPrayers(result.remaining);
-      if (result.fromCache) {}
-      setShowAIPanel(false);
-      setAiPrompt('');
-    } catch (error) {
-      setError(error.message || 'Failed to generate prayer. Please try again.');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
+  // 
   const uploadImage = async () => {
     let finalImageUrl = null;
     if (imageFile) {
@@ -2153,13 +2067,13 @@ export default function CompactCandleModal({
               value: 'votive',
               label: 'Votive',
               description: 'Classic candle box',
-              image: '/tinyVotive.webp',
+              image: '/images/tinyVotive.webp',
               modelPath: '/models/tinyVotiveOnly.glb'
             }, {
               value: 'japanese',
               label: 'Japanese',
               description: 'Traditional Japanese style',
-              image: '/tinyJapCan.webp',
+              image: '/images/tinyJapCan.webp',
               modelPath: '/models/tinyJapCanOnly.glb'
             }].map(type => <button key={type.value} className="candle-type-button" onClick={() => {
               setFormData(prev => ({
@@ -2306,15 +2220,15 @@ export default function CompactCandleModal({
                   <button
                     type="button"
                     onClick={() => {
-                      setImagePreview('/senora.png');
+                      setImagePreview('/images/nuestraSenora.webp');
                       setImageFile(null);
                     }}
                     style={{
                       padding: '15px',
-                      background: imagePreview === '/senora.png' ? 
+                      background: imagePreview === '/images/nuestraSenora.webp' ? 
                         'linear-gradient(135deg, rgba(255, 215, 0, 0.3), rgba(255, 215, 0, 0.2))' : 
                         'linear-gradient(135deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.3))',
-                      border: imagePreview === '/senora.png' ? '2px solid #ffd700' : '1px solid rgba(255, 215, 0, 0.3)',
+                      border: imagePreview === '/images/nuestraSenora.webp' ? '2px solid #ffd700' : '1px solid rgba(255, 215, 0, 0.3)',
                       borderRadius: '12px',
                       color: '#fff',
                       cursor: 'pointer',
@@ -2326,31 +2240,32 @@ export default function CompactCandleModal({
                     }}
                   >
                     <img 
-                      src="/senora.png" 
+                      src="/images/nuestraSenora.webp" 
                       alt="Senora" 
                       style={{
                         width: '80px',
                         height: '80px',
                         borderRadius: '8px',
-                        objectFit: 'cover'
+                        objectFit: 'contain',
+                        backgroundColor: 'rgba(0, 0, 0, 0.1)'
                       }} 
                     />
                     <span style={{ fontSize: '12px', fontWeight: 'bold' }}>Senora (Default)</span>
                   </button>
                   
-                  {/* PinkCloudA Option */}
+                  {/* Praying Hands Option */}
                   <button
                     type="button"
                     onClick={() => {
-                      setImagePreview('/PinkCloudA.png');
+                      setImagePreview('/images/hands.webp');
                       setImageFile(null);
                     }}
                     style={{
                       padding: '15px',
-                      background: imagePreview === '/PinkCloudA.png' ? 
+                      background: imagePreview === '/images/hands.webp' ? 
                         'linear-gradient(135deg, rgba(255, 215, 0, 0.3), rgba(255, 215, 0, 0.2))' : 
                         'linear-gradient(135deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.3))',
-                      border: imagePreview === '/PinkCloudA.png' ? '2px solid #ffd700' : '1px solid rgba(255, 215, 0, 0.3)',
+                      border: imagePreview === '/images/hands.webp' ? '2px solid #ffd700' : '1px solid rgba(255, 215, 0, 0.3)',
                       borderRadius: '12px',
                       color: '#fff',
                       cursor: 'pointer',
@@ -2362,8 +2277,8 @@ export default function CompactCandleModal({
                     }}
                   >
                     <img 
-                      src="/PinkCloudA.png" 
-                      alt="Pink Cloud" 
+                      src="/images/hands.webp" 
+                      alt="Praying Hands" 
                       style={{
                         width: '80px',
                         height: '80px',
@@ -2371,22 +2286,22 @@ export default function CompactCandleModal({
                         objectFit: 'cover'
                       }} 
                     />
-                    <span style={{ fontSize: '12px', fontWeight: 'bold' }}>Pink Cloud</span>
+                    <span style={{ fontSize: '12px', fontWeight: 'bold' }}>Praying Hands</span>
                   </button>
-                  
-                  {/* Nosferatu Option */}
+
+                  {/* Illumin80 Option */}
                   <button
                     type="button"
                     onClick={() => {
-                      setImagePreview('/nosferatu.png');
+                      setImagePreview('/images/ILLUMIN80_TATTOO.png');
                       setImageFile(null);
                     }}
                     style={{
                       padding: '15px',
-                      background: imagePreview === '/nosferatu.png' ? 
+                      background: imagePreview === '/images/ILLUMIN80_TATTOO.png' ? 
                         'linear-gradient(135deg, rgba(255, 215, 0, 0.3), rgba(255, 215, 0, 0.2))' : 
                         'linear-gradient(135deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.3))',
-                      border: imagePreview === '/nosferatu.png' ? '2px solid #ffd700' : '1px solid rgba(255, 215, 0, 0.3)',
+                      border: imagePreview === '/images/ILLUMIN80_TATTOO.png' ? '2px solid #ffd700' : '1px solid rgba(255, 215, 0, 0.3)',
                       borderRadius: '12px',
                       color: '#fff',
                       cursor: 'pointer',
@@ -2398,16 +2313,16 @@ export default function CompactCandleModal({
                     }}
                   >
                     <img 
-                      src="/nosferatu.png" 
-                      alt="Nosferatu" 
+                      src="/images/ILLUMIN80_TATTOO.png" 
+                      alt="Illumin80" 
                       style={{
-                        width: '80px',
+                        width: 'auto',
                         height: '80px',
                         borderRadius: '8px',
                         objectFit: 'cover'
                       }} 
                     />
-                    <span style={{ fontSize: '12px', fontWeight: 'bold' }}>Nosferatu</span>
+                    <span style={{ fontSize: '12px', fontWeight: 'bold' }}>Illumin80</span>
                   </button>
                   
                   {/* Custom Upload Option */}
@@ -2483,10 +2398,10 @@ export default function CompactCandleModal({
               emoji: '💭',
               description: 'Unburden heart'
             }, {
-              value: 'praise',
-              label: 'Thanks',
+              value: 'appreciation',
+              label: 'Appreciation',
               emoji: '✨',
-              description: 'Show gratitude'
+              description: 'Express your gratitude'
             }].map(type => <button key={type.value} onClick={() => {
               setFormData(prev => ({
                 ...prev,
@@ -2774,13 +2689,41 @@ export default function CompactCandleModal({
                 transition: 'all 0.3s ease',
                 transform: formData.background === bg.id ? 'scale(1.05)' : 'scale(1)'
               }}>
-                    {bg.type === 'image' && bg.path ? (
-                      <img src={bg.path} alt={bg.name} style={{
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        opacity: formData.background === bg.id ? 1 : 0.7
-                      }} />
+                    {(bg.type === 'image' || bg.type === 'url') && bg.path ? (
+                      <img 
+                        src={bg.path} 
+                        alt={bg.name}
+                        crossOrigin={bg.type === 'url' ? 'anonymous' : undefined}
+                        onError={(e) => {
+                          // Fallback for failed image loads
+                          e.target.style.display = 'none';
+                          e.target.parentElement.innerHTML = `
+                            <div style="
+                              width: 100%;
+                              height: 100%;
+                              display: flex;
+                              align-items: center;
+                              justify-content: center;
+                              background: linear-gradient(135deg, #3a3a3a, #2a2a2a);
+                              color: rgba(255, 255, 255, 0.7);
+                              font-size: 12px;
+                              text-align: center;
+                              padding: 10px;
+                            ">
+                              <div>
+                                <div style="font-size: 20px; margin-bottom: 5px;">🖼️</div>
+                                <div>${bg.name}</div>
+                              </div>
+                            </div>
+                          `;
+                        }}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          opacity: formData.background === bg.id ? 1 : 0.7
+                        }} 
+                      />
                     ) : bg.type === 'gradient' ? (
                       <div style={{
                         width: '100%',
@@ -3589,6 +3532,7 @@ export default function CompactCandleModal({
                       userAvatar={clerkImageUrl || imagePreview}
                       burnAmount={formData.burnedAmount}
                       baseColor={formData.baseColor}
+                      backgroundId={formData.background}
                     />}
                   </Suspense>
                   <OrbitControls 
@@ -3602,7 +3546,7 @@ export default function CompactCandleModal({
                     // autoRotateSpeed={2}
                     target={(currentStep === 5 || currentStep === 6) ? [0, -1, 0] : [0, 0, 0]}
                   />
-                </Canvas> : <img src={formData.candleType === 'japanese' ? '/tinyJapCan.webp' : '/tinyVotive.webp'} alt={`${formData.candleType} candle`} style={{
+                </Canvas> : <img src={formData.candleType === 'japanese' ? '/images/tinyJapCan.webp' : '/images/tinyVotive.webp'} alt={`${formData.candleType} candle`} style={{
                   width: 'auto',
                   height: '100%',
                   maxWidth: '100%',

@@ -3516,7 +3516,11 @@ export default function Home() {
       const droneEndProgress = 0.65;
       const inDroneSequence = currentProgress >= droneStartProgress && currentProgress <= droneEndProgress;
       
-      if (inDroneSequence && !isScrolling) {
+      // Skip custom handling on iPad/tablets to allow native scrolling
+      const isIPad = /iPad|Macintosh/.test(navigator.userAgent) && 'ontouchend' in document;
+      const isTablet = window.innerWidth >= 768 && window.innerWidth <= 1024;
+      
+      if (inDroneSequence && !isScrolling && !isIPad && !isTablet) {
         const touchY = e.touches[0].clientY;
         const deltaY = touchStartY - touchY;
         
@@ -3540,8 +3544,13 @@ export default function Home() {
     };
     
     // Add touch event listeners with passive true by default (only preventDefault during drone sequence)
+    // Check if device is iPad/tablet
+    const isIPad = /iPad|Macintosh/.test(navigator.userAgent) && 'ontouchend' in document;
+    const isTablet = window.innerWidth >= 768 && window.innerWidth <= 1024;
+    
+    // Use passive touch events on iPad/tablets to allow native scrolling
     document.addEventListener('touchstart', handleTouchStart, { passive: true });
-    document.addEventListener('touchmove', handleTouchMove, { passive: false }); // Need false to allow preventDefault
+    document.addEventListener('touchmove', handleTouchMove, { passive: isIPad || isTablet }); // Passive on iPad/tablets
     document.addEventListener('touchend', handleTouchEnd, { passive: true });
     
     // Track dynamically added listeners for cleanup

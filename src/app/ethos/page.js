@@ -96,7 +96,7 @@ export default function ModelViewerPage() {
             position: "fixed",
             top: "20px",
             right: "20px",
-            zIndex: 9999
+            zIndex: 999999
           }}
         >
           <CyberNav 
@@ -279,6 +279,7 @@ export default function ModelViewerPage() {
                     <span style={{ fontSize: "1.8rem" }}>{emoji}</span>
                   </button>
                 </
+                
                 SignInButton>
               )
             }
