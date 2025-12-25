@@ -529,7 +529,7 @@ export default function CyborgTemple() {
                 textAlign: "center",
                 fontStyle: "italic",
               }}>
-                Featuring 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙
+                Featuring 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙 and the 3 Wise Mechs
               </p>
               
               {!isMobileView && (
