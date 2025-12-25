@@ -540,7 +540,7 @@ export default function CyborgTemple() {
                   margin: 0,
                   marginBottom: "1rem",
                 }}>
-                  RL80 (more 'trade life' than trad wife) is learning to trade perpetuals. 
+                  The Virtual Mary (more 'trade life' than trad wife) is learning to trade perpetuals. 
                   Once she hits 100+ trades with a 60%+ win rate and keeps drawdown under 
                   15% for 30 days, the team ascends to the mainnet.
                 </p>
