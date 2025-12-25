@@ -82,6 +82,7 @@ const CyberNav = ({ is80sMode = false, position = "fixed", musicButton = null, u
     { id: '03', date: 'ETHICS & MORAL80', title: 'SCROLLS OF ST. GR80', path: '/ethos', thumbnail: '/images/ILLUMIN80_TATTOO.png' },
     { id: '04', date: 'CHAR80 & LIQUID80', title: 'COIN FOUNTAIN', path: '/fountain', thumbnail: '/images/HEART_TATTOO.png' },
     { id: '05', date: 'QUANT80 & CURIOS80', title: 'TOKENOMICS & FAQ', path: '/tokenomics', thumbnail: '/images/COIN_TATTOO.png' },
+    { id: '06', date: 'COMING SOON', title: 'LIGHT CLUB', path: '#', thumbnail: '/images/RL80_KNUCKLES.png' },
 
   ];
 

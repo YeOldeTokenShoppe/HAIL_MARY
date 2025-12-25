@@ -22,7 +22,7 @@ export default function LanguageSwitcher() {
       position: 'fixed',
       top: '5rem',
       right: '20px',
-                    width: isMobileDevice ? "3rem" : "3.5rem",
+                    width: isMobileDevice ? "3rem" : "3.75rem",
       zIndex: 9999,
       backgroundColor: 'rgba(0, 0, 0, 0.7)',
   

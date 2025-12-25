@@ -100,7 +100,7 @@ const Footer = ({ isMobile = false }) => {
         <div style={{
           marginBottom: '2rem'
         }}>
-          <Link href="/contact" style={{
+          <Link href="mailto:411@rl80.com" style={{
             color: '#d4af37',
             textDecoration: 'none',
             fontSize: '1.2rem',
