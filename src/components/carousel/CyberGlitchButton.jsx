@@ -8,6 +8,9 @@ export default function CyberGlitchButton({
   href,
   label = "RL80",
   mobile = false,
+  primaryHue,  // Accept but don't pass to DOM
+  primaryShadowHue,  // Accept but don't pass to DOM
+  secondaryShadowHue,  // Accept but don't pass to DOM
   ...props 
 }) {
   const handleClick = (e) => {
