@@ -3,12 +3,9 @@
 import React from 'react'
 
 export default function CyberGlitchButton({ 
-  text = "ENTER_", 
+  text = "ENTER", 
   onClick,
   href,
-  primaryHue = 298,  // Purple/pink for your theme
-  primaryShadowHue = 180,
-  secondaryShadowHue = 60,
   label = "RL80",
   mobile = false,
   ...props 
@@ -24,195 +21,219 @@ export default function CyberGlitchButton({
   return (
     <>
       <style jsx>{`
-        @keyframes shimmy-text {
+        @keyframes glitch {
           0% {
-            clip-path: inset(2% 0 95% 0);
+            clip-path: var(--clip-one);
           }
+
           2%, 8% {
-            clip-path: inset(78% 0 0 0);
-            transform: translate(-5px, 0);
+            clip-path: var(--clip-two);
+            transform: translate(calc(var(--shimmy-distance) * -1%), 0);
           }
+
           6% {
-            clip-path: inset(78% 0 0 0);
-            transform: translate(5px, 0);
+            clip-path: var(--clip-two);
+            transform: translate(calc(var(--shimmy-distance) * 1%), 0);
           }
+
           9% {
-            clip-path: inset(78% 0 0 0);
+            clip-path: var(--clip-two);
             transform: translate(0, 0);
           }
+
           10% {
-            clip-path: inset(44% 0 46% 0);
-            transform: translate(5px, 0);
+            clip-path: var(--clip-three);
+            transform: translate(calc(var(--shimmy-distance) * 1%), 0);
           }
+
           13% {
-            clip-path: inset(44% 0 46% 0);
+            clip-path: var(--clip-three);
             transform: translate(0, 0);
           }
+
           14%, 21% {
-            clip-path: inset(0 0 100% 0);
-            transform: translate(5px, 0);
+            clip-path: var(--clip-four);
+            transform: translate(calc(var(--shimmy-distance) * 1%), 0);
           }
-          15%, 20% {
-            clip-path: inset(40% 0 60% 0);
-            transform: translate(5px, 0);
-          }
+
           25% {
-            clip-path: inset(40% 0 15% 0);
-            transform: translate(5px, 0);
+            clip-path: var(--clip-five);
+            transform: translate(calc(var(--shimmy-distance) * 1%), 0);
           }
+
           30% {
-            clip-path: inset(40% 0 15% 0);
-            transform: translate(-5px, 0);
+            clip-path: var(--clip-five);
+            transform: translate(calc(var(--shimmy-distance) * -1%), 0);
           }
+
           35%, 45% {
-            clip-path: inset(63% 0 20% 0);
-            transform: translate(-5px, 0);
+            clip-path: var(--clip-six);
+            transform: translate(calc(var(--shimmy-distance) * -1%));
           }
+
           40% {
-            clip-path: inset(63% 0 20% 0);
-            transform: translate(5px, 0);
+            clip-path: var(--clip-six);
+            transform: translate(calc(var(--shimmy-distance) * 1%));
           }
+
           50% {
-            clip-path: inset(63% 0 20% 0);
+            clip-path: var(--clip-six);
             transform: translate(0, 0);
           }
+
           55% {
-            clip-path: inset(0 0 90% 0);
-            transform: translate(5px, 0);
+            clip-path: var(--clip-seven);
+            transform: translate(calc(var(--shimmy-distance) * 1%), 0);
           }
+
           60% {
-            clip-path: inset(0 0 90% 0);
+            clip-path: var(--clip-seven);
             transform: translate(0, 0);
           }
+
           31%, 61%, 100% {
-            clip-path: inset(0 0 100% 0);
+            clip-path: var(--clip-four);
           }
+        }
+        
+        .cybr-btn-wrapper {
+          position: relative;
+          height: ${mobile ? '50px' : '60px'};
+          width: ${mobile ? '140px' : '180px'};
+          margin: 3px;
         }
         
         .cybr-btn {
-          font-family: monospace;
-          font-weight: bold;
-          position: relative;
+          --primary: #ff184c;
+          // --shadow-primary: #fded00;
+          --color: white;
+          --font-size: ${mobile ? '12px' : '14px'};
+          --shadow-primary-hue: 180;
+          --shadow-secondary-hue: 60;
+          --shadow-secondary: hsl(var(--shadow-secondary-hue), 90%, 60%);
+          --clip: polygon(11% 0, 95% 0, 100% 25%, 90% 90%, 95% 90%, 85% 90%, 85% 100%, 7% 100%, 0 80%);
+          --border: 5px;
+          --shimmy-distance: 5;
+          --clip-one: polygon(0 2%, 100% 2%, 100% 95%, 95% 95%, 95% 90%, 85% 90%, 85% 95%, 8% 95%, 0 70%);
+          --clip-two: polygon(0 78%, 100% 78%, 100% 100%, 95% 100%, 95% 90%, 85% 90%, 85% 100%, 8% 100%, 0 78%);
+          --clip-three: polygon(0 44%, 100% 44%, 100% 54%, 95% 54%, 95% 54%, 85% 54%, 85% 54%, 8% 54%, 0 54%);
+          --clip-four: polygon(0 0, 100% 0, 100% 0, 95% 0, 95% 0, 85% 0, 85% 0, 8% 0, 0 0);
+          --clip-five: polygon(0 0, 100% 0, 100% 0, 95% 0, 95% 0, 85% 0, 85% 0, 8% 0, 0 0);
+          --clip-six: polygon(0 40%, 100% 40%, 100% 85%, 95% 85%, 95% 85%, 85% 85%, 85% 85%, 8% 85%, 0 70%);
+          --clip-seven: polygon(0 63%, 100% 63%, 100% 80%, 95% 80%, 95% 80%, 85% 80%, 85% 80%, 8% 80%, 0 70%);
+          
+          color: var(--color);
           text-transform: uppercase;
-          font-size: ${mobile ? '20px' : '26px'};
-          outline: transparent;
-          border: 0;
-          min-width: ${mobile ? '200px' : '300px'};
-          clip-path: polygon(-10% -10%, 110% -10%, 110% 110%, 10% 110%, -10% 40%);
-          padding: ${mobile ? '20px 40px' : '32px 64px'};
-          transition: all 0.1s ease;
+          font-size: var(--font-size);
+          letter-spacing: 3px;
+          position: relative;
+          font-weight: 900;
+          width: 100%;
+          height: 100%;
+          line-height: ${mobile ? '50px' : '60px'};
+          text-align: center;
+          transition: background 0.2s, font-size 0.3s;
+          border: none;
+          background: transparent;
           cursor: pointer;
-        }
-        
-        .cybr-btn:hover .cybr-btn__text::after,
-        .cybr-btn:hover .cybr-btn__glitch::after {
-          display: block;
+          font-family: monospace;
         }
         
         .cybr-btn:hover {
-          --primary-lightness: 40;
+          --primary: #cc133c;
+          --font-size: ${mobile ? '14px' : '16px'};
         }
         
         .cybr-btn:active {
-          --primary-lightness: 30;
+          --primary: #8B00FF;
+          --shadow-primary: #00e572;
+        }
+        
+        .cybr-btn:after, .cybr-btn:before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          clip-path: var(--clip);
+          z-index: -1;
+        }
+        
+        .cybr-btn:before {
+          background: var(--shadow-primary);
+          transform: translate(var(--border), 0);
+        }
+        
+        .cybr-btn:after {
+          background: var(--primary);
         }
         
         .cybr-btn__glitch {
-          height: 100%;
-          width: 100%;
-          display: block;
           position: absolute;
-          top: 0;
-          left: 0;
+          top: calc(var(--border) * -1);
+          left: calc(var(--border) * -1);
+          right: calc(var(--border) * -1);
+          bottom: calc(var(--border) * -1);
+          background: var(--shadow-primary);
+          text-shadow: 2px 2px var(--shadow-primary), -2px -2px var(--shadow-secondary);
+          clip-path: var(--clip);
+          animation: glitch 3s infinite;
           pointer-events: none;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 900;
+          letter-spacing: 3px;
+          font-size: var(--font-size);
         }
         
-        .cybr-btn__glitch::after {
-          display: none;
+        .cybr-btn__glitch:before {
           content: '';
-          height: 98%;
-          width: 98%;
           position: absolute;
-          top: 1%;
-          left: 1%;
-          background: inherit;
-          animation: shimmy-text 2s infinite alternate ease-in-out;
+          top: calc(var(--border) * 1);
+          right: calc(var(--border) * 1);
+          bottom: calc(var(--border) * 1);
+          left: calc(var(--border) * 1);
+          clip-path: var(--clip);
+          background: var(--primary);
+          z-index: -1;
         }
         
-        .cybr-btn__text {
-          color: white;
-          display: block;
-          height: 100%;
-          width: 100%;
-          position: relative;
-          z-index: 2;
-          white-space: nowrap;
+        .cybr-btn:hover .cybr-btn__glitch {
+          animation: glitch 2s infinite;
         }
         
-        .cybr-btn__text::after {
-          display: none;
+        .cybr-label {
+          background: var(--shadow-primary);
+          color: #323232;
+          font-size: 7px;
+          font-weight: 700;
+          letter-spacing: 1px;
+          position: absolute;
+          width: 24px;
+          height: 10px;
           top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          position: absolute;
-          content: attr(data-text);
-          color: white;
-          filter: brightness(1);
-          animation: shimmy-text 2s infinite alternate ease-in-out;
+          left: 81%;
+          line-height: 10px;
+          text-align: center;
+          font-family: monospace;
         }
-        
       `}</style>
       
-      <button
-        className="cybr-btn"
-        onClick={handleClick}
-        style={{
-          '--primary-hue': primaryHue,
-          '--primary-lightness': 50,
-          '--shadow-primary-hue': primaryShadowHue,
-          '--shadow-secondary-hue': secondaryShadowHue,
-          background: `hsl(${primaryHue}, 85%, calc(var(--primary-lightness) * 1%))`,
-          boxShadow: `-2px 0 1px 0px inset hsl(${primaryShadowHue}, 90%, 50%)`,
-        }}
-        {...props}
-      >
-        <span 
-          className="cybr-btn__text" 
-          data-text={text}
-          style={{
-            textShadow: `2px 2px hsl(${primaryShadowHue}, 90%, 50%), -2px -2px hsl(${secondaryShadowHue}, 90%, 60%)`,
-          }}
+      <div className="cybr-btn-wrapper">
+        <button
+          className="cybr-btn"
+          onClick={handleClick}
+          {...props}
         >
-          {text}
-        </span>
-        <span 
-          className="cybr-btn__glitch"
-          style={{
-            filter: `drop-shadow(-2px 2px hsl(${primaryShadowHue}, 90%, 50%)) 
-                     drop-shadow(-1px -1px hsla(${primaryShadowHue}, 90%, 50%, 0.5)) 
-                     drop-shadow(2px 2px hsl(${primaryShadowHue}, 90%, 50%))`,
-          }}
-        />
-        <span 
-          style={{
-            position: 'absolute',
-            padding: '1px 4px',
-            lineHeight: 1,
-            bottom: '-5%',
-            right: '5%',
-            background: `hsl(${secondaryShadowHue}, 90%, 60%)`,
-            color: 'hsl(0, 0%, 5%)',
-            fontSize: '9px',
-            letterSpacing: '1px',
-            fontFamily: 'monospace',
-            fontWeight: 'bold',
-            boxShadow: `2px 0 1px 0 inset hsl(${primaryShadowHue}, 90%, 50%)`,
-          }}
-        >
-          {label}
-        </span>
-      </button>
+          {text}<span aria-hidden="">_</span>
+          <span className="cybr-btn__glitch" aria-hidden="">
+            _{text.split('').join('_')}_
+          </span>
+          <span className="cybr-label">{label}</span>
+        </button>
+      </div>
     </>
   )
 }

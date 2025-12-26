@@ -33,20 +33,31 @@ export default function CarouselPage() {
   const is80sMode = context80sMode
   const [emoji, setEmoji] = useState("😇")
 
-  // Preload critical images
+  // Preload all critical images including carousel images
   useEffect(() => {
     const imagesToPreload = [
       '/virginRecords.jpg',
-      // Add any other critical images from the carousel here
+      // Carousel images
+      '/carousel_images/img1.jpg',
+      '/carousel_images/img2.jpg',
+      '/carousel_images/img3.jpg',
+      '/carousel_images/img4.jpg',
+      '/carousel_images/img5.jpg',
+      '/carousel_images/img6.jpg',
+      '/carousel_images/img7.jpg',
+      '/carousel_images/img8.jpg',
+      '/carousel_images/img9.jpeg',
     ];
 
     let loadedCount = 0;
+    const totalImages = imagesToPreload.length;
 
     const imagePromises = imagesToPreload.map(src => {
       return new Promise((resolve) => {
         const img = new Image();
         img.onload = () => {
           loadedCount++;
+          console.log(`Loaded ${loadedCount}/${totalImages}: ${src}`);
           resolve();
         };
         img.onerror = () => {
@@ -59,6 +70,7 @@ export default function CarouselPage() {
     });
 
     Promise.all(imagePromises).then(() => {
+      console.log('All images preloaded');
       setImagesLoaded(true);
     });
   }, []);
@@ -66,10 +78,11 @@ export default function CarouselPage() {
   // Check all loading states
   useEffect(() => {
     if (fontLoaded && imagesLoaded && carouselReady) {
-      // Small delay to ensure smooth transition
+      // Small delay to ensure smooth transition and Three.js initialization
       setTimeout(() => {
+        console.log('All resources loaded, revealing page');
         setIsPageLoading(false);
-      }, 300);
+      }, 500);
     }
   }, [fontLoaded, imagesLoaded, carouselReady]);
 
@@ -78,7 +91,7 @@ export default function CarouselPage() {
     loadingTimeoutRef.current = setTimeout(() => {
       console.log('Loading timeout reached, showing page');
       setIsPageLoading(false);
-    }, 8000); // 8 second timeout
+    }, 12000); // 12 second timeout for slower connections
     
     return () => {
       if (loadingTimeoutRef.current) {
@@ -87,13 +100,10 @@ export default function CarouselPage() {
     };
   }, []);
 
-  // Mark carousel as ready after a brief delay
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setCarouselReady(true);
-    }, 1500); // Give carousel time to initialize
-    
-    return () => clearTimeout(timer);
+  // Carousel ready callback
+  const handleCarouselReady = useCallback(() => {
+    console.log('Carousel component signaled ready');
+    setCarouselReady(true);
   }, []);
 
   // Alternate emoji for sign-in button
@@ -207,7 +217,7 @@ export default function CarouselPage() {
         }
       `}</style>
 
-      <CarouselComponent />
+      <CarouselComponent onReady={handleCarouselReady} />
       
       {/* RL80 Logo - Top Left */}
       {fontLoaded && (

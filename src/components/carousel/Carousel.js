@@ -7,8 +7,19 @@ import { Image, Environment, ScrollControls, useScroll, useTexture } from '@reac
 import { easing } from 'maath'
 import './util'
 
-export default function CarouselComponent() {
+export default function CarouselComponent({ onReady }) {
   const [hoveredCaption, setHoveredCaption] = useState(null)
+  const [sceneReady, setSceneReady] = useState(false)
+  
+  useEffect(() => {
+    if (sceneReady && onReady) {
+      // Give a small delay for final rendering
+      const timer = setTimeout(() => {
+        onReady()
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [sceneReady, onReady])
   
   return (
     <div style={{ width: '100%', height: '100vh', background: '#000' }}>
@@ -18,6 +29,8 @@ export default function CarouselComponent() {
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping
           gl.toneMappingExposure = 1
+          // Mark scene as ready after canvas is created
+          setTimeout(() => setSceneReady(true), 100)
         }}
       >
         <fog attach="fog" args={['#a79', 8.5, 12]} />

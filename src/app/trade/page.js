@@ -502,7 +502,7 @@ export default function CyborgTemple() {
           // Allow touch events to pass through when collapsed
           pointerEvents: "auto",
         }}>
-          {!userHasInteracted && (
+          {!userHasInteracted && !isMobileView &&(
             <>
               <p style={{
                 fontSize: isMobileView ? "1.8rem" : "1rem",

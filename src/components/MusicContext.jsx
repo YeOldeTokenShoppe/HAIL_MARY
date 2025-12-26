@@ -119,11 +119,20 @@ export const MusicProvider = ({ children }) => {
         console.error('[MusicContext] Error code:', firebaseError.code);
         console.error('[MusicContext] Error message:', firebaseError.message);
         
-        // Check if this is the dummy implementation
-        if (url === '' || (firebaseError && firebaseError.message === 'Firebase Storage timeout after 10 seconds')) {
-          console.error('[MusicContext] Firebase is not properly configured in production!');
-          console.error('[MusicContext] Check that Firebase environment variables are set in production');
+        // Check specific error types
+        if (firebaseError.code === 'storage/object-not-found') {
+          console.error('[MusicContext] File not found in Firebase Storage:', playlist[index].path);
+        } else if (firebaseError.code === 'storage/unauthorized') {
+          console.error('[MusicContext] Firebase Storage permissions error - check security rules');
+        } else if (firebaseError.code === 'storage/canceled') {
+          console.error('[MusicContext] Firebase Storage request was canceled');
+        } else if (firebaseError.code === 'storage/unknown') {
+          console.error('[MusicContext] Unknown Firebase Storage error - may be network/CORS issue');
+        } else if (firebaseError.message === 'Firebase Storage timeout after 10 seconds') {
+          console.error('[MusicContext] Firebase Storage request timed out - check network and Firebase configuration');
+          console.error('[MusicContext] This often indicates missing Firebase configuration in production');
         }
+        
         throw firebaseError;
       }
       
@@ -259,12 +268,29 @@ export const MusicProvider = ({ children }) => {
         try {
           console.log('[MusicContext] Preloading track:', playlist[index].name);
           const trackRef = storageRefUtil(storage, playlist[index].path);
-          const url = await getDownloadURL(trackRef);
+          console.log('[MusicContext] Preload: Storage ref created');
+          
+          // Add timeout for preloading too
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Preload timeout after 5 seconds')), 5000);
+          });
+          
+          const url = await Promise.race([
+            getDownloadURL(trackRef),
+            timeoutPromise
+          ]);
+          
+          console.log('[MusicContext] Preload: Got URL');
           setPreloadedUrl(url);
           setPreloadedIndex(index);
           console.log('[MusicContext] Track preloaded and ready');
         } catch (error) {
-          console.error('[MusicContext] Failed to preload track:', error);
+          console.error('[MusicContext] Failed to preload track:', error.message);
+          console.error('[MusicContext] Preload error details:', {
+            code: error.code,
+            message: error.message,
+            stack: error.stack
+          });
         }
       }
     };
