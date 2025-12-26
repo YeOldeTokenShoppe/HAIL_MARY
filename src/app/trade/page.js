@@ -421,7 +421,7 @@ export default function CyborgTemple() {
         <div style={{
           position: "fixed",
           top: "20px", 
-          left: "5rem",
+         left: isMobileView ? "2rem" : "5rem",
           borderRadius: "8px",
           padding: "10px",
           pointerEvents: "auto",
@@ -439,7 +439,7 @@ export default function CyborgTemple() {
               cursor: "pointer",
             }}
           >
-            <Link href="/" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
+            <Link href="/home" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
               RL80
             </Link>
             {Array.from({length: 100}).map((_, i) => {
@@ -505,7 +505,7 @@ export default function CyborgTemple() {
           {!userHasInteracted && (
             <>
               <p style={{
-                fontSize: isMobileView ? "0.9rem" : "1rem",
+                fontSize: isMobileView ? "1.8rem" : "1rem",
                 lineHeight: "1.2",
                 color: "rgba(255, 255, 255, 0.95)",
                 margin: 0,
@@ -517,11 +517,11 @@ export default function CyborgTemple() {
                 paddingBottom: isMobileView ? "0.75rem" : "1rem",
                 borderBottom: "1px solid rgba(255, 255, 255, 0.2)",
               }}>
-                Live multi-agent AI trading
+                Multi-agent AI trading
               </p>
               
               <p style={{
-                fontSize: isMobileView ? "0.85rem" : "0.9rem",
+                fontSize: isMobileView ? "1.1rem" : "0.9rem",
                 lineHeight: "1.2",
                 color: "rgba(255, 255, 255, 0.8)",
                 margin: 0,
@@ -930,12 +930,12 @@ export default function CyborgTemple() {
         {mounted && (
           <>
             {/* Aurora Toggle Button - Small toggle style */}
-            {sceneReady && (
+            {sceneReady && !isMobileView && (
               <div
                 style={{
                   position: "fixed",
                   top: "1rem",
-                  right: isMobileView ? "5rem" : "5.5rem",
+                  right: "5.5rem",
                   zIndex: 10001,
                   display: "flex",
                   alignItems: "center",

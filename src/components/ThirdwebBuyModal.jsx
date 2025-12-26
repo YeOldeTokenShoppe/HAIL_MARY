@@ -1,32 +1,17 @@
 'use client';
 
 import React from 'react';
-import dynamic from 'next/dynamic';
-import { defineChain } from "thirdweb";
-import { client } from "@/lib/client";
+import { BuyWidget } from "thirdweb/react";
+import { createThirdwebClient } from "thirdweb";
+import { defineChain } from "thirdweb/chains";
 
-// Dynamically import BuyWidget to avoid SSR issues with test dependencies
-const BuyWidget = dynamic(
-  () => import('thirdweb/react').then((mod) => ({ default: mod.BuyWidget })),
-  { 
-    ssr: false,
-    loading: () => (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: '400px',
-        color: '#ffd700',
-        fontSize: '1.2rem',
-        fontFamily: 'Courier New, monospace',
-      }}>
-        Loading...
-      </div>
-    )
-  }
-);
+// Create client with your Client ID
+const client = createThirdwebClient({
+  clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID,
+});
 
 const ThirdwebBuyModal = ({ isOpen, onClose }) => {
+  
   if (!isOpen) return null;
 
   return (
@@ -118,6 +103,7 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
           {/* Thirdweb Buy Widget */}
           <div style={{
             display: 'flex',
+            flexDirection: 'column',
             justifyContent: 'center',
             alignItems: 'center',
             minHeight: '400px',
@@ -125,14 +111,9 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
             <BuyWidget
               client={client}
               chain={defineChain(42161)} // Arbitrum One
-              // You can specify the token contract address here
-              // tokenAddress="0x..." // Add your RL80 token contract address
-              // Or let users buy native ETH
-              currency="USD"
-              amount="10" // Default amount in USD
+              // Add your token contract address when ready
+              // tokenAddress="0x..." 
               theme="dark"
-              // Optional: Configure supported payment methods
-              // paymentMethods={["crypto", "fiat"]}
             />
           </div>
 
@@ -144,7 +125,7 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
             fontSize: '0.9rem',
             fontFamily: 'Courier New, monospace',
           }}>
-            Secure purchase powered by Thirdweb
+            Secure purchase options for RL80 tokens
           </p>
         </div>
       </div>

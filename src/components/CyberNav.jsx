@@ -114,7 +114,7 @@ const CyberNav = ({ is80sMode = false, position = "fixed", musicButton = null, u
             style={{
               position: "fixed",
               top: position === "absolute" ? "10px" : "20px",
-              right: isMobile ? "5.5rem" : "6rem",
+              right: isMobile ? "4.5rem" : "6rem",
               zIndex: 10001,
               opacity: 1,
               pointerEvents: "auto",
@@ -133,7 +133,7 @@ const CyberNav = ({ is80sMode = false, position = "fixed", musicButton = null, u
           <div
             style={{
               position: "fixed",
-              top: position === "absolute" ? (isMobile ? "4.5rem" : "5.5rem") : (isMobile ? "5.5rem" : "6rem"),
+              top: position === "absolute" ? (isMobile ? "4.5rem" : "5.5rem") : (isMobile ? "5rem" : "6rem"),
               right: "20px",
               zIndex: 10001,
               opacity: 1,
@@ -230,8 +230,8 @@ const CyberNav = ({ is80sMode = false, position = "fixed", musicButton = null, u
               flexDirection: "column",
               justifyContent: "center",
               alignItems: "center",
-              // gap: "15px",
-              padding: "40px 20px",
+              gap: isMobile ? "2px" : "10px",
+              padding: isMobile ? "20px" : "40px 20px",
               isolation: "isolate",
               transform: "translateZ(0)"
             }}
@@ -293,7 +293,7 @@ const CyberNav = ({ is80sMode = false, position = "fixed", musicButton = null, u
                       flexDirection: "row",
                       alignItems: "center",
                       gap: "12px",
-                      padding: isActive ? "14px" : "16px",
+                      padding: isMobile ? "8px 12px" : (isActive ? "14px" : "16px"),
                       borderRadius: "10px",
                       backgroundColor: isActive 
                         ? (is80sMode ? "#67e8f9" : "#c896ff")
@@ -312,7 +312,7 @@ const CyberNav = ({ is80sMode = false, position = "fixed", musicButton = null, u
                       setHoveredItemPath('');
                     }}
                   >
-                    <div style={{ width: "60px", height: "60px", overflow: "hidden", borderRadius: "5px", flexShrink: "0" }}>
+                    <div style={{ width: isMobile ? "40px" : "60px", height: isMobile ? "40px" : "60px", overflow: "hidden", borderRadius: "5px", flexShrink: "0" }}>
                       <img
                         src={item.thumbnail}
                         alt={item.title}
@@ -330,7 +330,7 @@ const CyberNav = ({ is80sMode = false, position = "fixed", musicButton = null, u
                         style={{
                           color: isActive ? '#000000' : (is80sMode ? "#D946EF" : '#ffffff'),
                           fontWeight: "700",
-                          fontSize: isMobile ? "0.75rem" : "0.875rem",
+                          fontSize: isMobile ? "0.65rem" : "0.875rem",
                           fontFamily: "'Rajdhani', sans-serif",
                           textAlign: "left"
                         }}
@@ -340,7 +340,7 @@ const CyberNav = ({ is80sMode = false, position = "fixed", musicButton = null, u
                       <span
                         style={{
                           color: isActive ? '#000000' : (is80sMode ? "#D946EF" : '#ffff00'),
-                          fontSize: isMobile ? "1.25rem" : "1.5rem",
+                          fontSize: isMobile ? "1rem" : "1.5rem",
                           fontWeight: "700",
                           fontFamily: "'Rajdhani', sans-serif"
                         }}

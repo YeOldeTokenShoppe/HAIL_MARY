@@ -875,6 +875,11 @@ const PalmsScene = ({ onLoadingChange }) => {
     let modelsToLoad = 0;
     let modelsLoaded = 0;
     
+    // Retry configuration
+    const maxRetries = 3;
+    const retryDelay = 1000; // 1 second
+    const retryCount = {};
+    
     loadingManager.onStart = () => {
       modelsToLoad++;
     };
@@ -888,20 +893,62 @@ const PalmsScene = ({ onLoadingChange }) => {
     // };
     
     loadingManager.onError = (url) => {
-      console.error(`Error loading: ${url}`);
-      // Mark the failed model as loaded anyway to not block the scene
-      if (url.includes('palm2')) setModelsLoadState(prev => ({ ...prev, palm: true }));
-      if (url.includes('sign2')) setModelsLoadState(prev => ({ ...prev, sign: true }));
-      if (url.includes('synthSunset')) setModelsLoadState(prev => ({ ...prev, sun: true }));
-      if (url.includes('lambo5k3')) setModelsLoadState(prev => ({ ...prev, car: true }));
+      console.error(`[CRITICAL] Failed to load model: ${url}`);
+      // Set error state to properly track failures
+      if (url.includes('palm2')) setModelsLoadState(prev => ({ ...prev, palm: 'error' }));
+      if (url.includes('sign2')) setModelsLoadState(prev => ({ ...prev, sign: 'error' }));
+      if (url.includes('synthSunset')) setModelsLoadState(prev => ({ ...prev, sun: 'error' }));
+      if (url.includes('lambo5k3')) setModelsLoadState(prev => ({ ...prev, car: 'error' }));
+      
+      // Log additional debug info for production issues
+      console.error('[Debug] Failed URL:', url);
+      console.error('[Debug] Current origin:', window.location.origin);
+      console.error('[Debug] Full path attempted:', new URL(url, window.location.origin).href);
     };
     
     // Set up DRACO loader for compressed models
     const dracoLoader = new DRACOLoader();
-    dracoLoader.setDecoderPath('/draco/'); // Path to draco decoder files
+    // Use explicit path that works in production
+    const dracoPath = '/draco/';
+    dracoLoader.setDecoderPath(dracoPath);
+    dracoLoader.setDecoderConfig({ type: 'js' }); // Ensure JS decoder is used
     
     const loader = new GLTFLoader(loadingManager);
     loader.setDRACOLoader(dracoLoader);
+    
+    console.log('[PalmTreeDrive] Initialized loaders - DRACO path:', dracoPath);
+    
+    // Helper function to load models with retry logic
+    const loadModelWithRetry = (path, onSuccess, onProgress, onError, modelName) => {
+      const attemptKey = `${modelName}_${path}`;
+      if (!retryCount[attemptKey]) {
+        retryCount[attemptKey] = 0;
+      }
+      
+      const attemptLoad = () => {
+        console.log(`[PalmTreeDrive] Loading ${modelName} (attempt ${retryCount[attemptKey] + 1}/${maxRetries + 1})`);
+        
+        loader.load(
+          path,
+          onSuccess,
+          onProgress,
+          (error) => {
+            retryCount[attemptKey]++;
+            console.error(`[PalmTreeDrive] Error loading ${modelName} (attempt ${retryCount[attemptKey]}):`, error);
+            
+            if (retryCount[attemptKey] <= maxRetries) {
+              console.log(`[PalmTreeDrive] Retrying ${modelName} in ${retryDelay}ms...`);
+              setTimeout(attemptLoad, retryDelay);
+            } else {
+              console.error(`[PalmTreeDrive] Failed to load ${modelName} after ${maxRetries} retries`);
+              onError(error);
+            }
+          }
+        );
+      };
+      
+      attemptLoad();
+    };
 
     // Helper function for smooth step (used by both palm and sign animations)
     function smoothstep(edge0, edge1, x) {
@@ -909,8 +956,9 @@ const PalmsScene = ({ onLoadingChange }) => {
       return t * t * (3 - 2 * t);
     }
 
-    // Load Palm Tree GLB with error handling
-    loader.load('/models/palm2.glb', (gltf) => {
+    // Load Palm Tree GLB with error handling and retry
+    const palmPath = '/models/palm2.glb';
+    loadModelWithRetry(palmPath, (gltf) => {
       const palmModel = gltf.scene;
       
       // Mark palm model as loaded
@@ -1045,15 +1093,13 @@ const PalmsScene = ({ onLoadingChange }) => {
       // console.log('Loading palm tree:', (progress.loaded / progress.total * 100) + '%');
     },
     (error) => {
-      console.error('Error loading palm tree model:', error);
+      console.error('[CRITICAL] Palm tree model failed after all retries:', error);
       setModelsLoadState(prev => ({ ...prev, palm: 'error' }));
-      
-      // Fallback to procedural palms if GLB fails to load
-      // Original procedural palm code would go here as fallback
-    });
+    }, 'palm');
     
-    // Load Road Sign model
-    loader.load('/models/sign2.glb', (gltf) => {
+    // Load Road Sign model with retry
+    const signPath = '/models/sign2.glb';
+    loadModelWithRetry(signPath, (gltf) => {
       const signModel = gltf.scene;
       
       // Mark sign model as loaded
@@ -1178,12 +1224,13 @@ const PalmsScene = ({ onLoadingChange }) => {
       // console.log('Loading road sign:', (progress.loaded / progress.total * 100) + '%');
     },
     (error) => {
-      console.error('Error loading road sign model:', error);
+      console.error('[CRITICAL] Road sign model failed after all retries:', error);
       setModelsLoadState(prev => ({ ...prev, sign: 'error' }));
-    });
+    }, 'sign');
 
-    // Load Synthwave Sun model
-    loader.load('/models/synthSunset.glb', (gltf) => {
+    // Load Synthwave Sun model with retry
+    const sunPath = '/models/synthSunset.glb';
+    loadModelWithRetry(sunPath, (gltf) => {
       const sun = gltf.scene;
       
       // Mark sun model as loaded
@@ -1210,40 +1257,13 @@ const PalmsScene = ({ onLoadingChange }) => {
       // console.log('Loading sun:', (progress.loaded / progress.total * 100) + '%');
     },
     (error) => {
-      console.error('Error loading sun model:', error);
+      console.error('[CRITICAL] Sun model failed after all retries:', error);
       setModelsLoadState(prev => ({ ...prev, sun: 'error' }));
-      
-      // Fallback to simple sun if model fails to load
-      const sunGeom = new THREE.CircleGeometry(200, 64);
-      const sunMat = new THREE.MeshBasicMaterial({ color: 0xff8800, fog: false, transparent: true });
-      sunMat.onBeforeCompile = shader => {
-        shader.uniforms.time = { value: 0 };
-        shader.vertexShader = `
-          varying vec2 vUv;
-        ` + shader.vertexShader;
-        shader.vertexShader = shader.vertexShader.replace(
-          `#include <begin_vertex>`,
-          `#include <begin_vertex>
-            vUv = uv;
-          `
-        );
-        shader.fragmentShader = `
-          varying vec2 vUv;
-        ` + shader.fragmentShader;
-        shader.fragmentShader = shader.fragmentShader.replace(
-          `gl_FragColor = vec4( outgoingLight, diffuseColor.a );`,
-          `gl_FragColor = vec4( outgoingLight, diffuseColor.a * smoothstep(0.5, 0.7, vUv.y));`
-        );
-        materialShaders.push(shader);
-      };
-      
-      const sun = new THREE.Mesh(sunGeom, sunMat);
-      sun.position.set(0, 0, -500);
-      scene.add(sun);
-    });
+    }, 'sun');
     
-    // Load car model (now includes UFO)
-    loader.load('/models/lambo5k3.glb', (gltf) => {
+    // Load car model (now includes UFO) with retry
+    const carPath = '/models/lambo5k3.glb';
+    loadModelWithRetry(carPath, (gltf) => {
       const carScene = gltf.scene;
       
       setModelsLoadState(prev => ({ ...prev, car: 'loaded' }));
@@ -1502,11 +1522,11 @@ const PalmsScene = ({ onLoadingChange }) => {
     (progress) => {
       // console.log('Loading car:', (progress.loaded / progress.total * 100) + '%');
     },
-    // Error callback
+    // Error callback (only called after all retries fail)
     (error) => {
-      console.error('Error loading car model:', error);
+      console.error('[CRITICAL] Car model failed after all retries:', error);
       setModelsLoadState(prev => ({ ...prev, car: 'error' }));
-    });
+    }, 'car');
     
 
     materialShadersRef.current = materialShaders;
