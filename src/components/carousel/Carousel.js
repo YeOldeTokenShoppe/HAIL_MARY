@@ -327,7 +327,7 @@ function Banner(props) {
     
     // Add text
     context.fillStyle = '#000000'
-    context.font = 'bold 77px UnifrakturCook, serif'
+    context.font = 'bold 4rem UnifrakturCook, serif'
     context.textAlign = 'center'
     context.textBaseline = 'middle'
     

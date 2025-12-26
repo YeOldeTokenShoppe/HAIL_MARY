@@ -625,11 +625,11 @@ const CyborgTempleScene = ({
           if (child.name === 'Coin1') {
             coin1Ref.current = child;
             
-            // Make Coin1 clickable
+            // Make Coin1 clickable - maps to Macro
             const setCoin1ClickableData = (obj) => {
               obj.userData.clickable = true;
-              obj.userData.agentId = 'Coin1';
-              obj.userData.agentName = 'Coin1';
+              obj.userData.agentId = 'Macro';
+              obj.userData.agentName = 'Macro';
               obj.userData.targetObject = child;
               obj.userData.isCoin = true; // Mark as coin for special handling
               
@@ -644,11 +644,11 @@ const CyborgTempleScene = ({
           if (child.name === 'Coin2') {
             coin2Ref.current = child;
             
-            // Make Coin2 clickable
+            // Make Coin2 clickable - maps to Tekno
             const setCoin2ClickableData = (obj) => {
               obj.userData.clickable = true;
-              obj.userData.agentId = 'Coin2';
-              obj.userData.agentName = 'Coin2';
+              obj.userData.agentId = 'Tekno';
+              obj.userData.agentName = 'Tekno';
               obj.userData.targetObject = child;
               obj.userData.isCoin = true;
               
@@ -662,11 +662,11 @@ const CyborgTempleScene = ({
           if (child.name === 'Coin3') {
             coin3Ref.current = child;
             
-            // Make Coin3 clickable
+            // Make Coin3 clickable - maps to Emo
             const setCoin3ClickableData = (obj) => {
               obj.userData.clickable = true;
-              obj.userData.agentId = 'Coin3';
-              obj.userData.agentName = 'Coin3';
+              obj.userData.agentId = 'Emo';
+              obj.userData.agentName = 'Emo';
               obj.userData.targetObject = child;
               obj.userData.isCoin = true;
               
@@ -680,11 +680,11 @@ const CyborgTempleScene = ({
           if (child.name === 'Coin4') {
             coin4Ref.current = child;
             
-            // Make Coin4 clickable
+            // Make Coin4 clickable - maps to RL80
             const setCoin4ClickableData = (obj) => {
               obj.userData.clickable = true;
-              obj.userData.agentId = 'Coin4';
-              obj.userData.agentName = 'Coin4';
+              obj.userData.agentId = 'RL80';
+              obj.userData.agentName = 'RL80';
               obj.userData.targetObject = child;
               obj.userData.isCoin = true;
               
@@ -873,8 +873,10 @@ const CyborgTempleScene = ({
         const object = intersects[i].object;
         
         if (object.userData.isCoin) {
-          // Prevent default only when we're actually interacting with a coin
-          event.preventDefault();
+          // Prevent default only when we're actually interacting with a coin and it's cancelable
+          if (event.cancelable) {
+            event.preventDefault();
+          }
           
           // Trigger coin animation
           const coinName = object.userData.agentId;

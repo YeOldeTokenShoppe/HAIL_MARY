@@ -54,6 +54,8 @@ export const MusicProvider = ({ children }) => {
   const [isShuffled, setIsShuffled] = useState(true); // Default to shuffled
   const [shuffleHistory, setShuffleHistory] = useState([]);
   const [shuffleQueue, setShuffleQueue] = useState([]);
+  const [preloadedUrl, setPreloadedUrl] = useState(null);
+  const [preloadedIndex, setPreloadedIndex] = useState(null);
   
   // Use refs to track current values for event handlers
   const currentTrackIndexRef = React.useRef(0);
@@ -71,8 +73,8 @@ export const MusicProvider = ({ children }) => {
   
   
   // Load and play track function
-  const loadTrack = useCallback(async (index, shouldAutoPlay = false, playImmediately = false) => {
-    console.log('[MusicContext] loadTrack called:', { index, shouldAutoPlay, is80sMode, playImmediately });
+  const loadTrack = useCallback(async (index, shouldAutoPlay = false) => {
+    console.log('[MusicContext] loadTrack called:', { index, shouldAutoPlay, is80sMode });
     const playlist = is80sMode ? eightyTracks : non80sTracks;
     
     if (index < 0 || index >= playlist.length) {
@@ -84,23 +86,33 @@ export const MusicProvider = ({ children }) => {
     setIsLoadingTrack(true);
     
     try {
-      // If playImmediately is true, start playing before loading to preserve user gesture
-      let playPromise = null;
-      if (playImmediately && audioRef.current) {
-        playPromise = audioRef.current.play().catch(e => {
-          console.log('[MusicContext] Initial play failed:', e);
-          return null;
-        });
+      console.log('[MusicContext] Getting download URL for track path:', playlist[index].path);
+      
+      // Check if storage is initialized
+      if (!storage) {
+        console.error('[MusicContext] Firebase storage is not initialized!');
+        throw new Error('Firebase storage not initialized');
       }
       
       const trackRef = storageRefUtil(storage, playlist[index].path);
       const url = await getDownloadURL(trackRef);
+      console.log('[MusicContext] Got download URL:', url ? 'URL received' : 'No URL');
       
       if (audioRef.current) {
-        // If we're already playing something, don't pause
-        const wasPlaying = playImmediately || (playPromise !== null) || !audioRef.current.paused;
+        console.log('[MusicContext] Audio element exists, current src:', audioRef.current.src);
         
-        // Set new source without pausing first
+        // Check if we're replacing a placeholder (data: URL)
+        const isReplacingPlaceholder = audioRef.current.src && audioRef.current.src.startsWith('data:');
+        const wasPlaying = !audioRef.current.paused;
+        
+        if (!isReplacingPlaceholder) {
+          // Normal load - clear existing source first
+          audioRef.current.pause();
+          audioRef.current.src = '';
+        }
+        
+        // Set new source
+        console.log('[MusicContext] Setting new audio source', isReplacingPlaceholder ? '(replacing placeholder)' : '');
         audioRef.current.src = url;
         audioRef.current.load();
         
@@ -143,28 +155,31 @@ export const MusicProvider = ({ children }) => {
           });
         }
         
-        if (shouldAutoPlay || wasPlaying || playImmediately) {
-          console.log('[MusicContext] Attempting to play track');
+        // If we're replacing a placeholder that was playing, or shouldAutoPlay is true, play the track
+        if (shouldAutoPlay || (isReplacingPlaceholder && wasPlaying)) {
+          console.log('[MusicContext] Attempting to play track', isReplacingPlaceholder ? '(continuing from placeholder)' : '');
           try {
             await audioRef.current.play();
             console.log('[MusicContext] Playback started successfully');
             setIsPlaying(true);
           } catch (e) {
             console.error('[MusicContext] Play blocked:', e.message);
-            console.log('[MusicContext] User interaction required - track loaded but not playing');
+            console.log('[MusicContext] Track is loaded and ready, waiting for user interaction');
             setIsPlaying(false);
-            
-            // Track is loaded and ready, just needs user interaction to start
-            // The UI should show play button in paused state
+            // Return false to indicate play was blocked
+            return false;
           }
         } else {
           console.log('[MusicContext] Track loaded, ready to play');
         }
+        // Return true to indicate success
+        return true;
       }
     } catch (error) {
       console.error('[MusicContext] Error loading track:', error);
       setIsLoadingTrack(false);
       setIsPlaying(false);
+      return false;
     }
   }, [is80sMode, setCurrentTrackBPM]);
   
@@ -173,23 +188,99 @@ export const MusicProvider = ({ children }) => {
     loadTrackRef.current = loadTrack;
   }, [loadTrack]);
   
+  // Preload a track URL when component mounts or when mode changes
+  useEffect(() => {
+    const preloadFirstTrack = async () => {
+      const playlist = is80sMode ? eightyTracks : non80sTracks;
+      if (playlist.length > 0) {
+        let index = 0;
+        if (isShuffled) {
+          index = Math.floor(Math.random() * playlist.length);
+        }
+        
+        try {
+          console.log('[MusicContext] Preloading track:', playlist[index].name);
+          const trackRef = storageRefUtil(storage, playlist[index].path);
+          const url = await getDownloadURL(trackRef);
+          setPreloadedUrl(url);
+          setPreloadedIndex(index);
+          console.log('[MusicContext] Track preloaded and ready');
+        } catch (error) {
+          console.error('[MusicContext] Failed to preload track:', error);
+        }
+      }
+    };
+    
+    // Only preload if we don't already have audio loaded
+    if (!audioRef.current?.src) {
+      preloadFirstTrack();
+    }
+  }, [is80sMode, isShuffled]);
+
   // Play/Pause functions
   const play = useCallback(() => {
     if (audioRef.current) {
-      // If no track loaded, load a random track if shuffled
+      // If no track loaded, use preloaded URL or load a new track
       if (!audioRef.current.src) {
-        const playlist = is80sMode ? eightyTracks : non80sTracks;
-        let startIndex = 0;
-        
-        if (isShuffled && playlist.length > 0) {
-          // Start with a random track
-          startIndex = Math.floor(Math.random() * playlist.length);
-          console.log('[MusicContext] Starting with random track:', startIndex);
+        if (preloadedUrl && preloadedIndex !== null) {
+          // Use the preloaded URL for instant playback
+          console.log('[MusicContext] Using preloaded track for instant playback');
+          const playlist = is80sMode ? eightyTracks : non80sTracks;
+          
+          audioRef.current.src = preloadedUrl;
+          audioRef.current.load();
+          
+          // Set track info
+          setCurrentTrackIndex(preloadedIndex);
+          setCurrentTrackBPM(playlist[preloadedIndex].bpm || 100);
+          setCurrentTrack(playlist[preloadedIndex]);
+          
+          // Play immediately - this should work because we're in user interaction context
+          audioRef.current.play().then(() => {
+            console.log('[MusicContext] Playback started with preloaded track');
+            setIsPlaying(true);
+            
+            // Clear preloaded data
+            setPreloadedUrl(null);
+            setPreloadedIndex(null);
+            
+            // Save state to global manager
+            if (globalAudioManager) {
+              globalAudioManager.setState({
+                currentTrackIndex: preloadedIndex,
+                is80sMode: is80sMode,
+                currentTrack: playlist[preloadedIndex],
+                isShuffled: isShuffled
+              });
+            }
+          }).catch(e => {
+            console.error('[MusicContext] Play blocked even with preloaded track:', e);
+            setIsPlaying(false);
+          });
+        } else {
+          // Fallback to loading track normally
+          const playlist = is80sMode ? eightyTracks : non80sTracks;
+          let startIndex = 0;
+          
+          if (isShuffled && playlist.length > 0) {
+            startIndex = Math.floor(Math.random() * playlist.length);
+            console.log('[MusicContext] Starting with random track:', startIndex);
+          }
+          
+          console.log('[MusicContext] No preloaded track, loading now');
+          setIsLoadingTrack(true);
+          
+          loadTrack(startIndex, true).then((success) => {
+            if (!success) {
+              console.log('[MusicContext] Track loaded but autoplay was blocked');
+            }
+          }).catch(error => {
+            console.error('[MusicContext] Failed to load track:', error);
+            setIsLoadingTrack(false);
+          });
         }
-        
-        // Load track with playImmediately flag to preserve user gesture
-        loadTrack(startIndex, true, true);
       } else {
+        // Resume playback
         audioRef.current.play().then(() => {
           console.log('[MusicContext] Playback resumed');
           setIsPlaying(true);
@@ -199,7 +290,7 @@ export const MusicProvider = ({ children }) => {
         });
       }
     }
-  }, [loadTrack, is80sMode, isShuffled]);
+  }, [loadTrack, is80sMode, isShuffled, preloadedUrl, preloadedIndex, setCurrentTrackBPM]);
   
   const pause = useCallback(() => {
     if (audioRef.current) {

@@ -541,7 +541,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
               }}
               title="Candlelaria"
             >
-              🕯️
+              🙏
               <NotificationBadge 
                 count={notifications.candles}
                 color="#ff0041"
