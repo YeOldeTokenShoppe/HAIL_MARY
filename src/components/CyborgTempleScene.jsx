@@ -546,10 +546,10 @@ const CyborgTempleScene = ({
         }
         
         // Find eye meshes for blinking animation
-        if (child.name === 'L_eye' || child.name === 'L_Eye') {
+        if (child.name === 'L_eye' || child.name === 'L_Eye' || child.name === 'LeftEye' || child.name === 'left_eye') {
           leftEyeRef.current = child;
         }
-        if (child.name === 'R_eye' || child.name === 'R_Eye') {
+        if (child.name === 'R_eye' || child.name === 'R_Eye' || child.name === 'RightEye' || child.name === 'right_eye') {
           rightEyeRef.current = child;
         }
         
@@ -1741,7 +1741,13 @@ const CyborgTempleScene = ({
     }
     
     // Blinking animation for RL80's eyes
-    if (leftEyeRef.current && rightEyeRef.current && !isOnMobile) {
+    
+    if (!leftEyeRef.current || !rightEyeRef.current) {
+      return; // Exit early if no eyes
+    }
+    
+    // Remove mobile check - blinking should work on all devices
+    if (true) {
       const currentTime = state.clock.getElapsedTime() * 1000; // Convert to milliseconds
       const blinkState = blinkStateRef.current;
       
@@ -1783,10 +1789,10 @@ const CyborgTempleScene = ({
           }
           
           // Apply scale transformation to simulate closing eyes
-          // Use setFromMatrixScale to maintain position while scaling
-          const eyeScale = 1 - (progress * 0.9); // Don't fully close to 0, leave at 0.1
+          // Since the origin is now at the geometry center, we just scale on Y
+          const eyeScale = 1 - (progress * 0.95); // Scale down to 0.05 (nearly closed)
           
-          // Scale from the center of each eye mesh
+          // Scale only on Y axis to create blink effect
           leftEyeRef.current.scale.set(
             leftEyeRef.current.userData.originalScale.x,
             leftEyeRef.current.userData.originalScale.y * eyeScale,
@@ -1798,19 +1804,15 @@ const CyborgTempleScene = ({
             rightEyeRef.current.userData.originalScale.z
           );
           
-          // Compensate for position shift when scaling
-          // Move eyes slightly to maintain their visual position
-          const positionOffset = (1 - eyeScale) * 0.01; // Adjust this value as needed
-          leftEyeRef.current.position.y = leftEyeRef.current.userData.originalPosition.y - positionOffset;
-          rightEyeRef.current.position.y = rightEyeRef.current.userData.originalPosition.y - positionOffset;
+          
+          // No position compensation needed since origin is at geometry center
           
         } else {
           // Blink complete, reset to original
           blinkState.isBlinking = false;
           leftEyeRef.current.scale.copy(leftEyeRef.current.userData.originalScale);
           rightEyeRef.current.scale.copy(rightEyeRef.current.userData.originalScale);
-          leftEyeRef.current.position.copy(leftEyeRef.current.userData.originalPosition);
-          rightEyeRef.current.position.copy(rightEyeRef.current.userData.originalPosition);
+          // Positions don't need to be reset since we're not modifying them
         }
       }
     }

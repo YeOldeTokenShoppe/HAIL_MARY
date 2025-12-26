@@ -94,9 +94,45 @@ export const MusicProvider = ({ children }) => {
         throw new Error('Firebase storage not initialized');
       }
       
+      // Log storage object to see if it's a dummy
+      console.log('[MusicContext] Storage object type:', typeof storage);
+      console.log('[MusicContext] Storage object keys:', storage ? Object.keys(storage).slice(0, 5) : 'null');
+      
       const trackRef = storageRefUtil(storage, playlist[index].path);
-      const url = await getDownloadURL(trackRef);
-      console.log('[MusicContext] Got download URL:', url ? 'URL received' : 'No URL');
+      console.log('[MusicContext] Storage ref created, fetching from Firebase Storage...');
+      
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Firebase Storage timeout after 10 seconds')), 10000);
+      });
+      
+      let url;
+      try {
+        // Race between getDownloadURL and timeout
+        url = await Promise.race([
+          getDownloadURL(trackRef),
+          timeoutPromise
+        ]);
+        console.log('[MusicContext] getDownloadURL completed');
+      } catch (firebaseError) {
+        console.error('[MusicContext] Firebase Storage error:', firebaseError);
+        console.error('[MusicContext] Error code:', firebaseError.code);
+        console.error('[MusicContext] Error message:', firebaseError.message);
+        
+        // Check if this is the dummy implementation
+        if (url === '' || (firebaseError && firebaseError.message === 'Firebase Storage timeout after 10 seconds')) {
+          console.error('[MusicContext] Firebase is not properly configured in production!');
+          console.error('[MusicContext] Check that Firebase environment variables are set in production');
+        }
+        throw firebaseError;
+      }
+      
+      if (!url || url === '') {
+        console.error('[MusicContext] Got empty URL from Firebase Storage - check Firebase configuration');
+        throw new Error('Empty URL from Firebase Storage');
+      }
+      
+      console.log('[MusicContext] Got download URL:', url.substring(0, 50) + '...');
       
       if (audioRef.current) {
         console.log('[MusicContext] Audio element exists, current src:', audioRef.current.src);
@@ -190,6 +226,28 @@ export const MusicProvider = ({ children }) => {
   
   // Preload a track URL when component mounts or when mode changes
   useEffect(() => {
+    // First check Firebase Storage status
+    console.log('[MusicContext] Checking Firebase Storage on mount...');
+    console.log('[MusicContext] Storage initialized:', !!storage);
+    if (storage) {
+      console.log('[MusicContext] Storage type:', typeof storage);
+      console.log('[MusicContext] Storage has ref method:', typeof storage.ref === 'function');
+      
+      // Check if it's the dummy implementation
+      if (storage.ref && storage.ref().getDownloadURL) {
+        const testRef = storage.ref();
+        if (typeof testRef.getDownloadURL === 'function') {
+          // Try to get the function source to see if it's dummy
+          const funcStr = testRef.getDownloadURL.toString();
+          if (funcStr.includes('Promise.resolve("")')) {
+            console.error('[MusicContext] WARNING: Firebase Storage is using dummy implementation!');
+            console.error('[MusicContext] Firebase environment variables are likely missing in production');
+            return; // Don't try to preload
+          }
+        }
+      }
+    }
+    
     const preloadFirstTrack = async () => {
       const playlist = is80sMode ? eightyTracks : non80sTracks;
       if (playlist.length > 0) {
@@ -258,7 +316,7 @@ export const MusicProvider = ({ children }) => {
             setIsPlaying(false);
           });
         } else {
-          // Fallback to loading track normally
+          // Fallback: Load from Firebase Storage
           const playlist = is80sMode ? eightyTracks : non80sTracks;
           let startIndex = 0;
           
@@ -267,16 +325,26 @@ export const MusicProvider = ({ children }) => {
             console.log('[MusicContext] Starting with random track:', startIndex);
           }
           
-          console.log('[MusicContext] No preloaded track, loading now');
+          console.log('[MusicContext] No preloaded track, loading from Firebase');
           setIsLoadingTrack(true);
           
+          // Load track with autoplay
           loadTrack(startIndex, true).then((success) => {
             if (!success) {
-              console.log('[MusicContext] Track loaded but autoplay was blocked');
+              console.log('[MusicContext] Track loaded but autoplay was blocked - user needs to click play again');
+              // The track is now loaded, so next click will just resume
             }
           }).catch(error => {
             console.error('[MusicContext] Failed to load track:', error);
+            console.error('[MusicContext] Full error details:', {
+              message: error.message,
+              code: error.code,
+              stack: error.stack
+            });
             setIsLoadingTrack(false);
+            
+            // Show user-friendly error
+            alert('Unable to load music. Please check your internet connection and try again.');
           });
         }
       } else {
