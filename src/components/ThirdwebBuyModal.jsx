@@ -163,7 +163,7 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
           className={glitchActive ? 'modal-glitch' : ''}
           style={{
             position: 'relative',
-            background: 'linear-gradient(135deg, #1a0a14, #0a0a1a)',
+            background: 'linear-gradient(135deg, #93276a, #3434a7)',
             clipPath: 'polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))',
             padding: '3rem',
             maxWidth: '500px',

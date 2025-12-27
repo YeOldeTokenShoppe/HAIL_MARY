@@ -5,6 +5,13 @@ rules_version = '2';
 //    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
 service firebase.storage {
   match /b/{bucket}/o {
+    // Allow anyone to read audio files
+    match /audio/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+    
+    // Default rule for other paths
     match /{allPaths=**} {
       allow read, write: if false;
     }

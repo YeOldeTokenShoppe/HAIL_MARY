@@ -57,7 +57,6 @@ export default function CarouselPage() {
         const img = new Image();
         img.onload = () => {
           loadedCount++;
-          console.log(`Loaded ${loadedCount}/${totalImages}: ${src}`);
           resolve();
         };
         img.onerror = () => {
@@ -70,7 +69,6 @@ export default function CarouselPage() {
     });
 
     Promise.all(imagePromises).then(() => {
-      console.log('All images preloaded');
       setImagesLoaded(true);
     });
   }, []);
@@ -80,7 +78,6 @@ export default function CarouselPage() {
     if (fontLoaded && imagesLoaded && carouselReady) {
       // Small delay to ensure smooth transition and Three.js initialization
       setTimeout(() => {
-        console.log('All resources loaded, revealing page');
         setIsPageLoading(false);
       }, 500);
     }
@@ -89,7 +86,6 @@ export default function CarouselPage() {
   // Loading timeout fallback
   useEffect(() => {
     loadingTimeoutRef.current = setTimeout(() => {
-      console.log('Loading timeout reached, showing page');
       setIsPageLoading(false);
     }, 12000); // 12 second timeout for slower connections
     
@@ -102,7 +98,6 @@ export default function CarouselPage() {
 
   // Carousel ready callback
   const handleCarouselReady = useCallback(() => {
-    console.log('Carousel component signaled ready');
     setCarouselReady(true);
   }, []);
 
@@ -120,12 +115,10 @@ export default function CarouselPage() {
     const checkFont = async () => {
       try {
         await document.fonts.load("1em 'UnifrakturMaguntia'");
-        console.log('Font loaded successfully');
         setFontLoaded(true);
         document.body.classList.add('fonts-loaded');
         document.documentElement.classList.add('fonts-loaded');
       } catch (e) {
-        console.log('Font loading error:', e);
         setTimeout(() => {
           setFontLoaded(true);
           document.body.classList.add('fonts-loaded');
@@ -514,30 +507,29 @@ export default function CarouselPage() {
         />
       </div>
       
-      {/* Cyber Glitch Button - Responsive positioning */}
-      <div style={{
-        position: "fixed",
-        top: isMobileView ? "auto" : "3rem",
-        bottom: isMobileView ? "120px" : "auto",
-        left: isMobileView ? "50%" : "auto",
-        right: isMobileView ? "auto" : "6rem",
-        transform: isMobileView ? "translateX(-50%)" : "none",
-        zIndex: 200,
-      }}>
-        <CyberGlitchButton 
-          text={isMobileView ? "BUY_" : "BUY RL80_"}
-          onClick={() => {
-            // Trigger ThirdwebBuyModal
-            const event = new CustomEvent('openBuyModal')
-            window.dispatchEvent(event)
-          }}
-          primaryHue={274}  // Purple (CYBER color)
-          primaryShadowHue={180}  // Cyan
-          secondaryShadowHue={60}  // Yellow
-          label="RP80"
-          mobile={isMobileView}
-        />
-      </div>
+      {/* Cyber Glitch Button - Desktop only (mobile shows in carousel) */}
+      {!isMobileView && (
+        <div style={{
+          position: "fixed",
+          top: "3rem",
+          right: "6rem",
+          zIndex: 200,
+        }}>
+          <CyberGlitchButton 
+            text="BUY RL80_"
+            onClick={() => {
+              // Trigger ThirdwebBuyModal
+              const event = new CustomEvent('openBuyModal')
+              window.dispatchEvent(event)
+            }}
+            primaryHue={274}  // Purple (CYBER color)
+            primaryShadowHue={180}  // Cyan
+            secondaryShadowHue={60}  // Yellow
+            label="RP80"
+            mobile={false}
+          />
+        </div>
+      )}
       
       {/* Thirdweb Buy Modal */}
       <ThirdwebBuyModal 

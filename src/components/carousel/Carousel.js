@@ -6,10 +6,21 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Image, Environment, ScrollControls, useScroll, useTexture } from '@react-three/drei'
 import { easing } from 'maath'
 import './util'
+import CyberGlitchButton from './CyberGlitchButton'
 
 export default function CarouselComponent({ onReady }) {
   const [hoveredCaption, setHoveredCaption] = useState(null)
   const [sceneReady, setSceneReady] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+  
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
   
   useEffect(() => {
     if (sceneReady && onReady) {
@@ -23,7 +34,7 @@ export default function CarouselComponent({ onReady }) {
   
   return (
     <div style={{ width: '100%', height: '100vh', background: '#000' }}>
-      <CaptionOverlay caption={hoveredCaption} />
+      <CaptionOverlay caption={hoveredCaption} isMobile={isMobile} />
       <Canvas 
         camera={{ position: [0, 0, 100], fov: 15 }}
         onCreated={({ gl }) => {
@@ -251,27 +262,40 @@ function VideoCard({ videoUrl, ...props }) {
   )
 }
 
-function CaptionOverlay({ caption }) {
+function CaptionOverlay({ caption, isMobile }) {
+  const showButton = isMobile && !caption
+  
   return (
     <div
       style={{
         position: 'fixed',
         bottom: '30px',
         left: '50%',
-        transform: `translateX(-50%) ${caption ? 'translateY(0)' : 'translateY(150px)'}`,
-        background: 'rgba(0, 0, 0, 0.9)',
-        backdropFilter: 'blur(20px)',
-        padding: '12px 20px',
+        transform: `translateX(-50%) ${(caption || showButton) ? 'translateY(0)' : 'translateY(150px)'}`,
+        background: caption ? 'rgba(0, 0, 0, 0.9)' : 'transparent',
+        backdropFilter: caption ? 'blur(20px)' : 'none',
+        padding: caption ? '12px 20px' : '0',
         borderRadius: '12px',
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         zIndex: 100,
-        border: '1px solid rgba(255, 100, 255, 0.3)',
-        boxShadow: '0 10px 40px rgba(255, 100, 255, 0.25)',
-        opacity: caption ? 1 : 0,
-        pointerEvents: 'none',
+        border: caption ? '1px solid rgba(255, 100, 255, 0.3)' : 'none',
+        boxShadow: caption ? '0 10px 40px rgba(255, 100, 255, 0.25)' : 'none',
+        opacity: (caption || showButton) ? 1 : 0,
+        pointerEvents: showButton ? 'auto' : 'none',
         maxWidth: '400px',
       }}
     >
+      {showButton && (
+        <CyberGlitchButton 
+          text="BUY RL80_"
+          onClick={() => {
+            const event = new CustomEvent('openBuyModal')
+            window.dispatchEvent(event)
+          }}
+          label="RP80"
+          mobile={true}
+        />
+      )}
       {caption && (
         <div
           style={{

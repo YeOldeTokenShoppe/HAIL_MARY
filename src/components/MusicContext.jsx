@@ -74,19 +74,15 @@ export const MusicProvider = ({ children }) => {
   
   // Load and play track function
   const loadTrack = useCallback(async (index, shouldAutoPlay = false) => {
-    console.log('[MusicContext] loadTrack called:', { index, shouldAutoPlay, is80sMode });
     const playlist = is80sMode ? eightyTracks : non80sTracks;
     
     if (index < 0 || index >= playlist.length) {
-      console.log('[MusicContext] Invalid track index:', index);
       return;
     }
     
-    console.log('[MusicContext] Loading track:', playlist[index].name);
     setIsLoadingTrack(true);
     
     try {
-      console.log('[MusicContext] Getting download URL for track path:', playlist[index].path);
       
       // Check if storage is initialized
       if (!storage) {
@@ -95,11 +91,8 @@ export const MusicProvider = ({ children }) => {
       }
       
       // Log storage object to see if it's a dummy
-      console.log('[MusicContext] Storage object type:', typeof storage);
-      console.log('[MusicContext] Storage object keys:', storage ? Object.keys(storage).slice(0, 5) : 'null');
       
       const trackRef = storageRefUtil(storage, playlist[index].path);
-      console.log('[MusicContext] Storage ref created, fetching from Firebase Storage...');
       
       // Add timeout to prevent hanging
       const timeoutPromise = new Promise((_, reject) => {
@@ -113,7 +106,6 @@ export const MusicProvider = ({ children }) => {
           getDownloadURL(trackRef),
           timeoutPromise
         ]);
-        console.log('[MusicContext] getDownloadURL completed');
       } catch (firebaseError) {
         console.error('[MusicContext] Firebase Storage error:', firebaseError);
         console.error('[MusicContext] Error code:', firebaseError.code);
@@ -141,10 +133,8 @@ export const MusicProvider = ({ children }) => {
         throw new Error('Empty URL from Firebase Storage');
       }
       
-      console.log('[MusicContext] Got download URL:', url.substring(0, 50) + '...');
       
       if (audioRef.current) {
-        console.log('[MusicContext] Audio element exists, current src:', audioRef.current.src);
         
         // Check if we're replacing a placeholder (data: URL)
         const isReplacingPlaceholder = audioRef.current.src && audioRef.current.src.startsWith('data:');
@@ -157,13 +147,11 @@ export const MusicProvider = ({ children }) => {
         }
         
         // Set new source
-        console.log('[MusicContext] Setting new audio source', isReplacingPlaceholder ? '(replacing placeholder)' : '');
         audioRef.current.src = url;
         audioRef.current.load();
         
         await new Promise((resolve, reject) => {
           const handleCanPlay = () => {
-            console.log('[MusicContext] Track can play through');
             audioRef.current.removeEventListener('canplaythrough', handleCanPlay);
             audioRef.current.removeEventListener('error', handleError);
             resolve();
@@ -202,20 +190,16 @@ export const MusicProvider = ({ children }) => {
         
         // If we're replacing a placeholder that was playing, or shouldAutoPlay is true, play the track
         if (shouldAutoPlay || (isReplacingPlaceholder && wasPlaying)) {
-          console.log('[MusicContext] Attempting to play track', isReplacingPlaceholder ? '(continuing from placeholder)' : '');
           try {
             await audioRef.current.play();
-            console.log('[MusicContext] Playback started successfully');
             setIsPlaying(true);
           } catch (e) {
             console.error('[MusicContext] Play blocked:', e.message);
-            console.log('[MusicContext] Track is loaded and ready, waiting for user interaction');
             setIsPlaying(false);
             // Return false to indicate play was blocked
             return false;
           }
         } else {
-          console.log('[MusicContext] Track loaded, ready to play');
         }
         // Return true to indicate success
         return true;
@@ -236,25 +220,18 @@ export const MusicProvider = ({ children }) => {
   // Preload a track URL when component mounts or when mode changes
   useEffect(() => {
     // First check Firebase Storage status
-    console.log('[MusicContext] Checking Firebase Storage on mount...');
-    console.log('[MusicContext] Storage initialized:', !!storage);
+    
+    // Check Firebase config
+    
+    // Log the storage bucket value (partially masked for security)
+    if (process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET) {
+      const bucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+    } else {
+      console.error('[MusicContext] ERROR: Firebase Storage Bucket is not configured!');
+      console.error('[MusicContext] Set NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET in your deployment environment variables');
+    }
+    
     if (storage) {
-      console.log('[MusicContext] Storage type:', typeof storage);
-      console.log('[MusicContext] Storage has ref method:', typeof storage.ref === 'function');
-      
-      // Check if it's the dummy implementation
-      if (storage.ref && storage.ref().getDownloadURL) {
-        const testRef = storage.ref();
-        if (typeof testRef.getDownloadURL === 'function') {
-          // Try to get the function source to see if it's dummy
-          const funcStr = testRef.getDownloadURL.toString();
-          if (funcStr.includes('Promise.resolve("")')) {
-            console.error('[MusicContext] WARNING: Firebase Storage is using dummy implementation!');
-            console.error('[MusicContext] Firebase environment variables are likely missing in production');
-            return; // Don't try to preload
-          }
-        }
-      }
     }
     
     const preloadFirstTrack = async () => {
@@ -266,9 +243,7 @@ export const MusicProvider = ({ children }) => {
         }
         
         try {
-          console.log('[MusicContext] Preloading track:', playlist[index].name);
           const trackRef = storageRefUtil(storage, playlist[index].path);
-          console.log('[MusicContext] Preload: Storage ref created');
           
           // Add timeout for preloading too
           const timeoutPromise = new Promise((_, reject) => {
@@ -280,10 +255,8 @@ export const MusicProvider = ({ children }) => {
             timeoutPromise
           ]);
           
-          console.log('[MusicContext] Preload: Got URL');
           setPreloadedUrl(url);
           setPreloadedIndex(index);
-          console.log('[MusicContext] Track preloaded and ready');
         } catch (error) {
           console.error('[MusicContext] Failed to preload track:', error.message);
           console.error('[MusicContext] Preload error details:', {
@@ -308,7 +281,6 @@ export const MusicProvider = ({ children }) => {
       if (!audioRef.current.src) {
         if (preloadedUrl && preloadedIndex !== null) {
           // Use the preloaded URL for instant playback
-          console.log('[MusicContext] Using preloaded track for instant playback');
           const playlist = is80sMode ? eightyTracks : non80sTracks;
           
           audioRef.current.src = preloadedUrl;
@@ -321,7 +293,6 @@ export const MusicProvider = ({ children }) => {
           
           // Play immediately - this should work because we're in user interaction context
           audioRef.current.play().then(() => {
-            console.log('[MusicContext] Playback started with preloaded track');
             setIsPlaying(true);
             
             // Clear preloaded data
@@ -348,16 +319,13 @@ export const MusicProvider = ({ children }) => {
           
           if (isShuffled && playlist.length > 0) {
             startIndex = Math.floor(Math.random() * playlist.length);
-            console.log('[MusicContext] Starting with random track:', startIndex);
           }
           
-          console.log('[MusicContext] No preloaded track, loading from Firebase');
           setIsLoadingTrack(true);
           
           // Load track with autoplay
           loadTrack(startIndex, true).then((success) => {
             if (!success) {
-              console.log('[MusicContext] Track loaded but autoplay was blocked - user needs to click play again');
               // The track is now loaded, so next click will just resume
             }
           }).catch(error => {
@@ -376,10 +344,8 @@ export const MusicProvider = ({ children }) => {
       } else {
         // Resume playback
         audioRef.current.play().then(() => {
-          console.log('[MusicContext] Playback resumed');
           setIsPlaying(true);
         }).catch(e => {
-          console.log('[MusicContext] Play blocked:', e);
           setIsPlaying(false);
         });
       }
@@ -419,12 +385,7 @@ export const MusicProvider = ({ children }) => {
 
   // Next track function
   const nextTrack = useCallback(() => {
-    console.log('[MusicContext] nextTrack called');
-    console.log('[MusicContext] Current is80sMode:', is80sMode);
-    console.log('[MusicContext] Current track index:', currentTrackIndex);
-    console.log('[MusicContext] Is shuffled:', isShuffled);
     const playlist = is80sMode ? eightyTracks : non80sTracks;
-    console.log('[MusicContext] Using playlist:', playlist);
     
     let nextIndex;
     if (isShuffled) {
@@ -435,14 +396,11 @@ export const MusicProvider = ({ children }) => {
       if (globalAudioManager) {
         globalAudioManager.setState({ shuffleHistory: newHistory });
       }
-      console.log('[MusicContext] Random next index:', nextIndex);
     } else {
       nextIndex = (currentTrackIndex + 1) % playlist.length;
-      console.log('[MusicContext] Sequential next index:', nextIndex);
     }
     
     const wasPlaying = audioRef.current && !audioRef.current.paused;
-    console.log('[MusicContext] Was playing:', wasPlaying);
     loadTrack(nextIndex, wasPlaying);
   }, [currentTrackIndex, is80sMode, isShuffled, shuffleHistory, getRandomTrackIndex, loadTrack]);
   
@@ -493,12 +451,10 @@ export const MusicProvider = ({ children }) => {
         setCurrentTrackBPM(savedState.currentTrack.bpm || 100);
       }
       
-      console.log('[MusicContext] Restored state:', savedState);
     }
     
     // Add ended event listener that uses refs for current values
     const handleEnded = () => {
-      console.log('[MusicContext] Track ended, advancing to next track (shuffled)');
       
       // Set playing to false first to stop animation
       setIsPlaying(false);
@@ -514,7 +470,6 @@ export const MusicProvider = ({ children }) => {
         const availableIndices = playlist.map((_, i) => i).filter(i => i !== currentIdx);
         const nextIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
         
-        console.log('[MusicContext] Random next index:', nextIndex);
         setTimeout(() => {
           if (loadTrackRef.current) {
             loadTrackRef.current(nextIndex, true);
@@ -523,7 +478,6 @@ export const MusicProvider = ({ children }) => {
       } else {
         // Sequential playback
         const nextIndex = (currentTrackIndexRef.current + 1) % playlist.length;
-        console.log('[MusicContext] Sequential next index:', nextIndex);
         setTimeout(() => {
           if (loadTrackRef.current) {
             loadTrackRef.current(nextIndex, true);
@@ -542,7 +496,6 @@ export const MusicProvider = ({ children }) => {
 
   // Handle 80s mode change - reload track from new playlist
   useEffect(() => {
-    // console.log('[MusicContext] 80s mode changed to:', is80sMode);
     
     // Save mode change to global manager
     if (globalAudioManager) {
@@ -552,7 +505,6 @@ export const MusicProvider = ({ children }) => {
     // If we have a track playing or paused, reload from the new playlist
     if (audioRef.current && audioRef.current.src) {
       const wasPlaying = !audioRef.current.paused;
-      console.log('[MusicContext] Switching playlist, was playing:', wasPlaying);
       
       // Get the playlist for the new mode
       const playlist = is80sMode ? eightyTracks : non80sTracks;
@@ -561,7 +513,6 @@ export const MusicProvider = ({ children }) => {
       let newTrackIndex = 0;
       if (isShuffled && playlist.length > 0) {
         newTrackIndex = Math.floor(Math.random() * playlist.length);
-        console.log('[MusicContext] Starting with random track in new playlist:', newTrackIndex);
         // Reset shuffle history for the new playlist
         setShuffleHistory([]);
         if (globalAudioManager) {
