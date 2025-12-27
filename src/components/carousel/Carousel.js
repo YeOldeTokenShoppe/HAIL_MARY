@@ -3,15 +3,18 @@
 import * as THREE from 'three'
 import { useRef, useState, Suspense, useMemo, useEffect } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Image, Environment, ScrollControls, useScroll, useTexture } from '@react-three/drei'
+import { Image, Environment, ScrollControls, useScroll, useTexture, Text } from '@react-three/drei'
 import { easing } from 'maath'
 import './util'
 import CyberGlitchButton from './CyberGlitchButton'
+import ExperienceControls from './ExperienceControls'
+import { useMusic } from '../MusicContext'
 
 export default function CarouselComponent({ onReady }) {
   const [hoveredCaption, setHoveredCaption] = useState(null)
   const [sceneReady, setSceneReady] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const { is80sMode } = useMusic()
   
   useEffect(() => {
     const checkMobile = () => {
@@ -33,9 +36,57 @@ export default function CarouselComponent({ onReady }) {
   }, [sceneReady, onReady])
   
   return (
-    <div style={{ width: '100%', height: '100vh', background: '#000' }}>
-      <CaptionOverlay caption={hoveredCaption} isMobile={isMobile} />
+    <div style={{ width: '100%', height: '100vh', background: '#000', position: 'relative' }}>
+      {/* Video background for 80s mode */}
+      {is80sMode && (
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            opacity: 0.8,
+            zIndex: 2,
+            pointerEvents: 'none',
+          }}
+        >
+          <source src="/videos/84.mp4" type="video/mp4" />
+        </video>
+      )}
+      
+      {isMobile && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '30px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 100,
+          }}
+        >
+          <CyberGlitchButton 
+            text="BUY RL80_"
+            onClick={() => {
+              const event = new CustomEvent('openBuyModal')
+              window.dispatchEvent(event)
+            }}
+            label="RP80"
+            mobile={true}
+          />
+        </div>
+      )}
+      
+      {/* Experience Controls - positioned top-right */}
+      <ExperienceControls isMobile={isMobile} />
+      
       <Canvas 
+        style={{ position: 'relative', zIndex: 2 }}
         camera={{ position: [0, 0, 100], fov: 15 }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping
@@ -47,12 +98,12 @@ export default function CarouselComponent({ onReady }) {
         <fog attach="fog" args={['#a79', 8.5, 12]} />
         <Suspense fallback={null}>
           <ScrollControls pages={4} infinite>
-            <Rig rotation={[0, 0, 0.15]}>
+            <Rig rotation={[0, 0, isMobile ? 0.03 : 0.15]}>
               <Carousel setHoveredCaption={setHoveredCaption} />
             </Rig>
-            <Banner position={[0, -0.15, 0]} />
+            <Banner position={[0, -0.15, 0]} is80sMode={is80sMode} />
           </ScrollControls>
-          <Environment preset="dawn" background blur={0.5} />
+          {!is80sMode && <Environment preset="dawn" background blur={0.5} />}
         </Suspense>
       </Canvas>
     </div>
@@ -127,7 +178,7 @@ function Carousel({ radius = 1.4, count = 8, setHoveredCaption }) {
           key={i}
           url={`/carousel_images/img${(i % 9) + 1}.${i === 8 ? 'jpeg' : 'jpg'}`}
           position={[Math.sin((i / count) * Math.PI * 2) * radius, 0, Math.cos((i / count) * Math.PI * 2) * radius]}
-          rotation={[0, Math.PI + (i / count) * Math.PI * 2, 0]}
+          rotation={[0, (i / count) * Math.PI * 2, 0]}
           caption={captions[i]}
           setHoveredCaption={setHoveredCaption}
         />
@@ -137,7 +188,8 @@ function Carousel({ radius = 1.4, count = 8, setHoveredCaption }) {
 }
 
 function Card({ url, caption, setHoveredCaption, ...props }) {
-  const ref = useRef()
+  const groupRef = useRef()
+  const imageRef = useRef()
   const [hovered, hover] = useState(false)
   const pointerOver = (e) => {
     e.stopPropagation()
@@ -154,28 +206,92 @@ function Card({ url, caption, setHoveredCaption, ...props }) {
   }
   
   useFrame((_, delta) => {
-    if (!ref.current) return
+    if (!groupRef.current) return
     
-    easing.damp3(ref.current.scale, hovered ? 1.15 : 1, 0.1, delta)
+    easing.damp3(groupRef.current.scale, hovered ? 1.15 : 1, 0.1, delta)
     
-    if (ref.current.material) {
-      easing.damp(ref.current.material, 'radius', hovered ? 0.25 : 0.1, 0.2, delta)
-      easing.damp(ref.current.material, 'zoom', hovered ? 1 : 1.5, 0.2, delta)
+    if (imageRef.current?.material) {
+      easing.damp(imageRef.current.material, 'radius', hovered ? 0 : 0, 0.2, delta)
+      easing.damp(imageRef.current.material, 'zoom', hovered ? 1 : 1.5, 0.2, delta)
     }
   })
   
   return (
-    <Image 
-      ref={ref} 
-      url={url} 
-      transparent 
-      side={THREE.DoubleSide} 
-      onPointerOver={pointerOver} 
-      onPointerOut={pointerOut} 
-      {...props}
-    >
-      <planeGeometry args={[0.85, 1]} />
-    </Image>
+    <group ref={groupRef} {...props}>
+      {/* White polaroid frame background */}
+      <mesh position={[0, -0.08, -0.001]}>
+        <planeGeometry args={[1.05, 1.3]} />
+        <meshBasicMaterial color="#ffffff" side={THREE.DoubleSide} toneMapped={false} fog={false} />
+      </mesh>
+      
+      {/* The actual image - front side only */}
+      <Image 
+        ref={imageRef} 
+        url={url} 
+        transparent 
+        side={THREE.FrontSide} 
+        onPointerOver={pointerOver} 
+        onPointerOut={pointerOut} 
+        position={[0, 0.05, 0.001]}
+      >
+        <planeGeometry args={[0.85, 0.85]} />
+      </Image>
+      
+      {/* Black back of the entire polaroid */}
+      <mesh position={[0, -0.08, -0.002]}>
+        <planeGeometry args={[1.05, 1.3]} />
+        <meshBasicMaterial color="#000000" side={THREE.BackSide} toneMapped={false} fog={false} />
+      </mesh>
+      
+      {/* Caption text on the bottom border */}
+      {caption && (
+        <>
+          <Text
+            position={[0, -0.48, 0.001]}
+            fontSize={0.06}
+            color="black"
+            anchorX="center"
+            anchorY="middle"
+            maxWidth={0.9}
+            lineHeight={1.4}
+            font="/fonts/HomemadeApple-Regular.ttf"
+          >
+            {caption.year}
+          </Text>
+          <Text
+            position={[0, -0.54, 0.001]}
+            fontSize={0.04}
+            color="#444444"
+            anchorX="center"
+            anchorY="middle"
+            maxWidth={0.9}
+            lineHeight={1.4}
+            font="/fonts/HomemadeApple-Regular.ttf"
+          >
+            {caption.location}
+          </Text>
+          <Text
+            position={[0, -0.62, 0.001]}
+            fontSize={0.04}
+            color="#666666"
+            anchorX="center"
+            anchorY="middle"
+            maxWidth={0.85}
+            lineHeight={1.4}
+            font="/fonts/HomemadeApple-Regular.ttf"
+            textAlign="center"
+          >
+            {caption.description.substring(0, 45)}...
+          </Text>
+        </>
+      )}
+      
+      {/* Shadow effect */}
+      <mesh position={[0.02, -0.1, -0.002]}>
+        <planeGeometry args={[1.08, 1.33]} />
+        <meshBasicMaterial color="#000000" opacity={0.15} transparent side={THREE.DoubleSide} />
+      </mesh>
+    </group>
   )
 }
 
@@ -262,92 +378,9 @@ function VideoCard({ videoUrl, ...props }) {
   )
 }
 
-function CaptionOverlay({ caption, isMobile }) {
-  const showButton = isMobile && !caption
-  
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        bottom: '30px',
-        left: '50%',
-        transform: `translateX(-50%) ${(caption || showButton) ? 'translateY(0)' : 'translateY(150px)'}`,
-        background: caption ? 'rgba(0, 0, 0, 0.9)' : 'transparent',
-        backdropFilter: caption ? 'blur(20px)' : 'none',
-        padding: caption ? '12px 20px' : '0',
-        borderRadius: '12px',
-        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        zIndex: 100,
-        border: caption ? '1px solid rgba(255, 100, 255, 0.3)' : 'none',
-        boxShadow: caption ? '0 10px 40px rgba(255, 100, 255, 0.25)' : 'none',
-        opacity: (caption || showButton) ? 1 : 0,
-        pointerEvents: showButton ? 'auto' : 'none',
-        maxWidth: '400px',
-      }}
-    >
-      {showButton && (
-        <CyberGlitchButton 
-          text="BUY RL80_"
-          onClick={() => {
-            const event = new CustomEvent('openBuyModal')
-            window.dispatchEvent(event)
-          }}
-          label="RP80"
-          mobile={true}
-        />
-      )}
-      {caption && (
-        <div
-          style={{
-            textAlign: 'center',
-          }}
-        >
-          <div
-            style={{
-              fontSize: '0.9rem',
-              fontWeight: 'bold',
-              background: 'linear-gradient(135deg, #ff6ec7, #c77dff, #7209b7)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              marginBottom: '4px',
-              letterSpacing: '1.5px',
-              textTransform: 'uppercase',
-              fontFamily: 'monospace',
-              textShadow: '0 0 10px rgba(255, 100, 255, 0.4)',
-            }}
-          >
-            {caption.year}
-          </div>
-          <div
-            style={{
-              fontSize: '0.75rem',
-              color: '#ff6ec7',
-              marginBottom: '6px',
-              fontWeight: '300',
-              letterSpacing: '1px',
-              textTransform: 'uppercase',
-            }}
-          >
-            {caption.location}
-          </div>
-          <div
-            style={{
-              fontSize: '0.65rem',
-              color: 'rgba(255, 255, 255, 0.85)',
-              lineHeight: '1.4',
-              fontStyle: 'italic',
-            }}
-          >
-            {caption.description}
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
 
 function Banner(props) {
+  const { is80sMode } = props
   const ref = useRef()
   const scroll = useScroll()
   
@@ -355,40 +388,53 @@ function Banner(props) {
   const texture = useMemo(() => {
     const canvas = document.createElement('canvas')
     const context = canvas.getContext('2d')
-    canvas.width = 2048
+    canvas.width = 2048  // Higher resolution for better quality
     canvas.height = 128
     
-    // Style the canvas
-    context.fillStyle = '#ffffff'
+    // Style the canvas - neon blue in 80s mode, white normally
+    context.fillStyle = is80sMode ? '#00ffff' : '#ffffff'
     context.fillRect(0, 0, canvas.width, canvas.height)
     
-    // Add text
-    context.fillStyle = '#000000'
-    context.font = 'bold 4rem UnifrakturCook, serif'
-    context.textAlign = 'center'
+    // Add text - white in 80s mode, black normally
+    context.fillStyle = is80sMode ? '#000000' : '#000000'
+    // Use fixed pixel size for consistency
+    const fontSize = 76.5  // Adjust this value to change text size
+    context.font = `bold ${fontSize}px UnifrakturCook, serif`
+    context.textAlign = 'left'  // Use left alignment for precise positioning
     context.textBaseline = 'middle'
     
-    // Repeat text pattern
-    const text = 'Our Lady of Perpetual Profit • Nostra Mater de Perpetuum Lucrum • '
-    const textWidth = context.measureText(text).width
-    const repeats = Math.ceil(canvas.width / textWidth) + 1
+    // Single instance of text for texture
+    const text = 'Our Lady of Perpetual Profit • Nostra Mater de Perpetuum Lucrum • ';
     
-    for (let i = 0; i < repeats; i++) {
-      context.fillText(text, i * textWidth, canvas.height / 2)
+    // Measure text to create seamless texture
+    const metrics = context.measureText(text)
+    const textWidth = metrics.width
+    
+    // Draw text multiple times to fill the canvas width
+    let currentX = 0
+    while (currentX < canvas.width + textWidth) {
+      context.fillText(text, currentX, canvas.height / 2)
+      currentX += textWidth
     }
     
     // Create texture from canvas
     const canvasTexture = new THREE.CanvasTexture(canvas)
-    canvasTexture.wrapS = canvasTexture.wrapT = THREE.RepeatWrapping
-    canvasTexture.repeat.set(5, 1)
+    canvasTexture.wrapS = THREE.RepeatWrapping
+    canvasTexture.wrapT = THREE.ClampToEdgeWrapping
+    
+    // Calculate repeat based on cylinder circumference
+    // Cylinder radius is 1.6, so circumference = 2 * PI * 1.6 ≈ 10.05
+    // Adjust this value to control how many times text appears around cylinder
+    const textRepeatCount = 5  // Number of complete text repetitions around the cylinder
+    canvasTexture.repeat.set(textRepeatCount, 1)
     canvasTexture.needsUpdate = true
     
     return canvasTexture
-  }, [])
+  }, [is80sMode])
   
   useFrame((_, delta) => {
     if (texture) {
-      texture.offset.x += delta / 4
+      texture.offset.x += delta / 12
     }
     if (ref.current?.material?.time) {
       ref.current.material.time.value += Math.abs(scroll.delta) * 4

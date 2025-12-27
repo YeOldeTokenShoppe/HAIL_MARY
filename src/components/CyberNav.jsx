@@ -3,11 +3,10 @@ import ReactDOM from 'react-dom';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-const CyberNav = ({ is80sMode = false, position = "fixed", musicButton = null, userButton = null, extra80sButton = null, auroraButton = null }) => {
+const CyberNav = ({ is80sMode = false, position = "fixed" }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [hoveredItemPath, setHoveredItemPath] = useState('');
   const [isMobile, setIsMobile] = useState(false);
-  const [showExtraButtons, setShowExtraButtons] = useState(false);
   const [canHover, setCanHover] = useState(false);
   const pathname = usePathname();
   
@@ -40,8 +39,6 @@ const CyberNav = ({ is80sMode = false, position = "fixed", musicButton = null, u
   React.useEffect(() => {
     if (!isMenuOpen) {
       setHoveredItemPath('');
-      // Hide extra buttons when menu closes
-      setShowExtraButtons(false);
       // Re-enable body scroll
       const scrollY = document.body.style.top;
       document.body.style.overflow = '';
@@ -89,89 +86,12 @@ const CyberNav = ({ is80sMode = false, position = "fixed", musicButton = null, u
   // Always use mobile-style menu
   return (
       <>
-        {/* Aurora Button - flies out to the left from CyberNav */}
-        {auroraButton && (
-          <div
-            style={{
-              position: position === "relative" ? "relative" : position,
-              top: position === "relative" ? "0" : (position === "absolute" ? "10px" : "20px"),
-              right: position === "relative" ? (showExtraButtons ? (isMobile ? "8rem" : "9rem") : "0") : (showExtraButtons ? (isMobile ? "9rem" : "10rem") : "20px"),
-              zIndex: position === "relative" ? 1 : 100000001,
-              opacity: showExtraButtons ? 1 : 0,
-              pointerEvents: showExtraButtons ? "auto" : "none",
-              transform: showExtraButtons ? "translateX(0) scale(1)" : "translateX(100%) scale(0)",
-              transformOrigin: "right center",
-              transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
-            }}
-          >
-            {auroraButton}
-          </div>
-        )}
-        
-        {/* Music Button - flies out to the left from CyberNav */}
-        {musicButton && typeof document !== 'undefined' && showExtraButtons && ReactDOM.createPortal(
-          <div
-            style={{
-              position: "fixed",
-              top: position === "absolute" ? "10px" : "20px",
-              right: isMobile ? "4.5rem" : "6rem",
-              zIndex: 10001,
-              opacity: 1,
-              pointerEvents: "auto",
-              transform: "translateX(0) scale(1)",
-              transformOrigin: "right center",
-              transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) 0.05s",
-            }}
-          >
-            {musicButton}
-          </div>,
-          document.body
-        )}
-        
-        {/* User Button - flies out downward from CyberNav */}
-        {userButton && typeof document !== 'undefined' && showExtraButtons && ReactDOM.createPortal(
-          <div
-            style={{
-              position: "fixed",
-              top: position === "absolute" ? (isMobile ? "4.5rem" : "5.5rem") : (isMobile ? "5rem" : "6rem"),
-              right: "20px",
-              zIndex: 10001,
-              opacity: 1,
-              pointerEvents: "auto",
-              transform: "translateY(0) scale(1)",
-              transformOrigin: "center top",
-              transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s",
-            }}
-          >
-            {userButton}
-          </div>,
-          document.body
-        )}
-        
-        {/* 80s Button - always visible, positioned below the main nav button */}
-        {extra80sButton && (
-          <div
-            style={{
-              position: position === "relative" ? "relative" : position,
-              top: position === "relative" ? (isMobile ? "4.5rem" : "5rem") : (position === "absolute" ? (isMobile ? "5rem" : "5.5rem") : (isMobile ? "5.5rem" : "6rem")),
-              right: position === "relative" ? "0" : "20px",
-              zIndex: position === "relative" ? 1 : 9989,
-              opacity: 1,
-              pointerEvents: "auto",
-              transform: "translateY(0) scale(1)",
-              transformOrigin: "center top",
-              transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
-            }}
-          >
-            {extra80sButton}
-          </div>
-        )}
         
         <button
           style={{
             position: position === "relative" ? "relative" : position,
-            top: position === "relative" ? "0" : (position === "absolute" ? "10px" : "20px"),
-            right: position === "relative" ? "0" : "20px",
+            top: position === "relative" ? "0" : (position === "absolute" ? "10px" : "1rem"),
+            right: position === "relative" ? "0" : "1rem",
             zIndex: position === "relative" ? 1 : 9990,
             color: is80sMode ? "#D946EF" : "#ffffff",
             backgroundColor: "rgba(0, 0, 0, 0.7)",
@@ -183,14 +103,13 @@ const CyberNav = ({ is80sMode = false, position = "fixed", musicButton = null, u
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            width: isMobile ? "3.5rem" : "3.75rem",
-            height: isMobile ? "3.5rem" : "3.75rem",
+            width: isMobile ? "3.5rem" : "3.5rem",
+            height: isMobile ? "3.5rem" : "3.5rem",
             boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3)"
           }}
           aria-label="Menu"
           onClick={() => {
             setIsMenuOpen(!isMenuOpen);
-            setShowExtraButtons(!showExtraButtons);
             setHoveredItemPath('');
           }}
           onMouseEnter={(e) => e.target.style.backgroundColor = "rgba(0, 0, 0, 0.8)"}

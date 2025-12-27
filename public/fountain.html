@@ -472,70 +472,77 @@
 			-webkit-backdrop-filter: blur(10px);
 			box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 		">
-			<!-- Coin Cam checkbox -->
+			<!-- Combined row: Coin Cam checkbox, Pool counter, and Info button -->
 			<div style="
 				display: flex;
 				align-items: center;
-				gap: 6px;
+				justify-content: space-between;
 				width: 100%;
-				margin-bottom: 4px;
-				padding-bottom: 6px;
+				margin-bottom: 8px;
+				padding-bottom: 8px;
 				border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 			">
-				<input type="checkbox" id="coinCamToggle" checked style="
-					width: 16px;
-					height: 16px;
-					cursor: pointer;
-					accent-color: #FFD700;
-				">
-				<label for="coinCamToggle" style="
-					font-size: 12px;
-					font-weight: 600;
-					color: rgba(255, 255, 255, 0.9);
-					cursor: pointer;
-					text-transform: uppercase;
-					letter-spacing: 0.5px;
-					text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
-					font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-					user-select: none;
-				">Coin Cam</label>
-			</div>
-			<!-- Pool counter row -->
-			<div style="
-				display: flex;
-				align-items: center;
-				justify-content: flex-end;
-				gap: 6px;
-			">
+				<!-- Left side: Coin Cam -->
 				<div style="
-					font-size: 11px;
-					font-weight: 600;
-					color: rgba(255, 255, 255, 0.8);
-					text-transform: uppercase;
-					letter-spacing: 0.5px;
-					text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
-					font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-				">Pool:</div>
-				<div style="
-					font-size: 18px;
-					font-weight: 700;
-					color: white;
-					line-height: 1;
-					letter-spacing: -0.5px;
-					font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-					text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+					display: flex;
+					align-items: center;
+					gap: 6px;
 				">
-					<span id="mobileCurrentCount">0</span><span style="font-size: 0.7em; opacity: 0.7;">/200</span>
+					<input type="checkbox" id="coinCamToggle" checked style="
+						width: 16px;
+						height: 16px;
+						cursor: pointer;
+						accent-color: #FFD700;
+					">
+					<label for="coinCamToggle" style="
+						font-size: 12px;
+						font-weight: 600;
+						color: rgba(255, 255, 255, 0.9);
+						cursor: pointer;
+						text-transform: uppercase;
+						letter-spacing: 0.5px;
+						text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+						font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+						user-select: none;
+					">Coin Cam</label>
 				</div>
-				<!-- Info button -->
-				<button id="mobileInfoBtn" onclick="toggleInstructions()" class="pumpkin-info-button" style="
-					display: none;
-					width: 28px;
-					height: 28px;
-					font-size: 14px;
-					border-radius: 50%;
-					cursor: pointer;
-				">❓</button>
+				
+				<!-- Right side: Pool counter and Info button -->
+				<div style="
+					display: flex;
+					align-items: center;
+					gap: 6px;
+				">
+					<div style="
+						font-size: 11px;
+						font-weight: 600;
+						color: rgba(255, 255, 255, 0.8);
+						text-transform: uppercase;
+						letter-spacing: 0.5px;
+						text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+						font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+					">Pool:</div>
+					<div style="
+						font-size: 18px;
+						font-weight: 700;
+						color: white;
+						line-height: 1;
+						letter-spacing: -0.5px;
+						font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+						text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+					">
+						<span id="mobileCurrentCount">0</span><span style="font-size: 0.7em; opacity: 0.7;">/200</span>
+					</div>
+					<!-- Info button -->
+					<button id="mobileInfoBtn" onclick="toggleInstructions()" class="pumpkin-info-button" style="
+						display: none;
+						width: 28px;
+						height: 28px;
+						font-size: 14px;
+						border-radius: 50%;
+						cursor: pointer;
+					">❓</button>
+				</div>
 			</div>
 			
 			<!-- Mobile buttons container -->
@@ -1112,9 +1119,9 @@
 			const coinGeometry = new THREE.CylinderGeometry(0.02 * 2, 0.02 * 2, 0.005 * 2, 8); // Octagon shape with 8 segments
 			coinGeometry.rotateX(Math.PI / 2); // Lay the coin flat
 
-			// Define coin dimensions for use in physics
-			const COIN_RADIUS = 0.02 * 1.5;
-			const COIN_THICKNESS = 0.002 * 1.5;
+			// Define coin dimensions for use in physics - MUST match geometry!
+			const COIN_RADIUS = 0.02 * 2; // Match the actual geometry radius
+			const COIN_THICKNESS = 0.005 * 2; // Match the actual geometry thickness
 
 			// --- Coin Counter and Performance Settings ---
 			let totalCoinCount = 0;
@@ -2599,12 +2606,25 @@
                 // console.log("Searching for GoldCoin in model...");
                 let goldCoin = null;
                 // Log the full model structure to see all available objects
-                // console.log("Full model structure:", gltf.scene);
+                console.log("=== SCANNING MODEL FOR RAYBANS ===");
+                let totalNodes = 0;
+                fountainModel.traverse(function(node) {
+                    totalNodes++;
+                    if (node.name) {
+                        console.log(`Node: ${node.name} (${node.type})`);
+                    }
+                });
+                console.log(`Total nodes in model: ${totalNodes}`);
                 
                 fountainModel.traverse(function(node) {
                     // Log all nodes to help identify object names
                     if (node.name) {
-                        console.log("Found node:", node.name, node.type, node.material ? "has material" : "no material");
+                        // More detailed logging to find Raybans
+                        if (node.name.toLowerCase().includes('ray') || 
+                            node.name.toLowerCase().includes('sun') || 
+                            node.name.toLowerCase().includes('glass')) {
+                            console.log("⚠️ Potential Raybans/Sunglasses:", node.name, node.type, node.material ? "has material" : "no material");
+                        }
                     }
                     
                     // Check for Neon objects
@@ -2615,10 +2635,12 @@
                         node.visible = is80sMode;
                     }
                     
-                    // Hide Raybans by default (only show in 80s mode)
-                    if (node.name === 'Raybans') {
-                        console.log("Found Raybans object:", node.name);
+                    // Check for Raybans objects (case-insensitive, partial match)
+                    if (node.name && (node.name.toLowerCase().includes('rayban') || node.name.toLowerCase().includes('sunglasses'))) {
+                        console.log("Found Raybans/Sunglasses object:", node.name, "Type:", node.type);
+                        raybansObjects.push(node);
                         node.visible = is80sMode; // Only visible if already in 80s mode
+                        node.userData.isRaybans = true; // Mark for later reference
                     }
                     
                     // Force GoldCoin objects to match dynamic coin appearance in normal mode
@@ -3202,6 +3224,7 @@
 			let synthwaveBackground, neonGrid, retroSun, originalSky;
 			let originalStatueMaterials = new Map(); // Store original materials
 			let neonObjects = []; // Store references to Neon objects from the model
+			let raybansObjects = []; // Store references to Raybans objects from the model
 			
 			// Custom shader for chromatic aberration
 			const ChromaticAberrationShader = {
@@ -3376,7 +3399,7 @@
 					bloomPass.threshold = 0.85;
 					
 					chromaticAberrationPass.enabled = true;
-					chromaticAberrationPass.uniforms.amount.value = 0.005;
+					chromaticAberrationPass.uniforms.amount.value = 0.002;
 					
 					scanlinePass.enabled = true;
 					scanlinePass.uniforms.opacity.value = 0.15;
@@ -3437,6 +3460,12 @@
 					obj.visible = true;
 				});
 				
+				// Show Raybans objects from the model
+				raybansObjects.forEach(obj => {
+					console.log("Enabling Raybans visibility for:", obj.name);
+					obj.visible = true;
+				});
+				
 				// Make gold coins glow and show Raybans
 				scene.traverse((child) => {
 					if (child.isMesh) {
@@ -3457,7 +3486,7 @@
 						}
 						
 						// Show Raybans only in 80s mode
-						if (child.name === 'Raybans') {
+						if (child.userData.isRaybans || (child.name && (child.name === 'Raybans' || child.name.toLowerCase().includes('rayban')))) {
 							child.visible = true;
 							child.userData.raybansin80s = true;
 						}
@@ -3538,7 +3567,7 @@
 						}
 						
 						// Hide Raybans in normal mode
-						if (child.userData.raybansin80s) {
+						if (child.userData.raybansin80s || child.userData.isRaybans) {
 							child.visible = false;
 							child.userData.raybansin80s = false;
 						}
@@ -3547,6 +3576,12 @@
 				
 				// Hide Neon objects from the model
 				neonObjects.forEach(obj => {
+					obj.visible = false;
+				});
+				
+				// Hide Raybans objects from the model
+				raybansObjects.forEach(obj => {
+					console.log("Disabling Raybans visibility for:", obj.name);
 					obj.visible = false;
 				});
 			}
@@ -3897,8 +3932,8 @@
                 switch(cameraPhase) {
                     case 'following':
                         // Follow coin from a dynamic angle during flight
-                        const followDistance = 3.5; // Increased from 1.5 for better view
-                        const followHeight = 1; // Increased from 0.8
+                        const followDistance = 3.0; // Increased for wider view (was 3.5)
+                        const followHeight = 1.5; // Increased for better overhead angle (was 1)
                         
                         // Calculate ideal camera position (behind and above the coin's trajectory)
                         const velocityDir = coinVel.clone().normalize();
@@ -3955,10 +3990,10 @@
                         
                     case 'underwater':
                         // Follow coin underwater with blue tint effect
-                        const underwaterDistance = 0.3;
+                        const underwaterDistance = 1.2; // Increased for wider underwater view (was 0.3)
                         const underwaterCamPos = new THREE.Vector3(
-                            coinPos.x + underwaterDistance * 0.5 - 0.15, // Slight left shift
-                            coinPos.y + 0.1,
+                            coinPos.x + underwaterDistance * 0.5 - 0.6, // Slight left shift
+                            coinPos.y + 0.2, // Raised camera slightly (was 0.1)
                             coinPos.z + underwaterDistance * 0.5
                         );
                         
@@ -4228,9 +4263,43 @@
                     });
                 }
 
+                // Remove all per-frame logging to avoid spam
                 for ( let i = coins.length - 1; i >= 0; i-- ) {
                     const coin = coins[i];
                     const velocity = coin.userData.velocity;
+                    
+                    // Simple collision check for ALL coins (stopped or not)
+                    if (!coin.userData.stopped) {
+                        // Check against all other coins for stacking
+                        for (let j = 0; j < coins.length; j++) {
+                            if (i === j) continue;
+                            const other = coins[j];
+                            if (!other.userData.stopped && !other.userData.isStaticObstacle) continue; // Only stack on stopped coins
+                            
+                            const dx = coin.position.x - other.position.x;
+                            const dy = coin.position.y - other.position.y;
+                            const dz = coin.position.z - other.position.z;
+                            const hDist = Math.sqrt(dx*dx + dz*dz);
+                            
+                            // If directly above and close enough (using actual coin dimensions)
+                            // COIN_RADIUS = 0.04, COIN_THICKNESS = 0.01
+                            if (hDist < 0.08 && dy > 0 && dy < 0.05 && velocity.y <= 0) {
+                                console.log(`COLLISION! Stacking coin ${i} on coin ${j}! hDist=${hDist.toFixed(3)}, dy=${dy.toFixed(3)}`);
+                                coin.position.y = other.position.y + 0.01; // Use actual thickness
+                                velocity.y = 0;
+                                // Force coin to lie flat when stacking
+                                coin.rotation.x = -Math.PI / 2;
+                                coin.rotation.y = 0;
+                                coin.rotation.z = Math.random() * Math.PI * 2; // Random rotation on flat plane
+                                if (coin.userData.underwater) {
+                                    console.log(`Coin ${i} stopped on coin ${j}`);
+                                    coin.userData.stopped = true;
+                                    velocity.set(0,0,0);
+                                }
+                                break; // Stop checking once we've stacked
+                            }
+                        }
+                    }
                     
                     // --- Track if coin is stuck ---
                     if (!coin.userData.lastPositions) {
@@ -4264,26 +4333,30 @@
                     const isUnderwater = coin.userData.underwater;
                     const hasStopped = coin.userData.stopped;
 
-                    if (!hasStopped) {
-                        // --- Apply Spin ---
-                        coin.rotateOnWorldAxis(coin.userData.rotationAxis, coin.userData.rotationSpeed);
+                    // Stopped coins remain as obstacles but skip physics updates
+                    if (hasStopped) {
+                        continue;
+                    }
+                    
+                    // --- Apply Spin ---
+                    coin.rotateOnWorldAxis(coin.userData.rotationAxis, coin.userData.rotationSpeed);
 
-                        // --- Apply Gravity / Damping ---
-                        if (isUnderwater) {
-                            // Apply overall damping
-                            velocity.multiplyScalar(waterDamping);
-                            // Apply a small residual downward force (gravity - buoyancy approx)
-                            velocity.y -= gravity * underwaterGravityFactor; // Ensures it continues sinking
-                        } else {
-                            // Apply normal gravity above water
-                            velocity.y -= gravity;
-                        }
+                    // --- Apply Gravity / Damping ---
+                    if (isUnderwater) {
+                        // Apply overall damping
+                        velocity.multiplyScalar(waterDamping);
+                        // Apply a small residual downward force (gravity - buoyancy approx)
+                        velocity.y -= gravity * underwaterGravityFactor; // Ensures it continues sinking
+                    } else {
+                        // Apply normal gravity above water
+                        velocity.y -= gravity;
+                    }
 
-                        // Calculate next position before applying it
-                        const nextPosition = coin.position.clone().add(velocity.clone().multiplyScalar(dt));
-                        
-                        // --- Check for Fountain Collision ---
-                        if (fountainParts.length > 0 && !isUnderwater) {
+                    // Calculate next position before applying it
+                    const nextPosition = coin.position.clone().add(velocity.clone().multiplyScalar(dt));
+                    
+                    // --- Check for Fountain Collision ---
+                    if (fountainParts.length > 0 && !isUnderwater) {
                             // Create a ray from current position to next position
                             const rayDirection = nextPosition.clone().sub(coin.position).normalize();
                             coinRaycaster.set(coin.position, rayDirection);
@@ -4367,13 +4440,10 @@
                                                 totalCoinCount++;
                                                 updateCoinCounter();
                                                 
-                                                // Add to instanced mesh and remove individual mesh
+                                                // Add to instanced mesh but KEEP as invisible collision obstacle
                                                 addStaticCoinToInstances(coin.position.clone(), coin.rotation.clone(), id);
-                                                scene.remove(coin);
-                                                const coinIndex = coins.indexOf(coin);
-                                                if (coinIndex > -1) {
-                                                    coins.splice(coinIndex, 1);
-                                                }
+                                                coin.visible = false; // Hide since instanced mesh shows it
+                                                coin.userData.isStaticObstacle = true; // Mark as static obstacle
                                                 
                                                 // Check if we've reached the reset threshold
                                                 console.log('Coin saved. Total count:', totalCoinCount, 'Threshold:', RESET_THRESHOLD);
@@ -4390,6 +4460,159 @@
                                 if (coin.userData.stopped) {
                                     continue;
                                 }
+                            }
+                        }
+
+                        // --- Check for Coin-to-Coin Collisions ---
+                        const coinRadius = COIN_RADIUS; // Using existing coin radius constant
+                        const coinThickness = COIN_THICKNESS; // Using coin thickness for stacking
+                        let landedOnCoin = false;
+                        
+                        // Removed debug logs that were spamming console
+                        
+                        // Check all coins (including stopped ones still in the scene)
+                        for (let j = 0; j < coins.length; j++) {
+                            if (i === j) continue; // Skip self
+                            
+                            const otherCoin = coins[j];
+                            // Skip if other coin is NOT stopped - we only stack on stopped coins
+                            if (!otherCoin.userData.stopped && !otherCoin.userData.isStaticObstacle) continue;
+                            
+                            const otherPos = otherCoin.position;
+                            
+                            // Calculate distances
+                            const dx = nextPosition.x - otherPos.x;
+                            const dz = nextPosition.z - otherPos.z;
+                            const dy = nextPosition.y - otherPos.y;
+                            
+                            const horizontalDist = Math.sqrt(dx*dx + dz*dz);
+                            
+                            // Check if we're above and close enough to stack
+                            const isAbove = dy > 0 && dy < coinThickness * 3;
+                            const isOverlapping = horizontalDist < coinRadius * 1.8;
+                            const isFalling = velocity.y <= 0;
+                            
+                            if (isAbove && isOverlapping && isFalling) {
+                                console.log(`STACKING! Coin ${i} on coin ${j}: hDist=${horizontalDist.toFixed(3)}, vDist=${dy.toFixed(3)}`);
+                                
+                                // Place this coin exactly on top of the other
+                                nextPosition.y = otherPos.y + coinThickness;
+                                
+                                // Stop vertical movement
+                                velocity.y = 0;
+                                
+                                // If underwater, stop completely
+                                if (isUnderwater) {
+                                    console.log(`Coin ${i} stopping on coin ${j} underwater`);
+                                    coin.userData.stopped = true;
+                                    velocity.set(0, 0, 0);
+                                    landedOnCoin = true;
+                                    
+                                    // Force flat rotation
+                                    coin.rotation.set(-Math.PI / 2, 0, Math.random() * Math.PI * 2);
+                                    break;
+                                } else {
+                                    // Above water - reduce horizontal movement
+                                    velocity.x *= 0.1;
+                                    velocity.z *= 0.1;
+                                }
+                            }
+                            // Prevent side collisions at same height
+                            else if (Math.abs(dy) < coinThickness && horizontalDist < coinRadius * 2) {
+                                console.log(`SIDE COLLISION! Pushing coins ${i} and ${j} apart`);
+                                // Push apart horizontally
+                                if (horizontalDist > 0.001) {
+                                    const pushFactor = (coinRadius * 2 - horizontalDist) / horizontalDist;
+                                    nextPosition.x += dx * pushFactor;
+                                    nextPosition.z += dz * pushFactor;
+                                }
+                                velocity.x *= 0.5;
+                                velocity.z *= 0.5;
+                            }
+                        }
+                        
+                        // Now check collisions with static coins (already landed coins) 
+                        if (!landedOnCoin && staticCoinData.length > 0) {
+                            for (let k = 0; k < staticCoinData.length; k++) {
+                                const staticPos = staticCoinData[k].position;
+                                
+                                // Calculate distances
+                                const dx = nextPosition.x - staticPos.x;
+                                const dz = nextPosition.z - staticPos.z;
+                                const dy = nextPosition.y - staticPos.y;
+                                
+                                const horizontalDist = Math.sqrt(dx*dx + dz*dz);
+                                const verticalDist = Math.abs(dy);
+                                
+                                // Check if coins would overlap as cylinders
+                                if (horizontalDist < coinRadius * 2 && verticalDist < coinThickness) {
+                                    // Coins are overlapping at same height - push apart horizontally
+                                    if (horizontalDist > 0.001) {
+                                        const pushDir = new THREE.Vector2(
+                                            nextPosition.x - staticPos.x,
+                                            nextPosition.z - staticPos.z
+                                        ).normalize();
+                                        const pushDist = coinRadius * 2 - horizontalDist;
+                                        nextPosition.x += pushDir.x * pushDist;
+                                        nextPosition.z += pushDir.y * pushDist;
+                                    }
+                                    velocity.x *= 0.5;
+                                    velocity.z *= 0.5;
+                                }
+                                
+                                // Check for stacking - coin falling from above
+                                if (horizontalDist < coinRadius * 1.5 && // Allow some overlap for stacking
+                                    nextPosition.y > staticPos.y && // This coin is above
+                                    nextPosition.y - staticPos.y < coinThickness * 2 && // Close enough vertically
+                                    velocity.y <= 0) { // Falling down
+                                    
+                                    // Stack directly on top
+                                    nextPosition.y = staticPos.y + coinThickness;
+                                    velocity.y = 0;
+                                    
+                                    // If underwater, stop completely
+                                    if (isUnderwater) {
+                                        coin.userData.stopped = true;
+                                        velocity.set(0, 0, 0);
+                                        landedOnCoin = true;
+                                        
+                                        // Force flat rotation
+                                        coin.rotation.set(-Math.PI / 2, 0, Math.random() * Math.PI * 2);
+                                        console.log(`Coin stacked on static coin at height ${nextPosition.y}`);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // If coin landed on another coin underwater, handle the stop
+                        if (landedOnCoin && coin.userData.stopped) {
+                            // Save coin to Firestore if not already saved (skip for local coins)
+                            if (!coin.userData.firestoreId && !coin.userData.isStatic && !coin.userData.isLocalCoin) {
+                                saveCoinToFirestore({
+                                    position: nextPosition,
+                                    rotation: coin.rotation,
+                                    isInUpperBowl: isInUpperBowl,
+                                    charity: coin.userData.charity
+                                }).then(id => {
+                                    if (id) {
+                                        coin.userData.firestoreId = id;
+                                        totalCoinCount++;
+                                        updateCoinCounter();
+                                        
+                                        // Add to instanced mesh but KEEP as invisible collision obstacle
+                                        addStaticCoinToInstances(nextPosition.clone(), coin.rotation.clone(), id);
+                                        coin.visible = false; // Hide since instanced mesh shows it
+                                        coin.userData.isStaticObstacle = true; // Mark as static obstacle
+                                        
+                                        // Check if we've reached the reset threshold
+                                        console.log('Coin saved (stacked). Total count:', totalCoinCount, 'Threshold:', RESET_THRESHOLD);
+                                        if (totalCoinCount >= RESET_THRESHOLD && !isResetting) {
+                                            console.log('Fountain full! Archiving and resetting...');
+                                            archiveAndResetFountain();
+                                        }
+                                    }
+                                });
                             }
                         }
 
@@ -4437,7 +4660,7 @@
 
                         // --- Check for Reaching Bottom ---
                         if (isUnderwater && coin.position.y <= bottomDepth + 0.01) { // Check if close to or past bottom
-                             console.log("Coin reached bottom");
+                             console.log(`Coin ${i} reached bottom at y=${coin.position.y.toFixed(3)}, stopping`);
                              coin.position.y = bottomDepth; // Settle exactly at bottom
                              coin.userData.stopped = true;
                              velocity.set(0, 0, 0); // Stop all movement
@@ -4463,13 +4686,10 @@
                                          totalCoinCount++;
                                          updateCoinCounter();
                                          
-                                         // Add to instanced mesh and remove individual mesh
+                                         // Add to instanced mesh but KEEP as invisible collision obstacle
                                          addStaticCoinToInstances(coin.position.clone(), coin.rotation.clone(), id);
-                                         scene.remove(coin);
-                                         const coinIndex = coins.indexOf(coin);
-                                         if (coinIndex > -1) {
-                                             coins.splice(coinIndex, 1);
-                                         }
+                                         coin.visible = false; // Hide since instanced mesh shows it
+                                         coin.userData.isStaticObstacle = true; // Mark as static obstacle
                                          
                                          // Check if we've reached the reset threshold
                                          console.log('Coin saved. Total count:', totalCoinCount, 'Threshold:', RESET_THRESHOLD);
@@ -4518,7 +4738,6 @@
                                 coin.userData.stuckTimer = 0; // Reset if moving normally
                             }
                         }
-                    } // end if (!hasStopped)
 
                     // --- Cleanup Check ---
                     if ( coin.position.y < -10 ) {
@@ -5406,7 +5625,7 @@
 				
 				#mobileCollectionCounter {
 					display: flex !important;
-					bottom: 28vh !important;
+					bottom: 5vh !important;
 				}
 			}
 			

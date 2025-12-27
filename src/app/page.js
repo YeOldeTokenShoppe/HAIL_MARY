@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import PalmTreeDrive from '@/components/PalmTreeDrive';
 import { useMusic } from '@/components/MusicContext';
 import Link from 'next/link';
@@ -37,6 +37,13 @@ export default function Home() {
       setShowMusicControls(true);
     }
   }, [contextIsPlaying]);
+
+    const handleMusicToggle = useCallback((show) => {
+      setShowMusicControls(show);
+      if (show && !contextIsPlaying) {
+        play();
+      }
+    }, [contextIsPlaying, play]);
   
   // Check if font is loaded
   useEffect(() => {
@@ -214,19 +221,96 @@ export default function Home() {
           <CyberNav 
             is80sMode={is80sMode}
             position="fixed"
-            musicButton={
-              !showMusicControls ? (
-                <button
-                  onClick={() => {
-                    setShowMusicControls(true);
-                    if (!contextIsPlaying) {
-                      play();
-                    }
-                  }}
+            
+          />
+          <div
+        style={{
+          position: "fixed",
+          top: "5rem",
+          right: "1rem",
+          zIndex: 290
+        }}
+      >
+        {
+            !showMusicControls ? (
+              <button
+                onClick={() => handleMusicToggle(true)}
+                style={{
+                  width: isMobileDevice ? "3.5rem" : "3.5rem",
+                  height: isMobileDevice ? "3.5rem" : "3.5rem",
+                  borderRadius: "0.5rem",
+                  backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.2)" : "rgba(0, 0, 0, 0.7)",
+                  border: is80sMode ? "2px solid #D946EF" : "2px solid rgba(255, 255, 255, 0.2)",
+                  color: is80sMode ? "#67e8f9" : "#ffffff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  transition: "all 0.3s ease",
+                  backdropFilter: "blur(10px)",
+                  boxShadow: "0 0.125rem 0.5rem rgba(0, 0, 0, 0.3)",
+                }}
+                title="Toggle Music"
+              >
+                <svg
+                  width={isMobileDevice ? "20" : "30"}
+                  height={isMobileDevice ? "20" : "30"}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M9 18V5l12-2v13" />
+                  <circle cx="6" cy="18" r="3" />
+                  <circle cx="18" cy="16" r="3" />
+                </svg>
+              </button>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.5rem",
+                }}
+              >
+                {/* Spinning Album Art */}
+                <div
                   style={{
                     width: isMobileDevice ? "3rem" : "3.5rem",
                     height: isMobileDevice ? "3rem" : "3.5rem",
-                    borderRadius: "0.5rem",
+                    borderRadius: "50%",
+                    overflow: "hidden",
+                    animation: contextIsPlaying ? "spin 4s linear infinite" : "none",
+                    cursor: "pointer"
+                  }}
+                  onClick={() => {
+                    if (contextIsPlaying) {
+                      pause();
+                    } else {
+                      play();
+                    }
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      backgroundImage: "url('/virginRecords.jpg')",
+                      backgroundSize: "cover",
+                      backgroundPosition: "center"
+                    }}
+                  />
+                </div>
+                
+                {/* Skip Button */}
+                <button
+                  onClick={() => nextTrack && nextTrack()}
+                  style={{
+                    width: isMobileDevice ? "2rem" : "2.5rem",
+                    height: isMobileDevice ? "2rem" : "2.5rem",
+                    borderRadius: "0.25rem",
                     backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.2)" : "rgba(0, 0, 0, 0.7)",
                     border: is80sMode ? "2px solid #D946EF" : "2px solid rgba(255, 255, 255, 0.2)",
                     color: is80sMode ? "#67e8f9" : "#ffffff",
@@ -236,116 +320,48 @@ export default function Home() {
                     cursor: "pointer",
                     transition: "all 0.3s ease",
                     backdropFilter: "blur(10px)",
-                    boxShadow: "0 0.125rem 0.5rem rgba(0, 0, 0, 0.3)",
+                    boxShadow: "0 0.125rem 0.375rem rgba(0, 0, 0, 0.3)",
                   }}
-                  title="Toggle Music"
+                  title="Next Track"
                 >
-                  <svg
-                    width={isMobileDevice ? "20" : "30"}
-                    height={isMobileDevice ? "20" : "30"}
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M9 18V5l12-2v13" />
-                    <circle cx="6" cy="18" r="3" />
-                    <circle cx="18" cy="16" r="3" />
+                  <svg width={isMobileDevice ? "14" : "18"} height={isMobileDevice ? "14" : "18"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="5 4 15 12 5 20 5 4"/>
+                    <line x1="19" y1="5" x2="19" y2="19"/>
                   </svg>
                 </button>
-              ) : (
-                <div
+                
+                {/* Close Button */}
+                <button
+                  onClick={() => {
+                    handleMusicToggle(false);
+                    pause && pause();
+                  }}
                   style={{
+                    width: isMobileDevice ? "1.75rem" : "2rem",
+                    height: isMobileDevice ? "1.75rem" : "2rem",
+                    borderRadius: "0.25rem",
+                    backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.2)" : "rgba(0, 0, 0, 0.7)",
+                    border: is80sMode ? "1px solid #D946EF" : "1px solid rgba(255, 255, 255, 0.2)",
+                    color: is80sMode ? "#67e8f9" : "#ffffff",
                     display: "flex",
                     alignItems: "center",
-                    gap: "0.5rem",
+                    justifyContent: "center",
+                    cursor: "pointer",
+                    transition: "all 0.3s ease",
+                    backdropFilter: "blur(10px)",
+                    boxShadow: "0 0.125rem 0.375rem rgba(0, 0, 0, 0.3)",
                   }}
+                  title="Close Music"
                 >
-                  {/* Spinning Album Art */}
-                  <div
-                    className={contextIsPlaying ? "spinning-record" : ""}
-                    style={{
-                      width: isMobileDevice ? "3rem" : "3.5rem",
-                      height: isMobileDevice ? "3rem" : "3.5rem",
-                      borderRadius: "50%",
-                      backgroundImage: "url('/virginRecords.jpg')",
-                      backgroundSize: "cover",
-                      backgroundPosition: "center",
-                      cursor: "pointer"
-                    }}
-                    onClick={() => contextIsPlaying ? pause() : play()}
-                  />
-                  
-                  {/* Skip Button */}
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (nextTrack) {
-                        nextTrack();
-                      }
-                    }}
-                    style={{
-                      width: isMobileDevice ? "2rem" : "2.5rem",
-                      height: isMobileDevice ? "2rem" : "2.5rem",
-                      borderRadius: "0.25rem",
-                      backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.2)" : "rgba(0, 0, 0, 0.7)",
-                      border: is80sMode ? "2px solid #D946EF" : "2px solid rgba(255, 255, 255, 0.2)",
-                      color: is80sMode ? "#67e8f9" : "#ffffff",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      cursor: "pointer",
-                      transition: "all 0.3s ease",
-                      backdropFilter: "blur(10px)",
-                      boxShadow: "0 0.125rem 0.375rem rgba(0, 0, 0, 0.3)",
-                    }}
-                    title="Next Track"
-                  >
-                    <svg width={isMobileDevice ? "14" : "18"} height={isMobileDevice ? "14" : "18"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polygon points="5 4 15 12 5 20 5 4"/>
-                      <line x1="19" y1="5" x2="19" y2="19"/>
-                    </svg>
-                  </button>
-                  
-                  {/* Close Button */}
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setShowMusicControls(false);
-                      if (pause) {
-                        pause();
-                      }
-                    }}
-                    style={{
-                      width: isMobileDevice ? "1.75rem" : "2rem",
-                      height: isMobileDevice ? "1.75rem" : "2rem",
-                      borderRadius: "0.25rem",
-                      backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.2)" : "rgba(0, 0, 0, 0.7)",
-                      border: is80sMode ? "1px solid #D946EF" : "1px solid rgba(255, 255, 255, 0.2)",
-                      color: is80sMode ? "#67e8f9" : "#ffffff",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      cursor: "pointer",
-                      transition: "all 0.3s ease",
-                      backdropFilter: "blur(10px)",
-                      boxShadow: "0 0.125rem 0.375rem rgba(0, 0, 0, 0.3)",
-                    }}
-                    title="Close Music"
-                  >
-                    <svg width={isMobileDevice ? "12" : "14"} height={isMobileDevice ? "12" : "14"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18"/>
-                      <line x1="6" y1="6" x2="18" y2="18"/>
-                    </svg>
-                  </button>
-                </div>
-              )
-            }
-          />
+                  <svg width={isMobileDevice ? "12" : "14"} height={isMobileDevice ? "12" : "14"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/>
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+            )
+          }
+      </div>
         </div>
       )}
     </div>

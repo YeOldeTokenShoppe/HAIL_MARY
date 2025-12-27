@@ -46,7 +46,7 @@ export default function CarouselPage() {
       '/carousel_images/img6.jpg',
       '/carousel_images/img7.jpg',
       '/carousel_images/img8.jpg',
-      '/carousel_images/img9.jpeg',
+
     ];
 
     let loadedCount = 0;
@@ -267,19 +267,32 @@ export default function CarouselPage() {
         </div>
       )}
       
-      {/* CyberNav with integrated buttons - Top Right */}
+      {/* CyberNav - Top Right */}
       <div
         style={{
           position: "fixed",
-          top: "20px",
-          right: "20px",
+          top: "1rem",
+          right: "1rem",
           zIndex: 300
         }}
       >
         <CyberNav 
           is80sMode={is80sMode}
           position="fixed"
-          musicButton={
+        />
+      </div>
+      
+      {/* Control Buttons - Positioned horizontally below CyberNav */}
+      {/* Music Button */}
+      <div
+        style={{
+          position: "fixed",
+          top: "5rem",
+          right: "1rem",
+          zIndex: 290
+        }}
+      >
+        {
             !showMusicControls ? (
               <button
                 onClick={() => handleMusicToggle(true)}
@@ -409,110 +422,81 @@ export default function CarouselPage() {
               </div>
             )
           }
-          userButton={
-            user ? (
-              <UserButton
-                appearance={{
-                  baseTheme: "dark",
-                  elements: {
-                    avatarBox: {
-                      width: isMobileDevice ? "3.5rem" : "3.5rem",
-                      height: isMobileDevice ? "3.5rem" : "3.5rem",
-                      borderRadius: "8px",
-                      backgroundColor: "rgba(0, 0, 0, 0.7)",
-                      backdropFilter: "blur(10px)",
-                      border: "2px solid rgba(255, 255, 255, 0.2)",
-                      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3)"
-                    },
-                    userButtonPopoverCard: {
-                      backgroundColor: "rgba(0, 0, 0, 0.95)",
-                      backdropFilter: "blur(20px)",
-                      border: "2px solid rgba(0, 255, 0, 0.3)",
-                      borderRadius: "12px",
-                      boxShadow: "0 0 30px rgba(0, 255, 0, 0.2)"
-                    }
-                  }
-                }}
-              />
-            ) : (
-              <SignInButton mode="modal">
-                <button
-                  style={{
-                    width: isMobileDevice ? "3rem" : "3.5rem",
-                    height: isMobileDevice ? "3rem" : "3.5rem",
-                    borderRadius: "8px",
-                    backgroundColor: "rgba(0, 0, 0, 0.7)",
-                    border: "2px solid rgba(255, 255, 255, 0.2)",
-                    color: "#ffffff",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    backdropFilter: "blur(10px)",
-                    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3)"
-                  }}
-                >
-                  <span style={{ fontSize: "1.8rem" }}>{emoji}</span>
-                </button>
-              </SignInButton>
-            )
-          }
-          extra80sButton={
-            <button
-              onClick={() => toggle80sMode(!is80sMode)}
-              style={{
-                width: isMobileDevice ? "3.5rem" : "3.5rem",
-                height: isMobileDevice ? "3.5rem" : "3.5rem",
-                borderRadius: "0.5rem",
-                backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.3)" : "rgba(0, 0, 0, 0.7)",
-                border: is80sMode ? "2px solid #D946EF" : "2px solid rgba(255, 255, 255, 0.2)",
-                color: is80sMode ? "#67e8f9" : "#ffffff",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                transition: "all 0.3s ease",
-                backdropFilter: "blur(10px)",
-                boxShadow: is80sMode 
-                  ? "0 0 20px rgba(217, 70, 239, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3)" 
-                  : "0 2px 8px rgba(0, 0, 0, 0.3)",
-              }}
-              onMouseEnter={(e) => {
-                if (is80sMode) {
-                  e.currentTarget.style.boxShadow = "0 0 30px rgba(217, 70, 239, 0.7), 0 2px 8px rgba(0, 0, 0, 0.3)";
-                } else {
-                  e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.8)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (is80sMode) {
-                  e.currentTarget.style.boxShadow = "0 0 20px rgba(217, 70, 239, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3)";
-                } else {
-                  e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
-                }
-              }}
-              title={is80sMode ? "Disable 80s Mode" : "Enable 80s Mode"}
-            >
-              <span style={{
-                fontSize: isMobileDevice ? "18px" : "22px",
-                fontWeight: "bold",
-                color: is80sMode ? "#00ff41" : "#67e8f9",
-                textShadow: is80sMode ? "0 0 10px #00ff41" : "none",
-                fontFamily: "monospace"
-              }}>
-                80s
-              </span>
-            </button>
-          }
-        />
+      </div>
+      
+      {/* User Button - Next to Music Button */}
+      <div
+        style={{
+          position: "fixed",
+          top: "100px",
+          right: "85px",
+          zIndex: 290
+        }}
+      >
+      </div>
+      
+      {/* 80s Mode Button - Next to User Button */}
+      <div
+        style={{
+          position: "fixed",
+          top: "9rem",
+          right: "1rem",
+          zIndex: 290
+        }}
+      >
+        <button
+          onClick={() => toggle80sMode(!is80sMode)}
+          style={{
+            width: isMobileDevice ? "3.5rem" : "3.5rem",
+            height: isMobileDevice ? "3.5rem" : "3.5rem",
+            borderRadius: "0.5rem",
+            backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.3)" : "rgba(0, 0, 0, 0.7)",
+            border: is80sMode ? "2px solid #D946EF" : "2px solid rgba(255, 255, 255, 0.2)",
+            color: is80sMode ? "#67e8f9" : "#ffffff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            transition: "all 0.3s ease",
+            backdropFilter: "blur(10px)",
+            boxShadow: is80sMode 
+              ? "0 0 20px rgba(217, 70, 239, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3)" 
+              : "0 2px 8px rgba(0, 0, 0, 0.3)",
+          }}
+          onMouseEnter={(e) => {
+            if (is80sMode) {
+              e.currentTarget.style.boxShadow = "0 0 30px rgba(217, 70, 239, 0.7), 0 2px 8px rgba(0, 0, 0, 0.3)";
+            } else {
+              e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.8)";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (is80sMode) {
+              e.currentTarget.style.boxShadow = "0 0 20px rgba(217, 70, 239, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3)";
+            } else {
+              e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
+            }
+          }}
+          title={is80sMode ? "Disable 80s Mode" : "Enable 80s Mode"}
+        >
+          <span style={{
+            fontSize: isMobileDevice ? "18px" : "22px",
+            fontWeight: "bold",
+            color: is80sMode ? "#00ff41" : "#67e8f9",
+            textShadow: is80sMode ? "0 0 10px #00ff41" : "none",
+            fontFamily: "monospace"
+          }}>
+            80s
+          </span>
+        </button>
       </div>
       
       {/* Cyber Glitch Button - Desktop only (mobile shows in carousel) */}
       {!isMobileView && (
         <div style={{
           position: "fixed",
-          top: "3rem",
-          right: "6rem",
+          top: "1rem",
+          right: "8rem",
           zIndex: 200,
         }}>
           <CyberGlitchButton 

@@ -52,7 +52,7 @@ const FountainFrame = forwardRef(({ is80sMode = false, onFullyLoaded }, ref) => 
     }}>
       <iframe
         ref={iframeRef}
-        src={`/fountain.html${is80sMode ? '?80s=true' : ''}`}
+        src="/fountain.html"
         onLoad={handleIframeLoad}
         style={{
           position: 'absolute',

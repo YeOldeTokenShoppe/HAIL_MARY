@@ -110,7 +110,7 @@ export default function CyberGlitchButton({
           --primary: #ff184c;
           // --shadow-primary: #fded00;
           --color: white;
-          --font-size: ${mobile ? '12px' : '14px'};
+          --font-size: ${mobile ? '16px' : '18px'};
           --shadow-primary-hue: 180;
           --shadow-secondary-hue: 60;
           --shadow-secondary: hsl(var(--shadow-secondary-hue), 90%, 60%);
