@@ -146,11 +146,11 @@ const PostProcessingEffects = ({ is80sMode = false }) => {
         height={400}              // Increased from 300 for more detail
         blendFunction={BlendFunction.SCREEN} // Use SCREEN blend mode for a more natural glow
       />
-      <DepthOfField
+      {/* <DepthOfField
         focusDistance={4.0}       // Focus distance (equivalent to focus parameter)
         focalLength={0.0003}      // Focal length (equivalent to aperture parameter)
         bokehScale={0.01}         // Bokeh scale (equivalent to maxblur parameter)
-      />
+      /> */}
       {/* <ChromaticAberration
         offset={[0.001, 0.001]}   // Subtle chromatic aberration
       /> */}
@@ -177,8 +177,8 @@ const PostProcessingEffects = ({ is80sMode = false }) => {
         />
       )} */}
       <Bloom
-        intensity={bloomIntensity * 0.9}  // Subtle bloom enhancement for 80s mode
-        luminanceThreshold={0.35} // Higher threshold - only catch bright emissives
+        intensity={bloomIntensity * 0.1}  // Subtle bloom enhancement for 80s mode
+        luminanceThreshold={0.6} // Higher threshold - only catch bright emissives
         luminanceSmoothing={0.6}  // Softer bloom edges
         height={400}              // Standard resolution
         blendFunction={BlendFunction.SCREEN} // SCREEN for softer glow

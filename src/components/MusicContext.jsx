@@ -84,13 +84,13 @@ export const MusicProvider = ({ children }) => {
     
     try {
       
-      // Check if storage is initialized
-      if (!storage) {
-        console.error('[MusicContext] Firebase storage is not initialized!');
-        throw new Error('Firebase storage not initialized');
+      // Check if storage is initialized and not a dummy
+      if (!storage || !storage.app) {
+        console.error('[MusicContext] Firebase storage is not properly initialized!');
+        console.error('[MusicContext] This usually means Firebase environment variables are missing in production.');
+        console.error('[MusicContext] Please add NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET and other Firebase env vars to your deployment.');
+        throw new Error('Firebase storage not properly initialized - check environment variables');
       }
-      
-      // Log storage object to see if it's a dummy
       
       const trackRef = storageRefUtil(storage, playlist[index].path);
       
@@ -219,22 +219,36 @@ export const MusicProvider = ({ children }) => {
   
   // Preload a track URL when component mounts or when mode changes
   useEffect(() => {
-    // First check Firebase Storage status
-    
-    // Check Firebase config
+    // Debug Firebase configuration in production
+    console.log('[MusicContext] Firebase Config Check:', {
+      hasStorage: !!storage,
+      storageApp: storage?.app ? 'initialized' : 'missing',
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 'NOT SET',
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'NOT SET',
+      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? 'set' : 'NOT SET',
+      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'NOT SET'
+    });
     
     // Log the storage bucket value (partially masked for security)
     if (process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET) {
       const bucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+      console.log('[MusicContext] Storage bucket configured:', bucket.substring(0, 10) + '...');
     } else {
       console.error('[MusicContext] ERROR: Firebase Storage Bucket is not configured!');
       console.error('[MusicContext] Set NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET in your deployment environment variables');
     }
     
     if (storage) {
+      console.log('[MusicContext] Storage object exists, app status:', storage.app ? 'valid' : 'invalid/dummy');
     }
     
     const preloadFirstTrack = async () => {
+      // Skip preload if storage is not properly initialized
+      if (!storage || !storage.app) {
+        console.warn('[MusicContext] Skipping track preload - Firebase storage not properly initialized');
+        return;
+      }
+      
       const playlist = is80sMode ? eightyTracks : non80sTracks;
       if (playlist.length > 0) {
         let index = 0;
@@ -243,7 +257,9 @@ export const MusicProvider = ({ children }) => {
         }
         
         try {
+          console.log('[MusicContext] Attempting to preload track:', playlist[index].path);
           const trackRef = storageRefUtil(storage, playlist[index].path);
+          console.log('[MusicContext] Storage ref created:', trackRef._location?.path);
           
           // Add timeout for preloading too
           const timeoutPromise = new Promise((_, reject) => {
@@ -255,6 +271,7 @@ export const MusicProvider = ({ children }) => {
             timeoutPromise
           ]);
           
+          console.log('[MusicContext] Successfully preloaded track, URL length:', url?.length);
           setPreloadedUrl(url);
           setPreloadedIndex(index);
         } catch (error) {
