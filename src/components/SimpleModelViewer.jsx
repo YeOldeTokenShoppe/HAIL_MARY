@@ -455,7 +455,7 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
           // Add click handler
           const handleScrollClick = (event) => {
             event.stopPropagation();
-            console.log(`${scrollName} clicked!`);
+            // console.log(`${scrollName} clicked!`);
             if (onScrollClick) {
               const scrollNumber = scrollName.toLowerCase().replace('scroll', '');
               onScrollClick(`scroll${scrollNumber}.html`);
@@ -720,12 +720,12 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
   // Handle clicks on scroll objects and ball
   const handleClick = (event) => {
     const intersects = event.intersections;
-    console.log('Click detected, intersections:', intersects.length);
+    // console.log('Click detected, intersections:', intersects.length);
     if (intersects.length > 0) {
       const clickedObject = intersects[0].object;
-      console.log('Clicked object:', clickedObject.name, 'userData:', clickedObject.userData);
+      // console.log('Clicked object:', clickedObject.name, 'userData:', clickedObject.userData);
       if (clickedObject.userData.clickable && clickedObject.userData.onClick) {
-        console.log('Executing click handler for:', clickedObject.name);
+        // console.log('Executing click handler for:', clickedObject.name);
         clickedObject.userData.onClick(event);
       }
     }
@@ -1171,9 +1171,9 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
   
   // Hide loader only when everything is loaded
   useEffect(() => {
-    console.log('SimpleModelViewer loading status:', { modelLoaded, fontLoaded, iframeLoaded, isDesktop });
+    // console.log('SimpleModelViewer loading status:', { modelLoaded, fontLoaded, iframeLoaded, isDesktop });
     if (modelLoaded && fontLoaded && (iframeLoaded || !isDesktop)) {
-      console.log('All conditions met, hiding loader');
+      // console.log('All conditions met, hiding loader');
       // Add a small delay for smooth transition
       setTimeout(() => {
         setIsLoading(false);

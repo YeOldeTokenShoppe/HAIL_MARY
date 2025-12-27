@@ -38,6 +38,21 @@ const FountainFrame = forwardRef(({ is80sMode = false, onFullyLoaded }, ref) => 
   const handleIframeLoad = () => {
     setIsLoaded(true);
     // console.log('Fountain iframe loaded');
+    
+    // Send current 80s mode state to iframe after it loads
+    if (iframeRef.current && is80sMode) {
+      setTimeout(() => {
+        try {
+          iframeRef.current.contentWindow.postMessage(
+            { type: '80sMode', value: is80sMode },
+            '*'
+          );
+          console.log('Sent 80s mode state to iframe after load:', is80sMode);
+        } catch (e) {
+          console.log('Could not send initial message to iframe:', e);
+        }
+      }, 100); // Small delay to ensure iframe is fully initialized
+    }
   };
 
   return (
