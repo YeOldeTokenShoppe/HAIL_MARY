@@ -454,6 +454,7 @@ export default function CarouselPage() {
             border: is80sMode ? "2px solid #D946EF" : "2px solid rgba(255, 255, 255, 0.2)",
             color: is80sMode ? "#67e8f9" : "#ffffff",
             display: "flex",
+            lineHeight: 0.7,
             alignItems: "center",
             justifyContent: "center",
             cursor: "pointer",
@@ -486,7 +487,16 @@ export default function CarouselPage() {
             textShadow: is80sMode ? "0 0 10px #00ff41" : "none",
             fontFamily: "monospace"
           }}>
-            80s
+            80s<br/>
+             <span style={{
+            fontSize: isMobileDevice ? "10px" : "12px",
+            fontWeight: "bold",
+            color: is80sMode ? "#00ff41" : "#67e8f9",
+            textShadow: is80sMode ? "0 0 10px #00ff41" : "none",
+            fontFamily: "monospace"
+          }}>
+            mode
+          </span>
           </span>
         </button>
       </div>

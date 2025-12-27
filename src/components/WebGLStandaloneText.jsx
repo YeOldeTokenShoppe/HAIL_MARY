@@ -3,6 +3,9 @@
 import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { Text } from 'troika-three-text';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
 
 export default function WebGLStandaloneText({ 
   text = "WEBGL TEXT",
@@ -22,6 +25,10 @@ export default function WebGLStandaloneText({
   const frameIdRef = useRef(null);
   const startTimeRef = useRef(Date.now());
   const progressRef = useRef(0);
+  const composerRef = useRef(null);
+  const customPassRef = useRef(null);
+  const velocityRef = useRef(0);
+  const targetVelocityRef = useRef(0);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -47,6 +54,62 @@ export default function WebGLStandaloneText({
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
+    // Setup post-processing
+    const composer = new EffectComposer(renderer);
+    composerRef.current = composer;
+
+    // Add render pass
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+
+    // Create custom shader pass with your shaders
+    const customShader = {
+      uniforms: {
+        tDiffuse: { value: null },
+        uVelocity: { value: 0 },
+        uTime: { value: 0 }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform float uVelocity;
+        uniform float uTime;
+
+        varying vec2 vUv;
+
+        void main() {
+          vec2 uv = vUv;
+          
+          // Calculating wave distortion based on velocity
+          float waveAmplitude = uVelocity * 0.0009;
+          float waveFrequency = 4.0 + uVelocity * 0.01;
+          
+          // Applying wave distortion to the UV coordinates
+          vec2 waveUv = uv;
+          waveUv.x += sin(uv.y * waveFrequency + uTime) * waveAmplitude;
+          waveUv.y += sin(uv.x * waveFrequency * 5. + uTime * 0.8) * waveAmplitude;
+          
+          // Applying the RGB shift to the wave-distorted coordinates
+          float r = texture2D(tDiffuse, vec2(waveUv.x, waveUv.y + uVelocity * 0.005)).r;
+          vec2 gb = texture2D(tDiffuse, waveUv).gb;
+
+          gl_FragColor = vec4(r, gb, r);
+        }
+      `
+    };
+
+    const customPass = new ShaderPass(customShader);
+    customPass.renderToScreen = true;
+    composer.addPass(customPass);
+    customPassRef.current = customPass;
+
     // Create text mesh using Troika
     const textMesh = new Text();
     // Use textArray if provided, otherwise use single text
@@ -60,9 +123,9 @@ export default function WebGLStandaloneText({
     textMesh.font = '/fonts/Humane-Bold.ttf';
     
     // Add stroke for better visibility
-    textMesh.strokeColor = 0x000000;
-    textMesh.strokeWidth = fontSize * 0.02;
-    textMesh.strokeOpacity = 0.5;
+    // textMesh.strokeColor = 0x000000;
+    // textMesh.strokeWidth = fontSize * 0.02;
+    // textMesh.strokeOpacity = 0.5;
     
     // Custom material with wave effect
     textMesh.material = new THREE.ShaderMaterial({
@@ -122,7 +185,7 @@ export default function WebGLStandaloneText({
           
           // Add edge brightness
           float edgeGlow = smoothstep(0.0, 0.3, vUv.x) * smoothstep(1.0, 0.7, vUv.x);
-          color += edgeGlow * 0.2;
+          color += edgeGlow * 0.4;
           
           // Alpha based on progress
           float alpha = uProgress;
@@ -162,9 +225,23 @@ export default function WebGLStandaloneText({
           progressRef.current = Math.min(1, (Date.now() - startTimeRef.current) / animationDuration);
           textMeshRef.current.material.uniforms.uProgress.value = progressRef.current;
         }
+
+        // Update velocity uniform in text material
+        textMeshRef.current.material.uniforms.uVelocity.value = velocityRef.current;
       }
       
-      renderer.render(scene, camera);
+      // Calculate velocity based on animation progress changes
+      targetVelocityRef.current = Math.abs(progressRef.current - (progressRef.current - 0.016)) * 60;
+      velocityRef.current += (targetVelocityRef.current - velocityRef.current) * 0.1;
+      
+      // Update post-processing uniforms
+      if (customPassRef.current) {
+        customPassRef.current.uniforms.uTime.value = elapsedTime;
+        customPassRef.current.uniforms.uVelocity.value = velocityRef.current;
+      }
+      
+      // Use composer instead of direct renderer
+      composer.render();
     };
     animate();
 
@@ -192,6 +269,10 @@ export default function WebGLStandaloneText({
       if (textMeshRef.current) {
         scene.remove(textMeshRef.current);
         textMeshRef.current.dispose();
+      }
+      
+      if (composerRef.current) {
+        composerRef.current.dispose();
       }
       
       if (renderer) {

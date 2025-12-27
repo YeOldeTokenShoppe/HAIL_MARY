@@ -7,12 +7,10 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { useMusic } from './MusicContext';
 import { useLanguage } from './LanguageProvider';
-// import { IconButton, div } from '@chakra-ui/react';
 import { useRouter } from 'next/navigation';
 // import SynthwaveText from './SynthwaveText';
-// import MorphingSynthwaveText from './MorphingSynthwaveText';
+import MorphingWebGLText from './MorphingWebGLText';
 import WebGLStandaloneText from '@/components/WebGLStandaloneText';
 
 
@@ -22,61 +20,8 @@ import WebGLStandaloneText from '@/components/WebGLStandaloneText';
 // Register GSAP ScrollTrigger plugin
 gsap.registerPlugin(ScrollTrigger);
 
-// Text blocks are now defined inside the component to use translations
 
-// Define SynthwaveText words for each stage (keeping for potential future use)
-// const synthwaveWords = [
-//   "THIS",
-//   "COULD",
-//   "BE",
-//   "YOUR",
-//   "REAL80"
-// ];
 
-// Wavy shader effect shaders
-const wavyVertexShader = `
-  varying vec2 vUv;
-  void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-const wavyFragmentShader = `
-  uniform float u_time;
-  uniform vec2 u_mouse;
-  uniform float u_intensity;
-  uniform float u_opacity;
-  varying vec2 vUv;
-
-  void main() {
-    vec2 uv = vUv;
-    
-    // Create wavy distortion
-    float wave1 = sin(uv.x * 8.0 + u_time * 0.5 + u_mouse.x * 3.0) * u_intensity;
-    float wave2 = sin(uv.y * 10.0 + u_time * 0.8 + u_mouse.y * 2.5) * u_intensity;
-    float wave3 = cos(uv.x * 6.0 + u_time * 0.4 + u_mouse.x * 2.0) * u_intensity;
-    float wave4 = cos(uv.y * 7.0 + u_time * 0.6 + u_mouse.y * 2.0) * u_intensity;
-    
-    uv.y += wave1 + wave2;
-    uv.x += wave3 + wave4;
-    
-    // Create gradient with distortion
-    float gradient = 1.0 - distance(uv, vec2(0.5, 0.5)) * 1.5;
-    gradient = clamp(gradient, 0.0, 1.0);
-    
-    // Synthwave colors
-    vec3 color1 = vec3(0.0, 1.0, 1.0); // Cyan
-    vec3 color2 = vec3(1.0, 0.0, 1.0); // Magenta
-    vec3 color3 = vec3(0.0, 0.4, 1.0); // Blue
-    
-    // Mix colors based on position and waves
-    vec3 color = mix(color1, color2, sin(uv.x * 3.0 + u_time) * 0.5 + 0.5);
-    color = mix(color, color3, sin(uv.y * 3.0 + u_time * 0.7) * 0.5 + 0.5);
-    
-    gl_FragColor = vec4(color, gradient * u_opacity * 0.15);
-  }
-`;
 
 const PalmsScene = ({ onLoadingChange }) => {
   const { t } = useLanguage();
@@ -152,47 +97,10 @@ const PalmsScene = ({ onLoadingChange }) => {
   const [currentCameraStage, setCurrentCameraStage] = useState(0); // Track which camera position we're at
   const [showEnterButton, setShowEnterButton] = useState(true); // Show "Take me there" button immediately
   const [hideLastText, setHideLastText] = useState(false); // Hide the last text block after delay
+  const [shouldMorph, setShouldMorph] = useState(false); // Trigger morph animation
   // Music player states
-  const [userClosedMusic, setUserClosedMusic] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   
-  // Wavy effect refs and state
-  const wavyCanvasRef = useRef(null);
-  const wavySceneRef = useRef(null);
-  const wavyRendererRef = useRef(null);
-  const wavyMeshRef = useRef(null);
-  const wavyAnimationRef = useRef(null);
-  const [wavyMousePosition, setWavyMousePosition] = useState({ x: 0, y: 0 });
-  const [wavyIntensity, setWavyIntensity] = useState(0.005);
-  const wavyCurrentState = useRef({ mousePosition: { x: 0, y: 0 }, waveIntensity: 0.005 });
-  const wavyTargetState = useRef({ mousePosition: { x: 0, y: 0 }, waveIntensity: 0.005 });
-  
-  // Debug effect to track button state changes
-  // useEffect(() => {
-  // }, [showEnterButton]);
-  const audioRef = useRef(null);
-  const musicPlayerRef = useRef(null); // Local ref if needed
-  
-  // Performance detection for loader optimization
-  const [isLowEndDevice, setIsLowEndDevice] = useState(false);
-  
-
-  
-  // Sync music player UI with context state on mount
-  // useEffect(() => {
-  //   // Sync with global player if available
-  //   if (showGlobalPlayer !== undefined) {
-  //     setShowMobileMusicPlayer(showGlobalPlayer);
-  //     setMusicPlayerVisible(showGlobalPlayer);
-  //     setContextShowSpotify(showGlobalPlayer);
-  //   } else if (contextIsPlaying && !userClosedMusic) {
-  //     console.log('🎵 PalmTreeDrive: Music is playing in context, showing player UI');
-  //     setShowMobileMusicPlayer(true);
-  //     setMusicPlayerVisible(true);
-  //   }
-  // }, [showGlobalPlayer]); // React to global player changes
-  
-  // No need to sync local state - use context directly
   
   // Add refs for lights
   const carSpotlightRef = useRef(null);
@@ -216,7 +124,6 @@ const PalmsScene = ({ onLoadingChange }) => {
   const cameraRef = useRef(null);
   
   // Add refs for text animation
-  const scrollTextRef = useRef(null);
   const textSectionRef = useRef(null);
   
   // Refs for scroll camera
@@ -337,15 +244,6 @@ const PalmsScene = ({ onLoadingChange }) => {
       // Combine mobile + limited resources
       if (isMobileDevice && cores <= 4) isLowEnd = true;
       
-      setIsLowEndDevice(isLowEnd);
-      
-      // Log detection results for debugging
-      // console.log('Device Performance Detection:', {
-      //   isLowEnd,
-      //   cores,
-      //   isMobile: isMobileDevice,
-      //   screenSize: { width: window.screen.width, height: window.screen.height }
-      // });
     };
     
     detectDevicePerformance();
@@ -379,40 +277,17 @@ const PalmsScene = ({ onLoadingChange }) => {
     }
   }, [currentCameraStage, scrollCameraActive]);
   
-  // Effect to hide the last text block after 2 seconds
+  // Effect to trigger morph animation when reaching final stage
   useEffect(() => {
-    if (currentCameraStage === 4 && !hideLastText) {
+    if (currentCameraStage === 4 && !shouldMorph) {
       const timer = setTimeout(() => {
-        setHideLastText(true);
-      }, 2000);
+        setShouldMorph(true);
+      }, 1500); // Trigger morph after 1.5 seconds at final stage
       
       return () => clearTimeout(timer);
     }
-  }, [currentCameraStage, hideLastText]);
+  }, [currentCameraStage, shouldMorph]);
   
-  
-  
-  // Music player close handler
-  // const handleMusicPlayerClose = useCallback(() => {
-  //   // console.log('🎵 Closing music player');
-    
-  //   // Stop the music via refs
-  //   if (musicPlayerRef.current && musicPlayerRef.current.pause) {
-  //     // console.log('🎵 Pausing music via MusicPlayer3 ref');
-  //     musicPlayerRef.current.pause();
-  //   } else if (musicPlayerRef.current && musicPlayerRef.current.pause) {
-  //     // console.log('🎵 Pausing music via ref');
-  //     musicPlayerRef.current.pause();
-  //   }
-    
-  //   // Update context
-  //   setIsPlaying(false);
-  //   setShowSpotify(false);
-    
-  //   // Then hide the player
-  //   setUserClosedMusic(true);
-  // }, [setIsPlaying, setShowSpotify, musicPlayerRef]);
-
   const carModelRef = useRef(null);
   const intersectionRef = useRef(null);
   const maryMeshRef = useRef(null);
@@ -884,13 +759,6 @@ const PalmsScene = ({ onLoadingChange }) => {
       modelsToLoad++;
     };
     
-    // loadingManager.onLoad = () => {
-    //   // Don't hide loader here - wait for individual model callbacks
-    // };
-    
-    // loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
-    //   // console.log(`Loading: ${url} - ${itemsLoaded}/${itemsTotal}`);
-    // };
     
     loadingManager.onError = (url) => {
       console.error(`[CRITICAL] Failed to load model: ${url}`);
@@ -1191,14 +1059,6 @@ const PalmsScene = ({ onLoadingChange }) => {
           // Maintain upright rotation
           signDummy.rotation.x = 0; // No rotation to match initial setup
           
-          // Maintain rotation based on side
-          // if (baseX < 0) {
-          //   signDummy.rotation.y = Math.PI;
-          // } else {
-          //   signDummy.rotation.y = Math.PI;
-          // }
-          
-          // Set Z rotation to 0 (remove wobble for now to diagnose tilt)
           signDummy.rotation.z = 0;
           
           signDummy.updateMatrix();
@@ -1211,14 +1071,6 @@ const PalmsScene = ({ onLoadingChange }) => {
       materialShaders.push({ update: animateSigns });
       
       scene.add(signs);
-      
-      // Debug info
-      // console.log('Road signs loaded successfully:', {
-      //   count: signCount,
-      //   positions: signPositions,
-      //   geometry: signGeometry,
-      //   material: signMaterial
-      // });
     },
     (progress) => {
       // console.log('Loading road sign:', (progress.loaded / progress.total * 100) + '%');
@@ -2036,14 +1888,6 @@ const PalmsScene = ({ onLoadingChange }) => {
     
     // Handle mouse move for hover effect
     const handleMouseMove = (event) => {
-      // // Debug logging
-      // if (!maryGlowingRef.current || !mountRef.current) {
-      //   console.log('Mouse move blocked:', {
-      //     maryGlowing: maryGlowingRef.current,
-      //     mountExists: !!mountRef.current
-      //   });
-      //   return;
-      // }
       
       const rect = mountRef.current.getBoundingClientRect();
       mouse.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -2337,18 +2181,29 @@ const PalmsScene = ({ onLoadingChange }) => {
             marginBottom: isMobile ? '0' : '0', 
             position: 'relative', 
             height: '400px',
-            opacity: (currentCameraStage === 4 && hideLastText) ? 0 : 1,
-            transition: 'opacity 1s ease-out'
           }}>
-            {/* Using WebGL Standalone Text with textBlocks array */}
-            <WebGLStandaloneText 
-              textArray={textBlocks[currentCameraStage] || ["DRIFT"]}
-              fontSize={isMobile ? 1.8 : 2.1}
-              lineHeight={isMobile ? 1 : 1}
-              color="#ff00ff"
-              id={`palmtree-stage-${currentCameraStage}`}
-              className="mb-4"
-            />
+            {/* Use MorphingWebGLText for final stage, WebGLStandaloneText for others */}
+            {currentCameraStage === 4 ? (
+              <MorphingWebGLText 
+                startTextArray={["YOUR", "REAL80"]}
+                endText="RL80"
+                shouldMorph={shouldMorph}
+                morphDelay={500}
+                fontSize={isMobile ? 1.8 : 2.8}
+                lineHeight={1}
+                color="#fdcdf9"
+                className="mb-4"
+                isMobile={isMobile}
+              />
+            ) : (
+              <WebGLStandaloneText 
+                textArray={textBlocks[currentCameraStage] || ["DRIFT"]}
+                fontSize={isMobile ? 1.8 : 2.8}
+                lineHeight={isMobile ? 1 : 1}
+                id={`palmtree-stage-${currentCameraStage}`}
+                className="mb-4"
+              />
+            )}
           </div>
           <div 
             className="progress-dots"
@@ -2407,8 +2262,8 @@ const PalmsScene = ({ onLoadingChange }) => {
         }} 
       />
       
-      {/* Enter Button - positioned under the pagination dots, appears after text fades */}
-      {currentCameraStage === 4 && hideLastText && (
+      {/* Enter Button - positioned under the pagination dots, appears after morph completes */}
+      {currentCameraStage === 4 && shouldMorph && (
         <div style={{
           position: 'fixed',
           right: isMobile ? '20px' : '15%',

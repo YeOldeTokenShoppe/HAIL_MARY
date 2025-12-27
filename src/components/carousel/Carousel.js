@@ -398,13 +398,13 @@ function Banner(props) {
     // Add text - white in 80s mode, black normally
     context.fillStyle = is80sMode ? '#000000' : '#000000'
     // Use fixed pixel size for consistency
-    const fontSize = 76.5  // Adjust this value to change text size
+    const fontSize = 84  // Adjust this value to change text size
     context.font = `bold ${fontSize}px UnifrakturCook, serif`
     context.textAlign = 'left'  // Use left alignment for precise positioning
     context.textBaseline = 'middle'
     
     // Single instance of text for texture
-    const text = 'Our Lady of Perpetual Profit • Nostra Mater de Perpetuum Lucrum • ';
+    const text = 'Our Lady of Perpetual Profit • Domina Nostra Lucri Perpetui • ';
     
     // Measure text to create seamless texture
     const metrics = context.measureText(text)
