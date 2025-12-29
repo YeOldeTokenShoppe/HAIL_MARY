@@ -42,7 +42,7 @@ export async function POST(request) {
     // Generate unique filename
     const timestamp = Date.now();
     const randomId = Math.random().toString(36).substring(2, 15);
-    const filename = `polaroids/${timestamp}-${randomId}.png`;
+    const filename = `polaroids/${timestamp}-${randomId}.jpg`;
     
     console.log('[Upload API] Attempting to upload to Firebase Storage:', filename);
 
@@ -52,7 +52,7 @@ export async function POST(request) {
     const uploadResponse = await fetch(uploadUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'image/png',
+        'Content-Type': 'image/jpeg',
       },
       body: buffer,
     });
@@ -87,6 +87,7 @@ export async function POST(request) {
         tattooCharacter: { stringValue: metadata?.tattooCharacter || '' },
         candleType: { stringValue: metadata?.candleType || '' },
         baseColor: { stringValue: metadata?.baseColor || '' },
+        selectedPose: { stringValue: metadata?.selectedPose || 'run' },
         createdAt: { timestampValue: new Date().toISOString() },
       }
     };

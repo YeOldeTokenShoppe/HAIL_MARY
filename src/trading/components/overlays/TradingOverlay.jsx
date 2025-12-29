@@ -2597,7 +2597,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                 fontFamily: 'monospace'
               }}
             >
-              My Candle
+              My Devotions
             </button>
             <button
               onClick={() => setCandleTab('community')}
@@ -2617,7 +2617,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                 fontFamily: 'monospace'
               }}
             >
-              All Candles
+              All Devotions
             </button>
           </div>
         </div>

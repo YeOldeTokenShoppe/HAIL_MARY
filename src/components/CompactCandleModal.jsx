@@ -349,6 +349,9 @@ function InteractiveTattooViewer({
 const AVAILABLE_POSES = [
   { id: 'tpose', name: 'T-Pose', animationName: null },
   { id: 'run', name: 'Running', animationName: 'run' },  // id: 'run' for UI, but uses 'Action' animation
+  { id: 'stand1', name: 'Stand Pose 1', animationName: 'StandPose1' },  // StandPose1 animation
+  { id: 'stand2', name: 'Stand Pose 2', animationName: 'StandPose2' },  // StandPose2 animation
+  { id: 'dance', name: 'Dance', animationName: 'Dance_Pose' },  // Dance_Pose animation
 ];
 
 function SimpleTattooViewer({ 
@@ -429,15 +432,56 @@ function SimpleTattooViewer({
     const poseConfig = AVAILABLE_POSES.find(p => p.id === selectedPose);
     
     if (!poseConfig?.animationName || !animations?.length) {
+      // Reset model rotation for T-Pose
+      if (clonedModel) {
+        clonedModel.rotation.set(0, 0, 0);
+      }
       setPoseReady(true);
       setTattooVersion(v => v + 1);
       return;
     }
     
+    // Debug: Log all available animations
+    console.log('[SimpleTattoo] Available animations:', animations.map(a => a.name));
+    console.log('[SimpleTattoo] Looking for:', poseConfig.animationName);
+    
     const clip = animations.find(a => {
       const search = poseConfig.animationName.toLowerCase();
       const name = a.name.toLowerCase();
-      return name === search || name.includes(search.replace('_pose', ''));
+      console.log(`[SimpleTattoo] Comparing: "${name}" with "${search}"`);
+      
+      // More specific matching that preserves numbers
+      // First try exact match
+      if (name === search) {
+        console.log('[SimpleTattoo] Exact match found!');
+        return true;
+      }
+      
+      // Then try with underscores removed but keeping numbers
+      const searchNoUnderscore = search.replace(/_/g, '');
+      const nameNoUnderscore = name.replace(/_/g, '');
+      if (nameNoUnderscore === searchNoUnderscore) {
+        console.log('[SimpleTattoo] Match found without underscores!');
+        return true;
+      }
+      
+      // Try partial match but must include the number
+      if (search.includes('1') && name.includes('stand') && name.includes('1')) {
+        console.log('[SimpleTattoo] StandPose1 match!');
+        return true;
+      }
+      if (search.includes('2') && name.includes('stand') && name.includes('2')) {
+        console.log('[SimpleTattoo] StandPose2 match!');
+        return true;
+      }
+      
+      // For other animations without numbers
+      if (!search.match(/\d/) && name.includes(search.replace('_pose', '').replace('pose', ''))) {
+        console.log('[SimpleTattoo] Non-numbered animation match!');
+        return true;
+      }
+      
+      return false;
     });
     
     if (!clip) {
@@ -600,7 +644,10 @@ function SimpleTattooViewer({
       {showBackground && (backgroundTexture || backgroundGradient) && (
         <mesh ref={backgroundRef} position={[0, 0, -5]}>
           <planeGeometry args={[20, 20]} />
-          <meshBasicMaterial color="#4a0080" />
+          <meshBasicMaterial 
+            map={backgroundTexture}
+            color={backgroundGradient ? "#4a0080" : "#ffffff"}
+          />
         </mesh>
       )}
       <group ref={groupRef}>
@@ -663,10 +710,10 @@ function SimpleCandleViewer({ modelPath, customImageUrl, backgroundTexturePath, 
         clonedModel.position.set(0, 0, -1);
       } else if (modelPath.includes('tinyVotiveBox')) {
         clonedModel.scale.set(1, 1, 1);
-        clonedModel.position.set(0, -2.7, -1);  // Move down significantly
+        clonedModel.position.set(0, -1.5, -1);  // Raised from -2.7 to -0.5
       } else if (modelPath.includes('tinyJapCanBox')) {
         clonedModel.scale.set(1, 1, 1);  // Same scale as votive box
-        clonedModel.position.set(0, -2.7, -1);  // Move down significantly
+        clonedModel.position.set(0, -1.5, -1);  // Raised from -2.7 to -0.5
       } else {
         clonedModel.scale.set(1.5, 1.5, 1.5);
         clonedModel.position.set(0, -1, 1);
@@ -815,12 +862,96 @@ function SimpleCandleViewer({ modelPath, customImageUrl, backgroundTexturePath, 
         modelRef.current.remove(modelRef.current.children[0]);
       }
       
+      // Clear boxMeshRef if we're switching from a box model to a non-box model
+      if (!boxMeshFound) {
+        boxMeshRef.current = null;
+      }
+      
       // Add the model to the group
       groupRef.current = clonedModel;
       modelRef.current.add(clonedModel);
     }
   }, [scene, materials, modelPath, customImageUrl]);
   
+  // Effect to update Box mesh texture when backgroundTexturePath changes
+  React.useEffect(() => {
+    let retryCount = 0;
+    const maxRetries = 10;
+    let retryTimeout = null;
+    
+    // Function to apply the texture
+    const applyTexture = () => {
+      // Only apply texture if this is a box model
+      const isBoxModel = modelPath && (modelPath.includes('tinyVotiveBox') || modelPath.includes('tinyJapCanBox'));
+      
+      if (!isBoxModel) {
+        // Not a box model, no need to apply texture to Box mesh
+        return;
+      }
+      
+      if (!boxMeshRef.current || !boxMeshRef.current.material) {
+        if (retryCount < maxRetries) {
+          retryCount++;
+          console.log(`[SimpleCandleViewer] Box mesh not ready yet, retry ${retryCount}/${maxRetries}...`);
+          // Try again in a moment if the mesh isn't ready
+          retryTimeout = setTimeout(applyTexture, 100);
+        } else {
+          console.log('[SimpleCandleViewer] Max retries reached, Box mesh not found');
+        }
+        return;
+      }
+
+      if (backgroundTexturePath && backgroundTexturePath !== currentBackgroundPath.current) {
+        // Load and apply new background texture
+        console.log('[SimpleCandleViewer] Loading background texture:', backgroundTexturePath);
+        console.log('[SimpleCandleViewer] Box mesh found:', !!boxMeshRef.current);
+        console.log('[SimpleCandleViewer] Box material type:', boxMeshRef.current?.material?.type);
+        
+        textureLoader.load(backgroundTexturePath, (texture) => {
+          texture.wrapS = THREE.RepeatWrapping;
+          texture.wrapT = THREE.RepeatWrapping;
+          texture.repeat.set(1, -1);  // Negative Y to flip vertically
+          texture.offset.set(0, 1);   // Adjust offset when flipping
+          
+          if (boxMeshRef.current && boxMeshRef.current.material) {
+            // Make sure the material can accept a map
+            if (!boxMeshRef.current.material.map) {
+              console.log('[SimpleCandleViewer] Material had no map, adding texture');
+            }
+            boxMeshRef.current.material.map = texture;
+            boxMeshRef.current.material.color.set(0xffffff); // Set to white so texture shows properly
+            boxMeshRef.current.material.needsUpdate = true;
+            backgroundTextureRef.current = texture;
+            currentBackgroundPath.current = backgroundTexturePath;
+            console.log('[SimpleCandleViewer] Background texture applied to Box mesh');
+            console.log('[SimpleCandleViewer] Material map is now:', boxMeshRef.current.material.map);
+          }
+        }, undefined, (error) => {
+          console.error('[SimpleCandleViewer] Failed to load background texture:', error);
+        });
+      } else if (!backgroundTexturePath && currentBackgroundPath.current) {
+        // Remove texture when backgroundTexturePath is null
+        console.log('[SimpleCandleViewer] Removing background texture from Box mesh');
+        if (boxMeshRef.current && boxMeshRef.current.material && boxMeshRef.current.material.map) {
+          boxMeshRef.current.material.map = null;
+          boxMeshRef.current.material.color.set(0x333333);
+          boxMeshRef.current.material.needsUpdate = true;
+        }
+        currentBackgroundPath.current = null;
+      }
+    };
+
+    // Start the texture application process
+    applyTexture();
+    
+    // Cleanup function to clear timeout if component unmounts or dependencies change
+    return () => {
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+      }
+    };
+  }, [backgroundTexturePath, modelPath, textureLoader]);
+
   // Separate effect for base color application
   React.useEffect(() => {
     if (groupRef.current && baseColor) {
@@ -1304,7 +1435,7 @@ export default function CompactCandleModal({
     devotionType: '', // 'candle' or 'tattoo'
     messageType: '',
     candleType: 'votive',
-    selectedPose: 'tpose',
+    selectedPose: 'run',
     tattooCharacter: '', // 'blockhead1', 'blockhead2', or 'blockhead_runner'
     tattooDesign: '', // 'RL80_TATTOO' or 'ROSE_TATTOO'
     tattooPlacement: null, // Stores position, normal, meshName for tattoo placement
@@ -1333,8 +1464,20 @@ export default function CompactCandleModal({
   const [isCapturing, setIsCapturing] = useState(false);  // Prevent duplicate captures
   const [showCandleSnapshot, setShowCandleSnapshot] = useState(false);
   const [savedCandleData, setSavedCandleData] = useState(null);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const modalContentRef = useRef(null);
   const fileInputRef = useRef(null);
+  
+  // Auto-switch to 'run' pose when tattoo placement is complete
+  useEffect(() => {
+    if (formData.tattooPlacement && formData.devotionType === 'tattoo') {
+      // When tattoo placement is done, automatically switch from T-Pose to Run
+      setFormData(prev => ({ 
+        ...prev, 
+        selectedPose: 'run' 
+      }));
+    }
+  }, [formData.tattooPlacement, formData.devotionType]);
   const textareaRef = useRef(null);
   const scrollContainerRef = useRef(null);
 
@@ -1412,23 +1555,17 @@ export default function CompactCandleModal({
   const uploadImage = async () => {
     let finalImageUrl = null;
     
-    // For tattoo devotions, ONLY use the Firebase polaroid URL
+    // For tattoo devotions, we don't need to upload an image here
+    // The polaroid will be created and saved later
     if (formData.devotionType === 'tattoo') {
-      console.log('[CompactModal] uploadImage called for tattoo, capturedPolaroidUrl:', capturedPolaroidUrl);
-      if (capturedPolaroidUrl && capturedPolaroidUrl !== 'ERROR') {
-        finalImageUrl = capturedPolaroidUrl;
-        console.log('[CompactModal] Using Firebase polaroid URL:', finalImageUrl);
-        // Verify this is the correct URL (should be in polaroids/ folder)
-        if (finalImageUrl.includes('polaroids%2F') || finalImageUrl.includes('polaroids/')) {
-          console.log('[CompactModal] ✅ Correct polaroid URL confirmed');
-        } else {
-          console.warn('[CompactModal] ⚠️ URL is not from polaroids folder:', finalImageUrl);
-        }
+      console.log('[CompactModal] Tattoo devotion - using design as placeholder image');
+      // Use the tattoo design image as a placeholder
+      if (formData.tattooDesign) {
+        finalImageUrl = `/images/${formData.tattooDesign}.png`;
       } else {
-        // Don't fallback to uploading the black background image or using wrong image
-        console.error('[CompactModal] ERROR: No polaroid URL available for tattoo devotion - cannot save');
-        throw new Error('Polaroid upload failed - please try again');
+        finalImageUrl = '/images/rose.png'; // Default fallback
       }
+      console.log('[CompactModal] Using placeholder image for tattoo:', finalImageUrl);
     } else if (imageFile) {
       // Direct upload without template
       const timestamp = Date.now();
@@ -1671,12 +1808,6 @@ const serializeTattooPlacement = (placement) => {
         docData = {
           messageType: formData.messageType,
           devotionType: formData.devotionType,
-          candleType: formData.candleType,
-          candleHeight: formData.candleHeight || 'medium',
-          tattooCharacter: formData.tattooCharacter,
-          tattooDesign: formData.tattooDesign,
-          tattooPlacement: serializeTattooPlacement(formData.tattooPlacement),
-          selectedPose: formData.selectedPose || 'tpose',
           username: trimmedUsername,
           createdBy: user?.id,
           createdByUsername: user?.username || user?.firstName || user?.fullName,
@@ -1688,20 +1819,28 @@ const serializeTattooPlacement = (placement) => {
           burnedAmount: parseInt(formData.burnedAmount) || 1000,
           image: imageUrl,
           background: formData.background || 'synthwave',
-          baseColor: formData.baseColor || '#ffffff',
           staked: false,
           createdAt: serverTimestamp()
         };
+        
+        // Add candle-specific fields
+        if (formData.devotionType === 'candle') {
+          docData.candleType = formData.candleType;
+          docData.candleHeight = formData.candleHeight || 'medium';
+          docData.baseColor = formData.baseColor || '#ffffff';
+        }
+        
+        // Add tattoo-specific fields
+        if (formData.devotionType === 'tattoo') {
+          docData.tattooCharacter = formData.tattooCharacter;
+          docData.tattooDesign = formData.tattooDesign;
+          docData.tattooPlacement = serializeTattooPlacement(formData.tattooPlacement);
+          docData.selectedPose = formData.selectedPose || 'run';
+        }
       } else {
         docData = {
           messageType: formData.messageType,
           devotionType: formData.devotionType,
-          candleType: formData.candleType,
-          candleHeight: formData.candleHeight || 'medium',
-          tattooCharacter: formData.tattooCharacter,
-          tattooDesign: formData.tattooDesign,
-          tattooPlacement: serializeTattooPlacement(formData.tattooPlacement),
-          selectedPose: formData.selectedPose || 'tpose',
           username: trimmedUsername,
           createdBy: user?.id,
           createdByUsername: user?.username || user?.firstName || user?.fullName,
@@ -1710,13 +1849,29 @@ const serializeTattooPlacement = (placement) => {
           burnedAmount: parseInt(formData.burnedAmount) || 1000,
           image: imageUrl,
           background: formData.background || 'synthwave',
-          baseColor: formData.baseColor || '#ffffff',
           staked: false,
           createdAt: serverTimestamp()
         };
+        
+        // Add candle-specific fields
+        if (formData.devotionType === 'candle') {
+          docData.candleType = formData.candleType;
+          docData.candleHeight = formData.candleHeight || 'medium';
+          docData.baseColor = formData.baseColor || '#ffffff';
+        }
+        
+        // Add tattoo-specific fields
+        if (formData.devotionType === 'tattoo') {
+          docData.tattooCharacter = formData.tattooCharacter;
+          docData.tattooDesign = formData.tattooDesign;
+          docData.tattooPlacement = serializeTattooPlacement(formData.tattooPlacement);
+          docData.selectedPose = formData.selectedPose || 'run';
+        }
       }
-      const docRef = await addDoc(collection(db, 'candles'), docData);
+      // Skip saving to candles collection - will save to polaroids collection instead
+      // const docRef = await addDoc(collection(db, 'candles'), docData);
       setCandleWasCreated(true);
+      setIsSubmitting(true); // Show loading state immediately
       setSavedCandleData({
         username: formData.username || 'Anonymous',
         image: imagePreview || imageUrl,  // Use imagePreview (selected image) for snapshot, fallback to uploaded URL
@@ -1728,7 +1883,7 @@ const serializeTattooPlacement = (placement) => {
         tattooCharacter: formData.tattooCharacter,
         tattooDesign: formData.tattooDesign,
         tattooPlacement: formData.tattooPlacement,
-        selectedPose: formData.selectedPose || 'tpose',  // Add selectedPose here!
+        selectedPose: formData.selectedPose || 'run',  // Add selectedPose here!
         background: formData.background || 'synthwave',
         baseColor: formData.baseColor || '#ffffff'
       });
@@ -1744,12 +1899,18 @@ const serializeTattooPlacement = (placement) => {
       setCurrentStep(1);
       setImageFile(null);
       setImagePreview(null);
+      
+      // Show loading immediately before closing modal
       setShowCandleSnapshot(true);
-      onClose();
+      
+      // Small delay to ensure loading state is visible before modal closes
+      setTimeout(() => {
+        onClose();
+      }, 100);
       if (onCandleCreated) {
         onCandleCreated({
           ...docData,
-          id: docRef.id,
+          id: `temp-${Date.now()}`, // Temporary ID until polaroid is saved
           createdAt: new Date()
         });
       }
@@ -2103,9 +2264,37 @@ const serializeTattooPlacement = (placement) => {
               marginBottom: '20px'
             }}>
               {formData.tattooDesign ? 
-                'Click on the model above to place your tattoo' : 
+                (formData.tattooPlacement ? 
+                  '✅ Tattoo placed! You can click again to reposition or proceed to next step' : 
+                  '⚠️ Click on the character above to place your tattoo') : 
                 'Select the sacred design for your devotion'}
             </p>
+            
+            {formData.tattooDesign && !formData.tattooPlacement && (
+              <div style={{
+                padding: '15px',
+                background: 'rgba(255, 165, 0, 0.1)',
+                border: '2px solid #ffa500',
+                borderRadius: '10px',
+                marginBottom: '20px',
+                animation: 'pulse 2s infinite'
+              }}>
+                <div style={{
+                  fontSize: '16px',
+                  color: '#ffa500',
+                  fontWeight: 'bold'
+                }}>
+                  👆 Click on the character to place your tattoo!
+                </div>
+                <div style={{
+                  fontSize: '13px',
+                  color: 'rgba(255, 255, 255, 0.8)',
+                  marginTop: '5px'
+                }}>
+                  You must place the tattoo before proceeding
+                </div>
+              </div>
+            )}
             
             <div style={{
               display: 'flex',
@@ -2901,39 +3090,40 @@ const serializeTattooPlacement = (placement) => {
               </div>
             </div>
             
-            {/* Base Color Picker */}
-            <div style={{
-              marginTop: '20px',
-              padding: '15px',
-              background: 'rgba(0, 0, 0, 0.3)',
-              borderRadius: '12px',
-              border: '1px solid rgba(255, 215, 0, 0.2)'
-            }}>
-              <h4 style={{
-                fontSize: '16px',
-                marginBottom: '10px',
-                color: '#ffd700'
-              }}>Candle Base Color</h4>
+            {/* Base Color Picker - Only show for candles */}
+            {formData.devotionType === 'candle' && (
               <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '15px'
+                marginTop: '20px',
+                padding: '15px',
+                background: 'rgba(0, 0, 0, 0.3)',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 215, 0, 0.2)'
               }}>
-                <input
-                  type="color"
-                  value={formData.baseColor}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    baseColor: e.target.value
-                  }))}
-                  style={{
-                    width: '50px',
-                    height: '50px',
-                    border: '2px solid rgba(255, 215, 0, 0.5)',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    background: 'transparent'
-                  }}
+                <h4 style={{
+                  fontSize: '16px',
+                  marginBottom: '10px',
+                  color: '#ffd700'
+                }}>Candle Base Color</h4>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '15px'
+                }}>
+                  <input
+                    type="color"
+                    value={formData.baseColor}
+                    onChange={(e) => setFormData(prev => ({
+                      ...prev,
+                      baseColor: e.target.value
+                    }))}
+                    style={{
+                      width: '50px',
+                      height: '50px',
+                      border: '2px solid rgba(255, 215, 0, 0.5)',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      background: 'transparent'
+                    }}
                 />
                 <div style={{
                   flex: 1
@@ -2981,6 +3171,7 @@ const serializeTattooPlacement = (placement) => {
                 </button>
               </div>
             </div>
+            )}
           </div>;
       case 7:
         // Original step 6 - final review
@@ -3101,7 +3292,7 @@ const serializeTattooPlacement = (placement) => {
                   textAlign: 'center',
                   marginTop: '8px'
                 }}>
-                  ⚠️ Minimum 1000 tokens required to light candle
+                  ⚠️ Minimum 1000 tokens required
                 </div>
               ) : (
                 <div style={{
@@ -3310,6 +3501,18 @@ const serializeTattooPlacement = (placement) => {
     }
   };
   const handleNext = () => {
+    // Validation for tattoo placement in step 3
+    if (currentStep === 3 && formData.devotionType === 'tattoo') {
+      if (!formData.tattooDesign) {
+        setError('Please select a tattoo design');
+        return;
+      }
+      if (!formData.tattooPlacement) {
+        setError('Please click on the character to place your tattoo');
+        return;
+      }
+    }
+    
     if (currentStep < totalSteps) {
       // Skip step 3 (personalization) for Japanese candles only
       if (currentStep === 2 && formData.candleType === 'japanese') {
@@ -3432,7 +3635,7 @@ const serializeTattooPlacement = (placement) => {
     tattooCharacter: formData.tattooCharacter,
     tattooDesign: formData.tattooDesign,
     background: formData.background,
-    selectedPose: formData.selectedPose || 'tpose',           // 'tpose' or 'run'
+    selectedPose: formData.selectedPose || 'run',           // 'tpose' or 'run'
     tattooPlacement: formData.tattooPlacement,      // From InteractiveTattooViewer
     username: formData.username,
     burnedAmount: formData.burnedAmount,
@@ -3444,9 +3647,9 @@ const serializeTattooPlacement = (placement) => {
       console.log('[CompactModal] Tattoo polaroid captured from hidden renderer');
     }
   }} 
-  preloadOnly={false} 
-  instantCapture={true}
-  saveToFirebase={true}
+  preloadOnly={true}  // Just preload, don't capture
+  instantCapture={false}
+  saveToFirebase={false}  // Don't save from the preloader
   onFirebaseUploadComplete={(result) => {
     if (result.success) {
       console.log('[CompactModal] Tattoo saved to Firebase:', result.storageUrl);
@@ -3484,8 +3687,63 @@ const serializeTattooPlacement = (placement) => {
       if (!e.target.closest('.action-button')) {
         setShowCandleSnapshot(false);
         setSavedCandleData(null);
+        onClose(); // Also close the modal completely
       }
     }}>
+          {/* Click to close instruction */}
+          <div style={{
+            position: 'fixed',
+            bottom: '30px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 100002,
+            padding: '10px 20px',
+            background: 'rgba(0, 0, 0, 0.8)',
+            borderRadius: '20px',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            color: '#ffffff',
+            fontSize: '14px',
+            fontFamily: 'monospace',
+            pointerEvents: 'none',
+            animation: 'fadeInOut 2s ease infinite',
+          }}>
+            Click anywhere to close
+          </div>
+          {showSuccessMessage && (
+            <div style={{
+              position: 'fixed',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              zIndex: 100001,
+              background: 'linear-gradient(135deg, rgba(0, 255, 0, 0.95) 0%, rgba(0, 150, 0, 0.9) 100%)',
+              padding: '30px 50px',
+              borderRadius: '20px',
+              border: '2px solid #00ff00',
+              boxShadow: '0 20px 60px rgba(0, 255, 0, 0.4)',
+              textAlign: 'center',
+              animation: 'fadeInScale 0.3s ease',
+            }}>
+              <div style={{ fontSize: '48px', marginBottom: '15px' }}>✨</div>
+              <h2 style={{
+                color: '#ffffff',
+                margin: 0,
+                fontSize: '24px',
+                fontWeight: 'bold',
+                textShadow: '0 2px 4px rgba(0,0,0,0.3)'
+              }}>
+                {savedCandleData.devotionType === 'tattoo' ? 'Tattoo Saved!' : 'Candle Lit!'}
+              </h2>
+              <p style={{
+                color: '#ffffff',
+                margin: '10px 0 0 0',
+                fontSize: '16px',
+                opacity: 0.95
+              }}>
+                Your devotion has been saved.
+              </p>
+            </div>
+          )}
           
           <CandleSnapshotRenderer 
             isVisible={true} 
@@ -3493,19 +3751,65 @@ const serializeTattooPlacement = (placement) => {
             instantCapture={false} 
             onComplete={imageData => {
               // Capture the polaroid image when it's ready
-              if (imageData && formData.devotionType === 'tattoo') {
+              if (imageData) {
                 setCapturedImage(imageData);
-                console.log('[CompactModal] Received polaroid from CandleSnapshotRenderer');
+                console.log('[CompactModal] Received polaroid from CandleSnapshotRenderer for', savedCandleData.devotionType);
               }
             }}
-            saveToFirebase={false}  // Don't upload again - this is just for display
-            onFirebaseUploadComplete={null} 
+            saveToFirebase={true}  // Enable Firebase upload for both candles and tattoos
+            onFirebaseUploadComplete={(result) => {
+              if (result && result.success) {
+                console.log('[CompactModal] Polaroid uploaded successfully:', result.storageUrl);
+                setCapturedPolaroidUrl(result.storageUrl);
+                setShowSuccessMessage(true);
+                // Don't auto-close - let user dismiss when ready
+                // Hide the success message after a few seconds, but keep polaroid visible
+                setTimeout(() => {
+                  setShowSuccessMessage(false);
+                }, 3000);  // Hide success message after 3 seconds
+              } else if (result && !result.success) {
+                console.error('[CompactModal] Upload failed:', result.error);
+                // Show error for a moment, then allow user to dismiss
+                setShowSuccessMessage(false); // Hide success, could show error message instead
+              }
+            }} 
           />
         </div>}
       
       {}
       
       <style>{`
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.9;
+            transform: scale(1.02);
+          }
+        }
+        
+        @keyframes fadeInScale {
+          from {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.8);
+          }
+          to {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+          }
+        }
+        
+        @keyframes fadeInOut {
+          0%, 100% {
+            opacity: 0.7;
+          }
+          50% {
+            opacity: 1;
+          }
+        }
+        
         @keyframes slideDown {
           from {
             transform: translate(-50%, -100%);
@@ -3652,7 +3956,7 @@ const serializeTattooPlacement = (placement) => {
         <div className="compact-modal-layout">
           
           <div className={`compact-candle-preview ${currentStep === 4 ? 'message-step' : ''}`}>
-            <div className="preview-label">Your Candle Preview</div>
+            <div className="preview-label">Preview</div>
             
             <div style={{
                 width: '100%',
@@ -3746,8 +4050,8 @@ const serializeTattooPlacement = (placement) => {
               ) : (formData.candleType || formData.tattooCharacter) ? <Canvas 
                 key={`canvas-step-${currentStep}`}
                 camera={{
-                  position: currentStep === 3 ? [0, 0, 4] : (currentStep === 5 || currentStep === 6) ? [0, -3, 9] : [0, -3, 9],
-                  fov: currentStep === 3 ? 30 : 40
+                  position: [0, -3, 9],
+                  fov: 40
                 }} style={{
                   background: 'transparent',
                   position: 'relative',
@@ -3805,7 +4109,7 @@ const serializeTattooPlacement = (placement) => {
                             return null;
                           })()}
                           backgroundGradient={formData.background && formData.background.startsWith('dynamic-') ? formData.background : null}
-                          selectedPose={formData.selectedPose || 'tpose'}
+                          selectedPose={formData.selectedPose || 'run'}
                         />
                       )
                     ) : formData.candleType ? (
@@ -3836,12 +4140,12 @@ const serializeTattooPlacement = (placement) => {
                     enablePan={false} 
                     enableZoom={true} 
                     minDistance={3} 
-                    maxDistance={(currentStep === 5 || currentStep === 6) ? 25 : 25} 
+                    maxDistance={25} 
                     minPolarAngle={Math.PI / 4} 
                     maxPolarAngle={Math.PI / 2}
                     // autoRotate={currentStep !== 5 && currentStep !== 6}
                     // autoRotateSpeed={2}
-                    target={(currentStep === 5 || currentStep === 6) ? [0, -1, 0] : [0, 0, 0]}
+                    target={[0, 0, 0]}
                   />
                 </Canvas> : <img src={formData.candleType === 'japanese' ? '/images/tinyJapCan.webp' : '/images/tinyVotive.webp'} alt={`${formData.candleType} candle`} style={{
                   width: 'auto',
@@ -3907,8 +4211,8 @@ const serializeTattooPlacement = (placement) => {
                 marginBottom: '10px',
                 gap: '8px'
               }}>
-              {[1, 2, 3, 4, 5, 6].map(step => <div key={step} style={{
-                  width: '40px',
+              {[1, 2, 3, 4, 5, 6, 7].map(step => <div key={step} style={{
+                  width: '35px',
                   height: '4px',
                   backgroundColor: currentStep >= step ? '#ffd700' : 'rgba(255, 215, 0, 0.2)',
                   borderRadius: '2px',
@@ -3958,28 +4262,42 @@ const serializeTattooPlacement = (placement) => {
               
               {currentStep < 7 ? <button onClick={handleNext} style={{
                   padding: '10px 30px',
-                  background: 'linear-gradient(135deg, #ffd700, #ffed4e)',
+                  background: (currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement)) ? 
+                    'linear-gradient(135deg, #888, #999)' : 
+                    'linear-gradient(135deg, #ffd700, #ffed4e)',
                   border: 'none',
                   borderRadius: '8px',
-                  color: '#000',
-                  cursor: 'pointer',
+                  color: (currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement)) ? 
+                    '#555' : '#000',
+                  cursor: (currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement)) ? 
+                    'not-allowed' : 'pointer',
                   fontSize: '14px',
                   fontWeight: 'bold',
-                  boxShadow: '0 4px 15px rgba(255, 215, 0, 0.3)'
-                }} disabled={currentStep === 1 && !formData.devotionType || currentStep === 2 && !formData.candleType && !formData.tattooCharacter || currentStep === 4 && !formData.messageType}>
-                  Next
+                  boxShadow: (currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement)) ? 
+                    'none' : '0 4px 15px rgba(255, 215, 0, 0.3)',
+                  opacity: (currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement)) ? 
+                    0.6 : 1
+                }} disabled={currentStep === 1 && !formData.devotionType || currentStep === 2 && !formData.candleType && !formData.tattooCharacter || currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement) || currentStep === 4 && !formData.messageType}>
+                  {currentStep === 3 && formData.devotionType === 'tattoo' && !formData.tattooPlacement && formData.tattooDesign ? 
+                    'Place Tattoo First' : 'Next'}
                 </button> : <button onClick={handleConfirmedSave} style={{
                   padding: '10px 30px',
-                  background: 'linear-gradient(135deg, #ff6b35, #ff9558)',
+                  background: isSubmitting 
+                    ? 'linear-gradient(135deg, #00ff00, #00dd00)' 
+                    : 'linear-gradient(135deg, #ff6b35, #ff9558)',
                   border: 'none',
                   borderRadius: '8px',
                   color: '#fff',
-                  cursor: 'pointer',
+                  cursor: isSubmitting ? 'wait' : 'pointer',
                   fontSize: '14px',
                   fontWeight: 'bold',
-                  boxShadow: '0 4px 15px rgba(255, 107, 53, 0.4)'
+                  boxShadow: isSubmitting 
+                    ? '0 4px 15px rgba(0, 255, 0, 0.4)' 
+                    : '0 4px 15px rgba(255, 107, 53, 0.4)',
+                  opacity: isSubmitting ? 0.8 : 1,
+                  transition: 'all 0.3s ease'
                 }} disabled={isSubmitting || !formData.messageType || (!formData.candleType && !formData.tattooCharacter) || !formData.username.trim() || !formData.burnedAmount || formData.burnedAmount === '0' || parseInt(formData.burnedAmount) === 0}>
-                  {isSubmitting ? 'Lighting...' : 'Light Candle 🔥'}
+                  {isSubmitting ? '✨ Creating...' : 'Send it! 🔥'}
                 </button>}
             </div>
             
@@ -4262,7 +4580,7 @@ const serializeTattooPlacement = (placement) => {
                     fontWeight: 'bold',
                     transition: 'all 0.2s ease'
                   }}>
-                  {isSubmitting ? <span>Creating...</span> : <span>🕯️ Light Candle</span>}
+                  {isSubmitting ? <span>Creating...</span> : <span>Send it!</span>}
                 </button>
               </div>
 

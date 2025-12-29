@@ -125,7 +125,7 @@ const PolaroidSnapshot = ({
           tempCtx.drawImage(characterCanvas, 0, 0);
           
           // Convert to data URL with high quality
-          const dataUrl = tempCanvas.toDataURL('image/png', 1.0);
+          const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
           console.log('[PolaroidSnapshot] Composite image created with background, length:', dataUrl.length);
           console.log('[PolaroidSnapshot] Background was:', backgroundImage);
           
@@ -143,7 +143,7 @@ const PolaroidSnapshot = ({
           console.error('[PolaroidSnapshot] Failed to load background:', err);
           // Fallback: draw without background
           tempCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height);
-          const dataUrl = tempCanvas.toDataURL('image/png', 1.0);
+          const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
           
           if (dataUrl) {
             setImageUrl(dataUrl);
@@ -159,7 +159,7 @@ const PolaroidSnapshot = ({
         tempCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height);
         
         // Convert to data URL with high quality
-        const dataUrl = tempCanvas.toDataURL('image/png', 1.0);
+        const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
         
         if (dataUrl) {
           setImageUrl(dataUrl);
@@ -227,7 +227,7 @@ const PolaroidSnapshot = ({
       }
       
       // Try to capture the canvas
-      const dataUrl = canvas.toDataURL('image/png', 1.0);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
       
       // Check if we got a valid image (not just transparent/black)
       if (dataUrl && dataUrl.length > 100) {
@@ -288,7 +288,7 @@ const PolaroidSnapshot = ({
           }
         }
       }).then(canvas => {
-        const dataUrl = canvas.toDataURL('image/png');
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
         setImageUrl(dataUrl);
         setIsVisible(true);
         
@@ -390,8 +390,8 @@ const PolaroidSnapshot = ({
       if (shadow) shadow.style.visibility = '';
       
       // Store both data URL and blob for reuse
-      const dataUrl = canvas.toDataURL('image/png');
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.6));
       
       setPolaroidImageUrl(dataUrl);
       setPolaroidBlob(blob);
@@ -423,14 +423,8 @@ const PolaroidSnapshot = ({
         const capturedUrl = await capturePolaroid();
         // Pass the complete polaroid to onComplete after it's captured
         if (onComplete && capturedUrl) {
-          // Double-check the captured image is the composited one
-          // Note: capturedUrl includes the full polaroid frame, so it's usually larger than the raw composite
-          // Composited images are typically 700KB-2MB, non-composited are typically under 500KB
-          if (backgroundImage && capturedUrl.length < 500000) {
-            console.error('[PolaroidSnapshot] ERROR: Captured image is too small, not composited! Size:', capturedUrl.length);
-            return; // Don't upload the wrong image
-          }
-          console.log('[PolaroidSnapshot] Calling onComplete with image size:', capturedUrl.length, 'composited:', !!compositedImageUrl);
+          // We now use JPEG compression, so file sizes are intentionally smaller (50-200KB instead of 700KB-2MB)
+          console.log('[PolaroidSnapshot] Calling onComplete with compressed JPEG image size:', capturedUrl.length, 'composited:', !!compositedImageUrl);
           onComplete(capturedUrl);
         }
       }, 1500); // Increased delay to ensure background is fully composited

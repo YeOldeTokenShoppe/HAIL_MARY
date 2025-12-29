@@ -80,13 +80,14 @@
 }
 
 .polaroidText {
-  font-family: 'Courier New', monospace;
-  font-size: 18px;
+  font-family: "Homemade Apple", cursive;
+  font-size: 16px;
   color: #333;
   margin: 0;
-  font-weight: bold;
-  text-transform: uppercase;
-  letter-spacing: 2px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0.5px;
+  line-height: 1.4;
 }
 
 .polaroidShadow {
@@ -107,7 +108,7 @@
   }
   
   .polaroidText {
-    font-size: 16px;
+    font-size: 14px;
   }
   
   .polaroid {

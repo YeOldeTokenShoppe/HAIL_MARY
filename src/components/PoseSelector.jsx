@@ -4,6 +4,9 @@ import React from 'react';
 const AVAILABLE_POSES = [
   { id: 'tpose', name: 'T-Pose', animationName: null, icon: '🧍' },
   { id: 'run', name: 'Running', animationName: 'Run_Pose', icon: '🏃' },
+  { id: 'stand1', name: 'Stand Pose 1', animationName: 'StandPose1', icon: '🕴️' },
+  { id: 'stand2', name: 'Stand Pose 2', animationName: 'StandPose2', icon: '🚶' },
+  { id: 'dance', name: 'Dance', animationName: 'Dance_Pose', icon: '🕺' },
   // Add more poses here as you export them:
   // { id: 'idle', name: 'Idle', animationName: 'Idle_Pose', icon: '🧘' },
   // { id: 'wave', name: 'Wave', animationName: 'Wave_Pose', icon: '👋' },
@@ -11,6 +14,9 @@ const AVAILABLE_POSES = [
 ];
 
 function PoseSelector({ selectedPose = 'tpose', onPoseChange }) {
+  // Filter out T-Pose from the selector
+  const selectablePoses = AVAILABLE_POSES.filter(pose => pose.id !== 'tpose');
+  
   return (
     <div style={{
       display: 'flex',
@@ -36,7 +42,7 @@ function PoseSelector({ selectedPose = 'tpose', onPoseChange }) {
         gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
         gap: '8px',
       }}>
-        {AVAILABLE_POSES.map((pose) => (
+        {selectablePoses.map((pose) => (
           <button
             key={pose.id}
             onClick={() => onPoseChange(pose.id)}

@@ -61,15 +61,32 @@ function TattooModelViewer({ modelPath, candleData }) {
       mixerRef.current = null;
     }
     
-    if (candleData?.selectedPose === 'run' && animations?.length > 0) {
-      const runAnimation = animations.find(a => 
-        a.name === 'Run_Pose' || a.name === 'Action'
-      );
+    if (candleData?.selectedPose && candleData.selectedPose !== 'tpose' && animations?.length > 0) {
+      let targetAnimation = null;
       
-      if (runAnimation) {
-        console.log('[TattooModel] Applying animation:', runAnimation.name);
+      // Find the appropriate animation based on selectedPose
+      if (candleData.selectedPose === 'run') {
+        targetAnimation = animations.find(a => 
+          a.name === 'Run_Pose' || a.name.toLowerCase().includes('run')
+        );
+      } else if (candleData.selectedPose === 'dance') {
+        targetAnimation = animations.find(a => 
+          a.name.toLowerCase().includes('dance_pose') || a.name.toLowerCase().includes('dance')
+        );
+      } else if (candleData.selectedPose === 'stand1') {
+        targetAnimation = animations.find(a => 
+          a.name === 'StandPose1' || a.name.includes('StandPose1')
+        );
+      } else if (candleData.selectedPose === 'stand2') {
+        targetAnimation = animations.find(a => 
+          a.name === 'StandPose2' || a.name.includes('StandPose2')
+        );
+      }
+      
+      if (targetAnimation) {
+        console.log('[TattooModel] Applying animation:', targetAnimation.name, 'for pose:', candleData.selectedPose);
         mixerRef.current = new THREE.AnimationMixer(clonedModel);
-        const action = mixerRef.current.clipAction(runAnimation);
+        const action = mixerRef.current.clipAction(targetAnimation);
         action.reset();
         action.setEffectiveWeight(1);
         action.setLoop(THREE.LoopRepeat, Infinity);
@@ -84,15 +101,8 @@ function TattooModelViewer({ modelPath, candleData }) {
     };
   }, [candleData?.selectedPose, animations, clonedModel]);
   
-  // Update animation and tattoo position in frame
-  useFrame((state, delta) => {
-    if (mixerRef.current) {
-      mixerRef.current.update(delta);
-    }
-    
-    // Don't update position in useFrame - it's already attached to the bone
-    // The tattoo will move with the bone automatically
-  });
+  // DON'T use useFrame for tattoos - they should be completely static
+  // The tattoo is attached to the bone and the pose is frozen
   
   // Add tattoo - wait a bit for animation to settle
   React.useEffect(() => {
@@ -279,32 +289,81 @@ function ModelViewer({ modelPath, candleData = null, showPlaque = true, isFlippe
         console.log('[SingleCandleDisplay] Found', Object.keys(bonesMap).length, 'bones');
         
         // Apply animation EXACTLY like CompactCandleModal does
-        if (candleData.selectedPose === 'run' && animations && animations.length > 0) {
-          console.log('[SingleCandleDisplay] Applying run pose animation');
+        console.log('[SingleCandleDisplay] Available animations:', animations?.map(a => a.name));
+        console.log('[SingleCandleDisplay] Selected pose:', candleData.selectedPose);
+        
+        // Clear any existing mixer BEFORE checking for animations
+        if (mixerRef.current) {
+          mixerRef.current.stopAllAction();
+          mixerRef.current = null;
+        }
+        
+        // Create a new mixer for this model
+        mixerRef.current = new THREE.AnimationMixer(clonedModel);
+        
+        if (candleData.selectedPose && animations && animations.length > 0) {
+          console.log('[SingleCandleDisplay] Applying pose animation:', candleData.selectedPose);
           
-          // Clear any existing mixer
-          if (mixerRef.current) {
-            mixerRef.current.stopAllAction();
-            mixerRef.current = null;
+          let targetAnimation = null;
+          
+          console.log('[SingleCandleDisplay] All animation names:', animations.map(a => a.name));
+          
+          if (candleData.selectedPose === 'run') {
+            targetAnimation = animations.find(a => {
+              const name = a.name;
+              return name === 'Run_Pose' || 
+                     name === 'RunPose' || 
+                     name === 'Run' || 
+                     name === 'Character_Rig|Run_Pose' ||
+                     name.toLowerCase().includes('run');
+            });
+          } else if (candleData.selectedPose === 'dance') {
+            targetAnimation = animations.find(a => {
+              const name = a.name;
+              return name === 'Dance_Pose' || 
+                     name === 'DancePose' || 
+                     name === 'Dance' ||
+                     name === 'Character_Rig|Dance_Pose' ||
+                     name.toLowerCase().includes('dance');
+            });
+          } else if (candleData.selectedPose === 'stand1') {
+            targetAnimation = animations.find(a => {
+              const name = a.name;
+              return name === 'StandPose1' || 
+                     name === 'Stand_Pose_1' ||
+                     name === 'Character_Rig|StandPose1' ||
+                     name.includes('StandPose1') ||
+                     (name.includes('stand') && name.includes('1'));
+            });
+          } else if (candleData.selectedPose === 'stand2') {
+            targetAnimation = animations.find(a => {
+              const name = a.name;
+              return name === 'StandPose2' || 
+                     name === 'Stand_Pose_2' ||
+                     name === 'Character_Rig|StandPose2' ||
+                     name.includes('StandPose2') ||
+                     (name.includes('stand') && name.includes('2'));
+            });
           }
           
-          const runAnimation = animations.find(a => 
-            a.name === 'Run_Pose' || a.name.toLowerCase().includes('run')
-          );
-          
-          if (runAnimation) {
-            console.log('[SingleCandleDisplay] Playing:', runAnimation.name);
+          if (targetAnimation) {
+            console.log('[SingleCandleDisplay] Found target animation:', targetAnimation.name, 'duration:', targetAnimation.duration);
             
-            mixerRef.current = new THREE.AnimationMixer(clonedModel);
-            const action = mixerRef.current.clipAction(runAnimation);
+            // Stop ALL actions first to prevent blending
+            mixerRef.current.stopAllAction();
+            
+            // Now play only the target animation - match working version
+            const action = mixerRef.current.clipAction(targetAnimation);
             action.reset();
             action.setEffectiveWeight(1);
             action.setLoop(THREE.LoopRepeat, Infinity);
             action.play();
-            mixerRef.current.update(0);
+            
+            // Use update(0.5) like the working version
+            mixerRef.current.update(0.5);
             clonedModel.updateMatrixWorld(true);
             
-            // Rebuild bones map after animation like CompactCandleModal
+            // Rebuild bones map after animation
             const newBonesMap = {};
             clonedModel.traverse(child => {
               if (child.isSkinnedMesh && child.skeleton) {
@@ -674,20 +733,17 @@ function ModelViewer({ modelPath, candleData = null, showPlaque = true, isFlippe
     };
   }, [scene, materials, candleData]);
   
-  // Update animation mixer and skeleton - matching CompactCandleModal
+  // Update animation mixer - but NOT for tattoos with poses (they should be frozen)
   useFrame((state, delta) => {
-    // Animation mixer update - CRITICAL for applying the pose!
-    if (mixerRef.current && candleData?.selectedPose === 'run') {
+    // For tattoos with poses, DON'T update anything - keep completely frozen
+    if (candleData?.devotionType === 'tattoo' && candleData?.selectedPose) {
+      // Do nothing - keep the pose frozen exactly where we set it
+      return;
+    }
+    
+    // For non-tattoo items or items without poses, update normally
+    if (mixerRef.current) {
       mixerRef.current.update(delta);
-      
-      // Also force skeleton updates
-      if (groupRef.current) {
-        groupRef.current.traverse((child) => {
-          if (child.isSkinnedMesh && child.skeleton) {
-            child.skeleton.update();
-          }
-        });
-      }
     }
   });
   
@@ -774,43 +830,94 @@ export default function SingleCandleDisplay({ onOpenCompactModal, onClose }) {
     const fetchAllCandles = async () => {
       try {
         setLoading(true);
-        const candlesRef = collection(db, 'candles');
+        const allData = [];
         
-        // Fetch more for leaderboard to ensure we get high burners
-        const limitCount = filterMode === 'leaderboard' ? 50 : 20;
+        // Fetch from legacy candles collection
+        const candlesRef = collection(db, 'candles');
+        const limitCount = filterMode === 'leaderboard' ? 25 : 10;
         const q = query(candlesRef, orderBy('createdAt', 'desc'), limit(limitCount));
         const snapshot = await getDocs(q);
         
         const candlesData = snapshot.docs.map(doc => {
           const data = doc.data();
-          // Debug log for tattoo devotions
-          if (data.devotionType === 'tattoo') {
-            console.log('[SingleCandleDisplay] Fetched tattoo candle:', {
-              id: doc.id,
-              selectedPose: data.selectedPose,
-              devotionType: data.devotionType,
-              tattooCharacter: data.tattooCharacter
-            });
-          }
           return {
             id: doc.id,
-            ...data
+            ...data,
+            isPolaroid: false
           };
         });
         
+        allData.push(...candlesData);
+        
+        // Also fetch from polaroids collection
+        const polaroidsRef = collection(db, 'polaroids');
+        const polaroidQuery = query(polaroidsRef, limit(limitCount));
+        const polaroidSnapshot = await getDocs(polaroidQuery);
+        
+        const polaroidsData = polaroidSnapshot.docs.map(doc => {
+          const data = doc.data();
+          // Debug log for polaroid items
+          console.log('[SingleCandleDisplay] Fetched polaroid:', {
+            id: doc.id,
+            devotionType: data.devotionType,
+            username: data.username
+          });
+          return {
+            id: doc.id,
+            ...data,
+            // Map polaroid fields to expected format
+            isPolaroid: true,
+            image: data.imageUrl, // Polaroids use imageUrl for the snapshot
+            userName: data.username || 'Anonymous',
+            burnedAmount: parseInt(data.burnedAmount) || 0,
+            candleType: data.candleType || data.devotionType || 'votive',
+            createdAt: data.createdAt,
+            devotionType: data.devotionType,
+            tattooDesign: data.tattooDesign,
+            tattooCharacter: data.tattooCharacter,
+            baseColor: data.baseColor,
+            background: data.background
+          };
+        });
+        
+        allData.push(...polaroidsData);
+        
         // Log memory usage info
-        if (candlesData.length > 0) {
-          const totalSize = candlesData.reduce((sum, candle) => sum + getObjectSize(candle), 0);
-          const avgSize = Math.round(totalSize / candlesData.length);
-          // console.log('Candles memory usage:', {
-          //   totalRecords: candlesData.length,
-          //   totalSize: `${(totalSize / 1024).toFixed(2)} KB`,
-          //   averageSize: `${avgSize} bytes`,
-          //   largestRecord: Math.max(...candlesData.map(c => getObjectSize(c))) + ' bytes'
-          // });
+        if (allData.length > 0) {
+          const totalSize = allData.reduce((sum, candle) => sum + getObjectSize(candle), 0);
+          const avgSize = Math.round(totalSize / allData.length);
+          console.log(`Fetched ${allData.length} total items (${polaroidsData.length} polaroids, ${candlesData.length} legacy)`);
         }
         
-        setAllCandles(candlesData);
+        // Sort all data by createdAt
+        const sortedData = allData.sort((a, b) => {
+          // Handle different timestamp formats
+          const getTime = (item) => {
+            if (item.createdAt?.seconds) return item.createdAt.seconds;
+            if (item.createdAt instanceof Date) return item.createdAt.getTime() / 1000;
+            if (typeof item.createdAt === 'string') return new Date(item.createdAt).getTime() / 1000;
+            return 0;
+          };
+          
+          const aTime = getTime(a);
+          const bTime = getTime(b);
+          return bTime - aTime; // Descending order (newest first)
+        });
+        
+        // Apply filter mode
+        let processedData = sortedData;
+        if (filterMode === 'leaderboard') {
+          // Filter and sort by burnedAmount for leaderboard
+          processedData = sortedData
+            .filter(candle => candle.burnedAmount && candle.burnedAmount > 100)
+            .sort((a, b) => (b.burnedAmount || 0) - (a.burnedAmount || 0))
+            .slice(0, 10); // Top 10 burners
+        } else {
+          // Take first 20 for other modes
+          processedData = sortedData.slice(0, 20);
+        }
+        
+        setAllCandles(processedData);
         setLoading(false);
       } catch (error) {
         console.error('Error fetching all candles:', error);
@@ -832,13 +939,16 @@ export default function SingleCandleDisplay({ onOpenCompactModal, onClose }) {
       
       try {
         setLoadingMyCandles(true);
+        const allUserData = [];
+        
+        // Fetch from legacy candles collection
         const candlesRef = collection(db, 'candles');
         
         // First try by createdBy (user ID) which is most reliable
         let q = query(
           candlesRef, 
           where('createdBy', '==', user.id),
-          limit(20) // Reduced from 50 to 20
+          limit(10) // Reduced limit
         );
         let snapshot = await getDocs(q);
         
@@ -848,7 +958,7 @@ export default function SingleCandleDisplay({ onOpenCompactModal, onClose }) {
           q = query(
             candlesRef, 
             where('createdByUsername', '==', userIdentifier),
-            limit(20) // Reduced from 50 to 20
+            limit(10) // Reduced limit
           );
           snapshot = await getDocs(q);
           // console.log(`Found ${snapshot.size} candles for username: ${userIdentifier}`);
@@ -856,19 +966,61 @@ export default function SingleCandleDisplay({ onOpenCompactModal, onClose }) {
         
         const userCandlesData = snapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
+          ...doc.data(),
+          isPolaroid: false
         }));
         
-        // Log memory usage for user candles
-        if (userCandlesData.length > 0) {
-          const totalSize = userCandlesData.reduce((sum, candle) => sum + getObjectSize(candle), 0);
-
+        allUserData.push(...userCandlesData);
+        
+        // Also fetch from polaroids collection (new candles and tattoos)
+        const polaroidsRef = collection(db, 'polaroids');
+        const polaroidQuery = query(
+          polaroidsRef,
+          where('username', '==', userIdentifier),
+          limit(10)
+        );
+        const polaroidSnapshot = await getDocs(polaroidQuery);
+        
+        const polaroidsData = polaroidSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            // Map polaroid fields to expected format
+            isPolaroid: true,
+            image: data.imageUrl, // Polaroids use imageUrl for the snapshot
+            userName: data.username || 'Anonymous',
+            burnedAmount: parseInt(data.burnedAmount) || 0,
+            candleType: data.candleType || data.devotionType || 'votive',
+            createdAt: data.createdAt,
+            devotionType: data.devotionType,
+            tattooDesign: data.tattooDesign,
+            tattooCharacter: data.tattooCharacter,
+            baseColor: data.baseColor,
+            background: data.background
+          };
+        });
+        
+        allUserData.push(...polaroidsData);
+        
+        // Log memory usage for combined data
+        if (allUserData.length > 0) {
+          const totalSize = allUserData.reduce((sum, candle) => sum + getObjectSize(candle), 0);
+          console.log(`Fetched ${allUserData.length} user items (${polaroidsData.length} polaroids, ${userCandlesData.length} legacy)`);
         }
         
         // Sort by createdAt client-side to avoid needing composite index
-        const sortedUserCandles = userCandlesData.sort((a, b) => {
-          const aTime = a.createdAt?.seconds || 0;
-          const bTime = b.createdAt?.seconds || 0;
+        const sortedUserCandles = allUserData.sort((a, b) => {
+          // Handle different timestamp formats
+          const getTime = (item) => {
+            if (item.createdAt?.seconds) return item.createdAt.seconds;
+            if (item.createdAt instanceof Date) return item.createdAt.getTime() / 1000;
+            if (typeof item.createdAt === 'string') return new Date(item.createdAt).getTime() / 1000;
+            return 0;
+          };
+          
+          const aTime = getTime(a);
+          const bTime = getTime(b);
           return bTime - aTime; // Descending order (newest first)
         });
         
@@ -1196,7 +1348,7 @@ export default function SingleCandleDisplay({ onOpenCompactModal, onClose }) {
               textShadow: activeTab === 'all' ? '0 0 10px rgba(255, 215, 0, 0.5)' : 'none'
             }}
           >
-            All Candles
+            All Devotions
           </button>
           <button
             onClick={() => setActiveTab('my')}
@@ -1214,7 +1366,7 @@ export default function SingleCandleDisplay({ onOpenCompactModal, onClose }) {
               textShadow: activeTab === 'my' ? '0 0 10px rgba(255, 215, 0, 0.5)' : 'none'
             }}
           >
-            My Candle
+            My Devotions
           </button>
           <button
             onClick={() => setActiveTab('summary')}
@@ -1617,8 +1769,8 @@ export default function SingleCandleDisplay({ onOpenCompactModal, onClose }) {
               You haven't created any candles yet
             </div>
           </div>
-        ) : activeTab !== 'summary' && currentCandle?.devotionType === 'tattoo' && currentCandle?.image ? (
-          // Display snapshot for tattoo devotions
+        ) : activeTab !== 'summary' && currentCandle?.isPolaroid && currentCandle?.image ? (
+          // Display polaroid snapshot for both tattoo and candle devotions from polaroids collection
           <div style={{
             position: 'absolute',
             top: '50%',

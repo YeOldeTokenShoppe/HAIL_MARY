@@ -20,8 +20,9 @@ export function useRandomCandles(maxCandles = 20) {
       try {
         const allCandles = [];
         
-        // First, get user's own candles if logged in
+        // First, get user's own items from BOTH collections if logged in
         if (isSignedIn && user?.id) {
+          // Get from legacy candles collection
           const userQuery = query(
             collection(db, "candles"),
             where("createdBy", "==", user.id),
@@ -37,20 +38,40 @@ export function useRandomCandles(maxCandles = 20) {
           }));
           
           allCandles.push(...userCandles);
+          
+          // Get from new polaroids collection (for both candles and tattoos)
+          const polaroidQuery = query(
+            collection(db, "polaroids"),
+            where("username", "==", user.username || user.firstName || user.id),
+            limit(10) // Limit user's own polaroids to 10
+          );
+          
+          const polaroidSnapshot = await getDocs(polaroidQuery);
+          const userPolaroids = polaroidSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            isUserCandle: true,
+            isPolaroid: true, // Mark as from polaroids collection
+            createdAt: doc.data().createdAt?.toDate() || new Date()
+          }));
+          
+          allCandles.push(...userPolaroids);
         }
         
         // Calculate how many random candles we need
         const randomCandlesNeeded = Math.max(0, maxCandles - allCandles.length);
         
         if (randomCandlesNeeded > 0) {
-          // Get all candles (we'll randomly select from these)
+          const poolCandles = [];
+          
+          // Get from legacy candles collection
           const allQuery = query(
             collection(db, "candles"),
-            limit(100) // Get a pool of 100 to randomly select from
+            limit(50) // Get a pool of 50 to randomly select from
           );
           
           const allSnapshot = await getDocs(allQuery);
-          const poolCandles = allSnapshot.docs
+          const legacyCandles = allSnapshot.docs
             .map(doc => ({
               id: doc.id,
               ...doc.data(),
@@ -62,7 +83,31 @@ export function useRandomCandles(maxCandles = 20) {
               !isSignedIn || !user?.id || candle.createdBy !== user.id
             );
           
-          // Randomly shuffle and select
+          poolCandles.push(...legacyCandles);
+          
+          // Get from new polaroids collection
+          const polaroidQuery = query(
+            collection(db, "polaroids"),
+            limit(50) // Get a pool of 50 polaroids
+          );
+          
+          const polaroidSnapshot = await getDocs(polaroidQuery);
+          const polaroids = polaroidSnapshot.docs
+            .map(doc => ({
+              id: doc.id,
+              ...doc.data(),
+              isUserCandle: false,
+              isPolaroid: true,
+              createdAt: doc.data().createdAt?.toDate() || new Date()
+            }))
+            .filter(item => 
+              // Filter out user's items from the pool
+              !isSignedIn || !user || item.username !== (user.username || user.firstName || user.id)
+            );
+          
+          poolCandles.push(...polaroids);
+          
+          // Randomly shuffle and select from combined pool
           const shuffled = poolCandles.sort(() => 0.5 - Math.random());
           const randomSelection = shuffled.slice(0, randomCandlesNeeded);
           
@@ -70,24 +115,55 @@ export function useRandomCandles(maxCandles = 20) {
         }
         
         // Format all candles consistently
-        const formattedCandles = allCandles.map(candle => ({
-          id: candle.id,
-          userName: candle.username || candle.userName || "Anonymous",
-          image: candle.image,
-          message: candle.message,
-          burnedAmount: candle.burnedAmount || 1,
-          staked: candle.staked || false,
-          likes: candle.likes || 0,
-          allowLikes: candle.allowLikes !== false,
-          createdAt: candle.createdAt,
-          messageType: candle.messageType,
-          candleType: candle.candleType || 'votive',
-          candleHeight: candle.candleHeight || 'medium',
-          background: candle.background,
-          createdBy: candle.createdBy,
-          createdByUsername: candle.createdByUsername,
-          isUserCandle: candle.isUserCandle || false
-        }));
+        const formattedCandles = allCandles.map(candle => {
+          // Handle polaroid data structure
+          if (candle.isPolaroid) {
+            return {
+              id: candle.id,
+              userName: candle.username || "Anonymous",
+              image: candle.imageUrl, // Polaroids store the snapshot URL in imageUrl
+              message: candle.message || "",
+              burnedAmount: parseInt(candle.burnedAmount) || 0,
+              staked: candle.staked || false,
+              likes: candle.likes || 0,
+              allowLikes: candle.allowLikes !== false,
+              createdAt: candle.createdAt,
+              messageType: candle.messageType,
+              candleType: candle.candleType || candle.devotionType || 'votive',
+              candleHeight: candle.candleHeight || 'medium',
+              background: candle.background,
+              createdBy: candle.createdBy || candle.username,
+              createdByUsername: candle.username,
+              isUserCandle: candle.isUserCandle || false,
+              isPolaroid: true,
+              devotionType: candle.devotionType, // 'candle' or 'tattoo'
+              tattooDesign: candle.tattooDesign,
+              tattooCharacter: candle.tattooCharacter,
+              baseColor: candle.baseColor
+            };
+          }
+          
+          // Handle legacy candle data structure
+          return {
+            id: candle.id,
+            userName: candle.username || candle.userName || "Anonymous",
+            image: candle.image,
+            message: candle.message,
+            burnedAmount: candle.burnedAmount || 1,
+            staked: candle.staked || false,
+            likes: candle.likes || 0,
+            allowLikes: candle.allowLikes !== false,
+            createdAt: candle.createdAt,
+            messageType: candle.messageType,
+            candleType: candle.candleType || 'votive',
+            candleHeight: candle.candleHeight || 'medium',
+            background: candle.background,
+            createdBy: candle.createdBy,
+            createdByUsername: candle.createdByUsername,
+            isUserCandle: candle.isUserCandle || false,
+            isPolaroid: false
+          };
+        });
         
         setCandles(formattedCandles);
       } catch (error) {

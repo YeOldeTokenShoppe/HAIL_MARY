@@ -62,20 +62,6 @@ function CandleScene({ userData, onReady }) {
   let scene, animations;
   try {
     const model = useGLTF(modelPath);
-    console.log('[Snapshot] Loaded model from:', modelPath);
-    console.log('[Snapshot] Model object:', model);
-    console.log('[Snapshot] Model animations:', model.animations);
-    
-    // Check if Character_Rig has animations
-    let characterRig = null;
-    model.scene.traverse((child) => {
-      console.log('[Snapshot] Checking child:', child.name, 'type:', child.type);
-      if (child.name === 'Character_Rig') {
-        characterRig = child;
-        console.log('[Snapshot] Found Character_Rig!', child);
-      }
-    });
-    
     scene = model.scene;
     animations = model.animations;
   } catch (error) {
@@ -103,7 +89,7 @@ function CandleScene({ userData, onReady }) {
     if (userData?.devotionType === 'tattoo') {
       clonedScene = SkeletonUtilsClone(scene);
       clonedScene.scale.set(1.5, 1.5, 1.5);
-      clonedScene.position.set(0, -2, -1);  // Lowered to center character in frame
+      clonedScene.position.set(0, 0.2, -1);  // Raised from -2 to -1.5 to better center the figure
     } else {
       clonedScene = scene.clone();
     }
@@ -122,86 +108,34 @@ function CandleScene({ userData, onReady }) {
     
     // Apply animation for tattoo characters (if not T-pose)
     console.log('[Snapshot] Checking animation - devotionType:', userData?.devotionType, 'selectedPose:', userData?.selectedPose);
-    console.log('[Snapshot] Animations object:', animations);
-    console.log('[Snapshot] Number of animations:', animations?.length);
-    
-    // Simplified condition for debugging
-    if (userData?.devotionType === 'tattoo') {
-      console.log('[Snapshot] Tattoo detected, will try to apply pose:', userData?.selectedPose);
+    if (userData?.devotionType === 'tattoo' && userData?.selectedPose && userData.selectedPose !== 'tpose') {
+      console.log('[Snapshot] Should apply pose:', userData.selectedPose);
       console.log('[Snapshot] Available animations:', animations?.map(a => a.name));
       
-      if (animations && animations.length > 0) {
-        let targetAnimation = null;
+      // Look for run animation
+      if (userData.selectedPose === 'run' && animations && animations.length > 0) {
+        const runAnimation = animations.find(a => {
+          const name = a.name.toLowerCase();
+          const searchTerms = ['Run_Pose', 'run', 'running'];
+          return searchTerms.some(term => name.includes(term));
+        });
         
-        // Look for the appropriate animation based on selectedPose
-        if (userData.selectedPose === 'run') {
-          console.log('[Snapshot] Looking for run animation...');
-          console.log('[Snapshot] All animation names:', animations.map(a => a.name));
-          
-          targetAnimation = animations.find(a => {
-            const name = a.name;
-            console.log('[Snapshot] Checking animation:', name, 'duration:', a.duration);
-            // Check various possible names
-            return name === 'Run_Pose' || 
-                   name === 'RunPose' || 
-                   name === 'Run' || 
-                   name === 'Character_Rig|Run_Pose' ||  // Sometimes animations are named with rig prefix
-                   name.toLowerCase().includes('run');
-          });
-        } else if (userData.selectedPose === 'dance') {
-          targetAnimation = animations.find(a => {
-            const name = a.name;
-            return name === 'Dance_Pose' || 
-                   name === 'DancePose' || 
-                   name === 'Dance' ||
-                   name === 'Character_Rig|Dance_Pose' ||
-                   name.toLowerCase().includes('dance');
-          });
-        } else if (userData.selectedPose === 'stand1') {
-          targetAnimation = animations.find(a => {
-            const name = a.name;
-            return name === 'StandPose1' || 
-                   name === 'Stand_Pose_1' ||
-                   name === 'Character_Rig|StandPose1' ||
-                   name.includes('StandPose1') ||
-                   name.includes('stand') && name.includes('1');
-          });
-        } else if (userData.selectedPose === 'stand2') {
-          targetAnimation = animations.find(a => {
-            const name = a.name;
-            return name === 'StandPose2' || 
-                   name === 'Stand_Pose_2' ||
-                   name === 'Character_Rig|StandPose2' ||
-                   name.includes('StandPose2') ||
-                   name.includes('stand') && name.includes('2');
-          });
-        }
-        
-        if (targetAnimation) {
-          console.log('[Snapshot] Found animation:', targetAnimation.name, 'duration:', targetAnimation.duration, 'for pose:', userData.selectedPose);
-          
+        if (runAnimation) {
+          console.log('[Snapshot] Found animation:', runAnimation.name, 'duration:', runAnimation.duration);
           const mixer = new THREE.AnimationMixer(clonedScene);
+          const action = mixer.clipAction(runAnimation);
           
-          // Stop all actions first to prevent blending
-          mixer.stopAllAction();
-          
-          const action = mixer.clipAction(targetAnimation);
-          // Match EXACTLY what the working version does
+          // Match exactly what CompactCandleModal does
           action.reset();
           action.setEffectiveWeight(1);
           action.setLoop(THREE.LoopRepeat, Infinity);
           action.play();
-          
-          // Use update(0.5) like the working version - this actually works!
           mixer.update(0.5);
           clonedScene.updateMatrixWorld(true);
           
-          // Store mixer to potentially update it later if needed
-          mixerRef.current = mixer;
-          
-          console.log('[Snapshot] Animation applied:', targetAnimation.name, 'duration:', targetAnimation.duration);
+          console.log('[Snapshot] Running animation applied (matching CompactCandleModal)');
         } else {
-          console.warn('[Snapshot] No animation found for pose:', userData.selectedPose);
+          console.warn('[Snapshot] No run animation found');
         }
       }
     }
@@ -541,10 +475,20 @@ function CandleScene({ userData, onReady }) {
               side: THREE.DoubleSide,
             });
             
+            if (!roomTextureNeeded && !isTattooScene && onReady) {
+              setTimeout(onReady, 1000);
+            }
           });
         }
       });
       
+      if (!labelFound && !roomTextureNeeded && !isTattooScene && onReady) {
+        setTimeout(onReady, 500);
+      }
+    } else {
+      if (!roomTextureNeeded && !isTattooScene && onReady) {
+        setTimeout(onReady, 500);
+      }
     }
     
     // Set up animation for votive candles only
@@ -591,22 +535,8 @@ function CandleScene({ userData, onReady }) {
           if (candleRef.current) {
             candleRef.current.add(backgroundPlane);
           }
-          
-          // Call onReady after background is loaded
-          if (onReady && !isTattooScene) {
-            setTimeout(() => {
-              console.log('[Snapshot] Triggering ready after background load for candle');
-              onReady();
-            }, 500);
-          }
         }
       );
-    } else if (!isTattooScene && onReady) {
-      // If no background needed, still call onReady for candles
-      setTimeout(() => {
-        console.log('[Snapshot] Triggering ready for candle (no background)');
-        onReady();
-      }, 500);
     }
     
     return () => {
@@ -655,9 +585,7 @@ function CandleScene({ userData, onReady }) {
         flamePointLightRef.current.position.set(center.x, center.y + 1.8, center.z);
       }
       
-      // Only update animation for votive candles, NOT for tattoos
-      // Tattoos should stay frozen at their setTime position
-      if (mixerRef.current && userData?.candleType === 'votive' && userData?.devotionType !== 'tattoo') {
+      if (mixerRef.current && userData?.candleType === 'votive') {
         mixerRef.current.update(0.016);
       }
       
@@ -702,19 +630,8 @@ export default function CandleSnapshotRenderer({
   const [triggerSnapshot, setTriggerSnapshot] = useState(false);
   const [sceneReady, setSceneReady] = useState(false);
   const [showLoading, setShowLoading] = useState(!preloadOnly && !instantCapture);
-  const [loadingMessage, setLoadingMessage] = useState('Preparing your devotion...');
   const canvasRef = useRef();
-  const hasUploadedRef = useRef(false); // Prevent duplicate uploads
   
-  useEffect(() => {
-    // Update loading message based on devotion type
-    if (userData?.devotionType === 'tattoo') {
-      setLoadingMessage('Loading character model...');
-    } else {
-      setLoadingMessage('Preparing your candle...');
-    }
-  }, [userData?.devotionType]);
-
   useEffect(() => {
     if (sceneReady && isVisible) {
       if (preloadOnly && onReady) {
@@ -727,9 +644,6 @@ export default function CandleSnapshotRenderer({
         setTriggerSnapshot(true);
         return;
       }
-      
-      // Update message when scene is ready
-      setLoadingMessage('Creating your snapshot...');
       
       const timer = setTimeout(() => {
         setShowLoading(false);
@@ -750,10 +664,8 @@ export default function CandleSnapshotRenderer({
       onComplete(imageData);
     }
     
-    // Upload to Firebase via API - but only once per instance
-    if (saveToFirebase && imageData && !hasUploadedRef.current) {
-      hasUploadedRef.current = true; // Mark as uploaded to prevent duplicates
-      console.log(`[CandleSnapshotRenderer-${renderInstanceId.current}] Starting Firebase upload`);
+    // Upload to Firebase via API
+    if (saveToFirebase && imageData) {
       try {
         // Check if this image has a background by looking at its content
         const hasBackground = imageData && imageData.length > 2000000; // Composited images are larger
@@ -784,7 +696,6 @@ export default function CandleSnapshotRenderer({
               tattooCharacter: userData?.tattooCharacter,
               candleType: userData?.candleType,
               baseColor: userData?.baseColor,
-              selectedPose: userData?.selectedPose || 'run',
             },
           }),
         });
@@ -806,8 +717,6 @@ export default function CandleSnapshotRenderer({
           onFirebaseUploadComplete({ success: false, error: error.message });
         }
       }
-    } else if (saveToFirebase && imageData && hasUploadedRef.current) {
-      console.log(`[CandleSnapshotRenderer-${renderInstanceId.current}] Skipping duplicate Firebase upload`);
     }
   };
   
@@ -845,9 +754,7 @@ export default function CandleSnapshotRenderer({
             minWidth: '320px'
           }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-              <div style={{ fontSize: '48px', animation: 'bounce 1s ease infinite' }}>
-                {userData?.devotionType === 'tattoo' ? '🎨' : '🕯️'}
-              </div>
+              <div style={{ fontSize: '48px', animation: 'bounce 1s ease infinite' }}>🕯️</div>
               <h2 style={{
                 color: '#00ff00',
                 fontSize: '24px',
@@ -856,7 +763,7 @@ export default function CandleSnapshotRenderer({
                 textAlign: 'center',
                 textShadow: '0 0 20px rgba(0, 255, 0, 0.5)'
               }}>
-                Your message to RL80 has been created! ✨
+                Your candle has been lit! ✨
               </h2>
             </div>
             
@@ -869,7 +776,7 @@ export default function CandleSnapshotRenderer({
                 boxShadow: '0 0 20px rgba(0, 255, 0, 0.5)'
               }} />
               <div style={{ color: 'rgba(255, 255, 255, 0.8)', fontSize: '16px' }}>
-                {loadingMessage}
+                Creating your snapshot...
               </div>
             </div>
             
@@ -909,10 +816,7 @@ export default function CandleSnapshotRenderer({
       >
         <Canvas 
           ref={canvasRef} 
-          camera={{ 
-            position: userData?.devotionType === 'tattoo' ? [0, 2, 6] : [0, -1.7, 5], 
-            fov: 40 
-          }}
+          camera={{ position: [0, -2, 6], fov: 40 }}
           gl={{ alpha: true, preserveDrawingBuffer: true }}
         >
           {/* Only set black background if NOT a tattoo devotion with background */}

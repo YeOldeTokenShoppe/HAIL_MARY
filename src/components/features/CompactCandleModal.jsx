@@ -3004,7 +3004,7 @@ export default function CompactCandleModal({
                   textAlign: 'center',
                   marginTop: '8px'
                 }}>
-                  ⚠️ Minimum 1000 tokens required to light candle
+                  ⚠️ Minimum 1000 tokens required
                 </div>
               ) : (
                 <div style={{
@@ -3504,7 +3504,7 @@ export default function CompactCandleModal({
         <div className="compact-modal-layout">
           
           <div className={`compact-candle-preview ${currentStep === 4 ? 'message-step' : ''}`}>
-            <div className="preview-label">Your Candle Preview</div>
+            <div className="preview-label">Preview</div>
             
             <div style={{
                 width: '100%',
@@ -3717,7 +3717,7 @@ export default function CompactCandleModal({
                   fontWeight: 'bold',
                   boxShadow: '0 4px 15px rgba(255, 107, 53, 0.4)'
                 }} disabled={isSubmitting || !formData.messageType || !formData.candleType || !formData.username.trim() || !formData.burnedAmount || formData.burnedAmount === '0' || parseInt(formData.burnedAmount) === 0}>
-                  {isSubmitting ? 'Lighting...' : 'Light Candle 🔥'}
+                  {isSubmitting ? 'Lighting...' : 'Send it! 🔥'}
                 </button>}
             </div>
             
@@ -4272,7 +4272,7 @@ export default function CompactCandleModal({
                     fontWeight: 'bold',
                     transition: 'all 0.2s ease'
                   }}>
-                  {isSubmitting ? <span>Creating...</span> : <span>🕯️ Light Candle</span>}
+                  {isSubmitting ? <span>Creating...</span> : <span>Send it!</span>}
                 </button>
               </div>
 
