@@ -20,19 +20,20 @@ export const useMusic = () => {
 
 // Track lists
 const non80sTracks = [
-  { name: "Lifetimes", path: "audio/192k/07-lifetimes.m4a", bpm: 135 },
-  { name: "Magnetic - Tunde Adebimpe", path: "audio/320k/01-magnetic.m4a", bpm: 130 },
-  { name: "Rocket Man - Steven Drozd", path: "audio/320k/rocket-man---steven-drozd.m4a", bpm: 45 }
+  { name: "Lifetimes", path: "audio/07 Lifetimes.m4a", bpm: 135 },
+  { name: "Magnetic - Tunde Adebimpe", path: "audio/01 Magnetic.m4a", bpm: 130 },
+  { name: "Rocket Man - Steven Drozd", path: "audio/rocketMan.m4a", bpm: 45 }
 ];
 
 const eightyTracks = [
-  { name: "For Those About To Rock - AC/DC", path: "audio/320k/for-those-about-to-rock-ac-dc.m4a", bpm: 75 },
-  { name: "Dirty Cash - The Adventures of Stevie V", path: "audio/320k/dirty-cash.m4a", bpm: 100 },
-  { name: "Intergalactic - Beastie Boys", path: "audio/320k/intergalactic-beastie-boys.m4a", bpm: 108 },
-  { name: "Good Life - Inner City", path: "audio/320k/good-life-inner-city.m4a", bpm: 120 },
-  { name: "Like A Prayer - Madonna", path: "audio/320k/like-a-prayer-madonna.m4a", bpm: 85 },
-  { name: "99 Luftballoons - Nena", path: "audio/320k/99-luftballoons-nena.m4a", bpm: 85 },
-  { name: "Sweet Dreams - Eurythmics", path: "audio/320k/sweet-dreams-eurythmics.m4a", bpm: 85 }
+  { name: "For Those About To Rock - AC/DC", path: "audio/for-those-about-to-rock-ac-dc.m4a", bpm: 75 },
+  { name: "Dirty Cash - The Adventures of Stevie V", path: "audio/Dirty Cash.m4a", bpm: 100 },
+  { name: "Intergalactic - Beastie Boys", path: "audio/intergalactic.mp3", bpm: 108 },
+  { name: "Good Life - Inner City", path: "audio/good-life-inner-city.m4a", bpm: 120 },
+  { name: "Like A Prayer - Madonna", path: "audio/like-a-prayer-madonna.m4a", bpm: 85 },
+  { name: "99 Luftballoons - Nena", path: "audio/99 Luftballoons Nena.m4a", bpm: 85 },
+  { name: "Sweet Dreams - Eurythmics", path: "audio/Sweet Dreams Eurythmics.m4a", bpm: 85 },
+  { name: "Every Little Thing She Does (Is Magic) - The Police", path: "audio/EveryLittleThing.mp3", bpm: 85 }
 ];
 
 // Music Provider component
