@@ -1,11 +1,20 @@
 import React, { useRef, useState, useEffect, Suspense } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls, useGLTF } from '@react-three/drei';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
+import { clone as SkeletonUtilsClone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { collection, getDocs, query, orderBy, limit, where, doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebaseClient';
 import { useUser, SignIn } from '@clerk/nextjs';
 
+// Preload models like CandleSnapshotRenderer does
+if (typeof window !== 'undefined') {
+  useGLTF.preload('/models/tinyVotiveBox.glb');
+  useGLTF.preload('/models/tinyJapCanBox.glb');
+  useGLTF.preload('/models/blockhead1.glb');
+  useGLTF.preload('/models/blockhead2.glb');
+  useGLTF.preload('/models/blockhead_runner.glb');
+}
 
 // Helper function to decode HTML entities
 function decodeHTMLEntities(text) {
@@ -15,69 +24,352 @@ function decodeHTMLEntities(text) {
   return textarea.value;
 }
 
+// New component specifically for tattoo models - matching CompactCandleModal's SimpleTattooViewer
+function TattooModelViewer({ modelPath, candleData }) {
+  console.log('[TattooModelViewer] Props received:', {
+    modelPath,
+    candleData: {
+      tattooDesign: candleData?.tattooDesign,
+      tattooPlacement: candleData?.tattooPlacement,
+      selectedPose: candleData?.selectedPose,
+      devotionType: candleData?.devotionType
+    }
+  });
+  
+  const { scene, animations } = useGLTF(modelPath);
+  const groupRef = useRef();
+  const mixerRef = useRef();
+  const tattooMeshRef = useRef();
+  
+  // Clone model using useMemo
+  const clonedModel = React.useMemo(() => {
+    const clone = SkeletonUtilsClone(scene);
+    clone.scale.set(1.5, 1.5, 1.5);
+    clone.position.set(0, 0.5, -1);
+    return clone;
+  }, [scene]);
+  
+  // Set group ref
+  React.useEffect(() => {
+    groupRef.current = clonedModel;
+  }, [clonedModel]);
+  
+  // Apply pose animation
+  React.useEffect(() => {
+    if (mixerRef.current) {
+      mixerRef.current.stopAllAction();
+      mixerRef.current = null;
+    }
+    
+    if (candleData?.selectedPose === 'run' && animations?.length > 0) {
+      const runAnimation = animations.find(a => 
+        a.name === 'Run_Pose' || a.name === 'Action'
+      );
+      
+      if (runAnimation) {
+        console.log('[TattooModel] Applying animation:', runAnimation.name);
+        mixerRef.current = new THREE.AnimationMixer(clonedModel);
+        const action = mixerRef.current.clipAction(runAnimation);
+        action.reset();
+        action.setEffectiveWeight(1);
+        action.setLoop(THREE.LoopRepeat, Infinity);
+        action.play();
+        mixerRef.current.update(0);
+        clonedModel.updateMatrixWorld(true);
+      }
+    }
+    
+    return () => {
+      if (mixerRef.current) mixerRef.current.stopAllAction();
+    };
+  }, [candleData?.selectedPose, animations, clonedModel]);
+  
+  // Update animation and tattoo position in frame
+  useFrame((state, delta) => {
+    if (mixerRef.current) {
+      mixerRef.current.update(delta);
+    }
+    
+    // Don't update position in useFrame - it's already attached to the bone
+    // The tattoo will move with the bone automatically
+  });
+  
+  // Add tattoo - wait a bit for animation to settle
+  React.useEffect(() => {
+    if (!candleData?.tattooPlacement || !candleData?.tattooDesign) {
+      console.log('[TattooModel] No tattoo data');
+      return;
+    }
+    
+    // Remove old tattoo
+    if (tattooMeshRef.current) {
+      tattooMeshRef.current.parent?.remove(tattooMeshRef.current);
+      tattooMeshRef.current.geometry?.dispose();
+      tattooMeshRef.current.material?.dispose();
+      tattooMeshRef.current = null;
+    }
+    
+    // Add a small delay to ensure model is ready
+    const timer = setTimeout(() => {
+      const placement = candleData.tattooPlacement;
+      console.log('[TattooModel] Applying tattoo:', placement.boneName);
+      
+      const textureLoader = new THREE.TextureLoader();
+      
+      const imagePath = `/images/${candleData.tattooDesign}.png`;
+      console.log('[TattooModel] Loading texture from:', imagePath);
+      
+      textureLoader.load(
+        imagePath, 
+        (texture) => {
+          console.log('[TattooModel] Texture loaded successfully');
+        texture.colorSpace = THREE.SRGBColorSpace;
+        
+        const tattooGeometry = new THREE.PlaneGeometry(0.3, 0.3);
+        const tattooMaterial = new THREE.MeshBasicMaterial({
+          map: texture,
+          transparent: true,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          alphaTest: 0.1,
+        });
+        
+        const tattooMesh = new THREE.Mesh(tattooGeometry, tattooMaterial);
+        
+        // Position based on placement data
+        if (placement.boneName && placement.offsetLocal) {
+          let bone = null;
+          clonedModel.traverse(child => {
+            if (child.isBone && child.name === placement.boneName) {
+              bone = child;
+            }
+          });
+          
+          if (bone) {
+            console.log('[TattooModel] Found bone:', bone.name);
+            // Add tattoo directly to the bone so it moves with it
+            bone.add(tattooMesh);
+            
+            // Use the saved local offset position
+            tattooMesh.position.set(
+              placement.offsetLocal.x,
+              placement.offsetLocal.y,
+              placement.offsetLocal.z
+            );
+            
+            if (placement.normalLocal) {
+              const normal = new THREE.Vector3(
+                placement.normalLocal.x,
+                placement.normalLocal.y,
+                placement.normalLocal.z
+              );
+              const defaultNormal = new THREE.Vector3(0, 0, 1);
+              const quat = new THREE.Quaternion();
+              quat.setFromUnitVectors(defaultNormal, normal);
+              tattooMesh.quaternion.copy(quat);
+            }
+            
+            console.log('[TattooModel] Tattoo positioned at:', tattooMesh.position);
+          } else {
+            console.log('[TattooModel] Bone not found:', placement.boneName);
+          }
+        } else if (placement.worldPosition) {
+          // Fallback to world position
+          console.log('[TattooModel] Using world position');
+          clonedModel.add(tattooMesh);
+          tattooMesh.position.set(
+            placement.worldPosition.x,
+            placement.worldPosition.y,
+            placement.worldPosition.z
+          );
+        }
+        
+        tattooMeshRef.current = tattooMesh;
+        console.log('[TattooModel] Tattoo added successfully');
+        console.log('[TattooModel] Tattoo parent:', tattooMesh.parent?.name || 'No parent');
+        console.log('[TattooModel] Model children count:', clonedModel.children.length);
+      },
+      undefined,
+      (error) => {
+        console.error('[TattooModel] Error loading texture:', error);
+      });
+    }, 100); // Small delay to let animation settle
+    
+    return () => clearTimeout(timer);
+  }, [candleData, clonedModel]);
+  
+  return (
+    <>
+      {/* Lighting setup - matching CompactCandleModal */}
+      <ambientLight intensity={1.2} />
+      <directionalLight 
+        position={[5, 10, 5]} 
+        intensity={0.8} 
+        castShadow 
+        shadow-mapSize={[1024, 1024]}
+      />
+      <pointLight position={[0, 3, 2]} intensity={0.5} color="#ffaa00" />
+      <pointLight position={[-3, 2, -2]} intensity={0.3} color="#ffffff" />
+      
+      <group ref={groupRef}>
+        <primitive object={clonedModel} />
+      </group>
+    </>
+  );
+}
+
+
 // Model viewer component with candle data display and texture support
+// REPLACE the entire ModelViewer function in SingleCandleDisplay.jsx with this:
+
 function ModelViewer({ modelPath, candleData = null, showPlaque = true, isFlipped = false, isRevealing = false }) {
   const gltf = useGLTF(modelPath);
   const { scene, materials, animations } = gltf;
   const modelRef = useRef();
   const groupRef = useRef();
   const [plaqueVisible, setPlaqueVisible] = useState(true);
+  const [modelReady, setModelReady] = useState(false);
   const textureLoader = new THREE.TextureLoader();
   const boxMeshRef = useRef(null);
+  const mixerRef = useRef();
   
   // Clone and setup the model with textures
   React.useEffect(() => {
     if (scene && modelRef.current) {
-      const clonedModel = scene.clone();
+      // Use SkeletonUtilsClone for tattoo models (skinned meshes)
+      let clonedModel;
+      if (candleData?.devotionType === 'tattoo') {
+        clonedModel = SkeletonUtilsClone(scene);
+      } else {
+        clonedModel = scene.clone();
+      }
       
       // Scale and position the model - adjust for mobile
       const isMobile = window.innerWidth <= 768;
       clonedModel.scale.set(1, 1, 1);
       clonedModel.position.set(0, isMobile ? -1.2 : -1.2, isMobile ? -2 : -2);
       
-      // Debug: Log all meshes in the model when dealing with votive candles with images
-      if (candleData && candleData.candleType === 'votive' && candleData.image) {
-        console.log('[SingleCandleDisplay] Votive candle with custom image detected:', candleData.image);
-        console.log('[SingleCandleDisplay] All meshes in votive model:');
-        clonedModel.traverse((child) => {
-          if (child.isMesh) {
-            console.log(`  - Mesh: "${child.name}", Material: "${child.material?.name}"`);
-          }
-        });
-      }
+      // Initialize bonesMap outside the blocks so it's accessible everywhere
+      let bonesMap = {};
       
-      // Process meshes and apply textures
-      clonedModel.traverse((child) => {
-        // Debug logging for rigged characters
-        if (child.name && (child.name.includes('Robot') || child.name.includes('Macro') || child.name.includes('RL80') || child.name.includes('Empty'))) {
-          // console.log('Found character-related object:', {
-          //   name: child.name,
-          //   type: child.type,
-          //   isSkinnedMesh: child.isSkinnedMesh,
-          //   isMesh: child.isMesh,
-          //   isObject3D: child.isObject3D,
-          //   isBone: child.isBone,
-          //   hasChildren: child.children?.length > 0,
-          //   children: child.children?.map(c => ({ name: c.name, type: c.type }))
-          // });
+      // Handle tattoo devotions
+      if (candleData && candleData.devotionType === 'tattoo') {
+        console.log('[SingleCandleDisplay] TATTOO DEVOTION DETECTED');
+        console.log('[SingleCandleDisplay] Model path:', modelPath);
+        console.log('[SingleCandleDisplay] Candle data:', candleData);
+        
+        // Match CandleSnapshotRenderer's scale and position exactly
+        clonedModel.scale.set(1.5, 1.5, 1.5);
+        clonedModel.position.set(0, 0.5, -1);
+        
+        // Clear previous model and add new one
+        while (modelRef.current.children.length > 0) {
+          modelRef.current.remove(modelRef.current.children[0]);
+        }
+        groupRef.current = clonedModel;
+        modelRef.current.add(clonedModel);
+        
+        // Build bones map BEFORE animation
+        bonesMap = {};
+        clonedModel.traverse((child) => {
+          if (child.isBone) {
+            bonesMap[child.name] = child;
+          }
+        }); 
+        console.log('[SingleCandleDisplay] Found', Object.keys(bonesMap).length, 'bones');
+        
+        // Apply animation EXACTLY like CompactCandleModal does
+        if (candleData.selectedPose === 'run' && animations && animations.length > 0) {
+          console.log('[SingleCandleDisplay] Applying run pose animation');
           
-          if (child.isSkinnedMesh) {
-            // console.log('SkinnedMesh details:', {
-            //   name: child.name,
-            //   hasSkeleton: !!child.skeleton,
-            //   boneCount: child.skeleton?.bones?.length,
-            //   hasBindMatrix: !!child.bindMatrix,
-            //   hasBindMatrixInverse: !!child.bindMatrixInverse
-            // });
+          // Clear any existing mixer
+          if (mixerRef.current) {
+            mixerRef.current.stopAllAction();
+            mixerRef.current = null;
+          }
+          
+          const runAnimation = animations.find(a => 
+            a.name === 'Run_Pose' || a.name.toLowerCase().includes('run')
+          );
+          
+          if (runAnimation) {
+            console.log('[SingleCandleDisplay] Playing:', runAnimation.name);
+            
+            mixerRef.current = new THREE.AnimationMixer(clonedModel);
+            const action = mixerRef.current.clipAction(runAnimation);
+            action.reset();
+            action.setEffectiveWeight(1);
+            action.setLoop(THREE.LoopRepeat, Infinity);
+            action.play();
+            mixerRef.current.update(0);
+            clonedModel.updateMatrixWorld(true);
+            
+            // Rebuild bones map after animation like CompactCandleModal
+            const newBonesMap = {};
+            clonedModel.traverse(child => {
+              if (child.isSkinnedMesh && child.skeleton) {
+                child.skeleton.bones.forEach(bone => { 
+                  newBonesMap[bone.name] = bone; 
+                });
+              }
+            });
+            bonesMap = newBonesMap;
+            
+            console.log('[SingleCandleDisplay] Animation applied with', Object.keys(bonesMap).length, 'bones');
           }
         }
         
-        // Handle SkinnedMesh (rigged characters like RL80 and Macro)
+        // Force re-render after model is ready
+        setModelReady(true);
+        
+        // Model is already added to scene and bones map is rebuilt after animation
+        
+        // Apply optimal rotation for tattoo display
+        
+        // Handle background for tattoos
+        if (candleData.background && candleData.background !== 'none') {
+          const BACKGROUND_TEXTURES = {
+            'cyberpunk': '/images/cyberpunk.webp',
+            'synthwave': '/images/synthwave.webp',
+            'gothicTokyo': '/images/gothicTokyo.webp',
+            'neoTokyo': '/images/neoTokyo.webp',
+            'aurora': '/images/aurora.webp',
+            'sunset': '/images/gradient-sunset.webp',
+            'dreams': '/images/gradient-dreams.webp',
+            'tradingView': '/images/uattr.webp',
+            'chart': '/images/chart.webp',
+            'collectibles': '/images/pokemon2.webp',
+            'alchemy': '/images/alchemy.gif',
+          };
+          
+          const texturePath = BACKGROUND_TEXTURES[candleData.background];
+          if (texturePath) {
+            textureLoader.load(
+              texturePath,
+              (texture) => {
+                const bgPlane = new THREE.PlaneGeometry(10, 10);
+                const bgMaterial = new THREE.MeshBasicMaterial({ 
+                  map: texture,
+                  side: THREE.DoubleSide 
+                });
+                const bgMesh = new THREE.Mesh(bgPlane, bgMaterial);
+                bgMesh.position.z = -3;
+                bgMesh.renderOrder = -1000;
+                // Add background to modelRef (world space), not clonedModel
+                if (modelRef.current) {
+                  modelRef.current.add(bgMesh);
+                }
+              }
+            );
+          }
+        }
+      }
+      
+      // Process meshes for candles (senora, baseColor, background textures)
+      clonedModel.traverse((child) => {
         if (child.isSkinnedMesh) {
           child.castShadow = true;
           child.receiveShadow = true;
-          // console.log(`Processing SkinnedMesh: ${child.name}`);
-          // Force skeleton update to avoid t-pose
           if (child.skeleton) {
             child.skeleton.calculateInverses();
             child.skeleton.computeBoneTexture();
@@ -88,26 +380,17 @@ function ModelViewer({ modelPath, candleData = null, showPlaque = true, isFlippe
           child.receiveShadow = true;
           
           // Apply user image to senora mesh for votive candles
-          // Check multiple possible names/materials for the senora mesh
           const isSenoraObject = child.name === 'senora' || 
                                 child.name === 'Senora' ||
                                 (child.material && (
                                   child.material.name === 'senora' ||
                                   child.material.name === 'senora.001' ||
                                   child.material.name === 'Senora' ||
-                                  child.material.name === 'Material.001' // Sometimes the senora material has this name
+                                  child.material.name === 'Material.001'
                                 )) ||
                                 (child.parent && child.parent.name === 'senora');
           
-          // Use 'image' field from Firebase (not imageUrl)
           if (candleData && candleData.image && candleData.candleType === 'votive' && isSenoraObject) {
-            console.log('[SingleCandleDisplay] Found senora mesh, applying user image:', {
-              meshName: child.name,
-              materialName: child.material?.name,
-              imageUrl: candleData.image
-            });
-            
-            // Set crossOrigin for URL-based images
             if (candleData.image && (candleData.image.startsWith('http://') || candleData.image.startsWith('https://'))) {
               textureLoader.crossOrigin = 'anonymous';
             }
@@ -115,23 +398,18 @@ function ModelViewer({ modelPath, candleData = null, showPlaque = true, isFlippe
             textureLoader.load(
               candleData.image,
               (texture) => {
-                console.log('[SingleCandleDisplay] Senora texture loaded successfully');
                 texture.colorSpace = THREE.SRGBColorSpace;
-                texture.flipY = false; // Fixed: Don't flip the senora image
+                texture.flipY = false;
                 
-                // Calculate aspect ratio and adjust texture repeat to maintain it
                 const imageAspect = texture.image.width / texture.image.height;
-                const targetAspect = 1.0; // Assuming the UV map is square
+                const targetAspect = 1.0;
                 
                 if (imageAspect > targetAspect) {
-                  // Image is wider than target, scale height
                   texture.repeat.set(1, imageAspect / targetAspect);
                 } else {
-                  // Image is taller than target, scale width
                   texture.repeat.set(targetAspect / imageAspect, 1);
                 }
                 
-                // Center the texture
                 texture.offset.set(
                   (1 - texture.repeat.x) / 2,
                   (1 - texture.repeat.y) / 2
@@ -140,7 +418,6 @@ function ModelViewer({ modelPath, candleData = null, showPlaque = true, isFlippe
                 texture.wrapS = THREE.ClampToEdgeWrapping;
                 texture.wrapT = THREE.ClampToEdgeWrapping;
                 
-                // Clone material if not already cloned
                 if (!child.material.userData.cloned) {
                   child.material = child.material.clone();
                   child.material.userData.cloned = true;
@@ -159,12 +436,12 @@ function ModelViewer({ modelPath, candleData = null, showPlaque = true, isFlippe
             );
           }
           
-          // Clone material first for all meshes that we'll modify
+          // Clone material for all meshes
           if (child.material) {
             child.material = child.material.clone();
           }
           
-          // Check if this is the Box mesh first (for background texture)
+          // Check if this is the Box mesh
           const isBoxMesh = child.name === 'Box' || child.name === 'box';
           
           // Apply baseColor to XBase meshes (but NOT to Box mesh)
@@ -185,11 +462,10 @@ function ModelViewer({ modelPath, candleData = null, showPlaque = true, isFlippe
             child.material.needsUpdate = true;
           }
           
-          // Apply background texture to Box mesh
-          if (isBoxMesh && candleData && candleData.background && candleData.background !== 'none') {
+          // Apply background texture to Box mesh (candles only, not tattoos)
+          if (isBoxMesh && candleData && candleData.background && candleData.background !== 'none' && candleData.devotionType !== 'tattoo') {
             boxMeshRef.current = child;
             
-            // Map background IDs to texture paths
             const BACKGROUND_TEXTURES = {
               'cyberpunk': '/images/cyberpunk.webp',
               'synthwave': '/images/synthwave.webp',
@@ -201,18 +477,12 @@ function ModelViewer({ modelPath, candleData = null, showPlaque = true, isFlippe
               'tradingView': '/images/uattr.webp',
               'chart': '/images/chart.webp',
               'collectibles': '/images/pokemon2.webp',
-              'dreams': '/images/gradient-dreams.webp',
               'alchemy': '/images/alchemy.gif',
-      
-
-
             };
             
             const texturePath = BACKGROUND_TEXTURES[candleData.background];
             
             if (texturePath) {
-              // console.log(`Loading background texture: ${texturePath} for background: ${candleData.background}`);
-              // Set crossOrigin for URL-based images
               if (texturePath.startsWith('http://') || texturePath.startsWith('https://')) {
                 textureLoader.crossOrigin = 'anonymous';
               }
@@ -221,7 +491,7 @@ function ModelViewer({ modelPath, candleData = null, showPlaque = true, isFlippe
                 texturePath,
                 (texture) => {
                   texture.colorSpace = THREE.SRGBColorSpace;
-                  texture.flipY = false; // Match the setting from CompactCandleModal
+                  texture.flipY = false;
                   texture.wrapS = THREE.ClampToEdgeWrapping;
                   texture.wrapT = THREE.ClampToEdgeWrapping;
                   texture.needsUpdate = true;
@@ -230,22 +500,17 @@ function ModelViewer({ modelPath, candleData = null, showPlaque = true, isFlippe
                   child.material.map = texture;
                   child.material.needsUpdate = true;
                   
-                  // Reset color to white to show texture
                   if (child.material.color) {
                     child.material.color.set(0xffffff);
                   }
-                  // console.log(`Background texture applied successfully to ${child.name}`);
                 },
-                (xhr) => {
-                  // console.log(`Loading background: ${(xhr.loaded / xhr.total * 100)}% loaded`);
-                },
+                undefined,
                 (error) => {
                   console.error(`Error loading background texture ${texturePath}:`, error);
                 }
               );
             }
           } else if (isBoxMesh && (!candleData || !candleData.background || candleData.background === 'none')) {
-            // Clear texture if no background
             child.material = child.material.clone();
             child.material.map = null;
             child.material.color.set(0x333333);
@@ -254,19 +519,177 @@ function ModelViewer({ modelPath, candleData = null, showPlaque = true, isFlippe
         }
       });
       
-      // Clear previous model and add new one
-      while (modelRef.current.children.length > 0) {
-        modelRef.current.remove(modelRef.current.children[0]);
+      // ============================================
+      // TATTOO PLACEMENT - FIXED VERSION
+      // ============================================
+      if (candleData && candleData.devotionType === 'tattoo' && candleData.tattooPlacement && candleData.tattooDesign) {
+        const placement = candleData.tattooPlacement;
+        const useAnimation = candleData.selectedPose && candleData.selectedPose !== 'tpose';
+        const hasBoneData = placement.boneName && placement.offsetLocal && placement.normalLocal;
+        
+        console.log('[SingleCandleDisplay] Tattoo mode:', useAnimation && hasBoneData ? 'BONE' : 'WORLD');
+        
+        // Check for worldPosition (new format) or fall back to legacy formats
+        const worldPos = placement.worldPosition || placement.position;
+        const worldNormal = placement.worldNormal || placement.normal;
+        
+        if ((useAnimation && hasBoneData) || worldPos) {
+          // Create tattoo mesh
+          const tattooGeometry = new THREE.PlaneGeometry(0.4, 0.4);
+          const tattooMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff00ff, // Placeholder until texture loads
+            transparent: true,
+            opacity: 1,
+            depthWrite: false,
+            depthTest: true,
+            side: THREE.DoubleSide,
+            alphaTest: 0.1
+          });
+          
+          const tattooMesh = new THREE.Mesh(tattooGeometry, tattooMaterial);
+          tattooMesh.renderOrder = 999;
+          
+          // Apply positioning based on animation state
+          if (useAnimation && hasBoneData) {
+            // === BONE-RELATIVE POSITIONING ===
+            const bone = bonesMap[placement.boneName];
+            
+            if (bone) {
+              console.log('[SingleCandleDisplay] Attaching to bone:', placement.boneName);
+              
+              bone.updateMatrixWorld(true);
+              const boneWorldPos = new THREE.Vector3();
+              const boneWorldQuat = new THREE.Quaternion();
+              bone.getWorldPosition(boneWorldPos);
+              bone.getWorldQuaternion(boneWorldQuat);
+              
+              // Transform local offset to world
+              const offsetLocal = new THREE.Vector3(
+                placement.offsetLocal.x,
+                placement.offsetLocal.y,
+                placement.offsetLocal.z
+              );
+              const offsetWorld = offsetLocal.clone().applyQuaternion(boneWorldQuat);
+              
+              // Calculate world position
+              const tattooWorldPos = boneWorldPos.clone().add(offsetWorld);
+              
+              // Transform local normal to world
+              const normalLocal = new THREE.Vector3(
+                placement.normalLocal.x,
+                placement.normalLocal.y,
+                placement.normalLocal.z
+              );
+              const normalWorld = normalLocal.clone().applyQuaternion(boneWorldQuat).normalize();
+              
+              // Offset along normal
+              tattooWorldPos.add(normalWorld.clone().multiplyScalar(0.02));
+              
+              // Set position
+              tattooMesh.position.copy(tattooWorldPos);
+              
+              // FIX: Use quaternion instead of lookAt!
+              const defaultNormal = new THREE.Vector3(0, 0, 1);
+              const orientQuat = new THREE.Quaternion();
+              orientQuat.setFromUnitVectors(defaultNormal, normalWorld);
+              tattooMesh.quaternion.copy(orientQuat);
+              
+              console.log('[SingleCandleDisplay] Tattoo at:', tattooWorldPos.toArray().map(v => v.toFixed(3)));
+            } else {
+              console.warn('[SingleCandleDisplay] Bone not found:', placement.boneName);
+              // Fallback to world position
+              if (worldPos) {
+                tattooMesh.position.set(worldPos.x || 0, worldPos.y || 0, worldPos.z || 0);
+              }
+            }
+          } else if (worldPos) {
+            // For T-pose or no bone data, use world position directly
+            console.log('[SingleCandleDisplay] Using world position for T-pose');
+            tattooMesh.position.set(
+              worldPos.x || 0,
+              worldPos.y || 0,
+              worldPos.z || 0
+            );
+            
+            // Orient based on normal
+            if (worldNormal) {
+              const normal = new THREE.Vector3(
+                worldNormal.x || 0,
+                worldNormal.y || 0,
+                worldNormal.z || 1
+              ).normalize();
+              
+              // Offset along normal to prevent z-fighting
+              tattooMesh.position.add(normal.clone().multiplyScalar(0.02));
+              
+              // Orient using quaternion
+              const defaultNormal = new THREE.Vector3(0, 0, 1);
+              const quaternion = new THREE.Quaternion();
+              quaternion.setFromUnitVectors(defaultNormal, normal);
+              tattooMesh.quaternion.copy(quaternion);
+            }
+          }
+          
+          // KEY FIX: Add to modelRef (world space), NOT to clonedModel!
+          modelRef.current.add(tattooMesh);
+          
+          console.log('[SingleCandleDisplay] Tattoo added at world position:', tattooMesh.position.toArray());
+          
+          // Load texture and update material
+          textureLoader.load(
+            `/images/${candleData.tattooDesign}.png`,
+            (texture) => {
+              texture.colorSpace = THREE.SRGBColorSpace;
+              texture.needsUpdate = true;
+              
+              tattooMesh.material = new THREE.MeshBasicMaterial({
+                map: texture,
+                transparent: true,
+                opacity: 1,
+                depthWrite: false,
+                depthTest: true,
+                side: THREE.DoubleSide,
+                alphaTest: 0.1  // Add alphaTest like CandleSnapshotRenderer
+              });
+              
+              console.log('[SingleCandleDisplay] Tattoo texture loaded and applied');
+            },
+            undefined,
+            (error) => {
+              console.error('[SingleCandleDisplay] Failed to load tattoo texture:', error);
+            }
+          );
+        } else {
+          console.warn('[SingleCandleDisplay] No worldPosition found in tattoo placement data');
+        }
       }
-      groupRef.current = clonedModel;
-      modelRef.current.add(clonedModel);
-      
-      // Log if animations exist (shouldn't for candle-only models)
-      // if (animations && animations.length > 0) {
-      //   console.log(`Warning: Candle model has animations? ${animations.length} animations:`, animations.map(a => a.name));
-      // }
     }
+    
+    // Cleanup mixer on unmount or when candleData changes
+    return () => {
+      if (mixerRef.current) {
+        mixerRef.current.stopAllAction();
+        mixerRef.current = null;
+      }
+    };
   }, [scene, materials, candleData]);
+  
+  // Update animation mixer and skeleton - matching CompactCandleModal
+  useFrame((state, delta) => {
+    // Animation mixer update - CRITICAL for applying the pose!
+    if (mixerRef.current && candleData?.selectedPose === 'run') {
+      mixerRef.current.update(delta);
+      
+      // Also force skeleton updates
+      if (groupRef.current) {
+        groupRef.current.traverse((child) => {
+          if (child.isSkinnedMesh && child.skeleton) {
+            child.skeleton.update();
+          }
+        });
+      }
+    }
+  });
   
   if (!scene) {
     return (
@@ -293,9 +716,6 @@ function ModelViewer({ modelPath, candleData = null, showPlaque = true, isFlippe
       {/* The model - hide when flipped */}
       <group ref={modelRef} visible={!isFlipped}>
       </group>
-      
-      
-      {/* Camera controls disabled entirely for SingleCandleDisplay */}
     </>
   );
 }
@@ -361,10 +781,22 @@ export default function SingleCandleDisplay({ onOpenCompactModal, onClose }) {
         const q = query(candlesRef, orderBy('createdAt', 'desc'), limit(limitCount));
         const snapshot = await getDocs(q);
         
-        const candlesData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
+        const candlesData = snapshot.docs.map(doc => {
+          const data = doc.data();
+          // Debug log for tattoo devotions
+          if (data.devotionType === 'tattoo') {
+            console.log('[SingleCandleDisplay] Fetched tattoo candle:', {
+              id: doc.id,
+              selectedPose: data.selectedPose,
+              devotionType: data.devotionType,
+              tattooCharacter: data.tattooCharacter
+            });
+          }
+          return {
+            id: doc.id,
+            ...data
+          };
+        });
         
         // Log memory usage info
         if (candlesData.length > 0) {
@@ -394,15 +826,6 @@ export default function SingleCandleDisplay({ onOpenCompactModal, onClose }) {
     const fetchMyCandles = async () => {
       if (!isSignedIn || !user) return;
       
-      // Debug: Log user info to see what's available
-      // console.log('Current user:', {
-      //   username: user?.username,
-      //   firstName: user?.firstName,
-      //   lastName: user?.lastName,
-      //   fullName: user?.fullName,
-      //   email: user?.emailAddresses?.[0]?.emailAddress,
-      //   id: user?.id
-      // });
       
       // Try username first, then fall back to firstName or fullName
       const userIdentifier = user?.username || user?.firstName || user?.fullName || 'Anonymous';
@@ -419,7 +842,6 @@ export default function SingleCandleDisplay({ onOpenCompactModal, onClose }) {
         );
         let snapshot = await getDocs(q);
         
-        // console.log(`Found ${snapshot.size} candles for user ID: ${user.id}`);
         
         // If no results, try by createdByUsername
         if (snapshot.size === 0) {
@@ -440,10 +862,7 @@ export default function SingleCandleDisplay({ onOpenCompactModal, onClose }) {
         // Log memory usage for user candles
         if (userCandlesData.length > 0) {
           const totalSize = userCandlesData.reduce((sum, candle) => sum + getObjectSize(candle), 0);
-          // console.log('User candles memory:', {
-          //   records: userCandlesData.length,
-          //   totalSize: `${(totalSize / 1024).toFixed(2)} KB`
-          // });
+
         }
         
         // Sort by createdAt client-side to avoid needing composite index
@@ -505,171 +924,6 @@ export default function SingleCandleDisplay({ onOpenCompactModal, onClose }) {
         // console.log('No cached summary found. Run the cloud function to generate one.');
         return;
         
-        // ALL CODE BELOW IS DISABLED - Cloud function handles summary generation
-        /*
-        const candlesRef = collection(db, 'candles');
-        
-        // Calculate date range based on period
-        const now = new Date();
-        let startDate = new Date();
-        
-        if (summaryPeriod === 'daily') {
-          startDate.setDate(now.getDate() - 1);
-        } else if (summaryPeriod === 'weekly') {
-          startDate.setDate(now.getDate() - 7);
-        } else {
-          startDate.setMonth(now.getMonth() - 1);
-        }
-        
-        // Fetch candles from the time period
-        const q = query(candlesRef, orderBy('createdAt', 'desc'), limit(100));
-        const snapshot = await getDocs(q);
-        
-        // Process the data
-        let petitions = 0;
-        let praise = 0;
-        let confessions = 0;
-        let totalBurned = 0;
-        const messages = [];
-        
-        snapshot.docs.forEach(doc => {
-          const data = doc.data();
-          const messageType = data.messageType?.toLowerCase() || '';
-          
-          if (messageType.includes('petition') || messageType.includes('prayer')) {
-            petitions++;
-          } else if (messageType.includes('praise') || messageType.includes('gratitude') || messageType.includes('thanks')) {
-            praise++;
-          } else if (messageType.includes('confession')) {
-            confessions++;
-          }
-          
-          if (data.message) {
-            messages.push(data.message);
-          }
-          
-          if (data.burnedAmount) {
-            totalBurned += parseInt(data.burnedAmount) || 0;
-          }
-        });
-        
-        // Try to use OpenAI for sentiment analysis if available
-        let sentimentScore = 75;
-        let aiSummary = '';
-        let extractedThemes = ['Success', 'Growth', 'Community', 'Prosperity', 'Wellness'];
-        
-        // Check if we should use AI (limit to daily to save API calls)
-        if (summaryPeriod === 'daily' && messages.length > 0) {
-          try {
-            const openAIKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY;
-            
-            if (openAIKey) {
-              const prompt = `Analyze the following ${messages.length} temple candle messages and provide:
-1. A sentiment score from 0-100 (where 100 is most positive)
-2. A 2-3 sentence summary of the overall mood and themes
-3. List 5 key themes (single words)
-
-Messages:
-${messages.slice(0, 30).join('\n')}
-
-Respond in JSON format like:
-{"sentiment": 75, "summary": "...", "themes": ["word1", "word2", "word3", "word4", "word5"]}`;
-
-              const response = await fetch('https://api.openai.com/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${openAIKey}`
-                },
-                body: JSON.stringify({
-                  model: 'gpt-3.5-turbo',
-                  messages: [
-                    {
-                      role: 'system',
-                      content: 'You are analyzing spiritual messages from a digital temple. Be respectful and insightful.'
-                    },
-                    {
-                      role: 'user',
-                      content: prompt
-                    }
-                  ],
-                  temperature: 0.7,
-                  max_tokens: 200
-                })
-              });
-              
-              if (response.ok) {
-                const data = await response.json();
-                const aiResponse = data.choices[0].message.content;
-                
-                try {
-                  const parsed = JSON.parse(aiResponse);
-                  sentimentScore = parsed.sentiment || 75;
-                  aiSummary = parsed.summary || '';
-                  extractedThemes = parsed.themes || extractedThemes;
-                } catch (parseError) {
-                  console.log('Could not parse AI response, using defaults');
-                }
-              }
-            }
-          } catch (aiError) {
-            console.log('OpenAI analysis failed, using fallback:', aiError);
-          }
-        }
-        
-        // Fallback sentiment calculation if AI fails
-        // if (!aiSummary) {
-        //   const positiveWords = ['thank', 'grateful', 'blessed', 'happy', 'love', 'amazing', 'wonderful'];
-        //   const negativeWords = ['sad', 'worried', 'fear', 'anxious', 'stressed', 'difficult', 'struggle'];
-          
-        //   let positiveCount = 0;
-        //   let negativeCount = 0;
-          
-        //   messages.forEach(msg => {
-        //     const lower = msg.toLowerCase();
-        //     positiveWords.forEach(word => {
-        //       if (lower.includes(word)) positiveCount++;
-        //     });
-        //     negativeWords.forEach(word => {
-        //       if (lower.includes(word)) negativeCount++;
-        //     });
-        //   });
-          
-        //   sentimentScore = Math.min(100, Math.max(0, 
-        //     50 + (positiveCount - negativeCount) * 5
-        //   ));
-          
-        //   aiSummary = `The temple received ${snapshot.size} candles this ${summaryPeriod === 'daily' ? 'day' : summaryPeriod === 'weekly' ? 'week' : 'month'}. ${praise > petitions ? 'Gratitude and praise dominate the messages' : 'The community is actively seeking guidance and support'}. Total offerings reached ${totalBurned.toLocaleString()} RL80.`;
-        // }
-        
-        // Prepare the summary data
-        const summaryDataToSave = {
-          sentimentScore,
-          totalCandles: snapshot.size,
-          petitions,
-          praise,
-          confessions,
-          trend: sentimentScore > 50 ? 'up' : 'down',
-          summary: aiSummary,
-          themes: extractedThemes,
-          createdAt: Timestamp.now(),
-          period: summaryPeriod,
-          date: dateKey
-        };
-        
-        // Don't save locally-generated summaries - let the cloud function handle it
-        // if (snapshot.size > 0) {
-        //   try {
-        //     await setDoc(cachedSummaryRef, summaryDataToSave);
-        //     console.log('Summary saved to Firestore for other users');
-        //   } catch (saveError) {
-        //     console.error('Error saving summary to Firestore:', saveError);
-        //   }
-        // }
-        
-        // Update local state
-        setSummaryData(summaryDataToSave);
-        */
         
       } catch (error) {
         console.error('Error fetching summary data:', error);
@@ -829,9 +1083,19 @@ Respond in JSON format like:
     ? filteredCandles[currentAllCandleIndex]
     : myCandles[currentMyCandleIndex];
   
-  // Determine model path based on candle type
+  // Determine model path based on devotion type
   const getModelPath = (candle) => {
     if (!candle) return '/models/tinyVotiveBox.glb';
+    
+    // Handle tattoo devotions
+    if (candle.devotionType === 'tattoo') {
+      if (candle.tattooCharacter === 'blockhead2') {
+        return '/models/blockhead2.glb';
+      } else if (candle.tattooCharacter === 'blockhead_runner') {
+        return '/models/blockhead_runner.glb';
+      }
+      return '/models/blockhead1.glb';
+    }
     
     // Use box versions for better display with backgrounds
     if (candle.candleType === 'japanese') {
@@ -1353,10 +1617,35 @@ Respond in JSON format like:
               You haven't created any candles yet
             </div>
           </div>
+        ) : activeTab !== 'summary' && currentCandle?.devotionType === 'tattoo' && currentCandle?.image ? (
+          // Display snapshot for tattoo devotions
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '90%',
+            maxWidth: '500px',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}>
+            <img 
+              src={currentCandle.image}
+              alt="Tattoo Devotion"
+              style={{
+                width: '100%',
+                height: 'auto',
+                objectFit: 'contain',
+                borderRadius: '12px',
+                boxShadow: '0 0 30px rgba(255, 215, 0, 0.3)'
+              }}
+            />
+          </div>
         ) : activeTab !== 'summary' ? (
           <Canvas
             camera={{ 
-              position: isFlipped ? [0, 0, -6] : (isMobile ? [0, 0, 5] : [0, 0, 5]), 
+              position: isFlipped ? [0, 0, -6] : (isMobile ? [0, 0.3, 7] : [0, 0, 7]), 
               fov: isMobile ? 45 : 45 
             }}
             style={{ width: '100%', height: '100%', display: 'block' }}
@@ -1396,172 +1685,12 @@ Respond in JSON format like:
         ) : null}
         
         {/* Info Overlay - positioned on top of the canvas */}
-        {currentCandle && showPlaque && !isRevealing && !loading && !loadingMyCandles && activeTab !== 'summary' && (
-          <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            pointerEvents: 'none',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'flex-start',
-            zIndex: 10
-          }}>
-            {/* Username and avatar at top */}
-            <div style={{
-              marginTop: isMobile ? '60px' : '40px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '8px'
-            }}>
-              {currentCandle.userAvatar && (
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  position: 'relative',
-                  width: isMobile ? '3.5rem' : '3.5rem',
-                  height: isMobile ? '3.5rem' : '3.5rem',
-                  marginBottom: '8px'
-                }}>
-                  {/* Solid black circle background */}
-                  <div style={{
-                    position: 'absolute',
-                    width: '100%',
-                    height: '100%',
-                    borderRadius: '50%',
-                    backgroundColor: 'rgba(0, 0, 0, 0.9)',
-                    border: '2px solid #eaea0b',
-                    boxShadow: '0 0 12px rgba(234, 234, 11, 0.5)'
-                  }} />
-                  <img 
-                    src={currentCandle.userAvatar} 
-                    alt="User" 
-                    style={{
-                      width: isMobile ? '3rem' : '3rem',
-                      height: isMobile ? '3rem' : '3rem',
-                      borderRadius: '50%',
-                      position: 'relative',
-                      zIndex: 1
-                    }}
-                    onError={(e) => {
-                      e.target.style.display = 'none';
-                    }}
-                  />
-                </div>
-              )}
-              {currentCandle.username && (
-                <div style={{
-                  color: '#eaea0b',
-                  fontSize: isMobile ? '1rem' : '1rem',
-                  fontWeight: 'bold',
-                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)',
-                  letterSpacing: '0.5px'
-                }}>
-                  {currentCandle.username}
-                </div>
-              )}
-              
-              {/* Burned amount below username */}
-              {currentCandle.burnedAmount && parseInt(currentCandle.burnedAmount) > 0 && (
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  marginTop: '8px'
-                }}>
-                  <span style={{
-                    fontSize: isMobile ? '0.9rem' : '0.9rem',
-                    filter: 'drop-shadow(0 0 4px rgba(255, 100, 0, 0.8))'
-                  }}>🔥</span>
-                  <span style={{
-                    color: '#ffb000',
-                    fontSize: isMobile ? '0.9rem' : '0.9rem',
-                    fontWeight: 'bold',
-                    textShadow: '0 0 4px rgba(255, 176, 0, 0.6)'
-                  }}>
-                    {parseInt(currentCandle.burnedAmount).toLocaleString()} RL80
-                  </span>
-                </div>
-              )}
-            </div>
-            
-            {/* Message in center/upper area */}
-            {currentCandle.message && !isFlipped && (
-              <div style={{
-                marginTop: '20px',
-                marginLeft: 'auto',
-                marginRight: 'auto',
-                maxWidth: isMobile ? '280px' : '240px',
-                textAlign: 'center',
-                padding: '12px',
-                borderRadius: '8px'
-              }}>
-                <div style={{
-                  color: '#eaea0b',  // Yellow text for all
-                  fontSize: isMobile ? '14px' : '12px',
-                  fontStyle: 'italic',
-                  fontWeight: '800',  // Very bold
-                  lineHeight: '1.4',
-                  // Subtle dark stroke with glow - same as CompactCandleModal
-                  textShadow: `
-                    -1px -1px 2px rgba(0, 0, 0, 0.9),
-                     1px -1px 2px rgba(0, 0, 0, 0.9),
-                    -1px  1px 2px rgba(0, 0, 0, 0.9),
-                     1px  1px 2px rgba(0, 0, 0, 0.9),
-                     0 0 6px rgba(0, 0, 0, 0.8),
-                     0 0 15px rgba(234, 234, 11, 0.9),
-                     0 0 25px rgba(234, 234, 11, 0.5)`
-                }}>
-                  "{decodeHTMLEntities(currentCandle.message)}"
-                </div>
-              </div>
-            )}
-            
-            
-            {/* Flipped view - larger display */}
-            {isFlipped && (
-              <div style={{
-                marginTop: '60px',
-                marginLeft: 'auto',
-                marginRight: 'auto',
-                padding: '24px',
-                textAlign: 'center',
-                maxWidth: isMobile ? '80%' : '80%'
-              }}>
-                {currentCandle.message && (
-                  <p style={{
-                    fontSize: isMobile ? '1rem' : '1rem',
-                    lineHeight: '1.5',
-                    fontStyle: 'italic',
-                    color: '#ffd700',
-                    margin: '0 0 12px 0'
-                  }}>
-                    "{decodeHTMLEntities(currentCandle.message)}"
-                  </p>
-                )}
-                {currentCandle.messageType && (
-                  <div style={{
-                    fontSize: isMobile ? '1rem' : '1rem',
-                    color: '#00ff00',
-                    marginBottom: '0'
-                  }}>
-                    {currentCandle.messageType.charAt(0).toUpperCase() + currentCandle.messageType.slice(1)}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+  
         
         {/* Reveal Effect Curtains */}
         {!loading && !loadingMyCandles && (
           <>
-            <div style={{
+            {/* <div style={{
               position: 'absolute',
               top: 0,
               left: '-1px',
@@ -1586,127 +1715,12 @@ Respond in JSON format like:
               transition: 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
               zIndex: 20,
               boxShadow: isRevealing ? '-10px 0 30px rgba(220, 20, 60, 0.5)' : 'none'
-            }} />
+            }} /> */}
             
             {/* Particle Container */}
-            {showParticles && (
-              <div style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                pointerEvents: 'none',
-                zIndex: 25,
-                overflow: 'hidden'
-              }}>
-                {/* Japanese candle: 4 flame points */}
-                {particleCandleType === 'japanese' ? (
-                  // 4 flame sources at different positions
-                  <>
-                    {/* Top-left flame */}
-                    {[...Array(8)].map((_, i) => (
-                      <div
-                        key={`tl-${i}`}
-                        style={{
-                          position: 'absolute',
-                          width: '8px',
-                          height: '8px',
-                          borderRadius: '50%',
-                          background: `hsl(${15 + Math.random() * 30}, 100%, ${50 + Math.random() * 20}%)`,
-                          left: '45%',
-                          top: '45%',
-                          animation: `particleExplosion ${0.8 + Math.random() * 0.4}s ease-out forwards`,
-                          animationDelay: `${Math.random() * 0.15}s`,
-                          '--x-offset': `${Math.random() * 150 - 75}px`,
-                          '--y-offset': `${Math.random() * -150}px`
-                        }}
-                      />
-                    ))}
-                    {/* Top-right flame */}
-                    {[...Array(8)].map((_, i) => (
-                      <div
-                        key={`tr-${i}`}
-                        style={{
-                          position: 'absolute',
-                          width: '8px',
-                          height: '8px',
-                          borderRadius: '50%',
-                          background: `hsl(${15 + Math.random() * 30}, 100%, ${50 + Math.random() * 20}%)`,
-                          left: '55%',
-                          top: '40%',
-                          animation: `particleExplosion ${0.8 + Math.random() * 0.4}s ease-out forwards`,
-                          animationDelay: `${Math.random() * 0.15}s`,
-                          '--x-offset': `${Math.random() * 150 - 75}px`,
-                          '--y-offset': `${Math.random() * -150}px`
-                        }}
-                      />
-                    ))}
-                    {/* Bottom-left flame */}
-                    {[...Array(8)].map((_, i) => (
-                      <div
-                        key={`bl-${i}`}
-                        style={{
-                          position: 'absolute',
-                          width: '8px',
-                          height: '8px',
-                          borderRadius: '50%',
-                          background: `hsl(${15 + Math.random() * 30}, 100%, ${50 + Math.random() * 20}%)`,
-                          left: '35%',
-                          top: '50%',
-                          animation: `particleExplosion ${0.8 + Math.random() * 0.4}s ease-out forwards`,
-                          animationDelay: `${Math.random() * 0.15}s`,
-                          '--x-offset': `${Math.random() * 150 - 75}px`,
-                          '--y-offset': `${Math.random() * -150}px`
-                        }}
-                      />
-                    ))}
-                    {/* Bottom-right flame */}
-                    {[...Array(8)].map((_, i) => (
-                      <div
-                        key={`br-${i}`}
-                        style={{
-                          position: 'absolute',
-                          width: '8px',
-                          height: '8px',
-                          borderRadius: '50%',
-                          background: `hsl(${15 + Math.random() * 30}, 100%, ${50 + Math.random() * 20}%)`,
-                          left: '65%',
-                          top: '38%',
-                          animation: `particleExplosion ${0.8 + Math.random() * 0.4}s ease-out forwards`,
-                          animationDelay: `${Math.random() * 0.15}s`,
-                          '--x-offset': `${Math.random() * 150 - 75}px`,
-                          '--y-offset': `${Math.random() * -150}px`
-                        }}
-                      />
-                    ))}
-                  </>
-                ) : (
-                  // Votive candle: single flame point
-                  [...Array(30)].map((_, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        position: 'absolute',
-                        width: '10px',
-                        height: '10px',
-                        borderRadius: '50%',
-                        background: `hsl(${15 + Math.random() * 30}, 100%, ${50 + Math.random() * 20}%)`,
-                        left: '50%',
-                        top: '50%',
-                        animation: `particleExplosion ${1 + Math.random() * 0.5}s ease-out forwards`,
-                        animationDelay: `${Math.random() * 0.2}s`,
-                        '--x-offset': `${Math.random() * 400 - 200}px`,
-                        '--y-offset': `${Math.random() * 400 - 200}px`
-                      }}
-                    />
-                  ))
-                )}
-              </div>
-            )}
             
             {/* Diagonal Corner Flip Tab - Hide on Summary tab */}
-            {activeTab !== 'summary' && (
+            {/* {activeTab !== 'summary' && (
               <button
                 onClick={() => setIsFlipped(!isFlipped)}
                 onMouseEnter={(e) => {
@@ -1762,7 +1776,7 @@ Respond in JSON format like:
                 </span>
               </div>
             </button>
-            )}
+            )} */}
             
             {/* Pause/Play Button */}
             {((activeTab === 'all' && filteredCandles.length > 1) || (activeTab === 'my' && myCandles.length > 1)) && (
@@ -1989,3 +2003,6 @@ if (typeof document !== 'undefined' && !document.getElementById('animation-style
 // Preload the models
 useGLTF.preload('/models/tinyVotiveBox.glb');
 useGLTF.preload('/models/tinyJapCanBox.glb');
+useGLTF.preload('/models/blockhead1.glb');
+useGLTF.preload('/models/blockhead2.glb');
+useGLTF.preload('/models/blockhead_runner.glb');

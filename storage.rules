@@ -1,14 +1,23 @@
 rules_version = '2';
 
-// Craft rules based on data in your Firestore database
-// allow write: if firestore.get(
-//    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
 service firebase.storage {
   match /b/{bucket}/o {
     // Allow anyone to read audio files
     match /audio/{allPaths=**} {
       allow read: if true;
       allow write: if false;
+    }
+    
+    // Allow authenticated users to upload and read candle images
+    match /candles/{fileName} {
+      allow read: if true;  // Anyone can read candle images
+      allow write: if request.auth != null;  // Authenticated users can upload
+    }
+    
+    // Allow anyone to upload and read polaroid snapshots (temporary for testing)
+    match /polaroids/{fileName} {
+      allow read: if true;  // Anyone can read polaroid images
+      allow write: if true;  // Anyone can upload (for now - change to request.auth != null later)
     }
     
     // Default rule for other paths
