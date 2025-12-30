@@ -1282,7 +1282,7 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
                 // { text: '▶ VIDEO MESSAGE', y: 230, action: 'playVideo', video: '/videos/23.mp4' },
                 { text: '▲ TRADING DESK', y: 220, url: '/trade' },
                 { text: '◉ TOKENOMICS', y: 290, url: '/tokenomics' },
-                { text: '🔒 ILLUMIN80 [RESTRICTED]', y: 360, action: 'checkAccess', url: '/gallery3' },
+                { text: '🔒 ILLUMIN80 [RESTRICTED]', y: 360, action: 'checkAccess', url: '/trade' },
 
               ];
               

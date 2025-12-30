@@ -26,7 +26,7 @@ const SKYBOX_TEXTURES = {
 if (typeof window !== 'undefined') {
   useGLTF.preload('/models/tinyVotiveBox.glb');
   useGLTF.preload('/models/tinyJapCanBox.glb');
-  useGLTF.preload('/models/blockhead1.glb');
+  useGLTF.preload('/models/blockhead_Streetman.glb');
   useGLTF.preload('/models/blockhead2.glb');
   useGLTF.preload('/models/blockhead_runner.glb');
 }
@@ -34,12 +34,14 @@ if (typeof window !== 'undefined') {
 // Helper function to determine which model to load
 function getModelPath(userData, includeBox = false) {
   if (userData?.devotionType === 'tattoo') {
-    if (userData?.tattooCharacter === 'blockhead2') {
-      return '/models/blockhead2.glb';
+    if (userData?.tattooCharacter === 'blockhead_Streetman') {
+      return '/models/blockhead_Streetman.glb';  // Fixed typo: removed hyphen
     } else if (userData?.tattooCharacter === 'blockhead_runner') {
       return '/models/blockhead_runner.glb';
+    } else if (userData?.tattooCharacter === 'blockhead2') {
+      return '/models/blockhead2.glb';
     }
-    return '/models/blockhead1.glb';
+    return '/models/blockhead_Streetman.glb';
   }
   
   const candleType = userData?.candleType;
@@ -103,7 +105,7 @@ function CandleScene({ userData, onReady }) {
     if (userData?.devotionType === 'tattoo') {
       clonedScene = SkeletonUtilsClone(scene);
       clonedScene.scale.set(1.5, 1.5, 1.5);
-      clonedScene.position.set(0, -2, -1);  // Lowered to center character in frame
+      clonedScene.position.set(0, -2.3, -1);  // Lowered to center character in frame
     } else {
       clonedScene = scene.clone();
     }
@@ -129,6 +131,41 @@ function CandleScene({ userData, onReady }) {
     if (userData?.devotionType === 'tattoo') {
       console.log('[Snapshot] Tattoo detected, will try to apply pose:', userData?.selectedPose);
       console.log('[Snapshot] Available animations:', animations?.map(a => a.name));
+      
+      // Handle skateboard, platform, and dumbell visibility
+      if (clonedScene) {
+        clonedScene.traverse((child) => {
+          if (child.isMesh && child.name) {
+            const nameLower = child.name.toLowerCase();
+            
+            // Skateboard mesh visibility
+            if (nameLower.includes('skateboard') && !nameLower.includes('platform')) {
+              child.visible = userData?.selectedPose === 'skateboard';
+            }
+            // SkatePlatform visible only during skateboard animation
+            else if (nameLower.includes('skateplatform') || 
+                     (nameLower.includes('skate') && nameLower.includes('platform'))) {
+              child.visible = userData?.selectedPose === 'skateboard';
+            }
+            // Platform2 visible for all other animations
+            else if (nameLower === 'platform2' || nameLower.includes('platform2')) {
+              child.visible = userData?.selectedPose !== 'skateboard';
+            }
+            // Dumbell1 visible only during curl animation
+            else if (nameLower === 'dumbell1' || nameLower.includes('dumbell1')) {
+              child.visible = userData?.selectedPose === 'curl';
+            }
+            // Dumbell2 visible only during curl animation
+            else if (nameLower === 'dumbell2' || nameLower.includes('dumbell2')) {
+              child.visible = userData?.selectedPose === 'curl';
+            }
+            // Surfboard visible only during surf animation
+            else if (nameLower === 'surfboard' || nameLower.includes('surfboard')) {
+              child.visible = userData?.selectedPose === 'surf';
+            }
+          }
+        });
+      }
       
       if (animations && animations.length > 0) {
         let targetAnimation = null;
@@ -174,6 +211,62 @@ function CandleScene({ userData, onReady }) {
                    name === 'Character_Rig|StandPose2' ||
                    name.includes('StandPose2') ||
                    name.includes('stand') && name.includes('2');
+          });
+        } else if (userData.selectedPose === 'action') {
+          targetAnimation = animations.find(a => {
+            const name = a.name;
+            return name === 'Action' || 
+                   name === 'Character_Rig|Action' ||
+                   name.toLowerCase() === 'action';
+          });
+        } else if (userData.selectedPose === 'curl') {
+          targetAnimation = animations.find(a => {
+            const name = a.name;
+            return name === 'Curl' || 
+                   name === 'Character_Rig|Curl' ||
+                   name.toLowerCase() === 'curl';
+          });
+        } else if (userData.selectedPose === 'pray') {
+          targetAnimation = animations.find(a => {
+            const name = a.name;
+            return name === 'Pray' || 
+                   name === 'Character_Rig|Pray' ||
+                   name.toLowerCase() === 'pray';
+          });
+        } else if (userData.selectedPose === 'skateboard') {
+          targetAnimation = animations.find(a => {
+            const name = a.name;
+            return name === 'Skateboard' || 
+                   name === 'Character_Rig|Skateboard' ||
+                   name.toLowerCase() === 'skateboard';
+          });
+        } else if (userData.selectedPose === 'dance1') {
+          targetAnimation = animations.find(a => {
+            const name = a.name;
+            return name === 'Dance1' || 
+                   name === 'Character_Rig|Dance1' ||
+                   name.toLowerCase() === 'dance1';
+          });
+        } else if (userData.selectedPose === 'dance2') {
+          targetAnimation = animations.find(a => {
+            const name = a.name;
+            return name === 'Dance2' || 
+                   name === 'Character_Rig|Dance2' ||
+                   name.toLowerCase() === 'dance2';
+          });
+        } else if (userData.selectedPose === 'standpose1') {
+          targetAnimation = animations.find(a => {
+            const name = a.name;
+            return name === 'StandPose1' || 
+                   name === 'Character_Rig|StandPose1' ||
+                   name.toLowerCase() === 'standpose1';
+          });
+        } else if (userData.selectedPose === 'surf') {
+          targetAnimation = animations.find(a => {
+            const name = a.name;
+            return name === 'Surf' || 
+                   name === 'Character_Rig|Surf' ||
+                   name.toLowerCase() === 'surf';
           });
         }
         
@@ -761,6 +854,7 @@ export default function CandleSnapshotRenderer({
         
         console.log('[CandleSnapshotRenderer] Uploading to Firebase with metadata:', {
           username: userData?.username,
+          createdBy: userData?.createdBy,
           devotionType: userData?.devotionType,
           background: userData?.background,
           burnedAmount: userData?.burnedAmount,
@@ -770,22 +864,31 @@ export default function CandleSnapshotRenderer({
           baseColor: userData?.baseColor,
         });
         
+        // Build metadata based on devotion type
+        const metadata = {
+          username: userData?.username,
+          createdBy: userData?.createdBy,  // Add Clerk user ID
+          devotionType: userData?.devotionType,
+          background: userData?.background,
+          burnedAmount: userData?.burnedAmount,
+        };
+        
+        // Add type-specific fields
+        if (userData?.devotionType === 'tattoo') {
+          metadata.tattooDesign = userData?.tattooDesign;
+          metadata.tattooCharacter = userData?.tattooCharacter;
+          metadata.selectedPose = userData?.selectedPose || '';
+        } else {
+          metadata.candleType = userData?.candleType;
+          metadata.baseColor = userData?.baseColor;
+        }
+        
         const response = await fetch('/api/upload-polaroid', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             imageData: imageData,
-            metadata: {
-              username: userData?.username,
-              devotionType: userData?.devotionType,
-              background: userData?.background,
-              burnedAmount: userData?.burnedAmount,
-              tattooDesign: userData?.tattooDesign,
-              tattooCharacter: userData?.tattooCharacter,
-              candleType: userData?.candleType,
-              baseColor: userData?.baseColor,
-              selectedPose: userData?.selectedPose || 'run',
-            },
+            metadata: metadata,
           }),
         });
         

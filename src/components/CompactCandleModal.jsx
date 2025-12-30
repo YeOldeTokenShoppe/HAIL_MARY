@@ -6,8 +6,10 @@ import { DecalGeometry } from 'three/examples/jsm/geometries/DecalGeometry';
 import { clone as SkeletonUtilsClone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 useGLTF.preload('/models/tinyVotiveOnly.glb');
 useGLTF.preload('/models/tinyJapCanOnly.glb');
-useGLTF.preload('/models/blockhead1.glb');
-useGLTF.preload('/models/blockhead2.glb');
+useGLTF.preload('/models/blockhead_Streetman.glb');
+useGLTF.preload('/models/blockhead_Streetman_Tpose.glb');
+useGLTF.preload('/models/blockhead_Surfer.glb');
+useGLTF.preload('/models/blockhead_Surfer_Tpose.glb');
 import { 
   db, 
   storage, 
@@ -42,7 +44,9 @@ function InteractiveTattooViewer({
   tattooDesign, 
   onPlacementChange, 
   placementData, 
-  isPlacementMode = false 
+  isPlacementMode = false,
+  characterSkinColor = 'Brown',
+  tattooCharacter = ''
 }) {
   const { scene } = useGLTF(modelPath);
   
@@ -50,6 +54,7 @@ function InteractiveTattooViewer({
   const tattooMeshRef = useRef();
   const textureRef = useRef();
   const skeletonRef = useRef();
+  const skinTextureRef = useRef();
   
   const [hoveredPart, setHoveredPart] = useState(null);
   const [showRejectMessage, setShowRejectMessage] = useState(false);
@@ -82,6 +87,45 @@ function InteractiveTattooViewer({
       textureRef.current = texture;
     });
   }, [tattooDesign]);
+  
+  // Load skin texture for Streetman, Surfer, and Runner
+  useEffect(() => {
+    if ((tattooCharacter === 'blockhead_Streetman' || tattooCharacter === 'blockhead_Surfer' || tattooCharacter === 'blockhead_runner') && characterSkinColor && clonedScene) {
+      console.log('[InteractiveTattoo] Loading skin texture:', tattooCharacter, characterSkinColor);
+      const loader = new THREE.TextureLoader();
+      const texturePath = tattooCharacter === 'blockhead_Streetman' 
+        ? `/textures/Streetman_${characterSkinColor}.webp`
+        : tattooCharacter === 'blockhead_Surfer'
+        ? `/textures/SurferGuy_${characterSkinColor}.webp`
+        : `/textures/Runner_${characterSkinColor}.webp`;
+      
+      console.log('[InteractiveTattoo] Texture path:', texturePath);
+      
+      loader.load(texturePath, (texture) => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.flipY = false; // GLTF models usually need flipY = false
+        skinTextureRef.current = texture;
+        console.log('[InteractiveTattoo] Texture loaded successfully');
+        
+        // Apply texture to all skinned meshes
+        let applied = false;
+        clonedScene.traverse((child) => {
+          if (child.isSkinnedMesh && child.material) {
+            child.material.map = texture;
+            child.material.needsUpdate = true;
+            applied = true;
+            console.log('[InteractiveTattoo] Applied texture to mesh:', child.name);
+          }
+        });
+        
+        if (!applied) {
+          console.log('[InteractiveTattoo] Warning: No skinned meshes found to apply texture');
+        }
+      }, undefined, (error) => {
+        console.error('[InteractiveTattoo] Failed to load texture:', error);
+      });
+    }
+  }, [tattooCharacter, characterSkinColor, clonedScene]);
   
   useEffect(() => {
     if (placementData && !localPlacement) {
@@ -348,10 +392,18 @@ function InteractiveTattooViewer({
 
 const AVAILABLE_POSES = [
   { id: 'tpose', name: 'T-Pose', animationName: null },
-  { id: 'run', name: 'Running', animationName: 'run' },  // id: 'run' for UI, but uses 'Action' animation
-  { id: 'stand1', name: 'Stand Pose 1', animationName: 'StandPose1' },  // StandPose1 animation
-  { id: 'stand2', name: 'Stand Pose 2', animationName: 'StandPose2' },  // StandPose2 animation
-  { id: 'dance', name: 'Dance', animationName: 'Dance_Pose' },  // Dance_Pose animation
+  { id: 'run', name: 'Running', animationName: 'run' },  // For blockhead_runner
+  { id: 'stand1', name: 'Stand Pose 1', animationName: 'StandPose1' },
+  { id: 'stand2', name: 'Stand Pose 2', animationName: 'StandPose2' },
+  { id: 'dance', name: 'Dance', animationName: 'Dance_Pose' },
+  { id: 'action', name: 'Action', animationName: 'Action' },  // Streetman-specific animation
+  { id: 'curl', name: 'Curl', animationName: 'Curl' },  // Streetman-specific animation
+  { id: 'pray', name: 'Pray', animationName: 'Pray' },  // Streetman-specific animation
+  { id: 'skateboard', name: 'Skateboard', animationName: 'Skateboard' },  // Streetman-specific animation
+  { id: 'dance1', name: 'Dance 1', animationName: 'Dance1' },  // Streetman-specific animation
+  { id: 'dance2', name: 'Dance 2', animationName: 'Dance2' },  // Streetman-specific animation
+  { id: 'standpose1', name: 'Stand Pose', animationName: 'StandPose1' },  // Streetman-specific animation
+  { id: 'surf', name: 'Surf', animationName: 'Surf' },  // Surfer-specific animation
 ];
 
 function SimpleTattooViewer({ 
@@ -364,6 +416,8 @@ function SimpleTattooViewer({
   backgroundTexture = null, 
   backgroundGradient = null,
   selectedPose = 'tpose',
+  characterSkinColor = 'Brown',
+  tattooCharacter = '',
 }) {
   const { scene, animations } = useGLTF(modelPath);
   const groupRef = useRef();
@@ -372,6 +426,7 @@ function SimpleTattooViewer({
   const backgroundRef = useRef();
   const mixerRef = useRef();
   const bonesMapRef = useRef({});
+  const skinnedMeshRef = useRef();
   const [targetRotation, setTargetRotation] = useState(0);
   const [tattooVersion, setTattooVersion] = useState(0);
   const [poseReady, setPoseReady] = useState(false);
@@ -399,14 +454,90 @@ function SimpleTattooViewer({
         child.castShadow = true;
         child.receiveShadow = true;
         if (child.material) child.material = child.material.clone();
+        
+        // Hide skateboard mesh by default
+        if (child.name && child.name.toLowerCase().includes('skateboard')) {
+          child.visible = false;
+        }
+        
+        // Handle platform visibility - default state before pose is applied
+        const nameLower = child.name ? child.name.toLowerCase() : '';
+        if (nameLower.includes('skateplatform') || 
+            (nameLower.includes('skate') && nameLower.includes('platform'))) {
+          child.visible = false; // Will be updated when pose changes
+          console.log('[SimpleTattoo] Found SkatePlatform:', child.name, 'setting visible=false');
+        } else if (nameLower === 'platform2' || nameLower.includes('platform2')) {
+          child.visible = true; // Will be updated when pose changes
+          console.log('[SimpleTattoo] Found Platform2:', child.name, 'setting visible=true');
+        }
+        
+        // Hide Dumbell1 by default (only visible during curl)
+        if (nameLower === 'dumbell1' || nameLower.includes('dumbell1')) {
+          child.visible = false;
+          console.log('[SimpleTattoo] Found Dumbell1:', child.name, 'setting visible=false');
+        }
+        
+        // Hide Dumbell2 by default (only visible during curl)
+        if (nameLower === 'dumbell2' || nameLower.includes('dumbell2')) {
+          child.visible = false;
+          console.log('[SimpleTattoo] Found Dumbell2:', child.name, 'setting visible=false');
+        }
+        
+        // Hide surfboard by default (only visible during surf)
+        if (nameLower === 'surfboard' || nameLower.includes('surfboard')) {
+          child.visible = false;
+          console.log('[SimpleTattoo] Found Surfboard:', child.name, 'setting visible=false');
+        }
       }
       if (child.isSkinnedMesh && child.skeleton) {
         child.skeleton.bones.forEach(bone => { bonesMap[bone.name] = bone; });
+        // Store reference to the main skinned mesh
+        if (!skinnedMeshRef.current) {
+          skinnedMeshRef.current = child;
+        }
       }
     });
     bonesMapRef.current = bonesMap;
     return clone;
   }, [scene]);
+  
+  // Load skin texture for Streetman, Surfer, and Runner
+  useEffect(() => {
+    if ((tattooCharacter === 'blockhead_Streetman' || tattooCharacter === 'blockhead_Surfer' || tattooCharacter === 'blockhead_runner') && characterSkinColor && clonedModel) {
+      console.log('[SimpleTattoo] Loading skin texture:', tattooCharacter, characterSkinColor);
+      const loader = new THREE.TextureLoader();
+      const texturePath = tattooCharacter === 'blockhead_Streetman' 
+        ? `/textures/Streetman_${characterSkinColor}.webp`
+        : tattooCharacter === 'blockhead_Surfer'
+        ? `/textures/SurferGuy_${characterSkinColor}.webp`
+        : `/textures/Runner_${characterSkinColor}.webp`;
+      
+      console.log('[SimpleTattoo] Texture path:', texturePath);
+      
+      loader.load(texturePath, (texture) => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.flipY = false; // GLTF models usually need flipY = false
+        console.log('[SimpleTattoo] Texture loaded successfully');
+        
+        // Apply texture to all skinned meshes
+        let applied = false;
+        clonedModel.traverse((child) => {
+          if (child.isSkinnedMesh && child.material) {
+            child.material.map = texture;
+            child.material.needsUpdate = true;
+            applied = true;
+            console.log('[SimpleTattoo] Applied texture to mesh:', child.name);
+          }
+        });
+        
+        if (!applied) {
+          console.log('[SimpleTattoo] Warning: No skinned meshes found to apply texture');
+        }
+      }, undefined, (error) => {
+        console.error('[SimpleTattoo] Failed to load texture:', error);
+      });
+    }
+  }, [tattooCharacter, characterSkinColor, clonedModel]);
   
   const removeTattoo = useCallback(() => {
     if (tattooMeshRef.current) {
@@ -429,6 +560,15 @@ function SimpleTattooViewer({
       mixerRef.current = null;
     }
     
+    // Handle skateboard visibility
+    if (clonedModel) {
+      clonedModel.traverse((child) => {
+        if (child.isMesh && child.name && child.name.toLowerCase().includes('skateboard')) {
+          child.visible = selectedPose === 'skateboard';
+        }
+      });
+    }
+    
     const poseConfig = AVAILABLE_POSES.find(p => p.id === selectedPose);
     
     if (!poseConfig?.animationName || !animations?.length) {
@@ -444,11 +584,63 @@ function SimpleTattooViewer({
     // Debug: Log all available animations
     console.log('[SimpleTattoo] Available animations:', animations.map(a => a.name));
     console.log('[SimpleTattoo] Looking for:', poseConfig.animationName);
+    console.log('[SimpleTattoo] Selected pose:', selectedPose);
+    
+    // Special check for Surfer animations
+    if (tattooCharacter === 'blockhead_Surfer') {
+      console.log('[SimpleTattoo] Surfer character detected, checking for surf animation');
+      animations.forEach(a => {
+        if (a.name.toLowerCase().includes('surf')) {
+          console.log('[SimpleTattoo] Found surf-like animation:', a.name);
+        }
+      });
+    }
     
     const clip = animations.find(a => {
       const search = poseConfig.animationName.toLowerCase();
       const name = a.name.toLowerCase();
       console.log(`[SimpleTattoo] Comparing: "${name}" with "${search}"`);
+      
+      // Special cases for Streetman animations
+      if (search === 'action' && (name === 'action' || name.includes('action'))) {
+        console.log('[SimpleTattoo] Action animation found!');
+        return true;
+      }
+      if (search === 'curl' && (name === 'curl' || name.includes('curl'))) {
+        console.log('[SimpleTattoo] Curl animation found!');
+        return true;
+      }
+      if (search === 'pray' && (name === 'pray' || name.includes('pray'))) {
+        console.log('[SimpleTattoo] Pray animation found!');
+        return true;
+      }
+      if (search === 'skateboard' && (name === 'skateboard' || name.includes('skate'))) {
+        console.log('[SimpleTattoo] Skateboard animation found!');
+        return true;
+      }
+      if (search === 'dance1' && (name === 'dance1' || name.includes('dance1'))) {
+        console.log('[SimpleTattoo] Dance1 animation found!');
+        return true;
+      }
+      if (search === 'dance2' && (name === 'dance2' || name.includes('dance2'))) {
+        console.log('[SimpleTattoo] Dance2 animation found!');
+        return true;
+      }
+      if (search === 'standpose1' && (name === 'standpose1' || name.includes('standpose1'))) {
+        console.log('[SimpleTattoo] StandPose1 animation found!');
+        return true;
+      }
+      if (search === 'surf') {
+        // Try various possible names for surf animation
+        if (name === 'surf' || 
+            name === 'Surf' || 
+            name === 'Character_Rig|Surf' ||
+            name.toLowerCase() === 'surf' || 
+            name.toLowerCase().includes('surf')) {
+          console.log('[SimpleTattoo] Surf animation found with name:', name);
+          return true;
+        }
+      }
       
       // More specific matching that preserves numbers
       // First try exact match
@@ -485,6 +677,20 @@ function SimpleTattooViewer({
     });
     
     if (!clip) {
+      console.warn('[SimpleTattoo] No matching animation found for:', poseConfig.animationName);
+      // If we're looking for 'action' and it's not found, try to use the first available animation
+      if (selectedPose === 'action' && animations.length > 0) {
+        console.log('[SimpleTattoo] Using first available animation as fallback');
+        const firstClip = animations[0];
+        mixerRef.current = new THREE.AnimationMixer(clonedModel);
+        const action = mixerRef.current.clipAction(firstClip);
+        action.reset();
+        action.setEffectiveWeight(1);
+        action.setLoop(THREE.LoopRepeat, Infinity);
+        action.play();
+        mixerRef.current.update(0.5);  // Apply stronger update here too
+        clonedModel.updateMatrixWorld(true);
+      }
       setPoseReady(true);
       setTattooVersion(v => v + 1);
       return;
@@ -498,7 +704,9 @@ function SimpleTattooViewer({
     action.setEffectiveWeight(1);
     action.setLoop(THREE.LoopRepeat, Infinity);
     action.play();
-    mixerRef.current.update(0);
+    
+    // Apply a stronger initial update to ensure the pose takes effect
+    mixerRef.current.update(0.5);  // Update with a time delta to move into the animation
     clonedModel.updateMatrixWorld(true);
     
     // Rebuild bones map
@@ -531,14 +739,17 @@ function SimpleTattooViewer({
     
     // Create tattoo
     const planeGeom = new THREE.PlaneGeometry(0.3, 0.3);
-    const planeMat = new THREE.MeshBasicMaterial({
-      map: textureRef.current,
-      transparent: true,
-      side: THREE.DoubleSide,
-      depthTest: true,
-      depthWrite: false,
-      alphaTest: 0.1,
-    });
+const planeMat = new THREE.MeshBasicMaterial({
+  map: textureRef.current,
+  transparent: true,
+  side: THREE.DoubleSide,
+  depthTest: true,
+  depthWrite: false,
+  alphaTest: 0.1,
+  polygonOffset: true,
+  polygonOffsetFactor: -1,
+  polygonOffsetUnits: -1,
+});
     const tattooPlane = new THREE.Mesh(planeGeom, planeMat);
     tattooPlane.renderOrder = 999;
     
@@ -577,6 +788,41 @@ function SimpleTattooViewer({
       mixerRef.current.update(delta);
     }
     
+    // Update skateboard, platform, and dumbell visibility based on current pose
+    if (clonedModel) {
+      clonedModel.traverse((child) => {
+        if (child.isMesh && child.name) {
+          const nameLower = child.name.toLowerCase();
+          
+          // Skateboard visibility
+          if (nameLower.includes('skateboard') && !nameLower.includes('platform')) {
+            child.visible = selectedPose === 'skateboard';
+          }
+          // SkatePlatform visible only during skateboard animation
+          else if (nameLower.includes('skateplatform') || 
+                   (nameLower.includes('skate') && nameLower.includes('platform'))) {
+            child.visible = selectedPose === 'skateboard';
+          }
+          // Platform2 visible for all other animations
+          else if (nameLower === 'platform2' || nameLower.includes('platform2')) {
+            child.visible = selectedPose !== 'skateboard';
+          }
+          // Dumbell1 visible only during curl animation
+          else if (nameLower === 'dumbell1' || nameLower.includes('dumbell1')) {
+            child.visible = selectedPose === 'curl';
+          }
+          // Dumbell2 visible only during curl animation
+          else if (nameLower === 'dumbell2' || nameLower.includes('dumbell2')) {
+            child.visible = selectedPose === 'curl';
+          }
+          // Surfboard visible only during surf animation
+          else if (nameLower === 'surfboard' || nameLower.includes('surfboard')) {
+            child.visible = selectedPose === 'surf';
+          }
+        }
+      });
+    }
+    
     // UPDATE TATTOO POSITION based on bone
     if (tattooMeshRef.current && placementData) {
       const { worldPosition, worldNormal, boneName, offsetLocal, normalLocal } = placementData;
@@ -601,24 +847,57 @@ function SimpleTattooViewer({
           const offsetLocalVec = new THREE.Vector3(offsetLocal.x, offsetLocal.y, offsetLocal.z);
           const offsetWorld = offsetLocalVec.clone().applyQuaternion(boneWorldQuat);
           
-          // Calculate world position
+          // Calculate initial world position
           const tattooWorldPos = boneWorldPos.clone().add(offsetWorld);
           
           // Transform local normal to world space
           const normalLocalVec = new THREE.Vector3(normalLocal.x, normalLocal.y, normalLocal.z);
           const normalWorld = normalLocalVec.clone().applyQuaternion(boneWorldQuat).normalize();
           
-          // Offset along normal for z-fighting
-          tattooWorldPos.add(normalWorld.clone().multiplyScalar(0.02));
-          
-          // Set position (in group's local space, which is the same as world since group is at origin)
-          tattooMeshRef.current.position.copy(tattooWorldPos);
-          
-          // Orient plane to face along normal
-          const defaultNormal = new THREE.Vector3(0, 0, 1);
-          const orientQuat = new THREE.Quaternion();
-          orientQuat.setFromUnitVectors(defaultNormal, normalWorld);
-          tattooMeshRef.current.quaternion.copy(orientQuat);
+          // Use raycasting to find the exact surface position
+          if (skinnedMeshRef.current) {
+            const raycaster = new THREE.Raycaster();
+            raycaster.set(
+              tattooWorldPos.clone().add(normalWorld.clone().multiplyScalar(0.1)), // start slightly outside
+              normalWorld.clone().negate() // cast inward
+            );
+            
+            const hits = raycaster.intersectObject(skinnedMeshRef.current);
+            if (hits.length > 0) {
+              // Use the exact hit point on the surface
+              tattooMeshRef.current.position.copy(hits[0].point);
+              
+              // Use the actual surface normal
+              const faceNormal = hits[0].face.normal.clone().transformDirection(skinnedMeshRef.current.matrixWorld);
+              
+              // Offset slightly along the face normal to prevent z-fighting
+              tattooMeshRef.current.position.add(faceNormal.clone().multiplyScalar(0.002));
+              
+              // Orient to the actual surface normal
+              const defaultNormal = new THREE.Vector3(0, 0, 1);
+              const orientQuat = new THREE.Quaternion();
+              orientQuat.setFromUnitVectors(defaultNormal, faceNormal);
+              tattooMeshRef.current.quaternion.copy(orientQuat);
+            } else {
+              // Fallback to calculated position if raycast misses
+              tattooWorldPos.add(normalWorld.clone().multiplyScalar(0.02));
+              tattooMeshRef.current.position.copy(tattooWorldPos);
+              
+              const defaultNormal = new THREE.Vector3(0, 0, 1);
+              const orientQuat = new THREE.Quaternion();
+              orientQuat.setFromUnitVectors(defaultNormal, normalWorld);
+              tattooMeshRef.current.quaternion.copy(orientQuat);
+            }
+          } else {
+            // Fallback if no skinned mesh reference
+            tattooWorldPos.add(normalWorld.clone().multiplyScalar(0.02));
+            tattooMeshRef.current.position.copy(tattooWorldPos);
+            
+            const defaultNormal = new THREE.Vector3(0, 0, 1);
+            const orientQuat = new THREE.Quaternion();
+            orientQuat.setFromUnitVectors(defaultNormal, normalWorld);
+            tattooMeshRef.current.quaternion.copy(orientQuat);
+          }
         }
         
       } else {
@@ -1435,12 +1714,13 @@ export default function CompactCandleModal({
     devotionType: '', // 'candle' or 'tattoo'
     messageType: '',
     candleType: 'votive',
-    selectedPose: 'run',
-    tattooCharacter: '', // 'blockhead1', 'blockhead2', or 'blockhead_runner'
+    selectedPose: '',  // Will be set based on character
+    tattooCharacter: '', // 'blockhead_Streetman', 'blockhead_Surfer', or 'blockhead_runner'
+    characterSkinColor: 'Brown', // 'Black', 'Brown', or 'White' for Streetman and Runner
     tattooDesign: '', // 'RL80_TATTOO' or 'ROSE_TATTOO'
     tattooPlacement: null, // Stores position, normal, meshName for tattoo placement
     candleHeight: 'medium',
-    username: '',
+    username: user?.username || user?.firstName || user?.fullName || '',  // Prepopulate with Clerk user's name
     message: '',
     burnedAmount: '0',  // Default to 0
     allowLikes: false,
@@ -1468,13 +1748,23 @@ export default function CompactCandleModal({
   const modalContentRef = useRef(null);
   const fileInputRef = useRef(null);
   
+  // Update username when Clerk user data loads
+  useEffect(() => {
+    if (user && !formData.username) {
+      setFormData(prev => ({
+        ...prev,
+        username: user.username || user.firstName || user.fullName || ''
+      }));
+    }
+  }, [user]);
+  
   // Auto-switch to 'run' pose when tattoo placement is complete
   useEffect(() => {
     if (formData.tattooPlacement && formData.devotionType === 'tattoo') {
       // When tattoo placement is done, automatically switch from T-Pose to Run
       setFormData(prev => ({ 
         ...prev, 
-        selectedPose: 'run' 
+        selectedPose: 'action'  // Default to action for Streetman 
       }));
     }
   }, [formData.tattooPlacement, formData.devotionType]);
@@ -1835,7 +2125,9 @@ const serializeTattooPlacement = (placement) => {
           docData.tattooCharacter = formData.tattooCharacter;
           docData.tattooDesign = formData.tattooDesign;
           docData.tattooPlacement = serializeTattooPlacement(formData.tattooPlacement);
-          docData.selectedPose = formData.selectedPose || 'run';
+          docData.selectedPose = formData.selectedPose || 
+            (formData.tattooCharacter === 'blockhead_Streetman' ? 'action' : 
+             formData.tattooCharacter === 'blockhead_runner' ? 'run' : 'run');
         }
       } else {
         docData = {
@@ -1865,7 +2157,9 @@ const serializeTattooPlacement = (placement) => {
           docData.tattooCharacter = formData.tattooCharacter;
           docData.tattooDesign = formData.tattooDesign;
           docData.tattooPlacement = serializeTattooPlacement(formData.tattooPlacement);
-          docData.selectedPose = formData.selectedPose || 'run';
+          docData.selectedPose = formData.selectedPose || 
+            (formData.tattooCharacter === 'blockhead_Streetman' ? 'action' : 
+             formData.tattooCharacter === 'blockhead_runner' ? 'run' : 'run');
         }
       }
       // Skip saving to candles collection - will save to polaroids collection instead
@@ -1874,6 +2168,7 @@ const serializeTattooPlacement = (placement) => {
       setIsSubmitting(true); // Show loading state immediately
       setSavedCandleData({
         username: formData.username || 'Anonymous',
+        createdBy: user?.id || '',  // Add Clerk user ID
         image: imagePreview || imageUrl,  // Use imagePreview (selected image) for snapshot, fallback to uploaded URL
         message: formData.message,
         burnedAmount: docData.burnedAmount,
@@ -1881,9 +2176,12 @@ const serializeTattooPlacement = (placement) => {
         candleType: formData.candleType,
         candleHeight: formData.candleHeight || 'medium',
         tattooCharacter: formData.tattooCharacter,
+        characterSkinColor: formData.characterSkinColor,
         tattooDesign: formData.tattooDesign,
         tattooPlacement: formData.tattooPlacement,
-        selectedPose: formData.selectedPose || 'run',  // Add selectedPose here!
+        selectedPose: formData.selectedPose || 
+          (formData.tattooCharacter === 'blockhead_Streetman' ? 'action' : 
+           formData.tattooCharacter === 'blockhead_runner' ? 'run' : 'run'),  // Add selectedPose here!
         background: formData.background || 'synthwave',
         baseColor: formData.baseColor || '#ffffff'
       });
@@ -1999,7 +2297,12 @@ const serializeTattooPlacement = (placement) => {
               </button>
               
               <button
-                onClick={() => setFormData(prev => ({ ...prev, devotionType: 'tattoo', tattooCharacter: 'blockhead1' }))}
+                onClick={() => setFormData(prev => ({ 
+                  ...prev, 
+                  devotionType: 'tattoo', 
+                  tattooCharacter: 'blockhead_Streetman',
+                  selectedPose: 'action'  // Set default pose for Streetman
+                }))}
                 style={{
                   padding: '30px',
                   width: '250px',
@@ -2026,7 +2329,7 @@ const serializeTattooPlacement = (placement) => {
                 }}
               >
                 <img
-                  src="/images/blockhead1.png"
+                  src="/images/blockhead_Streetman.webp"
                   alt="Virtual Tattoo"
                   style={{
                     width: '100px',
@@ -2077,13 +2380,21 @@ const serializeTattooPlacement = (placement) => {
               margin: '0 auto'
             }}>
                 {[
-                  { value: 'blockhead1', label: 'Blockhead Alpha', image: '/images/blockhead1.png' },
-                  { value: 'blockhead2', label: 'Blockhead Beta', image: '/images/blockhead2.png' },
+                  { value: 'blockhead_Streetman', label: 'Streetman', image: '/images/blockhead_Streetman.webp' },
+                  { value: 'blockhead_Surfer', label: 'Surfer', image: '/images/blockhead_Surfer2.webp' },
                   { value: 'blockhead_runner', label: 'Runner', image: '/images/blockhead_runner.png' }
                 ].map(character => (
                   <button
                     key={character.value}
-                    onClick={() => setFormData(prev => ({ ...prev, tattooCharacter: character.value }))}
+                    onClick={() => setFormData(prev => ({ 
+                      ...prev, 
+                      tattooCharacter: character.value,
+                      // Set appropriate default pose for each character
+                      selectedPose: character.value === 'blockhead_Streetman' ? 'action' : 
+                                    character.value === 'blockhead_Surfer' ? 'action' :
+                                   character.value === 'blockhead_runner' ? 'run' : 
+                                   'run'
+                    }))}
                     style={{
                       padding: '20px',
                       width: '200px',
@@ -2139,6 +2450,76 @@ const serializeTattooPlacement = (placement) => {
                   </button>
                 ))}
               </div>
+              
+              {/* Skin Color Selector - Only show for Streetman, Surfer, and Runner */}
+              {(formData.tattooCharacter === 'blockhead_Streetman' || formData.tattooCharacter === 'blockhead_Surfer' || formData.tattooCharacter === 'blockhead_runner') && (
+                <div style={{
+                  marginTop: '30px',
+                  padding: '20px',
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(255, 215, 0, 0.2)'
+                }}>
+                  <h3 style={{
+                    fontSize: '18px',
+                    color: '#ffd700',
+                    marginBottom: '15px',
+                    textAlign: 'center'
+                  }}>Choose Skin Color</h3>
+                  
+                  <div style={{
+                    display: 'flex',
+                    gap: '15px',
+                    justifyContent: 'center'
+                  }}>
+                    {['Black', 'Brown', 'White'].map(color => (
+                      <button
+                        key={color}
+                        onClick={() => setFormData(prev => ({ ...prev, characterSkinColor: color }))}
+                        style={{
+                          padding: '12px 24px',
+                          background: formData.characterSkinColor === color ?
+                            'linear-gradient(135deg, rgba(255, 215, 0, 0.4), rgba(255, 215, 0, 0.3))' :
+                            'rgba(0, 0, 0, 0.4)',
+                          border: formData.characterSkinColor === color ?
+                            '2px solid #ffd700' :
+                            '1px solid rgba(255, 255, 255, 0.2)',
+                          borderRadius: '8px',
+                          color: formData.characterSkinColor === color ? '#ffd700' : '#fff',
+                          cursor: 'pointer',
+                          transition: 'all 0.3s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}
+                        onMouseEnter={e => {
+                          if (formData.characterSkinColor !== color) {
+                            e.currentTarget.style.background = 'rgba(255, 215, 0, 0.1)';
+                            e.currentTarget.style.borderColor = 'rgba(255, 215, 0, 0.5)';
+                          }
+                        }}
+                        onMouseLeave={e => {
+                          if (formData.characterSkinColor !== color) {
+                            e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)';
+                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
+                          }
+                        }}
+                      >
+                        <div style={{
+                          width: '20px',
+                          height: '20px',
+                          borderRadius: '50%',
+                          background: color === 'Black' ? '#3A2317' :
+                                     color === 'Brown' ? '#8B6B4E' :
+                                     '#F5DEB3',
+                          border: '2px solid rgba(255, 255, 255, 0.3)'
+                        }} />
+                        {color}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>;
         }
         
@@ -2686,6 +3067,30 @@ const serializeTattooPlacement = (placement) => {
             marginBottom: '20px'
           }}>Choose the intention for your candle</p>
             
+            {/* Alert message when no message type is selected */}
+            {!formData.messageType && (
+              <div style={{
+                padding: '12px 16px',
+                marginBottom: '20px',
+                background: 'rgba(255, 193, 7, 0.1)',
+                border: '1px solid rgba(255, 193, 7, 0.5)',
+                borderRadius: '8px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                animation: 'pulse 2s infinite'
+              }}>
+                <span style={{ fontSize: '20px' }}>⚠️</span>
+                <span style={{
+                  color: '#ffd700',
+                  fontSize: '14px',
+                  fontWeight: '500'
+                }}>
+                  Please select a message type to continue
+                </span>
+              </div>
+            )}
+            
             <div style={{
             display: 'flex',
             gap: '10px',
@@ -2761,6 +3166,16 @@ const serializeTattooPlacement = (placement) => {
                     ...prev, 
                     selectedPose: pose 
                   }))}
+                  // Only show specific poses for each character
+                  availablePoseIds={
+                    formData.tattooCharacter === 'blockhead_Streetman' 
+                      ? ['action', 'curl', 'pray', 'skateboard', 'dance1', 'dance2', 'standpose1']
+                      : formData.tattooCharacter === 'blockhead_Surfer'
+                      ? ['action', 'curl', 'pray', 'standpose1', 'stand2', 'surf']
+                      : formData.tattooCharacter === 'blockhead_runner'
+                      ? ['run', 'standpose1', 'stand2']
+                      : null // Use default for other characters
+                  }
                 />
                 
               </div>
@@ -3511,6 +3926,10 @@ const serializeTattooPlacement = (placement) => {
         setError('Please click on the character to place your tattoo');
         return;
       }
+      // Set default pose to 'action' for Streetman when moving to step 4
+      if (formData.tattooCharacter === 'blockhead_Streetman') {
+        setFormData(prev => ({ ...prev, selectedPose: prev.selectedPose || 'action' }));
+      }
     }
     
     if (currentStep < totalSteps) {
@@ -3633,11 +4052,15 @@ const serializeTattooPlacement = (placement) => {
   userData={{
     devotionType: 'tattoo',
     tattooCharacter: formData.tattooCharacter,
+    characterSkinColor: formData.characterSkinColor,
     tattooDesign: formData.tattooDesign,
     background: formData.background,
-    selectedPose: formData.selectedPose || 'run',           // 'tpose' or 'run'
+    selectedPose: formData.selectedPose || 
+      (formData.tattooCharacter === 'blockhead_Streetman' ? 'action' : 
+       formData.tattooCharacter === 'blockhead_runner' ? 'run' : 'run'),           // Character-appropriate default
     tattooPlacement: formData.tattooPlacement,      // From InteractiveTattooViewer
     username: formData.username,
+    createdBy: user?.id || '',  // Add Clerk user ID
     burnedAmount: formData.burnedAmount,
   }}
   onComplete={(imageData) => {
@@ -4005,10 +4428,12 @@ const serializeTattooPlacement = (placement) => {
                   <Suspense fallback={null}>
                     {formData.devotionType === 'tattoo' ? (
         <SimpleTattooViewer
-  modelPath="/models/blockhead_runner.glb"
+  modelPath="/models/blockhead_Streetman_Tpose.glb"
   tattooDesign={formData.tattooDesign}
   placementData={formData.tattooPlacement}  // Same data, same position!
   dedicationName={formData.username}
+  characterSkinColor={formData.characterSkinColor}
+  tattooCharacter={formData.tattooCharacter}
 />
                     ) : (
                       <SimpleCandleViewer
@@ -4073,10 +4498,10 @@ const serializeTattooPlacement = (placement) => {
                         // Interactive tattoo placement for Step 3
                         <InteractiveTattooViewer
                           modelPath={
-                            formData.tattooCharacter === 'blockhead1' ? '/models/blockhead1.glb' : 
-                            formData.tattooCharacter === 'blockhead2' ? '/models/blockhead2.glb' :
+                            formData.tattooCharacter === 'blockhead_Streetman' ? '/models/blockhead_Streetman_Tpose.glb' : 
+                            formData.tattooCharacter === 'blockhead_Surfer' ? '/models/blockhead_Surfer_Tpose.glb' :
                             formData.tattooCharacter === 'blockhead_runner' ? '/models/blockhead_runner.glb' :
-                            '/models/blockhead1.glb' // fallback
+                            '/models/blockhead_Streetman_Tpose.glb' // fallback
                           }
                           tattooDesign={formData.tattooDesign}
                           onPlacementChange={(placement) => setFormData(prev => ({ 
@@ -4085,15 +4510,23 @@ const serializeTattooPlacement = (placement) => {
                           }))}
                           placementData={formData.tattooPlacement}
                           isPlacementMode={true}
+                          characterSkinColor={formData.characterSkinColor}
+                          tattooCharacter={formData.tattooCharacter}
                         />
                       ) : (
                         // Regular viewer for other steps
                         <SimpleTattooViewer
                           modelPath={
-                            formData.tattooCharacter === 'blockhead1' ? '/models/blockhead1.glb' : 
-                            formData.tattooCharacter === 'blockhead2' ? '/models/blockhead2.glb' :
-                            formData.tattooCharacter === 'blockhead_runner' ? '/models/blockhead_runner.glb' :
-                            '/models/blockhead1.glb' // fallback
+                            // Use non-T-pose model for Streetman in steps 4-7
+                            formData.tattooCharacter === 'blockhead_Streetman' && currentStep >= 4 
+                              ? '/models/blockhead_Streetman.glb' 
+                              : formData.tattooCharacter === 'blockhead_Streetman' 
+                                ? '/models/blockhead_Streetman_Tpose.glb' 
+                                : formData.tattooCharacter === 'blockhead_Surfer' 
+                                  ? '/models/blockhead_Surfer.glb' 
+                                  : formData.tattooCharacter === 'blockhead_runner' 
+                                    ? '/models/blockhead_runner.glb' 
+                                    : '/models/blockhead_Streetman.glb' // fallback
                           }
                           dedicationName={formData.username}
                           dedicationMessage={formData.message}
@@ -4109,7 +4542,13 @@ const serializeTattooPlacement = (placement) => {
                             return null;
                           })()}
                           backgroundGradient={formData.background && formData.background.startsWith('dynamic-') ? formData.background : null}
-                          selectedPose={formData.selectedPose || 'run'}
+                          selectedPose={
+                            formData.selectedPose || 
+                            (formData.tattooCharacter === 'blockhead_Streetman' ? 'action' : 
+                             formData.tattooCharacter === 'blockhead_runner' ? 'run' : 'run')
+                          }
+                          characterSkinColor={formData.characterSkinColor}
+                          tattooCharacter={formData.tattooCharacter}
                         />
                       )
                     ) : formData.candleType ? (
@@ -4262,24 +4701,31 @@ const serializeTattooPlacement = (placement) => {
               
               {currentStep < 7 ? <button onClick={handleNext} style={{
                   padding: '10px 30px',
-                  background: (currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement)) ? 
+                  background: (currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement)) || 
+                    (currentStep === 4 && !formData.messageType) ? 
                     'linear-gradient(135deg, #888, #999)' : 
                     'linear-gradient(135deg, #ffd700, #ffed4e)',
                   border: 'none',
                   borderRadius: '8px',
-                  color: (currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement)) ? 
+                  color: (currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement)) || 
+                    (currentStep === 4 && !formData.messageType) ? 
                     '#555' : '#000',
-                  cursor: (currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement)) ? 
+                  cursor: (currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement)) || 
+                    (currentStep === 4 && !formData.messageType) ? 
                     'not-allowed' : 'pointer',
                   fontSize: '14px',
                   fontWeight: 'bold',
-                  boxShadow: (currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement)) ? 
+                  boxShadow: (currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement)) || 
+                    (currentStep === 4 && !formData.messageType) ? 
                     'none' : '0 4px 15px rgba(255, 215, 0, 0.3)',
-                  opacity: (currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement)) ? 
+                  opacity: (currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement)) || 
+                    (currentStep === 4 && !formData.messageType) ? 
                     0.6 : 1
                 }} disabled={currentStep === 1 && !formData.devotionType || currentStep === 2 && !formData.candleType && !formData.tattooCharacter || currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement) || currentStep === 4 && !formData.messageType}>
                   {currentStep === 3 && formData.devotionType === 'tattoo' && !formData.tattooPlacement && formData.tattooDesign ? 
-                    'Place Tattoo First' : 'Next'}
+                    'Place Tattoo First' : 
+                   currentStep === 4 && !formData.messageType ? 
+                    'Select Message Type' : 'Next'}
                 </button> : <button onClick={handleConfirmedSave} style={{
                   padding: '10px 30px',
                   background: isSubmitting 

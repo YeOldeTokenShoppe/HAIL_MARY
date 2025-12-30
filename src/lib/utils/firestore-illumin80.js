@@ -1,4 +1,4 @@
-import { db } from '@/utilities/firebaseServer';
+import { db } from '@/lib/firebaseServer';
 import { collection, query, orderBy, limit, getDocs, doc, updateDoc } from 'firebase/firestore';
 
 // Get the top 8% of token burners from Firestore

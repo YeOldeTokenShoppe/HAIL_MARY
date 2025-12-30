@@ -7,15 +7,25 @@ const AVAILABLE_POSES = [
   { id: 'stand1', name: 'Stand Pose 1', animationName: 'StandPose1', icon: '🕴️' },
   { id: 'stand2', name: 'Stand Pose 2', animationName: 'StandPose2', icon: '🚶' },
   { id: 'dance', name: 'Dance', animationName: 'Dance_Pose', icon: '🕺' },
-  // Add more poses here as you export them:
-  // { id: 'idle', name: 'Idle', animationName: 'Idle_Pose', icon: '🧘' },
-  // { id: 'wave', name: 'Wave', animationName: 'Wave_Pose', icon: '👋' },
-  // { id: 'victory', name: 'Victory', animationName: 'Victory_Pose', icon: '✌️' },
+  { id: 'action', name: 'Action', animationName: 'Action', icon: '💪' },
+  { id: 'curl', name: 'Curl', animationName: 'Curl', icon: '🏋️' },
+  { id: 'pray', name: 'Pray', animationName: 'Pray', icon: '🙏' },
+  { id: 'skateboard', name: 'Skateboard', animationName: 'Skateboard', icon: '🛹' },
+  { id: 'dance1', name: 'Dance 1', animationName: 'Dance1', icon: '💃' },
+  { id: 'dance2', name: 'Dance 2', animationName: 'Dance2', icon: '🪩' },
+  { id: 'standpose1', name: 'Stand Pose', animationName: 'StandPose1', icon: '🧘' },
+  { id: 'surf', name: 'Surf', animationName: 'Surf', icon: '🏄' },
 ];
 
-function PoseSelector({ selectedPose = 'tpose', onPoseChange }) {
-  // Filter out T-Pose from the selector
-  const selectablePoses = AVAILABLE_POSES.filter(pose => pose.id !== 'tpose');
+function PoseSelector({ selectedPose = 'tpose', onPoseChange, availablePoseIds = null }) {
+  // Filter poses based on availablePoseIds prop or default behavior
+  let selectablePoses;
+  if (availablePoseIds) {
+    selectablePoses = AVAILABLE_POSES.filter(pose => availablePoseIds.includes(pose.id));
+  } else {
+    // Default: Filter out T-Pose from the selector
+    selectablePoses = AVAILABLE_POSES.filter(pose => pose.id !== 'tpose');
+  }
   
   return (
     <div style={{

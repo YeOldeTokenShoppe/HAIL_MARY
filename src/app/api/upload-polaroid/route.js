@@ -75,21 +75,32 @@ export async function POST(request) {
     // Save to Firestore using REST API
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/polaroids?key=${apiKey}`;
     
+    // Build Firestore document - only include relevant fields for devotion type
+    const firestoreFields = {
+      imageUrl: { stringValue: publicUrl },
+      storagePath: { stringValue: filename },
+      username: { stringValue: metadata?.username || 'Anonymous' },
+      createdBy: { stringValue: metadata?.createdBy || '' },  // Clerk user ID
+      devotionType: { stringValue: metadata?.devotionType || 'candle' },
+      background: { stringValue: metadata?.background || '' },
+      burnedAmount: { stringValue: String(metadata?.burnedAmount || '0') },
+      createdAt: { timestampValue: new Date().toISOString() },
+    };
+    
+    // Add tattoo-specific fields only for tattoo devotions
+    if (metadata?.devotionType === 'tattoo') {
+      firestoreFields.tattooDesign = { stringValue: metadata?.tattooDesign || '' };
+      firestoreFields.tattooCharacter = { stringValue: metadata?.tattooCharacter || '' };
+      firestoreFields.selectedPose = { stringValue: metadata?.selectedPose || '' };
+      // Don't add candleType or baseColor for tattoos
+    } else {
+      // Add candle-specific fields only for candle devotions
+      firestoreFields.candleType = { stringValue: metadata?.candleType || 'votive' };
+      firestoreFields.baseColor = { stringValue: metadata?.baseColor || '#ffffff' };
+    }
+    
     const firestoreDoc = {
-      fields: {
-        imageUrl: { stringValue: publicUrl },
-        storagePath: { stringValue: filename },
-        username: { stringValue: metadata?.username || 'Anonymous' },
-        devotionType: { stringValue: metadata?.devotionType || 'candle' },
-        background: { stringValue: metadata?.background || '' },
-        burnedAmount: { stringValue: String(metadata?.burnedAmount || '0') },
-        tattooDesign: { stringValue: metadata?.tattooDesign || '' },
-        tattooCharacter: { stringValue: metadata?.tattooCharacter || '' },
-        candleType: { stringValue: metadata?.candleType || '' },
-        baseColor: { stringValue: metadata?.baseColor || '' },
-        selectedPose: { stringValue: metadata?.selectedPose || 'run' },
-        createdAt: { timestampValue: new Date().toISOString() },
-      }
+      fields: firestoreFields
     };
     
     const firestoreResponse = await fetch(firestoreUrl, {

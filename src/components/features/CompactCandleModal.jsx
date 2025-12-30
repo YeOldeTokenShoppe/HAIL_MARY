@@ -2000,7 +2000,7 @@ export default function CompactCandleModal({
       return;
     }
     if (!trimmedUsername) {
-      setError('Please enter a dedication name');
+      setError('Please enter your name');
       return;
     }
     if (!trimmedMessage) {
@@ -2525,7 +2525,7 @@ export default function CompactCandleModal({
               fontSize: '14px',
               color: 'rgba(255, 255, 255, 0.8)'
             }}>
-                Dedication Name
+                Name
               </label>
               <input type="text" value={formData.username} onChange={e => {
               const sanitized = sanitizeInput(e.target.value, 50);

@@ -40,13 +40,25 @@ export function useRandomCandles(maxCandles = 20) {
           allCandles.push(...userCandles);
           
           // Get from new polaroids collection (for both candles and tattoos)
-          const polaroidQuery = query(
+          // First try by createdBy (user ID) which is most reliable
+          let polaroidQuery = query(
             collection(db, "polaroids"),
-            where("username", "==", user.username || user.firstName || user.id),
+            where("createdBy", "==", user.id),
             limit(10) // Limit user's own polaroids to 10
           );
           
-          const polaroidSnapshot = await getDocs(polaroidQuery);
+          let polaroidSnapshot = await getDocs(polaroidQuery);
+          
+          // If no results with createdBy, try username as fallback
+          if (polaroidSnapshot.size === 0) {
+            polaroidQuery = query(
+              collection(db, "polaroids"),
+              where("username", "==", user.username || user.firstName || user.fullName),
+              limit(10)
+            );
+            polaroidSnapshot = await getDocs(polaroidQuery);
+          }
+          
           const userPolaroids = polaroidSnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
@@ -101,8 +113,10 @@ export function useRandomCandles(maxCandles = 20) {
               createdAt: doc.data().createdAt?.toDate() || new Date()
             }))
             .filter(item => 
-              // Filter out user's items from the pool
-              !isSignedIn || !user || item.username !== (user.username || user.firstName || user.id)
+              // Filter out user's items from the pool (check both createdBy and username)
+              !isSignedIn || !user || 
+              (item.createdBy !== user.id && 
+               item.username !== (user.username || user.firstName || user.fullName))
             );
           
           poolCandles.push(...polaroids);

@@ -8,7 +8,7 @@ import StarField from '@/components/StarField';
 import Link from 'next/link';
 import PostProcessingEffects from '@/components/PostProcessingEffects';
 import CyborgTempleScene from '@/components/CyborgTempleScene';
-
+import { Illumin80ClerkButton } from "@/components/Illumin80Display";
 import VideoScreens from "@/components/VideoScreens";
 import TickerDisplay3 from "@/components/TickerDisplay3";
 import { useMusic } from '@/components/MusicContext';
@@ -42,6 +42,7 @@ export default function CyborgTemple() {
   const [tickerReady, setTickerReady] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState("Initializing");
+  const [modelLoadStartTime] = useState(Date.now()); // Track when loading started
   const [isCandleModalOpen, setIsCandleModalOpen] = useState(false);
   const [shouldRenderCanvas, setShouldRenderCanvas] = useState(true);
   const [focusedAgent, setFocusedAgent] = useState(null); // Track which agent is focused
@@ -212,7 +213,7 @@ export default function CyborgTemple() {
     // Now we can start Canvas immediately since we're using a lightweight loader
     setCanvasReady(true);
     setLoadingProgress(20);
-    setLoadingMessage("Initializing Trading Environment");
+    setLoadingMessage(isMobileView ? "Loading 3D Model..." : "Initializing Trading Environment");
     
     // Don't set tickerReady here - wait for model to load first
     
@@ -261,7 +262,7 @@ export default function CyborgTemple() {
     // console.log('ModelRef current:', modelRef.current);
     setModelLoaded(true);
     setLoadingProgress(70);
-    setLoadingMessage("Loading features/trading data");
+    setLoadingMessage(isMobileView ? "Finalizing..." : "Loading trading data");
     
     // Only enable TickerDisplay3 on desktop
     if (!isMobileView) {
@@ -322,9 +323,16 @@ export default function CyborgTemple() {
     
     if (fontLoaded && mounted && modelLoaded && tickerCondition) {
       // console.log('✅ All conditions met! Starting scene reveal sequence...');
+      
+      // Calculate time elapsed since loading started
+      const timeElapsed = Date.now() - modelLoadStartTime;
+      const minimumLoadTime = 2000; // Minimum 2 seconds to prevent flash
+      const remainingTime = Math.max(0, minimumLoadTime - timeElapsed);
+      
       setLoadingProgress(100);
       setLoadingMessage("Ready!");
-      // Add extra delay to ensure all components are rendered
+      
+      // Add delay to ensure smooth transition
       const timer = setTimeout(() => {
         // console.log('🚀 Setting scene ready!');
         setSceneReady(true);
@@ -332,24 +340,31 @@ export default function CyborgTemple() {
           // console.log('🎬 Hiding loading screen!');
           setIsSceneLoading(false);
         }, 500); // Brief additional delay for smooth transition
-      }, isMobileView ? 500 : 1000); // Reduced delay for mobile
+      }, remainingTime + (isMobileView ? 500 : 1000)); // Wait for minimum time plus transition
       
       return () => clearTimeout(timer);
     }
-  }, [fontLoaded, mounted, modelLoaded, tickerLoaded, tickerReady, isMobileView]);
+  }, [fontLoaded, mounted, modelLoaded, tickerLoaded, tickerReady, isMobileView, modelLoadStartTime]);
 
   // Fallback timeout to prevent infinite loading
   useEffect(() => {
     const fallbackTimer = setTimeout(() => {
-      if (isSceneLoading) {
-        console.log('[Temple] Fallback timeout reached, forcing scene ready');
+      if (isSceneLoading && !modelLoaded) {
+        // Only force ready if model still hasn't loaded after extended timeout
+        console.log('[Temple] Fallback timeout reached, model still not loaded');
+        console.log('[Temple] Consider checking network or model file size');
+        // Don't reveal the scene - keep showing loader
+        // Just log the issue for debugging
+      } else if (isSceneLoading && modelLoaded) {
+        // If model is loaded but scene is still loading, it's safe to reveal
+        console.log('[Temple] Fallback timeout reached but model is loaded, revealing scene');
         setSceneReady(true);
         setIsSceneLoading(false);
       }
-    }, isMobileView ? 10000 : 20000); // 10 seconds for mobile, 20 for desktop
+    }, isMobileView ? 30000 : 30000); // 30 seconds for both - give model time to load
 
     return () => clearTimeout(fallbackTimer);
-  }, [isSceneLoading, isMobileView]);
+  }, [isSceneLoading, isMobileView, modelLoaded]);
 
   // Don't render on server-side
   if (!mounted) {
@@ -976,7 +991,7 @@ export default function CyborgTemple() {
                 style={{
                   position: "fixed",
                   top: "1rem",
-                  right: "5.5rem",
+                  right: "9.5rem",
                   zIndex: 10001,
                   display: "flex",
                   alignItems: "center",
@@ -1197,11 +1212,36 @@ export default function CyborgTemple() {
                   <div
                     style={{
                       position: "fixed",
-                      top: "100px",
-                      right: "85px",
+                      top: "1rem",
+                      right: "5.5rem",
                       zIndex: 290
                     }}
                   >
+                     <div style={{ order: isMobileDevice ? 1 : 1 }}>
+          {isSignedIn ? (
+            <Illumin80ClerkButton afterSignOutUrl="/" isMobileDevice={isMobileDevice} />
+          ) : (
+            <SignInButton mode="modal" forceRedirectUrl="/trade">
+              <button style={{
+               width: isMobileDevice ? "3.5rem" : "3.5rem",
+                height: isMobileDevice ? "3.5rem" : "3.5rem",
+                borderRadius: "8px",
+                backgroundColor: "rgba(0, 0, 0, 0.7)",
+                border: "2px solid rgba(255, 255, 255, 0.2)",
+                color: "#ffffff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                backdropFilter: "blur(10px)",
+                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3)"
+              }}>
+                <span style={{ fontSize: "2.5rem" }}>{emoji}</span>
+              </button>
+            </SignInButton>
+          )}
+        </div>
+        
                   </div>
                   
                   {/* 80s Mode Button - Next to User Button */}

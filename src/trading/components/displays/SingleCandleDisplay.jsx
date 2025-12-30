@@ -16,217 +16,7 @@ if (typeof window !== 'undefined') {
   useGLTF.preload('/models/blockhead_runner.glb');
 }
 
-// Helper function to decode HTML entities
-function decodeHTMLEntities(text) {
-  if (!text) return text;
-  const textarea = document.createElement('textarea');
-  textarea.innerHTML = text;
-  return textarea.value;
-}
 
-// New component specifically for tattoo models - matching CompactCandleModal's SimpleTattooViewer
-function TattooModelViewer({ modelPath, candleData }) {
-  console.log('[TattooModelViewer] Props received:', {
-    modelPath,
-    candleData: {
-      tattooDesign: candleData?.tattooDesign,
-      tattooPlacement: candleData?.tattooPlacement,
-      selectedPose: candleData?.selectedPose,
-      devotionType: candleData?.devotionType
-    }
-  });
-  
-  const { scene, animations } = useGLTF(modelPath);
-  const groupRef = useRef();
-  const mixerRef = useRef();
-  const tattooMeshRef = useRef();
-  
-  // Clone model using useMemo
-  const clonedModel = React.useMemo(() => {
-    const clone = SkeletonUtilsClone(scene);
-    clone.scale.set(1.5, 1.5, 1.5);
-    clone.position.set(0, 0.5, -1);
-    return clone;
-  }, [scene]);
-  
-  // Set group ref
-  React.useEffect(() => {
-    groupRef.current = clonedModel;
-  }, [clonedModel]);
-  
-  // Apply pose animation
-  React.useEffect(() => {
-    if (mixerRef.current) {
-      mixerRef.current.stopAllAction();
-      mixerRef.current = null;
-    }
-    
-    if (candleData?.selectedPose && candleData.selectedPose !== 'tpose' && animations?.length > 0) {
-      let targetAnimation = null;
-      
-      // Find the appropriate animation based on selectedPose
-      if (candleData.selectedPose === 'run') {
-        targetAnimation = animations.find(a => 
-          a.name === 'Run_Pose' || a.name.toLowerCase().includes('run')
-        );
-      } else if (candleData.selectedPose === 'dance') {
-        targetAnimation = animations.find(a => 
-          a.name.toLowerCase().includes('dance_pose') || a.name.toLowerCase().includes('dance')
-        );
-      } else if (candleData.selectedPose === 'stand1') {
-        targetAnimation = animations.find(a => 
-          a.name === 'StandPose1' || a.name.includes('StandPose1')
-        );
-      } else if (candleData.selectedPose === 'stand2') {
-        targetAnimation = animations.find(a => 
-          a.name === 'StandPose2' || a.name.includes('StandPose2')
-        );
-      }
-      
-      if (targetAnimation) {
-        console.log('[TattooModel] Applying animation:', targetAnimation.name, 'for pose:', candleData.selectedPose);
-        mixerRef.current = new THREE.AnimationMixer(clonedModel);
-        const action = mixerRef.current.clipAction(targetAnimation);
-        action.reset();
-        action.setEffectiveWeight(1);
-        action.setLoop(THREE.LoopRepeat, Infinity);
-        action.play();
-        mixerRef.current.update(0);
-        clonedModel.updateMatrixWorld(true);
-      }
-    }
-    
-    return () => {
-      if (mixerRef.current) mixerRef.current.stopAllAction();
-    };
-  }, [candleData?.selectedPose, animations, clonedModel]);
-  
-  // DON'T use useFrame for tattoos - they should be completely static
-  // The tattoo is attached to the bone and the pose is frozen
-  
-  // Add tattoo - wait a bit for animation to settle
-  React.useEffect(() => {
-    if (!candleData?.tattooPlacement || !candleData?.tattooDesign) {
-      console.log('[TattooModel] No tattoo data');
-      return;
-    }
-    
-    // Remove old tattoo
-    if (tattooMeshRef.current) {
-      tattooMeshRef.current.parent?.remove(tattooMeshRef.current);
-      tattooMeshRef.current.geometry?.dispose();
-      tattooMeshRef.current.material?.dispose();
-      tattooMeshRef.current = null;
-    }
-    
-    // Add a small delay to ensure model is ready
-    const timer = setTimeout(() => {
-      const placement = candleData.tattooPlacement;
-      console.log('[TattooModel] Applying tattoo:', placement.boneName);
-      
-      const textureLoader = new THREE.TextureLoader();
-      
-      const imagePath = `/images/${candleData.tattooDesign}.png`;
-      console.log('[TattooModel] Loading texture from:', imagePath);
-      
-      textureLoader.load(
-        imagePath, 
-        (texture) => {
-          console.log('[TattooModel] Texture loaded successfully');
-        texture.colorSpace = THREE.SRGBColorSpace;
-        
-        const tattooGeometry = new THREE.PlaneGeometry(0.3, 0.3);
-        const tattooMaterial = new THREE.MeshBasicMaterial({
-          map: texture,
-          transparent: true,
-          side: THREE.DoubleSide,
-          depthWrite: false,
-          alphaTest: 0.1,
-        });
-        
-        const tattooMesh = new THREE.Mesh(tattooGeometry, tattooMaterial);
-        
-        // Position based on placement data
-        if (placement.boneName && placement.offsetLocal) {
-          let bone = null;
-          clonedModel.traverse(child => {
-            if (child.isBone && child.name === placement.boneName) {
-              bone = child;
-            }
-          });
-          
-          if (bone) {
-            console.log('[TattooModel] Found bone:', bone.name);
-            // Add tattoo directly to the bone so it moves with it
-            bone.add(tattooMesh);
-            
-            // Use the saved local offset position
-            tattooMesh.position.set(
-              placement.offsetLocal.x,
-              placement.offsetLocal.y,
-              placement.offsetLocal.z
-            );
-            
-            if (placement.normalLocal) {
-              const normal = new THREE.Vector3(
-                placement.normalLocal.x,
-                placement.normalLocal.y,
-                placement.normalLocal.z
-              );
-              const defaultNormal = new THREE.Vector3(0, 0, 1);
-              const quat = new THREE.Quaternion();
-              quat.setFromUnitVectors(defaultNormal, normal);
-              tattooMesh.quaternion.copy(quat);
-            }
-            
-            console.log('[TattooModel] Tattoo positioned at:', tattooMesh.position);
-          } else {
-            console.log('[TattooModel] Bone not found:', placement.boneName);
-          }
-        } else if (placement.worldPosition) {
-          // Fallback to world position
-          console.log('[TattooModel] Using world position');
-          clonedModel.add(tattooMesh);
-          tattooMesh.position.set(
-            placement.worldPosition.x,
-            placement.worldPosition.y,
-            placement.worldPosition.z
-          );
-        }
-        
-        tattooMeshRef.current = tattooMesh;
-        console.log('[TattooModel] Tattoo added successfully');
-        console.log('[TattooModel] Tattoo parent:', tattooMesh.parent?.name || 'No parent');
-        console.log('[TattooModel] Model children count:', clonedModel.children.length);
-      },
-      undefined,
-      (error) => {
-        console.error('[TattooModel] Error loading texture:', error);
-      });
-    }, 100); // Small delay to let animation settle
-    
-    return () => clearTimeout(timer);
-  }, [candleData, clonedModel]);
-  
-  return (
-    <>
-      {/* Lighting setup - matching CompactCandleModal */}
-      <ambientLight intensity={1.2} />
-      <directionalLight 
-        position={[5, 10, 5]} 
-        intensity={0.8} 
-        castShadow 
-        shadow-mapSize={[1024, 1024]}
-      />
-      <pointLight position={[0, 3, 2]} intensity={0.5} color="#ffaa00" />
-      <pointLight position={[-3, 2, -2]} intensity={0.3} color="#ffffff" />
-      
-      <group ref={groupRef}>
-        <primitive object={clonedModel} />
-      </group>
-    </>
-  );
-}
 
 
 // Model viewer component with candle data display and texture support
@@ -284,6 +74,36 @@ function ModelViewer({ modelPath, candleData = null, showPlaque = true, isFlippe
         clonedModel.traverse((child) => {
           if (child.isBone) {
             bonesMap[child.name] = child;
+          }
+          // Handle skateboard, platform, and dumbell visibility
+          if (child.isMesh && child.name) {
+            const nameLower = child.name.toLowerCase();
+            
+            // Skateboard mesh visibility
+            if (nameLower.includes('skateboard') && !nameLower.includes('platform')) {
+              child.visible = candleData.selectedPose === 'skateboard';
+            }
+            // SkatePlatform visible only during skateboard animation
+            else if (nameLower.includes('skateplatform') || 
+                     (nameLower.includes('skate') && nameLower.includes('platform'))) {
+              child.visible = candleData.selectedPose === 'skateboard';
+            }
+            // Platform2 visible for all other animations
+            else if (nameLower === 'platform2' || nameLower.includes('platform2')) {
+              child.visible = candleData.selectedPose !== 'skateboard';
+            }
+            // Dumbell1 visible only during curl animation
+            else if (nameLower === 'dumbell1' || nameLower.includes('dumbell1')) {
+              child.visible = candleData.selectedPose === 'curl';
+            }
+            // Dumbell2 visible only during curl animation
+            else if (nameLower === 'dumbell2' || nameLower.includes('dumbell2')) {
+              child.visible = candleData.selectedPose === 'curl';
+            }
+            // Surfboard visible only during surf animation
+            else if (nameLower === 'surfboard' || nameLower.includes('surfboard')) {
+              child.visible = candleData.selectedPose === 'surf';
+            }
           }
         }); 
         console.log('[SingleCandleDisplay] Found', Object.keys(bonesMap).length, 'bones');
@@ -343,6 +163,62 @@ function ModelViewer({ modelPath, candleData = null, showPlaque = true, isFlippe
                      name === 'Character_Rig|StandPose2' ||
                      name.includes('StandPose2') ||
                      (name.includes('stand') && name.includes('2'));
+            });
+          } else if (candleData.selectedPose === 'action') {
+            targetAnimation = animations.find(a => {
+              const name = a.name;
+              return name === 'Action' || 
+                     name === 'Character_Rig|Action' ||
+                     name.toLowerCase() === 'action';
+            });
+          } else if (candleData.selectedPose === 'curl') {
+            targetAnimation = animations.find(a => {
+              const name = a.name;
+              return name === 'Curl' || 
+                     name === 'Character_Rig|Curl' ||
+                     name.toLowerCase() === 'curl';
+            });
+          } else if (candleData.selectedPose === 'pray') {
+            targetAnimation = animations.find(a => {
+              const name = a.name;
+              return name === 'Pray' || 
+                     name === 'Character_Rig|Pray' ||
+                     name.toLowerCase() === 'pray';
+            });
+          } else if (candleData.selectedPose === 'skateboard') {
+            targetAnimation = animations.find(a => {
+              const name = a.name;
+              return name === 'Skateboard' || 
+                     name === 'Character_Rig|Skateboard' ||
+                     name.toLowerCase() === 'skateboard';
+            });
+          } else if (candleData.selectedPose === 'dance1') {
+            targetAnimation = animations.find(a => {
+              const name = a.name;
+              return name === 'Dance1' || 
+                     name === 'Character_Rig|Dance1' ||
+                     name.toLowerCase() === 'dance1';
+            });
+          } else if (candleData.selectedPose === 'dance2') {
+            targetAnimation = animations.find(a => {
+              const name = a.name;
+              return name === 'Dance2' || 
+                     name === 'Character_Rig|Dance2' ||
+                     name.toLowerCase() === 'dance2';
+            });
+          } else if (candleData.selectedPose === 'standpose1') {
+            targetAnimation = animations.find(a => {
+              const name = a.name;
+              return name === 'StandPose1' || 
+                     name === 'Character_Rig|StandPose1' ||
+                     name.toLowerCase() === 'standpose1';
+            });
+          } else if (candleData.selectedPose === 'surf') {
+            targetAnimation = animations.find(a => {
+              const name = a.name;
+              return name === 'Surf' || 
+                     name === 'Character_Rig|Surf' ||
+                     name.toLowerCase() === 'surf';
             });
           }
           
@@ -974,12 +850,24 @@ export default function SingleCandleDisplay({ onOpenCompactModal, onClose }) {
         
         // Also fetch from polaroids collection (new candles and tattoos)
         const polaroidsRef = collection(db, 'polaroids');
-        const polaroidQuery = query(
+        
+        // Try to fetch by createdBy (user ID) first, then by username
+        let polaroidQuery = query(
           polaroidsRef,
-          where('username', '==', userIdentifier),
+          where('createdBy', '==', user.id),
           limit(10)
         );
-        const polaroidSnapshot = await getDocs(polaroidQuery);
+        let polaroidSnapshot = await getDocs(polaroidQuery);
+        
+        // If no results with createdBy, try username
+        if (polaroidSnapshot.size === 0) {
+          polaroidQuery = query(
+            polaroidsRef,
+            where('username', '==', userIdentifier),
+            limit(10)
+          );
+          polaroidSnapshot = await getDocs(polaroidQuery);
+        }
         
         const polaroidsData = polaroidSnapshot.docs.map(doc => {
           const data = doc.data();
