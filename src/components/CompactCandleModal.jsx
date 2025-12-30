@@ -7,7 +7,7 @@ import { clone as SkeletonUtilsClone } from 'three/examples/jsm/utils/SkeletonUt
 useGLTF.preload('/models/tinyVotiveOnly.glb');
 useGLTF.preload('/models/tinyJapCanOnly.glb');
 useGLTF.preload('/models/blockhead_Streetman.glb');
-useGLTF.preload('/models/blockhead_Streetman_Tpose.glb');
+useGLTF.preload('/models/blockhead_StreetMan_Tpose.glb');
 useGLTF.preload('/models/blockhead_Surfer.glb');
 useGLTF.preload('/models/blockhead_Surfer_Tpose.glb');
 import { 
@@ -4428,7 +4428,7 @@ const serializeTattooPlacement = (placement) => {
                   <Suspense fallback={null}>
                     {formData.devotionType === 'tattoo' ? (
         <SimpleTattooViewer
-  modelPath="/models/blockhead_Streetman_Tpose.glb"
+  modelPath="/models/blockhead_StreetMan_Tpose.glb"
   tattooDesign={formData.tattooDesign}
   placementData={formData.tattooPlacement}  // Same data, same position!
   dedicationName={formData.username}
@@ -4498,10 +4498,10 @@ const serializeTattooPlacement = (placement) => {
                         // Interactive tattoo placement for Step 3
                         <InteractiveTattooViewer
                           modelPath={
-                            formData.tattooCharacter === 'blockhead_Streetman' ? '/models/blockhead_Streetman_Tpose.glb' : 
+                            formData.tattooCharacter === 'blockhead_Streetman' ? '/models/blockhead_StreetMan_Tpose.glb' : 
                             formData.tattooCharacter === 'blockhead_Surfer' ? '/models/blockhead_Surfer_Tpose.glb' :
                             formData.tattooCharacter === 'blockhead_runner' ? '/models/blockhead_runner.glb' :
-                            '/models/blockhead_Streetman_Tpose.glb' // fallback
+                            '/models/blockhead_StreetMan_Tpose.glb' // fallback
                           }
                           tattooDesign={formData.tattooDesign}
                           onPlacementChange={(placement) => setFormData(prev => ({ 
@@ -4521,7 +4521,7 @@ const serializeTattooPlacement = (placement) => {
                             formData.tattooCharacter === 'blockhead_Streetman' && currentStep >= 4 
                               ? '/models/blockhead_Streetman.glb' 
                               : formData.tattooCharacter === 'blockhead_Streetman' 
-                                ? '/models/blockhead_Streetman_Tpose.glb' 
+                                ? '/models/blockhead_StreetMan_Tpose.glb' 
                                 : formData.tattooCharacter === 'blockhead_Surfer' 
                                   ? '/models/blockhead_Surfer.glb' 
                                   : formData.tattooCharacter === 'blockhead_runner' 
