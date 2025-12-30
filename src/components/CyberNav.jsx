@@ -3,12 +3,31 @@ import ReactDOM from 'react-dom';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-const CyberNav = ({ is80sMode = false, position = "fixed" }) => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+const CyberNav = ({ 
+  is80sMode = false, 
+  position = "fixed",
+  isOpen = null,  // External control of menu state
+  onClose = null, // Callback when menu should close
+  showButton = true // Whether to show the hamburger button
+}) => {
+  const [internalIsMenuOpen, setInternalIsMenuOpen] = useState(false);
+  // Use external control if provided, otherwise use internal state
+  const isMenuOpen = isOpen !== null ? isOpen : internalIsMenuOpen;
   const [hoveredItemPath, setHoveredItemPath] = useState('');
   const [isMobile, setIsMobile] = useState(false);
   const [canHover, setCanHover] = useState(false);
   const pathname = usePathname();
+  
+  // Helper function to handle closing the menu
+  const handleClose = () => {
+    if (isOpen !== null && onClose) {
+      // External control - call the close callback
+      onClose();
+    } else {
+      // Internal control
+      setInternalIsMenuOpen(false);
+    }
+  };
   
   // Clear hover state when pathname changes or menu state changes
   React.useEffect(() => {
@@ -87,6 +106,7 @@ const CyberNav = ({ is80sMode = false, position = "fixed" }) => {
   return (
       <>
         
+        {showButton && (
         <button
           style={{
             position: position === "relative" ? "relative" : position,
@@ -109,7 +129,13 @@ const CyberNav = ({ is80sMode = false, position = "fixed" }) => {
           }}
           aria-label="Menu"
           onClick={() => {
-            setIsMenuOpen(!isMenuOpen);
+            if (isOpen !== null && onClose) {
+              // External control - call the close callback
+              onClose();
+            } else {
+              // Internal control
+              setInternalIsMenuOpen(!internalIsMenuOpen);
+            }
             setHoveredItemPath('');
           }}
           onMouseEnter={(e) => e.target.style.backgroundColor = "rgba(0, 0, 0, 0.8)"}
@@ -130,6 +156,7 @@ const CyberNav = ({ is80sMode = false, position = "fixed" }) => {
             )}
           </svg>
         </button>
+        )}
         
         {isMenuOpen && typeof document !== 'undefined' && ReactDOM.createPortal(
           <div
@@ -156,7 +183,7 @@ const CyberNav = ({ is80sMode = false, position = "fixed" }) => {
             }}
             onClick={(e) => {
               if (e.target === e.currentTarget) {
-                setIsMenuOpen(false);
+                handleClose();
                 setHoveredItemPath('');
               }
             }}
@@ -174,7 +201,7 @@ const CyberNav = ({ is80sMode = false, position = "fixed" }) => {
                 fontSize: "24px",
                 zIndex: 10000
               }}
-              onClick={() => setIsMenuOpen(false)}
+              onClick={() => handleClose()}
               aria-label="Close menu"
             >
               <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -196,7 +223,7 @@ const CyberNav = ({ is80sMode = false, position = "fixed" }) => {
                   href={item.path}
                   style={{ textDecoration: 'none', display: 'block', cursor: 'pointer' }}
                   onClick={(e) => {
-                    setIsMenuOpen(false);
+                    handleClose();
                     setHoveredItemPath('');
                     
                     // Force a hard navigation if on the same page to reset state

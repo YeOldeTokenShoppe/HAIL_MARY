@@ -275,6 +275,8 @@ function ModelViewer({ modelPath, candleData = null, showPlaque = true, isFlippe
             'chart': '/images/chart.webp',
             'collectibles': '/images/pokemon2.webp',
             'alchemy': '/images/alchemy.gif',
+              'guadalupe_pink': '/images/guadalupePink.jpg',
+            'guadalupe_blue': '/images/guadalupeBlue.jpg'
           };
           
           const texturePath = BACKGROUND_TEXTURES[candleData.background];
@@ -413,6 +415,8 @@ function ModelViewer({ modelPath, candleData = null, showPlaque = true, isFlippe
               'chart': '/images/chart.webp',
               'collectibles': '/images/pokemon2.webp',
               'alchemy': '/images/alchemy.gif',
+              'guadalupe_pink': '/images/guadalupePink.jpg',
+            'guadalupe_blue': '/images/guadalupeBlue.jpg'
             };
             
             const texturePath = BACKGROUND_TEXTURES[candleData.background];

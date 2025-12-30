@@ -106,6 +106,9 @@ const CyborgTempleScene = ({
     nextSwitchDelay: Math.random() * 10000 + 20000, // Wait 20-30 seconds
   });
   
+  // Refs for PalmTree meshes - store multiple instances
+  const palmTreeRefs = useRef([]);
+  
   
   // Detect mobile device on mount
   useEffect(() => {
@@ -545,6 +548,13 @@ const CyborgTempleScene = ({
           object7MeshRef.current = child;
         }
         
+        // Find PalmTree meshes - they have names like PalmTree001, PalmTree002, etc
+        if (child.name && child.name.startsWith('PalmTree')) {
+          palmTreeRefs.current.push(child);
+          // Set initial visibility based on is80sMode
+          child.visible = is80sMode;
+        }
+        
         // Find eye meshes for blinking animation
         if (child.name === 'L_eye' || child.name === 'L_Eye' || child.name === 'LeftEye' || child.name === 'left_eye') {
           leftEyeRef.current = child;
@@ -782,6 +792,17 @@ const CyborgTempleScene = ({
       originalCameraPosition.current = camera.position.clone();
     }
   }, [camera]);
+  
+  // Update PalmTree visibility when is80sMode changes
+  useEffect(() => {
+    if (palmTreeRefs.current && palmTreeRefs.current.length > 0) {
+      palmTreeRefs.current.forEach(palmTree => {
+        if (palmTree) {
+          palmTree.visible = is80sMode;
+        }
+      });
+    }
+  }, [is80sMode]);
 
   // Add raycaster for click detection and keyboard shortcuts
   useEffect(() => {

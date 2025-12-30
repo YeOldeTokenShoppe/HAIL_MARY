@@ -1668,7 +1668,20 @@ const BACKGROUND_TEXTURES = [{
   path: '/images/alchemy.gif',
   name: 'Alchemy Pattern',
   type: 'image'
-}, ];
+}, 
+ {
+  id: 'guadalupe_pink',
+  path: '/images/pinkGuadalupe.jpg',
+  name: 'Pink Guadalupe',
+  type: 'image'
+},
+ {
+  id: 'guadalupe_blue',
+  path: '/images/blueGuadalupe.jpg',
+  name: 'Blue Guadalupe',
+  type: 'image'
+},
+];
 const sanitizeInput = (input, maxLength = 500) => {
   if (!input) return '';
   let sanitized = String(input);  // Don't trim here - it prevents typing spaces

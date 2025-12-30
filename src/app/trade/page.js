@@ -12,8 +12,10 @@ import { Illumin80ClerkButton } from "@/components/Illumin80Display";
 import VideoScreens from "@/components/VideoScreens";
 import TickerDisplay3 from "@/components/TickerDisplay3";
 import { useMusic } from '@/components/MusicContext';
-import { useUser, SignInButton, UserButton } from "@clerk/nextjs";
+import { useUser, SignInButton, UserButton, useClerk } from "@clerk/nextjs";
 import CyberNav from '@/components/CyberNav';
+import NavControls from '@/components/NavControls';
+import NavControlsMobile from '@/components/NavControlsMobile';
 import SimpleTextLoader from '@/components/SimpleTextLoader';
 import TradingOverlay from '@/trading/components/overlays/TradingOverlay';
 // import { useLighterTrading } from '@/hooks/useLighterTrading'; // Direct Lighter integration
@@ -50,6 +52,7 @@ export default function CyborgTemple() {
   const [useAurora, setUseAurora] = useState(true); // Toggle between Aurora and StarField
   const [userHasInteracted, setUserHasInteracted] = useState(false); // Track if user has clicked around
   const [isMobileDevice, setIsMobileDevice] = useState(false)
+  const [showCyberNav, setShowCyberNav] = useState(false); // Track CyberNav visibility
   const isTogglingRef = useRef(false); // Add ref for toggle state
   
   // Get music context
@@ -113,8 +116,9 @@ export default function CyborgTemple() {
       }
     }, [contextIsPlaying, showMusicControls]);
 
-  // Get user context
+  // Get user context and auth functions
   const { isSignedIn } = useUser();
+  const { openSignIn, signOut } = useClerk();
 
   // Suppress WebGL context lost warnings when modal is open
   useEffect(() => {
@@ -895,7 +899,7 @@ export default function CyborgTemple() {
               isPlaying={false}
               onLoad={handleSceneLoad}
               showAnnotations={true}
-              is80sMode={false}
+              is80sMode={context80sMode}
               isMobile={isMobileView}
               onAgentClick={(agentId) => {
                 if (agentId) {
@@ -929,7 +933,7 @@ export default function CyborgTemple() {
               isVisible={true} 
             />
 
-            <VideoScreens />
+            <VideoScreens is80sMode={context80sMode} />
 
               {/* <NeuralNetworkR3F 
               theme={2}
@@ -1053,7 +1057,7 @@ export default function CyborgTemple() {
               </div>
             )}
             
-            {/* CyberNav Menu with integrated buttons */}
+            {/* Nav Controls - Desktop vs Mobile */}
             <div
               style={{
                 position: "fixed",
@@ -1062,20 +1066,58 @@ export default function CyborgTemple() {
                 zIndex: 10001,
               }}
             >
-              <CyberNav 
-                is80sMode={context80sMode} 
-                position="fixed"
-
-              />
+              {isMobileView ? (
+                <NavControlsMobile 
+                  isPlaying={contextIsPlaying}
+                  onPlayMusic={() => play()}
+                  onStopMusic={() => pause()}
+                  onSkipTrack={() => nextTrack()}
+                  onUserClick={() => {
+                    if (isSignedIn) {
+                      signOut();
+                    } else {
+                      openSignIn({ forceRedirectUrl: "/trade" });
+                    }
+                  }}
+                  onMenuClick={() => setShowCyberNav(!showCyberNav)}
+                  isUserSignedIn={isSignedIn}
+                  isMenuOpen={showCyberNav}
+                />
+              ) : (
+                <NavControls 
+                  auroraOn={useAurora}
+                  setAuroraOn={setUseAurora}
+                  is80s={context80sMode}
+                  setIs80s={setContext80sMode}
+                  isPlaying={contextIsPlaying}
+                  onPlayMusic={() => play()}
+                  onStopMusic={() => pause()}
+                  onSkipTrack={() => nextTrack()}
+                  onUserClick={() => {
+                    if (isSignedIn) {
+                      signOut();
+                    } else {
+                      openSignIn({ forceRedirectUrl: "/trade" });
+                    }
+                  }}
+                  onMenuClick={() => setShowCyberNav(!showCyberNav)}
+                  isUserSignedIn={isSignedIn}
+                  isMenuOpen={showCyberNav}
+                />
+              )}
             </div>
-            <div
-                    style={{
-                      position: "fixed",
-                      top: "5rem",
-                      right: "1rem",
-                      zIndex: 290
-                    }}
-                  >
+            
+            {/* CyberNav Menu - Show when toggled */}
+            <CyberNav 
+              is80sMode={context80sMode} 
+              position="fixed"
+              isOpen={showCyberNav}
+              onClose={() => setShowCyberNav(false)}
+              showButton={false}
+            />
+            
+            {/* Music controls are now integrated into NavControls */}
+            <div style={{ display: "none" }}>
                     {
                         !showMusicControls ? (
                           <button
@@ -1208,8 +1250,8 @@ export default function CyborgTemple() {
                       }
                   </div>
                   
-                  {/* User Button - Next to Music Button */}
-                  <div
+                  {/* User Button - Now integrated into NavControls */}
+                  {/* <div
                     style={{
                       position: "fixed",
                       top: "1rem",
@@ -1242,10 +1284,10 @@ export default function CyborgTemple() {
           )}
         </div>
         
-                  </div>
+                  </div> */}
                   
-                  {/* 80s Mode Button - Next to User Button */}
-                  <div
+                  {/* 80s Mode Button - Now integrated into NavControls */}
+                  {/* <div
                     style={{
                       position: "fixed",
                       top: "9rem",
@@ -1308,7 +1350,7 @@ export default function CyborgTemple() {
                       </span>
                       </span>
                     </button>
-                  </div>
+                  </div> */}
                   
                  
               

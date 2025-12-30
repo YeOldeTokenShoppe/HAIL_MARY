@@ -28,7 +28,7 @@ const non80sTracks = [
 const eightyTracks = [
   { name: "For Those About To Rock - AC/DC", path: "audio/for-those-about-to-rock-ac-dc.m4a", bpm: 75 },
   { name: "Dirty Cash - The Adventures of Stevie V", path: "audio/Dirty Cash.m4a", bpm: 100 },
-  { name: "Intergalactic - Beastie Boys", path: "audio/intergalactic.mp3", bpm: 108 },
+  { name: "Intergalactic - Beastie Boys", path: "audio/Intergalactic.mp3", bpm: 108 },
   { name: "Good Life - Inner City", path: "audio/good-life-inner-city.m4a", bpm: 120 },
   { name: "Like A Prayer - Madonna", path: "audio/like-a-prayer-madonna.m4a", bpm: 85 },
   { name: "99 Luftballoons - Nena", path: "audio/99 Luftballoons Nena.m4a", bpm: 85 },

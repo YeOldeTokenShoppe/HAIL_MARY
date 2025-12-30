@@ -20,6 +20,9 @@ const SKYBOX_TEXTURES = {
   chart: '/images/chart.webp',
   collectibles: '/images/pokemon2.webp',
   alchemy: '/images/alchemy.gif',
+  guadalupe_pink: '/images/guadalupePink.jpg',
+  guadalupe_blue: '/images/guadalupeBlue.jpg'
+  
 };
 
 // Preload models
