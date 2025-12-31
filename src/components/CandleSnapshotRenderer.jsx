@@ -29,7 +29,7 @@ const SKYBOX_TEXTURES = {
 if (typeof window !== 'undefined') {
   useGLTF.preload('/models/tinyVotiveBox.glb');
   useGLTF.preload('/models/tinyJapCanBox.glb');
-  useGLTF.preload('/models/blockhead_Streetman.glb');
+  useGLTF.preload('/models/blockhead_StreetMan.glb');
   useGLTF.preload('/models/blockhead2.glb');
   useGLTF.preload('/models/blockhead_runner.glb');
 }
@@ -38,7 +38,7 @@ if (typeof window !== 'undefined') {
 function getModelPath(userData, includeBox = false) {
   if (userData?.devotionType === 'tattoo') {
     if (userData?.tattooCharacter === 'blockhead_Streetman') {
-      return '/models/blockhead_Streetman.glb';  // Fixed typo: removed hyphen
+      return '/models/blockhead_StreetMan.glb';  // Fixed typo: removed hyphen
     } else if (userData?.tattooCharacter === 'blockhead_runner') {
       return '/models/blockhead_runner.glb';
     } else if (userData?.tattooCharacter === 'blockhead2') {

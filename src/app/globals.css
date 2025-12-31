@@ -42,6 +42,19 @@
 
 
 
+/* Glowing border animation for Clerk modals */
+@keyframes borderGlow {
+  0%, 100% { 
+    background-position: 0% 50%;
+  }
+  50% { 
+    background-position: 100% 50%;
+  }
+}
+
+
+/* Remove the old restrictive styling - handled by more specific rules below */
+
 /* Accordion animations for shadcn/ui */
 @keyframes accordion-down {
   from {
@@ -3417,24 +3430,7 @@ h3 {
   margin-top: 2rem !important;
 }
 
-.cl-socialButtonsIconButton {
-  background: goldenrod !important;
-}
-.cl-internal-1o28kd1 {
-  width: 60px;
-  height: 60px;
-}
-.cl-socialButtonsProviderIcon {
-  width: 25px;
-  height: 25px;
-}
-
-.cl-formButtonPrimary {
-  background-color: goldenrod;
-}
-.cl-headerTitle {
-  font-size: 1.6rem;
-}
+/* Removed conflicting Clerk styles - now handled in layout.js */
 
 .sc-fLseNd eKTnZg {
   display: flex;
@@ -4493,24 +4489,7 @@ body {
 .cybr-btn:nth-of-type(2) {
   --primary-hue: 260;
 }
-.cl-socialButtonsIconButton {
-  background: goldenrod !important;
-}
-.cl-internal-1o28kd1 {
-  width: 60px;
-  height: 60px;
-}
-.cl-socialButtonsProviderIcon {
-  width: 25px;
-  height: 25px;
-}
-
-.cl-formButtonPrimary {
-  background-color: goldenrod;
-}
-.cl-headerTitle {
-  font-size: 1.6rem;
-}
+/* Removed conflicting Clerk styles - now handled in layout.js */
 /* .cl-userButtonTrigger {
   position: absolute;
   width: 3.5rem !important;
@@ -6572,4 +6551,426 @@ input[name="cyber-btn"]:checked + .cyber-btn .cyber-btn__glitch {
   31%, 61%, 100% {
     clip-path: var(--clip-four);
   }
+}
+
+/* ============ CLERK MODAL COMPREHENSIVE FIXES ============ */
+
+/* Modal container - no styling, just sizing */
+body .cl-rootBox,
+body .cl-cardBox {
+  max-width: 750px !important;
+  margin: 0 auto !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.cl-internal-dsfs4w {
+    box-sizing: border-box;
+    display: flex;
+    flex-flow: row;
+    -webkit-box-align: stretch;
+    align-items: stretch;
+    -webkit-box-pack: start;
+    justify-content: flex-start;
+    position: relative;
+    outline: 0px;
+    animation: 180ms ease-out 0s 1 normal none running animation-chn8p3;
+    height: auto;
+    margin: 0px;
+    background-color: rgb(119 42 168 / 95%) !important;
+    backdrop-filter: blur(20px) !important;
+    border-radius: 30px;
+}
+
+
+/* Only the innermost card gets styling */
+body .cl-card.cl-userProfile-root,
+body .cl-card.cl-signIn-start,
+body .cl-card.cl-signUp-start {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 auto !important;
+  background: rgba(20, 20, 30, 0.95) !important;
+  border: 2px solid rgba(138, 43, 226, 0.5) !important;
+  /* border-radius: 20px !important; */
+  box-shadow: 0 0 60px rgba(138, 43, 226, 0.4) !important;
+  box-sizing: border-box !important;
+}
+
+
+body .cl-internal-dsfs4w {
+  border: 2px solid rgba(138, 43, 226, 0.5) !important;
+  border-radius: 30px !important;
+}
+/* User profile specific width */
+body .cl-userProfile-root {
+  width: 750px !important;
+  max-width: 90vw !important;
+  display: flex !important;
+  flex-direction: row !important;
+}
+
+/* Fix the internal layout to prevent compression */
+body .cl-userProfile-root > div {
+  display: flex !important;
+  flex-direction: row !important;
+  width: 100% !important;
+}
+
+/* Sign in/up stay compact and centered */
+body .cl-signIn-root,
+body .cl-signUp-root {
+  width: 450px !important;
+  max-width: 90vw !important;
+  margin: 0 auto !important;
+}
+
+/* Fix the container hierarchy to prevent clipping */
+body .cl-signIn-root > div,
+body .cl-signUp-root > div {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Ensure all nested containers respect width */
+body .cl-signIn-root div[data-localization-key],
+body .cl-signUp-root div[data-localization-key] {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* Center the modal backdrop and content */
+body .cl-modalBackdrop {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 20px !important;
+}
+
+body .cl-modalContent {
+  margin: auto !important;
+  position: relative !important;
+  transform: none !important;
+  width: fit-content !important;
+  max-width: calc(100vw - 40px) !important;
+}
+
+/* Add purple background with magenta glow to sign-in modal */
+body .cl-signIn-root .cl-internal-dsfs4w,
+body .cl-signUp-root .cl-internal-dsfs4w {
+  background: rgba(119, 42, 168, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  border-radius: 20px !important;
+  border: 1px solid rgba(255, 0, 110, 0.3) !important;
+  box-shadow: 
+    0 0 20px rgba(255, 0, 110, 0.3),
+    0 0 40px rgba(255, 0, 110, 0.15),
+    inset 0 0 20px rgba(255, 0, 110, 0.05) !important;
+  animation: subtleMagentaPulse 4s ease-in-out infinite !important;
+  margin: 0 auto !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+/* Remove scroll from sign-in/up modals */
+body .cl-signIn-root,
+body .cl-signUp-root {
+  overflow: hidden !important;
+}
+
+body .cl-signIn-root .cl-card,
+body .cl-signUp-root .cl-card {
+  overflow: visible !important;
+}
+
+/* Style social media buttons with gradient and glow */
+body .cl-socialButtonsBlockButton,
+body .cl-internal-1uc9s2c {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.2)) !important;
+  border: 1px solid rgba(0, 245, 212, 0.3) !important;
+  transition: all 0.3s ease !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+body .cl-socialButtonsBlockButton:hover,
+body .cl-internal-1uc9s2c:hover {
+  background: linear-gradient(135deg, rgba(0, 245, 212, 0.15), rgba(255, 0, 110, 0.15)) !important;
+  border: 1px solid rgba(0, 245, 212, 0.6) !important;
+  box-shadow: 
+    0 0 15px rgba(0, 245, 212, 0.3),
+    inset 0 0 10px rgba(0, 245, 212, 0.1) !important;
+  transform: scale(1.02) !important;
+  z-index: 10 !important;
+}
+
+/* Close button styling - pink X */
+body .cl-modalCloseButton {
+  position: absolute !important;
+  top: 16px !important;
+  right: 16px !important;
+  width: 32px !important;
+  height: 32px !important;
+  background: transparent !important;
+  border: none !important;
+  color: #ff006e !important;
+  font-size: 32px !important;
+  font-weight: bold !important;
+  z-index: 100 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+}
+
+body .cl-modalCloseButton::before {
+  content: "×" !important;
+}
+
+body .cl-modalCloseButton svg {
+  display: none !important;
+}
+
+body .cl-modalCloseButton:hover {
+  color: #ff00ff !important;
+  transform: scale(1.1) !important;
+}
+
+/* Fix any vertical text issues */
+body .cl-profilePage__title,
+body .cl-profileSectionTitleText,
+body [class*="__title"] {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  white-space: normal !important;
+  word-wrap: break-word !important;
+}
+
+/* Profile page styling */
+body .cl-profilePage__header {
+  margin-bottom: 20px !important;
+  padding-bottom: 16px !important;
+  border-bottom: 1px solid rgba(138, 43, 226, 0.3) !important;
+}
+
+body .cl-profilePage__title {
+  color: #ff006e !important;
+  font-size: 20px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 2px !important;
+  font-weight: 700 !important;
+}
+
+/* Profile sections */
+body .cl-profileSection {
+  margin-bottom: 24px !important;
+}
+
+body .cl-profileSectionTitle {
+  color: #ff006e !important;
+  font-size: 14px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  margin-bottom: 12px !important;
+  font-weight: 600 !important;
+}
+
+/* Form fields - ensure full width */
+body .cl-formFieldInput,
+body .cl-formFieldInput__identifier,
+body .cl-formFieldInput__profile,
+body input[type="text"],
+body input[type="email"] {
+  width: 100% !important;
+  background: rgba(0, 0, 0, 0.6) !important;
+  border: 1px solid rgba(0, 245, 212, 0.3) !important;
+  color: #ffffff !important;
+  padding: 12px 16px !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  box-sizing: border-box !important;
+}
+
+body .cl-formFieldInput:focus,
+body input[type="text"]:focus,
+body input[type="email"]:focus {
+  border-color: #00f5d4 !important;
+  box-shadow: 0 0 15px rgba(0, 245, 212, 0.3) !important;
+  outline: none !important;
+}
+
+/* Buttons */
+body .cl-formButtonPrimary {
+  background: #ffffff !important;
+  color: #000000 !important;
+  padding: 12px 24px !important;
+  border-radius: 40px !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  border: none !important;
+  transition: all 0.2s ease !important;
+}
+
+body .cl-formButtonPrimary:hover {
+  background: linear-gradient(135deg, #ff006e, #8338ec) !important;
+  color: #ffffff !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Left sidebar */
+body .cl-navbar {
+  background: rgba(0, 0, 0, 0.8) !important;
+  border-right: 1px solid rgba(138, 43, 226, 0.3) !important;
+  padding: 20px !important;
+  min-width: 180px !important;
+}
+.cl-internal-16806en {
+text-align: center;
+}
+
+
+
+.cl-internal-1phi8nv {
+text-align: center;
+}
+
+body .cl-navbarButton {
+  color: rgba(255, 255, 255, 0.7) !important;
+  padding: 10px 16px !important;
+  margin-bottom: 8px !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  transition: all 0.2s ease !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+body .cl-navbarButton:hover,
+body .cl-navbarButtonActive {
+  background: rgba(255, 0, 110, 0.2) !important;
+  color: #ff006e !important;
+}
+
+/* Content area - ensure it takes proper space */
+body .cl-pageScrollBox,
+body .cl-profilePage {
+  flex: 1 1 auto !important;
+  min-width: 400px !important;
+  padding: 24px !important;
+  background: rgba(10, 10, 15, 0.6) !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* Ensure the form container takes full width */
+body .cl-profileSection,
+body .cl-formContainer {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Form fields should be full width */
+body .cl-formFieldRow {
+  width: 100% !important;
+  margin-bottom: 16px !important;
+}
+
+body .cl-formField {
+  width: 100% !important;
+}
+
+/* Modal backdrop */
+body .cl-modalBackdrop {
+  backdrop-filter: blur(8px) !important;
+  background: rgba(0, 0, 0, 0.85) !important;
+}
+
+/* Style the purple container with subtle magenta neon glow */
+body .cl-internal-dsfs4w {
+  background: rgba(119, 42, 168, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  border-radius: 20px !important;  /* Increased to match inner container */
+  height: auto !important;
+  border: 1px solid rgba(255, 0, 110, 0.3) !important;
+  box-shadow: 
+    0 0 20px rgba(255, 0, 110, 0.3),
+    0 0 40px rgba(255, 0, 110, 0.15),
+    inset 0 0 20px rgba(255, 0, 110, 0.05) !important;
+  animation: subtleMagentaPulse 4s ease-in-out infinite !important;
+  position: relative !important;
+  overflow: hidden !important;  /* Changed to hidden to clip inner content */
+}
+
+/* Round any parent containers */
+body [class*="cl-internal"] {
+  border-radius: 20px !important;
+}
+
+/* Ensure the modal portal container is also rounded */
+body [data-clerk-portal] > div > div {
+  border-radius: 20px !important;
+  overflow: hidden !important;
+}
+
+/* Removed corner bracket attempts - keeping clean rounded design */
+
+/* Subtle magenta glow pulse animation */
+@keyframes subtleMagentaPulse {
+  0%, 100% {
+    box-shadow: 
+      0 0 20px rgba(255, 0, 110, 0.3),
+      0 0 40px rgba(255, 0, 110, 0.15),
+      inset 0 0 20px rgba(255, 0, 110, 0.05);
+  }
+  50% {
+    box-shadow: 
+      0 0 25px rgba(255, 0, 110, 0.4),
+      0 0 50px rgba(255, 0, 110, 0.2),
+      inset 0 0 25px rgba(255, 0, 110, 0.08);
+  }
+}
+
+/* Sign Out Button - Add it to the Security section or navbar */
+body .cl-navbar {
+  position: relative !important;
+  padding-bottom: 70px !important; /* Space for sign out button */
+}
+
+/* Style the sign out button */
+body .cl-navbarButton[data-localization-key*="signOut"],
+body .cl-userProfile-root button[aria-label*="Sign out"],
+body .cl-userProfile-root button[aria-label*="sign out"],
+body button.cl-signOutButton {
+  position: absolute !important;
+  bottom: 20px !important;
+  left: 20px !important;
+  width: calc(100% - 40px) !important;
+  background: linear-gradient(135deg, #ff006e, #8338ec) !important;
+  color: #ffffff !important;
+  padding: 12px 20px !important;
+  border-radius: 12px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  font-size: 13px !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  box-shadow: 0 4px 20px rgba(255, 0, 110, 0.3) !important;
+  text-align: center !important;
+}
+
+body .cl-navbarButton[data-localization-key*="signOut"]:hover,
+body button.cl-signOutButton:hover {
+  background: linear-gradient(135deg, #8338ec, #ff006e) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 30px rgba(255, 0, 110, 0.5) !important;
+}
+
+/* If sign out is in Security section, make it visible */
+body .cl-profileSection__security button {
+  display: block !important;
+  margin-top: 20px !important;
 }

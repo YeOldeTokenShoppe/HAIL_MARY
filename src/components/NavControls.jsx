@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { UserButton, SignInButton } from '@clerk/nextjs';
 
 // Cyberpunk Nav Controls v4 - RL80
 // Separate toggles for Aurora shader and 80s mode
@@ -13,7 +14,6 @@ export default function NavControls({
   onPlayMusic,
   onStopMusic,
   onSkipTrack,
-  onUserClick,
   onMenuClick,
   isUserSignedIn = false,
   isMenuOpen = false  // Accept menu state from parent
@@ -203,12 +203,43 @@ export default function NavControls({
           color: #ff006e;
         }
 
-        /* Avatar */
-        .avatar-container {
+        /* User Button Container */
+        .user-button-container {
           position: relative;
         }
 
-        .avatar {
+        /* Style Clerk's UserButton */
+        .user-button-container :global(.cl-userButtonBox) {
+          height: 44px;
+        }
+
+        .user-button-container :global(.cl-userButtonTrigger) {
+          width: 44px;
+          height: 44px;
+          border-radius: 10px;
+          border: 2px solid #00f5d4;
+          box-shadow: 
+            0 0 20px rgba(0, 245, 212, 0.4),
+            inset 0 0 20px rgba(0, 245, 212, 0.1);
+          transition: all 0.3s ease;
+          overflow: hidden;
+        }
+        
+        .user-button-container :global(.cl-userButtonTrigger:hover) {
+          box-shadow: 
+            0 0 30px rgba(0, 245, 212, 0.6),
+            inset 0 0 20px rgba(0, 245, 212, 0.2);
+          transform: scale(1.05);
+        }
+
+        .user-button-container :global(.cl-avatarImage) {
+          width: 100%;
+          height: 100%;
+          border-radius: 8px;
+        }
+
+        /* Sign In Button */
+        .sign-in-btn {
           width: 44px;
           height: 44px;
           border-radius: 10px;
@@ -225,28 +256,11 @@ export default function NavControls({
           overflow: hidden;
         }
         
-        .avatar:hover {
+        .sign-in-btn:hover {
           box-shadow: 
             0 0 30px rgba(0, 245, 212, 0.6),
             inset 0 0 20px rgba(0, 245, 212, 0.2);
           transform: scale(1.05);
-        }
-
-        .avatar-status {
-          position: absolute;
-          bottom: -2px;
-          right: -2px;
-          width: 12px;
-          height: 12px;
-          background: #00ff88;
-          border-radius: 50%;
-          border: 2px solid #0d0d1a;
-          box-shadow: 0 0 8px rgba(0, 255, 136, 0.6);
-        }
-
-        .avatar-status.offline {
-          background: #666;
-          box-shadow: none;
         }
 
         /* Music Stack - Splits from one to two buttons */
@@ -396,7 +410,14 @@ export default function NavControls({
           text-shadow: 0 0 10px rgba(255, 0, 255, 0.8);
         }
 
-        .mode-80s .avatar {
+        .mode-80s .user-button-container :global(.cl-userButtonTrigger) {
+          border-color: #00ffff;
+          box-shadow: 
+            0 0 20px rgba(0, 255, 255, 0.4),
+            inset 0 0 20px rgba(0, 255, 255, 0.1);
+        }
+
+        .mode-80s .sign-in-btn {
           border-color: #00ffff;
           box-shadow: 
             0 0 20px rgba(0, 255, 255, 0.4),
@@ -445,7 +466,7 @@ export default function NavControls({
               <div className={`toggle-thumb ${is80s ? 'active' : ''}`} />
             </div>
             <span className="icon icon-right">🕹️</span>
-            <span className="toggle-label">80s</span>
+            <span className="toggle-label">80s MODE</span>
           </div>
         </div>
 
@@ -479,15 +500,27 @@ export default function NavControls({
           )}
         </div>
 
-        {/* Avatar */}
-        <div className="avatar-container" onClick={onUserClick}>
-          <div className="avatar">
-            <span style={{ fontSize: '24px' }}>
-              {isUserSignedIn ? '👤' : emoji}
-            </span>
-          </div>
-          <div className={`avatar-status ${isUserSignedIn ? '' : 'offline'}`} />
+        {/* User Button */}
+        <div className="user-button-container">
+          {isUserSignedIn ? (
+            <UserButton 
+              afterSignOutUrl="/trade"
+              appearance={{
+                elements: {
+                  avatarBox: "user-avatar-box",
+                  userButtonTrigger: "user-button-trigger"
+                }
+              }}
+            />
+          ) : (
+            <SignInButton mode="modal" forceRedirectUrl="/trade">
+              <button className="sign-in-btn">
+                <span style={{ fontSize: '24px' }}>{emoji}</span>
+              </button>
+            </SignInButton>
+          )}
         </div>
+
 
         {/* HAMBURGER MENU - THE HERO */}
         <button 

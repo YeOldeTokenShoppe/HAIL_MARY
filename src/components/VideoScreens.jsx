@@ -28,6 +28,47 @@ function VideoScreens({ is80sMode = false }) {
   const texture4Ref = useRef();
   const texture5Ref = useRef();
   const texture6Ref = useRef(); // For 80s80s80s texture
+  
+  // Track which screens should show regular content even in 80s mode
+  const [showRegularContent, setShowRegularContent] = useState({
+    Screen1: false,
+    Screen2: false,
+    Screen3: false,
+    Screen4: false
+  });
+  
+  // Reset toggle state when 80s mode changes
+  useEffect(() => {
+    if (!is80sMode) {
+      setShowRegularContent({
+        Screen1: false,
+        Screen2: false,
+        Screen3: false,
+        Screen4: false
+      });
+    }
+  }, [is80sMode]);
+  
+  // Listen for screen click events from CyborgTempleScene
+  useEffect(() => {
+    const handleScreenClick = (event) => {
+      if (is80sMode && event.detail && event.detail.screenName) {
+        const screenName = event.detail.screenName;
+        if (screenName in showRegularContent) {
+          setShowRegularContent(prev => ({
+            ...prev,
+            [screenName]: !prev[screenName]
+          }));
+        }
+      }
+    };
+    
+    window.addEventListener('screenClicked', handleScreenClick);
+    
+    return () => {
+      window.removeEventListener('screenClicked', handleScreenClick);
+    };
+  }, [is80sMode, showRegularContent]);
 
   useEffect(() => {
     // Determine which video to play based on mode
@@ -146,7 +187,7 @@ function VideoScreens({ is80sMode = false }) {
     texture6.magFilter = THREE.LinearFilter;
     texture6.format = THREE.RGBFormat;
     texture6.flipY = false; // Match other textures
-    texture6.repeat.x = -1; // Flip X-axis
+    texture6.repeat.x = 1; // Flip X-axis
     texture6.center.set(0.5, 0.5); // Set center for proper flipping
     texture6Ref.current = texture6;
 
@@ -186,7 +227,8 @@ function VideoScreens({ is80sMode = false }) {
           // console.log('[VideoScreens] Found Screen1, setting up texture');
           screen1Found = true;
           
-          if (is80sMode) {
+          // Show video if in 80s mode AND not toggled to regular content
+          if (is80sMode && !showRegularContent.Screen1) {
             // Apply video texture in 80s mode
             const material = new THREE.MeshBasicMaterial({
               map: texture1,
@@ -351,7 +393,8 @@ function VideoScreens({ is80sMode = false }) {
           // console.log('[VideoScreens] Found Screen2');
           screen2Found = true;
           
-          if (is80sMode) {
+          // Show video if in 80s mode AND not toggled to regular content
+          if (is80sMode && !showRegularContent.Screen2) {
             // Apply video texture in 80s mode
             const material = new THREE.MeshBasicMaterial({
               map: texture3,
@@ -499,7 +542,8 @@ function VideoScreens({ is80sMode = false }) {
           // console.log('[VideoScreens] Found Screen3');
           screen3Found = true;
           
-          if (is80sMode) {
+          // Show video if in 80s mode AND not toggled to regular content
+          if (is80sMode && !showRegularContent.Screen3) {
             // Apply video texture in 80s mode
             const material = new THREE.MeshBasicMaterial({
               map: texture4,
@@ -644,7 +688,8 @@ function VideoScreens({ is80sMode = false }) {
           // console.log('[VideoScreens] Found Screen4');
           screen4Found = true;
           
-          if (is80sMode) {
+          // Show video if in 80s mode AND not toggled to regular content
+          if (is80sMode && !showRegularContent.Screen4) {
             // Apply video texture in 80s mode
             const material = new THREE.MeshBasicMaterial({
               map: texture5,
@@ -867,7 +912,7 @@ function VideoScreens({ is80sMode = false }) {
       if (texture5Ref.current) texture5Ref.current.dispose();
       if (texture6Ref.current) texture6Ref.current.dispose();
     };
-  }, [scene, is80sMode]);
+  }, [scene, is80sMode, showRegularContent]);
 
   // Find Screen2 position and render MacroAgentScreen there
   const [screen2Position, setScreen2Position] = useState(null);

@@ -1240,7 +1240,7 @@ export default function SingleCandleDisplay({ onOpenCompactModal, onClose }) {
               textShadow: activeTab === 'all' ? '0 0 10px rgba(255, 215, 0, 0.5)' : 'none'
             }}
           >
-            All Devotions
+            All Votives
           </button>
           <button
             onClick={() => setActiveTab('my')}
@@ -1258,7 +1258,7 @@ export default function SingleCandleDisplay({ onOpenCompactModal, onClose }) {
               textShadow: activeTab === 'my' ? '0 0 10px rgba(255, 215, 0, 0.5)' : 'none'
             }}
           >
-            My Devotions
+            My Votives
           </button>
           <button
             onClick={() => setActiveTab('summary')}
@@ -1335,7 +1335,7 @@ export default function SingleCandleDisplay({ onOpenCompactModal, onClose }) {
                       </>
                     );
                   }
-                  return 'TEMPLE CANDLES';
+                  return 'EX VOTO';
                 })()}
               </span>
             )}

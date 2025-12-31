@@ -18,6 +18,7 @@ import NavControls from '@/components/NavControls';
 import NavControlsMobile from '@/components/NavControlsMobile';
 import SimpleTextLoader from '@/components/SimpleTextLoader';
 import TradingOverlay from '@/trading/components/overlays/TradingOverlay';
+import SynthSunset from '@/components/SynthSunset';
 // import { useLighterTrading } from '@/hooks/useLighterTrading'; // Direct Lighter integration
 import { useLighterAPI } from '@/hooks/useLighterAPI'; // API-based Lighter integration
 // import AgentChatDisplay from '@/components/AgentChatDisplay'; // Using existing Trading Team Chat instead
@@ -117,8 +118,8 @@ export default function CyborgTemple() {
     }, [contextIsPlaying, showMusicControls]);
 
   // Get user context and auth functions
-  const { isSignedIn } = useUser();
-  const { openSignIn, signOut } = useClerk();
+  const { isSignedIn, user } = useUser();
+  const { openSignIn, openUserProfile, signOut } = useClerk();
 
   // Suppress WebGL context lost warnings when modal is open
   useEffect(() => {
@@ -832,8 +833,8 @@ export default function CyborgTemple() {
             }
           }}
         />
-        {/* Aurora Background - Only render when Aurora is selected */}
-        {canvasReady && useAurora && !isCandleModalOpen && (
+        {/* Aurora Background - Only render when Aurora is selected AND not in 80s mode */}
+        {canvasReady && useAurora && !isCandleModalOpen && !context80sMode && (
           <div style={{ 
             position: 'absolute', 
             inset: 0, 
@@ -876,13 +877,81 @@ export default function CyborgTemple() {
             zIndex: 2
           }}
         >
-          <fog attach="fog" args={['#000000', 20, 200]} />
+          <fog attach="fog" args={context80sMode ? ['#1a0033', 50, 300] : ['#000000', 20, 200]} />
           <Suspense fallback={null}>
             <ambientLight intensity={0.3} />
             <PostProcessingEffects />
             
-            {/* Starfield background - only show when Aurora is off */}
-            {!useAurora && (
+            {/* Synthwave sunset for 80s mode */}
+            {context80sMode && (
+              <>
+                {/* Gradient skybox sphere */}
+                <mesh scale={[500, 500, 500]}>
+                  <sphereGeometry args={[1, 32, 32]} />
+                  <shaderMaterial
+                    side={1}  // BackSide - render inside of sphere
+                    depthWrite={false}
+                    vertexShader={`
+                      varying vec3 vWorldPosition;
+                      void main() {
+                        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                        vWorldPosition = worldPosition.xyz;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                      }
+                    `}
+                    fragmentShader={`
+                      varying vec3 vWorldPosition;
+                      void main() {
+                        // Normalize height from -1 to 1
+                        float height = normalize(vWorldPosition).y;
+                        
+                        // Define gradient colors - subtle horizon glow
+                        vec3 bottomColor = vec3(0.15, 0.05, 0.2);   // Dark purple (below horizon)
+                        vec3 horizonGlow = vec3(0.4, 0.15, 0.0);    // Muted orange glow at horizon line
+                        vec3 lowerSky = vec3(0.15, 0.0, 0.25);      // Purple just above horizon
+                        vec3 midColor = vec3(0.1, 0.0, 0.2);        // Medium purple
+                        vec3 topColor = vec3(0.02, 0.0, 0.1);       // Very dark purple
+                        
+                        vec3 color;
+                        
+                        if (height < -0.1) {
+                          // Well below horizon - dark purple
+                          color = bottomColor;
+                        } else if (height < 0.0) {
+                          // Just below horizon - transition to glow
+                          float t = (height + 0.1) / 0.1;
+                          color = mix(bottomColor, horizonGlow, t);
+                        } else if (height < 0.1) {
+                          // Just above horizon - orange glow fading to purple
+                          float t = height / 0.1;
+                          color = mix(horizonGlow, lowerSky, t);
+                        } else if (height < 0.5) {
+                          // Lower to mid sky
+                          float t = (height - 0.1) / 0.4;
+                          color = mix(lowerSky, midColor, t);
+                        } else {
+                          // Upper sky
+                          float t = (height - 0.5) / 0.5;
+                          color = mix(midColor, topColor, t);
+                        }
+                        
+                        gl_FragColor = vec4(color, 1.0);
+                      }
+                    `}
+                  />
+                </mesh>
+                
+                {/* Synthwave sun model */}
+                <SynthSunset 
+                  position={[0, 8, -20]}
+                  scale={[8, 8, 8]}
+                  rotation={[0, 0, 0]}
+                />
+              </>
+            )}
+            
+            {/* Starfield background - only show when Aurora is off AND not in 80s mode */}
+            {!useAurora && !context80sMode && (
               <StarField 
                 radius={150} 
                 count1={isMobileView ? 200 : 500} 
@@ -990,7 +1059,7 @@ export default function CyborgTemple() {
         {mounted && (
           <>
             {/* Aurora Toggle Button - Small toggle style */}
-            {sceneReady && !isMobileView && (
+            {/* {sceneReady && !isMobileView && (
               <div
                 style={{
                   position: "fixed",
@@ -1055,7 +1124,7 @@ export default function CyborgTemple() {
                   🦄
                 </span>
               </div>
-            )}
+            )} */}
             
             {/* Nav Controls - Desktop vs Mobile */}
             <div
@@ -1063,7 +1132,7 @@ export default function CyborgTemple() {
                 position: "fixed",
                 top: "1rem",
                 right: "1rem",
-                zIndex: 10001,
+                zIndex: 1001,
               }}
             >
               {isMobileView ? (
@@ -1074,7 +1143,7 @@ export default function CyborgTemple() {
                   onSkipTrack={() => nextTrack()}
                   onUserClick={() => {
                     if (isSignedIn) {
-                      signOut();
+                      openUserProfile();
                     } else {
                       openSignIn({ forceRedirectUrl: "/trade" });
                     }
@@ -1082,6 +1151,7 @@ export default function CyborgTemple() {
                   onMenuClick={() => setShowCyberNav(!showCyberNav)}
                   isUserSignedIn={isSignedIn}
                   isMenuOpen={showCyberNav}
+                  userImage={user?.imageUrl}
                 />
               ) : (
                 <NavControls 
@@ -1093,13 +1163,6 @@ export default function CyborgTemple() {
                   onPlayMusic={() => play()}
                   onStopMusic={() => pause()}
                   onSkipTrack={() => nextTrack()}
-                  onUserClick={() => {
-                    if (isSignedIn) {
-                      signOut();
-                    } else {
-                      openSignIn({ forceRedirectUrl: "/trade" });
-                    }
-                  }}
                   onMenuClick={() => setShowCyberNav(!showCyberNav)}
                   isUserSignedIn={isSignedIn}
                   isMenuOpen={showCyberNav}

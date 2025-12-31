@@ -12,7 +12,8 @@ export default function NavControlsMobile({
   onMenuClick,
   isUserSignedIn = false,
   isMenuOpen = false,
-  is80s = false
+  is80s = false,
+  userImage = null  // Accept user image from parent
 }) {
   const [emoji, setEmoji] = useState("😇");
   
@@ -272,9 +273,22 @@ export default function NavControlsMobile({
 
         {/* Avatar */}
         <div className="avatar-mobile" onClick={onUserClick}>
-          <span style={{ fontSize: '18px' }}>
-            {isUserSignedIn ? '👤' : emoji}
-          </span>
+          {isUserSignedIn && userImage ? (
+            <img 
+              src={userImage} 
+              alt="User" 
+              style={{ 
+                width: '100%', 
+                height: '100%', 
+                objectFit: 'cover',
+                borderRadius: '6px'
+              }} 
+            />
+          ) : (
+            <span style={{ fontSize: '18px' }}>
+              {isUserSignedIn ? '👤' : emoji}
+            </span>
+          )}
           <div className={`avatar-status-mobile ${isUserSignedIn ? '' : 'offline'}`} />
         </div>
 

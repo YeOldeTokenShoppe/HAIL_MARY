@@ -2569,7 +2569,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                 const displayType = messageType.charAt(0).toUpperCase() + messageType.slice(1);
                 return `Msg Protocol: ${displayType}`;
               }
-              return 'TEMPLE CANDLES';
+              return 'EX VOTO';
             })()}
           </div>
           
@@ -2597,7 +2597,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                 fontFamily: 'monospace'
               }}
             >
-              My Devotions
+              My Votives
             </button>
             <button
               onClick={() => setCandleTab('community')}
@@ -2617,7 +2617,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                 fontFamily: 'monospace'
               }}
             >
-              All Devotions
+              All Votives
             </button>
           </div>
         </div>

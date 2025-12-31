@@ -1206,6 +1206,13 @@ const CyborgTempleScene = ({
             onAgentClick(object.userData.agentId);
           }
           
+          // Dispatch custom event for screens to handle video toggle
+          if (object.userData.agentId && object.userData.agentId.startsWith('Screen')) {
+            window.dispatchEvent(new CustomEvent('screenClicked', {
+              detail: { screenName: object.userData.agentId }
+            }));
+          }
+          
           break; // Stop after first clickable object
         }
       }
