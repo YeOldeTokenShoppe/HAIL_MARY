@@ -1933,7 +1933,7 @@ export default function SingleCandleDisplay({ onOpenCompactModal, onClose }) {
               e.target.style.boxShadow = '0 4px 15px rgba(0, 255, 136, 0.4)';
             }}
           >
-            🕯️ Create Candle
+            Show Youri Devotion
           </button>
         )}
       </div>

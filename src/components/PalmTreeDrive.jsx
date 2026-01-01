@@ -501,10 +501,58 @@ const PalmsScene = ({ onLoadingChange }) => {
     camera.updateProjectionMatrix();
     cameraRef.current = camera;
     
-    const renderer = new THREE.WebGLRenderer({ 
-      antialias: !isMobileDevice, // Disable antialiasing on mobile for performance
-      powerPreference: isMobileDevice ? "low-power" : "high-performance"
-    });
+    // Check for WebGL support
+    const canvas = document.createElement('canvas');
+    const webglContext = canvas.getContext('webgl2') || canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    
+    if (!webglContext) {
+      console.error('WebGL is not supported in this browser');
+      // Show fallback message
+      const fallbackMessage = document.createElement('div');
+      fallbackMessage.style.cssText = `
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+        font-size: 20px;
+        text-align: center;
+        padding: 20px;
+        background: rgba(0, 0, 0, 0.8);
+        border-radius: 10px;
+      `;
+      fallbackMessage.innerHTML = 'WebGL is not available.<br/>Please enable hardware acceleration in your browser settings.';
+      mountRef.current.appendChild(fallbackMessage);
+      return;
+    }
+    
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ 
+        antialias: !isMobileDevice, // Disable antialiasing on mobile for performance
+        powerPreference: isMobileDevice ? "low-power" : "high-performance",
+        failIfMajorPerformanceCaveat: false // Allow software rendering as fallback
+      });
+    } catch (error) {
+      console.error('Failed to create WebGL renderer:', error);
+      // Show fallback message
+      const fallbackMessage = document.createElement('div');
+      fallbackMessage.style.cssText = `
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+        font-size: 20px;
+        text-align: center;
+        padding: 20px;
+        background: rgba(0, 0, 0, 0.8);
+        border-radius: 10px;
+      `;
+      fallbackMessage.innerHTML = 'Unable to initialize 3D graphics.<br/>Please try refreshing the page.';
+      mountRef.current.appendChild(fallbackMessage);
+      return;
+    }
     // Reduce pixel ratio on mobile for better performance
     const pixelRatio = isMobileDevice ? Math.min(window.devicePixelRatio, 1.5) : window.devicePixelRatio;
     renderer.setPixelRatio(pixelRatio);
@@ -2032,10 +2080,14 @@ const PalmsScene = ({ onLoadingChange }) => {
         observer.unobserve(intersectionRef.current);
       }
       observer.disconnect();
-      if (mountRef.current) {
-        if (renderer.domElement && renderer.domElement.parentNode === mountRef.current) {
-          mountRef.current.removeChild(renderer.domElement);
+      
+      // Check if renderer exists before cleanup
+      if (rendererRef.current && mountRef.current) {
+        if (rendererRef.current.domElement && rendererRef.current.domElement.parentNode === mountRef.current) {
+          mountRef.current.removeChild(rendererRef.current.domElement);
         }
+        rendererRef.current.dispose();
+        rendererRef.current = null;
       }
       
       // Dispose of scene objects
@@ -2053,8 +2105,11 @@ const PalmsScene = ({ onLoadingChange }) => {
         sceneRef.current.clear();
       }
       
-      controls.dispose();
-      renderer.dispose();
+      // Dispose controls if they exist
+      if (controlsRef.current) {
+        controlsRef.current.dispose();
+        controlsRef.current = null;
+      }
       
       // Clear refs
       sceneRef.current = null;

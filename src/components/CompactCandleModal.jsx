@@ -2377,7 +2377,7 @@ const serializeTattooPlacement = (placement) => {
               marginBottom: '10px',
               color: '#ffd700',
               fontWeight: 'bold'
-            }}>Choose Your Character</h2>
+            }}>Select Your Rep</h2>
               <p style={{
               fontSize: '14px',
               color: 'rgba(255, 255, 255, 0.7)',
@@ -3064,22 +3064,132 @@ const serializeTattooPlacement = (placement) => {
               </div>
           </div>;
       case 4:
+        // Pose selection for tattoos only
+        if (formData.devotionType === 'tattoo') {
+          return <div style={{
+            padding: '20px',
+            textAlign: 'center'
+          }}>
+            <h2 style={{
+              fontSize: '20px',
+              marginBottom: '8px',
+              color: '#ffd700',
+              fontWeight: 'bold'
+            }}>Choose Your Pose</h2>
+            <p style={{
+              fontSize: '12px',
+              color: 'rgba(255, 255, 255, 0.7)',
+              marginBottom: '20px'
+            }}>Select how your character will appear</p>
+            
+            <PoseSelector
+              selectedPose={formData.selectedPose}
+              onPoseChange={(pose) => setFormData(prev => ({ 
+                ...prev, 
+                selectedPose: pose 
+              }))}
+              // Only show specific poses for each character
+              availablePoseIds={
+                formData.tattooCharacter === 'blockhead_Streetman' 
+                  ? ['action', 'curl', 'pray', 'skateboard', 'dance1', 'dance2', 'standpose1']
+                  : formData.tattooCharacter === 'blockhead_Surfer'
+                  ? ['action', 'curl', 'pray', 'standpose1', 'stand2', 'surf']
+                  : formData.tattooCharacter === 'blockhead_runner'
+                  ? ['run', 'standpose1', 'stand2']
+                  : null // Use default for other characters
+              }
+            />
+          </div>;
+        }
+        // For candles, skip to message type selection
+        // Fall through to case 5
+      case 5:
+        // Combined message type selection and composition
         return <div style={{
-          padding: '20px',
-          textAlign: 'center'
+          padding: '20px'
         }}>
             <h2 style={{
-            fontSize: '20px',
-            marginBottom: '8px',
-            color: '#ffd700',
-            fontWeight: 'bold'
-          }}>What type of message?</h2>
+              fontSize: '20px',
+              marginBottom: '8px',
+              color: '#ffd700',
+              fontWeight: 'bold',
+              textAlign: 'center'
+            }}>Create Your Message</h2>
             <p style={{
-            fontSize: '12px',
-            color: 'rgba(255, 255, 255, 0.7)',
-            marginBottom: '20px'
-          }}>Choose the intention for your candle</p>
+              fontSize: '12px',
+              color: 'rgba(255, 255, 255, 0.7)',
+              marginBottom: '20px',
+              textAlign: 'center'
+            }}>Choose the intention and compose your message</p>
             
+            {/* Message type selection */}
+            <div style={{
+              display: 'flex',
+              gap: '10px',
+              width: '100%',
+              justifyContent: 'space-between',
+              marginBottom: '20px'
+            }}>
+              {[{
+                value: 'petition',
+                label: 'Petition',
+                emoji: '🙏',
+                description: 'Ask for intercession'
+              }, {
+                value: 'confession',
+                label: 'Confession',
+                emoji: '💭',
+                description: 'Unburden heart'
+              }, {
+                value: 'appreciation',
+                label: 'Appreciation',
+                emoji: '✨',
+                description: 'Express your gratitude'
+              }].map(type => <button key={type.value} onClick={() => {
+                setFormData(prev => ({
+                  ...prev,
+                  messageType: type.value
+                }));
+              }} style={{
+                flex: 1,
+                padding: '15px 8px',
+                background: formData.messageType === type.value ? 'linear-gradient(135deg, rgba(255, 215, 0, 0.3), rgba(255, 215, 0, 0.2))' : 'linear-gradient(135deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.3))',
+                border: formData.messageType === type.value ? '2px solid #ffd700' : '1px solid rgba(255, 215, 0, 0.3)',
+                borderRadius: '8px',
+                color: '#fff',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                textAlign: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '6px',
+                minWidth: '0',
+                boxShadow: formData.messageType === type.value ? '0 4px 15px rgba(255, 215, 0, 0.3)' : 'none'
+              }}>
+                <div style={{
+                  fontSize: '24px',
+                  lineHeight: '1'
+                }}>
+                  {type.emoji}
+                </div>
+                <div style={{
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  color: formData.messageType === type.value ? '#ffd700' : '#fff'
+                }}>
+                  {type.label}
+                </div>
+                <div style={{
+                  fontSize: '10px',
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  lineHeight: '1.2'
+                }}>
+                  {type.description}
+                </div>
+              </button>)}
+            </div>
+
             {/* Alert message when no message type is selected */}
             {!formData.messageType && (
               <div style={{
@@ -3103,235 +3213,144 @@ const serializeTattooPlacement = (placement) => {
                 </span>
               </div>
             )}
-            
-            <div style={{
-            display: 'flex',
-            gap: '10px',
-            width: '100%',
-            justifyContent: 'space-between'
-          }}>
-              {[{
-              value: 'petition',
-              label: 'Petition',
-              emoji: '🙏',
-              description: 'Ask for intercession'
-            }, {
-              value: 'confession',
-              label: 'Confession',
-              emoji: '💭',
-              description: 'Unburden heart'
-            }, {
-              value: 'appreciation',
-              label: 'Appreciation',
-              emoji: '✨',
-              description: 'Express your gratitude'
-            }].map(type => <button key={type.value} onClick={() => {
-              setFormData(prev => ({
-                ...prev,
-                messageType: type.value
-              }));
-            }} style={{
-              flex: 1,
-              padding: '15px 8px',
-              background: formData.messageType === type.value ? 'linear-gradient(135deg, rgba(255, 215, 0, 0.3), rgba(255, 215, 0, 0.2))' : 'linear-gradient(135deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.3))',
-              border: formData.messageType === type.value ? '2px solid #ffd700' : '1px solid rgba(255, 215, 0, 0.3)',
-              borderRadius: '8px',
-              color: '#fff',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              textAlign: 'center',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '6px',
-              minWidth: '0',
-              boxShadow: formData.messageType === type.value ? '0 4px 15px rgba(255, 215, 0, 0.3)' : 'none'
-            }}>
-                  <div style={{
-                fontSize: '24px',
-                lineHeight: '1'
-              }}>
-                    {type.emoji}
-                  </div>
-                  <div style={{
-                fontSize: '14px',
-                fontWeight: 'bold',
-                color: formData.messageType === type.value ? '#ffd700' : '#fff'
-              }}>
-                    {type.label}
-                  </div>
-                  <div style={{
-                fontSize: '10px',
-                color: 'rgba(255, 255, 255, 0.6)',
-                lineHeight: '1.2'
-              }}>
-                    {type.description}
-                  </div>
-                </button>)}
-            </div>
-            
-            {/* Pose Selector for Tattoo devotions */}
-            {formData.devotionType === 'tattoo' && formData.tattooPlacement && (
-              <div style={{ marginTop: '20px' }}>
-                <PoseSelector
-                  selectedPose={formData.selectedPose}
-                  onPoseChange={(pose) => setFormData(prev => ({ 
-                    ...prev, 
-                    selectedPose: pose 
-                  }))}
-                  // Only show specific poses for each character
-                  availablePoseIds={
-                    formData.tattooCharacter === 'blockhead_Streetman' 
-                      ? ['action', 'curl', 'pray', 'skateboard', 'dance1', 'dance2', 'standpose1']
-                      : formData.tattooCharacter === 'blockhead_Surfer'
-                      ? ['action', 'curl', 'pray', 'standpose1', 'stand2', 'surf']
-                      : formData.tattooCharacter === 'blockhead_runner'
-                      ? ['run', 'standpose1', 'stand2']
-                      : null // Use default for other characters
-                  }
-                />
-                
-              </div>
-            )}
-          </div>;
-      case 5:
-        // Original step 4 - message composition  
-        return <div style={{
-          padding: '20px'
-        }}>
-            
-            <div style={{
-            marginBottom: '20px'
-          }}>
-              <label style={{
-              display: 'block',
-              marginBottom: '8px',
-              fontSize: '14px',
-              color: 'rgba(255, 255, 255, 0.8)'
-            }}>
-                Dedication Name
-              </label>
-              <input type="text" value={formData.username} onChange={e => {
-              const sanitized = sanitizeInput(e.target.value, 50);
-              setFormData(prev => ({
-                ...prev,
-                username: sanitized
-              }));
-            }} placeholder="On behalf of..." maxLength={50} style={{
-              width: '100%',
-              padding: '12px',
-              borderRadius: '8px',
-              backgroundColor: 'rgba(0, 0, 0, 0.3)',
-              border: '1px solid rgba(255, 215, 0, 0.3)',
-              color: '#fff',
-              fontSize: '14px'
-            }} />
-            </div>
-            
-            {formData.messageType === 'petition' && <div style={{
-            display: 'flex',
-            gap: '8px',
-            marginBottom: '10px'
-          }}>
-              <select value={currentLanguage} onChange={e => {
-              setCurrentLanguage(e.target.value);
-              setSelectedPrayer(null);
-            }} style={{
-              width: '80px',
-              padding: '8px',
-              borderRadius: '6px',
-              backgroundColor: 'rgba(0, 0, 0, 0.3)',
-              border: '1px solid rgba(255, 215, 0, 0.3)',
-              color: '#fff',
-              fontSize: '12px',
-              cursor: 'pointer'
-            }}>
-                <option value="en">EN</option>
-                <option value="es">ES</option>
-                <option value="pt">PT</option>
-                <option value="fr">FR</option>
-                <option value="zh">中文</option>
-                <option value="hi">हिं</option>
-                <option value="it">IT</option>
-              </select>
-              <select value={selectedPrayer || ''} onChange={e => {
-              const value = e.target.value;
-              if (value === '') {
-                setSelectedPrayer(null);
-              } else {
-                const prayers = PRAYERS_BY_LANGUAGE[currentLanguage]?.prayers || PRAYERS_BY_LANGUAGE.en.prayers;
-                const prayer = prayers.find(p => p.id === value);
-                if (prayer) {
-                  setSelectedPrayer(value);
-                  setFormData(prev => ({
-                    ...prev,
-                    message: prayer.text
-                  }));
-                }
-              }
-            }} style={{
-              flex: 1,
-              padding: '8px',
-              borderRadius: '6px',
-              backgroundColor: 'rgba(0, 0, 0, 0.3)',
-              border: '1px solid rgba(255, 215, 0, 0.3)',
-              color: '#fff',
-              fontSize: '12px',
-              cursor: 'pointer'
-            }}>
-                <option value="">Select prayer template (optional)...</option>
-                {(PRAYERS_BY_LANGUAGE[currentLanguage]?.prayers || PRAYERS_BY_LANGUAGE.en.prayers).map(prayer => <option key={prayer.id} value={prayer.id}>
-                    {prayer.title}
-                  </option>)}
-              </select>
-            </div>}
 
-            <div style={{
-            marginBottom: '10px'
-          }}>
-              <label style={{
-              display: 'block',
-              marginBottom: '5px',
-              fontSize: '12px',
-              color: 'rgba(255, 255, 255, 0.8)'
-            }}>
-                Your Message
-              </label>
-              <textarea ref={textareaRef} value={scrambledDisplay || formData.message} onChange={e => {
-              if (!isEncrypted) {
-                const newValue = sanitizeInput(e.target.value, 500);
-                setFormData(prev => ({
-                  ...prev,
-                  message: newValue
-                }));
-                if (selectedPrayer) {
-                  const currentPrayers = PRAYERS_BY_LANGUAGE[currentLanguage]?.prayers || PRAYERS_BY_LANGUAGE.en.prayers;
-                  const selectedPrayerText = currentPrayers.find(p => p.id === selectedPrayer)?.text;
-                  if (selectedPrayerText && newValue !== selectedPrayerText) {
+            {/* Message composition fields - only show after message type is selected */}
+            {formData.messageType && (
+              <>
+                <div style={{
+                  marginBottom: '20px'
+                }}>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '8px',
+                    fontSize: '14px',
+                    color: 'rgba(255, 255, 255, 0.8)'
+                  }}>
+                    Dedication Name
+                  </label>
+                  <input type="text" value={formData.username} onChange={e => {
+                    const sanitized = sanitizeInput(e.target.value, 50);
+                    setFormData(prev => ({
+                      ...prev,
+                      username: sanitized
+                    }));
+                  }} placeholder="On behalf of..." maxLength={50} style={{
+                    width: '100%',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                    border: '1px solid rgba(255, 215, 0, 0.3)',
+                    color: '#fff',
+                    fontSize: '14px'
+                  }} />
+                </div>
+                
+                {formData.messageType === 'petition' && <div style={{
+                  display: 'flex',
+                  gap: '8px',
+                  marginBottom: '10px'
+                }}>
+                  <select value={currentLanguage} onChange={e => {
+                    setCurrentLanguage(e.target.value);
                     setSelectedPrayer(null);
-                  }
-                }
-              }
-            }} placeholder={selectedPrayer ? 'Edit the selected prayer or write your own...' : formData.messageType === 'petition' ? 'What do you seek... or select a prayer above' : formData.messageType === 'confession' ? 'What weighs on your heart...' : 'What are you grateful for...'} maxLength={500} style={{
-              width: '100%',
-              minHeight: '150px',
-              padding: '12px',
-              borderRadius: '8px',
-              backgroundColor: 'rgba(0, 0, 0, 0.3)',
-              border: '1px solid rgba(255, 215, 0, 0.3)',
-              color: '#fff',
-              fontSize: '14px',
-              resize: 'vertical'
-            }} />
-              <div style={{
-              marginTop: '5px',
-              fontSize: '11px',
-              color: 'rgba(255, 255, 255, 0.5)',
-              textAlign: 'right'
-            }}>
-                {formData.message.length}/500 characters
-              </div>
-            </div>
+                  }} style={{
+                    width: '80px',
+                    padding: '8px',
+                    borderRadius: '6px',
+                    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                    border: '1px solid rgba(255, 215, 0, 0.3)',
+                    color: '#fff',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}>
+                    <option value="en">EN</option>
+                    <option value="es">ES</option>
+                    <option value="pt">PT</option>
+                    <option value="fr">FR</option>
+                    <option value="zh">中文</option>
+                    <option value="hi">हिं</option>
+                    <option value="it">IT</option>
+                  </select>
+                  <select value={selectedPrayer || ''} onChange={e => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      setSelectedPrayer(null);
+                    } else {
+                      const prayers = PRAYERS_BY_LANGUAGE[currentLanguage]?.prayers || PRAYERS_BY_LANGUAGE.en.prayers;
+                      const prayer = prayers.find(p => p.id === value);
+                      if (prayer) {
+                        setSelectedPrayer(value);
+                        setFormData(prev => ({
+                          ...prev,
+                          message: prayer.text
+                        }));
+                      }
+                    }
+                  }} style={{
+                    flex: 1,
+                    padding: '8px',
+                    borderRadius: '6px',
+                    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                    border: '1px solid rgba(255, 215, 0, 0.3)',
+                    color: '#fff',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}>
+                    <option value="">Select prayer template (optional)...</option>
+                    {(PRAYERS_BY_LANGUAGE[currentLanguage]?.prayers || PRAYERS_BY_LANGUAGE.en.prayers).map(prayer => <option key={prayer.id} value={prayer.id}>
+                      {prayer.title}
+                    </option>)}
+                  </select>
+                </div>}
+
+                <div style={{
+                  marginBottom: '10px'
+                }}>
+                  <label style={{
+                    display: 'block',
+                    marginBottom: '5px',
+                    fontSize: '12px',
+                    color: 'rgba(255, 255, 255, 0.8)'
+                  }}>
+                    Your Message
+                  </label>
+                  <textarea ref={textareaRef} value={scrambledDisplay || formData.message} onChange={e => {
+                    if (!isEncrypted) {
+                      const newValue = sanitizeInput(e.target.value, 500);
+                      setFormData(prev => ({
+                        ...prev,
+                        message: newValue
+                      }));
+                      if (selectedPrayer) {
+                        const currentPrayers = PRAYERS_BY_LANGUAGE[currentLanguage]?.prayers || PRAYERS_BY_LANGUAGE.en.prayers;
+                        const selectedPrayerText = currentPrayers.find(p => p.id === selectedPrayer)?.text;
+                        if (selectedPrayerText && newValue !== selectedPrayerText) {
+                          setSelectedPrayer(null);
+                        }
+                      }
+                    }
+                  }} placeholder={selectedPrayer ? 'Edit the selected prayer or write your own...' : formData.messageType === 'petition' ? 'What do you seek... or select a prayer above' : formData.messageType === 'confession' ? 'What weighs on your heart...' : 'What are you grateful for...'} maxLength={500} style={{
+                    width: '100%',
+                    minHeight: '150px',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+                    border: '1px solid rgba(255, 215, 0, 0.3)',
+                    color: '#fff',
+                    fontSize: '14px',
+                    resize: 'vertical'
+                  }} />
+                  <div style={{
+                    marginTop: '5px',
+                    fontSize: '11px',
+                    color: 'rgba(255, 255, 255, 0.5)',
+                    textAlign: 'right'
+                  }}>
+                    {formData.message.length}/500 characters
+                  </div>
+                </div>
+              </>
+            )}
           </div>;
       case 6:
         // Original step 5 - background selection
@@ -3602,7 +3621,7 @@ const serializeTattooPlacement = (placement) => {
             )}
           </div>;
       case 7:
-        // Original step 6 - final review
+        // Final review
         return <div style={{
           padding: '12px',
           display: 'flex',
@@ -3939,16 +3958,24 @@ const serializeTattooPlacement = (placement) => {
         setError('Please click on the character to place your tattoo');
         return;
       }
-      // Set default pose to 'action' for Streetman when moving to step 4
-      if (formData.tattooCharacter === 'blockhead_Streetman') {
-        setFormData(prev => ({ ...prev, selectedPose: prev.selectedPose || 'action' }));
-      }
+      // Set default pose when moving to step 4
+      setFormData(prev => ({ 
+        ...prev, 
+        selectedPose: prev.selectedPose || 
+          (formData.tattooCharacter === 'blockhead_Streetman' ? 'action' : 
+           formData.tattooCharacter === 'blockhead_Surfer' ? 'action' :
+           formData.tattooCharacter === 'blockhead_runner' ? 'run' : 'action')
+      }));
     }
     
     if (currentStep < totalSteps) {
-      // Skip step 3 (personalization) for Japanese candles only
+      // Skip steps for candles vs tattoos
       if (currentStep === 2 && formData.candleType === 'japanese') {
-        setCurrentStep(4); // Jump directly to step 4
+        setCurrentStep(5); // Skip personalization (3) and pose selection (4)
+      } else if (currentStep === 3 && formData.devotionType === 'candle') {
+        setCurrentStep(5); // Skip pose selection (4) for candles
+      } else if (currentStep === 4 && formData.devotionType === 'candle') {
+        setCurrentStep(5); // This shouldn't happen but just in case
       } else {
         setCurrentStep(currentStep + 1);
       }
@@ -3956,9 +3983,11 @@ const serializeTattooPlacement = (placement) => {
   };
   const handlePrev = () => {
     if (currentStep > 1) {
-      // For Japanese candles only, skip step 3 when going back from step 4
-      if (currentStep === 4 && formData.candleType === 'japanese') {
-        setCurrentStep(2); // Jump back to step 2
+      // Skip steps when going back
+      if (currentStep === 5 && formData.candleType === 'japanese') {
+        setCurrentStep(2); // Skip personalization (3) and pose selection (4)
+      } else if (currentStep === 5 && formData.devotionType === 'candle') {
+        setCurrentStep(3); // Skip pose selection (4) for candles
       } else {
         setCurrentStep(currentStep - 1);
       }
@@ -4715,29 +4744,29 @@ const serializeTattooPlacement = (placement) => {
               {currentStep < 7 ? <button onClick={handleNext} style={{
                   padding: '10px 30px',
                   background: (currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement)) || 
-                    (currentStep === 4 && !formData.messageType) ? 
+                    (currentStep === 5 && !formData.messageType) ? 
                     'linear-gradient(135deg, #888, #999)' : 
                     'linear-gradient(135deg, #ffd700, #ffed4e)',
                   border: 'none',
                   borderRadius: '8px',
                   color: (currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement)) || 
-                    (currentStep === 4 && !formData.messageType) ? 
+                    (currentStep === 5 && !formData.messageType) ? 
                     '#555' : '#000',
                   cursor: (currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement)) || 
-                    (currentStep === 4 && !formData.messageType) ? 
+                    (currentStep === 5 && !formData.messageType) ? 
                     'not-allowed' : 'pointer',
                   fontSize: '14px',
                   fontWeight: 'bold',
                   boxShadow: (currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement)) || 
-                    (currentStep === 4 && !formData.messageType) ? 
+                    (currentStep === 5 && !formData.messageType) ? 
                     'none' : '0 4px 15px rgba(255, 215, 0, 0.3)',
                   opacity: (currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement)) || 
-                    (currentStep === 4 && !formData.messageType) ? 
+                    (currentStep === 5 && !formData.messageType) ? 
                     0.6 : 1
-                }} disabled={currentStep === 1 && !formData.devotionType || currentStep === 2 && !formData.candleType && !formData.tattooCharacter || currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement) || currentStep === 4 && !formData.messageType}>
+                }} disabled={currentStep === 1 && !formData.devotionType || currentStep === 2 && !formData.candleType && !formData.tattooCharacter || currentStep === 3 && formData.devotionType === 'tattoo' && (!formData.tattooDesign || !formData.tattooPlacement) || currentStep === 5 && !formData.messageType}>
                   {currentStep === 3 && formData.devotionType === 'tattoo' && !formData.tattooPlacement && formData.tattooDesign ? 
                     'Place Tattoo First' : 
-                   currentStep === 4 && !formData.messageType ? 
+                   currentStep === 5 && !formData.messageType ? 
                     'Select Message Type' : 'Next'}
                 </button> : <button onClick={handleConfirmedSave} style={{
                   padding: '10px 30px',
@@ -4755,7 +4784,7 @@ const serializeTattooPlacement = (placement) => {
                     : '0 4px 15px rgba(255, 107, 53, 0.4)',
                   opacity: isSubmitting ? 0.8 : 1,
                   transition: 'all 0.3s ease'
-                }} disabled={isSubmitting || !formData.messageType || (!formData.candleType && !formData.tattooCharacter) || !formData.username.trim() || !formData.burnedAmount || formData.burnedAmount === '0' || parseInt(formData.burnedAmount) === 0}>
+                }} disabled={isSubmitting || !formData.messageType || (!formData.candleType && !formData.tattooCharacter) || !formData.username || !formData.username.trim() || !formData.burnedAmount || formData.burnedAmount === '0' || parseInt(formData.burnedAmount) === 0}>
                   {isSubmitting ? '✨ Creating...' : 'Send it! 🔥'}
                 </button>}
             </div>

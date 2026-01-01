@@ -1,7 +1,8 @@
 "use client";
 import React, { Suspense, useState, useEffect, useRef, useCallback } from 'react';
+import * as THREE from 'three';
 import CleanCanvas from '@/components/CleanCanvas';
-import { OrbitControls, Stats } from '@react-three/drei';
+import { OrbitControls, Stats, Cloud, Clouds } from '@react-three/drei';
 import ConstellationModel from '@/components/ConstellationModel';
 import Aurora from '@/components/Aurora';
 import StarField from '@/components/StarField';
@@ -947,6 +948,99 @@ export default function CyborgTemple() {
                   scale={[8, 8, 8]}
                   rotation={[0, 0, 0]}
                 />
+                
+                {/* Scattered clouds for 80s atmosphere - avoiding SynthSunset area */}
+                <Clouds material={THREE.MeshBasicMaterial}>
+                  {/* Clouds positioned to avoid the sunset at [0, 8, -20] */}
+                  {/* Far left side clouds */}
+                  <Cloud 
+                    position={[-45, 16, 0]} 
+                    speed={0.18} 
+                    opacity={0.26}
+                    color="#fb5607"
+                    scale={[3.5, 2, 4]}
+                  />
+                  <Cloud 
+                    position={[-40, 11, -35]} 
+                    speed={0.22} 
+                    opacity={0.32}
+                    color="#8338ec"
+                    scale={[4, 2.5, 3]}
+                  />
+                  <Cloud 
+                    position={[-50, 19, 20]} 
+                    speed={0.14} 
+                    opacity={0.24}
+                    color="#c233b1"
+                    scale={[3, 2, 3.5]}
+                  />
+                  {/* Far right side clouds */}
+                  <Cloud 
+                    position={[45, 13, -35]} 
+                    speed={0.2} 
+                    opacity={0.3}
+                    color="#3a86ff"
+                    scale={[3.5, 2, 4]}
+                  />
+                  <Cloud 
+                    position={[50, 22, -10]} 
+                    speed={0.16} 
+                    opacity={0.2}
+                    color="#ff006e"
+                    scale={[2.8, 1.8, 3]}
+                  />
+                  <Cloud 
+                    position={[40, 18, 10]} 
+                    speed={0.1} 
+                    opacity={0.2}
+                    color="#ffbe0b"
+                    scale={[2.5, 1.5, 3]}
+                  />
+                  {/* Behind/side positions */}
+                  <Cloud 
+                    position={[25, 10, 35]} 
+                    speed={0.25} 
+                    opacity={0.35}
+                    color="#8338ec"
+                    scale={[3.5, 2, 4]}
+                  />
+                  <Cloud 
+                    position={[0, 14, 45]} 
+                    speed={0.18} 
+                    opacity={0.28}
+                    color="#3a86ff"
+                    scale={[4, 2.5, 3]}
+                  />
+                  <Cloud 
+                    position={[-30, 20, 30]} 
+                    speed={0.12} 
+                    opacity={0.22}
+                    color="#ff006e"
+                    scale={[3, 1.8, 3.5]}
+                  />
+                  <Cloud 
+                    position={[20, 25, 25]} 
+                    speed={0.11} 
+                    opacity={0.18}
+                    color="#8338ec"
+                    scale={[4, 2, 3.5]}
+                  />
+                  {/* High clouds that won't obstruct */}
+                  <Cloud 
+                    position={[-25, 28, -15]} 
+                    speed={0.15} 
+                    opacity={0.2}
+                    color="#fb5607"
+                    scale={[3, 1.5, 2.5]}
+                  />
+                  <Cloud 
+                    position={[30, 30, -25]} 
+                    speed={0.13} 
+                    opacity={0.18}
+                    color="#ff006e"
+                    scale={[2.5, 1.5, 3]}
+                  />
+                </Clouds>
               </>
             )}
             

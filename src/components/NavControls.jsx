@@ -461,11 +461,11 @@ export default function NavControls({
             className={`toggle-row toggle-80s ${is80s ? 'active' : ''}`}
             onClick={() => setIs80s(!is80s)}
           >
-            <span className="icon icon-left">🌴</span>
+            <span className="icon icon-left">🚀</span>
             <div className={`toggle-track ${is80s ? 'active' : ''}`}>
               <div className={`toggle-thumb ${is80s ? 'active' : ''}`} />
             </div>
-            <span className="icon icon-right">🕹️</span>
+            <span className="icon icon-right">🌴</span>
             <span className="toggle-label">80s MODE</span>
           </div>
         </div>

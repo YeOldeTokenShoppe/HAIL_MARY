@@ -10,7 +10,7 @@ import CyberGlitchButton from './CyberGlitchButton'
 import ExperienceControls from './ExperienceControls'
 import { useMusic } from '../MusicContext'
 
-export default function CarouselComponent({ onReady }) {
+export default function CarouselComponent({ onReady, disableScrollControls = false }) {
   const [hoveredCaption, setHoveredCaption] = useState(null)
   const [sceneReady, setSceneReady] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
@@ -97,12 +97,21 @@ export default function CarouselComponent({ onReady }) {
       >
         <fog attach="fog" args={['#a79', 8.5, 12]} />
         <Suspense fallback={null}>
-          <ScrollControls pages={4} infinite>
-            <Rig rotation={[0, 0, isMobile ? 0.03 : 0.15]}>
-              <Carousel setHoveredCaption={setHoveredCaption} />
-            </Rig>
-            <Banner position={[0, -0.15, 0]} is80sMode={is80sMode} />
-          </ScrollControls>
+          {disableScrollControls ? (
+            <>
+              <AutoRotatingRig rotation={[0, 0, isMobile ? 0.03 : 0.15]}>
+                <Carousel setHoveredCaption={setHoveredCaption} />
+              </AutoRotatingRig>
+              <Banner position={[0, -0.15, 0]} is80sMode={is80sMode} disableScrollControls={true} />
+            </>
+          ) : (
+            <ScrollControls pages={4} infinite>
+              <Rig rotation={[0, 0, isMobile ? 0.03 : 0.15]}>
+                <Carousel setHoveredCaption={setHoveredCaption} />
+              </Rig>
+              <Banner position={[0, -0.15, 0]} is80sMode={is80sMode} disableScrollControls={false} />
+            </ScrollControls>
+          )}
           {!is80sMode && <Environment preset="dawn" background blur={0.5} />}
         </Suspense>
       </Canvas>
@@ -118,6 +127,23 @@ function Rig(props) {
     if (!ref.current) return
     
     ref.current.rotation.y = -scroll.offset * (Math.PI * 2)
+    state.events.update()
+    easing.damp3(state.camera.position, [-state.pointer.x * 2, state.pointer.y + 1.5, 10], 0.3, delta)
+    state.camera.lookAt(0, 0, 0)
+  })
+  
+  return <group ref={ref} {...props} />
+}
+
+function AutoRotatingRig(props) {
+  const ref = useRef()
+  
+  useFrame((state, delta) => {
+    if (!ref.current) return
+    
+    // Auto-rotate the carousel
+    ref.current.rotation.y += delta * 0.1
+    
     state.events.update()
     easing.damp3(state.camera.position, [-state.pointer.x * 2, state.pointer.y + 1.5, 10], 0.3, delta)
     state.camera.lookAt(0, 0, 0)
@@ -380,41 +406,50 @@ function VideoCard({ videoUrl, ...props }) {
 
 
 function Banner(props) {
-  const { is80sMode } = props
+  const { is80sMode, disableScrollControls } = props
   const ref = useRef()
-  const scroll = useScroll()
+  const scroll = disableScrollControls ? null : useScroll()
   
   // Create text texture using canvas
   const texture = useMemo(() => {
     const canvas = document.createElement('canvas')
     const context = canvas.getContext('2d')
-    canvas.width = 2048  // Higher resolution for better quality
+    
+    // Configuration for exact phrase repetitions
+    const DESIRED_PHRASE_COUNT = 5  // Exactly 5 complete phrases around cylinder
+    const CYLINDER_RADIUS = 1.6
+    const CYLINDER_CIRCUMFERENCE = 2 * Math.PI * CYLINDER_RADIUS  // ≈ 10.05
+    
+    // Set up canvas styling first
+    const fontSize = 84
+    context.font = `bold ${fontSize}px UnifrakturCook, serif`
+    
+    // Single instance of text for texture
+    const text = 'Our Lady of Perpetual Profit • Domina Nostra Lucri Perpetui • ';
+    
+    // Measure text to determine canvas dimensions
+    const metrics = context.measureText(text)
+    const textWidth = metrics.width
+    
+    // Calculate canvas width to fit exact number of phrases
+    // We want the texture to contain exactly enough text for the desired repetitions
+    const texturePhraseCount = Math.ceil(DESIRED_PHRASE_COUNT)
+    canvas.width = Math.ceil(textWidth * texturePhraseCount)
     canvas.height = 128
     
     // Style the canvas - neon blue in 80s mode, white normally
     context.fillStyle = is80sMode ? '#00ffff' : '#ffffff'
     context.fillRect(0, 0, canvas.width, canvas.height)
     
-    // Add text - white in 80s mode, black normally
-    context.fillStyle = is80sMode ? '#000000' : '#000000'
-    // Use fixed pixel size for consistency
-    const fontSize = 84  // Adjust this value to change text size
+    // Re-set font after canvas resize (canvas resize resets context state)
     context.font = `bold ${fontSize}px UnifrakturCook, serif`
-    context.textAlign = 'left'  // Use left alignment for precise positioning
+    context.fillStyle = is80sMode ? '#000000' : '#000000'
+    context.textAlign = 'left'
     context.textBaseline = 'middle'
     
-    // Single instance of text for texture
-    const text = 'Our Lady of Perpetual Profit • Domina Nostra Lucri Perpetui • ';
-    
-    // Measure text to create seamless texture
-    const metrics = context.measureText(text)
-    const textWidth = metrics.width
-    
-    // Draw text multiple times to fill the canvas width
-    let currentX = 0
-    while (currentX < canvas.width + textWidth) {
-      context.fillText(text, currentX, canvas.height / 2)
-      currentX += textWidth
+    // Draw exactly the right number of phrases
+    for (let i = 0; i < texturePhraseCount; i++) {
+      context.fillText(text, i * textWidth, canvas.height / 2)
     }
     
     // Create texture from canvas
@@ -422,11 +457,9 @@ function Banner(props) {
     canvasTexture.wrapS = THREE.RepeatWrapping
     canvasTexture.wrapT = THREE.ClampToEdgeWrapping
     
-    // Calculate repeat based on cylinder circumference
-    // Cylinder radius is 1.6, so circumference = 2 * PI * 1.6 ≈ 10.05
-    // Adjust this value to control how many times text appears around cylinder
-    const textRepeatCount = 5  // Number of complete text repetitions around the cylinder
-    canvasTexture.repeat.set(textRepeatCount, 1)
+    // Set texture repeat to exactly 1 to use the full texture once around the cylinder
+    // This ensures exactly DESIRED_PHRASE_COUNT phrases appear
+    canvasTexture.repeat.set(1, 1)
     canvasTexture.needsUpdate = true
     
     return canvasTexture
@@ -434,10 +467,12 @@ function Banner(props) {
   
   useFrame((_, delta) => {
     if (texture) {
-      texture.offset.x += delta / 12
+      texture.offset.x += delta / 24
     }
     if (ref.current?.material?.time) {
-      ref.current.material.time.value += Math.abs(scroll.delta) * 4
+      // Use a default animation speed when scroll is not available
+      const scrollDelta = scroll ? Math.abs(scroll.delta) : 0.01
+      ref.current.material.time.value += scrollDelta * 4
     }
   })
   

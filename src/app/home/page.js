@@ -1,16 +1,23 @@
 'use client'
 
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useRouter, useSearchParams } from 'next/navigation'
 import CarouselComponent from '@/components/carousel/Carousel'
 import CyberGlitchButton from '@/components/carousel/CyberGlitchButton'
 import ThirdwebBuyModal from '@/components/ThirdwebBuyModal'
 import CyberNav from '@/components/CyberNav'
+import NavControlsMobile from '@/components/NavControlsMobile'
 import Link from 'next/link'
 import { useUser, SignInButton, UserButton } from '@clerk/nextjs'
 import { useMusic } from '@/components/MusicContext'
 import CoinLoader from '@/components/CoinLoader'
+import HandsGLTFScene from '@/components/HandsGLTFScene'
+import CandleShrine from '@/components/CandleShrine'
 
-export default function CarouselPage() {
+function CarouselPageContent() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const { user } = useUser()
   const { 
     play, 
@@ -32,6 +39,49 @@ export default function CarouselPage() {
   const isTogglingRef = useRef(false)
   const is80sMode = context80sMode
   const [emoji, setEmoji] = useState("😇")
+  
+  // State for offerings data shared between CandleShrine and HandsGLTFScene
+  const [hoveredOffering, setHoveredOffering] = useState(null)
+  const [justLitOffering, setJustLitOffering] = useState(null)
+  
+  // Mock offerings data - this would come from your database
+  const [mockOfferings, setMockOfferings] = useState([
+    { 
+      name: 'chelleville', 
+      type: 'petition', 
+      message: 'May my bags pump eternally', 
+      tokensBurned: 1000,
+      timestamp: '2m ago'
+    },
+    { 
+      name: 'degen_mike', 
+      type: 'appreciation', 
+      message: 'Thanks for the 10x Our Lady 🚀', 
+      tokensBurned: 5000,
+      timestamp: '5m ago'
+    },
+    { 
+      name: 'cryptopriest', 
+      type: 'confession', 
+      message: 'I sold the bottom... forgive me', 
+      tokensBurned: 2500,
+      timestamp: '12m ago'
+    },
+    { 
+      name: 'hodlqueen', 
+      type: 'petition', 
+      message: 'Deliver us from paper hands', 
+      tokensBurned: 10000,
+      timestamp: '1h ago'
+    },
+    { 
+      name: 'anonymous', 
+      type: 'appreciation', 
+      message: null, 
+      tokensBurned: 500,
+      timestamp: '2h ago'
+    },
+  ])
 
   // Preload all critical images including carousel images
   useEffect(() => {
@@ -177,6 +227,33 @@ export default function CarouselPage() {
       isTogglingRef.current = false;
     }, 500);
   }, [setContext80sMode]);
+  
+  // Initialize current view from URL parameter
+  const [currentView, setCurrentView] = useState(() => {
+    // Check URL param on initial load
+    const view = searchParams.get('view')
+    return view === 'shrine' ? 'shrine' : 'carousel'
+  });
+  
+  // State for CyberNav menu
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  
+  // Update URL when view changes
+  const handleViewChange = useCallback((newView) => {
+    setCurrentView(newView)
+    // Update URL without page reload
+    const url = new URL(window.location.href)
+    url.searchParams.set('view', newView)
+    router.push(url.pathname + url.search, { scroll: false })
+  }, [router]);
+  
+  // Handle browser back/forward
+  useEffect(() => {
+    const view = searchParams.get('view')
+    if (view === 'shrine' || view === 'carousel') {
+      setCurrentView(view)
+    }
+  }, [searchParams]);
 
   return (
     <>
@@ -209,8 +286,241 @@ export default function CarouselPage() {
           to { transform: rotate(360deg); }
         }
       `}</style>
-
-      <CarouselComponent onReady={handleCarouselReady} />
+ 
+      {/* Toggle Button for Views */}
+      <div style={{
+        position: "fixed",
+        bottom: "30px",
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 1000,
+        display: "flex",
+        gap: "10px",
+        background: "rgba(0, 0, 0, 0.8)",
+        padding: "10px 20px",
+        borderRadius: "30px",
+        backdropFilter: "blur(10px)",
+        border: "1px solid rgba(255, 255, 255, 0.2)"
+      }}>
+        <button
+          onClick={() => handleViewChange('carousel')}
+          style={{
+            background: currentView === 'carousel' ? "#00ff66" : "transparent",
+            color: currentView === 'carousel' ? "#000" : "#fff",
+            border: "none",
+            padding: "8px 20px",
+            borderRadius: "20px",
+            fontFamily: "monospace",
+            fontSize: "14px",
+            cursor: "pointer",
+            transition: "all 0.3s ease"
+          }}
+        >
+          📜 Lore
+        </button>
+        <button
+          onClick={() => handleViewChange('shrine')}
+          style={{
+            background: currentView === 'shrine' ? "#00ff66" : "transparent",
+            color: currentView === 'shrine' ? "#000" : "#fff",
+            border: "none",
+            padding: "8px 20px",
+            borderRadius: "20px",
+            fontFamily: "monospace",
+            fontSize: "14px",
+            cursor: "pointer",
+            transition: "all 0.3s ease"
+          }}
+        >
+          🕯️ Shrine
+        </button>
+      </div>
+      
+      {/* Animated Views Container */}
+      <AnimatePresence mode="wait">
+        {/* Carousel View */}
+        {currentView === 'carousel' && (
+          <motion.div
+            key="carousel"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            style={{
+              width: "100%",
+              height: "100vh",
+              position: "absolute",
+              top: 0,
+              left: 0
+            }}
+          >
+            <CarouselComponent onReady={handleCarouselReady} />
+            
+            {/* Nav Controls Mobile (for both mobile and desktop) - Top Right */}
+            <div style={{
+              position: "absolute",
+              top: "1rem",
+              right: "1rem",
+              zIndex: 300
+            }}>
+              <NavControlsMobile 
+                isPlaying={contextIsPlaying}
+                onPlayMusic={() => play()}
+                onStopMusic={() => pause()}
+                onSkipTrack={() => nextTrack()}
+                onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
+                onUserClick={() => {
+                  // Handle user click if needed
+                }}
+                isUserSignedIn={!!user}
+                isMenuOpen={isMenuOpen}
+              />
+            </div>
+            
+            {/* CyberNav Menu Panel */}
+            <CyberNav 
+              is80sMode={is80sMode}
+              position="fixed"
+              isOpen={isMenuOpen}
+              onClose={() => setIsMenuOpen(false)}
+              showButton={false}  // Hide CyberNav's own hamburger button
+            />
+          </motion.div>
+        )}
+        
+        {/* Shrine View */}
+        {currentView === 'shrine' && (
+          <motion.div
+            key="shrine"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100vh",
+              overflow: "hidden"
+            }}
+          >
+            {/* CandleShrine - Background Layer */}
+            <div style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              zIndex: 1
+            }}>
+              <CandleShrine 
+                offerings={mockOfferings}
+                onSelectOffering={setHoveredOffering}
+                onLightCandle={(offering) => {
+                  setMockOfferings(prev => [offering, ...prev])
+                  setJustLitOffering(offering)
+                  setTimeout(() => setJustLitOffering(null), 3000)
+                }}
+              />
+            </div>
+            
+            {/* HandsGLTFScene - Foreground Layer */}
+            <div style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              zIndex: 2,
+              pointerEvents: "auto"
+            }}>
+              <HandsGLTFScene 
+                offerings={mockOfferings}
+                hoveredOffering={hoveredOffering}
+                justLitOffering={justLitOffering}
+                onJustLitComplete={() => setJustLitOffering(null)}
+              />
+            </div>
+            
+            {/* Nav Controls Mobile (for both mobile and desktop) - Top Right */}
+            <div style={{
+              position: "absolute",
+              top: "1rem",
+              right: "1rem",
+              zIndex: 300
+            }}>
+              <NavControlsMobile 
+                isPlaying={contextIsPlaying}
+                onPlayMusic={() => play()}
+                onStopMusic={() => pause()}
+                onSkipTrack={() => nextTrack()}
+                onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
+                onUserClick={() => {
+                  // Handle user click if needed
+                }}
+                isUserSignedIn={!!user}
+                isMenuOpen={isMenuOpen}
+              />
+            </div>
+            
+            {/* CyberNav Menu Panel */}
+            <CyberNav 
+              is80sMode={is80sMode}
+              position="fixed"
+              isOpen={isMenuOpen}
+              onClose={() => setIsMenuOpen(false)}
+              showButton={false}  // Hide CyberNav's own hamburger button
+            />
+            
+            {/* Shrine Heading Overlay */}
+            {/* <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5, duration: 0.8, ease: "easeOut" }}
+              style={{
+                position: "absolute",
+                top: "120px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                zIndex: 100,
+                textAlign: "center",
+                pointerEvents: "none",
+                maxWidth: "90%"
+              }}
+            >
+              <h1 style={{
+                fontFamily: "'UnifrakturMaguntia', serif",
+                fontSize: isMobileView ? "2rem" : "3rem",
+                color: "#fff",
+                margin: 0,
+                textShadow: `
+                  0 0 40px rgba(0, 255, 102, 0.8),
+                  0 0 80px rgba(0, 255, 102, 0.4),
+                  0 0 120px rgba(0, 255, 102, 0.2),
+                  2px 2px 4px rgba(0, 0, 0, 0.8)
+                `,
+                letterSpacing: "0.05em",
+                fontWeight: "normal",
+                WebkitTextStroke: "1px rgba(0, 255, 102, 0.3)"
+              }}>
+                Get on Her Watchlist
+              </h1>
+              <div style={{
+                marginTop: "10px",
+                fontSize: isMobileView ? "0.9rem" : "1.1rem",
+                color: "rgba(255, 255, 255, 0.6)",
+                fontFamily: "monospace",
+                letterSpacing: "0.2em",
+                textTransform: "uppercase",
+                textShadow: "0 2px 4px rgba(0, 0, 0, 0.5)"
+              }}>
+                Light a candle • Make an offering
+              </div>
+            </motion.div> */}
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       {/* RL80 Logo - Top Left */}
       {fontLoaded && (
@@ -268,7 +578,7 @@ export default function CarouselPage() {
       )}
       
       {/* CyberNav - Top Right */}
-      <div
+      {/* <div
         style={{
           position: "fixed",
           top: "1rem",
@@ -280,11 +590,11 @@ export default function CarouselPage() {
           is80sMode={is80sMode}
           position="fixed"
         />
-      </div>
+      </div> */}
       
       {/* Control Buttons - Positioned horizontally below CyberNav */}
       {/* Music Button */}
-      <div
+      {/* <div
         style={{
           position: "fixed",
           top: "5rem",
@@ -336,7 +646,6 @@ export default function CarouselPage() {
                   gap: "0.5rem",
                 }}
               >
-                {/* Spinning Album Art */}
                 <div
                   style={{
                     width: isMobileDevice ? "3rem" : "3.5rem",
@@ -365,7 +674,6 @@ export default function CarouselPage() {
                   />
                 </div>
                 
-                {/* Skip Button */}
                 <button
                   onClick={() => nextTrack && nextTrack()}
                   style={{
@@ -391,7 +699,6 @@ export default function CarouselPage() {
                   </svg>
                 </button>
                 
-                {/* Close Button */}
                 <button
                   onClick={() => {
                     handleMusicToggle(false);
@@ -424,7 +731,6 @@ export default function CarouselPage() {
           }
       </div>
       
-      {/* User Button - Next to Music Button */}
       <div
         style={{
           position: "fixed",
@@ -435,7 +741,6 @@ export default function CarouselPage() {
       >
       </div>
       
-      {/* 80s Mode Button - Next to User Button */}
       <div
         style={{
           position: "fixed",
@@ -501,7 +806,6 @@ export default function CarouselPage() {
         </button>
       </div>
       
-      {/* Cyber Glitch Button - Desktop only (mobile shows in carousel) */}
       {!isMobileView && (
         <div style={{
           position: "fixed",
@@ -512,7 +816,6 @@ export default function CarouselPage() {
           <CyberGlitchButton 
             text="BUY RL80_"
             onClick={() => {
-              // Trigger ThirdwebBuyModal
               const event = new CustomEvent('openBuyModal')
               window.dispatchEvent(event)
             }}
@@ -523,7 +826,7 @@ export default function CarouselPage() {
             mobile={false}
           />
         </div>
-      )}
+      )} */}
       
       {/* Thirdweb Buy Modal */}
       <ThirdwebBuyModal 
@@ -533,5 +836,13 @@ export default function CarouselPage() {
       
       </div>
     </>
+  )
+}
+
+export default function CarouselPage() {
+  return (
+    <Suspense fallback={<CoinLoader loading={true} />}>
+      <CarouselPageContent />
+    </Suspense>
   )
 }
