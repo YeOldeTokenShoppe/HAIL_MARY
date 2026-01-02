@@ -5,7 +5,7 @@ import { useGLTF } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { HandsModel } from './HandsGLTFScene'
-import { CandleCloud, GradientBackground, PriceSimulator } from './CandleShrine'
+import { CandleCloud, GradientBackground, PriceSimulator, SceneSetup } from './CandleShrine'
 import { NewCandleEffectManager } from './NewCandleEffect'
 import CyberGlitchButton from './carousel/CyberGlitchButton'
 // PhoneLightRays now rendered inside HandsGLTFScene attached to phoneCase
@@ -93,19 +93,13 @@ export default function UnifiedShrine({
   }
 
   const handlePointerDown = useCallback((event) => {
-    // Only start dragging if clicking in the bottom 40% of screen (where hands are)
-    const screenHeight = window.innerHeight
-    const clickY = event.clientY || event.nativeEvent?.clientY || 0
-    
-    if (clickY > screenHeight * 0.6) {  // Bottom 40% of screen
-      isDragging.current = true
-      dragStart.current = {
-        x: event.clientX || event.nativeEvent?.clientX || 0,
-        rotation: userRotation
-      }
-      if (typeof document !== 'undefined' && document.body) {
-        document.body.style.cursor = 'grabbing'
-      }
+    isDragging.current = true
+    dragStart.current = {
+      x: event.clientX || event.nativeEvent?.clientX || 0,
+      rotation: userRotation
+    }
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.style.cursor = 'grabbing'
     }
   }, [userRotation])
 
@@ -162,6 +156,24 @@ export default function UnifiedShrine({
 
   return (
     <div style={{ width: '100%', height: '100vh', background: '#000', position: 'relative' }}>
+      {/* Retro image background for 80s mode */}
+      {is80sMode && (
+        <img
+          src="/images/retro.webp"
+          alt="80s retro background"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            opacity: 0.8,
+            zIndex: 1,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
       <Canvas
         camera={{ position: [0, -0.5, 9], fov: 50 }}
         onPointerDown={handlePointerDown}
@@ -173,14 +185,24 @@ export default function UnifiedShrine({
           antialias: true,
           powerPreference: "high-performance",
         }}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          zIndex: 2,
+          background: 'transparent',
+        }}
       >
+        <SceneSetup is80sMode={is80sMode} />
         <ambientLight intensity={0.6} />
         <directionalLight position={[10, 10, 5]} intensity={1} />
         <pointLight position={[10, 10, 10]} intensity={0.5} />
         <pointLight position={[-10, -10, -10]} intensity={1} />
         
         {/* Background gradient */}
-        <GradientBackground priceDirection={priceDirection} />
+        <GradientBackground priceDirection={priceDirection} is80sMode={is80sMode} />
         
         {/* Candles in the background - pushed further back */}
         <group position={[0, 2, -8]}>
@@ -259,51 +281,51 @@ export default function UnifiedShrine({
       {/* Price Ticker */}
       <div style={{
         position: 'absolute',
-        top: '195px',
-        right: '20px',
+        top: isMobile ? '100px' : '195px',
+        right: isMobile ? '10px' : '20px',
         background: 'rgba(0, 0, 0, 0.8)',
         border: `2px solid ${priceChange >= 0 ? '#00ff66' : '#ff4444'}`,
         borderRadius: '12px',
-        padding: '16px',
+        padding: isMobile ? '12px' : '16px',
         color: '#fff',
         fontFamily: 'monospace',
-        fontSize: '14px',
+        fontSize: isMobile ? '12px' : '14px',
         backdropFilter: 'blur(10px)',
         boxShadow: `0 0 20px ${priceChange >= 0 ? 'rgba(0, 255, 100, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
         zIndex: 1000,
-        width: '240px'
+        width: isMobile ? '160px' : '240px'
       }}>
         <div style={{ 
-          fontSize: '24px', 
+          fontSize: isMobile ? '18px' : '24px', 
           fontWeight: 'bold',
           color: priceChange >= 0 ? '#00ff66' : '#ff4444',
-          marginBottom: '8px'
+          marginBottom: isMobile ? '4px' : '8px'
         }}>
           ${tokenPrice.toFixed(6)}
         </div>
         <div style={{
-          fontSize: '18px',
+          fontSize: isMobile ? '14px' : '18px',
           color: priceChange >= 0 ? '#00ff66' : '#ff4444',
-          marginBottom: '12px',
+          marginBottom: isMobile ? '8px' : '12px',
           display: 'flex',
           alignItems: 'center',
-          gap: '8px'
+          gap: isMobile ? '4px' : '8px'
         }}>
           <span>{priceChange >= 0 ? '▲' : '▼'}</span>
           <span>{Math.abs(priceChange).toFixed(2)}%</span>
         </div>
-        <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px' }}>
-          Vol 24h: ${volume24h.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+        <div style={{ fontSize: isMobile ? '10px' : '12px', color: '#888', marginBottom: '4px' }}>
+          Vol 24h: ${isMobile ? (volume24h / 1000000).toFixed(1) + 'M' : volume24h.toLocaleString(undefined, { maximumFractionDigits: 0 })}
         </div>
-        <div style={{ fontSize: '12px', color: '#888' }}>
-          MCap: ${marketCap.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+        <div style={{ fontSize: isMobile ? '10px' : '12px', color: '#888' }}>
+          MCap: ${isMobile ? (marketCap / 1000000).toFixed(1) + 'M' : marketCap.toLocaleString(undefined, { maximumFractionDigits: 0 })}
         </div>
         
         {/* Mini chart */}
         <div style={{
-          marginTop: '12px',
-          height: '40px',
-          display: 'flex',
+          marginTop: isMobile ? '8px' : '12px',
+          height: isMobile ? '30px' : '40px',
+          display: isMobile ? 'none' : 'flex',  // Hide chart on mobile to save space
           alignItems: 'flex-end',
           gap: '1px'
         }}>
@@ -330,51 +352,54 @@ export default function UnifiedShrine({
       {/* Stats overlay (below price ticker on right) */}
       <div style={{
         position: 'absolute',
-        top: '380px',  // Small gap below the price ticker
-        right: '20px',
+        top: isMobile ? '200px' : '380px',  // Adjust position for mobile
+        right: isMobile ? '10px' : '20px',
         color: '#fff',
         fontFamily: 'monospace',
-        fontSize: '12px',
+        fontSize: isMobile ? '10px' : '12px',
         background: 'rgba(0, 0, 0, 0.8)',
         border: `2px solid ${priceChange >= 0 ? '#00ff66' : '#ff4444'}`,
-        padding: '16px',
+        padding: isMobile ? '12px' : '16px',
         borderRadius: '12px',
         backdropFilter: 'blur(10px)',
         boxShadow: `0 0 20px ${priceChange >= 0 ? 'rgba(0, 255, 100, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
-        width: '240px',
+        width: isMobile ? '160px' : '240px',
+        zIndex: 999,  // Ensure proper layering
       }}>
         <div style={{ 
           color: priceChange >= 0 ? '#00ff66' : '#ff4444',
-          fontSize: '24px',
+          fontSize: isMobile ? '16px' : '24px',
           fontWeight: 'bold',
-          marginBottom: '8px'
+          marginBottom: isMobile ? '4px' : '8px'
         }}>
           {priceChange >= 0 ? '↑' : '↓'} {priceChange.toFixed(2)}%
         </div>
-        <div style={{ color: '#888' }}>
-          🕯️ {(500 + additionalCandles.length).toLocaleString()} candles burning
+        <div style={{ color: '#888', fontSize: isMobile ? '10px' : '12px' }}>
+          🕯️ {(500 + additionalCandles.length).toLocaleString()} candles
         </div>
       </div>
       
       {/* Light a Candle Button with Cyber Glitch Style */}
       <div style={{
         position: 'absolute',
-        bottom: '80px',  // Moved up from 20px to ensure visibility on tablets
-        right: '20px',
+        bottom: isMobile ? '20px' : '80px',
+        right: isMobile ? '50%' : '20px',
+        transform: isMobile ? 'translateX(50%)' : 'none',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
+        zIndex: 2000,  // Ensure button is above everything else
       }}>
         <div style={{
           color: 'rgba(255, 255, 255, 0.9)',
-          fontSize: '2.5rem',
+          fontSize: isMobile ? '1.5rem' : '2.5rem',
           fontFamily: "'UnifrakturMaguntia', serif",
           letterSpacing: '1px',
-          marginBottom: '12px',
+          marginBottom: isMobile ? '8px' : '12px',
           textAlign: 'center',
           textShadow: '0 0 2rem rgba(147, 69, 255, 0.9), 0 8px 16px rgba(0, 0, 0, 0.9)',
         }}>
-          Get on Her <br/>Watchlist
+          Get on Her {!isMobile && <br/>}Watchlist
         </div>
         <style jsx>{`
           .cyber-candle-btn :global(.cybr-btn) {
@@ -408,6 +433,7 @@ export default function UnifiedShrine({
             text="GET LIT"
             onClick={handleLightCandleClick}
             label="RL80"
+            mobile={isMobile}
           />
         </div>
       </div>

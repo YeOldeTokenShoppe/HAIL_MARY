@@ -1699,8 +1699,19 @@ const phoneWorldTransform = useMemo(() => {
 }, [phoneCaseRef.current, phoneScreenRef.current, offerings, hoveredOffering, justLitOffering])
 
 // Return with swivel animation applied
+// Get mobile state from parent or detect it locally
+const [isMobileLocal, setIsMobileLocal] = useState(false)
+useEffect(() => {
+  const checkMobile = () => {
+    setIsMobileLocal(window.innerWidth < 768)
+  }
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
+  return () => window.removeEventListener('resize', checkMobile)
+}, [])
+
 return (
-  <group position={[0, -0.7, 0]}> {/* Position hands at bottom of screen */}
+  <group position={[0, isMobileLocal ? -0.3 : -0.7, 0]}> {/* Position hands higher on mobile */}
     <primitive 
       object={gltf.scene} 
       scale={[0.35, 0.35, 0.35]}

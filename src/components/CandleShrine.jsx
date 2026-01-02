@@ -8,8 +8,23 @@ import { NewCandleEffectManager } from './NewCandleEffect'
 const CANDLE_COUNT = 500
 const MAX_ADDITIONAL = 100 // Buffer for user-added candles
 
+// Clear scene background when in 80s mode
+export function SceneSetup({ is80sMode }) {
+  const { scene } = useThree()
+  
+  useEffect(() => {
+    if (is80sMode) {
+      scene.background = null
+    } else {
+      scene.background = new THREE.Color(0x000000)
+    }
+  }, [is80sMode, scene])
+  
+  return null
+}
+
 // Price-reactive gradient background
-export function GradientBackground({ priceDirection = 0 }) {
+export function GradientBackground({ priceDirection = 0, is80sMode = false }) {
   const meshRef = useRef()
   const { viewport } = useThree()
   
@@ -75,6 +90,12 @@ export function GradientBackground({ priceDirection = 0 }) {
     `,
     depthWrite: false,
   }), [])
+  
+  // Don't render gradient when in 80s mode (video background takes over)
+  if (is80sMode) {
+    console.log('GradientBackground: Skipping render due to 80s mode')
+    return null
+  }
   
   return (
     <mesh ref={meshRef} position={[0, 0, -20]} material={material}>
@@ -744,6 +765,8 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onLight
   const effectManagerRef = useRef()
   const [clickedCandleId, setClickedCandleId] = useState(null) // Track which candle was clicked
   
+  console.log('CandleShrine is80sMode:', is80sMode)
+  
   const handleNewCandle = (position, offering) => {
     console.log('New candle added at:', position)
     setAdditionalCandles(prev => [...prev, {
@@ -784,17 +807,46 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onLight
   
   return (
     <div style={{ width: '100%', height: '100vh', background: '#000', position: 'relative' }}>
+      {/* Retro image background for 80s mode */}
+      {is80sMode && (
+        <img
+          src="/images/retro.webp"
+          alt="80s retro background"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            opacity: 0.8,
+            zIndex: 1,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
       <Canvas
         camera={{ position: [0, 0, 15], fov: 60 }}
         dpr={2}
         gl={{ 
           antialias: true,
           powerPreference: "high-performance",
+          alpha: true,
+        }}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          zIndex: 2,
+          background: 'transparent',
         }}
       >
+        <SceneSetup is80sMode={is80sMode} />
         <ambientLight intensity={0.6} />
         <pointLight position={[10, 10, 10]} intensity={0.5} />
-        <GradientBackground priceDirection={priceDirection} />
+        <GradientBackground priceDirection={priceDirection} is80sMode={is80sMode} />
         <CandleCloud count={CANDLE_COUNT} priceDirection={priceDirection} additionalCandles={additionalCandles} onCandleClick={handleCandleClick} clickedCandleId={clickedCandleId} />
         <PriceSimulator onPriceChange={(price) => {
           setPriceDirection(price)
@@ -829,6 +881,7 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onLight
         color: '#fff',
         fontFamily: 'monospace',
         fontSize: '12px',
+        zIndex: 3,
       }}>
         <div style={{ 
           color: priceDirection >= 0 ? '#00ff66' : '#ff4444',
@@ -863,6 +916,7 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onLight
           fontWeight: 'bold',
           cursor: 'pointer',
           boxShadow: '0 0 30px rgba(0, 255, 100, 0.4)',
+          zIndex: 3,
         }}
       >
         🕯️ Light a Candle
