@@ -9,16 +9,20 @@ import './util'
 import CyberGlitchButton from './CyberGlitchButton'
 import ExperienceControls from './ExperienceControls'
 import { useMusic } from '../MusicContext'
+import MobilePolaroidGallery from './MobilePolaroidGallery'
 
 export default function CarouselComponent({ onReady, disableScrollControls = false }) {
   const [hoveredCaption, setHoveredCaption] = useState(null)
   const [sceneReady, setSceneReady] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [isMobilePhone, setIsMobilePhone] = useState(false)
   const { is80sMode } = useMusic()
   
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth <= 768)
+      // Check specifically for mobile phones (not tablets)
+      setIsMobilePhone(window.innerWidth <= 480)
     }
     checkMobile()
     window.addEventListener('resize', checkMobile)
@@ -93,8 +97,23 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
       )}
       
       {/* Experience Controls - positioned top-right */}
-      <ExperienceControls isMobile={isMobile} />
+      {!isMobilePhone && <ExperienceControls isMobile={isMobile} />}
       
+      {/* Mobile Phone Gallery - replaces 3D carousel on phones */}
+      {isMobilePhone ? (
+        <MobilePolaroidGallery 
+          images={[
+            { url: '/carousel_images/img1.jpg' },
+            { url: '/carousel_images/img2.jpg' },
+            { url: '/carousel_images/img3.jpg' },
+            { url: '/carousel_images/img4.jpg' },
+            { url: '/carousel_images/img5.jpg' },
+            { url: '/carousel_images/img6.jpg' },
+            { url: '/carousel_images/img7.jpg' },
+            { url: '/carousel_images/img8.jpg' },
+          ]}
+        />
+      ) : (
       <Canvas 
         style={{ position: 'relative', zIndex: 2 }}
         camera={{ position: [0, 0, 100], fov: 15 }}
@@ -120,19 +139,20 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               <AutoRotatingRig rotation={[0, 0, isMobile ? 0.03 : 0.15]}>
                 <Carousel setHoveredCaption={setHoveredCaption} />
               </AutoRotatingRig>
-              <Banner position={[0, -0.15, 0]} is80sMode={is80sMode} disableScrollControls={true} />
+              {!isMobile && <Banner position={[0, -0.15, 0]} is80sMode={is80sMode} disableScrollControls={true} />}
             </>
           ) : (
             <ScrollControls pages={4} infinite>
               <Rig rotation={[0, 0, isMobile ? 0.03 : 0.15]}>
                 <Carousel setHoveredCaption={setHoveredCaption} />
               </Rig>
-              <Banner position={[0, -0.15, 0]} is80sMode={is80sMode} disableScrollControls={false} />
+              {!isMobile && <Banner position={[0, -0.15, 0]} is80sMode={is80sMode} disableScrollControls={false} />}
             </ScrollControls>
           )}
           {!is80sMode && <Environment preset="dawn" background blur={0.5} />}
         </Suspense>
       </Canvas>
+      )}
     </div>
   )
 }

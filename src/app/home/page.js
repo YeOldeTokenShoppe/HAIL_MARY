@@ -507,7 +507,7 @@ function CarouselPageContent() {
                 isUserSignedIn={!!user}
                 isMenuOpen={isMenuOpen}
                 is80sMode={is80sMode}
-                onToggle80sMode={() => toggle80sMode(!is80sMode)}
+                onToggle80sMode={() => setContext80sMode(!is80sMode)}
                 userImage={user?.imageUrl}
               />
             </div>
@@ -585,7 +585,7 @@ function CarouselPageContent() {
                 isUserSignedIn={!!user}
                 isMenuOpen={isMenuOpen}
                 is80sMode={is80sMode}
-                onToggle80sMode={() => toggle80sMode(!is80sMode)}
+                onToggle80sMode={() => setContext80sMode(!is80sMode)}
                 userImage={user?.imageUrl}
               />
             </div>

@@ -12,6 +12,16 @@ const client = createThirdwebClient({
 
 const ThirdwebBuyModal = ({ isOpen, onClose }) => {
   const [glitchActive, setGlitchActive] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   useEffect(() => {
     if (isOpen) {
@@ -139,6 +149,44 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
         }}
         onClick={onClose}
       >
+        {/* Close Button - Outside modal content to avoid glitch */}
+        <button
+            className="close-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            style={{
+              position: 'fixed',
+              top: isMobile ? 'calc(5vh + 20px)' : '15px',
+              right: isMobile ? '25px' : '15px',
+              background: '#000',
+              border: 'none',
+              color: '#000',
+              fontSize: isMobile ? '28px' : '24px',
+              width: isMobile ? '50px' : '40px',
+              height: isMobile ? '50px' : '40px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'transform 0.3s ease',
+              zIndex: 10002,
+              fontWeight: 'bold',
+              fontFamily: 'monospace',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.1)';
+              e.currentTarget.style.color = '#ff184c';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.color = '#000';
+            }}
+          >
+            ✕
+          </button>
+        
         {/* Glitch Lines Effect */}
         <div style={{
           position: 'absolute',
@@ -165,9 +213,11 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
             position: 'relative',
             background: 'linear-gradient(135deg, #93276a, #3434a7)',
             clipPath: 'polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))',
-            padding: '3rem',
+            padding: isMobile ? '3.5rem 1.5rem 2rem' : '3rem',
             maxWidth: '500px',
             width: '90%',
+            maxHeight: isMobile ? '85vh' : '90vh',
+            overflowY: 'auto',
             boxShadow: glitchActive 
               ? '5px 5px 0 #ff184c, -5px -5px 0 #00e572, 0 0 50px rgba(139, 0, 255, 0.5)'
               : '3px 3px 0 #fded00, -3px -3px 0 #00e572, 0 0 30px rgba(255, 24, 76, 0.5)',
@@ -204,50 +254,13 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
             }} />
           </div>
           
-          {/* Close Button */}
-          <button
-            className="close-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            style={{
-              position: 'absolute',
-              top: '15px',
-              right: '15px',
-              background: '#1a0a14',
-              border: 'none',
-              color: '#fff',
-              fontSize: '24px',
-              width: '40px',
-              height: '40px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'all 0.3s ease',
-              zIndex: 10001,
-              fontWeight: 'bold',
-              fontFamily: 'monospace',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'scale(1.1)';
-              e.currentTarget.style.color = '#ff184c';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-              e.currentTarget.style.color = '#fff';
-            }}
-          >
-            ✕
-          </button>
 
           {/* Title with Glitch Effect */}
           <h2 className="title-glitch" style={{
             color: '#fff',
             textAlign: 'center',
-            marginBottom: '2rem',
-            fontSize: '2rem',
+            marginBottom: isMobile ? '1.5rem' : '2rem',
+            fontSize: isMobile ? '1.5rem' : '2rem',
             fontFamily: 'monospace',
             textTransform: 'uppercase',
             letterSpacing: '4px',
@@ -291,8 +304,8 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
             flexDirection: 'column',
             justifyContent: 'center',
             alignItems: 'center',
-            minHeight: '400px',
-            padding: '20px',
+            minHeight: isMobile ? '300px' : '400px',
+            padding: isMobile ? '15px' : '20px',
             background: 'rgba(15, 10, 20, 0.8)',
             border: '1px solid rgba(255, 24, 76, 0.3)',
             clipPath: 'polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px))',
