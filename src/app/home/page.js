@@ -291,7 +291,8 @@ function CarouselPageContent() {
       {/* Cyber Toggle Switch for Views */}
       <div style={{
         position: "fixed",
-        top: isMobileDevice ? "280px" : "30px", // Move up on mobile to be below stats
+        top: isMobileDevice ? "100px" : "auto", 
+        bottom: isMobileDevice ? "auto" : "30px",
         left: isMobileDevice ? "auto" : "50%",
         right: isMobileDevice ? "10px" : "auto",
         transform: isMobileDevice ? "none" : "translateX(-50%)",

@@ -281,7 +281,7 @@ export default function UnifiedShrine({
       {/* Price Ticker */}
       <div style={{
         position: 'absolute',
-        top: isMobile ? '100px' : '195px',
+        top: isMobile ? '150px' : '195px',
         right: isMobile ? '10px' : '20px',
         background: 'rgba(0, 0, 0, 0.8)',
         border: `2px solid ${priceChange >= 0 ? '#00ff66' : '#ff4444'}`,
@@ -352,7 +352,7 @@ export default function UnifiedShrine({
       {/* Stats overlay (below price ticker on right) */}
       <div style={{
         position: 'absolute',
-        top: isMobile ? '200px' : '380px',  // Adjust position for mobile
+        top: isMobile ? '250px' : '380px',  // Adjust position for mobile
         right: isMobile ? '10px' : '20px',
         color: '#fff',
         fontFamily: 'monospace',
