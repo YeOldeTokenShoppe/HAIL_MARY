@@ -193,6 +193,29 @@ export default function UnifiedShrine({
     zIndex: 999,
   }), [isMobile, priceChange])
   
+  // Memoize the price chart bars
+  const priceChartBars = useMemo(() => {
+    const recentPrices = priceHistory.slice(-20)
+    const min = Math.min(...recentPrices)
+    const max = Math.max(...recentPrices)
+    const range = max - min || 1
+    
+    return recentPrices.map((price, i) => {
+      const height = ((price - min) / range) * 35 + 5
+      return (
+        <div
+          key={i}
+          style={{
+            width: '8px',
+            height: `${height}px`,
+            background: i === 19 ? (priceChange >= 0 ? '#00ff66' : '#ff4444') : '#444',
+            borderRadius: '2px'
+          }}
+        />
+      )
+    })
+  }, [priceHistory, priceChange])
+  
   const handleLightCandleClick = () => {
     // Create a new offering with randomized data
     const messages = [
@@ -391,27 +414,7 @@ export default function UnifiedShrine({
             alignItems: 'flex-end',
             gap: '1px'
           }}>
-            {useMemo(() => {
-              const recentPrices = priceHistory.slice(-20)
-              const min = Math.min(...recentPrices)
-              const max = Math.max(...recentPrices)
-              const range = max - min || 1
-              
-              return recentPrices.map((price, i) => {
-                const height = ((price - min) / range) * 35 + 5
-                return (
-                  <div
-                    key={i}
-                    style={{
-                      width: '8px',
-                      height: `${height}px`,
-                      background: i === 19 ? (priceChange >= 0 ? '#00ff66' : '#ff4444') : '#444',
-                      borderRadius: '2px'
-                    }}
-                  />
-                )
-              })
-            }, [priceHistory, priceChange])}
+            {priceChartBars}
           </div>
         )}
       </div>
@@ -482,7 +485,7 @@ export default function UnifiedShrine({
         `}</style>
         <div className="cyber-candle-btn">
           <CyberGlitchButton
-            text="GET LIT"
+            text="ADD CANDLE"
             onClick={handleLightCandleClick}
             label="RL80"
             mobile={isMobile}

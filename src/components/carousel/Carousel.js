@@ -1,7 +1,7 @@
 'use client'
 
 import * as THREE from 'three'
-import { useRef, useState, Suspense, useMemo, useEffect } from 'react'
+import { useRef, useState, Suspense, useMemo, useEffect, useCallback } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Image, Environment, ScrollControls, useScroll, useTexture, Text } from '@react-three/drei'
 import { easing } from 'maath'
@@ -23,6 +23,16 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
     checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Clear any pending timers
+      if (onReady) {
+        onReady = null
+      }
+    }
   }, [])
   
   useEffect(() => {
@@ -91,9 +101,10 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
         gl={{
           antialias: true,
           alpha: true,
-          preserveDrawingBuffer: true,
+          preserveDrawingBuffer: false, // Don't preserve buffer for better memory
           powerPreference: "high-performance",
           failIfMajorPerformanceCaveat: false,
+          stencil: false, // Disable stencil buffer if not needed
         }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping
@@ -129,14 +140,21 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
 function Rig(props) {
   const ref = useRef()
   const scroll = useScroll()
+  const frameCount = useRef(0)
   
   useFrame((state, delta) => {
     if (!ref.current) return
     
+    frameCount.current++
+    
     ref.current.rotation.y = -scroll.offset * (Math.PI * 2)
-    state.events.update()
-    easing.damp3(state.camera.position, [-state.pointer.x * 2, state.pointer.y + 1.5, 10], 0.3, delta)
-    state.camera.lookAt(0, 0, 0)
+    
+    // Throttle camera updates to every 2 frames
+    if (frameCount.current % 2 === 0) {
+      state.events.update()
+      easing.damp3(state.camera.position, [-state.pointer.x * 2, state.pointer.y + 1.5, 10], 0.3, delta * 2)
+      state.camera.lookAt(0, 0, 0)
+    }
   })
   
   return <group ref={ref} {...props} />
@@ -144,24 +162,30 @@ function Rig(props) {
 
 function AutoRotatingRig(props) {
   const ref = useRef()
+  const frameCount = useRef(0)
   
   useFrame((state, delta) => {
     if (!ref.current) return
     
+    frameCount.current++
+    
     // Auto-rotate the carousel
     ref.current.rotation.y += delta * 0.1
     
-    state.events.update()
-    easing.damp3(state.camera.position, [-state.pointer.x * 2, state.pointer.y + 1.5, 10], 0.3, delta)
-    state.camera.lookAt(0, 0, 0)
+    // Throttle camera updates to every 2 frames
+    if (frameCount.current % 2 === 0) {
+      state.events.update()
+      easing.damp3(state.camera.position, [-state.pointer.x * 2, state.pointer.y + 1.5, 10], 0.3, delta * 2)
+      state.camera.lookAt(0, 0, 0)
+    }
   })
   
   return <group ref={ref} {...props} />
 }
 
 function Carousel({ radius = 1.4, count = 8, setHoveredCaption }) {
-  // Caption data for each image - customize these as needed
-  const captions = [
+  // Memoize captions to prevent recreation
+  const captions = useMemo(() => [
     {
       year: "3500 BCE",
       location: "Mesopotamian Temple",
@@ -202,7 +226,7 @@ function Carousel({ radius = 1.4, count = 8, setHoveredCaption }) {
       location: "Andromeda Gateway",
       description: "Intergalactic arbitrage creates wormholes in the fabric of economic reality"
     }
-  ]
+  ], [])
   
   return (
     <>
@@ -224,28 +248,36 @@ function Card({ url, caption, setHoveredCaption, ...props }) {
   const groupRef = useRef()
   const imageRef = useRef()
   const [hovered, hover] = useState(false)
-  const pointerOver = (e) => {
+  const frameCount = useRef(0)
+  
+  const pointerOver = useCallback((e) => {
     e.stopPropagation()
     hover(true)
     if (setHoveredCaption && caption) {
       setHoveredCaption(caption)
     }
-  }
-  const pointerOut = () => {
+  }, [setHoveredCaption, caption])
+  
+  const pointerOut = useCallback(() => {
     hover(false)
     if (setHoveredCaption) {
       setHoveredCaption(null)
     }
-  }
+  }, [setHoveredCaption])
   
   useFrame((_, delta) => {
     if (!groupRef.current) return
     
-    easing.damp3(groupRef.current.scale, hovered ? 1.15 : 1, 0.1, delta)
+    frameCount.current++
     
-    if (imageRef.current?.material) {
-      easing.damp(imageRef.current.material, 'radius', hovered ? 0 : 0, 0.2, delta)
-      easing.damp(imageRef.current.material, 'zoom', hovered ? 1 : 1.5, 0.2, delta)
+    // Throttle animations to every 2 frames for better performance
+    if (frameCount.current % 2 === 0) {
+      easing.damp3(groupRef.current.scale, hovered ? 1.15 : 1, 0.1, delta * 2)
+      
+      if (imageRef.current?.material) {
+        easing.damp(imageRef.current.material, 'radius', hovered ? 0 : 0, 0.2, delta * 2)
+        easing.damp(imageRef.current.material, 'zoom', hovered ? 1 : 1.5, 0.2, delta * 2)
+      }
     }
   })
   
@@ -356,26 +388,32 @@ function VideoCard({ videoUrl, ...props }) {
   }, [video, videoReady])
   
   useEffect(() => {
-    video.addEventListener('loadeddata', () => {
+    const handleLoadedData = () => {
       setVideoReady(true)
       video.play().catch(e => {
         console.log('Video autoplay failed, trying muted play:', e)
         video.muted = true
         video.play().catch(err => console.error('Video play still failed:', err))
       })
-    })
+    }
     
-    video.addEventListener('error', (e) => {
+    const handleError = () => {
       console.log('Video not available, using fallback image')
       setVideoReady(false)
-    })
+    }
+    
+    video.addEventListener('loadeddata', handleLoadedData)
+    video.addEventListener('error', handleError)
     
     video.src = videoUrl
     video.load()
     
     return () => {
+      video.removeEventListener('loadeddata', handleLoadedData)
+      video.removeEventListener('error', handleError)
       video.pause()
       video.src = ''
+      video.load() // Reset video element
       if (texture) texture.dispose()
     }
   }, [video, videoUrl, texture])
@@ -472,14 +510,31 @@ function Banner(props) {
     return canvasTexture
   }, [is80sMode])
   
+  // Cleanup texture on unmount
+  useEffect(() => {
+    return () => {
+      if (texture) {
+        texture.dispose()
+      }
+    }
+  }, [texture])
+  
+  // Add frame counter for throttling
+  const frameCount = useRef(0)
+  
   useFrame((_, delta) => {
+    frameCount.current++
+    
+    // Update texture offset every frame for smooth scrolling
     if (texture) {
       texture.offset.x += delta / 24
     }
-    if (ref.current?.material?.time) {
+    
+    // Throttle material time updates
+    if (frameCount.current % 3 === 0 && ref.current?.material?.time) {
       // Use a default animation speed when scroll is not available
       const scrollDelta = scroll ? Math.abs(scroll.delta) : 0.01
-      ref.current.material.time.value += scrollDelta * 4
+      ref.current.material.time.value += scrollDelta * 4 * 3 // Multiply by 3 to compensate for throttling
     }
   })
   

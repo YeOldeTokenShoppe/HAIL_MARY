@@ -224,10 +224,17 @@ function CarouselPageContent() {
       setContext80sMode(newMode);
     }
     
+    // Start music when 80s mode is enabled, stop when disabled
+    if (newMode) {
+      play();
+    } else {
+      pause();
+    }
+    
     setTimeout(() => {
       isTogglingRef.current = false;
     }, 500);
-  }, [setContext80sMode]);
+  }, [setContext80sMode, play, pause]);
   
   // Initialize current view from URL parameter
   const [currentView, setCurrentView] = useState(() => {
@@ -239,14 +246,43 @@ function CarouselPageContent() {
   // State for CyberNav menu
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
+  // Cleanup refs for view transitions
+  const cleanupTimeoutsRef = useRef([])
+  
+  // Cleanup function for view transitions
+  const cleanupBeforeViewChange = useCallback(() => {
+    // Clear any pending timeouts
+    cleanupTimeoutsRef.current.forEach(timeout => clearTimeout(timeout))
+    cleanupTimeoutsRef.current = []
+    
+    // Force garbage collection if available
+    if (window.gc) {
+      window.gc()
+    }
+  }, [])
+  
+  // State to force remount of components
+  const [componentKey, setComponentKey] = useState(0)
+  
   // Update URL when view changes
   const handleViewChange = useCallback((newView) => {
-    setCurrentView(newView)
-    // Update URL without page reload
-    const url = new URL(window.location.href)
-    url.searchParams.set('view', newView)
-    router.push(url.pathname + url.search, { scroll: false })
-  }, [router]);
+    // Cleanup before switching views
+    cleanupBeforeViewChange()
+    
+    // Force component remount by changing key
+    setComponentKey(prev => prev + 1)
+    
+    // Add a small delay to allow cleanup
+    const timeoutId = setTimeout(() => {
+      setCurrentView(newView)
+      // Update URL without page reload
+      const url = new URL(window.location.href)
+      url.searchParams.set('view', newView)
+      router.push(url.pathname + url.search, { scroll: false })
+    }, 100)
+    
+    cleanupTimeoutsRef.current.push(timeoutId)
+  }, [router, cleanupBeforeViewChange]);
   
   // Handle browser back/forward
   useEffect(() => {
@@ -255,6 +291,20 @@ function CarouselPageContent() {
       setCurrentView(view)
     }
   }, [searchParams]);
+  
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      // Clear all timeouts
+      cleanupTimeoutsRef.current.forEach(timeout => clearTimeout(timeout))
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current)
+      }
+      
+      // Cleanup WebGL contexts
+      cleanupBeforeViewChange()
+    }
+  }, [cleanupBeforeViewChange]);
 
   return (
     <>
@@ -411,7 +461,15 @@ function CarouselPageContent() {
       </div>
       
       {/* Animated Views Container */}
-      <AnimatePresence mode="wait">
+      <AnimatePresence 
+        mode="wait"
+        onExitComplete={() => {
+          // Additional cleanup after exit animation
+          if (window.gc) {
+            window.gc()
+          }
+        }}
+      >
         {/* Carousel View */}
         {currentView === 'carousel' && (
           <motion.div
@@ -428,7 +486,7 @@ function CarouselPageContent() {
               left: 0
             }}
           >
-            <CarouselComponent onReady={handleCarouselReady} />
+            <CarouselComponent key={`carousel-${componentKey}`} onReady={handleCarouselReady} disableScrollControls={false} />
             
             {/* Nav Controls Mobile (for both mobile and desktop) - Top Right */}
             <div style={{
@@ -449,7 +507,7 @@ function CarouselPageContent() {
                 isUserSignedIn={!!user}
                 isMenuOpen={isMenuOpen}
                 is80sMode={is80sMode}
-                onToggle80sMode={() => setContext80sMode(!is80sMode)}
+                onToggle80sMode={() => toggle80sMode(!is80sMode)}
                 userImage={user?.imageUrl}
               />
             </div>
@@ -492,6 +550,7 @@ function CarouselPageContent() {
               zIndex: 1
             }}>
               <UnifiedShrine 
+                key={`shrine-${componentKey}`}
                 offerings={mockOfferings}
                 onSelectOffering={setHoveredOffering}
                 onLightCandle={(offering) => {
@@ -526,7 +585,7 @@ function CarouselPageContent() {
                 isUserSignedIn={!!user}
                 isMenuOpen={isMenuOpen}
                 is80sMode={is80sMode}
-                onToggle80sMode={() => setContext80sMode(!is80sMode)}
+                onToggle80sMode={() => toggle80sMode(!is80sMode)}
                 userImage={user?.imageUrl}
               />
             </div>

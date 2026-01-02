@@ -498,8 +498,11 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
             const idleAnimation = gltf.animations.find(clip => clip.name === 'Armature|Idle')
             if (idleAnimation) {
               const action = mixersRef.current.devil.clipAction(idleAnimation)
+              action.setLoop(THREE.LoopRepeat, Infinity) // Loop infinitely
+              action.clampWhenFinished = false
+              action.timeScale = 0.8 // Slightly slower for devil
               action.play()
-              // console.log('Playing Armature|Idle animation on DevilEmoji')
+              console.log('Playing Armature|Idle animation on DevilEmoji')
             }
           }
         }
@@ -525,8 +528,11 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
             )
             if (cryingAnimation) {
               const action = mixersRef.current.crying.clipAction(cryingAnimation)
+              action.setLoop(THREE.LoopRepeat, Infinity) // Loop infinitely
+              action.clampWhenFinished = false
+              action.timeScale = 0.7 // Slightly slower for crying
               action.play()
-              // console.log('Playing ' + cryingAnimation.name + ' animation on CryingEmoji')
+              console.log('Playing ' + cryingAnimation.name + ' animation on CryingEmoji')
             }
           }
         }
@@ -552,8 +558,11 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
             )
             if (cryingAnimation) {
               const action = mixersRef.current.crying2.clipAction(cryingAnimation)
+              action.setLoop(THREE.LoopRepeat, Infinity) // Loop infinitely
+              action.clampWhenFinished = false
+              action.timeScale = 0.9 // Slightly different speed for variety
               action.play()
-              // console.log('Playing ' + cryingAnimation.name + ' animation on CryingEmoji2')
+              console.log('Playing ' + cryingAnimation.name + ' animation on CryingEmoji2')
             }
           }
         }
@@ -700,10 +709,13 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
             if (pacManAnimation) {
               console.log('🎮 Found PacMan animation:', pacManAnimation.name)
               actionsRef.current.pacMan = mixersRef.current.pacMan.clipAction(pacManAnimation)
-              actionsRef.current.pacMan.setLoop(THREE.LoopRepeat) // Ensure looping
+              actionsRef.current.pacMan.setLoop(THREE.LoopRepeat, Infinity) // Loop infinitely
+              actionsRef.current.pacMan.clampWhenFinished = false // Don't clamp at the end
+              actionsRef.current.pacMan.timeScale = 1.0 // Normal speed
               
               // Play animation if 80s mode is already on
               if (is80sMode) {
+                actionsRef.current.pacMan.reset() // Reset to start
                 actionsRef.current.pacMan.play()
                 console.log('🕹️ Starting PacMan animation')
               }
@@ -739,10 +751,13 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
             if (eatingAnimation) {
               console.log('🎮 Found PacMan2 Eating animation:', eatingAnimation.name)
               actionsRef.current.pacMan2 = mixersRef.current.pacMan2.clipAction(eatingAnimation)
-              actionsRef.current.pacMan2.setLoop(THREE.LoopRepeat) // Ensure looping
+              actionsRef.current.pacMan2.setLoop(THREE.LoopRepeat, Infinity) // Loop infinitely
+              actionsRef.current.pacMan2.clampWhenFinished = false // Don't clamp at the end
+              actionsRef.current.pacMan2.timeScale = 1.2 // Slightly faster as before
               
               // Play animation if 80s mode is already on
               if (is80sMode) {
+                actionsRef.current.pacMan2.reset() // Reset to start
                 actionsRef.current.pacMan2.play()
                 console.log('🕹️ Starting PacMan2 Eating animation')
               }
@@ -1059,6 +1074,7 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       // Control PacMan animation
       if (actionsRef.current.pacMan) {
         if (is80sMode) {
+          actionsRef.current.pacMan.reset() // Reset animation to start
           actionsRef.current.pacMan.play()
           console.log('🕹️ Playing PacMan Animation')
         } else {
@@ -1081,6 +1097,7 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       // Control PacMan2 Eating animation
       if (actionsRef.current.pacMan2) {
         if (is80sMode) {
+          actionsRef.current.pacMan2.reset() // Reset animation to start
           actionsRef.current.pacMan2.play()
           console.log('🍔 Playing PacMan2 Eating animation')
         } else {
@@ -1472,7 +1489,7 @@ useFrame((state, delta) => {
     scaredEmojiRef.current.position.y = scaredEmojiRef.current.userData.initialY + Math.sin(time * 2.5) * 0.15
   }
   
-  // Animate PukeEmoji with violent shaking when market crashes
+  // Animate PukeEmoji with rocking motion like it's about to puke
   if (pukeEmojiRef.current && pukeEmojiRef.current.visible) {
     if (!pukeEmojiRef.current.userData.initialPos) {
       pukeEmojiRef.current.userData.initialPos = {
@@ -1480,11 +1497,20 @@ useFrame((state, delta) => {
         y: pukeEmojiRef.current.position.y,
         z: pukeEmojiRef.current.position.z
       }
+      pukeEmojiRef.current.userData.initialRotation = {
+        x: pukeEmojiRef.current.rotation.x,
+        y: pukeEmojiRef.current.rotation.y,
+        z: pukeEmojiRef.current.rotation.z
+      }
     }
     // Gentler queasy wobbling motion
     pukeEmojiRef.current.position.x = pukeEmojiRef.current.userData.initialPos.x + Math.sin(time * 6) * 0.05
     pukeEmojiRef.current.position.y = pukeEmojiRef.current.userData.initialPos.y + Math.cos(time * 4) * 0.04
-    pukeEmojiRef.current.rotation.z = Math.sin(time * 5) * 0.15
+    
+    // Add forward/backward rocking on x-axis (like dry heaving)
+    pukeEmojiRef.current.rotation.x = pukeEmojiRef.current.userData.initialRotation.x + Math.sin(time * 3) * 0.3 // Rock forward and back
+    pukeEmojiRef.current.rotation.z = Math.sin(time * 5) * 0.15 // Side wobble
+    
     // Gentler pulsing for queasy effect
     const scale = 1 + Math.sin(time * 3) * 0.05
     pukeEmojiRef.current.scale.set(scale, scale, scale)
@@ -1731,10 +1757,10 @@ useEffect(() => {
 }, [])
 
 return (
-  <group position={[0, isMobileLocal ? -0.3 : -0.7, 0]}> {/* Position hands higher on mobile */}
+  <group position={[0, isMobileLocal ? -0.3 : -0.6, 0]}> {/* Position hands higher on mobile */}
     <primitive 
       object={gltf.scene} 
-      scale={[0.35, 0.35, 0.35]}
+      scale={[0.45, 0.45, 0.45]}
       rotation={[0, userRotation, 0]} // User rotation only (hands now face forward)
       onClick={handleClick}
       onPointerOver={handlePointerOver}
