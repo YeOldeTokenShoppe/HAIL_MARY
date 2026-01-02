@@ -11,7 +11,6 @@ import * as THREE from 'three'
 import { db } from '@/lib/firebaseClient'
 import { collection, query, getDocs, limit, orderBy, onSnapshot } from 'firebase/firestore'
 import { m } from 'framer-motion'
-import { PhoneScreenFeed3D } from './Phonescreenfeed'
 import { PhoneScreenTexture } from './PhoneScreenTexture'
 import { PhoneAura } from './PhoneAura'
 
