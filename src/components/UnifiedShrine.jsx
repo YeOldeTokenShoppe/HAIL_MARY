@@ -38,11 +38,12 @@ export default function UnifiedShrine({
   const [priceChange, setPriceChange] = useState(0)
   const [volume24h, setVolume24h] = useState(1234567)
   const [marketCap, setMarketCap] = useState(42069000)
-  const [priceHistory, setPriceHistory] = useState(
-    Array(20).fill(0).map((_, i) => 0.00042 + Math.random() * 0.00001 - 0.000005)
+  // Memoize initial price history to avoid recreation
+  const [priceHistory, setPriceHistory] = useState(() =>
+    Array(20).fill(0).map(() => 0.00042 + Math.random() * 0.00001 - 0.000005)
   )
 
-  // Mobile detection
+  // Mobile detection with cleanup
   useEffect(() => {
     const checkMobile = () => {
       if (typeof window !== 'undefined') {
@@ -52,19 +53,36 @@ export default function UnifiedShrine({
     checkMobile()
     if (typeof window !== 'undefined') {
       window.addEventListener('resize', checkMobile)
-      return () => window.removeEventListener('resize', checkMobile)
+      return () => {
+        window.removeEventListener('resize', checkMobile)
+        // Clean up any remaining timeouts
+        Object.values(timeoutRefs.current).forEach(timeout => {
+          clearTimeout(timeout)
+        })
+        timeoutRefs.current = {}
+      }
     }
   }, [])
 
+  // Store timeout refs for cleanup
+  const timeoutRefs = useRef({})
+  
   const handleCandleClick = useCallback((instanceId, position) => {
     console.log('Candle clicked in unified scene:', instanceId, position)
+    
+    // Clear any existing timeout for this candle
+    if (timeoutRefs.current[instanceId]) {
+      clearTimeout(timeoutRefs.current[instanceId])
+      delete timeoutRefs.current[instanceId]
+    }
     
     // Set the clicked candle ID for visual feedback
     setClickedCandleId(instanceId)
     
-    // Clear the glow after 2 seconds
-    setTimeout(() => {
+    // Clear the glow after 2 seconds with cleanup
+    timeoutRefs.current[instanceId] = setTimeout(() => {
       setClickedCandleId(null)
+      delete timeoutRefs.current[instanceId]
     }, 2000)
     
     // Select a random offering to display on phone screen
@@ -93,6 +111,7 @@ export default function UnifiedShrine({
   }
 
   const handlePointerDown = useCallback((event) => {
+    event.stopPropagation() // Prevent event bubbling
     isDragging.current = true
     dragStart.current = {
       x: event.clientX || event.nativeEvent?.clientX || 0,
@@ -112,13 +131,68 @@ export default function UnifiedShrine({
     }
   }, [])
 
-  const handlePointerUp = useCallback(() => {
+  const handlePointerUp = useCallback((event) => {
+    if (event) event.stopPropagation() // Prevent event bubbling
     isDragging.current = false
     if (typeof document !== 'undefined' && document.body) {
       document.body.style.cursor = 'auto'
     }
   }, [])
 
+  // Add cleanup effect for component unmount
+  useEffect(() => {
+    return () => {
+      // Clean up all timeouts on unmount
+      Object.values(timeoutRefs.current).forEach(timeout => {
+        clearTimeout(timeout)
+      })
+      timeoutRefs.current = {}
+      
+      // Reset cursor style
+      if (typeof document !== 'undefined' && document.body) {
+        document.body.style.cursor = 'auto'
+      }
+      
+      // Clear drag state
+      isDragging.current = false
+    }
+  }, [])
+  
+  // Memoize styles to prevent recreation on every render
+  const priceTickerStyle = useMemo(() => ({
+    position: 'absolute',
+    top: isMobile ? '150px' : '195px',
+    right: isMobile ? '10px' : '20px',
+    background: 'rgba(0, 0, 0, 0.8)',
+    border: `2px solid ${priceChange >= 0 ? '#00ff66' : '#ff4444'}`,
+    borderRadius: '12px',
+    padding: isMobile ? '12px' : '16px',
+    color: '#fff',
+    fontFamily: 'monospace',
+    fontSize: isMobile ? '12px' : '14px',
+    backdropFilter: 'blur(10px)',
+    boxShadow: `0 0 20px ${priceChange >= 0 ? 'rgba(0, 255, 100, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
+    zIndex: 1000,
+    width: isMobile ? '160px' : '240px'
+  }), [isMobile, priceChange])
+  
+  const statsOverlayStyle = useMemo(() => ({
+    position: 'absolute',
+    top: isMobile ? '250px' : '380px',
+    right: isMobile ? '10px' : '20px',
+    color: '#fff',
+    fontFamily: 'monospace',
+    fontSize: isMobile ? '10px' : '12px',
+    background: 'rgba(0, 0, 0, 0.8)',
+    border: `2px solid ${priceChange >= 0 ? '#00ff66' : '#ff4444'}`,
+    padding: isMobile ? '12px' : '16px',
+    borderRadius: '12px',
+    backdropFilter: 'blur(10px)',
+    boxShadow: `0 0 20px ${priceChange >= 0 ? 'rgba(0, 255, 100, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
+    width: isMobile ? '160px' : '240px',
+    zIndex: 999,
+  }), [isMobile, priceChange])
+  
   const handleLightCandleClick = () => {
     // Create a new offering with randomized data
     const messages = [
@@ -184,6 +258,8 @@ export default function UnifiedShrine({
           alpha: true, 
           antialias: true,
           powerPreference: "high-performance",
+          preserveDrawingBuffer: false, // Don't preserve buffer for better memory
+          failIfMajorPerformanceCaveat: false, // Don't fail on low-end devices
         }}
         style={{
           position: 'absolute',
@@ -279,22 +355,7 @@ export default function UnifiedShrine({
       </Canvas>
       
       {/* Price Ticker */}
-      <div style={{
-        position: 'absolute',
-        top: isMobile ? '150px' : '195px',
-        right: isMobile ? '10px' : '20px',
-        background: 'rgba(0, 0, 0, 0.8)',
-        border: `2px solid ${priceChange >= 0 ? '#00ff66' : '#ff4444'}`,
-        borderRadius: '12px',
-        padding: isMobile ? '12px' : '16px',
-        color: '#fff',
-        fontFamily: 'monospace',
-        fontSize: isMobile ? '12px' : '14px',
-        backdropFilter: 'blur(10px)',
-        boxShadow: `0 0 20px ${priceChange >= 0 ? 'rgba(0, 255, 100, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
-        zIndex: 1000,
-        width: isMobile ? '160px' : '240px'
-      }}>
+      <div style={priceTickerStyle}>
         <div style={{ 
           fontSize: isMobile ? '18px' : '24px', 
           fontWeight: 'bold',
@@ -322,50 +383,41 @@ export default function UnifiedShrine({
         </div>
         
         {/* Mini chart */}
-        <div style={{
-          marginTop: isMobile ? '8px' : '12px',
-          height: isMobile ? '30px' : '40px',
-          display: isMobile ? 'none' : 'flex',  // Hide chart on mobile to save space
-          alignItems: 'flex-end',
-          gap: '1px'
-        }}>
-          {priceHistory.slice(-20).map((price, i) => {
-            const min = Math.min(...priceHistory.slice(-20))
-            const max = Math.max(...priceHistory.slice(-20))
-            const range = max - min || 1
-            const height = ((price - min) / range) * 35 + 5
-            return (
-              <div
-                key={i}
-                style={{
-                  width: '8px',
-                  height: `${height}px`,
-                  background: i === 19 ? (priceChange >= 0 ? '#00ff66' : '#ff4444') : '#444',
-                  borderRadius: '2px'
-                }}
-              />
-            )
-          })}
-        </div>
+        {!isMobile && (
+          <div style={{
+            marginTop: '12px',
+            height: '40px',
+            display: 'flex',
+            alignItems: 'flex-end',
+            gap: '1px'
+          }}>
+            {useMemo(() => {
+              const recentPrices = priceHistory.slice(-20)
+              const min = Math.min(...recentPrices)
+              const max = Math.max(...recentPrices)
+              const range = max - min || 1
+              
+              return recentPrices.map((price, i) => {
+                const height = ((price - min) / range) * 35 + 5
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      width: '8px',
+                      height: `${height}px`,
+                      background: i === 19 ? (priceChange >= 0 ? '#00ff66' : '#ff4444') : '#444',
+                      borderRadius: '2px'
+                    }}
+                  />
+                )
+              })
+            }, [priceHistory, priceChange])}
+          </div>
+        )}
       </div>
       
       {/* Stats overlay (below price ticker on right) */}
-      <div style={{
-        position: 'absolute',
-        top: isMobile ? '250px' : '380px',  // Adjust position for mobile
-        right: isMobile ? '10px' : '20px',
-        color: '#fff',
-        fontFamily: 'monospace',
-        fontSize: isMobile ? '10px' : '12px',
-        background: 'rgba(0, 0, 0, 0.8)',
-        border: `2px solid ${priceChange >= 0 ? '#00ff66' : '#ff4444'}`,
-        padding: isMobile ? '12px' : '16px',
-        borderRadius: '12px',
-        backdropFilter: 'blur(10px)',
-        boxShadow: `0 0 20px ${priceChange >= 0 ? 'rgba(0, 255, 100, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
-        width: isMobile ? '160px' : '240px',
-        zIndex: 999,  // Ensure proper layering
-      }}>
+      <div style={statsOverlayStyle}>
         <div style={{ 
           color: priceChange >= 0 ? '#00ff66' : '#ff4444',
           fontSize: isMobile ? '16px' : '24px',

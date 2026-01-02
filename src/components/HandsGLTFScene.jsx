@@ -63,14 +63,18 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
   const materialPoolRef = useRef([]) // Pool of materials to reuse
   const { camera } = useThree()
   
-  // Animation mixers for animated emojis
-  const devilMixerRef = useRef(null)
-  const cryingMixerRef = useRef(null)
-  const cryingMixer2Ref = useRef(null)
-  const pacManMixerRef = useRef(null)
-  const pacManActionRef = useRef(null)
-  const pacMan2MixerRef = useRef(null)
-  const pacMan2ActionRef = useRef(null)
+  // Animation mixers for animated emojis - optimized with single ref object
+  const mixersRef = useRef({
+    devil: null,
+    crying: null,
+    crying2: null,
+    pacMan: null,
+    pacMan2: null
+  })
+  const actionsRef = useRef({
+    pacMan: null,
+    pacMan2: null
+  })
   
   // Market status based on price change
   const isLargeDown = priceChange <= -5 // Large downward price action (5% or more drop)
@@ -488,12 +492,12 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
             })
             
             // Create mixer for the entire DevilEmoji object
-            devilMixerRef.current = new THREE.AnimationMixer(child)
+            mixersRef.current.devil = new THREE.AnimationMixer(child)
             
             // Find and play the Idle animation
             const idleAnimation = gltf.animations.find(clip => clip.name === 'Armature|Idle')
             if (idleAnimation) {
-              const action = devilMixerRef.current.clipAction(idleAnimation)
+              const action = mixersRef.current.devil.clipAction(idleAnimation)
               action.play()
               // console.log('Playing Armature|Idle animation on DevilEmoji')
             }
@@ -514,13 +518,13 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
           
           // Set up animation mixer for CryingEmoji
           if (gltf.animations && gltf.animations.length > 0) {
-            cryingMixerRef.current = new THREE.AnimationMixer(child)
+            mixersRef.current.crying = new THREE.AnimationMixer(child)
             // Try both possible naming conventions
             const cryingAnimation = gltf.animations.find(clip => 
               clip.name === 'Armature|Idle.001' || clip.name === 'Armature|Idle001'
             )
             if (cryingAnimation) {
-              const action = cryingMixerRef.current.clipAction(cryingAnimation)
+              const action = mixersRef.current.crying.clipAction(cryingAnimation)
               action.play()
               // console.log('Playing ' + cryingAnimation.name + ' animation on CryingEmoji')
             }
@@ -541,13 +545,13 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
           
           // Set up animation mixer for CryingEmoji2
           if (gltf.animations && gltf.animations.length > 0) {
-            cryingMixer2Ref.current = new THREE.AnimationMixer(child)
+            mixersRef.current.crying2 = new THREE.AnimationMixer(child)
             // Try both possible naming conventions
             const cryingAnimation = gltf.animations.find(clip => 
               clip.name === 'Armature|Idle.001' || clip.name === 'Armature|Idle001'
             )
             if (cryingAnimation) {
-              const action = cryingMixer2Ref.current.clipAction(cryingAnimation)
+              const action = mixersRef.current.crying2.clipAction(cryingAnimation)
               action.play()
               // console.log('Playing ' + cryingAnimation.name + ' animation on CryingEmoji2')
             }
@@ -685,7 +689,7 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
           
           // Set up animation mixer for PacMan
           if (gltf.animations && gltf.animations.length > 0) {
-            pacManMixerRef.current = new THREE.AnimationMixer(child)
+            mixersRef.current.pacMan = new THREE.AnimationMixer(child)
             
             // Find the 'Animation' clip
             const pacManAnimation = gltf.animations.find(clip => 
@@ -695,12 +699,12 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
             
             if (pacManAnimation) {
               console.log('🎮 Found PacMan animation:', pacManAnimation.name)
-              pacManActionRef.current = pacManMixerRef.current.clipAction(pacManAnimation)
-              pacManActionRef.current.setLoop(THREE.LoopRepeat) // Ensure looping
+              actionsRef.current.pacMan = mixersRef.current.pacMan.clipAction(pacManAnimation)
+              actionsRef.current.pacMan.setLoop(THREE.LoopRepeat) // Ensure looping
               
               // Play animation if 80s mode is already on
               if (is80sMode) {
-                pacManActionRef.current.play()
+                actionsRef.current.pacMan.play()
                 console.log('🕹️ Starting PacMan animation')
               }
             } else {
@@ -724,7 +728,7 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
           
           // Set up animation mixer for PacMan2
           if (gltf.animations && gltf.animations.length > 0) {
-            pacMan2MixerRef.current = new THREE.AnimationMixer(child)
+            mixersRef.current.pacMan2 = new THREE.AnimationMixer(child)
             
             // Find the 'Eating' animation clip
             const eatingAnimation = gltf.animations.find(clip => 
@@ -734,12 +738,12 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
             
             if (eatingAnimation) {
               console.log('🎮 Found PacMan2 Eating animation:', eatingAnimation.name)
-              pacMan2ActionRef.current = pacMan2MixerRef.current.clipAction(eatingAnimation)
-              pacMan2ActionRef.current.setLoop(THREE.LoopRepeat) // Ensure looping
+              actionsRef.current.pacMan2 = mixersRef.current.pacMan2.clipAction(eatingAnimation)
+              actionsRef.current.pacMan2.setLoop(THREE.LoopRepeat) // Ensure looping
               
               // Play animation if 80s mode is already on
               if (is80sMode) {
-                pacMan2ActionRef.current.play()
+                actionsRef.current.pacMan2.play()
                 console.log('🕹️ Starting PacMan2 Eating animation')
               }
             } else {
@@ -834,8 +838,12 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
     }
   }, [gltf])
 
+  // Add frame counter for throttling expensive operations
+  const frameCounter = useRef(0)
+  
   // Smooth opacity animation in render loop
   useFrame((state, delta) => {
+    frameCounter.current++
     const fadeSpeed = 3.0 // Adjust this to control fade speed (higher = faster)
     
     // Helper function to update opacity for an object and its children
@@ -854,14 +862,15 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       })
     }
     
-    // Animate each emoji's opacity towards its target
-    Object.keys(opacityTargets.current).forEach(key => {
-      const target = opacityTargets.current[key]
-      const current = currentOpacities.current[key]
-      
-      // Smooth interpolation towards target
-      if (Math.abs(target - current) > 0.001) {
-        currentOpacities.current[key] = THREE.MathUtils.lerp(current, target, fadeSpeed * delta)
+    // Animate each emoji's opacity towards its target (throttle to every 2 frames)
+    if (frameCounter.current % 2 === 0) {
+      Object.keys(opacityTargets.current).forEach(key => {
+        const target = opacityTargets.current[key]
+        const current = currentOpacities.current[key]
+        
+        // Smooth interpolation towards target
+        if (Math.abs(target - current) > 0.001) {
+          currentOpacities.current[key] = THREE.MathUtils.lerp(current, target, fadeSpeed * delta * 2) // Multiply delta by 2 to compensate for throttling
         
         // Apply opacity to corresponding objects
         switch(key) {
@@ -931,6 +940,7 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
         }
       }
     })
+    }
   })
   
   // Control emoji visibility based on market status
@@ -1047,12 +1057,12 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       }
       
       // Control PacMan animation
-      if (pacManActionRef.current) {
+      if (actionsRef.current.pacMan) {
         if (is80sMode) {
-          pacManActionRef.current.play()
+          actionsRef.current.pacMan.play()
           console.log('🕹️ Playing PacMan Animation')
         } else {
-          pacManActionRef.current.stop()
+          actionsRef.current.pacMan.stop()
           console.log('⏸️ Stopping PacMan Animation')
         }
       }
@@ -1069,12 +1079,12 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       }
       
       // Control PacMan2 Eating animation
-      if (pacMan2ActionRef.current) {
+      if (actionsRef.current.pacMan2) {
         if (is80sMode) {
-          pacMan2ActionRef.current.play()
+          actionsRef.current.pacMan2.play()
           console.log('🍔 Playing PacMan2 Eating animation')
         } else {
-          pacMan2ActionRef.current.stop()
+          actionsRef.current.pacMan2.stop()
           console.log('⏸️ Stopping PacMan2 Eating animation')
         }
       }
@@ -1206,22 +1216,10 @@ useFrame((state, delta) => {
     setRaysVisible(dotProduct < 0.3) // Threshold of 0.3 gives a nice fade zone
   }
   
-  // Update animation mixers
-  if (devilMixerRef.current) {
-    devilMixerRef.current.update(delta)
-  }
-  if (cryingMixerRef.current) {
-    cryingMixerRef.current.update(delta)
-  }
-  if (cryingMixer2Ref.current) {
-    cryingMixer2Ref.current.update(delta)
-  }
-  if (pacManMixerRef.current) {
-    pacManMixerRef.current.update(delta)
-  }
-  if (pacMan2MixerRef.current) {
-    pacMan2MixerRef.current.update(delta)
-  }
+  // Update all animation mixers efficiently
+  Object.values(mixersRef.current).forEach(mixer => {
+    if (mixer) mixer.update(delta)
+  })
   
   // PacMan movement animation for 80s mode (pacman2 is parented and follows)
   if (is80sMode && pacManRef.current) {
@@ -1655,16 +1653,30 @@ useEffect(() => {
     texturePoolRef.current.forEach(disposeTexture)
     texturePoolRef.current = []
     
+    // Dispose all materials in pool
+    materialPoolRef.current.forEach(disposeMaterial)
+    materialPoolRef.current = []
+    
     // Dispose candle material
     if (candleLabel2Ref.current && candleLabel2Ref.current.material) {
       disposeMaterial(candleLabel2Ref.current.material)
     }
     
-    // Force browser garbage collection if available
-    if (window.gc) {
-      window.gc()
-      // console.log('Forced garbage collection')
-    }
+    // Dispose all animation mixers
+    Object.values(mixersRef.current).forEach(mixer => {
+      if (mixer) {
+        mixer.stopAllAction()
+        mixer.uncacheRoot(mixer.getRoot())
+      }
+    })
+    
+    // Clear mixer and action refs
+    Object.keys(mixersRef.current).forEach(key => {
+      mixersRef.current[key] = null
+    })
+    Object.keys(actionsRef.current).forEach(key => {
+      actionsRef.current[key] = null
+    })
     
     // Clear all object refs
     if (rightHandRef.current) rightHandRef.current = null
@@ -1672,6 +1684,14 @@ useEffect(() => {
     if (candleLabel2Ref.current) candleLabel2Ref.current = null
     randomUserImagesRef.current = []
     texturePoolRef.current = []
+    materialPoolRef.current = []
+    canvasPoolRef.current = []
+    
+    // Force browser garbage collection if available
+    if (window.gc) {
+      window.gc()
+      // console.log('Forced garbage collection')
+    }
     
     // console.log('HandsGLTFScene cleanup complete')
   }
