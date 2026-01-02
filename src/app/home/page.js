@@ -7,13 +7,12 @@ import CarouselComponent from '@/components/carousel/Carousel'
 import CyberGlitchButton from '@/components/carousel/CyberGlitchButton'
 import ThirdwebBuyModal from '@/components/ThirdwebBuyModal'
 import CyberNav from '@/components/CyberNav'
-import NavControlsMobile from '@/components/NavControlsMobile'
+import NavControlsHome from '@/components/NavControlsHome'
 import Link from 'next/link'
 import { useUser, SignInButton, UserButton } from '@clerk/nextjs'
 import { useMusic } from '@/components/MusicContext'
 import CoinLoader from '@/components/CoinLoader'
-import HandsGLTFScene from '@/components/HandsGLTFScene'
-import CandleShrine from '@/components/CandleShrine'
+import UnifiedShrine from '@/components/UnifiedShrine'
 
 function CarouselPageContent() {
   const router = useRouter()
@@ -43,6 +42,8 @@ function CarouselPageContent() {
   // State for offerings data shared between CandleShrine and HandsGLTFScene
   const [hoveredOffering, setHoveredOffering] = useState(null)
   const [justLitOffering, setJustLitOffering] = useState(null)
+  const [priceChange, setPriceChange] = useState(0)
+  const candleShrineRef = useRef(null) // Reference to CandleShrine component // Track market price change
   
   // Mock offerings data - this would come from your database
   const [mockOfferings, setMockOfferings] = useState([
@@ -363,7 +364,7 @@ function CarouselPageContent() {
               right: "1rem",
               zIndex: 300
             }}>
-              <NavControlsMobile 
+              <NavControlsHome 
                 isPlaying={contextIsPlaying}
                 onPlayMusic={() => play()}
                 onStopMusic={() => pause()}
@@ -374,6 +375,9 @@ function CarouselPageContent() {
                 }}
                 isUserSignedIn={!!user}
                 isMenuOpen={isMenuOpen}
+                is80sMode={is80sMode}
+                onToggle80sMode={() => setContext80sMode(!is80sMode)}
+                userImage={user?.imageUrl}
               />
             </div>
             
@@ -405,7 +409,7 @@ function CarouselPageContent() {
               overflow: "hidden"
             }}
           >
-            {/* CandleShrine - Background Layer */}
+            {/* Unified Scene with both candles and hands */}
             <div style={{
               position: "absolute",
               top: 0,
@@ -414,7 +418,7 @@ function CarouselPageContent() {
               height: "100%",
               zIndex: 1
             }}>
-              <CandleShrine 
+              <UnifiedShrine 
                 offerings={mockOfferings}
                 onSelectOffering={setHoveredOffering}
                 onLightCandle={(offering) => {
@@ -422,21 +426,8 @@ function CarouselPageContent() {
                   setJustLitOffering(offering)
                   setTimeout(() => setJustLitOffering(null), 3000)
                 }}
-              />
-            </div>
-            
-            {/* HandsGLTFScene - Foreground Layer */}
-            <div style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "100%",
-              height: "100%",
-              zIndex: 2,
-              pointerEvents: "auto"
-            }}>
-              <HandsGLTFScene 
-                offerings={mockOfferings}
+                onPriceChange={setPriceChange}
+                is80sMode={is80sMode}
                 hoveredOffering={hoveredOffering}
                 justLitOffering={justLitOffering}
                 onJustLitComplete={() => setJustLitOffering(null)}
@@ -450,7 +441,7 @@ function CarouselPageContent() {
               right: "1rem",
               zIndex: 300
             }}>
-              <NavControlsMobile 
+              <NavControlsHome 
                 isPlaying={contextIsPlaying}
                 onPlayMusic={() => play()}
                 onStopMusic={() => pause()}
@@ -461,6 +452,9 @@ function CarouselPageContent() {
                 }}
                 isUserSignedIn={!!user}
                 isMenuOpen={isMenuOpen}
+                is80sMode={is80sMode}
+                onToggle80sMode={() => setContext80sMode(!is80sMode)}
+                userImage={user?.imageUrl}
               />
             </div>
             
@@ -578,19 +572,8 @@ function CarouselPageContent() {
       )}
       
       {/* CyberNav - Top Right */}
-      {/* <div
-        style={{
-          position: "fixed",
-          top: "1rem",
-          right: "1rem",
-          zIndex: 300
-        }}
-      >
-        <CyberNav 
-          is80sMode={is80sMode}
-          position="fixed"
-        />
-      </div> */}
+     
+     
       
       {/* Control Buttons - Positioned horizontally below CyberNav */}
       {/* Music Button */}

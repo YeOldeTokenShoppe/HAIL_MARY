@@ -88,6 +88,13 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
       <Canvas 
         style={{ position: 'relative', zIndex: 2 }}
         camera={{ position: [0, 0, 100], fov: 15 }}
+        gl={{
+          antialias: true,
+          alpha: true,
+          preserveDrawingBuffer: true,
+          powerPreference: "high-performance",
+          failIfMajorPerformanceCaveat: false,
+        }}
         onCreated={({ gl }) => {
           gl.toneMapping = THREE.ACESFilmicToneMapping
           gl.toneMappingExposure = 1

@@ -3,11 +3,12 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
 // ============================================
-// ANIMATED FLAME SHADER MATERIAL
-// Apply this to the 'flame' mesh in your candle model
+// ANIMATED FLAME SHADER MATERIAL (DEPRECATED - DO NOT USE)
+// Keeping for reference but not using due to uniform limits
 // ============================================
 
-export function createFlameShaderMaterial(initialPhase = 0, initialSpeed = 1) {
+// DEPRECATED - causes uniform limit errors with many candles
+function createFlameShaderMaterial_DEPRECATED(initialPhase = 0, initialSpeed = 1) {
   return new THREE.ShaderMaterial({
     uniforms: {
       uTime: { value: 0 },
@@ -204,11 +205,13 @@ export function AnimatedFlameMesh({
   const materialRef = useRef()
   
   const material = useMemo(() => {
-    const mat = createFlameShaderMaterial(phase, speed)
-    mat.uniforms.uBaseColor.value = new THREE.Color(baseColor)
-    mat.uniforms.uTipColor.value = new THREE.Color(tipColor)
-    mat.uniforms.uIntensity.value = intensity
-    mat.uniforms.uFlickerStrength.value = flickerStrength
+    // Use basic material instead of shader for performance
+    const mat = new THREE.MeshBasicMaterial({ 
+      color: new THREE.Color(baseColor || '#ff6600'), 
+      // MeshBasicMaterial doesn't support emissive properties
+      transparent: true,
+      opacity: 0.9
+    })
     return mat
   }, [phase, speed, baseColor, tipColor, intensity, flickerStrength])
   
@@ -228,7 +231,12 @@ export function AnimatedFlameMesh({
 // Use this in your CandleGeometry component
 // ============================================
 export function applyFlameMaterial(scene, phase = 0, speed = 1, materialsRef = null) {
-  const flameMaterial = createFlameShaderMaterial(phase, speed)
+  // Use basic material instead of shader
+  const flameMaterial = new THREE.MeshBasicMaterial({ 
+    color: '#ff6600', 
+    emissive: '#ff6600',
+    emissiveIntensity: 2.0 
+  })
   
   scene.traverse((child) => {
     if (child.isMesh && child.name.toLowerCase() === 'flame') {
@@ -264,7 +272,14 @@ const sharedMaterials = {
 
 // Initialize shared materials once - use simpler materials to avoid uniform limits
 if (!sharedMaterials.flame) {
-  sharedMaterials.flame = createFlameShaderMaterial(0, 1)
+  // Use a simple basic material for flames instead of shader to avoid uniform limits
+  sharedMaterials.flame = new THREE.MeshBasicMaterial({
+    color: new THREE.Color('#ffaa00'), // Bright orange-yellow
+    transparent: true,
+    opacity: 0.95,
+    // Make it unlit (not affected by scene lighting)
+    toneMapped: false
+  })
   
   // Use MeshBasicMaterial instead of MeshPhysicalMaterial to reduce uniforms
   sharedMaterials.xbase = new THREE.MeshBasicMaterial({ 
@@ -319,7 +334,6 @@ export function CandleGeometryWithAnimatedFlame({
   useGLTF 
 }) {
   const { scene } = useGLTF(modelPath)
-  const flameMaterialRef = useRef()
   const groupRef = useRef()
   
   // Clone the scene and immediately replace ALL materials with shared ones
@@ -354,8 +368,11 @@ export function CandleGeometryWithAnimatedFlame({
         const meshName = child.name
         
         // Assign shared materials based on mesh name (case-insensitive check)
-        if (meshName.toLowerCase() === 'flame' || meshName.toLowerCase() === 'wick') {
+        if (meshName.toLowerCase() === 'flame') {
           child.material = sharedMaterials.flame
+        } else if (meshName.toLowerCase() === 'wick') {
+          // Wick gets a simple black material, no animation
+          child.material = new THREE.MeshBasicMaterial({ color: '#1a1a1a' })
         } else if (meshName === 'XBase') {
           child.material = sharedMaterials.xbase
         } else if (meshName.toLowerCase() === 'senora') {
@@ -372,6 +389,8 @@ export function CandleGeometryWithAnimatedFlame({
     return cloned
   }, [scene])
   
+  // No longer need flame material reference since we're not using shader uniforms
+  
   // Update materials based on hover/click state
   useEffect(() => {
     clonedScene.traverse((child) => {
@@ -379,8 +398,7 @@ export function CandleGeometryWithAnimatedFlame({
         const meshName = child.name
         
         if (meshName.toLowerCase() === 'flame' || meshName.toLowerCase() === 'wick') {
-          // Keep flame material reference for animation
-          flameMaterialRef.current = child.material
+          // Flame and wick materials don't need special handling here
           
         } else if (meshName === 'XBase') {
           // Update XBase materials based on state
@@ -407,23 +425,83 @@ export function CandleGeometryWithAnimatedFlame({
     })
   }, [clonedScene, isHovered, isClicked])
   
-  // Animate flame material with per-candle variation
+  // Animate flame using time offset for variation instead of individual materials
   useFrame((state) => {
-    if (flameMaterialRef.current) {
-      // Apply per-candle phase and speed variation
-      flameMaterialRef.current.uniforms.uTime.value = state.clock.elapsedTime * flameSpeed
-      flameMaterialRef.current.uniforms.uPhase.value = flamePhase
+    // Add comprehensive null checks
+    if (!clonedScene || !state || !state.clock) return
+    
+    // Find the flame mesh in the cloned scene
+    clonedScene.traverse((child) => {
+      // Comprehensive null checks for child and properties
+      if (!child || !child.isMesh || !child.name) return
       
-      // Extra flicker when hovered
-      if (isHovered) {
-        flameMaterialRef.current.uniforms.uFlickerStrength.value = 0.5
-      } else {
-        flameMaterialRef.current.uniforms.uFlickerStrength.value = 0.3
+      if (child.name.toLowerCase().includes('flame')) {
+        // Create a simple animated effect for flames
+        const time = state.clock.elapsedTime || 0
+        const animTime = time * flameSpeed + flamePhase
+        
+        // Multiple sine waves for organic flicker
+        const flicker1 = Math.sin(animTime * 5) * 0.3
+        const flicker2 = Math.sin(animTime * 8) * 0.2
+        const flicker3 = Math.sin(animTime * 13) * 0.1
+        const combinedFlicker = flicker1 + flicker2 + flicker3
+        
+        // Animate color and brightness - only if material exists
+        if (child.material) {
+          // Check for color property before accessing
+          if (child.material.color && typeof child.material.color.setHSL === 'function') {
+            // Oscillate between orange and bright yellow
+            const hue = 0.05 + combinedFlicker * 0.03 // Orange (0.05) to yellow (0.11)
+            const saturation = 1.0
+            const lightness = 0.65 + combinedFlicker * 0.15 + (isHovered ? 0.1 : 0)
+            
+            // Set the color
+            child.material.color.setHSL(hue, saturation, lightness)
+          }
+          
+          // Ensure visibility
+          if (child.visible !== undefined) {
+            child.visible = true
+          }
+          
+          // Only animate transform properties if they exist
+          if (child.scale && typeof child.scale.set === 'function') {
+            // Animate scale for pulsing effect (less dramatic to stay on wick)
+            const scaleFactor = 1 + combinedFlicker * 0.15 // Moderate scale variation
+            const scaleY = 1.2 + combinedFlicker * 0.3 // Vertical stretch for flame shape
+            child.scale.set(scaleFactor, scaleY, scaleFactor)
+          }
+          
+          if (child.rotation) {
+            // Add wavering rotation for realistic flame movement (reduced to prevent separation)
+            const waveX = Math.sin(animTime * 3) * 0.15 // Gentle forward/back tilt
+            const waveZ = Math.cos(animTime * 4) * 0.1 // Gentle side-to-side sway
+            const waveY = Math.sin(animTime * 2) * 0.05 // Subtle twist
+            if (child.rotation.x !== undefined) child.rotation.x = waveX
+            if (child.rotation.z !== undefined) child.rotation.z = waveZ
+            if (child.rotation.y !== undefined) child.rotation.y = waveY
+          }
+          
+          if (child.position) {
+            // Very subtle vertical bobbing (flames don't move much vertically)
+            const bobY = Math.sin(animTime * 6) * 0.01 // Tiny vertical movement
+            child.position.y = bobY
+          }
+          
+          // Remove horizontal drift - flames should stay centered on wick
+          // child.position.x = 0
+          // child.position.z = 0
+        }
       }
-    }
+    })
   })
   
   const scale = isClicked ? 0.6 : isHovered ? 0.55 : 0.5
+  
+  // Don't render if scene hasn't loaded yet
+  if (!clonedScene) {
+    return null
+  }
   
   return (
     <group ref={groupRef}>
@@ -509,7 +587,7 @@ export function CandleWithAnimatedFlame({
 // EXPORT FOR EASY IMPORT
 // ============================================
 export default {
-  createFlameShaderMaterial,
+  // createFlameShaderMaterial_DEPRECATED, // Don't export deprecated function
   useFlameAnimation,
   AnimatedFlameMesh,
   applyFlameMaterial,

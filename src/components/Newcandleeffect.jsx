@@ -505,34 +505,4 @@ export const NewCandleEffectManager = forwardRef(({
   )
 })
 
-// ============================================
-// EXAMPLE INTEGRATION
-// ============================================
-export function ExampleScene() {
-  const handleNewCandle = (position, offering) => {
-    console.log('New candle added at:', position)
-    console.log('Offering:', offering)
-    // Here you would add the candle to your permanent cloud
-  }
-  
-  return (
-    <>
-      {/* Your existing scene components */}
-      
-      <NewCandleEffectManager
-        phonePosition={[0, 0, 2]} // Position of phone screen
-        cloudBounds={{ x: 15, y: 10, z: 8 }}
-        onNewCandle={handleNewCandle}
-      />
-      
-      {/* 
-        To trigger the effect, call:
-        window.triggerNewCandle({ name: 'user', type: 'petition', ... })
-        
-        Or better, use a ref/context to expose triggerEffect
-      */}
-    </>
-  )
-}
-
 export default NewCandleEffect

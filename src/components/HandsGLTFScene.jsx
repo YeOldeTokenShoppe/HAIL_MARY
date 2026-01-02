@@ -5,7 +5,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, useGLTF, Box, useCursor } from '@react-three/drei'
 
 // Preload the model immediately when module loads
-useGLTF.preload('/models/hands3.glb')
+useGLTF.preload('/models/hands4.glb')
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { db } from '@/lib/firebaseClient'
@@ -13,18 +13,27 @@ import { collection, query, getDocs, limit, orderBy, onSnapshot } from 'firebase
 import { m } from 'framer-motion'
 import { PhoneScreenFeed3D } from './Phonescreenfeed'
 import { PhoneScreenTexture } from './PhoneScreenTexture'
+import { PhoneAura } from './PhoneAura'
 
 
-function HandsModel({ mousePosition, scrollY, onLoad, hasReachedSection, isInView, offerings, hoveredOffering, justLitOffering, onJustLitComplete, userRotation = 0 }) {
-  const gltf = useGLTF('/models/hands3.glb')
+export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView, offerings, hoveredOffering, justLitOffering, onJustLitComplete, userRotation = 0, priceChange = 0, hasActiveClick = false }) {
+  const gltf = useGLTF('/models/hands4.glb')
   const hasReportedLoad = useRef(false)
   const rightHandRef = useRef()
   const leftHandRef = useRef()
+  const backdropRef = useRef()
   const emoji1Ref = useRef()
   const emoji2Ref = useRef()
   const emoji3Ref = useRef()
   const emoji4Ref = useRef()
   const emoji5Ref = useRef()
+  const worriedEmojiRef = useRef()
+  const scaredEmojiRef = useRef()
+  const devilEmojiRef = useRef()
+  const cryingEmojiRef = useRef()
+  const cryingEmoji2Ref = useRef()
+  const greenArrowRef = useRef()
+  const redArrowRef = useRef()
   const iconLikeRef = useRef()
   const iconLoveRef = useRef()
   const iconText1Ref = useRef()
@@ -33,9 +42,12 @@ function HandsModel({ mousePosition, scrollY, onLoad, hasReachedSection, isInVie
   const iconStarRef = useRef()
   const candleLabel2Ref = useRef()
   const phoneScreenRef = useRef()
+  const phoneCaseRef = useRef()
+  const [phoneCaseWorldPos, setPhoneCaseWorldPos] = useState([0, 0, 0])
+  const [phoneCaseWorldQuat, setPhoneCaseWorldQuat] = useState([0, 0, 0, 1])
+  const [raysVisible, setRaysVisible] = useState(true)
   const [randomUserImages, setRandomUserImages] = useState([])
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [rotationProgress, setRotationProgress] = useState(0)
   const [hovered, setHovered] = useState(false)
   const [clickFeedback, setClickFeedback] = useState(false)
   const [imageTransition, setImageTransition] = useState(false)
@@ -51,6 +63,55 @@ function HandsModel({ mousePosition, scrollY, onLoad, hasReachedSection, isInVie
   const [swivelRotation, setSwivelRotation] = useState(0) // Track swivel rotation progress
   const swivelDirection = useRef('forward') // Track animation direction
   const animationStartTime2 = useRef(null) // Track animation start time
+  
+  // Animation mixers for animated emojis
+  const devilMixerRef = useRef(null)
+  const cryingMixerRef = useRef(null)
+  const cryingMixer2Ref = useRef(null)
+  
+  // Market status based on price change
+  const isLargeDown = priceChange <= -5 // Large downward price action (5% or more drop)
+  const isModerateDown = priceChange < -2 && priceChange > -5 // Moderate down
+  const isMiddling = priceChange >= -2 && priceChange <= 2 // Small swings (-2% to +2%)
+  const isPositive = priceChange > 2 // Positive price action (more than 2% up)
+  
+  // Opacity targets for smooth fading - store target opacity for each emoji group
+  const opacityTargets = useRef({
+    emoji1: 0,
+    emoji2: 0,
+    emoji3: 0,
+    emoji4: 0,
+    emoji5: 0,
+    worriedEmoji: 0,
+    scaredEmoji: 0,
+    devilEmoji: 0,
+    cryingEmoji: 0,
+    cryingEmoji2: 0,
+    greenArrow: 0,
+    redArrow: 0,
+    iconLove: 0,
+    iconText1: 0,
+    iconText2: 0
+  })
+  
+  // Current opacity values for smooth animation
+  const currentOpacities = useRef({
+    emoji1: 0,
+    emoji2: 0,
+    emoji3: 0,
+    emoji4: 0,
+    emoji5: 0,
+    worriedEmoji: 0,
+    scaredEmoji: 0,
+    devilEmoji: 0,
+    cryingEmoji: 0,
+    cryingEmoji2: 0,
+    greenArrow: 0,
+    redArrow: 0,
+    iconLove: 0,
+    iconText1: 0,
+    iconText2: 0
+  })
 
   // COMMENTED OUT: Image advance functionality for memory testing
   // const handleImageAdvance = useCallback(() => {
@@ -246,8 +307,17 @@ function HandsModel({ mousePosition, scrollY, onLoad, hasReachedSection, isInVie
         // Look for PhoneScreen mesh
         if (child.name === 'PhoneScreen' || child.name === 'phonescreen' || child.name === 'phone_screen' || 
             child.name === 'Phone_Screen' || child.name.toLowerCase().includes('phonescreen')) {
-          console.log('Found PhoneScreen mesh:', child.name, 'Type:', child.type, 'World Position:', child.getWorldPosition(new THREE.Vector3()))
+          // console.log('Found PhoneScreen mesh:', child.name, 'Type:', child.type, 'World Position:', child.getWorldPosition(new THREE.Vector3()))
           phoneScreenRef.current = child
+        }
+        
+        // Look for phoneCase mesh for light ray positioning
+        if (child.name === 'phoneCase' || child.name === 'PhoneCase' || child.name === 'phone_case') {
+          console.log('Found phoneCase mesh:', child.name, 'Type:', child.type, 'World Position:', child.getWorldPosition(new THREE.Vector3()))
+          phoneCaseRef.current = child
+          
+          // Mark that this mesh will have light rays attached
+          child.userData.hasLightRays = true
         }
         
         // Log all objects that contain 'emoji' or 'icon' in the name (case insensitive)
@@ -324,20 +394,163 @@ function HandsModel({ mousePosition, scrollY, onLoad, hasReachedSection, isInVie
           // console.log('✅ Found Icon-star:', child.name, 'Position:', child.position)
         }
         
-        // Fix Backdrop transparency issue with bloom
-        if (child.name === 'Backdrop' || child.name === 'backdrop' || child.name.toLowerCase().includes('backdrop')) {
+        // Find new emoji objects
+        if (child.name === 'WorriedEmoji' || child.name === 'worriedEmoji' || child.name === 'worried-emoji') {
+          worriedEmojiRef.current = child
+          // console.log('😟 Found WorriedEmoji:', child.name)
+        }
+        if (child.name === 'ScaredEmoji' || child.name === 'scaredEmoji' || child.name === 'scared-emoji') {
+          scaredEmojiRef.current = child
+          // console.log('😱 Found ScaredEmoji:', child.name)
+        }
+        if (child.name === 'DevilEmoji' || child.name === 'devilEmoji' || child.name === 'devil-emoji') {
+          devilEmojiRef.current = child
+          // console.log('😈 Found DevilEmoji:', child.name)
+          
+          // Set up animation mixer for DevilEmoji
+          if (gltf.animations && gltf.animations.length > 0) {
+            // Look for the Bone armature in the DevilEmoji
+            let boneArmature = null
+            child.traverse((subChild) => {
+              if (subChild.name === 'Bone' || subChild.type === 'Bone' || subChild.name.includes('Armature')) {
+                boneArmature = subChild
+                console.log('Found Bone armature in DevilEmoji:', subChild.name)
+              }
+            })
+            
+            // Create mixer for the entire DevilEmoji object
+            devilMixerRef.current = new THREE.AnimationMixer(child)
+            
+            // Find and play the Idle animation
+            const idleAnimation = gltf.animations.find(clip => clip.name === 'Armature|Idle')
+            if (idleAnimation) {
+              const action = devilMixerRef.current.clipAction(idleAnimation)
+              action.play()
+              // console.log('Playing Armature|Idle animation on DevilEmoji')
+            }
+          }
+        }
+        if (child.name === 'CryingEmoji' || child.name === 'cryingEmoji' || child.name === 'crying-emoji') {
+          cryingEmojiRef.current = child
+          // console.log('😭 Found CryingEmoji:', child.name)
+          
+          // Set up animation mixer for CryingEmoji
+          if (gltf.animations && gltf.animations.length > 0) {
+            cryingMixerRef.current = new THREE.AnimationMixer(child)
+            // Try both possible naming conventions
+            const cryingAnimation = gltf.animations.find(clip => 
+              clip.name === 'Armature|Idle.001' || clip.name === 'Armature|Idle001'
+            )
+            if (cryingAnimation) {
+              const action = cryingMixerRef.current.clipAction(cryingAnimation)
+              action.play()
+              // console.log('Playing ' + cryingAnimation.name + ' animation on CryingEmoji')
+            }
+          }
+        }
+        if (child.name === 'CryingEmoji2' || child.name === 'cryingEmoji2' || child.name === 'crying-emoji-2') {
+          cryingEmoji2Ref.current = child
+          // console.log('😭 Found CryingEmoji2:', child.name)
+          
+          // Set up animation mixer for CryingEmoji2
+          if (gltf.animations && gltf.animations.length > 0) {
+            cryingMixer2Ref.current = new THREE.AnimationMixer(child)
+            // Try both possible naming conventions
+            const cryingAnimation = gltf.animations.find(clip => 
+              clip.name === 'Armature|Idle.001' || clip.name === 'Armature|Idle001'
+            )
+            if (cryingAnimation) {
+              const action = cryingMixer2Ref.current.clipAction(cryingAnimation)
+              action.play()
+              // console.log('Playing ' + cryingAnimation.name + ' animation on CryingEmoji2')
+            }
+          }
+        }
+        if (child.name === 'GreenArrow' || child.name === 'greenArrow' || child.name === 'green-arrow') {
+          greenArrowRef.current = child
+          // console.log('⬆️ Found GreenArrow:', child.name)
+        }
+        if (child.name === 'RedArrow' || child.name === 'redArrow' || child.name === 'red-arrow') {
+          redArrowRef.current = child
+          // console.log('⬇️ Found RedArrow:', child.name)
+        }
+        
+        // Create digital portal effect for emoji backdrop
+        if (child.name === 'EmojiBackdrop' || child.name.toLowerCase().includes('emojibackdrop')) {
           if (child.isMesh && child.material) {
-            // console.log('Found Backdrop mesh, fixing transparency for bloom')
-            // Set the material to not be affected by post-processing
-            child.material.toneMapped = false
-            // Ensure proper transparency handling
-            child.material.transparent = true
-            child.material.alphaTest = 0.9 // Discard pixels below 50% opacity
-            child.material.depthWrite = false // Prevent depth writing issues
-            // Remove any emissive properties that might interact with bloom
-            child.material.emissive = new THREE.Color(0x000000)
-            child.material.emissiveIntensity = 0
+            console.log('Found EmojiBackdrop mesh, applying animated portal effect')
+            
+            // Create a cartoon-style swirling portal effect
+            const portalMaterial = new THREE.ShaderMaterial({
+              uniforms: {
+                uTime: { value: 0 },
+                uOpacity: { value: 0.6 }
+              },
+              vertexShader: `
+                varying vec2 vUv;
+                varying vec3 vPosition;
+                
+                void main() {
+                  vUv = uv;
+                  vPosition = position;
+                  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+              `,
+              fragmentShader: `
+                uniform float uTime;
+                uniform float uOpacity;
+                varying vec2 vUv;
+                
+                void main() {
+                  vec2 center = vec2(0.5, 0.5);
+                  vec2 uv = vUv - center;
+                  
+                  // Create swirling effect
+                  float angle = atan(uv.y, uv.x);
+                  float radius = length(uv);
+                  
+                  // Add time-based rotation
+                  angle += uTime * 2.0 * (1.0 - radius);
+                  
+                  // Create spiral pattern
+                  float spiral = sin(radius * 20.0 - angle * 3.0 - uTime * 3.0);
+                  
+                  // Color based on angle and time for rainbow effect
+                  vec3 color = vec3(
+                    sin(angle + uTime) * 0.5 + 0.5,
+                    sin(angle + uTime + 2.094) * 0.5 + 0.5,
+                    sin(angle + uTime + 4.189) * 0.5 + 0.5
+                  );
+                  
+                  // Add brightness variation
+                  color *= 0.5 + spiral * 0.5;
+                  
+                  // Fade out at edges
+                  float alpha = 1.0 - smoothstep(0.2, 0.5, radius);
+                  alpha *= uOpacity;
+                  
+                  gl_FragColor = vec4(color, alpha);
+                }
+              `,
+              transparent: true,
+              side: THREE.DoubleSide,
+              depthWrite: false,
+              blending: THREE.NormalBlending // Normal blending to see it better
+            })
+            
+            // Test with a simple material first
+            const testMaterial = new THREE.MeshBasicMaterial({
+              color: 0x00ff00,
+              transparent: true,
+              opacity: 0.5,
+              side: THREE.DoubleSide
+            })
+            
+            // child.material = testMaterial  // Use test material for now
+            child.material = portalMaterial  // Use portal shader
             child.material.needsUpdate = true
+            backdropRef.current = child
+            console.log('EmojiBackdrop portal shader applied successfully')
           }
         }
       })
@@ -345,6 +558,161 @@ function HandsModel({ mousePosition, scrollY, onLoad, hasReachedSection, isInVie
 
     }
   }, [gltf])
+
+  // Smooth opacity animation in render loop
+  useFrame((state, delta) => {
+    const fadeSpeed = 3.0 // Adjust this to control fade speed (higher = faster)
+    
+    // Helper function to update opacity for an object and its children
+    const updateOpacityRecursive = (object, opacity) => {
+      if (!object) return
+      
+      object.traverse((child) => {
+        if (child.isMesh && child.material) {
+          // Ensure material supports transparency
+          child.material.transparent = true
+          child.material.opacity = opacity
+          
+          // Hide object completely when opacity is near 0
+          child.visible = opacity > 0.01
+        }
+      })
+    }
+    
+    // Animate each emoji's opacity towards its target
+    Object.keys(opacityTargets.current).forEach(key => {
+      const target = opacityTargets.current[key]
+      const current = currentOpacities.current[key]
+      
+      // Smooth interpolation towards target
+      if (Math.abs(target - current) > 0.001) {
+        currentOpacities.current[key] = THREE.MathUtils.lerp(current, target, fadeSpeed * delta)
+        
+        // Apply opacity to corresponding objects
+        switch(key) {
+          case 'emoji1':
+            updateOpacityRecursive(emoji1Ref.current, currentOpacities.current[key])
+            break
+          case 'emoji2':
+            updateOpacityRecursive(emoji2Ref.current, currentOpacities.current[key])
+            break
+          case 'emoji3':
+            updateOpacityRecursive(emoji3Ref.current, currentOpacities.current[key])
+            break
+          case 'emoji4':
+            updateOpacityRecursive(emoji4Ref.current, currentOpacities.current[key])
+            break
+          case 'emoji5':
+            updateOpacityRecursive(emoji5Ref.current, currentOpacities.current[key])
+            break
+          case 'worriedEmoji':
+            updateOpacityRecursive(worriedEmojiRef.current, currentOpacities.current[key])
+            break
+          case 'scaredEmoji':
+            updateOpacityRecursive(scaredEmojiRef.current, currentOpacities.current[key])
+            break
+          case 'devilEmoji':
+            updateOpacityRecursive(devilEmojiRef.current, currentOpacities.current[key])
+            break
+          case 'cryingEmoji':
+            updateOpacityRecursive(cryingEmojiRef.current, currentOpacities.current[key])
+            break
+          case 'cryingEmoji2':
+            updateOpacityRecursive(cryingEmoji2Ref.current, currentOpacities.current[key])
+            break
+          case 'greenArrow':
+            updateOpacityRecursive(greenArrowRef.current, currentOpacities.current[key])
+            break
+          case 'redArrow':
+            updateOpacityRecursive(redArrowRef.current, currentOpacities.current[key])
+            break
+          case 'iconLove':
+            updateOpacityRecursive(iconLoveRef.current, currentOpacities.current[key])
+            break
+          case 'iconText1':
+            updateOpacityRecursive(iconText1Ref.current, currentOpacities.current[key])
+            break
+          case 'iconText2':
+            updateOpacityRecursive(iconText2Ref.current, currentOpacities.current[key])
+            break
+        }
+      }
+    })
+  })
+  
+  // Control emoji visibility based on market status
+  useEffect(() => {
+    
+    if (isPositive) {
+      // Positive prices - fade in happy emojis and green arrow
+      opacityTargets.current.emoji1 = 1
+      opacityTargets.current.emoji3 = 1
+      opacityTargets.current.emoji4 = 1
+      opacityTargets.current.emoji5 = 1
+      opacityTargets.current.greenArrow = 1
+      opacityTargets.current.iconLove = 1
+      opacityTargets.current.iconText1 = 1
+      opacityTargets.current.iconText2 = 1
+      
+      // Fade out negative emojis
+      opacityTargets.current.emoji2 = 0 // Not in positive list
+      opacityTargets.current.worriedEmoji = 0
+      opacityTargets.current.scaredEmoji = 0
+      opacityTargets.current.devilEmoji = 0
+      opacityTargets.current.cryingEmoji = 0
+      opacityTargets.current.cryingEmoji2 = 0
+      opacityTargets.current.redArrow = 0
+      
+      // console.log('📈 Market positive (+' + priceChange.toFixed(2) + '%) - showing happy emojis')
+    } else if (isMiddling || isModerateDown) {
+      // Middling prices and moderate downward action - fade in worried/scared emojis
+      opacityTargets.current.worriedEmoji = 1
+      opacityTargets.current.scaredEmoji = 1
+      
+      // Fade out positive emojis
+      opacityTargets.current.emoji1 = 0
+      opacityTargets.current.emoji3 = 0
+      opacityTargets.current.emoji4 = 0
+      opacityTargets.current.emoji5 = 0
+      opacityTargets.current.greenArrow = 0
+      opacityTargets.current.iconLove = 0
+      opacityTargets.current.iconText1 = 0
+      opacityTargets.current.iconText2 = 0
+      
+      // Fade out extreme negative emojis
+      opacityTargets.current.devilEmoji = 0
+      opacityTargets.current.cryingEmoji = 0
+      opacityTargets.current.cryingEmoji2 = 0
+      opacityTargets.current.redArrow = 0
+      
+      // Keep emoji2 and other icons neutral
+      opacityTargets.current.emoji2 = 1
+      
+      // console.log('😟 Market middling (' + priceChange.toFixed(2) + '%) - showing worried emojis')
+    } else if (isLargeDown) {
+      // Large downward price action - fade in panic emojis
+      opacityTargets.current.worriedEmoji = 1
+      opacityTargets.current.scaredEmoji = 1
+      opacityTargets.current.devilEmoji = 1
+      opacityTargets.current.cryingEmoji = 1
+      opacityTargets.current.cryingEmoji2 = 1
+      opacityTargets.current.redArrow = 1
+      
+      // Fade out all positive emojis
+      opacityTargets.current.emoji1 = 0
+      opacityTargets.current.emoji2 = 0
+      opacityTargets.current.emoji3 = 0
+      opacityTargets.current.emoji4 = 0
+      opacityTargets.current.emoji5 = 0
+      opacityTargets.current.greenArrow = 0
+      opacityTargets.current.iconLove = 0
+      opacityTargets.current.iconText1 = 0
+      opacityTargets.current.iconText2 = 0
+      
+      // Animations are already playing from model load, just ensure they're visible
+      // console.log('📉💀 Market crash (' + priceChange.toFixed(2) + '%) - showing panic emojis with animations!')
+    }
+  }, [isPositive, isMiddling, isModerateDown, isLargeDown, priceChange, gltf])
 
   
   // Safe texture management utility
@@ -439,31 +807,58 @@ function HandsModel({ mousePosition, scrollY, onLoad, hasReachedSection, isInVie
   // Trigger swivel animation based on view state
   useEffect(() => {
     if (isInView && swivelDirection.current === 'forward') {
-      console.log('🔄 Starting forward swivel animation!')
+      // console.log('🔄 Starting forward swivel animation!')
       animationStartTime2.current = Date.now()
     } else if (!isInView && swivelDirection.current === 'reverse') {
-      console.log('🔄 Starting reverse swivel animation!')
+      // console.log('🔄 Starting reverse swivel animation!')
       animationStartTime2.current = Date.now()
     }
   }, [isInView])
 
-  // // Memoized rotation calculation
-  // const calculateRotation = useMemo(() => {
-  //   const initialRotation = -Math.PI * 0.8
-    
-  //   // If animation hasn't started yet, keep initial rotation
-  //   if (!animationStartTime.current) {
-  //     return initialRotation
-  //   }
-    
-  //   // Interpolate from initial rotation to 0 based on animation progress
-  //   const rotation = initialRotation * (1 - rotationProgress)
-    
-  //   return rotation
-  // }, [rotationProgress])
+  // Scroll-based rotation removed - model now uses swivel and user-controlled rotation only
 
 // Combined animations useFrame
-useFrame((state) => {
+useFrame((state, delta) => {
+  // Update digital portal backdrop animation
+  if (backdropRef.current && backdropRef.current.material && backdropRef.current.material.uniforms) {
+    backdropRef.current.material.uniforms.uTime.value = state.clock.elapsedTime
+  }
+  
+  // Track phoneCase world position for light rays
+  if (phoneCaseRef.current) {
+    const worldPos = new THREE.Vector3()
+    const worldQuat = new THREE.Quaternion()
+    phoneCaseRef.current.getWorldPosition(worldPos)
+    phoneCaseRef.current.getWorldQuaternion(worldQuat)
+    setPhoneCaseWorldPos([worldPos.x, worldPos.y, worldPos.z])
+    setPhoneCaseWorldQuat([worldQuat.x, worldQuat.y, worldQuat.z, worldQuat.w])
+    
+    // Check if phone is facing camera (rays should only be visible from front)
+    // Get phone's forward direction in world space
+    const phoneForward = new THREE.Vector3(0, 0, 1)
+    phoneForward.applyQuaternion(worldQuat)
+    
+    // Get camera direction to phone
+    const cameraToPhone = worldPos.clone().sub(state.camera.position).normalize()
+    
+    // Calculate dot product - positive means facing camera, negative means facing away
+    const dotProduct = phoneForward.dot(cameraToPhone)
+    
+    // Hide rays when viewing from behind (dot product negative)
+    setRaysVisible(dotProduct < 0.3) // Threshold of 0.3 gives a nice fade zone
+  }
+  
+  // Update animation mixers
+  if (devilMixerRef.current) {
+    devilMixerRef.current.update(delta)
+  }
+  if (cryingMixerRef.current) {
+    cryingMixerRef.current.update(delta)
+  }
+  if (cryingMixer2Ref.current) {
+    cryingMixer2Ref.current.update(delta)
+  }
+  
   // Swivel animation
   if (animationStartTime2.current) {
     const elapsed = Date.now() - animationStartTime2.current
@@ -495,8 +890,8 @@ useFrame((state) => {
   // Floating animations for emojis and icons
   const time = state.clock.getElapsedTime()
   
-  // Animate emojis with more dynamic floating motion
-  if (emoji1Ref.current) {
+  // Animate emojis with more dynamic floating motion (only if visible)
+  if (emoji1Ref.current && emoji1Ref.current.visible) {
     if (!emoji1Ref.current.userData.initialY) {
       emoji1Ref.current.userData.initialY = emoji1Ref.current.position.y
       emoji1Ref.current.userData.initialX = emoji1Ref.current.position.x
@@ -509,7 +904,7 @@ useFrame((state) => {
     emoji1Ref.current.rotation.y = Math.cos(time * 1.8) * 0.15
   }
   
-  if (emoji2Ref.current) {
+  if (emoji2Ref.current && emoji2Ref.current.visible) {
     if (!emoji2Ref.current.userData.initialY) {
       emoji2Ref.current.userData.initialY = emoji2Ref.current.position.y
       emoji2Ref.current.userData.initialX = emoji2Ref.current.position.x
@@ -522,7 +917,7 @@ useFrame((state) => {
     emoji2Ref.current.rotation.x = Math.cos(time * 2.0 + 1) * 0.12
   }
   
-  if (emoji3Ref.current) {
+  if (emoji3Ref.current && emoji3Ref.current.visible) {
     if (!emoji3Ref.current.userData.initialY) {
       emoji3Ref.current.userData.initialY = emoji3Ref.current.position.y
       emoji3Ref.current.userData.initialX = emoji3Ref.current.position.x
@@ -535,7 +930,7 @@ useFrame((state) => {
     emoji3Ref.current.rotation.y = Math.cos(time * 1.7 + 2) * 0.2
   }
   
-  if (emoji4Ref.current) {
+  if (emoji4Ref.current && emoji4Ref.current.visible) {
     if (!emoji4Ref.current.userData.initialY) {
       emoji4Ref.current.userData.initialY = emoji4Ref.current.position.y
       emoji4Ref.current.userData.initialX = emoji4Ref.current.position.x
@@ -548,7 +943,7 @@ useFrame((state) => {
     emoji4Ref.current.rotation.x = Math.cos(time * 1.6 + 3) * 0.14
   }
   
-  if (emoji5Ref.current) {
+  if (emoji5Ref.current && emoji5Ref.current.visible) {
     if (!emoji5Ref.current.userData.initialY) {
       emoji5Ref.current.userData.initialY = emoji5Ref.current.position.y
       emoji5Ref.current.userData.initialX = emoji5Ref.current.position.x
@@ -561,8 +956,8 @@ useFrame((state) => {
     emoji5Ref.current.rotation.y = Math.cos(time * 2.1 + 4) * 0.18
   }
   
-  // Animate icons with more noticeable floating motion
-  if (iconLikeRef.current) {
+  // Animate icons with more noticeable floating motion (only if visible)
+  if (iconLikeRef.current && iconLikeRef.current.visible) {
     if (!iconLikeRef.current.userData.initialY) {
       iconLikeRef.current.userData.initialY = iconLikeRef.current.position.y
       iconLikeRef.current.userData.initialX = iconLikeRef.current.position.x
@@ -574,7 +969,7 @@ useFrame((state) => {
     iconLikeRef.current.rotation.z = Math.sin(time * 2.2 + 5) * 0.15
   }
   
-  if (iconLoveRef.current) {
+  if (iconLoveRef.current && iconLoveRef.current.visible) {
     if (!iconLoveRef.current.userData.initialY) {
       iconLoveRef.current.userData.initialY = iconLoveRef.current.position.y
       iconLoveRef.current.userData.initialX = iconLoveRef.current.position.x
@@ -587,7 +982,7 @@ useFrame((state) => {
     iconLoveRef.current.rotation.y = Math.cos(time * 1.8 + 6) * 0.12
   }
   
-  if (iconText1Ref.current) {
+  if (iconText1Ref.current && iconText1Ref.current.visible) {
     if (!iconText1Ref.current.userData.initialY) {
       iconText1Ref.current.userData.initialY = iconText1Ref.current.position.y
       iconText1Ref.current.userData.initialX = iconText1Ref.current.position.x
@@ -599,7 +994,7 @@ useFrame((state) => {
     iconText1Ref.current.rotation.z = Math.sin(time * 1.8 + 7) * 0.18
   }
   
-  if (iconText2Ref.current) {
+  if (iconText2Ref.current && iconText2Ref.current.visible) {
     if (!iconText2Ref.current.userData.initialY) {
       iconText2Ref.current.userData.initialY = iconText2Ref.current.position.y
       iconText2Ref.current.userData.initialX = iconText2Ref.current.position.x
@@ -611,7 +1006,7 @@ useFrame((state) => {
     iconText2Ref.current.rotation.z = Math.sin(time * 2.3 + 8) * 0.13
   }
   
-  if (iconPlayRef.current) {
+  if (iconPlayRef.current && iconPlayRef.current.visible) {
     if (!iconPlayRef.current.userData.initialY) {
       iconPlayRef.current.userData.initialY = iconPlayRef.current.position.y
       iconPlayRef.current.userData.initialX = iconPlayRef.current.position.x
@@ -623,7 +1018,7 @@ useFrame((state) => {
     iconPlayRef.current.rotation.z = Math.sin(time * 2.0 + 9) * 0.16
   }
   
-  if (iconStarRef.current) {
+  if (iconStarRef.current && iconStarRef.current.visible) {
     if (!iconStarRef.current.userData.initialY) {
       iconStarRef.current.userData.initialY = iconStarRef.current.position.y
       iconStarRef.current.userData.initialX = iconStarRef.current.position.x
@@ -634,6 +1029,44 @@ useFrame((state) => {
     iconStarRef.current.position.z = iconStarRef.current.userData.initialZ + Math.sin(time * 1.5 + 10) * 0.25
     iconStarRef.current.rotation.z = Math.sin(time * 2.4 + 10) * 0.2
     iconStarRef.current.rotation.y = Math.cos(time * 1.9 + 10) * 0.15
+  }
+  
+  // Animate worried and scared emojis with nervous shaking
+  if (worriedEmojiRef.current && worriedEmojiRef.current.visible) {
+    if (!worriedEmojiRef.current.userData.initialY) {
+      worriedEmojiRef.current.userData.initialY = worriedEmojiRef.current.position.y
+      worriedEmojiRef.current.userData.initialX = worriedEmojiRef.current.position.x
+    }
+    // Nervous shaking motion
+    worriedEmojiRef.current.position.x = worriedEmojiRef.current.userData.initialX + Math.sin(time * 8) * 0.05
+    worriedEmojiRef.current.position.y = worriedEmojiRef.current.userData.initialY + Math.sin(time * 2) * 0.2
+  }
+  
+  if (scaredEmojiRef.current && scaredEmojiRef.current.visible) {
+    if (!scaredEmojiRef.current.userData.initialY) {
+      scaredEmojiRef.current.userData.initialY = scaredEmojiRef.current.position.y
+      scaredEmojiRef.current.userData.initialX = scaredEmojiRef.current.position.x
+    }
+    // More intense shaking
+    scaredEmojiRef.current.position.x = scaredEmojiRef.current.userData.initialX + Math.sin(time * 12) * 0.08
+    scaredEmojiRef.current.position.y = scaredEmojiRef.current.userData.initialY + Math.sin(time * 2.5) * 0.15
+  }
+  
+  // Animate arrows with directional motion
+  if (greenArrowRef.current && greenArrowRef.current.visible) {
+    if (!greenArrowRef.current.userData.initialY) {
+      greenArrowRef.current.userData.initialY = greenArrowRef.current.position.y
+    }
+    // Upward pulsing motion
+    greenArrowRef.current.position.y = greenArrowRef.current.userData.initialY + Math.sin(time * 3) * 0.06 + 0.2
+  }
+  
+  if (redArrowRef.current && redArrowRef.current.visible) {
+    if (!redArrowRef.current.userData.initialY) {
+      redArrowRef.current.userData.initialY = redArrowRef.current.position.y
+    }
+    // Downward pulsing motion
+    redArrowRef.current.position.y = redArrowRef.current.userData.initialY - Math.sin(time * 3) * 0.3 - 0.2
   }
 })
 
@@ -668,7 +1101,9 @@ const handlePointerOver = useCallback((event) => {
   while (current) {
     if (current.userData.onClick || current.userData.clickable) {
       setHovered(true)
-      document.body.style.cursor = 'pointer'
+      if (typeof document !== 'undefined' && document.body) {
+        document.body.style.cursor = 'pointer'
+      }
       break
     }
     current = current.parent
@@ -677,7 +1112,9 @@ const handlePointerOver = useCallback((event) => {
 
 const handlePointerOut = useCallback(() => {
   setHovered(false)
-  document.body.style.cursor = 'default'
+  if (typeof document !== 'undefined' && document.body) {
+    document.body.style.cursor = 'default'
+  }
 }, [])
 
 // Use cursor hook for pointer changes
@@ -714,21 +1151,26 @@ useEffect(() => {
   }
 }, [disposeTexture, disposeMaterial])
 
-// Get world position and rotation of phone screen if available
+// Get world position and rotation of phone (preferring phoneCase over phoneScreen)
 const phoneWorldTransform = useMemo(() => {
-  if (phoneScreenRef.current) {
+  // Prefer phoneCase for positioning, fall back to phoneScreen
+  const phoneRefLocal = phoneCaseRef.current || phoneScreenRef.current
+  
+  if (phoneRefLocal) {
     const worldPos = new THREE.Vector3()
     const worldQuat = new THREE.Quaternion()
     const worldScale = new THREE.Vector3()
-    phoneScreenRef.current.getWorldPosition(worldPos)
-    phoneScreenRef.current.getWorldQuaternion(worldQuat)
-    phoneScreenRef.current.getWorldScale(worldScale)
-    console.log('📱 Phone screen world position:', worldPos)
+    phoneRefLocal.getWorldPosition(worldPos)
+    phoneRefLocal.getWorldQuaternion(worldQuat)
+    phoneRefLocal.getWorldScale(worldScale)
+    console.log('📱 Phone position from:', phoneCaseRef.current ? 'phoneCase' : 'phoneScreen')
+    console.log('📱 Phone world position:', worldPos)
     console.log('📱 Offerings available:', offerings?.length || 0)
+    
     return { position: worldPos, quaternion: worldQuat, scale: worldScale }
   }
   return null
-}, [phoneScreenRef.current, offerings, hoveredOffering, justLitOffering])
+}, [phoneCaseRef.current, phoneScreenRef.current, offerings, hoveredOffering, justLitOffering])
 
 // Return with swivel animation applied
 return (
@@ -749,8 +1191,25 @@ return (
         offerings={offerings}
         hoveredOffering={hoveredOffering}
         justLitOffering={justLitOffering}
-
-        />
+        hasActiveClick={hasActiveClick}
+      />
+    )}
+    
+    {/* Aura that follows phoneCase world position */}
+    {raysVisible && (
+      <PhoneAura
+        phonePosition={[
+          phoneCaseWorldPos[0], 
+          phoneCaseWorldPos[1] + 2.7,  // Y offset - adjust this value
+          phoneCaseWorldPos[2] - 0.3
+        ]}
+        color='#00ffff'
+        intensity={1}
+        size={4}
+        opacity={0.8}
+        isActive={hasActiveClick}
+        priceDirection={priceChange / 5}
+      />
     )}
   </group>
 )
@@ -776,9 +1235,9 @@ function MouseTracker({ setMousePosition }) {
 
 // Removed LoadingBox - no fallback cube needed
 
-export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffering, justLitOffering, onJustLitComplete }) {
+export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffering, justLitOffering, onJustLitComplete, priceChange = 0 }) {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
-  const [scrollY, setScrollY] = useState(0)
+  // Scroll tracking removed - no longer needed
   const [isMobile, setIsMobile] = useState(false)
   const [showClickIndicator, setShowClickIndicator] = useState(false)
   const [modelLoaded, setModelLoaded] = useState(false)
@@ -791,12 +1250,20 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
   
   // Simple drag handlers for rotation
   const handlePointerDown = useCallback((event) => {
-    isDragging.current = true
-    dragStart.current = {
-      x: event.clientX,
-      rotation: userRotation
+    // Only start dragging if clicking in the bottom 40% of screen (where hands are)
+    const screenHeight = window.innerHeight
+    const clickY = event.clientY
+    
+    if (clickY > screenHeight * 0.6) {  // Bottom 40% of screen
+      isDragging.current = true
+      dragStart.current = {
+        x: event.clientX,
+        rotation: userRotation
+      }
+      if (typeof document !== 'undefined' && document.body) {
+        document.body.style.cursor = 'grabbing'
+      }
     }
-    document.body.style.cursor = 'grabbing'
   }, [userRotation])
 
   const handlePointerMove = useCallback((event) => {
@@ -809,7 +1276,9 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
 
   const handlePointerUp = useCallback(() => {
     isDragging.current = false
-    document.body.style.cursor = 'auto'
+    if (typeof document !== 'undefined' && document.body) {
+      document.body.style.cursor = 'auto'
+    }
   }, [])
   
   // Track when component comes into view using Intersection Observer
@@ -858,24 +1327,18 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
   // Mobile detection
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768)
+      if (typeof window !== 'undefined') {
+        setIsMobile(window.innerWidth < 768)
+      }
     }
     checkMobile()
-    window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', checkMobile)
+      return () => window.removeEventListener('resize', checkMobile)
+    }
   }, [])
 
-  // Add scroll listener
-  useEffect(() => {
-    const handleScroll = () => {
-      setScrollY(window.scrollY)
-    }
-    
-    window.addEventListener('scroll', handleScroll)
-    handleScroll() // Set initial scroll position
-    
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
+  // Scroll listener removed - no longer needed for rotation
   
   return (
     <div 
@@ -885,7 +1348,7 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
         height: '100%', 
         position: 'relative',
         overflow: 'hidden',
-        pointerEvents: 'auto',
+        pointerEvents: 'auto',  // Enable pointer events
         isolation: 'isolate'
       }}>
       
@@ -893,10 +1356,25 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
       {/* 3D Canvas */}
       <Canvas
         camera={{ position: [0, -0.5, 5], fov: 45 }}
-        onPointerDown={handlePointerDown}
+        onPointerDown={(event) => {
+          // Check if click is in upper portion where candles are
+          const screenHeight = window.innerHeight
+          const clickY = event.clientY || event.nativeEvent?.clientY || 0
+          
+          if (clickY < screenHeight * 0.6) {
+            // Upper 60% - don't handle, let it pass through
+            event.stopPropagation = () => {} // Disable stopPropagation
+            return
+          }
+          handlePointerDown(event)
+        }}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
+        onPointerMissed={(event) => {
+          // When clicking on empty space, pass the event through
+          console.log('Canvas pointer missed - clientY:', event?.clientY)
+        }}
         style={{ 
           width: '100%', 
           height: '100%',
@@ -921,7 +1399,6 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
         <Suspense fallback={null}>
           <HandsModel 
             mousePosition={mousePosition} 
-            scrollY={scrollY}
             hasReachedSection={hasReachedSection}
             isInView={isInView}
             offerings={offerings}
@@ -929,6 +1406,7 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
             justLitOffering={justLitOffering}
             onJustLitComplete={onJustLitComplete}
             userRotation={userRotation}
+            priceChange={priceChange}
             onLoad={() => {
               setModelLoaded(true);
               if (onLoadComplete) onLoadComplete();

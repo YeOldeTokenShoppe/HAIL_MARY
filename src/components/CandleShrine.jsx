@@ -1,950 +1,890 @@
-import React, { useRef, useMemo, useState, useEffect, useCallback } from 'react'
+import React, { useRef, useMemo, useEffect, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
-import { EffectComposer, Bloom, BrightnessContrast } from '@react-three/postprocessing'
+import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
-import { NewCandleEffectManager } from './Newcandleeffect'
+import { NewCandleEffectManager } from './NewCandleEffect'
 
-// Preload the candle model
-useGLTF.preload('/models/tinyVotiveOnly.glb')
-
-// ============================================
-// CONFIG
-// ============================================
 const CANDLE_COUNT = 500
-const SPREAD = { x: 40, y: 20, z: 15 }  // Increased spread for better distribution with more candles
+const MAX_ADDITIONAL = 100 // Buffer for user-added candles
 
-// Movement config - target-based instead of additive drift
-const PRICE_OFFSET_MAX = 10 // Max vertical offset when price is at extreme - increased for more noticeable movement
-const DRIFT_SPEED = 0.5 // How fast candles move toward their target
-const WOBBLE_SPEED = 0.3
-const WOBBLE_AMOUNT = 0.03
-
-// ============================================
-// PRICE STATE QUANTIZER
-// Returns discrete state to prevent constant re-renders
-// ============================================
-function quantizePriceState(priceDirection) {
-  if (priceDirection < -0.6) return 'STRONG_DOWN'
-  if (priceDirection < -0.2) return 'DOWN'
-  if (priceDirection < 0.2) return 'NEUTRAL'
-  if (priceDirection < 0.6) return 'UP'
-  return 'STRONG_UP'
-}
-
-// ============================================
-// CANDLE GEOMETRY - Using GLTF Model
-// ============================================
-function CandleGeometry({ isHovered, isClicked }) {
-  const { scene } = useGLTF('/models/tinyVotiveOnly.glb')
-  const { camera } = useThree()
-  const labelRef = useRef()
-  const groupRef = useRef()
-  
-  const clonedScene = useMemo(() => scene.clone(true), [scene])
-  
-  useEffect(() => {
-    clonedScene.traverse((child) => {
-      if (child.isMesh && child.name.toLowerCase().includes('senora')) {
-        labelRef.current = child
-      }
-    })
-  }, [clonedScene])
-  
-  useFrame(() => {
-    if (labelRef.current) {
-      if (!labelRef.current.userData.initialRotation) {
-        labelRef.current.userData.initialRotation = labelRef.current.rotation.y
-      }
-      
-      const parentWorldQuaternion = new THREE.Quaternion()
-      if (labelRef.current.parent) {
-        labelRef.current.parent.getWorldQuaternion(parentWorldQuaternion)
-      }
-      
-      const euler = new THREE.Euler().setFromQuaternion(parentWorldQuaternion)
-      const parentRotationY = euler.y
-      
-      labelRef.current.rotation.y = -parentRotationY + labelRef.current.userData.initialRotation
-    }
-  })
-  
-  useEffect(() => {
-    clonedScene.traverse((child) => {
-      if (child.isMesh && child.material) {
-        child.material = child.material.clone()
-        
-        const meshName = child.name.toLowerCase()
-        
-        if (meshName.includes('xbase')) {
-          child.material.emissive = new THREE.Color('#8bec03')
-          child.material.emissiveIntensity = isClicked ? 1.5 : isHovered ? 1.2 : 1.0
-        } else if (meshName.includes('senora')) {
-          if (!child.material.emissive) {
-            child.material.emissive = new THREE.Color('#ffffff')
-          }
-          child.material.emissiveIntensity = isClicked ? 1.8 : isHovered ? 1.5 : 1.2
-          child.material.toneMapped = false
-        } else if (meshName.includes('glass')) {
-          child.material.emissive = new THREE.Color('#000000')
-          child.material.emissiveIntensity = 0
-          if (child.material.transparent !== undefined) {
-            child.material.transparent = true
-            child.material.opacity = child.material.opacity || 0.3
-          }
-        } else if (meshName.includes('flame') || meshName.includes('wick') || meshName.includes('fire')) {
-          child.material.emissive = new THREE.Color('#ffaa00')
-          child.material.emissiveIntensity = isClicked ? 3.0 : isHovered ? 2.5 : 2.0
-          child.material.toneMapped = false
-        }
-        
-        child.material.needsUpdate = true
-      }
-    })
-  }, [clonedScene, isHovered, isClicked])
-  
-  const scale = isClicked ? 0.6 : isHovered ? 0.55 : 0.5
-  
-  return (
-    <group ref={groupRef}>
-      <primitive object={clonedScene} scale={[scale, scale, scale]} />
-      {/* Point light disabled for performance with many candles */}
-      {/* Only add lights for hovered/clicked candles to stay under uniform limit */}
-      {(isHovered || isClicked) && (
-        <pointLight 
-          position={[0, 0.3, 0]} 
-          color={isClicked ? "#ffffff" : "#ffe8dd"} 
-          intensity={isClicked ? 0.4 : 0.25} 
-          distance={3} 
-        />
-      )}
-    </group>
-  )
-}
-
-// ============================================
-// SINGLE CANDLE - TARGET-BASED MOVEMENT
-// ============================================
-function Candle({ index, homePosition, priceDirection, onHover, onUnhover, onClick }) {
-  const ref = useRef()
-  const [isHovered, setIsHovered] = useState(false)
-  const [isClicked, setIsClicked] = useState(false)
-  
-  // Track if this is a newly added candle for smooth integration
-  const integrationProgress = useRef(0)
-  const isNewCandle = useRef(true)
-  
-  // Per-candle random values (stable across renders)
-  const randomValues = useMemo(() => ({
-    speed: 0.3 + Math.random() * 0.7,
-    phase: Math.random() * Math.PI * 2,
-    wobbleX: 0.02 + Math.random() * 0.03,
-    wobbleZ: 0.02 + Math.random() * 0.03,
-    // Individual offset multiplier so candles don't all move the same amount
-    offsetMultiplier: 0.7 + Math.random() * 0.6,
-    // Slight delay in following price (staggered response)
-    responseDelay: Math.random() * 0.5,
-  }), [])
-  
-  // Store current position for smooth interpolation
-  const currentPos = useRef(new THREE.Vector3(...homePosition))
-  
-  useFrame((state, delta) => {
-    if (!ref.current) return
-    
-    // Smoothly integrate new candles over 2 seconds
-    if (isNewCandle.current) {
-      integrationProgress.current = Math.min(1, integrationProgress.current + delta / 2)
-      if (integrationProgress.current >= 1) {
-        isNewCandle.current = false
-      }
-    }
-    
-    const time = state.clock.elapsedTime
-    const { speed, phase, wobbleX, wobbleZ, offsetMultiplier, responseDelay } = randomValues
-    
-    // Calculate target position based on price direction
-    // For new candles, gradually apply the price offset
-    const integrationFactor = isNewCandle.current ? integrationProgress.current : 1
-    const priceOffset = priceDirection * PRICE_OFFSET_MAX * offsetMultiplier * integrationFactor
-    
-    // Give new candles an initial upward boost that fades over time
-    const upwardBoost = isNewCandle.current ? (1 - integrationProgress.current) * 1.5 : 0
-    
-    const targetY = homePosition[1] + priceOffset + upwardBoost
-    const targetX = homePosition[0] + Math.sin(time * speed * WOBBLE_SPEED + phase) * wobbleX * 10 * integrationFactor
-    const targetZ = homePosition[2] + Math.cos(time * speed * WOBBLE_SPEED * 0.7 + phase) * wobbleZ * 10 * integrationFactor
-    
-    // Smoothly interpolate toward target (easing)
-    // This creates gentle, organic movement instead of snapping
-    const lerpFactor = 1 - Math.pow(0.1, delta * DRIFT_SPEED * (1 - responseDelay))
-    
-    currentPos.current.x += (targetX - currentPos.current.x) * lerpFactor
-    currentPos.current.y += (targetY - currentPos.current.y) * lerpFactor
-    currentPos.current.z += (targetZ - currentPos.current.z) * lerpFactor
-    
-    // Apply position
-    ref.current.position.copy(currentPos.current)
-    
-    // Gentle rotation
-    ref.current.rotation.y += delta * 0.1 * speed * (isHovered ? 3 : 1)
-  })
-  
-  const handlePointerOver = (e) => {
-    e.stopPropagation()
-    setIsHovered(true)
-    onHover(index, e.point)
-    document.body.style.cursor = 'pointer'
-  }
-  
-  const handlePointerOut = () => {
-    setIsHovered(false)
-    onUnhover()
-    document.body.style.cursor = 'default'
-  }
-  
-  const handleClick = (e) => {
-    e.stopPropagation()
-    setIsClicked(true)
-    onClick && onClick(index)
-    setTimeout(() => setIsClicked(false), 500)
-  }
-  
-  return (
-    <group
-      ref={ref}
-      position={homePosition}
-      onPointerOver={handlePointerOver}
-      onPointerOut={handlePointerOut}
-      onClick={handleClick}
-    >
-      <CandleGeometry isHovered={isHovered} isClicked={isClicked} />
-    </group>
-  )
-}
-
-// ============================================
-// CANDLE CLOUD
-// ============================================
-function CandleCloud({ priceDirection, offerings, onSelectOffering, additionalCandles = [], newCandleAdded }) {
-  const [candleCount, setCandleCount] = useState(CANDLE_COUNT)
-  
-  // Generate stable home positions for base candles
-  const basePositions = useMemo(() => {
-    return Array.from({ length: CANDLE_COUNT }, () => [
-      (Math.random() - 0.5) * SPREAD.x * 2,
-      (Math.random() - 0.5) * SPREAD.y * 1.5, // Slightly less vertical spread
-      (Math.random() - 0.5) * SPREAD.z * 2 - 5
-    ])
-  }, [])
-  
-  // Combine base positions with additional candles
-  const allCandles = useMemo(() => {
-    const base = basePositions.map((pos, i) => ({
-      position: pos,
-      offering: offerings[i % offerings.length],
-      id: `base-${i}`
-    }))
-    const added = additionalCandles.map(candle => ({
-      ...candle,
-      id: candle.id || `added-${Date.now()}-${Math.random()}`
-    }))
-    return [...base, ...added]
-  }, [basePositions, additionalCandles, offerings])
-  
-  // Legacy code for old newCandleAdded prop - can be removed later
-  const [homePositions, setHomePositions] = useState(basePositions)
-  useEffect(() => {
-    if (newCandleAdded && newCandleAdded > 0) {
-      const side = Math.random() > 0.5 ? 1 : -1
-      const newPosition = [
-        side * (3 + Math.random() * 2),
-        0.5 + Math.random() * 0.5,
-        1 + Math.random()
-      ]
-      setHomePositions(prev => [newPosition, ...prev])
-      setCandleCount(prev => prev + 1)
-      
-      console.log('🕯️ New candle added at position:', newPosition)
-    }
-  }, [newCandleAdded])
-  
-  const handleHover = (index, point) => {
-    if (offerings && offerings.length > 0) {
-      const randomOffering = offerings[Math.floor(Math.random() * offerings.length)]
-      onSelectOffering(randomOffering)
-    }
-  }
-  
-  const handleUnhover = () => {
-    onSelectOffering(null)
-  }
-  
-  const handleClick = (index) => {
-    if (offerings && offerings.length > 0) {
-      const specialOffering = {
-        ...offerings[index % offerings.length],
-        message: `✨ Your light has been added to the shrine ✨`
-      }
-      onSelectOffering(specialOffering)
-      setTimeout(() => onSelectOffering(null), 2000)
-    }
-  }
-  
-  return (
-    <group>
-      {allCandles.map((candle, i) => (
-        <Candle
-          key={candle.id}
-          index={i}
-          homePosition={candle.position}
-          priceDirection={priceDirection}
-          onHover={handleHover}
-          onUnhover={handleUnhover}
-          onClick={handleClick}
-        />
-      ))}
-    </group>
-  )
-}
-
-// ============================================
-// GRADIENT BACKGROUND - QUANTIZED STATE
-// ============================================
-function GradientBackground({ priceDirection }) {
+// Price-reactive gradient background
+export function GradientBackground({ priceDirection = 0 }) {
   const meshRef = useRef()
   const { viewport } = useThree()
   
-  // Quantize price to discrete state
-  const priceState = useMemo(() => quantizePriceState(priceDirection), [priceDirection])
-  
-  // Only recalculate colors when state changes (not on every price tick)
-  const [currentState, setCurrentState] = useState(priceState)
-  const targetColorsRef = useRef({ bottom: null, top: null })
-  
-  // Debounce state changes - wait for sustained change
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (priceState !== currentState) {
-        setCurrentState(priceState)
-      }
-    }, 500) // Wait 500ms before committing to new state
-    
-    return () => clearTimeout(timeout)
-  }, [priceState, currentState])
-  
-  // Calculate target colors based on quantized state
-  const targetColors = useMemo(() => {
-    const colorSchemes = {
-      STRONG_DOWN: {
-        bottom: new THREE.Color('#3d0a0a'),
-        top: new THREE.Color('#ff2222')
-      },
-      DOWN: {
-        bottom: new THREE.Color('#2d0f1a'),
-        top: new THREE.Color('#aa4466')
-      },
-      NEUTRAL: {
-        bottom: new THREE.Color('#1a1a2e'),
-        top: new THREE.Color('#4a4a6a')
-      },
-      UP: {
-        bottom: new THREE.Color('#0f2d1a'),
-        top: new THREE.Color('#44aa66')
-      },
-      STRONG_UP: {
-        bottom: new THREE.Color('#0a3d1a'),
-        top: new THREE.Color('#22ff66')
-      }
-    }
-    return colorSchemes[currentState]
-  }, [currentState])
-  
-  // Store current colors for interpolation
-  const currentColorsRef = useRef({
-    bottom: targetColors.bottom.clone(),
-    top: targetColors.top.clone()
+  // Lerp colors smoothly
+  const colorsRef = useRef({
+    bottom: new THREE.Color('#1a1a2e'),
+    top: new THREE.Color('#4a4a6a'),
   })
   
-  // Shader uniforms
-  const uniforms = useMemo(() => ({
-    uColorBottom: { value: currentColorsRef.current.bottom },
-    uColorTop: { value: currentColorsRef.current.top },
-  }), [])
-  
-  // Animate color transitions in the render loop (smooth lerp)
-  useFrame((state, delta) => {
+  useFrame(() => {
     if (!meshRef.current) return
     
-    const lerpSpeed = delta * 0.5 // Slow, smooth transition
+    // Target colors based on price
+    let targetBottom, targetTop
+    if (priceDirection > 0.3) {
+      targetBottom = new THREE.Color('#0a2d1a')
+      targetTop = new THREE.Color('#22ff66')
+    } else if (priceDirection < -0.3) {
+      targetBottom = new THREE.Color('#2d0a0a')
+      targetTop = new THREE.Color('#ff4444')
+    } else {
+      targetBottom = new THREE.Color('#1a1a2e')
+      targetTop = new THREE.Color('#4a4a6a')
+    }
     
-    currentColorsRef.current.bottom.lerp(targetColors.bottom, lerpSpeed)
-    currentColorsRef.current.top.lerp(targetColors.top, lerpSpeed)
+    // Smooth lerp
+    colorsRef.current.bottom.lerp(targetBottom, 0.02)
+    colorsRef.current.top.lerp(targetTop, 0.02)
     
     // Update uniforms
-    meshRef.current.material.uniforms.uColorBottom.value = currentColorsRef.current.bottom
-    meshRef.current.material.uniforms.uColorTop.value = currentColorsRef.current.top
+    meshRef.current.material.uniforms.uColorBottom.value = colorsRef.current.bottom
+    meshRef.current.material.uniforms.uColorTop.value = colorsRef.current.top
   })
   
-  const vertexShader = `
-    varying vec2 vUv;
-    void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `
-  
-  const fragmentShader = `
-    uniform vec3 uColorBottom;
-    uniform vec3 uColorTop;
-    varying vec2 vUv;
-    
-    void main() {
-      float mixFactor = smoothstep(0.0, 1.0, vUv.y);
-      vec3 color = mix(uColorBottom, uColorTop, mixFactor);
+  const material = useMemo(() => new THREE.ShaderMaterial({
+    uniforms: {
+      uColorBottom: { value: new THREE.Color('#1a1a2e') },
+      uColorTop: { value: new THREE.Color('#4a4a6a') },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uColorBottom;
+      uniform vec3 uColorTop;
+      varying vec2 vUv;
       
-      // Subtle vignette
-      vec2 center = vUv - 0.5;
-      float vignette = 1.0 - dot(center, center) * 0.5;
-      color *= vignette;
-      
-      gl_FragColor = vec4(color, 1.0);
-    }
-  `
+      void main() {
+        float mixFactor = smoothstep(0.0, 1.0, vUv.y);
+        vec3 color = mix(uColorBottom, uColorTop, mixFactor);
+        
+        // Subtle vignette
+        vec2 center = vUv - 0.5;
+        float vignette = 1.0 - dot(center, center) * 0.5;
+        color *= vignette;
+        
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `,
+    depthWrite: false,
+  }), [])
   
   return (
-    <mesh ref={meshRef} position={[0, 0, -15]} scale={[viewport.width * 3, viewport.height * 3, 1]}>
-      <planeGeometry args={[1, 1]} />
-      <shaderMaterial
-        vertexShader={vertexShader}
-        fragmentShader={fragmentShader}
-        uniforms={uniforms}
-      />
+    <mesh ref={meshRef} position={[0, 0, -20]} material={material}>
+      <planeGeometry args={[viewport.width * 4, viewport.height * 4]} />
     </mesh>
   )
 }
 
-// ============================================
-// OFFERING TOOLTIP
-// ============================================
-function OfferingTooltip({ offering }) {
-  if (!offering) return null
-  
-  return (
-    <div style={{
-      position: 'absolute',
-      bottom: '20px',
-      left: '50%',
-      transform: 'translateX(-50%)',
-      background: 'rgba(0, 0, 0, 0.85)',
-      border: '1px solid rgba(0, 255, 100, 0.3)',
-      borderRadius: '8px',
-      padding: '12px 20px',
-      color: '#fff',
-      fontFamily: 'monospace',
-      fontSize: '14px',
-      pointerEvents: 'none',
-      backdropFilter: 'blur(10px)',
-      boxShadow: '0 0 20px rgba(0, 255, 100, 0.2)',
-    }}>
-      <div style={{ color: '#00ff66', marginBottom: '4px' }}>
-        {offering.name || 'Anonymous'}
-      </div>
-      <div style={{ color: '#888', fontSize: '12px' }}>
-        {offering.type === 'petition' && '🙏 Petition'}
-        {offering.type === 'confession' && '🖤 Confession'}
-        {offering.type === 'appreciation' && '✨ Appreciation'}
-      </div>
-      {offering.message && (
-        <div style={{ marginTop: '8px', fontStyle: 'italic', maxWidth: '300px' }}>
-          "{offering.message}"
-        </div>
-      )}
-      <div style={{ color: '#666', fontSize: '10px', marginTop: '8px' }}>
-        🔥 Burned {offering.tokensBurned?.toLocaleString() || '???'} RL80
-      </div>
-    </div>
-  )
-}
-
-// ============================================
-// STATS DISPLAY
-// ============================================
-function ShrineStats({ totalCandles, totalBurned, priceChange }) {
-  return (
-    <div style={{
-      position: 'absolute',
-      top: '350px',  // Closer to the price ticker (was 420px)
-      right: '20px',  // Moved to right side
-      background: 'rgba(0, 0, 0, 0.8)',
-      border: `2px solid ${priceChange >= 0 ? '#00ff66' : '#ff4444'}`,  // Same border color as price ticker
-      borderRadius: '12px',
-      padding: '16px',
-      color: '#fff',
-      fontFamily: 'monospace',
-      fontSize: '12px',
-      backdropFilter: 'blur(10px)',
-      boxShadow: `0 0 20px ${priceChange >= 0 ? 'rgba(0, 255, 100, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
-      width: '240px'  // Same width as price ticker
-    }}>
-      <div style={{ 
-        color: priceChange >= 0 ? '#00ff66' : '#ff4444',
-        fontSize: '24px',
-        fontWeight: 'bold',
-        marginBottom: '8px'
-      }}>
-        {priceChange >= 0 ? '↑' : '↓'} {Math.abs(priceChange).toFixed(2)}%
-      </div>
-      <div style={{ color: '#ccc', marginBottom: '4px' }}>
-        🕯️ {totalCandles.toLocaleString()} candles burning
-      </div>
-      <div style={{ color: '#888' }}>
-        🔥 {totalBurned.toLocaleString()} RL80 sacrificed
-      </div>
-    </div>
-  )
-}
-
-// ============================================
-// LEGACY NEW CANDLE GLB COMPONENT - REPLACED BY NewCandleEffectManager
-// Keeping for reference but not using anymore
-// ============================================
-function NewCandleGLB_LEGACY({ triggered }) {
-  const { scene } = useGLTF('/models/tinyVotiveOnly.glb')
-  const [candles, setCandles] = useState([])
-  const groupRef = useRef()
-  
-  useEffect(() => {
-    if (triggered && triggered > 0) {
-      // Add a new candle instance
-      const side = Math.random() > 0.5 ? 1 : -1
-      const newCandle = {
-        id: Date.now(),
-        position: [
-          side * (3 + Math.random() * 2),  // Left or right side
-          -2,  // Start below ground
-          1 + Math.random() * 2  // Medium distance
-        ],
-        targetY: -0.5 + Math.random() * 0.5,  // Final height
-        scale: 1.2 + Math.random() * 0.4,  // Bigger size
-        startTime: Date.now(),
-        glowIntensity: 5  // Start with strong glow
-      }
-      setCandles(prev => [...prev, newCandle])
-      console.log('🕯️ New GLB candle added:', newCandle)
-    }
-  }, [triggered])
-  
-  // Animate candles rising, glowing, and drifting to center
-  useFrame((state) => {
-    setCandles(prev => prev.map(candle => {
-      const elapsed = (Date.now() - candle.startTime) / 1000
-      let updatedCandle = { ...candle }
+// Animated material that moves vertices in shader
+function createAnimatedMaterial(color, options = {}) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uColor: { value: new THREE.Color(color) },
+      uOpacity: { value: options.opacity ?? 1.0 },
+    },
+    vertexShader: `
+      uniform float uTime;
       
-      // Phase 1: Rising animation (0-3 seconds)
-      if (elapsed < 3) {
-        const y = -2 + (candle.targetY + 2) * Math.min(elapsed / 3, 1)
-        updatedCandle.position = [candle.position[0], y, candle.position[2]]
+      float hash(float n) {
+        return fract(sin(n) * 43758.5453123);
       }
-      // Phase 2: Drift toward center (3-10 seconds)
-      else if (elapsed >= 3 && elapsed < 10) {
-        const driftProgress = (elapsed - 3) / 7  // 0 to 1 over 7 seconds
-        const targetX = (Math.random() - 0.5) * 4  // Random position in center cloud
-        const targetZ = -3 + Math.random() * 2  // Deeper into scene
+      
+      void main() {
+        float id = float(gl_InstanceID);
+        float phase = hash(id) * 6.28318;
+        float speed = 0.2 + hash(id + 100.0) * 0.3;
         
-        // Smooth interpolation toward center
-        updatedCandle.position = [
-          candle.position[0] * (1 - driftProgress) + targetX * driftProgress,
-          candle.targetY + Math.sin(state.clock.elapsedTime * 2) * 0.1,  // Add wobble
-          candle.position[2] * (1 - driftProgress) + targetZ * driftProgress
-        ]
+        float time = uTime * speed + phase;
         
-        // Store final position for later use
-        if (!candle.finalPosition) {
-          candle.finalPosition = [targetX, candle.targetY, targetZ]
+        // Gentle wobble
+        float wobbleX = sin(time * 0.15) * 0.2;
+        float wobbleY = sin(time * 0.1) * 0.1;
+        float wobbleZ = cos(time * 0.12) * 0.2;
+        
+        vec4 instancePos = instanceMatrix * vec4(position, 1.0);
+        instancePos.x += wobbleX;
+        instancePos.y += wobbleY;
+        instancePos.z += wobbleZ;
+        
+        gl_Position = projectionMatrix * modelViewMatrix * instancePos;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uColor;
+      uniform float uOpacity;
+      
+      void main() {
+        gl_FragColor = vec4(uColor, uOpacity);
+      }
+    `,
+    transparent: options.transparent ?? false,
+    side: options.side ?? THREE.FrontSide,
+    depthWrite: options.depthWrite ?? true,
+  })
+}
+
+// Senora material with texture support
+function createSenoraMaterial(texture) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uMap: { value: texture },
+    },
+    vertexShader: `
+      uniform float uTime;
+      
+      varying vec2 vUv;
+      
+      float hash(float n) {
+        return fract(sin(n) * 43758.5453123);
+      }
+      
+      void main() {
+        vUv = uv;
+        
+        float id = float(gl_InstanceID);
+        float phase = hash(id) * 6.28318;
+        float speed = 0.2 + hash(id + 100.0) * 0.3;
+        
+        float time = uTime * speed + phase;
+        
+        float wobbleX = sin(time * 0.15) * 0.2;
+        float wobbleY = sin(time * 0.1) * 0.1;
+        float wobbleZ = cos(time * 0.12) * 0.2;
+        
+        vec4 instancePos = instanceMatrix * vec4(position, 1.0);
+        instancePos.x += wobbleX;
+        instancePos.y += wobbleY;
+        instancePos.z += wobbleZ;
+        
+        gl_Position = projectionMatrix * modelViewMatrix * instancePos;
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D uMap;
+      varying vec2 vUv;
+      
+      void main() {
+        vec4 texColor = texture2D(uMap, vUv);
+        if (texColor.a < 0.5) discard;
+        gl_FragColor = texColor;
+      }
+    `,
+    transparent: true,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  })
+}
+
+// Flame material with color gradient
+function createFlameMaterial() {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+    },
+    vertexShader: `
+      uniform float uTime;
+      
+      varying float vHeight;
+      varying float vPhase;
+      
+      float hash(float n) {
+        return fract(sin(n) * 43758.5453123);
+      }
+      
+      void main() {
+        float id = float(gl_InstanceID);
+        float phase = hash(id) * 6.28318;
+        float speed = 0.2 + hash(id + 100.0) * 0.3;
+        vPhase = hash(id + 300.0) * 6.28318;
+        
+        // Height for color gradient
+        vHeight = clamp(position.y / 0.5, 0.0, 1.0);
+        
+        vec3 pos = position;
+        
+        // Flame sway
+        float flameTime = uTime * 0.5 + vPhase;
+        pos.x += sin(flameTime * 0.8) * 0.01 * vHeight * vHeight;
+        pos.z += cos(flameTime * 0.6) * 0.008 * vHeight * vHeight;
+        
+        float time = uTime * speed + phase;
+        
+        // Cloud wobble (matches other parts)
+        float wobbleX = sin(time * 0.15) * 0.2;
+        float wobbleY = sin(time * 0.1) * 0.1;
+        float wobbleZ = cos(time * 0.12) * 0.2;
+        
+        vec4 instancePos = instanceMatrix * vec4(pos, 1.0);
+        instancePos.x += wobbleX;
+        instancePos.y += wobbleY;
+        instancePos.z += wobbleZ;
+        
+        gl_Position = projectionMatrix * modelViewMatrix * instancePos;
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      varying float vHeight;
+      varying float vPhase;
+      
+      void main() {
+        float time = uTime + vPhase;
+        
+        vec3 baseColor = vec3(1.0, 0.3, 0.0);
+        vec3 tipColor = vec3(1.0, 0.9, 0.3);
+        vec3 color = mix(baseColor, tipColor, vHeight);
+        
+        // Hot core
+        float core = smoothstep(0.3, 0.0, vHeight);
+        color = mix(color, vec3(1.0, 1.0, 0.9), core * 0.5);
+        
+        float pulse = sin(time * 3.0) * 0.1 + 1.0;
+        float alpha = (1.0 - vHeight * 0.4) * pulse;
+        
+        gl_FragColor = vec4(color * 2.0 * pulse, alpha);
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  })
+}
+
+// Extract and CLONE all geometries from GLB, including local transforms
+function useClonedGeometries(modelPath) {
+  const { scene } = useGLTF(modelPath)
+  
+  return useMemo(() => {
+    const geometries = {}
+    const textures = {}
+    const localMatrices = {}
+    
+    console.log('=== Loading candle model ===')
+    scene.updateWorldMatrix(true, false)
+    const rootInverse = new THREE.Matrix4().copy(scene.matrixWorld).invert()
+    
+    scene.traverse((child) => {
+      if (child.isMesh) {
+        console.log('Found mesh:', child.name, 'Geometry:', child.geometry, 'Material:', child.material?.name)
+      }
+      if (!child.isMesh) return
+      
+      const name = child.name.toLowerCase()
+      let key = null
+      
+      if (name.includes('xbase') || name.includes('base')) {
+        key = 'xbase'
+      } else if (name.includes('glass')) {
+        key = 'glass'
+      } else if (name.includes('wick')) {
+        key = 'wick'
+      } else if (name.includes('senora')) {
+        key = 'senora'
+        if (child.material?.map) {
+          textures.senora = child.material.map
         }
-      }
-      // Phase 3: Join the main candle cloud
-      else if (elapsed >= 10 && candle.finalPosition) {
-        // Now it's part of the cloud, add gentle floating
-        const time = state.clock.elapsedTime
-        updatedCandle.position = [
-          candle.finalPosition[0] + Math.sin(time + candle.id) * 0.1,
-          candle.finalPosition[1] + Math.sin(time * 0.5 + candle.id) * 0.05,
-          candle.finalPosition[2] + Math.cos(time * 0.3 + candle.id) * 0.1
-        ]
+      } else if (name.includes('flame')) {
+        key = 'flame'
       }
       
-      // Pulsing glow for first 10 seconds
-      if (elapsed < 10) {
-        updatedCandle.glowIntensity = 3 + Math.sin(elapsed * 3) * 2
+      if (key) {
+        const clonedGeometry = child.geometry.clone()
+        // Ensure bounding sphere is computed for raycasting
+        clonedGeometry.computeBoundingSphere()
+        clonedGeometry.computeBoundingBox()
+        geometries[key] = clonedGeometry
+        child.updateWorldMatrix(true, false)
+        localMatrices[key] = new THREE.Matrix4().copy(child.matrixWorld).premultiply(rootInverse)
+        console.log(`Stored ${key} geometry with bounds:`, clonedGeometry.boundingSphere)
+      }
+    })
+    
+    return { geometries, textures, localMatrices }
+  }, [scene])
+}
+
+function usePositions(count) {
+  return useMemo(() => {
+    const positions = []
+    for (let i = 0; i < count; i++) {
+      positions.push({
+        x: (Math.random() - 0.5) * 40,
+        y: (Math.random() - 0.5) * 15,
+        z: (Math.random() - 0.5) * 20 - 5,
+        rotation: Math.random() * Math.PI * 2,
+      })
+    }
+    return positions
+  }, [count])
+}
+
+function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.5, timeRef, priceRef, maxCount, onCandleClick }) {
+  const meshRef = useRef()
+  const actualCount = positions.length
+  const capacity = maxCount || actualCount
+  const [hovered, setHovered] = useState(false)
+  
+  // Recalculate base matrices when positions change
+  const baseMatrices = useMemo(() => {
+    const matrices = []
+    const tempMatrix = new THREE.Matrix4()
+    const tempPosition = new THREE.Vector3()
+    const tempQuaternion = new THREE.Quaternion()
+    const tempScale = new THREE.Vector3(scale, scale, scale)
+    const hiddenMatrix = new THREE.Matrix4().makeTranslation(0, -10000, 0) // Hide unused
+    
+    for (let i = 0; i < capacity; i++) {
+      if (i < positions.length) {
+        const pos = positions[i]
+        tempPosition.set(pos.x, pos.y, pos.z)
+        tempQuaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pos.rotation)
+        tempMatrix.compose(tempPosition, tempQuaternion, tempScale)
+        if (localMatrix) {
+          tempMatrix.multiply(localMatrix)
+        }
+        matrices.push(tempMatrix.clone())
       } else {
-        updatedCandle.glowIntensity = Math.max(0, candle.glowIntensity - 0.02)
+        matrices.push(hiddenMatrix.clone())
       }
+    }
+    return matrices
+  }, [positions, localMatrix, scale, capacity])
+  
+  // Set up dynamic usage once
+  useEffect(() => {
+    if (!meshRef.current) return
+    meshRef.current.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+  }, [])
+  
+  // Animate every frame
+  useFrame(() => {
+    if (!meshRef.current) return
+    
+    const time = timeRef.current
+    const priceDirection = priceRef.current
+    const tempMatrix = new THREE.Matrix4()
+    
+    for (let i = 0; i < actualCount; i++) {
+      const pos = positions[i]
+      const phase = pos.x * 0.1 + pos.y * 0.2 + pos.z * 0.15
+      const speed = 0.5 + Math.abs(Math.sin(pos.x * 0.5)) * 0.3
+      const t = time * speed + phase
       
-      return updatedCandle
-    }))
+      const priceResponse = 0.7 + Math.abs(Math.sin(pos.x * 0.3 + pos.z * 0.2)) * 0.6
+      
+      const offsetX = Math.sin(t * 0.4) * 0.3
+      const offsetY = Math.sin(t * 0.3) * 0.2 + priceDirection * 3.0 * priceResponse
+      const offsetZ = Math.cos(t * 0.35) * 0.3
+      
+      tempMatrix.copy(baseMatrices[i])
+      tempMatrix.elements[12] += offsetX
+      tempMatrix.elements[13] += offsetY
+      tempMatrix.elements[14] += offsetZ
+      
+      meshRef.current.setMatrixAt(i, tempMatrix)
+    }
+    
+    // Hide any unused slots
+    const hiddenMatrix = new THREE.Matrix4().makeTranslation(0, -10000, 0)
+    for (let i = actualCount; i < capacity; i++) {
+      meshRef.current.setMatrixAt(i, hiddenMatrix)
+    }
+    
+    meshRef.current.instanceMatrix.needsUpdate = true
   })
   
+  if (!geometry) return null
+  
+  // Enable cursor change on hover
+  useEffect(() => {
+    if (hovered && typeof document !== 'undefined') {
+      document.body.style.cursor = 'pointer'
+    } else if (typeof document !== 'undefined') {
+      document.body.style.cursor = 'auto'
+    }
+  }, [hovered])
+
+  // Debug log on mount and ensure matrices are initialized
+  useEffect(() => {
+    if (meshRef.current && geometry) {
+      console.log(`InstancedMesh created for ${material.type || 'unknown'} with ${actualCount} instances, capacity ${capacity}`)
+      console.log('Geometry bounds:', geometry.boundingBox, geometry.boundingSphere)
+      
+      // Initialize instance matrices for raycasting to work
+      const tempMatrix = new THREE.Matrix4()
+      for (let i = 0; i < capacity; i++) {
+        if (i < actualCount) {
+          tempMatrix.copy(baseMatrices[i])
+        } else {
+          tempMatrix.makeTranslation(0, -10000, 0) // Hide unused instances
+        }
+        meshRef.current.setMatrixAt(i, tempMatrix)
+      }
+      meshRef.current.instanceMatrix.needsUpdate = true
+      meshRef.current.computeBoundingSphere() // Important for raycasting
+    }
+  }, [geometry, actualCount, capacity, material, baseMatrices])
+
   return (
-    <group ref={groupRef}>
-      {candles.map(candle => {
-        const clonedScene = scene.clone()
-        
-        // Apply emissive material to all meshes for glow
-        clonedScene.traverse((child) => {
-          if (child.isMesh) {
-            child.material = child.material.clone()
-            child.material.emissive = new THREE.Color(0xffaa00)
-            child.material.emissiveIntensity = candle.glowIntensity
+    <instancedMesh
+      ref={meshRef}
+      args={[geometry, material, capacity]}
+      frustumCulled={false}
+      onPointerOver={(event) => {
+        event.stopPropagation()
+        console.log('Hovering over candle instance:', event.instanceId)
+        setHovered(true)
+      }}
+      onPointerOut={(event) => {
+        event.stopPropagation()
+        setHovered(false)
+      }}
+      onClick={(event) => {
+        event.stopPropagation()
+        console.log('InstancedPart clicked - instanceId:', event.instanceId, 'Material:', material)
+        if (onCandleClick && event.instanceId !== undefined) {
+          const instanceId = event.instanceId
+          if (instanceId < positions.length) {
+            onCandleClick(instanceId, positions[instanceId])
           }
-        })
+        }
+      }}
+    />
+  )
+}
+
+export function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, additionalCandles = [], onCandleClick, clickedCandleId }) {
+  const { geometries, textures, localMatrices } = useClonedGeometries('/models/tinyVotiveOnly.glb')
+  const basePositions = usePositions(count)
+  const timeRef = useRef(0)
+  const priceRef = useRef(priceDirection)
+  
+  // Combine base positions with additional candles
+  const positions = useMemo(() => {
+    const additional = additionalCandles.map(c => ({
+      x: c.position[0],
+      y: c.position[1],
+      z: c.position[2],
+      rotation: c.rotation || Math.random() * Math.PI * 2
+    }))
+    return [...basePositions, ...additional]
+  }, [basePositions, additionalCandles])
+  
+  // Update priceRef when prop changes
+  useEffect(() => {
+    priceRef.current = priceDirection
+  }, [priceDirection])
+  
+  // Create simple materials - only flame gets a shader
+  const flameMaterial = useMemo(() => new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uClickedId: { value: -1 }, // ID of clicked candle for purple glow
+    },
+    vertexShader: `
+      uniform float uTime;
+      attribute float instanceId;
+      
+      varying float vHeight;
+      varying float vPhase;
+      varying float vInstanceId;
+      
+      float hash(float n) {
+        return fract(sin(n) * 43758.5453123);
+      }
+      
+      void main() {
+        float id = float(gl_InstanceID);
+        vInstanceId = float(gl_InstanceID);
+        vPhase = hash(id) * 6.28318;
         
-        return (
-          <group key={candle.id} position={candle.position}>
-            <primitive
-              object={clonedScene}
-              scale={[candle.scale, candle.scale, candle.scale]}
-            />
-            
-            {/* Glow sphere around new candles */}
-            {candle.glowIntensity > 0.5 && (
-              <>
-                <mesh>
-                  <sphereGeometry args={[1.5, 16, 16]} />
-                  <meshBasicMaterial
-                    color="#ffff00"
-                    transparent
-                    opacity={candle.glowIntensity * 0.05}
-                    depthWrite={false}
-                  />
-                </mesh>
-                
-                {/* Point light for extra glow */}
-                <pointLight
-                  color="#ffaa00"
-                  intensity={candle.glowIntensity}
-                  distance={8}
-                />
-              </>
-            )}
-          </group>
-        )
-      })}
+        // Height normalized 0-1
+        vHeight = clamp((position.y + 0.1) / 0.6, 0.0, 1.0);
+        
+        // Flame flicker animation - MORE DRAMATIC
+        float flameTime = uTime * 3.0 + vPhase;
+        vec3 pos = position;
+        
+        // Strong sway side to side
+        float sway = sin(flameTime * 1.5) * 0.06 * vHeight * vHeight;
+        sway += sin(flameTime * 2.3) * 0.03 * vHeight; // secondary wobble
+        pos.x += sway;
+        
+        // Flicker height - makes flame "dance"
+        float flicker = sin(flameTime * 2.0) * 0.04 * vHeight;
+        flicker += sin(flameTime * 3.7) * 0.02 * vHeight * vHeight;
+        pos.y += flicker;
+        
+        // Z wobble too
+        pos.z += cos(flameTime * 1.8) * 0.04 * vHeight * vHeight;
+        
+        // Taper at top - flame gets thinner
+        float taper = 1.0 - vHeight * 0.5;
+        pos.x *= taper;
+        pos.z *= taper;
+        
+        // Stretch vertically when flickering up
+        float stretch = 1.0 + sin(flameTime * 2.5) * 0.1 * vHeight;
+        pos.y *= stretch;
+        
+        vec4 instancePos = instanceMatrix * vec4(pos, 1.0);
+        gl_Position = projectionMatrix * modelViewMatrix * instancePos;
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform float uClickedId;
+      varying float vHeight;
+      varying float vPhase;
+      varying float vInstanceId;
+      
+      void main() {
+        float time = uTime * 3.0 + vPhase;
+        
+        // Check if this is the clicked candle - more lenient matching
+        bool isClicked = false;
+        if (uClickedId >= 0.0) {
+          // Check if this instance matches the clicked ID
+          float diff = abs(uClickedId - vInstanceId);
+          isClicked = (diff < 1.0);
+        }
+        
+        // Base flame colors
+        vec3 innerColor = vec3(1.0, 0.95, 0.8);   // Hot white center
+        vec3 midColor = vec3(1.0, 0.5, 0.0);      // Orange
+        vec3 outerColor = vec3(1.0, 0.2, 0.0);    // Deep red-orange
+        
+        // Purple glow colors for clicked candle - more dramatic
+        vec3 purpleInner = vec3(1.0, 0.0, 1.0);   // Bright magenta
+        vec3 purpleMid = vec3(0.8, 0.0, 1.0);     // Deep purple
+        vec3 purpleOuter = vec3(0.6, 0.0, 1.0);   // Purple
+        
+        vec3 color;
+        if (isClicked) {
+          // Purple flame for clicked candle
+          if (vHeight < 0.3) {
+            color = mix(purpleInner, purpleMid, vHeight / 0.3);
+          } else if (vHeight < 0.7) {
+            color = mix(purpleMid, purpleOuter, (vHeight - 0.3) / 0.4);
+          } else {
+            color = mix(purpleOuter, vec3(0.8, 0.4, 1.0), (vHeight - 0.7) / 0.3);
+          }
+        } else {
+          // Normal flame colors
+          if (vHeight < 0.3) {
+            color = mix(innerColor, midColor, vHeight / 0.3);
+          } else if (vHeight < 0.7) {
+            color = mix(midColor, outerColor, (vHeight - 0.3) / 0.4);
+          } else {
+            color = mix(outerColor, vec3(1.0, 0.8, 0.0), (vHeight - 0.7) / 0.3);
+          }
+        }
+        
+        // Rapid flicker intensity
+        float flicker = sin(time * 4.0) * 0.25 + sin(time * 9.0) * 0.15 + 1.0;
+        
+        // Much brighter intensity for clicked candle
+        float intensity = isClicked ? 8.0 * flicker : 3.5 * flicker;
+        
+        // Alpha: solid at bottom, fade at top with flicker
+        float alpha = 1.0 - vHeight * 0.5;
+        alpha *= (0.8 + flicker * 0.2);
+        
+        gl_FragColor = vec4(color * intensity, alpha);
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    toneMapped: false,
+  }), [])
+  
+  // Create XBase material with purple glow effect
+  const xbaseMaterial = useMemo(() => new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uClickedId: { value: -1 },
+      uBaseColor: { value: new THREE.Color('#8bec03') },
+      uGlowColor: { value: new THREE.Color('#ff00ff') }
+    },
+    vertexShader: `
+      varying float vInstanceId;
+      
+      void main() {
+        vInstanceId = float(gl_InstanceID);
+        vec4 mvPosition = modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uBaseColor;
+      uniform vec3 uGlowColor;
+      uniform float uClickedId;
+      uniform float uTime;
+      varying float vInstanceId;
+      
+      void main() {
+        // Check if this is the clicked candle
+        bool isClicked = false;
+        if (uClickedId >= 0.0) {
+          float diff = abs(uClickedId - vInstanceId);
+          isClicked = (diff < 1.0);
+        }
+        
+        vec3 color = uBaseColor;
+        float intensity = 1.0;
+        
+        if (isClicked) {
+          // Pulsing purple glow
+          float pulse = sin(uTime * 4.0) * 0.3 + 0.7;
+          color = mix(uGlowColor, vec3(1.0, 0.0, 1.0), pulse);
+          intensity = 2.0 + sin(uTime * 6.0) * 0.5;
+        }
+        
+        gl_FragColor = vec4(color * intensity, 1.0);
+      }
+    `,
+    side: THREE.FrontSide,
+  }), [])
+
+  const materials = useMemo(() => ({
+    xbase: xbaseMaterial,
+    glass: new THREE.MeshBasicMaterial({ color: '#888888', transparent: true, opacity: 0.3 }),
+    wick: new THREE.MeshBasicMaterial({ color: '#222222' }),
+    senora: new THREE.MeshBasicMaterial({ map: textures.senora, transparent: true, side: THREE.DoubleSide }),
+    flame: flameMaterial,
+  }), [textures, flameMaterial, xbaseMaterial])
+  
+  // Update clicked candle ID in both flame and xbase materials
+  useEffect(() => {
+    const idToSet = clickedCandleId !== null ? clickedCandleId : -1
+    
+    if (flameMaterial.uniforms) {
+      flameMaterial.uniforms.uClickedId.value = idToSet
+    }
+    
+    if (xbaseMaterial.uniforms) {
+      xbaseMaterial.uniforms.uClickedId.value = idToSet
+    }
+    
+    console.log('Setting clicked candle ID in shaders:', idToSet)
+  }, [clickedCandleId, flameMaterial, xbaseMaterial])
+  
+  // Update time ref for all animations
+  useFrame((state) => {
+    timeRef.current = state.clock.elapsedTime
+    if (flameMaterial.uniforms) {
+      flameMaterial.uniforms.uTime.value = state.clock.elapsedTime
+    }
+    if (xbaseMaterial.uniforms) {
+      xbaseMaterial.uniforms.uTime.value = state.clock.elapsedTime
+    }
+  })
+  
+  const maxCount = CANDLE_COUNT + MAX_ADDITIONAL
+  
+  // Log what geometries we have
+  useEffect(() => {
+    console.log('Available geometries:', Object.keys(geometries))
+    console.log('Glass geometry:', geometries.glass)
+  }, [geometries])
+
+  return (
+    <group>
+      {/* All parts should be clickable */}
+      <InstancedPart geometry={geometries.xbase} material={materials.xbase} positions={positions} localMatrix={localMatrices.xbase} timeRef={timeRef} priceRef={priceRef} maxCount={maxCount} onCandleClick={onCandleClick} />
+      <InstancedPart geometry={geometries.wick} material={materials.wick} positions={positions} localMatrix={localMatrices.wick} timeRef={timeRef} priceRef={priceRef} maxCount={maxCount} onCandleClick={onCandleClick} />
+      <InstancedPart geometry={geometries.senora} material={materials.senora} positions={positions} localMatrix={localMatrices.senora} timeRef={timeRef} priceRef={priceRef} maxCount={maxCount} onCandleClick={onCandleClick} />
+      <InstancedPart geometry={geometries.flame} material={materials.flame} positions={positions} localMatrix={localMatrices.flame} timeRef={timeRef} priceRef={priceRef} maxCount={maxCount} onCandleClick={onCandleClick} />
+      {/* Glass last for click priority */}
+      <InstancedPart geometry={geometries.glass} material={materials.glass} positions={positions} localMatrix={localMatrices.glass} timeRef={timeRef} priceRef={priceRef} maxCount={maxCount} onCandleClick={onCandleClick} />
     </group>
   )
 }
 
+useGLTF.preload('/models/tinyVotiveOnly.glb')
 
-// ============================================
-// MAIN SHRINE SCENE
-// ============================================
-function ShrineScene({ priceChange = 2.5, offerings = [], totalCandles = 847, totalBurned = 1250000, onSelectOffering, onLightCandle, newCandleTrigger, phonePosition = [-8, 0, 2], addedCandles = [], onNewCandle }) {
-  const [selectedOffering, setSelectedOffering] = useState(null)
+// Demo price simulator component
+export function PriceSimulator({ onPriceChange }) {
+  useFrame((state) => {
+    // Simulate price movement: slow wave with occasional spikes
+    const t = state.clock.elapsedTime
+    const baseWave = Math.sin(t * 0.2) * 0.5
+    const spike = Math.sin(t * 0.7) * Math.sin(t * 0.3) * 0.3
+    const price = baseWave + spike
+    onPriceChange(price)
+  })
+  return null
+}
+
+export default function CandleShrine({ offerings = [], onSelectOffering, onLightCandle, onPriceChange, is80sMode }) {
+  const [priceDirection, setPriceDirection] = useState(0)
+  const [additionalCandles, setAdditionalCandles] = useState([])
+  const pricePercent = (priceDirection * 5).toFixed(2) // Convert to percentage
+  const effectManagerRef = useRef()
+  const [clickedCandleId, setClickedCandleId] = useState(null) // Track which candle was clicked
   
-  // Pass selection to parent component
-  useEffect(() => {
-    if (onSelectOffering) {
-      onSelectOffering(selectedOffering)
+  const handleNewCandle = (position, offering) => {
+    console.log('New candle added at:', position)
+    setAdditionalCandles(prev => [...prev, {
+      position,
+      offering,
+      id: Date.now(),
+      rotation: Math.random() * Math.PI * 2
+    }])
+  }
+  
+  const triggerNewCandle = () => {
+    if (effectManagerRef.current) {
+      effectManagerRef.current.triggerEffect({ name: 'Test User', type: 'petition' })
     }
-  }, [selectedOffering, onSelectOffering])
+  }
   
-  // Convert price change percentage to direction (-1 to 1)
-  const priceDirection = Math.max(-1, Math.min(1, priceChange / 5))
-  
-  // Debug log to check if price is changing
-  useEffect(() => {
-    console.log('Price change:', priceChange, '% -> Direction:', priceDirection)
-  }, [priceChange, priceDirection])
+  const handleCandleClick = (instanceId, position) => {
+    console.log('Candle clicked:', instanceId, position)
+    
+    // Set the clicked candle ID for visual feedback
+    setClickedCandleId(instanceId)
+    
+    // Clear the glow after 2 seconds
+    setTimeout(() => {
+      setClickedCandleId(null)
+    }, 2000)
+    
+    // Select a random offering to display on phone screen
+    if (offerings && offerings.length > 0) {
+      const randomIndex = Math.floor(Math.random() * offerings.length)
+      const selectedOffering = offerings[randomIndex]
+      console.log('Selected offering:', selectedOffering)
+      if (onSelectOffering) {
+        onSelectOffering(selectedOffering)
+      }
+    }
+  }
   
   return (
-    <div style={{ width: '100%', height: '100vh', position: 'relative', background: '#000' }}>
+    <div style={{ width: '100%', height: '100vh', background: '#000', position: 'relative' }}>
       <Canvas
-        camera={{ position: [0, 0, 8], fov: 60 }}
+        camera={{ position: [0, 0, 15], fov: 60 }}
+        dpr={2}
         gl={{ 
-          antialias: true, 
-          alpha: false,
-          toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.5
+          antialias: true,
+          powerPreference: "high-performance",
         }}
       >
-        <ambientLight intensity={0.4} color="#ffffff" />
-        <pointLight position={[10, 10, 10]} intensity={0.5} color="#ffffff" />
-        <pointLight position={[0, -5, 5]} color="#8bec03" intensity={0.3} />
-        <pointLight position={[-5, 0, 3]} color="#8bec03" intensity={0.2} />
-        <pointLight position={[5, 0, 3]} color="#8bec03" intensity={0.2} />
-        
+        <ambientLight intensity={0.6} />
+        <pointLight position={[10, 10, 10]} intensity={0.5} />
         <GradientBackground priceDirection={priceDirection} />
-        
-        <CandleCloud
-          priceDirection={priceDirection}
-          offerings={offerings}
-          onSelectOffering={setSelectedOffering}
-          additionalCandles={addedCandles}
-          newCandleAdded={false}
-        />
-        
-        {/* New candle effect manager with smooth animation */}
+        <CandleCloud count={CANDLE_COUNT} priceDirection={priceDirection} additionalCandles={additionalCandles} onCandleClick={handleCandleClick} clickedCandleId={clickedCandleId} />
+        <PriceSimulator onPriceChange={(price) => {
+          setPriceDirection(price)
+          if (onPriceChange) {
+            onPriceChange(price * 5) // Convert to percentage
+          }
+        }} />
         <NewCandleEffectManager
-          phonePosition={phonePosition}
-          cloudBounds={{ x: SPREAD.x, y: SPREAD.y, z: SPREAD.z }}
-          onNewCandle={onNewCandle}
+          ref={effectManagerRef}
+          phonePosition={[0, -3, 5]}
+          cloudBounds={{ x: 20, y: 10, z: 10 }}
+          onNewCandle={handleNewCandle}
           candleModelPath="/models/tinyVotiveOnly.glb"
-          ref={newCandleTrigger}
         />
-        
-        <fog attach="fog" args={['#1a1a2e', 15, 40]} />
         
         <EffectComposer>
           <Bloom
-            intensity={1}
+            intensity={1.2}
             luminanceThreshold={0.2}
             luminanceSmoothing={0.9}
             mipmapBlur
             radius={0.8}
           />
-          <BrightnessContrast
-            brightness={0.1}
-            contrast={0.2}
-          />
         </EffectComposer>
       </Canvas>
       
-      <ShrineStats
-        totalCandles={totalCandles}
-        totalBurned={totalBurned}
-        priceChange={priceChange}
-      />
-      
-      {/* Tooltip disabled - now showing on phone screen instead */}
-      {/* <OfferingTooltip offering={selectedOffering} /> */}
-    </div>
-  )
-}
-
-// ============================================
-// EXAMPLE USAGE WITH MOCK DATA
-// ============================================
-export default function CandleShrine({ offerings: externalOfferings, onSelectOffering, onLightCandle }) {
-  const [tokenPrice, setTokenPrice] = useState(0.042)
-  const [priceChange, setPriceChange] = useState(2.0)
-  const [priceHistory, setPriceHistory] = useState([0.042])
-  const [volume24h, setVolume24h] = useState(125000)
-  const [marketCap, setMarketCap] = useState(4200000)
-  const newCandleTriggerRef = useRef() // Reference to trigger new candle effect
-  const [addedCandles, setAddedCandles] = useState([]) // Track dynamically added candles
-  
-  // Handle new candle being added to the scene permanently
-  const handleNewCandle = (position, offering) => {
-    console.log('Adding permanent candle at:', position, offering)
-    setAddedCandles(prev => [...prev, { position, offering, id: Date.now() }])
-    // Here you could also persist to Firebase or other storage
-  }
-  
-  const mockOfferings = [
-    { name: 'chelleville', type: 'petition', message: 'May my bags pump eternally', tokensBurned: 1000 },
-    { name: 'degen_mike', type: 'appreciation', message: 'Thanks for the 10x Our Lady', tokensBurned: 5000 },
-    { name: 'cryptopriest', type: 'confession', message: 'I sold the bottom...', tokensBurned: 2500 },
-    { name: 'hodlqueen', type: 'petition', message: 'Deliver us from paper hands', tokensBurned: 10000 },
-    { name: 'anonymous', type: 'appreciation', message: null, tokensBurned: 500 },
-  ]
-  
-  // Simulate price movements with momentum
-  useEffect(() => {
-    let momentum = 0
-    
-    const interval = setInterval(() => {
-      setTokenPrice(prev => {
-        // Random walk with momentum
-        const noise = (Math.random() - 0.5) * 0.01
-        momentum = momentum * 0.95 + noise // Decay momentum, add noise
-        
-        // Occasional larger moves
-        if (Math.random() < 0.05) {
-          momentum += (Math.random() - 0.5) * 0.05
-        }
-        
-        const newPrice = Math.max(0.001, prev * (1 + momentum))
-        
-        // Calculate 24h change (simplified)
-        const percentChange = ((newPrice - 0.042) / 0.042) * 100
-        setPriceChange(percentChange)
-        
-        setPriceHistory(history => [...history.slice(-49), newPrice])
-        setVolume24h(v => v * (0.98 + Math.random() * 0.04))
-        setMarketCap(newPrice * 100000000)
-        
-        return newPrice
-      })
-    }, 2000) // Update every 2 seconds (less frequent)
-    
-    return () => clearInterval(interval)
-  }, [])
-  
-  // Use external offerings if provided, otherwise use mock data
-  const actualOfferings = externalOfferings || mockOfferings
-  
-  return (
-    <>
-      {/* Price Ticker */}
+      {/* Stats overlay */}
       <div style={{
         position: 'absolute',
-        top: '160px',  // Moved down to avoid overlapping with other UI
-        right: '20px',
-        background: 'rgba(0, 0, 0, 0.8)',
-        border: `2px solid ${priceChange >= 0 ? '#00ff66' : '#ff4444'}`,
-        borderRadius: '12px',
-        padding: '16px',
+        top: '20px',
+        left: '20px',
         color: '#fff',
         fontFamily: 'monospace',
-        fontSize: '14px',
-        backdropFilter: 'blur(10px)',
-        boxShadow: `0 0 20px ${priceChange >= 0 ? 'rgba(0, 255, 100, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
-        zIndex: 1000,
-        width: '240px'  // Fixed width instead of minWidth
+        fontSize: '12px',
       }}>
         <div style={{ 
-          fontSize: '24px', 
+          color: priceDirection >= 0 ? '#00ff66' : '#ff4444',
+          fontSize: '24px',
           fontWeight: 'bold',
-          color: priceChange >= 0 ? '#00ff66' : '#ff4444',
           marginBottom: '8px'
         }}>
-          ${tokenPrice.toFixed(6)}
+          {priceDirection >= 0 ? '↑' : '↓'} {pricePercent}%
         </div>
-        <div style={{
-          fontSize: '18px',
-          color: priceChange >= 0 ? '#00ff66' : '#ff4444',
-          marginBottom: '12px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-          <span>{priceChange >= 0 ? '▲' : '▼'}</span>
-          <span>{Math.abs(priceChange).toFixed(2)}%</span>
+        <div style={{ color: '#888' }}>
+          🕯️ {(CANDLE_COUNT + additionalCandles.length).toLocaleString()} candles burning
         </div>
-        <div style={{ fontSize: '12px', color: '#888', marginBottom: '4px' }}>
-          Vol 24h: ${volume24h.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-        </div>
-        <div style={{ fontSize: '12px', color: '#888' }}>
-          MCap: ${marketCap.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-        </div>
-        
-        {/* Mini chart */}
-        <div style={{
-          marginTop: '12px',
-          height: '40px',
-          display: 'flex',
-          alignItems: 'flex-end',
-          gap: '1px'
-        }}>
-          {priceHistory.slice(-20).map((price, i) => {
-            const min = Math.min(...priceHistory.slice(-20))
-            const max = Math.max(...priceHistory.slice(-20))
-            const range = max - min || 1
-            const height = ((price - min) / range) * 35 + 5
-            return (
-              <div
-                key={i}
-                style={{
-                  width: '8px',
-                  height: `${height}px`,
-                  background: i === 19 ? (priceChange >= 0 ? '#00ff66' : '#ff4444') : '#444',
-                  borderRadius: '2px'
-                }}
-              />
-            )
-          })}
+        <div style={{ color: '#666', marginTop: '4px' }}>
+          🔥 1,250,000 RL80 sacrificed
         </div>
       </div>
       
-      <ShrineScene
-        priceChange={priceChange}
-        offerings={actualOfferings}
-        totalCandles={847}
-        totalBurned={1250000}
-        onSelectOffering={onSelectOffering}
-        onLightCandle={onLightCandle}
-        newCandleTrigger={newCandleTriggerRef}
-        phonePosition={[-8, 0, 2]}
-        addedCandles={addedCandles}
-        onNewCandle={handleNewCandle}
-      />
-      
-      {/* Light a Candle Button with Heading */}
-      <div style={{
-        position: 'absolute',
-        bottom: '20px',
-        right: '20px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        width: '200px', // Fixed width for both text and button
-      }}>
-        <div style={{
-          color: 'rgba(255, 255, 255, 0.9)',
-          fontSize: '1.1rem',
-          fontFamily: "'UnifrakturMaguntia', serif",
-        //   textTransform: 'uppercase',
-          letterSpacing: '1px',
-          marginBottom: '12px',
-          textAlign: 'center',
-          width: '100%',
-          textShadow: '0 0 20px rgba(0, 255, 102, 0.6), 0 2px 4px rgba(0, 0, 0, 0.8)',
-        }}>
-          Get on Her Watchlist
-        </div>
-        <button
-          style={{
-            width: '100%', // Full width of container
-            background: 'linear-gradient(135deg, #00ff66 0%, #00aa44 100%)',
-            border: 'none',
-            borderRadius: '8px',
-            padding: '16px 32px',
-            color: '#000',
-            fontFamily: 'monospace',
-            fontSize: '16px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            boxShadow: '0 0 30px rgba(0, 255, 100, 0.4)',
-          }}
-        onClick={() => {
-          // Create a new offering with randomized data for testing
-          const messages = [
-            'Please pump my bags to the moon 🚀',
-            'Grant me diamond hands in these trying times',
-            'May the green candles be ever in my favor',
-            'Bless this dip for I shall slurp',
-            'Forgive me for selling the bottom',
-            'Thank you for this glorious pump',
-            'Guide me through the bear market darkness'
-          ]
-          const names = ['anon_trader', 'crypto_believer', 'hodl_warrior', 'defi_degen', 'moon_boy', 'whale_watcher']
-          const types = ['petition', 'confession', 'appreciation']
-          
-          const newOffering = {
-            name: names[Math.floor(Math.random() * names.length)],
-            type: types[Math.floor(Math.random() * types.length)],
-            message: messages[Math.floor(Math.random() * messages.length)],
-            tokensBurned: Math.floor(Math.random() * 10000) + 500,
-            timestamp: 'just now'
-          }
-          
-          console.log('🕯️ New candle lit:', newOffering)
-          
-          // Call the callback to show on phone screen
-          if (onLightCandle) {
-            onLightCandle(newOffering)
-          }
-          
-          // Trigger new candle animation using the smooth effect
-          if (newCandleTriggerRef.current?.triggerEffect) {
-            newCandleTriggerRef.current.triggerEffect(newOffering)
-          }
+      {/* Light a candle button */}
+      <button
+        onClick={triggerNewCandle}
+        style={{
+          position: 'absolute',
+          bottom: '20px',
+          right: '20px',
+          background: 'linear-gradient(135deg, #00ff66 0%, #00aa44 100%)',
+          border: 'none',
+          borderRadius: '8px',
+          padding: '16px 32px',
+          color: '#000',
+          fontFamily: 'monospace',
+          fontSize: '16px',
+          fontWeight: 'bold',
+          cursor: 'pointer',
+          boxShadow: '0 0 30px rgba(0, 255, 100, 0.4)',
         }}
       >
         🕯️ Light a Candle
       </button>
-      </div>
-    </>
+      
+      {/* Test button to trigger candle click */}
+      <button
+        onClick={() => {
+          // Simulate clicking on candle with ID 10
+          handleCandleClick(10, { x: 0, y: 0, z: 0 })
+        }}
+        style={{
+          position: 'absolute',
+          bottom: '20px',
+          left: '20px',
+          background: 'linear-gradient(135deg, #aa66ff 0%, #6633cc 100%)',
+          border: 'none',
+          borderRadius: '8px',
+          padding: '16px 32px',
+          color: '#fff',
+          fontFamily: 'monospace',
+          fontSize: '16px',
+          fontWeight: 'bold',
+          cursor: 'pointer',
+          boxShadow: '0 0 30px rgba(170, 102, 255, 0.4)',
+          zIndex: 1000
+        }}
+      >
+        🔮 Test Candle Click
+      </button>
+    </div>
   )
 }
