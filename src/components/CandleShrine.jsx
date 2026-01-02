@@ -493,6 +493,7 @@ export function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, addition
       uClickedId: { value: -1 }, // ID of clicked candle for purple glow
     },
     vertexShader: `
+      precision highp float;
       uniform float uTime;
       attribute float instanceId;
       
@@ -543,6 +544,7 @@ export function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, addition
       }
     `,
     fragmentShader: `
+      precision highp float;
       uniform float uTime;
       uniform float uClickedId;
       varying float vHeight;
@@ -620,6 +622,7 @@ export function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, addition
       uGlowColor: { value: new THREE.Color('#ff00ff') }
     },
     vertexShader: `
+      precision highp float;
       varying float vInstanceId;
       
       void main() {
@@ -629,6 +632,7 @@ export function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, addition
       }
     `,
     fragmentShader: `
+      precision highp float;
       uniform vec3 uBaseColor;
       uniform vec3 uGlowColor;
       uniform float uClickedId;

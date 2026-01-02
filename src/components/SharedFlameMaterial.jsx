@@ -29,6 +29,7 @@ export function getSharedFlameMaterial(canvasId = 'default') {
       uIntensity: { value: 2.5 }, // Increased intensity
     },
     vertexShader: `
+      precision highp float;
       uniform float uTime;
       
       varying vec2 vUv;
@@ -115,6 +116,7 @@ export function getSharedFlameMaterial(canvasId = 'default') {
       }
     `,
     fragmentShader: `
+      precision highp float;
       uniform float uTime;
       uniform vec3 uBaseColor;
       uniform vec3 uMidColor;

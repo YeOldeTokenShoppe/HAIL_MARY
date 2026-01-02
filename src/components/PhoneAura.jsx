@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
 const auraFragmentShader = `
+  precision highp float;
   uniform vec3 color;
   uniform float opacity;
   uniform float time;
@@ -29,6 +30,7 @@ const auraFragmentShader = `
 `
 
 const auraVertexShader = `
+  precision highp float;
   varying vec2 vUv;
   void main() {
     vUv = uv;

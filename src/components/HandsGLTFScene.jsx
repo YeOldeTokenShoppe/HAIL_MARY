@@ -487,6 +487,7 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
                 uOpacity: { value: 0.6 }
               },
               vertexShader: `
+                precision highp float;
                 varying vec2 vUv;
                 varying vec3 vPosition;
                 
@@ -497,6 +498,7 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
                 }
               `,
               fragmentShader: `
+                precision highp float;
                 uniform float uTime;
                 uniform float uOpacity;
                 varying vec2 vUv;

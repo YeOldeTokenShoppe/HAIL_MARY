@@ -252,6 +252,7 @@ function TrailParticleMaterial() {
         uColor: { value: new THREE.Color('#00ff66') }
       },
       vertexShader: `
+        precision highp float;
         attribute float size;
         attribute float opacity;
         varying float vOpacity;
@@ -264,6 +265,7 @@ function TrailParticleMaterial() {
         }
       `,
       fragmentShader: `
+        precision highp float;
         uniform vec3 uColor;
         varying float vOpacity;
         

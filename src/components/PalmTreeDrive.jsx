@@ -713,6 +713,7 @@ const PalmsScene = ({ onLoadingChange }) => {
         fogFar: { value: scene.fog.far }
       },
       vertexShader: `
+        precision highp float;
         uniform float time;
         varying vec3 vPos;
         varying vec2 vUv;
@@ -733,6 +734,7 @@ const PalmsScene = ({ onLoadingChange }) => {
         }
       `,
       fragmentShader: `
+        precision highp float;
         uniform float time;
         uniform vec3 fogColor;
         uniform float fogNear;

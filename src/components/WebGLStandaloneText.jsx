@@ -70,6 +70,7 @@ export default function WebGLStandaloneText({
         uTime: { value: 0 }
       },
       vertexShader: `
+        precision highp float;
         varying vec2 vUv;
 
         void main() {
@@ -78,6 +79,7 @@ export default function WebGLStandaloneText({
         }
       `,
       fragmentShader: `
+        precision highp float;
         uniform sampler2D tDiffuse;
         uniform float uVelocity;
         uniform float uTime;
@@ -136,6 +138,7 @@ export default function WebGLStandaloneText({
         uVelocity: { value: 0 }
       },
       vertexShader: `
+        precision highp float;
         uniform float uTime;
         uniform float uProgress;
         
@@ -160,6 +163,7 @@ export default function WebGLStandaloneText({
         }
       `,
       fragmentShader: `
+        precision highp float;
         uniform vec3 uColor;
         uniform float uProgress;
         uniform float uTime;
