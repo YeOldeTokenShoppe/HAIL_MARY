@@ -269,7 +269,7 @@ function CarouselPageContent() {
       }}>
       
       {/* Add inline keyframes for font and spinning animation */}
-      <style jsx global>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         @font-face {
           font-family: 'UnifrakturMaguntia';
           src: url('/fonts/UnifrakturMaguntia-Regular.ttf') format('truetype');
@@ -286,55 +286,126 @@ function CarouselPageContent() {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
-      `}</style>
- 
-      {/* Toggle Button for Views */}
+      `}} />
+      
+      {/* Cyber Toggle Switch for Views */}
       <div style={{
         position: "fixed",
         bottom: "30px",
         left: "50%",
         transform: "translateX(-50%)",
         zIndex: 1000,
-        display: "flex",
-        gap: "10px",
-        background: "rgba(0, 0, 0, 0.8)",
-        padding: "10px 20px",
-        borderRadius: "30px",
-        backdropFilter: "blur(10px)",
-        border: "1px solid rgba(255, 255, 255, 0.2)"
       }}>
-        <button
-          onClick={() => handleViewChange('carousel')}
+        <div 
           style={{
-            background: currentView === 'carousel' ? "#00ff66" : "transparent",
-            color: currentView === 'carousel' ? "#000" : "#fff",
-            border: "none",
-            padding: "8px 20px",
-            borderRadius: "20px",
-            fontFamily: "monospace",
-            fontSize: "14px",
-            cursor: "pointer",
-            transition: "all 0.3s ease"
+            position: 'relative',
+            width: '200px',
+            height: '50px',
+            background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%)',
+            border: '2px solid #9945ff',
+            borderRadius: '25px',
+            overflow: 'hidden',
+            cursor: 'pointer',
+            boxShadow: '0 0 20px rgba(153, 69, 255, 0.3), inset 0 0 20px rgba(0, 0, 0, 0.8)',
           }}
+          onClick={() => handleViewChange(currentView === 'carousel' ? 'shrine' : 'carousel')}
         >
-          📜 Lore
-        </button>
-        <button
-          onClick={() => handleViewChange('shrine')}
-          style={{
-            background: currentView === 'shrine' ? "#00ff66" : "transparent",
-            color: currentView === 'shrine' ? "#000" : "#fff",
-            border: "none",
-            padding: "8px 20px",
-            borderRadius: "20px",
-            fontFamily: "monospace",
-            fontSize: "14px",
-            cursor: "pointer",
-            transition: "all 0.3s ease"
-          }}
-        >
-          🕯️ Shrine
-        </button>
+          {/* Toggle slider */}
+          <div style={{
+            position: 'absolute',
+            top: '3px',
+            left: currentView === 'carousel' ? '3px' : '103px',
+            width: '94px',
+            height: '44px',
+            background: `linear-gradient(135deg, ${currentView === 'carousel' ? '#00ff66' : '#9945ff'} 0%, ${currentView === 'carousel' ? '#00cc44' : '#7c37d0'} 100%)`,
+            borderRadius: '22px',
+            transition: 'all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+            boxShadow: `0 0 15px ${currentView === 'carousel' ? 'rgba(0, 255, 102, 0.6)' : 'rgba(153, 69, 255, 0.6)'}, inset 0 0 10px rgba(255, 255, 255, 0.2)`,
+          }} />
+          
+          {/* Icons */}
+          <span style={{
+            position: 'absolute',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            fontSize: '20px',
+            transition: 'all 0.3s ease',
+            pointerEvents: 'none',
+            userSelect: 'none',
+            left: '8px',
+            opacity: currentView === 'carousel' ? '1' : '0.3',
+            filter: currentView === 'carousel' ? 'drop-shadow(0 0 3px rgba(0, 255, 102, 0.8))' : 'none',
+          }}></span>
+          
+          {/* Labels */}
+          <span style={{
+            position: 'absolute',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            fontFamily: "'Courier New', monospace",
+            fontWeight: 'bold',
+            fontSize: '14px',
+            letterSpacing: '1px',
+            textTransform: 'uppercase',
+            transition: 'all 0.3s ease',
+            pointerEvents: 'none',
+            userSelect: 'none',
+            left: '28px',
+            color: currentView === 'carousel' ? '#000' : '#666',
+            textShadow: currentView === 'carousel' ? '0 0 5px rgba(0, 255, 102, 0.8)' : 'none',
+          }}>Lore</span>
+          
+          <span style={{
+            position: 'absolute',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            fontFamily: "'Courier New', monospace",
+            fontWeight: 'bold',
+            fontSize: '14px',
+            letterSpacing: '1px',
+            textTransform: 'uppercase',
+            transition: 'all 0.3s ease',
+            pointerEvents: 'none',
+            userSelect: 'none',
+            right: '22px',
+            color: currentView === 'shrine' ? '#fff' : '#666',
+            textShadow: currentView === 'shrine' ? '0 0 5px rgba(153, 69, 255, 0.8)' : 'none',
+          }}>Shrine</span>
+          
+          <span style={{
+            position: 'absolute',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            fontSize: '20px',
+            transition: 'all 0.3s ease',
+            pointerEvents: 'none',
+            userSelect: 'none',
+            right: '8px',
+            opacity: currentView === 'shrine' ? '1' : '0.3',
+            filter: currentView === 'shrine' ? 'drop-shadow(0 0 3px rgba(153, 69, 255, 0.8))' : 'none',
+          }}></span>
+          
+          {/* Circuit lines */}
+          <div style={{
+            position: 'absolute',
+            height: '1px',
+            background: 'linear-gradient(90deg, transparent, #00ffff, transparent)',
+            opacity: '0.3',
+            top: '0',
+            left: '0',
+            right: '0',
+          }} />
+          
+          <div style={{
+            position: 'absolute',
+            height: '1px',
+            background: 'linear-gradient(90deg, transparent, #00ffff, transparent)',
+            opacity: '0.3',
+            bottom: '0',
+            left: '0',
+            right: '0',
+          }} />
+        </div>
       </div>
       
       {/* Animated Views Container */}
@@ -488,12 +559,7 @@ function CarouselPageContent() {
                 fontSize: isMobileView ? "2rem" : "3rem",
                 color: "#fff",
                 margin: 0,
-                textShadow: `
-                  0 0 40px rgba(0, 255, 102, 0.8),
-                  0 0 80px rgba(0, 255, 102, 0.4),
-                  0 0 120px rgba(0, 255, 102, 0.2),
-                  2px 2px 4px rgba(0, 0, 0, 0.8)
-                `,
+                textShadow: "0 0 40px rgba(0, 255, 102, 0.8), 0 0 80px rgba(0, 255, 102, 0.4), 0 0 120px rgba(0, 255, 102, 0.2), 2px 2px 4px rgba(0, 0, 0, 0.8)",
                 letterSpacing: "0.05em",
                 fontWeight: "normal",
                 WebkitTextStroke: "1px rgba(0, 255, 102, 0.3)"
@@ -542,6 +608,21 @@ function CarouselPageContent() {
             </Link>
             {Array.from({length: 100}).map((_, i) => {
               const index = i + 1;
+              const r80s = 201 - index * 2;
+              const g80s = 55 - index * 3;
+              const b80s = 256 - index * 2;
+              const rNormal = 255 - index * 2;
+              const gNormal = 255 - index * 3;
+              const bNormal = 255 - index * 2;
+              const translateX = index * 0.1;
+              const translateY = index * 0.1;
+              const scale = 1 + index * 0.01;
+              
+              // Create color strings
+              const color80s = 'rgba(' + r80s + ', ' + g80s + ', ' + b80s + ')';
+              const colorNormal = 'rgba(' + rNormal + ', ' + gNormal + ', ' + bNormal + ')';
+              const transformStr = 'translate(' + translateX + 'rem, ' + translateY + 'rem) scale(' + scale + ')';
+              
               return (
                 <div
                   key={index}
@@ -552,14 +633,9 @@ function CarouselPageContent() {
                     zIndex: -1,
                     top: 0,
                     left: 0,
-                    color: is80sMode 
-                      ? `rgba(${201 - index * 2}, ${55 - index * 3}, ${256 - index * 2})` 
-                      : `rgba(${255 - index * 2}, ${255 - index * 3}, ${255 - index * 2})`,
+                    color: is80sMode ? color80s : colorNormal,
                     filter: "blur(0.1rem)",
-                    transform: `translate(
-                      ${index * 0.1}rem, 
-                      ${index * 0.1}rem
-                    ) scale(${1 + index * 0.01})`,
+                    transform: transformStr,
                     opacity: (1 / index) * 1.5,
                   }}
                 >
@@ -575,144 +651,6 @@ function CarouselPageContent() {
      
      
       
-      {/* Control Buttons - Positioned horizontally below CyberNav */}
-      {/* Music Button */}
-      {/* <div
-        style={{
-          position: "fixed",
-          top: "5rem",
-          right: "1rem",
-          zIndex: 290
-        }}
-      >
-        {
-            !showMusicControls ? (
-              <button
-                onClick={() => handleMusicToggle(true)}
-                style={{
-                  width: isMobileDevice ? "3.5rem" : "3.5rem",
-                  height: isMobileDevice ? "3.5rem" : "3.5rem",
-                  borderRadius: "0.5rem",
-                  backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.2)" : "rgba(0, 0, 0, 0.7)",
-                  border: is80sMode ? "2px solid #D946EF" : "2px solid rgba(255, 255, 255, 0.2)",
-                  color: is80sMode ? "#67e8f9" : "#ffffff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  transition: "all 0.3s ease",
-                  backdropFilter: "blur(10px)",
-                  boxShadow: "0 0.125rem 0.5rem rgba(0, 0, 0, 0.3)",
-                }}
-                title="Toggle Music"
-              >
-                <svg
-                  width={isMobileDevice ? "20" : "30"}
-                  height={isMobileDevice ? "20" : "30"}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M9 18V5l12-2v13" />
-                  <circle cx="6" cy="18" r="3" />
-                  <circle cx="18" cy="16" r="3" />
-                </svg>
-              </button>
-            ) : (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                }}
-              >
-                <div
-                  style={{
-                    width: isMobileDevice ? "3rem" : "3.5rem",
-                    height: isMobileDevice ? "3rem" : "3.5rem",
-                    borderRadius: "50%",
-                    overflow: "hidden",
-                    animation: contextIsPlaying ? "spin 4s linear infinite" : "none",
-                    cursor: "pointer"
-                  }}
-                  onClick={() => {
-                    if (contextIsPlaying) {
-                      pause();
-                    } else {
-                      play();
-                    }
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      backgroundImage: "url('/virginRecords.jpg')",
-                      backgroundSize: "cover",
-                      backgroundPosition: "center"
-                    }}
-                  />
-                </div>
-                
-                <button
-                  onClick={() => nextTrack && nextTrack()}
-                  style={{
-                    width: isMobileDevice ? "2rem" : "2.5rem",
-                    height: isMobileDevice ? "2rem" : "2.5rem",
-                    borderRadius: "0.25rem",
-                    backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.2)" : "rgba(0, 0, 0, 0.7)",
-                    border: is80sMode ? "2px solid #D946EF" : "2px solid rgba(255, 255, 255, 0.2)",
-                    color: is80sMode ? "#67e8f9" : "#ffffff",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    transition: "all 0.3s ease",
-                    backdropFilter: "blur(10px)",
-                    boxShadow: "0 0.125rem 0.375rem rgba(0, 0, 0, 0.3)",
-                  }}
-                  title="Next Track"
-                >
-                  <svg width={isMobileDevice ? "14" : "18"} height={isMobileDevice ? "14" : "18"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="5 4 15 12 5 20 5 4"/>
-                    <line x1="19" y1="5" x2="19" y2="19"/>
-                  </svg>
-                </button>
-                
-                <button
-                  onClick={() => {
-                    handleMusicToggle(false);
-                    pause && pause();
-                  }}
-                  style={{
-                    width: isMobileDevice ? "1.75rem" : "2rem",
-                    height: isMobileDevice ? "1.75rem" : "2rem",
-                    borderRadius: "0.25rem",
-                    backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.2)" : "rgba(0, 0, 0, 0.7)",
-                    border: is80sMode ? "1px solid #D946EF" : "1px solid rgba(255, 255, 255, 0.2)",
-                    color: is80sMode ? "#67e8f9" : "#ffffff",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    transition: "all 0.3s ease",
-                    backdropFilter: "blur(10px)",
-                    boxShadow: "0 0.125rem 0.375rem rgba(0, 0, 0, 0.3)",
-                  }}
-                  title="Close Music"
-                >
-                  <svg width={isMobileDevice ? "12" : "14"} height={isMobileDevice ? "12" : "14"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
-                  </svg>
-                </button>
-              </div>
-            )
-          }
-      </div>
       
       <div
         style={{
@@ -724,99 +662,11 @@ function CarouselPageContent() {
       >
       </div>
       
-      <div
-        style={{
-          position: "fixed",
-          top: "9rem",
-          right: "1rem",
-          zIndex: 290
-        }}
-      >
-        <button
-          onClick={() => toggle80sMode(!is80sMode)}
-          style={{
-            width: isMobileDevice ? "3.5rem" : "3.5rem",
-            height: isMobileDevice ? "3.5rem" : "3.5rem",
-            borderRadius: "0.5rem",
-            backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.3)" : "rgba(0, 0, 0, 0.7)",
-            border: is80sMode ? "2px solid #D946EF" : "2px solid rgba(255, 255, 255, 0.2)",
-            color: is80sMode ? "#67e8f9" : "#ffffff",
-            display: "flex",
-            lineHeight: 0.7,
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            transition: "all 0.3s ease",
-            backdropFilter: "blur(10px)",
-            boxShadow: is80sMode 
-              ? "0 0 20px rgba(217, 70, 239, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3)" 
-              : "0 2px 8px rgba(0, 0, 0, 0.3)",
-          }}
-          onMouseEnter={(e) => {
-            if (is80sMode) {
-              e.currentTarget.style.boxShadow = "0 0 30px rgba(217, 70, 239, 0.7), 0 2px 8px rgba(0, 0, 0, 0.3)";
-            } else {
-              e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.8)";
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (is80sMode) {
-              e.currentTarget.style.boxShadow = "0 0 20px rgba(217, 70, 239, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3)";
-            } else {
-              e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
-            }
-          }}
-          title={is80sMode ? "Disable 80s Mode" : "Enable 80s Mode"}
-        >
-          <span style={{
-            fontSize: isMobileDevice ? "18px" : "22px",
-            fontWeight: "bold",
-            color: is80sMode ? "#00ff41" : "#67e8f9",
-            textShadow: is80sMode ? "0 0 10px #00ff41" : "none",
-            fontFamily: "monospace"
-          }}>
-            80s<br/>
-             <span style={{
-            fontSize: isMobileDevice ? "10px" : "12px",
-            fontWeight: "bold",
-            color: is80sMode ? "#00ff41" : "#67e8f9",
-            textShadow: is80sMode ? "0 0 10px #00ff41" : "none",
-            fontFamily: "monospace"
-          }}>
-            mode
-          </span>
-          </span>
-        </button>
-      </div>
-      
-      {!isMobileView && (
-        <div style={{
-          position: "fixed",
-          top: "1rem",
-          right: "8rem",
-          zIndex: 200,
-        }}>
-          <CyberGlitchButton 
-            text="BUY RL80_"
-            onClick={() => {
-              const event = new CustomEvent('openBuyModal')
-              window.dispatchEvent(event)
-            }}
-            primaryHue={274}  // Purple (CYBER color)
-            primaryShadowHue={180}  // Cyan
-            secondaryShadowHue={60}  // Yellow
-            label="RP80"
-            mobile={false}
-          />
-        </div>
-      )} */}
-      
       {/* Thirdweb Buy Modal */}
       <ThirdwebBuyModal 
         isOpen={showBuyModal} 
         onClose={() => setShowBuyModal(false)}
       />
-      
       </div>
     </>
   )

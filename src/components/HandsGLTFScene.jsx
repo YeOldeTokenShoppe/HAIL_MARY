@@ -15,7 +15,7 @@ import { PhoneScreenTexture } from './PhoneScreenTexture'
 import { PhoneAura } from './PhoneAura'
 
 
-export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView, offerings, hoveredOffering, justLitOffering, onJustLitComplete, userRotation = 0, priceChange = 0, hasActiveClick = false }) {
+export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView, offerings, hoveredOffering, justLitOffering, onJustLitComplete, userRotation = 0, priceChange = 0, hasActiveClick = false, is80sMode = false }) {
   const gltf = useGLTF('/models/hands4.glb')
   const hasReportedLoad = useRef(false)
   const rightHandRef = useRef()
@@ -31,6 +31,12 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
   const devilEmojiRef = useRef()
   const cryingEmojiRef = useRef()
   const cryingEmoji2Ref = useRef()
+  const pukeEmojiRef = useRef()
+  const sadEmojiRef = useRef()
+  const questionMarkRef = useRef()
+  const questionMark2Ref = useRef()
+  const exclamationMarkRef = useRef()
+  const exclamationMark2Ref = useRef()
   const greenArrowRef = useRef()
   const redArrowRef = useRef()
   const iconLikeRef = useRef()
@@ -42,31 +48,29 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
   const candleLabel2Ref = useRef()
   const phoneScreenRef = useRef()
   const phoneCaseRef = useRef()
+  const pacManRef = useRef() // Reference for PacMan parent object
+  const pacMan2Ref = useRef() // Reference for second PacMan object
   const [phoneCaseWorldPos, setPhoneCaseWorldPos] = useState([0, 0, 0])
   const [phoneCaseWorldQuat, setPhoneCaseWorldQuat] = useState([0, 0, 0, 1])
   const [raysVisible, setRaysVisible] = useState(true)
   const [randomUserImages, setRandomUserImages] = useState([])
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [hovered, setHovered] = useState(false)
-  const [clickFeedback, setClickFeedback] = useState(false)
-  const [imageTransition, setImageTransition] = useState(false)
-  const animationStartTime = useRef(null)
-  const lastMousePosition = useRef({ x: 0, y: 0 })
-  const mouseVelocity = useRef({ x: 0, y: 0 })
   const randomUserImagesRef = useRef([])
   const currentImageIndexRef = useRef(0)
   const texturePoolRef = useRef([]) // Pool of textures to reuse
   const canvasPoolRef = useRef([]) // Pool of canvas elements to reuse
   const materialPoolRef = useRef([]) // Pool of materials to reuse
   const { camera } = useThree()
-  const [swivelRotation, setSwivelRotation] = useState(0) // Track swivel rotation progress
-  const swivelDirection = useRef('forward') // Track animation direction
-  const animationStartTime2 = useRef(null) // Track animation start time
   
   // Animation mixers for animated emojis
   const devilMixerRef = useRef(null)
   const cryingMixerRef = useRef(null)
   const cryingMixer2Ref = useRef(null)
+  const pacManMixerRef = useRef(null)
+  const pacManActionRef = useRef(null)
+  const pacMan2MixerRef = useRef(null)
+  const pacMan2ActionRef = useRef(null)
   
   // Market status based on price change
   const isLargeDown = priceChange <= -5 // Large downward price action (5% or more drop)
@@ -75,41 +79,73 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
   const isPositive = priceChange > 2 // Positive price action (more than 2% up)
   
   // Opacity targets for smooth fading - store target opacity for each emoji group
+  // Initialize based on current price state to ensure correct visibility from start
+  const getInitialOpacity = (emojiName) => {
+    // If prices are positive, only show positive emojis
+    if (priceChange > 2) {
+      const positiveEmojis = ['emoji1', 'emoji3', 'emoji4', 'emoji5', 'greenArrow', 'iconLove', 'iconText1', 'iconText2']
+      return positiveEmojis.includes(emojiName) ? 1 : 0
+    }
+    // If prices are middling or moderate down
+    else if (priceChange >= -2 || (priceChange < -2 && priceChange > -5)) {
+      const middlingEmojis = ['emoji2', 'worriedEmoji', 'scaredEmoji', 'sadEmoji', 'questionMark', 'questionMark2']
+      return middlingEmojis.includes(emojiName) ? 1 : 0
+    }
+    // If prices are crashing (large down)
+    else if (priceChange <= -5) {
+      const crashEmojis = ['worriedEmoji', 'scaredEmoji', 'devilEmoji', 'cryingEmoji', 'cryingEmoji2', 'pukeEmoji', 'sadEmoji', 'questionMark', 'questionMark2', 'exclamationMark', 'exclamationMark2', 'redArrow']
+      return crashEmojis.includes(emojiName) ? 1 : 0
+    }
+    return 0
+  }
+  
   const opacityTargets = useRef({
-    emoji1: 0,
-    emoji2: 0,
-    emoji3: 0,
-    emoji4: 0,
-    emoji5: 0,
-    worriedEmoji: 0,
-    scaredEmoji: 0,
-    devilEmoji: 0,
-    cryingEmoji: 0,
-    cryingEmoji2: 0,
-    greenArrow: 0,
-    redArrow: 0,
-    iconLove: 0,
-    iconText1: 0,
-    iconText2: 0
+    emoji1: getInitialOpacity('emoji1'),
+    emoji2: getInitialOpacity('emoji2'),
+    emoji3: getInitialOpacity('emoji3'),
+    emoji4: getInitialOpacity('emoji4'),
+    emoji5: getInitialOpacity('emoji5'),
+    worriedEmoji: getInitialOpacity('worriedEmoji'),
+    scaredEmoji: getInitialOpacity('scaredEmoji'),
+    devilEmoji: getInitialOpacity('devilEmoji'),
+    cryingEmoji: getInitialOpacity('cryingEmoji'),
+    cryingEmoji2: getInitialOpacity('cryingEmoji2'),
+    pukeEmoji: getInitialOpacity('pukeEmoji'),
+    sadEmoji: getInitialOpacity('sadEmoji'),
+    questionMark: getInitialOpacity('questionMark'),
+    questionMark2: getInitialOpacity('questionMark2'),
+    exclamationMark: getInitialOpacity('exclamationMark'),
+    exclamationMark2: getInitialOpacity('exclamationMark2'),
+    greenArrow: getInitialOpacity('greenArrow'),
+    redArrow: getInitialOpacity('redArrow'),
+    iconLove: getInitialOpacity('iconLove'),
+    iconText1: getInitialOpacity('iconText1'),
+    iconText2: getInitialOpacity('iconText2')
   })
   
-  // Current opacity values for smooth animation
+  // Current opacity values for smooth animation - start same as targets
   const currentOpacities = useRef({
-    emoji1: 0,
-    emoji2: 0,
-    emoji3: 0,
-    emoji4: 0,
-    emoji5: 0,
-    worriedEmoji: 0,
-    scaredEmoji: 0,
-    devilEmoji: 0,
-    cryingEmoji: 0,
-    cryingEmoji2: 0,
-    greenArrow: 0,
-    redArrow: 0,
-    iconLove: 0,
-    iconText1: 0,
-    iconText2: 0
+    emoji1: getInitialOpacity('emoji1'),
+    emoji2: getInitialOpacity('emoji2'),
+    emoji3: getInitialOpacity('emoji3'),
+    emoji4: getInitialOpacity('emoji4'),
+    emoji5: getInitialOpacity('emoji5'),
+    worriedEmoji: getInitialOpacity('worriedEmoji'),
+    scaredEmoji: getInitialOpacity('scaredEmoji'),
+    devilEmoji: getInitialOpacity('devilEmoji'),
+    cryingEmoji: getInitialOpacity('cryingEmoji'),
+    cryingEmoji2: getInitialOpacity('cryingEmoji2'),
+    pukeEmoji: getInitialOpacity('pukeEmoji'),
+    sadEmoji: getInitialOpacity('sadEmoji'),
+    questionMark: getInitialOpacity('questionMark'),
+    questionMark2: getInitialOpacity('questionMark2'),
+    exclamationMark: getInitialOpacity('exclamationMark'),
+    exclamationMark2: getInitialOpacity('exclamationMark2'),
+    greenArrow: getInitialOpacity('greenArrow'),
+    redArrow: getInitialOpacity('redArrow'),
+    iconLove: getInitialOpacity('iconLove'),
+    iconText1: getInitialOpacity('iconText1'),
+    iconText2: getInitialOpacity('iconText2')
   })
 
   // COMMENTED OUT: Image advance functionality for memory testing
@@ -266,6 +302,13 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
     if (gltf.scene) {
       // console.log('Scene found:', gltf.scene)
       
+      // Log all available animations
+      if (gltf.animations && gltf.animations.length > 0) {
+        console.log('📋 All available animations in model:')
+        gltf.animations.forEach((clip, index) => {
+          console.log(`  ${index}: "${clip.name}" (duration: ${clip.duration}s)`)
+        })
+      }
       
       // Traverse the scene to find specific objects
       gltf.scene.traverse((child) => {
@@ -397,14 +440,41 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
         if (child.name === 'WorriedEmoji' || child.name === 'worriedEmoji' || child.name === 'worried-emoji') {
           worriedEmojiRef.current = child
           // console.log('😟 Found WorriedEmoji:', child.name)
+          
+          // Apply initial visibility based on price state
+          child.traverse((subChild) => {
+            if (subChild.isMesh && subChild.material) {
+              subChild.material.transparent = true
+              subChild.material.opacity = getInitialOpacity('worriedEmoji')
+              subChild.visible = getInitialOpacity('worriedEmoji') > 0.01
+            }
+          })
         }
         if (child.name === 'ScaredEmoji' || child.name === 'scaredEmoji' || child.name === 'scared-emoji') {
           scaredEmojiRef.current = child
           // console.log('😱 Found ScaredEmoji:', child.name)
+          
+          // Apply initial visibility based on price state
+          child.traverse((subChild) => {
+            if (subChild.isMesh && subChild.material) {
+              subChild.material.transparent = true
+              subChild.material.opacity = getInitialOpacity('scaredEmoji')
+              subChild.visible = getInitialOpacity('scaredEmoji') > 0.01
+            }
+          })
         }
         if (child.name === 'DevilEmoji' || child.name === 'devilEmoji' || child.name === 'devil-emoji') {
           devilEmojiRef.current = child
           // console.log('😈 Found DevilEmoji:', child.name)
+          
+          // Apply initial visibility based on price state
+          child.traverse((subChild) => {
+            if (subChild.isMesh && subChild.material) {
+              subChild.material.transparent = true
+              subChild.material.opacity = getInitialOpacity('devilEmoji')
+              subChild.visible = getInitialOpacity('devilEmoji') > 0.01
+            }
+          })
           
           // Set up animation mixer for DevilEmoji
           if (gltf.animations && gltf.animations.length > 0) {
@@ -433,6 +503,15 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
           cryingEmojiRef.current = child
           // console.log('😭 Found CryingEmoji:', child.name)
           
+          // Apply initial visibility based on price state
+          child.traverse((subChild) => {
+            if (subChild.isMesh && subChild.material) {
+              subChild.material.transparent = true
+              subChild.material.opacity = getInitialOpacity('cryingEmoji')
+              subChild.visible = getInitialOpacity('cryingEmoji') > 0.01
+            }
+          })
+          
           // Set up animation mixer for CryingEmoji
           if (gltf.animations && gltf.animations.length > 0) {
             cryingMixerRef.current = new THREE.AnimationMixer(child)
@@ -451,6 +530,15 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
           cryingEmoji2Ref.current = child
           // console.log('😭 Found CryingEmoji2:', child.name)
           
+          // Apply initial visibility based on price state
+          child.traverse((subChild) => {
+            if (subChild.isMesh && subChild.material) {
+              subChild.material.transparent = true
+              subChild.material.opacity = getInitialOpacity('cryingEmoji2')
+              subChild.visible = getInitialOpacity('cryingEmoji2') > 0.01
+            }
+          })
+          
           // Set up animation mixer for CryingEmoji2
           if (gltf.animations && gltf.animations.length > 0) {
             cryingMixer2Ref.current = new THREE.AnimationMixer(child)
@@ -465,13 +553,199 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
             }
           }
         }
+        // Find PukeEmoji for crash scenarios
+        if (child.name === 'PukeEmoji' || child.name === 'pukeEmoji' || child.name === 'puke-emoji' || child.name === 'Puke-Emoji') {
+          pukeEmojiRef.current = child
+          console.log('🤮 Found PukeEmoji:', child.name)
+          
+          // Apply initial visibility based on price state
+          child.traverse((subChild) => {
+            if (subChild.isMesh && subChild.material) {
+              subChild.material.transparent = true
+              subChild.material.opacity = getInitialOpacity('pukeEmoji')
+              subChild.visible = getInitialOpacity('pukeEmoji') > 0.01
+            }
+          })
+        }
+        
+        // Find SadEmoji for downturn scenarios
+        if (child.name === 'SadEmoji' || child.name === 'sadEmoji' || child.name === 'sad-emoji' || child.name === 'Sad-Emoji') {
+          sadEmojiRef.current = child
+          console.log('😢 Found SadEmoji:', child.name)
+          
+          // Apply initial visibility based on price state
+          child.traverse((subChild) => {
+            if (subChild.isMesh && subChild.material) {
+              subChild.material.transparent = true
+              subChild.material.opacity = getInitialOpacity('sadEmoji')
+              subChild.visible = getInitialOpacity('sadEmoji') > 0.01
+            }
+          })
+        }
+        
+        // Find QuestionMark for uncertain market conditions
+        if (child.name === 'QuestionMark' || child.name === 'questionMark' || child.name === 'question-mark' || child.name === 'Question-Mark') {
+          questionMarkRef.current = child
+          console.log('❓ Found QuestionMark:', child.name)
+          
+          // Apply initial visibility based on price state
+          child.traverse((subChild) => {
+            if (subChild.isMesh && subChild.material) {
+              subChild.material.transparent = true
+              subChild.material.opacity = getInitialOpacity('questionMark')
+              subChild.visible = getInitialOpacity('questionMark') > 0.01
+            }
+          })
+        }
+        
+        // Find QuestionMark2 (linked to QuestionMark)
+        if (child.name === 'QuestionMark2' || child.name === 'questionMark2' || child.name === 'question-mark-2' || child.name === 'Question-Mark2') {
+          questionMark2Ref.current = child
+          console.log('❓ Found QuestionMark2:', child.name)
+          
+          // Apply initial visibility based on price state
+          child.traverse((subChild) => {
+            if (subChild.isMesh && subChild.material) {
+              subChild.material.transparent = true
+              subChild.material.opacity = getInitialOpacity('questionMark2')
+              subChild.visible = getInitialOpacity('questionMark2') > 0.01
+            }
+          })
+        }
+        
+        // Find ExclamationPoint for crisis conditions (checking both naming conventions)
+        if (child.name === 'ExclamationPoint' || child.name === 'exclamationPoint' || child.name === 'ExclamationMark' || child.name === 'exclamationMark') {
+          exclamationMarkRef.current = child
+          console.log('❗ Found ExclamationPoint:', child.name)
+          
+          // Apply initial visibility based on price state
+          child.traverse((subChild) => {
+            if (subChild.isMesh && subChild.material) {
+              subChild.material.transparent = true
+              subChild.material.opacity = getInitialOpacity('exclamationMark')
+              subChild.visible = getInitialOpacity('exclamationMark') > 0.01
+            }
+          })
+        }
+        
+        // Find ExclamationPoint2 for crisis conditions
+        if (child.name === 'ExclamationPoint2' || child.name === 'exclamationPoint2' || child.name === 'ExclamationMark2' || child.name === 'exclamationMark2') {
+          exclamationMark2Ref.current = child
+          console.log('❗ Found ExclamationPoint2:', child.name)
+          
+          // Apply initial visibility based on price state
+          child.traverse((subChild) => {
+            if (subChild.isMesh && subChild.material) {
+              subChild.material.transparent = true
+              subChild.material.opacity = getInitialOpacity('exclamationMark2')
+              subChild.visible = getInitialOpacity('exclamationMark2') > 0.01
+            }
+          })
+        }
+        
         if (child.name === 'GreenArrow' || child.name === 'greenArrow' || child.name === 'green-arrow') {
           greenArrowRef.current = child
           // console.log('⬆️ Found GreenArrow:', child.name)
+          
+          // Apply initial visibility based on price state
+          child.traverse((subChild) => {
+            if (subChild.isMesh && subChild.material) {
+              subChild.material.transparent = true
+              subChild.material.opacity = getInitialOpacity('greenArrow')
+              subChild.visible = getInitialOpacity('greenArrow') > 0.01
+            }
+          })
         }
         if (child.name === 'RedArrow' || child.name === 'redArrow' || child.name === 'red-arrow') {
           redArrowRef.current = child
           // console.log('⬇️ Found RedArrow:', child.name)
+          
+          // Apply initial visibility based on price state
+          child.traverse((subChild) => {
+            if (subChild.isMesh && subChild.material) {
+              subChild.material.transparent = true
+              subChild.material.opacity = getInitialOpacity('redArrow')
+              subChild.visible = getInitialOpacity('redArrow') > 0.01
+            }
+          })
+        }
+        
+        // Find PacMan parent object for 80s mode
+        if (child.name === 'PacMan' || child.name === 'pacman' || child.name === 'Pacman' || child.name === 'PACMAN') {
+          pacManRef.current = child
+          console.log('🟡 Found PacMan parent object:', child.name)
+          console.log('PacMan children:', child.children.map(c => c.name))
+          console.log('PacMan type:', child.type)
+          console.log('PacMan position:', child.position)
+          console.log('PacMan scale:', child.scale)
+          
+          // Set initial visibility on the parent object (this should cascade to children)
+          child.visible = is80sMode
+          console.log('Set PacMan initial visibility to:', is80sMode)
+          
+          // Set up animation mixer for PacMan
+          if (gltf.animations && gltf.animations.length > 0) {
+            pacManMixerRef.current = new THREE.AnimationMixer(child)
+            
+            // Find the 'Animation' clip
+            const pacManAnimation = gltf.animations.find(clip => 
+              clip.name === 'Animation' || clip.name === 'animation' || 
+              clip.name.toLowerCase().includes('pacman')
+            )
+            
+            if (pacManAnimation) {
+              console.log('🎮 Found PacMan animation:', pacManAnimation.name)
+              pacManActionRef.current = pacManMixerRef.current.clipAction(pacManAnimation)
+              pacManActionRef.current.setLoop(THREE.LoopRepeat) // Ensure looping
+              
+              // Play animation if 80s mode is already on
+              if (is80sMode) {
+                pacManActionRef.current.play()
+                console.log('🕹️ Starting PacMan animation')
+              }
+            } else {
+              console.log('⚠️ No Animation found for PacMan, available animations:', 
+                gltf.animations.map(a => a.name))
+            }
+          }
+        }
+        
+        // Find second PacMan object for 80s mode
+        if (child.name === 'pacman2' || child.name === 'PacMan2' || child.name === 'Pacman2' || child.name === 'PACMAN2') {
+          pacMan2Ref.current = child
+          console.log('🟡 Found PacMan2 object:', child.name)
+          console.log('PacMan2 children:', child.children.map(c => c.name))
+          console.log('PacMan2 type:', child.type)
+          console.log('PacMan2 position:', child.position)
+          
+          // Set initial visibility on the parent object
+          child.visible = is80sMode
+          console.log('Set PacMan2 initial visibility to:', is80sMode)
+          
+          // Set up animation mixer for PacMan2
+          if (gltf.animations && gltf.animations.length > 0) {
+            pacMan2MixerRef.current = new THREE.AnimationMixer(child)
+            
+            // Find the 'Eating' animation clip
+            const eatingAnimation = gltf.animations.find(clip => 
+              clip.name === 'Eating' || clip.name === 'eating' || 
+              clip.name.toLowerCase().includes('eating')
+            )
+            
+            if (eatingAnimation) {
+              console.log('🎮 Found PacMan2 Eating animation:', eatingAnimation.name)
+              pacMan2ActionRef.current = pacMan2MixerRef.current.clipAction(eatingAnimation)
+              pacMan2ActionRef.current.setLoop(THREE.LoopRepeat) // Ensure looping
+              
+              // Play animation if 80s mode is already on
+              if (is80sMode) {
+                pacMan2ActionRef.current.play()
+                console.log('🕹️ Starting PacMan2 Eating animation')
+              }
+            } else {
+              console.log('⚠️ No Eating animation found for PacMan2')
+            }
+          }
         }
         
         // Create digital portal effect for emoji backdrop
@@ -621,6 +895,24 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
           case 'cryingEmoji2':
             updateOpacityRecursive(cryingEmoji2Ref.current, currentOpacities.current[key])
             break
+          case 'pukeEmoji':
+            updateOpacityRecursive(pukeEmojiRef.current, currentOpacities.current[key])
+            break
+          case 'sadEmoji':
+            updateOpacityRecursive(sadEmojiRef.current, currentOpacities.current[key])
+            break
+          case 'questionMark':
+            updateOpacityRecursive(questionMarkRef.current, currentOpacities.current[key])
+            break
+          case 'questionMark2':
+            updateOpacityRecursive(questionMark2Ref.current, currentOpacities.current[key])
+            break
+          case 'exclamationMark':
+            updateOpacityRecursive(exclamationMarkRef.current, currentOpacities.current[key])
+            break
+          case 'exclamationMark2':
+            updateOpacityRecursive(exclamationMark2Ref.current, currentOpacities.current[key])
+            break
           case 'greenArrow':
             updateOpacityRecursive(greenArrowRef.current, currentOpacities.current[key])
             break
@@ -643,6 +935,14 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
   
   // Control emoji visibility based on market status
   useEffect(() => {
+    // If 80s mode is active, hide ALL emojis/icons (PacMan handled separately)
+    if (is80sMode) {
+      // Hide all emojis and icons when in 80s mode
+      Object.keys(opacityTargets.current).forEach(key => {
+        opacityTargets.current[key] = 0
+      })
+      return // Exit early, don't process market-based visibility
+    }
     
     if (isPositive) {
       // Positive prices - fade in happy emojis and green arrow
@@ -662,13 +962,22 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       opacityTargets.current.devilEmoji = 0
       opacityTargets.current.cryingEmoji = 0
       opacityTargets.current.cryingEmoji2 = 0
+      opacityTargets.current.pukeEmoji = 0
+      opacityTargets.current.sadEmoji = 0
+      opacityTargets.current.questionMark = 0
+      opacityTargets.current.questionMark2 = 0
+      opacityTargets.current.exclamationMark = 0
+      opacityTargets.current.exclamationMark2 = 0
       opacityTargets.current.redArrow = 0
       
       // console.log('📈 Market positive (+' + priceChange.toFixed(2) + '%) - showing happy emojis')
     } else if (isMiddling || isModerateDown) {
-      // Middling prices and moderate downward action - fade in worried/scared emojis
+      // Middling prices and moderate downward action - fade in worried/scared/sad emojis
       opacityTargets.current.worriedEmoji = 1
       opacityTargets.current.scaredEmoji = 1
+      opacityTargets.current.sadEmoji = 1  // SadEmoji visible during mild and strong downturns
+      opacityTargets.current.questionMark = 1  // QuestionMarks visible during uncertain times
+      opacityTargets.current.questionMark2 = 1
       
       // Fade out positive emojis
       opacityTargets.current.emoji1 = 0
@@ -684,6 +993,9 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       opacityTargets.current.devilEmoji = 0
       opacityTargets.current.cryingEmoji = 0
       opacityTargets.current.cryingEmoji2 = 0
+      opacityTargets.current.pukeEmoji = 0  // Not visible in moderate downturns
+      opacityTargets.current.exclamationMark = 0  // Not visible in moderate downturns
+      opacityTargets.current.exclamationMark2 = 0  // Not visible in moderate downturns
       opacityTargets.current.redArrow = 0
       
       // Keep emoji2 and other icons neutral
@@ -697,6 +1009,12 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       opacityTargets.current.devilEmoji = 1
       opacityTargets.current.cryingEmoji = 1
       opacityTargets.current.cryingEmoji2 = 1
+      opacityTargets.current.pukeEmoji = 1  // PukeEmoji appears during crashes
+      opacityTargets.current.sadEmoji = 1   // SadEmoji also visible during crashes
+      opacityTargets.current.questionMark = 1  // QuestionMarks visible during chaos
+      opacityTargets.current.questionMark2 = 1
+      opacityTargets.current.exclamationMark = 1  // ExclamationMark only during crashes
+      opacityTargets.current.exclamationMark2 = 1  // ExclamationMark2 only during crashes
       opacityTargets.current.redArrow = 1
       
       // Fade out all positive emojis
@@ -713,8 +1031,57 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       // Animations are already playing from model load, just ensure they're visible
       // console.log('📉💀 Market crash (' + priceChange.toFixed(2) + '%) - showing panic emojis with animations!')
     }
-  }, [isPositive, isMiddling, isModerateDown, isLargeDown, priceChange, gltf])
+  }, [isPositive, isMiddling, isModerateDown, isLargeDown, priceChange, gltf, is80sMode])
 
+  // Control PacMan visibility based on 80s mode
+  useEffect(() => {
+    console.log('🎮 80s mode changed to:', is80sMode)
+    
+    // Control first PacMan
+    if (pacManRef.current) {
+      // Visibility is now controlled in the animation loop
+      // Just reset position when toggling mode
+      if (!is80sMode) {
+        pacManRef.current.visible = false
+        pacManRef.current.position.x = 0 // Reset to center
+      }
+      
+      // Control PacMan animation
+      if (pacManActionRef.current) {
+        if (is80sMode) {
+          pacManActionRef.current.play()
+          console.log('🕹️ Playing PacMan Animation')
+        } else {
+          pacManActionRef.current.stop()
+          console.log('⏸️ Stopping PacMan Animation')
+        }
+      }
+    } else {
+      console.log('⚠️ PacMan ref not found')
+    }
+    
+    // Control second PacMan (now parented to first PacMan)
+    if (pacMan2Ref.current) {
+      // Since pacman2 is parented, we only need to control its animation
+      // Visibility and position are handled by the parent
+      if (!is80sMode) {
+        pacMan2Ref.current.visible = false
+      }
+      
+      // Control PacMan2 Eating animation
+      if (pacMan2ActionRef.current) {
+        if (is80sMode) {
+          pacMan2ActionRef.current.play()
+          console.log('🍔 Playing PacMan2 Eating animation')
+        } else {
+          pacMan2ActionRef.current.stop()
+          console.log('⏸️ Stopping PacMan2 Eating animation')
+        }
+      }
+    } else {
+      console.log('⚠️ PacMan2 ref not found')
+    }
+  }, [is80sMode])
   
   // Safe texture management utility
   const disposeTexture = useCallback((texture) => {
@@ -805,16 +1172,6 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
   // const imageData = randomUserImages[currentImageIndex]
   // ... rest of complex texture management code removed ...
 
-  // Trigger swivel animation based on view state
-  useEffect(() => {
-    if (isInView && swivelDirection.current === 'forward') {
-      // console.log('🔄 Starting forward swivel animation!')
-      animationStartTime2.current = Date.now()
-    } else if (!isInView && swivelDirection.current === 'reverse') {
-      // console.log('🔄 Starting reverse swivel animation!')
-      animationStartTime2.current = Date.now()
-    }
-  }, [isInView])
 
   // Scroll-based rotation removed - model now uses swivel and user-controlled rotation only
 
@@ -859,35 +1216,99 @@ useFrame((state, delta) => {
   if (cryingMixer2Ref.current) {
     cryingMixer2Ref.current.update(delta)
   }
+  if (pacManMixerRef.current) {
+    pacManMixerRef.current.update(delta)
+  }
+  if (pacMan2MixerRef.current) {
+    pacMan2MixerRef.current.update(delta)
+  }
   
-  // Swivel animation
-  if (animationStartTime2.current) {
-    const elapsed = Date.now() - animationStartTime2.current
-    const duration = 2000 // 2 seconds for full rotation
-    const progress = Math.min(elapsed / duration, 1)
+  // PacMan movement animation for 80s mode (pacman2 is parented and follows)
+  if (is80sMode && pacManRef.current) {
+    // Total cycle: 8 seconds move + 3 seconds wait = 11 seconds
+    const totalCycleTime = 11 // 8 seconds for movement, 3 seconds for delay
+    const cycleTime = state.clock.elapsedTime % totalCycleTime
     
-    // Use easeInOutCubic for smooth animation
-    const easedProgress = progress < 0.5
-      ? 4 * progress * progress * progress
-      : 1 - Math.pow(-2 * progress + 2, 3) / 2
+    // Keep PacMan always visible
+    pacManRef.current.visible = true
     
-    if (isInView) {
-      // Forward animation (0 to PI)
-      setSwivelRotation(easedProgress * Math.PI)
-      if (progress === 1) {
-        swivelDirection.current = 'reverse'
-        animationStartTime2.current = null
+    // Calculate opacity for fade effect
+    let opacity = 0
+    
+    // First 4 seconds: move left
+    // Next 3 seconds: hidden/delay
+    // Next 4 seconds: move right
+    
+    if (cycleTime < 4) {
+      // Moving left phase (0 to 4 seconds)
+      const leftProgress = cycleTime / 4 // 0 to 1
+      
+      // Fade in at start (0 to 0.15), fade out at end (0.85 to 1.0)
+      if (leftProgress < 0.15) {
+        opacity = leftProgress / 0.15 // Fade in from 0 to 1
+      } else if (leftProgress > 0.85) {
+        opacity = 1 - ((leftProgress - 0.85) / 0.15) // Fade out from 1 to 0
+      } else {
+        opacity = 1 // Fully visible in the middle
       }
+      
+      // Move from center to left
+      pacManRef.current.position.x = -leftProgress * 5
+      
+      // Face left (no rotation needed, default facing)
+      pacManRef.current.rotation.y = 0
+      
+    } else if (cycleTime < 7) {
+      // Delay phase (4 to 7 seconds) - stay hidden
+      opacity = 0
+      pacManRef.current.position.x = 0 // Reset to center during delay
+      
     } else {
-      // Reverse animation (PI to 0)
-      setSwivelRotation((1 - easedProgress) * Math.PI)
-      if (progress === 1) {
-        swivelDirection.current = 'forward'
-        animationStartTime2.current = null
+      // Moving right phase (7 to 11 seconds)
+      const rightProgress = (cycleTime - 7) / 4 // 0 to 1
+      
+      // Fade in at start (0 to 0.15), fade out at end (0.85 to 1.0)
+      if (rightProgress < 0.15) {
+        opacity = rightProgress / 0.15 // Fade in from 0 to 1
+      } else if (rightProgress > 0.85) {
+        opacity = 1 - ((rightProgress - 0.85) / 0.15) // Fade out from 1 to 0
+      } else {
+        opacity = 1 // Fully visible in the middle
       }
+      
+      // Move from center to right
+      pacManRef.current.position.x = rightProgress * 5
+      
+      // Face right (180 degree rotation)
+      pacManRef.current.rotation.y = Math.PI
+    }
+    
+    // Apply opacity to all meshes in PacMan
+    pacManRef.current.traverse((child) => {
+      if (child.isMesh && child.material) {
+        child.material.transparent = true
+        child.material.opacity = opacity
+      }
+    })
+    
+    // Apply same opacity to pacman2 (parented to PacMan)
+    if (pacMan2Ref.current) {
+      pacMan2Ref.current.visible = true
+      
+      // Apply same opacity as parent
+      pacMan2Ref.current.traverse((child) => {
+        if (child.isMesh && child.material) {
+          child.material.transparent = true
+          child.material.opacity = opacity
+        }
+      })
+      
+      // If pacman2 appears to be moving backwards, flip it 180 degrees
+      // This compensates for any initial rotation differences in the model
+      pacMan2Ref.current.rotation.y = Math.PI // Rotate 180 degrees relative to parent
     }
   }
-
+  
   // Floating animations for emojis and icons
   const time = state.clock.getElapsedTime()
   
@@ -1053,6 +1474,110 @@ useFrame((state, delta) => {
     scaredEmojiRef.current.position.y = scaredEmojiRef.current.userData.initialY + Math.sin(time * 2.5) * 0.15
   }
   
+  // Animate PukeEmoji with violent shaking when market crashes
+  if (pukeEmojiRef.current && pukeEmojiRef.current.visible) {
+    if (!pukeEmojiRef.current.userData.initialPos) {
+      pukeEmojiRef.current.userData.initialPos = {
+        x: pukeEmojiRef.current.position.x,
+        y: pukeEmojiRef.current.position.y,
+        z: pukeEmojiRef.current.position.z
+      }
+    }
+    // Gentler queasy wobbling motion
+    pukeEmojiRef.current.position.x = pukeEmojiRef.current.userData.initialPos.x + Math.sin(time * 6) * 0.05
+    pukeEmojiRef.current.position.y = pukeEmojiRef.current.userData.initialPos.y + Math.cos(time * 4) * 0.04
+    pukeEmojiRef.current.rotation.z = Math.sin(time * 5) * 0.15
+    // Gentler pulsing for queasy effect
+    const scale = 1 + Math.sin(time * 3) * 0.05
+    pukeEmojiRef.current.scale.set(scale, scale, scale)
+  }
+  
+  // Animate SadEmoji with slow, drooping motion and head shaking
+  if (sadEmojiRef.current && sadEmojiRef.current.visible) {
+    if (!sadEmojiRef.current.userData.initialY) {
+      sadEmojiRef.current.userData.initialY = sadEmojiRef.current.position.y
+      sadEmojiRef.current.userData.initialX = sadEmojiRef.current.position.x
+    }
+    // Slow, sad swaying
+    sadEmojiRef.current.position.x = sadEmojiRef.current.userData.initialX + Math.sin(time * 0.8) * 0.05
+    sadEmojiRef.current.position.y = sadEmojiRef.current.userData.initialY + Math.sin(time * 1.2) * 0.03 - 0.1 // Slight droop
+    sadEmojiRef.current.rotation.z = Math.sin(time * 0.6) * 0.05 // Gentle tilt
+    // Head shaking in disbelief (Y-axis rotation)
+    sadEmojiRef.current.rotation.y = Math.sin(time * 2.5) * 0.3 // Shaking head "no" motion
+  }
+  
+  // Animate QuestionMark with limited confused rotation
+  if (questionMarkRef.current && questionMarkRef.current.visible) {
+    if (!questionMarkRef.current.userData.initialPos) {
+      questionMarkRef.current.userData.initialPos = {
+        x: questionMarkRef.current.position.x,
+        y: questionMarkRef.current.position.y
+      }
+    }
+    // Limited rotation back and forth (like confused head tilting)
+    questionMarkRef.current.rotation.y = Math.sin(time * 1.5) * 0.52 // Limited to 30 degrees
+    // Floating motion
+    questionMarkRef.current.position.y = questionMarkRef.current.userData.initialPos.y + Math.sin(time * 2) * 0.1
+    questionMarkRef.current.position.x = questionMarkRef.current.userData.initialPos.x + Math.cos(time * 1.5) * 0.05
+    // Add a slight Z-axis tilt for more confused look
+    questionMarkRef.current.rotation.z = Math.sin(time * 1.8) * 0.2
+  }
+  
+  // Animate QuestionMark2 with opposite limited rotation
+  if (questionMark2Ref.current && questionMark2Ref.current.visible) {
+    if (!questionMark2Ref.current.userData.initialPos) {
+      questionMark2Ref.current.userData.initialPos = {
+        x: questionMark2Ref.current.position.x,
+        y: questionMark2Ref.current.position.y
+      }
+    }
+    // Opposite limited rotation (like confused head tilting the other way)
+    questionMark2Ref.current.rotation.y = -Math.sin(time * 1.5) * 0.52 // Opposite direction, limited to 30 degrees
+    // Floating motion with offset phase
+    questionMark2Ref.current.position.y = questionMark2Ref.current.userData.initialPos.y + Math.sin(time * 2 + Math.PI) * 0.1
+    questionMark2Ref.current.position.x = questionMark2Ref.current.userData.initialPos.x + Math.cos(time * 1.5 + Math.PI) * 0.05
+    // Opposite Z-axis tilt
+    questionMark2Ref.current.rotation.z = -Math.sin(time * 1.8) * 0.2
+  }
+  
+  // Animate ExclamationMark with limited rotation (30 degrees = ~0.52 radians)
+  if (exclamationMarkRef.current && exclamationMarkRef.current.visible) {
+    if (!exclamationMarkRef.current.userData.initialScale) {
+      exclamationMarkRef.current.userData.initialScale = exclamationMarkRef.current.scale.clone()
+      exclamationMarkRef.current.userData.initialY = exclamationMarkRef.current.position.y
+    }
+    // Urgent pulsing
+    const pulseScale = 1 + Math.abs(Math.sin(time * 6)) * 0.2
+    exclamationMarkRef.current.scale.set(
+      exclamationMarkRef.current.userData.initialScale.x * pulseScale,
+      exclamationMarkRef.current.userData.initialScale.y * pulseScale,
+      exclamationMarkRef.current.userData.initialScale.z * pulseScale
+    )
+    // Bouncing motion
+    exclamationMarkRef.current.position.y = exclamationMarkRef.current.userData.initialY + Math.abs(Math.sin(time * 4)) * 0.15
+    // Limited rotation - 30 degrees (0.52 radians) max in each direction
+    exclamationMarkRef.current.rotation.z = Math.sin(time * 3) * 0.52 // Slower, limited rotation
+  }
+  
+  // Animate ExclamationMark2 with opposite limited rotation
+  if (exclamationMark2Ref.current && exclamationMark2Ref.current.visible) {
+    if (!exclamationMark2Ref.current.userData.initialScale) {
+      exclamationMark2Ref.current.userData.initialScale = exclamationMark2Ref.current.scale.clone()
+      exclamationMark2Ref.current.userData.initialY = exclamationMark2Ref.current.position.y
+    }
+    // Urgent pulsing (offset phase)
+    const pulseScale = 1 + Math.abs(Math.sin(time * 6 + Math.PI/2)) * 0.2
+    exclamationMark2Ref.current.scale.set(
+      exclamationMark2Ref.current.userData.initialScale.x * pulseScale,
+      exclamationMark2Ref.current.userData.initialScale.y * pulseScale,
+      exclamationMark2Ref.current.userData.initialScale.z * pulseScale
+    )
+    // Bouncing motion (offset phase)
+    exclamationMark2Ref.current.position.y = exclamationMark2Ref.current.userData.initialY + Math.abs(Math.sin(time * 4 + Math.PI/2)) * 0.15
+    // Limited rotation opposite direction
+    exclamationMark2Ref.current.rotation.z = -Math.sin(time * 3) * 0.52 // Opposite direction, limited to 30 degrees
+  }
+  
   // Animate arrows with directional motion
   if (greenArrowRef.current && greenArrowRef.current.visible) {
     if (!greenArrowRef.current.userData.initialY) {
@@ -1179,7 +1704,7 @@ return (
     <primitive 
       object={gltf.scene} 
       scale={[0.35, 0.35, 0.35]}
-      rotation={[0, Math.PI + swivelRotation + userRotation, 0]} // Combine swivel and user rotation
+      rotation={[0, userRotation, 0]} // User rotation only (hands now face forward)
       onClick={handleClick}
       onPointerOver={handlePointerOver}
       onPointerOut={handlePointerOut}
@@ -1236,7 +1761,7 @@ function MouseTracker({ setMousePosition }) {
 
 // Removed LoadingBox - no fallback cube needed
 
-export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffering, justLitOffering, onJustLitComplete, priceChange = 0 }) {
+export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffering, justLitOffering, onJustLitComplete, priceChange = 0, is80sMode = false }) {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   // Scroll tracking removed - no longer needed
   const [isMobile, setIsMobile] = useState(false)
@@ -1408,6 +1933,7 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
             onJustLitComplete={onJustLitComplete}
             userRotation={userRotation}
             priceChange={priceChange}
+            is80sMode={is80sMode}
             onLoad={() => {
               setModelLoaded(true);
               if (onLoadComplete) onLoadComplete();

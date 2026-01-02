@@ -7,6 +7,7 @@ import * as THREE from 'three'
 import { HandsModel } from './HandsGLTFScene'
 import { CandleCloud, GradientBackground, PriceSimulator } from './CandleShrine'
 import { NewCandleEffectManager } from './NewCandleEffect'
+import CyberGlitchButton from './carousel/CyberGlitchButton'
 // PhoneLightRays now rendered inside HandsGLTFScene attached to phoneCase
 
 // Unified scene combining candles and hands in one Canvas
@@ -206,6 +207,7 @@ export default function UnifiedShrine({
               userRotation={userRotation}
               priceChange={priceDirection * 5}
               hasActiveClick={clickedCandleId !== null}
+              is80sMode={is80sMode}
               onLoad={() => console.log('Hands loaded in unified scene')}
             />
           </group>
@@ -354,46 +356,60 @@ export default function UnifiedShrine({
         </div>
       </div>
       
-      {/* Light a Candle Button with Heading */}
+      {/* Light a Candle Button with Cyber Glitch Style */}
       <div style={{
         position: 'absolute',
-        bottom: '20px',
+        bottom: '80px',  // Moved up from 20px to ensure visibility on tablets
         right: '20px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        width: '200px',
       }}>
         <div style={{
           color: 'rgba(255, 255, 255, 0.9)',
-          fontSize: '1.1rem',
+          fontSize: '2.5rem',
           fontFamily: "'UnifrakturMaguntia', serif",
           letterSpacing: '1px',
           marginBottom: '12px',
           textAlign: 'center',
-          width: '100%',
-          textShadow: '0 0 20px rgba(0, 255, 102, 0.6), 0 2px 4px rgba(0, 0, 0, 0.8)',
+          textShadow: '0 0 2rem rgba(147, 69, 255, 0.9), 0 8px 16px rgba(0, 0, 0, 0.9)',
         }}>
-          Get on Her Watchlist
+          Get on Her <br/>Watchlist
         </div>
-        <button
-          style={{
-            width: '100%',
-            background: 'linear-gradient(135deg, #00ff66 0%, #00aa44 100%)',
-            border: 'none',
-            borderRadius: '8px',
-            padding: '16px 32px',
-            color: '#000',
-            fontFamily: 'monospace',
-            fontSize: '16px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            boxShadow: '0 0 30px rgba(0, 255, 100, 0.4)',
-          }}
-          onClick={handleLightCandleClick}
-        >
-          🕯️ Light a Candle
-        </button>
+        <style jsx>{`
+          .cyber-candle-btn :global(.cybr-btn) {
+            --primary: #9945ff;
+            --shadow-primary: #00ffff;
+            --shadow-secondary-hue: 340;
+            --color: white;
+          }
+          .cyber-candle-btn :global(.cybr-btn:hover) {
+            --primary: #7c37d0;
+            --shadow-primary: #00ffff;
+          }
+          .cyber-candle-btn :global(.cybr-btn:active) {
+            --primary: #00ffff;
+            --shadow-primary: #ff0066;
+          }
+          .cyber-candle-btn :global(.cybr-btn__glitch) {
+            background: linear-gradient(45deg, #00ffff, #9945ff);
+            text-shadow: 2px 2px #ff0066, -2px -2px #00ffff;
+          }
+          .cyber-candle-btn :global(.cybr-label) {
+            background: linear-gradient(45deg, #00ffff, #ff0066);
+            color: #000;
+            font-weight: 900;
+            top: 3px !important;  /* Move down slightly */
+            right: 15% !important;  /* Move left to keep it on the button */
+          }
+        `}</style>
+        <div className="cyber-candle-btn">
+          <CyberGlitchButton
+            text="GET LIT"
+            onClick={handleLightCandleClick}
+            label="RL80"
+          />
+        </div>
       </div>
     </div>
   )

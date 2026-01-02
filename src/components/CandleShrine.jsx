@@ -723,11 +723,15 @@ useGLTF.preload('/models/tinyVotiveOnly.glb')
 // Demo price simulator component
 export function PriceSimulator({ onPriceChange }) {
   useFrame((state) => {
-    // Simulate price movement: slow wave with occasional spikes
+    // Simulate price movement: slow wave with occasional spikes and crashes
     const t = state.clock.elapsedTime
-    const baseWave = Math.sin(t * 0.2) * 0.5
-    const spike = Math.sin(t * 0.7) * Math.sin(t * 0.3) * 0.3
-    const price = baseWave + spike
+    const baseWave = Math.sin(t * 0.2) * 0.6
+    const spike = Math.sin(t * 0.7) * Math.sin(t * 0.3) * 0.4
+    // Add occasional crashes (negative spikes) and pumps
+    const crashCycle = Math.sin(t * 0.1) < -0.7 ? -0.8 : 0 // Occasional deep crashes
+    const pumpCycle = Math.sin(t * 0.15 + 2) > 0.8 ? 0.6 : 0 // Occasional pumps
+    const volatility = Math.sin(t * 1.5) * 0.2 // Fast volatility
+    const price = baseWave + spike + crashCycle + pumpCycle + volatility
     onPriceChange(price)
   })
   return null
@@ -865,30 +869,7 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onLight
       </button>
       
       {/* Test button to trigger candle click */}
-      <button
-        onClick={() => {
-          // Simulate clicking on candle with ID 10
-          handleCandleClick(10, { x: 0, y: 0, z: 0 })
-        }}
-        style={{
-          position: 'absolute',
-          bottom: '20px',
-          left: '20px',
-          background: 'linear-gradient(135deg, #aa66ff 0%, #6633cc 100%)',
-          border: 'none',
-          borderRadius: '8px',
-          padding: '16px 32px',
-          color: '#fff',
-          fontFamily: 'monospace',
-          fontSize: '16px',
-          fontWeight: 'bold',
-          cursor: 'pointer',
-          boxShadow: '0 0 30px rgba(170, 102, 255, 0.4)',
-          zIndex: 1000
-        }}
-      >
-        🔮 Test Candle Click
-      </button>
+      
     </div>
   )
 }
