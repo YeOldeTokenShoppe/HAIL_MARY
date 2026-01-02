@@ -439,8 +439,8 @@ function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.5
   // Debug log on mount and ensure matrices are initialized
   useEffect(() => {
     if (meshRef.current && geometry) {
-      console.log(`InstancedMesh created for ${material.type || 'unknown'} with ${actualCount} instances, capacity ${capacity}`)
-      console.log('Geometry bounds:', geometry.boundingBox, geometry.boundingSphere)
+      // console.log(`InstancedMesh created for ${material.type || 'unknown'} with ${actualCount} instances, capacity ${capacity}`)
+      // console.log('Geometry bounds:', geometry.boundingBox, geometry.boundingSphere)
       
       // Initialize instance matrices for raycasting to work
       const tempMatrix = new THREE.Matrix4()

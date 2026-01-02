@@ -10,6 +10,8 @@ const ANIMATION_DURATION = 2.5 // seconds
 const TRAIL_PARTICLE_COUNT = 20
 const TRAIL_LIFETIME = 0.8 // How long each particle lives
 const ARC_HEIGHT = 3 // How high the arc goes above the midpoint
+const MOBILE_ARC_HEIGHT = 1.5 // Lower arc for mobile visibility
+const MOBILE_BREAKPOINT = 768 // px
 
 // Easing function - ease out cubic for smooth deceleration
 const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3)
@@ -26,7 +28,8 @@ export function NewCandleEffect({
   endPosition = [5, 2, -3],   // Target in candle cloud
   onComplete = () => {},
   candleModelPath = '/models/tinyVotiveOnly.glb',
-  isActive = true
+  isActive = true,
+  isMobile = false
 }) {
   const groupRef = useRef()
   const trailRef = useRef()
@@ -36,13 +39,14 @@ export function NewCandleEffect({
   
   // Calculate arc path control point
   const controlPoint = useMemo(() => {
+    const arcHeight = isMobile ? MOBILE_ARC_HEIGHT : ARC_HEIGHT
     const mid = [
       (startPosition[0] + endPosition[0]) / 2,
-      Math.max(startPosition[1], endPosition[1]) + ARC_HEIGHT,
+      Math.max(startPosition[1], endPosition[1]) + arcHeight,
       (startPosition[2] + endPosition[2]) / 2
     ]
     return new THREE.Vector3(...mid)
-  }, [startPosition, endPosition])
+  }, [startPosition, endPosition, isMobile])
   
   const startVec = useMemo(() => new THREE.Vector3(...startPosition), [startPosition])
   const endVec = useMemo(() => new THREE.Vector3(...endPosition), [endPosition])
@@ -443,19 +447,41 @@ export const NewCandleEffectManager = forwardRef(({
   })
   const [showBurst, setShowBurst] = useState(false)
   const [burstPosition, setBurstPosition] = useState([0, 0, 0])
+  const [isMobile, setIsMobile] = useState(false)
+  
+  // Detect mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
   
   // Call this to trigger a new candle effect
   const triggerEffect = (offering) => {
-    // Random target position in cloud
-    const target = [
-      (Math.random() - 0.5) * cloudBounds.x,
-      (Math.random() - 0.5) * cloudBounds.y,
-      (Math.random() - 0.5) * cloudBounds.z - 5
-    ]
+    // Random target position in cloud - constrained for mobile
+    let target;
+    if (isMobile) {
+      // For mobile, keep the target more centered and closer
+      target = [
+        (Math.random() - 0.5) * cloudBounds.x * 0.4, // 40% of normal range
+        (Math.random() - 0.5) * cloudBounds.y * 0.5 + 2, // 50% range, slightly higher
+        (Math.random() - 0.5) * cloudBounds.z * 0.3 - 3 // Closer to camera
+      ]
+    } else {
+      // Desktop - full range
+      target = [
+        (Math.random() - 0.5) * cloudBounds.x,
+        (Math.random() - 0.5) * cloudBounds.y,
+        (Math.random() - 0.5) * cloudBounds.z - 5
+      ]
+    }
     
     setEffectState({
       isActive: true,
-      startPosition: phonePosition,
+      startPosition: isMobile ? [0, -2, 4] : phonePosition, // Adjust start position for mobile too
       endPosition: target,
       offering
     })
@@ -480,13 +506,13 @@ export const NewCandleEffectManager = forwardRef(({
   // Expose trigger function via ref
   useImperativeHandle(ref, () => ({
     triggerEffect
-  }), [phonePosition, cloudBounds])
+  }), [phonePosition, cloudBounds, isMobile])
   
   // Also attach to window for easy testing
   useEffect(() => {
     window.triggerNewCandle = triggerEffect
     return () => { delete window.triggerNewCandle }
-  }, [phonePosition])
+  }, [phonePosition, isMobile])
   
   return (
     <>
@@ -496,6 +522,7 @@ export const NewCandleEffectManager = forwardRef(({
         isActive={effectState.isActive}
         onComplete={handleEffectComplete}
         candleModelPath={candleModelPath}
+        isMobile={isMobile}
       />
       
       <ArrivalBurst

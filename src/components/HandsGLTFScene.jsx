@@ -1735,9 +1735,9 @@ const phoneWorldTransform = useMemo(() => {
     phoneRefLocal.getWorldPosition(worldPos)
     phoneRefLocal.getWorldQuaternion(worldQuat)
     phoneRefLocal.getWorldScale(worldScale)
-    console.log('📱 Phone position from:', phoneCaseRef.current ? 'phoneCase' : 'phoneScreen')
-    console.log('📱 Phone world position:', worldPos)
-    console.log('📱 Offerings available:', offerings?.length || 0)
+    // console.log('📱 Phone position from:', phoneCaseRef.current ? 'phoneCase' : 'phoneScreen')
+    // console.log('📱 Phone world position:', worldPos)
+    // console.log('📱 Offerings available:', offerings?.length || 0)
     
     return { position: worldPos, quaternion: worldQuat, scale: worldScale }
   }

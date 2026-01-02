@@ -26,12 +26,12 @@ export default function NavControlsHome({
   }, []);
 
   // Alternate emoji for 80s button
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setEightyEmoji(prev => prev === "🎸" ? "🎹" : "🎸");
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
+  // useEffect(() => {
+  //   const interval = setInterval(() => {
+  //     setEightyEmoji(prev => prev === "🎸" ? "🎹" : "🎸");
+  //   }, 2000);
+  //   return () => clearInterval(interval);
+  // }, []);
 
   const handlePlayClick = () => {
     if (onPlayMusic) {

@@ -360,7 +360,6 @@ export function PhoneScreenTexture({
       if (timeSinceInteraction > autoRotateDelay && now - lastUpdateTime.current > 4000) {
         currentOfferingIndex.current = (currentOfferingIndex.current + 1) % offerings.length
         lastUpdateTime.current = now
-        console.log('Auto-rotating to offering:', offerings[currentOfferingIndex.current].name)
       }
     }
   })

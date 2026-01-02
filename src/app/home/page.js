@@ -340,7 +340,7 @@ function CarouselPageContent() {
       
       {/* Cyber Toggle Switch for Views */}
       <div style={{
-        position: "fixed",
+        position: isMobileDevice ? "absolute" : "fixed",
         top: isMobileDevice ? "100px" : "auto", 
         bottom: isMobileDevice ? "auto" : "30px",
         left: isMobileDevice ? "auto" : "50%",

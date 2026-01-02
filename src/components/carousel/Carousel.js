@@ -66,7 +66,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             height: '100%',
             objectFit: 'cover',
             opacity: 0.8,
-            zIndex: 2,
+            zIndex: 1,
             pointerEvents: 'none',
           }}
         >

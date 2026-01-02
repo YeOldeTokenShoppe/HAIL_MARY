@@ -166,31 +166,33 @@ export default function UnifiedShrine({
     background: 'rgba(0, 0, 0, 0.8)',
     border: `2px solid ${priceChange >= 0 ? '#00ff66' : '#ff4444'}`,
     borderRadius: '12px',
-    padding: isMobile ? '12px' : '16px',
+    padding: isMobile ? '8px 10px' : '16px',
     color: '#fff',
     fontFamily: 'monospace',
-    fontSize: isMobile ? '12px' : '14px',
+    fontSize: isMobile ? '11px' : '14px',
     backdropFilter: 'blur(10px)',
     boxShadow: `0 0 20px ${priceChange >= 0 ? 'rgba(0, 255, 100, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
     zIndex: 1000,
-    width: isMobile ? '160px' : '240px'
+    width: isMobile ? '140px' : '230px',
+    pointerEvents: 'none'
   }), [isMobile, priceChange])
   
   const statsOverlayStyle = useMemo(() => ({
     position: 'absolute',
-    top: isMobile ? '250px' : '380px',
+    top: isMobile ? '230px' : '380px',
     right: isMobile ? '10px' : '20px',
     color: '#fff',
     fontFamily: 'monospace',
     fontSize: isMobile ? '10px' : '12px',
     background: 'rgba(0, 0, 0, 0.8)',
     border: `2px solid ${priceChange >= 0 ? '#00ff66' : '#ff4444'}`,
-    padding: isMobile ? '12px' : '16px',
+    padding: isMobile ? '8px 10px' : '16px',
     borderRadius: '12px',
     backdropFilter: 'blur(10px)',
     boxShadow: `0 0 20px ${priceChange >= 0 ? 'rgba(0, 255, 100, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
-    width: isMobile ? '160px' : '240px',
+    width: isMobile ? '140px' : '240px',
     zIndex: 999,
+    pointerEvents: 'none'
   }), [isMobile, priceChange])
   
   // Memoize the price chart bars
@@ -380,17 +382,17 @@ export default function UnifiedShrine({
       {/* Price Ticker */}
       <div style={priceTickerStyle}>
         <div style={{ 
-          fontSize: isMobile ? '18px' : '24px', 
+          fontSize: isMobile ? '15px' : '24px', 
           fontWeight: 'bold',
           color: priceChange >= 0 ? '#00ff66' : '#ff4444',
-          marginBottom: isMobile ? '4px' : '8px'
+          marginBottom: isMobile ? '2px' : '8px'
         }}>
           ${tokenPrice.toFixed(6)}
         </div>
         <div style={{
-          fontSize: isMobile ? '14px' : '18px',
+          fontSize: isMobile ? '11px' : '18px',
           color: priceChange >= 0 ? '#00ff66' : '#ff4444',
-          marginBottom: isMobile ? '8px' : '12px',
+          marginBottom: isMobile ? '4px' : '12px',
           display: 'flex',
           alignItems: 'center',
           gap: isMobile ? '4px' : '8px'
@@ -398,10 +400,10 @@ export default function UnifiedShrine({
           <span>{priceChange >= 0 ? '▲' : '▼'}</span>
           <span>{Math.abs(priceChange).toFixed(2)}%</span>
         </div>
-        <div style={{ fontSize: isMobile ? '10px' : '12px', color: '#888', marginBottom: '4px' }}>
+        <div style={{ fontSize: isMobile ? '9px' : '12px', color: '#888', marginBottom: '2px' }}>
           Vol 24h: ${isMobile ? (volume24h / 1000000).toFixed(1) + 'M' : volume24h.toLocaleString(undefined, { maximumFractionDigits: 0 })}
         </div>
-        <div style={{ fontSize: isMobile ? '10px' : '12px', color: '#888' }}>
+        <div style={{ fontSize: isMobile ? '9px' : '12px', color: '#888' }}>
           MCap: ${isMobile ? (marketCap / 1000000).toFixed(1) + 'M' : marketCap.toLocaleString(undefined, { maximumFractionDigits: 0 })}
         </div>
         
@@ -423,14 +425,17 @@ export default function UnifiedShrine({
       <div style={statsOverlayStyle}>
         <div style={{ 
           color: priceChange >= 0 ? '#00ff66' : '#ff4444',
-          fontSize: isMobile ? '16px' : '24px',
+          fontSize: isMobile ? '13px' : '24px',
           fontWeight: 'bold',
-          marginBottom: isMobile ? '4px' : '8px'
+          marginBottom: isMobile ? '2px' : '8px'
         }}>
           {priceChange >= 0 ? '↑' : '↓'} {priceChange.toFixed(2)}%
         </div>
         <div style={{ color: '#888', fontSize: isMobile ? '10px' : '12px' }}>
           🕯️ {(500 + additionalCandles.length).toLocaleString()} candles
+        </div>
+        <div style={{ color: '#888', fontSize: isMobile ? '10px' : '12px', marginTop: '4px' }}>
+          🔥 0 tokens burned
         </div>
       </div>
       
@@ -447,7 +452,7 @@ export default function UnifiedShrine({
       }}>
         <div style={{
           color: 'rgba(255, 255, 255, 0.9)',
-          fontSize: isMobile ? '1.5rem' : '2.5rem',
+          fontSize: isMobile ? '2rem' : '2.5rem',
           fontFamily: "'UnifrakturMaguntia', serif",
           letterSpacing: '1px',
           marginBottom: isMobile ? '8px' : '12px',

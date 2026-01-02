@@ -834,8 +834,8 @@ export default function CyborgTemple() {
             }
           }}
         />
-        {/* Aurora Background - Only render when Aurora is selected AND not in 80s mode */}
-        {canvasReady && useAurora && !isCandleModalOpen && !context80sMode && (
+        {/* Aurora Background - Only render when Aurora is selected AND (not in 80s mode OR on mobile) */}
+        {canvasReady && useAurora && !isCandleModalOpen && (!context80sMode || isMobileView) && (
           <div style={{ 
             position: 'absolute', 
             inset: 0, 
@@ -883,8 +883,8 @@ export default function CyborgTemple() {
             <ambientLight intensity={0.3} />
             <PostProcessingEffects />
             
-            {/* Synthwave sunset for 80s mode */}
-            {context80sMode && (
+            {/* Synthwave sunset for 80s mode - desktop only */}
+            {context80sMode && !isMobileView && (
               <>
                 {/* Gradient skybox sphere */}
                 <mesh scale={[500, 500, 500]}>
@@ -1044,8 +1044,8 @@ export default function CyborgTemple() {
               </>
             )}
             
-            {/* Starfield background - only show when Aurora is off AND not in 80s mode */}
-            {!useAurora && !context80sMode && (
+            {/* Starfield background - only show when Aurora is off AND (not in 80s mode OR on mobile) */}
+            {!useAurora && (!context80sMode || isMobileView) && (
               <StarField 
                 radius={150} 
                 count1={isMobileView ? 200 : 500} 

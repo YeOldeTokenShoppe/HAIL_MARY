@@ -75,7 +75,7 @@ const MobilePolaroidGallery = ({ images = [] }) => {
         
         .polaroid-caption {
           position: absolute;
-          bottom: 8px;
+          bottom: 20px;
           left: 10px;
           right: 10px;
           text-align: center;
@@ -160,7 +160,7 @@ const MobilePolaroidGallery = ({ images = [] }) => {
         
         .pause-indicator {
           position: absolute;
-          top: 50%;
+          top: 80%;
           left: 50%;
           transform: translate(-50%, -50%);
           background: rgba(0, 0, 0, 0.7);

@@ -26,6 +26,7 @@ const non80sTracks = [
 ];
 
 const eightyTracks = [
+  { name: "Girls on Film - Duran Duran", path: "audio/Girls On Film.mp3", bpm: 100 },
   { name: "For Those About To Rock - AC/DC", path: "audio/for-those-about-to-rock-ac-dc.m4a", bpm: 75 },
   { name: "Dirty Cash - The Adventures of Stevie V", path: "audio/Dirty Cash.m4a", bpm: 100 },
   { name: "Intergalactic - Beastie Boys", path: "audio/Intergalactic.mp3", bpm: 108 },
