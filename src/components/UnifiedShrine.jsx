@@ -5,13 +5,156 @@ import { useGLTF, Stats } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { HandsModel } from './HandsGLTFScene'
-import { CandleCloud, GradientBackground, PriceSimulator, SceneSetup } from './CandleShrine'
+// IMPORTANT: Import from the optimized version!
+import { CandleCloud, GradientBackground, SceneSetup } from './CandleShrine'
 import { NewCandleEffectManager } from './NewCandleEffect'
 import CyberGlitchButton from './carousel/CyberGlitchButton'
 import SkewedHeading from './SkewedHeading'
-// PhoneLightRays now rendered inside HandsGLTFScene attached to phoneCase
 
-// Unified scene combining candles and hands in one Canvas
+// Optimized PriceSimulator - uses refs instead of state for animation
+// Only updates React state at throttled intervals for UI
+function OptimizedPriceSimulator({ priceRef, onUIUpdate }) {
+  const lastUIUpdate = useRef(0)
+  const UI_UPDATE_INTERVAL = 100 // Update UI 10 times per second, not 60
+  
+  useFrame((state) => {
+    const t = state.clock.elapsedTime
+    
+    // Calculate price (runs every frame for smooth animation)
+    const baseWave = Math.sin(t * 0.15) * 0.5
+    const trend = Math.sin(t * 0.08) * 0.3
+    const gentleVolatility = Math.sin(t * 1.0) * 0.15
+    const crashCycle = Math.sin(t * 0.1) < -0.8 ? -0.6 : 0
+    const pumpCycle = Math.sin(t * 0.15 + 2) > 0.8 ? 0.5 : 0
+    
+    const price = baseWave + trend + gentleVolatility + crashCycle + pumpCycle
+    
+    // Update ref immediately (no re-render, used by shaders)
+    priceRef.current = price
+    
+    // Throttle UI updates to prevent excessive re-renders
+    const now = state.clock.elapsedTime * 1000
+    if (now - lastUIUpdate.current > UI_UPDATE_INTERVAL) {
+      lastUIUpdate.current = now
+      onUIUpdate(price)
+    }
+  })
+  
+  return null
+}
+
+// Separate component for candle cloud to prevent re-renders from parent state
+const MemoizedCandleCloud = React.memo(function MemoizedCandleCloud({ 
+  priceRef, 
+  additionalCandles, 
+  onCandleClick, 
+  clickedCandleId 
+}) {
+  // This component reads from ref, doesn't depend on priceDirection state
+  return (
+    <CandleCloudWithRef
+      count={500}
+      priceRef={priceRef}
+      additionalCandles={additionalCandles}
+      onCandleClick={onCandleClick}
+      clickedCandleId={clickedCandleId}
+    />
+  )
+})
+
+// Wrapper that passes ref value to CandleCloud via useFrame
+function CandleCloudWithRef({ count, priceRef, additionalCandles, onCandleClick, clickedCandleId }) {
+  const [priceDirection, setPriceDirection] = useState(0)
+  
+  // Update local state from ref at reasonable interval
+  useFrame(() => {
+    // Direct assignment, no setState needed - CandleCloud reads from sharedUniforms
+  })
+  
+  return (
+    <CandleCloud
+      count={count}
+      priceDirection={priceRef.current}
+      additionalCandles={additionalCandles}
+      onCandleClick={onCandleClick}
+      clickedCandleId={clickedCandleId}
+    />
+  )
+}
+
+// Memoized gradient that reads from ref
+const MemoizedGradientBackground = React.memo(function MemoizedGradientBackground({ priceRef, is80sMode }) {
+  const meshRef = useRef()
+  const { viewport } = useThree()
+  
+  const colorsRef = useRef({
+    bottom: new THREE.Color('#1a1a2e'),
+    top: new THREE.Color('#4a4a6a'),
+  })
+  
+  useFrame(() => {
+    if (!meshRef.current) return
+    
+    const priceDirection = priceRef.current
+    
+    let targetBottom, targetTop
+    if (priceDirection > 0.3) {
+      targetBottom = new THREE.Color('#0a2d1a')
+      targetTop = new THREE.Color('#22ff66')
+    } else if (priceDirection < -0.3) {
+      targetBottom = new THREE.Color('#2d0a0a')
+      targetTop = new THREE.Color('#ff4444')
+    } else {
+      targetBottom = new THREE.Color('#1a1a2e')
+      targetTop = new THREE.Color('#4a4a6a')
+    }
+    
+    colorsRef.current.bottom.lerp(targetBottom, 0.02)
+    colorsRef.current.top.lerp(targetTop, 0.02)
+    
+    meshRef.current.material.uniforms.uColorBottom.value = colorsRef.current.bottom
+    meshRef.current.material.uniforms.uColorTop.value = colorsRef.current.top
+  })
+  
+  const material = useMemo(() => new THREE.ShaderMaterial({
+    uniforms: {
+      uColorBottom: { value: new THREE.Color('#1a1a2e') },
+      uColorTop: { value: new THREE.Color('#4a4a6a') },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uColorBottom;
+      uniform vec3 uColorTop;
+      varying vec2 vUv;
+      
+      void main() {
+        float mixFactor = smoothstep(0.0, 1.0, vUv.y);
+        vec3 color = mix(uColorBottom, uColorTop, mixFactor);
+        vec2 center = vUv - 0.5;
+        float vignette = 1.0 - dot(center, center) * 0.5;
+        color *= vignette;
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `,
+    depthWrite: false,
+  }), [])
+  
+  if (is80sMode) return null
+  
+  return (
+    <mesh ref={meshRef} position={[0, 0, -20]} material={material}>
+      <planeGeometry args={[viewport.width * 4, viewport.height * 4]} />
+    </mesh>
+  )
+})
+
+// Main component
 export default function UnifiedShrine({ 
   offerings = [], 
   onSelectOffering, 
@@ -22,11 +165,19 @@ export default function UnifiedShrine({
   justLitOffering,
   onJustLitComplete 
 }) {
-  const [priceDirection, setPriceDirection] = useState(0)
+  // Use ref for real-time price (no re-renders)
+  const priceRef = useRef(0)
+  
+  // State only for UI display (throttled updates)
+  const [displayPrice, setDisplayPrice] = useState({
+    direction: 0,
+    change: 0,
+    tokenPrice: 0.000420,
+  })
+  
   const [additionalCandles, setAdditionalCandles] = useState([])
   const [clickedCandleId, setClickedCandleId] = useState(null)
   const effectManagerRef = useRef()
-  const newCandleTriggerRef = useRef()
   const [userRotation, setUserRotation] = useState(0)
   const isDragging = useRef(false)
   const dragStart = useRef({ x: 0, rotation: 0 })
@@ -34,17 +185,21 @@ export default function UnifiedShrine({
   const [hasReachedSection, setHasReachedSection] = useState(true)
   const [isInView, setIsInView] = useState(true)
   
-  // Price tracking states
-  const [tokenPrice, setTokenPrice] = useState(0.000420)
-  const [priceChange, setPriceChange] = useState(0)
-  const [volume24h, setVolume24h] = useState(1234567)
-  const [marketCap, setMarketCap] = useState(42069000)
-  // Memoize initial price history to avoid recreation
+  // Price history - update much less frequently
   const [priceHistory, setPriceHistory] = useState(() =>
     Array(20).fill(0).map(() => 0.00042 + Math.random() * 0.00001 - 0.000005)
   )
+  const lastHistoryUpdate = useRef(0)
+  const HISTORY_UPDATE_INTERVAL = 500 // Update chart every 500ms
+  
+  // Static values that don't need to update
+  const volume24h = 1234567
+  const marketCap = 42069000
 
-  // Mobile detection with cleanup
+  // Store timeout refs for cleanup
+  const timeoutRefs = useRef({})
+
+  // Mobile detection
   useEffect(() => {
     const checkMobile = () => {
       if (typeof window !== 'undefined') {
@@ -56,49 +211,55 @@ export default function UnifiedShrine({
       window.addEventListener('resize', checkMobile)
       return () => {
         window.removeEventListener('resize', checkMobile)
-        // Clean up any remaining timeouts
-        Object.values(timeoutRefs.current).forEach(timeout => {
-          clearTimeout(timeout)
-        })
+        Object.values(timeoutRefs.current).forEach(clearTimeout)
         timeoutRefs.current = {}
       }
     }
   }, [])
 
-  // Store timeout refs for cleanup
-  const timeoutRefs = useRef({})
-  
-  const handleCandleClick = useCallback((instanceId, position) => {
-    console.log('Candle clicked in unified scene:', instanceId, position)
+  // Throttled UI update handler
+  const handleUIUpdate = useCallback((price) => {
+    const changePercent = price * 5
+    const newTokenPrice = 0.000420 * (1 + changePercent / 100)
     
-    // Clear any existing timeout for this candle
+    setDisplayPrice({
+      direction: price,
+      change: changePercent,
+      tokenPrice: newTokenPrice,
+    })
+    
+    // Update history even less frequently
+    const now = Date.now()
+    if (now - lastHistoryUpdate.current > HISTORY_UPDATE_INTERVAL) {
+      lastHistoryUpdate.current = now
+      setPriceHistory(prev => [...prev.slice(1), newTokenPrice])
+    }
+    
+    if (onPriceChange) {
+      onPriceChange(changePercent)
+    }
+  }, [onPriceChange])
+
+  const handleCandleClick = useCallback((instanceId, position) => {
     if (timeoutRefs.current[instanceId]) {
       clearTimeout(timeoutRefs.current[instanceId])
       delete timeoutRefs.current[instanceId]
     }
     
-    // Set the clicked candle ID for visual feedback
     setClickedCandleId(instanceId)
     
-    // Clear the glow after 2 seconds with cleanup
     timeoutRefs.current[instanceId] = setTimeout(() => {
       setClickedCandleId(null)
       delete timeoutRefs.current[instanceId]
     }, 2000)
     
-    // Select a random offering to display on phone screen
-    if (offerings && offerings.length > 0) {
+    if (offerings?.length > 0 && onSelectOffering) {
       const randomIndex = Math.floor(Math.random() * offerings.length)
-      const selectedOffering = offerings[randomIndex]
-      console.log('Selected offering:', selectedOffering)
-      if (onSelectOffering) {
-        onSelectOffering(selectedOffering)
-      }
+      onSelectOffering(offerings[randomIndex])
     }
   }, [offerings, onSelectOffering])
 
-  const handleNewCandle = (position, offering) => {
-    console.log('New candle added at:', position)
+  const handleNewCandle = useCallback((position, offering) => {
     setAdditionalCandles(prev => [...prev, {
       position,
       offering,
@@ -109,10 +270,10 @@ export default function UnifiedShrine({
     if (onLightCandle) {
       onLightCandle(offering)
     }
-  }
+  }, [onLightCandle])
 
   const handlePointerDown = useCallback((event) => {
-    event.stopPropagation() // Prevent event bubbling
+    event.stopPropagation()
     isDragging.current = true
     dragStart.current = {
       x: event.clientX || event.nativeEvent?.clientX || 0,
@@ -127,56 +288,47 @@ export default function UnifiedShrine({
     if (isDragging.current) {
       const clientX = event.clientX || event.nativeEvent?.clientX || 0
       const deltaX = (clientX - dragStart.current.x) * 0.01
-      const newRotation = dragStart.current.rotation + deltaX
-      setUserRotation(newRotation)
+      setUserRotation(dragStart.current.rotation + deltaX)
     }
   }, [])
 
-  const handlePointerUp = useCallback((event) => {
-    if (event) event.stopPropagation() // Prevent event bubbling
+  const handlePointerUp = useCallback(() => {
     isDragging.current = false
     if (typeof document !== 'undefined' && document.body) {
       document.body.style.cursor = 'auto'
     }
   }, [])
 
-  // Add cleanup effect for component unmount
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      // Clean up all timeouts on unmount
-      Object.values(timeoutRefs.current).forEach(timeout => {
-        clearTimeout(timeout)
-      })
+      Object.values(timeoutRefs.current).forEach(clearTimeout)
       timeoutRefs.current = {}
-      
-      // Reset cursor style
       if (typeof document !== 'undefined' && document.body) {
         document.body.style.cursor = 'auto'
       }
-      
-      // Clear drag state
       isDragging.current = false
     }
   }, [])
   
-  // Memoize styles to prevent recreation on every render
+  // Memoize styles
   const priceTickerStyle = useMemo(() => ({
     position: 'absolute',
     top: isMobile ? '140px' : '195px',
     right: isMobile ? '10px' : '20px',
     background: 'rgba(0, 0, 0, 0.8)',
-    border: `2px solid ${priceChange >= 0 ? '#00ff66' : '#ff4444'}`,
+    border: `2px solid ${displayPrice.change >= 0 ? '#00ff66' : '#ff4444'}`,
     borderRadius: '12px',
     padding: isMobile ? '8px 10px' : '16px',
     color: '#fff',
     fontFamily: 'monospace',
     fontSize: isMobile ? '11px' : '14px',
     backdropFilter: 'blur(10px)',
-    boxShadow: `0 0 20px ${priceChange >= 0 ? 'rgba(0, 255, 100, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
+    boxShadow: `0 0 20px ${displayPrice.change >= 0 ? 'rgba(0, 255, 100, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
     zIndex: 1000,
     width: isMobile ? '140px' : '230px',
     pointerEvents: 'none'
-  }), [isMobile, priceChange])
+  }), [isMobile, displayPrice.change])
   
   const statsOverlayStyle = useMemo(() => ({
     position: 'absolute',
@@ -186,17 +338,17 @@ export default function UnifiedShrine({
     fontFamily: 'monospace',
     fontSize: isMobile ? '10px' : '12px',
     background: 'rgba(0, 0, 0, 0.8)',
-    border: `2px solid ${priceChange >= 0 ? '#00ff66' : '#ff4444'}`,
+    border: `2px solid ${displayPrice.change >= 0 ? '#00ff66' : '#ff4444'}`,
     padding: isMobile ? '8px 10px' : '16px',
     borderRadius: '12px',
     backdropFilter: 'blur(10px)',
-    boxShadow: `0 0 20px ${priceChange >= 0 ? 'rgba(0, 255, 100, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
+    boxShadow: `0 0 20px ${displayPrice.change >= 0 ? 'rgba(0, 255, 100, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
     width: isMobile ? '140px' : '230px',
     zIndex: 999,
     pointerEvents: 'none'
-  }), [isMobile, priceChange])
+  }), [isMobile, displayPrice.change])
   
-  // Memoize the price chart bars
+  // Memoize price chart bars
   const priceChartBars = useMemo(() => {
     const recentPrices = priceHistory.slice(-20)
     const min = Math.min(...recentPrices)
@@ -211,16 +363,15 @@ export default function UnifiedShrine({
           style={{
             width: '8px',
             height: `${height}px`,
-            background: i === 19 ? (priceChange >= 0 ? '#00ff66' : '#ff4444') : '#444',
+            background: i === 19 ? (displayPrice.change >= 0 ? '#00ff66' : '#ff4444') : '#444',
             borderRadius: '2px'
           }}
         />
       )
     })
-  }, [priceHistory, priceChange])
+  }, [priceHistory, displayPrice.change])
   
-  const handleLightCandleClick = () => {
-    // Create a new offering with randomized data
+  const handleLightCandleClick = useCallback(() => {
     const messages = [
       'Please pump my bags to the moon 🚀',
       'Grant me diamond hands in these trying times',
@@ -241,22 +392,18 @@ export default function UnifiedShrine({
       timestamp: 'just now'
     }
     
-    console.log('🕯️ New candle lit:', newOffering)
-    
-    // Call the callback to show on phone screen
     if (onLightCandle) {
       onLightCandle(newOffering)
     }
     
-    // Trigger new candle animation
     if (effectManagerRef.current?.triggerEffect) {
       effectManagerRef.current.triggerEffect(newOffering)
     }
-  }
+  }, [onLightCandle])
 
   return (
     <div style={{ width: '100%', height: '100vh', background: '#000', position: 'relative' }}>
-      {/* Retro image background for 80s mode */}
+      {/* 80s mode background */}
       {is80sMode && (
         <img
           src="/images/retro.webp"
@@ -274,6 +421,7 @@ export default function UnifiedShrine({
           }}
         />
       )}
+      
       <Canvas
         camera={{ position: [0, -0.5, 9], fov: 50 }}
         onPointerDown={handlePointerDown}
@@ -284,8 +432,8 @@ export default function UnifiedShrine({
           alpha: true, 
           antialias: true,
           powerPreference: "high-performance",
-          preserveDrawingBuffer: false, // Don't preserve buffer for better memory
-          failIfMajorPerformanceCaveat: false, // Don't fail on low-end devices
+          preserveDrawingBuffer: false,
+          failIfMajorPerformanceCaveat: false,
         }}
         style={{
           position: 'absolute',
@@ -296,6 +444,8 @@ export default function UnifiedShrine({
           zIndex: 2,
           background: 'transparent',
         }}
+        // Limit frame rate if needed - uncomment for testing
+        // frameloop="demand"
       >
         <SceneSetup is80sMode={is80sMode} />
         <ambientLight intensity={0.6} />
@@ -303,23 +453,24 @@ export default function UnifiedShrine({
         <pointLight position={[10, 10, 10]} intensity={0.5} />
         <pointLight position={[-10, -10, -10]} intensity={1} />
         
-        {/* Background gradient */}
-        <GradientBackground priceDirection={priceDirection} is80sMode={is80sMode} />
+        {/* Background gradient - reads from ref */}
+        <MemoizedGradientBackground priceRef={priceRef} is80sMode={is80sMode} />
         
-        {/* Candles in the background - pushed further back */}
+        {/* Candles - pushed back, reads from ref for smooth animation */}
         <group position={[0, 2, -8]}>
-          <CandleCloud 
-            count={500} 
-            priceDirection={priceDirection} 
-            additionalCandles={additionalCandles} 
-            onCandleClick={handleCandleClick} 
-            clickedCandleId={clickedCandleId} 
-
-    
+          <CandleCloud
+            count={500}
+            priceRef={priceRef}
+            additionalCandles={additionalCandles}
+            onCandleClick={handleCandleClick}
+            clickedCandleId={clickedCandleId}
           />
         </group>
-              <Stats className="stats-monitor" />
-        {/* Hands in the foreground - scaled up for better visibility */}
+        
+        {/* Only show Stats in development */}
+        {process.env.NODE_ENV === 'development' && <Stats className="stats-monitor" />}
+        
+        {/* Hands model */}
         <Suspense fallback={null}>
           <group scale={1.8} position={[0, -0.5, 0]}>
             <HandsModel 
@@ -331,33 +482,19 @@ export default function UnifiedShrine({
               justLitOffering={justLitOffering}
               onJustLitComplete={onJustLitComplete}
               userRotation={userRotation}
-              priceChange={priceDirection * 5}
+              priceChange={displayPrice.change}
               hasActiveClick={clickedCandleId !== null}
               is80sMode={is80sMode}
-              onLoad={() => console.log('Hands loaded in unified scene')}
+              onLoad={() => console.log('Hands loaded')}
             />
           </group>
         </Suspense>
         
-        {/* Light rays are now attached to phoneCase inside HandsModel */}
-        
-        {/* Price simulator */}
-        <PriceSimulator onPriceChange={(price) => {
-          setPriceDirection(price)
-          const changePercent = price * 5
-          setPriceChange(changePercent)
-          
-          // Update token price based on change
-          const newPrice = 0.000420 * (1 + changePercent / 100)
-          setTokenPrice(newPrice)
-          
-          // Update price history
-          setPriceHistory(prev => [...prev.slice(1), newPrice])
-          
-          if (onPriceChange) {
-            onPriceChange(changePercent)
-          }
-        }} />
+        {/* Optimized price simulator - updates ref every frame, state throttled */}
+        <OptimizedPriceSimulator 
+          priceRef={priceRef} 
+          onUIUpdate={handleUIUpdate} 
+        />
         
         {/* Candle effect manager */}
         <NewCandleEffectManager
@@ -368,7 +505,7 @@ export default function UnifiedShrine({
           candleModelPath="/models/tinyVotiveOnly.glb"
         />
         
-        {/* Post-processing effects */}
+        {/* Post-processing - skip on mobile */}
         {!isMobile && (
           <EffectComposer>
             <Bloom 
@@ -387,27 +524,27 @@ export default function UnifiedShrine({
         <div style={{ 
           fontSize: isMobile ? '15px' : '24px', 
           fontWeight: 'bold',
-          color: priceChange >= 0 ? '#00ff66' : '#ff4444',
+          color: displayPrice.change >= 0 ? '#00ff66' : '#ff4444',
           marginBottom: isMobile ? '2px' : '8px'
         }}>
-          ${tokenPrice.toFixed(6)}
+          ${displayPrice.tokenPrice.toFixed(6)}
         </div>
         <div style={{
           fontSize: isMobile ? '11px' : '18px',
-          color: priceChange >= 0 ? '#00ff66' : '#ff4444',
+          color: displayPrice.change >= 0 ? '#00ff66' : '#ff4444',
           marginBottom: isMobile ? '4px' : '12px',
           display: 'flex',
           alignItems: 'center',
           gap: isMobile ? '4px' : '8px'
         }}>
-          <span>{priceChange >= 0 ? '▲' : '▼'}</span>
-          <span>{Math.abs(priceChange).toFixed(2)}%</span>
+          <span>{displayPrice.change >= 0 ? '▲' : '▼'}</span>
+          <span>{Math.abs(displayPrice.change).toFixed(2)}%</span>
         </div>
         <div style={{ fontSize: isMobile ? '9px' : '12px', color: '#888', marginBottom: '2px' }}>
-          Vol 24h: ${isMobile ? (volume24h / 1000000).toFixed(1) + 'M' : volume24h.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          Vol 24h: ${isMobile ? (volume24h / 1000000).toFixed(1) + 'M' : volume24h.toLocaleString()}
         </div>
         <div style={{ fontSize: isMobile ? '9px' : '12px', color: '#888' }}>
-          MCap: ${isMobile ? (marketCap / 1000000).toFixed(1) + 'M' : marketCap.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+          MCap: ${isMobile ? (marketCap / 1000000).toFixed(1) + 'M' : marketCap.toLocaleString()}
         </div>
         
         {/* Mini chart */}
@@ -424,15 +561,15 @@ export default function UnifiedShrine({
         )}
       </div>
       
-      {/* Stats overlay (below price ticker on right) */}
+      {/* Stats overlay */}
       <div style={statsOverlayStyle}>
         <div style={{ 
-          color: priceChange >= 0 ? '#00ff66' : '#ff4444',
+          color: displayPrice.change >= 0 ? '#00ff66' : '#ff4444',
           fontSize: isMobile ? '13px' : '24px',
           fontWeight: 'bold',
           marginBottom: isMobile ? '2px' : '8px'
         }}>
-          {priceChange >= 0 ? '↑' : '↓'} {priceChange.toFixed(2)}%
+          {displayPrice.change >= 0 ? '↑' : '↓'} {displayPrice.change.toFixed(2)}%
         </div>
         <div style={{ color: '#888', fontSize: isMobile ? '10px' : '12px' }}>
           🕯️ {(500 + additionalCandles.length).toLocaleString()} candles
@@ -442,7 +579,7 @@ export default function UnifiedShrine({
         </div>
       </div>
       
-      {/* Light a Candle Button with Cyber Glitch Style */}
+      {/* Light a Candle Button */}
       <div style={{
         position: 'absolute',
         bottom: isMobile ? '20px' : '80px',
@@ -451,7 +588,7 @@ export default function UnifiedShrine({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        zIndex: 2000,  // Ensure button is above everything else
+        zIndex: 2000,
       }}>
         <div style={{
           color: 'rgba(255, 255, 255, 0.9)',
@@ -462,14 +599,12 @@ export default function UnifiedShrine({
           textAlign: 'center',
           textShadow: '0 0 2rem rgba(147, 69, 255, 0.9), 0 8px 16px rgba(0, 0, 0, 0.9)',
         }}>
-          {/* Get on Her {!isMobile && <br/>}Watchlist */}
-             <SkewedHeading 
-                lines={["Get on Her", "Watchlist"]}
-                // colors={["#d4af37", "#f4e4c1", "#ffd700"]}
-                    colors={["#00ff00"]}
-                fontSize={{ mobile: "2.1rem", desktop: "3rem" }}
-                isMobile={isMobile}
-              />
+          <SkewedHeading 
+            lines={["Get on Her", "Watchlist"]}
+            colors={["#00ff00"]}
+            fontSize={{ mobile: "2.1rem", desktop: "3rem" }}
+            isMobile={isMobile}
+          />
         </div>
         <style jsx>{`
           .cyber-candle-btn :global(.cybr-btn) {
@@ -494,8 +629,8 @@ export default function UnifiedShrine({
             background: linear-gradient(45deg, #00ffff, #ff0066);
             color: #000;
             font-weight: 900;
-            top: 3px !important;  /* Move down slightly */
-            right: 15% !important;  /* Move left to keep it on the button */
+            top: 3px !important;
+            right: 15% !important;
           }
         `}</style>
         <div className="cyber-candle-btn">

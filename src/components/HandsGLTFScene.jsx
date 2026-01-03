@@ -74,11 +74,15 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
     pacMan2: null
   })
   
-  // Market status based on price change
-  const isLargeDown = priceChange <= -5 // Large downward price action (5% or more drop)
-  const isModerateDown = priceChange < -2 && priceChange > -5 // Moderate down
-  const isMiddling = priceChange >= -2 && priceChange <= 2 // Small swings (-2% to +2%)
-  const isPositive = priceChange > 2 // Positive price action (more than 2% up)
+  // Debounced price for emoji changes (updates less frequently)
+  const debouncedPriceRef = useRef(priceChange)
+  const lastEmojiUpdateRef = useRef(0)
+  
+  // Market status based on debounced price change for emoji stability
+  const isLargeDown = debouncedPriceRef.current <= -5 // Large downward price action (5% or more drop)
+  const isModerateDown = debouncedPriceRef.current < -2 && debouncedPriceRef.current > -5 // Moderate down
+  const isMiddling = debouncedPriceRef.current >= -2 && debouncedPriceRef.current <= 2 // Small swings (-2% to +2%)
+  const isPositive = debouncedPriceRef.current > 2 // Positive price action (more than 2% up)
   
   // Opacity targets for smooth fading - store target opacity for each emoji group
   // Initialize based on current price state to ensure correct visibility from start
@@ -886,6 +890,14 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
   // Smooth opacity animation in render loop
   useFrame((state, delta) => {
     frameCounter.current++
+    
+    // Update debounced price every 1.5 seconds to reduce emoji switching
+    const currentTime = state.clock.elapsedTime
+    if (currentTime - lastEmojiUpdateRef.current > 1.5) {
+      lastEmojiUpdateRef.current = currentTime
+      // Smooth transition to new price state
+      debouncedPriceRef.current += (priceChange - debouncedPriceRef.current) * 0.4
+    }
     const fadeSpeed = 3.0 // Adjust this to control fade speed (higher = faster)
     
     // Helper function to update opacity for an object and its children

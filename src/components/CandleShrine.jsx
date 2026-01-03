@@ -6,29 +6,465 @@ import * as THREE from 'three'
 import { NewCandleEffectManager } from './NewCandleEffect'
 
 const CANDLE_COUNT = 500
-const MAX_ADDITIONAL = 100 // Buffer for user-added candles
+const MAX_ADDITIONAL = 100
 
-// Clear scene background when in 80s mode
+// Shared time uniform - all materials reference this single object
+const sharedUniforms = {
+  uTime: { value: 0 },
+  uClickedId: { value: -1 },
+  uPriceDirection: { value: 0 },
+}
+
+// Base vertex shader chunk for candle wobble - reused across all materials
+const wobbleVertexChunk = `
+  uniform float uTime;
+  uniform float uPriceDirection;
+  
+  // Fast hash function
+  float hash(float n) {
+    return fract(sin(n) * 43758.5453123);
+  }
+  
+  // Calculate wobble offset for a candle instance
+  vec3 getWobbleOffset(float instanceId, vec3 basePosition) {
+    float phase = hash(instanceId) * 6.28318;
+    float speed = 0.2 + hash(instanceId + 100.0) * 0.3;
+    float priceResponse = 0.7 + abs(sin(instanceId * 0.3)) * 0.6;
+    
+    float t = uTime * speed + phase;
+    
+    // Smooth floating motion
+    float offsetX = sin(t * 0.4) * 0.3;
+    float offsetY = sin(t * 0.3) * 0.2 + uPriceDirection * 3.0 * priceResponse;
+    float offsetZ = cos(t * 0.35) * 0.3;
+    
+    return vec3(offsetX, offsetY, offsetZ);
+  }
+`
+
+// Create a material with wobble animation baked in
+function createWobbleMaterial(baseColor, options = {}) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      ...sharedUniforms,
+      uColor: { value: new THREE.Color(baseColor) },
+      uOpacity: { value: options.opacity ?? 1.0 },
+    },
+    vertexShader: `
+      ${wobbleVertexChunk}
+      
+      void main() {
+        float id = float(gl_InstanceID);
+        vec4 instancePos = instanceMatrix * vec4(position, 1.0);
+        
+        // Apply wobble offset
+        vec3 wobble = getWobbleOffset(id, instancePos.xyz);
+        instancePos.xyz += wobble;
+        
+        gl_Position = projectionMatrix * modelViewMatrix * instancePos;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uColor;
+      uniform float uOpacity;
+      
+      void main() {
+        gl_FragColor = vec4(uColor, uOpacity);
+      }
+    `,
+    transparent: options.transparent ?? false,
+    side: options.side ?? THREE.FrontSide,
+    depthWrite: options.depthWrite ?? true,
+  })
+}
+
+// XBase material with click glow effect
+function createXBaseMaterial() {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      ...sharedUniforms,
+      uBaseColor: { value: new THREE.Color('#8bec03') },
+      uGlowColor: { value: new THREE.Color('#ff00ff') },
+    },
+    vertexShader: `
+      ${wobbleVertexChunk}
+      
+      varying float vInstanceId;
+      
+      void main() {
+        float id = float(gl_InstanceID);
+        vInstanceId = id;
+        
+        vec4 instancePos = instanceMatrix * vec4(position, 1.0);
+        vec3 wobble = getWobbleOffset(id, instancePos.xyz);
+        instancePos.xyz += wobble;
+        
+        gl_Position = projectionMatrix * modelViewMatrix * instancePos;
+      }
+    `,
+    fragmentShader: `
+      uniform vec3 uBaseColor;
+      uniform vec3 uGlowColor;
+      uniform float uClickedId;
+      uniform float uTime;
+      varying float vInstanceId;
+      
+      void main() {
+        bool isClicked = uClickedId >= 0.0 && abs(uClickedId - vInstanceId) < 1.0;
+        
+        vec3 color = uBaseColor;
+        float intensity = 1.0;
+        
+        if (isClicked) {
+          float pulse = sin(uTime * 4.0) * 0.3 + 0.7;
+          color = mix(uGlowColor, vec3(1.0, 0.0, 1.0), pulse);
+          intensity = 2.0 + sin(uTime * 6.0) * 0.5;
+        }
+        
+        gl_FragColor = vec4(color * intensity, 1.0);
+      }
+    `,
+    side: THREE.FrontSide,
+  })
+}
+
+// Senora (label) material with texture
+function createSenoraMaterial(texture) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      ...sharedUniforms,
+      uMap: { value: texture },
+    },
+    vertexShader: `
+      ${wobbleVertexChunk}
+      
+      varying vec2 vUv;
+      
+      void main() {
+        vUv = uv;
+        float id = float(gl_InstanceID);
+        
+        vec4 instancePos = instanceMatrix * vec4(position, 1.0);
+        vec3 wobble = getWobbleOffset(id, instancePos.xyz);
+        instancePos.xyz += wobble;
+        
+        gl_Position = projectionMatrix * modelViewMatrix * instancePos;
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D uMap;
+      varying vec2 vUv;
+      
+      void main() {
+        vec4 texColor = texture2D(uMap, vUv);
+        if (texColor.a < 0.5) discard;
+        gl_FragColor = texColor;
+      }
+    `,
+    transparent: true,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  })
+}
+
+// Flame material - most complex shader with flicker + wobble
+function createFlameMaterial() {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      ...sharedUniforms,
+    },
+    vertexShader: `
+      ${wobbleVertexChunk}
+      
+      varying float vHeight;
+      varying float vPhase;
+      varying float vInstanceId;
+      
+      void main() {
+        float id = float(gl_InstanceID);
+        vInstanceId = id;
+        vPhase = hash(id) * 6.28318;
+        
+        // Height normalized 0-1
+        vHeight = clamp((position.y + 0.1) / 0.6, 0.0, 1.0);
+        
+        // Flame flicker animation
+        float flameTime = uTime * 3.0 + vPhase;
+        vec3 pos = position;
+        
+        // Strong sway side to side
+        float sway = sin(flameTime * 1.5) * 0.06 * vHeight * vHeight;
+        sway += sin(flameTime * 2.3) * 0.03 * vHeight;
+        pos.x += sway;
+        
+        // Flicker height
+        float flicker = sin(flameTime * 2.0) * 0.04 * vHeight;
+        flicker += sin(flameTime * 3.7) * 0.02 * vHeight * vHeight;
+        pos.y += flicker;
+        
+        // Z wobble
+        pos.z += cos(flameTime * 1.8) * 0.04 * vHeight * vHeight;
+        
+        // Taper at top
+        float taper = 1.0 - vHeight * 0.5;
+        pos.x *= taper;
+        pos.z *= taper;
+        
+        // Vertical stretch
+        float stretch = 1.0 + sin(flameTime * 2.5) * 0.1 * vHeight;
+        pos.y *= stretch;
+        
+        // Apply instance transform first, then wobble
+        vec4 instancePos = instanceMatrix * vec4(pos, 1.0);
+        vec3 wobble = getWobbleOffset(id, instancePos.xyz);
+        instancePos.xyz += wobble;
+        
+        gl_Position = projectionMatrix * modelViewMatrix * instancePos;
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform float uClickedId;
+      varying float vHeight;
+      varying float vPhase;
+      varying float vInstanceId;
+      
+      void main() {
+        float time = uTime * 3.0 + vPhase;
+        bool isClicked = uClickedId >= 0.0 && abs(uClickedId - vInstanceId) < 1.0;
+        
+        // Base flame colors
+        vec3 innerColor = vec3(1.0, 0.95, 0.8);
+        vec3 midColor = vec3(1.0, 0.5, 0.0);
+        vec3 outerColor = vec3(1.0, 0.2, 0.0);
+        
+        // Purple glow for clicked
+        vec3 purpleInner = vec3(1.0, 0.0, 1.0);
+        vec3 purpleMid = vec3(0.8, 0.0, 1.0);
+        vec3 purpleOuter = vec3(0.6, 0.0, 1.0);
+        
+        vec3 color;
+        if (isClicked) {
+          if (vHeight < 0.3) {
+            color = mix(purpleInner, purpleMid, vHeight / 0.3);
+          } else if (vHeight < 0.7) {
+            color = mix(purpleMid, purpleOuter, (vHeight - 0.3) / 0.4);
+          } else {
+            color = mix(purpleOuter, vec3(0.8, 0.4, 1.0), (vHeight - 0.7) / 0.3);
+          }
+        } else {
+          if (vHeight < 0.3) {
+            color = mix(innerColor, midColor, vHeight / 0.3);
+          } else if (vHeight < 0.7) {
+            color = mix(midColor, outerColor, (vHeight - 0.3) / 0.4);
+          } else {
+            color = mix(outerColor, vec3(1.0, 0.8, 0.0), (vHeight - 0.7) / 0.3);
+          }
+        }
+        
+        float flicker = sin(time * 4.0) * 0.25 + sin(time * 9.0) * 0.15 + 1.0;
+        float intensity = isClicked ? 8.0 * flicker : 3.5 * flicker;
+        float alpha = (1.0 - vHeight * 0.5) * (0.8 + flicker * 0.2);
+        
+        gl_FragColor = vec4(color * intensity, alpha);
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    toneMapped: false,
+  })
+}
+
+// Extract geometries from GLB
+function useClonedGeometries(modelPath) {
+  const { scene } = useGLTF(modelPath)
+  
+  return useMemo(() => {
+    const geometries = {}
+    const textures = {}
+    const localMatrices = {}
+    
+    scene.updateWorldMatrix(true, false)
+    const rootInverse = new THREE.Matrix4().copy(scene.matrixWorld).invert()
+    
+    scene.traverse((child) => {
+      if (!child.isMesh) return
+      
+      const name = child.name.toLowerCase()
+      let key = null
+      
+      if (name.includes('xbase') || name.includes('base')) key = 'xbase'
+      else if (name.includes('glass')) key = 'glass'
+      else if (name.includes('wick')) key = 'wick'
+      else if (name.includes('senora')) {
+        key = 'senora'
+        if (child.material?.map) textures.senora = child.material.map
+      }
+      else if (name.includes('flame')) key = 'flame'
+      
+      if (key) {
+        const clonedGeometry = child.geometry.clone()
+        clonedGeometry.computeBoundingSphere()
+        clonedGeometry.computeBoundingBox()
+        geometries[key] = clonedGeometry
+        child.updateWorldMatrix(true, false)
+        localMatrices[key] = new THREE.Matrix4().copy(child.matrixWorld).premultiply(rootInverse)
+      }
+    })
+    
+    return { geometries, textures, localMatrices }
+  }, [scene])
+}
+
+// Generate random positions
+function usePositions(count) {
+  return useMemo(() => {
+    const positions = []
+    for (let i = 0; i < count; i++) {
+      positions.push({
+        x: (Math.random() - 0.5) * 40,
+        y: (Math.random() - 0.5) * 15,
+        z: (Math.random() - 0.5) * 20 - 5,
+        rotation: Math.random() * Math.PI * 2,
+      })
+    }
+    return positions
+  }, [count])
+}
+
+// Simplified InstancedPart - NO per-frame matrix updates!
+function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.5, maxCount, onCandleClick }) {
+  const meshRef = useRef()
+  const actualCount = positions.length
+  const capacity = maxCount || actualCount
+  
+  // Calculate static base matrices ONCE
+  const baseMatrices = useMemo(() => {
+    const matrices = []
+    const tempMatrix = new THREE.Matrix4()
+    const tempPosition = new THREE.Vector3()
+    const tempQuaternion = new THREE.Quaternion()
+    const tempScale = new THREE.Vector3(scale, scale, scale)
+    const hiddenMatrix = new THREE.Matrix4().makeTranslation(0, -10000, 0)
+    
+    for (let i = 0; i < capacity; i++) {
+      if (i < positions.length) {
+        const pos = positions[i]
+        tempPosition.set(pos.x, pos.y, pos.z)
+        tempQuaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pos.rotation)
+        tempMatrix.compose(tempPosition, tempQuaternion, tempScale)
+        if (localMatrix) {
+          tempMatrix.multiply(localMatrix)
+        }
+        matrices.push(tempMatrix.clone())
+      } else {
+        matrices.push(hiddenMatrix.clone())
+      }
+    }
+    return matrices
+  }, [positions, localMatrix, scale, capacity])
+  
+  // Set matrices ONCE on mount or when positions change
+  useEffect(() => {
+    if (!meshRef.current) return
+    
+    for (let i = 0; i < capacity; i++) {
+      meshRef.current.setMatrixAt(i, baseMatrices[i])
+    }
+    meshRef.current.instanceMatrix.needsUpdate = true
+    meshRef.current.computeBoundingSphere()
+  }, [baseMatrices, capacity])
+  
+  if (!geometry) return null
+  
+  return (
+    <instancedMesh
+      ref={meshRef}
+      args={[geometry, material, capacity]}
+      frustumCulled={false}
+      onClick={(event) => {
+        event.stopPropagation()
+        if (onCandleClick && event.instanceId !== undefined && event.instanceId < positions.length) {
+          onCandleClick(event.instanceId, positions[event.instanceId])
+        }
+      }}
+    />
+  )
+}
+
+// Single animation controller - updates shared uniforms once per frame
+// Accepts either a ref (for smooth updates) or a value (for static/slow updates)
+function AnimationController({ priceDirection, priceRef }) {
+  useFrame((state) => {
+    sharedUniforms.uTime.value = state.clock.elapsedTime
+    // Prefer ref for smooth animation, fall back to prop
+    sharedUniforms.uPriceDirection.value = priceRef?.current ?? priceDirection ?? 0
+  })
+  return null
+}
+
+export function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, priceRef, additionalCandles = [], onCandleClick, clickedCandleId }) {
+  const { geometries, textures, localMatrices } = useClonedGeometries('/models/tinyVotiveOnly.glb')
+  const basePositions = usePositions(count)
+  
+  // Combine positions
+  const positions = useMemo(() => {
+    const additional = additionalCandles.map(c => ({
+      x: c.position[0],
+      y: c.position[1],
+      z: c.position[2],
+      rotation: c.rotation || Math.random() * Math.PI * 2
+    }))
+    return [...basePositions, ...additional]
+  }, [basePositions, additionalCandles])
+  
+  // Create materials ONCE
+  const materials = useMemo(() => ({
+    xbase: createXBaseMaterial(),
+    glass: createWobbleMaterial('#888888', { transparent: true, opacity: 0.3 }),
+    wick: createWobbleMaterial('#222222'),
+    senora: createSenoraMaterial(textures.senora),
+    flame: createFlameMaterial(),
+  }), [textures])
+  
+  // Update clicked ID in shared uniforms
+  useEffect(() => {
+    sharedUniforms.uClickedId.value = clickedCandleId ?? -1
+  }, [clickedCandleId])
+  
+  const maxCount = CANDLE_COUNT + MAX_ADDITIONAL
+
+  return (
+    <group>
+      {/* Single animation controller for ALL parts - uses ref for smooth updates */}
+      <AnimationController priceDirection={priceDirection} priceRef={priceRef} />
+      
+      <InstancedPart geometry={geometries.xbase} material={materials.xbase} positions={positions} localMatrix={localMatrices.xbase} maxCount={maxCount} onCandleClick={onCandleClick} />
+      <InstancedPart geometry={geometries.wick} material={materials.wick} positions={positions} localMatrix={localMatrices.wick} maxCount={maxCount} onCandleClick={onCandleClick} />
+      <InstancedPart geometry={geometries.senora} material={materials.senora} positions={positions} localMatrix={localMatrices.senora} maxCount={maxCount} onCandleClick={onCandleClick} />
+      <InstancedPart geometry={geometries.flame} material={materials.flame} positions={positions} localMatrix={localMatrices.flame} maxCount={maxCount} onCandleClick={onCandleClick} />
+      <InstancedPart geometry={geometries.glass} material={materials.glass} positions={positions} localMatrix={localMatrices.glass} maxCount={maxCount} onCandleClick={onCandleClick} />
+    </group>
+  )
+}
+
+// Scene setup and gradient background unchanged
 export function SceneSetup({ is80sMode }) {
   const { scene } = useThree()
   
   useEffect(() => {
-    if (is80sMode) {
-      scene.background = null
-    } else {
-      scene.background = new THREE.Color(0x000000)
-    }
+    scene.background = is80sMode ? null : new THREE.Color(0x000000)
   }, [is80sMode, scene])
   
   return null
 }
 
-// Price-reactive gradient background
 export function GradientBackground({ priceDirection = 0, is80sMode = false }) {
   const meshRef = useRef()
   const { viewport } = useThree()
   
-  // Lerp colors smoothly
   const colorsRef = useRef({
     bottom: new THREE.Color('#1a1a2e'),
     top: new THREE.Color('#4a4a6a'),
@@ -37,7 +473,6 @@ export function GradientBackground({ priceDirection = 0, is80sMode = false }) {
   useFrame(() => {
     if (!meshRef.current) return
     
-    // Target colors based on price
     let targetBottom, targetTop
     if (priceDirection > 0.3) {
       targetBottom = new THREE.Color('#0a2d1a')
@@ -50,11 +485,9 @@ export function GradientBackground({ priceDirection = 0, is80sMode = false }) {
       targetTop = new THREE.Color('#4a4a6a')
     }
     
-    // Smooth lerp
     colorsRef.current.bottom.lerp(targetBottom, 0.02)
     colorsRef.current.top.lerp(targetTop, 0.02)
     
-    // Update uniforms
     meshRef.current.material.uniforms.uColorBottom.value = colorsRef.current.bottom
     meshRef.current.material.uniforms.uColorTop.value = colorsRef.current.top
   })
@@ -79,23 +512,16 @@ export function GradientBackground({ priceDirection = 0, is80sMode = false }) {
       void main() {
         float mixFactor = smoothstep(0.0, 1.0, vUv.y);
         vec3 color = mix(uColorBottom, uColorTop, mixFactor);
-        
-        // Subtle vignette
         vec2 center = vUv - 0.5;
         float vignette = 1.0 - dot(center, center) * 0.5;
         color *= vignette;
-        
         gl_FragColor = vec4(color, 1.0);
       }
     `,
     depthWrite: false,
   }), [])
   
-  // Don't render gradient when in 80s mode (video background takes over)
-  if (is80sMode) {
-    console.log('GradientBackground: Skipping render due to 80s mode')
-    return null
-  }
+  if (is80sMode) return null
   
   return (
     <mesh ref={meshRef} position={[0, 0, -20]} material={material}>
@@ -104,671 +530,31 @@ export function GradientBackground({ priceDirection = 0, is80sMode = false }) {
   )
 }
 
-// Animated material that moves vertices in shader
-function createAnimatedMaterial(color, options = {}) {
-  return new THREE.ShaderMaterial({
-    uniforms: {
-      uTime: { value: 0 },
-      uColor: { value: new THREE.Color(color) },
-      uOpacity: { value: options.opacity ?? 1.0 },
-    },
-    vertexShader: `
-      uniform float uTime;
-      
-      float hash(float n) {
-        return fract(sin(n) * 43758.5453123);
-      }
-      
-      void main() {
-        float id = float(gl_InstanceID);
-        float phase = hash(id) * 6.28318;
-        float speed = 0.2 + hash(id + 100.0) * 0.3;
-        
-        float time = uTime * speed + phase;
-        
-        // Gentle wobble
-        float wobbleX = sin(time * 0.15) * 0.2;
-        float wobbleY = sin(time * 0.1) * 0.1;
-        float wobbleZ = cos(time * 0.12) * 0.2;
-        
-        vec4 instancePos = instanceMatrix * vec4(position, 1.0);
-        instancePos.x += wobbleX;
-        instancePos.y += wobbleY;
-        instancePos.z += wobbleZ;
-        
-        gl_Position = projectionMatrix * modelViewMatrix * instancePos;
-      }
-    `,
-    fragmentShader: `
-      uniform vec3 uColor;
-      uniform float uOpacity;
-      
-      void main() {
-        gl_FragColor = vec4(uColor, uOpacity);
-      }
-    `,
-    transparent: options.transparent ?? false,
-    side: options.side ?? THREE.FrontSide,
-    depthWrite: options.depthWrite ?? true,
-  })
-}
-
-// Senora material with texture support
-function createSenoraMaterial(texture) {
-  return new THREE.ShaderMaterial({
-    uniforms: {
-      uTime: { value: 0 },
-      uMap: { value: texture },
-    },
-    vertexShader: `
-      uniform float uTime;
-      
-      varying vec2 vUv;
-      
-      float hash(float n) {
-        return fract(sin(n) * 43758.5453123);
-      }
-      
-      void main() {
-        vUv = uv;
-        
-        float id = float(gl_InstanceID);
-        float phase = hash(id) * 6.28318;
-        float speed = 0.2 + hash(id + 100.0) * 0.3;
-        
-        float time = uTime * speed + phase;
-        
-        float wobbleX = sin(time * 0.15) * 0.2;
-        float wobbleY = sin(time * 0.1) * 0.1;
-        float wobbleZ = cos(time * 0.12) * 0.2;
-        
-        vec4 instancePos = instanceMatrix * vec4(position, 1.0);
-        instancePos.x += wobbleX;
-        instancePos.y += wobbleY;
-        instancePos.z += wobbleZ;
-        
-        gl_Position = projectionMatrix * modelViewMatrix * instancePos;
-      }
-    `,
-    fragmentShader: `
-      uniform sampler2D uMap;
-      varying vec2 vUv;
-      
-      void main() {
-        vec4 texColor = texture2D(uMap, vUv);
-        if (texColor.a < 0.5) discard;
-        gl_FragColor = texColor;
-      }
-    `,
-    transparent: true,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-  })
-}
-
-// Flame material with color gradient
-function createFlameMaterial() {
-  return new THREE.ShaderMaterial({
-    uniforms: {
-      uTime: { value: 0 },
-    },
-    vertexShader: `
-      uniform float uTime;
-      
-      varying float vHeight;
-      varying float vPhase;
-      
-      float hash(float n) {
-        return fract(sin(n) * 43758.5453123);
-      }
-      
-      void main() {
-        float id = float(gl_InstanceID);
-        float phase = hash(id) * 6.28318;
-        float speed = 0.2 + hash(id + 100.0) * 0.3;
-        vPhase = hash(id + 300.0) * 6.28318;
-        
-        // Height for color gradient
-        vHeight = clamp(position.y / 0.5, 0.0, 1.0);
-        
-        vec3 pos = position;
-        
-        // Flame sway
-        float flameTime = uTime * 0.5 + vPhase;
-        pos.x += sin(flameTime * 0.8) * 0.01 * vHeight * vHeight;
-        pos.z += cos(flameTime * 0.6) * 0.008 * vHeight * vHeight;
-        
-        float time = uTime * speed + phase;
-        
-        // Cloud wobble (matches other parts)
-        float wobbleX = sin(time * 0.15) * 0.2;
-        float wobbleY = sin(time * 0.1) * 0.1;
-        float wobbleZ = cos(time * 0.12) * 0.2;
-        
-        vec4 instancePos = instanceMatrix * vec4(pos, 1.0);
-        instancePos.x += wobbleX;
-        instancePos.y += wobbleY;
-        instancePos.z += wobbleZ;
-        
-        gl_Position = projectionMatrix * modelViewMatrix * instancePos;
-      }
-    `,
-    fragmentShader: `
-      uniform float uTime;
-      varying float vHeight;
-      varying float vPhase;
-      
-      void main() {
-        float time = uTime + vPhase;
-        
-        vec3 baseColor = vec3(1.0, 0.3, 0.0);
-        vec3 tipColor = vec3(1.0, 0.9, 0.3);
-        vec3 color = mix(baseColor, tipColor, vHeight);
-        
-        // Hot core
-        float core = smoothstep(0.3, 0.0, vHeight);
-        color = mix(color, vec3(1.0, 1.0, 0.9), core * 0.5);
-        
-        float pulse = sin(time * 3.0) * 0.1 + 1.0;
-        float alpha = (1.0 - vHeight * 0.4) * pulse;
-        
-        gl_FragColor = vec4(color * 2.0 * pulse, alpha);
-      }
-    `,
-    transparent: true,
-    blending: THREE.AdditiveBlending,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-  })
-}
-
-// Extract and CLONE all geometries from GLB, including local transforms
-function useClonedGeometries(modelPath) {
-  const { scene } = useGLTF(modelPath)
-  
-  return useMemo(() => {
-    const geometries = {}
-    const textures = {}
-    const localMatrices = {}
-    
-    console.log('=== Loading candle model ===')
-    scene.updateWorldMatrix(true, false)
-    const rootInverse = new THREE.Matrix4().copy(scene.matrixWorld).invert()
-    
-    scene.traverse((child) => {
-      if (child.isMesh) {
-        console.log('Found mesh:', child.name, 'Geometry:', child.geometry, 'Material:', child.material?.name)
-      }
-      if (!child.isMesh) return
-      
-      const name = child.name.toLowerCase()
-      let key = null
-      
-      if (name.includes('xbase') || name.includes('base')) {
-        key = 'xbase'
-      } else if (name.includes('glass')) {
-        key = 'glass'
-      } else if (name.includes('wick')) {
-        key = 'wick'
-      } else if (name.includes('senora')) {
-        key = 'senora'
-        if (child.material?.map) {
-          textures.senora = child.material.map
-        }
-      } else if (name.includes('flame')) {
-        key = 'flame'
-      }
-      
-      if (key) {
-        const clonedGeometry = child.geometry.clone()
-        // Ensure bounding sphere is computed for raycasting
-        clonedGeometry.computeBoundingSphere()
-        clonedGeometry.computeBoundingBox()
-        geometries[key] = clonedGeometry
-        child.updateWorldMatrix(true, false)
-        localMatrices[key] = new THREE.Matrix4().copy(child.matrixWorld).premultiply(rootInverse)
-        console.log(`Stored ${key} geometry with bounds:`, clonedGeometry.boundingSphere)
-      }
-    })
-    
-    return { geometries, textures, localMatrices }
-  }, [scene])
-}
-
-function usePositions(count) {
-  return useMemo(() => {
-    const positions = []
-    for (let i = 0; i < count; i++) {
-      positions.push({
-        x: (Math.random() - 0.5) * 40,
-        y: (Math.random() - 0.5) * 15,
-        z: (Math.random() - 0.5) * 20 - 5,
-        rotation: Math.random() * Math.PI * 2,
-      })
-    }
-    return positions
-  }, [count])
-}
-
-function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.5, timeRef, priceRef, maxCount, onCandleClick }) {
-  const meshRef = useRef()
-  const actualCount = positions.length
-  const capacity = maxCount || actualCount
-  const [hovered, setHovered] = useState(false)
-  
-  // Recalculate base matrices when positions change
-  const baseMatrices = useMemo(() => {
-    const matrices = []
-    const tempMatrix = new THREE.Matrix4()
-    const tempPosition = new THREE.Vector3()
-    const tempQuaternion = new THREE.Quaternion()
-    const tempScale = new THREE.Vector3(scale, scale, scale)
-    const hiddenMatrix = new THREE.Matrix4().makeTranslation(0, -10000, 0) // Hide unused
-    
-    for (let i = 0; i < capacity; i++) {
-      if (i < positions.length) {
-        const pos = positions[i]
-        tempPosition.set(pos.x, pos.y, pos.z)
-        tempQuaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pos.rotation)
-        tempMatrix.compose(tempPosition, tempQuaternion, tempScale)
-        if (localMatrix) {
-          tempMatrix.multiply(localMatrix)
-        }
-        matrices.push(tempMatrix.clone())
-      } else {
-        matrices.push(hiddenMatrix.clone())
-      }
-    }
-    return matrices
-  }, [positions, localMatrix, scale, capacity])
-  
-  // Set up dynamic usage once
-  useEffect(() => {
-    if (!meshRef.current) return
-    meshRef.current.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
-  }, [])
-  
-  // Animate every frame
-  useFrame(() => {
-    if (!meshRef.current) return
-    
-    const time = timeRef.current
-    const priceDirection = priceRef.current
-    const tempMatrix = new THREE.Matrix4()
-    
-    for (let i = 0; i < actualCount; i++) {
-      const pos = positions[i]
-      const phase = pos.x * 0.1 + pos.y * 0.2 + pos.z * 0.15
-      const speed = 0.5 + Math.abs(Math.sin(pos.x * 0.5)) * 0.3
-      const t = time * speed + phase
-      
-      const priceResponse = 0.7 + Math.abs(Math.sin(pos.x * 0.3 + pos.z * 0.2)) * 0.6
-      
-      const offsetX = Math.sin(t * 0.4) * 0.3
-      const offsetY = Math.sin(t * 0.3) * 0.2 + priceDirection * 3.0 * priceResponse
-      const offsetZ = Math.cos(t * 0.35) * 0.3
-      
-      tempMatrix.copy(baseMatrices[i])
-      tempMatrix.elements[12] += offsetX
-      tempMatrix.elements[13] += offsetY
-      tempMatrix.elements[14] += offsetZ
-      
-      meshRef.current.setMatrixAt(i, tempMatrix)
-    }
-    
-    // Hide any unused slots
-    const hiddenMatrix = new THREE.Matrix4().makeTranslation(0, -10000, 0)
-    for (let i = actualCount; i < capacity; i++) {
-      meshRef.current.setMatrixAt(i, hiddenMatrix)
-    }
-    
-    meshRef.current.instanceMatrix.needsUpdate = true
-  })
-  
-  if (!geometry) return null
-  
-  // Enable cursor change on hover
-  useEffect(() => {
-    if (hovered && typeof document !== 'undefined') {
-      document.body.style.cursor = 'pointer'
-    } else if (typeof document !== 'undefined') {
-      document.body.style.cursor = 'auto'
-    }
-  }, [hovered])
-
-  // Debug log on mount and ensure matrices are initialized
-  useEffect(() => {
-    if (meshRef.current && geometry) {
-      // console.log(`InstancedMesh created for ${material.type || 'unknown'} with ${actualCount} instances, capacity ${capacity}`)
-      // console.log('Geometry bounds:', geometry.boundingBox, geometry.boundingSphere)
-      
-      // Initialize instance matrices for raycasting to work
-      const tempMatrix = new THREE.Matrix4()
-      for (let i = 0; i < capacity; i++) {
-        if (i < actualCount) {
-          tempMatrix.copy(baseMatrices[i])
-        } else {
-          tempMatrix.makeTranslation(0, -10000, 0) // Hide unused instances
-        }
-        meshRef.current.setMatrixAt(i, tempMatrix)
-      }
-      meshRef.current.instanceMatrix.needsUpdate = true
-      meshRef.current.computeBoundingSphere() // Important for raycasting
-    }
-  }, [geometry, actualCount, capacity, material, baseMatrices])
-
-  return (
-    <instancedMesh
-      ref={meshRef}
-      args={[geometry, material, capacity]}
-      frustumCulled={false}
-      onPointerOver={(event) => {
-        event.stopPropagation()
-        console.log('Hovering over candle instance:', event.instanceId)
-        setHovered(true)
-      }}
-      onPointerOut={(event) => {
-        event.stopPropagation()
-        setHovered(false)
-      }}
-      onClick={(event) => {
-        event.stopPropagation()
-        console.log('InstancedPart clicked - instanceId:', event.instanceId, 'Material:', material)
-        if (onCandleClick && event.instanceId !== undefined) {
-          const instanceId = event.instanceId
-          if (instanceId < positions.length) {
-            onCandleClick(instanceId, positions[instanceId])
-          }
-        }
-      }}
-    />
-  )
-}
-
-export function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, additionalCandles = [], onCandleClick, clickedCandleId }) {
-  const { geometries, textures, localMatrices } = useClonedGeometries('/models/tinyVotiveOnly.glb')
-  const basePositions = usePositions(count)
-  const timeRef = useRef(0)
-  const priceRef = useRef(priceDirection)
-  
-  // Combine base positions with additional candles
-  const positions = useMemo(() => {
-    const additional = additionalCandles.map(c => ({
-      x: c.position[0],
-      y: c.position[1],
-      z: c.position[2],
-      rotation: c.rotation || Math.random() * Math.PI * 2
-    }))
-    return [...basePositions, ...additional]
-  }, [basePositions, additionalCandles])
-  
-  // Update priceRef when prop changes
-  useEffect(() => {
-    priceRef.current = priceDirection
-  }, [priceDirection])
-  
-  // Create simple materials - only flame gets a shader
-  const flameMaterial = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: {
-      uTime: { value: 0 },
-      uClickedId: { value: -1 }, // ID of clicked candle for purple glow
-    },
-    vertexShader: `
-      precision highp float;
-      uniform float uTime;
-      attribute float instanceId;
-      
-      varying float vHeight;
-      varying float vPhase;
-      varying float vInstanceId;
-      
-      float hash(float n) {
-        return fract(sin(n) * 43758.5453123);
-      }
-      
-      void main() {
-        float id = float(gl_InstanceID);
-        vInstanceId = float(gl_InstanceID);
-        vPhase = hash(id) * 6.28318;
-        
-        // Height normalized 0-1
-        vHeight = clamp((position.y + 0.1) / 0.6, 0.0, 1.0);
-        
-        // Flame flicker animation - MORE DRAMATIC
-        float flameTime = uTime * 3.0 + vPhase;
-        vec3 pos = position;
-        
-        // Strong sway side to side
-        float sway = sin(flameTime * 1.5) * 0.06 * vHeight * vHeight;
-        sway += sin(flameTime * 2.3) * 0.03 * vHeight; // secondary wobble
-        pos.x += sway;
-        
-        // Flicker height - makes flame "dance"
-        float flicker = sin(flameTime * 2.0) * 0.04 * vHeight;
-        flicker += sin(flameTime * 3.7) * 0.02 * vHeight * vHeight;
-        pos.y += flicker;
-        
-        // Z wobble too
-        pos.z += cos(flameTime * 1.8) * 0.04 * vHeight * vHeight;
-        
-        // Taper at top - flame gets thinner
-        float taper = 1.0 - vHeight * 0.5;
-        pos.x *= taper;
-        pos.z *= taper;
-        
-        // Stretch vertically when flickering up
-        float stretch = 1.0 + sin(flameTime * 2.5) * 0.1 * vHeight;
-        pos.y *= stretch;
-        
-        vec4 instancePos = instanceMatrix * vec4(pos, 1.0);
-        gl_Position = projectionMatrix * modelViewMatrix * instancePos;
-      }
-    `,
-    fragmentShader: `
-      precision highp float;
-      uniform float uTime;
-      uniform float uClickedId;
-      varying float vHeight;
-      varying float vPhase;
-      varying float vInstanceId;
-      
-      void main() {
-        float time = uTime * 3.0 + vPhase;
-        
-        // Check if this is the clicked candle - more lenient matching
-        bool isClicked = false;
-        if (uClickedId >= 0.0) {
-          // Check if this instance matches the clicked ID
-          float diff = abs(uClickedId - vInstanceId);
-          isClicked = (diff < 1.0);
-        }
-        
-        // Base flame colors
-        vec3 innerColor = vec3(1.0, 0.95, 0.8);   // Hot white center
-        vec3 midColor = vec3(1.0, 0.5, 0.0);      // Orange
-        vec3 outerColor = vec3(1.0, 0.2, 0.0);    // Deep red-orange
-        
-        // Purple glow colors for clicked candle - more dramatic
-        vec3 purpleInner = vec3(1.0, 0.0, 1.0);   // Bright magenta
-        vec3 purpleMid = vec3(0.8, 0.0, 1.0);     // Deep purple
-        vec3 purpleOuter = vec3(0.6, 0.0, 1.0);   // Purple
-        
-        vec3 color;
-        if (isClicked) {
-          // Purple flame for clicked candle
-          if (vHeight < 0.3) {
-            color = mix(purpleInner, purpleMid, vHeight / 0.3);
-          } else if (vHeight < 0.7) {
-            color = mix(purpleMid, purpleOuter, (vHeight - 0.3) / 0.4);
-          } else {
-            color = mix(purpleOuter, vec3(0.8, 0.4, 1.0), (vHeight - 0.7) / 0.3);
-          }
-        } else {
-          // Normal flame colors
-          if (vHeight < 0.3) {
-            color = mix(innerColor, midColor, vHeight / 0.3);
-          } else if (vHeight < 0.7) {
-            color = mix(midColor, outerColor, (vHeight - 0.3) / 0.4);
-          } else {
-            color = mix(outerColor, vec3(1.0, 0.8, 0.0), (vHeight - 0.7) / 0.3);
-          }
-        }
-        
-        // Rapid flicker intensity
-        float flicker = sin(time * 4.0) * 0.25 + sin(time * 9.0) * 0.15 + 1.0;
-        
-        // Much brighter intensity for clicked candle
-        float intensity = isClicked ? 8.0 * flicker : 3.5 * flicker;
-        
-        // Alpha: solid at bottom, fade at top with flicker
-        float alpha = 1.0 - vHeight * 0.5;
-        alpha *= (0.8 + flicker * 0.2);
-        
-        gl_FragColor = vec4(color * intensity, alpha);
-      }
-    `,
-    transparent: true,
-    blending: THREE.AdditiveBlending,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-    toneMapped: false,
-  }), [])
-  
-  // Create XBase material with purple glow effect
-  const xbaseMaterial = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: {
-      uTime: { value: 0 },
-      uClickedId: { value: -1 },
-      uBaseColor: { value: new THREE.Color('#8bec03') },
-      uGlowColor: { value: new THREE.Color('#ff00ff') }
-    },
-    vertexShader: `
-      precision highp float;
-      varying float vInstanceId;
-      
-      void main() {
-        vInstanceId = float(gl_InstanceID);
-        vec4 mvPosition = modelViewMatrix * instanceMatrix * vec4(position, 1.0);
-        gl_Position = projectionMatrix * mvPosition;
-      }
-    `,
-    fragmentShader: `
-      precision highp float;
-      uniform vec3 uBaseColor;
-      uniform vec3 uGlowColor;
-      uniform float uClickedId;
-      uniform float uTime;
-      varying float vInstanceId;
-      
-      void main() {
-        // Check if this is the clicked candle
-        bool isClicked = false;
-        if (uClickedId >= 0.0) {
-          float diff = abs(uClickedId - vInstanceId);
-          isClicked = (diff < 1.0);
-        }
-        
-        vec3 color = uBaseColor;
-        float intensity = 1.0;
-        
-        if (isClicked) {
-          // Pulsing purple glow
-          float pulse = sin(uTime * 4.0) * 0.3 + 0.7;
-          color = mix(uGlowColor, vec3(1.0, 0.0, 1.0), pulse);
-          intensity = 2.0 + sin(uTime * 6.0) * 0.5;
-        }
-        
-        gl_FragColor = vec4(color * intensity, 1.0);
-      }
-    `,
-    side: THREE.FrontSide,
-  }), [])
-
-  const materials = useMemo(() => ({
-    xbase: xbaseMaterial,
-    glass: new THREE.MeshBasicMaterial({ color: '#888888', transparent: true, opacity: 0.3 }),
-    wick: new THREE.MeshBasicMaterial({ color: '#222222' }),
-    senora: new THREE.MeshBasicMaterial({ map: textures.senora, transparent: true, side: THREE.DoubleSide }),
-    flame: flameMaterial,
-  }), [textures, flameMaterial, xbaseMaterial])
-  
-  // Update clicked candle ID in both flame and xbase materials
-  useEffect(() => {
-    const idToSet = clickedCandleId !== null ? clickedCandleId : -1
-    
-    if (flameMaterial.uniforms) {
-      flameMaterial.uniforms.uClickedId.value = idToSet
-    }
-    
-    if (xbaseMaterial.uniforms) {
-      xbaseMaterial.uniforms.uClickedId.value = idToSet
-    }
-    
-    console.log('Setting clicked candle ID in shaders:', idToSet)
-  }, [clickedCandleId, flameMaterial, xbaseMaterial])
-  
-  // Update time ref for all animations
-  useFrame((state) => {
-    timeRef.current = state.clock.elapsedTime
-    if (flameMaterial.uniforms) {
-      flameMaterial.uniforms.uTime.value = state.clock.elapsedTime
-    }
-    if (xbaseMaterial.uniforms) {
-      xbaseMaterial.uniforms.uTime.value = state.clock.elapsedTime
-    }
-  })
-  
-  const maxCount = CANDLE_COUNT + MAX_ADDITIONAL
-  
-  // Log what geometries we have
-  useEffect(() => {
-    console.log('Available geometries:', Object.keys(geometries))
-    console.log('Glass geometry:', geometries.glass)
-  }, [geometries])
-
-  return (
-    <group>
-      {/* All parts should be clickable */}
-      <InstancedPart geometry={geometries.xbase} material={materials.xbase} positions={positions} localMatrix={localMatrices.xbase} timeRef={timeRef} priceRef={priceRef} maxCount={maxCount} onCandleClick={onCandleClick} />
-      <InstancedPart geometry={geometries.wick} material={materials.wick} positions={positions} localMatrix={localMatrices.wick} timeRef={timeRef} priceRef={priceRef} maxCount={maxCount} onCandleClick={onCandleClick} />
-      <InstancedPart geometry={geometries.senora} material={materials.senora} positions={positions} localMatrix={localMatrices.senora} timeRef={timeRef} priceRef={priceRef} maxCount={maxCount} onCandleClick={onCandleClick} />
-      <InstancedPart geometry={geometries.flame} material={materials.flame} positions={positions} localMatrix={localMatrices.flame} timeRef={timeRef} priceRef={priceRef} maxCount={maxCount} onCandleClick={onCandleClick} />
-      {/* Glass last for click priority */}
-      <InstancedPart geometry={geometries.glass} material={materials.glass} positions={positions} localMatrix={localMatrices.glass} timeRef={timeRef} priceRef={priceRef} maxCount={maxCount} onCandleClick={onCandleClick} />
-    </group>
-  )
-}
-
-useGLTF.preload('/models/tinyVotiveOnly.glb')
-
-// Demo price simulator component
 export function PriceSimulator({ onPriceChange }) {
   useFrame((state) => {
-    // Simulate price movement: slow wave with occasional spikes and crashes
     const t = state.clock.elapsedTime
-    const baseWave = Math.sin(t * 0.2) * 0.6
-    const spike = Math.sin(t * 0.7) * Math.sin(t * 0.3) * 0.4
-    // Add occasional crashes (negative spikes) and pumps
-    const crashCycle = Math.sin(t * 0.1) < -0.7 ? -0.8 : 0 // Occasional deep crashes
-    const pumpCycle = Math.sin(t * 0.15 + 2) > 0.8 ? 0.6 : 0 // Occasional pumps
-    const volatility = Math.sin(t * 1.5) * 0.2 // Fast volatility
-    const price = baseWave + spike + crashCycle + pumpCycle + volatility
+    const baseWave = Math.sin(t * 0.15) * 0.5
+    const trend = Math.sin(t * 0.08) * 0.3
+    const gentleVolatility = Math.sin(t * 1.0) * 0.15
+    const crashCycle = Math.sin(t * 0.1) < -0.8 ? -0.6 : 0
+    const pumpCycle = Math.sin(t * 0.15 + 2) > 0.8 ? 0.5 : 0
+    
+    const price = baseWave + trend + gentleVolatility + crashCycle + pumpCycle
     onPriceChange(price)
   })
   return null
 }
 
+useGLTF.preload('/models/tinyVotiveOnly.glb')
+
 export default function CandleShrine({ offerings = [], onSelectOffering, onLightCandle, onPriceChange, is80sMode }) {
   const [priceDirection, setPriceDirection] = useState(0)
   const [additionalCandles, setAdditionalCandles] = useState([])
-  const pricePercent = (priceDirection * 5).toFixed(2) // Convert to percentage
+  const pricePercent = (priceDirection * 5).toFixed(2)
   const effectManagerRef = useRef()
-  const [clickedCandleId, setClickedCandleId] = useState(null) // Track which candle was clicked
-  
-  console.log('CandleShrine is80sMode:', is80sMode)
+  const [clickedCandleId, setClickedCandleId] = useState(null)
   
   const handleNewCandle = (position, offering) => {
-    console.log('New candle added at:', position)
     setAdditionalCandles(prev => [...prev, {
       position,
       offering,
@@ -784,30 +570,17 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onLight
   }
   
   const handleCandleClick = (instanceId, position) => {
-    console.log('Candle clicked:', instanceId, position)
-    
-    // Set the clicked candle ID for visual feedback
     setClickedCandleId(instanceId)
+    setTimeout(() => setClickedCandleId(null), 2000)
     
-    // Clear the glow after 2 seconds
-    setTimeout(() => {
-      setClickedCandleId(null)
-    }, 2000)
-    
-    // Select a random offering to display on phone screen
-    if (offerings && offerings.length > 0) {
+    if (offerings?.length > 0 && onSelectOffering) {
       const randomIndex = Math.floor(Math.random() * offerings.length)
-      const selectedOffering = offerings[randomIndex]
-      console.log('Selected offering:', selectedOffering)
-      if (onSelectOffering) {
-        onSelectOffering(selectedOffering)
-      }
+      onSelectOffering(offerings[randomIndex])
     }
   }
   
   return (
     <div style={{ width: '100%', height: '100vh', background: '#000', position: 'relative' }}>
-      {/* Retro image background for 80s mode */}
       {is80sMode && (
         <img
           src="/images/retro.webp"
@@ -847,12 +620,16 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onLight
         <ambientLight intensity={0.6} />
         <pointLight position={[10, 10, 10]} intensity={0.5} />
         <GradientBackground priceDirection={priceDirection} is80sMode={is80sMode} />
-        <CandleCloud count={CANDLE_COUNT} priceDirection={priceDirection} additionalCandles={additionalCandles} onCandleClick={handleCandleClick} clickedCandleId={clickedCandleId} />
+        <CandleCloud 
+          count={CANDLE_COUNT} 
+          priceDirection={priceDirection} 
+          additionalCandles={additionalCandles} 
+          onCandleClick={handleCandleClick} 
+          clickedCandleId={clickedCandleId} 
+        />
         <PriceSimulator onPriceChange={(price) => {
           setPriceDirection(price)
-          if (onPriceChange) {
-            onPriceChange(price * 5) // Convert to percentage
-          }
+          if (onPriceChange) onPriceChange(price * 5)
         }} />
         <NewCandleEffectManager
           ref={effectManagerRef}
@@ -873,7 +650,6 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onLight
         </EffectComposer>
       </Canvas>
       
-      {/* Stats overlay */}
       <div style={{
         position: 'absolute',
         top: '20px',
@@ -899,7 +675,6 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onLight
         </div>
       </div>
       
-      {/* Light a candle button */}
       <button
         onClick={triggerNewCandle}
         style={{
@@ -921,9 +696,6 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onLight
       >
         🕯️ Light a Candle
       </button>
-      
-      {/* Test button to trigger candle click */}
-      
     </div>
   )
 }

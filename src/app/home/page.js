@@ -353,7 +353,7 @@ function CarouselPageContent() {
         <div 
           style={{
             position: 'relative',
-            width: isMobileDevice ? '140px' : '200px',
+            width: isMobileDevice ? '160px' : '240px',
             height: isMobileDevice ? '35px' : '50px',
             background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%)',
             border: '2px solid #9945ff',
@@ -368,8 +368,8 @@ function CarouselPageContent() {
           <div style={{
             position: 'absolute',
             top: isMobileDevice ? '2px' : '3px',
-            left: currentView === 'carousel' ? (isMobileDevice ? '2px' : '3px') : (isMobileDevice ? '72px' : '103px'),
-            width: isMobileDevice ? '66px' : '94px',
+            left: currentView === 'carousel' ? (isMobileDevice ? '2px' : '3px') : (isMobileDevice ? '82px' : '123px'),
+            width: isMobileDevice ? '76px' : '114px',
             height: isMobileDevice ? '31px' : '44px',
             background: `linear-gradient(135deg, ${currentView === 'carousel' ? '#00ff66' : '#9945ff'} 0%, ${currentView === 'carousel' ? '#00cc44' : '#7c37d0'} 100%)`,
             borderRadius: '22px',
@@ -404,9 +404,9 @@ function CarouselPageContent() {
             transition: 'all 0.3s ease',
             pointerEvents: 'none',
             userSelect: 'none',
-            left: isMobileDevice ? '20px' : '28px',
-            color: currentView === 'carousel' ? '#000' : '#666',
-            textShadow: currentView === 'carousel' ? '0 0 5px rgba(0, 255, 102, 0.8)' : 'none',
+            left: isMobileDevice ? '25px' : '35px',
+            color: currentView === 'carousel' ? '#000' : '#00ff66',
+            textShadow: currentView === 'carousel' ? '0 0 5px rgba(0, 255, 102, 0.8)' : '0 0 10px rgba(0, 255, 102, 0.8), 0 0 20px rgba(0, 255, 102, 0.4)',
           }}>Lore</span>
           
           <span style={{
@@ -415,16 +415,16 @@ function CarouselPageContent() {
             transform: 'translateY(-50%)',
             fontFamily: "'Courier New', monospace",
             fontWeight: 'bold',
-            fontSize: isMobileDevice ? '11px' : '14px',
-            letterSpacing: isMobileDevice ? '0.5px' : '1px',
+            fontSize: isMobileDevice ? '10px' : '12px',
+            letterSpacing: isMobileDevice ? '0.3px' : '0.8px',
             textTransform: 'uppercase',
             transition: 'all 0.3s ease',
             pointerEvents: 'none',
             userSelect: 'none',
-            right: isMobileDevice ? '15px' : '22px',
-            color: currentView === 'shrine' ? '#fff' : '#666',
-            textShadow: currentView === 'shrine' ? '0 0 5px rgba(153, 69, 255, 0.8)' : 'none',
-          }}>Shrine</span>
+            right: isMobileDevice ? '10px' : '18px',
+            color: currentView === 'shrine' ? '#fff' : '#00ff66',
+            textShadow: currentView === 'shrine' ? '0 0 5px rgba(153, 69, 255, 0.8)' : '0 0 10px rgba(0, 255, 102, 0.8), 0 0 20px rgba(0, 255, 102, 0.4)',
+          }}>Luminarium</span>
           
           <span style={{
             position: 'absolute',
