@@ -465,6 +465,7 @@ export default function UnifiedShrine({
             onCandleClick={handleCandleClick}
             clickedCandleId={clickedCandleId}
           />
+            <Stats className="stats-monitor" />
         </group>
         
         {/* Only show Stats in development */}
