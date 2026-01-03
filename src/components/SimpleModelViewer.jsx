@@ -331,7 +331,7 @@ function FloatingChart({ position, chartData, chartType = 'line', chartLabel = '
         <meshBasicMaterial 
           color={glowColor}
           transparent={true}
-          opacity={hovered ? 0.3 : 0.15}
+          opacity={hovered ? 1 : 0.75}
           side={THREE.DoubleSide}
         />
       </mesh>
@@ -367,7 +367,7 @@ function FloatingChart({ position, chartData, chartType = 'line', chartLabel = '
           opacity={1}
           alphaTest={0.01}
           emissive={glowColor}
-          emissiveIntensity={hovered ? 2.5 : 1.5}
+          emissiveIntensity={hovered ? 3.5 : 2.5}
         />
       </mesh>
       
@@ -377,7 +377,7 @@ function FloatingChart({ position, chartData, chartType = 'line', chartLabel = '
         <meshBasicMaterial 
           color={glowColor}
           transparent={true}
-          opacity={hovered ? 0.4 : 0.2}
+          opacity={hovered ? 0.8 : 0.5}
           side={THREE.DoubleSide}
           blending={THREE.AdditiveBlending}
         />
@@ -398,9 +398,11 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
   const ballMaterialRef = useRef(null);
   const ballMeshRef = useRef(null);
   const pyramidMeshRef = useRef(null);
+  const pyramidMaterialRef = useRef(null);
   const [userRotation, setUserRotation] = useState(0); // User-controlled rotation offset
   const [isDragging, setIsDragging] = useState(false);
   const [lastMouseX, setLastMouseX] = useState(0);
+  const [hoveredObject, setHoveredObject] = useState(null); // Track which object is being hovered
   
   useEffect(() => {
     const handleResize = () => {
@@ -449,6 +451,11 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
         if (scrollMesh) {
           // console.log(`Found ${scrollName}, applying glow effect and click handler`);
           
+          // Store the original scale to prevent accumulation
+          if (!scrollMesh.userData.originalScale) {
+            scrollMesh.userData.originalScale = scrollMesh.scale.clone();
+          }
+          
           // Store mesh reference for click handling
           scrollMeshesRef.current[scrollName] = scrollMesh;
           
@@ -469,19 +476,33 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
               child.userData.scrollName = scrollName;
               child.userData.onClick = handleScrollClick;
               
+              // Hover will be handled by the main pointer events
+              
               if (child.material) {
                 // Clone the material to avoid affecting other objects
                 const originalMaterial = child.material;
                 const glowMaterial = originalMaterial.clone();
                 
+                // Store original emissive settings
+                glowMaterial.userData.originalEmissive = glowMaterial.emissive ? glowMaterial.emissive.clone() : new THREE.Color(0x000000);
+                glowMaterial.userData.originalEmissiveIntensity = glowMaterial.emissiveIntensity || 0;
+                
                 // Add emissive glow
                 glowMaterial.emissive = new THREE.Color(0xd4af37); // Golden glow
-                glowMaterial.emissiveIntensity = 0.1;
+                glowMaterial.emissiveIntensity = 0.3; // Start with higher base intensity
                 
                 // Make it slightly transparent for a magical effect
                 if (!glowMaterial.transparent) {
                   glowMaterial.transparent = true;
-                  glowMaterial.opacity = 0.9;
+                  glowMaterial.opacity = 0.85;
+                }
+                
+                // Enable better material properties for glow
+                if (glowMaterial.metalness !== undefined) {
+                  glowMaterial.metalness = 0.3;
+                }
+                if (glowMaterial.roughness !== undefined) {
+                  glowMaterial.roughness = 0.4;
                 }
                 
                 child.material = glowMaterial;
@@ -528,23 +549,27 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
             
             if (child.material) {
               // Clone the material to avoid affecting other objects
-              // const originalMaterial = child.material;
-              // const glowMaterial = originalMaterial.clone();
+              const originalMaterial = child.material;
+              const glowMaterial = originalMaterial.clone();
+              
+              // Store original emissive settings
+              glowMaterial.userData.originalEmissive = glowMaterial.emissive ? glowMaterial.emissive.clone() : new THREE.Color(0x000000);
+              glowMaterial.userData.originalEmissiveIntensity = glowMaterial.emissiveIntensity || 0;
               
               // Add emissive glow
-              // glowMaterial.emissive = new THREE.Color(0x4a90e2); // Blue glow for the ball
-              // glowMaterial.emissiveIntensity = 0.2;
+              glowMaterial.emissive = new THREE.Color(0x4a90e2); // Blue glow for the ball
+              glowMaterial.emissiveIntensity = 0.15;
               
               // Make it slightly transparent for a magical effect
-              // if (!glowMaterial.transparent) {
-              //   glowMaterial.transparent = true;
-              //   glowMaterial.opacity = 0.9;
-              // }
+              if (!glowMaterial.transparent) {
+                glowMaterial.transparent = true;
+                glowMaterial.opacity = 0.9;
+              }
               
-              // child.material = glowMaterial;
+              child.material = glowMaterial;
               
               // Store reference for pulsing animation
-              // ballMaterialRef.current = glowMaterial;
+              ballMaterialRef.current = glowMaterial;
               
               // console.log('Applied glow material to ball');
             }
@@ -615,6 +640,12 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
             }
             
             pyramidMesh.material = glowMaterial;
+            
+            // Store reference for hover effects
+            if (!pyramidMaterialRef.current) {
+              pyramidMaterialRef.current = glowMaterial;
+            }
+            
             // console.log('Applied glow material to', pyramidMesh.name);
           }
         });
@@ -702,7 +733,7 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
   useFrame(({ clock }) => {
     if (scrollMaterialsRef.current.length > 0) {
       const time = clock.getElapsedTime();
-      const pulseIntensity = 0.2 + Math.sin(time * 2) * 0.1; // Gentle pulse between 0.05 and 0.15
+      const pulseIntensity = 0.3 + Math.sin(time * 2) * 0.15; // Slightly brighter base pulse
       
       scrollMaterialsRef.current.forEach(material => {
         material.emissiveIntensity = pulseIntensity;
@@ -715,7 +746,98 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
       const ballPulseIntensity = 0.2 + Math.sin(time * 1.5) * 0.1; // Different pulse rhythm for ball
       ballMaterialRef.current.emissiveIntensity = ballPulseIntensity;
     }
+    
+    // Pyramid pulsing animation
+    if (pyramidMaterialRef.current) {
+      const time = clock.getElapsedTime();
+      const pyramidPulseIntensity = 0.5 + Math.sin(time * 1) * 0.15; // Slower pulse for pyramid
+      pyramidMaterialRef.current.emissiveIntensity = pyramidPulseIntensity;
+    }
   });
+  
+  // Track current hover state
+  const currentHoverRef = useRef(null);
+  
+  // Handle pointer events - simplified, no scaling
+  const handlePointerOver = (event) => {
+    event.stopPropagation();
+    const intersects = event.intersections;
+    if (intersects.length > 0) {
+      const hoveredObject = intersects[0].object;
+      
+      // Check for scroll objects
+      if (hoveredObject.userData.scrollName) {
+        const scrollName = hoveredObject.userData.scrollName;
+        
+        // Only apply if not already hovering this object
+        if (currentHoverRef.current !== scrollName) {
+          console.log(`Hovering over ${scrollName}`);
+          currentHoverRef.current = scrollName;
+          setHoveredObject(scrollName);
+          document.body.style.cursor = 'pointer';
+          
+          // Only change materials, NO SCALING
+          const scrollMesh = scrollMeshesRef.current[scrollName];
+          if (scrollMesh) {
+            scrollMesh.traverse((child) => {
+              if (child.isMesh && child.material) {
+                // Store original values if not stored
+                if (!child.material.userData.originalEmissiveIntensity) {
+                  child.material.userData.originalEmissiveIntensity = child.material.emissiveIntensity;
+                }
+                // Enhance glow
+                child.material.emissiveIntensity = 1.0; // Bright glow
+                child.material.emissive = new THREE.Color(0xffd700); // Bright gold
+                child.material.opacity = 1;
+              }
+            });
+          }
+        }
+      }
+      // Check for other clickable objects
+      else if (hoveredObject.userData.ballObject && currentHoverRef.current !== 'ball') {
+        currentHoverRef.current = 'ball';
+        setHoveredObject('ball');
+        document.body.style.cursor = 'pointer';
+      } else if (hoveredObject.userData.pyramidObject && currentHoverRef.current !== 'pyramid') {
+        currentHoverRef.current = 'pyramid';
+        setHoveredObject('pyramid');
+        document.body.style.cursor = 'pointer';
+      }
+    }
+  };
+  
+  const handlePointerOut = (event) => {
+    event.stopPropagation();
+    console.log('Pointer out, resetting:', currentHoverRef.current);
+    
+    // Reset the currently hovered object
+    if (currentHoverRef.current && currentHoverRef.current.startsWith('Scroll')) {
+      const scrollMesh = scrollMeshesRef.current[currentHoverRef.current];
+      if (scrollMesh) {
+        // Reset materials only
+        scrollMesh.traverse((child) => {
+          if (child.isMesh && child.material) {
+            // Restore original values
+            child.material.emissiveIntensity = child.material.userData.originalEmissiveIntensity || 0.3;
+            child.material.emissive = new THREE.Color(0xd4af37); // Normal gold
+            child.material.opacity = 0.85;
+          }
+        });
+        
+        // Make absolutely sure scale is normal
+        if (scrollMesh.userData.originalScale) {
+          scrollMesh.scale.copy(scrollMesh.userData.originalScale);
+        } else {
+          scrollMesh.scale.set(1, 1, 1);
+        }
+      }
+    }
+    
+    currentHoverRef.current = null;
+    setHoveredObject(null);
+    document.body.style.cursor = 'auto';
+  };
   
   // Handle clicks on scroll objects and ball
   const handleClick = (event) => {
@@ -780,6 +902,25 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
         object={scene} 
         scale={scale}
         onClick={handleClick}
+        onPointerOver={(e) => {
+          console.log('Primitive pointer over event triggered');
+          handlePointerOver(e);
+        }}
+        onPointerOut={(e) => {
+          console.log('Primitive pointer out event triggered');
+          handlePointerOut(e);
+        }}
+        onPointerMove={(e) => {
+          // Use pointer move as a backup for hover detection
+          if (e.intersections.length > 0) {
+            const obj = e.intersections[0].object;
+            if (obj.userData.clickable && !hoveredObject) {
+              handlePointerOver(e);
+            }
+          } else if (hoveredObject) {
+            handlePointerOut(e);
+          }
+        }}
         onPointerDown={handlePointerDown}
       />
     </group>
@@ -1309,7 +1450,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
               padding: '2rem',
               paddingTop: '8rem',
               zIndex: 1000,
-              pointerEvents: showIntroText ? 'auto' : 'none'  // Only allow pointer events when intro is shown
+              pointerEvents: 'none'  // Allow clicks to pass through to the 3D scene
             }}>
               {/* Heading placeholder - keep structure */}
               <div style={{
@@ -1463,7 +1604,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
           </video>
         )}
         <CleanCanvas
-          style={{ position: 'relative', zIndex: 1 }}
+          style={{ position: 'relative', zIndex: 1, pointerEvents: 'auto' }}
           camera={{ 
             position: isDesktop 
               ? [-7, 1, 7] 
@@ -1636,7 +1777,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
             <div
               style={{
                 position: 'absolute',
-                bottom: '1rem',
+                bottom: '3rem',
                 left: '1rem',
                 right: '1rem',
                 width: 'calc(100% - 2rem)',

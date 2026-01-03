@@ -92,13 +92,13 @@ const CyberNav = ({
 
   const navItems = [
     { id: '00', date: 'ICON ON I-80', title: "ROADMAP", path: '/', thumbnail: '/images/I80.png' },
-    { id: '01', date: 'DEFI GRAV80', title: 'SOMETHING ABOUT RL80', path: '/home', thumbnail: '/images/ROSE_TATTOO.png' },
+    { id: '01', date: 'DEFI GRAV80', title: 'SOMETHING ABOUT RL80', path: '/home', thumbnail: '/images/ROSE_TATTOO.webp' },
     // { id: '02', date: 'LIGHT UTIL80', title: 'THE ILLUMIN80', path: '/gallery3', thumbnail: '/heart.png' },
-    { id: '02', date: 'PRAYER & PROBABIL80', title: 'TRADING DESK', path: '/trade', thumbnail: '/images/3ACES_TATTOO.png' },
-    { id: '03', date: 'ETHICS & MORAL80', title: 'SCROLLS OF ST. GR80', path: '/ethos', thumbnail: '/images/ILLUMIN80_TATTOO.png' },
-    { id: '04', date: 'CHAR80 & LIQUID80', title: 'COIN FOUNTAIN', path: '/fountain', thumbnail: '/images/HEART_TATTOO.png' },
-    { id: '05', date: 'QUANT80 & CURIOS80', title: 'TOKENOMICS & FAQ', path: '/tokenomics', thumbnail: '/images/COIN_TATTOO.png' },
-    { id: '06', date: 'COMING SOON', title: 'LIGHT CLUB', path: '#', thumbnail: '/images/RL80_KNUCKLES.png' },
+    { id: '02', date: 'PRAYER & PROBABIL80', title: 'TRADING DESK', path: '/trade', thumbnail: '/images/3ACES_TATTOO.webp' },
+    { id: '03', date: 'ETHICS & MORAL80', title: 'SCROLLS OF ST. GR80', path: '/ethos', thumbnail: '/images/ILLUMIN80_TATTOO.webp' },
+    { id: '04', date: 'CHAR80 & LIQUID80', title: 'COIN FOUNTAIN', path: '/fountain', thumbnail: '/images/HEART_TATTOO.webp' },
+    { id: '05', date: 'QUANT80 & CURIOS80', title: 'TOKENOMICS & FAQ', path: '/tokenomics', thumbnail: '/images/COIN_TATTOO.webp' },
+    { id: '06', date: 'COMING SOON', title: 'LIGHT CLUB', path: '#', thumbnail: '/images/RL80_KNUCKLES.webp' },
 
   ];
 

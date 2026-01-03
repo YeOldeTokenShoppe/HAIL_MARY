@@ -1,13 +1,14 @@
 'use client'
 import React, { useRef, useState, useEffect, Suspense, useCallback, useMemo } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { useGLTF } from '@react-three/drei'
+import { useGLTF, Stats } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { HandsModel } from './HandsGLTFScene'
 import { CandleCloud, GradientBackground, PriceSimulator, SceneSetup } from './CandleShrine'
 import { NewCandleEffectManager } from './NewCandleEffect'
 import CyberGlitchButton from './carousel/CyberGlitchButton'
+import SkewedHeading from './SkewedHeading'
 // PhoneLightRays now rendered inside HandsGLTFScene attached to phoneCase
 
 // Unified scene combining candles and hands in one Canvas
@@ -161,7 +162,7 @@ export default function UnifiedShrine({
   // Memoize styles to prevent recreation on every render
   const priceTickerStyle = useMemo(() => ({
     position: 'absolute',
-    top: isMobile ? '150px' : '195px',
+    top: isMobile ? '140px' : '195px',
     right: isMobile ? '10px' : '20px',
     background: 'rgba(0, 0, 0, 0.8)',
     border: `2px solid ${priceChange >= 0 ? '#00ff66' : '#ff4444'}`,
@@ -179,7 +180,7 @@ export default function UnifiedShrine({
   
   const statsOverlayStyle = useMemo(() => ({
     position: 'absolute',
-    top: isMobile ? '230px' : '380px',
+    top: isMobile ? '215px' : '380px',
     right: isMobile ? '10px' : '20px',
     color: '#fff',
     fontFamily: 'monospace',
@@ -190,7 +191,7 @@ export default function UnifiedShrine({
     borderRadius: '12px',
     backdropFilter: 'blur(10px)',
     boxShadow: `0 0 20px ${priceChange >= 0 ? 'rgba(0, 255, 100, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
-    width: isMobile ? '140px' : '240px',
+    width: isMobile ? '140px' : '230px',
     zIndex: 999,
     pointerEvents: 'none'
   }), [isMobile, priceChange])
@@ -313,9 +314,11 @@ export default function UnifiedShrine({
             additionalCandles={additionalCandles} 
             onCandleClick={handleCandleClick} 
             clickedCandleId={clickedCandleId} 
+
+    
           />
         </group>
-        
+              <Stats className="stats-monitor" />
         {/* Hands in the foreground - scaled up for better visibility */}
         <Suspense fallback={null}>
           <group scale={1.8} position={[0, -0.5, 0]}>
@@ -459,7 +462,14 @@ export default function UnifiedShrine({
           textAlign: 'center',
           textShadow: '0 0 2rem rgba(147, 69, 255, 0.9), 0 8px 16px rgba(0, 0, 0, 0.9)',
         }}>
-          Get on Her {!isMobile && <br/>}Watchlist
+          {/* Get on Her {!isMobile && <br/>}Watchlist */}
+             <SkewedHeading 
+                lines={["Get on Her", "Watchlist"]}
+                // colors={["#d4af37", "#f4e4c1", "#ffd700"]}
+                    colors={["#00ff00"]}
+                fontSize={{ mobile: "2.1rem", desktop: "3rem" }}
+                isMobile={isMobile}
+              />
         </div>
         <style jsx>{`
           .cyber-candle-btn :global(.cybr-btn) {

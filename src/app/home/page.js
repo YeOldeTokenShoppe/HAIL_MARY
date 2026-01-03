@@ -226,8 +226,10 @@ function CarouselPageContent() {
     
     // Start music when 80s mode is enabled, stop when disabled
     if (newMode) {
+      setShowMusicControls(true);  // Show music controls
       play();
     } else {
+      setShowMusicControls(false); // Hide music controls
       pause();
     }
     

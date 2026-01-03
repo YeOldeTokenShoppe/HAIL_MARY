@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import PalmTreeDrive from '@/components/PalmTreeDrive';
 import { useMusic } from '@/components/MusicContext';
-import Link from 'next/link';
 import CyberNav from '@/components/CyberNav';
 import CoinLoader from '@/components/CoinLoader';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
@@ -94,13 +93,13 @@ export default function Home() {
   
   
   // Debug logging
-  useEffect(() => {
-    console.log('RL80 Logo Debug:', {
-      isSceneLoading,
-      fontLoaded,
-      shouldShowLogo: !isSceneLoading && fontLoaded
-    });
-  }, [isSceneLoading, fontLoaded]);
+  // useEffect(() => {
+  //   console.log('RL80 Logo Debug:', {
+  //     isSceneLoading,
+  //     fontLoaded,
+  //     shouldShowLogo: !isSceneLoading && fontLoaded
+  //   });
+  // }, [isSceneLoading, fontLoaded]);
 
   return (
     <div style={{ width: '100vw', minHeight: '100vh' }}>
@@ -174,9 +173,9 @@ export default function Home() {
               cursor: "pointer",
             }}
           >
-            <Link href="/home" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
+            <a href="/home" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
               RL80
-            </Link>
+            </a>
             {Array.from({length: 100}).map((_, i) => {
               const index = i + 1;
               return (

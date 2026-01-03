@@ -10,6 +10,7 @@ import CyberGlitchButton from './CyberGlitchButton'
 import ExperienceControls from './ExperienceControls'
 import { useMusic } from '../MusicContext'
 import MobilePolaroidGallery from './MobilePolaroidGallery'
+import MobilePolaroidGallerySimple from './MobilePolaroidGallerySimple'
 
 export default function CarouselComponent({ onReady, disableScrollControls = false }) {
   const [hoveredCaption, setHoveredCaption] = useState(null)
@@ -75,25 +76,55 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
       )}
       
       {isMobile && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: '30px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 100,
-          }}
-        >
-          <CyberGlitchButton 
-            text="BUY RL80_"
-            onClick={() => {
-              const event = new CustomEvent('openBuyModal')
-              window.dispatchEvent(event)
+        <>
+          <style jsx>{`
+            .cyber-buy-btn :global(.cybr-btn) {
+              --primary: #9945ff;
+              --shadow-primary: #00ffff;
+              --shadow-secondary-hue: 340;
+              --color: white;
+            }
+            .cyber-buy-btn :global(.cybr-btn:hover) {
+              --primary: #7c37d0;
+              --shadow-primary: #00ffff;
+            }
+            .cyber-buy-btn :global(.cybr-btn:active) {
+              --primary: #00ffff;
+              --shadow-primary: #ff0066;
+            }
+            .cyber-buy-btn :global(.cybr-btn__glitch) {
+              background: linear-gradient(45deg, #00ffff, #9945ff);
+              text-shadow: 2px 2px #ff0066, -2px -2px #00ffff;
+            }
+            .cyber-buy-btn :global(.cybr-label) {
+              background: linear-gradient(45deg, #00ffff, #ff0066);
+              color: #000;
+              font-weight: 900;
+              top: 3px !important;
+              right: 15% !important;
+            }
+          `}</style>
+          <div
+            className="cyber-buy-btn"
+            style={{
+              position: 'fixed',
+              bottom: '30px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 100,
             }}
-            label="RP80"
-            mobile={true}
-          />
-        </div>
+          >
+            <CyberGlitchButton 
+              text="BUY RL80"
+              onClick={() => {
+                const event = new CustomEvent('openBuyModal')
+                window.dispatchEvent(event)
+              }}
+              label="RL80"
+              mobile={true}
+            />
+          </div>
+        </>
       )}
       
       {/* Experience Controls - positioned top-right */}
@@ -101,7 +132,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
       
       {/* Mobile Phone Gallery - replaces 3D carousel on phones */}
       {isMobilePhone ? (
-        <MobilePolaroidGallery 
+        <MobilePolaroidGallerySimple 
           images={[
             { url: '/carousel_images/img1.jpg' },
             { url: '/carousel_images/img2.jpg' },

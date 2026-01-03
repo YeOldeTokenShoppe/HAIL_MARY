@@ -98,6 +98,7 @@ const PalmsScene = ({ onLoadingChange }) => {
   const [showEnterButton, setShowEnterButton] = useState(true); // Show "Take me there" button immediately
   const [hideLastText, setHideLastText] = useState(false); // Hide the last text block after delay
   const [shouldMorph, setShouldMorph] = useState(false); // Trigger morph animation
+  const [hasStartedScrolling, setHasStartedScrolling] = useState(false); // Track if user has started scrolling
   // Music player states
   const [isMobile, setIsMobile] = useState(false);
   
@@ -1735,6 +1736,11 @@ const PalmsScene = ({ onLoadingChange }) => {
         fastScrollEnd: false, // Disable for better touch response
         ignoreMobileResize: true, // Ignore resize events on mobile
         onUpdate: (self) => {
+          // Hide scroll prompt as soon as user starts scrolling
+          if (self.progress > 0 && !hasStartedScrolling) {
+            setHasStartedScrolling(true);
+          }
+          
           // Debug logging to track scroll progress and timeline
           if (self.progress > 0.9 || self.progress === 0 || Math.abs(self.progress - 0.5) < 0.01 || Math.abs(self.progress - 0.25) < 0.01 || Math.abs(self.progress - 0.75) < 0.01) {
             const tlProg = tl.progress();
@@ -2286,16 +2292,17 @@ const PalmsScene = ({ onLoadingChange }) => {
             ))}
           </div>
           
-          {/* Scroll hint - fades out at end of sequence */}
+          {/* Scroll hint - disappears as soon as user starts scrolling */}
           <div style={{
             marginTop: '1rem',
             fontSize: '12px',
             color: '#01ff00',
-            opacity: currentCameraStage === 4 ? 0 : 0.5,
+            opacity: hasStartedScrolling ? 0 : 0.5,
             textAlign: 'center',
             fontFamily: 'monospace',
-            animation: currentCameraStage === 4 ? 'none' : 'pulse 2s ease-in-out infinite',
+            animation: hasStartedScrolling ? 'none' : 'pulse 2s ease-in-out infinite',
             transition: 'opacity 0.5s ease',
+            pointerEvents: 'none',
           }}>
             scroll up to continue
           </div>

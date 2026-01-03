@@ -29,16 +29,14 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
   const worriedEmojiRef = useRef()
   const scaredEmojiRef = useRef()
   const devilEmojiRef = useRef()
-  const cryingEmojiRef = useRef()
   const cryingEmoji2Ref = useRef()
   const pukeEmojiRef = useRef()
   const sadEmojiRef = useRef()
   const questionMarkRef = useRef()
   const questionMark2Ref = useRef()
+  const questionMarkMeshes = useRef([])  // Store ALL question mark related meshes
   const exclamationMarkRef = useRef()
   const exclamationMark2Ref = useRef()
-  const greenArrowRef = useRef()
-  const redArrowRef = useRef()
   const iconLikeRef = useRef()
   const iconLoveRef = useRef()
   const iconText1Ref = useRef()
@@ -87,7 +85,7 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
   const getInitialOpacity = (emojiName) => {
     // If prices are positive, only show positive emojis
     if (priceChange > 2) {
-      const positiveEmojis = ['emoji1', 'emoji3', 'emoji4', 'emoji5', 'greenArrow', 'iconLove', 'iconText1', 'iconText2']
+      const positiveEmojis = ['emoji1', 'emoji3', 'emoji4', 'emoji5', 'iconLove', 'iconText1', 'iconText2']
       return positiveEmojis.includes(emojiName) ? 1 : 0
     }
     // If prices are middling or moderate down
@@ -97,7 +95,7 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
     }
     // If prices are crashing (large down)
     else if (priceChange <= -5) {
-      const crashEmojis = ['worriedEmoji', 'scaredEmoji', 'devilEmoji', 'cryingEmoji', 'cryingEmoji2', 'pukeEmoji', 'sadEmoji', 'questionMark', 'questionMark2', 'exclamationMark', 'exclamationMark2', 'redArrow']
+      const crashEmojis = ['worriedEmoji', 'scaredEmoji', 'devilEmoji', 'cryingEmoji2', 'pukeEmoji', 'sadEmoji', 'questionMark', 'questionMark2', 'exclamationMark', 'exclamationMark2']
       return crashEmojis.includes(emojiName) ? 1 : 0
     }
     return 0
@@ -112,7 +110,6 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
     worriedEmoji: getInitialOpacity('worriedEmoji'),
     scaredEmoji: getInitialOpacity('scaredEmoji'),
     devilEmoji: getInitialOpacity('devilEmoji'),
-    cryingEmoji: getInitialOpacity('cryingEmoji'),
     cryingEmoji2: getInitialOpacity('cryingEmoji2'),
     pukeEmoji: getInitialOpacity('pukeEmoji'),
     sadEmoji: getInitialOpacity('sadEmoji'),
@@ -120,8 +117,6 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
     questionMark2: getInitialOpacity('questionMark2'),
     exclamationMark: getInitialOpacity('exclamationMark'),
     exclamationMark2: getInitialOpacity('exclamationMark2'),
-    greenArrow: getInitialOpacity('greenArrow'),
-    redArrow: getInitialOpacity('redArrow'),
     iconLove: getInitialOpacity('iconLove'),
     iconText1: getInitialOpacity('iconText1'),
     iconText2: getInitialOpacity('iconText2')
@@ -137,7 +132,6 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
     worriedEmoji: getInitialOpacity('worriedEmoji'),
     scaredEmoji: getInitialOpacity('scaredEmoji'),
     devilEmoji: getInitialOpacity('devilEmoji'),
-    cryingEmoji: getInitialOpacity('cryingEmoji'),
     cryingEmoji2: getInitialOpacity('cryingEmoji2'),
     pukeEmoji: getInitialOpacity('pukeEmoji'),
     sadEmoji: getInitialOpacity('sadEmoji'),
@@ -145,8 +139,6 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
     questionMark2: getInitialOpacity('questionMark2'),
     exclamationMark: getInitialOpacity('exclamationMark'),
     exclamationMark2: getInitialOpacity('exclamationMark2'),
-    greenArrow: getInitialOpacity('greenArrow'),
-    redArrow: getInitialOpacity('redArrow'),
     iconLove: getInitialOpacity('iconLove'),
     iconText1: getInitialOpacity('iconText1'),
     iconText2: getInitialOpacity('iconText2')
@@ -314,7 +306,17 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
         })
       }
       
-      // Traverse the scene to find specific objects
+      // First pass: collect ALL QuestionMark-related objects
+      questionMarkMeshes.current = []
+      gltf.scene.traverse((child) => {
+        if (child.name && (child.name.includes('QuestionMark') || child.name.includes('questionMark') || 
+            child.name.includes('QSymbol') || child.name.includes('qsymbol'))) {
+          questionMarkMeshes.current.push(child)
+          console.log('Collected QuestionMark-related object:', child.name, child.type)
+        }
+      })
+      
+      // Second pass: traverse the scene to find specific objects
       gltf.scene.traverse((child) => {
         // console.log('Found object:', child.name, 'Type:', child.type)
         
@@ -506,39 +508,10 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
             }
           }
         }
-        if (child.name === 'CryingEmoji' || child.name === 'cryingEmoji' || child.name === 'crying-emoji') {
-          cryingEmojiRef.current = child
-          // console.log('😭 Found CryingEmoji:', child.name)
-          
-          // Apply initial visibility based on price state
-          child.traverse((subChild) => {
-            if (subChild.isMesh && subChild.material) {
-              subChild.material.transparent = true
-              subChild.material.opacity = getInitialOpacity('cryingEmoji')
-              subChild.visible = getInitialOpacity('cryingEmoji') > 0.01
-            }
-          })
-          
-          // Set up animation mixer for CryingEmoji
-          if (gltf.animations && gltf.animations.length > 0) {
-            mixersRef.current.crying = new THREE.AnimationMixer(child)
-            // Try both possible naming conventions
-            const cryingAnimation = gltf.animations.find(clip => 
-              clip.name === 'Armature|Idle.001' || clip.name === 'Armature|Idle001'
-            )
-            if (cryingAnimation) {
-              const action = mixersRef.current.crying.clipAction(cryingAnimation)
-              action.setLoop(THREE.LoopRepeat, Infinity) // Loop infinitely
-              action.clampWhenFinished = false
-              action.timeScale = 0.7 // Slightly slower for crying
-              action.play()
-              console.log('Playing ' + cryingAnimation.name + ' animation on CryingEmoji')
-            }
-          }
-        }
+        // Find CryingEmoji2 for large down scenarios (>5% drop)
         if (child.name === 'CryingEmoji2' || child.name === 'cryingEmoji2' || child.name === 'crying-emoji-2') {
           cryingEmoji2Ref.current = child
-          // console.log('😭 Found CryingEmoji2:', child.name)
+          console.log('😭 Found CryingEmoji2:', child.name)
           
           // Apply initial visibility based on price state
           child.traverse((subChild) => {
@@ -566,6 +539,7 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
             }
           }
         }
+        
         // Find PukeEmoji for crash scenarios
         if (child.name === 'PukeEmoji' || child.name === 'pukeEmoji' || child.name === 'puke-emoji' || child.name === 'Puke-Emoji') {
           pukeEmojiRef.current = child
@@ -601,12 +575,19 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
           questionMarkRef.current = child
           console.log('❓ Found QuestionMark:', child.name)
           
-          // Apply initial visibility based on price state
+          // Set initial visibility on parent object and ALL descendants
+          const initialOpacity = getInitialOpacity('questionMark')
+          const isVisible = initialOpacity > 0.01
+          
+          // Set visibility on the parent Group
+          child.visible = isVisible
+          
+          // Traverse and set visibility on ALL children (Groups and Meshes)
           child.traverse((subChild) => {
+            subChild.visible = isVisible
             if (subChild.isMesh && subChild.material) {
               subChild.material.transparent = true
-              subChild.material.opacity = getInitialOpacity('questionMark')
-              subChild.visible = getInitialOpacity('questionMark') > 0.01
+              subChild.material.opacity = initialOpacity
             }
           })
         }
@@ -616,12 +597,19 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
           questionMark2Ref.current = child
           console.log('❓ Found QuestionMark2:', child.name)
           
-          // Apply initial visibility based on price state
+          // Set initial visibility on parent object and ALL descendants
+          const initialOpacity = getInitialOpacity('questionMark2')
+          const isVisible = initialOpacity > 0.01
+          
+          // Set visibility on the parent Group
+          child.visible = isVisible
+          
+          // Traverse and set visibility on ALL children (Groups and Meshes)
           child.traverse((subChild) => {
+            subChild.visible = isVisible
             if (subChild.isMesh && subChild.material) {
               subChild.material.transparent = true
-              subChild.material.opacity = getInitialOpacity('questionMark2')
-              subChild.visible = getInitialOpacity('questionMark2') > 0.01
+              subChild.material.opacity = initialOpacity
             }
           })
         }
@@ -656,32 +644,6 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
           })
         }
         
-        if (child.name === 'GreenArrow' || child.name === 'greenArrow' || child.name === 'green-arrow') {
-          greenArrowRef.current = child
-          // console.log('⬆️ Found GreenArrow:', child.name)
-          
-          // Apply initial visibility based on price state
-          child.traverse((subChild) => {
-            if (subChild.isMesh && subChild.material) {
-              subChild.material.transparent = true
-              subChild.material.opacity = getInitialOpacity('greenArrow')
-              subChild.visible = getInitialOpacity('greenArrow') > 0.01
-            }
-          })
-        }
-        if (child.name === 'RedArrow' || child.name === 'redArrow' || child.name === 'red-arrow') {
-          redArrowRef.current = child
-          // console.log('⬇️ Found RedArrow:', child.name)
-          
-          // Apply initial visibility based on price state
-          child.traverse((subChild) => {
-            if (subChild.isMesh && subChild.material) {
-              subChild.material.transparent = true
-              subChild.material.opacity = getInitialOpacity('redArrow')
-              subChild.visible = getInitialOpacity('redArrow') > 0.01
-            }
-          })
-        }
         
         // Find PacMan parent object for 80s mode
         if (child.name === 'PacMan' || child.name === 'pacman' || child.name === 'Pacman' || child.name === 'PACMAN') {
@@ -851,6 +813,71 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       
 
     }
+    
+    // Cleanup function
+    return () => {
+      console.log('🧹 Cleaning up HandsGLTFScene resources...')
+      
+      // Stop and dispose all animation mixers
+      if (mixersRef.current) {
+        Object.entries(mixersRef.current).forEach(([name, mixer]) => {
+          if (mixer) {
+            mixer.stopAllAction()
+            mixer.uncacheRoot(mixer.getRoot())
+            console.log(`Disposed mixer: ${name}`)
+          }
+        })
+        mixersRef.current = {}
+      }
+      
+      // Stop all animation actions
+      if (actionsRef.current) {
+        Object.entries(actionsRef.current).forEach(([name, action]) => {
+          if (action) {
+            action.stop()
+            console.log(`Stopped action: ${name}`)
+          }
+        })
+        actionsRef.current = {}
+      }
+      
+      // Dispose of collected QuestionMark meshes
+      if (questionMarkMeshes.current) {
+        questionMarkMeshes.current = []
+      }
+      
+      // Traverse and dispose all materials and geometries
+      if (gltf.scene) {
+        gltf.scene.traverse((child) => {
+          if (child.isMesh) {
+            // Dispose geometry
+            if (child.geometry) {
+              child.geometry.dispose()
+            }
+            
+            // Dispose materials (can be array or single material)
+            if (child.material) {
+              const materials = Array.isArray(child.material) ? child.material : [child.material]
+              materials.forEach(material => {
+                // Dispose textures
+                if (material.map) material.map.dispose()
+                if (material.normalMap) material.normalMap.dispose()
+                if (material.emissiveMap) material.emissiveMap.dispose()
+                if (material.roughnessMap) material.roughnessMap.dispose()
+                if (material.metalnessMap) material.metalnessMap.dispose()
+                if (material.alphaMap) material.alphaMap.dispose()
+                if (material.aoMap) material.aoMap.dispose()
+                
+                // Dispose the material itself
+                material.dispose()
+              })
+            }
+          }
+        })
+      }
+      
+      console.log('✅ HandsGLTFScene cleanup complete')
+    }
   }, [gltf])
 
   // Add frame counter for throttling expensive operations
@@ -865,14 +892,35 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
     const updateOpacityRecursive = (object, opacity) => {
       if (!object) return
       
+      const isVisible = opacity > 0.01
+      
+      // Set visibility on the parent object itself
+      object.visible = isVisible
+      
+      // For Groups with children, make sure to update them
+      if (object.children && object.children.length > 0) {
+        object.children.forEach(child => {
+          child.visible = isVisible
+          
+          // Recursively handle nested children
+          if (child.children && child.children.length > 0) {
+            updateOpacityRecursive(child, opacity)
+          }
+          
+          // Handle meshes
+          if (child.isMesh && child.material) {
+            child.material.transparent = true
+            child.material.opacity = opacity
+          }
+        })
+      }
+      
+      // Also use traverse as a backup to catch everything
       object.traverse((child) => {
+        child.visible = isVisible
         if (child.isMesh && child.material) {
-          // Ensure material supports transparency
           child.material.transparent = true
           child.material.opacity = opacity
-          
-          // Hide object completely when opacity is near 0
-          child.visible = opacity > 0.01
         }
       })
     }
@@ -913,9 +961,6 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
           case 'devilEmoji':
             updateOpacityRecursive(devilEmojiRef.current, currentOpacities.current[key])
             break
-          case 'cryingEmoji':
-            updateOpacityRecursive(cryingEmojiRef.current, currentOpacities.current[key])
-            break
           case 'cryingEmoji2':
             updateOpacityRecursive(cryingEmoji2Ref.current, currentOpacities.current[key])
             break
@@ -927,21 +972,31 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
             break
           case 'questionMark':
             updateOpacityRecursive(questionMarkRef.current, currentOpacities.current[key])
+            // Also update ALL collected QuestionMark-related objects
+            questionMarkMeshes.current.forEach(obj => {
+              obj.visible = currentOpacities.current[key] > 0.01
+              if (obj.isMesh && obj.material) {
+                obj.material.transparent = true
+                obj.material.opacity = currentOpacities.current[key]
+              }
+            })
             break
           case 'questionMark2':
             updateOpacityRecursive(questionMark2Ref.current, currentOpacities.current[key])
+            // Also update ALL collected QuestionMark-related objects
+            questionMarkMeshes.current.forEach(obj => {
+              obj.visible = currentOpacities.current[key] > 0.01
+              if (obj.isMesh && obj.material) {
+                obj.material.transparent = true
+                obj.material.opacity = currentOpacities.current[key]
+              }
+            })
             break
           case 'exclamationMark':
             updateOpacityRecursive(exclamationMarkRef.current, currentOpacities.current[key])
             break
           case 'exclamationMark2':
             updateOpacityRecursive(exclamationMark2Ref.current, currentOpacities.current[key])
-            break
-          case 'greenArrow':
-            updateOpacityRecursive(greenArrowRef.current, currentOpacities.current[key])
-            break
-          case 'redArrow':
-            updateOpacityRecursive(redArrowRef.current, currentOpacities.current[key])
             break
           case 'iconLove':
             updateOpacityRecursive(iconLoveRef.current, currentOpacities.current[key])
@@ -975,7 +1030,6 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       opacityTargets.current.emoji3 = 1
       opacityTargets.current.emoji4 = 1
       opacityTargets.current.emoji5 = 1
-      opacityTargets.current.greenArrow = 1
       opacityTargets.current.iconLove = 1
       opacityTargets.current.iconText1 = 1
       opacityTargets.current.iconText2 = 1
@@ -985,7 +1039,6 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       opacityTargets.current.worriedEmoji = 0
       opacityTargets.current.scaredEmoji = 0
       opacityTargets.current.devilEmoji = 0
-      opacityTargets.current.cryingEmoji = 0
       opacityTargets.current.cryingEmoji2 = 0
       opacityTargets.current.pukeEmoji = 0
       opacityTargets.current.sadEmoji = 0
@@ -993,7 +1046,6 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       opacityTargets.current.questionMark2 = 0
       opacityTargets.current.exclamationMark = 0
       opacityTargets.current.exclamationMark2 = 0
-      opacityTargets.current.redArrow = 0
       
       // console.log('📈 Market positive (+' + priceChange.toFixed(2) + '%) - showing happy emojis')
     } else if (isMiddling || isModerateDown) {
@@ -1009,19 +1061,16 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       opacityTargets.current.emoji3 = 0
       opacityTargets.current.emoji4 = 0
       opacityTargets.current.emoji5 = 0
-      opacityTargets.current.greenArrow = 0
       opacityTargets.current.iconLove = 0
       opacityTargets.current.iconText1 = 0
       opacityTargets.current.iconText2 = 0
       
       // Fade out extreme negative emojis
       opacityTargets.current.devilEmoji = 0
-      opacityTargets.current.cryingEmoji = 0
-      opacityTargets.current.cryingEmoji2 = 0
+      opacityTargets.current.cryingEmoji2 = 0  // Only shows when down >5%
       opacityTargets.current.pukeEmoji = 0  // Not visible in moderate downturns
       opacityTargets.current.exclamationMark = 0  // Not visible in moderate downturns
       opacityTargets.current.exclamationMark2 = 0  // Not visible in moderate downturns
-      opacityTargets.current.redArrow = 0
       
       // Keep emoji2 and other icons neutral
       opacityTargets.current.emoji2 = 1
@@ -1032,15 +1081,13 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       opacityTargets.current.worriedEmoji = 1
       opacityTargets.current.scaredEmoji = 1
       opacityTargets.current.devilEmoji = 1
-      opacityTargets.current.cryingEmoji = 1
-      opacityTargets.current.cryingEmoji2 = 1
+      opacityTargets.current.cryingEmoji2 = 1  // CryingEmoji2 appears when down >5%
       opacityTargets.current.pukeEmoji = 1  // PukeEmoji appears during crashes
       opacityTargets.current.sadEmoji = 1   // SadEmoji also visible during crashes
       opacityTargets.current.questionMark = 1  // QuestionMarks visible during chaos
       opacityTargets.current.questionMark2 = 1
       opacityTargets.current.exclamationMark = 1  // ExclamationMark only during crashes
       opacityTargets.current.exclamationMark2 = 1  // ExclamationMark2 only during crashes
-      opacityTargets.current.redArrow = 1
       
       // Fade out all positive emojis
       opacityTargets.current.emoji1 = 0
@@ -1048,7 +1095,6 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       opacityTargets.current.emoji3 = 0
       opacityTargets.current.emoji4 = 0
       opacityTargets.current.emoji5 = 0
-      opacityTargets.current.greenArrow = 0
       opacityTargets.current.iconLove = 0
       opacityTargets.current.iconText1 = 0
       opacityTargets.current.iconText2 = 0
@@ -1132,7 +1178,7 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
     }
   }, [disposeTexture])
 
-  // SIMPLIFIED: Basic texture application (no complex disposal)
+  // SIMPLIFIED: Basic texture application with proper disposal
   useEffect(() => {
     if (!candleLabel2Ref.current || randomUserImages.length === 0) {
       return
@@ -1141,7 +1187,12 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
     const imageData = randomUserImages[0] // Only use first image
     if (!imageData?.image) return
     
-    // Simple texture loading without complex memory management
+    // Store references for cleanup
+    let texture = null
+    let material = null
+    let previousMaterial = null
+    
+    // Simple texture loading with cleanup
     const canvas = document.createElement('canvas')
     canvas.width = 128
     canvas.height = 128
@@ -1178,21 +1229,41 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
         ctx.fillText(imageData.username, 64, 128 - 12)
       }
       
-      const texture = new THREE.CanvasTexture(canvas)
+      texture = new THREE.CanvasTexture(canvas)
       texture.needsUpdate = true
       texture.generateMipmaps = false
       texture.flipY = false // No additional flipping needed
       texture.wrapS = THREE.ClampToEdgeWrapping
       texture.wrapT = THREE.ClampToEdgeWrapping
       
-      const material = new THREE.MeshBasicMaterial({
+      material = new THREE.MeshBasicMaterial({
         map: texture,
         side: THREE.DoubleSide
       })
       
+      // Store previous material for disposal
+      if (candleLabel2Ref.current.material) {
+        previousMaterial = candleLabel2Ref.current.material
+      }
+      
       candleLabel2Ref.current.material = material
+      
+      // Dispose previous material and texture
+      if (previousMaterial) {
+        if (previousMaterial.map) previousMaterial.map.dispose()
+        previousMaterial.dispose()
+      }
     }
     img.src = imageData.image
+    
+    // Cleanup function
+    return () => {
+      if (texture) texture.dispose()
+      if (material) {
+        if (material.map) material.map.dispose()
+        material.dispose()
+      }
+    }
   }, [randomUserImages])
 
   // COMMENTED OUT: Complex texture management
@@ -1603,21 +1674,6 @@ useFrame((state, delta) => {
   }
   
   // Animate arrows with directional motion
-  if (greenArrowRef.current && greenArrowRef.current.visible) {
-    if (!greenArrowRef.current.userData.initialY) {
-      greenArrowRef.current.userData.initialY = greenArrowRef.current.position.y
-    }
-    // Upward pulsing motion
-    greenArrowRef.current.position.y = greenArrowRef.current.userData.initialY + Math.sin(time * 3) * 0.06 + 0.2
-  }
-  
-  if (redArrowRef.current && redArrowRef.current.visible) {
-    if (!redArrowRef.current.userData.initialY) {
-      redArrowRef.current.userData.initialY = redArrowRef.current.position.y
-    }
-    // Downward pulsing motion
-    redArrowRef.current.position.y = redArrowRef.current.userData.initialY - Math.sin(time * 3) * 0.3 - 0.2
-  }
 })
 
 
@@ -1783,13 +1839,13 @@ return (
       <PhoneAura
         phonePosition={[
           phoneCaseWorldPos[0], 
-          phoneCaseWorldPos[1] + 2.7,  // Y offset - adjust this value
+          phoneCaseWorldPos[1] + 2.9,  // Y offset - adjust this value
           phoneCaseWorldPos[2] - 0.3
         ]}
         color='#00ffff'
         intensity={1}
-        size={4}
-        opacity={0.8}
+        size={5}
+        opacity={0.9}
         isActive={hasActiveClick}
         priceDirection={priceChange / 5}
       />

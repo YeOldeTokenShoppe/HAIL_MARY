@@ -238,32 +238,69 @@ const CyborgTempleScene = ({
     
     // Always use DRACO loader since both models may have compression
     const dracoLoader = new DRACOLoader();
-    dracoLoader.setDecoderPath("/draco/");
+    // Use full URL for Draco decoder in production to avoid path issues
+    const dracoPath = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+      ? `${window.location.origin}/draco/`
+      : "/draco/";
+    console.log(`[CyborgTempleScene] Using Draco decoder path: ${dracoPath}`);
+    dracoLoader.setDecoderPath(dracoPath);
     gltfLoader.setDRACOLoader(dracoLoader);
 
     // Determine which model to load based on device type
-    const modelPath = isOnMobile ? "/models/MOBILE.glb" : "/models/RL80_4anims.glb";
+    let modelPath = isOnMobile ? "/models/MOBILE.glb" : "/models/RL80_4anims.glb";
+    const fallbackModelPath = "/models/RL80_4anims.glb"; // Desktop model as fallback
+    let usingFallback = false;
     const startTime = performance.now();
     
+    // Log detailed information about the loading attempt
+    console.log(`[CyborgTempleScene] Loading model for mobile: ${isOnMobile}`);
+    console.log(`[CyborgTempleScene] Model path: ${modelPath}`);
+    console.log(`[CyborgTempleScene] Full URL: ${window.location.origin}${modelPath}`);
+    
     // First, verify the model file is accessible
-    fetch(modelPath, { method: 'HEAD' })
+    fetch(modelPath, { 
+      method: 'HEAD',
+      mode: 'cors',
+      cache: 'no-cache' // Bypass cache to ensure we get fresh response
+    })
       .then(response => {
+        console.log(`[CyborgTempleScene] HEAD request response:`, {
+          ok: response.ok,
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries())
+        });
         if (!response.ok) {
           throw new Error(`Model file not accessible: ${response.status} ${response.statusText}`);
         }
       })
       .catch(error => {
         console.error(`[CyborgTempleScene] Failed to verify model file:`, error);
+        console.error(`[CyborgTempleScene] This may indicate a server configuration issue in production.`);
       });
     
     let retryCount = 0;
     const maxRetries = 3;
     
-    const loadModel = () => {
+    const loadModel = (attemptFullUrl = false) => {
+      // In production, sometimes relative paths fail, so we try with full URL as fallback
+      const urlToLoad = attemptFullUrl && typeof window !== 'undefined' 
+        ? `${window.location.origin}${modelPath}`
+        : modelPath;
+        
+      console.log(`[CyborgTempleScene] Attempting to load from: ${urlToLoad}`);
+      
       gltfLoader.load(
-      modelPath, 
+      urlToLoad, 
       (gltf) => {
         const loadTime = performance.now() - startTime;
+        
+        // Log successful load
+        if (usingFallback) {
+          console.warn(`[CyborgTempleScene] Successfully loaded fallback desktop model on mobile device`);
+        } else {
+          console.log(`[CyborgTempleScene] Successfully loaded ${isOnMobile ? 'mobile' : 'desktop'} model in ${loadTime.toFixed(0)}ms`);
+        }
         
         const templeScene = gltf.scene;
       
@@ -721,12 +758,16 @@ const CyborgTempleScene = ({
     },
     // Error callback
     (error) => {
-      console.error(`[CyborgTempleScene] Error loading model ${modelPath}:`, error);
+      console.error(`[CyborgTempleScene] Error loading model ${urlToLoad}:`, error);
       console.error(`[CyborgTempleScene] Error details:`, {
         message: error.message,
         stack: error.stack,
         modelPath: modelPath,
-        isOnMobile: isOnMobile
+        urlUsed: urlToLoad,
+        isOnMobile: isOnMobile,
+        userAgent: navigator.userAgent,
+        windowWidth: window.innerWidth,
+        attemptNumber: retryCount + 1
       });
       
       // Check if it's a 404 error
@@ -735,21 +776,58 @@ const CyborgTempleScene = ({
         console.error('[CyborgTempleScene] Please ensure the file exists at: public' + modelPath);
       }
       
-      // Retry logic
+      // Retry logic with full URL fallback and desktop model fallback for mobile
       if (retryCount < maxRetries) {
         retryCount++;
-        console.warn(`[CyborgTempleScene] Retrying model load (attempt ${retryCount}/${maxRetries})...`);
+        const useFullUrl = retryCount >= 2; // Try full URL on second retry
+        
+        // On last retry for mobile, try the desktop model as fallback
+        if (retryCount === maxRetries && isOnMobile && !usingFallback) {
+          console.warn(`[CyborgTempleScene] Mobile model failed, attempting fallback to desktop model...`);
+          modelPath = fallbackModelPath;
+          usingFallback = true;
+          retryCount = maxRetries - 1; // Give one more chance with desktop model
+        }
+        
+        console.warn(`[CyborgTempleScene] Retrying model load (attempt ${retryCount}/${maxRetries})${useFullUrl ? ' with full URL' : ''}${usingFallback ? ' using fallback model' : ''}...`);
         setTimeout(() => {
-          loadModel();
+          loadModel(useFullUrl);
         }, 1000 * retryCount); // Exponential backoff
       } else {
         console.error(`[CyborgTempleScene] Failed to load model after ${maxRetries} attempts`);
-        // Still call onLoad even if there's an error, so the page doesn't hang
-        if (onLoad) {
-          console.warn('[CyborgTempleScene] Calling onLoad despite error to prevent hanging');
-          setTimeout(() => {
-            onLoad();
-          }, 100);
+        console.error('[CyborgTempleScene] Model loading is REQUIRED. Page will not proceed.');
+        
+        // Don't call onLoad when model fails - this prevents the page from loading
+        // Instead, show an error message to the user
+        if (typeof window !== 'undefined') {
+          // Create an error overlay
+          const errorDiv = document.createElement('div');
+          errorDiv.style.position = 'fixed';
+          errorDiv.style.top = '50%';
+          errorDiv.style.left = '50%';
+          errorDiv.style.transform = 'translate(-50%, -50%)';
+          errorDiv.style.backgroundColor = 'rgba(255, 0, 0, 0.9)';
+          errorDiv.style.color = 'white';
+          errorDiv.style.padding = '20px';
+          errorDiv.style.borderRadius = '10px';
+          errorDiv.style.zIndex = '100000';
+          errorDiv.style.textAlign = 'center';
+          errorDiv.style.maxWidth = '80%';
+          errorDiv.innerHTML = `
+            <h2>Failed to Load 3D Model</h2>
+            <p>Unable to load the required 3D model (${modelPath}).</p>
+            <p>Please refresh the page or try again later.</p>
+            <button onclick="window.location.reload()" style="
+              margin-top: 10px;
+              padding: 10px 20px;
+              background: white;
+              color: black;
+              border: none;
+              border-radius: 5px;
+              cursor: pointer;
+            ">Refresh Page</button>
+          `;
+          document.body.appendChild(errorDiv);
         }
       }
     });

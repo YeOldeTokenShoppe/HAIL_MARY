@@ -2,16 +2,10 @@
 
 import React, { useMemo, useState } from 'react'
 
-const MobilePolaroidGallery = ({ images = [] }) => {
-  const n = images.length || 5
+const MobilePolaroidGallerySimple = ({ images = [] }) => {
+  const n = images.length || 8
   const [isPaused, setIsPaused] = useState(false)
   
-  // Generate random rotations for each image
-  const rotations = useMemo(() => {
-    return Array.from({ length: n }, () => -20 + Math.random() * 40)
-  }, [n])
-  
-  // Captions for each polaroid
   const captions = useMemo(() => [
     { year: "3500 BCE", location: "Mesopotamia" },
     { year: "1348 CE", location: "Venice" },
@@ -26,41 +20,36 @@ const MobilePolaroidGallery = ({ images = [] }) => {
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: `
-        .mobile-gallery {
-          --d: 16s; /* duration - slower shuffling */
-          
+        .polaroid-gallery {
+          --d: 16s;
           display: grid;
           width: 300px;
-          margin: 0 auto;
-          padding-top: 60px;
-          position: relative;
-          height: 380px;
+          margin: 100px auto;
           cursor: pointer;
         }
         
-        .mobile-gallery.paused > .polaroid-frame {
+        .polaroid-gallery.paused > .polaroid-frame {
           animation-play-state: paused !important;
         }
         
-        .mobile-gallery > .polaroid-frame {
+        .polaroid-gallery > .polaroid-frame {
           grid-area: 1/1;
           width: 100%;
           background: white;
           padding: 10px 10px 60px 10px;
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.1);
-          box-sizing: border-box;
           position: relative;
           z-index: 2;
           animation: 
-            slide var(--d) infinite,
-            z-order var(--d) infinite steps(1);
+            polaroid-slide var(--d) infinite,
+            polaroid-z-order var(--d) infinite steps(1);
         }
         
-        .mobile-gallery .polaroid-frame:last-child {
-          animation-name: slide, z-order-last;
+        .polaroid-gallery .polaroid-frame:last-child {
+          animation-name: polaroid-slide, polaroid-z-order-last;
         }
         
-        .polaroid-img {
+        .polaroid-frame img {
           width: 100%;
           aspect-ratio: 1;
           object-fit: cover;
@@ -91,39 +80,63 @@ const MobilePolaroidGallery = ({ images = [] }) => {
           margin-top: 2px;
         }
         
-        /* Generated styles for each image */
-        ${Array.from({ length: n }, (_, i) => `
-        .mobile-gallery > .polaroid-frame:nth-child(${i + 1}) {
-          animation-delay: calc(${(1 - (i + 1))/n} * var(--d));
-          --r: ${rotations[i]}deg;
-        }`).join('')}
+        /* Individual image styles for 8 images */
+        .polaroid-gallery > .polaroid-frame:nth-child(1) {
+          animation-delay: calc(0s * var(--d));
+          --r: -15deg;
+        }
+        .polaroid-gallery > .polaroid-frame:nth-child(2) {
+          animation-delay: calc(-0.125 * var(--d));
+          --r: 5deg;
+        }
+        .polaroid-gallery > .polaroid-frame:nth-child(3) {
+          animation-delay: calc(-0.25 * var(--d));
+          --r: -10deg;
+        }
+        .polaroid-gallery > .polaroid-frame:nth-child(4) {
+          animation-delay: calc(-0.375 * var(--d));
+          --r: 12deg;
+        }
+        .polaroid-gallery > .polaroid-frame:nth-child(5) {
+          animation-delay: calc(-0.5 * var(--d));
+          --r: -8deg;
+        }
+        .polaroid-gallery > .polaroid-frame:nth-child(6) {
+          animation-delay: calc(-0.625 * var(--d));
+          --r: 18deg;
+        }
+        .polaroid-gallery > .polaroid-frame:nth-child(7) {
+          animation-delay: calc(-0.75 * var(--d));
+          --r: -5deg;
+        }
+        .polaroid-gallery > .polaroid-frame:nth-child(8) {
+          animation-delay: calc(-0.875 * var(--d));
+          --r: 10deg;
+        }
         
-        @keyframes slide {
-          ${50/n}% {transform: translateX(120%) rotate(var(--r))}
+        @keyframes polaroid-slide {
+          6.25% { transform: translateX(120%) rotate(var(--r)) }
           0%,
           100%,
-          ${100/n}% {transform: translateX(0%) rotate(var(--r))}
+          12.5% { transform: translateX(0%) rotate(var(--r)) }
         }
         
-        @keyframes z-order {
-          ${50/n}%,
-          ${100/n}% {z-index: 1}
-          ${100 - 100/n}% {z-index: 2}
+        @keyframes polaroid-z-order {
+          6.25%,
+          12.5% { z-index: 1 }
+          87.5% { z-index: 2 }
         }
         
-        @keyframes z-order-last {
-          ${50/n}%,
-          ${100/n}% {z-index: 1}
-          ${100 - 50/n}% {z-index: 2}
+        @keyframes polaroid-z-order-last {
+          6.25%,
+          12.5% { z-index: 1 }
+          93.75% { z-index: 2 }
         }
         
-        .gallery-container {
-          width: 100%;
-          height: 100vh;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
+        .polaroid-container {
+          min-height: 100vh;
+          display: grid;
+          place-content: center;
           background: linear-gradient(135deg, #CDB380 0%, #B39C7D 100%);
           overflow: hidden;
           position: relative;
@@ -151,19 +164,18 @@ const MobilePolaroidGallery = ({ images = [] }) => {
         }
       `}} />
       
-      <div className="gallery-container">
+      <div className="polaroid-container">
+        <div className={`pause-indicator ${isPaused ? 'visible' : ''}`}>
+          {isPaused ? 'Paused - Tap to resume' : 'Shuffling...'}
+        </div>
         <div 
-          className={`mobile-gallery ${isPaused ? 'paused' : ''}`}
+          className={`polaroid-gallery ${isPaused ? 'paused' : ''}`}
           onClick={() => setIsPaused(!isPaused)}
         >
-          <div className={`pause-indicator ${isPaused ? 'visible' : ''}`}>
-            {isPaused ? 'Paused - Tap to resume' : 'Shuffling...'}
-          </div>
-          {images.map((img, i) => (
+          {images.slice(0, 8).map((img, i) => (
             <div key={i} className="polaroid-frame">
               <img 
-                className="polaroid-img"
-                src={img.url || `/carousel_images/img${(i % 8) + 1}.jpg`}
+                src={img.url || `/carousel_images/img${i + 1}.jpg`}
                 alt={`Polaroid ${i + 1}`}
               />
               <div className="polaroid-caption">
@@ -178,4 +190,4 @@ const MobilePolaroidGallery = ({ images = [] }) => {
   )
 }
 
-export default MobilePolaroidGallery
+export default MobilePolaroidGallerySimple
