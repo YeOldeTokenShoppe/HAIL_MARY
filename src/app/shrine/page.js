@@ -160,6 +160,217 @@ export default function ShrinePage() {
         />
       </div>
       
+      {/* Tiny Candle Button with Glowing Arrow - Bottom Right - Desktop Only */}
+      {!isMobileView && (
+        <>
+          <div 
+            className="candle-button"
+            style={{
+              position: "fixed",
+              bottom: "30px",
+              right: "30px",
+              width: "80px",
+              height: "80px",
+              zIndex: 297,
+              borderRadius: "50%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              transition: "transform 0.3s ease, filter 0.3s ease",
+            }}
+            onClick={() => router.push('/carousel')}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "scale(1.15) rotate(-5deg)";
+              e.currentTarget.style.filter = "drop-shadow(0 0 20px #ff9500)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "scale(1) rotate(0deg)";
+              e.currentTarget.style.filter = "none";
+            }}
+          >
+            <img 
+              src="/images/tinyCandleButton.webp"
+              alt="Tiny Candle Button"
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "contain",
+              }}
+            />
+          </div>
+          
+          {/* Glowing Arrow with Text */}
+          <svg
+            className="luminarium-arrow"
+            style={{
+              position: "fixed",
+              bottom: "20px",
+              right: "20px",
+              width: "300px",
+              height: "150px",
+              zIndex: 296,
+              pointerEvents: "auto",
+              cursor: "pointer",
+            }}
+            viewBox="0 0 300 150"
+            onClick={() => router.push('/carousel')}
+        onMouseEnter={(e) => {
+          const text = e.currentTarget.querySelector('text');
+          const arrow = e.currentTarget.querySelector('#arrowPath');
+          const arrowHead = e.currentTarget.querySelector('.arrow-head');
+          if (text) {
+            text.style.fontSize = '32';
+            text.style.fill = '#ffffff';
+            text.style.filter = 'url(#glow) drop-shadow(0 0 10px #ffcc00)';
+          }
+          if (arrow) {
+            arrow.style.strokeWidth = '3.5';
+            arrow.style.filter = 'url(#glow) drop-shadow(0 0 15px #ff9500)';
+          }
+          if (arrowHead) {
+            arrowHead.style.strokeWidth = '3.5';
+          }
+        }}
+        onMouseLeave={(e) => {
+          const text = e.currentTarget.querySelector('text');
+          const arrow = e.currentTarget.querySelector('#arrowPath');
+          const arrowHead = e.currentTarget.querySelector('.arrow-head');
+          if (text) {
+            text.style.fontSize = '28';
+            text.style.fill = '#ffcc00';
+            text.style.filter = 'url(#candleGlow)';
+          }
+          if (arrow) {
+            arrow.style.strokeWidth = '2.5';
+            arrow.style.filter = 'url(#glow)';
+          }
+          if (arrowHead) {
+            arrowHead.style.strokeWidth = '2.5';
+          }
+        }}
+      >
+        {/* Define gradients and filters */}
+        <defs>
+          <linearGradient id="arrowGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
+            <stop offset="50%" stopColor="#ffcc00" stopOpacity="0.8" />
+            <stop offset="100%" stopColor="#ff9500" stopOpacity="1" />
+          </linearGradient>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+          <filter id="candleGlow">
+            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+            <feFlood floodColor="#ff9500" floodOpacity="0.4"/>
+            <feComposite in2="coloredBlur" operator="in"/>
+            <feMerge>
+              <feMergeNode/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+        
+        {/* Curved arrow path */}
+        <path
+          id="arrowPath"
+          d="M 20 100 Q 100 40, 200 60"
+          stroke="url(#arrowGradient)"
+          strokeWidth="2.5"
+          fill="none"
+          filter="url(#glow)"
+          strokeLinecap="round"
+          opacity="0.9"
+        >
+          <animate
+            attributeName="stroke-opacity"
+            values="0.6;1;0.6"
+            dur="2.5s"
+            repeatCount="indefinite"
+          />
+        </path>
+        
+        {/* Invisible path for text (offset above the arrow) */}
+        <path
+          id="textPath"
+          d="M 20 85 Q 100 25, 200 45"
+          fill="none"
+          stroke="none"
+        />
+        
+        {/* Arrow head */}
+        <path
+          className="arrow-head"
+          d="M 195 55 L 205 60 L 195 65"
+          stroke="url(#arrowGradient)"
+          strokeWidth="2.5"
+          fill="none"
+          filter="url(#glow)"
+          strokeLinecap="round"
+        >
+          <animate
+            attributeName="stroke-opacity"
+            values="0.6;1;0.6"
+            dur="2.5s"
+            repeatCount="indefinite"
+          />
+        </path>
+        
+        {/* Text along path - placeholder for user to update */}
+        <text
+          fill="#ffcc00"
+          fontSize="28"
+          fontFamily="'UnifrakturMaguntia', cursive"
+          filter="url(#candleGlow)"
+          style={{ transition: "all 0.3s ease" }}
+        >
+          <textPath href="#textPath" startOffset="15%">
+            Carousel
+          </textPath>
+          <animate
+            attributeName="fill-opacity"
+            values="0.7;1;0.7"
+            dur="3s"
+            repeatCount="indefinite"
+          />
+        </text>
+        
+        {/* Floating particles */}
+        {[...Array(6)].map((_, i) => (
+          <circle
+            key={i}
+            r="1.5"
+            fill="#ffcc00"
+            filter="url(#glow)"
+          >
+            <animateMotion
+              dur={`${4 + i}s`}
+              repeatCount="indefinite"
+              path="M 20 100 Q 100 40, 200 60"
+            >
+              <mpath href="#arrowPath" />
+            </animateMotion>
+            <animate
+              attributeName="opacity"
+              values="0;1;0"
+              dur={`${4 + i}s`}
+              repeatCount="indefinite"
+            />
+            <animate
+              attributeName="r"
+              values="0.5;2;0.5"
+              dur={`${4 + i}s`}
+              repeatCount="indefinite"
+            />
+          </circle>
+        ))}
+          </svg>
+        </>
+      )}
       
       {/* Navigation Toggle */}
       {/* <div style={{
@@ -218,7 +429,7 @@ export default function ShrinePage() {
               cursor: "pointer",
             }}
           >
-            <Link href="/home" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
+            <Link href="/carousel" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
               RL80
             </Link>
             {Array.from({length: 100}).map((_, i) => {
@@ -319,7 +530,7 @@ export default function ShrinePage() {
               cursor: "pointer",
             }}
           >
-            <Link href="/home" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
+            <Link href="/carousel" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
               RL80
             </Link>
             {Array.from({length: 100}).map((_, i) => {

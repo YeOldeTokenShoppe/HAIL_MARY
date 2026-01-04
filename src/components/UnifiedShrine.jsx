@@ -534,7 +534,7 @@ export default function UnifiedShrine({
       <div style={{
         position: 'absolute',
         bottom: isMobile ? '20px' : '80px',
-        right: isMobile ? '50%' : '20px',
+        left: isMobile ? '-10%' : '20px',
         transform: isMobile ? 'translateX(50%)' : 'none',
         display: 'flex',
         flexDirection: 'column',
@@ -575,8 +575,6 @@ export default function UnifiedShrine({
             background: linear-gradient(45deg, #00ffff, #ff0066);
             color: #000;
             font-weight: 900;
-            top: 3px !important;
-            right: 15% !important;
           }
         `}</style>
         <div className="cyber-candle-btn">

@@ -102,16 +102,16 @@ export default function CyberGlitchButton({
         
         .cybr-btn-wrapper {
           position: relative;
-          height: ${mobile ? '50px' : '60px'};
-          width: ${mobile ? '160px' : '180px'};
-          margin: 3px;
+          height: ${mobile ? '3.5rem' : '3.5rem'};
+          width: ${mobile ? '9rem' : '9rem'};
+          margin: 0.2rem;
         }
         
         .cybr-btn {
-          --primary: #ff184c;
-          // --shadow-primary: #fded00;
+          --primary: #9945ff;
+          --shadow-primary: #00ffff;
           --color: white;
-          --font-size: ${mobile ? '14px' : '18px'};
+          --font-size: ${mobile ? '0.875rem' : '1.125rem'};
           --shadow-primary-hue: 180;
           --shadow-secondary-hue: 60;
           --shadow-secondary: hsl(var(--shadow-secondary-hue), 90%, 60%);
@@ -129,7 +129,7 @@ export default function CyberGlitchButton({
           color: var(--color);
           text-transform: uppercase;
           font-size: var(--font-size);
-          letter-spacing: 3px;
+          letter-spacing: 0.2rem;
           position: relative;
           font-weight: 900;
           width: 100%;
@@ -138,7 +138,7 @@ export default function CyberGlitchButton({
           flex-direction: column;
           justify-content: center;
           align-items: center;
-          line-height: ${text2 ? (mobile ? '22px' : '26px') : (mobile ? '50px' : '60px')};
+          line-height: ${text2 ? (mobile ? '1.375rem' : '1.625rem') : (mobile ? '2.5rem' : '3.75rem')};
           text-align: center;
           transition: background 0.2s, font-size 0.3s;
           border: none;
@@ -148,13 +148,13 @@ export default function CyberGlitchButton({
         }
         
         .cybr-btn:hover {
-          --primary: #cc133c;
-          --font-size: ${mobile ? '14px' : '16px'};
+          --primary: #7c37d0;
+          --font-size: ${mobile ? '0.875rem' : '1rem'};
         }
         
         .cybr-btn:active {
-          --primary: #8B00FF;
-          --shadow-primary: #00e572;
+          --primary: #6b2fb5;
+          --shadow-primary: #00ffff;
         }
         
         .cybr-btn:after, .cybr-btn:before {
@@ -193,9 +193,9 @@ export default function CyberGlitchButton({
           align-items: center;
           justify-content: center;
           font-weight: 900;
-          letter-spacing: 3px;
+          letter-spacing: 0.2rem;
           font-size: var(--font-size);
-          line-height: ${text2 ? (mobile ? '22px' : '26px') : 'normal'};
+          line-height: ${text2 ? (mobile ? '1.375rem' : '1.625rem') : 'normal'};
         }
         
         .cybr-btn__glitch:before {
@@ -217,15 +217,15 @@ export default function CyberGlitchButton({
         .cybr-label {
           background: var(--shadow-primary);
           color: #323232;
-          font-size: 7px;
+          font-size: 0.4375rem;
           font-weight: 700;
-          letter-spacing: 1px;
+          letter-spacing: 0.0625rem;
           position: absolute;
-          width: 24px;
-          height: 10px;
+          width: 1.5rem;
+          height: 0.625rem;
           top: 0;
           left: 81%;
-          line-height: 10px;
+          line-height: 0.625rem;
           text-align: center;
           font-family: monospace;
         }

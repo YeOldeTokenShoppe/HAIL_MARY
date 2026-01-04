@@ -173,7 +173,7 @@ export default function Home() {
               cursor: "pointer",
             }}
           >
-            <a href="/home" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
+            <a href="/carousel" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
               RL80
             </a>
             {Array.from({length: 100}).map((_, i) => {

@@ -626,7 +626,7 @@ function CarouselPageContent() {
               cursor: "pointer",
             }}
           >
-            <Link href="/home" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
+            <Link href="/carousel" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
               RL80
             </Link>
             {Array.from({length: 100}).map((_, i) => {

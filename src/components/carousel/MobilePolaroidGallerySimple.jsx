@@ -62,20 +62,20 @@ const MobilePolaroidGallerySimple = ({ images = [] }) => {
           left: 10px;
           right: 10px;
           text-align: center;
-          font-family: 'Courier New', monospace;
+          font-family: 'Homemade Apple', monospace;
           color: #333;
-          font-size: 11px;
+          font-size: 18px;
           line-height: 1.2;
         }
         
         .polaroid-year {
           font-weight: bold;
-          font-size: 12px;
+          font-size: 16px;
         }
         
         .polaroid-location {
           font-style: italic;
-          font-size: 10px;
+          font-size: 14px;
           opacity: 0.7;
           margin-top: 2px;
         }

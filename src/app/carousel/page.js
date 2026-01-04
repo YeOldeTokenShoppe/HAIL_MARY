@@ -96,6 +96,32 @@ export default function CarouselPage() {
         
         #text, .text__copy {
           font-family: 'UnifrakturMaguntia', serif !important;
+
+  
+          .cyber-candle-btn :global(.cybr-btn) {
+            --primary: #9945ff;
+            --shadow-primary: #00ffff;
+            --shadow-secondary-hue: 340;
+            --color: white;
+          }
+          .cyber-candle-btn :global(.cybr-btn:hover) {
+            --primary: #7c37d0;
+            --shadow-primary: #00ffff;
+          }
+          .cyber-candle-btn :global(.cybr-btn:active) {
+            --primary: #6b2fb5;
+            --shadow-primary: #00ffff;
+          }
+          .cyber-candle-btn :global(.cybr-btn__glitch) {
+            background: linear-gradient(45deg, #00ffff, #9945ff);
+            text-shadow: 2px 2px #ff0066, -2px -2px #00ffff;
+          }
+          .cyber-candle-btn :global(.cybr-label) {
+            background: linear-gradient(45deg, #00ffff, #ff0066);
+            color: #000;
+            font-weight: 900;
+          }
+
         }
       `}} />
       
@@ -108,22 +134,17 @@ export default function CarouselPage() {
         top: "90px",
         right: "1.5rem",
         zIndex: 298,
-        width: '9rem',
-        height: '3rem'
+        // width: '9rem',
+        // height: '3rem'
       }}>
-        <div className="cyber-buy-btn">
-          <CyberGlitchButton 
-            text="BUY RL80"
+
+        <div className="cyber-candle-btn" style={{ opacity: mounted ? 1 : 0, transition: 'opacity 0.3s' }}>
+          <CyberGlitchButton
+            text="Buy"
+            text2="RL80"
             onClick={() => setShowBuyModal(true)}
             label="RL80"
             mobile={false}
-            style={{
-              '--primary': '#9945ff',
-              '--shadow-primary': '#00ffff',
-              width: '140px',
-              height: '50px',
-              fontSize: '14px'
-            }}
           />
         </div>
       </div>
@@ -405,8 +426,6 @@ export default function CarouselPage() {
           background: linear-gradient(45deg, #00ffff, #ff0066);
           color: #000;
           font-weight: 900;
-          top: 3px !important;
-          right: 15% !important;
         }
       `}</style>
       
@@ -472,7 +491,7 @@ export default function CarouselPage() {
               cursor: "pointer",
             }}
           >
-            <Link href="/home" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
+            <Link href="/carousel" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
               RL80
             </Link>
             {Array.from({length: 100}).map((_, i) => {

@@ -2008,7 +2008,7 @@ const PalmsScene = ({ onLoadingChange }) => {
         
         if (intersects.length > 0) {
           const isMobile = detectMobileDevice();
-          const destination = isMobile ? '/home' : '/home';
+          const destination = isMobile ? '/carousel' : '/carousel';
           
           // Add fade out transition before navigating
           gsap.to(mountRef.current, {
@@ -2034,7 +2034,7 @@ const PalmsScene = ({ onLoadingChange }) => {
             const distance = intersect.point.distanceTo(maryPos);
             if (distance < 2) { // Within 2 units of Mary's position
               const isMobile = detectMobileDevice();
-              const destination = isMobile ? '/home' : '/home';
+              const destination = isMobile ? '/carousel' : '/carousel';
 
               // Add fade out transition before navigating
               gsap.to(mountRef.current, {

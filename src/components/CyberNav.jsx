@@ -92,7 +92,7 @@ const CyberNav = ({
 
   const navItems = [
     { id: '00', date: 'ICON ON I-80', title: "ROADMAP", path: '/', thumbnail: '/images/I80.png' },
-    { id: '01', date: 'DEFI GRAV80', title: 'SOMETHING ABOUT RL80', path: '/home', thumbnail: '/images/ROSE_TATTOO.webp' },
+    { id: '01', date: 'DEFI GRAV80', title: 'SOMETHING ABOUT RL80', path: '/carousel', thumbnail: '/images/ROSE_TATTOO.webp' },
     // { id: '02', date: 'LIGHT UTIL80', title: 'THE ILLUMIN80', path: '/gallery3', thumbnail: '/heart.png' },
     { id: '02', date: 'PRAYER & PROBABIL80', title: 'TRADING DESK', path: '/trade', thumbnail: '/images/3ACES_TATTOO.webp' },
     { id: '03', date: 'ETHICS & MORAL80', title: 'SCROLLS OF ST. GR80', path: '/ethos', thumbnail: '/images/ILLUMIN80_TATTOO.webp' },

@@ -6,10 +6,9 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Image, Environment, ScrollControls, useScroll, useTexture, Text } from '@react-three/drei'
 import { easing } from 'maath'
 import './util'
-import CyberGlitchButton from './CyberGlitchButton'
 import ExperienceControls from './ExperienceControls'
 import { useMusic } from '../MusicContext'
-import MobilePolaroidGallery from './MobilePolaroidGallery'
+
 import MobilePolaroidGallerySimple from './MobilePolaroidGallerySimple'
 
 export default function CarouselComponent({ onReady, disableScrollControls = false }) {
@@ -134,38 +133,6 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
       </Canvas>
       )}
       
-      {/* Buy RL80 Button - Mobile only (desktop version is in carousel page) */}
-      {isMobile && (
-        <>
-          <style jsx>{`
-            .cyber-buy-btn :global(.cybr-btn) {
-              --primary: #9945ff;
-              --shadow-primary: #00ffff;
-              --shadow-secondary-hue: 340;
-              --color: white;
-            }
-            .cyber-buy-btn :global(.cybr-btn:hover) {
-              --primary: #7c37d0;
-              --shadow-primary: #00ffff;
-            }
-            .cyber-buy-btn :global(.cybr-btn:active) {
-              --primary: #00ffff;
-              --shadow-primary: #ff0066;
-            }
-            .cyber-buy-btn :global(.cybr-btn__glitch) {
-              background: linear-gradient(45deg, #00ffff, #9945ff);
-              text-shadow: 2px 2px #ff0066, -2px -2px #00ffff;
-            }
-            .cyber-buy-btn :global(.cybr-label) {
-              background: linear-gradient(45deg, #00ffff, #ff0066);
-              color: #000;
-              font-weight: 900;
-              top: 3px !important;
-              right: 15% !important;
-            }
-          `}</style>
-        </>
-      )}
     </div>
   )
 }
