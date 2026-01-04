@@ -111,7 +111,7 @@ export default function CyberGlitchButton({
           --primary: #9945ff;
           --shadow-primary: #00ffff;
           --color: white;
-          --font-size: ${mobile ? '0.875rem' : '1.125rem'};
+          --font-size: ${mobile ? '0.875rem' : '1rem'};
           --shadow-primary-hue: 180;
           --shadow-secondary-hue: 60;
           --shadow-secondary: hsl(var(--shadow-secondary-hue), 90%, 60%);
@@ -138,7 +138,7 @@ export default function CyberGlitchButton({
           flex-direction: column;
           justify-content: center;
           align-items: center;
-          line-height: ${text2 ? (mobile ? '1.375rem' : '1.625rem') : (mobile ? '2.5rem' : '3.75rem')};
+          line-height: ${text2 ? (mobile ? '1.375rem' : '1.375rem') : (mobile ? '2.5rem' : '3.75rem')};
           text-align: center;
           transition: background 0.2s, font-size 0.3s;
           border: none;

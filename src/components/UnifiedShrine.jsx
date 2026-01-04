@@ -579,8 +579,8 @@ export default function UnifiedShrine({
         `}</style>
         <div className="cyber-candle-btn">
           <CyberGlitchButton
-            text="LIght"
-            text2="one up"
+            text="Get Lit"
+            text2="for RL80"
             onClick={handleLightCandleClick}
             label="RL80"
             mobile={isMobile}

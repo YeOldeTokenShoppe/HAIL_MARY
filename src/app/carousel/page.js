@@ -315,8 +315,8 @@ export default function CarouselPage() {
           filter="url(#candleGlow)"
           style={{ transition: "all 0.3s ease" }}
         >
-          <textPath href="#textPath" startOffset="15%">
-            Luminarium
+          <textPath href="#textPath" startOffset="5%">
+            The Illumin80
           </textPath>
           <animate
             attributeName="fill-opacity"

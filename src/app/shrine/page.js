@@ -179,7 +179,7 @@ export default function ShrinePage() {
               cursor: "pointer",
               transition: "transform 0.3s ease, filter 0.3s ease",
             }}
-            onClick={() => router.push('/carousel')}
+            onClick={() => router.push('/trade')}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = "scale(1.15) rotate(-5deg)";
               e.currentTarget.style.filter = "drop-shadow(0 0 20px #ff9500)";
@@ -190,7 +190,7 @@ export default function ShrinePage() {
             }}
           >
             <img 
-              src="/images/tinyCandleButton.webp"
+              src="/images/3ACES_TATTOO.webp"
               alt="Tiny Candle Button"
               style={{
                 width: "100%",
@@ -214,7 +214,7 @@ export default function ShrinePage() {
               cursor: "pointer",
             }}
             viewBox="0 0 300 150"
-            onClick={() => router.push('/carousel')}
+            onClick={() => router.push('/trade')}
         onMouseEnter={(e) => {
           const text = e.currentTarget.querySelector('text');
           const arrow = e.currentTarget.querySelector('#arrowPath');
@@ -328,8 +328,8 @@ export default function ShrinePage() {
           filter="url(#candleGlow)"
           style={{ transition: "all 0.3s ease" }}
         >
-          <textPath href="#textPath" startOffset="15%">
-            Carousel
+          <textPath href="#textPath" startOffset="5%">
+            Synth Traders
           </textPath>
           <animate
             attributeName="fill-opacity"
