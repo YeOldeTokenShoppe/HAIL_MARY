@@ -28,7 +28,7 @@ export {
 } from './agents/configs/agent-config';
 
 // Knowledge Base
-export { default as features/tradingKnowledge } from './agents/configs/knowledge/features/trading-knowledge.json';
+export { default as tradingKnowledge } from './agents/configs/knowledge/features/trading-knowledge.json';
 
 // ============================================================================
 // LIGHTER TRADING
@@ -44,7 +44,7 @@ export { AIAgent } from './lighter/agents/ai-agent';
 export { AIAgentLLM } from './lighter/agents/ai-agent-llm';
 
 // Lighter Trading
-export { features/trading } from './lighter/features/trading';
+export {trading } from './lighter/features/trading';
 export { setupApiKey } from './lighter/setup-api-key';
 export { websocket } from './lighter/websocket';
 
@@ -52,7 +52,7 @@ export { websocket } from './lighter/websocket';
 // SERVICES
 // ============================================================================
 
-export { features/tradingBotService } from './services/features/tradingBotService';
+export { tradingBotService } from './services/features/tradingBotService';
 export { lighterConnectionManager } from './services/lighterConnectionManager';
 export { calculateRiskAppetite } from './services/risk-appetite-calculator';
 

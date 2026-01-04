@@ -31,9 +31,10 @@ function CarouselPageContent() {
   const [isMobileDevice, setIsMobileDevice] = useState(false)
   const [fontLoaded, setFontLoaded] = useState(false)
   const [showBuyModal, setShowBuyModal] = useState(false)
-  const [isPageLoading, setIsPageLoading] = useState(true)
-  const [imagesLoaded, setImagesLoaded] = useState(false)
-  const [carouselReady, setCarouselReady] = useState(false)
+  const [isPageLoading, setIsPageLoading] = useState(false) // Start with false to show content immediately
+  const [imagesLoaded, setImagesLoaded] = useState(true) // Default to true
+  const [carouselReady, setCarouselReady] = useState(true) // Default to true
+  const [hasNavigated, setHasNavigated] = useState(false)
   const loadingTimeoutRef = useRef(null)
   const isTogglingRef = useRef(false)
   const is80sMode = context80sMode
@@ -84,11 +85,13 @@ function CarouselPageContent() {
     },
   ])
 
-  // Preload all critical images including carousel images
+  // Check if we navigated from another page - REMOVED FOR NOW
+
+  // Simplified image preloading - don't block page display
   useEffect(() => {
+    // Preload images in background without blocking
     const imagesToPreload = [
       '/virginRecords.jpg',
-      // Carousel images
       '/carousel_images/img1.jpg',
       '/carousel_images/img2.jpg',
       '/carousel_images/img3.jpg',
@@ -97,59 +100,19 @@ function CarouselPageContent() {
       '/carousel_images/img6.jpg',
       '/carousel_images/img7.jpg',
       '/carousel_images/img8.jpg',
-
     ];
 
-    let loadedCount = 0;
-    const totalImages = imagesToPreload.length;
-
-    const imagePromises = imagesToPreload.map(src => {
-      return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-          loadedCount++;
-          resolve();
-        };
-        img.onerror = () => {
-          console.warn(`Failed to load image: ${src}`);
-          loadedCount++;
-          resolve(); // Resolve anyway to not block loading
-        };
-        img.src = src;
-      });
-    });
-
-    Promise.all(imagePromises).then(() => {
-      setImagesLoaded(true);
+    imagesToPreload.forEach(src => {
+      const img = new Image();
+      img.src = src; // Just preload, don't wait
     });
   }, []);
 
-  // Check all loading states
-  useEffect(() => {
-    if (fontLoaded && imagesLoaded && carouselReady) {
-      // Small delay to ensure smooth transition and Three.js initialization
-      setTimeout(() => {
-        setIsPageLoading(false);
-      }, 500);
-    }
-  }, [fontLoaded, imagesLoaded, carouselReady]);
+  // REMOVED complex loading logic - page shows immediately
 
-  // Loading timeout fallback
-  useEffect(() => {
-    loadingTimeoutRef.current = setTimeout(() => {
-      setIsPageLoading(false);
-    }, 12000); // 12 second timeout for slower connections
-    
-    return () => {
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Carousel ready callback
+  // Carousel ready callback - simplified
   const handleCarouselReady = useCallback(() => {
-    setCarouselReady(true);
+    // No longer needed
   }, []);
 
   // Alternate emoji for sign-in button
@@ -238,12 +201,8 @@ function CarouselPageContent() {
     }, 500);
   }, [setContext80sMode, play, pause]);
   
-  // Initialize current view from URL parameter
-  const [currentView, setCurrentView] = useState(() => {
-    // Check URL param on initial load
-    const view = searchParams.get('view')
-    return view === 'shrine' ? 'shrine' : 'carousel'
-  });
+  // Initialize current view - default to carousel
+  const [currentView, setCurrentView] = useState('carousel');
   
   // State for CyberNav menu
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -286,13 +245,16 @@ function CarouselPageContent() {
     cleanupTimeoutsRef.current.push(timeoutId)
   }, [router, cleanupBeforeViewChange]);
   
-  // Handle browser back/forward
+  // Handle URL parameters on mount and changes
   useEffect(() => {
     const view = searchParams.get('view')
-    if (view === 'shrine' || view === 'carousel') {
-      setCurrentView(view)
+    console.log('URL view parameter:', view, 'Current view:', currentView)
+    if (view === 'shrine') {
+      setCurrentView('shrine')
+    } else if (view === 'carousel' || !view) {
+      setCurrentView('carousel')
     }
-  }, [searchParams]);
+  }, [searchParams, currentView]);
   
   // Cleanup on component unmount
   useEffect(() => {
@@ -310,14 +272,12 @@ function CarouselPageContent() {
 
   return (
     <>
-      {/* CoinLoader - Shows while page is loading */}
-      <CoinLoader loading={isPageLoading} />
-
-      {/* Main content - Hidden while loading */}
+      {/* CoinLoader - Removed since we're showing content immediately */}
+      
+      {/* Main content - Always visible */}
       <div style={{
-        opacity: isPageLoading ? 0 : 1,
-        visibility: isPageLoading ? 'hidden' : 'visible',
-        transition: 'opacity 0.5s ease-in-out',
+        opacity: 1,
+        visibility: 'visible',
       }}>
       
       {/* Add inline keyframes for font and spinning animation */}
@@ -472,8 +432,8 @@ function CarouselPageContent() {
           }
         }}
       >
-        {/* Carousel View */}
-        {currentView === 'carousel' && (
+        {/* Carousel View - Always render if not explicitly shrine */}
+        {currentView !== 'shrine' && (
           <motion.div
             key="carousel"
             initial={{ opacity: 0 }}

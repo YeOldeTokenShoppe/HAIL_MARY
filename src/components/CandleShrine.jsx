@@ -299,8 +299,8 @@ function useClonedGeometries(modelPath) {
       else if (name.includes('glass')) key = 'glass'
       else if (name.includes('wick')) key = 'wick'
       else if (name.includes('senora')) {
-        key = 'senora'
-        if (child.material?.map) textures.senora = child.material.map
+        // Skip senora mesh - we don't want to include it in clones
+        return
       }
       else if (name.includes('flame')) key = 'flame'
       
@@ -425,7 +425,6 @@ export function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, priceRef
     xbase: createXBaseMaterial(),
     glass: createWobbleMaterial('#888888', { transparent: true, opacity: 0.3 }),
     wick: createWobbleMaterial('#222222'),
-    senora: createSenoraMaterial(textures.senora),
     flame: createFlameMaterial(),
   }), [textures])
   
@@ -443,7 +442,6 @@ export function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, priceRef
       
       <InstancedPart geometry={geometries.xbase} material={materials.xbase} positions={positions} localMatrix={localMatrices.xbase} maxCount={maxCount} onCandleClick={onCandleClick} />
       <InstancedPart geometry={geometries.wick} material={materials.wick} positions={positions} localMatrix={localMatrices.wick} maxCount={maxCount} onCandleClick={onCandleClick} />
-      <InstancedPart geometry={geometries.senora} material={materials.senora} positions={positions} localMatrix={localMatrices.senora} maxCount={maxCount} onCandleClick={onCandleClick} />
       <InstancedPart geometry={geometries.flame} material={materials.flame} positions={positions} localMatrix={localMatrices.flame} maxCount={maxCount} onCandleClick={onCandleClick} />
       <InstancedPart geometry={geometries.glass} material={materials.glass} positions={positions} localMatrix={localMatrices.glass} maxCount={maxCount} onCandleClick={onCandleClick} />
     </group>

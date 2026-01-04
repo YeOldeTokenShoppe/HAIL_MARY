@@ -16,7 +16,21 @@ import { PhoneAura } from './PhoneAura'
 
 
 export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView, offerings, hoveredOffering, justLitOffering, onJustLitComplete, userRotation = 0, priceChange = 0, hasActiveClick = false, is80sMode = false }) {
-  const gltf = useGLTF('/models/hands4.glb')
+  // Get mobile state from parent or detect it locally
+  const [isMobileLocal, setIsMobileLocal] = useState(false)
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobileLocal(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+  
+  // Load different model based on device type
+  // Assuming you'll create a hands_MOBILE.glb without emojis/icons
+  const modelPath = isMobileLocal ? '/models/hands_MOBILE2.glb' : '/models/hands4.glb'
+  const gltf = useGLTF(modelPath)
   const hasReportedLoad = useRef(false)
   const rightHandRef = useRef()
   const leftHandRef = useRef()
@@ -401,22 +415,77 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
         // Find emoji objects with flexible matching
         if (child.name === 'Emoji-1' || child.name === 'emoji-1' || child.name === 'Emoji1') {
           emoji1Ref.current = child
+          // Hide on mobile
+          if (isMobileLocal) {
+            child.visible = false
+            child.traverse((node) => {
+              if (node.isMesh && node.material) {
+                node.material.opacity = 0
+                node.material.transparent = true
+              }
+              node.visible = false
+            })
+          }
           // console.log('✅ Found Emoji-1:', child.name, 'Position:', child.position)
         }
         if (child.name === 'Emoji-2' || child.name === 'emoji-2' || child.name === 'Emoji2') {
           emoji2Ref.current = child
+          // Hide on mobile
+          if (isMobileLocal) {
+            child.visible = false
+            child.traverse((node) => {
+              if (node.isMesh && node.material) {
+                node.material.opacity = 0
+                node.material.transparent = true
+              }
+              node.visible = false
+            })
+          }
           // console.log('✅ Found Emoji-2:', child.name, 'Position:', child.position)
         }
         if (child.name === 'Emoji-3' || child.name === 'emoji-3' || child.name === 'Emoji3') {
           emoji3Ref.current = child
+          // Hide on mobile
+          if (isMobileLocal) {
+            child.visible = false
+            child.traverse((node) => {
+              if (node.isMesh && node.material) {
+                node.material.opacity = 0
+                node.material.transparent = true
+              }
+              node.visible = false
+            })
+          }
           // console.log('✅ Found Emoji-3:', child.name, 'Position:', child.position)
         }
         if (child.name === 'Emoji-4' || child.name === 'emoji-4' || child.name === 'Emoji4') {
           emoji4Ref.current = child
+          // Hide on mobile
+          if (isMobileLocal) {
+            child.visible = false
+            child.traverse((node) => {
+              if (node.isMesh && node.material) {
+                node.material.opacity = 0
+                node.material.transparent = true
+              }
+              node.visible = false
+            })
+          }
           // console.log('✅ Found Emoji-4:', child.name, 'Position:', child.position)
         }
          if (child.name === 'Emoji-5' || child.name === 'emoji-5' || child.name === 'Emoji5') {
           emoji5Ref.current = child
+          // Hide on mobile
+          if (isMobileLocal) {
+            child.visible = false
+            child.traverse((node) => {
+              if (node.isMesh && node.material) {
+                node.material.opacity = 0
+                node.material.transparent = true
+              }
+              node.visible = false
+            })
+          }
           // console.log('✅ Found Emoji-5:', child.name, 'Position:', child.position)
         }
         
@@ -1813,16 +1882,6 @@ const phoneWorldTransform = useMemo(() => {
 }, [phoneCaseRef.current, phoneScreenRef.current, offerings, hoveredOffering, justLitOffering])
 
 // Return with swivel animation applied
-// Get mobile state from parent or detect it locally
-const [isMobileLocal, setIsMobileLocal] = useState(false)
-useEffect(() => {
-  const checkMobile = () => {
-    setIsMobileLocal(window.innerWidth < 768)
-  }
-  checkMobile()
-  window.addEventListener('resize', checkMobile)
-  return () => window.removeEventListener('resize', checkMobile)
-}, [])
 
 return (
   <group position={[0, isMobileLocal ? -0.3 : -0.6, 0]}> {/* Position hands higher on mobile */}

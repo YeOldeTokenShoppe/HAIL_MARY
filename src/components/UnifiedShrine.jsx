@@ -43,44 +43,9 @@ function OptimizedPriceSimulator({ priceRef, onUIUpdate }) {
   return null
 }
 
-// Separate component for candle cloud to prevent re-renders from parent state
-const MemoizedCandleCloud = React.memo(function MemoizedCandleCloud({ 
-  priceRef, 
-  additionalCandles, 
-  onCandleClick, 
-  clickedCandleId 
-}) {
-  // This component reads from ref, doesn't depend on priceDirection state
-  return (
-    <CandleCloudWithRef
-      count={500}
-      priceRef={priceRef}
-      additionalCandles={additionalCandles}
-      onCandleClick={onCandleClick}
-      clickedCandleId={clickedCandleId}
-    />
-  )
-})
 
-// Wrapper that passes ref value to CandleCloud via useFrame
-function CandleCloudWithRef({ count, priceRef, additionalCandles, onCandleClick, clickedCandleId }) {
-  const [priceDirection, setPriceDirection] = useState(0)
-  
-  // Update local state from ref at reasonable interval
-  useFrame(() => {
-    // Direct assignment, no setState needed - CandleCloud reads from sharedUniforms
-  })
-  
-  return (
-    <CandleCloud
-      count={count}
-      priceDirection={priceRef.current}
-      additionalCandles={additionalCandles}
-      onCandleClick={onCandleClick}
-      clickedCandleId={clickedCandleId}
-    />
-  )
-}
+
+
 
 // Memoized gradient that reads from ref
 const MemoizedGradientBackground = React.memo(function MemoizedGradientBackground({ priceRef, is80sMode }) {
@@ -312,39 +277,21 @@ export default function UnifiedShrine({
   }, [])
   
   // Memoize styles
-  const priceTickerStyle = useMemo(() => ({
+  const unifiedStatsStyle = useMemo(() => ({
     position: 'absolute',
-    top: isMobile ? '140px' : '195px',
+    top: isMobile ? '100px' : '105px',
     right: isMobile ? '10px' : '20px',
     background: 'rgba(0, 0, 0, 0.8)',
     border: `2px solid ${displayPrice.change >= 0 ? '#00ff66' : '#ff4444'}`,
     borderRadius: '12px',
-    padding: isMobile ? '8px 10px' : '16px',
+    padding: isMobile ? '10px 12px' : '18px',
     color: '#fff',
     fontFamily: 'monospace',
     fontSize: isMobile ? '11px' : '14px',
     backdropFilter: 'blur(10px)',
     boxShadow: `0 0 20px ${displayPrice.change >= 0 ? 'rgba(0, 255, 100, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
     zIndex: 1000,
-    width: isMobile ? '140px' : '230px',
-    pointerEvents: 'none'
-  }), [isMobile, displayPrice.change])
-  
-  const statsOverlayStyle = useMemo(() => ({
-    position: 'absolute',
-    top: isMobile ? '215px' : '380px',
-    right: isMobile ? '10px' : '20px',
-    color: '#fff',
-    fontFamily: 'monospace',
-    fontSize: isMobile ? '10px' : '12px',
-    background: 'rgba(0, 0, 0, 0.8)',
-    border: `2px solid ${displayPrice.change >= 0 ? '#00ff66' : '#ff4444'}`,
-    padding: isMobile ? '8px 10px' : '16px',
-    borderRadius: '12px',
-    backdropFilter: 'blur(10px)',
-    boxShadow: `0 0 20px ${displayPrice.change >= 0 ? 'rgba(0, 255, 100, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
-    width: isMobile ? '140px' : '230px',
-    zIndex: 999,
+    width: isMobile ? '160px' : '240px',
     pointerEvents: 'none'
   }), [isMobile, displayPrice.change])
   
@@ -520,63 +467,66 @@ export default function UnifiedShrine({
         )}
       </Canvas>
       
-      {/* Price Ticker */}
-      <div style={priceTickerStyle}>
+      {/* Unified Stats Box */}
+      <div style={unifiedStatsStyle}>
         <div style={{ 
-          fontSize: isMobile ? '15px' : '24px', 
+          fontSize: isMobile ? '16px' : '24px', 
           fontWeight: 'bold',
           color: displayPrice.change >= 0 ? '#00ff66' : '#ff4444',
-          marginBottom: isMobile ? '2px' : '8px'
+          marginBottom: isMobile ? '4px' : '8px'
         }}>
-          ${displayPrice.tokenPrice.toFixed(6)}
+          ${displayPrice.tokenPrice.toFixed(7)}
         </div>
         <div style={{
-          fontSize: isMobile ? '11px' : '18px',
+          fontSize: isMobile ? '12px' : '16px',
           color: displayPrice.change >= 0 ? '#00ff66' : '#ff4444',
-          marginBottom: isMobile ? '4px' : '12px',
+          marginBottom: isMobile ? '8px' : '12px',
           display: 'flex',
           alignItems: 'center',
-          gap: isMobile ? '4px' : '8px'
+          gap: isMobile ? '4px' : '6px'
         }}>
           <span>{displayPrice.change >= 0 ? '▲' : '▼'}</span>
-          <span>{Math.abs(displayPrice.change).toFixed(2)}%</span>
+          <span>{displayPrice.change.toFixed(2)}%</span>
         </div>
-        <div style={{ fontSize: isMobile ? '9px' : '12px', color: '#888', marginBottom: '2px' }}>
-          Vol 24h: ${isMobile ? (volume24h / 1000000).toFixed(1) + 'M' : volume24h.toLocaleString()}
-        </div>
-        <div style={{ fontSize: isMobile ? '9px' : '12px', color: '#888' }}>
-          MCap: ${isMobile ? (marketCap / 1000000).toFixed(1) + 'M' : marketCap.toLocaleString()}
+        
+        {/* Volume and Market Cap */}
+        <div style={{ 
+          fontSize: isMobile ? '10px' : '12px', 
+          color: '#999', 
+          marginBottom: isMobile ? '8px' : '10px',
+          paddingBottom: isMobile ? '8px' : '10px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+        }}>
+          <div style={{ marginBottom: '3px' }}>
+            Vol 24h: ${isMobile ? (volume24h / 1000000).toFixed(1) + 'M' : volume24h.toLocaleString()}
+          </div>
+          <div>
+            MCap: ${isMobile ? (marketCap / 1000000).toFixed(1) + 'M' : marketCap.toLocaleString()}
+          </div>
         </div>
         
         {/* Mini chart */}
-        {!isMobile && (
-          <div style={{
-            marginTop: '12px',
-            height: '40px',
-            display: 'flex',
-            alignItems: 'flex-end',
-            gap: '1px'
-          }}>
-            {priceChartBars}
-          </div>
-        )}
-      </div>
-      
-      {/* Stats overlay */}
-      <div style={statsOverlayStyle}>
-        <div style={{ 
-          color: displayPrice.change >= 0 ? '#00ff66' : '#ff4444',
-          fontSize: isMobile ? '13px' : '24px',
-          fontWeight: 'bold',
-          marginBottom: isMobile ? '2px' : '8px'
+        <div style={{
+          marginBottom: isMobile ? '8px' : '12px',
+          height: '40px',
+          display: 'flex',
+          alignItems: 'flex-end',
+          gap: '1px'
         }}>
-          {displayPrice.change >= 0 ? '↑' : '↓'} {displayPrice.change.toFixed(2)}%
+          {priceChartBars}
         </div>
-        <div style={{ color: '#888', fontSize: isMobile ? '10px' : '12px' }}>
-          🕯️ {(500 + additionalCandles.length).toLocaleString()} candles
-        </div>
-        <div style={{ color: '#888', fontSize: isMobile ? '10px' : '12px', marginTop: '4px' }}>
-          🔥 0 tokens burned
+        
+        {/* Candles and Burned Stats */}
+        <div style={{ 
+          fontSize: isMobile ? '10px' : '12px', 
+          color: '#888'
+        }}>
+          <div style={{ marginBottom: '4px' }}>
+            🕯️ {(500 + additionalCandles.length).toLocaleString()} candles
+          </div>
+          <div>
+            🔥 0 tokens burned
+          </div>
         </div>
       </div>
       
@@ -592,13 +542,8 @@ export default function UnifiedShrine({
         zIndex: 2000,
       }}>
         <div style={{
-          color: 'rgba(255, 255, 255, 0.9)',
-          fontSize: isMobile ? '2rem' : '2.5rem',
-          fontFamily: "'UnifrakturMaguntia', serif",
-          letterSpacing: '1px',
           marginBottom: isMobile ? '8px' : '12px',
           textAlign: 'center',
-          textShadow: '0 0 2rem rgba(147, 69, 255, 0.9), 0 8px 16px rgba(0, 0, 0, 0.9)',
         }}>
           <SkewedHeading 
             lines={["Get on Her", "Watchlist"]}
@@ -636,7 +581,8 @@ export default function UnifiedShrine({
         `}</style>
         <div className="cyber-candle-btn">
           <CyberGlitchButton
-            text="ADD CANDLE"
+            text="LIght"
+            text2="one up"
             onClick={handleLightCandleClick}
             label="RL80"
             mobile={isMobile}

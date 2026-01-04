@@ -4,6 +4,7 @@ import React from 'react'
 
 export default function CyberGlitchButton({ 
   text = "ENTER", 
+  text2 = "",  // Second line of text
   onClick,
   href,
   label = "RL80",
@@ -102,7 +103,7 @@ export default function CyberGlitchButton({
         .cybr-btn-wrapper {
           position: relative;
           height: ${mobile ? '50px' : '60px'};
-          width: ${mobile ? '140px' : '180px'};
+          width: ${mobile ? '160px' : '180px'};
           margin: 3px;
         }
         
@@ -133,7 +134,11 @@ export default function CyberGlitchButton({
           font-weight: 900;
           width: 100%;
           height: 100%;
-          line-height: ${mobile ? '50px' : '60px'};
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          line-height: ${text2 ? (mobile ? '22px' : '26px') : (mobile ? '50px' : '60px')};
           text-align: center;
           transition: background 0.2s, font-size 0.3s;
           border: none;
@@ -184,11 +189,13 @@ export default function CyberGlitchButton({
           animation: glitch 3s infinite;
           pointer-events: none;
           display: flex;
+          flex-direction: column;
           align-items: center;
           justify-content: center;
           font-weight: 900;
           letter-spacing: 3px;
           font-size: var(--font-size);
+          line-height: ${text2 ? (mobile ? '22px' : '26px') : 'normal'};
         }
         
         .cybr-btn__glitch:before {
@@ -230,9 +237,23 @@ export default function CyberGlitchButton({
           onClick={handleClick}
           {...props}
         >
-          {text}<span aria-hidden="">_</span>
+          {text2 ? (
+            <>
+              <span>{text}<span aria-hidden="">_</span></span>
+              <span>{text2}<span aria-hidden="">_</span></span>
+            </>
+          ) : (
+            <>{text}<span aria-hidden="">_</span></>
+          )}
           <span className="cybr-btn__glitch" aria-hidden="">
-            _{text.split('').join('_')}_
+            {text2 ? (
+              <>
+                <span>_{text.split('').join('_')}_</span>
+                <span>_{text2.split('').join('_')}_</span>
+              </>
+            ) : (
+              <>_{text.split('').join('_')}_</>
+            )}
           </span>
           <span className="cybr-label">{label}</span>
         </button>

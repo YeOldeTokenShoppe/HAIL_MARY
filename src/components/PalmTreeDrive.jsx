@@ -9,6 +9,7 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useLanguage } from './LanguageProvider';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 // import SynthwaveText from './SynthwaveText';
 import MorphingWebGLText from './MorphingWebGLText';
 import WebGLStandaloneText from '@/components/WebGLStandaloneText';
@@ -2344,9 +2345,29 @@ const PalmsScene = ({ onLoadingChange }) => {
         }}>
           <button
             onClick={() => {
-              const isMobile = detectMobileDevice();
-              const destination = isMobile ? '/home' : '/home';
-              router.push(destination);
+              // Clean up Three.js/WebGL resources before navigation
+              if (rendererRef.current) {
+                rendererRef.current.dispose();
+                rendererRef.current = null;
+              }
+              if (sceneRef.current) {
+                sceneRef.current.traverse((child) => {
+                  if (child.geometry) child.geometry.dispose();
+                  if (child.material) {
+                    if (Array.isArray(child.material)) {
+                      child.material.forEach(m => m.dispose());
+                    } else {
+                      child.material.dispose();
+                    }
+                  }
+                });
+                sceneRef.current = null;
+              }
+              
+              // Small delay to ensure cleanup, then navigate to carousel page
+              setTimeout(() => {
+                router.push('/carousel');
+              }, 100);
             }}
             style={{
               padding: isMobile ? '10px 25px' : '15px 40px',
