@@ -134,6 +134,7 @@ export default function CarouselPage() {
         top: "90px",
         right: "1.5rem",
         zIndex: 298,
+        marginTop: '0rem',
         // width: '9rem',
         // height: '3rem'
       }}>
@@ -154,10 +155,10 @@ export default function CarouselPage() {
         className="candle-button"
         style={{
           position: "fixed",
-          bottom: "30px",
-          right: "30px",
-          width: "80px",
-          height: "80px",
+          bottom: isMobileDevice ? "50px" : "30px",
+          right: isMobileDevice ? "25px" : "30px",
+          width: isMobileDevice ? "60px" : "80px",
+          height: isMobileDevice ? "60px" : "80px",
           zIndex: 297,
           borderRadius: "50%",
           display: "flex",
@@ -192,10 +193,10 @@ export default function CarouselPage() {
         className="luminarium-arrow"
         style={{
           position: "fixed",
-          bottom: "20px",
-          right: "20px",
-          width: "300px",
-          height: "150px",
+          bottom: isMobileDevice ? "20px" : "20px",
+          right: isMobileDevice ? "15px" : "20px",
+          width: isMobileDevice ? "250px" : "300px",
+          height: isMobileDevice ? "120px" : "150px",
           zIndex: 296,
           pointerEvents: "auto",
           cursor: "pointer",

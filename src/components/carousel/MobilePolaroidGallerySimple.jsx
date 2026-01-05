@@ -23,12 +23,14 @@ const MobilePolaroidGallerySimple = ({ images = [] }) => {
         .polaroid-gallery {
           --d: 16s;
           display: grid;
-          width: 300px;
+          width: 260px;
           position: fixed;
-          top: 50%;
+          top: calc(45% + 1rem);
           left: 50%;
           transform: translate(-50%, -50%);
           cursor: pointer;
+          margin-top: 2rem;
+          margin-bottom: 7rem;
         }
         
         .polaroid-gallery.paused > .polaroid-frame {
@@ -141,7 +143,7 @@ const MobilePolaroidGallerySimple = ({ images = [] }) => {
           width: 100vw;
           display: grid;
           place-content: center;
-          background: linear-gradient(135deg, #CDB380 0%, #B39C7D 100%);
+          background: linear-gradient(135deg, #aa7799 0%, #886677 100%);
           overflow: hidden;
           position: fixed;
           top: 0;

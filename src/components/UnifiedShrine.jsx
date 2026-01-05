@@ -74,10 +74,10 @@ const MemoizedGradientBackground = React.memo(function MemoizedGradientBackgroun
     const priceDirection = priceRef.current
     
     let targetBottom, targetTop
-    if (priceDirection > 0.3) {
+    if (priceDirection > 0.02) {
       targetBottom = new THREE.Color('#0a2d1a')
       targetTop = new THREE.Color('#22ff66')
-    } else if (priceDirection < -0.3) {
+    } else if (priceDirection < -0.02) {
       targetBottom = new THREE.Color('#2d0a0a')
       targetTop = new THREE.Color('#ff4444')
     } else {
@@ -413,7 +413,7 @@ export default function UnifiedShrine({
   }, [onLightCandle])
 
   return (
-    <div style={{ width: '100%', height: '100vh', background: '#000', position: 'relative' }}>
+    <div style={{ width: '100%', height: isMobile ? '120vh' : '100vh', background: '#000', position: 'relative' }}>
       {/* 80s mode background */}
       {is80sMode && (
         <img
@@ -433,7 +433,7 @@ export default function UnifiedShrine({
         />
       )}
       
-      {contextLost && (
+      {/* {contextLost && (
         <div style={{
           position: 'absolute',
           top: '50%',
@@ -450,11 +450,11 @@ export default function UnifiedShrine({
           <div style={{ fontSize: '18px', marginBottom: '10px' }}>⚠️ Graphics context lost</div>
           <div style={{ fontSize: '14px', opacity: 0.8 }}>Recovering...</div>
         </div>
-      )}
+      )} */}
       
       <div ref={canvasRef} style={{ width: '100%', height: '100%' }}>
       <Canvas
-        camera={{ position: [0, -0.5, 9], fov: 50 }}
+        camera={{ position: [0, isMobile ? -1 : -0.5, isMobile ? 11 : 9], fov: isMobile ? 55 : 50 }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -462,7 +462,7 @@ export default function UnifiedShrine({
         dpr={isMobile ? 1 : (typeof window !== 'undefined' ? window.devicePixelRatio : 1)}
         gl={{ 
           alpha: true, 
-          antialias: !isMobile,
+          antialias: true,
           powerPreference: "high-performance",
           preserveDrawingBuffer: false,
           failIfMajorPerformanceCaveat: false,
@@ -513,11 +513,11 @@ export default function UnifiedShrine({
         </group>
         
         {/* Only show Stats in development */}
-        {process.env.NODE_ENV === 'development' && <Stats className="stats-monitor" />}
+        <Stats className="stats-monitor" />
         
         {/* Hands model */}
         <Suspense fallback={null}>
-          <group scale={1.8} position={[0, -0.5, 0]}>
+          <group scale={1.8} position={[0, -1, 0]}>
             <HandsModel 
               mousePosition={{ x: 0, y: 0 }}
               hasReachedSection={hasReachedSection}
@@ -634,7 +634,7 @@ export default function UnifiedShrine({
       <div style={{
         position: 'absolute',
         bottom: isMobile ? '20px' : '80px',
-        left: isMobile ? '50%' : '20px',
+        left: isMobile ? '45%' : '20px',
         transform: isMobile ? 'translateX(-50%)' : 'none',
         display: 'flex',
         flexDirection: 'column',
@@ -694,7 +694,7 @@ export default function UnifiedShrine({
           background: 'radial-gradient(ellipse at center, rgba(255, 94, 0, 0.15) 0%, transparent 60%)',
           borderRadius: '50%',
           border: '1px solid rgba(255, 94, 0, 0.4)',
-          backdropFilter: 'blur(8px)',
+          backdropFilter: 'blur(18px)',
           position: 'relative',
           maxWidth: isMobile ? '100px' : '250px',
           maxHeight: isMobile ? '100px' : 'none',
@@ -708,7 +708,7 @@ export default function UnifiedShrine({
               textTransform: 'uppercase',
               letterSpacing: '1px',
               textShadow: '0 0 10px rgba(255, 94, 0, 0.5)',
-              marginBottom: '-0.5rem',
+              marginBottom: '1rem',
               marginTop: '2rem'
             }}>
               Light Me

@@ -98,7 +98,7 @@ const CyberNav = ({
     { id: '04', date: 'ETHICS & MORAL80', title: 'SCROLLS OF ST. GR80', path: '/ethos', thumbnail: '/images/ILLUMIN80_TATTOO.webp' },
     { id: '05', date: 'CHAR80 & LIQUID80', title: 'COIN FOUNTAIN', path: '/fountain', thumbnail: '/images/HEART_TATTOO.webp' },
     { id: '06', date: 'QUANT80 & CURIOS80', title: 'TOKENOMICS & FAQ', path: '/tokenomics', thumbnail: '/images/COIN_TATTOO.webp' },
-    { id: '07', date: 'COMING SOON', title: 'LIGHT CLUB', path: '#', thumbnail: '/images/RL80_KNUCKLES.webp' },
+    // { id: '07', date: 'COMING SOON', title: 'LIGHT CLUB', path: '#', thumbnail: '/images/RL80_KNUCKLES.webp' },
 
   ];
 
