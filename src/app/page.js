@@ -217,15 +217,15 @@ export default function Home() {
             zIndex: 9999,
           }}
         >
-          <CyberNav 
+          {/* <CyberNav 
             is80sMode={is80sMode}
             position="fixed"
             
-          />
+          /> */}
           <div
         style={{
           position: "fixed",
-          top: "5rem",
+          top: "1rem",
           right: "1rem",
           zIndex: 290
         }}
@@ -238,7 +238,7 @@ export default function Home() {
                   width: isMobileDevice ? "3.5rem" : "3.5rem",
                   height: isMobileDevice ? "3.5rem" : "3.5rem",
                   borderRadius: "0.5rem",
-                  backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.2)" : "rgba(0, 0, 0, 0.7)",
+                  backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.2)" : "transparent",
                   border: is80sMode ? "2px solid #D946EF" : "2px solid rgba(255, 255, 255, 0.2)",
                   color: is80sMode ? "#67e8f9" : "#ffffff",
                   display: "flex",
@@ -310,7 +310,7 @@ export default function Home() {
                     width: isMobileDevice ? "2rem" : "2.5rem",
                     height: isMobileDevice ? "2rem" : "2.5rem",
                     borderRadius: "0.25rem",
-                    backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.2)" : "rgba(0, 0, 0, 0.7)",
+                    backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.2)" : "transparent",
                     border: is80sMode ? "2px solid #D946EF" : "2px solid rgba(255, 255, 255, 0.2)",
                     color: is80sMode ? "#67e8f9" : "#ffffff",
                     display: "flex",
@@ -339,7 +339,7 @@ export default function Home() {
                     width: isMobileDevice ? "1.75rem" : "2rem",
                     height: isMobileDevice ? "1.75rem" : "2rem",
                     borderRadius: "0.25rem",
-                    backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.2)" : "rgba(0, 0, 0, 0.7)",
+                    backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.2)" : "transparent",
                     border: is80sMode ? "1px solid #D946EF" : "1px solid rgba(255, 255, 255, 0.2)",
                     color: is80sMode ? "#67e8f9" : "#ffffff",
                     display: "flex",

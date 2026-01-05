@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useEffect, useRef, Suspense } from 'react'
-import { createPortal } from 'react-dom'
 import NavControlsHome from '@/components/NavControlsHome'
 import CyberNav from '@/components/CyberNav'
 import Link from 'next/link'
@@ -10,9 +9,6 @@ import { useMusic } from '@/components/MusicContext'
 import UnifiedShrine from '@/components/UnifiedShrine'
 import ThirdwebBuyModal from '@/components/ThirdwebBuyModal'
 import { useRouter } from 'next/navigation'
-import { Canvas } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
-import * as THREE from 'three'
 
 // Tiny Votive Model Component
 
@@ -33,6 +29,7 @@ export default function ShrinePage() {
   const [showBuyModal, setShowBuyModal] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [currentView, setCurrentView] = useState('shrine')
+  const [mounted, setMounted] = useState(false)
   const is80sMode = context80sMode
   
   // State for offerings data
@@ -78,6 +75,11 @@ export default function ShrinePage() {
       timestamp: '2h ago'
     },
   ])
+
+  // Set mounted state after hydration
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Check if font is loaded and add fonts-loaded class
   useEffect(() => {
@@ -144,20 +146,36 @@ export default function ShrinePage() {
         height: "100%",
         zIndex: 1
       }}>
-        <UnifiedShrine 
-          offerings={mockOfferings}
-          onSelectOffering={setHoveredOffering}
-          onLightCandle={(offering) => {
-            setMockOfferings(prev => [offering, ...prev])
-            setJustLitOffering(offering)
-            setTimeout(() => setJustLitOffering(null), 3000)
-          }}
-          onPriceChange={setPriceChange}
-          is80sMode={is80sMode}
-          hoveredOffering={hoveredOffering}
-          justLitOffering={justLitOffering}
-          onJustLitComplete={() => setJustLitOffering(null)}
-        />
+        <Suspense fallback={
+          <div style={{
+            width: '100%',
+            height: '100vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'linear-gradient(135deg, #1a1a2e 0%, #4a4a6a 100%)',
+            color: '#ffffff',
+            fontSize: '1.5rem'
+          }}>
+            Loading shrine...
+          </div>
+        }>
+          <UnifiedShrine 
+            key="shrine-scene"
+            offerings={mockOfferings}
+            onSelectOffering={setHoveredOffering}
+            onLightCandle={(offering) => {
+              setMockOfferings(prev => [offering, ...prev])
+              setJustLitOffering(offering)
+              setTimeout(() => setJustLitOffering(null), 3000)
+            }}
+            onPriceChange={setPriceChange}
+            is80sMode={is80sMode}
+            hoveredOffering={hoveredOffering}
+            justLitOffering={justLitOffering}
+            onJustLitComplete={() => setJustLitOffering(null)}
+          />
+        </Suspense>
       </div>
       
       {/* Tiny Candle Button with Glowing Arrow - Bottom Right - Desktop Only */}
@@ -411,7 +429,7 @@ export default function ShrinePage() {
       {/* RL80 Logo - Top Left */}
       {fontLoaded && (
         <div style={{
-          position: "fixed",
+          position: "absolute",
           top: "20px", 
           left: "20px",
           borderRadius: "8px",
@@ -509,58 +527,6 @@ export default function ShrinePage() {
         onClose={() => setShowBuyModal(false)}
       />
       
-      {/* RL80 Logo - Top Left - Using Portal to ensure it's on top */}
-      {typeof document !== 'undefined' && createPortal(
-        <div style={{
-          position: "fixed",
-          top: "20px", 
-          left: "20px",
-          borderRadius: "8px",
-          padding: "10px",
-          pointerEvents: "auto",
-          zIndex: 99999,
-        }}>
-          <div 
-            id="text"
-            style={{
-              position: "relative",
-              fontFamily: "'UnifrakturMaguntia', serif",
-              fontSize: isMobileView ? "3rem" : "4rem",
-              color: "#ffffff",
-              cursor: "pointer",
-            }}
-          >
-            <Link href="/carousel" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
-              RL80
-            </Link>
-            {Array.from({length: 100}).map((_, i) => {
-              const index = i + 1;
-              return (
-                <div
-                  key={index}
-                  className="text__copy"
-                  style={{
-                    position: "absolute",
-                    pointerEvents: "none",
-                    zIndex: -1,
-                    top: 0,
-                    left: 0,
-                    color: is80sMode 
-                      ? `rgba(${201 - index * 2}, ${55 - index * 3}, ${256 - index * 2})` 
-                      : `rgba(${255 - index * 2}, ${255 - index * 3}, ${255 - index * 2})`,
-                    filter: "blur(0.1rem)",
-                    transform: `translate(${index * 0.1}rem, ${index * 0.1}rem) scale(${1 + index * 0.01})`,
-                    opacity: (1 / index) * 1.5,
-                  }}
-                >
-                  RL80
-                </div>
-              );
-            })}
-          </div>
-        </div>,
-        document.body
-      )}
     </>
   )
 }

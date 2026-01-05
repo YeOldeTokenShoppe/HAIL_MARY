@@ -396,8 +396,15 @@ function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.5
 
 // Single animation controller - updates shared uniforms once per frame
 // Accepts either a ref (for smooth updates) or a value (for static/slow updates)
-function AnimationController({ priceDirection, priceRef }) {
+function AnimationController({ priceDirection, priceRef, isMobile }) {
+  const frameCount = useRef(0)
+  
   useFrame((state) => {
+    frameCount.current++
+    
+    // On mobile, only update animations every 3 frames
+    if (isMobile && frameCount.current % 3 !== 0) return
+    
     sharedUniforms.uTime.value = state.clock.elapsedTime
     // Prefer ref for smooth animation, fall back to prop
     sharedUniforms.uPriceDirection.value = priceRef?.current ?? priceDirection ?? 0
@@ -405,7 +412,7 @@ function AnimationController({ priceDirection, priceRef }) {
   return null
 }
 
-export function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, priceRef, additionalCandles = [], onCandleClick, clickedCandleId }) {
+export function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, priceRef, additionalCandles = [], onCandleClick, clickedCandleId, isMobile = false }) {
   const { geometries, textures, localMatrices } = useClonedGeometries('/models/tinyVotiveOnly.glb')
   const basePositions = usePositions(count)
   
@@ -438,7 +445,7 @@ export function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, priceRef
   return (
     <group>
       {/* Single animation controller for ALL parts - uses ref for smooth updates */}
-      <AnimationController priceDirection={priceDirection} priceRef={priceRef} />
+      <AnimationController priceDirection={priceDirection} priceRef={priceRef} isMobile={isMobile} />
       
       <InstancedPart geometry={geometries.xbase} material={materials.xbase} positions={positions} localMatrix={localMatrices.xbase} maxCount={maxCount} onCandleClick={onCandleClick} />
       <InstancedPart geometry={geometries.wick} material={materials.wick} positions={positions} localMatrix={localMatrices.wick} maxCount={maxCount} onCandleClick={onCandleClick} />

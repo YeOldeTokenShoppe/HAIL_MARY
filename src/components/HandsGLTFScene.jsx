@@ -415,103 +415,155 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
         // Find emoji objects with flexible matching
         if (child.name === 'Emoji-1' || child.name === 'emoji-1' || child.name === 'Emoji1') {
           emoji1Ref.current = child
-          // Hide on mobile
-          if (isMobileLocal) {
-            child.visible = false
-            child.traverse((node) => {
-              if (node.isMesh && node.material) {
-                node.material.opacity = 0
-                node.material.transparent = true
-              }
-              node.visible = false
-            })
-          }
+          // Hide initially (on mobile and desktop) until price conditions are met
+          const initialOpacity = getInitialOpacity('emoji1')
+          child.visible = initialOpacity > 0.01
+          child.traverse((node) => {
+            if (node.isMesh && node.material) {
+              node.material.opacity = initialOpacity
+              node.material.transparent = true
+            }
+            node.visible = initialOpacity > 0.01
+          })
           // console.log('✅ Found Emoji-1:', child.name, 'Position:', child.position)
         }
         if (child.name === 'Emoji-2' || child.name === 'emoji-2' || child.name === 'Emoji2') {
           emoji2Ref.current = child
-          // Hide on mobile
-          if (isMobileLocal) {
-            child.visible = false
-            child.traverse((node) => {
-              if (node.isMesh && node.material) {
-                node.material.opacity = 0
-                node.material.transparent = true
-              }
-              node.visible = false
-            })
-          }
+          // Hide initially (on mobile and desktop) until price conditions are met
+          const initialOpacity = getInitialOpacity('emoji2')
+          child.visible = initialOpacity > 0.01
+          child.traverse((node) => {
+            if (node.isMesh && node.material) {
+              node.material.opacity = initialOpacity
+              node.material.transparent = true
+            }
+            node.visible = initialOpacity > 0.01
+          })
           // console.log('✅ Found Emoji-2:', child.name, 'Position:', child.position)
         }
         if (child.name === 'Emoji-3' || child.name === 'emoji-3' || child.name === 'Emoji3') {
           emoji3Ref.current = child
-          // Hide on mobile
-          if (isMobileLocal) {
-            child.visible = false
-            child.traverse((node) => {
-              if (node.isMesh && node.material) {
-                node.material.opacity = 0
-                node.material.transparent = true
-              }
-              node.visible = false
-            })
-          }
+          // Hide initially (on mobile and desktop) until price conditions are met
+          const initialOpacity = getInitialOpacity('emoji3')
+          child.visible = initialOpacity > 0.01
+          child.traverse((node) => {
+            if (node.isMesh && node.material) {
+              node.material.opacity = initialOpacity
+              node.material.transparent = true
+            }
+            node.visible = initialOpacity > 0.01
+          })
           // console.log('✅ Found Emoji-3:', child.name, 'Position:', child.position)
         }
         if (child.name === 'Emoji-4' || child.name === 'emoji-4' || child.name === 'Emoji4') {
           emoji4Ref.current = child
-          // Hide on mobile
-          if (isMobileLocal) {
-            child.visible = false
-            child.traverse((node) => {
-              if (node.isMesh && node.material) {
-                node.material.opacity = 0
-                node.material.transparent = true
-              }
-              node.visible = false
-            })
-          }
+          // Hide initially (on mobile and desktop) until price conditions are met
+          const initialOpacity = getInitialOpacity('emoji4')
+          child.visible = initialOpacity > 0.01
+          child.traverse((node) => {
+            if (node.isMesh && node.material) {
+              node.material.opacity = initialOpacity
+              node.material.transparent = true
+            }
+            node.visible = initialOpacity > 0.01
+          })
           // console.log('✅ Found Emoji-4:', child.name, 'Position:', child.position)
         }
          if (child.name === 'Emoji-5' || child.name === 'emoji-5' || child.name === 'Emoji5') {
           emoji5Ref.current = child
-          // Hide on mobile
-          if (isMobileLocal) {
-            child.visible = false
-            child.traverse((node) => {
-              if (node.isMesh && node.material) {
-                node.material.opacity = 0
-                node.material.transparent = true
-              }
-              node.visible = false
-            })
-          }
+          // Hide initially (on mobile and desktop) until price conditions are met
+          const initialOpacity = getInitialOpacity('emoji5')
+          child.visible = initialOpacity > 0.01
+          child.traverse((node) => {
+            if (node.isMesh && node.material) {
+              node.material.opacity = initialOpacity
+              node.material.transparent = true
+            }
+            node.visible = initialOpacity > 0.01
+          })
           // console.log('✅ Found Emoji-5:', child.name, 'Position:', child.position)
         }
         
         // Find icon objects
         if (child.name === 'Icon-text3' || child.name === 'icon-like' || child.name === 'IconLike') {
           iconLikeRef.current = child
+          // Hide initially until price conditions are met
+          child.visible = false
+          child.traverse((node) => {
+            if (node.isMesh && node.material) {
+              node.material.opacity = 0
+              node.material.transparent = true
+            }
+            node.visible = false
+          })
           // console.log('✅ Found Icon-like:', child.name, 'Position:', child.position)
         }
         if (child.name === 'Icon-love' || child.name === 'icon-love' || child.name === 'IconLove') {
           iconLoveRef.current = child
+          // Hide initially until price conditions are met
+          const initialOpacity = getInitialOpacity('iconLove')
+          child.visible = initialOpacity > 0.01
+          child.traverse((node) => {
+            if (node.isMesh && node.material) {
+              node.material.opacity = initialOpacity
+              node.material.transparent = true
+            }
+            node.visible = initialOpacity > 0.01
+          })
           // console.log('✅ Found Icon-love:', child.name, 'Position:', child.position)
         }
         if (child.name === 'Icon-text-1' || child.name === 'icon-text-1' || child.name === 'IconText1') {
           iconText1Ref.current = child
+          // Hide initially until price conditions are met
+          const initialOpacity = getInitialOpacity('iconText1')
+          child.visible = initialOpacity > 0.01
+          child.traverse((node) => {
+            if (node.isMesh && node.material) {
+              node.material.opacity = initialOpacity
+              node.material.transparent = true
+            }
+            node.visible = initialOpacity > 0.01
+          })
           // console.log('✅ Found Icon-text-1:', child.name, 'Position:', child.position)
         }
         if (child.name === 'Icon-text-2' || child.name === 'icon-text-2' || child.name === 'IconText2') {
           iconText2Ref.current = child
+          // Hide initially until price conditions are met
+          const initialOpacity = getInitialOpacity('iconText2')
+          child.visible = initialOpacity > 0.01
+          child.traverse((node) => {
+            if (node.isMesh && node.material) {
+              node.material.opacity = initialOpacity
+              node.material.transparent = true
+            }
+            node.visible = initialOpacity > 0.01
+          })
           // console.log('✅ Found Icon-text-2:', child.name, 'Position:', child.position)
         }
         if (child.name === 'Icon-play' || child.name === 'icon-play' || child.name === 'IconPlay') {
           iconPlayRef.current = child
+          // Hide initially - iconPlay is not tracked in opacity system
+          child.visible = false
+          child.traverse((node) => {
+            if (node.isMesh && node.material) {
+              node.material.opacity = 0
+              node.material.transparent = true
+            }
+            node.visible = false
+          })
           // console.log('✅ Found Icon-play:', child.name, 'Position:', child.position)
         }
         if (child.name === 'Icon-star' || child.name === 'icon-star' || child.name === 'IconStar') {
           iconStarRef.current = child
+          // Hide initially - iconStar is not tracked in opacity system
+          child.visible = false
+          child.traverse((node) => {
+            if (node.isMesh && node.material) {
+              node.material.opacity = 0
+              node.material.transparent = true
+            }
+            node.visible = false
+          })
           // console.log('✅ Found Icon-star:', child.name, 'Position:', child.position)
         }
         

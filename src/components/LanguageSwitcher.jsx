@@ -20,11 +20,11 @@ export default function LanguageSwitcher() {
   return (
     <div style={{
       position: 'fixed',
-      top: '9rem',
+      top: '5rem',
       right: '1rem',
                     width: isMobileDevice ? "3rem" : "3.5rem",
       zIndex: 9999,
-      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      backgroundColor: 'transparent',
   
       // padding: '4px',
       borderRadius: '4px',

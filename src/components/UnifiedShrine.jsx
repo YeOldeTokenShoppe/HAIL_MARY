@@ -8,35 +8,46 @@ import { HandsModel } from './HandsGLTFScene'
 // IMPORTANT: Import from the optimized version!
 import { CandleCloud, GradientBackground, SceneSetup } from './CandleShrine'
 import { NewCandleEffectManager } from './NewCandleEffect'
-import CyberGlitchButton from './carousel/CyberGlitchButton'
+import Matchstick from './Matchstick'
 import SkewedHeading from './SkewedHeading'
 
 // Optimized PriceSimulator - uses refs instead of state for animation
 // Only updates React state at throttled intervals for UI
 function OptimizedPriceSimulator({ priceRef, onUIUpdate }) {
   const lastUIUpdate = useRef(0)
-  const UI_UPDATE_INTERVAL = 100 // Update UI 10 times per second, not 60
+  const lastPriceUpdate = useRef(0)
+  const currentPrice = useRef(0)
+  const targetPrice = useRef(0)
+  const UI_UPDATE_INTERVAL = 1000 // Update UI once per second
+  const PRICE_CHANGE_INTERVAL = 5000 // Change price every 5 seconds (in production would be 60000 for 1 minute)
   
   useFrame((state) => {
-    const t = state.clock.elapsedTime
+    const now = state.clock.elapsedTime * 1000
     
-    // Calculate price (runs every frame for smooth animation)
-    const baseWave = Math.sin(t * 0.15) * 0.5
-    const trend = Math.sin(t * 0.08) * 0.3
-    const gentleVolatility = Math.sin(t * 1.0) * 0.15
-    const crashCycle = Math.sin(t * 0.1) < -0.8 ? -0.6 : 0
-    const pumpCycle = Math.sin(t * 0.15 + 2) > 0.8 ? 0.5 : 0
+    // Generate new price target every PRICE_CHANGE_INTERVAL
+    if (now - lastPriceUpdate.current > PRICE_CHANGE_INTERVAL) {
+      lastPriceUpdate.current = now
+      
+      // Simulate realistic price movement
+      const changePercent = (Math.random() - 0.5) * 0.1 // -5% to +5% change
+      targetPrice.current = currentPrice.current + changePercent
+      
+      // Add occasional larger movements
+      if (Math.random() < 0.1) {
+        targetPrice.current += (Math.random() - 0.5) * 0.3 // Occasional -15% to +15% spike
+      }
+    }
     
-    const price = baseWave + trend + gentleVolatility + crashCycle + pumpCycle
+    // Smoothly interpolate to target price
+    currentPrice.current += (targetPrice.current - currentPrice.current) * 0.02
     
     // Update ref immediately (no re-render, used by shaders)
-    priceRef.current = price
+    priceRef.current = currentPrice.current
     
     // Throttle UI updates to prevent excessive re-renders
-    const now = state.clock.elapsedTime * 1000
     if (now - lastUIUpdate.current > UI_UPDATE_INTERVAL) {
       lastUIUpdate.current = now
-      onUIUpdate(price)
+      onUIUpdate(currentPrice.current)
     }
   })
   
@@ -149,6 +160,8 @@ export default function UnifiedShrine({
   const [isMobile, setIsMobile] = useState(false)
   const [hasReachedSection, setHasReachedSection] = useState(true)
   const [isInView, setIsInView] = useState(true)
+  const canvasRef = useRef()
+  const [contextLost, setContextLost] = useState(false)
   
   // Price history - update much less frequently
   const [priceHistory, setPriceHistory] = useState(() =>
@@ -168,7 +181,7 @@ export default function UnifiedShrine({
   useEffect(() => {
     const checkMobile = () => {
       if (typeof window !== 'undefined') {
-        setIsMobile(window.innerWidth < 768)
+        setIsMobile(window.innerWidth <= 768)
       }
     }
     checkMobile()
@@ -264,6 +277,37 @@ export default function UnifiedShrine({
     }
   }, [])
 
+  // WebGL context lost/restore handlers
+  useEffect(() => {
+    if (!canvasRef.current) return
+    
+    const canvas = canvasRef.current.querySelector('canvas')
+    if (!canvas) return
+    
+    const handleContextLost = (event) => {
+      event.preventDefault()
+      console.warn('WebGL context lost on shrine page')
+      setContextLost(true)
+      
+      // Clear all timeouts and animations
+      Object.values(timeoutRefs.current).forEach(clearTimeout)
+      timeoutRefs.current = {}
+    }
+    
+    const handleContextRestored = () => {
+      console.log('WebGL context restored on shrine page')
+      setContextLost(false)
+    }
+    
+    canvas.addEventListener('webglcontextlost', handleContextLost)
+    canvas.addEventListener('webglcontextrestored', handleContextRestored)
+    
+    return () => {
+      canvas.removeEventListener('webglcontextlost', handleContextLost)
+      canvas.removeEventListener('webglcontextrestored', handleContextRestored)
+    }
+  }, [canvasRef.current])
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -273,6 +317,26 @@ export default function UnifiedShrine({
         document.body.style.cursor = 'auto'
       }
       isDragging.current = false
+      
+      // Dispose of Three.js resources
+      if (canvasRef.current) {
+        const { gl, scene } = canvasRef.current
+        if (scene) {
+          scene.traverse((child) => {
+            if (child.geometry) child.geometry.dispose()
+            if (child.material) {
+              if (Array.isArray(child.material)) {
+                child.material.forEach(mat => mat.dispose())
+              } else {
+                child.material.dispose()
+              }
+            }
+          })
+        }
+        if (gl) {
+          gl.dispose()
+        }
+      }
     }
   }, [])
   
@@ -369,15 +433,36 @@ export default function UnifiedShrine({
         />
       )}
       
+      {contextLost && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 1000,
+          background: 'rgba(0, 0, 0, 0.9)',
+          padding: '20px',
+          borderRadius: '10px',
+          color: '#fff',
+          textAlign: 'center',
+          fontFamily: 'monospace'
+        }}>
+          <div style={{ fontSize: '18px', marginBottom: '10px' }}>⚠️ Graphics context lost</div>
+          <div style={{ fontSize: '14px', opacity: 0.8 }}>Recovering...</div>
+        </div>
+      )}
+      
+      <div ref={canvasRef} style={{ width: '100%', height: '100%' }}>
       <Canvas
         camera={{ position: [0, -0.5, 9], fov: 50 }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
+        dpr={isMobile ? 1 : (typeof window !== 'undefined' ? window.devicePixelRatio : 1)}
         gl={{ 
           alpha: true, 
-          antialias: true,
+          antialias: !isMobile,
           powerPreference: "high-performance",
           preserveDrawingBuffer: false,
           failIfMajorPerformanceCaveat: false,
@@ -391,14 +476,26 @@ export default function UnifiedShrine({
           zIndex: 2,
           background: 'transparent',
         }}
+        onCreated={({ gl, scene }) => {
+          // Enable context recovery
+          const ext = gl.getContext().getExtension('WEBGL_lose_context')
+          
+          // Store references for cleanup
+          canvasRef.current.gl = gl
+          canvasRef.current.scene = scene
+        }}
         // Limit frame rate if needed - uncomment for testing
         // frameloop="demand"
       >
         <SceneSetup is80sMode={is80sMode} />
-        <ambientLight intensity={0.6} />
-        <directionalLight position={[10, 10, 5]} intensity={1} />
-        <pointLight position={[10, 10, 10]} intensity={0.5} />
-        <pointLight position={[-10, -10, -10]} intensity={1} />
+        <ambientLight intensity={isMobile ? 0.8 : 0.6} />
+        {!isMobile && (
+          <>
+            <directionalLight position={[10, 10, 5]} intensity={1} />
+            <pointLight position={[10, 10, 10]} intensity={0.5} />
+            <pointLight position={[-10, -10, -10]} intensity={1} />
+          </>
+        )}
         
         {/* Background gradient - reads from ref */}
         <MemoizedGradientBackground priceRef={priceRef} is80sMode={is80sMode} />
@@ -406,13 +503,13 @@ export default function UnifiedShrine({
         {/* Candles - pushed back, reads from ref for smooth animation */}
         <group position={[0, 2, -8]}>
           <CandleCloud
-            count={500}
+            count={isMobile ? 150 : 500}
             priceRef={priceRef}
             additionalCandles={additionalCandles}
             onCandleClick={handleCandleClick}
             clickedCandleId={clickedCandleId}
+            isMobile={isMobile}
           />
-            <Stats className="stats-monitor" />
         </group>
         
         {/* Only show Stats in development */}
@@ -466,6 +563,7 @@ export default function UnifiedShrine({
           </EffectComposer>
         )}
       </Canvas>
+      </div>
       
       {/* Unified Stats Box */}
       <div style={unifiedStatsStyle}>
@@ -505,16 +603,18 @@ export default function UnifiedShrine({
           </div>
         </div>
         
-        {/* Mini chart */}
-        <div style={{
-          marginBottom: isMobile ? '8px' : '12px',
-          height: '40px',
-          display: 'flex',
-          alignItems: 'flex-end',
-          gap: '1px'
-        }}>
-          {priceChartBars}
-        </div>
+        {/* Mini chart - desktop only */}
+        {!isMobile && (
+          <div style={{
+            marginBottom: '12px',
+            height: '40px',
+            display: 'flex',
+            alignItems: 'flex-end',
+            gap: '1px'
+          }}>
+            {priceChartBars}
+          </div>
+        )}
         
         {/* Candles and Burned Stats */}
         <div style={{ 
@@ -534,8 +634,8 @@ export default function UnifiedShrine({
       <div style={{
         position: 'absolute',
         bottom: isMobile ? '20px' : '80px',
-        left: isMobile ? '-10%' : '20px',
-        transform: isMobile ? 'translateX(50%)' : 'none',
+        left: isMobile ? '50%' : '20px',
+        transform: isMobile ? 'translateX(-50%)' : 'none',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -553,38 +653,114 @@ export default function UnifiedShrine({
           />
         </div>
         <style jsx>{`
-          .cyber-candle-btn :global(.cybr-btn) {
-            --primary: #9945ff;
-            --shadow-primary: #00ffff;
-            --shadow-secondary-hue: 340;
-            --color: white;
+          @keyframes glow-pulse {
+            0%, 100% { 
+              box-shadow: 0 0 20px rgba(255, 94, 0, 0.3),
+                          0 0 40px rgba(255, 94, 0, 0.2),
+                          inset 0 0 20px rgba(255, 94, 0, 0.1);
+            }
+            50% { 
+              box-shadow: 0 0 30px rgba(255, 94, 0, 0.5),
+                          0 0 60px rgba(255, 94, 0, 0.3),
+                          inset 0 0 30px rgba(255, 94, 0, 0.2);
+            }
           }
-          .cyber-candle-btn :global(.cybr-btn:hover) {
-            --primary: #7c37d0;
-            --shadow-primary: #00ffff;
+          
+          @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
           }
-          .cyber-candle-btn :global(.cybr-btn:active) {
-            --primary: #00ffff;
-            --shadow-primary: #ff0066;
+          
+          .matchstick-container {
+            animation: glow-pulse 2s ease-in-out infinite;
           }
-          .cyber-candle-btn :global(.cybr-btn__glitch) {
-            background: linear-gradient(45deg, #00ffff, #9945ff);
-            text-shadow: 2px 2px #ff0066, -2px -2px #00ffff;
+          
+          
+          @keyframes arrow-bounce {
+            0%, 100% { transform: translateX(0); }
+            50% { transform: translateX(10px); }
           }
-          .cyber-candle-btn :global(.cybr-label) {
-            background: linear-gradient(45deg, #00ffff, #ff0066);
-            color: #000;
-            font-weight: 900;
+          
+          .arrow-indicator {
+            animation: arrow-bounce 1.5s ease-in-out infinite;
           }
         `}</style>
-        <div className="cyber-candle-btn">
-          <CyberGlitchButton
-            text="Get Lit"
-            text2="for RL80"
-            onClick={handleLightCandleClick}
-            label="RL80"
-            mobile={isMobile}
-          />
+        <div className="matchstick-container" style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: isMobile ? '0' : '0.5rem',
+          padding: isMobile ? '0.2rem' : '1rem',
+          background: 'radial-gradient(ellipse at center, rgba(255, 94, 0, 0.15) 0%, transparent 60%)',
+          borderRadius: '50%',
+          border: '1px solid rgba(255, 94, 0, 0.4)',
+          backdropFilter: 'blur(8px)',
+          position: 'relative',
+          maxWidth: isMobile ? '100px' : '250px',
+          maxHeight: isMobile ? '100px' : 'none',
+          overflow: 'hidden',
+        }}>
+          {!isMobile && (
+            <div className="cta-text" style={{
+              color: '#ff5e00',
+              fontSize: '1.1rem',
+              fontWeight: 'bold',
+              textTransform: 'uppercase',
+              letterSpacing: '1px',
+              textShadow: '0 0 10px rgba(255, 94, 0, 0.5)',
+              marginBottom: '-0.5rem',
+              marginTop: '2rem'
+            }}>
+              Light Me
+            </div>
+          )}
+          <div style={{
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '100%',
+          }}>
+            {isMobile && (
+              <div style={{
+                position: 'absolute',
+                left: '25%',
+                top: '10%',
+                transform: 'translateY(-50%)',
+                color: '#ff5e00',
+                fontSize: '0.4rem',
+                fontWeight: 'bold',
+                textTransform: 'uppercase',
+                letterSpacing: '0.1px',
+                textShadow: '0 0 4px rgba(255, 94, 0, 0.9)',
+                zIndex: 10,
+              }}>
+                Click to Light
+              </div>
+            )}
+            <Matchstick onLight={handleLightCandleClick} />
+          </div>
+          {/* {!isMobile && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.3rem',
+              color: 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.85rem',
+              marginTop: '-0.5rem',
+            }}>
+              <span className="arrow-indicator" style={{
+                fontSize: '1.2rem',
+                color: '#ff5e00',
+              }}>→</span>
+              <span>Click to offer</span>
+              <span className="arrow-indicator" style={{
+                fontSize: '1.2rem',
+                color: '#ff5e00',
+                transform: 'scaleX(-1)',
+              }}>→</span>
+            </div>
+          )} */}
         </div>
       </div>
     </div>

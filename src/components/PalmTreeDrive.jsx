@@ -2296,9 +2296,9 @@ const PalmsScene = ({ onLoadingChange }) => {
           {/* Scroll hint - disappears as soon as user starts scrolling */}
           <div style={{
             marginTop: '1rem',
-            fontSize: '12px',
+            fontSize: '14px',
             color: '#01ff00',
-            opacity: hasStartedScrolling ? 0 : 0.5,
+            opacity: hasStartedScrolling ? 0 : 0.7,
             textAlign: 'center',
             fontFamily: 'monospace',
             animation: hasStartedScrolling ? 'none' : 'pulse 2s ease-in-out infinite',

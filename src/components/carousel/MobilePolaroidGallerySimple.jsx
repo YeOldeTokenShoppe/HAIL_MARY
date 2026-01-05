@@ -24,7 +24,10 @@ const MobilePolaroidGallerySimple = ({ images = [] }) => {
           --d: 16s;
           display: grid;
           width: 300px;
-          margin: 100px auto;
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
           cursor: pointer;
         }
         
@@ -134,12 +137,16 @@ const MobilePolaroidGallerySimple = ({ images = [] }) => {
         }
         
         .polaroid-container {
-          min-height: 100vh;
+          height: 100vh;
+          width: 100vw;
           display: grid;
           place-content: center;
           background: linear-gradient(135deg, #CDB380 0%, #B39C7D 100%);
           overflow: hidden;
-          position: relative;
+          position: fixed;
+          top: 0;
+          left: 0;
+          touch-action: pan-x;
         }
         
         .pause-indicator {

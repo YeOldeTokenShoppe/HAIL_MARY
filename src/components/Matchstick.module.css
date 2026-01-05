@@ -1,0 +1,317 @@
+
+.wrapper {
+    position: relative;
+    height: 8rem;
+    width: 8rem;
+    transition: transform 0.3s ease;
+}
+
+.wrapper:hover {
+    transform: rotate(3deg) scale(1.1);
+}
+
+@keyframes float {
+    0%, 100% { 
+        transform: scale(0.5) rotate(-30deg) translateY(0px); 
+    }
+    50% { 
+        transform: scale(0.5) rotate(-30deg) translateY(-10px); 
+    }
+}
+
+.container {
+    position: relative;
+    height: 100%;
+    width: 100%;
+    transform: scale(0.5) rotate(-30deg);
+    transform-origin: center;
+    cursor: pointer;
+    animation: float 3s ease-in-out infinite;
+}
+
+.wrapper:hover .container {
+    animation-play-state: paused;
+}
+
+@media (max-width: 768px) {
+    .wrapper {
+        height: 10rem;
+        width: 10rem;
+    }
+    
+    @keyframes float {
+        0%, 100% { 
+            transform: scale(0.4) rotate(-30deg) translateY(0px); 
+        }
+        50% { 
+            transform: scale(0.4) rotate(-30deg) translateY(-10px); 
+        }
+    }
+    
+    .container {
+        transform: scale(0.4) rotate(-30deg);
+    }
+    
+    .wood-wrapper {
+        top: -10px;  /* Same raised position for tablets */
+    }
+    
+    .flame-container {
+        top: -30px;  /* Same adjusted position for tablets */
+    }
+}
+
+@media (max-width: 480px) {
+    .wrapper {
+        height: 10rem;
+        width: 10rem;
+    }
+    
+    @keyframes float {
+        0%, 100% { 
+            transform: scale(0.3) rotate(-30deg) translateY(0px); 
+        }
+        50% { 
+            transform: scale(0.3) rotate(-30deg) translateY(-8px); 
+        }
+    }
+    
+    .container {
+        transform: scale(0.3) rotate(-30deg);
+    }
+}
+
+.container * {
+    position: absolute;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+.instruction {
+    color: rgba(255, 255, 255, 0.4);
+    text-transform: uppercase;
+    font-family: sans-serif;
+    font-size: 24px;
+    white-space: nowrap;
+    left: 100px;
+    top: 280px;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+
+/* ---------------------------------- flame --------------------------------- */
+
+.flame-container {
+    top: -30px;  /* Reduced from 125px to match the raised matchstick */
+    left: 47.6%;
+    width: 60px;
+    height: 20px;
+    position: absolute;
+    transform-origin: center bottom;
+    animation: flicker 6ms 200ms ease-in infinite alternate;
+    opacity: 0;
+    z-index: 3;
+}
+
+.flame {
+    bottom: 0;
+    position: absolute;
+    border-bottom-right-radius: 50%;
+    border-bottom-left-radius: 50%;
+    border-top-left-radius: 50%;
+    transform: rotate(-45deg) scale(0.9, 0.9);
+}
+
+.yellow {
+    left: 15px;
+    width: 30px;
+    height: 30px;
+    background: gold;
+    box-shadow: 0px 0px 9px 4px gold;
+}
+
+.orange {
+    left: 10px;
+    width: 40px;
+    height: 40px;
+    background: orange;
+    filter: blur(0.3px);
+    box-shadow: 0px 0px 9px 4px orange;
+}
+
+.red {
+    left: 5px;
+    width: 50px;
+    height: 50px;
+    background: OrangeRed;
+    filter: blur(0.4px);
+    box-shadow: 0px 0px 6px 4px OrangeRed;
+}
+
+.white {
+    left: 15px;
+    bottom: -4px;
+    width: 30px;
+    height: 30px;
+    background: white;
+    filter: blur(0.4px);
+    box-shadow: 0px 0px 9px 4px white;
+}
+
+.circle {
+    border-radius: 50%;
+    position: absolute;
+}
+
+
+/* .blue {
+    width: 20px;
+    height: 20px;
+    left: 22px;
+    bottom: -40px;
+    background: rgb(18, 3, 109);
+    filter: blur(8px);
+    box-shadow: 0px 0px 15px 10px SlateBlue;
+} */
+
+.black {
+    width: 10px;
+    height: 10px;
+    left: 23px;
+    bottom: -4px;
+    background: #5e1301;
+    filter: blur(6px);
+    box-shadow: 0px 0px 15px 10px #5e1301;
+}
+
+@keyframes flicker {
+    0% {
+        transform: rotate(-1deg);
+    }
+    20% {
+        transform: rotate(1deg);
+    }
+    40% {
+        transform: rotate(-1deg);
+    }
+    60% {
+        transform: rotate(1deg) scaleY(0.8);
+    }
+    80% {
+        transform: rotate(-2deg) scaleY(0.8);
+    }
+    100% {
+        transform: rotate(1deg);
+    }
+}
+
+
+/* ---------------------------------- wood ---------------------------------- */
+
+.wood-wrapper {
+    height: 200px;
+    width: 50px;
+    top: -10px;  /* Raised further up */
+    left: 48.5%;
+    /* background-color: rgba(255, 0, 0, 0.151); */
+    /* border: 1px solid rgba(255, 0, 0, 0.205); */
+}
+
+.wood {
+    height: 160px;
+    width: 16px;
+    background-color: brown;
+    background: linear-gradient( to right, rgb(153, 61, 0) 30%, rgb(153, 61, 0) 0%, rgb(241, 147, 83));
+    border-radius: 3px;
+    filter: blur(0.5px);
+    top: 0px;
+    left: 17px;
+    z-index: 3;
+    overflow: hidden;
+}
+
+.tip {
+    height: 42px;
+    width: 32px;
+    background-color: #530e00;
+    /* background: linear-gradient(to right, #530e00 10%, rgb(255, 75, 31)); */
+    border-radius: 47%;
+    top: -33px;
+    left: 9px;
+    overflow: hidden;
+    z-index: 2;
+}
+
+.wood p {
+    color: transparent;
+    text-decoration: underline wavy #530e00;
+    transform: scaleY(2) scaleX(3);
+    top: -29px;
+    left: 1px;
+}
+
+.switch {
+    height: 100%;
+    width: 100%;
+    z-index: 5;
+    opacity: 0;
+    left: 0;
+    top: 0;
+    position: absolute;
+    aspect-ratio: unset;
+    cursor: pointer;
+}
+
+.switch:checked~.flame-container,
+.switch:checked~.glowing-area,
+.switch:checked~.main-glow {
+    opacity: 1;
+}
+
+.switch:checked~.instruction {
+    opacity: 0;
+}
+
+.glowing-area {
+    height: 100%;
+    width: 100%;
+    /* background-color: #5529004d; */
+    opacity: 0;
+}
+
+.main-glow {
+    height: 250px;
+    width: 200px;
+    /* background-color: #241201; */
+    background: radial-gradient( #ff5e00, #ff5e00d7, #ff5e00b0, #ff5e0081, #ff5e004b);
+    border-radius: 50%;
+    filter: blur(62px);
+    top: 7px;
+    left: 215px;
+    animation: flicker 100ms 200ms ease-in infinite alternate;
+    z-index: 1;
+    opacity: 0;
+}
+
+@keyframes flicker {
+    0% {
+        transform: rotate(-1deg);
+    }
+    20% {
+        transform: rotate(1deg);
+    }
+    40% {
+        transform: rotate(-1deg);
+    }
+    60% {
+        transform: rotate(1deg) scaleY(0.98);
+    }
+    80% {
+        transform: rotate(-2deg) scaleY(0.98);
+    }
+    100% {
+        transform: rotate(1deg);
+    }
+}
