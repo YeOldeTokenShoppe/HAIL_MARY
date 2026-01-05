@@ -247,7 +247,7 @@ export default function CarouselPage() {
       {/* Buy RL80 Button - Top Right */}
       <div style={{
         position: "fixed",
-        top: "90px",
+        top: "6rem",
         right: "1.5rem",
         zIndex: 298,
         marginTop: '0rem',

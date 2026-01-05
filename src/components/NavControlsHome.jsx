@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { SignInButton, UserButton } from "@clerk/nextjs";
 
 // Home page specific nav controls with integrated 80s mode button
 export default function NavControlsHome({ 
@@ -15,7 +16,6 @@ export default function NavControlsHome({
   userImage = null
 }) {
   const [emoji, setEmoji] = useState("😇");
-  const [eightyEmoji, setEightyEmoji] = useState("🎸");
   
   // Alternate emoji for avatar
   useEffect(() => {
@@ -24,14 +24,6 @@ export default function NavControlsHome({
     }, 3000);
     return () => clearInterval(interval);
   }, []);
-
-  // Alternate emoji for 80s button
-  // useEffect(() => {
-  //   const interval = setInterval(() => {
-  //     setEightyEmoji(prev => prev === "🎸" ? "🎹" : "🎸");
-  //   }, 2000);
-  //   return () => clearInterval(interval);
-  // }, []);
 
   const handlePlayClick = () => {
     if (onPlayMusic) {
@@ -78,8 +70,11 @@ export default function NavControlsHome({
 
         /* 80s Mode Button */
         .eighties-btn-mobile {
-          width: 40px;
-          height: 40px;
+          width: 3rem;
+          height: 3rem;
+          min-width: 3rem;
+          min-height: 3rem;
+          flex-shrink: 0;
           border-radius: 10px;
           background: ${is80sMode 
             ? 'rgba(255, 0, 255, 0.1)' 
@@ -140,13 +135,16 @@ export default function NavControlsHome({
           display: flex;
           flex-direction: column;
           gap: 2px;
-          min-height: 40px;
+          min-height: 3rem;
+          width: 3rem;
+          min-width: 3rem;
+          flex-shrink: 0;
           justify-content: center;
         }
 
         .music-btn-mobile {
-          width: 40px;
-          height: 19px;
+          width: 3rem;
+          height: 1.4rem;
           border-radius: 6px;
           background: rgba(212, 175, 55, 0.05);
           border: 1.5px solid rgba(212, 175, 55, 0.2);
@@ -160,7 +158,7 @@ export default function NavControlsHome({
         }
 
         .music-btn-mobile.single {
-          height: 40px;
+          height: 3rem;
           border-radius: 10px;
           font-size: 16px;
           color: rgba(212, 175, 55, 0.8);
@@ -181,8 +179,11 @@ export default function NavControlsHome({
 
         /* Avatar - Consistent size */
         .avatar-mobile {
-          width: 40px;
-          height: 40px;
+          width: 3rem;
+          height: 3rem;
+          min-width: 3rem;
+          min-height: 3rem;
+          flex-shrink: 0;
           border-radius: 10px;
           background: rgba(212, 175, 55, 0.05);
           border: 1.5px solid rgba(212, 175, 55, 0.2);
@@ -198,6 +199,45 @@ export default function NavControlsHome({
         .avatar-mobile:hover {
           border-color: rgba(212, 175, 55, 0.4);
           background: rgba(212, 175, 55, 0.1);
+        }
+
+        /* Style Clerk's UserButton to match our avatar-mobile style */
+        :global(.cl-userButtonBox) {
+          width: 3rem !important;
+          height: 3rem !important;
+        }
+
+        :global(.cl-userButtonTrigger) {
+          width: 3rem !important;
+          height: 3rem !important;
+          min-width: 3rem !important;
+          min-height: 3rem !important;
+          max-width: 3rem !important;
+          max-height: 3rem !important;
+          border-radius: 10px !important;
+          background: rgba(212, 175, 55, 0.05) !important;
+          border: 1.5px solid rgba(212, 175, 55, 0.2) !important;
+          transition: all 0.2s ease;
+          padding: 0 !important;
+          overflow: hidden !important;
+        }
+
+        :global(.cl-userButtonTrigger:hover) {
+          border-color: rgba(212, 175, 55, 0.4) !important;
+          background: rgba(212, 175, 55, 0.1) !important;
+        }
+
+        :global(.cl-avatarBox) {
+          width: 100% !important;
+          height: 100% !important;
+          border-radius: 10px !important;
+        }
+
+        :global(.cl-avatarImage) {
+          width: 100% !important;
+          height: 100% !important;
+          border-radius: 8px !important;
+          object-fit: cover !important;
         }
 
         .avatar-status-mobile {
@@ -220,8 +260,11 @@ export default function NavControlsHome({
         /* Hamburger - Consistent with other buttons */
         .menu-button-mobile {
           position: relative;
-          width: 40px;
-          height: 40px;
+          width: 3rem;
+          height: 3rem;
+          min-width: 3rem;
+          min-height: 3rem;
+          flex-shrink: 0;
           border-radius: 10px;
           background: rgba(212, 175, 55, 0.05);
           border: 1.5px solid rgba(212, 175, 55, 0.2);
@@ -294,6 +337,16 @@ export default function NavControlsHome({
           box-shadow: 0 0 12px rgba(0, 255, 255, 0.3);
         }
 
+        .mode-80s :global(.cl-userButtonTrigger) {
+          border-color: #00ffff !important;
+          box-shadow: 0 0 12px rgba(0, 255, 255, 0.3) !important;
+        }
+
+        .mode-80s :global(.cl-userButtonTrigger:hover) {
+          border-color: #00ffff !important;
+          box-shadow: 0 0 20px rgba(0, 255, 255, 0.5) !important;
+        }
+
         .mode-80s .music-btn-mobile {
           border-color: rgba(255, 0, 255, 0.4);
         }
@@ -326,7 +379,7 @@ export default function NavControlsHome({
           onClick={onToggle80sMode}
           title={is80sMode ? "Disable 80s Mode" : "Enable 80s Mode"}
         >
-          <span className="eighties-btn-emoji">{is80sMode ? eightyEmoji : ''}</span>
+          <span className="eighties-btn-emoji">{is80sMode ? '🎸' : ''}</span>
           <span className="eighties-btn-text">
             80s
           </span>
@@ -366,24 +419,25 @@ export default function NavControlsHome({
         </div>
 
         {/* Avatar */}
-        <div className="avatar-mobile" onClick={onUserClick}>
-          {isUserSignedIn && userImage ? (
-            <img 
-              src={userImage} 
-              alt="User" 
-              style={{ 
-                width: '100%', 
-                height: '100%', 
-                objectFit: 'cover',
-                borderRadius: '6px'
-              }} 
+        <div style={{ width: '3rem', height: '3rem', flexShrink: 0 }}>
+          {isUserSignedIn ? (
+            <UserButton 
+              afterSignOutUrl="/"
+              appearance={{
+                elements: {
+                  avatarBox: "avatar-mobile",
+                  userButtonTrigger: "avatar-mobile"
+                }
+              }}
             />
           ) : (
-            <span style={{ fontSize: '18px' }}>
-              {isUserSignedIn ? '👤' : emoji}
-            </span>
+            <SignInButton mode="modal" forceRedirectUrl="/">
+              <button className="avatar-mobile">
+                <span style={{ fontSize: '18px' }}>{emoji}</span>
+                <div className="avatar-status-mobile offline" />
+              </button>
+            </SignInButton>
           )}
-          <div className={`avatar-status-mobile ${isUserSignedIn ? '' : 'offline'}`} />
         </div>
 
         {/* Menu */}
