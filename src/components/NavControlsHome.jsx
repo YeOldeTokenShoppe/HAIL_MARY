@@ -58,9 +58,9 @@ export default function NavControlsHome({
           font-family: 'Orbitron', monospace;
           display: flex;
           align-items: center;
-          gap: 10px;
-          padding: 8px;
-          background: rgba(10, 10, 20, 0.4);
+          gap: 5px;
+          padding: 5px;
+          background: rgba(10, 10, 20, 0.3);
           backdrop-filter: blur(20px);
           -webkit-backdrop-filter: blur(20px);
           border-radius: 16px;
@@ -70,10 +70,10 @@ export default function NavControlsHome({
 
         /* 80s Mode Button */
         .eighties-btn-mobile {
-          width: 3rem;
-          height: 3rem;
-          min-width: 3rem;
-          min-height: 3rem;
+          width: 2.5rem;
+          height: 2.5rem;
+          min-width: 2.5rem;
+          min-height: 2.5rem;
           flex-shrink: 0;
           border-radius: 10px;
           background: ${is80sMode 
@@ -115,7 +115,7 @@ export default function NavControlsHome({
         }
 
         .eighties-btn-text-small {
-          font-size: 7px;
+          font-size: 0.7rem;
           font-weight: bold;
           color: ${is80sMode ? '#00ff41' : '#67e8f9'};
           text-shadow: ${is80sMode ? '0 0 10px #00ff41' : 'none'};
@@ -135,15 +135,15 @@ export default function NavControlsHome({
           display: flex;
           flex-direction: column;
           gap: 2px;
-          min-height: 3rem;
-          width: 3rem;
-          min-width: 3rem;
+          min-height: 2.5rem;
+          width: 2.5rem;
+          min-width: 2.5rem;
           flex-shrink: 0;
           justify-content: center;
         }
 
         .music-btn-mobile {
-          width: 3rem;
+          width: 2.5rem;
           height: 1.4rem;
           border-radius: 6px;
           background: rgba(212, 175, 55, 0.05);
@@ -158,9 +158,9 @@ export default function NavControlsHome({
         }
 
         .music-btn-mobile.single {
-          height: 3rem;
+          height: 2.5rem;
           border-radius: 10px;
-          font-size: 16px;
+          font-size: 2rem;
           color: rgba(212, 175, 55, 0.8);
         }
         
@@ -179,10 +179,10 @@ export default function NavControlsHome({
 
         /* Avatar - Consistent size */
         .avatar-mobile {
-          width: 3rem;
-          height: 3rem;
-          min-width: 3rem;
-          min-height: 3rem;
+          width: 2.5rem;
+          height: 2.5rem;
+          min-width: 2.5rem;
+          min-height: 2.5rem;
           flex-shrink: 0;
           border-radius: 10px;
           background: rgba(212, 175, 55, 0.05);
@@ -201,30 +201,26 @@ export default function NavControlsHome({
           background: rgba(212, 175, 55, 0.1);
         }
 
-        /* Style Clerk's UserButton to match our avatar-mobile style */
-        :global(.cl-userButtonBox) {
-          width: 3rem !important;
-          height: 3rem !important;
+        /* Style Clerk's UserButton when wrapped in avatar-mobile */
+        .avatar-mobile :global(.cl-userButtonBox) {
+          width: 100% !important;
+          height: 100% !important;
+          background: transparent !important;
+          border: none !important;
         }
 
-        :global(.cl-userButtonTrigger) {
-          width: 3rem !important;
-          height: 3rem !important;
-          min-width: 3rem !important;
-          min-height: 3rem !important;
-          max-width: 3rem !important;
-          max-height: 3rem !important;
-          border-radius: 10px !important;
-          background: rgba(212, 175, 55, 0.05) !important;
-          border: 1.5px solid rgba(212, 175, 55, 0.2) !important;
-          transition: all 0.2s ease;
+        .avatar-mobile :global(.cl-userButtonTrigger) {
+          width: 100% !important;
+          height: 100% !important;
+          background: transparent !important;
+          border: none !important;
           padding: 0 !important;
-          overflow: hidden !important;
+          border-radius: 10px !important;
         }
-
-        :global(.cl-userButtonTrigger:hover) {
-          border-color: rgba(212, 175, 55, 0.4) !important;
-          background: rgba(212, 175, 55, 0.1) !important;
+        
+        .avatar-mobile :global(.cl-userButtonTrigger button) {
+          border: none !important;
+          background: transparent !important;
         }
 
         :global(.cl-avatarBox) {
@@ -260,10 +256,10 @@ export default function NavControlsHome({
         /* Hamburger - Consistent with other buttons */
         .menu-button-mobile {
           position: relative;
-          width: 3rem;
-          height: 3rem;
-          min-width: 3rem;
-          min-height: 3rem;
+          width: 2.5rem;
+          height: 2.5rem;
+          min-width: 2.5rem;
+          min-height: 2.5rem;
           flex-shrink: 0;
           border-radius: 10px;
           background: rgba(212, 175, 55, 0.05);
@@ -287,8 +283,8 @@ export default function NavControlsHome({
         }
 
         .menu-line-mobile {
-          width: 20px;
-          height: 2px;
+          width: 1.6rem;
+          height: 4px;
           background: rgba(212, 175, 55, 0.7);
           border-radius: 1px;
           transition: all 0.2s ease;
@@ -419,21 +415,23 @@ export default function NavControlsHome({
         </div>
 
         {/* Avatar */}
-        <div style={{ width: '3rem', height: '3rem', flexShrink: 0 }}>
+        <div style={{ width: '2.5rem', height: '2.5rem', flexShrink: 0 }}>
           {isUserSignedIn ? (
-            <UserButton 
-              afterSignOutUrl="/"
-              appearance={{
-                elements: {
-                  avatarBox: "avatar-mobile",
-                  userButtonTrigger: "avatar-mobile"
-                }
-              }}
-            />
+            <div className="avatar-mobile" style={{ padding: 0 }}>
+              <UserButton 
+                afterSignOutUrl="/"
+                appearance={{
+                  elements: {
+                    avatarBox: "avatar-mobile-inner",
+                    userButtonTrigger: "avatar-mobile-inner"
+                  }
+                }}
+              />
+            </div>
           ) : (
             <SignInButton mode="modal" forceRedirectUrl="/">
               <button className="avatar-mobile">
-                <span style={{ fontSize: '18px' }}>{emoji}</span>
+                <span style={{ fontSize: '2rem' }}>{emoji}</span>
                 <div className="avatar-status-mobile offline" />
               </button>
             </SignInButton>

@@ -52,7 +52,7 @@ export default function ShrineLeftPanel({
         alignItems: 'flex-start',
         gap: '24px',
         zIndex: 100,
-        pointerEvents: 'auto',
+        pointerEvents: 'none',  // Allow clicks to pass through to canvas
       }}>
         
         {/* Title */}
@@ -60,6 +60,7 @@ export default function ShrineLeftPanel({
             id="main-title"
             onClick={() => router?.push('/carousel')}
             style={{ 
+              pointerEvents: 'auto',  // Enable clicks on the title
               color: is80sMode ? "#ffffff" : "#d4af37",
               fontFamily: 'UnifrakturCook, serif',
               textShadow: is80sMode 
@@ -112,7 +113,7 @@ export default function ShrineLeftPanel({
             2px 2px 4px rgba(0, 0, 0, 0.6)
           `,
           letterSpacing: '0.08em',
-          textAlign: isMobile ? 'center' : 'left',
+          textAlign: isMobile ? 'center' : 'center',
           lineHeight: 1.4,
           maxWidth: isMobile ? '280px' : '320px',
         }}>
@@ -141,6 +142,7 @@ export default function ShrineLeftPanel({
           className={styles.wrapper}
           onClick={handleMatchClick}
           style={{
+            pointerEvents: 'auto',  // Enable clicks on the matchstick
             marginTop: '16px', 
             marginLeft: '5%',
           }}

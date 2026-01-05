@@ -9,72 +9,67 @@ import { HandsModel } from './HandsGLTFScene'
 import { CandleCloud, GradientBackground, SceneSetup } from './CandleShrine'
 import { NewCandleEffectManager } from './NewCandleEffect'
 
+
+// Scene rotation controller - handles rotation without blocking clicks
+function SceneRotator({ children, userRotation }) {
+  const groupRef = useRef()
+  
+  useFrame(() => {
+    if (groupRef.current) {
+      groupRef.current.rotation.y = userRotation
+    }
+  })
+  
+  return (
+    <group ref={groupRef}>
+      {children}
+    </group>
+  )
+}
+
 // Optimized PriceSimulator - uses refs instead of state for animation
 // Only updates React state at throttled intervals for UI
+// FIXED: Constant offset accumulation - price only affects colors, not motion
 function OptimizedPriceSimulator({ priceRef, shortTermPriceRef, continuousOffsetRef, onUIUpdate, disabled = false }) {
   const lastUIUpdate = useRef(0)
   const lastPriceUpdate = useRef(0)
-  const lastShortTermUpdate = useRef(0)
+  const lastFrameTime = useRef(0)
   const currentPrice = useRef(0)
   const targetPrice = useRef(0)
-  const shortTermPrice = useRef(0)
-  const shortTermTarget = useRef(0)
-  const continuousOffset = useRef(0)
-  const UI_UPDATE_INTERVAL = 1000 // Update UI once per second
-  const PRICE_CHANGE_INTERVAL = 5000 // Change price every 5 seconds (in production would be 60000 for 1 minute)
-  const SHORT_TERM_INTERVAL = 1000 // Update short-term price every second for more dynamic movement
+  const UI_UPDATE_INTERVAL = 1000
+  const PRICE_CHANGE_INTERVAL = 5000
   
   useFrame((state) => {
-    // Skip all updates if disabled (test mode is active)
     if (disabled) return
     
     const now = state.clock.elapsedTime * 1000
+    const deltaTime = lastFrameTime.current ? (now - lastFrameTime.current) / 1000 : 0.016
+    lastFrameTime.current = now
     
     // Generate new price target every PRICE_CHANGE_INTERVAL
     if (now - lastPriceUpdate.current > PRICE_CHANGE_INTERVAL) {
       lastPriceUpdate.current = now
-      
-      // Simulate realistic price movement
-      const changePercent = (Math.random() - 0.5) * 0.1 // -5% to +5% change
+      const changePercent = (Math.random() - 0.5) * 0.1
       targetPrice.current = currentPrice.current + changePercent
-      
-      // Add occasional larger movements
       if (Math.random() < 0.1) {
-        targetPrice.current += (Math.random() - 0.5) * 0.3 // Occasional -15% to +15% spike
+        targetPrice.current += (Math.random() - 0.5) * 0.3
       }
     }
     
-    // Generate short-term price movements more frequently
-    if (now - lastShortTermUpdate.current > SHORT_TERM_INTERVAL) {
-      lastShortTermUpdate.current = now
-      // Short-term follows the main price direction with some variation
-      // If main price is positive, short-term is also positive (with variation)
-      // If main price is negative, short-term is also negative (with variation)
-      const mainDirection = Math.sign(currentPrice.current) || (Math.random() > 0.5 ? 1 : -1)
-      const variation = 0.02 + Math.random() * 0.04 // 2-6% variation
-      shortTermTarget.current = mainDirection * variation
-    }
+    // Smooth price interpolation (for color changes only)
+    const priceFactor = 1.0 - Math.exp(-deltaTime * 0.8)
+    currentPrice.current += (targetPrice.current - currentPrice.current) * priceFactor
     
-    // Smoothly interpolate to target price
-    currentPrice.current += (targetPrice.current - currentPrice.current) * 0.02
+    // === KEY: Constant accumulation rate - no price influence ===
+    // This guarantees perfectly smooth motion
+    const CONSTANT_SPEED = 0.5
+    continuousOffsetRef.current += deltaTime * CONSTANT_SPEED
     
-    // Smoothly interpolate short-term price (follows main price direction)
-    shortTermPrice.current += (shortTermTarget.current - shortTermPrice.current) * 0.05
-    
-    // Accumulate continuous offset for candle movement
-    // Movement speed based on main price for consistency (not short-term)
-    // This ensures candles move in sync with background color
-    // Scale: 1% price change = 0.01 units/frame movement (was 0.3, now much slower)
-    // At 60fps, 1% price change = 0.6 units/second vertical movement
-    const movementSpeed = currentPrice.current * 0.01
-    continuousOffset.current += movementSpeed
-    
-    // Update refs immediately (no re-render, used by shaders)
+    // Update refs for shaders (price still used for colors)
     priceRef.current = currentPrice.current
-    if (shortTermPriceRef) shortTermPriceRef.current = shortTermPrice.current
-    if (continuousOffsetRef) continuousOffsetRef.current = continuousOffset.current
+    if (shortTermPriceRef) shortTermPriceRef.current = 0 // Not used anymore
     
-    // Throttle UI updates to prevent excessive re-renders
+    // Throttle UI updates
     if (now - lastUIUpdate.current > UI_UPDATE_INTERVAL) {
       lastUIUpdate.current = now
       onUIUpdate(currentPrice.current)
@@ -255,14 +250,17 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
   }, [onLightCandle])
 
   const handlePointerDown = useCallback((event) => {
-    event.stopPropagation()
-    isDragging.current = true
-    dragStart.current = {
-      x: event.clientX || event.nativeEvent?.clientX || 0,
-      rotation: userRotation
-    }
-    if (typeof document !== 'undefined' && document.body) {
-      document.body.style.cursor = 'grabbing'
+    // Only start drag if we didn't click on a mesh
+    // In R3F, if we click empty space, no object will be set
+    if (!event.object) {
+      isDragging.current = true
+      dragStart.current = {
+        x: event.clientX || event.nativeEvent?.clientX || 0,
+        rotation: userRotation
+      }
+      if (typeof document !== 'undefined' && document.body) {
+        document.body.style.cursor = 'grabbing'
+      }
     }
   }, [userRotation])
 
@@ -271,6 +269,8 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
       const clientX = event.clientX || event.nativeEvent?.clientX || 0
       const deltaX = (clientX - dragStart.current.x) * 0.01
       const newRotation = dragStart.current.rotation + deltaX
+      
+      // Allow full 360 degree rotation
       setUserRotation(newRotation)
     }
   }, [])
@@ -349,27 +349,52 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
   useEffect(() => {
     if (testPriceOverride !== null) {
       // Normalize the test price for shader (expecting -1 to 1 range)
-      // Test slider is -20 to 20, so divide by 20
       const normalizedPrice = testPriceOverride / 20
       
-      // Update refs directly for immediate visual response
+      // Update price ref for color changes
       priceRef.current = normalizedPrice
-      shortTermPriceRef.current = normalizedPrice * 0.8 // Some variation
       
-      // For continuous movement, scale appropriately
-      continuousOffsetRef.current += normalizedPrice * 0.01
-      
-      // Force UI update (keep original scale for display)
+      // Force UI update
       handleUIUpdate(testPriceOverride)
     }
   }, [testPriceOverride, handleUIUpdate])
+  
+  // Separate effect to continuously update offset even in test mode
+  useEffect(() => {
+    if (testPriceOverride === null) return
+    
+    let animationId
+    let lastTime = performance.now()
+    
+    const updateOffset = (currentTime) => {
+      const deltaTime = (currentTime - lastTime) / 1000
+      lastTime = currentTime
+      
+      // Constant rate - same as auto mode
+      const CONSTANT_SPEED = 0.5
+      continuousOffsetRef.current += deltaTime * CONSTANT_SPEED
+      
+      animationId = requestAnimationFrame(updateOffset)
+    }
+    
+    animationId = requestAnimationFrame(updateOffset)
+    return () => cancelAnimationFrame(animationId)
+  }, [testPriceOverride])
+
+  // Memoize exclusionZone to prevent CandleCloud re-renders
+  // Increased radius to better exclude candles from backdrop area
+  const exclusionZone = useMemo(() => ({
+    center: [0, -1, -7],
+    radius: 8,  // Increased from 5 to better clear the backdrop
+    height: 8   // Increased from 6 to cover more vertical space
+  }), [])
 
   // Memoize styles
   const unifiedStatsStyle = useMemo(() => ({
     position: 'absolute',  // Use fixed positioning for proper layering
     top: isMobile ? '100px' : '105px',
     right: isMobile ? '10px' : '20px',
-    background: 'rgba(0, 0, 0, 0.8)',
+    // background: 'rgba(0, 0, 0, 0.8)',
     border: `2px solid ${displayPrice.change >= 0 ? '#00ff66' : '#ff4444'}`,
     borderRadius: '12px',
     padding: isMobile ? '10px 12px' : '18px',
@@ -457,11 +482,12 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
       >
       {mounted && (
       <Canvas
-        camera={{ position: [0, isMobile ? -1 : -0.5, isMobile ? 11 : 9], fov: isMobile ? 55 : 50 }}
+        camera={{ position: [0, isMobile ? 0 : 0, isMobile ? 2 : 0], fov: isMobile ? 75 : 70 }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
+        onPointerMissed={handlePointerDown}
         dpr={isMobile ? 1 : (typeof window !== 'undefined' ? window.devicePixelRatio : 1)}
         gl={{ 
           alpha: true,  // Enable alpha for proper transparency
@@ -514,44 +540,49 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
         )}
         
         {/* Background gradient - reads from ref */}
-      <GradientBackground is80sMode={is80sMode} />
+        <GradientBackground is80sMode={is80sMode} />
         
-        {/* Candles - pushed back, reads from refs for smooth animation */}
-        <group position={[0, 2, -8]}>
-          <CandleCloud
-            count={isMobile ? 150 : 500}
-            priceRef={priceRef}
-            shortTermPriceRef={shortTermPriceRef}
-            continuousOffsetRef={continuousOffsetRef}
-            additionalCandles={additionalCandles}
-            onCandleClick={handleCandleClick}
-            clickedCandleId={clickedCandleId}
-            isMobile={isMobile}
-          />
-        </group>
-        
-        {/* Hands model */}
-        <Suspense fallback={null}>
-          <group scale={1.8} position={[0, -1, 0]}>
-            <HandsModel 
-              mousePosition={{ x: 0, y: 0 }}
-              hasReachedSection={hasReachedSection}
-              isInView={isInView}
-              offerings={offerings}
-              hoveredOffering={hoveredOffering}
-              justLitOffering={justLitOffering}
-              onJustLitComplete={onJustLitComplete}
-              userRotation={userRotation}
-              priceChange={displayPrice.change}
-              hasActiveClick={clickedCandleId !== null}
-              is80sMode={is80sMode}
-              onLoad={() => console.log('Hands loaded')}
+        {/* Rotatable scene content */}
+        <SceneRotator userRotation={userRotation}>
+          {/* Combined group for hands and surrounding candles */}
+          <group position={[0, 0, 0]}>
+            {/* Candles surrounding the camera/viewer with exclusion zone around hands */}
+            <CandleCloud
+              count={isMobile ? 300 : 500}
+              priceRef={priceRef}
+              shortTermPriceRef={shortTermPriceRef}
+              continuousOffsetRef={continuousOffsetRef}
+              additionalCandles={additionalCandles}
+              onCandleClick={handleCandleClick}
+              clickedCandleId={clickedCandleId}
+              isMobile={isMobile}
+              exclusionZone={exclusionZone}
             />
+            
+            {/* Hands model in front */}
+            <Suspense fallback={null}>
+              <group scale={1.8} position={[0, -1, -6]}>
+                <HandsModel 
+                  mousePosition={{ x: 0, y: 0 }}
+                  hasReachedSection={hasReachedSection}
+                  isInView={isInView}
+                  offerings={offerings}
+                  hoveredOffering={hoveredOffering}
+                  justLitOffering={justLitOffering}
+                  onJustLitComplete={onJustLitComplete}
+                  userRotation={userRotation}
+                  priceChange={displayPrice.change}
+                  hasActiveClick={clickedCandleId !== null}
+                  is80sMode={is80sMode}
+                  onLoad={() => console.log('Hands loaded')}
+                />
+              </group>
+            </Suspense>
           </group>
-        </Suspense>
+        </SceneRotator>
         
         {/* Only show Stats in development */}
-        {/* <Stats className="stats-monitor" /> */}
+        <Stats className="stats-monitor" />
         
         {/* Optimized price simulator - updates refs every frame, state throttled */}
         <OptimizedPriceSimulator 

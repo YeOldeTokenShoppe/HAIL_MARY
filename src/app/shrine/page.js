@@ -11,6 +11,7 @@ import ThirdwebBuyModal from '@/components/ThirdwebBuyModal'
 import CoinLoader from '@/components/CoinLoader'
 import { useRouter } from 'next/navigation'
 import ShrineLeftPanel from '@/components/ShrineLeftPanel'
+import Matchstick from '@/components/Matchstick'
 
 // Tiny Votive Model Component
 
@@ -296,7 +297,7 @@ export default function ShrinePage() {
             textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)',
           }}>
             <div style={{ 
-              fontSize: '0.95rem',
+              fontSize: '1.5rem',
               fontWeight: 400,
               textTransform: 'uppercase',
               letterSpacing: '0.06em',
@@ -306,7 +307,7 @@ export default function ShrinePage() {
               Get On Her Watchlist
             </div>
             <div style={{ 
-              fontSize: '0.75rem',
+              fontSize: '1rem',
               opacity: 0.7,
               fontWeight: 300,
             }}>
@@ -376,29 +377,22 @@ export default function ShrinePage() {
               transition: 'all 0.3s ease',
               boxShadow: mobileMatchstickLit
                 ? '0 0 15px rgba(255, 149, 0, 0.3)'
-                : 'none',
+                : '0 0 0 0 rgba(212, 175, 55, 0)',
+              animation: mobileMatchstickLit
+                ? 'none'
+                : 'buttonPulse 2s ease-in-out infinite',
               position: 'relative',
               overflow: 'hidden',
             }}
           >
-            {/* Flame icon when lit */}
-            {mobileMatchstickLit ? (
-              <div style={{
-                fontSize: '1.5rem',
-                animation: 'flicker 1.5s infinite',
-              }}>
-                🔥
-              </div>
-            ) : (
-              /* Simple candle icon when unlit with subtle glow */
-              <div style={{
-                fontSize: '1.5rem',
-                opacity: 0.7,
-                animation: 'candleGlow 3s ease-in-out infinite',
-              }}>
-                🕯️
-              </div>
-            )}
+            {/* Matchstick component - lit or unlit based on state */}
+            <div style={{
+              transform: 'scale(0.5) translateY(12px)',
+              opacity: mobileMatchstickLit ? 1 : 0.9,
+              pointerEvents: 'none',  // Prevent internal click handling
+            }}>
+              <Matchstick isLit={mobileMatchstickLit} />
+            </div>
             
             {/* Pulse animation */}
             {mobileMatchstickLit ? (
@@ -464,6 +458,21 @@ export default function ShrinePage() {
             box-shadow: 
               0 0 0 8px rgba(212, 175, 55, 0),
               0 0 20px 4px rgba(212, 175, 55, 0.3);
+          }
+        }
+        
+        @keyframes buttonPulse {
+          0%, 100% {
+            box-shadow: 
+              0 0 0 0 rgba(212, 175, 55, 0.4),
+              0 0 10px 2px rgba(212, 175, 55, 0.2);
+            border-color: rgba(212, 175, 55, 0.15);
+          }
+          50% {
+            box-shadow: 
+              0 0 0 6px rgba(212, 175, 55, 0),
+              0 0 20px 4px rgba(212, 175, 55, 0.3);
+            border-color: rgba(212, 175, 55, 0.3);
           }
         }
       `}</style>

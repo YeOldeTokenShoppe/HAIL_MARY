@@ -154,7 +154,7 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
         
         .pause-indicator {
           position: absolute;
-          top: 80%;
+          top: 60%;
           left: 50%;
           transform: translate(-50%, -50%);
           background: rgba(0, 0, 0, 0.7);
@@ -163,6 +163,7 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
           border-radius: 20px;
           font-family: 'Courier New', monospace;
           font-size: 14px;
+          text-align: center;
           pointer-events: none;
           opacity: 0;
           transition: opacity 0.3s;

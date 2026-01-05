@@ -1875,7 +1875,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
             right: 0,
             bottom: 0,
             background: 'rgba(0, 0, 0, 0.95)',
-            zIndex: 10000,
+            zIndex: 10001,
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
@@ -1974,7 +1974,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            zIndex: 10000,
+            zIndex: 10001,
             backdropFilter: 'blur(5px)'
           }}
         >

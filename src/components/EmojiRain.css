@@ -1,0 +1,44 @@
+/* EmojiRain.css */
+.emoji-rain-container {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  height: 400px;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.emoji-float {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  font-size: calc(1rem + var(--scale) * 0.3rem);
+  user-select: none;
+  will-change: transform, opacity;
+  animation: 
+    float-up var(--duration) linear forwards,
+    fade var(--duration) linear forwards,
+    wobble calc(var(--duration) / 2) ease-in-out infinite;
+  transform: translateX(var(--start-x));
+}
+
+@keyframes float-up {
+  0% {
+    transform: translateX(var(--start-x)) translateY(0px) scale(calc(var(--scale) * 0.6));
+  }
+  100% {
+    transform: translateX(var(--end-x)) translateY(-250px) scale(var(--scale));
+  }
+}
+
+@keyframes fade {
+  0% { opacity: 0; }
+  5% { opacity: 0.9; }
+  85% { opacity: 0.9; }
+  100% { opacity: 0; }
+}
+
+@keyframes wobble {
+  0%, 100% { rotate: 0deg; }
+  25% { rotate: var(--wobble); }
+  75% { rotate: calc(var(--wobble) * -1); }
+}

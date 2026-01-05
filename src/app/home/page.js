@@ -561,46 +561,6 @@ function CarouselPageContent() {
               showButton={false}  // Hide CyberNav's own hamburger button
             />
             
-            {/* Shrine Heading Overlay */}
-            {/* <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5, duration: 0.8, ease: "easeOut" }}
-              style={{
-                position: "absolute",
-                top: "120px",
-                left: "50%",
-                transform: "translateX(-50%)",
-                zIndex: 100,
-                textAlign: "center",
-                pointerEvents: "none",
-                maxWidth: "90%"
-              }}
-            >
-              <h1 style={{
-                fontFamily: "'UnifrakturMaguntia', serif",
-                fontSize: isMobileView ? "2rem" : "3rem",
-                color: "#fff",
-                margin: 0,
-                textShadow: "0 0 40px rgba(0, 255, 102, 0.8), 0 0 80px rgba(0, 255, 102, 0.4), 0 0 120px rgba(0, 255, 102, 0.2), 2px 2px 4px rgba(0, 0, 0, 0.8)",
-                letterSpacing: "0.05em",
-                fontWeight: "normal",
-                WebkitTextStroke: "1px rgba(0, 255, 102, 0.3)"
-              }}>
-                Get on Her Watchlist
-              </h1>
-              <div style={{
-                marginTop: "10px",
-                fontSize: isMobileView ? "0.9rem" : "1.1rem",
-                color: "rgba(255, 255, 255, 0.6)",
-                fontFamily: "monospace",
-                letterSpacing: "0.2em",
-                textTransform: "uppercase",
-                textShadow: "0 2px 4px rgba(0, 0, 0, 0.5)"
-              }}>
-                Light a candle • Make an offering
-              </div>
-            </motion.div> */}
           </motion.div>
         )}
       </AnimatePresence>

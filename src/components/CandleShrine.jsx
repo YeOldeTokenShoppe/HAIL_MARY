@@ -18,6 +18,7 @@ const sharedUniforms = {
 }
 
 // Base vertex shader chunk for candle wobble - reused across all materials
+// SIMPLIFIED: Use uTime directly - it's guaranteed smooth from Three.js clock
 const wobbleVertexChunk = `
   uniform float uTime;
   uniform float uPriceDirection;
@@ -31,29 +32,35 @@ const wobbleVertexChunk = `
   
   // Calculate wobble offset for a candle instance with continuous movement
   vec3 getWobbleOffset(float instanceId, vec3 basePosition) {
-    float phase = hash(instanceId) * 6.28318;
-    float speed = 0.2 + hash(instanceId + 100.0) * 0.3;
-    float priceResponse = 0.7 + abs(sin(instanceId * 0.3)) * 0.6;
+    // Each candle gets unique phase offsets
+    float phaseX = hash(instanceId) * 6.28318;
+    float phaseY = hash(instanceId + 50.0) * 6.28318;
+    float phaseZ = hash(instanceId + 100.0) * 6.28318;
     
-    float t = uTime * speed + phase;
+    // Use uTime directly - guaranteed smooth from Three.js clock
+    // Multiply by slow factor to get gentle motion
+    float t = uTime * 0.5;
     
-    // Smooth floating motion
-    float offsetX = sin(t * 0.4) * 0.3;
+    // Each candle has slightly different speeds for organic feel
+    float speedX = 0.3 + hash(instanceId + 100.0) * 0.2;
+    float speedY = 0.25 + hash(instanceId + 200.0) * 0.15;
+    float speedZ = 0.28 + hash(instanceId + 300.0) * 0.18;
     
-    // Continuous vertical movement based on short-term price
-    // Add variation per candle for more organic feel
-    float movementVariation = 0.8 + hash(instanceId + 77.0) * 0.4; // 80% to 120% speed variation
-    float continuousY = uContinuousOffset * movementVariation;
+    // Layer multiple sine waves for complex but smooth motion
+    // Primary wave
+    float offsetX = sin(t * speedX + phaseX) * 0.35;
+    float offsetY = sin(t * speedY + phaseY) * 0.5;
+    float offsetZ = sin(t * speedZ + phaseZ) * 0.3;
     
-    // Wrap around viewport (increased to 35 units to match the new candle spread)
-    float viewportHeight = 35.0;
-    // Use fract to create seamless wrapping
-    float wrappedY = fract((continuousY + viewportHeight * 0.5) / viewportHeight) * viewportHeight - viewportHeight * 0.5;
+    // Secondary slower wave for drift feel
+    offsetX += cos(t * speedX * 0.4 + phaseX) * 0.2;
+    offsetY += cos(t * speedY * 0.3 + phaseY) * 0.35;
+    offsetZ += sin(t * speedZ * 0.5 + phaseZ + 1.0) * 0.15;
     
-    // Combine original wobble with continuous movement and price response
-    float offsetY = sin(t * 0.3) * 0.2 + uPriceDirection * 3.0 * priceResponse + wrappedY;
-    
-    float offsetZ = cos(t * 0.35) * 0.3;
+    // Tertiary micro-movement
+    float microSpeed = 1.5 + hash(instanceId + 400.0) * 0.5;
+    offsetX += sin(t * microSpeed + phaseX) * 0.05;
+    offsetY += cos(t * microSpeed * 0.9 + phaseY) * 0.08;
     
     return vec3(offsetX, offsetY, offsetZ);
   }
@@ -95,7 +102,6 @@ function createWobbleMaterial(baseColor, options = {}) {
   })
 }
 
-// XBase material with click glow effect
 // XBase material with click glow effect AND price-reactive color
 function createXBaseMaterial() {
   return new THREE.ShaderMaterial({
@@ -351,15 +357,33 @@ function useClonedGeometries(modelPath) {
   }, [scene])
 }
 
-// Generate random positions
-function usePositions(count) {
+// Generate random positions with exclusion zones
+function usePositions(count, exclusionZone = null) {
   return useMemo(() => {
     const positions = []
     
     for (let i = 0; i < count; i++) {
       let x = (Math.random() - 0.5) * 40
       let y = (Math.random() - 0.5) * 30
-      const z = (Math.random() - 0.5) * 20 - 5
+      let z = (Math.random() - 0.5) * 20 - 5
+      
+      // Check if position is within exclusion cylinder (for hands model)
+      if (exclusionZone) {
+        const { center, radius, height } = exclusionZone
+        const distFromCenter = Math.sqrt(
+          Math.pow(x - center[0], 2) + 
+          Math.pow(z - center[2], 2)
+        )
+        const withinHeight = Math.abs(y - center[1]) < height / 2
+        
+        // If inside exclusion cylinder, push outside
+        if (distFromCenter < radius && withinHeight) {
+          const angle = Math.atan2(z - center[2], x - center[0])
+          const pushDistance = radius + 2 // Push outside radius + margin
+          x = center[0] + Math.cos(angle) * pushDistance
+          z = center[2] + Math.sin(angle) * pushDistance
+        }
+      }
       
       // Calculate "danger" level based on proximity to UI zone (bottom-left)
       const uiCenterX = -12
@@ -391,7 +415,7 @@ function usePositions(count) {
       })
     }
     return positions
-  }, [count])
+  }, [count, exclusionZone])
 }
 
 // Simplified InstancedPart - NO per-frame matrix updates!
@@ -434,7 +458,15 @@ function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.5
       meshRef.current.setMatrixAt(i, baseMatrices[i])
     }
     meshRef.current.instanceMatrix.needsUpdate = true
+    
+    // Force compute bounding box and sphere for better raycasting
+    meshRef.current.computeBoundingBox()
     meshRef.current.computeBoundingSphere()
+    
+    // Expand bounding sphere to account for shader wobble
+    if (meshRef.current.boundingSphere) {
+      meshRef.current.boundingSphere.radius *= 1.5  // Account for movement
+    }
   }, [baseMatrices, capacity])
   
   if (!geometry) return null
@@ -444,11 +476,16 @@ function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.5
       ref={meshRef}
       args={[geometry, material, capacity]}
       frustumCulled={false}
+      renderOrder={-5}
       onClick={(event) => {
         event.stopPropagation()
         if (onCandleClick && event.instanceId !== undefined && event.instanceId < positions.length) {
+          console.log('Clicked candle:', event.instanceId, 'at', positions[event.instanceId])
           onCandleClick(event.instanceId, positions[event.instanceId])
         }
+      }}
+      onPointerMissed={() => {
+        console.log('Clicked but missed all candles')
       }}
     />
   )
@@ -457,38 +494,20 @@ function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.5
 // Single animation controller - updates shared uniforms once per frame
 // Accepts either refs (for smooth updates) or values (for static/slow updates)
 function AnimationController({ priceDirection, priceRef, shortTermPriceRef, continuousOffsetRef, isMobile }) {
-  const frameCount = useRef(0)
-  const lastLogTime = useRef(0)
-  
   useFrame((state) => {
-    frameCount.current++
-    
-    // On mobile, only update animations every 3 frames
-    if (isMobile && frameCount.current % 3 !== 0) return
-    
+    // Update time - this is the ONLY thing that drives candle position
+    // state.clock.elapsedTime is guaranteed smooth by Three.js
     sharedUniforms.uTime.value = state.clock.elapsedTime
-    // Prefer ref for smooth animation, fall back to prop
-    sharedUniforms.uPriceDirection.value = priceRef?.current ?? priceDirection ?? 0
-    sharedUniforms.uShortTermPrice.value = shortTermPriceRef?.current ?? 0
-    sharedUniforms.uContinuousOffset.value = continuousOffsetRef?.current ?? 0
     
-    // Debug log every 2 seconds
-    if (state.clock.elapsedTime - lastLogTime.current > 2) {
-      lastLogTime.current = state.clock.elapsedTime
-      console.log('Candle movement:', {
-        continuousOffset: continuousOffsetRef?.current,
-        shortTermPrice: shortTermPriceRef?.current,
-        priceDirection: priceRef?.current,
-        uPriceDirection: sharedUniforms.uPriceDirection.value
-      })
-    }
+    // Price direction still used for color changes (not position)
+    sharedUniforms.uPriceDirection.value = priceRef?.current ?? priceDirection ?? 0
   })
   return null
 }
 
-export function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, priceRef, shortTermPriceRef, continuousOffsetRef, additionalCandles = [], onCandleClick, clickedCandleId, isMobile = false }) {
+export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, priceRef, shortTermPriceRef, continuousOffsetRef, additionalCandles = [], onCandleClick, clickedCandleId, isMobile = false, exclusionZone = null }) {
   const { geometries, textures, localMatrices } = useClonedGeometries('/models/tinyVotiveOnly.glb')
-  const basePositions = usePositions(count)
+  const basePositions = usePositions(count, exclusionZone)
   
   // Combine positions
   const positions = useMemo(() => {
@@ -533,7 +552,7 @@ const materials = useMemo(() => ({
       <InstancedPart geometry={geometries.glass} material={materials.glass} positions={positions} localMatrix={localMatrices.glass} maxCount={maxCount} onCandleClick={onCandleClick} />
     </group>
   )
-}
+})
 
 // Scene setup and gradient background unchanged
 export function SceneSetup({ is80sMode }) {
@@ -687,6 +706,8 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onLight
           setPriceDirection(price)
           if (onPriceChange) onPriceChange(price * 5)
         }} />
+
+        
         <NewCandleEffectManager
           ref={effectManagerRef}
           phonePosition={[0, -3, 5]}

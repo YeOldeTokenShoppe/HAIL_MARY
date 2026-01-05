@@ -1,11 +1,16 @@
 import React, { useState } from 'react'
 import styles from './Matchstick.module.css'
 
-const Matchstick = ({ onLight }) => {
-  const [isLit, setIsLit] = useState(false)
+const Matchstick = ({ onLight, isLit: externalIsLit }) => {
+  const [internalIsLit, setInternalIsLit] = useState(false)
+  
+  // Use external state if provided, otherwise use internal state
+  const isLit = externalIsLit !== undefined ? externalIsLit : internalIsLit
 
   const handleToggle = () => {
-    setIsLit(!isLit)
+    if (externalIsLit === undefined) {
+      setInternalIsLit(!internalIsLit)
+    }
     if (onLight && !isLit) {
       onLight()
     }
@@ -22,7 +27,7 @@ const Matchstick = ({ onLight }) => {
           checked={isLit}
           onChange={handleToggle}
         />
-        <div className={styles['wood-wrapper']}>
+        <div className={styles.woodWrapper}>
           <div className={styles.wood}>
             <p>b</p>
           </div>
@@ -30,9 +35,9 @@ const Matchstick = ({ onLight }) => {
         </div>
    
 
-        <div className={styles['glowing-area']}></div>
-        <div className={styles['main-glow']}></div>
-        <div className={styles['flame-container']}>
+        <div className={styles.glowingArea}></div>
+        <div className={styles.mainGlow}></div>
+        <div className={styles.flameContainer}>
           <div className={`${styles.red} ${styles.flame}`}></div>
           <div className={`${styles.orange} ${styles.flame}`}></div>
           <div className={`${styles.yellow} ${styles.flame}`}></div>
