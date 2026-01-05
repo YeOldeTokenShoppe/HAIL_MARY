@@ -127,13 +127,13 @@ export default function ShrineLeftPanel({
           </span>
           <span style={{ 
             display: 'block', 
-            fontSize: isMobile ? '0.9rem' : '1rem',
+            fontSize: isMobile ? '0.9rem' : '0.9rem',
             opacity: 0.8,
             marginTop: '6px',
             fontWeight: 300,
             fontStyle: 'italic',
           }}>
-            Light a candle fore price pumps
+            Light a candle to pray for price pumps
           </span>
         </div>
 

@@ -626,7 +626,7 @@ export const NewCandleEffectManager = forwardRef(({
       // Desktop - bias toward front of view with consistent height
       target = [
         (Math.random() - 0.5) * cloudBounds.x * 0.7, // 70% of full width for better visibility
-        0 + Math.random() * -0.6, // Consistent Y near viewer level (0 to 1.0)
+        0 + Math.random() * -1.0, // Consistent Y near viewer level (0 to 1.0)
         Math.random() * cloudBounds.z * 0.2 - 12 // Further in front (-12 to -14)
       ]
     }
