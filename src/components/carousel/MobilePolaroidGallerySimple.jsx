@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from 'react'
 
-const MobilePolaroidGallerySimple = ({ images = [] }) => {
+const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
   const n = images.length || 8
   const [isPaused, setIsPaused] = useState(false)
   
@@ -21,7 +21,7 @@ const MobilePolaroidGallerySimple = ({ images = [] }) => {
     <>
       <style dangerouslySetInnerHTML={{ __html: `
         .polaroid-gallery {
-          --d: 16s;
+          --d: 24s; 
           display: grid;
           width: 260px;
           position: fixed;
@@ -31,6 +31,7 @@ const MobilePolaroidGallerySimple = ({ images = [] }) => {
           cursor: pointer;
           margin-top: 2rem;
           margin-bottom: 7rem;
+          z-index: 10;
         }
         
         .polaroid-gallery.paused > .polaroid-frame {
@@ -143,7 +144,7 @@ const MobilePolaroidGallerySimple = ({ images = [] }) => {
           width: 100vw;
           display: grid;
           place-content: center;
-          background: linear-gradient(135deg, #aa7799 0%, #886677 100%);
+          background: ${is80sMode ? 'transparent' : 'linear-gradient(135deg, #CDB380 0%, #B39C7D 100%)'};
           overflow: hidden;
           position: fixed;
           top: 0;

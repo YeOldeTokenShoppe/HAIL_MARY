@@ -162,6 +162,7 @@ export default function UnifiedShrine({
   const [isInView, setIsInView] = useState(true)
   const canvasRef = useRef()
   const [contextLost, setContextLost] = useState(false)
+  const [matchstickClicked, setMatchstickClicked] = useState(false)
   
   // Price history - update much less frequently
   const [priceHistory, setPriceHistory] = useState(() =>
@@ -383,6 +384,7 @@ export default function UnifiedShrine({
   }, [priceHistory, displayPrice.change])
   
   const handleLightCandleClick = useCallback(() => {
+    setMatchstickClicked(true)
     const messages = [
       'Please pump my bags to the moon 🚀',
       'Grant me diamond hands in these trying times',
@@ -693,7 +695,7 @@ export default function UnifiedShrine({
           padding: isMobile ? '0.2rem' : '1rem',
           background: 'radial-gradient(ellipse at center, rgba(255, 94, 0, 0.15) 0%, transparent 60%)',
           borderRadius: '50%',
-          border: '1px solid rgba(255, 94, 0, 0.4)',
+          border: 'px solid rgba(255, 94, 0, 0.4)',
           backdropFilter: 'blur(18px)',
           position: 'relative',
           maxWidth: isMobile ? '100px' : '250px',
@@ -702,7 +704,7 @@ export default function UnifiedShrine({
         }}>
           {!isMobile && (
             <div className="cta-text" style={{
-              color: '#ff5e00',
+              color: '#ffcc00',
               fontSize: '1.1rem',
               fontWeight: 'bold',
               textTransform: 'uppercase',
@@ -721,18 +723,18 @@ export default function UnifiedShrine({
             justifyContent: 'center',
             width: '100%',
           }}>
-            {isMobile && (
+            {isMobile && !matchstickClicked && (
               <div style={{
                 position: 'absolute',
-                left: '25%',
-                top: '10%',
+                left: '18%',
+                top: '15%',
                 transform: 'translateY(-50%)',
                 color: '#ff5e00',
-                fontSize: '0.4rem',
+                fontSize: '0.6rem',
                 fontWeight: 'bold',
                 textTransform: 'uppercase',
                 letterSpacing: '0.1px',
-                textShadow: '0 0 4px rgba(255, 94, 0, 0.9)',
+                textShadow: '0 0 4px rgba(255, 204, 0, 0.9)',
                 zIndex: 10,
               }}>
                 Click to Light

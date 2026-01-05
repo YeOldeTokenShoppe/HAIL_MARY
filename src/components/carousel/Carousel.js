@@ -50,29 +50,35 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
   }, [sceneReady, onReady])
   
   return (
-    <div style={{ width: '100%', height: '100vh', background: '#000', position: 'relative' }}>
-      {/* Video background for 80s mode */}
-      {is80sMode && (
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            opacity: 0.8,
-            zIndex: 1,
-            pointerEvents: 'none',
-          }}
-        >
-          <source src="/videos/84.mp4" type="video/mp4" />
-        </video>
-      )}
+    <div style={{ 
+      width: '100%', 
+      height: '100vh', 
+      backgroundColor: (is80sMode && isMobilePhone) ? 'transparent' : '#000',
+      position: 'relative',
+      overflow: 'hidden'
+    }}>
+        {/* Video background for 80s mode - desktop only */}
+        {is80sMode && !isMobilePhone && (
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              opacity: 0.8,
+              zIndex: 1,
+              pointerEvents: 'none',
+            }}
+          >
+            <source src="/videos/84.mp4" type="video/mp4" />
+          </video>
+        )}
       
       
       {/* Experience Controls - positioned top-right */}
@@ -80,18 +86,21 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
       
       {/* Mobile Phone Gallery - replaces 3D carousel on phones */}
       {isMobilePhone ? (
-        <MobilePolaroidGallerySimple 
-          images={[
-            { url: '/carousel_images/img1.jpg' },
-            { url: '/carousel_images/img2.jpg' },
-            { url: '/carousel_images/img3.jpg' },
-            { url: '/carousel_images/img4.jpg' },
-            { url: '/carousel_images/img5.jpg' },
-            { url: '/carousel_images/img6.jpg' },
-            { url: '/carousel_images/img7.jpg' },
-            { url: '/carousel_images/img8.jpg' },
-          ]}
-        />
+        <div style={{ position: 'relative', zIndex: 10 }}>
+          <MobilePolaroidGallerySimple 
+            is80sMode={is80sMode}
+            images={[
+              { url: '/carousel_images/img1.jpg' },
+              { url: '/carousel_images/img2.jpg' },
+              { url: '/carousel_images/img3.jpg' },
+              { url: '/carousel_images/img4.jpg' },
+              { url: '/carousel_images/img5.jpg' },
+              { url: '/carousel_images/img6.jpg' },
+              { url: '/carousel_images/img7.jpg' },
+              { url: '/carousel_images/img8.jpg' },
+            ]}
+          />
+        </div>
       ) : (
       <Canvas 
         style={{ position: 'relative', zIndex: 2 }}

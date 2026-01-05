@@ -84,7 +84,17 @@ export default function CarouselPage() {
   }, []);
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
+    <div style={{ 
+      position: 'relative', 
+      width: '100%', 
+      height: '100vh',
+      ...(is80sMode && isMobileDevice ? {
+        backgroundImage: 'url("/images/retro.webp")',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      } : {})
+    }}>
       <style dangerouslySetInnerHTML={{ __html: `
         @font-face {
           font-family: 'UnifrakturMaguntia';
@@ -98,15 +108,68 @@ export default function CarouselPage() {
           font-family: 'UnifrakturMaguntia', serif !important;
 
   
+          .cyber-candle-btn {
+            position: relative;
+          }
+          
+          .cyber-candle-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 150%;
+            height: 150%;
+            background: radial-gradient(ellipse at center, 
+              rgba(153, 69, 255, 0.9) 0%,
+              rgba(0, 255, 255, 0.7) 20%,
+              rgba(153, 69, 255, 0.4) 40%,
+              rgba(0, 255, 255, 0.2) 60%,
+              transparent 80%
+            );
+            filter: blur(30px);
+            animation: pulseGlow 2s ease-in-out infinite;
+            pointer-events: none;
+            z-index: -1;
+          }
+          
+          @keyframes pulseGlow {
+            0%, 100% {
+              opacity: 0.8;
+              transform: translate(-50%, -50%) scale(1);
+            }
+            50% {
+              opacity: 1;
+              transform: translate(-50%, -50%) scale(1.1);
+            }
+          }
+          
+          .cyber-candle-btn:hover::before {
+            animation: pulseGlow 1s ease-in-out infinite;
+            filter: blur(25px);
+            background: radial-gradient(ellipse at center, 
+              rgba(153, 69, 255, 0.8) 0%,
+              rgba(0, 255, 255, 0.6) 25%,
+              rgba(255, 0, 102, 0.3) 50%,
+              transparent 70%
+            );
+          }
+          
           .cyber-candle-btn :global(.cybr-btn) {
             --primary: #9945ff;
             --shadow-primary: #00ffff;
             --shadow-secondary-hue: 340;
             --color: white;
+            position: relative;
+            z-index: 1;
           }
           .cyber-candle-btn :global(.cybr-btn:hover) {
             --primary: #7c37d0;
             --shadow-primary: #00ffff;
+            box-shadow: 
+              0 0 30px rgba(153, 69, 255, 0.8),
+              0 0 60px rgba(0, 255, 255, 0.6),
+              0 0 90px rgba(153, 69, 255, 0.4);
           }
           .cyber-candle-btn :global(.cybr-btn:active) {
             --primary: #6b2fb5;
@@ -135,11 +198,17 @@ export default function CarouselPage() {
         right: "1.5rem",
         zIndex: 298,
         marginTop: '0rem',
+        overflow: 'visible',
         // width: '9rem',
         // height: '3rem'
       }}>
 
-        <div className="cyber-candle-btn" style={{ opacity: mounted ? 1 : 0, transition: 'opacity 0.3s' }}>
+        <div className="cyber-candle-btn" style={{ 
+          opacity: mounted ? 1 : 0, 
+          transition: 'opacity 0.3s',
+          position: 'relative',
+          display: 'inline-block'
+        }}>
           <CyberGlitchButton
             text="Buy"
             text2="RL80"
@@ -314,7 +383,11 @@ export default function CarouselPage() {
           fontSize="28"
           fontFamily="'UnifrakturMaguntia', cursive"
           filter="url(#candleGlow)"
-          style={{ transition: "all 0.3s ease" }}
+          style={{ 
+            transition: "all 0.3s ease",
+            textShadow: isMobileDevice ? "2px 2px 8px rgba(0, 0, 0, 0.9), 4px 4px 12px rgba(0, 0, 0, 0.7)" : "none",
+            filter: isMobileDevice ? "url(#candleGlow) drop-shadow(3px 3px 6px rgba(0, 0, 0, 0.8))" : "url(#candleGlow)"
+          }}
         >
           <textPath href="#textPath" startOffset="5%">
             The Illumin80
