@@ -13,12 +13,160 @@ const ARC_HEIGHT = 3 // How high the arc goes above the midpoint
 const MOBILE_ARC_HEIGHT = 1.5 // Lower arc for mobile visibility
 const MOBILE_BREAKPOINT = 768 // px
 
+// Arctic Rings config - matching original vanilla Three.js
+const RING_COUNT = 5
+const RING_COLORS = [
+  new THREE.Color(0x00ffff),  // Cyan
+  new THREE.Color(0x87ceeb),  // Sky blue
+  new THREE.Color(0xffffff)   // White
+]
+
 // Easing function - ease out cubic for smooth deceleration
 const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3)
 
 // Easing function - ease in out for smooth movement
 const easeInOutCubic = (t) => 
   t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+
+// ============================================
+// ARCTIC RINGS EFFECT
+// Expanding icy rings on candle arrival
+// Faithful port of vanilla Three.js version
+// ============================================
+export function ArcticRingsEffect({ position, isActive, onComplete, onBloomPulse }) {
+  const groupRef = useRef()
+  const flashRef = useRef()
+  const hasStartedRef = useRef(false)
+  const hasCompletedRef = useRef(false)
+  const bloomFlashRef = useRef(0)
+  
+  // Initialize rings when activated
+  useEffect(() => {
+    if (isActive && groupRef.current && !hasStartedRef.current) {
+      hasStartedRef.current = true
+      hasCompletedRef.current = false
+      
+      // Clear any existing rings
+      while (groupRef.current.children.length > 0) {
+        const child = groupRef.current.children[0]
+        if (child.geometry) child.geometry.dispose()
+        if (child.material) child.material.dispose()
+        groupRef.current.remove(child)
+      }
+      
+      // Trigger bloom flash
+      bloomFlashRef.current = 1.0
+      onBloomPulse?.(4.0) // Start at peak intensity
+      
+      // Create rings exactly like the original
+      for (let r = 0; r < RING_COUNT; r++) {
+        const ringGeo = new THREE.RingGeometry(
+          0.5 + r * 0.3,  // inner radius
+          0.6 + r * 0.3,  // outer radius
+          32              // segments
+        )
+        const col = RING_COLORS[r % RING_COLORS.length]
+        const mat = new THREE.MeshBasicMaterial({
+          color: col,
+          transparent: true,
+          opacity: 1.0,
+          blending: THREE.AdditiveBlending,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+          toneMapped: false  // Critical for bloom to work!
+        })
+        const ring = new THREE.Mesh(ringGeo, mat)
+        ring.rotation.x = Math.PI / 2  // Same as original
+        ring.userData.speed = 0.03 + r * 0.02  // Same as original
+        ring.userData.life = 1.0
+        
+        groupRef.current.add(ring)
+      }
+    }
+    
+    // Reset when deactivated so it can fire again
+    if (!isActive) {
+      hasStartedRef.current = false
+    }
+  }, [isActive, onBloomPulse])
+  
+  useFrame(() => {
+    if (!groupRef.current) return
+    
+    // Animate bloom flash decay - ~30 frames (~500ms at 60fps) like original setTimeout
+    if (bloomFlashRef.current > 0) {
+      bloomFlashRef.current -= 0.033
+      if (bloomFlashRef.current <= 0) {
+        bloomFlashRef.current = 0
+        onBloomPulse?.(1.2) // Back to base intensity
+      } else {
+        // Lerp from 4.0 down to base intensity (1.2)
+        const currentIntensity = 1.2 + (4.0 - 1.2) * bloomFlashRef.current
+        onBloomPulse?.(currentIntensity)
+      }
+    }
+    
+    // Animate the central flash mesh
+    if (flashRef.current && hasStartedRef.current) {
+      const flashOpacity = Math.max(0, bloomFlashRef.current * 0.9)
+      flashRef.current.material.opacity = flashOpacity
+      const flashScale = 1 + (1 - bloomFlashRef.current) * 5
+      flashRef.current.scale.setScalar(flashScale)
+    }
+    
+    // Nothing to animate
+    if (groupRef.current.children.length === 0) {
+      // Fire completion once when all rings are gone
+      if (hasStartedRef.current && !hasCompletedRef.current) {
+        hasCompletedRef.current = true
+        onComplete?.()
+      }
+      return
+    }
+    
+    // Iterate backwards for safe removal - exactly like original
+    for (let i = groupRef.current.children.length - 1; i >= 0; i--) {
+      const ring = groupRef.current.children[i]
+      
+      // Scale up - same as original
+      ring.scale.x += ring.userData.speed
+      ring.scale.y += ring.userData.speed
+      
+      // Decrease life - frame-based like original (0.01 per frame)
+      ring.userData.life -= 0.01
+      
+      // Update opacity directly
+      ring.material.opacity = ring.userData.life
+      
+      // Remove dead rings
+      if (ring.userData.life <= 0) {
+        ring.geometry.dispose()
+        ring.material.dispose()
+        groupRef.current.remove(ring)
+      }
+    }
+  })
+  
+  // Always render the group - let the rings live out their full animation
+  return (
+    <>
+      <group ref={groupRef} position={position} />
+      
+      {/* Bright central flash disc - helps trigger bloom */}
+      <mesh ref={flashRef} position={position} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[2, 32]} />
+        <meshBasicMaterial
+          color={0x00ffff}
+          transparent
+          opacity={0}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+    </>
+  )
+}
 
 // ============================================
 // MAIN EFFECT COMPONENT
@@ -330,7 +478,7 @@ function CandleModel({ modelPath, phase }) {
 }
 
 // ============================================
-// ARRIVAL BURST EFFECT
+// ARRIVAL BURST EFFECT (Original - kept for reference)
 // Triggers when candle reaches destination
 // ============================================
 export function ArrivalBurst({ position, isActive, onComplete }) {
@@ -432,13 +580,15 @@ export function ArrivalBurst({ position, isActive, onComplete }) {
 
 // ============================================
 // COMBINED EFFECT MANAGER
-// Handles the full sequence
+// Handles the full sequence with Arctic Rings
 // ============================================
 export const NewCandleEffectManager = forwardRef(({
   phonePosition = [0, 0, 0],
   cloudBounds = { x: 20, y: 15, z: 10 },
   onNewCandle,
-  candleModelPath = '/models/tinyVotiveOnly.glb'
+  candleModelPath = '/models/tinyVotiveOnly.glb',
+  useArcticRings = true, // Toggle between Arctic Rings and original burst
+  onBloomPulse // Callback to update bloom intensity: (intensity) => setBloomIntensity(intensity)
 }, ref) => {
   const [effectState, setEffectState] = useState({
     isActive: false,
@@ -525,11 +675,21 @@ export const NewCandleEffectManager = forwardRef(({
         isMobile={isMobile}
       />
       
-      <ArrivalBurst
-        position={burstPosition}
-        isActive={showBurst}
-        onComplete={handleBurstComplete}
-      />
+      {/* Arctic Rings or original burst based on prop */}
+      {useArcticRings ? (
+        <ArcticRingsEffect
+          position={burstPosition}
+          isActive={showBurst}
+          onComplete={handleBurstComplete}
+          onBloomPulse={onBloomPulse}
+        />
+      ) : (
+        <ArrivalBurst
+          position={burstPosition}
+          isActive={showBurst}
+          onComplete={handleBurstComplete}
+        />
+      )}
     </>
   )
 })

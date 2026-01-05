@@ -24,7 +24,7 @@ const Matchstick = ({ onLight }) => {
         />
         <div className={styles['wood-wrapper']}>
           <div className={styles.wood}>
-            {/* <p>bbb</p> */}
+            <p>b</p>
           </div>
           <div className={styles.tip}></div>
         </div>

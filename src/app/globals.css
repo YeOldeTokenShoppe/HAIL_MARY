@@ -126,6 +126,14 @@ canvas {
 /* @import "@fortawesome/fontawesome-free/css/all.min.css"; */
 /* @import "sparkle.css"; */
 /* @import "coinLoaderSimple.css"; */
+@font-face {
+  font-family: 'Permanent Marker';
+  src: url('/fonts/PermanentMarker-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 
 
 

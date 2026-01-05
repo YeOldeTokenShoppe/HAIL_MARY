@@ -11,12 +11,14 @@ import ThirdwebBuyModal from '@/components/ThirdwebBuyModal'
 import CoinLoader from '@/components/CoinLoader'
 import { useRouter } from 'next/navigation'
 import ShrineLeftPanel from '@/components/ShrineLeftPanel'
+import styles from '@/components/Matchstick.module.css'
 
 // Tiny Votive Model Component
 
 export default function ShrinePage() {
   const router = useRouter()
   const { user } = useUser()
+  const unifiedShrineRef = useRef()
   const { 
     play, 
     pause, 
@@ -33,6 +35,7 @@ export default function ShrinePage() {
   const [currentView, setCurrentView] = useState('shrine')
   const [mounted, setMounted] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [mobileMatchstickLit, setMobileMatchstickLit] = useState(false)
   const is80sMode = context80sMode
   
   // State for offerings data
@@ -211,6 +214,7 @@ export default function ShrinePage() {
           </div>
         }>
           <UnifiedShrine 
+            ref={unifiedShrineRef}
             key="shrine-scene"
             offerings={mockOfferings}
             onSelectOffering={setHoveredOffering}
@@ -231,7 +235,7 @@ export default function ShrinePage() {
         is80sMode={is80sMode}
         isMobile={isMobileView}
         onLightCandle={() => {
-          // Trigger your candle lighting logic
+          // Create a new offering
           const messages = [
             'Please pump my bags to the moon 🚀',
             'Grant me diamond hands in these trying times',
@@ -248,15 +252,197 @@ export default function ShrinePage() {
             timestamp: 'just now'
           }
           
+          // Add offering to the list
           setMockOfferings(prev => [newOffering, ...prev])
           setJustLitOffering(newOffering)
           setTimeout(() => setJustLitOffering(null), 3000)
+          
+          // Trigger the candle launch animation
+          if (unifiedShrineRef.current) {
+            unifiedShrineRef.current.triggerCandleEffect(newOffering)
+          }
         }}
         router={router}
       />
+      
+      {/* Mobile CTA and Matchstick */}
+      {isMobileView && (
+        <>
+          {/* CTA Text for Mobile - Centered */}
+          <div style={{
+            position: 'absolute',
+            bottom: '1.5rem',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 100,
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: '1.2rem',
+            fontWeight: 300,
+            color: 'rgba(246, 245, 241, 0.95)',
+            textShadow: `
+              0 0 20px rgba(212, 175, 55, 0.4),
+              0 0 40px rgba(212, 175, 55, 0.2),
+              2px 2px 4px rgba(0, 0, 0, 0.6)
+            `,
+            letterSpacing: '0.08em',
+            textAlign: 'center',
+            lineHeight: 1.4,
+          }}>
+            <span style={{ 
+              display: 'block',
+              fontWeight: 400,
+              textTransform: 'uppercase',
+              letterSpacing: '0.12em',
+            }}>
+              Get on Her Watchlist
+            </span>
+            <span style={{ 
+              display: 'block', 
+              fontSize: '0.9rem',
+              opacity: 0.8,
+              marginTop: '6px',
+              fontWeight: 300,
+              fontStyle: 'italic',
+            }}>
+              Light a candle for price pumps
+            </span>
+          </div>
+          
+          {/* Matchstick - Positioned at 60% left */}
+          <div 
+            className={styles.wrapper}
+            onClick={() => {
+              if (!mobileMatchstickLit) {
+                // Create a new offering
+                const messages = [
+                  'Please pump my bags to the moon 🚀',
+                  'Grant me diamond hands in these trying times',
+                  'May the green candles be ever in my favor',
+                ]
+                const names = ['anon_trader', 'crypto_believer', 'hodl_warrior']
+                const types = ['petition', 'confession', 'appreciation']
+                
+                const newOffering = {
+                  name: names[Math.floor(Math.random() * names.length)],
+                  type: types[Math.floor(Math.random() * types.length)],
+                  message: messages[Math.floor(Math.random() * messages.length)],
+                  tokensBurned: Math.floor(Math.random() * 10000) + 500,
+                  timestamp: 'just now'
+                }
+                
+                // Add offering to the list
+                setMockOfferings(prev => [newOffering, ...prev])
+                setJustLitOffering(newOffering)
+                setTimeout(() => setJustLitOffering(null), 3000)
+                
+                // Trigger the candle launch animation
+                if (unifiedShrineRef.current) {
+                  unifiedShrineRef.current.triggerCandleEffect(newOffering)
+                }
+                
+                setMobileMatchstickLit(true)
+              }
+              setMobileMatchstickLit(!mobileMatchstickLit)
+            }}
+            style={{
+              position: 'absolute',
+              bottom: '-7rem',
+              left: '60%',
+              transform: 'translateX(-50%)',
+              zIndex: 100,
+            }}
+          >
+            <div className={styles.container}>
+              <input type="checkbox" className={styles.switch} checked={mobileMatchstickLit} readOnly />
+              
+              {/* Organic ambient glow - replaces the harsh circle */}
+              <div className={styles.ambientGlow} />
+              
+              <div className={styles.flameContainer}>
+                <div className={`${styles.flame} ${styles.red}`}></div>
+                <div className={`${styles.flame} ${styles.orange}`}></div>
+                <div className={`${styles.flame} ${styles.yellow}`}></div>
+                <div className={`${styles.flame} ${styles.white}`}></div>
+                <div className={`${styles.circle} ${styles.black}`}></div>
+              </div>
+              
+              <div className={styles.woodWrapper}>
+                <div className={styles.tip}></div>
+                <div className={styles.wood}>
+                  <p>b</p>
+                </div>
+              </div>
+              
+              <div className={styles.glowingArea}></div>
+              <div className={styles.mainGlow}></div>
+            </div>
+          </div>
+        </>
+      )}
+      
       {/* Tiny Candle Button with Glowing Arrow - Bottom Right - Desktop Only */}
       {!isMobileView && (
         <>
+          {/* Bottom-Right Corner Vignette - layered for smooth blending */}
+          {/* Outer soft layer */}
+          <div style={{
+            position: "fixed",
+            bottom: "-50px",
+            right: "-50px",
+            width: "500px",
+            height: "350px",
+            zIndex: 3,
+            pointerEvents: "none",
+            background: `radial-gradient(
+              circle at 100% 100%,
+              rgba(10,10,20,0.5) 0%,
+              rgba(10,10,20,0.35) 30%,
+              rgba(10,10,20,0.2) 50%,
+              rgba(10,10,20,0.1) 70%,
+              transparent 90%
+            )`,
+            filter: "blur(20px)",
+          }} />
+          
+          {/* Middle layer */}
+          <div style={{
+            position: "fixed",
+            bottom: "-20px",
+            right: "-20px",
+            width: "420px",
+            height: "280px",
+            zIndex: 3,
+            pointerEvents: "none",
+            background: `radial-gradient(
+              ellipse 450px 300px at 100% 100%,
+              rgba(10,10,20,0.7) 0%,
+              rgba(10,10,20,0.55) 25%,
+              rgba(10,10,20,0.35) 45%,
+              rgba(10,10,20,0.2) 65%,
+              transparent 85%
+            )`,
+            filter: "blur(8px)",
+          }} />
+          
+          {/* Inner focused layer */}
+          <div style={{
+            position: "fixed",
+            bottom: 0,
+            right: 0,
+            width: "350px",
+            height: "220px",
+            zIndex: 3,
+            pointerEvents: "none",
+            background: `radial-gradient(
+              ellipse at 100% 100%,
+              rgba(10,10,20,0.9) 0%,
+              rgba(10,10,20,0.7) 30%,
+              rgba(10,10,20,0.4) 55%,
+              transparent 80%
+            )`,
+            filter: "blur(2px)",
+          }} />
+
           <div 
             className="candle-button"
             style={{
@@ -423,7 +609,7 @@ export default function ShrinePage() {
           style={{ transition: "all 0.3s ease" }}
         >
           <textPath href="#textPath" startOffset="5%">
-            Synth Traders
+            Trade School
           </textPath>
           <animate
             attributeName="fill-opacity"

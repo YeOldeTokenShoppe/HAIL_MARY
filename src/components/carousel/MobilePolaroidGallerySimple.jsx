@@ -68,7 +68,7 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
           left: 10px;
           right: 10px;
           text-align: center;
-          font-family: 'Homemade Apple', monospace;
+          font-family: 'Permanent Marker';
           color: #333;
           font-size: 18px;
           line-height: 1.2;

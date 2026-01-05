@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
 import styles from './Matchstick.module.css'
 
@@ -14,11 +14,18 @@ export default function ShrineLeftPanel({
   onLightCandle,
   router 
 }) {
+  const [isLit, setIsLit] = useState(false)
   
   const handleMatchClick = () => {
-    if (onLightCandle) {
+    if (!isLit && onLightCandle) {
       onLightCandle()
     }
+    setIsLit(!isLit)
+  }
+
+  // Don't render on mobile (phones), but keep for tablets and desktop
+  if (isMobile) {
+    return null
   }
 
   return (
@@ -28,11 +35,9 @@ export default function ShrineLeftPanel({
         position: 'fixed',
         top: 0,
         left: 0,
-        width: isMobile ? '100%' : '45%',
+        width: '45%',
         height: '100%',
-        background: isMobile 
-          ? 'linear-gradient(180deg, rgba(0,0,0,0.7) 0%, transparent 30%, transparent 70%, rgba(0,0,0,0.5) 100%)'
-          : 'linear-gradient(90deg, rgba(10,10,20,0.85) 0%, rgba(10,10,20,0.6) 40%, rgba(10,10,20,0.2) 70%, transparent 100%)',
+        background: 'linear-gradient(90deg, rgba(10,10,20,0.85) 0%, rgba(10,10,20,0.6) 40%, rgba(10,10,20,0.2) 70%, transparent 100%)',
         pointerEvents: 'none',
         zIndex: 3,
       }} />
@@ -40,24 +45,22 @@ export default function ShrineLeftPanel({
       {/* Main content container - positioned as one cohesive unit */}
       <div style={{
         position: 'fixed',
-        left: isMobile ? '50%' : '40px',
-        bottom: isMobile ? '20px' : '12%',
-        transform: isMobile ? 'translateX(-50%)' : 'none',
+        left: '40px',
+        top: '5%',
         display: 'flex',
         flexDirection: 'column',
-        alignItems: isMobile ? 'center' : 'flex-start',
-        gap: isMobile ? '16px' : '24px',
+        alignItems: 'flex-start',
+        gap: '24px',
         zIndex: 100,
         pointerEvents: 'auto',
       }}>
         
-        {/* Title - Desktop only, mobile has separate RL80 logo */}
-        {!isMobile && (
-          <h1 className='custom-title'
+        {/* Title */}
+        <h1 className='custom-title'
             id="main-title"
             onClick={() => router?.push('/carousel')}
             style={{ 
-              color: is80sMode ? "#ffffff" : "#f6f5f1ff",
+              color: is80sMode ? "#ffffff" : "#d4af37",
               fontFamily: 'UnifrakturCook, serif',
               textShadow: is80sMode 
                 ? `
@@ -69,12 +72,16 @@ export default function ShrineLeftPanel({
                   0 0 100px rgba(201, 55, 255, 0.5)
                 `
                 : `
-                  0 0 10px rgba(212, 175, 55, 0.8),
-                  0 0 20px rgba(212, 175, 55, 0.6),
-                  0 0 30px rgba(212, 175, 55, 0.8),
-                  6px 6px 16px rgba(0, 0, 0, 1),
-                  -2px -2px 8px rgba(255, 192, 203, 0.7),
-                  0 0 100px rgba(212, 175, 55, 0.1)
+                  rgba(83, 61, 74, 0.9) 1px 1px,
+                  rgba(83, 61, 74, 0.9) 2px 2px,
+                  rgba(83, 61, 74, 0.8) 3px 3px,
+                  rgba(83, 61, 74, 0.8) 4px 4px,
+                  rgba(83, 61, 74, 0.7) 5px 5px,
+                  rgba(83, 61, 74, 0.7) 6px 6px,
+                  rgba(83, 61, 74, 0.6) 7px 7px,
+                  rgba(83, 61, 74, 0.6) 8px 8px,
+                  rgba(255, 192, 203, 0.4) -1px -1px 5px,
+                  rgba(0, 0, 0, 0.8) 10px 10px 15px
                 `,
               fontSize: "3rem",
               fontWeight: 900,
@@ -92,11 +99,10 @@ export default function ShrineLeftPanel({
             </span>
             <span className="title-line" style={{ display: 'block', marginLeft: "4rem", position: 'relative' }}>Profit</span>
           </h1>
-        )}
 
         {/* CTA Text - Clean modern font */}
         <div style={{
-          fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+          fontFamily: "'Bebas Neue', sans-serif",
           fontSize: isMobile ? '1.2rem' : '1.4rem',
           fontWeight: 300,
           color: 'rgba(246, 245, 241, 0.95)',
@@ -108,6 +114,7 @@ export default function ShrineLeftPanel({
           letterSpacing: '0.08em',
           textAlign: isMobile ? 'center' : 'left',
           lineHeight: 1.4,
+          maxWidth: isMobile ? '280px' : '320px',
         }}>
           <span style={{ 
             display: 'block',
@@ -115,7 +122,7 @@ export default function ShrineLeftPanel({
             textTransform: 'uppercase',
             letterSpacing: '0.12em',
           }}>
-            Seek Her Favor
+            Get on Her Watchlist 
           </span>
           <span style={{ 
             display: 'block', 
@@ -125,7 +132,7 @@ export default function ShrineLeftPanel({
             fontWeight: 300,
             fontStyle: 'italic',
           }}>
-            Light a candle for blessings
+            Light a candle for price pumps
           </span>
         </div>
 
@@ -134,11 +141,12 @@ export default function ShrineLeftPanel({
           className={styles.wrapper}
           onClick={handleMatchClick}
           style={{
-            marginTop: isMobile ? '8px' : '16px',
+            marginTop: '16px', 
+            marginLeft: '5%',
           }}
         >
           <div className={styles.container}>
-            <input type="checkbox" className={styles.switch} />
+            <input type="checkbox" className={styles.switch} checked={isLit} readOnly />
             
             {/* Organic ambient glow - replaces the harsh circle */}
             <div className={styles.ambientGlow} />
@@ -154,7 +162,7 @@ export default function ShrineLeftPanel({
             <div className={styles.woodWrapper}>
               <div className={styles.tip}></div>
               <div className={styles.wood}>
-                <p>~~~~~~~~</p>
+                <p>b</p>
               </div>
             </div>
             

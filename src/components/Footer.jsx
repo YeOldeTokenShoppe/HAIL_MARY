@@ -25,7 +25,6 @@ const Footer = ({ isMobile = false }) => {
         maxWidth: '1200px',
         margin: '0 auto'
       }}>
-        {/* Footer Title with Coin */}
         <div style={{
           display: 'flex',
           flexDirection: 'column',
@@ -35,21 +34,12 @@ const Footer = ({ isMobile = false }) => {
           gap: '2rem',
           marginTop: isMobile ? '1rem' : '3rem',
         }}>
-          {/* Coin positioned above title */}
           <div style={{
             display: 'flex',
             justifyContent: 'center',
           }}>
-            {/* <CircularCTA
-              text="• PREME EMERE • CLICK TO BUY • PREME EMERE • CLICK TO BUY • PREME EMERE • CLICK TO BUY"
-              href="/trade"
-              accentColor="#00ff00"
-              bgColor="none"
-              size={200}
-              textSize={isMobile ? 7 : 7}
-            /> */}
           </div>
-                     <h1 className='custom-title footer-title'
+            <h1 className='custom-title footer-title'
               id="main-title"
               style={{ 
               position: "relative",
@@ -71,7 +61,7 @@ const Footer = ({ isMobile = false }) => {
               `,
               fontSize: getResponsiveValue("3rem", "3rem", "3rem", "3rem"),
               fontWeight: 900,
-              lineHeight: 0.8,
+              lineHeight: 0.9,
               transform: isMobile ? "rotate(-5deg)" : "rotate(-8deg) skew(-15deg)",
               zIndex: 10,
               whiteSpace: isMobile ? 'normal' : 'nowrap',
@@ -79,12 +69,12 @@ const Footer = ({ isMobile = false }) => {
               margin: 0,
               pointerEvents: 'auto',
             }}>
-              <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
-              <span className="title-line" style={{ display: 'block', position: 'relative' }}>
-                <span style={{ fontSize: isMobile ? "1.2rem" : "1.5rem" }}>of    </span>
+              <span  style={{ display: 'block',  marginLeft: isMobile ? "0rem" : "-2rem",position: 'relative' }}>Our Lady</span>
+              <span  style={{ display: 'block', position: 'relative' }}>
+                <span style={{ fontSize: isMobile ? "1.2rem" : "1.3rem" }}>of    </span>
                 Perpetual
               </span>
-              <span className="title-line" style={{ display: 'block', marginLeft: isMobile ? "0rem" : "0rem", position: 'relative' }}>Profit</span>
+              <span  style={{ display: 'block', marginLeft: isMobile ? "0rem" : "0rem", position: 'relative' }}>Profit</span>
             </h1>
         </div>
         

@@ -1,5 +1,5 @@
 'use client'
-import React, { useRef, useState, useEffect, Suspense, useCallback, useMemo } from 'react'
+import React, { useRef, useState, useEffect, Suspense, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useGLTF, Stats, OrbitControls } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
@@ -92,7 +92,7 @@ function OptimizedPriceSimulator({ priceRef, shortTermPriceRef, continuousOffset
 
 
 // Main component
-export default function UnifiedShrine({ 
+const UnifiedShrine = forwardRef(function UnifiedShrine({ 
   offerings = [], 
   onSelectOffering, 
   onLightCandle, 
@@ -101,13 +101,16 @@ export default function UnifiedShrine({
   hoveredOffering,
   justLitOffering,
   onJustLitComplete 
-}) {
+}, ref) {
   // Track if component is mounted for SSR safety
   const [mounted, setMounted] = useState(false)
   // Use refs for real-time price and movement (no re-renders)
   const priceRef = useRef(0)
   const shortTermPriceRef = useRef(0)
   const continuousOffsetRef = useRef(0)
+const [bloomIntensity, setBloomIntensity] = useState(1.2)
+  const effectRef = useRef()
+  
   
   // State only for UI display (throttled updates)
   const [displayPrice, setDisplayPrice] = useState({
@@ -122,7 +125,15 @@ export default function UnifiedShrine({
   
   const [additionalCandles, setAdditionalCandles] = useState([])
   const [clickedCandleId, setClickedCandleId] = useState(null)
-  const effectManagerRef = useRef()
+  
+  // Expose method to trigger candle effect
+  useImperativeHandle(ref, () => ({
+    triggerCandleEffect: (offering) => {
+      if (effectRef.current) {
+        effectRef.current.triggerEffect(offering)
+      }
+    }
+  }), [])
   const [userRotation, setUserRotation] = useState(0)
   const isDragging = useRef(false)
   const dragStart = useRef({ x: 0, rotation: 0 })
@@ -551,27 +562,23 @@ export default function UnifiedShrine({
           disabled={testPriceOverride !== null}  // Disable when test controls are active
         />
         
-        {/* Candle effect manager */}
-        <NewCandleEffectManager
-          ref={effectManagerRef}
-          phonePosition={[0, -3, 5]}
-          cloudBounds={{ x: 20, y: 10, z: 10 }}
-          onNewCandle={handleNewCandle}
-          candleModelPath="/models/tinyVotiveOnly.glb"
-        />
+<NewCandleEffectManager
+  ref={effectRef}
+  phonePosition={[0, 0, 5]}
+  onNewCandle={handleNewCandle}
+  onBloomPulse={setBloomIntensity}  // Pass the state setter
+/>
         
-        {/* Post-processing - skip on mobile */}
-        {/* {!isMobile && ( */}
-          <EffectComposer>
-            <Bloom 
-              intensity={1.0}
-              luminanceThreshold={0.2}
-              luminanceSmoothing={0.9}
-              mipmapBlur
-              radius={0.8}
-            />
-          </EffectComposer>
-        {/* )} */}
+     
+<EffectComposer>
+<Bloom 
+    intensity={bloomIntensity}
+    luminanceThreshold={0.1}  // Lower this (was 0.2) - original uses 0.1
+    luminanceSmoothing={0.9}
+    mipmapBlur
+    radius={0.8}
+  />
+</EffectComposer>
       </Canvas>
       )}
       </div>
@@ -861,4 +868,6 @@ export default function UnifiedShrine({
       
     </div>
   )
-}
+})
+
+export default UnifiedShrine
