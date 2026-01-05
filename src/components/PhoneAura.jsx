@@ -89,7 +89,12 @@ export function PhoneAura({
   return (
     <group ref={groupRef} position={phonePosition} rotation={phoneRotation}>
       {/* Layer 1: Furthest back, largest */}
-      <mesh position={[0, 0, -0.8]} rotation={[0, 0, 0]} renderOrder={1}>
+      <mesh 
+        position={[0, 0, -0.8]} 
+        rotation={[0, 0, 0]} 
+        renderOrder={1}
+        raycast={() => null} // Ignore raycasts - let clicks pass through
+      >
         <circleGeometry args={[size * 0.7, 64]} />
         <shaderMaterial
           vertexShader={auraVertexShader}
@@ -104,7 +109,12 @@ export function PhoneAura({
       </mesh>
       
       {/* Layer 2: Middle layer */}
-      <mesh position={[0, 0, -0.5]} rotation={[0, 0, 0]} renderOrder={2}>
+      <mesh 
+        position={[0, 0, -0.5]} 
+        rotation={[0, 0, 0]} 
+        renderOrder={2}
+        raycast={() => null} // Ignore raycasts - let clicks pass through
+      >
         <circleGeometry args={[size * 0.5, 64]} />
         <shaderMaterial
           ref={materialRef}
@@ -120,7 +130,12 @@ export function PhoneAura({
       </mesh>
       
       {/* Layer 3: Closest to phone but still behind */}
-      <mesh position={[0, 0, -0.2]} rotation={[0, 0, 0]} renderOrder={3}>
+      <mesh 
+        position={[0, 0, -0.2]} 
+        rotation={[0, 0, 0]} 
+        renderOrder={3}
+        raycast={() => null} // Ignore raycasts - let clicks pass through
+      >
         <circleGeometry args={[size * 0.35, 64]} />
         <shaderMaterial
           vertexShader={auraVertexShader}

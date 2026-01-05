@@ -15,6 +15,13 @@ const sharedUniforms = {
   uPriceDirection: { value: 0 },
   uContinuousOffset: { value: 0 }, // Accumulated offset from continuous price movement
   uShortTermPrice: { value: 0 }, // Short-term price change for dynamic movement
+  uPulseTime: { value: -1 }, // Time when pulse started, -1 = no pulse
+  uPulsePosition: { value: new THREE.Vector3(0, 0, 0) }, // Position of pulse origin
+}
+
+// Expose globally for pulse triggers
+if (typeof window !== 'undefined') {
+  window.sharedUniforms = sharedUniforms
 }
 
 // Base vertex shader chunk for candle wobble - reused across all materials
@@ -24,6 +31,8 @@ const wobbleVertexChunk = `
   uniform float uPriceDirection;
   uniform float uContinuousOffset;
   uniform float uShortTermPrice;
+  uniform float uPulseTime;
+  uniform vec3 uPulsePosition;
   
   // Fast hash function
   float hash(float n) {
@@ -61,6 +70,41 @@ const wobbleVertexChunk = `
     float microSpeed = 1.5 + hash(instanceId + 400.0) * 0.5;
     offsetX += sin(t * microSpeed + phaseX) * 0.05;
     offsetY += cos(t * microSpeed * 0.9 + phaseY) * 0.08;
+    
+    // Add pulse effect when a new candle lands
+    if (uPulseTime > 0.0) {
+      float pulseAge = uTime - uPulseTime;
+      if (pulseAge < 1.5) { // Pulse lasts 1.5 seconds
+        // Calculate distance from pulse origin
+        float dist = distance(basePosition, uPulsePosition);
+        
+        // Wave travels outward at speed of 15 units per second
+        float waveRadius = pulseAge * 15.0;
+        float waveWidth = 5.0;
+        
+        // Check if this candle is within the wave
+        float waveDist = abs(dist - waveRadius);
+        if (waveDist < waveWidth) {
+          // Smooth wave profile
+          float waveStrength = 1.0 - (waveDist / waveWidth);
+          waveStrength *= 1.0 - (pulseAge / 1.5); // Fade out over time
+          
+          // Push candles outward from pulse center
+          vec3 pushDir = normalize(basePosition - uPulsePosition);
+          // Randomize the push slightly per candle
+          pushDir.x += (hash(instanceId + 500.0) - 0.5) * 0.3;
+          pushDir.y += abs(hash(instanceId + 600.0) - 0.5) * 0.5; // Bias upward
+          pushDir.z += (hash(instanceId + 700.0) - 0.5) * 0.3;
+          pushDir = normalize(pushDir);
+          
+          // Apply the pulse displacement
+          vec3 pulseOffset = pushDir * waveStrength * 1.5;
+          offsetX += pulseOffset.x;
+          offsetY += pulseOffset.y;
+          offsetZ += pulseOffset.z;
+        }
+      }
+    }
     
     return vec3(offsetX, offsetY, offsetZ);
   }
@@ -454,6 +498,9 @@ function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.5
   useEffect(() => {
     if (!meshRef.current) return
     
+    // Set the actual count of instances to render
+    meshRef.current.count = actualCount
+    
     for (let i = 0; i < capacity; i++) {
       meshRef.current.setMatrixAt(i, baseMatrices[i])
     }
@@ -467,7 +514,7 @@ function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.5
     if (meshRef.current.boundingSphere) {
       meshRef.current.boundingSphere.radius *= 1.5  // Account for movement
     }
-  }, [baseMatrices, capacity])
+  }, [baseMatrices, capacity, actualCount])
   
   if (!geometry) return null
   
@@ -477,6 +524,7 @@ function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.5
       args={[geometry, material, capacity]}
       frustumCulled={false}
       renderOrder={-5}
+      raycast={THREE.InstancedMesh.prototype.raycast}
       onClick={(event) => {
         event.stopPropagation()
         if (onCandleClick && event.instanceId !== undefined && event.instanceId < positions.length) {

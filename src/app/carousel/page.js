@@ -442,7 +442,7 @@ export default function CarouselPage() {
             filter: "url(#candleGlow) drop-shadow(3px 3px 6px rgba(0, 0, 0, 0.8))"
           }}
         >
-          <textPath href="#textPath" startOffset="5%">
+          <textPath href="#textPath" startOffset="0">
             The Illumin80
           </textPath>
           <animate

@@ -11,8 +11,9 @@ import { NewCandleEffectManager } from './NewCandleEffect'
 
 
 // Scene rotation controller - handles rotation without blocking clicks
-function SceneRotator({ children, userRotation }) {
+function SceneRotator({ children, userRotation, onRotationStart, onRotationMove, onRotationEnd }) {
   const groupRef = useRef()
+  const [isPointerDown, setIsPointerDown] = useState(false)
   
   useFrame(() => {
     if (groupRef.current) {
@@ -21,9 +22,46 @@ function SceneRotator({ children, userRotation }) {
   })
   
   return (
-    <group ref={groupRef}>
-      {children}
-    </group>
+    <>
+      {/* Invisible background plane for rotation - render first so it's behind everything */}
+      <mesh
+        position={[0, 0, -100]}
+        onPointerDown={(e) => {
+          e.stopPropagation()
+          setIsPointerDown(true)
+          onRotationStart(e)
+        }}
+        onPointerMove={(e) => {
+          if (isPointerDown) {
+            e.stopPropagation()
+            onRotationMove(e)
+          }
+        }}
+        onPointerUp={(e) => {
+          e.stopPropagation()
+          setIsPointerDown(false)
+          onRotationEnd()
+        }}
+        onPointerLeave={(e) => {
+          if (isPointerDown) {
+            e.stopPropagation()
+            setIsPointerDown(false)
+            onRotationEnd()
+          }
+        }}
+        onPointerCancel={(e) => {
+          e.stopPropagation()
+          setIsPointerDown(false)
+          onRotationEnd()
+        }}
+      >
+        <planeGeometry args={[1000, 1000]} />
+        <meshBasicMaterial transparent opacity={0} />
+      </mesh>
+      
+      {/* Actual scene content that rotates */}
+      <group ref={groupRef}>{children}</group>
+    </>
   )
 }
 
@@ -132,6 +170,8 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
   const [userRotation, setUserRotation] = useState(0)
   const isDragging = useRef(false)
   const dragStart = useRef({ x: 0, rotation: 0 })
+  const hasDraggedEnough = useRef(false) // Track if we've moved enough to start rotating
+  const DRAG_THRESHOLD = 5 // Pixels to move before rotation starts
   const [isMobile, setIsMobile] = useState(false)
   const [hasReachedSection, setHasReachedSection] = useState(true)
   const [isInView, setIsInView] = useState(true)
@@ -249,35 +289,61 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
     }
   }, [onLightCandle])
 
-  const handlePointerDown = useCallback((event) => {
-    // Only start drag if we didn't click on a mesh
-    // In R3F, if we click empty space, no object will be set
-    if (!event.object) {
-      isDragging.current = true
-      dragStart.current = {
-        x: event.clientX || event.nativeEvent?.clientX || 0,
-        rotation: userRotation
-      }
-      if (typeof document !== 'undefined' && document.body) {
-        document.body.style.cursor = 'grabbing'
-      }
+  // Trigger pulse in candle cloud when Arctic Rings fire
+  const handleCandlePulse = useCallback((position) => {
+    if (window.sharedUniforms) {
+      window.sharedUniforms.uPulseTime.value = window.sharedUniforms.uTime.value
+      window.sharedUniforms.uPulsePosition.value.set(position[0], position[1], position[2])
     }
+  }, [])
+
+  const handlePointerDown = useCallback((event) => {
+    // Mark potential drag start but don't start rotating yet
+    isDragging.current = true
+    hasDraggedEnough.current = false
+    dragStart.current = {
+      x: event.clientX || event.touches?.[0]?.clientX || 0,
+      rotation: userRotation,
+      startX: event.clientX || event.touches?.[0]?.clientX || 0 // Store initial position
+    }
+    // Don't change cursor yet - wait for actual drag
   }, [userRotation])
 
   const handlePointerMove = useCallback((event) => {
     if (isDragging.current) {
-      const clientX = event.clientX || event.nativeEvent?.clientX || 0
-      const deltaX = (clientX - dragStart.current.x) * 0.01
-      const newRotation = dragStart.current.rotation + deltaX
+      const clientX = event.clientX || event.touches?.[0]?.clientX || 0
       
-      // Allow full 360 degree rotation
-      setUserRotation(newRotation)
+      // Check if we've moved enough to start rotating
+      if (!hasDraggedEnough.current) {
+        const distanceMoved = Math.abs(clientX - dragStart.current.startX)
+        if (distanceMoved >= DRAG_THRESHOLD) {
+          hasDraggedEnough.current = true
+          // Now we're actually dragging - update cursor
+          if (typeof document !== 'undefined' && document.body) {
+            document.body.style.cursor = 'grabbing'
+          }
+        } else {
+          // Haven't moved enough yet, don't rotate
+          return
+        }
+      }
+      
+      // Only rotate if we've dragged enough
+      if (hasDraggedEnough.current) {
+        const deltaX = (clientX - dragStart.current.x) * 0.01
+        const newRotation = dragStart.current.rotation + deltaX
+        
+        // Allow full 360 degree rotation
+        setUserRotation(newRotation)
+      }
     }
   }, [])
 
   const handlePointerUp = useCallback(() => {
     isDragging.current = false
-    if (typeof document !== 'undefined' && document.body) {
+    hasDraggedEnough.current = false
+    // Only reset cursor if we actually started dragging
+    if (typeof document !== 'undefined' && document.body && document.body.style.cursor === 'grabbing') {
       document.body.style.cursor = 'auto'
     }
   }, [])
@@ -401,7 +467,7 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
     color: '#fff',
     fontFamily: 'monospace',
     fontSize: isMobile ? '11px' : '14px',
-    backdropFilter: 'blur(10px)',
+    backdropFilter: 'blur(20px)',
     boxShadow: `0 0 20px ${displayPrice.change >= 0 ? 'rgba(0, 255, 100, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
     zIndex: 1000,
     width: isMobile ? '160px' : '240px',
@@ -483,11 +549,6 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
       {mounted && (
       <Canvas
         camera={{ position: [0, isMobile ? 0 : 0, isMobile ? 2 : 0], fov: isMobile ? 75 : 70 }}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
-        onPointerMissed={handlePointerDown}
         dpr={isMobile ? 1 : (typeof window !== 'undefined' ? window.devicePixelRatio : 1)}
         gl={{ 
           alpha: true,  // Enable alpha for proper transparency
@@ -543,7 +604,12 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
         <GradientBackground is80sMode={is80sMode} />
         
         {/* Rotatable scene content */}
-        <SceneRotator userRotation={userRotation}>
+        <SceneRotator 
+          userRotation={userRotation}
+          onRotationStart={handlePointerDown}
+          onRotationMove={handlePointerMove}
+          onRotationEnd={handlePointerUp}
+        >
           {/* Combined group for hands and surrounding candles */}
           <group position={[0, 0, 0]}>
             {/* Candles surrounding the camera/viewer with exclusion zone around hands */}
@@ -598,6 +664,7 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
   phonePosition={[0, 0, 5]}
   onNewCandle={handleNewCandle}
   onBloomPulse={setBloomIntensity}  // Pass the state setter
+  onCandlePulse={handleCandlePulse}  // Trigger pulse in candle cloud
 />
         
      

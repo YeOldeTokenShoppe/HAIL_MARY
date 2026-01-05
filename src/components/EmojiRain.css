@@ -1,7 +1,7 @@
 /* EmojiRain.css */
 .emoji-rain-container {
   position: absolute;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -90%);
   height: 400px;
   pointer-events: none;
   z-index: 10;
@@ -23,7 +23,7 @@
 
 @keyframes float-up {
   0% {
-    transform: translateX(var(--start-x)) translateY(0px) scale(calc(var(--scale) * 0.6));
+    transform: translateX(var(--start-x)) translateY(300px) scale(calc(var(--scale) * 0.6));
   }
   100% {
     transform: translateX(var(--end-x)) translateY(-250px) scale(var(--scale));

@@ -33,7 +33,7 @@ const easeInOutCubic = (t) =>
 // Expanding icy rings on candle arrival
 // Faithful port of vanilla Three.js version
 // ============================================
-export function ArcticRingsEffect({ position, isActive, onComplete, onBloomPulse }) {
+export function ArcticRingsEffect({ position, isActive, onComplete, onBloomPulse, onRingsStart }) {
   const groupRef = useRef()
   const flashRef = useRef()
   const hasStartedRef = useRef(false)
@@ -57,6 +57,7 @@ export function ArcticRingsEffect({ position, isActive, onComplete, onBloomPulse
       // Trigger bloom flash
       bloomFlashRef.current = 1.0
       onBloomPulse?.(4.0) // Start at peak intensity
+      onRingsStart?.() // Notify that rings animation has started
       
       // Create rings exactly like the original
       for (let r = 0; r < RING_COUNT; r++) {
@@ -588,7 +589,8 @@ export const NewCandleEffectManager = forwardRef(({
   onNewCandle,
   candleModelPath = '/models/tinyVotiveOnly.glb',
   useArcticRings = true, // Toggle between Arctic Rings and original burst
-  onBloomPulse // Callback to update bloom intensity: (intensity) => setBloomIntensity(intensity)
+  onBloomPulse, // Callback to update bloom intensity: (intensity) => setBloomIntensity(intensity)
+  onCandlePulse // Callback to trigger pulse effect in candle cloud: (position) => triggerPulse(position)
 }, ref) => {
   const [effectState, setEffectState] = useState({
     isActive: false,
@@ -617,15 +619,15 @@ export const NewCandleEffectManager = forwardRef(({
       // For mobile, keep the target more centered and closer
       target = [
         (Math.random() - 0.5) * cloudBounds.x * 0.4, // 40% of normal range
-        (Math.random() - 0.5) * cloudBounds.y * 0.5 + 2, // 50% range, slightly higher
-        (Math.random() - 0.5) * cloudBounds.z * 0.3 - 3 // Closer to camera
+        1.5 + Math.random() * 0.5, // Consistent Y around eye level (1.5 to 2.0)
+        Math.random() * cloudBounds.z * 0.15 - 10 // Further in front (-10 to -11.5)
       ]
     } else {
-      // Desktop - full range
+      // Desktop - bias toward front of view with consistent height
       target = [
-        (Math.random() - 0.5) * cloudBounds.x,
-        (Math.random() - 0.5) * cloudBounds.y,
-        (Math.random() - 0.5) * cloudBounds.z - 5
+        (Math.random() - 0.5) * cloudBounds.x * 0.7, // 70% of full width for better visibility
+        0 + Math.random() * -0.6, // Consistent Y near viewer level (0 to 1.0)
+        Math.random() * cloudBounds.z * 0.2 - 12 // Further in front (-12 to -14)
       ]
     }
     
@@ -682,6 +684,7 @@ export const NewCandleEffectManager = forwardRef(({
           isActive={showBurst}
           onComplete={handleBurstComplete}
           onBloomPulse={onBloomPulse}
+          onRingsStart={() => onCandlePulse?.(burstPosition)}
         />
       ) : (
         <ArrivalBurst

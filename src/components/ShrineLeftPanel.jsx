@@ -58,7 +58,7 @@ export default function ShrineLeftPanel({
         {/* Title */}
         <h1 className='custom-title'
             id="main-title"
-            onClick={() => router?.push('/carousel')}
+            // onClick={() => router?.push('/carousel')}
             style={{ 
               pointerEvents: 'auto',  // Enable clicks on the title
               color: is80sMode ? "#ffffff" : "#d4af37",
@@ -133,7 +133,7 @@ export default function ShrineLeftPanel({
             fontWeight: 300,
             fontStyle: 'italic',
           }}>
-            Light a candle for price pumps
+            Light a candle fore price pumps
           </span>
         </div>
 
