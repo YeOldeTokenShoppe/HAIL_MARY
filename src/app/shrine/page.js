@@ -11,7 +11,6 @@ import ThirdwebBuyModal from '@/components/ThirdwebBuyModal'
 import CoinLoader from '@/components/CoinLoader'
 import { useRouter } from 'next/navigation'
 import ShrineLeftPanel from '@/components/ShrineLeftPanel'
-import styles from '@/components/Matchstick.module.css'
 
 // Tiny Votive Model Component
 
@@ -265,53 +264,64 @@ export default function ShrinePage() {
         router={router}
       />
       
-      {/* Mobile CTA and Matchstick */}
+      {/* Mobile CTA and Matchstick - Minimal Floating Design */}
       {isMobileView && (
-        <>
-          {/* CTA Text for Mobile - Centered */}
+        <div style={{
+          position: 'fixed',
+          bottom: '16px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 'calc(100% - 32px)',
+          maxWidth: '340px',
+          background: 'rgba(10, 10, 20, 0.4)',
+          border: '1px solid rgba(212, 175, 55, 0.15)',
+          borderRadius: '16px',
+          padding: '12px 16px',
+          boxShadow: `
+            0 4px 20px rgba(0, 0, 0, 0.3),
+            inset 0 1px 0 rgba(255, 255, 255, 0.05)
+          `,
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          zIndex: 100,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '16px',
+        }}>
+          {/* Left side - Text */}
           <div style={{
-            position: 'absolute',
-            bottom: '1.5rem',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 100,
+            flex: 1,
             fontFamily: "'Bebas Neue', sans-serif",
-            fontSize: '1.2rem',
-            fontWeight: 300,
-            color: 'rgba(246, 245, 241, 0.95)',
-            textShadow: `
-              0 0 20px rgba(212, 175, 55, 0.4),
-              0 0 40px rgba(212, 175, 55, 0.2),
-              2px 2px 4px rgba(0, 0, 0, 0.6)
-            `,
-            letterSpacing: '0.08em',
-            textAlign: 'center',
-            lineHeight: 1.4,
+            color: 'rgba(246, 245, 241, 0.9)',
+            textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)',
           }}>
-            <span style={{ 
-              display: 'block',
+            <div style={{ 
+              fontSize: '0.95rem',
               fontWeight: 400,
               textTransform: 'uppercase',
-              letterSpacing: '0.12em',
+              letterSpacing: '0.06em',
+              marginBottom: '2px',
+              color: 'rgba(212, 175, 55, 0.9)',
             }}>
-              Get on Her Watchlist
-            </span>
-            <span style={{ 
-              display: 'block', 
-              fontSize: '0.9rem',
-              opacity: 0.8,
-              marginTop: '6px',
+              Get On Her Watchlist
+            </div>
+            <div style={{ 
+              fontSize: '0.75rem',
+              opacity: 0.7,
               fontWeight: 300,
-              fontStyle: 'italic',
             }}>
-              Light a candle for price pumps
-            </span>
+              Light a candle for price pumps!
+            </div>
           </div>
           
-          {/* Matchstick - Positioned at 60% left */}
+          {/* Right side - Matchstick Button */}
           <div 
-            className={styles.wrapper}
             onClick={() => {
+              // Haptic feedback if available
+              if (window.navigator && window.navigator.vibrate) {
+                window.navigator.vibrate(50) // Short vibration
+              }
+              
               if (!mobileMatchstickLit) {
                 // Create a new offering
                 const messages = [
@@ -341,44 +351,122 @@ export default function ShrinePage() {
                 }
                 
                 setMobileMatchstickLit(true)
+                
+                // Longer haptic for successful lighting
+                if (window.navigator && window.navigator.vibrate) {
+                  window.navigator.vibrate([50, 50, 50]) // Pattern vibration
+                }
               }
               setMobileMatchstickLit(!mobileMatchstickLit)
             }}
             style={{
-              position: 'absolute',
-              bottom: '-7rem',
-              left: '60%',
-              transform: 'translateX(-50%)',
-              zIndex: 100,
+              width: '60px',
+              height: '60px',
+              borderRadius: '50%',
+              background: mobileMatchstickLit 
+                ? 'radial-gradient(circle, rgba(255, 149, 0, 0.2) 0%, rgba(255, 100, 0, 0.05) 70%, transparent 100%)'
+                : 'rgba(212, 175, 55, 0.1)',
+              border: mobileMatchstickLit 
+                ? '1.5px solid rgba(255, 149, 0, 0.4)' 
+                : '1.5px solid rgba(212, 175, 55, 0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              boxShadow: mobileMatchstickLit
+                ? '0 0 15px rgba(255, 149, 0, 0.3)'
+                : 'none',
+              position: 'relative',
+              overflow: 'hidden',
             }}
           >
-            <div className={styles.container}>
-              <input type="checkbox" className={styles.switch} checked={mobileMatchstickLit} readOnly />
-              
-              {/* Organic ambient glow - replaces the harsh circle */}
-              <div className={styles.ambientGlow} />
-              
-              <div className={styles.flameContainer}>
-                <div className={`${styles.flame} ${styles.red}`}></div>
-                <div className={`${styles.flame} ${styles.orange}`}></div>
-                <div className={`${styles.flame} ${styles.yellow}`}></div>
-                <div className={`${styles.flame} ${styles.white}`}></div>
-                <div className={`${styles.circle} ${styles.black}`}></div>
+            {/* Flame icon when lit */}
+            {mobileMatchstickLit ? (
+              <div style={{
+                fontSize: '1.5rem',
+                animation: 'flicker 1.5s infinite',
+              }}>
+                🔥
               </div>
-              
-              <div className={styles.woodWrapper}>
-                <div className={styles.tip}></div>
-                <div className={styles.wood}>
-                  <p>b</p>
-                </div>
+            ) : (
+              /* Simple candle icon when unlit with subtle glow */
+              <div style={{
+                fontSize: '1.5rem',
+                opacity: 0.7,
+                animation: 'candleGlow 3s ease-in-out infinite',
+              }}>
+                🕯️
               </div>
-              
-              <div className={styles.glowingArea}></div>
-              <div className={styles.mainGlow}></div>
-            </div>
+            )}
+            
+            {/* Pulse animation */}
+            {mobileMatchstickLit ? (
+              // Pulse for lit state
+              <div style={{
+                position: 'absolute',
+                width: '100%',
+                height: '100%',
+                borderRadius: '50%',
+                border: '2px solid rgba(255, 149, 0, 0.6)',
+                animation: 'pulse 2s infinite',
+                pointerEvents: 'none',
+              }} />
+            ) : (
+              // Subtle glow ring for unlit state
+              <div style={{
+                position: 'absolute',
+                width: '100%',
+                height: '100%',
+                borderRadius: '50%',
+                boxShadow: '0 0 0 0 rgba(212, 175, 55, 0.4)',
+                animation: 'inviteGlow 3s ease-in-out infinite',
+                pointerEvents: 'none',
+              }} />
+            )}
           </div>
-        </>
+        </div>
       )}
+      
+      {/* Add keyframe animations */}
+      <style jsx>{`
+        @keyframes flicker {
+          0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
+          25% { transform: scale(1.1) rotate(-5deg); opacity: 0.9; }
+          50% { transform: scale(0.95) rotate(3deg); opacity: 1; }
+          75% { transform: scale(1.05) rotate(-3deg); opacity: 0.95; }
+        }
+        
+        @keyframes pulse {
+          0% { transform: scale(1); opacity: 0.6; }
+          50% { transform: scale(1.2); opacity: 0; }
+          100% { transform: scale(1.4); opacity: 0; }
+        }
+        
+        @keyframes candleGlow {
+          0%, 100% { 
+            opacity: 0.7;
+            filter: drop-shadow(0 0 3px rgba(212, 175, 55, 0));
+          }
+          50% { 
+            opacity: 0.9;
+            filter: drop-shadow(0 0 8px rgba(212, 175, 55, 0.4));
+          }
+        }
+        
+        @keyframes inviteGlow {
+          0%, 100% {
+            box-shadow: 
+              0 0 0 0 rgba(212, 175, 55, 0),
+              0 0 10px 2px rgba(212, 175, 55, 0.2);
+          }
+          50% {
+            box-shadow: 
+              0 0 0 8px rgba(212, 175, 55, 0),
+              0 0 20px 4px rgba(212, 175, 55, 0.3);
+          }
+        }
+      `}</style>
       
       {/* Tiny Candle Button with Glowing Arrow - Bottom Right - Desktop Only */}
       {!isMobileView && (

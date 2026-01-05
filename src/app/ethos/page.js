@@ -7,6 +7,7 @@ import { useMusic } from '@/components/MusicContext';
 import CoinLoader from '@/components/CoinLoader';
 import CyberNav from '@/components/CyberNav';
 import CompactCandleModal from '@/components/CompactCandleModal';
+import NavControlsHome from '@/components/NavControlsHome';
 
 const SimpleModelViewer = dynamic(() => import('@/components/SimpleModelViewer'), {
   ssr: false,
@@ -25,21 +26,11 @@ export default function ModelViewerPage() {
     is80sMode: context80sMode, 
     setIs80sMode: setContext80sMode
   } = useMusic();
-  const [showMusicControls, setShowMusicControls] = useState(contextIsPlaying);
   const [showCandleModal, setShowCandleModal] = useState(false);
   const [isPageLoading, setIsPageLoading] = useState(true);
-  const isTogglingRef = useRef(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const is80sMode = context80sMode;
-  const [emoji, setEmoji] = useState("😇");
 
-  // Alternate emoji for sign-in button
-  useEffect(() => {
-    const emojiInterval = setInterval(() => {
-      setEmoji((prevEmoji) => (prevEmoji === "😇" ? "😈" : "😇"));
-    }, 3000);
-
-    return () => clearInterval(emojiInterval);
-  }, []);
   
   // Check if device is mobile
   useEffect(() => {
@@ -53,33 +44,6 @@ export default function ModelViewerPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Sync showMusicControls with playing state
-  useEffect(() => {
-    if (contextIsPlaying && !showMusicControls) {
-      setShowMusicControls(true);
-    }
-  }, [contextIsPlaying, showMusicControls]);
-
-  const handleMusicToggle = useCallback((show) => {
-    setShowMusicControls(show);
-    if (show && !contextIsPlaying) {
-      // Use play() which handles random track selection
-      play();
-    }
-  }, [contextIsPlaying, play]);
-
-  const toggle80sMode = useCallback((newMode) => {
-    if (isTogglingRef.current) return;
-    isTogglingRef.current = true;
-    
-    if (setContext80sMode) {
-      setContext80sMode(newMode);
-    }
-    
-    setTimeout(() => {
-      isTogglingRef.current = false;
-    }, 500);
-  }, [setContext80sMode]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
@@ -89,241 +53,39 @@ export default function ModelViewerPage() {
         is80sMode={is80sMode}
       />
       
-      {/* CyberNav with integrated buttons */}
+      {/* Nav Controls */}
       {!isPageLoading && (
-        <div
-          style={{
+        <>
+          <div style={{
             position: "fixed",
-            top: "20px",
-            right: "20px",
-            zIndex: 999999
-          }}
-        >
+            top: "1rem",
+            right: "1rem",
+            zIndex: 10000,
+          }}>
+            <NavControlsHome 
+              isPlaying={contextIsPlaying}
+              onPlayMusic={() => play()}
+              onStopMusic={() => pause()}
+              onSkipTrack={() => nextTrack()}
+              onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
+              onUserClick={() => {}}
+              isUserSignedIn={!!user}
+              isMenuOpen={isMenuOpen}
+              is80sMode={is80sMode}
+              onToggle80sMode={() => setContext80sMode(!is80sMode)}
+              userImage={user?.imageUrl}
+            />
+          </div>
+          
+          {/* CyberNav Menu Panel */}
           <CyberNav 
             is80sMode={is80sMode}
             position="fixed"
-          
+            isOpen={isMenuOpen}
+            onClose={() => setIsMenuOpen(false)}
+            showButton={false}
           />
-                {/* Control Buttons - Positioned horizontally below CyberNav */}
-      {/* Music Button */}
-      <div
-        style={{
-          position: "fixed",
-          top: "5rem",
-          right: "1rem",
-          zIndex: 290
-        }}
-      >
-        {
-            !showMusicControls ? (
-              <button
-                onClick={() => handleMusicToggle(true)}
-                style={{
-                  width: isMobileDevice ? "3.5rem" : "3.5rem",
-                  height: isMobileDevice ? "3.5rem" : "3.5rem",
-                  borderRadius: "0.5rem",
-                  backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.2)" : "rgba(0, 0, 0, 0.7)",
-                  border: is80sMode ? "2px solid #D946EF" : "2px solid rgba(255, 255, 255, 0.2)",
-                  color: is80sMode ? "#67e8f9" : "#ffffff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  transition: "all 0.3s ease",
-                  backdropFilter: "blur(10px)",
-                  boxShadow: "0 0.125rem 0.5rem rgba(0, 0, 0, 0.3)",
-                }}
-                title="Toggle Music"
-              >
-                <svg
-                  width={isMobileDevice ? "20" : "30"}
-                  height={isMobileDevice ? "20" : "30"}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M9 18V5l12-2v13" />
-                  <circle cx="6" cy="18" r="3" />
-                  <circle cx="18" cy="16" r="3" />
-                </svg>
-              </button>
-            ) : (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                }}
-              >
-                {/* Spinning Album Art */}
-                <div
-                  style={{
-                    width: isMobileDevice ? "3rem" : "3.5rem",
-                    height: isMobileDevice ? "3rem" : "3.5rem",
-                    borderRadius: "50%",
-                    overflow: "hidden",
-                    animation: contextIsPlaying ? "spin 4s linear infinite" : "none",
-                    cursor: "pointer"
-                  }}
-                  onClick={() => {
-                    if (contextIsPlaying) {
-                      pause();
-                    } else {
-                      play();
-                    }
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      backgroundImage: "url('/virginRecords.jpg')",
-                      backgroundSize: "cover",
-                      backgroundPosition: "center"
-                    }}
-                  />
-                </div>
-                
-                {/* Skip Button */}
-                <button
-                  onClick={() => nextTrack && nextTrack()}
-                  style={{
-                    width: isMobileDevice ? "2rem" : "2.5rem",
-                    height: isMobileDevice ? "2rem" : "2.5rem",
-                    borderRadius: "0.25rem",
-                    backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.2)" : "rgba(0, 0, 0, 0.7)",
-                    border: is80sMode ? "2px solid #D946EF" : "2px solid rgba(255, 255, 255, 0.2)",
-                    color: is80sMode ? "#67e8f9" : "#ffffff",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    transition: "all 0.3s ease",
-                    backdropFilter: "blur(10px)",
-                    boxShadow: "0 0.125rem 0.375rem rgba(0, 0, 0, 0.3)",
-                  }}
-                  title="Next Track"
-                >
-                  <svg width={isMobileDevice ? "14" : "18"} height={isMobileDevice ? "14" : "18"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="5 4 15 12 5 20 5 4"/>
-                    <line x1="19" y1="5" x2="19" y2="19"/>
-                  </svg>
-                </button>
-                
-                {/* Close Button */}
-                <button
-                  onClick={() => {
-                    handleMusicToggle(false);
-                    pause && pause();
-                  }}
-                  style={{
-                    width: isMobileDevice ? "1.75rem" : "2rem",
-                    height: isMobileDevice ? "1.75rem" : "2rem",
-                    borderRadius: "0.25rem",
-                    backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.2)" : "rgba(0, 0, 0, 0.7)",
-                    border: is80sMode ? "1px solid #D946EF" : "1px solid rgba(255, 255, 255, 0.2)",
-                    color: is80sMode ? "#67e8f9" : "#ffffff",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    transition: "all 0.3s ease",
-                    backdropFilter: "blur(10px)",
-                    boxShadow: "0 0.125rem 0.375rem rgba(0, 0, 0, 0.3)",
-                  }}
-                  title="Close Music"
-                >
-                  <svg width={isMobileDevice ? "12" : "14"} height={isMobileDevice ? "12" : "14"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
-                  </svg>
-                </button>
-              </div>
-            )
-          }
-      </div>
-      
-      {/* User Button - Next to Music Button */}
-      <div
-        style={{
-          position: "fixed",
-          top: "100px",
-          right: "85px",
-          zIndex: 290
-        }}
-      >
-      </div>
-      
-      {/* 80s Mode Button - Next to User Button */}
-      <div
-        style={{
-          position: "fixed",
-          top: "9rem",
-          right: "1rem",
-          zIndex: 290
-        }}
-      >
-        <button
-          onClick={() => toggle80sMode(!is80sMode)}
-          style={{
-            width: isMobileDevice ? "3.5rem" : "3.5rem",
-            height: isMobileDevice ? "3.5rem" : "3.5rem",
-            borderRadius: "0.5rem",
-            backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.3)" : "rgba(0, 0, 0, 0.7)",
-            border: is80sMode ? "2px solid #D946EF" : "2px solid rgba(255, 255, 255, 0.2)",
-            color: is80sMode ? "#67e8f9" : "#ffffff",
-            display: "flex",
-            lineHeight: 0.7,
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            transition: "all 0.3s ease",
-            backdropFilter: "blur(10px)",
-            boxShadow: is80sMode 
-              ? "0 0 20px rgba(217, 70, 239, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3)" 
-              : "0 2px 8px rgba(0, 0, 0, 0.3)",
-          }}
-          onMouseEnter={(e) => {
-            if (is80sMode) {
-              e.currentTarget.style.boxShadow = "0 0 30px rgba(217, 70, 239, 0.7), 0 2px 8px rgba(0, 0, 0, 0.3)";
-            } else {
-              e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.8)";
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (is80sMode) {
-              e.currentTarget.style.boxShadow = "0 0 20px rgba(217, 70, 239, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3)";
-            } else {
-              e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.7)";
-            }
-          }}
-          title={is80sMode ? "Disable 80s Mode" : "Enable 80s Mode"}
-        >
-          <span style={{
-            fontSize: isMobileDevice ? "18px" : "22px",
-            fontWeight: "bold",
-            color: is80sMode ? "#00ff41" : "#67e8f9",
-            textShadow: is80sMode ? "0 0 10px #00ff41" : "none",
-            fontFamily: "monospace"
-          }}>
-            80s<br/>
-             <span style={{
-            fontSize: isMobileDevice ? "10px" : "12px",
-            fontWeight: "bold",
-            color: is80sMode ? "#00ff41" : "#67e8f9",
-            textShadow: is80sMode ? "0 0 10px #00ff41" : "none",
-            fontFamily: "monospace"
-          }}>
-            mode
-          </span>
-          </span>
-        </button>
-      </div>
-
-        </div>
+        </>
       )}
 
       {/* Buy Token FAB (optional - uncomment if needed) */}

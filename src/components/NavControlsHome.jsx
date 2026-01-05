@@ -66,23 +66,25 @@ export default function NavControlsHome({
           font-family: 'Orbitron', monospace;
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 10px;
           padding: 8px;
-          background: rgba(0, 0, 0, 0.5);
-          backdrop-filter: blur(12px);
-          border-radius: 12px;
-          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: rgba(10, 10, 20, 0.4);
+          backdrop-filter: blur(20px);
+          -webkit-backdrop-filter: blur(20px);
+          border-radius: 16px;
+          border: 1px solid rgba(212, 175, 55, 0.15);
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         }
 
         /* 80s Mode Button */
         .eighties-btn-mobile {
-          width: 36px;
-          height: 36px;
-          border-radius: 8px;
+          width: 40px;
+          height: 40px;
+          border-radius: 10px;
           background: ${is80sMode 
-            ? 'linear-gradient(135deg, rgba(255, 0, 255, 0.3), rgba(0, 255, 255, 0.3))' 
-            : 'rgba(0, 0, 0, 0.6)'};
-          border: 2px solid ${is80sMode ? '#ff00ff' : 'rgba(217, 70, 239, 0.4)'};
+            ? 'rgba(255, 0, 255, 0.1)' 
+            : 'rgba(212, 175, 55, 0.05)'};
+          border: 1.5px solid ${is80sMode ? 'rgba(255, 0, 255, 0.4)' : 'rgba(212, 175, 55, 0.2)'};
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -91,8 +93,8 @@ export default function NavControlsHome({
           cursor: pointer;
           transition: all 0.3s ease;
           box-shadow: ${is80sMode 
-            ? '0 0 20px rgba(217, 70, 239, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3)' 
-            : '0 2px 8px rgba(0, 0, 0, 0.3)'};
+            ? '0 0 15px rgba(255, 0, 255, 0.3)' 
+            : 'none'};
           position: relative;
         }
 
@@ -137,60 +139,65 @@ export default function NavControlsHome({
         .music-stack-mobile {
           display: flex;
           flex-direction: column;
-          gap: 3px;
-          min-height: 36px;
+          gap: 2px;
+          min-height: 40px;
           justify-content: center;
         }
 
         .music-btn-mobile {
-          width: 32px;
-          height: 16px;
-          border-radius: 4px;
-          background: rgba(0, 0, 0, 0.6);
-          border: 1px solid rgba(255, 0, 110, 0.4);
+          width: 40px;
+          height: 19px;
+          border-radius: 6px;
+          background: rgba(212, 175, 55, 0.05);
+          border: 1.5px solid rgba(212, 175, 55, 0.2);
           display: flex;
           align-items: center;
           justify-content: center;
           cursor: pointer;
           transition: all 0.2s ease;
-          color: rgba(255, 255, 255, 0.7);
-          font-size: 8px;
+          color: rgba(212, 175, 55, 0.7);
+          font-size: 10px;
         }
 
         .music-btn-mobile.single {
-          height: 36px;
-          border-radius: 8px;
-          font-size: 14px;
-          color: #ff006e;
+          height: 40px;
+          border-radius: 10px;
+          font-size: 16px;
+          color: rgba(212, 175, 55, 0.8);
         }
         
         .music-btn-mobile:hover,
         .music-btn-mobile:active {
-          background: rgba(255, 0, 110, 0.2);
-          border-color: #ff006e;
-          color: #ff006e;
+          background: rgba(212, 175, 55, 0.1);
+          border-color: rgba(212, 175, 55, 0.4);
+          color: rgba(212, 175, 55, 0.9);
         }
 
         .music-btn-mobile.active {
-          color: #ff006e;
-          border-color: #ff006e;
-          box-shadow: 0 0 8px rgba(255, 0, 110, 0.3);
+          color: rgba(212, 175, 55, 0.9);
+          border-color: rgba(212, 175, 55, 0.4);
+          background: rgba(212, 175, 55, 0.1);
         }
 
-        /* Avatar - Smaller */
+        /* Avatar - Consistent size */
         .avatar-mobile {
-          width: 36px;
-          height: 36px;
-          border-radius: 8px;
-          background: linear-gradient(135deg, #1a1a2e, #0d0d1a);
-          border: 2px solid #00f5d4;
+          width: 40px;
+          height: 40px;
+          border-radius: 10px;
+          background: rgba(212, 175, 55, 0.05);
+          border: 1.5px solid rgba(212, 175, 55, 0.2);
           display: flex;
           align-items: center;
           justify-content: center;
-          box-shadow: 0 0 12px rgba(0, 245, 212, 0.3);
           cursor: pointer;
           overflow: hidden;
           position: relative;
+          transition: all 0.2s ease;
+        }
+        
+        .avatar-mobile:hover {
+          border-color: rgba(212, 175, 55, 0.4);
+          background: rgba(212, 175, 55, 0.1);
         }
 
         .avatar-status-mobile {
@@ -210,54 +217,38 @@ export default function NavControlsHome({
           box-shadow: none;
         }
 
-        /* Hamburger - Still the hero but smaller */
+        /* Hamburger - Consistent with other buttons */
         .menu-button-mobile {
           position: relative;
-          width: 44px;
-          height: 44px;
+          width: 40px;
+          height: 40px;
           border-radius: 10px;
-          background: linear-gradient(135deg, rgba(255, 0, 110, 0.2), rgba(131, 56, 236, 0.2));
-          border: 2px solid #ff006e;
+          background: rgba(212, 175, 55, 0.05);
+          border: 1.5px solid rgba(212, 175, 55, 0.2);
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          gap: 4px;
+          gap: 3px;
           cursor: pointer;
           transition: all 0.2s ease;
-          box-shadow: 
-            0 0 20px rgba(255, 0, 110, 0.4),
-            0 0 40px rgba(255, 0, 110, 0.15);
+        }
+        
+        .menu-button-mobile:hover {
+          border-color: rgba(212, 175, 55, 0.4);
+          background: rgba(212, 175, 55, 0.1);
         }
         
         .menu-button-mobile:active {
           transform: scale(0.95);
         }
 
-        .menu-button-mobile::before {
-          content: '';
-          position: absolute;
-          inset: -2px;
-          border-radius: 12px;
-          background: linear-gradient(135deg, #ff006e, #8338ec, #00f5d4, #ff006e);
-          background-size: 300% 300%;
-          animation: borderGlowMobile 3s ease infinite;
-          z-index: -1;
-          opacity: 0.5;
-        }
-
-        @keyframes borderGlowMobile {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-        }
-
         .menu-line-mobile {
-          width: 18px;
+          width: 20px;
           height: 2px;
-          background: #ff006e;
-          border-radius: 2px;
-          transition: all 0.3s ease;
-          box-shadow: 0 0 6px rgba(255, 0, 110, 0.8);
+          background: rgba(212, 175, 55, 0.7);
+          border-radius: 1px;
+          transition: all 0.2s ease;
         }
 
         .menu-button-mobile.open .menu-line-mobile:nth-child(1) {
@@ -270,6 +261,14 @@ export default function NavControlsHome({
         
         .menu-button-mobile.open .menu-line-mobile:nth-child(3) {
           transform: rotate(-45deg) translate(4px, -4px);
+        }
+        
+        .menu-button-mobile.open {
+          background: rgba(212, 175, 55, 0.1);
+        }
+        
+        .menu-button-mobile.open .menu-line-mobile {
+          background: rgba(212, 175, 55, 0.9);
         }
 
         /* 80s Mode styling */

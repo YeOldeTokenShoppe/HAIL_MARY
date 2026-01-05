@@ -366,7 +366,7 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
 
   // Memoize styles
   const unifiedStatsStyle = useMemo(() => ({
-    position: 'fixed',  // Use fixed positioning for proper layering
+    position: 'absolute',  // Use fixed positioning for proper layering
     top: isMobile ? '100px' : '105px',
     right: isMobile ? '10px' : '20px',
     background: 'rgba(0, 0, 0, 0.8)',
@@ -408,7 +408,7 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
   
 
   return (
-    <div style={{ width: '100%', height: isMobile ? '120vh' : '100vh', background: '#000', position: 'relative' }}>
+    <div style={{ width: '100%', height: isMobile ? '100vh' : '100vh', background: '#000', position: 'relative' }}>
       {/* 80s mode background */}
       {is80sMode && (
         <img
