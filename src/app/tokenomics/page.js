@@ -113,55 +113,57 @@ export default function TokenomicsPage() {
           <div style={{
             position: 'relative',
             display: 'flex',
-            flexDirection: 'column',
+            // flexDirection: 'column',
             width: '100%',
             paddingTop: '2rem',
             minHeight: '100vh',
             pointerEvents: 'none',
           }}>
             
-            <h1 className='custom-title'
-                id="main-title"
-                style={{ 
-                position: "relative",
-                left: "-35%",
-                color: is80sMode ? "#ffffff" : "#f6f5f1ff",
-                fontFamily: 'UnifrakturCook, serif',
-                textShadow: is80sMode 
-                  ? `
-                    0 0 20px rgba(201, 55, 255, 0.9),
-                    0 0 40px rgba(201, 55, 255, 0.8),
-                    0 0 60px rgba(201, 55, 255, 0.7),
-                    4px 4px 12px rgba(201, 55, 255, 1),
-                    -2px -2px 8px rgba(255, 0, 255, 0.8),
-                    0 0 100px rgba(201, 55, 255, 0.5)
-                  `
-                  : `
-                    0 0 10px rgba(212, 175, 55, 0.8),
-                    0 0 20px rgba(212, 175, 55, 0.6),
-                    0 0 30px rgba(212, 175, 55, 0.8),
-                    6px 6px 16px rgba(0, 0, 0, 1),
-                    -2px -2px 8px rgba(255, 192, 203, 0.7),
-                    0 0 100px rgba(212, 175, 55, 0.1)
-                  `,
-                fontSize: "3.5rem",
-                fontWeight: 900,
-                lineHeight: 0.8,
-                transform: "rotate(-8deg) skew(-15deg)",
-                zIndex: 1000,
-                whiteSpace: 'nowrap',
-                cursor: 'pointer',
-                marginTop: '1rem',
-                pointerEvents: 'auto',
-              }}
-              onClick={() => window.location.href = '/carousel'}
-            >
-              <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
-              <span className="title-line" style={{ display: 'block', position: 'relative' }}>
-                <span style={{ fontSize: "2rem" }}>of    </span>
+           <h1 className='custom-title footer-title'
+              id="main-title"
+              style={{ 
+              position: "relative",
+              // left: isMobile ? "5%" : "10%",
+              color: is80sMode ? "#ffffff" : "#d4af37",
+              textShadow: is80sMode 
+                ? `
+                  0 0 20px rgba(201, 55, 255, 0.9),
+                  0 0 40px rgba(201, 55, 255, 0.8),
+                  0 0 60px rgba(201, 55, 255, 0.7),
+                  4px 4px 12px rgba(201, 55, 255, 1),
+                  -2px -2px 8px rgba(255, 0, 255, 0.8),
+                  0 0 100px rgba(201, 55, 255, 0.5)
+                `
+                : `
+                  rgba(83, 61, 74, 0.9) 1px 1px,
+                  rgba(83, 61, 74, 0.9) 2px 2px,
+                  rgba(83, 61, 74, 0.8) 3px 3px,
+                  rgba(83, 61, 74, 0.8) 4px 4px,
+                  rgba(83, 61, 74, 0.7) 5px 5px,
+                  rgba(83, 61, 74, 0.7) 6px 6px,
+                  rgba(83, 61, 74, 0.6) 7px 7px,
+                  rgba(83, 61, 74, 0.6) 8px 8px,
+                  rgba(255, 192, 203, 0.4) -1px -1px 5px,
+                  rgba(0, 0, 0, 0.8) 10px 10px 15px
+                `,
+              fontSize:  "3.5rem",
+              fontFamily: "'UnifrakturCook', serif",
+              fontWeight: 900,
+              lineHeight: 0.8,
+              transform: isMobileDevice ? "rotate(-5deg)" : "rotate(-8deg) skew(-15deg)",
+              zIndex: 10,
+              whiteSpace: isMobileDevice ? 'normal' : 'nowrap',
+              cursor: 'pointer',
+              margin: 0,
+              pointerEvents: 'auto',
+            }}>
+              <span  style={{ display: 'block',  marginLeft: isMobileDevice ? "0rem" : "-2rem",position: 'relative' }}>Our Lady</span>
+              <span  style={{ display: 'block', position: 'relative' }}>
+                <span style={{ fontSize: isMobileDevice ? "1.2rem" : "1.3rem" }}>of    </span>
                 Perpetual
               </span>
-              <span className="title-line" style={{ display: 'block', marginLeft: "4rem", position: 'relative' }}>Profit</span>
+              <span  style={{ display: 'block', marginLeft: isMobileDevice ? "0rem" : "0rem", position: 'relative' }}>Profit</span>
             </h1>
 
           </div>
