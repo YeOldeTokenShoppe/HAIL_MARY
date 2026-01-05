@@ -1,27 +1,33 @@
 'use client'
 import React, { useRef, useState, useEffect, Suspense, useCallback, useMemo } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { useGLTF, Stats } from '@react-three/drei'
+import { useGLTF, Stats, OrbitControls } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { HandsModel } from './HandsGLTFScene'
 // IMPORTANT: Import from the optimized version!
 import { CandleCloud, GradientBackground, SceneSetup } from './CandleShrine'
 import { NewCandleEffectManager } from './NewCandleEffect'
-import Matchstick from './Matchstick'
-import SkewedHeading from './SkewedHeading'
 
 // Optimized PriceSimulator - uses refs instead of state for animation
 // Only updates React state at throttled intervals for UI
-function OptimizedPriceSimulator({ priceRef, onUIUpdate }) {
+function OptimizedPriceSimulator({ priceRef, shortTermPriceRef, continuousOffsetRef, onUIUpdate, disabled = false }) {
   const lastUIUpdate = useRef(0)
   const lastPriceUpdate = useRef(0)
+  const lastShortTermUpdate = useRef(0)
   const currentPrice = useRef(0)
   const targetPrice = useRef(0)
+  const shortTermPrice = useRef(0)
+  const shortTermTarget = useRef(0)
+  const continuousOffset = useRef(0)
   const UI_UPDATE_INTERVAL = 1000 // Update UI once per second
   const PRICE_CHANGE_INTERVAL = 5000 // Change price every 5 seconds (in production would be 60000 for 1 minute)
+  const SHORT_TERM_INTERVAL = 1000 // Update short-term price every second for more dynamic movement
   
   useFrame((state) => {
+    // Skip all updates if disabled (test mode is active)
+    if (disabled) return
+    
     const now = state.clock.elapsedTime * 1000
     
     // Generate new price target every PRICE_CHANGE_INTERVAL
@@ -38,11 +44,35 @@ function OptimizedPriceSimulator({ priceRef, onUIUpdate }) {
       }
     }
     
+    // Generate short-term price movements more frequently
+    if (now - lastShortTermUpdate.current > SHORT_TERM_INTERVAL) {
+      lastShortTermUpdate.current = now
+      // Short-term follows the main price direction with some variation
+      // If main price is positive, short-term is also positive (with variation)
+      // If main price is negative, short-term is also negative (with variation)
+      const mainDirection = Math.sign(currentPrice.current) || (Math.random() > 0.5 ? 1 : -1)
+      const variation = 0.02 + Math.random() * 0.04 // 2-6% variation
+      shortTermTarget.current = mainDirection * variation
+    }
+    
     // Smoothly interpolate to target price
     currentPrice.current += (targetPrice.current - currentPrice.current) * 0.02
     
-    // Update ref immediately (no re-render, used by shaders)
+    // Smoothly interpolate short-term price (follows main price direction)
+    shortTermPrice.current += (shortTermTarget.current - shortTermPrice.current) * 0.05
+    
+    // Accumulate continuous offset for candle movement
+    // Movement speed based on main price for consistency (not short-term)
+    // This ensures candles move in sync with background color
+    // Scale: 1% price change = 0.01 units/frame movement (was 0.3, now much slower)
+    // At 60fps, 1% price change = 0.6 units/second vertical movement
+    const movementSpeed = currentPrice.current * 0.01
+    continuousOffset.current += movementSpeed
+    
+    // Update refs immediately (no re-render, used by shaders)
     priceRef.current = currentPrice.current
+    if (shortTermPriceRef) shortTermPriceRef.current = shortTermPrice.current
+    if (continuousOffsetRef) continuousOffsetRef.current = continuousOffset.current
     
     // Throttle UI updates to prevent excessive re-renders
     if (now - lastUIUpdate.current > UI_UPDATE_INTERVAL) {
@@ -59,76 +89,7 @@ function OptimizedPriceSimulator({ priceRef, onUIUpdate }) {
 
 
 // Memoized gradient that reads from ref
-const MemoizedGradientBackground = React.memo(function MemoizedGradientBackground({ priceRef, is80sMode }) {
-  const meshRef = useRef()
-  const { viewport } = useThree()
-  
-  const colorsRef = useRef({
-    bottom: new THREE.Color('#1a1a2e'),
-    top: new THREE.Color('#4a4a6a'),
-  })
-  
-  useFrame(() => {
-    if (!meshRef.current) return
-    
-    const priceDirection = priceRef.current
-    
-    let targetBottom, targetTop
-    if (priceDirection > 0.02) {
-      targetBottom = new THREE.Color('#0a2d1a')
-      targetTop = new THREE.Color('#22ff66')
-    } else if (priceDirection < -0.02) {
-      targetBottom = new THREE.Color('#2d0a0a')
-      targetTop = new THREE.Color('#ff4444')
-    } else {
-      targetBottom = new THREE.Color('#1a1a2e')
-      targetTop = new THREE.Color('#4a4a6a')
-    }
-    
-    colorsRef.current.bottom.lerp(targetBottom, 0.02)
-    colorsRef.current.top.lerp(targetTop, 0.02)
-    
-    meshRef.current.material.uniforms.uColorBottom.value = colorsRef.current.bottom
-    meshRef.current.material.uniforms.uColorTop.value = colorsRef.current.top
-  })
-  
-  const material = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: {
-      uColorBottom: { value: new THREE.Color('#1a1a2e') },
-      uColorTop: { value: new THREE.Color('#4a4a6a') },
-    },
-    vertexShader: `
-      varying vec2 vUv;
-      void main() {
-        vUv = uv;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `,
-    fragmentShader: `
-      uniform vec3 uColorBottom;
-      uniform vec3 uColorTop;
-      varying vec2 vUv;
-      
-      void main() {
-        float mixFactor = smoothstep(0.0, 1.0, vUv.y);
-        vec3 color = mix(uColorBottom, uColorTop, mixFactor);
-        vec2 center = vUv - 0.5;
-        float vignette = 1.0 - dot(center, center) * 0.5;
-        color *= vignette;
-        gl_FragColor = vec4(color, 1.0);
-      }
-    `,
-    depthWrite: false,
-  }), [])
-  
-  if (is80sMode) return null
-  
-  return (
-    <mesh ref={meshRef} position={[0, 0, -20]} material={material}>
-      <planeGeometry args={[viewport.width * 4, viewport.height * 4]} />
-    </mesh>
-  )
-})
+
 
 // Main component
 export default function UnifiedShrine({ 
@@ -141,8 +102,12 @@ export default function UnifiedShrine({
   justLitOffering,
   onJustLitComplete 
 }) {
-  // Use ref for real-time price (no re-renders)
+  // Track if component is mounted for SSR safety
+  const [mounted, setMounted] = useState(false)
+  // Use refs for real-time price and movement (no re-renders)
   const priceRef = useRef(0)
+  const shortTermPriceRef = useRef(0)
+  const continuousOffsetRef = useRef(0)
   
   // State only for UI display (throttled updates)
   const [displayPrice, setDisplayPrice] = useState({
@@ -150,6 +115,10 @@ export default function UnifiedShrine({
     change: 0,
     tokenPrice: 0.000420,
   })
+  
+  // TEST SLIDER CONTROL - Remove this when done testing
+  const [testPriceOverride, setTestPriceOverride] = useState(null)
+  const [showTestControls, setShowTestControls] = useState(true)
   
   const [additionalCandles, setAdditionalCandles] = useState([])
   const [clickedCandleId, setClickedCandleId] = useState(null)
@@ -162,11 +131,24 @@ export default function UnifiedShrine({
   const [isInView, setIsInView] = useState(true)
   const canvasRef = useRef()
   const [contextLost, setContextLost] = useState(false)
-  const [matchstickClicked, setMatchstickClicked] = useState(false)
+  
+  // Clean up WebGL context on unmount
+  useEffect(() => {
+    return () => {
+      if (canvasRef.current?.gl) {
+        try {
+          canvasRef.current.gl.dispose()
+          canvasRef.current.gl = null
+        } catch (err) {
+          console.warn('Error cleaning up WebGL context:', err)
+        }
+      }
+    }
+  }, [])
   
   // Price history - update much less frequently
   const [priceHistory, setPriceHistory] = useState(() =>
-    Array(20).fill(0).map(() => 0.00042 + Math.random() * 0.00001 - 0.000005)
+    Array(20).fill(0.00042) // Start with consistent values for SSR
   )
   const lastHistoryUpdate = useRef(0)
   const HISTORY_UPDATE_INTERVAL = 500 // Update chart every 500ms
@@ -178,13 +160,14 @@ export default function UnifiedShrine({
   // Store timeout refs for cleanup
   const timeoutRefs = useRef({})
 
-  // Mobile detection
+  // Mobile detection with SSR safety
   useEffect(() => {
     const checkMobile = () => {
       if (typeof window !== 'undefined') {
         setIsMobile(window.innerWidth <= 768)
       }
     }
+    // Only run on client side after mount
     checkMobile()
     if (typeof window !== 'undefined') {
       window.addEventListener('resize', checkMobile)
@@ -195,14 +178,23 @@ export default function UnifiedShrine({
       }
     }
   }, [])
+  
+  // Initialize random price history after mount to avoid SSR mismatch
+  useEffect(() => {
+    setMounted(true)
+    // Generate random initial values only on client side
+    setPriceHistory(Array(20).fill(0).map(() => 0.00042 + Math.random() * 0.00001 - 0.000005))
+  }, [])
 
   // Throttled UI update handler
   const handleUIUpdate = useCallback((price) => {
-    const changePercent = price * 5
+    // Use test override if set, otherwise use simulated price
+    const effectivePrice = testPriceOverride !== null ? testPriceOverride : price
+    const changePercent = effectivePrice * 5
     const newTokenPrice = 0.000420 * (1 + changePercent / 100)
     
     setDisplayPrice({
-      direction: price,
+      direction: effectivePrice,
       change: changePercent,
       tokenPrice: newTokenPrice,
     })
@@ -217,7 +209,7 @@ export default function UnifiedShrine({
     if (onPriceChange) {
       onPriceChange(changePercent)
     }
-  }, [onPriceChange])
+  }, [onPriceChange, testPriceOverride])
 
   const handleCandleClick = useCallback((instanceId, position) => {
     if (timeoutRefs.current[instanceId]) {
@@ -267,7 +259,8 @@ export default function UnifiedShrine({
     if (isDragging.current) {
       const clientX = event.clientX || event.nativeEvent?.clientX || 0
       const deltaX = (clientX - dragStart.current.x) * 0.01
-      setUserRotation(dragStart.current.rotation + deltaX)
+      const newRotation = dragStart.current.rotation + deltaX
+      setUserRotation(newRotation)
     }
   }, [])
 
@@ -341,9 +334,28 @@ export default function UnifiedShrine({
     }
   }, [])
   
+  // Handle test slider changes
+  useEffect(() => {
+    if (testPriceOverride !== null) {
+      // Normalize the test price for shader (expecting -1 to 1 range)
+      // Test slider is -20 to 20, so divide by 20
+      const normalizedPrice = testPriceOverride / 20
+      
+      // Update refs directly for immediate visual response
+      priceRef.current = normalizedPrice
+      shortTermPriceRef.current = normalizedPrice * 0.8 // Some variation
+      
+      // For continuous movement, scale appropriately
+      continuousOffsetRef.current += normalizedPrice * 0.01
+      
+      // Force UI update (keep original scale for display)
+      handleUIUpdate(testPriceOverride)
+    }
+  }, [testPriceOverride, handleUIUpdate])
+
   // Memoize styles
   const unifiedStatsStyle = useMemo(() => ({
-    position: 'absolute',
+    position: 'fixed',  // Use fixed positioning for proper layering
     top: isMobile ? '100px' : '105px',
     right: isMobile ? '10px' : '20px',
     background: 'rgba(0, 0, 0, 0.8)',
@@ -383,36 +395,6 @@ export default function UnifiedShrine({
     })
   }, [priceHistory, displayPrice.change])
   
-  const handleLightCandleClick = useCallback(() => {
-    setMatchstickClicked(true)
-    const messages = [
-      'Please pump my bags to the moon 🚀',
-      'Grant me diamond hands in these trying times',
-      'May the green candles be ever in my favor',
-      'Bless this dip for I shall slurp',
-      'Forgive me for selling the bottom',
-      'Thank you for this glorious pump',
-      'Guide me through the bear market darkness'
-    ]
-    const names = ['anon_trader', 'crypto_believer', 'hodl_warrior', 'defi_degen', 'moon_boy', 'whale_watcher']
-    const types = ['petition', 'confession', 'appreciation']
-    
-    const newOffering = {
-      name: names[Math.floor(Math.random() * names.length)],
-      type: types[Math.floor(Math.random() * types.length)],
-      message: messages[Math.floor(Math.random() * messages.length)],
-      tokensBurned: Math.floor(Math.random() * 10000) + 500,
-      timestamp: 'just now'
-    }
-    
-    if (onLightCandle) {
-      onLightCandle(newOffering)
-    }
-    
-    if (effectManagerRef.current?.triggerEffect) {
-      effectManagerRef.current.triggerEffect(newOffering)
-    }
-  }, [onLightCandle])
 
   return (
     <div style={{ width: '100%', height: isMobile ? '120vh' : '100vh', background: '#000', position: 'relative' }}>
@@ -454,7 +436,15 @@ export default function UnifiedShrine({
         </div>
       )} */}
       
-      <div ref={canvasRef} style={{ width: '100%', height: '100%' }}>
+      <div 
+        ref={canvasRef} 
+        style={{ 
+          width: '100%', 
+          height: '100%', 
+          position: 'relative'
+        }}
+      >
+      {mounted && (
       <Canvas
         camera={{ position: [0, isMobile ? -1 : -0.5, isMobile ? 11 : 9], fov: isMobile ? 55 : 50 }}
         onPointerDown={handlePointerDown}
@@ -463,11 +453,13 @@ export default function UnifiedShrine({
         onPointerLeave={handlePointerUp}
         dpr={isMobile ? 1 : (typeof window !== 'undefined' ? window.devicePixelRatio : 1)}
         gl={{ 
-          alpha: true, 
-          antialias: true,
-          powerPreference: "high-performance",
+          alpha: true,  // Enable alpha for proper transparency
+          antialias: !isMobile,  // Disable antialiasing on mobile
+          powerPreference: isMobile ? "low-power" : "high-performance",
           preserveDrawingBuffer: false,
           failIfMajorPerformanceCaveat: false,
+          stencil: false,  // Disable stencil buffer if not needed
+          depth: true,
         }}
         style={{
           position: 'absolute',
@@ -475,21 +467,32 @@ export default function UnifiedShrine({
           left: 0,
           width: '100%',
           height: '100%',
-          zIndex: 2,
-          background: 'transparent',
+          zIndex: 1,  // Lower z-index to be behind UI elements
+          background: 'transparent'
         }}
         onCreated={({ gl, scene }) => {
-          // Enable context recovery
-          const ext = gl.getContext().getExtension('WEBGL_lose_context')
-          
           // Store references for cleanup
           canvasRef.current.gl = gl
           canvasRef.current.scene = scene
+          
+          // Handle context loss
+          const canvas = gl.domElement
+          canvas.addEventListener('webglcontextlost', (e) => {
+            e.preventDefault()
+            console.log('WebGL context lost, attempting recovery...')
+            setContextLost(true)
+          })
+          
+          canvas.addEventListener('webglcontextrestored', () => {
+            console.log('WebGL context restored')
+            setContextLost(false)
+          })
         }}
         // Limit frame rate if needed - uncomment for testing
         // frameloop="demand"
       >
         <SceneSetup is80sMode={is80sMode} />
+        
         <ambientLight intensity={isMobile ? 0.8 : 0.6} />
         {!isMobile && (
           <>
@@ -500,22 +503,21 @@ export default function UnifiedShrine({
         )}
         
         {/* Background gradient - reads from ref */}
-        <MemoizedGradientBackground priceRef={priceRef} is80sMode={is80sMode} />
+      <GradientBackground is80sMode={is80sMode} />
         
-        {/* Candles - pushed back, reads from ref for smooth animation */}
+        {/* Candles - pushed back, reads from refs for smooth animation */}
         <group position={[0, 2, -8]}>
           <CandleCloud
             count={isMobile ? 150 : 500}
             priceRef={priceRef}
+            shortTermPriceRef={shortTermPriceRef}
+            continuousOffsetRef={continuousOffsetRef}
             additionalCandles={additionalCandles}
             onCandleClick={handleCandleClick}
             clickedCandleId={clickedCandleId}
             isMobile={isMobile}
           />
         </group>
-        
-        {/* Only show Stats in development */}
-        <Stats className="stats-monitor" />
         
         {/* Hands model */}
         <Suspense fallback={null}>
@@ -537,10 +539,16 @@ export default function UnifiedShrine({
           </group>
         </Suspense>
         
-        {/* Optimized price simulator - updates ref every frame, state throttled */}
+        {/* Only show Stats in development */}
+        {/* <Stats className="stats-monitor" /> */}
+        
+        {/* Optimized price simulator - updates refs every frame, state throttled */}
         <OptimizedPriceSimulator 
-          priceRef={priceRef} 
-          onUIUpdate={handleUIUpdate} 
+          priceRef={priceRef}
+          shortTermPriceRef={shortTermPriceRef}
+          continuousOffsetRef={continuousOffsetRef}
+          onUIUpdate={handleUIUpdate}
+          disabled={testPriceOverride !== null}  // Disable when test controls are active
         />
         
         {/* Candle effect manager */}
@@ -553,7 +561,7 @@ export default function UnifiedShrine({
         />
         
         {/* Post-processing - skip on mobile */}
-        {!isMobile && (
+        {/* {!isMobile && ( */}
           <EffectComposer>
             <Bloom 
               intensity={1.0}
@@ -563,9 +571,228 @@ export default function UnifiedShrine({
               radius={0.8}
             />
           </EffectComposer>
-        )}
+        {/* )} */}
       </Canvas>
+      )}
       </div>
+      
+      {/* TEST CONTROLS - Remove when done testing */}
+      {/* {showTestControls && (
+        <div style={{
+          position: 'fixed',  // Use fixed positioning to ensure it's above everything
+          top: '20px',
+          left: '300px',
+          background: 'rgba(0, 0, 0, 0.95)',
+          border: '2px solid #ff00ff',
+          borderRadius: '8px',
+          padding: '15px',
+          color: '#fff',
+          fontFamily: 'monospace',
+          fontSize: '12px',
+          zIndex: 10000,
+          width: '300px',
+          backdropFilter: 'blur(10px)',
+          pointerEvents: 'auto'
+        }}>
+          <div style={{ 
+            marginBottom: '10px', 
+            fontWeight: 'bold',
+            color: '#ff00ff',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <span>🧪 TEST CONTROLS</span>
+            <button
+              onClick={() => setShowTestControls(false)}
+              style={{
+                background: 'transparent',
+                border: '1px solid #ff00ff',
+                color: '#ff00ff',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '10px'
+              }}
+            >
+              HIDE
+            </button>
+          </div>
+          
+          <div style={{ marginBottom: '10px' }}>
+            <label style={{ display: 'block', marginBottom: '5px', color: '#aaa' }}>
+              Price Movement: {testPriceOverride !== null ? `${(testPriceOverride * 5).toFixed(2)}%` : 'Auto'}
+            </label>
+            <input
+              type="range"
+              min="-20"
+              max="20"
+              step="0.1"
+              value={testPriceOverride !== null ? testPriceOverride : 0}
+              onChange={(e) => setTestPriceOverride(parseFloat(e.target.value))}
+              style={{
+                width: '100%',
+                marginBottom: '5px'
+              }}
+            />
+            <div style={{ display: 'flex', gap: '5px', marginTop: '5px' }}>
+              <button
+                onClick={() => setTestPriceOverride(-20)}
+                style={{
+                  flex: 1,
+                  background: '#ff4444',
+                  border: 'none',
+                  color: '#fff',
+                  padding: '4px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '10px'
+                }}
+              >
+                -100%
+              </button>
+              <button
+                onClick={() => setTestPriceOverride(-10)}
+                style={{
+                  flex: 1,
+                  background: '#ff6666',
+                  border: 'none',
+                  color: '#fff',
+                  padding: '4px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '10px'
+                }}
+              >
+                -50%
+              </button>
+              <button
+                onClick={() => setTestPriceOverride(0)}
+                style={{
+                  flex: 1,
+                  background: '#666',
+                  border: 'none',
+                  color: '#fff',
+                  padding: '4px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '10px'
+                }}
+              >
+                0%
+              </button>
+              <button
+                onClick={() => setTestPriceOverride(10)}
+                style={{
+                  flex: 1,
+                  background: '#66ff66',
+                  border: 'none',
+                  color: '#000',
+                  padding: '4px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '10px'
+                }}
+              >
+                +50%
+              </button>
+              <button
+                onClick={() => setTestPriceOverride(20)}
+                style={{
+                  flex: 1,
+                  background: '#00ff00',
+                  border: 'none',
+                  color: '#000',
+                  padding: '4px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '10px'
+                }}
+              >
+                +100%
+              </button>
+            </div>
+          </div>
+          
+          <div style={{ 
+            display: 'flex', 
+            gap: '10px',
+            borderTop: '1px solid #333',
+            paddingTop: '10px',
+            marginTop: '10px'
+          }}>
+            <button
+              onClick={() => setTestPriceOverride(null)}
+              style={{
+                flex: 1,
+                background: testPriceOverride === null ? '#ff00ff' : '#333',
+                border: '1px solid #ff00ff',
+                color: '#fff',
+                padding: '6px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '11px',
+                fontWeight: 'bold'
+              }}
+            >
+              AUTO MODE
+            </button>
+            <button
+              onClick={() => {
+                // Random price between -20 and 20
+                const random = (Math.random() - 0.5) * 40
+                setTestPriceOverride(random)
+              }}
+              style={{
+                flex: 1,
+                background: '#666',
+                border: '1px solid #999',
+                color: '#fff',
+                padding: '6px',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '11px',
+                fontWeight: 'bold'
+              }}
+            >
+              RANDOM
+            </button>
+          </div>
+          
+          <div style={{ 
+            marginTop: '10px',
+            fontSize: '10px',
+            color: '#666',
+            textAlign: 'center'
+          }}>
+            Controls candle movement & colors
+          </div>
+        </div>
+      )} */}
+      
+      {/* Show test controls button when hidden */}
+      {/* {!showTestControls && (
+        <button
+          onClick={() => setShowTestControls(true)}
+          style={{
+            position: 'fixed',  // Use fixed to ensure it's clickable
+            top: '20px',
+            left: '300px',
+            background: 'rgba(0, 0, 0, 0.9)',
+            border: '1px solid #ff00ff',
+            color: '#ff00ff',
+            padding: '8px 12px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '10px',
+            fontFamily: 'monospace',
+            zIndex: 10000,
+            backdropFilter: 'blur(10px)',
+          }}
+        >
+          🧪 SHOW TEST CONTROLS
+        </button>
+      )} */}
       
       {/* Unified Stats Box */}
       <div style={unifiedStatsStyle}>
@@ -632,139 +859,6 @@ export default function UnifiedShrine({
         </div>
       </div>
       
-      {/* Light a Candle Button */}
-      <div style={{
-        position: 'absolute',
-        bottom: isMobile ? '20px' : '80px',
-        left: isMobile ? '45%' : '20px',
-        transform: isMobile ? 'translateX(-50%)' : 'none',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        zIndex: 2000,
-      }}>
-        <div style={{
-          marginBottom: isMobile ? '8px' : '12px',
-          textAlign: 'center',
-        }}>
-          <SkewedHeading 
-            lines={["Get on Her", "Watchlist"]}
-            colors={["#00ff00"]}
-            fontSize={{ mobile: "2.1rem", desktop: "3rem" }}
-            isMobile={isMobile}
-          />
-        </div>
-        <style jsx>{`
-          @keyframes glow-pulse {
-            0%, 100% { 
-              box-shadow: 0 0 20px rgba(255, 94, 0, 0.3),
-                          0 0 40px rgba(255, 94, 0, 0.2),
-                          inset 0 0 20px rgba(255, 94, 0, 0.1);
-            }
-            50% { 
-              box-shadow: 0 0 30px rgba(255, 94, 0, 0.5),
-                          0 0 60px rgba(255, 94, 0, 0.3),
-                          inset 0 0 30px rgba(255, 94, 0, 0.2);
-            }
-          }
-          
-          @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-          }
-          
-          .matchstick-container {
-            animation: glow-pulse 2s ease-in-out infinite;
-          }
-          
-          
-          @keyframes arrow-bounce {
-            0%, 100% { transform: translateX(0); }
-            50% { transform: translateX(10px); }
-          }
-          
-          .arrow-indicator {
-            animation: arrow-bounce 1.5s ease-in-out infinite;
-          }
-        `}</style>
-        <div className="matchstick-container" style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: isMobile ? '0' : '0.5rem',
-          padding: isMobile ? '0.2rem' : '1rem',
-          background: 'radial-gradient(ellipse at center, rgba(255, 94, 0, 0.15) 0%, transparent 60%)',
-          borderRadius: '50%',
-          border: 'px solid rgba(255, 94, 0, 0.4)',
-          backdropFilter: 'blur(18px)',
-          position: 'relative',
-          maxWidth: isMobile ? '100px' : '250px',
-          maxHeight: isMobile ? '100px' : 'none',
-          overflow: 'hidden',
-        }}>
-          {!isMobile && (
-            <div className="cta-text" style={{
-              color: '#ffcc00',
-              fontSize: '1.1rem',
-              fontWeight: 'bold',
-              textTransform: 'uppercase',
-              letterSpacing: '1px',
-              textShadow: '0 0 10px rgba(255, 94, 0, 0.5)',
-              marginBottom: '1rem',
-              marginTop: '2rem'
-            }}>
-              Light Me
-            </div>
-          )}
-          <div style={{
-            position: 'relative',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '100%',
-          }}>
-            {isMobile && !matchstickClicked && (
-              <div style={{
-                position: 'absolute',
-                left: '18%',
-                top: '15%',
-                transform: 'translateY(-50%)',
-                color: '#ff5e00',
-                fontSize: '0.6rem',
-                fontWeight: 'bold',
-                textTransform: 'uppercase',
-                letterSpacing: '0.1px',
-                textShadow: '0 0 4px rgba(255, 204, 0, 0.9)',
-                zIndex: 10,
-              }}>
-                Click to Light
-              </div>
-            )}
-            <Matchstick onLight={handleLightCandleClick} />
-          </div>
-          {/* {!isMobile && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.3rem',
-              color: 'rgba(255, 255, 255, 0.7)',
-              fontSize: '0.85rem',
-              marginTop: '-0.5rem',
-            }}>
-              <span className="arrow-indicator" style={{
-                fontSize: '1.2rem',
-                color: '#ff5e00',
-              }}>→</span>
-              <span>Click to offer</span>
-              <span className="arrow-indicator" style={{
-                fontSize: '1.2rem',
-                color: '#ff5e00',
-                transform: 'scaleX(-1)',
-              }}>→</span>
-            </div>
-          )} */}
-        </div>
-      </div>
     </div>
   )
 }

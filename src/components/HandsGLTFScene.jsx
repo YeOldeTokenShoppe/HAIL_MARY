@@ -95,28 +95,44 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
   // Market status based on debounced price change for emoji stability
   const isLargeDown = debouncedPriceRef.current <= -5 // Large downward price action (5% or more drop)
   const isModerateDown = debouncedPriceRef.current < -2 && debouncedPriceRef.current > -5 // Moderate down
-  const isMiddling = debouncedPriceRef.current >= -2 && debouncedPriceRef.current <= 2 // Small swings (-2% to +2%)
-  const isPositive = debouncedPriceRef.current > 2 // Positive price action (more than 2% up)
+  const isSlightlyNegative = debouncedPriceRef.current < 0 && debouncedPriceRef.current >= -2 // Slightly negative (-2% to 0%)
+  const isSlightlyPositive = debouncedPriceRef.current >= 0 && debouncedPriceRef.current <= 2 // Slightly positive (0% to +2%)
+  const isModeratelyPositive = debouncedPriceRef.current > 2 && debouncedPriceRef.current <= 5 // Moderately positive (2% to 5%)
+  const isLargeUp = debouncedPriceRef.current > 5 // Large upward price action (more than 5% up)
   
   // Opacity targets for smooth fading - store target opacity for each emoji group
   // Initialize based on current price state to ensure correct visibility from start
   const getInitialOpacity = (emojiName) => {
-    // If prices are positive, only show positive emojis
-    if (priceChange > 2) {
-      const positiveEmojis = ['emoji1', 'emoji3', 'emoji4', 'emoji5', 'iconLove', 'iconText1', 'iconText2']
+    // Large upward movement - maximum celebration
+    if (priceChange > 5) {
+      const celebrationEmojis = ['emoji1', 'emoji3', 'emoji4', 'emoji5', 'iconLove', 'iconText1', 'iconText2']
+      return celebrationEmojis.includes(emojiName) ? 1 : 0
+    }
+    // Moderately positive - happy emojis
+    else if (priceChange > 2) {
+      const positiveEmojis = ['emoji1', 'emoji3', 'emoji4', 'emoji5', 'iconLove']
       return positiveEmojis.includes(emojiName) ? 1 : 0
     }
-    // If prices are middling or moderate down
-    else if (priceChange >= -2 || (priceChange < -2 && priceChange > -5)) {
-      const middlingEmojis = ['emoji2', 'worriedEmoji', 'scaredEmoji', 'sadEmoji', 'questionMark', 'questionMark2']
-      return middlingEmojis.includes(emojiName) ? 1 : 0
+    // Slightly positive - cautiously optimistic
+    else if (priceChange >= 0) {
+      const optimisticEmojis = ['emoji1', 'emoji2', 'emoji3']
+      return optimisticEmojis.includes(emojiName) ? 1 : 0
     }
-    // If prices are crashing (large down)
-    else if (priceChange <= -5) {
-      const crashEmojis = ['worriedEmoji', 'scaredEmoji', 'devilEmoji', 'cryingEmoji2', 'pukeEmoji', 'sadEmoji', 'questionMark', 'questionMark2', 'exclamationMark', 'exclamationMark2']
-      return crashEmojis.includes(emojiName) ? 1 : 0
+    // Slightly negative - mild concern
+    else if (priceChange >= -2) {
+      const concernedEmojis = ['emoji2', 'worriedEmoji', 'questionMark']
+      return concernedEmojis.includes(emojiName) ? 1 : 0
     }
-    return 0
+    // Moderate down - worried
+    else if (priceChange > -5) {
+      const worriedEmojis = ['worriedEmoji', 'scaredEmoji', 'sadEmoji', 'questionMark', 'questionMark2']
+      return worriedEmojis.includes(emojiName) ? 1 : 0
+    }
+    // Large down - panic
+    else {
+      const panicEmojis = ['worriedEmoji', 'scaredEmoji', 'devilEmoji', 'cryingEmoji2', 'pukeEmoji', 'sadEmoji', 'questionMark', 'questionMark2', 'exclamationMark', 'exclamationMark2']
+      return panicEmojis.includes(emojiName) ? 1 : 0
+    }
   }
   
   const opacityTargets = useRef({
@@ -1157,8 +1173,8 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       return // Exit early, don't process market-based visibility
     }
     
-    if (isPositive) {
-      // Positive prices - fade in happy emojis and green arrow
+    if (isLargeUp) {
+      // Large upward movement (>5%) - maximum celebration
       opacityTargets.current.emoji1 = 1
       opacityTargets.current.emoji3 = 1
       opacityTargets.current.emoji4 = 1
@@ -1167,8 +1183,8 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       opacityTargets.current.iconText1 = 1
       opacityTargets.current.iconText2 = 1
       
-      // Fade out negative emojis
-      opacityTargets.current.emoji2 = 0 // Not in positive list
+      // Fade out all negative emojis
+      opacityTargets.current.emoji2 = 0
       opacityTargets.current.worriedEmoji = 0
       opacityTargets.current.scaredEmoji = 0
       opacityTargets.current.devilEmoji = 0
@@ -1180,14 +1196,58 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       opacityTargets.current.exclamationMark = 0
       opacityTargets.current.exclamationMark2 = 0
       
-      // console.log('📈 Market positive (+' + priceChange.toFixed(2) + '%) - showing happy emojis')
-    } else if (isMiddling || isModerateDown) {
-      // Middling prices and moderate downward action - fade in worried/scared/sad emojis
-      opacityTargets.current.worriedEmoji = 1
-      opacityTargets.current.scaredEmoji = 1
-      opacityTargets.current.sadEmoji = 1  // SadEmoji visible during mild and strong downturns
-      opacityTargets.current.questionMark = 1  // QuestionMarks visible during uncertain times
-      opacityTargets.current.questionMark2 = 1
+    } else if (isModeratelyPositive) {
+      // Moderately positive (2-5%) - happy emojis
+      opacityTargets.current.emoji1 = 1
+      opacityTargets.current.emoji3 = 1
+      opacityTargets.current.emoji4 = 1
+      opacityTargets.current.emoji5 = 1
+      opacityTargets.current.iconLove = 1
+      opacityTargets.current.iconText1 = 0.5
+      opacityTargets.current.iconText2 = 0.5
+      
+      // Fade out negative emojis
+      opacityTargets.current.emoji2 = 0
+      opacityTargets.current.worriedEmoji = 0
+      opacityTargets.current.scaredEmoji = 0
+      opacityTargets.current.devilEmoji = 0
+      opacityTargets.current.cryingEmoji2 = 0
+      opacityTargets.current.pukeEmoji = 0
+      opacityTargets.current.sadEmoji = 0
+      opacityTargets.current.questionMark = 0
+      opacityTargets.current.questionMark2 = 0
+      opacityTargets.current.exclamationMark = 0
+      opacityTargets.current.exclamationMark2 = 0
+      
+    } else if (isSlightlyPositive) {
+      // Slightly positive (0-2%) - cautiously optimistic
+      opacityTargets.current.emoji1 = 1
+      opacityTargets.current.emoji2 = 0.5
+      opacityTargets.current.emoji3 = 1
+      opacityTargets.current.emoji4 = 0.5
+      opacityTargets.current.emoji5 = 0
+      opacityTargets.current.iconLove = 0
+      opacityTargets.current.iconText1 = 0
+      opacityTargets.current.iconText2 = 0
+      
+      // Fade out negative emojis
+      opacityTargets.current.worriedEmoji = 0
+      opacityTargets.current.scaredEmoji = 0
+      opacityTargets.current.devilEmoji = 0
+      opacityTargets.current.cryingEmoji2 = 0
+      opacityTargets.current.pukeEmoji = 0
+      opacityTargets.current.sadEmoji = 0
+      opacityTargets.current.questionMark = 0
+      opacityTargets.current.questionMark2 = 0
+      opacityTargets.current.exclamationMark = 0
+      opacityTargets.current.exclamationMark2 = 0
+      
+    } else if (isSlightlyNegative) {
+      // Slightly negative (-2 to 0%) - mild concern
+      opacityTargets.current.emoji2 = 1
+      opacityTargets.current.worriedEmoji = 0.5
+      opacityTargets.current.questionMark = 0.5
+      opacityTargets.current.questionMark2 = 0
       
       // Fade out positive emojis
       opacityTargets.current.emoji1 = 0
@@ -1199,16 +1259,39 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       opacityTargets.current.iconText2 = 0
       
       // Fade out extreme negative emojis
+      opacityTargets.current.scaredEmoji = 0
       opacityTargets.current.devilEmoji = 0
-      opacityTargets.current.cryingEmoji2 = 0  // Only shows when down >5%
-      opacityTargets.current.pukeEmoji = 0  // Not visible in moderate downturns
-      opacityTargets.current.exclamationMark = 0  // Not visible in moderate downturns
-      opacityTargets.current.exclamationMark2 = 0  // Not visible in moderate downturns
+      opacityTargets.current.cryingEmoji2 = 0
+      opacityTargets.current.pukeEmoji = 0
+      opacityTargets.current.sadEmoji = 0
+      opacityTargets.current.exclamationMark = 0
+      opacityTargets.current.exclamationMark2 = 0
       
-      // Keep emoji2 and other icons neutral
-      opacityTargets.current.emoji2 = 1
+    } else if (isModerateDown) {
+      // Moderate down (-5 to -2%) - worried
+      opacityTargets.current.worriedEmoji = 1
+      opacityTargets.current.scaredEmoji = 1
+      opacityTargets.current.sadEmoji = 1
+      opacityTargets.current.questionMark = 1
+      opacityTargets.current.questionMark2 = 1
       
-      // console.log('😟 Market middling (' + priceChange.toFixed(2) + '%) - showing worried emojis')
+      // Fade out positive emojis
+      opacityTargets.current.emoji1 = 0
+      opacityTargets.current.emoji2 = 0.5
+      opacityTargets.current.emoji3 = 0
+      opacityTargets.current.emoji4 = 0
+      opacityTargets.current.emoji5 = 0
+      opacityTargets.current.iconLove = 0
+      opacityTargets.current.iconText1 = 0
+      opacityTargets.current.iconText2 = 0
+      
+      // Fade out extreme negative emojis
+      opacityTargets.current.devilEmoji = 0
+      opacityTargets.current.cryingEmoji2 = 0
+      opacityTargets.current.pukeEmoji = 0
+      opacityTargets.current.exclamationMark = 0
+      opacityTargets.current.exclamationMark2 = 0
+      
     } else if (isLargeDown) {
       // Large downward price action - fade in panic emojis
       opacityTargets.current.worriedEmoji = 1
@@ -1235,7 +1318,7 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       // Animations are already playing from model load, just ensure they're visible
       // console.log('📉💀 Market crash (' + priceChange.toFixed(2) + '%) - showing panic emojis with animations!')
     }
-  }, [isPositive, isMiddling, isModerateDown, isLargeDown, priceChange, gltf, is80sMode])
+  }, [isLargeUp, isModeratelyPositive, isSlightlyPositive, isSlightlyNegative, isModerateDown, isLargeDown, priceChange, gltf, is80sMode])
 
   // Control PacMan visibility based on 80s mode
   useEffect(() => {
@@ -1940,7 +2023,7 @@ return (
     <primitive 
       object={gltf.scene} 
       scale={[0.45, 0.45, 0.45]}
-      rotation={[0, userRotation, 0]} // User rotation only (hands now face forward)
+      rotation={[0, userRotation, 0]} // Apply user rotation to hands
       onClick={handleClick}
       onPointerOver={handlePointerOver}
       onPointerOut={handlePointerOut}
@@ -1968,7 +2051,7 @@ return (
         color='#00ffff'
         intensity={1}
         size={5}
-        opacity={0.9}
+        opacity={0.5}
         isActive={hasActiveClick}
         priceDirection={priceChange / 5}
       />
@@ -2006,42 +2089,6 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
   const containerRef = useRef(null)
   const [hasReachedSection, setHasReachedSection] = useState(false)
   const [isInView, setIsInView] = useState(false) // Track if currently in view
-  const [userRotation, setUserRotation] = useState(0) // Track user's manual rotation
-  const isDragging = useRef(false)
-  const dragStart = useRef({ x: 0, rotation: 0 })
-  
-  // Simple drag handlers for rotation
-  const handlePointerDown = useCallback((event) => {
-    // Only start dragging if clicking in the bottom 40% of screen (where hands are)
-    const screenHeight = window.innerHeight
-    const clickY = event.clientY
-    
-    if (clickY > screenHeight * 0.6) {  // Bottom 40% of screen
-      isDragging.current = true
-      dragStart.current = {
-        x: event.clientX,
-        rotation: userRotation
-      }
-      if (typeof document !== 'undefined' && document.body) {
-        document.body.style.cursor = 'grabbing'
-      }
-    }
-  }, [userRotation])
-
-  const handlePointerMove = useCallback((event) => {
-    if (isDragging.current) {
-      const deltaX = (event.clientX - dragStart.current.x) * 0.01
-      const newRotation = dragStart.current.rotation + deltaX
-      setUserRotation(newRotation)
-    }
-  }, [])
-
-  const handlePointerUp = useCallback(() => {
-    isDragging.current = false
-    if (typeof document !== 'undefined' && document.body) {
-      document.body.style.cursor = 'auto'
-    }
-  }, [])
   
   // Track when component comes into view using Intersection Observer
   useEffect(() => {
@@ -2118,25 +2165,6 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
       {/* 3D Canvas */}
       <Canvas
         camera={{ position: [0, -0.5, 5], fov: 45 }}
-        onPointerDown={(event) => {
-          // Check if click is in upper portion where candles are
-          const screenHeight = window.innerHeight
-          const clickY = event.clientY || event.nativeEvent?.clientY || 0
-          
-          if (clickY < screenHeight * 0.6) {
-            // Upper 60% - don't handle, let it pass through
-            event.stopPropagation = () => {} // Disable stopPropagation
-            return
-          }
-          handlePointerDown(event)
-        }}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerUp}
-        onPointerMissed={(event) => {
-          // When clicking on empty space, pass the event through
-          console.log('Canvas pointer missed - clientY:', event?.clientY)
-        }}
         style={{ 
           width: '100%', 
           height: '100%',
@@ -2167,7 +2195,6 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
             hoveredOffering={hoveredOffering}
             justLitOffering={justLitOffering}
             onJustLitComplete={onJustLitComplete}
-            userRotation={userRotation}
             priceChange={priceChange}
             is80sMode={is80sMode}
             onLoad={() => {
@@ -2180,7 +2207,14 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
         {/* DISABLED: MouseTracker for memory leak testing */}
         {/* <MouseTracker setMousePosition={setMousePosition} /> */}
         
-        {/* OrbitControls removed - using manual rotation only */}
+        {/* OrbitControls for rotation */}
+        <OrbitControls 
+          enablePan={false}
+          enableZoom={false}
+          enableRotate={true}
+          maxPolarAngle={Math.PI / 2}
+          minPolarAngle={Math.PI / 2}
+        />
         
         {/* Post-processing effects - disabled on mobile for performance */}
         {!isMobile && (

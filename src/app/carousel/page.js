@@ -10,6 +10,7 @@ import { useUser } from '@clerk/nextjs'
 import { useMusic } from '@/components/MusicContext'
 import ThirdwebBuyModal from '@/components/ThirdwebBuyModal'
 import CyberGlitchButton from '@/components/carousel/CyberGlitchButton'
+import CoinLoader from '@/components/CoinLoader'
 import { useRouter } from 'next/navigation'
 
 export default function CarouselPage() {
@@ -29,11 +30,60 @@ export default function CarouselPage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isMobileDevice, setIsMobileDevice] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
   const [mounted, setMounted] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const is80sMode = context80sMode
 
-  // Set mounted state after hydration
+  // Set mounted state after hydration and handle loading
   useEffect(() => {
     setMounted(true);
+    
+    // Preload all carousel images
+    const imageUrls = [
+      '/carousel_images/img1.jpg',
+      '/carousel_images/img2.jpg',
+      '/carousel_images/img3.jpg',
+      '/carousel_images/img4.jpg',
+      '/carousel_images/img5.jpg',
+      '/carousel_images/img6.jpg',
+      '/carousel_images/img7.jpg',
+      '/carousel_images/img8.jpg'
+    ];
+    
+    let loadedCount = 0;
+    
+    const imagePromises = imageUrls.map(url => {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          loadedCount++;
+          resolve(true);
+        };
+        img.onerror = () => {
+          console.warn(`Failed to load image: ${url}`);
+          loadedCount++;
+          resolve(false); // Resolve anyway to not block loading
+        };
+        img.src = url;
+      });
+    });
+    
+    // Wait for all images to load (or fail)
+    Promise.all(imagePromises).then(() => {
+      // Add a small delay for smooth transition
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 500);
+    });
+    
+    // Fallback timeout in case images take too long
+    const fallbackTimer = setTimeout(() => {
+      if (isLoading) {
+        console.warn('Image loading timeout - proceeding anyway');
+        setIsLoading(false);
+      }
+    }, 10000); // 10 second max wait
+    
+    return () => clearTimeout(fallbackTimer);
   }, []);
 
   // Check if font is loaded and add fonts-loaded class
@@ -95,6 +145,9 @@ export default function CarouselPage() {
         backgroundRepeat: 'no-repeat'
       } : {})
     }}>
+      {/* CoinLoader */}
+      <CoinLoader loading={isLoading} />
+      
       <style dangerouslySetInnerHTML={{ __html: `
         @font-face {
           font-family: 'UnifrakturMaguntia';
@@ -544,8 +597,78 @@ export default function CarouselPage() {
         onClose={() => setShowBuyModal(false)}
       />
       
-      {/* RL80 Logo - Top Left - Using Portal to ensure it's on top */}
-      {typeof document !== 'undefined' && createPortal(
+      {/* Our Lady of Perpetual Profit Logo - Top Left (Desktop) / RL80 (Mobile) - Using Portal to ensure it's on top */}
+      {typeof document !== 'undefined' && !isMobileView && createPortal(
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100vh',
+          zIndex: 99999,
+          pointerEvents: 'none',
+        }}>
+          <div style={{
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            width: '100%',
+            paddingTop: '3rem',
+            minHeight: '100vh',
+            pointerEvents: 'none',
+          }}>
+            
+            <h1 className='custom-title'
+                id="main-title"
+                style={{ 
+                position: "relative",
+                left: "-37%",
+                color: is80sMode ? "#ffffff" : "#f6f5f1ff",
+                fontFamily: 'UnifrakturCook, serif',
+                textShadow: is80sMode 
+                  ? `
+                    0 0 20px rgba(201, 55, 255, 0.9),
+                    0 0 40px rgba(201, 55, 255, 0.8),
+                    0 0 60px rgba(201, 55, 255, 0.7),
+                    4px 4px 12px rgba(201, 55, 255, 1),
+                    -2px -2px 8px rgba(255, 0, 255, 0.8),
+                    0 0 100px rgba(201, 55, 255, 0.5)
+                  `
+                  : `
+                    0 0 10px rgba(212, 175, 55, 0.8),
+                    0 0 20px rgba(212, 175, 55, 0.6),
+                    0 0 30px rgba(212, 175, 55, 0.8),
+                    6px 6px 16px rgba(0, 0, 0, 1),
+                    -2px -2px 8px rgba(255, 192, 203, 0.7),
+                    0 0 100px rgba(212, 175, 55, 0.1)
+                  `,
+                fontSize: "3.5rem",
+                fontWeight: 900,
+                lineHeight: 0.8,
+                transform: "rotate(-8deg) skew(-15deg)",
+                zIndex: 1000,
+                whiteSpace: 'nowrap',
+                cursor: 'pointer',
+                marginTop: '1rem',
+                pointerEvents: 'auto',
+              }}
+              onClick={() => router.push('/shrine')}
+            >
+              <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
+              <span className="title-line" style={{ display: 'block', position: 'relative' }}>
+                <span style={{ fontSize: "2rem" }}>of    </span>
+                Perpetual
+              </span>
+              <span className="title-line" style={{ display: 'block', marginLeft: "4rem", position: 'relative' }}>Profit</span>
+            </h1>
+
+          </div>
+        </div>,
+        document.body
+      )}
+      
+      {/* RL80 Logo - Mobile Only - Using Portal */}
+      {typeof document !== 'undefined' && isMobileView && createPortal(
         <div style={{
           position: "fixed",
           top: "20px", 
@@ -560,12 +683,12 @@ export default function CarouselPage() {
             style={{
               position: "relative",
               fontFamily: "'UnifrakturMaguntia', serif",
-              fontSize: isMobileView ? "3rem" : "4rem",
+              fontSize: "3rem",
               color: "#ffffff",
               cursor: "pointer",
             }}
           >
-            <Link href="/carousel" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
+            <Link href="/shrine" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
               RL80
             </Link>
             {Array.from({length: 100}).map((_, i) => {

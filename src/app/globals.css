@@ -6974,3 +6974,17 @@ body .cl-profileSection__security button {
   display: block !important;
   margin-top: 20px !important;
 }
+
+/* Fix for drei Stats and other overlays blocking interactions */
+div[data-three] {
+  pointer-events: none !important;
+}
+
+/* Ensure Stats panels dont block clicks */
+.stats-monitor {
+  pointer-events: none !important;
+}
+
+/* Remove the overly broad rule that was blocking everything */
+/* Only target specific drei/stats elements if needed */
+

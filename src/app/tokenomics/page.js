@@ -99,8 +99,77 @@ export default function TokenomicsPage() {
       padding: '80px 20px 40px',
     }}>
      
-      {/* Logo in top left */}
-      {!isSceneLoading && (
+      {/* Our Lady of Perpetual Profit Logo (Desktop) / RL80 (Mobile) */}
+      {!isSceneLoading && !isMobile && (
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          minHeight: '100vh',
+          zIndex: 10,
+          pointerEvents: 'none',
+        }}>
+          <div style={{
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            width: '100%',
+            paddingTop: '2rem',
+            minHeight: '100vh',
+            pointerEvents: 'none',
+          }}>
+            
+            <h1 className='custom-title'
+                id="main-title"
+                style={{ 
+                position: "relative",
+                left: "-37%",
+                color: is80sMode ? "#ffffff" : "#f6f5f1ff",
+                fontFamily: 'UnifrakturCook, serif',
+                textShadow: is80sMode 
+                  ? `
+                    0 0 20px rgba(201, 55, 255, 0.9),
+                    0 0 40px rgba(201, 55, 255, 0.8),
+                    0 0 60px rgba(201, 55, 255, 0.7),
+                    4px 4px 12px rgba(201, 55, 255, 1),
+                    -2px -2px 8px rgba(255, 0, 255, 0.8),
+                    0 0 100px rgba(201, 55, 255, 0.5)
+                  `
+                  : `
+                    0 0 10px rgba(212, 175, 55, 0.8),
+                    0 0 20px rgba(212, 175, 55, 0.6),
+                    0 0 30px rgba(212, 175, 55, 0.8),
+                    6px 6px 16px rgba(0, 0, 0, 1),
+                    -2px -2px 8px rgba(255, 192, 203, 0.7),
+                    0 0 100px rgba(212, 175, 55, 0.1)
+                  `,
+                fontSize: "3.5rem",
+                fontWeight: 900,
+                lineHeight: 0.8,
+                transform: "rotate(-8deg) skew(-15deg)",
+                zIndex: 1000,
+                whiteSpace: 'nowrap',
+                cursor: 'pointer',
+                marginTop: '1rem',
+                pointerEvents: 'auto',
+              }}
+              onClick={() => window.location.href = '/carousel'}
+            >
+              <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
+              <span className="title-line" style={{ display: 'block', position: 'relative' }}>
+                <span style={{ fontSize: "2rem" }}>of    </span>
+                Perpetual
+              </span>
+              <span className="title-line" style={{ display: 'block', marginLeft: "4rem", position: 'relative' }}>Profit</span>
+            </h1>
+
+          </div>
+        </div>
+      )}
+      
+      {/* RL80 Logo - Mobile Only */}
+      {!isSceneLoading && isMobile && (
         <div style={{
           position: "absolute",
           top: "20px", 
@@ -116,7 +185,7 @@ export default function TokenomicsPage() {
                  style={{
               position: "relative",
               fontFamily: "'UnifrakturMaguntia', serif",
-              fontSize: isMobile ? "3rem" : "4rem",
+              fontSize: "3rem",
               color: "#ffffff",
               cursor: "pointer",
             }}

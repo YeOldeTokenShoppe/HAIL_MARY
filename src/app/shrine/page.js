@@ -8,7 +8,9 @@ import { useUser } from '@clerk/nextjs'
 import { useMusic } from '@/components/MusicContext'
 import UnifiedShrine from '@/components/UnifiedShrine'
 import ThirdwebBuyModal from '@/components/ThirdwebBuyModal'
+import CoinLoader from '@/components/CoinLoader'
 import { useRouter } from 'next/navigation'
+import ShrineLeftPanel from '@/components/ShrineLeftPanel'
 
 // Tiny Votive Model Component
 
@@ -30,6 +32,7 @@ export default function ShrinePage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [currentView, setCurrentView] = useState('shrine')
   const [mounted, setMounted] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const is80sMode = context80sMode
   
   // State for offerings data
@@ -76,9 +79,52 @@ export default function ShrinePage() {
     },
   ])
 
-  // Set mounted state after hydration
+  // Set mounted state after hydration and handle loading
   useEffect(() => {
     setMounted(true);
+    
+    // Preload critical shrine assets
+    const assetsToPreload = [
+      '/images/retro.webp', // Background image for 80s mode
+      '/images/3ACES_TATTOO.webp' // Button image
+    ];
+    
+    // Note: The 3D model (/models/tinyVotiveOnly.glb) will be loaded by Three.js
+    // and we'll rely on the Suspense fallback for that
+    
+    let loadedCount = 0;
+    const totalAssets = assetsToPreload.length;
+    
+    const checkAllLoaded = () => {
+      loadedCount++;
+      if (loadedCount >= totalAssets) {
+        // Add a small delay for smooth transition
+        setTimeout(() => {
+          setIsLoading(false);
+        }, 500);
+      }
+    };
+    
+    // Preload images
+    assetsToPreload.forEach(url => {
+      const img = new Image();
+      img.onload = checkAllLoaded;
+      img.onerror = () => {
+        console.warn(`Failed to load asset: ${url}`);
+        checkAllLoaded(); // Continue anyway
+      };
+      img.src = url;
+    });
+    
+    // Fallback timeout in case assets take too long
+    const fallbackTimer = setTimeout(() => {
+      if (isLoading) {
+        console.warn('Asset loading timeout - proceeding anyway');
+        setIsLoading(false);
+      }
+    }, 10000); // 10 second max wait
+    
+    return () => clearTimeout(fallbackTimer);
   }, []);
 
   // Check if font is loaded and add fonts-loaded class
@@ -123,6 +169,9 @@ export default function ShrinePage() {
 
   return (
     <>
+      {/* CoinLoader */}
+      <CoinLoader loading={isLoading} />
+      
       <style dangerouslySetInnerHTML={{ __html: `
         @font-face {
           font-family: 'UnifrakturMaguntia';
@@ -144,7 +193,8 @@ export default function ShrinePage() {
         left: 0,
         width: "100%",
         height: "100%",
-        zIndex: 1
+        zIndex: 1,
+        pointerEvents: 'auto'
       }}>
         <Suspense fallback={
           <div style={{
@@ -177,7 +227,33 @@ export default function ShrinePage() {
           />
         </Suspense>
       </div>
-      
+      <ShrineLeftPanel 
+        is80sMode={is80sMode}
+        isMobile={isMobileView}
+        onLightCandle={() => {
+          // Trigger your candle lighting logic
+          const messages = [
+            'Please pump my bags to the moon 🚀',
+            'Grant me diamond hands in these trying times',
+            'May the green candles be ever in my favor',
+          ]
+          const names = ['anon_trader', 'crypto_believer', 'hodl_warrior']
+          const types = ['petition', 'confession', 'appreciation']
+          
+          const newOffering = {
+            name: names[Math.floor(Math.random() * names.length)],
+            type: types[Math.floor(Math.random() * types.length)],
+            message: messages[Math.floor(Math.random() * messages.length)],
+            tokensBurned: Math.floor(Math.random() * 10000) + 500,
+            timestamp: 'just now'
+          }
+          
+          setMockOfferings(prev => [newOffering, ...prev])
+          setJustLitOffering(newOffering)
+          setTimeout(() => setJustLitOffering(null), 3000)
+        }}
+        router={router}
+      />
       {/* Tiny Candle Button with Glowing Arrow - Bottom Right - Desktop Only */}
       {!isMobileView && (
         <>
@@ -426,8 +502,9 @@ export default function ShrinePage() {
         </Link>
       </div> */}
       
-      {/* RL80 Logo - Top Left */}
-      {fontLoaded && (
+      
+      {/* RL80 Logo - Mobile Only */}
+      {fontLoaded && isMobileView && (
         <div style={{
           position: "absolute",
           top: "20px", 
@@ -442,7 +519,7 @@ export default function ShrinePage() {
             style={{
               position: "relative",
               fontFamily: "'UnifrakturMaguntia', serif",
-              fontSize: isMobileView ? "3rem" : "4rem",
+              fontSize: "3rem",
               color: "#ffffff",
               cursor: "pointer",
             }}
@@ -495,7 +572,8 @@ export default function ShrinePage() {
         position: "absolute",
         top: "1rem",
         right: "1rem",
-        zIndex: 300
+        zIndex: 10000,
+        pointerEvents: 'auto'
       }}>
         <NavControlsHome 
           isPlaying={contextIsPlaying}

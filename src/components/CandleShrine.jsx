@@ -13,19 +13,23 @@ const sharedUniforms = {
   uTime: { value: 0 },
   uClickedId: { value: -1 },
   uPriceDirection: { value: 0 },
+  uContinuousOffset: { value: 0 }, // Accumulated offset from continuous price movement
+  uShortTermPrice: { value: 0 }, // Short-term price change for dynamic movement
 }
 
 // Base vertex shader chunk for candle wobble - reused across all materials
 const wobbleVertexChunk = `
   uniform float uTime;
   uniform float uPriceDirection;
+  uniform float uContinuousOffset;
+  uniform float uShortTermPrice;
   
   // Fast hash function
   float hash(float n) {
     return fract(sin(n) * 43758.5453123);
   }
   
-  // Calculate wobble offset for a candle instance
+  // Calculate wobble offset for a candle instance with continuous movement
   vec3 getWobbleOffset(float instanceId, vec3 basePosition) {
     float phase = hash(instanceId) * 6.28318;
     float speed = 0.2 + hash(instanceId + 100.0) * 0.3;
@@ -35,7 +39,20 @@ const wobbleVertexChunk = `
     
     // Smooth floating motion
     float offsetX = sin(t * 0.4) * 0.3;
-    float offsetY = sin(t * 0.3) * 0.2 + uPriceDirection * 3.0 * priceResponse;
+    
+    // Continuous vertical movement based on short-term price
+    // Add variation per candle for more organic feel
+    float movementVariation = 0.8 + hash(instanceId + 77.0) * 0.4; // 80% to 120% speed variation
+    float continuousY = uContinuousOffset * movementVariation;
+    
+    // Wrap around viewport (increased to 35 units to match the new candle spread)
+    float viewportHeight = 35.0;
+    // Use fract to create seamless wrapping
+    float wrappedY = fract((continuousY + viewportHeight * 0.5) / viewportHeight) * viewportHeight - viewportHeight * 0.5;
+    
+    // Combine original wobble with continuous movement and price response
+    float offsetY = sin(t * 0.3) * 0.2 + uPriceDirection * 3.0 * priceResponse + wrappedY;
+    
     float offsetZ = cos(t * 0.35) * 0.3;
     
     return vec3(offsetX, offsetY, offsetZ);
@@ -79,12 +96,15 @@ function createWobbleMaterial(baseColor, options = {}) {
 }
 
 // XBase material with click glow effect
+// XBase material with click glow effect AND price-reactive color
 function createXBaseMaterial() {
   return new THREE.ShaderMaterial({
     uniforms: {
       ...sharedUniforms,
-      uBaseColor: { value: new THREE.Color('#8bec03') },
-      uGlowColor: { value: new THREE.Color('#ff00ff') },
+      uBaseColor: { value: new THREE.Color('#88ff88') },    // neutral green
+      uBullColor: { value: new THREE.Color('#00ff66') },    // bright green for gains
+      uBearColor: { value: new THREE.Color('#ff4444') },    // red for losses
+      uGlowColor: { value: new THREE.Color('#ff00ff') },    // purple for clicked
     },
     vertexShader: `
       ${wobbleVertexChunk}
@@ -104,17 +124,30 @@ function createXBaseMaterial() {
     `,
     fragmentShader: `
       uniform vec3 uBaseColor;
+      uniform vec3 uBullColor;
+      uniform vec3 uBearColor;
       uniform vec3 uGlowColor;
       uniform float uClickedId;
       uniform float uTime;
+      uniform float uPriceDirection;
       varying float vInstanceId;
       
       void main() {
         bool isClicked = uClickedId >= 0.0 && abs(uClickedId - vInstanceId) < 1.0;
         
-        vec3 color = uBaseColor;
+        // Price-reactive wax color
+        // uPriceDirection roughly ranges from -1 to 1
+        float t = smoothstep(-0.5, 0.5, uPriceDirection);
+        
+        // Two-stage lerp for smooth transitions:
+        // bear (red) -> neutral (soft green) -> bull (bright green)
+        vec3 priceColor = mix(uBearColor, uBaseColor, smoothstep(0.0, 0.5, t));
+        priceColor = mix(priceColor, uBullColor, smoothstep(0.5, 1.0, t));
+        
+        vec3 color = priceColor;
         float intensity = 1.0;
         
+        // Clicked candle override - purple glow effect
         if (isClicked) {
           float pulse = sin(uTime * 4.0) * 0.3 + 0.7;
           color = mix(uGlowColor, vec3(1.0, 0.0, 1.0), pulse);
@@ -322,11 +355,38 @@ function useClonedGeometries(modelPath) {
 function usePositions(count) {
   return useMemo(() => {
     const positions = []
+    
     for (let i = 0; i < count; i++) {
+      let x = (Math.random() - 0.5) * 40
+      let y = (Math.random() - 0.5) * 30
+      const z = (Math.random() - 0.5) * 20 - 5
+      
+      // Calculate "danger" level based on proximity to UI zone (bottom-left)
+      const uiCenterX = -12
+      const uiCenterY = -8
+      const distToUI = Math.sqrt(
+        Math.pow((x - uiCenterX) * 0.8, 2) + 
+        Math.pow((y - uiCenterY) * 1.2, 2)
+      )
+      
+      // If too close to UI zone, probabilistically push away
+      const dangerThreshold = 12
+      if (distToUI < dangerThreshold) {
+        const pushChance = 1 - (distToUI / dangerThreshold)
+        
+        if (Math.random() < pushChance * 0.8) {
+          // Push away from UI center
+          const angle = Math.atan2(y - uiCenterY, x - uiCenterX)
+          const pushDist = (dangerThreshold - distToUI) * 0.8
+          x += Math.cos(angle) * pushDist
+          y += Math.sin(angle) * pushDist
+        }
+      }
+      
       positions.push({
-        x: (Math.random() - 0.5) * 40,
-        y: (Math.random() - 0.5) * 15,
-        z: (Math.random() - 0.5) * 20 - 5,
+        x,
+        y,
+        z,
         rotation: Math.random() * Math.PI * 2,
       })
     }
@@ -395,9 +455,10 @@ function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.5
 }
 
 // Single animation controller - updates shared uniforms once per frame
-// Accepts either a ref (for smooth updates) or a value (for static/slow updates)
-function AnimationController({ priceDirection, priceRef, isMobile }) {
+// Accepts either refs (for smooth updates) or values (for static/slow updates)
+function AnimationController({ priceDirection, priceRef, shortTermPriceRef, continuousOffsetRef, isMobile }) {
   const frameCount = useRef(0)
+  const lastLogTime = useRef(0)
   
   useFrame((state) => {
     frameCount.current++
@@ -408,11 +469,24 @@ function AnimationController({ priceDirection, priceRef, isMobile }) {
     sharedUniforms.uTime.value = state.clock.elapsedTime
     // Prefer ref for smooth animation, fall back to prop
     sharedUniforms.uPriceDirection.value = priceRef?.current ?? priceDirection ?? 0
+    sharedUniforms.uShortTermPrice.value = shortTermPriceRef?.current ?? 0
+    sharedUniforms.uContinuousOffset.value = continuousOffsetRef?.current ?? 0
+    
+    // Debug log every 2 seconds
+    if (state.clock.elapsedTime - lastLogTime.current > 2) {
+      lastLogTime.current = state.clock.elapsedTime
+      console.log('Candle movement:', {
+        continuousOffset: continuousOffsetRef?.current,
+        shortTermPrice: shortTermPriceRef?.current,
+        priceDirection: priceRef?.current,
+        uPriceDirection: sharedUniforms.uPriceDirection.value
+      })
+    }
   })
   return null
 }
 
-export function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, priceRef, additionalCandles = [], onCandleClick, clickedCandleId, isMobile = false }) {
+export function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, priceRef, shortTermPriceRef, continuousOffsetRef, additionalCandles = [], onCandleClick, clickedCandleId, isMobile = false }) {
   const { geometries, textures, localMatrices } = useClonedGeometries('/models/tinyVotiveOnly.glb')
   const basePositions = usePositions(count)
   
@@ -428,12 +502,12 @@ export function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, priceRef
   }, [basePositions, additionalCandles])
   
   // Create materials ONCE
-  const materials = useMemo(() => ({
-    xbase: createXBaseMaterial(),
-    glass: createWobbleMaterial('#888888', { transparent: true, opacity: 0.3 }),
-    wick: createWobbleMaterial('#222222'),
-    flame: createFlameMaterial(),
-  }), [textures])
+const materials = useMemo(() => ({
+  xbase: createXBaseMaterial(),  // Now price-reactive!
+  glass: createWobbleMaterial('#888888', { transparent: true, opacity: 0.3 }),
+  wick: createWobbleMaterial('#222222'),
+  flame: createFlameMaterial(),  // Or createFlameMaterialPriceReactive() for tinted flames
+}), [])
   
   // Update clicked ID in shared uniforms
   useEffect(() => {
@@ -444,8 +518,14 @@ export function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, priceRef
 
   return (
     <group>
-      {/* Single animation controller for ALL parts - uses ref for smooth updates */}
-      <AnimationController priceDirection={priceDirection} priceRef={priceRef} isMobile={isMobile} />
+      {/* Single animation controller for ALL parts - uses refs for smooth updates */}
+      <AnimationController 
+        priceDirection={priceDirection} 
+        priceRef={priceRef}
+        shortTermPriceRef={shortTermPriceRef}
+        continuousOffsetRef={continuousOffsetRef}
+        isMobile={isMobile} 
+      />
       
       <InstancedPart geometry={geometries.xbase} material={materials.xbase} positions={positions} localMatrix={localMatrices.xbase} maxCount={maxCount} onCandleClick={onCandleClick} />
       <InstancedPart geometry={geometries.wick} material={materials.wick} positions={positions} localMatrix={localMatrices.wick} maxCount={maxCount} onCandleClick={onCandleClick} />
@@ -466,41 +546,13 @@ export function SceneSetup({ is80sMode }) {
   return null
 }
 
-export function GradientBackground({ priceDirection = 0, is80sMode = false }) {
-  const meshRef = useRef()
+export function GradientBackground({ is80sMode = false }) {
   const { viewport } = useThree()
-  
-  const colorsRef = useRef({
-    bottom: new THREE.Color('#1a1a2e'),
-    top: new THREE.Color('#4a4a6a'),
-  })
-  
-  useFrame(() => {
-    if (!meshRef.current) return
-    
-    let targetBottom, targetTop
-    if (priceDirection > 0.3) {
-      targetBottom = new THREE.Color('#0a2d1a')
-      targetTop = new THREE.Color('#22ff66')
-    } else if (priceDirection < -0.3) {
-      targetBottom = new THREE.Color('#2d0a0a')
-      targetTop = new THREE.Color('#ff4444')
-    } else {
-      targetBottom = new THREE.Color('#1a1a2e')
-      targetTop = new THREE.Color('#4a4a6a')
-    }
-    
-    colorsRef.current.bottom.lerp(targetBottom, 0.02)
-    colorsRef.current.top.lerp(targetTop, 0.02)
-    
-    meshRef.current.material.uniforms.uColorBottom.value = colorsRef.current.bottom
-    meshRef.current.material.uniforms.uColorTop.value = colorsRef.current.top
-  })
   
   const material = useMemo(() => new THREE.ShaderMaterial({
     uniforms: {
       uColorBottom: { value: new THREE.Color('#1a1a2e') },
-      uColorTop: { value: new THREE.Color('#4a4a6a') },
+      uColorTop: { value: new THREE.Color('#2d2d4a') },
     },
     vertexShader: `
       varying vec2 vUv;
@@ -529,12 +581,11 @@ export function GradientBackground({ priceDirection = 0, is80sMode = false }) {
   if (is80sMode) return null
   
   return (
-    <mesh ref={meshRef} position={[0, 0, -20]} material={material}>
+    <mesh position={[0, 0, -20]} material={material}>
       <planeGeometry args={[viewport.width * 4, viewport.height * 4]} />
     </mesh>
   )
 }
-
 export function PriceSimulator({ onPriceChange }) {
   useFrame((state) => {
     const t = state.clock.elapsedTime

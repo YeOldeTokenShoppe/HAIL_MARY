@@ -72,6 +72,7 @@ const CoinLoader = ({ loading = true, onComplete }) => {
           align-items: center;
           z-index: 10001;
           opacity: ${loading ? '1' : '0'};
+          pointer-events: ${loading ? 'auto' : 'none'};
           transition: opacity 0.5s ease-out;
           will-change: opacity;
           transform: translateZ(0);

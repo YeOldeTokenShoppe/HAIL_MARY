@@ -12,7 +12,7 @@ const Matchstick = ({ onLight }) => {
   }
 
   return (
-    <div className={styles.wrapper}>
+    <div className={styles.wrapper} onClick={handleToggle} style={{cursor: 'pointer'}}>
       <div className={styles.container}>
         <input
           type="checkbox"
