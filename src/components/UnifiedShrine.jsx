@@ -4,7 +4,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useGLTF, Stats, OrbitControls } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
-import { HandsModel } from './HandsGLTFScene'
+import { HandsModel, CameraController } from './HandsGLTFScene'
 // IMPORTANT: Import from the optimized version!
 import { CandleCloud, GradientBackground, SceneSetup } from './CandleShrine'
 import { NewCandleEffectManager } from './NewCandleEffect'
@@ -137,6 +137,8 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
 }, ref) {
   // Track if component is mounted for SSR safety
   const [mounted, setMounted] = useState(false)
+  // Focus mode for phone zoom
+  const [focusMode, setFocusMode] = useState(false)
   // Use refs for real-time price and movement (no re-renders)
   const priceRef = useRef(0)
   const shortTermPriceRef = useRef(0)
@@ -448,12 +450,12 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
   }, [testPriceOverride])
 
   // Memoize exclusionZone to prevent CandleCloud re-renders
-  // Increased radius to better exclude candles from backdrop area
+  // Adjusted to match actual model position and scale
   const exclusionZone = useMemo(() => ({
-    center: [0, -1, -7],
-    radius: 8,  // Increased from 5 to better clear the backdrop
-    height: 8   // Increased from 6 to cover more vertical space
-  }), [])
+    center: [0, -1, 3],   // Match the model group position
+    radius: isMobile ? 15 : 15,  // Much larger radius to account for scale 1.8 and clear entire area
+    height: 30             // Cover full vertical space of the scaled model
+  }), [isMobile])
 
   // Memoize styles
   const unifiedStatsStyle = useMemo(() => ({
@@ -546,6 +548,30 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
           position: 'relative'
         }}
       >
+      {/* Focus Mode Indicator */}
+      {focusMode && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(0, 0, 0, 0.7)',
+            color: '#00ff66',
+            padding: '10px 20px',
+            borderRadius: '20px',
+            fontSize: '14px',
+            fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+            zIndex: 100,
+            pointerEvents: 'none',
+            border: '1px solid #00ff66',
+            backdropFilter: 'blur(10px)'
+          }}
+        >
+          📱 Focus Mode • Click phone to exit
+        </div>
+      )}
+      
       {mounted && (
       <Canvas
         camera={{ position: [0, isMobile ? 0 : 0, isMobile ? 2 : 0], fov: isMobile ? 75 : 70 }}
@@ -639,6 +665,10 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
                   userRotation={userRotation}
                   priceChange={displayPrice.change}
                   hasActiveClick={clickedCandleId !== null}
+                  onPhoneClick={() => {
+                    console.log('Phone clicked in UnifiedShrine! Current focus:', focusMode, '-> New:', !focusMode);
+                    setFocusMode(!focusMode);
+                  }}
                   is80sMode={is80sMode}
                   onLoad={() => console.log('Hands loaded')}
                 />
@@ -667,6 +697,9 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
   onCandlePulse={handleCandlePulse}  // Trigger pulse in candle cloud
 />
         
+            {/* Camera controller for focus mode */}
+            <CameraController focusMode={focusMode} />
+            
      
 <EffectComposer>
 <Bloom 

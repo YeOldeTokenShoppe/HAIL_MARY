@@ -11,7 +11,6 @@ import ThirdwebBuyModal from '@/components/ThirdwebBuyModal'
 import CoinLoader from '@/components/CoinLoader'
 import { useRouter } from 'next/navigation'
 import ShrineLeftPanel from '@/components/ShrineLeftPanel'
-import Matchstick from '@/components/Matchstick'
 
 // Tiny Votive Model Component
 
@@ -385,13 +384,36 @@ export default function ShrinePage() {
               overflow: 'hidden',
             }}
           >
-            {/* Matchstick component - lit or unlit based on state */}
+            {/* Simple mobile matchstick - lit or unlit based on state */}
             <div style={{
-              transform: 'scale(0.5) translateY(12px)',
-              opacity: mobileMatchstickLit ? 1 : 0.9,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+              height: '100%',
               pointerEvents: 'none',  // Prevent internal click handling
             }}>
-              <Matchstick isLit={mobileMatchstickLit} />
+              {mobileMatchstickLit ? (
+                // Lit state - flame emoji
+                <div style={{
+                  fontSize: '32px',
+                  animation: 'flicker 0.5s ease-in-out infinite',
+                }}>
+                  🔥
+                </div>
+              ) : (
+                // Unlit state - matchstick SVG
+                <img 
+                  src="/images/matchstick.svg"
+                  alt="Matchstick"
+                  style={{
+                    width: '28px',
+                    height: '28px',
+                    opacity: 0.9,
+                    filter: 'brightness(1.2)',
+                  }}
+                />
+              )}
             </div>
             
             {/* Pulse animation */}

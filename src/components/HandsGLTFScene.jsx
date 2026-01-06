@@ -18,7 +18,15 @@ import { Html } from '@react-three/drei'
 import EmojiRain from './EmojiRain'
 
 
-export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView, offerings, hoveredOffering, justLitOffering, onJustLitComplete, userRotation = 0, priceChange = 0, hasActiveClick = false, is80sMode = false }) {
+export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView, offerings, hoveredOffering, justLitOffering, onJustLitComplete, userRotation = 0, priceChange = 0, hasActiveClick = false, is80sMode = false, onPhoneClick }) {
+  // Debug: Log all props on mount
+  useEffect(() => {
+    console.log('HandsModel mounted with onPhoneClick:', !!onPhoneClick, typeof onPhoneClick);
+    if (onPhoneClick) {
+      console.log('onPhoneClick function:', onPhoneClick.toString());
+    }
+  }, [onPhoneClick]);
+  
   // Get mobile state from parent or detect it locally
   const [isMobileLocal, setIsMobileLocal] = useState(false)
   useEffect(() => {
@@ -61,8 +69,25 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       // Look for PhoneScreen mesh
       if (child.name === 'PhoneScreen' || child.name === 'phonescreen' || child.name === 'phone_screen' || 
           child.name === 'Phone_Screen' || child.name.toLowerCase().includes('phonescreen')) {
-        console.log('Found PhoneScreen mesh:', child.name)
+        console.log('Found PhoneScreen mesh:', child.name, 'Adding click handler')
         phoneScreenRef.current = child
+        // Ensure the mesh can be raycasted
+        if (child.isMesh) {
+          child.raycast = THREE.Mesh.prototype.raycast
+          child.material.side = THREE.DoubleSide // Make sure both sides are clickable
+        }
+        // Add click handler for focus mode
+        child.userData.onClick = () => {
+          console.log('PhoneScreen onClick triggered!')
+          if (onPhoneClick) {
+            console.log('Calling onPhoneClick')
+            onPhoneClick()
+          } else {
+            console.log('onPhoneClick not defined!')
+          }
+        }
+        child.userData.clickable = true
+        console.log('PhoneScreen userData after setup:', child.userData)
       }
       
       // Look for phoneCase mesh for light ray positioning
@@ -122,7 +147,7 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       if (onLoad) onLoad()
       hasReportedLoad.current = true
     }
-  }, [gltf, onLoad, is80sMode])
+  }, [gltf, onLoad, is80sMode, onPhoneClick])
   const texturePoolRef = useRef([]) // Pool of textures to reuse
   const canvasPoolRef = useRef([]) // Pool of canvas elements to reuse
   const materialPoolRef = useRef([]) // Pool of materials to reuse
@@ -467,90 +492,90 @@ useFrame((state, delta) => {
   })
   
   // PacMan movement animation for 80s mode (pacman2 is parented and follows)
-  if (is80sMode && pacManRef.current) {
-    // Total cycle: 8 seconds move + 3 seconds wait = 11 seconds
-    const totalCycleTime = 11 // 8 seconds for movement, 3 seconds for delay
-    const cycleTime = state.clock.elapsedTime % totalCycleTime
+  // if (is80sMode && pacManRef.current) {
+  //   // Total cycle: 8 seconds move + 3 seconds wait = 11 seconds
+  //   const totalCycleTime = 11 // 8 seconds for movement, 3 seconds for delay
+  //   const cycleTime = state.clock.elapsedTime % totalCycleTime
     
-    // Keep PacMan always visible
-    pacManRef.current.visible = true
+  //   // Keep PacMan always visible
+  //   pacManRef.current.visible = true
     
-    // Calculate opacity for fade effect
-    let opacity = 0
+  //   // Calculate opacity for fade effect
+  //   let opacity = 0
     
-    // First 4 seconds: move left
-    // Next 3 seconds: hidden/delay
-    // Next 4 seconds: move right
+  //   // First 4 seconds: move left
+  //   // Next 3 seconds: hidden/delay
+  //   // Next 4 seconds: move right
     
-    if (cycleTime < 4) {
-      // Moving left phase (0 to 4 seconds)
-      const leftProgress = cycleTime / 4 // 0 to 1
+  //   if (cycleTime < 4) {
+  //     // Moving left phase (0 to 4 seconds)
+  //     const leftProgress = cycleTime / 4 // 0 to 1
       
-      // Fade in at start (0 to 0.15), fade out at end (0.85 to 1.0)
-      if (leftProgress < 0.15) {
-        opacity = leftProgress / 0.15 // Fade in from 0 to 1
-      } else if (leftProgress > 0.85) {
-        opacity = 1 - ((leftProgress - 0.85) / 0.15) // Fade out from 1 to 0
-      } else {
-        opacity = 1 // Fully visible in the middle
-      }
+  //     // Fade in at start (0 to 0.15), fade out at end (0.85 to 1.0)
+  //     if (leftProgress < 0.15) {
+  //       opacity = leftProgress / 0.15 // Fade in from 0 to 1
+  //     } else if (leftProgress > 0.85) {
+  //       opacity = 1 - ((leftProgress - 0.85) / 0.15) // Fade out from 1 to 0
+  //     } else {
+  //       opacity = 1 // Fully visible in the middle
+  //     }
       
-      // Move from center to left
-      pacManRef.current.position.x = -leftProgress * 5
+  //     // Move from center to left
+  //     pacManRef.current.position.x = -leftProgress * 5
       
-      // Face left (no rotation needed, default facing)
-      pacManRef.current.rotation.y = 0
+  //     // Face left (no rotation needed, default facing)
+  //     pacManRef.current.rotation.y = 0
       
-    } else if (cycleTime < 7) {
-      // Delay phase (4 to 7 seconds) - stay hidden
-      opacity = 0
-      pacManRef.current.position.x = 0 // Reset to center during delay
+  //   } else if (cycleTime < 7) {
+  //     // Delay phase (4 to 7 seconds) - stay hidden
+  //     opacity = 0
+  //     pacManRef.current.position.x = 0 // Reset to center during delay
       
-    } else {
-      // Moving right phase (7 to 11 seconds)
-      const rightProgress = (cycleTime - 7) / 4 // 0 to 1
+  //   } else {
+  //     // Moving right phase (7 to 11 seconds)
+  //     const rightProgress = (cycleTime - 7) / 4 // 0 to 1
       
-      // Fade in at start (0 to 0.15), fade out at end (0.85 to 1.0)
-      if (rightProgress < 0.15) {
-        opacity = rightProgress / 0.15 // Fade in from 0 to 1
-      } else if (rightProgress > 0.85) {
-        opacity = 1 - ((rightProgress - 0.85) / 0.15) // Fade out from 1 to 0
-      } else {
-        opacity = 1 // Fully visible in the middle
-      }
+  //     // Fade in at start (0 to 0.15), fade out at end (0.85 to 1.0)
+  //     if (rightProgress < 0.15) {
+  //       opacity = rightProgress / 0.15 // Fade in from 0 to 1
+  //     } else if (rightProgress > 0.85) {
+  //       opacity = 1 - ((rightProgress - 0.85) / 0.15) // Fade out from 1 to 0
+  //     } else {
+  //       opacity = 1 // Fully visible in the middle
+  //     }
       
-      // Move from center to right
-      pacManRef.current.position.x = rightProgress * 5
+  //     // Move from center to right
+  //     pacManRef.current.position.x = rightProgress * 5
       
-      // Face right (180 degree rotation)
-      pacManRef.current.rotation.y = Math.PI
-    }
+  //     // Face right (180 degree rotation)
+  //     pacManRef.current.rotation.y = Math.PI
+  //   }
     
-    // Apply opacity to all meshes in PacMan
-    pacManRef.current.traverse((child) => {
-      if (child.isMesh && child.material) {
-        child.material.transparent = true
-        child.material.opacity = opacity
-      }
-    })
+  //   // Apply opacity to all meshes in PacMan
+  //   pacManRef.current.traverse((child) => {
+  //     if (child.isMesh && child.material) {
+  //       child.material.transparent = true
+  //       child.material.opacity = opacity
+  //     }
+  //   })
     
-    // Apply same opacity to pacman2 (parented to PacMan)
-    if (pacMan2Ref.current) {
-      pacMan2Ref.current.visible = true
+  //   // Apply same opacity to pacman2 (parented to PacMan)
+  //   if (pacMan2Ref.current) {
+  //     pacMan2Ref.current.visible = true
       
-      // Apply same opacity as parent
-      pacMan2Ref.current.traverse((child) => {
-        if (child.isMesh && child.material) {
-          child.material.transparent = true
-          child.material.opacity = opacity
-        }
-      })
+  //     // Apply same opacity as parent
+  //     pacMan2Ref.current.traverse((child) => {
+  //       if (child.isMesh && child.material) {
+  //         child.material.transparent = true
+  //         child.material.opacity = opacity
+  //       }
+  //     })
       
-      // If pacman2 appears to be moving backwards, flip it 180 degrees
-      // This compensates for any initial rotation differences in the model
-      pacMan2Ref.current.rotation.y = Math.PI // Rotate 180 degrees relative to parent
-    }
-  }
+  //     // If pacman2 appears to be moving backwards, flip it 180 degrees
+  //     // This compensates for any initial rotation differences in the model
+  //     pacMan2Ref.current.rotation.y = Math.PI // Rotate 180 degrees relative to parent
+  //   }
+  // }
   
   // Floating animations for emojis and icons
   
@@ -567,13 +592,13 @@ const handleClick = useCallback((event) => {
   
   // Get the clicked object
   const clickedObject = event.object
-  // console.log('Click detected on object:', clickedObject.name, 'Type:', clickedObject.type)
+  console.log('Click detected on object:', clickedObject.name, 'Type:', clickedObject.type)
   
   // Check if the clicked object or any of its parents has a click handler
   let current = clickedObject
   while (current) {
     if (current.userData.onClick) {
-      // console.log('Clicked on:', current.name, 'triggering image advance')
+      console.log('Found onClick handler on:', current.name, 'triggering onClick')
       current.userData.onClick()
       break
     }
@@ -681,13 +706,23 @@ const phoneWorldTransform = useMemo(() => {
   return null
 }, [phoneCaseRef.current, phoneScreenRef.current, offerings, hoveredOffering, justLitOffering])
 
+// Create local click handler for phone
+const handlePhoneClick = useCallback(() => {
+  console.log('handlePhoneClick called, onPhoneClick:', typeof onPhoneClick);
+  if (onPhoneClick && typeof onPhoneClick === 'function') {
+    onPhoneClick();
+  } else {
+    console.warn('onPhoneClick prop not passed to HandsModel');
+  }
+}, [onPhoneClick]);
+
 // Return with swivel animation applied
 
 return (
   <group position={[0, isMobileLocal ? -0.3 : -0.3, 0]}> {/* Position hands higher on mobile */}
     <primitive 
       object={gltf.scene} 
-      scale={[0.45, 0.45, 0.45]}
+      scale={[0.65, 0.65, 0.65]}
       rotation={[0, userRotation, 0]} // Apply user rotation to hands
       onClick={handleClick}
       onPointerOver={handlePointerOver}
@@ -705,6 +740,28 @@ return (
       />
     )}
     
+    {/* Clickable overlay for phone - positioned approximately where the phone is */}
+    <Box
+      position={[0, 0.3, 1.0]}  // Adjusted to better match phone position
+      rotation={[0, 0, 0]}
+      scale={[0.6, 1.0, 0.2]}
+      onClick={(e) => {
+        e.stopPropagation();
+        console.log('Phone click area clicked!');
+        handlePhoneClick();
+      }}
+      onPointerOver={() => {
+        console.log('Hovering over phone click area');
+        document.body.style.cursor = 'pointer';
+      }}
+      onPointerOut={() => {
+        console.log('Left phone click area');
+        document.body.style.cursor = 'default';
+      }}
+    >
+      <meshBasicMaterial transparent opacity={0} />
+    </Box>
+    
     {/* Aura that follows phoneCase world position */}
     {raysVisible && (
       <PhoneAura
@@ -716,8 +773,8 @@ return (
         phoneRotation={phoneCaseWorldRotation}
         color='#00ffff'
         intensity={1}
-        size={6}
-        opacity={0.1}
+        size={8}
+        opacity={0.5}
         isActive={hasActiveClick}
         priceDirection={priceChange / 5}
       />
@@ -769,6 +826,44 @@ function MouseTracker({ setMousePosition }) {
   return null
 }
 
+// Camera controller for focus mode animation
+export function CameraController({ focusMode, controlsRef }) {
+  const { camera } = useThree()
+  const targetPosition = useRef(new THREE.Vector3(0, 0, 2))  // Match the original closer position
+  const currentPosition = useRef(new THREE.Vector3(0, 0, 2))  // Start at the original position
+  const hasLoggedRef = useRef(false)
+  
+  // Log when focus mode changes
+  useEffect(() => {
+    console.log('CameraController: focusMode changed to:', focusMode)
+  }, [focusMode])
+  
+  useFrame(() => {
+    // Set target position based on focus mode
+    if (focusMode) {
+      targetPosition.current.set(0, -0.8, -2) // Negative z for extreme close-up, raised Y for better angle
+      if (!hasLoggedRef.current) {
+        console.log('Camera moving to focus position:', targetPosition.current)
+        hasLoggedRef.current = true
+      }
+    } else {
+      targetPosition.current.set(0, 0, 2) // Default position - closer to match original
+      hasLoggedRef.current = false
+    }
+    
+    // Smooth lerp to target position
+    currentPosition.current.lerp(targetPosition.current, 0.1)
+    camera.position.copy(currentPosition.current)
+    
+    // Update OrbitControls to prevent conflicts
+    if (controlsRef?.current) {
+      controlsRef.current.update()
+    }
+  })
+  
+  return null
+}
+
 // Removed LoadingBox - no fallback cube needed
 
 export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffering, justLitOffering, onJustLitComplete, priceChange = 0, is80sMode = false }) {
@@ -781,6 +876,7 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
   const controlsRef = useRef(null)
   const [hasReachedSection, setHasReachedSection] = useState(false)
   const [isInView, setIsInView] = useState(false) // Track if currently in view
+  const [focusMode, setFocusMode] = useState(false) // Track focus mode for phone zoom
   
   // Track when component comes into view using Intersection Observer
   useEffect(() => {
@@ -879,6 +975,30 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
       }}>
       
       
+      {/* Focus Mode Indicator */}
+      {focusMode && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(0, 0, 0, 0.7)',
+            color: '#00ff66',
+            padding: '10px 20px',
+            borderRadius: '20px',
+            fontSize: '14px',
+            fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+            zIndex: 100,
+            pointerEvents: 'none',
+            border: '1px solid #00ff66',
+            backdropFilter: 'blur(10px)'
+          }}
+        >
+          📱 Focus Mode • Click phone to exit
+        </div>
+      )}
+      
       {/* 3D Canvas */}
       <Canvas
         camera={{ position: [0, -0.5, 5], fov: 45 }}
@@ -914,6 +1034,10 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
             onJustLitComplete={onJustLitComplete}
             priceChange={priceChange}
             is80sMode={is80sMode}
+            onPhoneClick={() => {
+              console.log('Phone clicked! Current focus mode:', focusMode, '-> New focus mode:', !focusMode);
+              setFocusMode(!focusMode);
+            }}
             onLoad={() => {
               setModelLoaded(true);
               if (onLoadComplete) onLoadComplete();
@@ -921,12 +1045,16 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
           />
         </Suspense>
 
+        {/* Camera controller for focus mode */}
+        <CameraController focusMode={focusMode} controlsRef={controlsRef} />
+
         {/* DISABLED: MouseTracker for memory leak testing */}
         {/* <MouseTracker setMousePosition={setMousePosition} /> */}
         
-        {/* OrbitControls for rotation - only on drag */}
+        {/* OrbitControls for rotation - only on drag, disabled in focus mode */}
         <OrbitControls 
           ref={controlsRef}
+          enabled={!focusMode}
           enablePan={false}
           enableZoom={false}
           enableRotate={true}

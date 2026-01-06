@@ -30,6 +30,43 @@ export default function ShrineLeftPanel({
 
   return (
     <>
+      {/* CSS animations for the matchstick button */}
+      <style jsx>{`
+        @keyframes buttonPulse {
+          0%, 100% {
+            box-shadow: 
+              0 0 0 0 rgba(212, 175, 55, 0.4),
+              0 0 10px 2px rgba(212, 175, 55, 0.2);
+            border-color: rgba(212, 175, 55, 0.15);
+          }
+          50% {
+            box-shadow: 
+              0 0 0 6px rgba(212, 175, 55, 0),
+              0 0 20px 4px rgba(212, 175, 55, 0.3);
+            border-color: rgba(212, 175, 55, 0.3);
+          }
+        }
+        
+        @keyframes pulse {
+          0% { transform: scale(1); opacity: 0.6; }
+          50% { transform: scale(1.2); opacity: 0; }
+          100% { transform: scale(1.4); opacity: 0; }
+        }
+        
+        @keyframes inviteGlow {
+          0%, 100% {
+            box-shadow: 
+              0 0 0 0 rgba(212, 175, 55, 0),
+              0 0 10px 2px rgba(212, 175, 55, 0.2);
+          }
+          50% {
+            box-shadow: 
+              0 0 0 8px rgba(212, 175, 55, 0),
+              0 0 20px 4px rgba(212, 175, 55, 0.3);
+          }
+        }
+      `}</style>
+      
       {/* Vignette overlay - creates breathing room on the left */}
       <div style={{
         position: 'fixed',
@@ -137,40 +174,93 @@ export default function ShrineLeftPanel({
           </span>
         </div>
 
-        {/* Matchstick - Integrated with organic glow */}
+        {/* Matchstick with circular background - matching mobile style */}
         <div 
-          className={styles.wrapper}
           onClick={handleMatchClick}
           style={{
             pointerEvents: 'auto',  // Enable clicks on the matchstick
-            marginTop: '16px', 
-            marginLeft: '5%',
+            marginTop: 'calc(16px + 2rem)',  // Combine margin and padding offset
+            marginLeft: '15%',  // Center under CTA text
+            width: '8rem',
+            height: '8rem',
+            borderRadius: '50%',
+            background: isLit 
+              ? 'radial-gradient(circle, rgba(255, 149, 0, 0.2) 0%, rgba(255, 100, 0, 0.05) 70%, transparent 100%)'
+              : 'rgba(212, 175, 55, 0.1)',
+            border: isLit 
+              ? '1.5px solid rgba(255, 149, 0, 0.4)' 
+              : '1.5px solid rgba(212, 175, 55, 0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            boxShadow: isLit
+              ? '0 0 15px rgba(255, 149, 0, 0.3)'
+              : '0 0 0 0 rgba(212, 175, 55, 0)',
+            animation: isLit
+              ? 'none'
+              : 'buttonPulse 2s ease-in-out infinite',
+            position: 'relative',
+            overflow: 'hidden',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
           }}
         >
-          <div className={styles.container}>
-            <input type="checkbox" className={styles.switch} checked={isLit} readOnly />
-            
-            {/* Organic ambient glow - replaces the harsh circle */}
-            <div className={styles.ambientGlow} />
-            
-            <div className={styles.flameContainer}>
-              <div className={`${styles.flame} ${styles.red}`}></div>
-              <div className={`${styles.flame} ${styles.orange}`}></div>
-              <div className={`${styles.flame} ${styles.yellow}`}></div>
-              <div className={`${styles.flame} ${styles.white}`}></div>
-              <div className={`${styles.circle} ${styles.black}`}></div>
-            </div>
-            
-            <div className={styles.woodWrapper}>
-              <div className={styles.tip}></div>
-              <div className={styles.wood}>
-                <p>b</p>
+          <div className={styles.wrapper} style={{
+            transform: 'scale(0.75)',  // Just scale, no translation needed
+            pointerEvents: 'none',
+          }}>
+            <div className={styles.container}>
+              <input type="checkbox" className={styles.switch} checked={isLit} readOnly />
+              
+              {/* Organic ambient glow - replaces the harsh circle */}
+              <div className={styles.ambientGlow} />
+              
+              <div className={styles.flameContainer}>
+                <div className={`${styles.flame} ${styles.red}`}></div>
+                <div className={`${styles.flame} ${styles.orange}`}></div>
+                <div className={`${styles.flame} ${styles.yellow}`}></div>
+                <div className={`${styles.flame} ${styles.white}`}></div>
+                <div className={`${styles.circle} ${styles.black}`}></div>
               </div>
+              
+              <div className={styles.woodWrapper}>
+                <div className={styles.tip}></div>
+                <div className={styles.wood}>
+                  <p>b</p>
+                </div>
+              </div>
+              
+              <div className={styles.glowingArea}></div>
+              <div className={styles.mainGlow}></div>
             </div>
-            
-            <div className={styles.glowingArea}></div>
-            <div className={styles.mainGlow}></div>
           </div>
+          
+          {/* Pulse animation overlay */}
+          {isLit ? (
+            // Pulse for lit state
+            <div style={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              borderRadius: '50%',
+              border: '2px solid rgba(255, 149, 0, 0.6)',
+              animation: 'pulse 2s infinite',
+              pointerEvents: 'none',
+            }} />
+          ) : (
+            // Subtle glow ring for unlit state
+            <div style={{
+              position: 'absolute',
+              width: '100%',
+              height: '100%',
+              borderRadius: '50%',
+              boxShadow: '0 0 0 0 rgba(212, 175, 55, 0.4)',
+              animation: 'inviteGlow 3s ease-in-out infinite',
+              pointerEvents: 'none',
+            }} />
+          )}
         </div>
 
       </div>

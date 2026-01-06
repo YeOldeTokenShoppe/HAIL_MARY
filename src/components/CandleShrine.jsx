@@ -355,8 +355,8 @@ function createFlameMaterial() {
     transparent: true,
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
-    depthWrite: false,
-    toneMapped: false,
+    depthWrite: true,
+    toneMapped: true,
   })
 }
 
@@ -614,7 +614,7 @@ export function SceneSetup({ is80sMode }) {
 }
 
 export function GradientBackground({ is80sMode = false }) {
-  const { viewport } = useThree()
+  const { viewport, camera } = useThree()
   
   const material = useMemo(() => new THREE.ShaderMaterial({
     uniforms: {
@@ -647,9 +647,16 @@ export function GradientBackground({ is80sMode = false }) {
   
   if (is80sMode) return null
   
+  // Position the plane far behind everything and scale it to cover the full viewport
+  // Using viewport dimensions at the plane's z-distance to ensure full coverage
+  const distance = 50
+  const fov = camera.fov * (Math.PI / 180)
+  const planeHeight = 2 * Math.tan(fov / 2) * distance
+  const planeWidth = planeHeight * viewport.aspect
+  
   return (
-    <mesh position={[0, 0, -20]} material={material}>
-      <planeGeometry args={[viewport.width * 4, viewport.height * 4]} />
+    <mesh position={[0, 0, -distance]} material={material}>
+      <planeGeometry args={[planeWidth * 1.5, planeHeight * 1.5]} />
     </mesh>
   )
 }
@@ -748,7 +755,12 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onLight
           priceDirection={priceDirection} 
           additionalCandles={additionalCandles} 
           onCandleClick={handleCandleClick} 
-          clickedCandleId={clickedCandleId} 
+          clickedCandleId={clickedCandleId}
+          exclusionZone={{
+            center: [0, 0, 0],  // Center of the phone model
+            radius: 12,         // Increased radius to clear the phone area
+            height: 20          // Cover vertical space
+          }}
         />
         <PriceSimulator onPriceChange={(price) => {
           setPriceDirection(price)

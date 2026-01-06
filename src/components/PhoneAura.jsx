@@ -90,9 +90,9 @@ export function PhoneAura({
     <group ref={groupRef} position={phonePosition} rotation={phoneRotation}>
       {/* Layer 1: Furthest back, largest */}
       <mesh 
-        position={[0, 0, -0.8]} 
+        position={[0, 0, -0.3]} 
         rotation={[0, 0, 0]} 
-        renderOrder={1}
+        renderOrder={3}
         raycast={() => null} // Ignore raycasts - let clicks pass through
       >
         <circleGeometry args={[size * 0.7, 64]} />
@@ -102,15 +102,15 @@ export function PhoneAura({
           uniforms={uniforms}
           transparent
           side={THREE.DoubleSide}
-          depthWrite={false}
-          depthTest={false}
+          depthWrite={true}
+          depthTest={true}
           blending={THREE.AdditiveBlending}
         />
       </mesh>
       
       {/* Layer 2: Middle layer */}
       <mesh 
-        position={[0, 0, -0.5]} 
+        position={[0, 0, -0.4]} 
         rotation={[0, 0, 0]} 
         renderOrder={2}
         raycast={() => null} // Ignore raycasts - let clicks pass through
@@ -123,15 +123,15 @@ export function PhoneAura({
           uniforms={uniforms}
           transparent
           side={THREE.DoubleSide}
-          depthWrite={false}
-          depthTest={false}
+          depthWrite={true}
+          depthTest={true}
           blending={THREE.AdditiveBlending}
         />
       </mesh>
       
       {/* Layer 3: Closest to phone but still behind */}
       <mesh 
-        position={[0, 0, -0.2]} 
+        position={[0, 0, -1.0]} 
         rotation={[0, 0, 0]} 
         renderOrder={3}
         raycast={() => null} // Ignore raycasts - let clicks pass through
@@ -143,20 +143,20 @@ export function PhoneAura({
           uniforms={uniforms}
           transparent
           side={THREE.DoubleSide}
-          depthWrite={false}
-          depthTest={false}
+          depthWrite={true}
+          depthTest={true}
           blending={THREE.AdditiveBlending}
         />
       </mesh>
       
       {/* Subtle point light to catch any 3D emoji geometry */}
-      <pointLight
+      {/* <pointLight
         color={currentColor}
         intensity={intensity * 0.5}
         distance={15}
         decay={2}
         position={[0, 0, 1]}
-      />
+      /> */}
     </group>
   )
 }
