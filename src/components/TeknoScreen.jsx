@@ -41,7 +41,6 @@ const useTechnicalData = (refreshInterval = 60000) => { // 1 minute to check for
         // Try real data first, fallback to simulated if it fails
         let response = await fetch('/api/ai/technical-real')
         if (!response.ok) {
-          console.log('[TeknoScreen] Real API failed, falling back to simulated')
           response = await fetch('/api/ai/technical')
         }
         if (response.ok) {
@@ -69,7 +68,6 @@ const useTechnicalData = (refreshInterval = 60000) => { // 1 minute to check for
             })
           }
           
-          console.log(`[TeknoScreen] Loaded cached data (age: ${cacheAge}s, source: ${cachedData.source})`)
         } else {
           console.error('[TeknoScreen] Failed to fetch technical data')
         }
@@ -122,7 +120,6 @@ const TeknoScreen = () => {
       
       // Log once when we start drawing
       if (!hasStartedDrawing) {
-        console.log('[TeknoScreen] Started drawing to Screen3!')
         setHasStartedDrawing(true)
       }
       

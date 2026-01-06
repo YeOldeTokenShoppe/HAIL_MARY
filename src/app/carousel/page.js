@@ -91,12 +91,10 @@ export default function CarouselPage() {
     const checkFont = async () => {
       try {
         await document.fonts.load("1em 'UnifrakturMaguntia'");
-        console.log('Font loaded successfully');
         setFontLoaded(true);
         // Add the fonts-loaded class to make the font visible
         document.documentElement.classList.add('fonts-loaded');
       } catch (e) {
-        console.log('Font load error, using fallback');
         setTimeout(() => {
           setFontLoaded(true);
           document.documentElement.classList.add('fonts-loaded');
@@ -107,9 +105,9 @@ export default function CarouselPage() {
   }, []);
   
   // Debug logging
-  useEffect(() => {
-    console.log('RL80 Logo state:', { fontLoaded, isMobileView });
-  }, [fontLoaded, isMobileView]);
+  // useEffect(() => {
+  //   console.log('RL80 Logo state:', { fontLoaded, isMobileView });
+  // }, [fontLoaded, isMobileView]);
 
   // Check if mobile view and device
   useEffect(() => {

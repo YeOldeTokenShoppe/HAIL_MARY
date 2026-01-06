@@ -222,26 +222,26 @@ export const MusicProvider = ({ children }) => {
   // Preload a track URL when component mounts or when mode changes
   useEffect(() => {
     // Debug Firebase configuration in production
-    console.log('[MusicContext] Firebase Config Check:', {
-      hasStorage: !!storage,
-      storageApp: storage?.app ? 'initialized' : 'missing',
-      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 'NOT SET',
-      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'NOT SET',
-      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? 'set' : 'NOT SET',
-      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'NOT SET'
-    });
+    // console.log('[MusicContext] Firebase Config Check:', {
+    //   hasStorage: !!storage,
+    //   storageApp: storage?.app ? 'initialized' : 'missing',
+    //   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || 'NOT SET',
+    //   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'NOT SET',
+    //   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ? 'set' : 'NOT SET',
+    //   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'NOT SET'
+    // });
     
     // Log the storage bucket value (partially masked for security)
     if (process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET) {
       const bucket = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
-      console.log('[MusicContext] Storage bucket configured:', bucket.substring(0, 10) + '...');
+      // console.log('[MusicContext] Storage bucket configured:', bucket.substring(0, 10) + '...');
     } else {
       console.error('[MusicContext] ERROR: Firebase Storage Bucket is not configured!');
       console.error('[MusicContext] Set NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET in your deployment environment variables');
     }
     
     if (storage) {
-      console.log('[MusicContext] Storage object exists, app status:', storage.app ? 'valid' : 'invalid/dummy');
+      // console.log('[MusicContext] Storage object exists, app status:', storage.app ? 'valid' : 'invalid/dummy');
     }
     
     const preloadFirstTrack = async () => {
@@ -259,10 +259,10 @@ export const MusicProvider = ({ children }) => {
         }
         
         try {
-          console.log('[MusicContext] Attempting to preload track:', playlist[index].path);
+          // console.log('[MusicContext] Attempting to preload track:', playlist[index].path);
           const trackRef = storageRefUtil(storage, playlist[index].path);
-          console.log('[MusicContext] Storage ref created:', trackRef._location?.path);
-          
+          // console.log('[MusicContext] Storage ref created:', trackRef._location?.path);
+
           // Add timeout for preloading too
           const timeoutPromise = new Promise((_, reject) => {
             setTimeout(() => reject(new Error('Preload timeout after 5 seconds')), 5000);
@@ -273,7 +273,7 @@ export const MusicProvider = ({ children }) => {
             timeoutPromise
           ]);
           
-          console.log('[MusicContext] Successfully preloaded track, URL length:', url?.length);
+          // console.log('[MusicContext] Successfully preloaded track, URL length:', url?.length);
           setPreloadedUrl(url);
           setPreloadedIndex(index);
         } catch (error) {

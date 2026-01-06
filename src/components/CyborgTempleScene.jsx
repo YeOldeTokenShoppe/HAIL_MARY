@@ -253,9 +253,6 @@ const CyborgTempleScene = ({
     const startTime = performance.now();
     
     // Log detailed information about the loading attempt
-    console.log(`[CyborgTempleScene] Loading model for mobile: ${isOnMobile}`);
-    console.log(`[CyborgTempleScene] Model path: ${modelPath}`);
-    console.log(`[CyborgTempleScene] Full URL: ${window.location.origin}${modelPath}`);
     
     // First, verify the model file is accessible
     fetch(modelPath, { 
@@ -264,12 +261,12 @@ const CyborgTempleScene = ({
       cache: 'no-cache' // Bypass cache to ensure we get fresh response
     })
       .then(response => {
-        console.log(`[CyborgTempleScene] HEAD request response:`, {
-          ok: response.ok,
-          status: response.status,
-          statusText: response.statusText,
-          headers: Object.fromEntries(response.headers.entries())
-        });
+        // console.log(`[CyborgTempleScene] HEAD request response:`, {
+        //   ok: response.ok,
+        //   status: response.status,
+        //   statusText: response.statusText,
+        //   headers: Object.fromEntries(response.headers.entries())
+        // });
         if (!response.ok) {
           throw new Error(`Model file not accessible: ${response.status} ${response.statusText}`);
         }
@@ -288,7 +285,6 @@ const CyborgTempleScene = ({
         ? `${window.location.origin}${modelPath}`
         : modelPath;
         
-      console.log(`[CyborgTempleScene] Attempting to load from: ${urlToLoad}`);
       
       gltfLoader.load(
       urlToLoad, 
@@ -299,7 +295,7 @@ const CyborgTempleScene = ({
         if (usingFallback) {
           console.warn(`[CyborgTempleScene] Successfully loaded fallback desktop model on mobile device`);
         } else {
-          console.log(`[CyborgTempleScene] Successfully loaded ${isOnMobile ? 'mobile' : 'desktop'} model in ${loadTime.toFixed(0)}ms`);
+          // console.log(`[CyborgTempleScene] Successfully loaded ${isOnMobile ? 'mobile' : 'desktop'} model in ${loadTime.toFixed(0)}ms`);
         }
         
         const templeScene = gltf.scene;

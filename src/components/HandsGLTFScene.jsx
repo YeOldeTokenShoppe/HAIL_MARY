@@ -20,12 +20,11 @@ import EmojiRain from './EmojiRain'
 
 export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView, offerings, hoveredOffering, justLitOffering, onJustLitComplete, userRotation = 0, priceChange = 0, hasActiveClick = false, is80sMode = false, onPhoneClick }) {
   // Debug: Log all props on mount
-  useEffect(() => {
-    console.log('HandsModel mounted with onPhoneClick:', !!onPhoneClick, typeof onPhoneClick);
-    if (onPhoneClick) {
-      console.log('onPhoneClick function:', onPhoneClick.toString());
-    }
-  }, [onPhoneClick]);
+  // useEffect(() => {
+  //   if (onPhoneClick) {
+  //     // console.log('onPhoneClick function:', onPhoneClick.toString());
+  //   }
+  // }, [onPhoneClick]);
   
   // Get mobile state from parent or detect it locally
   const [isMobileLocal, setIsMobileLocal] = useState(false)
@@ -69,7 +68,6 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       // Look for PhoneScreen mesh
       if (child.name === 'PhoneScreen' || child.name === 'phonescreen' || child.name === 'phone_screen' || 
           child.name === 'Phone_Screen' || child.name.toLowerCase().includes('phonescreen')) {
-        console.log('Found PhoneScreen mesh:', child.name, 'Adding click handler')
         phoneScreenRef.current = child
         // Ensure the mesh can be raycasted
         if (child.isMesh) {
@@ -78,21 +76,19 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
         }
         // Add click handler for focus mode
         child.userData.onClick = () => {
-          console.log('PhoneScreen onClick triggered!')
           if (onPhoneClick) {
-            console.log('Calling onPhoneClick')
+            // console.log('Calling onPhoneClick')
             onPhoneClick()
           } else {
             console.log('onPhoneClick not defined!')
           }
         }
         child.userData.clickable = true
-        console.log('PhoneScreen userData after setup:', child.userData)
       }
       
       // Look for phoneCase mesh for light ray positioning
       if (child.name === 'phoneCase' || child.name === 'PhoneCase' || child.name === 'phone_case') {
-        console.log('Found phoneCase mesh:', child.name)
+        // console.log('Found phoneCase mesh:', child.name)
         phoneCaseRef.current = child
         // Mark that this mesh will have light rays attached
         child.userData.hasLightRays = true
@@ -111,22 +107,12 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
         leftHandRef.current = child
       }
       
-      // Look for PacMan objects (for 80s mode)
-      if (child.name === 'PacMan' || child.name === 'pacman' || child.name === 'Pac_Man') {
-        console.log('Found PacMan mesh:', child.name)
-        pacManRef.current = child
-        child.visible = is80sMode
-      }
-      
-      if (child.name === 'PacMan2' || child.name === 'pacman2' || child.name === 'Pac_Man2') {
-        console.log('Found PacMan2 mesh:', child.name)
-        pacMan2Ref.current = child
-        child.visible = is80sMode
-      }
+
+
       
       // Look for Backdrop object and set it to always render behind everything
       if (child.name === 'Backdrop' || child.name === 'backdrop' || child.name.toLowerCase().includes('backdrop')) {
-        console.log('Found Backdrop mesh:', child.name)
+        // console.log('Found Backdrop mesh:', child.name)
         backdropRef.current = child
         // Set renderOrder to ensure it renders first (behind everything)
         child.renderOrder = -10
@@ -143,7 +129,6 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
     })
     
     if (!hasReportedLoad.current) {
-      console.log('✅ Model loaded and meshes assigned')
       if (onLoad) onLoad()
       hasReportedLoad.current = true
     }
@@ -284,58 +269,7 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
   // Smooth opacity animation in render loop
 
   
-  // Control emoji visibility based on market status
-  // Control PacMan visibility based on 80s mode
-  useEffect(() => {
-    console.log('🎮 80s mode changed to:', is80sMode)
-    
-    // Control first PacMan
-    if (pacManRef.current) {
-      // Visibility is now controlled in the animation loop
-      // Just reset position when toggling mode
-      if (!is80sMode) {
-        pacManRef.current.visible = false
-        pacManRef.current.position.x = 0 // Reset to center
-      }
-      
-      // Control PacMan animation
-      if (actionsRef.current.pacMan) {
-        if (is80sMode) {
-          actionsRef.current.pacMan.reset() // Reset animation to start
-          actionsRef.current.pacMan.play()
-          console.log('🕹️ Playing PacMan Animation')
-        } else {
-          actionsRef.current.pacMan.stop()
-          console.log('⏸️ Stopping PacMan Animation')
-        }
-      }
-    } else {
-      console.log('⚠️ PacMan ref not found')
-    }
-    
-    // Control second PacMan (now parented to first PacMan)
-    if (pacMan2Ref.current) {
-      // Since pacman2 is parented, we only need to control its animation
-      // Visibility and position are handled by the parent
-      if (!is80sMode) {
-        pacMan2Ref.current.visible = false
-      }
-      
-      // Control PacMan2 Eating animation
-      if (actionsRef.current.pacMan2) {
-        if (is80sMode) {
-          actionsRef.current.pacMan2.reset() // Reset animation to start
-          actionsRef.current.pacMan2.play()
-          console.log('🍔 Playing PacMan2 Eating animation')
-        } else {
-          actionsRef.current.pacMan2.stop()
-          console.log('⏸️ Stopping PacMan2 Eating animation')
-        }
-      }
-    } else {
-      console.log('⚠️ PacMan2 ref not found')
-    }
-  }, [is80sMode])
+
   
   // Safe texture management utility
   const disposeTexture = useCallback((texture) => {
@@ -592,13 +526,12 @@ const handleClick = useCallback((event) => {
   
   // Get the clicked object
   const clickedObject = event.object
-  console.log('Click detected on object:', clickedObject.name, 'Type:', clickedObject.type)
   
   // Check if the clicked object or any of its parents has a click handler
   let current = clickedObject
   while (current) {
     if (current.userData.onClick) {
-      console.log('Found onClick handler on:', current.name, 'triggering onClick')
+      // console.log('Found onClick handler on:', current.name, 'triggering onClick')
       current.userData.onClick()
       break
     }
@@ -834,16 +767,15 @@ export function CameraController({ focusMode, controlsRef }) {
   const hasLoggedRef = useRef(false)
   
   // Log when focus mode changes
-  useEffect(() => {
-    console.log('CameraController: focusMode changed to:', focusMode)
-  }, [focusMode])
+  // useEffect(() => {
+  //   console.log('CameraController: focusMode changed to:', focusMode)
+  // }, [focusMode])
   
   useFrame(() => {
     // Set target position based on focus mode
     if (focusMode) {
       targetPosition.current.set(0, -0.8, -2) // Negative z for extreme close-up, raised Y for better angle
       if (!hasLoggedRef.current) {
-        console.log('Camera moving to focus position:', targetPosition.current)
         hasLoggedRef.current = true
       }
     } else {
@@ -884,15 +816,14 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        console.log('Intersection Observer triggered:', {
-          isIntersecting: entry.isIntersecting,
-          intersectionRatio: entry.intersectionRatio
-        })
+        // console.log('Intersection Observer triggered:', {
+        //   isIntersecting: entry.isIntersecting,
+        //   intersectionRatio: entry.intersectionRatio
+        // })
         
         setIsInView(entry.isIntersecting)
         
         if (entry.isIntersecting && !hasReachedSection) {
-          console.log('🎯 HandsGLTFScene entered viewport!')
           setHasReachedSection(true)
         }
       },
@@ -903,7 +834,6 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
     )
 
     observer.observe(containerRef.current)
-    console.log('Intersection Observer set up for container')
 
     return () => {
       observer.disconnect()
@@ -1035,7 +965,6 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
             priceChange={priceChange}
             is80sMode={is80sMode}
             onPhoneClick={() => {
-              console.log('Phone clicked! Current focus mode:', focusMode, '-> New focus mode:', !focusMode);
               setFocusMode(!focusMode);
             }}
             onLoad={() => {

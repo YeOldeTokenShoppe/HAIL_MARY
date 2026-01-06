@@ -209,7 +209,7 @@ export default function ShrinePage() {
             color: '#ffffff',
             fontSize: '1.5rem'
           }}>
-            Loading shrine...
+            {/* Loading shrine... */}
           </div>
         }>
           <UnifiedShrine 
@@ -218,7 +218,7 @@ export default function ShrinePage() {
             offerings={mockOfferings}
             onSelectOffering={setHoveredOffering}
             onLightCandle={(offering) => {
-              setMockOfferings(prev => [offering, ...prev])
+              setMockOfferings(prev => [offering, ...prev].slice(0, 20))
               setJustLitOffering(offering)
               setTimeout(() => setJustLitOffering(null), 3000)
             }}
@@ -251,8 +251,8 @@ export default function ShrinePage() {
             timestamp: 'just now'
           }
           
-          // Add offering to the list
-          setMockOfferings(prev => [newOffering, ...prev])
+          // Add offering to the list (limit to 20 to prevent memory issues)
+          setMockOfferings(prev => [newOffering, ...prev].slice(0, 20))
           setJustLitOffering(newOffering)
           setTimeout(() => setJustLitOffering(null), 3000)
           
@@ -310,7 +310,7 @@ export default function ShrinePage() {
               opacity: 0.7,
               fontWeight: 300,
             }}>
-              Light a candle for price pumps!
+              Light a candle - Join the Illumin80
             </div>
           </div>
           
@@ -340,8 +340,8 @@ export default function ShrinePage() {
                   timestamp: 'just now'
                 }
                 
-                // Add offering to the list
-                setMockOfferings(prev => [newOffering, ...prev])
+                // Add offering to the list (limit to 20 to prevent memory issues)
+                setMockOfferings(prev => [newOffering, ...prev].slice(0, 20))
                 setJustLitOffering(newOffering)
                 setTimeout(() => setJustLitOffering(null), 3000)
                 

@@ -34,17 +34,15 @@ export function LanguageProvider({ children }) {
       const urlLang = urlParams.get('lang');
       
       if (urlLang && translations[urlLang]) {
-        console.log('Language set from URL param:', urlLang);
+        // console.log('Language set from URL param:', urlLang);
         setLocale(urlLang);
         setIsAutoDetected(false);
         return;
       }
       
-      console.log('Browser language detected:', browserLang, '-> langCode:', langCode);
-      console.log('Available translations:', Object.keys(translations));
       
       if (translations[langCode]) {
-        console.log('Auto-setting locale to browser language:', langCode);
+        // console.log('Auto-setting locale to browser language:', langCode);
         setLocale(langCode);
         setIsAutoDetected(true);
       } else {

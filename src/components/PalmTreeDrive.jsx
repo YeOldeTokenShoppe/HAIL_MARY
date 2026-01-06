@@ -836,7 +836,6 @@ const PalmsScene = ({ onLoadingChange }) => {
     const loader = new GLTFLoader(loadingManager);
     loader.setDRACOLoader(dracoLoader);
     
-    console.log('[PalmTreeDrive] Initialized loaders - DRACO path:', dracoPath);
     
     // Helper function to load models with retry logic
     const loadModelWithRetry = (path, onSuccess, onProgress, onError, modelName) => {
@@ -846,7 +845,6 @@ const PalmsScene = ({ onLoadingChange }) => {
       }
       
       const attemptLoad = () => {
-        console.log(`[PalmTreeDrive] Loading ${modelName} (attempt ${retryCount[attemptKey] + 1}/${maxRetries + 1})`);
         
         loader.load(
           path,
@@ -857,7 +855,6 @@ const PalmsScene = ({ onLoadingChange }) => {
             console.error(`[PalmTreeDrive] Error loading ${modelName} (attempt ${retryCount[attemptKey]}):`, error);
             
             if (retryCount[attemptKey] <= maxRetries) {
-              console.log(`[PalmTreeDrive] Retrying ${modelName} in ${retryDelay}ms...`);
               setTimeout(attemptLoad, retryDelay);
             } else {
               console.error(`[PalmTreeDrive] Failed to load ${modelName} after ${maxRetries} retries`);
@@ -1474,7 +1471,6 @@ const PalmsScene = ({ onLoadingChange }) => {
 
       
       if (!cameraRef.current || !controlsRef.current) {
-        console.log('Camera or controls not ready, retrying...');
         setTimeout(setupScrollAnimation, 500);
         return;
       }

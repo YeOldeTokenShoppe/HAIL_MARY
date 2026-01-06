@@ -21,23 +21,22 @@ export function PhoneScreenTexture({
   // Initialize canvas
   useEffect(() => {
     const canvas = canvasRef.current
-    canvas.width = 2048  // Double resolution for much sharper text
-    canvas.height = 4096
+    canvas.width = 1024  // Higher resolution for sharper text
+    canvas.height = 2048
     
     // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas)
     texture.needsUpdate = true
     texture.flipY = true  // Flip the texture vertically
-    texture.anisotropy = 16  // Maximum anisotropic filtering for sharper text at angles
-    texture.minFilter = THREE.LinearMipmapLinearFilter  // Better filtering with mipmaps
+    texture.minFilter = THREE.LinearFilter  // Sharper filtering
     texture.magFilter = THREE.LinearFilter
-    texture.generateMipmaps = true  // Enable mipmaps for better quality at distance
+    texture.generateMipmaps = false  // Disable mipmaps for sharper text
     textureRef.current = texture
     
     // Create material with the texture
     const material = new THREE.MeshBasicMaterial({
       map: texture,
-      side: THREE.DoubleSide,  // Make both sides clickable
+      side: THREE.FrontSide,
       transparent: false,  // No transparency for better contrast
       toneMapped: false,  // Disable tone mapping for true colors
     })
@@ -45,11 +44,7 @@ export function PhoneScreenTexture({
     
     // Apply material to the phone screen mesh
     if (meshRef && materialRef.current) {
-      // Store any existing userData before changing material
-      const userData = meshRef.userData
       meshRef.material = materialRef.current
-      // Restore userData to preserve click handlers
-      meshRef.userData = userData
     }
     
     return () => {
@@ -86,22 +81,22 @@ export function PhoneScreenTexture({
     ctx.fillStyle = gradient
     ctx.fillRect(0, 0, width, height)
     
-    // Draw status bar (doubled font sizes for 2x resolution)
+    // Draw status bar (larger fonts for better readability)
     ctx.fillStyle = '#aaa'
-    ctx.font = '72px -apple-system, BlinkMacSystemFont, sans-serif'
-    ctx.fillText('9:41', 100, 160)
-    ctx.fillText('📶 🔋', width - 300, 160)
+    ctx.font = '36px -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.fillText('9:41', 50, 80)
+    ctx.fillText('📶 🔋', width - 150, 80)
     
     // Draw app header
     ctx.fillStyle = '#fff'
-    ctx.font = 'bold 96px -apple-system, BlinkMacSystemFont, sans-serif'
-    ctx.fillText("🕯️ Our Lady's Inbox", 100, 400)
+    ctx.font = 'bold 48px -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.fillText("🕯️ Our Lady's Inbox", 50, 200)
     
     // Status indicator - purple when active click
     ctx.fillStyle = hasActiveClick ? '#ff00ff' : '#00ff66'
-    ctx.font = '64px -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.font = '32px -apple-system, BlinkMacSystemFont, sans-serif'
     const statusText = hasActiveClick ? '● Candle Selected' : '● Receiving prayers'
-    ctx.fillText(statusText, 100, 520)
+    ctx.fillText(statusText, 50, 260)
     
     // Determine which offering to show
     let displayOffering = null
@@ -124,10 +119,10 @@ export function PhoneScreenTexture({
     // Add purple glow border when active click
     if (hasActiveClick) {
       ctx.strokeStyle = '#ff00ff'
-      ctx.lineWidth = 12
+      ctx.lineWidth = 6
       ctx.shadowColor = '#ff00ff'
-      ctx.shadowBlur = 40
-      ctx.strokeRect(20, 20, width - 40, height - 40)
+      ctx.shadowBlur = 20
+      ctx.strokeRect(10, 10, width - 20, height - 20)
       ctx.shadowBlur = 0
     }
     
@@ -139,9 +134,9 @@ export function PhoneScreenTexture({
   const drawOffering = (ctx, offering, width, height, isHovered) => {
     if (!offering) return
     
-    const y = 640  // Doubled for 2x resolution
-    const padding = 80  // Doubled for 2x resolution
-    const boxHeight = 1600  // Doubled for 2x resolution
+    const y = 320  // Move up to use more screen space
+    const padding = 40  // Slightly less padding to maximize content area
+    const boxHeight = 800  // Much larger box to fill the screen
     
     // Draw offering box with modern social media styling
     // Create a rounded rectangle function
@@ -192,20 +187,20 @@ export function PhoneScreenTexture({
     }
     
     // Draw rounded rectangle for modern look
-    roundedRect(padding, y, width - padding * 2, boxHeight, 40)
+    roundedRect(padding, y, width - padding * 2, boxHeight, 20)
     ctx.fillStyle = boxGradient
     ctx.fill()
     
     // Add border with glow effect
     ctx.strokeStyle = isHovered ? colors.border.replace('0.3', '0.5') : colors.border
-    ctx.lineWidth = isHovered ? 6 : 4
+    ctx.lineWidth = isHovered ? 3 : 2
     ctx.stroke()
     
     // Add subtle inner shadow effect at top
-    const shadowGradient = ctx.createLinearGradient(0, y, 0, y + 200)
+    const shadowGradient = ctx.createLinearGradient(0, y, 0, y + 100)
     shadowGradient.addColorStop(0, 'rgba(0, 0, 0, 0.2)')
     shadowGradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
-    roundedRect(padding, y, width - padding * 2, 200, 40)
+    roundedRect(padding, y, width - padding * 2, 100, 20)
     ctx.fillStyle = shadowGradient
     ctx.fill()
     
@@ -218,10 +213,10 @@ export function PhoneScreenTexture({
     const config = typeConfig[offering.type] || typeConfig.petition
     
     // Add a colored accent pill/badge at the top
-    const pillY = y + 60
-    const pillHeight = 80
-    const pillWidth = 360
-    roundedRect(padding + 80, pillY, pillWidth, pillHeight, 40)
+    const pillY = y + 30
+    const pillHeight = 40
+    const pillWidth = 180
+    roundedRect(padding + 40, pillY, pillWidth, pillHeight, 20)
     const pillGradient = ctx.createLinearGradient(0, pillY, 0, pillY + pillHeight)
     pillGradient.addColorStop(0, config.color)
     pillGradient.addColorStop(1, config.color + '99')  // Add transparency
@@ -230,38 +225,38 @@ export function PhoneScreenTexture({
     
     // Type label inside pill
     ctx.fillStyle = '#000'
-    ctx.font = 'bold 48px -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, sans-serif'
     ctx.textAlign = 'center'
-    ctx.fillText(config.label, padding + 80 + pillWidth/2, pillY + 56)
+    ctx.fillText(config.label, padding + 40 + pillWidth/2, pillY + 28)
     ctx.textAlign = 'left'
     
     // Larger name text
     ctx.fillStyle = '#fff'
-    ctx.font = 'bold 128px -apple-system, BlinkMacSystemFont, sans-serif'
-    ctx.fillText(config.icon, padding + 80, y + 240)
-    ctx.fillText(offering.name || 'Anonymous', padding + 320, y + 240)
+    ctx.font = 'bold 64px -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.fillText(config.icon, padding + 40, y + 120)
+    ctx.fillText(offering.name || 'Anonymous', padding + 160, y + 120)
     
     // Draw message if exists - much larger and more prominent
     if (offering.message) {
       ctx.fillStyle = '#ffffff'  // Brighter white for better visibility
-      ctx.font = '104px -apple-system, BlinkMacSystemFont, sans-serif'  // Doubled font size
+      ctx.font = '52px -apple-system, BlinkMacSystemFont, sans-serif'  // Much larger font
       
       // Word wrap the message - shifted right to avoid thumb
       const words = offering.message.split(' ')
       let line = ''
-      let lineY = y + 480  // Doubled for 2x resolution
-      const messageLeftOffset = 400  // Doubled for 2x resolution
+      let lineY = y + 240  // Adjusted for new layout with pill
+      const messageLeftOffset = 200  // Shift text right to avoid thumb
       const maxWidth = width - messageLeftOffset - padding * 2  // Adjust max width accordingly
-      const lineHeight = 160  // Doubled line spacing
+      const lineHeight = 80  // Increased line spacing for larger text
       
       // Add opening quote - positioned to the left but higher
       ctx.fillStyle = config.color
-      ctx.font = 'bold 144px Georgia, serif'
-      ctx.fillText('"', padding + 200, lineY - 120)
+      ctx.font = 'bold 72px Georgia, serif'
+      ctx.fillText('"', padding + 100, lineY - 60)
       
       // Message text - shifted right
       ctx.fillStyle = '#ffffff'
-      ctx.font = '104px -apple-system, BlinkMacSystemFont, sans-serif'
+      ctx.font = '52px -apple-system, BlinkMacSystemFont, sans-serif'
       
       for (let word of words) {
         const testLine = line + word + ' '
@@ -271,25 +266,25 @@ export function PhoneScreenTexture({
           line = word + ' '
           lineY += lineHeight
           // Stop if we're running out of space
-          if (lineY > y + boxHeight - 300) break
+          if (lineY > y + boxHeight - 150) break
         } else {
           line = testLine
         }
       }
-      if (line.length > 0 && lineY < y + boxHeight - 300) {
+      if (line.length > 0 && lineY < y + boxHeight - 150) {
         ctx.fillText(line.trim(), messageLeftOffset, lineY)
       }
       
       // Add closing quote
       ctx.fillStyle = config.color
-      ctx.font = 'bold 144px Georgia, serif'
-      ctx.fillText('"', width - padding - 160, lineY + 80)
+      ctx.font = 'bold 72px Georgia, serif'
+      ctx.fillText('"', width - padding - 80, lineY + 40)
     }
     
     // Draw tokens burned - larger and at the bottom
     ctx.fillStyle = '#ff6b35'
-    ctx.font = 'bold 96px -apple-system, BlinkMacSystemFont, sans-serif'
-    ctx.fillText(`🔥 ${offering.tokensBurned?.toLocaleString() || '???'} RL80`, padding + 80, y + boxHeight - 120)
+    ctx.font = 'bold 48px -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.fillText(`🔥 ${offering.tokensBurned?.toLocaleString() || '???'} RL80`, padding + 40, y + boxHeight - 60)
   }
   
   // Draw prayer received notification
@@ -298,7 +293,7 @@ export function PhoneScreenTexture({
     const centerY = height / 2
     
     // Draw glowing circle - much larger
-    const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 600)
+    const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 300)
     gradient.addColorStop(0, 'rgba(0, 255, 102, 0.6)')
     gradient.addColorStop(0.5, 'rgba(0, 255, 102, 0.3)')
     gradient.addColorStop(1, 'rgba(0, 255, 102, 0)')
@@ -307,28 +302,28 @@ export function PhoneScreenTexture({
     
     // Draw checkmark circle - larger
     ctx.beginPath()
-    ctx.arc(centerX, centerY - 200, 240, 0, Math.PI * 2)
+    ctx.arc(centerX, centerY - 100, 120, 0, Math.PI * 2)
     ctx.fillStyle = '#00ff66'
     ctx.fill()
     
     ctx.fillStyle = '#000'
-    ctx.font = 'bold 280px -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.font = 'bold 140px -apple-system, BlinkMacSystemFont, sans-serif'
     ctx.textAlign = 'center'
-    ctx.fillText('✓', centerX, centerY - 100)
+    ctx.fillText('✓', centerX, centerY - 50)
     
     // Draw text - much larger
     ctx.fillStyle = '#00ff66'
-    ctx.font = 'bold 128px -apple-system, BlinkMacSystemFont, sans-serif'
-    ctx.fillText('PRAYER RECEIVED', centerX, centerY + 240)
+    ctx.font = 'bold 64px -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.fillText('PRAYER RECEIVED', centerX, centerY + 120)
     
     ctx.fillStyle = '#fff'
-    ctx.font = '96px -apple-system, BlinkMacSystemFont, sans-serif'
-    ctx.fillText('Our Lady has heard you', centerX, centerY + 400)
+    ctx.font = '48px -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.fillText('Our Lady has heard you', centerX, centerY + 200)
     
     if (offering && offering.tokensBurned) {
       ctx.fillStyle = '#00ff66'
-      ctx.font = 'bold 80px -apple-system, BlinkMacSystemFont, sans-serif'
-      ctx.fillText(`🔥 ${offering.tokensBurned.toLocaleString()} RL80 sacrificed`, centerX, centerY + 560)
+      ctx.font = 'bold 40px -apple-system, BlinkMacSystemFont, sans-serif'
+      ctx.fillText(`🔥 ${offering.tokensBurned.toLocaleString()} RL80 sacrificed`, centerX, centerY + 280)
     }
     
     ctx.textAlign = 'left'

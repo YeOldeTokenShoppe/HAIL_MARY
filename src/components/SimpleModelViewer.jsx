@@ -556,9 +556,9 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
               glowMaterial.userData.originalEmissive = glowMaterial.emissive ? glowMaterial.emissive.clone() : new THREE.Color(0x000000);
               glowMaterial.userData.originalEmissiveIntensity = glowMaterial.emissiveIntensity || 0;
               
-              // Add emissive glow
+              // Add emissive glow - more subtle
               glowMaterial.emissive = new THREE.Color(0x4a90e2); // Blue glow for the ball
-              glowMaterial.emissiveIntensity = 0.15;
+              glowMaterial.emissiveIntensity = 0.08; // Reduced intensity for subtlety
               
               // Make it slightly transparent for a magical effect
               if (!glowMaterial.transparent) {
@@ -740,10 +740,10 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
       });
     }
     
-    // Ball pulsing animation
+    // Ball pulsing animation - more subtle
     if (ballMaterialRef.current) {
       const time = clock.getElapsedTime();
-      const ballPulseIntensity = 0.2 + Math.sin(time * 1.5) * 0.1; // Different pulse rhythm for ball
+      const ballPulseIntensity = 0.04 + Math.sin(time * 1.5) * 0.03; // Much more subtle pulse
       ballMaterialRef.current.emissiveIntensity = ballPulseIntensity;
     }
     
@@ -1197,7 +1197,7 @@ function PyramidModel() {
       ref={meshRef}
       object={clonedScene} 
       scale={[2, 2, 2]}
-      position={[0, 0, 0]}
+      position={isMobile ? [0, -2, 0] : [0, 0, 0]}
     />
   );
 }
@@ -1222,6 +1222,8 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
   const [showIntroText, setShowIntroText] = useState(true); // Control intro text visibility
   const scrollIframeRef = useRef(null);
   const mobileScrollIframeRef = useRef(null);
+  const isMobile = windowWidth <= 768;
+
   
   useEffect(() => {
     const handleResize = () => {
@@ -1353,17 +1355,16 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
       )}
       
       {/* Heading - Show only after loading is complete */}
-      {console.log('Heading render check:', { isDesktop, isTablet, isLoading, shouldShow: (isDesktop || isTablet) && !isLoading })}
       {(isDesktop || isTablet) && !isLoading && (
         <div style={{
           position: 'absolute',
           left: '0',
-          top: '2rem',
+          top: isMobile ? '4rem' : '2rem',
           width: '50%',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          padding: '2rem',
+          padding: '1rem',
           zIndex: 100,
           pointerEvents: 'none',
           // backgroundColor: 'rgba(0, 0, 0, 0.3)', // Subtle black background
@@ -1391,7 +1392,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
       {windowWidth <= 768 && !isLoading && (
         <div style={{
           position: 'absolute',
-          top: '2rem',
+          top: '4rem',
           left: '1rem',
           right: '1rem',
           zIndex: 100,
@@ -1447,8 +1448,8 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
               flexDirection: 'column',
               justifyContent: 'flex-start',
               alignItems: 'center',
-              padding: '2rem',
-              paddingTop: '8rem',
+              padding: '1rem',
+              paddingTop: isMobile ? '10rem' : '8rem',
               zIndex: 1000,
               pointerEvents: 'none'  // Allow clicks to pass through to the 3D scene
             }}>
@@ -1460,64 +1461,117 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
               }}>
                 <div style={{ height: '4rem' }}></div>
                 
-                {/* Introduction text */}
+                {/* Introduction text - Parchment style */}
                 {showIntroText && (
                   <div style={{
-                    marginTop: isTablet ? '3rem' : '1rem',
+                    marginTop: isTablet ? '2rem' : '0.5rem',
                     padding: '1rem',
-                    backgroundColor: 'rgba(142, 102, 43, 0.1)',
-                    border: '2px solid #8e662b',
-                    borderRadius: '8px',
-                    maxWidth: '450px',
-                    margin: `${isTablet ? '3rem' : '-1rem'} auto 0`,
+                    background: 'linear-gradient(135deg, rgba(194, 154, 77, 0.2) 0%, rgba(142, 102, 43, 0.15) 50%, rgba(194, 154, 77, 0.2) 100%)',
+                    border: '3px double #8e662b',
+                    borderRadius: '0',
+                    maxWidth: '500px',
+                    margin: `${isTablet ? '2rem' : '0'} auto 0`,
                     position: 'relative',
-                    pointerEvents: 'auto'
+                    pointerEvents: 'none', // Allow clicks to pass through the container
+                    boxShadow: `
+                      inset 0 0 30px rgba(142, 102, 43, 0.3),
+                      0 4px 8px rgba(0, 0, 0, 0.5),
+                      0 0 20px rgba(212, 175, 55, 0.1)
+                    `,
+                    clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%)'
                   }}>
-                    {/* Close button */}
+                    {/* Decorative corner flourish */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '-5px',
+                      left: '-5px',
+                      fontSize: '1.5rem',
+                      color: '#8e662b',
+                      opacity: 0.7,
+                      pointerEvents: 'none'
+                    }}>✦</div>
+                    <div style={{
+                      position: 'absolute',
+                      top: '-5px',
+                      right: '-5px',
+                      fontSize: '1.5rem',
+                      color: '#8e662b',
+                      opacity: 0.7,
+                      pointerEvents: 'none'
+                    }}>✦</div>
+                    
+                    {/* Main text content */}
+                    <p style={{
+                      color: '#d4af37',
+                      fontFamily: 'Georgia, "Times New Roman", serif',
+                      fontSize: '1.15rem',
+                      fontWeight: 500,
+                      letterSpacing: '0.03em',
+                      lineHeight: 1.6,
+                      margin: '0 0 1rem 0',
+                      textAlign: 'center',
+                      textShadow: `
+                        2px 2px 4px rgba(0, 0, 0, 0.9),
+                        0 0 20px rgba(212, 175, 55, 0.3)
+                      `,
+                      fontStyle: 'italic',
+                      pointerEvents: 'none'
+                    }}>
+                      "Here you can find the works of devout RL80 devotee, Saint GR80, the anachronistic android, mystic and medieval scholar."
+                    </p>
+                    
+                    {/* Additional flavor text */}
+                    <p style={{
+                      color: '#c29a4d',
+                      fontFamily: 'Georgia, "Times New Roman", serif',
+                      fontSize: '0.95rem',
+                      lineHeight: 1.5,
+                      margin: 0,
+                      textAlign: 'center',
+                      textShadow: '1px 1px 3px rgba(0, 0, 0, 0.8)',
+                      opacity: 0.9,
+                      pointerEvents: 'none'
+                    }}>
+                      ✧ Click the scrolls to explore ancient wisdom ✧<br/>
+                      {/* ✧ Touch the crystal ball for numerological insights ✧<br/>
+                      ✧ Examine the pyramid to unveil sacred geometry ✧ */}
+                    </p>
+                    
+                    {/* Close button - needs pointer events */}
                     <button
                       onClick={() => setShowIntroText(false)}
                       style={{
                         position: 'absolute',
-                        top: '0.5rem',
-                        right: '0.5rem',
-                        background: 'transparent',
+                        bottom: '-8px',
+                        right: '-8px',
+                        background: 'rgba(142, 102, 43, 0.4)',
                         border: '1px solid #8e662b',
                         color: '#8e662b',
-                        width: '1.5rem',
-                        height: '1.5rem',
-                        borderRadius: '50%',
+                        width: '1.2rem',
+                        height: '1.2rem',
                         cursor: 'pointer',
-                        fontSize: '1rem',
+                        fontSize: '0.8rem',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         transition: 'all 0.2s ease',
-                        padding: 0
+                        padding: 0,
+                        opacity: 0.6,
+                        pointerEvents: 'auto' // Button needs to be clickable
                       }}
                       onMouseEnter={(e) => {
-                        e.target.style.background = 'rgba(142, 102, 43, 0.2)';
-                        e.target.style.transform = 'scale(1.1)';
+                        e.target.style.opacity = '1';
+                        e.target.style.background = 'rgba(142, 102, 43, 0.6)';
                       }}
                       onMouseLeave={(e) => {
-                        e.target.style.background = 'transparent';
-                        e.target.style.transform = 'scale(1)';
+                        e.target.style.opacity = '0.6';
+                        e.target.style.background = 'rgba(142, 102, 43, 0.4)';
                       }}
-                      aria-label="Close intro text"
+                      aria-label="Hide introduction"
+                      title="Hide this message"
                     >
                       ×
                     </button>
-                    <p style={{
-                      color: '#d4af37',
-                      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                      fontWeight: 400,
-                      letterSpacing: '0.02em',
-                      lineHeight: 1.3,
-                      margin: 0,
-                      textAlign: 'center',
-                      textShadow: '1px 1px 2px rgba(0, 0, 0, 0.8)'
-                    }}>
-                      Here you can find the works of devout RL80 devotee, Saint GR80, the anachronistic android, mystic and medieval scholar.
-                    </p>
                   </div>
                 )}
               </div>
@@ -1588,9 +1642,9 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
             playsInline
             style={{
               position: 'absolute',
-              top: isDesktop ? '20%' : '30%',
-              ...(isDesktop ? { left: '50%' } : { right: '30%' }),
-              transform: isDesktop ? 'translate(-50%, -50%) scale(0.6)' : 'translate(50%, -50%) scale(0.4)',
+              top: isDesktop ? '20%' : isMobile ? '23%' : '30%',
+              ...(isDesktop ? { left: '50%' } : isMobile ? { right: '65%' } : { right: '30%' }),
+              transform: isDesktop ? 'translate(-50%, -50%) scale(0.6)' : isMobile ? 'translate(50%, -50%) scale(0.35)' : 'translate(50%, -50%) scale(0.4)',
               width: '50%',
               height: '50%',
               objectFit: 'contain',
@@ -1644,7 +1698,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
               }
             }}
             onBallClick={() => setShowNumerology(true)}
-            onPyramidClick={() => setExaminedObject('pyramid')}
+            onPyramidClick={() => {}} // Disabled for now
           />
           <Environment preset="night" />
           {/* <FlatCharts onChartClick={setSelectedChart} /> */}
@@ -1708,70 +1762,6 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
         {/* Mobile overlays - only show on mobile */}
         {windowWidth <= 768 && (
           <>
-            {/* Introduction text for mobile - positioned at top left */}
-            <div
-              style={{
-                position: 'absolute',
-                top: '8rem',
-                left: '1rem',
-                right: '1rem',
-                zIndex: 1000,
-                textAlign: 'left',
-                pointerEvents: showIntroText ? 'auto' : 'none'  // Allow clicks when intro is visible
-              }}
-            >
-              {/* Introduction text for mobile - more compact */}
-              {showIntroText && (
-                <div style={{
-                  marginTop: '0.8rem',
-                  padding: '0.6rem',
-                  backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                  border: '2px solid #8e662b',
-                  borderRadius: '6px',
-                  maxWidth: windowWidth <= 480 ? '260px' : '320px',
-                  position: 'relative',
-                  pointerEvents: 'auto'  // Ensure this div can receive clicks
-                }}>
-                  {/* Close button for mobile */}
-                  <button
-                    onClick={() => setShowIntroText(false)}
-                    style={{
-                      position: 'absolute',
-                      top: '0.25rem',
-                      right: '0.25rem',
-                      background: 'transparent',
-                      border: '1px solid #8e662b',
-                      color: '#8e662b',
-                      width: '1.2rem',
-                      height: '1.2rem',
-                      borderRadius: '50%',
-                      cursor: 'pointer',
-                      fontSize: '0.8rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'all 0.2s ease',
-                      padding: 0
-                    }}
-                    aria-label="Close intro text"
-                  >
-                    ×
-                  </button>
-                  <p style={{
-                    color: '#d4af37',
-                    fontFamily: 'Georgia, serif',
-                    fontSize: windowWidth <= 480 ? '0.8rem' : '0.9rem',
-                    lineHeight: 1.4,
-                    margin: 0,
-                    textAlign: 'center',
-                    textShadow: '1px 1px 2px rgba(0, 0, 0, 0.8)',
-                    paddingRight: '1.5rem' // Make room for close button
-                  }}>
-                    Here you can find the works of RL80 devotee, Saint GR80, a mechanized mystic and medieval scholar.
-                  </p>
-                </div>
-              )}
-            </div>
             
             {/* Scroll overlay for mobile - repositioned and resized */}
             <div
@@ -1786,24 +1776,40 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
                 borderRadius: '8px'
               }}
             >
-              {/* Mobile magnify button */}
+              {/* Mobile magnify button - positioned better */}
               <button
                 onClick={() => setShowMagnifiedScroll(true)}
                 style={{
                   position: 'absolute',
-                  top: '40%',
-                  left: '110%',
-                  background: 'rgba(212, 175, 55, 0.3)',
-                  border: '1px solid rgba(212, 175, 55, 0.6)',
+                  top: '-2.5rem',
+                  right: '0.5rem',
+                  background: 'rgba(212, 175, 55, 0.4)',
+                  border: '2px solid rgba(212, 175, 55, 0.8)',
                   color: '#d4af37',
-                  padding: '0.25rem',
-                  borderRadius: '0.25rem',
+                  padding: '0.4rem',
+                  borderRadius: '50%',
                   cursor: 'pointer',
-                  fontSize: '3.8rem',
+                  fontSize: '1.5rem',
                   zIndex: 10,
-                  pointerEvents: 'auto'
+                  pointerEvents: 'auto',
+                  width: '2.5rem',
+                  height: '2.5rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.5)',
+                  transition: 'all 0.3s ease'
+                }}
+                onTouchStart={(e) => {
+                  e.currentTarget.style.transform = 'scale(0.95)';
+                  e.currentTarget.style.background = 'rgba(212, 175, 55, 0.6)';
+                }}
+                onTouchEnd={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.background = 'rgba(212, 175, 55, 0.4)';
                 }}
                 title="Magnify scroll"
+                aria-label="Magnify scroll for better reading"
               >
                 🔍
               </button>
@@ -1916,7 +1922,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
           {/* Title */}
           <h2 style={{
             color: '#d4af37',
-            fontFamily: 'Georgia, serif',
+            fontFamily: 'UnifrakturCook',
             fontSize: '2.5rem',
             marginBottom: '1rem',
             textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)',
@@ -1929,7 +1935,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
           <div 
             style={{
               position: 'relative',
-              width: windowWidth > 768 ? '600px' : '90%',
+              width: windowWidth > 768 ? '600px' : '100%',
               maxHeight: windowWidth > 768 ? '600px' : '70vh',
               background: 'radial-gradient(ellipse at center, rgba(74, 144, 226, 0.1) 0%, rgba(0, 0, 0, 0.8) 100%)',
               borderRadius: '1rem',
@@ -1954,8 +1960,8 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
             lineHeight: 1.6,
             textShadow: '1px 1px 2px rgba(0, 0, 0, 0.8)'
           }}>
-            Consult the mystical 8-ball for divine numerological insights. 
-            The sacred sphere reveals wisdom through the ancient art of numbers.
+            Consult the mystical 8-ball for divine numerological insights and ancient wisdom. 
+            {/* The sacred sphere reveals wisdom through the ancient art of numbers. */}
           </p>
         </div>
       )}
@@ -1987,7 +1993,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
               background: 'rgba(20, 20, 20, 0.95)',
               borderRadius: '1rem',
               border: '2px solid #8e662b',
-              padding: '1rem',
+              padding: isMobile ? '0' : '1rem',
               overflow: 'hidden'
             }}
           >
@@ -2112,10 +2118,10 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
               }}
               style={{
                 width: '100%',
-                height: 'calc(100% - 6rem)',
+                height: isMobile ? 'calc(100% - 5rem)' : 'calc(100% - 6rem)',
                 border: 'none',
                 background: 'transparent',
-                borderRadius: '0.5rem',
+                borderRadius: isMobile ? '0' : '0.5rem',
                 overflow: 'auto'
               }}
               title="Magnified Scroll"

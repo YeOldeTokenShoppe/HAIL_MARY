@@ -1,5 +1,5 @@
 'use client'
-import React, { useRef, useState, useEffect, Suspense, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react'
+import React, { useRef, useState, useEffect, Suspense, useCallback, useMemo, forwardRef, useImperativeHandle, Component } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useGLTF, Stats, OrbitControls } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
@@ -9,6 +9,52 @@ import { HandsModel, CameraController } from './HandsGLTFScene'
 import { CandleCloud, GradientBackground, SceneSetup } from './CandleShrine'
 import { NewCandleEffectManager } from './NewCandleEffect'
 
+// Simple error boundary for Canvas
+class CanvasErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError(error) {
+    console.warn('Canvas render error:', error)
+    return { hasError: true }
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.warn('Canvas error details:', errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ 
+          position: 'absolute', 
+          top: '50%', 
+          left: '50%', 
+          transform: 'translate(-50%, -50%)',
+          color: '#666',
+          textAlign: 'center'
+        }}>
+          <p>WebGL context temporarily unavailable</p>
+          <button onClick={() => window.location.reload()} style={{
+            marginTop: '10px',
+            padding: '8px 16px',
+            background: '#333',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}>
+            Reload Page
+          </button>
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
+}
 
 // Scene rotation controller - handles rotation without blocking clicks
 function SceneRotator({ children, userRotation, onRotationStart, onRotationMove, onRotationEnd }) {
@@ -102,6 +148,12 @@ function OptimizedPriceSimulator({ priceRef, shortTermPriceRef, continuousOffset
     // This guarantees perfectly smooth motion
     const CONSTANT_SPEED = 0.5
     continuousOffsetRef.current += deltaTime * CONSTANT_SPEED
+    
+    // Wrap the offset to prevent floating point precision issues
+    // Keep it within a reasonable range (0-1000) since shaders use modulo anyway
+    if (continuousOffsetRef.current > 1000) {
+      continuousOffsetRef.current -= 1000
+    }
     
     // Update refs for shaders (price still used for colors)
     priceRef.current = currentPrice.current
@@ -572,10 +624,11 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
         </div>
       )}
       
-      {mounted && (
+      {mounted && typeof window !== 'undefined' && (
+      <CanvasErrorBoundary>
       <Canvas
         camera={{ position: [0, isMobile ? 0 : 0, isMobile ? 2 : 0], fov: isMobile ? 75 : 70 }}
-        dpr={isMobile ? 1 : (typeof window !== 'undefined' ? window.devicePixelRatio : 1)}
+        dpr={isMobile ? 1 : (window.devicePixelRatio || 1)}
         gl={{ 
           alpha: true,  // Enable alpha for proper transparency
           antialias: !isMobile,  // Disable antialiasing on mobile
@@ -584,6 +637,9 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
           failIfMajorPerformanceCaveat: false,
           stencil: false,  // Disable stencil buffer if not needed
           depth: true,
+        }}
+        onError={(error) => {
+          console.warn('Canvas error:', error)
         }}
         style={{
           position: 'absolute',
@@ -595,9 +651,14 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
           background: 'transparent'
         }}
         onCreated={({ gl, scene }) => {
+          // Additional safety check for WebGL context
+          if (!gl || !gl.getParameter) {
+            console.warn('WebGL context not fully initialized')
+            return
+          }
+          
           // Store references for cleanup
-          canvasRef.current.gl = gl
-          canvasRef.current.scene = scene
+          canvasRef.current = { gl, scene }
           
           // Handle context loss
           const canvas = gl.domElement
@@ -666,11 +727,11 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
                   priceChange={displayPrice.change}
                   hasActiveClick={clickedCandleId !== null}
                   onPhoneClick={() => {
-                    console.log('Phone clicked in UnifiedShrine! Current focus:', focusMode, '-> New:', !focusMode);
+                    // console.log('Phone clicked in UnifiedShrine! Current focus:', focusMode, '-> New:', !focusMode);
                     setFocusMode(!focusMode);
                   }}
                   is80sMode={is80sMode}
-                  onLoad={() => console.log('Hands loaded')}
+                  // onLoad={() => console.log('Hands loaded')}
                 />
               </group>
             </Suspense>
@@ -678,7 +739,7 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
         </SceneRotator>
         
         {/* Only show Stats in development */}
-        <Stats className="stats-monitor" />
+        {process.env.NODE_ENV === 'development' && <Stats className="stats-monitor" />}
         
         {/* Optimized price simulator - updates refs every frame, state throttled */}
         <OptimizedPriceSimulator 
@@ -711,6 +772,7 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
   />
 </EffectComposer>
       </Canvas>
+      </CanvasErrorBoundary>
       )}
       </div>
       

@@ -170,7 +170,7 @@ export default function ShrineLeftPanel({
             fontWeight: 300,
             fontStyle: 'italic',
           }}>
-            Light a candle to pray for price pumps
+            Light a candle to Join the Illumin80
           </span>
         </div>
 

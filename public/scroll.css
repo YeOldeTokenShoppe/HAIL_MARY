@@ -19,10 +19,10 @@ div {
 
 #container {
   font-family: UnifrakturMaguntia;
-  width: 22rem !important;
-  height: 60%;
-  max-height: 45rem;
-  top: 50%;
+    width: 30% !important;
+    height: 50% !important;
+    max-height: 50rem !important;
+  top: 60%;
   left: 50%;
   -webkit-perspective: 290rem;
   perspective: 290rem;
@@ -102,7 +102,7 @@ div {
 /* Desktop media query */
 @media (min-width: 1025px) {
   #container {
-    width: 45% !important;
+    width: 55% !important;
     height: 60% !important;
     max-height: 50rem !important;
     font-size: 1.1em !important;
@@ -121,11 +121,89 @@ div {
   }
 }
 
-/* Mobile media query - apply scroll2.css styling for better scroll shape */
+/* iPad Pro and iPad Mini Portrait Mode */
+@media (min-width: 768px) and (max-width: 1366px) and (orientation: portrait) {
+  #container {
+    width: 50% !important;
+    height: 30vh !important;
+    max-height: 40rem !important;
+    font-size: 1.05em !important;
+    transform: translate(-50%, -50%) rotateY(15deg) !important;
+  }
+  
+  #container p {
+    padding: 0 0.5rem 0 1.2rem;
+  }
+  
+  #content {
+    padding-top: 0.5rem;
+  }
+}
+
+/* Specific for iPad Mini Portrait (768px × 1024px) */
+@media (width: 768px) and (height: 1024px) and (orientation: portrait),
+       (width: 768px) and (min-height: 1024px) and (orientation: portrait) {
+  #container {
+    width: 65% !important;
+    height: 48vh !important;
+    max-height: 38rem !important;
+    font-size: 1em !important;
+  }
+}
+
+/* Specific for iPad Pro 11" Portrait (834px × 1194px) */
+@media (width: 834px) and (height: 1194px) and (orientation: portrait),
+       (width: 834px) and (min-height: 1194px) and (orientation: portrait) {
+  #container {
+    width: 68% !important;
+    height: 50vh !important;
+    max-height: 40rem !important;
+    font-size: 1.05em !important;
+  }
+}
+
+/* Specific for iPad Pro 12.9" Portrait (1024px × 1366px) */
+@media (width: 1024px) and (height: 1366px) and (orientation: portrait),
+       (width: 1024px) and (min-height: 1366px) and (orientation: portrait) {
+  #container {
+    width: 72% !important;
+    height: 52vh !important;
+    max-height: 42rem !important;
+    font-size: 1.1em !important;
+  }
+}
+
+/* Average phone media query (most common phone sizes) */
+@media (min-width: 375px) and (max-width: 428px) and (max-height: 926px) {
+  #container {
+    width: 85% !important;
+    height: 45vh !important;
+    max-height: none;
+    font-size: 0.9em !important;
+    transform: translate(-50%, -50%) rotateY(18deg) !important;
+  }
+  
+  #container p {
+    padding: 0 0.4rem 0 0.8rem;
+  }
+}
+
+/* Small phones (iPhone SE, older Android) */
+@media (max-width: 375px) and (max-height: 812px) {
+  #container {
+    width: 80% !important;
+    height: 42vh !important;
+    max-height: none;
+    font-size: 0.85em !important;
+    transform: translate(-50%, -50%) rotateY(16deg) !important;
+  }
+}
+
+/* Mobile media query - general fallback */
 @media (max-width: 768px) {
   #container {
-  width: 65% !important;
-    height: 60vh;
+    width: 85% !important;
+    height: 52vh;
     max-height: none;
     font-size: 1em !important;
     transform: translate(-50%, -50%) rotateY(20deg);
