@@ -25,7 +25,7 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
           display: grid;
           width: 260px;
           position: fixed;
-          top: calc(45% + 1rem);
+          top: calc(38% + 1rem);
           left: 50%;
           transform: translate(-50%, -50%);
           cursor: pointer;
@@ -154,7 +154,7 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
         
         .pause-indicator {
           position: absolute;
-          top: 60%;
+          top: 65%;
           left: 50%;
           transform: translate(-50%, -50%);
           background: rgba(0, 0, 0, 0.7);
@@ -172,6 +172,35 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
         
         .pause-indicator.visible {
           opacity: 1;
+        }
+        
+        .mobile-gallery-info {
+          position: fixed;
+          bottom: 20%;
+          left: 50%;
+          transform: translateX(-50%);
+          text-align: center;
+          color: #333;
+          font-family: 'Permanent Marker', -apple-system, BlinkMacSystemFont, sans-serif;
+          z-index: 11;
+          padding: 0 20px;
+          width: 90%;
+          max-width: 320px;
+        }
+        
+        .mobile-gallery-heading {
+          font-size: 24px;
+          margin-bottom: 8px;
+          letter-spacing: 0.5px;
+          text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .mobile-gallery-description {
+          font-size: 14px;
+          line-height: 1.4;
+          opacity: 0.8;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          font-weight: 400;
         }
       `}} />
       
@@ -195,6 +224,13 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
               </div>
             </div>
           ))}
+        </div>
+        
+        <div className="mobile-gallery-info">
+          <h2 className="mobile-gallery-heading">Time Travel Gallery</h2>
+          <p className="mobile-gallery-description">
+            Witness moments across millennia as reality bends through the ages
+          </p>
         </div>
       </div>
     </>

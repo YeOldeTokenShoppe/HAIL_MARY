@@ -50,13 +50,26 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
   }, [sceneReady, onReady])
   
   return (
-    <div style={{ 
-      width: '100%', 
-      height: '100vh', 
-      backgroundColor: (is80sMode && isMobilePhone) ? 'transparent' : '#000',
-      position: 'relative',
-      overflow: 'hidden'
-    }}>
+    <>
+      <style jsx>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
+      <div style={{ 
+        width: '100%', 
+        height: '100vh', 
+        backgroundColor: (is80sMode && isMobilePhone) ? 'transparent' : '#000',
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
         {/* Video background for 80s mode - desktop only */}
         {is80sMode && !isMobilePhone && (
           <video
@@ -83,6 +96,45 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
       
       {/* Experience Controls - positioned top-right */}
       {!isMobilePhone && <ExperienceControls isMobile={isMobile} />}
+      
+      {/* Desktop Intro Section - bottom-left overlay */}
+      {!isMobilePhone && (
+        <div style={{
+          position: 'fixed',
+          bottom: '8%',
+          left: '3%',
+          zIndex: 20,
+          maxWidth: '380px',
+          padding: '20px 25px',
+          background: 'rgba(20, 15, 25, 0.85)',
+          backdropFilter: 'blur(12px)',
+          borderRadius: '8px',
+          border: '1px solid rgba(255, 215, 0, 0.2)',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+          animation: 'fadeInUp 0.8s ease-out',
+        }}>
+          <h2 style={{
+            fontSize: '26px',
+            fontFamily: 'UnifrakturCook, serif',
+            color: '#ffd700',
+            marginBottom: '10px',
+            letterSpacing: '0.5px',
+            textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)',
+          }}>
+            Chronicles of Sacred Commerce
+          </h2>
+          <p style={{
+            fontSize: '14px',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            color: 'rgba(255, 255, 255, 0.85)',
+            lineHeight: '1.5',
+            margin: 0,
+          }}>
+            Journey through eight millennia where profit meets prophecy, 
+            from ancient temple algorithms to intergalactic arbitrage
+          </p>
+        </div>
+      )}
       
       {/* Mobile Phone Gallery - replaces 3D carousel on phones */}
       {isMobilePhone ? (
@@ -142,7 +194,8 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
       </Canvas>
       )}
       
-    </div>
+      </div>
+    </>
   )
 }
 

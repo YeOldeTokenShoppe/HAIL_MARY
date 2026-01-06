@@ -300,7 +300,7 @@ export default function CarouselPage() {
         }}
       >
         <img 
-          src="/images/tinyCandleButton.webp"
+          src="/images/SKULL_TATTOO.webp"
           alt="Tiny Candle Button"
           style={{
             width: "100%",
