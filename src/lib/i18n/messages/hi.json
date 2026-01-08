@@ -1,0 +1,44 @@
+{
+  "home": {
+  },
+  "palmTreeDrive": {
+    "reality": "अब यह\nवास्तविकता है",
+    "buyButton": "खरीदें",
+    "about": "के बारे में",
+    "tokenomics": "टोकनोमिक्स",
+    "illuminati": "इलुमिनाटी",
+    "trade": "व्यापार",
+    "stage1": {
+      "line1": "संभावना",
+      "line2": "की कल्पना करें",
+      "line3": " "
+    },
+    "stage2": {
+      "line1": "समृद्धि",
+      "line2": "ईमानदारी के साथ",
+      "line3": " "
+    },
+    "stage3": {
+      "line1": "जो फासिस्ट",
+      "line2": "नहीं है, बेबी",
+      "line3": " "
+    },
+    "stage4": {
+      "line1": "परोपकारी",
+      "line2": "प्रौद्योगिकी",
+      "line3": "का उपयोग करके"
+    },
+    "stage5": {
+      "line1": " ",
+      "line2": " ",
+      "line3": " "
+    }
+  },
+  "navigation": {
+  },
+  "footer": {
+    "allRightsReserved": "सर्वाधिकार सुरक्षित",
+    "privacyPolicy": "गोपनीयता नीति",
+    "termsOfService": "सेवा की शर्तें"
+  }
+}

@@ -5,8 +5,18 @@ import en from '../lib/i18n/messages/en.json';
 import es from '../lib/i18n/messages/es.json';
 import fr from '../lib/i18n/messages/fr.json';
 import ja from '../lib/i18n/messages/ja.json';
+import ru from '../lib/i18n/messages/ru.json';
+import ko from '../lib/i18n/messages/ko.json';
+import zh from '../lib/i18n/messages/zh.json';
+import hi from '../lib/i18n/messages/hi.json';
+import ar from '../lib/i18n/messages/ar.json';
+import vi from '../lib/i18n/messages/vi.json';
+import de from '../lib/i18n/messages/de.json';
+import it from '../lib/i18n/messages/it.json';
+import pt from '../lib/i18n/messages/pt.json';
+import la from '../lib/i18n/messages/la.json';
 
-const translations = { en, es, fr, ja };
+const translations = { en, es, fr, ja, ru, ko, zh, hi, ar, vi, de, it, pt, la };
 
 const LanguageContext = createContext({
   locale: 'en',
@@ -29,18 +39,27 @@ export function LanguageProvider({ children }) {
       const langCode = browserLang.split('-')[0].toLowerCase();
       setDetectedLanguage(browserLang);
       
-      // Check URL params first (manual override)
+      // Check localStorage first (user's saved preference)
+      const savedLang = localStorage.getItem('preferredLanguage');
+      if (savedLang && translations[savedLang]) {
+        setLocale(savedLang);
+        setIsAutoDetected(false);
+        return;
+      }
+      
+      // Check URL params second (manual override)
       const urlParams = new URLSearchParams(window.location.search);
       const urlLang = urlParams.get('lang');
       
       if (urlLang && translations[urlLang]) {
         // console.log('Language set from URL param:', urlLang);
         setLocale(urlLang);
+        localStorage.setItem('preferredLanguage', urlLang);
         setIsAutoDetected(false);
         return;
       }
       
-      
+      // Finally, try to use browser language
       if (translations[langCode]) {
         // console.log('Auto-setting locale to browser language:', langCode);
         setLocale(langCode);
@@ -55,10 +74,11 @@ export function LanguageProvider({ children }) {
     detectLanguage();
   }, []);
   
-  // When manually changing locale, mark as not auto-detected
+  // When manually changing locale, mark as not auto-detected and save to localStorage
   const handleSetLocale = (newLocale) => {
     setLocale(newLocale);
     setIsAutoDetected(false);
+    localStorage.setItem('preferredLanguage', newLocale);
   };
   
   // Translation function

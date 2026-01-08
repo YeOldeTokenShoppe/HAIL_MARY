@@ -1,49 +1,40 @@
 {
   "home": {
-    "welcome": "Bienvenue",
-    "ourLady": "Notre Dame",
-    "ofPerpetualProfit": "du Profit Perpétuel",
-    "holdRL80": "Tenez RL80",
-    "prosperity": "PROSPÉRITÉ",
-    "forAll": "POUR TOUS",
-    "humanity": "HUMANITÉ",
-    "behold": "VOICI",
-    "buyNow": "Acheter Maintenant",
-    "learnMore": "En Savoir Plus",
-    "tokenomics": "Tokenomics",
-    "community": "Communauté",
-    "aboutUs": "À Propos"
   },
   "palmTreeDrive": {
+    "reality": "c'est maintenant\nréalité",
+    "buyButton": "Acheter",
+    "about": "À propos",
+    "tokenomics": "Tokenomics",
+    "illuminati": "Illuminati",
+    "trade": "Échanger",
     "stage1": {
-      "line1": "rejoignez",
-      "line2": "le voyage"
+      "line1": "imagine la",
+      "line2": "possibilité",
+      "line3": " "
     },
     "stage2": {
-      "line1": "nous prenons",
-      "line2": "la route",
-      "line3": "panoramique"
+      "line1": "de prospérité",
+      "line2": "avec intégrité",
+      "line3": " "
     },
     "stage3": {
-      "line1": "si le caractère",
-      "line2": "est destinée"
+      "line1": "qui n'est pas",
+      "line2": "fasciste, bébé",
+      "line3": " "
     },
     "stage4": {
-      "line1": "alors",
-      "line2": "le succès",
-      "line3": "pourrait être"
+      "line1": "utilisant une",
+      "line2": "technologie",
+      "line3": "bienveillante"
     },
     "stage5": {
-      "line1": "votre",
-      "line2": "REAL80"
+      "line1": " ",
+      "line2": " ",
+      "line3": " "
     }
   },
   "navigation": {
-    "home": "Accueil",
-    "trading": "Trading",
-    "temple": "Temple",
-    "about": "À Propos",
-    "contact": "Contact"
   },
   "footer": {
     "allRightsReserved": "Tous droits réservés",

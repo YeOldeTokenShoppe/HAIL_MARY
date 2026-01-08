@@ -11,10 +11,25 @@ export default function LanguageSwitcher() {
   
   
   const languages = [
+    // Most common first
     { code: 'en', label: 'English' },
     { code: 'es', label: 'Español' },
+    { code: 'zh', label: '中文' },
+    // European languages
     { code: 'fr', label: 'Français' },
-    { code: 'ja', label: '日本語' }
+    { code: 'de', label: 'Deutsch' },
+    { code: 'it', label: 'Italiano' },
+    { code: 'pt', label: 'Português' },
+    { code: 'ru', label: 'Русский' },
+    // Asian languages
+    { code: 'ja', label: '日本語' },
+    { code: 'ko', label: '한국어' },
+    { code: 'hi', label: 'हिन्दी' },
+    { code: 'vi', label: 'Tiếng Việt' },
+    // RTL language
+    { code: 'ar', label: 'العربية' },
+    // Fun option at the end
+    { code: 'la', label: 'Latina' }
   ];
   
   return (

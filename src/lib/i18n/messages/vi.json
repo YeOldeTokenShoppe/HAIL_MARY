@@ -1,0 +1,44 @@
+{
+  "home": {
+  },
+  "palmTreeDrive": {
+    "reality": "bây giờ là\nthực tế",
+    "buyButton": "Mua",
+    "about": "Về chúng tôi",
+    "tokenomics": "Tokenomics",
+    "illuminati": "Illuminati",
+    "trade": "Giao dịch",
+    "stage1": {
+      "line1": "hãy tưởng tượng",
+      "line2": "khả năng",
+      "line3": " "
+    },
+    "stage2": {
+      "line1": "thịnh vượng",
+      "line2": "với chính trực",
+      "line3": " "
+    },
+    "stage3": {
+      "line1": "đây không phải",
+      "line2": "phát xít, em yêu",
+      "line3": " "
+    },
+    "stage4": {
+      "line1": "sử dụng",
+      "line2": "công nghệ",
+      "line3": "nhân từ"
+    },
+    "stage5": {
+      "line1": " ",
+      "line2": " ",
+      "line3": " "
+    }
+  },
+  "navigation": {
+  },
+  "footer": {
+    "allRightsReserved": "Tất cả các quyền được bảo lưu",
+    "privacyPolicy": "Chính sách bảo mật",
+    "termsOfService": "Điều khoản dịch vụ"
+  }
+}

@@ -1,104 +1,105 @@
 body {
-    background: 'none';
-    overflow: hidden;
-  
-  }
-  
-  ::-webkit-scrollbar {
-    display: none;
-  }
-  
-  div {
-    margin: 0;
-    padding: 0;
-    -webkit-transform-style: preserve-3d;
-    transform-style: preserve-3d;
-    position: absolute;
-    z-index: 0;
-  }
-  
+  background: 'none';
+  overflow: hidden;
+
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+div {
+  margin: 0;
+  padding: 0;
+  -webkit-transform-style: preserve-3d;
+  transform-style: preserve-3d;
+  position: absolute;
+  z-index: 0;
+}
+
 #container {
   font-family: UnifrakturMaguntia;
-  width: 22rem !important;
-  height: 60%;
-  max-height: 45rem;
-  top: 50%;
+  width: 50% !important;
+  height: 60% !important;
+  max-height: 45rem !important;
+  top: 60%;
   left: 50%;
   -webkit-perspective: 290rem;
   perspective: 290rem;
   transform: translate(-50%, -50%) rotateY(20deg);
-  font-size: 1em !important;
+  font-size: 1rem !important;
 }
-  
-  #container p {
-    padding: 0 0.3rem 0 1rem;
-  }
-  
-  #container hr {
-    margin: 0 1rem 0 1rem;
-  }
-  
-  .panel-node {
-    width: 100%;
-  }
-  
-  .panel-cutout {
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-  }
-  
-  #content {
-    -ms-overflow-style: none;
-    overflow: -moz-scrollbars-none;
-    overflow-y: scroll;
-    height: 100%;
-  }
-  
-  #content,
-  .panel-content {
-    background: #fefee0;
-  }
-  
-  .panel-content {
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    -khtml-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-  }
-  
-  .backface > * {
-    opacity: 0.25;
-  }
-  
-  #lorem {
-    font-size: 7em;
-    float: left;
-    color: rgb(1, 111, 18);
-    border: 1px solid black;
-    margin-right: 5px;
-  }
-  
-  #tree {
-    float: right;
-    width: 10em;
-    height: 10em;
-    border: 0px solid black;
-    margin: 0 5px 0 2px;
-  }
-  .container {
-    display: flex;
-    flex-direction: row; /* Ensure items are laid out in a row */
-    align-items: center; /* Adjust this as needed */
-    justify-content: center;
-    height: 100vh;
-    overflow: hidden;
-  
-    height: auto; /* Keeps the aspect ratio of the image */
-  }
 
+#container p {
+  padding: 0 0.3rem 0 1rem;
+}
+
+#container hr {
+  margin: 0 1rem 0 1rem;
+}
+
+.panel-node {
+  width: 100%;
+}
+
+.panel-cutout {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+#content {
+  -ms-overflow-style: none;
+  overflow: -moz-scrollbars-none;
+  overflow-y: scroll;
+  height: 100%;
+
+}
+
+#content,
+.panel-content {
+  background: #fefee0;
+}
+
+.panel-content {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.backface > * {
+  opacity: 0.25;
+}
+
+#lorem {
+  font-size: 7em;
+  float: left;
+  color: red;
+  border: 1px solid black;
+  margin-right: 5px;
+
+}
+
+#tree {
+  float: right;
+  width: 10em;
+  height: 10em;
+  border: 0px solid black;
+  margin: 0 5px 0 2px;
+}
+.container {
+  display: flex;
+  flex-direction: row; /* Ensure items are laid out in a row */
+  align-items: center; /* Adjust this as needed */
+  justify-content: center;
+  height: 100vh;
+  overflow: hidden;
+
+  height: auto; /* Keeps the aspect ratio of the image */
+}
 
 /* Desktop media query */
 @media (min-width: 1025px) {
@@ -122,8 +123,8 @@ body {
   }
 }
 
-/* iPad Pro and iPad Mini Portrait Mode */
-@media (min-width: 768px) and (max-width: 1366px) and (orientation: portrait) {
+/* General iPad Portrait Mode (excluding specific models handled above) */
+@media (min-width: 768px) and (max-width: 1100px) and (min-height: 1000px) {
   #container {
     width: 50% !important;
     height: 30vh !important;
@@ -142,8 +143,7 @@ body {
 }
 
 /* Specific for iPad Mini Portrait (768px × 1024px) */
-@media (width: 768px) and (height: 1024px) and (orientation: portrait),
-       (width: 768px) and (min-height: 1024px) and (orientation: portrait) {
+@media (min-width: 760px) and (max-width: 780px) and (min-height: 1000px) and (orientation: portrait) {
   #container {
     width: 65% !important;
     height: 48vh !important;
@@ -153,8 +153,7 @@ body {
 }
 
 /* Specific for iPad Pro 11" Portrait (834px × 1194px) */
-@media (width: 834px) and (height: 1194px) and (orientation: portrait),
-       (width: 834px) and (min-height: 1194px) and (orientation: portrait) {
+@media (min-width: 820px) and (max-width: 850px) and (min-height: 1180px) and (orientation: portrait) {
   #container {
     width: 68% !important;
     height: 50vh !important;
@@ -163,14 +162,35 @@ body {
   }
 }
 
+/* Specific for iPad Pro 11" Landscape (1194px × 834px) */
+@media (min-width: 1180px) and (max-width: 1210px) and (min-height: 820px) and (max-height: 850px) and (orientation: landscape) {
+  #container {
+    width: 42% !important;
+    height: 62vh !important;
+    max-height: 43rem !important;
+    font-size: 1.05em !important;
+    transform: translate(-50%, -50%) rotateY(20deg) !important;
+  }
+}
+
 /* Specific for iPad Pro 12.9" Portrait (1024px × 1366px) */
-@media (width: 1024px) and (height: 1366px) and (orientation: portrait),
-       (width: 1024px) and (min-height: 1366px) and (orientation: portrait) {
+@media (min-width: 1000px) and (max-width: 1050px) and (min-height: 1350px) and (orientation: portrait) {
   #container {
     width: 72% !important;
     height: 52vh !important;
     max-height: 42rem !important;
     font-size: 1.1em !important;
+  }
+}
+
+/* Specific for iPad Pro 12.9" Landscape (1366px × 1024px) */
+@media (min-width: 1300px) and (min-height: 900px) {
+  #container {
+    width: 45% !important;
+    height: 65vh !important;
+    max-height: 45rem !important;
+    font-size: 1.1em !important;
+    transform: translate(-50%, -50%) rotateY(20deg) !important;
   }
 }
 
@@ -192,18 +212,105 @@ body {
 /* Small phones (iPhone SE, older Android) */
 @media (max-width: 375px) and (max-height: 812px) {
   #container {
-    width: 80% !important;
-    height: 42vh !important;
+    width: 60% !important;
+    height: 32vh !important;
     max-height: none;
     font-size: 0.85em !important;
     transform: translate(-50%, -50%) rotateY(16deg) !important;
   }
 }
 
-/* Mobile media query - general fallback */
-@media (max-width: 768px) {
+/* Device-specific styles using classes with orientation */
+
+/* iPad Pro 12.9" */
+#container.device-ipad-pro-12-portrait {
+  width: 60% !important;
+  height: 55vh !important;
+  max-height: 38rem !important;
+  font-size: 1.1em !important;
+  transform: translate(-50%, -50%) rotateY(16deg) !important;
+}
+
+#container.device-ipad-pro-12-landscape {
+  width: 65% !important;
+  height: 50vh !important;
+  /* max-height: 40rem !important; */
+  font-size: 1.15em !important;
+  transform: translate(-50%, -50%) rotateY(18deg) !important;
+}
+
+/* iPad Pro 11" */
+#container.device-ipad-pro-11-portrait {
+  width: 58% !important;
+  height: 53vh !important;
+  max-height: 36rem !important;
+  font-size: 1.05em !important;
+  transform: translate(-50%, -50%) rotateY(16deg) !important;
+}
+
+#container.device-ipad-pro-11-landscape {
+  width: 52% !important;
+  height: 62vh !important;
+  max-height: 38rem !important;
+  font-size: 1.1em !important;
+  transform: translate(-50%, -50%) rotateY(18deg) !important;
+}
+
+/* iPad Mini */
+#container.device-ipad-mini-portrait {
+  width: 85% !important;
+  height: 52vh !important;
+  max-height: 34rem !important;
+  font-size: 1em !important;
+  transform: translate(-50%, -50%) rotateY(15deg) !important;
+}
+
+#container.device-ipad-mini-landscape {
+  width: 70% !important;
+  height: 52vh !important;
+  max-height: 35rem !important;
+  font-size: 1.05em !important;
+  transform: translate(-50%, -50%) rotateY(17deg) !important;
+}
+
+/* Regular iPad */
+#container.device-ipad-portrait {
+  width: 55% !important;
+  height: 48vh !important;
+  max-height: 32rem !important;
+  font-size: 0.95em !important;
+  transform: translate(-50%, -50%) rotateY(15deg) !important;
+}
+
+#container.device-ipad-landscape {
+  width: 100% !important;
+  height: 55vh !important;
+  /* max-height: 35rem !important; */
+  font-size: 1.05em !important;
+  transform: translate(-50%, -50%) rotateY(17deg) !important;
+}
+
+/* Mobile and Desktop remain the same */
+#container.device-mobile {
+  width: 65% !important;
+  height: 52vh !important;
+  max-height: none !important;
+  font-size: 1em !important;
+  transform: translate(-50%, -50%) rotateY(20deg) !important;
+}
+
+#container.device-desktop {
+  width: 45% !important;
+  height: 60vh !important;
+  max-height: 50rem !important;
+  font-size: 1.2em !important;
+  transform: translate(-50%, -50%) rotateY(20deg) !important;
+}
+
+/* Mobile media query - general fallback (only for actual mobile devices) */
+@media (max-width: 768px) and (max-height: 950px) {
   #container {
-    width: 85% !important;
+    width: 65% !important;
     height: 52vh;
     max-height: none;
     font-size: 1em !important;

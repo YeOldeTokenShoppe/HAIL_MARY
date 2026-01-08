@@ -1,49 +1,45 @@
 {
   "home": {
-    "welcome": "Welcome",
-    "ourLady": "Our Lady",
-    "ofPerpetualProfit": "of Perpetual Profit",
-    "holdRL80": "Hold RL80",
-    "prosperity": "PROSPERITY",
-    "forAll": "FOR ALL",
-    "humanity": "HUMANITY",
-    "behold": "BEHOLD",
-    "buyNow": "Buy Now",
-    "learnMore": "Learn More",
-    "tokenomics": "Tokenomics",
-    "community": "Community",
-    "aboutUs": "About Us"
+
+
+
   },
   "palmTreeDrive": {
+    "reality": "it's now\nREAL80",
+    "buyButton": "Buy",
+    "about": "About",
+    "tokenomics": "Tokenomics",
+    "illuminati": "Illuminati",
+    "trade": "Trade",
     "stage1": {
-      "line1": "join",
-      "line2": "the ride"
+      "line1": "imagine the",
+      "line2": "possibility",
+      "line3": " "
     },
     "stage2": {
-      "line1": "we're taking",
-      "line2": "the scenic",
-      "line3": "route"
+      "line1": "of prosperity",
+      "line2": "with integrity",
+      "line3": " "
     },
     "stage3": {
-      "line1": "if character",
-      "line2": "is destiny"
+      "line1": "that's not",
+      "line2": "fascist, baby",
+      "line3": " "
+    
     },
     "stage4": {
-      "line1": "then",
-      "line2": "success",
-      "line3": "could be"
+      "line1": "using",
+      "line2": "benevolent",
+      "line3": "technology"
+
     },
     "stage5": {
-      "line1": "your",
-      "line2": "REAL80"
+      "line1": " ",
+      "line2": " ",
+      "line3": " "
     }
   },
   "navigation": {
-    "home": "Home",
-    "trading": "Trading",
-    "temple": "Temple",
-    "about": "About",
-    "contact": "Contact"
   },
   "footer": {
     "allRightsReserved": "All rights reserved",

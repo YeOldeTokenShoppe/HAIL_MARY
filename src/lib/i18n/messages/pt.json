@@ -2,30 +2,30 @@
   "home": {
   },
   "palmTreeDrive": {
-    "reality": "es ahora\nrealidad",
+    "reality": "é agora\nrealidade",
     "buyButton": "Comprar",
-    "about": "Acerca",
+    "about": "Sobre",
     "tokenomics": "Tokenomics",
     "illuminati": "Illuminati",
-    "trade": "Comerciar",
+    "trade": "Negociar",
     "stage1": {
-      "line1": "imagina la",
-      "line2": "posibilidad",
+      "line1": "imagine a",
+      "line2": "possibilidade",
       "line3": " "
     },
     "stage2": {
-      "line1": "de prosperidad",
-      "line2": "con integridad",
+      "line1": "de prosperidade",
+      "line2": "com integridade",
       "line3": " "
     },
     "stage3": {
-      "line1": "que no es",
-      "line2": "fascista, cariño",
+      "line1": "isso não é",
+      "line2": "fascista, querido",
       "line3": " "
     },
     "stage4": {
       "line1": "usando",
-      "line2": "tecnología",
+      "line2": "tecnologia",
       "line3": "benevolente"
     },
     "stage5": {
@@ -37,8 +37,8 @@
   "navigation": {
   },
   "footer": {
-    "allRightsReserved": "Todos los derechos reservados",
-    "privacyPolicy": "Política de Privacidad",
-    "termsOfService": "Términos de Servicio"
+    "allRightsReserved": "Todos os direitos reservados",
+    "privacyPolicy": "Política de Privacidade",
+    "termsOfService": "Termos de Serviço"
   }
 }

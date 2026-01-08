@@ -1,0 +1,44 @@
+{
+  "home": {
+  },
+  "palmTreeDrive": {
+    "reality": "это теперь\nреальность",
+    "buyButton": "Купить",
+    "about": "О нас",
+    "tokenomics": "Токеномика",
+    "illuminati": "Иллюминаты",
+    "trade": "Торговля",
+    "stage1": {
+      "line1": "представь",
+      "line2": "возможность",
+      "line3": " "
+    },
+    "stage2": {
+      "line1": "процветания",
+      "line2": "с честностью",
+      "line3": " "
+    },
+    "stage3": {
+      "line1": "это не",
+      "line2": "фашизм, детка",
+      "line3": " "
+    },
+    "stage4": {
+      "line1": "используя",
+      "line2": "благожелательную",
+      "line3": "технологию"
+    },
+    "stage5": {
+      "line1": " ",
+      "line2": " ",
+      "line3": " "
+    }
+  },
+  "navigation": {
+  },
+  "footer": {
+    "allRightsReserved": "Все права защищены",
+    "privacyPolicy": "Политика конфиденциальности",
+    "termsOfService": "Условия обслуживания"
+  }
+}

@@ -9,10 +9,11 @@ import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useLanguage } from './LanguageProvider';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 // import SynthwaveText from './SynthwaveText';
 import MorphingWebGLText from './MorphingWebGLText';
 import WebGLStandaloneText from '@/components/WebGLStandaloneText';
+import ThirdwebBuyModal from './ThirdwebBuyModal';
+import NavButtons from './NavButtons';
 
 
 
@@ -25,7 +26,7 @@ gsap.registerPlugin(ScrollTrigger);
 
 
 const PalmsScene = ({ onLoadingChange }) => {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
   const rendererRef = useRef(null);
@@ -39,12 +40,15 @@ const PalmsScene = ({ onLoadingChange }) => {
     sun: 'loading', 
     car: 'loading'
   });
-  
+
+
+
   // Define text blocks for transitions using translations
   const textBlocks = [
     [
       t('palmTreeDrive.stage1.line1'),
-      t('palmTreeDrive.stage1.line2')
+      t('palmTreeDrive.stage1.line2'),
+      t('palmTreeDrive.stage1.line3')
     ],
     [
       t('palmTreeDrive.stage2.line1'),
@@ -53,7 +57,8 @@ const PalmsScene = ({ onLoadingChange }) => {
     ],
     [
       t('palmTreeDrive.stage3.line1'),
-      t('palmTreeDrive.stage3.line2')
+      t('palmTreeDrive.stage3.line2'),
+      t('palmTreeDrive.stage3.line3')
     ],
     [
       t('palmTreeDrive.stage4.line1'),
@@ -62,7 +67,8 @@ const PalmsScene = ({ onLoadingChange }) => {
     ],
     [
       t('palmTreeDrive.stage5.line1'),
-      t('palmTreeDrive.stage5.line2')
+      t('palmTreeDrive.stage5.line2'),
+      t('palmTreeDrive.stage5.line3')
     ]
   ];
 
@@ -99,7 +105,7 @@ const PalmsScene = ({ onLoadingChange }) => {
   const [showEnterButton, setShowEnterButton] = useState(true); // Show "Take me there" button immediately
   const [hideLastText, setHideLastText] = useState(false); // Hide the last text block after delay
   const [shouldMorph, setShouldMorph] = useState(false); // Trigger morph animation
-  const [hasStartedScrolling, setHasStartedScrolling] = useState(false); // Track if user has started scrolling
+  const [showBuyModal, setShowBuyModal] = useState(false); // Control ThirdwebBuyModal visibility
   // Music player states
   const [isMobile, setIsMobile] = useState(false);
   
@@ -836,6 +842,7 @@ const PalmsScene = ({ onLoadingChange }) => {
     const loader = new GLTFLoader(loadingManager);
     loader.setDRACOLoader(dracoLoader);
     
+    console.log('[PalmTreeDrive] Initialized loaders - DRACO path:', dracoPath);
     
     // Helper function to load models with retry logic
     const loadModelWithRetry = (path, onSuccess, onProgress, onError, modelName) => {
@@ -845,6 +852,7 @@ const PalmsScene = ({ onLoadingChange }) => {
       }
       
       const attemptLoad = () => {
+        console.log(`[PalmTreeDrive] Loading ${modelName} (attempt ${retryCount[attemptKey] + 1}/${maxRetries + 1})`);
         
         loader.load(
           path,
@@ -855,6 +863,7 @@ const PalmsScene = ({ onLoadingChange }) => {
             console.error(`[PalmTreeDrive] Error loading ${modelName} (attempt ${retryCount[attemptKey]}):`, error);
             
             if (retryCount[attemptKey] <= maxRetries) {
+              console.log(`[PalmTreeDrive] Retrying ${modelName} in ${retryDelay}ms...`);
               setTimeout(attemptLoad, retryDelay);
             } else {
               console.error(`[PalmTreeDrive] Failed to load ${modelName} after ${maxRetries} retries`);
@@ -1471,6 +1480,7 @@ const PalmsScene = ({ onLoadingChange }) => {
 
       
       if (!cameraRef.current || !controlsRef.current) {
+        console.log('Camera or controls not ready, retrying...');
         setTimeout(setupScrollAnimation, 500);
         return;
       }
@@ -1733,11 +1743,6 @@ const PalmsScene = ({ onLoadingChange }) => {
         fastScrollEnd: false, // Disable for better touch response
         ignoreMobileResize: true, // Ignore resize events on mobile
         onUpdate: (self) => {
-          // Hide scroll prompt as soon as user starts scrolling
-          if (self.progress > 0 && !hasStartedScrolling) {
-            setHasStartedScrolling(true);
-          }
-          
           // Debug logging to track scroll progress and timeline
           if (self.progress > 0.9 || self.progress === 0 || Math.abs(self.progress - 0.5) < 0.01 || Math.abs(self.progress - 0.25) < 0.01 || Math.abs(self.progress - 0.75) < 0.01) {
             const tlProg = tl.progress();
@@ -2004,7 +2009,7 @@ const PalmsScene = ({ onLoadingChange }) => {
         
         if (intersects.length > 0) {
           const isMobile = detectMobileDevice();
-          const destination = isMobile ? '/carousel' : '/carousel';
+          const destination = isMobile ? '/home' : '/home';
           
           // Add fade out transition before navigating
           gsap.to(mountRef.current, {
@@ -2030,7 +2035,7 @@ const PalmsScene = ({ onLoadingChange }) => {
             const distance = intersect.point.distanceTo(maryPos);
             if (distance < 2) { // Within 2 units of Mary's position
               const isMobile = detectMobileDevice();
-              const destination = isMobile ? '/carousel' : '/carousel';
+              const destination = isMobile ? '/home' : '/home';
 
               // Add fade out transition before navigating
               gsap.to(mountRef.current, {
@@ -2224,7 +2229,7 @@ const PalmsScene = ({ onLoadingChange }) => {
             right: isMobile ? '20px' : '15%',
             top: isMobile ? '40%' : '50%',
             transform: 'translateY(-50%)',
-            width: isMobile ? '75%' : '50%',
+            width: isMobile ? '85%' : '50%',
             maxWidth: '600px',
             pointerEvents: 'none',
             zIndex: "1000",
@@ -2240,17 +2245,30 @@ const PalmsScene = ({ onLoadingChange }) => {
           <div style={{ 
             marginBottom: isMobile ? '0' : '0', 
             position: 'relative', 
-            height: '400px',
+            height: '700px',  // Increased to accommodate 3 lines of text
+            minHeight: '450px',
           }}>
             {/* Use MorphingWebGLText for final stage, WebGLStandaloneText for others */}
             {currentCameraStage === 4 ? (
               <MorphingWebGLText 
-                startTextArray={["YOUR", "REAL80"]}
+                startTextArray={[t('palmTreeDrive.reality')]}
                 endText="RL80"
                 shouldMorph={shouldMorph}
                 morphDelay={500}
-                fontSize={isMobile ? 1.8 : 2.8}
-                lineHeight={1}
+                fontSize={(() => {
+                  // Adjust font sizes for different scripts to prevent clipping
+                  const isArabic = locale === 'ar';
+                  const isAsian = ['ja', 'zh', 'ko'].includes(locale);
+                  const isDevanagari = locale === 'hi';
+                  
+                  if (isArabic || isDevanagari) {
+                    return isMobile ? 1.0 : 1.5;
+                  } else if (isAsian) {
+                    return isMobile ? 1.1 : 1.6;
+                  }
+                  return isMobile ? 1.2 : 1.8;
+                })()}
+                lineHeight={['ar', 'hi'].includes(locale) ? 1.1 : 0.9}
                 color="#fdcdf9"
                 className="mb-4"
                 isMobile={isMobile}
@@ -2258,50 +2276,64 @@ const PalmsScene = ({ onLoadingChange }) => {
             ) : (
               <WebGLStandaloneText 
                 textArray={textBlocks[currentCameraStage] || ["DRIFT"]}
-                fontSize={isMobile ? 1.8 : 2.8}
-                lineHeight={isMobile ? 1 : 1}
+                fontSize={(() => {
+                  // Adjust font sizes for different scripts to prevent clipping
+                  const isArabic = locale === 'ar';
+                  const isAsian = ['ja', 'zh', 'ko'].includes(locale);
+                  const isDevanagari = locale === 'hi';
+                  
+                  if (isArabic || isDevanagari) {
+                    return isMobile ? 1.0 : 1.5;
+                  } else if (isAsian) {
+                    return isMobile ? 1.1 : 1.6;
+                  }
+                  return isMobile ? 1.2 : 1.8;
+                })()}
+                lineHeight={['ar', 'hi'].includes(locale) ? 1.1 : 0.9}
                 id={`palmtree-stage-${currentCameraStage}`}
                 className="mb-4"
               />
             )}
           </div>
-          <div 
-            className="progress-dots"
-            style={{
-              display: 'flex',
-              gap: '8px',
-              marginTop: '1rem',
-              justifyContent: 'center',
-            }}>
-            {[0, 1, 2, 3, 4].map((index) => (
-              <div
-                key={index}
-                style={{
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  backgroundColor: 'white',
-                  opacity: index === currentCameraStage ? 1 : 0.3,
-                  transition: 'all 0.3s ease',
-                  boxShadow: index === currentCameraStage ? '0 0 10px rgba(255, 255, 255, 0.8)' : 'none',
-                }}
-              />
-            ))}
-          </div>
+          {/* Hide dots when morph animation is complete and Enter button appears */}
+          {!(currentCameraStage === 4 && shouldMorph) && (
+            <div 
+              className="progress-dots"
+              style={{
+                display: 'flex',
+                gap: '8px',
+                marginTop: '1rem',
+                justifyContent: 'center',
+              }}>
+              {[0, 1, 2, 3, 4].map((index) => (
+                <div
+                  key={index}
+                  style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    backgroundColor: 'white',
+                    opacity: index === currentCameraStage ? 1 : 0.3,
+                    transition: 'all 0.3s ease',
+                    boxShadow: index === currentCameraStage ? '0 0 10px rgba(255, 255, 255, 0.8)' : 'none',
+                  }}
+                />
+              ))}
+            </div>
+          )}
           
-          {/* Scroll hint - disappears as soon as user starts scrolling */}
+          {/* Scroll hint - fades out at end of sequence */}
           <div style={{
-            marginTop: '0',
-            fontSize: '14px',
+            marginTop: '1rem',
+            fontSize: '12px',
             color: '#01ff00',
-            opacity: hasStartedScrolling ? 0 : 0.8,
+            opacity: currentCameraStage === 4 ? 0 : 0.5,
             textAlign: 'center',
             fontFamily: 'monospace',
-            animation: hasStartedScrolling ? 'none' : 'pulse 2s ease-in-out infinite',
+            animation: currentCameraStage === 4 ? 'none' : 'pulse 2s ease-in-out infinite',
             transition: 'opacity 0.5s ease',
-            pointerEvents: 'none',
           }}>
-            scroll up <br/>to continue
+            scroll up to continue
           </div>
         </div>
       )}
@@ -2324,76 +2356,75 @@ const PalmsScene = ({ onLoadingChange }) => {
       />
       
       {/* Enter Button - positioned under the pagination dots, appears after morph completes */}
-      {currentCameraStage === 4 && shouldMorph && (
+     {currentCameraStage === 4 && shouldMorph && (
         <div style={{
           position: 'fixed',
           right: isMobile ? '20px' : '15%',
-          top: '55%',
-          transform: 'translateY(calc(-50% + 150px))', // Position below the text section
-          width: isMobile ? '75%' : '50%',
+          top: '70%',
+          transform: 'translateY(-50%)', // Center vertically at new position
+          width: isMobile ? '85%' : '50%',
           maxWidth: '600px',
           display: 'flex',
+          flexDirection: 'column',
           justifyContent: 'center',
           alignItems: 'center',
-          zIndex: 999999,
+          zIndex: 100,
           pointerEvents: 'auto',
           animation: 'simpleFadeIn 1s ease-in',
         }}>
-          <button
-            onClick={() => {
-              // Clean up Three.js/WebGL resources before navigation
-              if (rendererRef.current) {
-                rendererRef.current.dispose();
-                rendererRef.current = null;
-              }
-              if (sceneRef.current) {
-                sceneRef.current.traverse((child) => {
-                  if (child.geometry) child.geometry.dispose();
-                  if (child.material) {
-                    if (Array.isArray(child.material)) {
-                      child.material.forEach(m => m.dispose());
-                    } else {
-                      child.material.dispose();
-                    }
-                  }
-                });
-                sceneRef.current = null;
-              }
-              
-              // Small delay to ensure cleanup, then navigate to carousel page
-              setTimeout(() => {
-                router.push('/carousel');
-              }, 100);
-            }}
-            style={{
-              padding: isMobile ? '10px 25px' : '15px 40px',
-              fontSize: isMobile ? "1.3rem" : "1.8rem",
-              fontFamily: "'UnifrakturMaguntia', serif",
-              backgroundColor: "#000000",
-              color: "#ff00ee",
-              border: "2px solid #ff00ee",
-              borderRadius: "8px",
-              cursor: "pointer",
-              transition: "all 0.3s ease",
-              boxShadow: "0 0 20px rgba(255, 0, 238, 0.5)",
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = "#1a001a";
-              e.target.style.transform = "scale(1.05)";
-              e.target.style.boxShadow = "0 0 30px rgba(255, 0, 238, 0.8)";
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = "#000000";
-              e.target.style.transform = "scale(1)";
-              e.target.style.boxShadow = "0 0 20px rgba(255, 0, 238, 0.5)";
-            }}
-          >
-            Enter
-          </button>
+          {/* All navigation items on same level */}
+          <div style={{
+            display: 'flex',
+            gap: '2rem',
+            justifyContent: 'center',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            marginTop: '3rem',
+          }}>
+            <button
+              onClick={() => {
+                // Open the ThirdwebBuyModal instead of navigating
+                setShowBuyModal(true);
+              }}
+              style={{
+                padding: isMobile ? '10px 25px' : '15px 40px',
+                fontSize: isMobile ? "1.3rem" : "1.8rem",
+                fontFamily: "'UnifrakturCook', serif",
+                background: 'rgba(20, 10, 35, 0.85)',
+                color: "#ff00ee",
+                border: "2px solid #ff00ee",
+                borderRadius: "8px",
+                cursor: "pointer",
+                transition: "all 0.3s ease",
+                boxShadow: "0 0 20px rgba(255, 0, 238, 0.5)",
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = "#1a001a";
+                e.target.style.transform = "scale(1.05)";
+                e.target.style.boxShadow = "0 0 30px rgba(255, 0, 238, 0.8)";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = "#000000";
+                e.target.style.transform = "scale(1)";
+                e.target.style.boxShadow = "0 0 20px rgba(255, 0, 238, 0.5)";
+              }}
+            >
+              {t('palmTreeDrive.buyButton')}
+            </button>
+            
+            <NavButtons/>
+          </div>
         </div>
       )}
+      
+      {/* Thirdweb Buy Modal */}
+      <ThirdwebBuyModal 
+        isOpen={showBuyModal} 
+        onClose={() => setShowBuyModal(false)}
+      />
     </div>
   );
 };
+
 
 export default PalmsScene;

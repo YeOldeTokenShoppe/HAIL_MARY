@@ -1,0 +1,44 @@
+{
+  "home": {
+  },
+  "palmTreeDrive": {
+    "reality": "이제\n현실이다",
+    "buyButton": "구매",
+    "about": "소개",
+    "tokenomics": "토크노믹스",
+    "illuminati": "일루미나티",
+    "trade": "거래",
+    "stage1": {
+      "line1": "가능성을",
+      "line2": "상상해보세요",
+      "line3": " "
+    },
+    "stage2": {
+      "line1": "성실함과",
+      "line2": "번영의",
+      "line3": " "
+    },
+    "stage3": {
+      "line1": "파시스트가",
+      "line2": "아니야, 베이비",
+      "line3": " "
+    },
+    "stage4": {
+      "line1": "자비로운",
+      "line2": "기술을",
+      "line3": "사용하여"
+    },
+    "stage5": {
+      "line1": " ",
+      "line2": " ",
+      "line3": " "
+    }
+  },
+  "navigation": {
+  },
+  "footer": {
+    "allRightsReserved": "모든 권리 보유",
+    "privacyPolicy": "개인정보 보호정책",
+    "termsOfService": "서비스 약관"
+  }
+}

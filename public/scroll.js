@@ -149,6 +149,20 @@ if (/iPhone|Android/.test(navigator.userAgent)) {
 }
 
 var $ = document.querySelector.bind(document);
+
+// Get device type from URL parameter
+function getDeviceFromURL() {
+  var urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get('device') || 'unknown';
+}
+
+// Apply device-specific class to container
+var deviceType = getDeviceFromURL();
+var container = $("#container");
+if (container && deviceType) {
+  container.className += ' device-' + deviceType;
+}
+
 createScrollOverlay($("#content"), 20, num, theta);
 
 var el = $("#content");

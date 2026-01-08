@@ -95,7 +95,7 @@ export default function ShrineLeftPanel({
         {/* Title */}
         <h1 className='custom-title'
             id="main-title"
-            // onClick={() => router?.push('/carousel')}
+            // onClick={() => router?.push('/about')}
             style={{ 
               pointerEvents: 'auto',  // Enable clicks on the title
               color: is80sMode ? "#ffffff" : "#d4af37",

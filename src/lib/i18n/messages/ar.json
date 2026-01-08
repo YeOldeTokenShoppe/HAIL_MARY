@@ -1,0 +1,44 @@
+{
+  "home": {
+  },
+  "palmTreeDrive": {
+    "reality": "الآن هو\nالواقع",
+    "buyButton": "شراء",
+    "about": "حول",
+    "tokenomics": "اقتصاديات الرمز",
+    "illuminati": "المتنورين",
+    "trade": "تداول",
+    "stage1": {
+      "line1": "تخيل",
+      "line2": "الإمكانية",
+      "line3": " "
+    },
+    "stage2": {
+      "line1": "الازدهار",
+      "line2": "مع النزاهة",
+      "line3": " "
+    },
+    "stage3": {
+      "line1": "هذا ليس",
+      "line2": "فاشية، حبيبي",
+      "line3": " "
+    },
+    "stage4": {
+      "line1": "باستخدام",
+      "line2": "التكنولوجيا",
+      "line3": "الخيّرة"
+    },
+    "stage5": {
+      "line1": " ",
+      "line2": " ",
+      "line3": " "
+    }
+  },
+  "navigation": {
+  },
+  "footer": {
+    "allRightsReserved": "جميع الحقوق محفوظة",
+    "privacyPolicy": "سياسة الخصوصية",
+    "termsOfService": "شروط الخدمة"
+  }
+}

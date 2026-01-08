@@ -200,7 +200,7 @@ export default function FountainPage() {
                 marginTop: '1rem',
                 pointerEvents: 'auto',
               }}
-              onClick={() => window.location.href = '/carousel'}
+              onClick={() => window.location.href = '/about'}
             >
               <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
               <span className="title-line" style={{ display: 'block', position: 'relative' }}>

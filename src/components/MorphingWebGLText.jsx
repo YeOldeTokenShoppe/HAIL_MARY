@@ -5,11 +5,12 @@ import WebGLStandaloneText from './WebGLStandaloneText';
 import gsap from 'gsap';
 
 const MorphingWebGLText = ({ 
-  startTextArray = ["YOUR", "REAL80"],
+  startTextArray = ["and shared it", "with everybody"],
   endText = "RL80",
   shouldMorph = false,
   morphDelay = 500,
-  fontSize = 2.8,
+  fontSize = 2.4,
+  mobileFontSize = 1.2,
   lineHeight = 0.5,
   color = "#fdcdf9",
   className = "",
@@ -39,7 +40,7 @@ const MorphingWebGLText = ({
         })
         .to(rlTextRef.current, {
           opacity: 1,
-          scale: 1,
+          scale: 2,  // Grow larger instead of shrinking
           filter: 'blur(0px)',
           duration: 1.5,
           ease: "power2.inOut"
@@ -79,7 +80,7 @@ const MorphingWebGLText = ({
       >
         <WebGLStandaloneText 
           textArray={startTextArray}
-          fontSize={fontSize}
+          fontSize={isMobile ? mobileFontSize : fontSize}
           lineHeight={lineHeight}
           color={color}
           id="morph-real80"
@@ -101,8 +102,8 @@ const MorphingWebGLText = ({
         }}
       >
         <WebGLStandaloneText 
-          text={endText}
-          fontSize={fontSize}
+          textArray={[endText]}
+          fontSize={isMobile ? mobileFontSize : fontSize}
           lineHeight={lineHeight}
           color={color}
           id="morph-rl80"

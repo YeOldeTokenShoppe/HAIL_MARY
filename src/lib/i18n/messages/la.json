@@ -1,0 +1,44 @@
+{
+  "home": {
+  },
+  "palmTreeDrive": {
+    "reality": "nunc est\nveritas",
+    "buyButton": "Eme",
+    "about": "De Nobis",
+    "tokenomics": "Oeconomia Signi",
+    "illuminati": "Illuminati",
+    "trade": "Mercatura",
+    "stage1": {
+      "line1": "imagina",
+      "line2": "possibilitatem",
+      "line3": " "
+    },
+    "stage2": {
+      "line1": "prosperitatis",
+      "line2": "cum integritate",
+      "line3": " "
+    },
+    "stage3": {
+      "line1": "quod non est",
+      "line2": "fascista, carissime",
+      "line3": " "
+    },
+    "stage4": {
+      "line1": "utens",
+      "line2": "technologia",
+      "line3": "benevola"
+    },
+    "stage5": {
+      "line1": " ",
+      "line2": " ",
+      "line3": " "
+    }
+  },
+  "navigation": {
+  },
+  "footer": {
+    "allRightsReserved": "Omnia iura reservata",
+    "privacyPolicy": "Ratio Secreti",
+    "termsOfService": "Condiciones Servitii"
+  }
+}

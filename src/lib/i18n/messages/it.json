@@ -1,0 +1,44 @@
+{
+  "home": {
+  },
+  "palmTreeDrive": {
+    "reality": "è ora\nrealtà",
+    "buyButton": "Acquista",
+    "about": "Chi siamo",
+    "tokenomics": "Tokenomics",
+    "illuminati": "Illuminati",
+    "trade": "Scambia",
+    "stage1": {
+      "line1": "immagina la",
+      "line2": "possibilità",
+      "line3": " "
+    },
+    "stage2": {
+      "line1": "di prosperità",
+      "line2": "con integrità",
+      "line3": " "
+    },
+    "stage3": {
+      "line1": "questo non è",
+      "line2": "fascista, tesoro",
+      "line3": " "
+    },
+    "stage4": {
+      "line1": "usando",
+      "line2": "tecnologia",
+      "line3": "benevola"
+    },
+    "stage5": {
+      "line1": " ",
+      "line2": " ",
+      "line3": " "
+    }
+  },
+  "navigation": {
+  },
+  "footer": {
+    "allRightsReserved": "Tutti i diritti riservati",
+    "privacyPolicy": "Politica sulla privacy",
+    "termsOfService": "Termini di servizio"
+  }
+}

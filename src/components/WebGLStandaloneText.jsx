@@ -12,7 +12,7 @@ export default function WebGLStandaloneText({
   textArray = null, // New prop for array of text lines
   className = "",
   fontSize = 2,
-  lineHeight = 1.4,
+  lineHeight = 1,
   color = "#fdcdf9",
   id = "webgl-standalone-text",
   skipAnimation = false // New prop to skip the rise animation
@@ -311,7 +311,7 @@ export default function WebGLStandaloneText({
         position: 'relative',
         width: '100%',
         height: '100%',
-        minHeight: '300px'
+        minHeight: '580px'
       }}
     />
   );

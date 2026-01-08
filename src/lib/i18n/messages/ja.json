@@ -1,49 +1,40 @@
 {
   "home": {
-    "welcome": "ようこそ",
-    "ourLady": "聖母",
-    "ofPerpetualProfit": "永続的な利益の",
-    "holdRL80": "RL80を保持",
-    "prosperity": "繁栄",
-    "forAll": "すべての人のために",
-    "humanity": "人類",
-    "behold": "見よ",
-    "buyNow": "今すぐ購入",
-    "learnMore": "詳しく見る",
-    "tokenomics": "トークノミクス",
-    "community": "コミュニティ",
-    "aboutUs": "私たちについて"
   },
   "palmTreeDrive": {
+    "reality": "今こそ\n現実",
+    "buyButton": "購入",
+    "about": "概要",
+    "tokenomics": "トークノミクス",
+    "illuminati": "イルミナティ",
+    "trade": "取引",
     "stage1": {
-      "line1": "参加しよう",
-      "line2": "この旅に"
+      "line1": "想像して",
+      "line2": "可能性を",
+      "line3": " "
     },
     "stage2": {
-      "line1": "私たちは",
-      "line2": "景色の良い",
-      "line3": "道を行く"
+      "line1": "誠実さと",
+      "line2": "繁栄を",
+      "line3": " "
     },
     "stage3": {
-      "line1": "もし性格が",
-      "line2": "運命なら"
+      "line1": "ファシスト",
+      "line2": "じゃないよ、ベイビー",
+      "line3": " "
     },
     "stage4": {
-      "line1": "それなら",
-      "line2": "成功は",
-      "line3": "きっと"
+      "line1": "慈悲深い",
+      "line2": "テクノロジーを",
+      "line3": "使って"
     },
     "stage5": {
-      "line1": "あなたの",
-      "line2": "REAL80"
+      "line1": " ",
+      "line2": " ",
+      "line3": " "
     }
   },
   "navigation": {
-    "home": "ホーム",
-    "trading": "トレーディング",
-    "temple": "寺院",
-    "about": "概要",
-    "contact": "お問い合わせ"
   },
   "footer": {
     "allRightsReserved": "全著作権所有",

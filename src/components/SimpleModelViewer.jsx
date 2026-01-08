@@ -702,7 +702,7 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
   
   // Check device type
   const isDesktop = windowWidth > 1024;
-  const isTablet = windowWidth > 768 && windowWidth <= 1024;
+  const isTablet = windowWidth >= 768 && windowWidth <= 1024;
   const isMobile = windowWidth <= 768;
   
   // Check if tablet is in portrait mode (height > width)
@@ -722,9 +722,9 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
   const position = isDesktop 
     ? [centerOffset.x + 1, centerOffset.y - 2, centerOffset.z + 3] // Desktop: offset to right side
     : isTabletPortrait
-    ? [centerOffset.x -1, centerOffset.y - 1, centerOffset.z + 2] // Tablet portrait: centered
+    ? [centerOffset.x + 2, centerOffset.y - 2, centerOffset.z] // Tablet portrait: centered
     : isTablet
-    ? [centerOffset.x + 1.5, centerOffset.y - 1.5, centerOffset.z + 1] // Tablet landscape: slightly offset
+    ? [centerOffset.x + 3.5, centerOffset.y - 2.5, centerOffset.z + 1] // Tablet landscape: slightly offset
     : [centerOffset.x, centerOffset.y - 1, centerOffset.z - 1]; // Mobile: centered
   
   const scale = isDesktop ? 2 : isTablet ? 1.8 : 1.5; // Tablet: between desktop and mobile
@@ -1213,15 +1213,143 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
   const [modelLoaded, setModelLoaded] = useState(false);
   const [fontLoaded, setFontLoaded] = useState(false);
   const [iframeLoaded, setIframeLoaded] = useState(false);
-  const [currentScrollSrc, setCurrentScrollSrc] = useState('/scroll.html'); // Default scroll
+  // Detect device type based on actual window dimensions (not iframe)
+  const getDeviceType = () => {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const isPortrait = h > w;
+    
+    // iPad Pro 12.9" Portrait
+    if (w >= 1024 && w <= 1050 && h >= 1350 && h <= 1380) {
+      return 'ipad-pro-12-portrait';
+    }
+    // iPad Pro 12.9" Landscape
+    if (w >= 1350 && w <= 1380 && h >= 1000 && h <= 1050) {
+      return 'ipad-pro-12-landscape';
+    }
+    
+    // iPad Pro 11" Portrait
+    if (w >= 820 && w <= 850 && h >= 1180 && h <= 1210) {
+      return 'ipad-pro-11-portrait';
+    }
+    // iPad Pro 11" Landscape
+    if (w >= 1180 && w <= 1210 && h >= 820 && h <= 850) {
+      return 'ipad-pro-11-landscape';
+    }
+    
+    // iPad Mini Portrait
+    if (w >= 760 && w <= 780 && h >= 1000 && h <= 1050) {
+      return 'ipad-mini-portrait';
+    }
+    // iPad Mini Landscape
+    if (w >= 1000 && w <= 1050 && h >= 760 && h <= 780) {
+      return 'ipad-mini-landscape';
+    }
+    
+    // Regular iPad Portrait
+    if (w >= 768 && w <= 850 && h >= 1000 && h <= 1100 && isPortrait) {
+      return 'ipad-portrait';
+    }
+    // Regular iPad Landscape
+    if (w >= 1000 && w <= 1100 && h >= 768 && h <= 850 && !isPortrait) {
+      return 'ipad-landscape';
+    }
+    
+    // Mobile
+    if (w <= 768 && h <= 950) {
+      return 'mobile';
+    }
+    // Desktop
+    return 'desktop';
+  };
+
+  const deviceType = getDeviceType();
+  
+  // Device-specific positioning for iframe
+  const getIframePositioning = (device) => {
+    const positions = {
+      // iPad Pro 12.9"
+      'ipad-pro-12-portrait': {
+        left: '2%',
+        bottom: '12rem',
+        width: '45%',
+        height: '40%'
+      },
+      'ipad-pro-12-landscape': {
+        left: '5%',
+        bottom: '10rem',
+        width: '40%',
+        height: '45%'
+      },
+      // iPad Pro 11"
+      'ipad-pro-11-portrait': {
+        left: '2%',
+        bottom: '10rem',
+        width: '42%',
+        height: '38%'
+      },
+      'ipad-pro-11-landscape': {
+        left: '3%',
+        bottom: '9rem',
+        width: '38%',
+        height: '43%'
+      },
+      // iPad Mini
+      'ipad-mini-portrait': {
+        left: '3%',
+        bottom: '10rem',
+        width: '58%',
+        height: '45%'
+      },
+      'ipad-mini-landscape': {
+        left: '1%',
+        bottom: '2rem',
+        width: '50%',
+        height: '65%'
+      },
+      // Regular iPad
+      'ipad-portrait': {
+        left: '1%',
+        bottom: '7rem',
+        width: '38%',
+        height: '35%'
+      },
+      'ipad-landscape': {
+        left: '1%',
+        bottom: '8rem',
+        width: '50%',
+        height: '95%'
+      },
+      // Desktop
+      'desktop': {
+        left: '0',
+        bottom: '4rem',
+        width: '50%',
+        height: '60%'
+      },
+      // Mobile
+      'mobile': {
+        left: '1rem',
+        bottom: '3rem',
+        width: 'calc(100% - 2rem)',
+        height: '40%'
+      }
+    };
+    return positions[device] || positions['desktop'];
+  };
+  
+  const iframePos = getIframePositioning(deviceType);
+  const [currentScrollSrc, setCurrentScrollSrc] = useState(`/scroll.html?device=${deviceType}`); // Default scroll with device info
   const [showNumerology, setShowNumerology] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [nextScrollSrc, setNextScrollSrc] = useState(null);
   const [showMagnifiedScroll, setShowMagnifiedScroll] = useState(false);
   const [examinedObject, setExaminedObject] = useState(null); // For examining the pyramid
   const [showIntroText, setShowIntroText] = useState(true); // Control intro text visibility
+  const [magnifiedZoom, setMagnifiedZoom] = useState(1.5); // Track zoom level for magnified view
   const scrollIframeRef = useRef(null);
   const mobileScrollIframeRef = useRef(null);
+  const magnifiedIframeRef = useRef(null); // Add ref for magnified iframe
   const isMobile = windowWidth <= 768;
 
   
@@ -1355,7 +1483,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
       )}
       
       {/* Heading - Show only after loading is complete */}
-      {(isDesktop || isTablet) && !isLoading && (
+      {(isDesktop || isTablet || deviceType.includes('ipad')) && !isLoading && (
         <div style={{
           position: 'absolute',
           left: '0',
@@ -1389,7 +1517,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
       )}
       
       {/* Mobile Heading - Show only after loading is complete */}
-      {windowWidth <= 768 && !isLoading && (
+      {windowWidth < 768 && !isLoading && (
         <div style={{
           position: 'absolute',
           top: '4rem',
@@ -1434,8 +1562,8 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
         position: 'relative'
       }}>
         
-        {/* Left Column Overlay - Intro text and Scroll (Desktop and Tablet) */}
-        {(isDesktop || isTablet) && (
+        {/* Left Column Overlay - Intro text and Scroll (Desktop, Tablet, and iPads) */}
+        {(isDesktop || isTablet || deviceType.includes('ipad')) && (
           <>
             {/* Intro text Section - positioned below heading */}
             <div style={{
@@ -1449,13 +1577,13 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
               justifyContent: 'flex-start',
               alignItems: 'center',
               padding: '1rem',
-              paddingTop: isMobile ? '10rem' : '8rem',
+              paddingTop: isMobile ? '8rem' : '8rem',
               zIndex: 1000,
               pointerEvents: 'none'  // Allow clicks to pass through to the 3D scene
             }}>
               {/* Heading placeholder - keep structure */}
               <div style={{
-                marginBottom: '2rem',
+                marginBottom: '1rem',
                 textAlign: 'center',
                 pointerEvents: 'none'
               }}>
@@ -1464,13 +1592,13 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
                 {/* Introduction text - Parchment style */}
                 {showIntroText && (
                   <div style={{
-                    marginTop: isTablet ? '2rem' : '0.5rem',
-                    padding: '1rem',
+                    // marginTop: isTablet ? '0' : '0.5rem',
+                    padding: '0.5rem',
                     background: 'linear-gradient(135deg, rgba(194, 154, 77, 0.2) 0%, rgba(142, 102, 43, 0.15) 50%, rgba(194, 154, 77, 0.2) 100%)',
                     border: '3px double #8e662b',
                     borderRadius: '0',
-                    maxWidth: '500px',
-                    margin: `${isTablet ? '2rem' : '0'} auto 0`,
+                    maxWidth: '320px',
+                    margin: `${isTablet ? '1rem' : '0'} auto 0`,
                     position: 'relative',
                     pointerEvents: 'none', // Allow clicks to pass through the container
                     boxShadow: `
@@ -1504,11 +1632,11 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
                     <p style={{
                       color: '#d4af37',
                       fontFamily: 'Georgia, "Times New Roman", serif',
-                      fontSize: '1.15rem',
+                      fontSize: '0.9rem',
                       fontWeight: 500,
                       letterSpacing: '0.03em',
-                      lineHeight: 1.6,
-                      margin: '0 0 1rem 0',
+                      lineHeight: 1,
+                      margin: '0 0 0.5rem 0',
                       textAlign: 'center',
                       textShadow: `
                         2px 2px 4px rgba(0, 0, 0, 0.9),
@@ -1521,7 +1649,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
                     </p>
                     
                     {/* Additional flavor text */}
-                    <p style={{
+                    {/* <p style={{
                       color: '#c29a4d',
                       fontFamily: 'Georgia, "Times New Roman", serif',
                       fontSize: '0.95rem',
@@ -1533,9 +1661,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
                       pointerEvents: 'none'
                     }}>
                       ✧ Click the scrolls to explore ancient wisdom ✧<br/>
-                      {/* ✧ Touch the crystal ball for numerological insights ✧<br/>
-                      ✧ Examine the pyramid to unveil sacred geometry ✧ */}
-                    </p>
+                    </p> */}
                     
                     {/* Close button - needs pointer events */}
                     <button
@@ -1577,13 +1703,13 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
               </div>
             </div>
             
-            {/* Scroll iframe - separate positioning */}
+            {/* Scroll iframe - separate positioning based on device */}
             <div style={{
               position: 'absolute',
-              left: '0',
-              bottom: isTablet ? '4rem' : '2rem',
-              width: isTabletPortrait ? '50%' : isTablet ? '30%' : '50%',
-              height: isTablet ? '40%' : '50%',
+              left: iframePos.left,
+              bottom: iframePos.bottom,
+              width: iframePos.width,
+              height: iframePos.height,
               padding: '2rem',
               zIndex: 1000,
               pointerEvents: 'none'
@@ -1591,11 +1717,14 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
               <div style={{ width: '100%', height: '100%', position: 'relative' }}>
                 {/* Double-click magnify button */}
                 <button
-                  onClick={() => setShowMagnifiedScroll(true)}
+                  onClick={() => {
+                    setMagnifiedZoom(1.5); // Reset zoom to default when opening
+                    setShowMagnifiedScroll(true);
+                  }}
                   style={{
                     position: 'absolute',
                     top: '60%',
-                    left: '80%',
+                    left: '85%',
                     background: 'rgba(212, 175, 55, 0.3)',
                     border: '1px solid rgba(212, 175, 55, 0.6)',
                     color: '#d4af37',
@@ -1686,8 +1815,8 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
               // Don't transition if already transitioning
               if (isTransitioning) return;
               
-              // Store next scroll and start transition
-              setNextScrollSrc(scrollPath);
+              // Store next scroll with device parameter
+              setNextScrollSrc(`${scrollPath}?device=${deviceType}`);
               setIsTransitioning(true);
               
               // Hide iframe during transition
@@ -1759,26 +1888,35 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
         )}
       </CleanCanvas>
         
-        {/* Mobile overlays - only show on mobile */}
-        {windowWidth <= 768 && (
+        {/* Mobile overlays - only show on actual mobile devices */}
+        {windowWidth <= 768 && !deviceType.includes('ipad') && (
           <>
             
-            {/* Scroll overlay for mobile - repositioned and resized */}
+            {/* Scroll overlay for mobile/iPad - repositioned and resized based on device */}
             <div
               style={{
                 position: 'absolute',
-                bottom: '3rem',
-                left: '1rem',
-                right: '1rem',
-                width: 'calc(100% - 2rem)',
-                height: windowWidth <= 480 ? '35%' : '40%',
+                bottom: deviceType === 'ipad-mini' ? '5rem' :
+                        deviceType === 'ipad' ? '4rem' : '3rem',
+                left: deviceType === 'ipad-mini' ? '25%' :
+                      deviceType === 'ipad' ? '20%' : '1rem',
+                right: deviceType === 'ipad-mini' ? '25%' :
+                       deviceType === 'ipad' ? '20%' : '1rem',
+                width: deviceType === 'ipad-mini' ? '50%' :
+                       deviceType === 'ipad' ? '60%' : 'calc(100% - 2rem)',
+                height: deviceType === 'ipad-mini' ? '45%' :
+                        deviceType === 'ipad' ? '42%' :
+                        windowWidth <= 480 ? '35%' : '40%',
                 zIndex: 5,
                 borderRadius: '8px'
               }}
             >
               {/* Mobile magnify button - positioned better */}
               <button
-                onClick={() => setShowMagnifiedScroll(true)}
+                onClick={() => {
+                  setMagnifiedZoom(1.5); // Reset zoom to default when opening
+                  setShowMagnifiedScroll(true);
+                }}
                 style={{
                   position: 'absolute',
                   top: '-2.5rem',
@@ -2052,17 +2190,18 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
               display: 'flex',
               justifyContent: 'center',
               marginBottom: '0.5rem',
-              gap: '1rem'
+              gap: '1rem',
+              position: 'relative',
+              zIndex: 10002,
+              pointerEvents: 'auto'
             }}>
               <button
-                onClick={() => {
-                  const iframe = document.querySelector('#magnified-iframe');
-                  if (iframe && iframe.contentDocument) {
-                    const body = iframe.contentDocument.body;
-                    const currentZoom = body.style.zoom || '1';
-                    const newZoom = Math.max(0.5, parseFloat(currentZoom) - 0.25);
-                    body.style.zoom = newZoom;
-                  }
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const newZoom = Math.max(0.5, magnifiedZoom - 0.25);
+                  console.log('Zoom Out clicked, new zoom:', newZoom);
+                  setMagnifiedZoom(newZoom);
                 }}
                 style={{
                   background: 'rgba(212, 175, 55, 0.2)',
@@ -2070,20 +2209,33 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
                   color: '#d4af37',
                   padding: '0.5rem 1rem',
                   borderRadius: '0.25rem',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  zIndex: 10002
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = 'rgba(212, 175, 55, 0.4)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = 'rgba(212, 175, 55, 0.2)';
                 }}
               >
                 Zoom Out
               </button>
+              <span style={{
+                color: '#d4af37',
+                fontSize: '1rem',
+                alignSelf: 'center'
+              }}>
+                {Math.round(magnifiedZoom * 100)}%
+              </span>
               <button
-                onClick={() => {
-                  const iframe = document.querySelector('#magnified-iframe');
-                  if (iframe && iframe.contentDocument) {
-                    const body = iframe.contentDocument.body;
-                    const currentZoom = body.style.zoom || '1';
-                    const newZoom = Math.min(3, parseFloat(currentZoom) + 0.25);
-                    body.style.zoom = newZoom;
-                  }
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const newZoom = Math.min(3, magnifiedZoom + 0.25);
+                  console.log('Zoom In clicked, new zoom:', newZoom);
+                  setMagnifiedZoom(newZoom);
                 }}
                 style={{
                   background: 'rgba(212, 175, 55, 0.2)',
@@ -2091,41 +2243,46 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
                   color: '#d4af37',
                   padding: '0.5rem 1rem',
                   borderRadius: '0.25rem',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  zIndex: 10002
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = 'rgba(212, 175, 55, 0.4)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = 'rgba(212, 175, 55, 0.2)';
                 }}
               >
                 Zoom In
               </button>
             </div>
             
-            {/* Magnified iframe */}
-            <iframe
-              id="magnified-iframe"
-              src={currentScrollSrc}
-              onLoad={(e) => {
-                // Set initial zoom to make text larger
-                setTimeout(() => {
-                  try {
-                    if (e.target.contentDocument) {
-                      e.target.contentDocument.body.style.zoom = '1.5';
-                      e.target.contentDocument.body.style.fontSize = '1.2em';
-                      e.target.contentDocument.body.style.lineHeight = '1.6';
-                    }
-                  } catch (err) {
-                    // console.log('Could not access iframe content for zoom');
-                  }
-                }, 100);
-              }}
-              style={{
-                width: '100%',
-                height: isMobile ? 'calc(100% - 5rem)' : 'calc(100% - 6rem)',
-                border: 'none',
-                background: 'transparent',
-                borderRadius: isMobile ? '0' : '0.5rem',
-                overflow: 'auto'
-              }}
-              title="Magnified Scroll"
-            />
+            {/* Iframe container with overflow for zooming */}
+            <div style={{
+              width: '100%',
+              height: isMobile ? 'calc(100% - 5rem)' : 'calc(100% - 6rem)',
+              overflow: 'auto',
+              position: 'relative',
+              top: '-3rem',
+              borderRadius: isMobile ? '0' : '0.5rem',
+            }}>
+              {/* Magnified iframe */}
+              <iframe
+                ref={magnifiedIframeRef}
+                id="magnified-iframe"
+                src={currentScrollSrc}
+                style={{
+                  width: `${100 / magnifiedZoom}%`,
+                  height: `${100 / magnifiedZoom}%`,
+                  border: 'none',
+                  background: 'transparent',
+                  transform: `scale(${magnifiedZoom})`,
+                  transformOrigin: 'top left',
+                }}
+                title="Magnified Scroll"
+              />
+            </div>
           </div>
         </div>
       )}

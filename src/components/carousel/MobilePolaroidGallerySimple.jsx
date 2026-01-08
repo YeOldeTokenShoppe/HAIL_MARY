@@ -23,9 +23,9 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
         .polaroid-gallery {
           --d: 24s; 
           display: grid;
-          width: 260px;
+          width: 240px;
           position: fixed;
-          top: calc(38% + 1rem);
+          top: calc(40% + 1rem);
           left: 50%;
           transform: translate(-50%, -50%);
           cursor: pointer;
@@ -176,7 +176,7 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
         
         .mobile-gallery-info {
           position: fixed;
-          bottom: 20%;
+          bottom: 18%;
           left: 50%;
           transform: translateX(-50%);
           text-align: center;

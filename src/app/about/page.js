@@ -245,7 +245,7 @@ export default function CarouselPage() {
       {/* Buy RL80 Button - Top Right */}
       <div style={{
         position: "fixed",
-        top: "6rem",
+        top: isMobileDevice ? "5.5rem" : "6rem",
         right: "1.5rem",
         zIndex: 298,
         marginTop: '0rem',
@@ -275,10 +275,10 @@ export default function CarouselPage() {
         className="candle-button"
         style={{
           position: "fixed",
-          bottom: isMobileDevice ? "50px" : "30px",
-          right: isMobileDevice ? "25px" : "30px",
-          width: isMobileDevice ? "60px" : "80px",
-          height: isMobileDevice ? "60px" : "80px",
+          bottom: isMobileDevice ? "40px" : "30px",
+          right: isMobileDevice ? "20px" : "30px",
+          width: isMobileDevice ? "50px" : "80px",
+          height: isMobileDevice ? "50px" : "80px",
           zIndex: 297,
           borderRadius: "50%",
           display: "flex",
@@ -287,7 +287,7 @@ export default function CarouselPage() {
           cursor: "pointer",
           transition: "transform 0.3s ease, filter 0.3s ease",
         }}
-        onClick={() => router.push('/shrine')}
+        onClick={() => router.push('/illumin80')}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = "scale(1.15) rotate(-5deg)";
           e.currentTarget.style.filter = "drop-shadow(0 0 20px #ff9500)";
@@ -314,15 +314,15 @@ export default function CarouselPage() {
         style={{
           position: "fixed",
           bottom: isMobileDevice ? "20px" : "20px",
-          right: isMobileDevice ? "15px" : "20px",
-          width: isMobileDevice ? "250px" : "300px",
-          height: isMobileDevice ? "120px" : "150px",
+          right: isMobileDevice ? "10px" : "20px",
+          width: isMobileDevice ? "220px" : "300px",
+          height: isMobileDevice ? "100px" : "150px",
           zIndex: 296,
           pointerEvents: "auto",
           cursor: "pointer",
         }}
         viewBox="0 0 300 150"
-        onClick={() => router.push('/shrine')}
+        onClick={() => router.push('/illumin80')}
         onMouseEnter={(e) => {
           const text = e.currentTarget.querySelector('text');
           const arrow = e.currentTarget.querySelector('#arrowPath');
@@ -618,6 +618,7 @@ export default function CarouselPage() {
             
             <h1 className='custom-title footer-title'
               id="main-title"
+              onClick={() => router.push('/#final')}
               style={{ 
               position: "relative",
               // left: isMobile ? "5%" : "10%",
@@ -688,7 +689,7 @@ export default function CarouselPage() {
               cursor: "pointer",
             }}
           >
-            <Link href="/shrine" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
+            <Link href="/#final" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
               RL80
             </Link>
             {Array.from({length: 100}).map((_, i) => {
