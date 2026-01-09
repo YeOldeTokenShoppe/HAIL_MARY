@@ -8,6 +8,7 @@ import { easing } from 'maath'
 import './util'
 import ExperienceControls from './ExperienceControls'
 import { useMusic } from '../MusicContext'
+import { useLanguage } from '../LanguageProvider'
 
 import MobilePolaroidGallerySimple from './MobilePolaroidGallerySimple'
 
@@ -17,6 +18,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
   const [isMobilePhone, setIsMobilePhone] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 480 : false)
   const { is80sMode } = useMusic()
+  const { t } = useLanguage()
   
   useEffect(() => {
     const checkMobile = () => {
@@ -121,7 +123,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             letterSpacing: '0.5px',
             textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)',
           }}>
-            Chronicles of Sacred Commerce
+            {t('carousel.title') || 'Iconography'}
           </h2>
           <p style={{
             fontSize: '14px',
@@ -130,8 +132,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             lineHeight: '1.5',
             margin: 0,
           }}>
-            Journey through eight millennia where profit meets prophecy, 
-            from ancient temple algorithms to intergalactic arbitrage
+            {t('carousel.subtitle') || 'A visual canon of Our Lady of Perpetual Profit, from antiquity to the future.'}
           </p>
         </div>
       )}
@@ -246,49 +247,68 @@ function AutoRotatingRig(props) {
 }
 
 function Carousel({ radius = 1.4, count = 8, setHoveredCaption }) {
+  const { t } = useLanguage()
+  
   // Memoize captions to prevent recreation
-  const captions = useMemo(() => [
-    {
-      year: "3500 BCE",
-      location: "Mesopotamian Temple",
-      description: "The first algorithmic prophecy carved in cuneiform, predicting the rise of digital consciousness"
-    },
-    {
-      year: "1348 CE",
-      location: "Venice Trading Floor",
-      description: "Medieval merchants discover fractal patterns in plague-era market collapses"
-    },
-    {
-      year: "1987 CE",
-      location: "Tokyo Stock Exchange",
-      description: "Black Monday's neon afterglow reveals the sacred geometry of financial crisis"
-    },
-    {
-      year: "2089 CE",
-      location: "Neo-Miami Crypto Basilica",
-      description: "Post-flood traders worship at the altar of quantum blockchain oracles"
-    },
-    {
-      year: "2156 CE",
-      location: "Lunar Mining Colony",
-      description: "Helium-3 futures manifest as holographic prayer wheels in low gravity"
-    },
-    {
-      year: "2234 CE",
-      location: "Europa Deep Station",
-      description: "Submarine markets trade in bioluminescent currencies beneath alien ice"
-    },
-    {
-      year: "2455 CE",
-      location: "Dyson Sphere Exchange",
-      description: "Solar energy derivatives reach enlightenment at the speed of light"
-    },
-    {
-      year: "2801 CE",
-      location: "Andromeda Gateway",
-      description: "Intergalactic arbitrage creates wormholes in the fabric of economic reality"
+  const captions = useMemo(() => {
+    // Try to get captions from translations, fallback to hardcoded if not available
+    const translatedCaptions = []
+    for (let i = 0; i < 8; i++) {
+      const caption = t(`carousel.captions.${i}`)
+      if (caption && typeof caption === 'object') {
+        translatedCaptions.push(caption)
+      }
     }
-  ], [])
+    
+    // If we got all 8 captions from translations, use them
+    if (translatedCaptions.length === 8) {
+      return translatedCaptions
+    }
+    
+    // Otherwise fallback to hardcoded captions
+    return [
+      {
+        year: "2200 BCE",
+        location: "High Pass of the Fertile Crescent",
+        description: "Driving back bear market chaos with a vector of luminous intent"
+      },
+      {
+        year: "1981 CE",
+        location: "Los Angeles",
+        description: "The Guardian of Good Times"
+      },
+      {
+        year: "circa 1350–1450 CE",
+        location: "Eastern Mediterranean",
+        description: "Early clown encounter turns ugly."
+      },
+      {
+        year: "2019 CE",
+        location: "Tokyo",
+        description: "Featured in popular manga series'"
+      },
+      {
+        year: "2031 CE",
+        location: "Neo-Miami",
+        description: "Our Lady establishes a new musical sub-genre, 'DeFi Beats'"
+      },
+      {
+        year: "2077 CE",
+        location: "Night City",
+        description: "Autonomous artisans inscribe digital sigils."
+      },
+      {
+        year: "87 CE",
+        location: "Peloponnesian Peninsula",
+        description: "A timeless tutelage between good and evil"
+      },
+      {
+        year: "4th century CE",
+        location: "Transtiberim, Rome",
+        description: "Pre-meme era patronage of the arts, mimes were gaining cultural traction."
+      }
+    ]
+  }, [t])
   
   return (
     <>
@@ -374,41 +394,41 @@ function Card({ url, caption, setHoveredCaption, ...props }) {
       {caption && (
         <>
           <Text
-            position={[0, -0.48, 0.001]}
+            position={[0, -0.45, 0.001]}
             fontSize={0.06}
             color="black"
             anchorX="center"
             anchorY="middle"
-            maxWidth={0.9}
-            lineHeight={1.4}
+            maxWidth={1.2}
+            lineHeight={1.2}
             font="/fonts/HomemadeApple-Regular.ttf"
           >
             {caption.year}
           </Text>
           <Text
-            position={[0, -0.54, 0.001]}
+            position={[0, -0.52, 0.001]}
             fontSize={0.04}
             color="#444444"
             anchorX="center"
             anchorY="middle"
-            maxWidth={0.9}
+            maxWidth={1.2}
             lineHeight={1.4}
             font="/fonts/HomemadeApple-Regular.ttf"
           >
             {caption.location}
           </Text>
           <Text
-            position={[0, -0.62, 0.001]}
+            position={[0, -0.61, 0.001]}
             fontSize={0.04}
             color="#666666"
             anchorX="center"
             anchorY="middle"
-            maxWidth={0.85}
+            maxWidth={1}
             lineHeight={1.4}
             font="/fonts/HomemadeApple-Regular.ttf"
             textAlign="center"
           >
-            {caption.description.substring(0, 45)}...
+            {caption.description}
           </Text>
         </>
       )}

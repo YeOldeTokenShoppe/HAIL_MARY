@@ -237,7 +237,7 @@ export default function FountainPage() {
               cursor: "pointer",
             }}
           >
-            <Link href="/carousel" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
+            <Link href="/about" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
               RL80
             </Link>
             {Array.from({ length: 100 }).map((_, i) => {
@@ -270,7 +270,7 @@ export default function FountainPage() {
 
       {/* Nav Controls - Top Right */}
       <div style={{
-        position: "fixed",
+        position: "absolute",
         top: "1rem",
         right: "1rem",
         zIndex: 300

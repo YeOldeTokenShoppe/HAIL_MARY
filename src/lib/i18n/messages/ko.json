@@ -2,37 +2,38 @@
   "home": {
   },
   "palmTreeDrive": {
-    "reality": "이제\n현실이다",
+    "reality": "당신의\n현실",
     "buyButton": "구매",
     "about": "소개",
     "tokenomics": "토크노믹스",
     "illuminati": "일루미나티",
-    "trade": "거래",
+    "more": "더...",
     "stage1": {
-      "line1": "가능성을",
-      "line2": "상상해보세요",
+      "line1": "디파이",
+      "line2": "꿈",
       "line3": " "
     },
     "stage2": {
-      "line1": "성실함과",
-      "line2": "번영의",
+      "line1": "권위에",
+      "line2": "도전",
       "line3": " "
     },
     "stage3": {
-      "line1": "파시스트가",
-      "line2": "아니야, 베이비",
+      "line1": "성격이",
+      "line2": "운명이라면",
       "line3": " "
     },
     "stage4": {
-      "line1": "자비로운",
-      "line2": "기술을",
-      "line3": "사용하여"
+      "line1": "이것은",
+      "line2": "그럴 수도",
+      "line3": " "
     },
     "stage5": {
-      "line1": " ",
-      "line2": " ",
+      "line1": "지금은",
+      "line2": "현실",
       "line3": " "
-    }
+    },
+    "scrollPrompt": "위로 스크롤하여 계속하기"
   },
   "navigation": {
   },
@@ -40,5 +41,60 @@
     "allRightsReserved": "모든 권리 보유",
     "privacyPolicy": "개인정보 보호정책",
     "termsOfService": "서비스 약관"
+  },
+  "buttons": {
+    "buy": "구매"
+  },
+  "heading": {
+    "ourLady": "영원한 수익의",
+    "of": "",
+    "perpetual": "성모",
+    "profit": "마리아"
+  },
+  "carousel": {
+    "title": "성상학",
+    "subtitle": "고대부터 미래까지, 영원한 수익의 성모 마리아의 시각적 정전.",
+    "captions": [
+      {
+        "year": "기원전 2200년",
+        "location": "비옥한 초승달 지대",
+        "description": "약세 시장을 물리치다"
+      },
+      {
+        "year": "서기 1982년",
+        "location": "로스앤젤레스",
+        "description": "좋은 시절의 수호자"
+      },
+      {
+        "year": "약 1350-1450년",
+        "location": "바르트부르크 성, 튀링겐",
+        "description": "초기 광대와의 만남이 험악해지다"
+      },
+      {
+        "year": "서기 2019년",
+        "location": "도쿄",
+        "description": "인기 만화 시리즈에 등장"
+      },
+      {
+        "year": "서기 2081년",
+        "location": "네오 마이애미",
+        "description": "디파이 비트를 깔아놓다"
+      },
+      {
+        "year": "서기 2077년",
+        "location": "나이트 시티",
+        "description": "사이버펑크 사이보그들 사이에서 인기"
+      },
+      {
+        "year": "서기 87년",
+        "location": "펠로폰네소스 반도",
+        "description": "올바른 선택에 대한 조언"
+      },
+      {
+        "year": "4세기",
+        "location": "트란스티베림, 로마",
+        "description": "밈 이전 시대의 예술 후원자"
+      }
+    ]
   }
 }

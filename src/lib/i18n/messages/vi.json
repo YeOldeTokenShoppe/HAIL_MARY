@@ -2,37 +2,38 @@
   "home": {
   },
   "palmTreeDrive": {
-    "reality": "bây giờ là\nthực tế",
+    "reality": "của bạn\nthực tế",
     "buyButton": "Mua",
     "about": "Về chúng tôi",
     "tokenomics": "Tokenomics",
     "illuminati": "Illuminati",
-    "trade": "Giao dịch",
+    "more": "Thêm...",
     "stage1": {
-      "line1": "hãy tưởng tượng",
-      "line2": "khả năng",
+      "line1": "Đê-Phi",
+      "line2": "giấc mơ",
       "line3": " "
     },
     "stage2": {
-      "line1": "thịnh vượng",
-      "line2": "với chính trực",
+      "line1": "thách thức",
+      "line2": "quyền lực",
       "line3": " "
     },
     "stage3": {
-      "line1": "đây không phải",
-      "line2": "phát xít, em yêu",
+      "line1": "nếu tính cách",
+      "line2": "là số phận",
       "line3": " "
     },
     "stage4": {
-      "line1": "sử dụng",
-      "line2": "công nghệ",
-      "line3": "nhân từ"
+      "line1": "điều này",
+      "line2": "có thể là",
+      "line3": " "
     },
     "stage5": {
-      "line1": " ",
-      "line2": " ",
+      "line1": "bây giờ là",
+      "line2": "THỰC TẾ",
       "line3": " "
-    }
+    },
+    "scrollPrompt": "cuộn lên để tiếp tục"
   },
   "navigation": {
   },
@@ -40,5 +41,60 @@
     "allRightsReserved": "Tất cả các quyền được bảo lưu",
     "privacyPolicy": "Chính sách bảo mật",
     "termsOfService": "Điều khoản dịch vụ"
+  },
+  "buttons": {
+    "buy": "Mua"
+  },
+  "heading": {
+    "ourLady": "Đức Mẹ",
+    "of": "",
+    "perpetual": "Lợi Nhuận",
+    "profit": "Vĩnh Cửu"
+  },
+  "carousel": {
+    "title": "Biểu Tượng Học",
+    "subtitle": "Bộ sưu tập hình ảnh của Đức Mẹ Lợi Nhuận Vĩnh Cửu, từ cổ đại đến tương lai.",
+    "captions": [
+      {
+        "year": "2200 TCN",
+        "location": "Lưỡi Liềm Màu Mỡ",
+        "description": "Đẩy lùi thị trường gấu"
+      },
+      {
+        "year": "1982 SCN",
+        "location": "Los Angeles",
+        "description": "Người Bảo Vệ Thời Gian Tốt Đẹp"
+      },
+      {
+        "year": "khoảng 1350-1450",
+        "location": "Lâu Đài Wartburg, Thuringia",
+        "description": "Cuộc gặp gỡ sớm với chú hề trở nên xấu xí"
+      },
+      {
+        "year": "2019 SCN",
+        "location": "Tokyo",
+        "description": "Xuất hiện trong series manga nổi tiếng"
+      },
+      {
+        "year": "2081 SCN",
+        "location": "Neo-Miami",
+        "description": "Đặt nền móng cho Đê-Phi Beats"
+      },
+      {
+        "year": "2077 SCN",
+        "location": "Thành Phố Đêm",
+        "description": "Phổ biến trong giới cyberpunk-cyborg"
+      },
+      {
+        "year": "87 SCN",
+        "location": "Bán Đảo Peloponnese",
+        "description": "Khuyên bảo về việc đưa ra lựa chọn đúng đắn"
+      },
+      {
+        "year": "Thế kỷ IV",
+        "location": "Transtiberim, Roma",
+        "description": "Người bảo trợ nghệ thuật thời tiền-meme"
+      }
+    ]
   }
 }

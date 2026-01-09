@@ -2,37 +2,38 @@
   "home": {
   },
   "palmTreeDrive": {
-    "reality": "es ahora\nrealidad",
+    "reality": "tu\nrealidad",
     "buyButton": "Comprar",
     "about": "Acerca",
     "tokenomics": "Tokenomics",
     "illuminati": "Illuminati",
-    "trade": "Comerciar",
+    "more": "Más...",
     "stage1": {
-      "line1": "imagina la",
-      "line2": "posibilidad",
+      "line1": "DeFi",
+      "line2": "sueños",
       "line3": " "
     },
     "stage2": {
-      "line1": "de prosperidad",
-      "line2": "con integridad",
+      "line1": "desafía",
+      "line2": "autoridad",
       "line3": " "
     },
     "stage3": {
-      "line1": "que no es",
-      "line2": "fascista, cariño",
+      "line1": "si el carácter",
+      "line2": "es destino",
       "line3": " "
     },
     "stage4": {
-      "line1": "usando",
-      "line2": "tecnología",
-      "line3": "benevolente"
+      "line1": "esto",
+      "line2": "podría ser",
+      "line3": " "
     },
     "stage5": {
-      "line1": " ",
-      "line2": " ",
+      "line1": "es ahora",
+      "line2": "REALIDAD",
       "line3": " "
-    }
+    },
+    "scrollPrompt": "desliza hacia arriba para continuar"
   },
   "navigation": {
   },
@@ -40,5 +41,60 @@
     "allRightsReserved": "Todos los derechos reservados",
     "privacyPolicy": "Política de Privacidad",
     "termsOfService": "Términos de Servicio"
+  },
+  "buttons": {
+    "buy": "Comprar"
+  },
+  "heading": {
+    "ourLady": "Nuestra Señora",
+    "of": "del",
+    "perpetual": "Perpetuo",
+    "profit": "Lucro"
+  },
+  "carousel": {
+    "title": "Iconografía",
+    "subtitle": "Un canon visual de Nuestra Señora del Lucro Perpetuo, desde la antigüedad hasta el futuro.",
+    "captions": [
+      {
+        "year": "2200 AEC",
+        "location": "Creciente Fértil",
+        "description": "Rechazando el mercado bajista"
+      },
+      {
+        "year": "1982 EC",
+        "location": "Los Ángeles",
+        "description": "La Guardiana de los Buenos Tiempos"
+      },
+      {
+        "year": "circa 1350–1450 EC",
+        "location": "Castillo de Wartburg, Turingia",
+        "description": "Encuentro temprano con payaso se vuelve feo"
+      },
+      {
+        "year": "2019 EC",
+        "location": "Tokio",
+        "description": "Presentada en popular serie de manga"
+      },
+      {
+        "year": "2081 EC",
+        "location": "Neo-Miami",
+        "description": "Creando ritmos DeFi"
+      },
+      {
+        "year": "2077 EC",
+        "location": "Ciudad Nocturna",
+        "description": "Popular entre ciborgs ciberpunk"
+      },
+      {
+        "year": "87 EC",
+        "location": "Península del Peloponeso",
+        "description": "Aconsejando sobre tomar buenas decisiones"
+      },
+      {
+        "year": "siglo IV EC",
+        "location": "Transtíber, Roma",
+        "description": "Patrona de las artes - era pre-meme"
+      }
+    ]
   }
 }

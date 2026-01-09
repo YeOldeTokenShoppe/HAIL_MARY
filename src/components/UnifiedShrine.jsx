@@ -1,13 +1,13 @@
 'use client'
 import React, { useRef, useState, useEffect, Suspense, useCallback, useMemo, forwardRef, useImperativeHandle, Component } from 'react'
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { useGLTF, Stats, OrbitControls } from '@react-three/drei'
-import { EffectComposer, Bloom } from '@react-three/postprocessing'
+import { Canvas, useFrame } from '@react-three/fiber'
+import { Stats } from '@react-three/drei'
 import * as THREE from 'three'
 import { HandsModel, CameraController } from './HandsGLTFScene'
 // IMPORTANT: Import from the optimized version!
 import { CandleCloud, GradientBackground, SceneSetup } from './CandleShrine'
 import { NewCandleEffectManager } from './NewCandleEffect'
+import { EffectComposer, Bloom } from '@react-three/postprocessing'
 
 // Simple error boundary for Canvas
 class CanvasErrorBoundary extends Component {
@@ -21,7 +21,7 @@ class CanvasErrorBoundary extends Component {
     return { hasError: true }
   }
 
-  componentDidCatch(error, errorInfo) {
+  componentDidCatch(_error, errorInfo) {
     console.warn('Canvas error details:', errorInfo)
   }
 
@@ -195,7 +195,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   const priceRef = useRef(0)
   const shortTermPriceRef = useRef(0)
   const continuousOffsetRef = useRef(0)
-const [bloomIntensity, setBloomIntensity] = useState(1.2)
+// const [bloomIntensity, setBloomIntensity] = useState(1.2) // Disabled for stability
   const effectRef = useRef()
   
   
@@ -206,9 +206,9 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
     tokenPrice: 0.000420,
   })
   
-  // TEST SLIDER CONTROL - Remove this when done testing
-  const [testPriceOverride, setTestPriceOverride] = useState(null)
-  const [showTestControls, setShowTestControls] = useState(true)
+  // TEST SLIDER CONTROL - Disabled
+  const testPriceOverride = null // const [testPriceOverride, setTestPriceOverride] = useState(null)
+  // const [showTestControls, setShowTestControls] = useState(true)
   
   const [additionalCandles, setAdditionalCandles] = useState([])
   const [clickedCandleId, setClickedCandleId] = useState(null)
@@ -227,8 +227,8 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
   const hasDraggedEnough = useRef(false) // Track if we've moved enough to start rotating
   const DRAG_THRESHOLD = 5 // Pixels to move before rotation starts
   const [isMobile, setIsMobile] = useState(false)
-  const [hasReachedSection, setHasReachedSection] = useState(true)
-  const [isInView, setIsInView] = useState(true)
+  const hasReachedSection = true // const [hasReachedSection, setHasReachedSection] = useState(true)
+  const isInView = true // const [isInView, setIsInView] = useState(true)
   const canvasRef = useRef()
   const [contextLost, setContextLost] = useState(false)
   
@@ -253,9 +253,8 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
   const lastHistoryUpdate = useRef(0)
   const HISTORY_UPDATE_INTERVAL = 500 // Update chart every 500ms
   
-  // Static values that don't need to update
-  const volume24h = 1234567
-  const marketCap = 42069000
+  // Track total burned tokens
+  const [totalBurned, setTotalBurned] = useState(2847395) // Starting with a realistic number
 
   // Store timeout refs for cleanup
   const timeoutRefs = useRef({})
@@ -279,11 +278,19 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
     }
   }, [])
   
-  // Initialize random price history after mount to avoid SSR mismatch
+  // Initialize with longer delay to ensure stability
   useEffect(() => {
-    setMounted(true)
-    // Generate random initial values only on client side
-    setPriceHistory(Array(20).fill(0).map(() => 0.00042 + Math.random() * 0.00001 - 0.000005))
+    // Longer delay to ensure DOM and other resources are ready
+    const mountTimer = setTimeout(() => {
+      // Check if we're not already experiencing context issues
+      if (!contextLost) {
+        setMounted(true)
+        // Generate random initial values only on client side
+        setPriceHistory(Array(20).fill(0).map(() => 0.00042 + Math.random() * 0.00001 - 0.000005))
+      }
+    }, 500) // Increased delay for stability
+    
+    return () => clearTimeout(mountTimer)
   }, [])
 
   // Throttled UI update handler
@@ -311,7 +318,7 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
     }
   }, [onPriceChange, testPriceOverride])
 
-  const handleCandleClick = useCallback((instanceId, position) => {
+  const handleCandleClick = useCallback((instanceId) => {
     if (timeoutRefs.current[instanceId]) {
       clearTimeout(timeoutRefs.current[instanceId])
       delete timeoutRefs.current[instanceId]
@@ -337,6 +344,11 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
       id: Date.now(),
       rotation: Math.random() * Math.PI * 2
     }])
+    
+    // Update total burned tokens
+    if (offering?.tokensBurned) {
+      setTotalBurned(prev => prev + (offering.tokensBurned || 0))
+    }
     
     if (onLightCandle) {
       onLightCandle(offering)
@@ -402,36 +414,37 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
     }
   }, [])
 
-  // WebGL context lost/restore handlers
+  // Track reload attempts to prevent infinite loops
+  const reloadAttempts = useRef(0)
+  const lastContextLostTime = useRef(0)
+  
+  // Context lost recovery with debouncing
   useEffect(() => {
-    if (!canvasRef.current) return
+    let recoveryTimer = null
     
-    const canvas = canvasRef.current.querySelector('canvas')
-    if (!canvas) return
-    
-    const handleContextLost = (event) => {
-      event.preventDefault()
-      console.warn('WebGL context lost on shrine page')
-      setContextLost(true)
+    if (contextLost) {
+      const now = Date.now()
+      const timeSinceLastLoss = now - lastContextLostTime.current
+      lastContextLostTime.current = now
       
-      // Clear all timeouts and animations
-      Object.values(timeoutRefs.current).forEach(clearTimeout)
-      timeoutRefs.current = {}
+      // If losing context repeatedly in quick succession, wait longer
+      const waitTime = timeSinceLastLoss < 2000 ? 5000 : 3000
+      
+      recoveryTimer = setTimeout(() => {
+        if (contextLost && reloadAttempts.current < 3) {
+          console.log(`Context recovery timeout (attempt ${reloadAttempts.current + 1}/3), reloading...`)
+          reloadAttempts.current++
+          window.location.reload()
+        } else if (reloadAttempts.current >= 3) {
+          console.error('Max reload attempts reached. Please refresh manually.')
+        }
+      }, waitTime)
     }
-    
-    const handleContextRestored = () => {
-      console.log('WebGL context restored on shrine page')
-      setContextLost(false)
-    }
-    
-    canvas.addEventListener('webglcontextlost', handleContextLost)
-    canvas.addEventListener('webglcontextrestored', handleContextRestored)
     
     return () => {
-      canvas.removeEventListener('webglcontextlost', handleContextLost)
-      canvas.removeEventListener('webglcontextrestored', handleContextRestored)
+      if (recoveryTimer) clearTimeout(recoveryTimer)
     }
-  }, [canvasRef.current])
+  }, [contextLost])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -443,24 +456,9 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
       }
       isDragging.current = false
       
-      // Dispose of Three.js resources
-      if (canvasRef.current) {
-        const { gl, scene } = canvasRef.current
-        if (scene) {
-          scene.traverse((child) => {
-            if (child.geometry) child.geometry.dispose()
-            if (child.material) {
-              if (Array.isArray(child.material)) {
-                child.material.forEach(mat => mat.dispose())
-              } else {
-                child.material.dispose()
-              }
-            }
-          })
-        }
-        if (gl) {
-          gl.dispose()
-        }
+      // Call stored cleanup functions if they exist
+      if (canvasRef.current?._cleanupListeners) {
+        canvasRef.current._cleanupListeners()
       }
     }
   }, [])
@@ -628,15 +626,19 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
       <CanvasErrorBoundary>
       <Canvas
         camera={{ position: [0, isMobile ? 0 : 0, isMobile ? 2 : 0], fov: isMobile ? 75 : 70 }}
-        dpr={isMobile ? 1 : (window.devicePixelRatio || 1)}
+        dpr={isMobile ? Math.min(window.devicePixelRatio || 1, 1.5) : Math.min(window.devicePixelRatio || 1, 2)}
+        frameloop="always"
         gl={{ 
-          alpha: true,  // Enable alpha for proper transparency
-          antialias: !isMobile,  // Disable antialiasing on mobile
-          powerPreference: isMobile ? "low-power" : "high-performance",
+          antialias: true, // Enable for better quality on all devices
+          toneMapping: THREE.ACESFilmicToneMapping, // Use proper tone mapping for better visuals
+          powerPreference: isMobile ? "default" : "high-performance",
+          alpha: false,
+          premultipliedAlpha: false,
           preserveDrawingBuffer: false,
           failIfMajorPerformanceCaveat: false,
-          stencil: false,  // Disable stencil buffer if not needed
+          stencil: false,
           depth: true,
+          precision: "highp" // High precision for better quality
         }}
         onError={(error) => {
           console.warn('Canvas error:', error)
@@ -650,28 +652,51 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
           zIndex: 1,  // Lower z-index to be behind UI elements
           background: 'transparent'
         }}
-        onCreated={({ gl, scene }) => {
-          // Additional safety check for WebGL context
-          if (!gl || !gl.getParameter) {
-            console.warn('WebGL context not fully initialized')
-            return
-          }
-          
+        onCreated={({ gl, scene, camera }) => {
           // Store references for cleanup
-          canvasRef.current = { gl, scene }
-          
-          // Handle context loss
-          const canvas = gl.domElement
-          canvas.addEventListener('webglcontextlost', (e) => {
-            e.preventDefault()
-            console.log('WebGL context lost, attempting recovery...')
-            setContextLost(true)
-          })
-          
-          canvas.addEventListener('webglcontextrestored', () => {
-            console.log('WebGL context restored')
+          if (gl && scene) {
+            canvasRef.current = { gl, scene, camera }
+            // Set initial state
             setContextLost(false)
-          })
+            
+            // Clear any pending timeouts
+            Object.values(timeoutRefs.current).forEach(clearTimeout)
+            timeoutRefs.current = {}
+            
+            // Add WebGL context event handlers with debouncing
+            const canvas = gl.domElement
+            let contextLostTimeout = null
+            
+            const handleContextLost = (event) => {
+              event.preventDefault()
+              console.warn('WebGL context lost')
+              
+              // Debounce rapid context losses
+              if (contextLostTimeout) clearTimeout(contextLostTimeout)
+              
+              contextLostTimeout = setTimeout(() => {
+                setContextLost(true)
+                Object.values(timeoutRefs.current).forEach(clearTimeout)
+                timeoutRefs.current = {}
+              }, 100)
+            }
+            
+            const handleContextRestored = () => {
+              console.log('WebGL context restored')
+              if (contextLostTimeout) clearTimeout(contextLostTimeout)
+              setContextLost(false)
+              reloadAttempts.current = 0 // Reset reload counter on successful restore
+            }
+            
+            canvas.addEventListener('webglcontextlost', handleContextLost, false)
+            canvas.addEventListener('webglcontextrestored', handleContextRestored, false)
+            
+            // Store cleanup function
+            canvasRef.current._cleanupListeners = () => {
+              canvas.removeEventListener('webglcontextlost', handleContextLost)
+              canvas.removeEventListener('webglcontextrestored', handleContextRestored)
+            }
+          }
         }}
         // Limit frame rate if needed - uncomment for testing
         // frameloop="demand"
@@ -754,7 +779,7 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
   ref={effectRef}
   phonePosition={[0, 0, 5]}
   onNewCandle={handleNewCandle}
-  onBloomPulse={setBloomIntensity}  // Pass the state setter
+  // onBloomPulse={setBloomIntensity}  // Disabled for stability
   onCandlePulse={handleCandlePulse}  // Trigger pulse in candle cloud
 />
         
@@ -762,15 +787,20 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
             <CameraController focusMode={focusMode} />
             
      
-<EffectComposer>
-<Bloom 
-    intensity={bloomIntensity}
-    luminanceThreshold={0.1}  // Lower this (was 0.2) - original uses 0.1
-    luminanceSmoothing={0.9}
-    mipmapBlur
-    radius={0.8}
-  />
-</EffectComposer>
+{/* Disable EffectComposer temporarily to improve stability */}
+
+  <Suspense fallback={null}>
+    <EffectComposer>
+      <Bloom 
+        intensity={1.0}
+        luminanceThreshold={0.1}
+        luminanceSmoothing={0.9}
+        mipmapBlur
+        radius={0.8}
+      />
+    </EffectComposer>
+  </Suspense>
+
       </Canvas>
       </CanvasErrorBoundary>
       )}
@@ -994,69 +1024,129 @@ const [bloomIntensity, setBloomIntensity] = useState(1.2)
         </button>
       )} */}
       
-      {/* Unified Stats Box */}
+      {/* Unified Stats Box - Redesigned */}
       <div style={unifiedStatsStyle}>
-        <div style={{ 
-          fontSize: isMobile ? '16px' : '24px', 
-          fontWeight: 'bold',
-          color: displayPrice.change >= 0 ? '#00ff66' : '#ff4444',
-          marginBottom: isMobile ? '4px' : '8px'
-        }}>
-          ${displayPrice.tokenPrice.toFixed(7)}
-        </div>
+        {/* Price Action - Prominent */}
         <div style={{
-          fontSize: isMobile ? '12px' : '16px',
-          color: displayPrice.change >= 0 ? '#00ff66' : '#ff4444',
-          marginBottom: isMobile ? '8px' : '12px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: isMobile ? '4px' : '6px'
+          marginBottom: isMobile ? '10px' : '15px',
+          padding: isMobile ? '8px' : '12px',
+          background: displayPrice.change >= 0 
+            ? 'rgba(0, 255, 102, 0.1)' 
+            : 'rgba(255, 68, 68, 0.1)',
+          borderRadius: '8px',
+          border: `1px solid ${displayPrice.change >= 0 
+            ? 'rgba(0, 255, 102, 0.3)' 
+            : 'rgba(255, 68, 68, 0.3)'}`
         }}>
-          <span>{displayPrice.change >= 0 ? '▲' : '▼'}</span>
-          <span>{displayPrice.change.toFixed(2)}%</span>
+          <div style={{ 
+            fontSize: isMobile ? '18px' : '24px', 
+            fontWeight: 'bold',
+            color: displayPrice.change >= 0 ? '#00ff66' : '#ff4444',
+            marginBottom: '6px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span>{displayPrice.change >= 0 ? '+' : ''}{displayPrice.change.toFixed(2)}%</span>
+          </div>
+          <div style={{
+            fontSize: isMobile ? '12px' : '14px',
+            color: '#ccc',
+            fontFamily: 'monospace'
+          }}>
+            ${displayPrice.tokenPrice.toFixed(7)}
+          </div>
         </div>
         
-        {/* Volume and Market Cap */}
-        <div style={{ 
-          fontSize: isMobile ? '10px' : '12px', 
-          color: '#999', 
-          marginBottom: isMobile ? '8px' : '10px',
-          paddingBottom: isMobile ? '8px' : '10px',
-          borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+        {/* Candles & Burn Stats - Side by side */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          gap: isMobile ? '8px' : '10px',
+          marginBottom: isMobile ? '0' : '15px'
         }}>
-          <div style={{ marginBottom: '3px' }}>
-            Vol 24h: ${isMobile ? (volume24h / 1000000).toFixed(1) + 'M' : volume24h.toLocaleString()}
+          {/* Candles */}
+          <div style={{
+            padding: isMobile ? '8px' : '10px',
+            background: 'rgba(212, 175, 55, 0.1)',
+            borderRadius: '8px',
+            border: '1px solid rgba(212, 175, 55, 0.3)',
+            textAlign: 'center'
+          }}>
+            <div style={{ 
+              fontSize: isMobile ? '16px' : '16px', 
+              fontWeight: 'bold',
+              color: '#d4af37',
+              marginBottom: '4px'
+            }}>
+              <img 
+                src="/images/GreenCandleIcon.webp"
+                alt=""
+                style={{
+                  width: '1.2em',
+                  height: '1.2em',
+                  objectFit: 'contain',
+                  verticalAlign: 'middle',
+                  marginRight: '0.3em',
+                  display: 'inline-block'
+                }}
+              /> {(500 + additionalCandles.length).toLocaleString()}
+            </div>
+            <div style={{
+              fontSize: isMobile ? '10px' : '11px',
+              color: '#ccc',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}>
+              Candles
+            </div>
           </div>
-          <div>
-            MCap: ${isMobile ? (marketCap / 1000000).toFixed(1) + 'M' : marketCap.toLocaleString()}
+          
+          {/* Burned */}
+          <div style={{
+            padding: isMobile ? '8px' : '10px',
+            background: 'rgba(255, 149, 0, 0.1)',
+            borderRadius: '8px',
+            border: '1px solid rgba(255, 149, 0, 0.3)',
+            textAlign: 'center'
+          }}>
+            <div style={{ 
+              fontSize: isMobile ? '16px' : '16px', 
+              fontWeight: 'bold',
+              color: '#ff9500',
+              marginBottom: '4px'
+            }}>
+              <span style={{ fontSize: isMobile ? '20px' : '20px' }}>🔥</span> {totalBurned >= 1000000 
+                ? `${(totalBurned / 1000000).toFixed(1)}M`
+                : totalBurned >= 1000 
+                ? `${(totalBurned / 1000).toFixed(1)}K`
+                : totalBurned.toLocaleString()}
+            </div>
+            <div style={{
+              fontSize: isMobile ? '10px' : '11px',
+              color: '#ccc',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              marginBottom: '-8px'
+   
+            }}>
+              Burned
+            </div>
           </div>
         </div>
         
         {/* Mini chart - desktop only */}
         {!isMobile && (
           <div style={{
-            marginBottom: '12px',
-            height: '40px',
+            height: '30px',
             display: 'flex',
             alignItems: 'flex-end',
-            gap: '1px'
+            gap: '1px',
+            opacity: 0.6
           }}>
             {priceChartBars}
           </div>
         )}
-        
-        {/* Candles and Burned Stats */}
-        <div style={{ 
-          fontSize: isMobile ? '10px' : '12px', 
-          color: '#888'
-        }}>
-          <div style={{ marginBottom: '4px' }}>
-            🕯️ {(500 + additionalCandles.length).toLocaleString()} candles
-          </div>
-          <div>
-            🔥 0 tokens burned
-          </div>
-        </div>
       </div>
       
     </div>

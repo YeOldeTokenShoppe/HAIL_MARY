@@ -57,7 +57,7 @@ export default function ModelViewerPage() {
       {!isPageLoading && (
         <>
           <div style={{
-            position: "fixed",
+            position: "absolute",
             top: "1rem",
             right: "1rem",
             zIndex: 10000,

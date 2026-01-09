@@ -2,37 +2,38 @@
   "home": {
   },
   "palmTreeDrive": {
-    "reality": "nunc est\nveritas",
+    "reality": "tua\nrealitas",
     "buyButton": "Eme",
     "about": "De Nobis",
     "tokenomics": "Oeconomia Signi",
     "illuminati": "Illuminati",
-    "trade": "Mercatura",
+    "more": "Plus...",
     "stage1": {
-      "line1": "imagina",
-      "line2": "possibilitatem",
+      "line1": "DeFi",
+      "line2": "somnia",
       "line3": " "
     },
     "stage2": {
-      "line1": "prosperitatis",
-      "line2": "cum integritate",
+      "line1": "provocat",
+      "line2": "auctoritatem",
       "line3": " "
     },
     "stage3": {
-      "line1": "quod non est",
-      "line2": "fascista, carissime",
+      "line1": "si character",
+      "line2": "est fatum",
       "line3": " "
     },
     "stage4": {
-      "line1": "utens",
-      "line2": "technologia",
-      "line3": "benevola"
+      "line1": "hoc",
+      "line2": "potest esse",
+      "line3": " "
     },
     "stage5": {
-      "line1": " ",
-      "line2": " ",
+      "line1": "nunc est",
+      "line2": "REALITAS",
       "line3": " "
-    }
+    },
+    "scrollPrompt": "sursum volve ut pergas"
   },
   "navigation": {
   },
@@ -40,5 +41,60 @@
     "allRightsReserved": "Omnia iura reservata",
     "privacyPolicy": "Ratio Secreti",
     "termsOfService": "Condiciones Servitii"
+  },
+  "buttons": {
+    "buy": "Eme"
+  },
+  "heading": {
+    "ourLady": "Domina Nostra",
+    "of": "",
+    "perpetual": "Lucri",
+    "profit": "Perpetui"
+  },
+  "carousel": {
+    "title": "Iconographia",
+    "subtitle": "Canon visualis Dominae Nostrae Lucri Perpetui, ab antiquitate ad futurum.",
+    "captions": [
+      {
+        "year": "MCCCC a.C.n.",
+        "location": "Lunula Fertilis",
+        "description": "Mercatum ursi repellens"
+      },
+      {
+        "year": "MCMLXXXII p.C.n.",
+        "location": "Angelopolis",
+        "description": "Custos Temporum Bonorum"
+      },
+      {
+        "year": "circa MCCCL-MCDL",
+        "location": "Castrum Wartburg, Thuringia",
+        "description": "Congressus primus cum scurra fit turpis"
+      },
+      {
+        "year": "MMXIX p.C.n.",
+        "location": "Tokium",
+        "description": "In serie manga populari apparet"
+      },
+      {
+        "year": "MMLXXXI p.C.n.",
+        "location": "Neo-Miamia",
+        "description": "Rhythmos DeFi ponens"
+      },
+      {
+        "year": "MMLXXVII p.C.n.",
+        "location": "Urbs Nocturna",
+        "description": "Popularis inter cyborg cyberpunk"
+      },
+      {
+        "year": "LXXXVII p.C.n.",
+        "location": "Peninsula Peloponnesia",
+        "description": "Consulens de bonis electionibus"
+      },
+      {
+        "year": "Saeculum IV",
+        "location": "Transtiberim, Roma",
+        "description": "Patrona artium aetatis ante-memae"
+      }
+    ]
   }
 }

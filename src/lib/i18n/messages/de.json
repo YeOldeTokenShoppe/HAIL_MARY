@@ -2,37 +2,38 @@
   "home": {
   },
   "palmTreeDrive": {
-    "reality": "es ist jetzt\nRealität",
+    "reality": "deine\nRealität",
     "buyButton": "Kaufen",
     "about": "Über",
     "tokenomics": "Tokenomics",
     "illuminati": "Illuminati",
-    "trade": "Handeln",
+    "more": "Mehr...",
     "stage1": {
-      "line1": "stell dir",
-      "line2": "die Möglichkeit vor",
+      "line1": "DeFi",
+      "line2": "Träume",
       "line3": " "
     },
     "stage2": {
-      "line1": "von Wohlstand",
-      "line2": "mit Integrität",
+      "line1": "trotzt",
+      "line2": "Autorität",
       "line3": " "
     },
     "stage3": {
-      "line1": "das ist nicht",
-      "line2": "faschistisch, Baby",
+      "line1": "wenn Charakter",
+      "line2": "Schicksal ist",
       "line3": " "
     },
     "stage4": {
-      "line1": "mit",
-      "line2": "wohlwollender",
-      "line3": "Technologie"
+      "line1": "das",
+      "line2": "könnte sein",
+      "line3": " "
     },
     "stage5": {
-      "line1": " ",
-      "line2": " ",
+      "line1": "ist jetzt",
+      "line2": "REALITÄT",
       "line3": " "
-    }
+    },
+    "scrollPrompt": "nach oben scrollen um fortzufahren"
   },
   "navigation": {
   },
@@ -40,5 +41,60 @@
     "allRightsReserved": "Alle Rechte vorbehalten",
     "privacyPolicy": "Datenschutzrichtlinie",
     "termsOfService": "Nutzungsbedingungen"
+  },
+  "buttons": {
+    "buy": "Kaufen"
+  },
+  "heading": {
+    "ourLady": "Unsere Liebe Frau",
+    "of": "des",
+    "perpetual": "Ewigen",
+    "profit": "Profits"
+  },
+  "carousel": {
+    "title": "Ikonographie",
+    "subtitle": "Ein visueller Kanon Unserer Lieben Frau des Ewigen Profits, von der Antike bis zur Zukunft.",
+    "captions": [
+      {
+        "year": "2200 v. Chr.",
+        "location": "Fruchtbarer Halbmond",
+        "description": "Den Bärenmarkt zurückdrängen"
+      },
+      {
+        "year": "1982 n. Chr.",
+        "location": "Los Angeles",
+        "description": "Die Hüterin der guten Zeiten"
+      },
+      {
+        "year": "ca. 1350–1450",
+        "location": "Wartburg, Thüringen",
+        "description": "Frühe Clown-Begegnung wird hässlich"
+      },
+      {
+        "year": "2019 n. Chr.",
+        "location": "Tokio",
+        "description": "In beliebter Manga-Serie vorgestellt"
+      },
+      {
+        "year": "2081 n. Chr.",
+        "location": "Neo-Miami",
+        "description": "DeFi-Beats auflegen"
+      },
+      {
+        "year": "2077 n. Chr.",
+        "location": "Night City",
+        "description": "Beliebt bei Cyberpunk-Cyborgs"
+      },
+      {
+        "year": "87 n. Chr.",
+        "location": "Peloponnesische Halbinsel",
+        "description": "Beratung über gute Entscheidungen"
+      },
+      {
+        "year": "4. Jahrhundert",
+        "location": "Transtiberim, Rom",
+        "description": "Kunstmäzenin der Vor-Meme-Ära"
+      }
+    ]
   }
 }

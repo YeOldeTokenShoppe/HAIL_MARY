@@ -236,7 +236,6 @@ export default function CyborgTemple() {
       if (typeof window !== 'undefined' && typeof document !== 'undefined') {
         try {
           await document.fonts.load("1em 'UnifrakturMaguntia'");
-          // console.log('Font loaded successfully');
           setFontLoaded(true);
           setLoadingProgress(prev => Math.min(prev + 10, 100));
         } catch (e) {
@@ -501,7 +500,7 @@ export default function CyborgTemple() {
               cursor: "pointer",
             }}
           >
-            <Link href="/carousel" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
+            <Link href="/about" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
               RL80
             </Link>
             {Array.from({length: 100}).map((_, i) => {

@@ -2,37 +2,38 @@
   "home": {
   },
   "palmTreeDrive": {
-    "reality": "è ora\nrealtà",
+    "reality": "la tua\nrealtà",
     "buyButton": "Acquista",
     "about": "Chi siamo",
     "tokenomics": "Tokenomics",
     "illuminati": "Illuminati",
-    "trade": "Scambia",
+    "more": "Altro...",
     "stage1": {
-      "line1": "immagina la",
-      "line2": "possibilità",
+      "line1": "DeFi",
+      "line2": "sogni",
       "line3": " "
     },
     "stage2": {
-      "line1": "di prosperità",
-      "line2": "con integrità",
+      "line1": "sfida",
+      "line2": "l'autorità",
       "line3": " "
     },
     "stage3": {
-      "line1": "questo non è",
-      "line2": "fascista, tesoro",
+      "line1": "se il carattere",
+      "line2": "è destino",
       "line3": " "
     },
     "stage4": {
-      "line1": "usando",
-      "line2": "tecnologia",
-      "line3": "benevola"
+      "line1": "questo",
+      "line2": "potrebbe essere",
+      "line3": " "
     },
     "stage5": {
-      "line1": " ",
-      "line2": " ",
+      "line1": "è ora",
+      "line2": "REALTÀ",
       "line3": " "
-    }
+    },
+    "scrollPrompt": "scorri verso l'alto per continuare"
   },
   "navigation": {
   },
@@ -40,5 +41,60 @@
     "allRightsReserved": "Tutti i diritti riservati",
     "privacyPolicy": "Politica sulla privacy",
     "termsOfService": "Termini di servizio"
+  },
+  "buttons": {
+    "buy": "Acquista"
+  },
+  "heading": {
+    "ourLady": "Nostra Signora",
+    "of": "del",
+    "perpetual": "Profitto",
+    "profit": "Perpetuo"
+  },
+  "carousel": {
+    "title": "Iconografia",
+    "subtitle": "Un canone visivo di Nostra Signora del Profitto Perpetuo, dall'antichità al futuro.",
+    "captions": [
+      {
+        "year": "2200 a.C.",
+        "location": "Mezzaluna Fertile",
+        "description": "Respingere il mercato ribassista"
+      },
+      {
+        "year": "1982 d.C.",
+        "location": "Los Angeles",
+        "description": "La Guardiana dei Bei Tempi"
+      },
+      {
+        "year": "circa 1350–1450",
+        "location": "Castello di Wartburg, Turingia",
+        "description": "L'incontro precoce col pagliaccio diventa brutto"
+      },
+      {
+        "year": "2019 d.C.",
+        "location": "Tokyo",
+        "description": "Presente nella popolare serie manga"
+      },
+      {
+        "year": "2081 d.C.",
+        "location": "Neo-Miami",
+        "description": "Creare ritmi DeFi"
+      },
+      {
+        "year": "2077 d.C.",
+        "location": "Night City",
+        "description": "Popolare tra i cyborg cyberpunk"
+      },
+      {
+        "year": "87 d.C.",
+        "location": "Penisola del Peloponneso",
+        "description": "Consigliare sulle buone scelte"
+      },
+      {
+        "year": "IV secolo",
+        "location": "Trastevere, Roma",
+        "description": "Mecenate delle arti nell'era pre-meme"
+      }
+    ]
   }
 }

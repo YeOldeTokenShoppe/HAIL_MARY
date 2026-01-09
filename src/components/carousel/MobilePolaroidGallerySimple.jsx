@@ -1,21 +1,40 @@
 'use client'
 
 import React, { useMemo, useState } from 'react'
+import { useLanguage } from '../LanguageProvider'
 
 const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
   const n = images.length || 8
   const [isPaused, setIsPaused] = useState(false)
+  const { t } = useLanguage()
   
-  const captions = useMemo(() => [
-    { year: "3500 BCE", location: "Mesopotamia" },
-    { year: "1348 CE", location: "Venice" },
-    { year: "1987 CE", location: "Tokyo" },
-    { year: "2089 CE", location: "Neo-Miami" },
-    { year: "2156 CE", location: "Lunar Colony" },
-    { year: "2234 CE", location: "Europa" },
-    { year: "2455 CE", location: "Dyson Sphere" },
-    { year: "2801 CE", location: "Andromeda" }
-  ], [])
+  const captions = useMemo(() => {
+    // Try to get captions from translations, fallback to hardcoded if not available
+    const translatedCaptions = []
+    for (let i = 0; i < 8; i++) {
+      const caption = t(`carousel.captions.${i}`)
+      if (caption && typeof caption === 'object') {
+        translatedCaptions.push(caption)
+      }
+    }
+    
+    // If we got all 8 captions from translations, use them
+    if (translatedCaptions.length === 8) {
+      return translatedCaptions
+    }
+    
+    // Otherwise fallback to hardcoded captions
+    return [
+      { year: "2200 BCE", location: "Fertile Crescent", description: "Driving back bear market" },
+      { year: "1982 CE", location: "Los Angeles", description: "The Guardian of Good Times" },
+      { year: "circa 1350–1450 CE", location: "Wartburg Castle, Thuringia", description: "Early clown encounter turns ugly" },
+      { year: "2019 CE", location: "Tokyo", description: "Featured in popular manga series" },
+      { year: "2081 CE", location: "Neo-Miami", description: "Laying down DeFi Beats" },
+      { year: "2077 CE", location: "Night City", description: "Popular among cyberpunk-cyborgs" },
+      { year: "87 CE", location: "Peloponnesian Peninsula", description: "Advising on making good choices" },
+      { year: "4th century CE", location: "Transtiberim, Rome", description: "Patron of the arts - pre-meme era" }
+    ]
+  }, [t])
   
   return (
     <>
@@ -23,9 +42,9 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
         .polaroid-gallery {
           --d: 24s; 
           display: grid;
-          width: 240px;
+          width: 17rem;
           position: fixed;
-          top: calc(40% + 1rem);
+          top: calc(35% + 1rem);
           left: 50%;
           transform: translate(-50%, -50%);
           cursor: pointer;
@@ -42,7 +61,7 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
           grid-area: 1/1;
           width: 100%;
           background: white;
-          padding: 10px 10px 60px 10px;
+          padding: 10px 10px 80px 10px;
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.1);
           position: relative;
           z-index: 2;
@@ -64,26 +83,34 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
         
         .polaroid-caption {
           position: absolute;
-          bottom: 20px;
+          bottom: 15px;
           left: 10px;
           right: 10px;
           text-align: center;
           font-family: 'Permanent Marker';
           color: #333;
-          font-size: 18px;
-          line-height: 1.2;
+          font-size: 16px;
+          line-height: 1.15;
         }
         
         .polaroid-year {
           font-weight: bold;
-          font-size: 16px;
+          font-size: 15px;
         }
         
         .polaroid-location {
           font-style: italic;
-          font-size: 14px;
+          font-size: 13px;
           opacity: 0.7;
+          margin-top: 1px;
+        }
+        
+        .polaroid-description {
+          font-size: 12px;
+          opacity: 0.6;
           margin-top: 2px;
+          font-style: normal;
+          line-height: 1.2;
         }
         
         /* Individual image styles for 8 images */
@@ -221,15 +248,16 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
               <div className="polaroid-caption">
                 <div className="polaroid-year">{captions[i]?.year}</div>
                 <div className="polaroid-location">{captions[i]?.location}</div>
+                <div className="polaroid-description">{captions[i]?.description}</div>
               </div>
             </div>
           ))}
         </div>
         
         <div className="mobile-gallery-info">
-          <h2 className="mobile-gallery-heading">Time Travel Gallery</h2>
+          <h2 className="mobile-gallery-heading">{t('carousel.title') || 'Iconography'}</h2>
           <p className="mobile-gallery-description">
-            Witness moments across millennia as reality bends through the ages
+            {t('carousel.subtitle') || 'A visual canon of Our Lady of Perpetual Profit, from antiquity to the future.'}
           </p>
         </div>
       </div>

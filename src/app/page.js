@@ -49,7 +49,6 @@ export default function Home() {
     const checkFont = async () => {
       try {
         await document.fonts.load("1em 'UnifrakturMaguntia'");
-        console.log('Font loaded successfully');
         setFontLoaded(true);
         // Add fonts-loaded class to body and html to reveal hidden font elements
         document.body.classList.add('fonts-loaded');
@@ -173,7 +172,7 @@ export default function Home() {
               cursor: "pointer",
             }}
           >
-            <a href="/carousel" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
+            <a href="/about" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
               RL80
             </a>
             {Array.from({length: 100}).map((_, i) => {

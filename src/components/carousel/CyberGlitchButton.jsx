@@ -102,16 +102,21 @@ export default function CyberGlitchButton({
         
         .cybr-btn-wrapper {
           position: relative;
-          height: ${mobile ? '3.5rem' : '3.5rem'};
-          width: ${mobile ? '9rem' : '9rem'};
+          height: 3.5rem;
+          width: 9rem;
           margin: 0.2rem;
+        }
+        
+        .cybr-btn-wrapper.mobile {
+          height: 3rem;
+          width: 7rem;
         }
         
         .cybr-btn {
           --primary: #9945ff;
           --shadow-primary: #00ffff;
           --color: white;
-          --font-size: ${mobile ? '0.875rem' : '1rem'};
+          --font-size: 1rem;
           --shadow-primary-hue: 180;
           --shadow-secondary-hue: 60;
           --shadow-secondary: hsl(var(--shadow-secondary-hue), 90%, 60%);
@@ -138,7 +143,7 @@ export default function CyberGlitchButton({
           flex-direction: column;
           justify-content: center;
           align-items: center;
-          line-height: ${text2 ? (mobile ? '1.375rem' : '1.375rem') : (mobile ? '2.5rem' : '3.75rem')};
+          line-height: ${text2 ? '1.375rem' : '3.75rem'};
           text-align: center;
           transition: background 0.2s, font-size 0.3s;
           border: none;
@@ -147,9 +152,18 @@ export default function CyberGlitchButton({
           font-family: monospace;
         }
         
+        .cybr-btn.mobile {
+          --font-size: 0.875rem;
+          line-height: ${text2 ? '1.375rem' : '2.5rem'};
+        }
+        
         .cybr-btn:hover {
           --primary: #7c37d0;
-          --font-size: ${mobile ? '0.875rem' : '1rem'};
+          --font-size: 1rem;
+        }
+        
+        .cybr-btn.mobile:hover {
+          --font-size: 0.875rem;
         }
         
         .cybr-btn:active {
@@ -195,7 +209,11 @@ export default function CyberGlitchButton({
           font-weight: 900;
           letter-spacing: 0.2rem;
           font-size: var(--font-size);
-          line-height: ${text2 ? (mobile ? '1.375rem' : '1.625rem') : 'normal'};
+          line-height: ${text2 ? '1.625rem' : 'normal'};
+        }
+        
+        .cybr-btn.mobile .cybr-btn__glitch {
+          line-height: ${text2 ? '1.375rem' : 'normal'};
         }
         
         .cybr-btn__glitch:before {
@@ -231,9 +249,9 @@ export default function CyberGlitchButton({
         }
       `}</style>
       
-      <div className="cybr-btn-wrapper">
+      <div className={`cybr-btn-wrapper ${mobile ? 'mobile' : ''}`}>
         <button
-          className="cybr-btn"
+          className={`cybr-btn ${mobile ? 'mobile' : ''}`}
           onClick={handleClick}
           {...props}
         >

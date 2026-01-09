@@ -20,6 +20,7 @@ export const useMusic = () => {
 
 // Track lists
 const non80sTracks = [
+  { name: "Utopia", path: "audio/08 Utopia.m4a", bpm: 100 },
   { name: "Lifetimes", path: "audio/07 Lifetimes.m4a", bpm: 135 },
   { name: "Magnetic - Tunde Adebimpe", path: "audio/01 Magnetic.m4a", bpm: 130 },
   { name: "Rocket Man - Steven Drozd", path: "audio/rocketMan.m4a", bpm: 45 }
@@ -254,7 +255,9 @@ export const MusicProvider = ({ children }) => {
       const playlist = is80sMode ? eightyTracks : non80sTracks;
       if (playlist.length > 0) {
         let index = 0;
-        if (isShuffled) {
+        // For non-80s mode, always preload Utopia (index 0) as the first track
+        // For 80s mode, use shuffle if enabled
+        if (isShuffled && is80sMode) {
           index = Math.floor(Math.random() * playlist.length);
         }
         
@@ -336,7 +339,9 @@ export const MusicProvider = ({ children }) => {
           const playlist = is80sMode ? eightyTracks : non80sTracks;
           let startIndex = 0;
           
-          if (isShuffled && playlist.length > 0) {
+          // For non-80s mode, always start with Utopia (index 0) as the first track
+          // For 80s mode, use shuffle if enabled
+          if (isShuffled && playlist.length > 0 && is80sMode) {
             startIndex = Math.floor(Math.random() * playlist.length);
           }
           

@@ -842,7 +842,6 @@ const PalmsScene = ({ onLoadingChange }) => {
     const loader = new GLTFLoader(loadingManager);
     loader.setDRACOLoader(dracoLoader);
     
-    console.log('[PalmTreeDrive] Initialized loaders - DRACO path:', dracoPath);
     
     // Helper function to load models with retry logic
     const loadModelWithRetry = (path, onSuccess, onProgress, onError, modelName) => {
@@ -852,7 +851,7 @@ const PalmsScene = ({ onLoadingChange }) => {
       }
       
       const attemptLoad = () => {
-        console.log(`[PalmTreeDrive] Loading ${modelName} (attempt ${retryCount[attemptKey] + 1}/${maxRetries + 1})`);
+        // console.log(`[PalmTreeDrive] Loading ${modelName} (attempt ${retryCount[attemptKey] + 1}/${maxRetries + 1})`);
         
         loader.load(
           path,
@@ -860,13 +859,13 @@ const PalmsScene = ({ onLoadingChange }) => {
           onProgress,
           (error) => {
             retryCount[attemptKey]++;
-            console.error(`[PalmTreeDrive] Error loading ${modelName} (attempt ${retryCount[attemptKey]}):`, error);
+            // console.error(`[PalmTreeDrive] Error loading ${modelName} (attempt ${retryCount[attemptKey]}):`, error);
             
             if (retryCount[attemptKey] <= maxRetries) {
-              console.log(`[PalmTreeDrive] Retrying ${modelName} in ${retryDelay}ms...`);
+              // console.log(`[PalmTreeDrive] Retrying ${modelName} in ${retryDelay}ms...`);
               setTimeout(attemptLoad, retryDelay);
             } else {
-              console.error(`[PalmTreeDrive] Failed to load ${modelName} after ${maxRetries} retries`);
+              // console.error(`[PalmTreeDrive] Failed to load ${modelName} after ${maxRetries} retries`);
               onError(error);
             }
           }
@@ -2009,7 +2008,7 @@ const PalmsScene = ({ onLoadingChange }) => {
         
         if (intersects.length > 0) {
           const isMobile = detectMobileDevice();
-          const destination = isMobile ? '/home' : '/home';
+          const destination = isMobile ? '/about' : '/about';
           
           // Add fade out transition before navigating
           gsap.to(mountRef.current, {
@@ -2035,7 +2034,7 @@ const PalmsScene = ({ onLoadingChange }) => {
             const distance = intersect.point.distanceTo(maryPos);
             if (distance < 2) { // Within 2 units of Mary's position
               const isMobile = detectMobileDevice();
-              const destination = isMobile ? '/home' : '/home';
+              const destination = isMobile ? '/about' : '/about';
 
               // Add fade out transition before navigating
               gsap.to(mountRef.current, {
@@ -2260,11 +2259,14 @@ const PalmsScene = ({ onLoadingChange }) => {
                   const isArabic = locale === 'ar';
                   const isAsian = ['ja', 'zh', 'ko'].includes(locale);
                   const isDevanagari = locale === 'hi';
+                  const isCyrillic = ['ru', 'uk', 'bg'].includes(locale); // Russian, Ukrainian, Bulgarian
                   
                   if (isArabic || isDevanagari) {
                     return isMobile ? 1.0 : 1.5;
                   } else if (isAsian) {
-                    return isMobile ? 1.1 : 1.6;
+                    return isMobile ? 0.7 : 1.3;
+                  } else if (isCyrillic) {
+                    return isMobile ? 1.0 : 1.2; // Smaller size for Cyrillic text
                   }
                   return isMobile ? 1.2 : 1.8;
                 })()}
@@ -2281,11 +2283,14 @@ const PalmsScene = ({ onLoadingChange }) => {
                   const isArabic = locale === 'ar';
                   const isAsian = ['ja', 'zh', 'ko'].includes(locale);
                   const isDevanagari = locale === 'hi';
+                  const isCyrillic = ['ru', 'uk', 'bg'].includes(locale); // Russian, Ukrainian, Bulgarian
                   
                   if (isArabic || isDevanagari) {
                     return isMobile ? 1.0 : 1.5;
                   } else if (isAsian) {
-                    return isMobile ? 1.1 : 1.6;
+                    return isMobile ? 0.7 : 1.3;
+                  } else if (isCyrillic) {
+                    return isMobile ? 1.0 : 1.2; // Smaller size for Cyrillic text
                   }
                   return isMobile ? 1.2 : 1.8;
                 })()}
@@ -2333,7 +2338,7 @@ const PalmsScene = ({ onLoadingChange }) => {
             animation: currentCameraStage === 4 ? 'none' : 'pulse 2s ease-in-out infinite',
             transition: 'opacity 0.5s ease',
           }}>
-            scroll up to continue
+            {t('palmTreeDrive.scrollPrompt')}
           </div>
         </div>
       )}

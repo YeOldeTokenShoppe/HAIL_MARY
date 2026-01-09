@@ -1,14 +1,26 @@
 'use client';
 
-import React, { useState }  from 'react';
+import React, { useState, useEffect }  from 'react';
 
 import { useLanguage } from './LanguageProvider';
 
 export default function LanguageSwitcher() {
   const { locale, setLocale, detectedLanguage, isAutoDetected } = useLanguage();
     const [isMobileView, setIsMobileView] = useState(false);
-    const [isMobileDevice, setIsMobileDevice] = useState(typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
+    const [isMobileDevice, setIsMobileDevice] = useState(false);
   
+  // Set mobile device state after component mounts
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobileDevice(window.innerWidth <= 768);
+      setIsMobileView(window.innerWidth <= 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   const languages = [
     // Most common first

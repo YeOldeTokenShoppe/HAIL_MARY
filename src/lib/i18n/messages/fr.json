@@ -2,37 +2,38 @@
   "home": {
   },
   "palmTreeDrive": {
-    "reality": "c'est maintenant\nréalité",
+    "reality": "votre\nréalité",
     "buyButton": "Acheter",
     "about": "À propos",
     "tokenomics": "Tokenomics",
     "illuminati": "Illuminati",
-    "trade": "Échanger",
+    "more": "Plus...",
     "stage1": {
-      "line1": "imagine la",
-      "line2": "possibilité",
+      "line1": "DeFi",
+      "line2": "rêves",
       "line3": " "
     },
     "stage2": {
-      "line1": "de prospérité",
-      "line2": "avec intégrité",
+      "line1": "défie",
+      "line2": "l'autorité",
       "line3": " "
     },
     "stage3": {
-      "line1": "qui n'est pas",
-      "line2": "fasciste, bébé",
+      "line1": "si le caractère",
+      "line2": "est destin",
       "line3": " "
     },
     "stage4": {
-      "line1": "utilisant une",
-      "line2": "technologie",
-      "line3": "bienveillante"
+      "line1": "cela",
+      "line2": "pourrait être",
+      "line3": " "
     },
     "stage5": {
-      "line1": " ",
-      "line2": " ",
+      "line1": "c'est maintenant",
+      "line2": "RÉALITÉ",
       "line3": " "
-    }
+    },
+    "scrollPrompt": "faites défiler vers le haut pour continuer"
   },
   "navigation": {
   },
@@ -40,5 +41,60 @@
     "allRightsReserved": "Tous droits réservés",
     "privacyPolicy": "Politique de Confidentialité",
     "termsOfService": "Conditions d'Utilisation"
+  },
+  "buttons": {
+    "buy": "Acheter"
+  },
+  "heading": {
+    "ourLady": "Notre-Dame",
+    "of": "du",
+    "perpetual": "Profit",
+    "profit": "Perpétuel"
+  },
+  "carousel": {
+    "title": "Iconographie",
+    "subtitle": "Un canon visuel de Notre-Dame du Profit Perpétuel, de l'antiquité au futur.",
+    "captions": [
+      {
+        "year": "2200 av. J.-C.",
+        "location": "Croissant Fertile",
+        "description": "Repousser le marché baissier"
+      },
+      {
+        "year": "1982 apr. J.-C.",
+        "location": "Los Angeles",
+        "description": "La Gardienne des Bons Temps"
+      },
+      {
+        "year": "vers 1350-1450",
+        "location": "Château de Wartburg, Thuringe",
+        "description": "Une rencontre précoce avec un clown tourne mal"
+      },
+      {
+        "year": "2019 apr. J.-C.",
+        "location": "Tokyo",
+        "description": "Présentée dans une série manga populaire"
+      },
+      {
+        "year": "2081 apr. J.-C.",
+        "location": "Néo-Miami",
+        "description": "Poser les beats DeFi"
+      },
+      {
+        "year": "2077 apr. J.-C.",
+        "location": "Night City",
+        "description": "Populaire parmi les cyborgs cyberpunk"
+      },
+      {
+        "year": "87 apr. J.-C.",
+        "location": "Péninsule du Péloponnèse",
+        "description": "Conseiller sur les bons choix"
+      },
+      {
+        "year": "IVe siècle",
+        "location": "Transtevere, Rome",
+        "description": "Mécène des arts de l'ère pré-mème"
+      }
+    ]
   }
 }

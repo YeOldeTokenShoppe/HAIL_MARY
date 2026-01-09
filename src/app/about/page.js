@@ -12,10 +12,12 @@ import ThirdwebBuyModal from '@/components/ThirdwebBuyModal'
 import CyberGlitchButton from '@/components/carousel/CyberGlitchButton'
 import CoinLoader from '@/components/CoinLoader'
 import { useRouter } from 'next/navigation'
+import { useLanguage } from '@/components/LanguageProvider'
 
 export default function CarouselPage() {
   const router = useRouter()
   const { user } = useUser()
+  const { t } = useLanguage()
   const { 
     play, 
     pause, 
@@ -24,11 +26,12 @@ export default function CarouselPage() {
     is80sMode: context80sMode, 
     setIs80sMode: setContext80sMode
   } = useMusic()
-  const [isMobileView, setIsMobileView] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
+  const [isMobileView, setIsMobileView] = useState(false)
   const [fontLoaded, setFontLoaded] = useState(false)
   const [showBuyModal, setShowBuyModal] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [isMobileDevice, setIsMobileDevice] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
+  const [isMobileDevice, setIsMobileDevice] = useState(false)
+  const [deviceDetected, setDeviceDetected] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const is80sMode = context80sMode
@@ -86,6 +89,60 @@ export default function CarouselPage() {
     return () => clearTimeout(fallbackTimer);
   }, []);
 
+  // Handle resize events for responsive behavior
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth
+      const height = window.innerHeight
+      const isPortrait = height > width
+      
+      // Detect if it's likely an iPad (including iPad Mini)
+      const isIPad = /iPad/.test(navigator.userAgent) || 
+                     (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+      
+      // For tablets: check if it's in portrait and width is tablet-like (768px)
+      const isTabletPortrait = isIPad && isPortrait && width >= 768 && width <= 834
+      
+      // Phone breakpoint - only true phones, not tablets even in portrait
+      const isPhone = width < 480 && !isIPad
+      
+      // Mobile view for other UI elements
+      const isMobileView = width <= 1024 && !isIPad
+      
+      console.log('Detection - Width:', width, 'Height:', height, 'Portrait:', isPortrait)
+      console.log('isIPad:', isIPad, 'isTabletPortrait:', isTabletPortrait, 'isPhone:', isPhone)
+      console.log('Setting isMobileDevice to:', isPhone)
+      
+      // Only phones get mobile treatment, not tablets even in portrait
+      setIsMobileDevice(prevState => {
+        if (prevState !== isPhone) {
+          console.log('Updating isMobileDevice from', prevState, 'to', isPhone)
+        }
+        return isPhone
+      })
+      setIsMobileView(isMobileView)
+      setDeviceDetected(true)
+    }
+
+    // Run immediately
+    if (typeof window !== 'undefined') {
+      handleResize()
+    }
+    
+    window.addEventListener('resize', handleResize)
+    window.addEventListener('orientationchange', handleResize)
+
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      window.removeEventListener('orientationchange', handleResize)
+    }
+  }, [])
+
+  // Debug effect to track isMobileDevice state changes
+  useEffect(() => {
+    console.log('isMobileDevice state changed to:', isMobileDevice)
+  }, [isMobileDevice])
+
   // Check if font is loaded and add fonts-loaded class
   useEffect(() => {
     const checkFont = async () => {
@@ -108,18 +165,6 @@ export default function CarouselPage() {
   // useEffect(() => {
   //   console.log('RL80 Logo state:', { fontLoaded, isMobileView });
   // }, [fontLoaded, isMobileView]);
-
-  // Check if mobile view and device
-  useEffect(() => {
-    const checkMobile = () => {
-      const isMobile = window.innerWidth <= 768;
-      setIsMobileView(isMobile);
-      setIsMobileDevice(isMobile);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
   
   // Listen for openBuyModal event
   useEffect(() => {
@@ -242,33 +287,36 @@ export default function CarouselPage() {
       {/* Main carousel */}
       <CarouselComponent disableScrollControls={false} />
       
-      {/* Buy RL80 Button - Top Right */}
-      <div style={{
-        position: "fixed",
-        top: isMobileDevice ? "5.5rem" : "6rem",
-        right: "1.5rem",
-        zIndex: 298,
-        marginTop: '0rem',
-        overflow: 'visible',
-        // width: '9rem',
-        // height: '3rem'
-      }}>
+      {/* Buy RL80 Button */}
+      {deviceDetected && (
+        <div style={{
+          position: "fixed",
+          top: isMobileDevice ? "85%" : "6rem",
+          right: isMobileDevice ? "67%" : "1.5rem",
+          zIndex: 298,
+          marginTop: '0rem',
+          overflow: 'visible',
 
-        <div className="cyber-candle-btn" style={{ 
-          opacity: mounted ? 1 : 0, 
-          transition: 'opacity 0.3s',
-          position: 'relative',
-          display: 'inline-block'
         }}>
-          <CyberGlitchButton
-            text="Buy"
-            text2="RL80"
-            onClick={() => setShowBuyModal(true)}
-            label="RL80"
-            mobile={false}
-          />
+
+          <div className="cyber-candle-btn" style={{ 
+            opacity: mounted ? 1 : 0, 
+            transition: 'opacity 0.3s',
+            position: 'relative',
+            display: 'inline-block'
+          }}>
+            {console.log('Button render - isMobileDevice state:', isMobileDevice, 'Window width:', typeof window !== 'undefined' ? window.innerWidth : 'SSR', 'deviceDetected:', deviceDetected)}
+            <CyberGlitchButton
+              key={`button-${isMobileDevice}`}
+              text={t('buttons.buy') || 'Buy'}
+              text2="RL80"
+              onClick={() => setShowBuyModal(true)}
+              label="RL80"
+              mobile={isMobileDevice}
+            />
+          </div>
         </div>
-      </div>
+      )}
       
       {/* Tiny Candle Button with Glowing Arrow - Bottom Right */}
       <div 
@@ -556,7 +604,7 @@ export default function CarouselPage() {
       
       {/* Top Right Controls Container */}
       <div style={{
-        position: "fixed",
+        position: "absolute",
         top: "1rem",
         right: "1rem",
         zIndex: 300,
@@ -595,8 +643,8 @@ export default function CarouselPage() {
         onClose={() => setShowBuyModal(false)}
       />
       
-      {/* Our Lady of Perpetual Profit Logo - Top Left (Desktop) / RL80 (Mobile) - Using Portal to ensure it's on top */}
-      {typeof document !== 'undefined' && !isMobileView && createPortal(
+      {/* Our Lady of Perpetual Profit Logo - Top Left (Desktop/Tablet) - Using Portal to ensure it's on top */}
+      {typeof document !== 'undefined' && deviceDetected && !isMobileDevice && createPortal(
         <div style={{
           position: 'fixed',
           top: 0,
@@ -655,12 +703,16 @@ export default function CarouselPage() {
               margin: 0,
               pointerEvents: 'auto',
             }}>
-              <span  style={{ display: 'block',  marginLeft: isMobileDevice ? "0rem" : "-2rem",position: 'relative' }}>Our Lady</span>
+              <span  style={{ display: 'block',  marginLeft: isMobileDevice ? "0rem" : "-2rem",position: 'relative' }}>{t('heading.ourLady') || 'Our Lady'}</span>
               <span  style={{ display: 'block', position: 'relative' }}>
-                <span style={{ fontSize: isMobileDevice ? "1.2rem" : "1.3rem" }}>of    </span>
-                Perpetual
+                {t('heading.of') && t('heading.of') !== 'heading.of' && (
+                  <span style={{ fontSize: isMobileDevice ? "1.2rem" : "1.3rem" }}>{t('heading.of')}    </span>
+                )}
+                {t('heading.perpetual') || 'Perpetual'}
               </span>
-              <span  style={{ display: 'block', marginLeft: isMobileDevice ? "0rem" : "0rem", position: 'relative' }}>Profit</span>
+              {t('heading.profit') && t('heading.profit') !== 'heading.profit' && (
+                <span  style={{ display: 'block', marginLeft: isMobileDevice ? "0rem" : "0rem", position: 'relative' }}>{t('heading.profit')}</span>
+              )}
             </h1>
 
           </div>
@@ -669,7 +721,7 @@ export default function CarouselPage() {
       )}
       
       {/* RL80 Logo - Mobile Only - Using Portal */}
-      {typeof document !== 'undefined' && isMobileDevice && createPortal(
+      {typeof document !== 'undefined' && deviceDetected && isMobileDevice && createPortal(
         <div style={{
           position: "fixed",
           top: "20px", 

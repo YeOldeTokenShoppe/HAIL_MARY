@@ -5,39 +5,40 @@
 
   },
   "palmTreeDrive": {
-    "reality": "it's now\nREAL80",
+    "reality": "your\nreal80",
     "buyButton": "Buy",
     "about": "About",
     "tokenomics": "Tokenomics",
     "illuminati": "Illumin80",
-    "trade": "Trade",
+    "more": "More...",
     "stage1": {
-      "line1": "imagine the",
-      "line2": "possibility",
+      "line1": "DeFi",
+      "line2": "dreams",
       "line3": " "
     },
     "stage2": {
-      "line1": "of prosperity",
-      "line2": "with integrity",
+      "line1": "defies",
+      "line2": "author80",
       "line3": " "
     },
     "stage3": {
-      "line1": "that's not",
-      "line2": "fascist, baby",
+      "line1": "if character",
+      "line2": "is destiny",
       "line3": " "
     
     },
     "stage4": {
-      "line1": "using",
-      "line2": "benevolent",
-      "line3": "technology"
+      "line1": "this",
+      "line2": "could be",
+      "line3": " "
 
     },
     "stage5": {
-      "line1": " ",
-      "line2": " ",
+      "line1": "is now",
+      "line2": "REAL80",
       "line3": " "
-    }
+    },
+    "scrollPrompt": "scroll up to continue"
   },
   "navigation": {
   },
@@ -45,5 +46,60 @@
     "allRightsReserved": "All rights reserved",
     "privacyPolicy": "Privacy Policy",
     "termsOfService": "Terms of Service"
+  },
+  "buttons": {
+    "buy": "Buy"
+  },
+  "heading": {
+    "ourLady": "Our Lady",
+    "of": "of",
+    "perpetual": "Perpetual",
+    "profit": "Profit"
+  },
+  "carousel": {
+    "title": "Iconography",
+    "subtitle": "A visual canon of Our Lady of Perpetual Profit, from antiquity to the future.",
+    "captions": [
+      {
+        "year": "2200 BCE",
+        "location": "Fertile Crescent",
+        "description": "Driving back bear market"
+      },
+      {
+        "year": "1982 CE",
+        "location": "Los Angeles",
+        "description": "The Guardian of Good Times"
+      },
+      {
+        "year": "circa 1350–1450 CE",
+        "location": "Wartburg Castle, Thuringia",
+        "description": "Early clown encounter turns ugly"
+      },
+      {
+        "year": "2019 CE",
+        "location": "Tokyo",
+        "description": "Featured in popular manga series"
+      },
+      {
+        "year": "2081 CE",
+        "location": "Neo-Miami",
+        "description": "Laying down DeFi Beats"
+      },
+      {
+        "year": "2077 CE",
+        "location": "Night City",
+        "description": "Popular among cyberpunk-cyborgs"
+      },
+      {
+        "year": "87 CE",
+        "location": "Peloponnesian Peninsula",
+        "description": "Advising on making good choices"
+      },
+      {
+        "year": "4th century CE",
+        "location": "Transtiberim, Rome",
+        "description": "Patron of the arts - pre-meme era"
+      }
+    ]
   }
 }

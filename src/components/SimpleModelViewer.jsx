@@ -1416,7 +1416,6 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
         // Remove test element
         document.body.removeChild(testDiv);
         
-        // console.log('UnifrakturCook font loaded successfully');
         setFontLoaded(true);
         document.documentElement.classList.add('fonts-loaded');
       } catch (e) {
@@ -1520,7 +1519,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
       {windowWidth < 768 && !isLoading && (
         <div style={{
           position: 'absolute',
-          top: '4rem',
+          top: '2rem',
           left: '1rem',
           right: '1rem',
           zIndex: 100,
@@ -1542,7 +1541,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
             margin: 0,
             opacity: 1,
             visibility: 'visible'
-          }}>The Scrolls <br/>of St. GR80</h1>
+          }}>The <br/>Scrolls <span style={{fontSize: '1.5rem', position: 'relative', top: '-0.5rem', left: '-0.5rem'}}>of</span><br/>St. GR80</h1>
         </div>
       )}
       
@@ -1796,7 +1795,15 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
               : [4, 1, 5], 
             fov: isDesktop ? 40 : isTablet ? 45 : 50 
           }}
-          gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, alpha: true }}
+          gl={{ 
+            antialias: true, 
+            toneMapping: THREE.ACESFilmicToneMapping, 
+            alpha: true,  // Keep alpha for compatibility
+            premultipliedAlpha: true,  // Standard alpha handling
+            preserveDrawingBuffer: false,
+            failIfMajorPerformanceCaveat: false,
+            powerPreference: "high-performance"
+          }}
         >
         <ambientLight intensity={0.2} />
         {/* Multiple point lights around the cylinder */}

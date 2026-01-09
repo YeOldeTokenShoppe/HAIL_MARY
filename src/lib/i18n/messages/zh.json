@@ -2,37 +2,38 @@
   "home": {
   },
   "palmTreeDrive": {
-    "reality": "现在就是\n现实",
+    "reality": "你的\n现实",
     "buyButton": "购买",
     "about": "关于",
     "tokenomics": "代币经济",
     "illuminati": "光明会",
-    "trade": "交易",
+    "more": "更多...",
     "stage1": {
-      "line1": "想象",
-      "line2": "可能性",
+      "line1": "去中心化",
+      "line2": "金融梦想",
       "line3": " "
     },
     "stage2": {
-      "line1": "繁荣",
-      "line2": "与诚信",
+      "line1": "挑战",
+      "line2": "权威",
       "line3": " "
     },
     "stage3": {
-      "line1": "这不是",
-      "line2": "法西斯，宝贝",
+      "line1": "如果品格",
+      "line2": "即是命运",
       "line3": " "
     },
     "stage4": {
-      "line1": "使用",
-      "line2": "仁慈的",
-      "line3": "技术"
+      "line1": "这",
+      "line2": "可能是",
+      "line3": " "
     },
     "stage5": {
-      "line1": " ",
-      "line2": " ",
+      "line1": "现在是",
+      "line2": "现实",
       "line3": " "
-    }
+    },
+    "scrollPrompt": "向上滚动继续"
   },
   "navigation": {
   },
@@ -40,5 +41,60 @@
     "allRightsReserved": "版权所有",
     "privacyPolicy": "隐私政策",
     "termsOfService": "服务条款"
+  },
+  "buttons": {
+    "buy": "购买"
+  },
+  "heading": {
+    "ourLady": "永恒利润",
+    "of": "之",
+    "perpetual": "圣母",
+    "profit": ""
+  },
+  "carousel": {
+    "title": "圣像学",
+    "subtitle": "永恒利润圣母的视觉经典，从古代到未来。",
+    "captions": [
+      {
+        "year": "公元前2200年",
+        "location": "新月沃土",
+        "description": "击退熊市"
+      },
+      {
+        "year": "公元1982年",
+        "location": "洛杉矶",
+        "description": "美好时光的守护者"
+      },
+      {
+        "year": "约1350-1450年",
+        "location": "瓦尔特堡城堡，图林根",
+        "description": "早期小丑遭遇变得丑陋"
+      },
+      {
+        "year": "公元2019年",
+        "location": "东京",
+        "description": "出现在热门漫画系列中"
+      },
+      {
+        "year": "公元2081年",
+        "location": "新迈阿密",
+        "description": "奠定DeFi节拍"
+      },
+      {
+        "year": "公元2077年",
+        "location": "夜之城",
+        "description": "在赛博朋克机械人中流行"
+      },
+      {
+        "year": "公元87年",
+        "location": "伯罗奔尼撒半岛",
+        "description": "关于做出正确选择的建议"
+      },
+      {
+        "year": "4世纪",
+        "location": "罗马台伯河外区",
+        "description": "前表情包时代的艺术赞助人"
+      }
+    ]
   }
 }

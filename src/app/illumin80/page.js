@@ -83,6 +83,15 @@ export default function ShrinePage() {
 
   // Set mounted state after hydration and handle loading
   useEffect(() => {
+    // Check mobile status immediately before mounting
+    const checkMobile = () => {
+      const isMobile = window.innerWidth <= 768;
+      setIsMobileView(isMobile);
+      setIsMobileDevice(isMobile);
+    };
+    checkMobile();
+    
+    // Then mount and load assets
     setMounted(true);
     
     // Preload critical shrine assets
@@ -230,10 +239,13 @@ export default function ShrinePage() {
           />
         </Suspense>
       </div>
-      <ShrineLeftPanel 
-        is80sMode={is80sMode}
-        isMobile={isMobileView}
-        onLightCandle={() => {
+      
+      {/* Only render ShrineLeftPanel on desktop/tablet after we know device type */}
+      {mounted && !isMobileView && (
+        <ShrineLeftPanel 
+          is80sMode={is80sMode}
+          isMobile={false}
+          onLightCandle={() => {
           // Create a new offering
           const messages = [
             'Please pump my bags to the moon 🚀',
@@ -262,7 +274,8 @@ export default function ShrinePage() {
           }
         }}
         router={router}
-      />
+        />
+      )}
       
       {/* Mobile CTA and Matchstick - Minimal Floating Design */}
       {isMobileView && (
@@ -829,7 +842,7 @@ export default function ShrinePage() {
               cursor: "pointer",
             }}
           >
-            <Link href="/carousel" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
+            <Link href="/about" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
               RL80
             </Link>
             {Array.from({length: 100}).map((_, i) => {

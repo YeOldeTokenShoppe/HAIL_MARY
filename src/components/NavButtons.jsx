@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from './LanguageProvider';
+import CyberNav from './CyberNav';
+import Link from 'next/link';
 
 
 const NavButtons = () => {
   const { t } = useLanguage();
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [isCyberNavOpen, setIsCyberNavOpen] = useState(false);
   
   const navItems = [
     { label: t('palmTreeDrive.about'), icon: '/images/ROSE_TATTOO.webp', href: '/about' },
     { label: t('palmTreeDrive.tokenomics'), icon: '/images/DIAMOND_TATTOO.webp', href: '/tokenomics' },
-    { label: t('palmTreeDrive.illuminati'), icon: '/images/ILLUMIN80_TATTOO.webp', href: '/illumin80' },
-    { label: t('palmTreeDrive.trade'), icon: '/images/3ACES_TATTOO.webp', href: '/trade-school' },
+    { label: t('The Illumin80'), icon: '/images/ILLUMIN80_TATTOO.webp', href: '/illumin80' },
+    { label: t('palmTreeDrive.more'), icon: '/images/3ACES_TATTOO.webp', href: null, openCyberNav: true },
   ];
 
   useEffect(() => {
@@ -23,34 +26,74 @@ const NavButtons = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  const handleItemClick = (e, item) => {
+    if (item.openCyberNav) {
+      e.preventDefault();
+      setIsCyberNavOpen(true);
+    }
+  };
+
   return (
-    <nav style={{
-      ...styles.navRow,
-      ...(isMobile ? styles.navRowMobile : {}),
-    }}>
-      {navItems.map((item, index) => (
-        <a
-          key={item.label}
-          href={item.href}
-          style={{
-            ...styles.navBtn,
-            ...(hoveredIndex === index ? styles.navBtnHover : {}),
-          }}
-          onMouseEnter={() => setHoveredIndex(index)}
-          onMouseLeave={() => setHoveredIndex(null)}
-        >
-          <span
-            style={{
-              ...styles.label,
-              ...(isMobile ? styles.labelMobile : {}),
-              ...(hoveredIndex === index ? styles.labelHover : {}),
-            }}
-          >
-            {item.label}
-          </span>
-        </a>
-      ))}
-    </nav>
+    <>
+      <nav style={{
+        ...styles.navRow,
+        ...(isMobile ? styles.navRowMobile : {}),
+      }}>
+        {navItems.map((item, index) => (
+          item.href ? (
+            <Link
+              key={item.label}
+              href={item.href}
+              style={{
+                ...styles.navBtn,
+                ...(hoveredIndex === index ? styles.navBtnHover : {}),
+              }}
+              onMouseEnter={() => setHoveredIndex(index)}
+              onMouseLeave={() => setHoveredIndex(null)}
+            >
+              <span
+                style={{
+                  ...styles.label,
+                  ...(isMobile ? styles.labelMobile : {}),
+                  ...(hoveredIndex === index ? styles.labelHover : {}),
+                }}
+              >
+                {item.label}
+              </span>
+            </Link>
+          ) : (
+            <button
+              key={item.label}
+              style={{
+                ...styles.navBtn,
+                ...(hoveredIndex === index ? styles.navBtnHover : {}),
+                background: 'none',
+                border: 'none',
+                font: 'inherit',
+              }}
+              onClick={(e) => handleItemClick(e, item)}
+              onMouseEnter={() => setHoveredIndex(index)}
+              onMouseLeave={() => setHoveredIndex(null)}
+            >
+              <span
+                style={{
+                  ...styles.label,
+                  ...(isMobile ? styles.labelMobile : {}),
+                  ...(hoveredIndex === index ? styles.labelHover : {}),
+                }}
+              >
+                {item.label}
+              </span>
+            </button>
+          )
+        ))}
+      </nav>
+      <CyberNav 
+        isOpen={isCyberNavOpen}
+        onClose={() => setIsCyberNavOpen(false)}
+        showButton={false}
+      />
+    </>
   );
 };
 
@@ -90,7 +133,7 @@ const styles = {
     fontWeight: 'bold',
   },
   labelMobile: {
-    fontSize: '0.95rem',
+    fontSize: '1.1rem',
     textShadow: '0 0 15px rgba(255, 0, 238, 0.9), 0 0 30px rgba(255, 0, 238, 0.6), 2px 2px 3px rgba(255, 0, 238, 0.4)',
   },
   labelHover: {

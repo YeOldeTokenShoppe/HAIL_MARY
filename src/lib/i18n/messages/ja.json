@@ -2,37 +2,38 @@
   "home": {
   },
   "palmTreeDrive": {
-    "reality": "今こそ\n現実",
+    "reality": "あなたの\n現実",
     "buyButton": "購入",
     "about": "概要",
     "tokenomics": "トークノミクス",
     "illuminati": "イルミナティ",
-    "trade": "取引",
+    "more": "もっと...",
     "stage1": {
-      "line1": "想像して",
-      "line2": "可能性を",
+      "line1": "ディーファイ",
+      "line2": "夢",
       "line3": " "
     },
     "stage2": {
-      "line1": "誠実さと",
-      "line2": "繁栄を",
+      "line1": "権威に",
+      "line2": "挑戦",
       "line3": " "
     },
     "stage3": {
-      "line1": "ファシスト",
-      "line2": "じゃないよ、ベイビー",
+      "line1": "性格が",
+      "line2": "運命なら",
       "line3": " "
     },
     "stage4": {
-      "line1": "慈悲深い",
-      "line2": "テクノロジーを",
-      "line3": "使って"
+      "line1": "これが",
+      "line2": "そうかも",
+      "line3": " "
     },
     "stage5": {
-      "line1": " ",
-      "line2": " ",
+      "line1": "今は",
+      "line2": "現実",
       "line3": " "
-    }
+    },
+    "scrollPrompt": "上にスクロールして続ける"
   },
   "navigation": {
   },
@@ -40,5 +41,60 @@
     "allRightsReserved": "全著作権所有",
     "privacyPolicy": "プライバシーポリシー",
     "termsOfService": "利用規約"
+  },
+  "buttons": {
+    "buy": "購入"
+  },
+  "heading": {
+    "ourLady": "永遠なる利益の",
+    "of": "",
+    "perpetual": "聖母",
+    "profit": ""
+  },
+  "carousel": {
+    "title": "聖像学",
+    "subtitle": "永遠なる利益の聖母の視覚的典範、古代から未来まで。",
+    "captions": [
+      {
+        "year": "紀元前2200年",
+        "location": "肥沃な三日月地帯",
+        "description": "弱気相場を撃退"
+      },
+      {
+        "year": "西暦1982年",
+        "location": "ロサンゼルス",
+        "description": "良き時代の守護者"
+      },
+      {
+        "year": "約1350-1450年",
+        "location": "ヴァルトブルク城、テューリンゲン",
+        "description": "道化師との初期の遭遇が醜くなる"
+      },
+      {
+        "year": "西暦2019年",
+        "location": "東京",
+        "description": "人気マンガシリーズに登場"
+      },
+      {
+        "year": "西暦2081年",
+        "location": "ネオ・マイアミ",
+        "description": "ディーファイ・ビートを刻む"
+      },
+      {
+        "year": "西暦2077年",
+        "location": "ナイトシティ",
+        "description": "サイバーパンク・サイボーグの間で人気"
+      },
+      {
+        "year": "西暦87年",
+        "location": "ペロポネソス半島",
+        "description": "正しい選択についての助言"
+      },
+      {
+        "year": "4世紀",
+        "location": "トランスティベリム、ローマ",
+        "description": "ミーム以前の時代の芸術の後援者"
+      }
+    ]
   }
 }
