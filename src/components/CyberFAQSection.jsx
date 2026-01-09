@@ -23,130 +23,94 @@ export default function CyberFAQSection({ isMobile = false }) {
       title: 'What is RL80"?',
       response: ` ACCESSING DATABASE... 
       
-Our flagship protocol combines cutting-edge DeFi technology with divine inspiration. Built on immutable smart contracts, it offers unparalleled staking rewards and community governance.
+RL80 is the on-chain expression of Our Lady of Perpetual Profit—a watcher of markets across centuries, now instantiated in code.
+It uses transparent mechanics, community participation, and creative presentation to explore how trust, incentives, and belief systems shape financial behavior.
 
-Key features include:
-• Automated yield optimization
-// • Sacred tokenomics blessed by Our Lady
-• Intuitive interface for both degens and normies
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque sed porta tortor, vel pellentesque felis. Fusce nibh neque, posuere sit amet lobortis id, lacinia eget velit. Nulla eget metus laoreet, semper arcu et, mollis sem. Vestibulum diam turpis, euismod in pharetra eget, gravida ut purus.`,
+`,
       status: '[DATA.RETRIEVED]',
       subQuestions: [
         {
           id: 'SUB_001_A',
-          command: '>> SUB.QUERY: Tokenomics.Details',
-          title: 'What are the tokenomics?',
-          response: `LOADING TOKENOMICS MODULE...
+          command: '>> SUB.QUERY: Utility.Details',
+          title: 'What can I do with RL80?',
+          response: `LOADING UTILITY MODULE...
 
-Total Supply: 1,000,000,000 RL80
-Initial Distribution:
-• 40% - Community rewards & staking
-• 25% - Liquidity pools
-• 20% - Treasury (time-locked)
-• 10% - Team (vested 2 years)
-• 5% - Marketing & partnerships
+You can simply hold RL80, or you can actively engage with its features.
+Nothing is required, and no action is framed as an obligation. The system is designed so that meaning and utility emerge from how the community chooses to participate.
+Depending on how you choose to engage, RL80 allows you to:
+	•	Hold as a long-term signal of alignment
+	•	Stake to participate in rewards
+	•	Burn tokens for symbolic acts, recognition, or access to special features
+	•	Interact with creative, on-chain displays that reflect community activity
 
-Deflationary mechanics with 2% burn on transfers
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed pellentesque laoreet ex, a condimentum mi fringilla non. Nunc porttitor, augue eget condimentum vulputate, dolor felis mollis odio, ac feugiat lacus nulla euismod odio.`,
-          status: '[TOKENOMICS.LOADED]'
+`,
+          status: '[UTILITY.LOADED]'
         },
         {
           id: 'SUB_001_B',
-          command: '>> SUB.QUERY: Contract.Addresses',
-          title: 'What are the contract addresses?',
-          response: `FETCHING CONTRACT DATA...
+          command: '>> SUB.QUERY: Memetic.value',
+          title: 'IS RL80 a meme token?',
+          response: `FETCHING META NARRATIVE...
 
-Main Contract: 0x8080...RL80 (Ethereum)
-Staking Contract: 0x7777...STAKE
-Liquidity Pool: Uniswap V3
-Bridge Contract: 0x9999...BRIDGE
+          While RL80 embraces humor, myth, and iconography, the project prioritizes interaction, longevity, and system behavior over attention cycles.
 
-All contracts audited by CertiK and Quantstamp`,
-          status: '[CONTRACTS.VERIFIED]'
+          RL80 offers what might be called 'light utility'.
+          Its ritual burning mechanism and visible acts of participation add light to a shared digital shrine—small gestures of intention made within a system that, like markets themselves, often feels unseen, impersonal, and beyond individual control.`,
+          status: '[NARRATIVE.DEFINED]'
         },
         {
           id: 'SUB_001_C',
-          command: '>> SUB.QUERY: Tech.Stack',
-          title: 'What technology powers RL80?',
-          response: `ANALYZING TECH INFRASTRUCTURE...
+          command: '>> SUB.QUERY: BURN.Mechanism',
+          title: 'Why would I burn RL80 tokens?',
+          response: `ANALYZING IGNITION MECHANISM...
 
-Built on:
-• Ethereum blockchain (ERC-20)
-• Solidity 0.8.19
-• OpenZeppelin contracts v4.9
-• Chainlink oracles for price feeds
-• IPFS for metadata storage
-• Layer 2 integration via Arbitrum`,
-          status: '[TECH.ANALYZED]'
+      Burning is the primary utility of RL80.
+
+      It serves as a way to clarify intention through action. Any amount may be burned—participation is intentionally accessible, inexpensive, and voluntary. What matters is not scale, but presence.
+
+      The act parallels traditional candle votives offered to the Virgin Mary: a small, personal gesture made visible within a shared space. In RL80, each burn adds light to the shrine.
+
+      Every burn permanently reduces the fixed token supply. In doing so, an offering becomes a universal goodwill gesture—one that strengthens the system for all participants rather than extracting value from others.
+
+      On the Illumin80 page, the total number of candles burning and tokens burned to date form a living display of collective engagement—a quiet, real-time signal of sentiment, conviction, and attention over time.
+`,
+          status: '[MECHANISM.ANALYZED]'
         }
       ]
     },
     {
       id: 'QUERY_002', 
-      command: '> QUERY: Security.Details',
-      title: 'Trust, Safety, & Transparency',
-      response: ` LOADING SECURITY MODULE...
+      command: '> QUERY: Special.Status',
+      title: 'What is The Illumin80?',
+      response: ` LOADING LUMINARY MODULE...
 
-Digital assets are delivered instantly to your wallet address. No physical shipping required. 
+The Illumin80 refers to participants who have chosen to actively engage with RL80 by staking or burning tokens.
 
-Transaction details:
-• Instant blockchain confirmation
-• Gas-optimized smart contracts
-• Real-time tracking via Etherscan
-• 24/7 availability across all timezones
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum lorem tortor, suscipit porta ex vestibulum, vulputate ultrices neque. Donec eleifend ex ultrices quam finibus euismod nec ac sem. Pellentesque sed porta tortor, vel pellentesque felis.`,
-      status: '[PROTOCOL.ACTIVE]',
+`,
+      status: '[REQUIREMENTS.LISTED]',
       subQuestions: [
         {
           id: 'SUB_002_A',
-          command: '>> SUB.QUERY: Audit.Reports',
-          title: 'What security audits have been performed?',
-          response: `RETRIEVING AUDIT RECORDS...
+          command: '>> SUB.QUERY: Burn.Protocol',
+          title: 'How do I burn a candle?',
+          response: `RETRIEVING INSTRUCTIONS...
 
-Completed Audits:
-• CertiK - Full smart contract audit (Score: 95/100)
-• Quantstamp - Security assessment passed
-• PeckShield - DeFi vulnerability scan clear
-• Halborn - Penetration testing complete
-
-All reports publicly available on GitHub
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce nibh neque, posuere sit amet lobortis id, lacinia eget velit. Nulla eget metus laoreet, semper arcu et, mollis sem.`,
-          status: '[AUDITS.VERIFIED]'
+To burn a candle, visit the /illumin80 page and follow the on-screen steps.
+Detailed burning instructions are available below.
+`,
+          status: '[INSTRUCTIONS.LISTED]'
         },
         {
           id: 'SUB_002_B',
-          command: '>> SUB.QUERY: Risk.Management',
-          title: 'How are user funds protected?',
-          response: `INITIALIZING SAFETY PROTOCOLS...
-
-Protection Measures:
-• Multi-signature treasury (3/5 signers required)
-• Time-locked withdrawals (48hr delay)
-• Emergency pause functionality
-• Insurance fund (5% of fees)
-• Regular security updates
-• Bug bounty program up to $100k`,
-          status: '[SAFETY.ENGAGED]'
+          command: '>> SUB.QUERY: Staking.Protocol',
+          title: 'How do I stake RL80?',
+          response: `CREATING SUMMARY...
+Staking RL80 allows you to participate in longer-term system mechanics.
+Detailed staking instructions are available in the next module.
+`,
+          status: '[INSTRUCTIONS.SUMMARIZED]'
         },
-        {
-          id: 'SUB_002_C',
-          command: '>> SUB.QUERY: Transparency.Metrics',
-          title: 'How transparent is the protocol?',
-          response: `ACCESSING TRANSPARENCY DATA...
 
-Full Transparency:
-• Open-source code on GitHub
-• Real-time analytics dashboard
-• Weekly community updates
-• Monthly financial reports
-• All team wallets public
-• Governance votes on-chain`,
-          status: '[TRANSPARENCY.100%]'
-        }
       ]
     },
     {
@@ -155,66 +119,81 @@ Full Transparency:
       title: 'Staking & Rewards',
       response: ` ACCESSING STAKING PROTOCOL...
 
-All transactions are final and immutable on the blockchain. However, our Lady provides spiritual returns that are infinite.
+Staking lets you deposit RL80 into the staking vault to participate in the system’s reward stream. While staked, your tokens remain yours, but they are locked in the staking contract until your unlock period ends.
 
-Policy highlights:
-• Permanent value accrual through staking
-• Community support available 24/7
-• Bug bounty program for protocol improvements
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum diam turpis, euismod in pharetra eget, gravida ut purus. Sed pellentesque laoreet ex, a condimentum mi fringilla non.`,
+`,
       status: '[TERMS.LOADED]',
       subQuestions: [
         {
           id: 'SUB_003_A',
           command: '>> SUB.QUERY: APY.Current',
           title: 'What are the current staking returns?',
-          response: `CALCULATING CURRENT APY...
+          response: `CALCULATING ...
+          
+RL80 staking does not offer a fixed or guaranteed rate of return.
 
-Staking Tiers:
-• Bronze (1k+ RL80): 15% APY
-• Silver (10k+ RL80): 25% APY
-• Gold (100k+ RL80): 40% APY
-• Divine (1M+ RL80): 80% APY
+Rewards are paid in ETH and depend on how much ETH is routed into the staking contract from the RL80 tax and rewards infrastructure. The amount you earn is proportional to your share of the total staked supply and the timing of distributions—but it is not a set yield like a bank interest rate.
 
-Compounded daily, rewards in RL80
-No lock-up period required
+Because rewards come from real on-chain activity (e.g., taxes converted to ETH via the rewards splitter), the effective return can vary over time and is influenced by market conditions and token flow.
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nunc porttitor, augue eget condimentum vulputate, dolor felis mollis odio, ac feugiat lacus nulla euismod odio. Vestibulum lorem tortor, suscipit porta ex vestibulum.`,
-          status: '[APY.CALCULATED]'
+You can view your pending rewards in the staking interface before claiming.
+
+ `,
+          status: '[REWARDS.CALCULATED]'
         },
         {
           id: 'SUB_003_B',
           command: '>> SUB.QUERY: Rewards.Distribution',
-          title: 'How are rewards distributed?',
+          title: 'Where do staking rewards come from?',
           response: `LOADING DISTRIBUTION LOGIC...
 
-Reward Sources:
-• 50% from protocol fees
-• 30% from liquidation penalties
-• 20% from partner protocols
-
-Distribution:
-• Automatic daily compounding
-• Claimable anytime
-• No withdrawal fees`,
+Staking rewards are paid in ETH. ETH is routed into the staking contract from RL80’s tax flow via a distributor module that swaps collected RL80 for ETH and forwards a share to stakers.
+`,
           status: '[DISTRIBUTION.ACTIVE]'
         },
         {
           id: 'SUB_003_C',
-          command: '>> SUB.QUERY: Boost.Mechanisms',
-          title: 'How can I boost my rewards?',
-          response: `ANALYZING BOOST OPTIONS...
+          command: '>> SUB.QUERY: Reward.Mechanism',
+          title: 'How are rewards calculated?',
+          response: `ANALYZING ...
 
-Reward Multipliers:
-• NFT holders: +10% boost
-• LP providers: +15% boost
-• Governance participants: +5% boost
-• Referral program: +2% per referral
-• Long-term staking (90+ days): +20%
+Rewards are distributed proportionally based on how much RL80 you have staked and for how long. The contract uses a cumulative per-token accounting model so rewards remain fair across deposits and withdrawals.
 
-Boosts stack up to 50% maximum`,
-          status: '[BOOSTS.AVAILABLE]'
+ `,
+          status: '[REWARDS.CALCULATED]'
+        },
+                {
+          id: 'SUB_003_D',
+          command: '>> SUB.QUERY: LOCK.Mechanism',
+          title: 'Is there a lockup?',
+          response: `ANALYZING ...
+
+Yes. Staked RL80 has a 7-day lock. Staking again extends your unlock time forward.
+ `,
+          status: '[LOCKUP.CLARIFIED]'
+        }
+        ,
+                {
+          id: 'SUB_003_E',
+          command: '>> SUB.QUERY: CLAIM.Mechanism',
+          title: 'When can I claim?',
+          response: `ANALYZING ...
+
+You can claim at any time while the contract is active, as long as your claim meets the minimum claim threshold (to reduce gas-inefficient micro-claims).
+ `,
+          status: '[REWARDS.CALCULATED]'
+        }
+        ,
+                {
+          id: 'SUB_003_F',
+          command: '>> SUB.QUERY: CLAIM.Mechanism',
+          title: 'What happens if rewards arrive when TVL is low?',
+          response: `ANALYZING ...
+
+Yes. You can claim your staking rewards whenever you choose, as long as your accrued rewards meet the minimum claim amount.
+
+Because claiming requires an on-chain transaction, a minimum threshold is used to help prevent gas-inefficient micro-claims. You remain in full control of when to claim. `,
+          status: '[REWARDS.CALCULATED]'
         }
       ]
     },
@@ -223,28 +202,29 @@ Boosts stack up to 50% maximum`,
       command: '> QUERY: Burn.Protocol',
       title: 'Candle Burning',
       response: ` INITIALIZING METANARRATIVE...
+To burn a candle, visit the /illumin80 page and follow the on-screen steps.
+Burning RL80 is optional and accessible—any amount may be burned to participate. Each burn lights a candle and adds your message to the shrine.
 
-Accepted currencies:
-• ETH (Ethereum)
-• USDC / USDT / DAI
-• Credit card via third-party providers
-• All transactions secured by blockchain cryptography`,
-      status: '[GATEWAY.READY]',
+Each candle burns for 7 days.
+
+Only one candle may be active per wallet at a time.
+If you burn again before your candle expires, your new candle replaces the existing one—renewing your light rather than stacking visibility.
+      `,
+      status: '[PROTOCOL.READY]',
       subQuestions: [
         {
           id: 'SUB_004_A',
           command: '>> SUB.QUERY: Burn.Mechanics',
           title: 'How does the burn mechanism work?',
           response: `LOADING BURN PROTOCOL...
+        
+When RL80 tokens are burned, they are sent to the 0x000… address (often called the burn address).
 
-Burn Mechanics:
-• 2% of every transaction burned forever
-• Weekly community burn events
-• 50% of penalty fees burned
-• Deflationary supply model
+This address has no private key and cannot be accessed by anyone. Tokens sent there are permanently removed from circulation and cannot be recovered, spent, or reassigned.
 
-Total Burned: 42,080,000 RL80
-Burn rate increasing monthly`,
+Burning is irreversible by design.
+
+`,
           status: '[BURN.ACTIVE]'
         },
         {
@@ -254,14 +234,13 @@ Burn rate increasing monthly`,
           response: `ACCESSING SACRED PROTOCOLS...
 
 Digital Candle Ritual:
-• Each burn represents a prayer
+• Each candle represents a prayer, confession, or appreciation
 • Community intentions amplified
-• Sacred geometry in burn patterns
-• Aligned with lunar cycles
-• Blessed by Our Lady's grace
+• Sentiment analysis provided by visual display and statistical summary, as well as a periodic AI analysis of general message content.
 
 Spiritual ROI: ∞`,
-          status: '[RITUAL.BLESSED]'
+
+          status: '[RITUAL.CONFIRMATION]'
         },
         {
           id: 'SUB_004_C',
@@ -276,150 +255,25 @@ Deflationary Effects:
 • Holder value appreciation
 • Sustainable tokenomics
 
-Projected supply in 2025: 800M RL80`,
+INITIAL SUPPLY: 80B RL80`,
           status: '[IMPACT.POSITIVE]'
-        }
-      ]
-    },
-    {
-      id: 'QUERY_005',
-      command: '> QUERY: Multi-Agent.Cooperative',
-      title: 'Trading Desk',
-      response: ` LOADING TRADING SYSTEM ...
-
-Smart contracts are audited and verified. Your investment is protected by:
-• Multi-sig treasury
-• Time-locked liquidity
-• Community governance
-• Divine providence of Our Lady`,
-      status: '[WARRANTY.ACTIVE]',
-      subQuestions: [
-        {
-          id: 'SUB_005_A',
-          command: '>> SUB.QUERY: Trading.Strategies',
-          title: 'What trading strategies are available?',
-          response: `ANALYZING TRADING ALGORITHMS...
-
-Available Strategies:
-• DCA (Dollar Cost Averaging)
-• Grid trading bot
-• Arbitrage detection
-• Liquidity provision auto-balancer
-• Stop-loss/Take-profit automation
-• AI sentiment-based trading`,
-          status: '[STRATEGIES.LOADED]'
-        },
-        {
-          id: 'SUB_005_B',
-          command: '>> SUB.QUERY: Bot.Performance',
-          title: 'How do the trading bots perform?',
-          response: `FETCHING PERFORMANCE DATA...
-
-Historical Performance:
-• Average monthly return: 12-18%
-• Win rate: 73%
-• Maximum drawdown: 15%
-• Sharpe ratio: 2.4
-• Active traders: 4,200+
-
-Past performance ≠ future results`,
-          status: '[PERFORMANCE.TRACKED]'
-        },
-        {
-          id: 'SUB_005_C',
-          command: '>> SUB.QUERY: Fee.Structure',
-          title: 'What are the trading fees?',
-          response: `LOADING FEE SCHEDULE...
-
-Trading Desk Fees:
-• Spot trading: 0.1%
-• Bot usage: 20% of profits
-• No subscription fees
-• Gas costs optimized
-• Volume discounts available
-• RL80 holders: 50% fee reduction`,
-          status: '[FEES.DISPLAYED]'
-        }
-      ]
-    },
-        {
-      id: 'QUERY_006',
-      command: '> QUERY: Charity.module',
-      title: 'Charity',
-      response: ` CONNECTING TO CHARITY SYSTEM..
-
-Our protocol dedicates resources to meaningful causes:
-• 5% of protocol fees to charity
-• Community-voted recipients
-• Transparent on-chain donations
-• Monthly impact reports
-
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque sed porta tortor, vel pellentesque felis. Fusce nibh neque, posuere sit amet lobortis id, lacinia eget velit. Nulla eget metus laoreet, semper arcu et, mollis sem.`,
-      status: '[SUPPORT.ONLINE]',
-      subQuestions: [
-        {
-          id: 'SUB_006_A',
-          command: '>> SUB.QUERY: Charity.Programs',
-          title: 'What charitable initiatives exist?',
-          response: `LOADING CHARITY MODULE...
-
-Active Programs:
-• 5% of fees to selected charities
-• Monthly community vote on recipients
-• Disaster relief fund
-• Education sponsorships
-• Open-source development grants
-
-Total donated: $2.8M USD`,
-          status: '[CHARITY.ACTIVE]'
-        },
-        {
-          id: 'SUB_006_B',
-          command: '>> SUB.QUERY: Impact.Metrics',
-          title: 'What is the social impact?',
-          response: `CALCULATING IMPACT METRICS...
-
-Community Impact:
-• 15 schools funded
-• 500+ developers supported
-• 10,000 meals provided
-• 50 wells built in Africa
-• 100% transparent allocation
-• Verified by third-party auditors`,
-          status: '[IMPACT.MEASURED]'
-        },
-        {
-          id: 'SUB_006_C',
-          command: '>> SUB.QUERY: Participation.Guide',
-          title: 'How can I participate in charity?',
-          response: `ACCESSING PARTICIPATION PROTOCOLS...
-
-Get Involved:
-• Stake RL80 for automatic contribution
-• Vote on charity proposals
-• Submit new charity candidates
-• Join volunteer programs
-• NFT charity auctions
-• Direct donation matching`,
-          status: '[PARTICIPATION.OPEN]'
         }
       ]
     },
     
     {
-      id: 'QUERY_007',
+      id: 'QUERY_005',
       command: '> QUERY: Legal.Compliance',
-      title: 'Legal',
+      title: 'Legal and Tax Info',
       response: ` CONNECTING TO LEGAL ADVISOR..
 
 Legal framework and compliance:
-• Fully compliant with DeFi regulations
-• KYC/AML procedures in place
-• Regular legal audits
-• Terms of service enforced
-• Privacy policy GDPR compliant
 
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla eget metus laoreet, semper arcu et, mollis sem. Vestibulum lorem tortor, suscipit porta ex vestibulum, vulputate ultrices neque. Donec eleifend ex ultrices quam finibus euismod nec ac sem.`,
+
+• Terms of service enforced
+
+
+ `,
       status: '[SUPPORT.ONLINE]',
       subQuestions: [
         {
@@ -428,13 +282,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla eget metus laoree
           title: 'What is the regulatory compliance?',
           response: `CHECKING COMPLIANCE STATUS...
 
-Regulatory Compliance:
-• SEC no-action letter pending
-• FinCEN MSB registered
-• EU MiCA compliant
-• KYC/AML procedures active
-• Legal opinions obtained
-• Jurisdictional restrictions applied`,
+`,
           status: '[COMPLIANCE.VERIFIED]'
         },
         {
@@ -445,11 +293,9 @@ Regulatory Compliance:
 
 Key Terms:
 • 18+ years required
-• Non-US persons only
 • No financial advice provided
 • User assumes all risks
-• Arbitration clause included
-• Governed by Cayman law`,
+`,
           status: '[TERMS.DISPLAYED]'
         },
         {
@@ -460,11 +306,9 @@ Key Terms:
 
 Data Protection:
 • No personal data stored on-chain
-• GDPR compliant
-• End-to-end encryption
 • No data sold to third parties
 • Right to deletion honored
-• Regular security audits`,
+`,
           status: '[PRIVACY.SECURED]'
         }
       ]

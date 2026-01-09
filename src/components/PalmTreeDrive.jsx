@@ -1346,9 +1346,6 @@ const PalmsScene = ({ onLoadingChange }) => {
             // console.log('Found Display mesh, applying video texture'); 
             child.material = new THREE.MeshBasicMaterial({
               map: videoTexture,
-              emissiveMap: videoTexture,
-              emissive: new THREE.Color(0xffffff),
-              emissiveIntensity: 1,
               transparent: true,
               opacity: 1
             });

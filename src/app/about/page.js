@@ -81,7 +81,6 @@ export default function CarouselPage() {
     // Fallback timeout in case images take too long
     const fallbackTimer = setTimeout(() => {
       if (isLoading) {
-        console.warn('Image loading timeout - proceeding anyway');
         setIsLoading(false);
       }
     }, 10000); // 10 second max wait
@@ -109,14 +108,10 @@ export default function CarouselPage() {
       // Mobile view for other UI elements
       const isMobileView = width <= 1024 && !isIPad
       
-      console.log('Detection - Width:', width, 'Height:', height, 'Portrait:', isPortrait)
-      console.log('isIPad:', isIPad, 'isTabletPortrait:', isTabletPortrait, 'isPhone:', isPhone)
-      console.log('Setting isMobileDevice to:', isPhone)
       
       // Only phones get mobile treatment, not tablets even in portrait
       setIsMobileDevice(prevState => {
         if (prevState !== isPhone) {
-          console.log('Updating isMobileDevice from', prevState, 'to', isPhone)
         }
         return isPhone
       })
@@ -138,10 +133,7 @@ export default function CarouselPage() {
     }
   }, [])
 
-  // Debug effect to track isMobileDevice state changes
-  useEffect(() => {
-    console.log('isMobileDevice state changed to:', isMobileDevice)
-  }, [isMobileDevice])
+
 
   // Check if font is loaded and add fonts-loaded class
   useEffect(() => {
@@ -161,10 +153,7 @@ export default function CarouselPage() {
     checkFont();
   }, []);
   
-  // Debug logging
-  // useEffect(() => {
-  //   console.log('RL80 Logo state:', { fontLoaded, isMobileView });
-  // }, [fontLoaded, isMobileView]);
+
   
   // Listen for openBuyModal event
   useEffect(() => {
@@ -305,7 +294,6 @@ export default function CarouselPage() {
             position: 'relative',
             display: 'inline-block'
           }}>
-            {console.log('Button render - isMobileDevice state:', isMobileDevice, 'Window width:', typeof window !== 'undefined' ? window.innerWidth : 'SSR', 'deviceDetected:', deviceDetected)}
             <CyberGlitchButton
               key={`button-${isMobileDevice}`}
               text={t('buttons.buy') || 'Buy'}

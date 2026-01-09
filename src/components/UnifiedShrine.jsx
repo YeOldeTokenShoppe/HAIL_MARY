@@ -282,12 +282,10 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   useEffect(() => {
     // Longer delay to ensure DOM and other resources are ready
     const mountTimer = setTimeout(() => {
-      // Check if we're not already experiencing context issues
-      if (!contextLost) {
-        setMounted(true)
-        // Generate random initial values only on client side
-        setPriceHistory(Array(20).fill(0).map(() => 0.00042 + Math.random() * 0.00001 - 0.000005))
-      }
+      // Always mount - don't depend on contextLost state
+      setMounted(true)
+      // Generate random initial values only on client side
+      setPriceHistory(Array(20).fill(0).map(() => 0.00042 + Math.random() * 0.00001 - 0.000005))
     }, 500) // Increased delay for stability
     
     return () => clearTimeout(mountTimer)
@@ -432,9 +430,10 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
       
       recoveryTimer = setTimeout(() => {
         if (contextLost && reloadAttempts.current < 3) {
-          console.log(`Context recovery timeout (attempt ${reloadAttempts.current + 1}/3), reloading...`)
+          console.log(`Context recovery timeout (attempt ${reloadAttempts.current + 1}/3)`)
           reloadAttempts.current++
-          window.location.reload()
+          // Disabled automatic reload - let user manually reload if needed
+          // window.location.reload()
         } else if (reloadAttempts.current >= 3) {
           console.error('Max reload attempts reached. Please refresh manually.')
         }
@@ -669,7 +668,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
             
             const handleContextLost = (event) => {
               event.preventDefault()
-              console.warn('WebGL context lost')
+             
               
               // Debounce rapid context losses
               if (contextLostTimeout) clearTimeout(contextLostTimeout)
@@ -790,15 +789,17 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
 {/* Disable EffectComposer temporarily to improve stability */}
 
   <Suspense fallback={null}>
-    <EffectComposer>
-      <Bloom 
-        intensity={1.0}
-        luminanceThreshold={0.1}
-        luminanceSmoothing={0.9}
-        mipmapBlur
+    {!contextLost && (
+      <EffectComposer>
+        <Bloom 
+          intensity={1.0}
+          luminanceThreshold={0.1}
+          luminanceSmoothing={0.9}
+          mipmapBlur
         radius={0.8}
       />
     </EffectComposer>
+    )}
   </Suspense>
 
       </Canvas>

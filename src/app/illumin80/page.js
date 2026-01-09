@@ -94,48 +94,12 @@ export default function ShrinePage() {
     // Then mount and load assets
     setMounted(true);
     
-    // Preload critical shrine assets
-    const assetsToPreload = [
-      '/images/retro.webp', // Background image for 80s mode
-      '/images/3ACES_TATTOO.webp' // Button image
-    ];
+    // Simple loading delay - let Three.js handle asset loading
+    const loadingTimer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1500); // 1.5 second delay for smooth transition
     
-    // Note: The 3D model (/models/tinyVotiveOnly.glb) will be loaded by Three.js
-    // and we'll rely on the Suspense fallback for that
-    
-    let loadedCount = 0;
-    const totalAssets = assetsToPreload.length;
-    
-    const checkAllLoaded = () => {
-      loadedCount++;
-      if (loadedCount >= totalAssets) {
-        // Add a small delay for smooth transition
-        setTimeout(() => {
-          setIsLoading(false);
-        }, 500);
-      }
-    };
-    
-    // Preload images
-    assetsToPreload.forEach(url => {
-      const img = new Image();
-      img.onload = checkAllLoaded;
-      img.onerror = () => {
-        console.warn(`Failed to load asset: ${url}`);
-        checkAllLoaded(); // Continue anyway
-      };
-      img.src = url;
-    });
-    
-    // Fallback timeout in case assets take too long
-    const fallbackTimer = setTimeout(() => {
-      if (isLoading) {
-        console.warn('Asset loading timeout - proceeding anyway');
-        setIsLoading(false);
-      }
-    }, 10000); // 10 second max wait
-    
-    return () => clearTimeout(fallbackTimer);
+    return () => clearTimeout(loadingTimer);
   }, []);
 
   // Check if font is loaded and add fonts-loaded class

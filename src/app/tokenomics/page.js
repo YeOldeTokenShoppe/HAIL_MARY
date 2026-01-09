@@ -9,6 +9,7 @@ import CyberFAQSection from '@/components/CyberFAQSection';
 import CoinLoader from '@/components/CoinLoader';
 import { useMusic } from '@/components/MusicContext';
 import { useUser, SignInButton, UserButton } from "@clerk/nextjs";
+import NavControlsHome from '@/components/NavControlsHome';
 import CyberNav from '@/components/CyberNav';
 import Link from 'next/link';
 import Footer from '@/components/Footer';
@@ -22,6 +23,7 @@ export default function TokenomicsPage() {
   const [showMusicControls, setShowMusicControls] = useState(false);
   const [emoji, setEmoji] = useState("😇");
   const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -64,7 +66,8 @@ export default function TokenomicsPage() {
     isPlaying: contextIsPlaying,
     nextTrack,
     currentTrack,
-    is80sMode
+    is80sMode,
+    setIs80sMode
   } = useMusic();
     
 
@@ -110,6 +113,39 @@ export default function TokenomicsPage() {
           zIndex: 10,
           pointerEvents: 'none',
         }}>
+          {mounted && !isSceneLoading && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "20px",
+                    right: "20px",
+                    zIndex: 9,
+                    pointerEvents: "auto"
+                  }}
+                >
+                  <NavControlsHome 
+                    isPlaying={contextIsPlaying}
+                    onPlayMusic={() => play()}
+                    onStopMusic={() => pause()}
+                    onSkipTrack={() => nextTrack()}
+                    onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
+                    onUserClick={() => {}}
+                    isUserSignedIn={!!user}
+                    isMenuOpen={isMenuOpen}
+                    is80sMode={is80sMode}
+                    onToggle80sMode={() => setIs80sMode(!is80sMode)}
+                  />
+                </div>
+                )}
+                
+          {/* CyberNav Menu Panel */}
+          <CyberNav 
+            is80sMode={is80sMode}
+            position="fixed"
+            isOpen={isMenuOpen}
+            onClose={() => setIsMenuOpen(false)}
+            showButton={false}
+          />
           <div style={{
             position: 'relative',
             display: 'flex',
@@ -704,204 +740,7 @@ export default function TokenomicsPage() {
               </div>
             </div>
           </div>
-           {mounted && !isSceneLoading && (
-                <div
-                  style={{
-                    position: "fixed",
-                    top: "20px",
-                    right: "20px",
-                    zIndex: 999999
-                  }}
-                >
-                  <CyberNav 
-                    is80sMode={is80sMode}
-                    position="fixed"
-                    musicButton={
-                      !showMusicControls ? (
-                        <button
-                          onClick={() => {
-                            setShowMusicControls(true);
-                            if (!contextIsPlaying) {
-                              play();
-                            }
-                          }}
-                          style={{
-                            width: isMobile ? "3rem" : "3.5rem",
-                            height: isMobile ? "3rem" : "3.5rem",
-                            borderRadius: "0.5rem",
-                            backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.2)" : "rgba(0, 0, 0, 0.7)",
-                            border: is80sMode ? "2px solid #D946EF" : "2px solid rgba(255, 255, 255, 0.2)",
-                            color: is80sMode ? "#67e8f9" : "#ffffff",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            cursor: "pointer",
-                            transition: "all 0.3s ease",
-                            backdropFilter: "blur(10px)",
-                            boxShadow: "0 0.125rem 0.5rem rgba(0, 0, 0, 0.3)",
-                          }}
-                          title="Toggle Music"
-                        >
-                          <svg
-                            width={isMobile ? "20" : "30"}
-                            height={isMobile ? "20" : "30"}
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <path d="M9 18V5l12-2v13" />
-                            <circle cx="6" cy="18" r="3" />
-                            <circle cx="18" cy="16" r="3" />
-                          </svg>
-                        </button>
-                      ) : (
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.5rem",
-                          }}
-                        >
-                          {/* Spinning Album Art */}
-                          <div
-                            style={{
-                              width: isMobile ? "3rem" : "3.5rem",
-                              height: isMobile ? "3rem" : "3.5rem",
-                              borderRadius: "50%",
-                              overflow: "hidden",
-                              animation: contextIsPlaying ? "spin 4s linear infinite" : "none",
-                              cursor: "pointer"
-                            }}
-                            onClick={() => {
-                              if (contextIsPlaying) {
-                                pause();
-                              } else {
-                                play();
-                              }
-                            }}
-                          >
-                            <div
-                              style={{
-                                width: "100%",
-                                height: "100%",
-                                backgroundImage: "url('/virginRecords.jpg')",
-                                backgroundSize: "cover",
-                                backgroundPosition: "center"
-                              }}
-                            />
-                          </div>
-                          
-                          {/* Skip Button */}
-                          <button
-                            onClick={() => nextTrack && nextTrack()}
-                            style={{
-                              width: isMobile ? "2rem" : "2.5rem",
-                              height: isMobile ? "2rem" : "2.5rem",
-                              borderRadius: "0.25rem",
-                              backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.2)" : "rgba(0, 0, 0, 0.7)",
-                              border: is80sMode ? "2px solid #D946EF" : "2px solid rgba(255, 255, 255, 0.2)",
-                              color: is80sMode ? "#67e8f9" : "#ffffff",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              cursor: "pointer",
-                              transition: "all 0.3s ease",
-                              backdropFilter: "blur(10px)",
-                              boxShadow: "0 0.125rem 0.375rem rgba(0, 0, 0, 0.3)",
-                            }}
-                            title="Next Track"
-                          >
-                            <svg width={isMobile ? "14" : "18"} height={isMobile ? "14" : "18"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <polygon points="5 4 15 12 5 20 5 4"/>
-                              <line x1="19" y1="5" x2="19" y2="19"/>
-                            </svg>
-                          </button>
-                          
-                          {/* Close Button */}
-                          <button
-                            onClick={() => {
-                              setShowMusicControls(false);
-                              pause && pause();
-                            }}
-                            style={{
-                              width: isMobile ? "1.75rem" : "2rem",
-                              height: isMobile ? "1.75rem" : "2rem",
-                              borderRadius: "0.25rem",
-                              backgroundColor: is80sMode ? "rgba(217, 70, 239, 0.2)" : "rgba(0, 0, 0, 0.7)",
-                              border: is80sMode ? "1px solid #D946EF" : "1px solid rgba(255, 255, 255, 0.2)",
-                              color: is80sMode ? "#67e8f9" : "#ffffff",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              cursor: "pointer",
-                              transition: "all 0.3s ease",
-                              backdropFilter: "blur(10px)",
-                              boxShadow: "0 0.125rem 0.375rem rgba(0, 0, 0, 0.3)",
-                            }}
-                            title="Close Music"
-                          >
-                            <svg width={isMobile ? "12" : "14"} height={isMobile ? "12" : "14"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <line x1="18" y1="6" x2="6" y2="18"/>
-                              <line x1="6" y1="6" x2="18" y2="18"/>
-                            </svg>
-                          </button>
-                        </div>
-                      )
-                    }
-                    userButton={
-                      user ? (
-                        <UserButton
-                          appearance={{
-                            baseTheme: "dark",
-                            elements: {
-                              avatarBox: {
-                                width: isMobileDevice ? "3rem" : "3.5rem",
-                                height: isMobileDevice ? "3rem" : "3.5rem",
-                                borderRadius: "8px",
-                                backgroundColor: "rgba(0, 0, 0, 0.7)",
-                                backdropFilter: "blur(10px)",
-                                border: "2px solid rgba(255, 255, 255, 0.2)",
-                                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3)"
-                              },
-                              userButtonPopoverCard: {
-                                backgroundColor: "rgba(0, 0, 0, 0.95)",
-                                backdropFilter: "blur(20px)",
-                                border: "2px solid rgba(0, 255, 0, 0.3)",
-                                borderRadius: "12px",
-                                boxShadow: "0 0 30px rgba(0, 255, 0, 0.2)"
-                              }
-                            }
-                          }}
-                        />
-                      ) : (
-                        <SignInButton mode="modal">
-                          <button
-                            style={{
-                              width: isMobileDevice ? "3rem" : "3.5rem",
-                              height: isMobileDevice ? "3rem" : "3.5rem",
-                              borderRadius: "8px",
-                              backgroundColor: "rgba(0, 0, 0, 0.7)",
-                              border: "2px solid rgba(255, 255, 255, 0.2)",
-                              color: "#ffffff",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              cursor: "pointer",
-                              backdropFilter: "blur(10px)",
-                              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.3)"
-                            }}
-                          >
-                            <span style={{ fontSize: "1.8rem" }}>{emoji}</span>
-                          </button>
-                        </SignInButton>
-                      )
-                    }
-                  />
-                </div>
-                )}
+           
 
           {/* End of hidden old tokenomics section */}
                     <CyberFAQSection isMobile={isMobile} />
