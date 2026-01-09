@@ -96,5 +96,10 @@
         "description": "ミーム以前の時代の芸術の後援者"
       }
     ]
+  
+  },
+  "buyModal": {
+    "title": "購入_RL80_",
+    "secureTransaction": "<安全な取引プロトコル有効>"
   }
 }

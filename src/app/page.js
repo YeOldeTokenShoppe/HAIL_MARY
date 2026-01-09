@@ -171,10 +171,12 @@ export default function Home() {
               color: "#ffffff",
               cursor: "pointer",
             }}
+            onClick={(e) => {
+              e.preventDefault();
+              window.location.href = "/about";
+            }}
           >
-            <a href="/about" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
-              RL80
-            </a>
+            RL80
             {Array.from({length: 100}).map((_, i) => {
               const index = i + 1;
               return (

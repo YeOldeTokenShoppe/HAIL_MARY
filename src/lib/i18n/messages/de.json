@@ -96,5 +96,10 @@
         "description": "Kunstmäzenin der Vor-Meme-Ära"
       }
     ]
+  
+  },
+  "buyModal": {
+    "title": "KAUFEN_RL80_",
+    "secureTransaction": "<SICHERES_TRANSAKTIONSPROTOKOLL_AKTIV>"
   }
 }

@@ -96,5 +96,9 @@
         "description": "Patrona de las artes - era pre-meme"
       }
     ]
+  },
+  "buyModal": {
+    "title": "COMPRAR_RL80_",
+    "secureTransaction": "<PROTOCOLO_TRANSACCIÓN_SEGURA_ACTIVO>"
   }
 }

@@ -101,5 +101,9 @@
         "description": "Patron of the arts - pre-meme era"
       }
     ]
+  },
+  "buyModal": {
+    "title": "BUY_RL80_",
+    "secureTransaction": "<SECURE_TRANSACTION_PROTOCOL_ACTIVE>"
   }
 }

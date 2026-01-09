@@ -96,5 +96,10 @@
         "description": "Mecenate delle arti nell'era pre-meme"
       }
     ]
+  
+  },
+  "buyModal": {
+    "title": "ACQUISTA_RL80_",
+    "secureTransaction": "<PROTOCOLLO_TRANSAZIONE_SICURA_ATTIVO>"
   }
 }

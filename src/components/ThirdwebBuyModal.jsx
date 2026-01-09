@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { BuyWidget } from "thirdweb/react";
 import { createThirdwebClient } from "thirdweb";
 import { defineChain } from "thirdweb/chains";
+import { useLanguage } from './LanguageProvider';
 
 // Create client with your Client ID
 const client = createThirdwebClient({
@@ -13,6 +14,9 @@ const client = createThirdwebClient({
 const ThirdwebBuyModal = ({ isOpen, onClose }) => {
   const [glitchActive, setGlitchActive] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const { t } = useLanguage();
+  
+
   
   useEffect(() => {
     const checkMobile = () => {
@@ -268,7 +272,7 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
             position: 'relative',
           }}>
             <span style={{ position: 'relative', zIndex: 2 }}>
-              BUY_RL80_
+              {t('buyModal.title') || 'BUY_RL80_'}
             </span>
             {glitchActive && (
               <>
@@ -281,7 +285,7 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
                   width: '100%',
                   textAlign: 'center',
                 }}>
-                  BUY_RL80_
+                  {t('buyModal.title') || 'BUY_RL80_'}
                 </span>
                 <span style={{
                   position: 'absolute',
@@ -292,7 +296,7 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
                   width: '100%',
                   textAlign: 'center',
                 }}>
-                  BUY_RL80_
+                  {t('buyModal.title') || 'BUY_RL80_'}
                 </span>
               </>
             )}
@@ -369,7 +373,7 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
             textTransform: 'uppercase',
             textShadow: '0 0 10px rgba(0, 229, 114, 0.5)',
           }}>
-            &lt;SECURE_TRANSACTION_PROTOCOL_ACTIVE&gt;
+            {t('buyModal.secureTransaction') || '<SECURE_TRANSACTION_PROTOCOL_ACTIVE>'}
           </p>
         </div>
       </div>

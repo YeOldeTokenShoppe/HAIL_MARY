@@ -96,5 +96,9 @@
         "description": "Mécène des arts de l'ère pré-mème"
       }
     ]
+  },
+  "buyModal": {
+    "title": "ACHETER_RL80_",
+    "secureTransaction": "<PROTOCOLE_TRANSACTION_SÉCURISÉE_ACTIF>"
   }
 }

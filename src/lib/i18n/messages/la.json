@@ -96,5 +96,10 @@
         "description": "Patrona artium aetatis ante-memae"
       }
     ]
+  
+  },
+  "buyModal": {
+    "title": "EMERE_RL80_",
+    "secureTransaction": "<PROTOCOLLVM_TRANSACTIONIS_SECVRAE_ACTIVVM>"
   }
 }

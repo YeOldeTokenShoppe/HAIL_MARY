@@ -96,5 +96,10 @@
         "description": "밈 이전 시대의 예술 후원자"
       }
     ]
+  
+  },
+  "buyModal": {
+    "title": "구매_RL80_",
+    "secureTransaction": "<보안_거래_프로토콜_활성>"
   }
 }

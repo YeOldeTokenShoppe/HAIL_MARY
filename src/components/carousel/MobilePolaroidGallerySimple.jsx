@@ -56,6 +56,13 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
         .polaroid-gallery.paused > .polaroid-frame {
           animation-play-state: paused !important;
         }
+
+
+         @media (max-width: 480px) {
+                 .polaroid-gallery {
+                    width: 15rem;
+                }
+              }
         
         .polaroid-gallery > .polaroid-frame {
           grid-area: 1/1;

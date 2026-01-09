@@ -96,5 +96,10 @@
         "description": "前表情包时代的艺术赞助人"
       }
     ]
+
+  },
+  "buyModal": {
+    "title": "购买_RL80_",
+    "secureTransaction": "<安全交易协议激活>"
   }
 }

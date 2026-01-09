@@ -106,6 +106,7 @@ const PalmsScene = ({ onLoadingChange }) => {
   const [hideLastText, setHideLastText] = useState(false); // Hide the last text block after delay
   const [shouldMorph, setShouldMorph] = useState(false); // Trigger morph animation
   const [showBuyModal, setShowBuyModal] = useState(false); // Control ThirdwebBuyModal visibility
+  const [hasScrolled, setHasScrolled] = useState(false); // Track if user has started scrolling
   // Music player states
   const [isMobile, setIsMobile] = useState(false);
   
@@ -138,6 +139,7 @@ const PalmsScene = ({ onLoadingChange }) => {
   const scrollCameraEnabledRef = useRef(true); // Initialize as true to match state
   const scrollProgressRef = useRef(0); // Start at 0 for aerial view
   const animationFrameRef = useRef(null); // Track animation frame ID for cleanup
+  const hasScrolledRef = useRef(false); // Track if user has started scrolling
 
   // Force initial scroll position on mount and page load
   useEffect(() => {
@@ -154,6 +156,8 @@ const PalmsScene = ({ onLoadingChange }) => {
       window.scrollTo(0, 0);
       setCurrentCameraStage(0);
       scrollProgressRef.current = 0;
+      setHasScrolled(false);
+      hasScrolledRef.current = false;
     };
     
     // Reset on component mount
@@ -1488,6 +1492,8 @@ const PalmsScene = ({ onLoadingChange }) => {
       window.scrollTo(0, 0);
       scrollProgressRef.current = 0;
       setCurrentCameraStage(0);
+      setHasScrolled(false);
+      hasScrolledRef.current = false;
       
       // Detect if device is mobile (phone, not tablet)
       const isMobile = (() => {
@@ -1751,7 +1757,11 @@ const PalmsScene = ({ onLoadingChange }) => {
           }
           scrollProgressRef.current = self.progress;
           
-
+          // Mark that user has scrolled if progress > 0
+          if (self.progress > 0 && !hasScrolledRef.current) {
+            hasScrolledRef.current = true;
+            setHasScrolled(true);
+          }
           
           // Update camera stage based on progress for text changes
           let stage = 0;
@@ -2324,16 +2334,17 @@ const PalmsScene = ({ onLoadingChange }) => {
             </div>
           )}
           
-          {/* Scroll hint - fades out at end of sequence */}
+          {/* Scroll hint - fades out when user scrolls */}
           <div style={{
             marginTop: '1rem',
             fontSize: '12px',
             color: '#01ff00',
-            opacity: currentCameraStage === 4 ? 0 : 0.5,
+            opacity: hasScrolled ? 0 : 0.5,
             textAlign: 'center',
             fontFamily: 'monospace',
-            animation: currentCameraStage === 4 ? 'none' : 'pulse 2s ease-in-out infinite',
+            animation: hasScrolled ? 'none' : 'pulse 2s ease-in-out infinite',
             transition: 'opacity 0.5s ease',
+            pointerEvents: 'none',
           }}>
             {t('palmTreeDrive.scrollPrompt')}
           </div>

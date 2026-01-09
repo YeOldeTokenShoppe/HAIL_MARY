@@ -96,5 +96,10 @@
         "description": "Người bảo trợ nghệ thuật thời tiền-meme"
       }
     ]
+  
+  },
+  "buyModal": {
+    "title": "MUA_RL80_",
+    "secureTransaction": "<GIAO_THỨC_BẢO_MẬT_ĐANG_HOẠT_ĐỘNG>"
   }
 }
