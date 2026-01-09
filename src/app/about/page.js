@@ -323,7 +323,7 @@ export default function CarouselPage() {
           cursor: "pointer",
           transition: "transform 0.3s ease, filter 0.3s ease",
         }}
-        onClick={() => router.push('/illumin80')}
+        onClick={() => window.location.href = '/illumin80'}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = "scale(1.15) rotate(-5deg)";
           e.currentTarget.style.filter = "drop-shadow(0 0 20px #ff9500)";
@@ -358,7 +358,7 @@ export default function CarouselPage() {
           cursor: "pointer",
         }}
         viewBox="0 0 300 150"
-        onClick={() => router.push('/illumin80')}
+        onClick={() => window.location.href = '/illumin80'}
         onMouseEnter={(e) => {
           const text = e.currentTarget.querySelector('text');
           const arrow = e.currentTarget.querySelector('#arrowPath');
@@ -717,7 +717,7 @@ export default function CarouselPage() {
           borderRadius: "8px",
           padding: "10px",
           pointerEvents: "auto",
-          zIndex: 99999,
+          zIndex: 999,
         }}>
           <div 
             id="text"

@@ -170,9 +170,11 @@ export default function Home() {
               fontSize: isMobileView ? "3rem" : "4rem",
               color: "#ffffff",
               cursor: "pointer",
+              userSelect: "none",
             }}
             onClick={(e) => {
               e.preventDefault();
+              e.stopPropagation();
               window.location.href = "/about";
             }}
           >

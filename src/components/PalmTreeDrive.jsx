@@ -2000,6 +2000,9 @@ const PalmsScene = ({ onLoadingChange }) => {
     
     // Handle click on Mary
     const handleClick = (event) => {
+      // Don't handle 3D clicks when Buy modal is open
+      if (showBuyModal) return;
+      
       if (!maryGlowingRef.current || !mountRef.current) return;
       
       const rect = mountRef.current.getBoundingClientRect();
@@ -2395,7 +2398,9 @@ const PalmsScene = ({ onLoadingChange }) => {
             marginTop: '3rem',
           }}>
             <button
-              onClick={() => {
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 // Open the ThirdwebBuyModal instead of navigating
                 setShowBuyModal(true);
               }}
