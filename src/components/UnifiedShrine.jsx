@@ -1,14 +1,16 @@
 'use client'
 import React, { useRef, useState, useEffect, Suspense, useCallback, useMemo, forwardRef, useImperativeHandle, Component } from 'react'
-import { useFrame } from '@react-three/fiber'
-import CleanCanvas from './CleanCanvas'
-import { Stats } from '@react-three/drei'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { Stats, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { HandsModel, CameraController } from './HandsGLTFScene'
 // IMPORTANT: Import from the optimized version!
 import { CandleCloud, GradientBackground, SceneSetup } from './CandleShrine'
 import { NewCandleEffectManager } from './NewCandleEffect'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
+
+
+
 
 // Simple error boundary for Canvas
 class CanvasErrorBoundary extends Component {
@@ -72,7 +74,7 @@ function SceneRotator({ children, userRotation, onRotationStart, onRotationMove,
     <>
       {/* Invisible background plane for rotation - render first so it's behind everything */}
       <mesh
-        position={[0, 0, -100]}
+        position={[0, 0, 0]}
         onPointerDown={(e) => {
           e.stopPropagation()
           setIsPointerDown(true)
@@ -102,9 +104,9 @@ function SceneRotator({ children, userRotation, onRotationStart, onRotationMove,
           onRotationEnd()
         }}
       >
-        <planeGeometry args={[1000, 1000]} />
-        <meshBasicMaterial transparent opacity={0} />
-      </mesh>
+  <planeGeometry args={[1000, 1000]} />
+  <meshBasicMaterial transparent opacity={0} depthWrite={false} depthTest={false} />
+        </mesh>
       
       {/* Actual scene content that rotates */}
       <group ref={groupRef}>{children}</group>
@@ -234,19 +236,23 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   const canvasRef = useRef()
   const [contextLost, setContextLost] = useState(false)
   
+  
   // Clean up WebGL context on unmount
-  useEffect(() => {
-    return () => {
-      if (canvasRef.current?.gl) {
+useEffect(() => {
+  return () => {
+    // Defer cleanup to allow React to finish unmounting
+    const glRef = canvasRef.current?.gl
+    if (glRef) {
+      requestAnimationFrame(() => {
         try {
-          canvasRef.current.gl.dispose()
-          canvasRef.current.gl = null
+          glRef.dispose()
         } catch (err) {
-          console.warn('Error cleaning up WebGL context:', err)
+          // Silent fail - context might already be gone
         }
-      }
+      })
     }
-  }, [])
+  }
+}, [])
   
   // Price history - update much less frequently
   const [priceHistory, setPriceHistory] = useState(() =>
@@ -305,17 +311,17 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
     }
   }, [])
   
-  // Initialize with longer delay to ensure stability
+  // Mount immediately on client-side - no delay that could be interrupted
   useEffect(() => {
-    // Longer delay to ensure DOM and other resources are ready
-    const mountTimer = setTimeout(() => {
-      // Always mount - don't depend on contextLost state
-      setMounted(true)
-      // Generate random initial values only on client side
-      setPriceHistory(Array(20).fill(0).map(() => 0.00042 + Math.random() * 0.00001 - 0.000005))
-    }, 500) // Increased delay for stability
+    // Mount immediately - don't delay
+    setMounted(true)
+    // Generate random initial values only on client side
+    setPriceHistory(Array(20).fill(0).map(() => 0.00042 + Math.random() * 0.00001 - 0.000005))
     
-    return () => clearTimeout(mountTimer)
+    return () => {
+      // Cleanup on unmount
+      setMounted(false)
+    }
   }, [])
 
   // Throttled UI update handler
@@ -574,7 +580,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   
 
   return (
-    <div style={{ width: '100%', height: isMobile ? '100vh' : '100vh', background: '#000', position: 'relative' }}>
+    <div style={{ width: '100vw', height: isMobile ? '100vh' : '100vh', background: '#000', position: 'fixed'}}>
       {/* 80s mode background */}
       {is80sMode && (
         <img
@@ -594,31 +600,15 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
         />
       )}
       
-      {/* {contextLost && (
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          zIndex: 1000,
-          background: 'rgba(0, 0, 0, 0.9)',
-          padding: '20px',
-          borderRadius: '10px',
-          color: '#fff',
-          textAlign: 'center',
-          fontFamily: 'monospace'
-        }}>
-          <div style={{ fontSize: '18px', marginBottom: '10px' }}>⚠️ Graphics context lost</div>
-          <div style={{ fontSize: '14px', opacity: 0.8 }}>Recovering...</div>
-        </div>
-      )} */}
+
       
       <div 
         ref={canvasRef} 
         style={{ 
-          width: '100%', 
-          height: '100%', 
-          position: 'relative'
+          width: '100vw', 
+          height: '100vh', 
+          position: 'fixed', 
+          zIndex: 1
         }}
       >
       {/* Focus Mode Indicator */}
@@ -647,7 +637,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
       
       {mounted && typeof window !== 'undefined' && (
       <CanvasErrorBoundary>
-      <CleanCanvas
+      <Canvas
         camera={{ position: [0, isMobile ? 0 : 0, isMobile ? 2 : 0], fov: isMobile ? 75 : 70 }}
         dpr={isMobile ? Math.min(window.devicePixelRatio || 1, 1.5) : Math.min(window.devicePixelRatio || 1, 2)}
         frameloop="always"
@@ -686,46 +676,12 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
             Object.values(timeoutRefs.current).forEach(clearTimeout)
             timeoutRefs.current = {}
             
-            // Add WebGL context event handlers with debouncing
-            const canvas = gl.domElement
-            let contextLostTimeout = null
-            
-            const handleContextLost = (event) => {
-              event.preventDefault()
-             
-              
-              // Debounce rapid context losses
-              if (contextLostTimeout) clearTimeout(contextLostTimeout)
-              
-              contextLostTimeout = setTimeout(() => {
-                setContextLost(true)
-                Object.values(timeoutRefs.current).forEach(clearTimeout)
-                timeoutRefs.current = {}
-              }, 100)
-            }
-            
-            const handleContextRestored = () => {
-              console.log('WebGL context restored')
-              if (contextLostTimeout) clearTimeout(contextLostTimeout)
-              setContextLost(false)
-              reloadAttempts.current = 0 // Reset reload counter on successful restore
-            }
-            
-            canvas.addEventListener('webglcontextlost', handleContextLost, false)
-            canvas.addEventListener('webglcontextrestored', handleContextRestored, false)
-            
-            // Store cleanup function
-            canvasRef.current._cleanupListeners = () => {
-              canvas.removeEventListener('webglcontextlost', handleContextLost)
-              canvas.removeEventListener('webglcontextrestored', handleContextRestored)
-            }
           }
         }}
         // Limit frame rate if needed - uncomment for testing
         // frameloop="demand"
       >
         <SceneSetup is80sMode={is80sMode} />
-        
         <ambientLight intensity={isMobile ? 0.8 : 0.6} />
         {!isMobile && (
           <>
@@ -737,6 +693,8 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
         
         {/* Background gradient - reads from ref */}
         <GradientBackground is80sMode={is80sMode} />
+
+        
         
         {/* Rotatable scene content */}
         <SceneRotator 
@@ -747,20 +705,21 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
         >
           {/* Combined group for hands and surrounding candles */}
           <group position={[0, 0, 0]}>
-            {/* Candles surrounding the camera/viewer with exclusion zone around hands */}
-            <CandleCloud
-              count={isMobile ? 300 : 500}
-              priceRef={priceRef}
-              shortTermPriceRef={shortTermPriceRef}
-              continuousOffsetRef={continuousOffsetRef}
-              additionalCandles={additionalCandles}
-              onCandleClick={handleCandleClick}
-              clickedCandleId={clickedCandleId}
-              isMobile={isMobile}
-              exclusionZone={exclusionZone}
-            />
+            <Suspense fallback={null}>
+              <CandleCloud
+                count={isMobile ? 300 : 500}
+                priceRef={priceRef}
+                shortTermPriceRef={shortTermPriceRef}
+                continuousOffsetRef={continuousOffsetRef}
+                additionalCandles={additionalCandles}
+                onCandleClick={handleCandleClick}
+                clickedCandleId={clickedCandleId}
+                isMobile={isMobile}
+                exclusionZone={exclusionZone}
+              />
+            </Suspense> 
             
-            {/* Hands model in front */}
+        
             <Suspense fallback={null}>
               <group scale={1.8} position={[0, -1, -6]}>
                 <HandsModel 
@@ -776,11 +735,9 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
                   hasActiveClick={clickedCandleId !== null}
                   user={user}
                   onPhoneClick={() => {
-                    // console.log('Phone clicked in UnifiedShrine! Current focus:', focusMode, '-> New:', !focusMode);
                     setFocusMode(!focusMode);
                   }}
                   is80sMode={is80sMode}
-                  // onLoad={() => console.log('Hands loaded')}
                 />
               </group>
             </Suspense>
@@ -788,7 +745,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
         </SceneRotator>
         
         {/* Only show Stats in development */}
-        {process.env.NODE_ENV === 'development' && <Stats className="stats-monitor" />}
+        {/* {process.env.NODE_ENV === 'development' && <Stats className="stats-monitor" />} */}
         
         {/* Optimized price simulator - updates refs every frame, state throttled */}
         <OptimizedPriceSimulator 
@@ -811,10 +768,9 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
             <CameraController focusMode={focusMode} />
             
      
-{/* Disable EffectComposer temporarily to improve stability */}
 
   <Suspense fallback={null}>
-    {!contextLost && (
+
       <EffectComposer>
         <Bloom 
           intensity={1.0}
@@ -824,231 +780,14 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
         radius={0.8}
       />
     </EffectComposer>
-    )}
+
   </Suspense>
 
-      </CleanCanvas>
+      </Canvas>
       </CanvasErrorBoundary>
       )}
       </div>
       
-      {/* TEST CONTROLS - Remove when done testing */}
-      {/* {showTestControls && (
-        <div style={{
-          position: 'fixed',  // Use fixed positioning to ensure it's above everything
-          top: '20px',
-          left: '300px',
-          background: 'rgba(0, 0, 0, 0.95)',
-          border: '2px solid #ff00ff',
-          borderRadius: '8px',
-          padding: '15px',
-          color: '#fff',
-          fontFamily: 'monospace',
-          fontSize: '12px',
-          zIndex: 10000,
-          width: '300px',
-          backdropFilter: 'blur(10px)',
-          pointerEvents: 'auto'
-        }}>
-          <div style={{ 
-            marginBottom: '10px', 
-            fontWeight: 'bold',
-            color: '#ff00ff',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center'
-          }}>
-            <span>🧪 TEST CONTROLS</span>
-            <button
-              onClick={() => setShowTestControls(false)}
-              style={{
-                background: 'transparent',
-                border: '1px solid #ff00ff',
-                color: '#ff00ff',
-                padding: '2px 8px',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '10px'
-              }}
-            >
-              HIDE
-            </button>
-          </div>
-          
-          <div style={{ marginBottom: '10px' }}>
-            <label style={{ display: 'block', marginBottom: '5px', color: '#aaa' }}>
-              Price Movement: {testPriceOverride !== null ? `${(testPriceOverride * 5).toFixed(2)}%` : 'Auto'}
-            </label>
-            <input
-              type="range"
-              min="-20"
-              max="20"
-              step="0.1"
-              value={testPriceOverride !== null ? testPriceOverride : 0}
-              onChange={(e) => setTestPriceOverride(parseFloat(e.target.value))}
-              style={{
-                width: '100%',
-                marginBottom: '5px'
-              }}
-            />
-            <div style={{ display: 'flex', gap: '5px', marginTop: '5px' }}>
-              <button
-                onClick={() => setTestPriceOverride(-20)}
-                style={{
-                  flex: 1,
-                  background: '#ff4444',
-                  border: 'none',
-                  color: '#fff',
-                  padding: '4px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '10px'
-                }}
-              >
-                -100%
-              </button>
-              <button
-                onClick={() => setTestPriceOverride(-10)}
-                style={{
-                  flex: 1,
-                  background: '#ff6666',
-                  border: 'none',
-                  color: '#fff',
-                  padding: '4px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '10px'
-                }}
-              >
-                -50%
-              </button>
-              <button
-                onClick={() => setTestPriceOverride(0)}
-                style={{
-                  flex: 1,
-                  background: '#666',
-                  border: 'none',
-                  color: '#fff',
-                  padding: '4px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '10px'
-                }}
-              >
-                0%
-              </button>
-              <button
-                onClick={() => setTestPriceOverride(10)}
-                style={{
-                  flex: 1,
-                  background: '#66ff66',
-                  border: 'none',
-                  color: '#000',
-                  padding: '4px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '10px'
-                }}
-              >
-                +50%
-              </button>
-              <button
-                onClick={() => setTestPriceOverride(20)}
-                style={{
-                  flex: 1,
-                  background: '#00ff00',
-                  border: 'none',
-                  color: '#000',
-                  padding: '4px',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '10px'
-                }}
-              >
-                +100%
-              </button>
-            </div>
-          </div>
-          
-          <div style={{ 
-            display: 'flex', 
-            gap: '10px',
-            borderTop: '1px solid #333',
-            paddingTop: '10px',
-            marginTop: '10px'
-          }}>
-            <button
-              onClick={() => setTestPriceOverride(null)}
-              style={{
-                flex: 1,
-                background: testPriceOverride === null ? '#ff00ff' : '#333',
-                border: '1px solid #ff00ff',
-                color: '#fff',
-                padding: '6px',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '11px',
-                fontWeight: 'bold'
-              }}
-            >
-              AUTO MODE
-            </button>
-            <button
-              onClick={() => {
-                // Random price between -20 and 20
-                const random = (Math.random() - 0.5) * 40
-                setTestPriceOverride(random)
-              }}
-              style={{
-                flex: 1,
-                background: '#666',
-                border: '1px solid #999',
-                color: '#fff',
-                padding: '6px',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '11px',
-                fontWeight: 'bold'
-              }}
-            >
-              RANDOM
-            </button>
-          </div>
-          
-          <div style={{ 
-            marginTop: '10px',
-            fontSize: '10px',
-            color: '#666',
-            textAlign: 'center'
-          }}>
-            Controls candle movement & colors
-          </div>
-        </div>
-      )} */}
-      
-      {/* Show test controls button when hidden */}
-      {/* {!showTestControls && (
-        <button
-          onClick={() => setShowTestControls(true)}
-          style={{
-            position: 'fixed',  // Use fixed to ensure it's clickable
-            top: '20px',
-            left: '300px',
-            background: 'rgba(0, 0, 0, 0.9)',
-            border: '1px solid #ff00ff',
-            color: '#ff00ff',
-            padding: '8px 12px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '10px',
-            fontFamily: 'monospace',
-            zIndex: 10000,
-            backdropFilter: 'blur(10px)',
-          }}
-        >
-          🧪 SHOW TEST CONTROLS
-        </button>
-      )} */}
       
       {/* CSS for candle count animation */}
       <style jsx>{`

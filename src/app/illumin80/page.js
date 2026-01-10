@@ -1,20 +1,21 @@
 'use client'
 
 import React, { useState, useEffect, useRef, Suspense, useCallback } from 'react'
+import dynamic from 'next/dynamic'
 import NavControlsHome from '@/components/NavControlsHome'
 import CyberNav from '@/components/CyberNav'
 import Link from 'next/link'
 import { useUser, SignInButton } from '@clerk/nextjs'
 import { useMusic } from '@/components/MusicContext'
 import { useWalletAuth } from '@/components/WalletAuthProvider'
-import UnifiedShrine from '@/components/UnifiedShrine'
 import ThirdwebBuyModal from '@/components/ThirdwebBuyModal'
 import LightCandleModal from '@/components/LightCandleModal'
 import { WalletConnectionModal } from '@/components/WalletConnectionModal'
-import CoinLoader from '@/components/CoinLoader'
 import { useRouter } from 'next/navigation'
 import ShrineLeftPanel from '@/components/ShrineLeftPanel'
 import { db, collection, addDoc, serverTimestamp, getDocs, query, orderBy, limit, onSnapshot } from '@/lib/firebaseClient'
+import UnifiedShrine from '@/components/UnifiedShrine'
+
 
 // Tiny Votive Model Component
 
@@ -42,7 +43,6 @@ export default function ShrinePage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [currentView, setCurrentView] = useState('shrine')
   const [mounted, setMounted] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
   const [mobileMatchstickLit, setMobileMatchstickLit] = useState(false)
   const [remountKey, setRemountKey] = useState(0)
   const is80sMode = context80sMode
@@ -53,6 +53,26 @@ export default function ShrinePage() {
   const [priceChange, setPriceChange] = useState(0)
   const [offerings, setOfferings] = useState([])
   const [isLoadingOfferings, setIsLoadingOfferings] = useState(true)
+
+
+  const [isClient, setIsClient] = useState(false)
+  const [delayedMount, setDelayedMount] = useState(false)
+
+useEffect(() => {
+  setIsClient(true)
+}, [])
+
+useEffect(() => {
+  // Small delay to let previous page fully cleanup
+  const timer = setTimeout(() => {
+    setDelayedMount(true)
+  }, 100)
+  
+  return () => {
+    clearTimeout(timer)
+    setDelayedMount(false)
+  }
+}, [])
 
   // Fetch offerings from Firestore
   const fetchOfferings = useCallback(async () => {
@@ -163,11 +183,8 @@ export default function ShrinePage() {
     }
   }, [fetchOfferings, unifiedShrineRef])
 
-  // Set mounted state after hydration and handle loading
+  // Set mounted state after hydration
   useEffect(() => {
-    // Force remount of UnifiedShrine on navigation
-    setRemountKey(prev => prev + 1);
-    
     // Check mobile status immediately before mounting
     const checkMobile = () => {
       const isMobile = window.innerWidth <= 768;
@@ -176,15 +193,8 @@ export default function ShrinePage() {
     };
     checkMobile();
     
-    // Then mount and load assets
+    // Then mount
     setMounted(true);
-    
-    // Simple loading delay - let Three.js handle asset loading
-    const loadingTimer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1500); // 1.5 second delay for smooth transition
-    
-    return () => clearTimeout(loadingTimer);
   }, []);
 
   // Check if font is loaded and add fonts-loaded class
@@ -293,9 +303,6 @@ export default function ShrinePage() {
 
   return (
     <>
-      {/* CoinLoader */}
-      <CoinLoader loading={isLoading} />
-      
       <style dangerouslySetInnerHTML={{ __html: `
         @font-face {
           font-family: 'UnifrakturMaguntia';
@@ -320,23 +327,10 @@ export default function ShrinePage() {
         zIndex: 1,
         pointerEvents: 'auto'
       }}>
-        <Suspense fallback={
-          <div style={{
-            width: '100%',
-            height: '100vh',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'linear-gradient(135deg, #1a1a2e 0%, #4a4a6a 100%)',
-            color: '#ffffff',
-            fontSize: '1.5rem'
-          }}>
-            {/* Loading shrine... */}
-          </div>
-        }>
+        {isClient && delayedMount ? (
           <UnifiedShrine 
             ref={unifiedShrineRef}
-            key={`shrine-scene-${remountKey}`}
+            // key={`shrine-scene-${remountKey}`}
             offerings={offerings}
             onSelectOffering={setHoveredOffering}
             onLightCandle={(offering) => {
@@ -350,7 +344,7 @@ export default function ShrinePage() {
             onJustLitComplete={() => setJustLitOffering(null)}
             user={user}
           />
-        </Suspense>
+        ) : null}
       </div>
       
       {/* Only render ShrineLeftPanel on desktop/tablet after we know device type */}
@@ -837,53 +831,17 @@ export default function ShrinePage() {
         </>
       )}
       
-      {/* Navigation Toggle */}
-      {/* <div style={{
-        position: "fixed",
-        bottom: "30px",
-        left: "50%",
-        transform: "translateX(-50%)",
-        zIndex: 998,
-      }}>
-        <Link href="/carousel" style={{ textDecoration: 'none' }}>
-          <div 
-            style={{
-              position: 'relative',
-              width: '240px',
-              height: '50px',
-              background: 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%)',
-              border: '2px solid #00ff66',
-              borderRadius: '25px',
-              overflow: 'hidden',
-              cursor: 'pointer',
-              boxShadow: '0 0 20px rgba(0, 255, 102, 0.3), inset 0 0 20px rgba(0, 0, 0, 0.8)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: '#9945ff',
-              fontFamily: "'Courier New', monospace",
-              fontWeight: 'bold',
-              fontSize: '14px',
-              letterSpacing: '1px',
-              textTransform: 'uppercase',
-            }}
-          >
-            ← Back to Lore
-          </div>
-        </Link>
-      </div> */}
-      
       
       {/* RL80 Logo - Mobile Only */}
       {fontLoaded && isMobileView && (
         <div style={{
-          position: "absolute",
+          position: "fixed",
           top: "20px", 
           left: "20px",
           borderRadius: "8px",
           padding: "10px",
           pointerEvents: "auto",
-          zIndex: 10,
+          zIndex: 999,
         }}>
           <div 
             id="text"
@@ -940,10 +898,10 @@ export default function ShrinePage() {
       
       {/* Nav Controls - Top Right */}
       <div style={{
-        position: "absolute",
+        position: "fixed",
         top: "1rem",
         right: "1rem",
-        zIndex: 10000,
+        zIndex: 999,
         pointerEvents: 'auto'
       }}>
         <NavControlsHome 
@@ -1003,35 +961,101 @@ export default function ShrinePage() {
         >
           <div 
             style={{
-              background: 'linear-gradient(135deg, #1a0525 0%, #2a0a3a 100%)',
-              border: '2px solid rgba(255, 0, 255, 0.3)',
-              borderRadius: '20px',
-              padding: '2rem',
-              maxWidth: '400px',
+              background: 'rgba(20, 20, 30, 0.98)',
+              border: '1px solid rgba(138, 43, 226, 0.4)',
+              borderRadius: '24px',
+              padding: '3rem 2.5rem',
+              maxWidth: '420px',
               textAlign: 'center',
               color: '#fff',
+              boxShadow: '0 0 60px rgba(138, 43, 226, 0.3)',
+              position: 'relative',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#ff00ff' }}>
-              🕯️ Sign In Required
+            {/* Close button */}
+            <button
+              style={{
+                position: 'absolute',
+                top: '1rem',
+                right: '1rem',
+                background: 'transparent',
+                border: 'none',
+                color: '#ff006e',
+                fontSize: '2rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'transform 0.2s',
+              }}
+              onClick={() => setShowAuthMessage(null)}
+              onMouseEnter={(e) => e.target.style.transform = 'scale(1.1)'}
+              onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+            >
+              ×
+            </button>
+            
+            {/* Icon */}
+            <div style={{ marginBottom: '1rem' }}>
+              <img 
+                src="/images/ILLUMIN80_TATTOO.webp" 
+                alt="ILLUMIN80" 
+                style={{ 
+                  width: '60px', 
+                  height: '60px', 
+                  objectFit: 'contain',
+                  filter: 'drop-shadow(0 0 20px rgba(138, 43, 226, 0.8)) drop-shadow(0 0 40px rgba(138, 43, 226, 0.5)) drop-shadow(0 0 60px rgba(138, 43, 226, 0.3))'
+                }} 
+              />
+            </div>
+            
+            <h2 style={{ 
+              fontSize: '1.2rem', 
+              marginBottom: '0.5rem', 
+              fontWeight: 'bold',
+              textTransform: 'uppercase',
+              letterSpacing: '2px',
+              fontFamily: "'Orbitron', monospace"
+            }}>
+              Sign In Required
             </h2>
-            <p style={{ marginBottom: '1.5rem', opacity: 0.9 }}>
-              Please sign in to light a candle and share your message with Our Lady.
+            <p style={{ 
+              marginBottom: '2rem', 
+              color: '#00f5d4',
+              fontSize: '0.95rem',
+              lineHeight: '1.5'
+            }}>
+              Please sign in to light a candle.
             </p>
             <SignInButton mode="modal">
               <button style={{
-                padding: '0.75rem 2rem',
-                background: 'linear-gradient(135deg, #ff006e 0%, #8338ec 100%)',
+                padding: '1rem 2rem',
+                background: '#fff',
                 border: 'none',
-                borderRadius: '10px',
-                color: '#fff',
+                borderRadius: '50px',
+                color: '#000',
                 fontSize: '1rem',
-                fontWeight: 'bold',
+                fontWeight: '600',
                 cursor: 'pointer',
-                width: '100%'
-              }}>
-                Sign In
+                width: '100%',
+                fontFamily: "'Orbitron', monospace",
+                letterSpacing: '1px',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = 'rgba(255, 255, 255, 0.9)';
+                e.target.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = '#fff';
+                e.target.style.transform = 'translateY(0)';
+              }}
+              >
+                Continue →
               </button>
             </SignInButton>
           </div>

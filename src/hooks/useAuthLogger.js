@@ -14,12 +14,10 @@ export function useAuthLogger() {
     if (isLoaded && user) {
       // Only log if this is a new session or different user
       if (!hasLoggedLogin.current || lastUserId.current !== user.id) {
-        console.log('Logging Clerk login for user:', user.id);
         
         // Log to Firebase
         logClerkLogin(user).then(docId => {
           if (docId) {
-            console.log('Clerk login logged to Firebase:', docId);
           }
         }).catch(error => {
           console.error('Error logging Clerk login:', error);

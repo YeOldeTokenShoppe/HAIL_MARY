@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useUser, useClerk } from '@clerk/nextjs';
+import { useUser, useClerk, UserButton } from '@clerk/nextjs';
 import { useWalletAuth } from './WalletAuthProvider';
 import { WalletConnectionModal } from './WalletConnectionModal';
 import { WalletDetailsModal } from './WalletDetailsModal';
@@ -20,6 +20,7 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
   const [activeTab, setActiveTab] = useState('account');
   const [showWalletConnection, setShowWalletConnection] = useState(false);
   const [showWalletDetails, setShowWalletDetails] = useState(false);
+  const [showClerkDropdown, setShowClerkDropdown] = useState(false);
   
   // Listen for external wallet details event
   useEffect(() => {
@@ -50,13 +51,13 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
               className={`modal-tab ${activeTab === 'account' ? 'active' : ''}`}
               onClick={() => setActiveTab('account')}
             >
-              👤 Account
+              Account
             </button>
             <button 
               className={`modal-tab ${activeTab === 'wallet' ? 'active' : ''}`}
               onClick={() => setActiveTab('wallet')}
             >
-              💎 Wallet
+              Wallet
             </button>
           </div>
 
@@ -79,9 +80,31 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
                 </div>
                 
                 <div className="account-actions">
+                  {/* Hidden UserButton that we'll trigger programmatically */}
+                  <div style={{ position: 'absolute', visibility: 'hidden', pointerEvents: 'none' }}>
+                    <UserButton afterSignOutUrl="/" />
+                  </div>
+                  
                   <button 
                     className="action-button"
-                    onClick={() => window.open('https://accounts.clerk.dev/user', '_blank')}
+                    onClick={() => {
+                      setShowClerkDropdown(true);
+                      // Find and click the hidden UserButton to open its dropdown
+                      const userButtonTrigger = document.querySelector('.cl-userButtonTrigger');
+                      if (userButtonTrigger) {
+                        userButtonTrigger.click();
+                      }
+                      // Listen for when the dropdown closes
+                      setTimeout(() => {
+                        const checkInterval = setInterval(() => {
+                          const dropdown = document.querySelector('.cl-userButtonPopoverCard');
+                          if (!dropdown) {
+                            setShowClerkDropdown(false);
+                            clearInterval(checkInterval);
+                          }
+                        }, 100);
+                      }, 500);
+                    }}
                   >
                     Manage Account
                   </button>
@@ -98,21 +121,29 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
                 {isWalletConnected ? (
                   <>
                     <div className="wallet-info">
-                      <div className="wallet-address">
-                        <span>Address:</span>
-                        <code>{walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)}</code>
-                        <button 
-                          onClick={() => {
-                            navigator.clipboard.writeText(walletAddress);
-                            alert('Address copied!');
-                          }}
-                        >
-                          📋
-                        </button>
+                      <div className="wallet-address" style={{ flexDirection: 'column', gap: '8px' }}>
+                        <span className="wallet-label" style={{ textAlign: 'center', width: '100%' }}>Address</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+                          <code style={{ flex: 1 }}>{walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)}</code>
+                          <button 
+                            className="copy-btn"
+                            onClick={() => {
+                              navigator.clipboard.writeText(walletAddress);
+                              const btn = event.target;
+                              const originalText = btn.textContent;
+                              btn.textContent = '✓';
+                              setTimeout(() => {
+                                btn.textContent = originalText;
+                              }, 1000);
+                            }}
+                          >
+                            ⧉
+                          </button>
+                        </div>
                       </div>
-                      <div className="wallet-balance">
-                        <span>Balance:</span>
-                        <strong>{tokenBalance || '0'} RL80</strong>
+                      <div className="wallet-balance" style={{ flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+                        <span className="wallet-label" style={{ textAlign: 'center', width: '100%' }}>Balance</span>
+                        <strong className="balance-amount" style={{ width: '100%' }}>{tokenBalance?.toLocaleString() || '0'} RL80</strong>
                       </div>
                     </div>
                     
@@ -163,78 +194,131 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
           onClose={() => setShowWalletDetails(false)} 
         />
       )}
+      
+      {/* Blurred backdrop when Clerk dropdown is open */}
+      {showClerkDropdown && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(5px)',
+            zIndex: 9999,
+            pointerEvents: 'none'
+          }}
+        />
+      )}
+      
+      {/* Global styles for Clerk dropdown z-index */}
+      <style jsx global>{`
+        .cl-userButtonPopoverCard,
+        .cl-userButtonPopoverFooter,
+        .cl-popoverCard,
+        .cl-userButtonPopoverMain,
+        .cl-scrollBox,
+        [data-localization-key] {
+          z-index: 10000 !important;
+        }
+        
+        .cl-portal {
+          z-index: 10001 !important;
+        }
+        
+        /* Override Clerk's inline positioning to center the dropdown */
+        .cl-userButtonPopoverCard {
+          position: fixed !important;
+          top: 50% !important;
+          left: 50% !important;
+          transform: translate(-50%, -50%) !important;
+        }
+      `}</style>
 
       <style jsx>{`
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&display=swap');
         .modal-overlay {
           position: fixed;
           top: 0;
           left: 0;
           right: 0;
           bottom: 0;
-          background: rgba(0, 0, 0, 0.8);
+          background: rgba(0, 0, 0, 0.85);
+          backdrop-filter: blur(10px);
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 9999;
+          z-index: 50;
         }
 
         .unified-modal {
-          background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-          border: 2px solid rgba(0, 245, 212, 0.3);
-          border-radius: 20px;
-          padding: 2rem;
+          background: rgba(20, 20, 30, 0.95);
+          border: 1px solid rgba(138, 43, 226, 0.2);
+          border-radius: 16px;
+          padding: 1.5rem;
           width: 90%;
-          max-width: 400px;
+          max-width: 420px;
           position: relative;
-          box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
         }
 
         .modal-close-btn {
           position: absolute;
-          top: 1rem;
-          right: 1rem;
-          background: rgba(255, 255, 255, 0.1);
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          color: white;
-          width: 30px;
-          height: 30px;
-          border-radius: 50%;
+          top: 0.75rem;
+          right: 0.75rem;
+          background: transparent;
+          border: none;
+          color: rgba(255, 255, 255, 0.5);
+          width: 28px;
+          height: 28px;
+          border-radius: 6px;
           font-size: 20px;
           cursor: pointer;
           transition: all 0.2s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .modal-close-btn:hover {
-          background: rgba(255, 0, 0, 0.3);
-          transform: scale(1.1);
+          color: rgba(255, 255, 255, 0.9);
+          background: rgba(255, 255, 255, 0.1);
         }
 
         .modal-tabs {
           display: flex;
-          gap: 0.5rem;
+          gap: 0;
           margin-bottom: 1.5rem;
-          border-bottom: 1px solid rgba(0, 245, 212, 0.2);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          justify-content: center;
         }
 
         .modal-tab {
           background: transparent;
           border: none;
-          color: rgba(255, 255, 255, 0.6);
-          padding: 0.75rem 1.5rem;
-          font-size: 1rem;
+          color: rgba(255, 255, 255, 0.5);
+          padding: 0.75rem 2rem;
+          font-size: 0.9rem;
+          font-weight: 500;
+          font-family: 'Orbitron', monospace;
+          text-transform: uppercase;
+          letter-spacing: 1px;
           cursor: pointer;
           transition: all 0.2s;
           border-bottom: 2px solid transparent;
           margin-bottom: -1px;
+          position: relative;
         }
 
         .modal-tab.active {
           color: #00f5d4;
           border-bottom-color: #00f5d4;
+          text-shadow: 0 0 10px rgba(0, 245, 212, 0.3);
         }
 
-        .modal-tab:hover {
-          color: #00f5d4;
+        .modal-tab:hover:not(.active) {
+          color: rgba(255, 255, 255, 0.8);
         }
 
         .modal-content {
@@ -243,16 +327,19 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
 
         .user-info {
           display: flex;
+          flex-direction: column;
           align-items: center;
           gap: 1rem;
           margin-bottom: 2rem;
+          text-align: center;
         }
 
         .user-avatar {
           width: 60px;
           height: 60px;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          border-radius: 12px;
+          background: rgba(138, 43, 226, 0.1);
+          border: 1px solid rgba(138, 43, 226, 0.3);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -291,40 +378,45 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
         }
 
         .action-button {
-          background: rgba(0, 245, 212, 0.1);
+          background: rgba(255, 255, 255, 0.05);
           border: 1px solid rgba(0, 245, 212, 0.3);
-          color: #00f5d4;
+          color: #fff;
           padding: 0.75rem;
           border-radius: 10px;
-          font-size: 1rem;
+          font-size: 0.9rem;
+          font-family: 'Orbitron', monospace;
+          font-weight: 500;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
           cursor: pointer;
           transition: all 0.2s;
         }
 
         .action-button:hover {
-          background: rgba(0, 245, 212, 0.2);
-          transform: translateY(-2px);
-          box-shadow: 0 5px 15px rgba(0, 245, 212, 0.3);
+          background: rgba(0, 245, 212, 0.1);
+          border-color: rgba(0, 245, 212, 0.5);
+          box-shadow: 0 0 20px rgba(0, 245, 212, 0.2);
         }
 
         .action-button.signout,
         .action-button.disconnect {
-          background: rgba(255, 59, 48, 0.1);
+          background: rgba(255, 255, 255, 0.05);
           border-color: rgba(255, 59, 48, 0.3);
-          color: #ff3b30;
+          color: #ff6b6b;
         }
 
         .action-button.signout:hover,
         .action-button.disconnect:hover {
-          background: rgba(255, 59, 48, 0.2);
-          box-shadow: 0 5px 15px rgba(255, 59, 48, 0.3);
+          background: rgba(255, 59, 48, 0.1);
+          border-color: rgba(255, 59, 48, 0.5);
+          box-shadow: 0 0 20px rgba(255, 59, 48, 0.2);
         }
 
         .wallet-info {
-          background: rgba(0, 0, 0, 0.3);
-          border: 1px solid rgba(0, 245, 212, 0.2);
-          border-radius: 10px;
-          padding: 1rem;
+          background: rgba(0, 0, 0, 0.4) !important;
+          border: 1px solid rgba(0, 245, 212, 0.2) !important;
+          border-radius: 12px;
+          padding: 1.5rem;
           margin-bottom: 1.5rem;
         }
 
@@ -332,33 +424,69 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
         .wallet-balance {
           display: flex;
           align-items: center;
-          gap: 0.5rem;
-          margin: 0.5rem 0;
+          justify-content: space-between;
+          margin: 1rem 0;
           color: white;
+        }
+        
+        .wallet-label {
+          color: rgba(255, 255, 255, 0.5);
+          font-size: 0.85rem;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          font-family: 'Orbitron', monospace;
+          min-width: 70px;
+          text-align: left;
         }
 
         .wallet-address code {
+          background: rgba(0, 245, 212, 0.05);
+          border: 1px solid rgba(0, 245, 212, 0.2);
+          padding: 0.4rem 0.75rem;
+          border-radius: 8px;
+          font-family: 'Courier New', monospace;
+          color: #00f5d4;
+          font-size: 0.95rem;
+          font-weight: 500;
+          flex: 1;
+          text-align: center;
+          margin: 0 0.5rem;
+        }
+
+        .copy-btn {
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          color: rgba(255, 255, 255, 0.6);
+          width: 28px;
+          height: 28px;
+          border-radius: 6px;
+          cursor: pointer;
+          transition: all 0.2s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+        }
+
+        .copy-btn:hover {
           background: rgba(0, 245, 212, 0.1);
-          padding: 0.25rem 0.5rem;
-          border-radius: 5px;
-          font-family: monospace;
+          border-color: rgba(0, 245, 212, 0.3);
           color: #00f5d4;
         }
 
-        .wallet-address button {
-          background: transparent;
-          border: none;
-          cursor: pointer;
-          font-size: 1rem;
-          transition: transform 0.2s;
-        }
-
-        .wallet-address button:hover {
-          transform: scale(1.2);
-        }
-
-        .wallet-balance strong {
-          color: #ffee00;
+        .balance-amount {
+          color: #00f5d4 !important;
+          font-family: 'Orbitron', monospace;
+          font-size: 1.1rem;
+          font-weight: 600;
+          text-shadow: 0 0 10px rgba(0, 245, 212, 0.3);
+          background: rgba(0, 245, 212, 0.05) !important;
+          padding: 0.4rem 0.75rem;
+          border-radius: 8px;
+          border: 1px solid rgba(0, 245, 212, 0.2) !important;
+          flex: 1;
+          text-align: center;
+          margin-left: 0.5rem;
         }
 
         .wallet-connect {
@@ -372,9 +500,15 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
         }
 
         .action-button.connect {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          border: none;
-          color: white;
+          background: rgba(138, 43, 226, 0.1);
+          border: 1px solid rgba(138, 43, 226, 0.3);
+          color: #fff;
+        }
+        
+        .action-button.connect:hover {
+          background: rgba(138, 43, 226, 0.2);
+          border-color: rgba(138, 43, 226, 0.5);
+          box-shadow: 0 0 20px rgba(138, 43, 226, 0.3);
         }
 
         @media (max-width: 480px) {

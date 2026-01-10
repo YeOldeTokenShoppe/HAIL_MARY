@@ -394,10 +394,7 @@ a {
   color: #fff !important;
 }
 
-.swiper-button-next,
-.swiper-button-prev {
-  color: #8e662b;
-}
+
 .mySwiper {
   width: 100%;
   height: 500px;
@@ -406,20 +403,7 @@ a {
 .mySwiper .swiper-slide {
   width: auto;
 }
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  color: #8e662b;
-  /* font-family: "UnifrakturCook"; */
-  font-weight: 700;
-  letter-spacing: 0.15rem;
-  line-height: 1.5;
-  margin: 0 0 1.5rem 0;
-  text-align: center;
-}
+/*  */
 .headlines h1 {
   line-height: 1 !important;
   margin-bottom: 1rem !important;
@@ -431,19 +415,7 @@ h6 {
   line-height: 1.3;
 }
 
-.headlines h1,
-.headlines h2,
-.headlines h3,
-.headlines h4,
-.headlines h5,
-.headlines h6 {
-  color: #8e662b !important;
-  /* font-family: UnifrakturCook !important; */
-  font-weight: 700;
-  letter-spacing: 0.15rem;
-  margin: 0 0 1.5rem;
-  text-align: center;
-}
+
 
 .words {
   font-size: 1.25rem;
@@ -708,32 +680,8 @@ p {
   text-align: center;
 }
 
-h1,
-h2,
-h3,
-h4,
-h6 {
-  color: #8e662b;
-  /* font-family: "UnifrakturCook" !important; */
-  font-weight: 700;
-  letter-spacing: 0.15rem;
-  line-height: 1.5;
-  margin: 0 0 1.5rem 0;
-  text-align: center;
-  /* text-transform: uppercase; */
-}
-h3,
-h4,
-h5 {
-  color: #8e662b !important;
-  /* font-family: "UnifrakturCook" !important; */
-  font-weight: 700;
-  letter-spacing: 0.15rem;
-  line-height: 1.5;
-  margin: 0 0 1.5rem 0;
-  text-align: center;
-  /* text-transform: uppercase; */
-}
+
+
 h1.major,
 h2.major,
 h3.major,
@@ -1293,16 +1241,7 @@ ul.icons li .icon:hover:active {
   overflow: auto;
 }
 
-.bm-item {
-  display: inline-block;
-  text-decoration: none;
-  margin-bottom: 10px;
-  color: #8e662b !important;
-  transition: color 0.4s;
-  text-align: center; /* Centers the text */
-  padding-top: 50px;
-  font-family: "UnifrakturCook" !important;
-}
+
 
 .header-one .bm-item:hover {
   color: #b26e9c !important;
@@ -1315,22 +1254,7 @@ ul.icons li .icon:hover:active {
   transform: scale(0.8) !important; /* Same scale */
 }
 
-.bm-burger-button {
-  position: absolute;
-  width: 4em;
-  height: 4em;
-  left: 5% !important;
-  top: 3rem;
-  z-index: 1 !important;
-}
 
-.bm-burger-bars {
-  background: #8e662b;
-  height: 15px !important;
-}
-.bm-burger-bars:hover {
-  color: #b26e9c !important;
-}
 
 /* .bm-burger-bars-hover {
   background: #a90000;
@@ -1342,9 +1266,7 @@ ul.icons li .icon:hover:active {
   font-size: medium;
 }
 
-.bm-cross {
-  background: #8e662b !important;
-}
+
 .bm-cross:hover {
   color: #b26e9c !important;
 
@@ -2045,21 +1967,6 @@ i {
   font-style: italic;
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  color: #8e662b;
-  /* font-family: "UnifrakturCook"; */
-  font-weight: 700;
-  letter-spacing: 0.15rem;
-  line-height: 1.5;
-  margin: 0 0 1.5rem 0;
-  text-align: center;
-  /* text-transform: uppercase; */
-}
 
 h1.major,
 h2.major,
@@ -2588,10 +2495,7 @@ ul.icons li .icon:hover:active {
   /* z-index: 1; */
 }
 
-.bm-burger-bars {
-  background: #8e662b;
-  height: 10px !important;
-}
+
 
 .bm-cross-button {
   top: 2rem;
@@ -3298,11 +3202,11 @@ h3 {
   -webkit-text-stroke: 1px black;
 }
 
-* {
+/* * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-}
+} */
 
 *:focus,
 *:active {
@@ -3326,26 +3230,7 @@ h3 {
   list-style: none;
 }
 
-.wrapper .icon {
-  position: relative;
-  background: #1b1724;
-  border: 0px;
-  border: 2px solid #8e662b;
 
-  border-radius: 50%;
-  padding: 15px;
-  margin: 10px;
-  width: 50px;
-  height: 50px;
-  font-size: 18px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  flex-direction: column;
-  box-shadow: 0 10px 10px rgba(0, 0, 0, 0.1);
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-}
 
 .wrapper .tooltip {
   position: absolute;
@@ -4121,14 +4006,7 @@ div.css-161tt0w {
   margin: 1rem;
   animation: modalFadeIn 0.3s ease-out;
 }
-.modal-content {
-  background-color: #8e662b;
-  padding: 20px;
-  border-radius: 8px;
-  width: auto; /* Automatically size based on content */
-  max-width: 100%; /* Prevent the modal from exceeding the screen width */
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-}
+
 
 /* Close button for the modal */
 .close-button {
@@ -4542,17 +4420,7 @@ body {
   object-fit: cover;
   border-radius: 10% !important;
 }
-.css-ez23ye {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 3rem !important;
-  height: 3rem !important;
-  object-fit: cover;
-  z-index: 1000;
-  background: #8e662b !important;
-  color: white !important;
-}
+
 @media (max-width: 760px) {
   .menu-wrapper {
     width: 100%;
@@ -5466,32 +5334,7 @@ body {
   color: #ffeb3b;
 }
 
-.modal-content {
-  width: 350px;
-  height: 350px;
-  position: relative;
-  animation: modalFadeIn 0.3s ease-out;
-  overflow: hidden; /* Add this */
-  border-radius: 20px;
-  /* background: rgba(0, 0, 0, 0.5) !important; */
-  padding: 1rem;
-  margin: 1rem;
-  animation: modalFadeIn 0.3s ease-out;
-}
-.modal-overlay {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 1000;
 
-  align-items: center;
-  justify-content: center;
-  overflow: hidden; /* Add this */
-}
 
 /* Optional: Add transform-style preservation to maintain 3D effects */
 .eight,
@@ -6692,8 +6535,12 @@ body .cl-signUp-root {
 body .cl-signIn-root .cl-card,
 body .cl-signUp-root .cl-card {
   overflow: visible !important;
+  border-radius: 30px;
 }
 
+.cl-internal-y5cuhb {
+  gap: 0;
+}
 /* Style social media buttons with gradient and glow */
 body .cl-socialButtonsBlockButton,
 body .cl-internal-1uc9s2c {
@@ -6912,10 +6759,13 @@ body .cl-internal-dsfs4w {
 }
 
 /* Round any parent containers */
-body [class*="cl-internal"] {
+/* body [class*="cl-internal"] {
   border-radius: 20px !important;
-}
+} */
+.cl-internal-w3zdjl {
+transform: none;
 
+}
 /* Ensure the modal portal container is also rounded */
 body [data-clerk-portal] > div > div {
   border-radius: 20px !important;

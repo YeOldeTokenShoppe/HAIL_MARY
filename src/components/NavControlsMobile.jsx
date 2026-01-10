@@ -127,8 +127,8 @@ export default function NavControlsMobile({
 
         .avatar-status-mobile {
           position: absolute;
-          bottom: -1px;
-          right: -1px;
+          bottom: 1px;
+          right: 1px;
           width: 8px;
           height: 8px;
           background: #00ff88;

@@ -11,7 +11,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
   
   const [offeringType, setOfferingType] = useState('petition');
   const [message, setMessage] = useState('');
-  const [tokenAmount, setTokenAmount] = useState(100);
+  const [tokenAmount, setTokenAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Reset form when modal opens
@@ -19,7 +19,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
     if (isOpen) {
       setOfferingType('petition');
       setMessage('');
-      setTokenAmount(100);
+      setTokenAmount('');
       setIsSubmitting(false);
     }
   }, [isOpen]);
@@ -34,6 +34,12 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
       return;
     }
 
+    const amount = parseInt(tokenAmount) || 0;
+    if (amount < 1) {
+      alert('Minimum 1 RL80 token required to light a candle');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -41,7 +47,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
         name: user?.firstName || user?.username || 'Anonymous',
         type: offeringType,
         message: message.trim(),
-        tokensBurned: tokenAmount,
+        tokensBurned: parseInt(tokenAmount) || 0,
         userId: user?.id,
         walletAddress: walletAddress,
         userImageUrl: user?.imageUrl || null,
@@ -83,7 +89,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
       description: 'Ask for guidance or help'
     },
     confession: { 
-      icon: '🖤', 
+      icon: '❤️‍🔥', 
       color: '#aa66ff', 
       label: 'CONFESSION',
       description: 'Share what weighs on your heart'
@@ -91,8 +97,8 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
     appreciation: { 
       icon: '✨', 
       color: '#00ff66', 
-      label: 'APPRECIATION',
-      description: 'Express gratitude and thanks'
+      label: 'THANKS',
+      description: 'Express gratitude'
     }
   };
 
@@ -135,16 +141,24 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
         }
 
         .modal-content {
-          background: linear-gradient(135deg, #1a0525 0%, #2a0a3a 100%);
-          border: 2px solid rgba(255, 0, 255, 0.3);
+          background: rgba(20, 20, 30, 0.98);
+          border: 2px solid transparent;
+          background-image: linear-gradient(rgba(20, 20, 30, 0.98), rgba(20, 20, 30, 0.98)),
+                           linear-gradient(90deg, #8b5cf6, #ec4899);
+          background-origin: border-box;
+          background-clip: padding-box, border-box;
           border-radius: 20px;
           padding: 2rem;
           width: 90%;
           max-width: 500px;
-          max-height: 90vh;
-          overflow-y: auto;
+          height: auto;
+          max-height: 85vh;
+          overflow: hidden;
           position: relative;
           animation: fadeIn 0.4s ease-out;
+          display: flex;
+          flex-direction: column;
+          box-shadow: 0 20px 60px rgba(139, 92, 246, 0.3);
         }
 
         .close-button {
@@ -153,71 +167,82 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           right: 1rem;
           background: none;
           border: none;
-          color: #fff;
+          color: #ec4899;
           font-size: 1.5rem;
           cursor: pointer;
-          opacity: 0.7;
-          transition: opacity 0.2s;
+          transition: all 0.2s;
+          width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
 
         .close-button:hover {
-          opacity: 1;
+          transform: scale(1.1);
+          color: #f472b6;
         }
 
         .modal-title {
-          font-size: 2rem;
-          font-weight: bold;
+          font-size: 1.5rem;
+          font-weight: 600;
           color: #fff;
           text-align: center;
           margin-bottom: 1.5rem;
           font-family: 'Orbitron', monospace;
-          text-shadow: 0 0 20px rgba(255, 0, 255, 0.5);
         }
 
         .offering-types {
           display: flex;
-          gap: 0.5rem;
+          gap: 0.4rem;
           margin-bottom: 1.5rem;
+          justify-content: center;
         }
 
         .offering-type-button {
           flex: 1;
-          padding: 0.75rem;
-          background: rgba(255, 255, 255, 0.05);
-          border: 2px solid transparent;
-          border-radius: 10px;
-          color: #fff;
+          padding: 0.5rem 0.3rem;
+          background: transparent;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 12px;
+          color: rgba(255, 255, 255, 0.7);
           cursor: pointer;
           transition: all 0.3s;
           text-align: center;
+          min-width: 0;
         }
 
         .offering-type-button:hover {
-          background: rgba(255, 255, 255, 0.1);
+          background: rgba(255, 255, 255, 0.05);
+          border-color: rgba(255, 255, 255, 0.2);
         }
 
         .offering-type-button.selected {
-          background: rgba(255, 255, 255, 0.15);
-          animation: glow 2s ease-in-out infinite;
+          background: rgba(139, 92, 246, 0.1);
+          border-color: #8b5cf6;
+          color: #fff;
         }
 
         .type-icon {
-          font-size: 1.5rem;
+          font-size: 1.25rem;
           display: block;
-          margin-bottom: 0.25rem;
+          margin-bottom: 0.3rem;
         }
 
         .type-label {
-          font-size: 0.75rem;
-          font-weight: bold;
+          font-size: 0.65rem;
+          font-weight: 600;
           text-transform: uppercase;
-          letter-spacing: 1px;
+          letter-spacing: 0.5px;
+          word-break: break-word;
         }
 
         .type-description {
-          font-size: 0.6rem;
+          font-size: 0.5rem;
           opacity: 0.7;
-          margin-top: 0.25rem;
+          margin-top: 0.2rem;
+          line-height: 1.2;
+          padding: 0 0.2rem;
         }
 
         .form-group {
@@ -226,76 +251,76 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
 
         .form-label {
           display: block;
-          color: #fff;
+          color: #00f5d4;
           margin-bottom: 0.5rem;
-          font-size: 0.875rem;
+          font-size: 0.75rem;
           text-transform: uppercase;
           letter-spacing: 1px;
-          opacity: 0.8;
+          font-weight: 500;
         }
 
         .message-textarea {
           width: 100%;
-          min-height: 120px;
+          height: 80px;
           padding: 0.75rem;
-          background: rgba(255, 255, 255, 0.05);
-          border: 2px solid rgba(255, 255, 255, 0.2);
-          border-radius: 10px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 12px;
           color: #fff;
-          font-size: 1rem;
-          resize: vertical;
+          font-size: 0.9rem;
+          resize: none;
           transition: all 0.3s;
         }
 
         .message-textarea:focus {
           outline: none;
-          border-color: rgba(255, 0, 255, 0.5);
-          background: rgba(255, 255, 255, 0.08);
+          border-color: #8b5cf6;
+          background: rgba(139, 92, 246, 0.05);
         }
 
         .token-input {
           width: 100%;
           padding: 0.75rem;
-          background: rgba(255, 255, 255, 0.05);
-          border: 2px solid rgba(255, 255, 255, 0.2);
-          border-radius: 10px;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          border-radius: 12px;
           color: #fff;
-          font-size: 1rem;
+          font-size: 0.9rem;
           transition: all 0.3s;
         }
 
         .token-input:focus {
           outline: none;
-          border-color: rgba(255, 170, 0, 0.5);
-          background: rgba(255, 255, 255, 0.08);
+          border-color: #8b5cf6;
+          background: rgba(139, 92, 246, 0.05);
         }
 
         .token-balance {
-          font-size: 0.75rem;
-          color: #ffaa00;
-          margin-top: 0.25rem;
+          font-size: 0.7rem;
+          color: rgba(255, 255, 255, 0.5);
+          margin-top: 0.5rem;
         }
 
         .submit-button {
           width: 100%;
-          padding: 1rem;
-          background: linear-gradient(135deg, #ff006e 0%, #8338ec 100%);
+          padding: 0.875rem;
+          background: #fff;
           border: none;
-          border-radius: 10px;
-          color: #fff;
-          font-size: 1rem;
-          font-weight: bold;
-          text-transform: uppercase;
-          letter-spacing: 2px;
+          border-radius: 50px;
+          color: #000;
+          font-size: 0.9rem;
+          font-weight: 600;
           cursor: pointer;
           transition: all 0.3s;
           position: relative;
           overflow: hidden;
+          margin-top: 1rem;
         }
 
         .submit-button:hover:not(:disabled) {
           transform: translateY(-2px);
-          box-shadow: 0 10px 30px rgba(255, 0, 110, 0.4);
+          box-shadow: 0 10px 30px rgba(255, 255, 255, 0.2);
+          background: #f0f0f0;
         }
 
         .submit-button:disabled {
@@ -303,19 +328,15 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           cursor: not-allowed;
         }
 
-        .candle-icon {
-          display: inline-block;
-          margin-right: 0.5rem;
-        }
       `}</style>
 
       <div className="modal-overlay" onClick={onClose}>
         <div className="modal-content" onClick={(e) => e.stopPropagation()}>
           <button className="close-button" onClick={onClose}>✕</button>
           
-          <h2 className="modal-title">🕯️ Light a Candle</h2>
+          <h2 className="modal-title">Light a Candle</h2>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
             {/* Offering Type Selection */}
             <div className="offering-types">
               {Object.entries(offeringTypes).map(([type, config]) => (
@@ -344,13 +365,13 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
               <textarea
                 id="message"
                 className="message-textarea"
-                placeholder="Share your thoughts with Our Lady..."
+                placeholder=""
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 maxLength={280}
                 required
               />
-              <div style={{ textAlign: 'right', fontSize: '0.75rem', color: '#666', marginTop: '0.25rem' }}>
+              <div style={{ textAlign: 'right', fontSize: '0.6rem', color: '#666', marginTop: '0.1rem' }}>
                 {message.length}/280
               </div>
             </div>
@@ -367,7 +388,8 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                 min="1"
                 max={tokenBalance || 10000}
                 value={tokenAmount}
-                onChange={(e) => setTokenAmount(parseInt(e.target.value) || 0)}
+                onChange={(e) => setTokenAmount(e.target.value)}
+                placeholder="1 RL80 minimum"
                 required
               />
               {tokenBalance !== null && tokenBalance !== undefined ? (
@@ -389,9 +411,8 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
             <button
               type="submit"
               className="submit-button"
-              disabled={isSubmitting || !message.trim()}
+              disabled={isSubmitting || !message.trim() || !tokenAmount || parseInt(tokenAmount) < 1}
             >
-              <span className="candle-icon">🕯️</span>
               {isSubmitting ? 'Lighting...' : 'Light Candle'}
             </button>
           </form>

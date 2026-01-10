@@ -72,7 +72,6 @@ export function WalletAuthProvider({ children }) {
         localStorage.setItem(`wallet_${user.id}`, JSON.stringify(walletData));
       }
       
-      console.log('Wallet synced locally for user:', user.id);
     } catch (error) {
       console.error('Error syncing wallet:', error);
     } finally {
@@ -126,7 +125,6 @@ export function WalletAuthProvider({ children }) {
         if (user) {
           logWalletConnection(user, account.address, walletType).then(docId => {
             if (docId) {
-              console.log('Wallet connection logged to Firebase:', docId);
             }
           }).catch(error => {
             console.error('Error logging wallet connection:', error);
@@ -157,12 +155,10 @@ export function WalletAuthProvider({ children }) {
       // Clear wallet from localStorage
       if (user) {
         localStorage.removeItem(`wallet_${user.id}`);
-        console.log('Wallet disconnected for user:', user.id);
         
         // Log wallet disconnection to Firebase
         logWalletDisconnection(user, currentAddress).then(docId => {
           if (docId) {
-            console.log('Wallet disconnection logged to Firebase:', docId);
           }
         }).catch(error => {
           console.error('Error logging wallet disconnection:', error);
@@ -183,7 +179,6 @@ export function WalletAuthProvider({ children }) {
         try {
           const walletData = JSON.parse(storedData);
           if (walletData.walletAddress) {
-            console.log('Found previous wallet in storage:', walletData.walletAddress);
             // Note: Auto-reconnect would require storing wallet type
             // For now, user needs to manually reconnect
           }

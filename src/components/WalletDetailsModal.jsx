@@ -245,11 +245,11 @@ export function WalletDetailsModal({ onClose }) {
 
         {/* Staking Section */}
         <div className="wallet-section">
-          <h3>Staking Activity</h3>
+          <h3 style={{ display: 'block', width: '100%', marginBottom: '12px' }}>Staking Activity</h3>
           {isLoadingStaking ? (
             <div className="loading-spinner">Loading staking data...</div>
           ) : (
-            <>
+            <div style={{ width: '100%' }}>
               <div className="staking-grid">
                 <div className="staking-item">
                   <span className="staking-label">Staked Amount</span>
@@ -277,7 +277,7 @@ export function WalletDetailsModal({ onClose }) {
                   <span className="time-label">Ready to claim!</span>
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
 
@@ -320,7 +320,10 @@ export function WalletDetailsModal({ onClose }) {
               className="action-button unstake"
               style={{ backgroundColor: '#ff6b6b' }}
             >
-              Unstake All ({stakedBalance} RL80)
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                <span>Unstake All</span>
+                <span style={{ fontSize: '9px', opacity: 0.8 }}>({stakedBalance} RL80)</span>
+              </div>
             </TransactionButton>
           )}
           
@@ -578,18 +581,16 @@ export const WalletDetailsStyles = () => (
     }
 
     .wallet-details-modal {
-      background: linear-gradient(135deg, rgba(20, 20, 35, 0.98), rgba(30, 20, 45, 0.98));
-      border: 2px solid rgba(0, 245, 212, 0.3);
-      border-radius: 24px;
-      padding: 30px;
-      max-width: 520px;
+      background: rgba(20, 20, 30, 0.95);
+      border: 1px solid rgba(0, 245, 212, 0.2);
+      border-radius: 16px;
+      padding: 20px;
+      max-width: 480px;
       width: 90%;
       max-height: 85vh;
       overflow-y: auto;
       position: relative;
-      box-shadow: 
-        0 0 80px rgba(0, 245, 212, 0.3),
-        inset 0 0 30px rgba(138, 43, 226, 0.1);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
       animation: slideUp 0.3s ease;
     }
 
@@ -633,13 +634,13 @@ export const WalletDetailsStyles = () => (
 
     .wallet-details-header h2 {
       color: #fff;
-      font-size: 24px;
-      font-weight: bold;
+      font-size: 18px;
+      font-weight: 600;
       font-family: 'Orbitron', monospace;
       text-transform: uppercase;
-      letter-spacing: 2px;
+      letter-spacing: 1px;
       margin: 0;
-      text-shadow: 0 0 20px rgba(255, 255, 255, 0.6);
+      text-shadow: 0 0 10px rgba(0, 245, 212, 0.3);
     }
 
     .wallet-status-badge {
@@ -671,17 +672,22 @@ export const WalletDetailsStyles = () => (
 
     /* Sections */
     .wallet-section {
-      margin-bottom: 25px;
+      margin-bottom: 20px;
+      display: block !important;
+      width: 100% !important;
     }
 
     .wallet-section h3 {
       color: #00f5d4;
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 600;
       font-family: 'Orbitron', monospace;
       text-transform: uppercase;
       letter-spacing: 1px;
-      margin: 0 0 12px 0;
+      margin: 0 0 10px 0;
+      width: 100%;
+      padding-bottom: 6px;
+      border-bottom: 1px solid rgba(0, 245, 212, 0.1);
     }
 
     /* Address Box */
@@ -704,28 +710,30 @@ export const WalletDetailsStyles = () => (
     }
 
     .copy-button, .refresh-button {
-      padding: 8px;
-      background: rgba(255, 238, 0, 0.1);
-      border: 1px solid rgba(255, 238, 0, 0.3);
-      border-radius: 8px;
+      padding: 6px 10px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
       cursor: pointer;
-      font-size: 16px;
+      font-size: 14px;
       transition: all 0.2s;
+      color: rgba(255, 255, 255, 0.6);
     }
 
     .copy-button:hover, .refresh-button:hover {
-      background: rgba(255, 238, 0, 0.2);
-      transform: scale(1.05);
+      background: rgba(0, 245, 212, 0.1);
+      border-color: rgba(0, 245, 212, 0.3);
+      color: #00f5d4;
     }
 
     /* Balance Grid */
     .balance-grid {
       display: flex;
       align-items: center;
-      gap: 12px;
+      justify-content: space-between;
       padding: 16px;
       background: rgba(0, 0, 0, 0.4);
-      border: 1px solid rgba(255, 238, 0, 0.2);
+      border: 1px solid rgba(0, 245, 212, 0.2);
       border-radius: 12px;
     }
 
@@ -744,44 +752,49 @@ export const WalletDetailsStyles = () => (
     }
 
     .balance-value {
-      color: #ffee00;
-      font-size: 24px;
-      font-weight: bold;
+      color: #00f5d4;
+      font-size: 20px;
+      font-weight: 600;
       font-family: 'Orbitron', monospace;
-      text-shadow: 0 0 15px rgba(255, 238, 0, 0.5);
+      text-shadow: 0 0 10px rgba(0, 245, 212, 0.4);
     }
 
     /* Staking Grid */
     .staking-grid {
-      display: grid;
+      display: grid !important;
       grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-      margin-bottom: 15px;
+      gap: 10px;
+      margin-bottom: 10px;
+      width: 100%;
+      clear: both;
     }
 
     .staking-item {
-      padding: 12px;
+      padding: 10px;
       background: rgba(0, 0, 0, 0.3);
       border: 1px solid rgba(138, 43, 226, 0.2);
-      border-radius: 10px;
+      border-radius: 8px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 4px;
+      min-width: 0; /* Allows content to shrink */
     }
 
     .staking-label {
       color: rgba(255, 255, 255, 0.5);
-      font-size: 10px;
+      font-size: 9px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       font-family: 'Orbitron', monospace;
+      line-height: 1;
     }
 
     .staking-value {
       color: #fff;
-      font-size: 16px;
+      font-size: 14px;
       font-weight: 600;
       font-family: 'Orbitron', monospace;
+      line-height: 1.2;
     }
 
     .staking-value.rewards {
@@ -794,10 +807,10 @@ export const WalletDetailsStyles = () => (
 
     /* Next Reward Box */
     .next-reward-box {
-      padding: 14px;
+      padding: 10px;
       background: linear-gradient(135deg, rgba(0, 255, 136, 0.1), rgba(0, 245, 212, 0.1));
       border: 1px solid rgba(0, 255, 136, 0.3);
-      border-radius: 10px;
+      border-radius: 8px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -805,35 +818,42 @@ export const WalletDetailsStyles = () => (
 
     .next-reward-box span {
       color: #00ff88;
-      font-size: 13px;
+      font-size: 11px;
       font-weight: 600;
       font-family: 'Orbitron', monospace;
     }
 
     .time-label {
       color: rgba(255, 255, 255, 0.6) !important;
-      font-size: 11px !important;
+      font-size: 10px !important;
     }
 
     /* Actions */
     .wallet-actions {
-      display: flex;
-      gap: 10px;
-      margin-top: 25px;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      margin-top: 20px;
     }
 
     .action-button {
-      flex: 1;
-      padding: 12px;
-      border-radius: 10px;
+      padding: 10px 8px;
+      border-radius: 8px;
       border: none;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: bold;
       font-family: 'Orbitron', monospace;
       text-transform: uppercase;
       letter-spacing: 0.5px;
       cursor: pointer;
       transition: all 0.2s;
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      width: 100%;
+      box-sizing: border-box;
     }
 
     .action-button.stake {
@@ -891,27 +911,25 @@ export const WalletDetailsStyles = () => (
     /* Close Button */
     .wallet-modal-close {
       position: absolute;
-      top: 15px;
-      right: 15px;
-      background: #ffee00;
-      color: #000;
-      width: 30px;
-      height: 30px;
-      border-radius: 4px;
+      top: 12px;
+      right: 12px;
+      background: transparent;
+      color: rgba(255, 255, 255, 0.5);
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
       border: none;
       font-size: 20px;
-      font-weight: bold;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       transition: all 0.2s;
-      transform: rotate(45deg);
     }
 
     .wallet-modal-close:hover {
-      background: #fff;
-      transform: rotate(45deg) scale(1.1);
+      color: rgba(255, 255, 255, 0.9);
+      background: rgba(255, 255, 255, 0.1);
     }
 
     /* Stake Modal Styles */
@@ -1008,7 +1026,7 @@ export const WalletDetailsStyles = () => (
     }
 
     .balance-hint {
-      color: rgba(255, 238, 0, 0.8);
+      color: rgba(0, 245, 212, 0.6);
       font-size: 11px;
       font-family: 'Orbitron', monospace;
       margin-top: 6px;
@@ -1062,11 +1080,19 @@ export const WalletDetailsStyles = () => (
       }
 
       .staking-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px;
       }
 
       .wallet-actions {
-        flex-direction: column;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px;
+      }
+      
+      .action-button {
+        font-size: 10px;
+        padding: 8px 6px;
+        min-height: 38px;
       }
 
       .stake-modal {

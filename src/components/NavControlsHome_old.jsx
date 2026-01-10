@@ -1,8 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SignInButton, useUser } from "@clerk/nextjs";
-import { usePathname } from 'next/navigation';
-import { useWalletAuth } from './WalletAuthProvider';
-import { UnifiedAccountModal } from './UnifiedAccountModal';
+import { SignInButton, UserButton } from "@clerk/nextjs";
 
 // Home page specific nav controls with integrated 80s mode button
 export default function NavControlsHome({ 
@@ -19,17 +16,6 @@ export default function NavControlsHome({
   userImage = null
 }) {
   const [emoji, setEmoji] = useState("😇");
-  const [showUnifiedModal, setShowUnifiedModal] = useState(false);
-  const pathname = usePathname(); // Get current path
-  const { user: clerkUser } = useUser();
-  const { 
-    walletAddress, 
-    tokenBalance, 
-    isWalletConnected,
-    connectWallet,
-    disconnectWallet,
-    isConnecting
-  } = useWalletAuth();
   
   // Alternate emoji for avatar
   useEffect(() => {
@@ -191,60 +177,6 @@ export default function NavControlsHome({
           background: rgba(212, 175, 55, 0.1);
         }
 
-        /* Unified Account/Wallet Container */
-        .unified-account-container {
-          height: 2.5rem;
-          min-width: fit-content;
-          flex-shrink: 0;
-        }
-        
-        .account-wallet-split {
-          display: flex;
-          align-items: center;
-          height: 100%;
-          background: rgba(0, 0, 0, 0.4);
-          border: 1.5px solid rgba(0, 245, 212, 0.2);
-          border-radius: 10px;
-          overflow: hidden;
-          transition: all 0.2s ease;
-        }
-        
-        .account-wallet-split:hover {
-          border-color: rgba(0, 245, 212, 0.4);
-          box-shadow: 0 0 10px rgba(0, 245, 212, 0.2);
-        }
-        
-        .account-section {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          height: 100%;
-          padding: 0 0.25rem;
-        }
-        
-        .button-divider {
-          width: 1px;
-          height: 60%;
-          background: rgba(0, 245, 212, 0.3);
-          margin: 0;
-        }
-        
-        .wallet-section {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          height: 100%;
-          padding: 0 0.4rem;
-          background: transparent;
-          border: none;
-          cursor: pointer;
-          transition: background 0.2s ease;
-        }
-        
-        .wallet-section:hover {
-          background: rgba(0, 245, 212, 0.1);
-        }
-        
         /* Avatar - Consistent size */
         .avatar-mobile {
           width: 2.5rem;
@@ -267,121 +199,6 @@ export default function NavControlsHome({
         .avatar-mobile:hover {
           border-color: rgba(212, 175, 55, 0.4);
           background: rgba(212, 175, 55, 0.1);
-        }
-
-        /* Wallet connected state */
-        .avatar-mobile.wallet-connected {
-          border-color: rgba(0, 245, 212, 0.4);
-          box-shadow: 0 0 10px rgba(0, 245, 212, 0.2);
-        }
-        
-        /* Wallet button when not connected */
-        .wallet-button-mobile {
-          width: auto;
-          min-width: 2.5rem;
-          height: 2.5rem;
-          padding: 0 10px;
-          flex-shrink: 0;
-          border-radius: 10px;
-          background: linear-gradient(135deg, rgba(0, 245, 212, 0.1), rgba(0, 187, 249, 0.1));
-          border: 1.5px solid rgba(0, 245, 212, 0.3);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 6px;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          font-family: 'Orbitron', monospace;
-          font-size: 9px;
-          font-weight: bold;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          color: #00f5d4;
-        }
-        
-        .wallet-button-mobile:hover {
-          border-color: rgba(0, 245, 212, 0.6);
-          background: linear-gradient(135deg, rgba(0, 245, 212, 0.2), rgba(0, 187, 249, 0.2));
-          box-shadow: 0 0 15px rgba(0, 245, 212, 0.3);
-          transform: scale(1.02);
-        }
-        
-        .wallet-button-mobile:active {
-          transform: scale(0.98);
-        }
-        
-        .wallet-icon {
-          width: 14px;
-          height: 14px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-        
-        /* Wallet info display */
-        .wallet-icon-mobile {
-          width: 2.5rem;
-          height: 2.5rem;
-          min-width: 2.5rem;
-          border-radius: 10px;
-          background: rgba(0, 0, 0, 0.4);
-          border: 1.5px solid rgba(0, 245, 212, 0.2);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 0.3rem;
-          transition: all 0.2s ease;
-          flex-shrink: 0;
-        }
-        
-        .wallet-icon-mobile:hover {
-          background: rgba(0, 245, 212, 0.1);
-          border-color: rgba(0, 245, 212, 0.4);
-          transform: scale(1.05);
-          box-shadow: 0 0 10px rgba(0, 245, 212, 0.3);
-        }
-        
-        /* Keep old styles for potential future use */
-        .wallet-info-mobile {
-          display: flex;
-          align-items: center;
-          gap: 4px;
-          padding: 0 6px;
-          height: 2.5rem;
-          border-radius: 10px;
-          background: rgba(0, 0, 0, 0.4);
-          border: 1.5px solid rgba(0, 245, 212, 0.2);
-          font-family: 'Orbitron', monospace;
-          font-size: 9px;
-          overflow: hidden;
-          min-width: fit-content;
-          transition: all 0.2s ease;
-        }
-        
-        .wallet-info-mobile:hover {
-          background: rgba(0, 245, 212, 0.1);
-          border-color: rgba(0, 245, 212, 0.4);
-          transform: scale(1.02);
-        }
-        
-        .wallet-address {
-          color: #00f5d4;
-          font-weight: 600;
-        }
-        
-        .wallet-balance {
-          color: #ffee00;
-          font-weight: bold;
-          padding: 2px 4px;
-          background: rgba(255, 238, 0, 0.1);
-          border-radius: 4px;
-          border: 1px solid rgba(255, 238, 0, 0.2);
-        }
-        
-        .wallet-divider {
-          width: 1px;
-          height: 14px;
-          background: rgba(212, 175, 55, 0.2);
         }
 
         /* Style Clerk's UserButton when wrapped in avatar-mobile */
@@ -597,47 +414,26 @@ export default function NavControlsHome({
           )}
         </div>
 
-        {/* Unified Account/Wallet Button */}
-        <div className="unified-account-container">
-          {clerkUser ? (
-            <button 
-              className="avatar-mobile"
-              onClick={() => setShowUnifiedModal(true)}
-              title={`Account${isWalletConnected ? ` | ${walletAddress?.slice(0, 6)}...${walletAddress?.slice(-4)}` : ''}`}
-            >
-              {clerkUser?.imageUrl ? (
-                <img 
-                  src={clerkUser.imageUrl} 
-                  alt="Avatar" 
-                  style={{ 
-                    width: '100%', 
-                    height: '100%',
-                    objectFit: 'cover',
-                    borderRadius: '8px'
-                  }}
-                />
-              ) : (
-                <span style={{ fontSize: '2rem' }}>{emoji}</span>
-              )}
-              {isWalletConnected && (
-                <div 
-                  className="avatar-status-mobile" 
-                  style={{ 
-                    background: '#00f5d4',
-                    boxShadow: '0 0 4px rgba(0, 245, 212, 0.6)'
-                  }}
-                />
-              )}
-            </button>
+        {/* Avatar */}
+        <div style={{ width: '2.5rem', height: '2.5rem', flexShrink: 0 }}>
+          {isUserSignedIn ? (
+            <div className="avatar-mobile" style={{ padding: 0 }}>
+              <UserButton 
+                afterSignOutUrl="/"
+                appearance={{
+                  elements: {
+                    avatarBox: "avatar-mobile-inner",
+                    userButtonTrigger: "avatar-mobile-inner"
+                  }
+                }}
+              />
+            </div>
           ) : (
-            <SignInButton 
-              mode="modal" 
-              forceRedirectUrl={pathname || "/"}
-            >
-              <div className="avatar-mobile" style={{ cursor: 'pointer' }}>
+            <SignInButton mode="modal" forceRedirectUrl="/">
+              <button className="avatar-mobile">
                 <span style={{ fontSize: '2rem' }}>{emoji}</span>
                 <div className="avatar-status-mobile offline" />
-              </div>
+              </button>
             </SignInButton>
           )}
         </div>
@@ -652,12 +448,6 @@ export default function NavControlsHome({
           <span className="menu-line-mobile" />
         </button>
       </div>
-      
-      {/* Unified Account Modal */}
-      <UnifiedAccountModal 
-        isOpen={showUnifiedModal} 
-        onClose={() => setShowUnifiedModal(false)} 
-      />
     </>
   );
 }

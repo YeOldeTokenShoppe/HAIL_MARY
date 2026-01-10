@@ -27,6 +27,11 @@ if (typeof window !== 'undefined') {
 // Base vertex shader chunk for candle wobble - reused across all materials
 // SIMPLIFIED: Use uTime directly - it's guaranteed smooth from Three.js clock
 const wobbleVertexChunk = `
+#ifndef USE_INSTANCING
+  attribute mat4 instanceMatrix;
+#endif
+
+  
   uniform float uTime;
   uniform float uPriceDirection;
   uniform float uContinuousOffset;
@@ -143,6 +148,8 @@ function createWobbleMaterial(baseColor, options = {}) {
     transparent: options.transparent ?? false,
     side: options.side ?? THREE.FrontSide,
     depthWrite: options.depthWrite ?? true,
+    // Enable instancing support
+    defines: { USE_INSTANCING: '' },
   })
 }
 
@@ -208,6 +215,8 @@ function createXBaseMaterial() {
       }
     `,
     side: THREE.FrontSide,
+    // Enable instancing support
+    defines: { USE_INSTANCING: '' },
   })
 }
 
@@ -357,6 +366,8 @@ function createFlameMaterial() {
     side: THREE.DoubleSide,
     depthWrite: true,
     toneMapped: true,
+    // Enable instancing support
+    defines: { USE_INSTANCING: '' },
   })
 }
 
@@ -528,13 +539,10 @@ function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.5
       onClick={(event) => {
         event.stopPropagation()
         if (onCandleClick && event.instanceId !== undefined && event.instanceId < positions.length) {
-          console.log('Clicked candle:', event.instanceId, 'at', positions[event.instanceId])
           onCandleClick(event.instanceId, positions[event.instanceId])
         }
       }}
-      onPointerMissed={() => {
-        console.log('Clicked but missed all candles')
-      }}
+
     />
   )
 }
@@ -554,6 +562,24 @@ function AnimationController({ priceDirection, priceRef, shortTermPriceRef, cont
 }
 
 export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, priceRef, shortTermPriceRef, continuousOffsetRef, additionalCandles = [], onCandleClick, clickedCandleId, isMobile = false, exclusionZone = null }) {
+  
+  // Reset uniforms on mount to ensure clean state
+  useEffect(() => {
+    // Reset uniforms on mount to ensure clean state
+    sharedUniforms.uTime.value = 0
+    sharedUniforms.uClickedId.value = -1
+    sharedUniforms.uPriceDirection.value = 0
+    sharedUniforms.uContinuousOffset.value = 0
+    sharedUniforms.uShortTermPrice.value = 0
+    sharedUniforms.uPulseTime.value = -1
+    sharedUniforms.uPulsePosition.value.set(0, 0, 0)
+    
+    return () => {
+      // Reset on unmount too
+      sharedUniforms.uTime.value = 0
+    }
+  }, [])
+  
   const { geometries, textures, localMatrices } = useClonedGeometries('/models/tinyVotiveOnly.glb')
   const basePositions = usePositions(count, exclusionZone)
   
@@ -569,12 +595,12 @@ export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUN
   }, [basePositions, additionalCandles])
   
   // Create materials ONCE
-const materials = useMemo(() => ({
-  xbase: createXBaseMaterial(),  // Now price-reactive!
-  glass: createWobbleMaterial('#888888', { transparent: true, opacity: 0.3 }),
-  wick: createWobbleMaterial('#222222'),
-  flame: createFlameMaterial(),  // Or createFlameMaterialPriceReactive() for tinted flames
-}), [])
+  const materials = useMemo(() => ({
+    xbase: createXBaseMaterial(),  // Now price-reactive!
+    glass: createWobbleMaterial('#888888', { transparent: true, opacity: 0.3 }),
+    wick: createWobbleMaterial('#222222'),
+    flame: createFlameMaterial(),  // Or createFlameMaterialPriceReactive() for tinted flames
+  }), [])
   
   // Update clicked ID in shared uniforms
   useEffect(() => {

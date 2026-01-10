@@ -1,9 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, Suspense } from 'react'
+import dynamic from 'next/dynamic'
 import { createPortal } from 'react-dom'
-import CarouselComponent from '@/components/carousel/Carousel'
-import NavControlsHome from '@/components/NavControlsHome'
 import CyberNav from '@/components/CyberNav'
 import Link from 'next/link'
 import { useUser } from '@clerk/nextjs'
@@ -11,11 +10,23 @@ import { useMusic } from '@/components/MusicContext'
 import ThirdwebBuyModal from '@/components/ThirdwebBuyModal'
 import CyberGlitchButton from '@/components/carousel/CyberGlitchButton'
 import CoinLoader from '@/components/CoinLoader'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useLanguage } from '@/components/LanguageProvider'
+
+// Dynamic imports with no SSR for consistent loading
+const CarouselComponent = dynamic(() => import('@/components/carousel/Carousel'), {
+  ssr: false,
+  loading: () => <CoinLoader loading={true} />
+})
+
+const NavControlsHome = dynamic(() => import('@/components/NavControlsHome'), {
+  ssr: false,
+  loading: () => null // Don't show loader for nav controls
+})
 
 export default function CarouselPage() {
   const router = useRouter()
+  const pathname = usePathname()
   const { user } = useUser()
   const { t } = useLanguage()
   const { 

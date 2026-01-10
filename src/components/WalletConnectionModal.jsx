@@ -2,12 +2,29 @@
 
 import { useState } from 'react';
 import { ConnectButton } from "thirdweb/react";
+import { darkTheme } from "thirdweb/react";
 import { client } from '@/lib/contract';
 import { defineChain } from "thirdweb/chains";
 import { inAppWallet } from "thirdweb/wallets/in-app";
 import { createWallet } from "thirdweb/wallets";
 
 const chain = defineChain(84532); // Base Sepolia
+
+// Custom theme for the wallet modal
+const customTheme = darkTheme({
+  colors: {
+    primaryButtonBg: "rgba(0, 245, 212, 0.1)",
+    primaryButtonText: "#00f5d4",
+    modalBg: "rgba(20, 20, 30, 0.98)",
+    borderColor: "rgba(0, 245, 212, 0.2)",
+    accentText: "#00f5d4",
+    primaryText: "#ffffff",
+    secondaryText: "rgba(255, 255, 255, 0.6)",
+    connectedButtonBg: "rgba(0, 245, 212, 0.1)",
+    connectedButtonBgHover: "rgba(0, 245, 212, 0.2)",
+  },
+  fontFamily: "'Orbitron', monospace",
+});
 
 export function WalletConnectionModal({ onClose }) {
   const [connectionType, setConnectionType] = useState(null);
@@ -46,97 +63,116 @@ export function WalletConnectionModal({ onClose }) {
       >
         <div 
           style={{
-            background: 'linear-gradient(135deg, rgba(20, 20, 30, 0.98), rgba(30, 20, 40, 0.98))',
-            border: '2px solid rgba(138, 43, 226, 0.4)',
-            borderRadius: '20px',
-            padding: '30px',
-            maxWidth: '500px',
+            background: 'rgba(20, 20, 30, 0.95)',
+            border: '1px solid rgba(138, 43, 226, 0.2)',
+            borderRadius: '12px',
+            padding: '20px',
+            maxWidth: '400px',
             width: '90%',
             position: 'relative',
-            boxShadow: '0 0 60px rgba(138, 43, 226, 0.4)',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
           }}
           onClick={(e) => e.stopPropagation()}
         >
           <button 
             style={{
               position: 'absolute',
-              top: '15px',
-              right: '15px',
-              background: '#ffee00',
-              color: '#000',
-              width: '30px',
-              height: '30px',
+              top: '12px',
+              right: '12px',
+              background: 'transparent',
+              color: 'rgba(255, 255, 255, 0.6)',
+              width: '24px',
+              height: '24px',
               borderRadius: '4px',
               border: 'none',
-              fontSize: '20px',
-              fontWeight: 'bold',
+              fontSize: '18px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              transition: 'color 0.2s',
             }}
+            onMouseEnter={(e) => e.currentTarget.style.color = '#fff'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)'}
             onClick={onClose}
           >×</button>
           
           <h2 style={{
             color: '#fff',
-            fontSize: '24px',
-            fontWeight: 'bold',
+            fontSize: '18px',
+            fontWeight: '600',
             textAlign: 'center',
-            marginBottom: '30px',
+            marginBottom: '20px',
             fontFamily: "'Orbitron', monospace",
-            textTransform: 'uppercase',
-            letterSpacing: '2px',
-            textShadow: '0 0 20px rgba(255, 255, 255, 0.6)',
+            letterSpacing: '1px',
+            textShadow: '0 0 10px rgba(0, 245, 212, 0.3)',
           }}>Connect Wallet</h2>
           
           <div style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '15px',
+            gap: '10px',
           }}>
             <button 
               style={{
-                background: 'linear-gradient(135deg, #1e3a8a, #3b82f6)',
-                border: '2px solid rgba(59, 130, 246, 0.5)',
-                borderRadius: '15px',
-                padding: '20px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(59, 130, 246, 0.3)',
+                borderRadius: '8px',
+                padding: '12px 16px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '15px',
+                justifyContent: 'center',
                 cursor: 'pointer',
-                transition: 'all 0.3s',
+                transition: 'all 0.2s',
                 width: '100%',
+                color: '#fff',
+                fontSize: '14px',
+                fontWeight: '500',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)';
+                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.5)';
+                e.currentTarget.style.boxShadow = '0 0 15px rgba(59, 130, 246, 0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+                e.currentTarget.style.boxShadow = 'none';
               }}
               onClick={() => setConnectionType('existing')}
             >
-              <div style={{ fontSize: '40px' }}>🔗</div>
-              <div style={{ textAlign: 'left' }}>
-                <h3 style={{ color: '#fff', margin: 0, fontSize: '16px' }}>Connect Existing Wallet</h3>
-                <p style={{ color: 'rgba(255, 255, 255, 0.7)', margin: '5px 0 0 0', fontSize: '14px' }}>Use MetaMask, Coinbase, or WalletConnect</p>
-              </div>
+              Connect Existing Wallet
             </button>
             
             <button 
               style={{
-                background: 'linear-gradient(135deg, #00f5d4, #00bbf9)',
-                border: '2px solid rgba(0, 245, 212, 0.5)',
-                borderRadius: '15px',
-                padding: '20px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(0, 245, 212, 0.3)',
+                borderRadius: '8px',
+                padding: '12px 16px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '15px',
+                justifyContent: 'center',
                 cursor: 'pointer',
-                transition: 'all 0.3s',
+                transition: 'all 0.2s',
                 width: '100%',
+                color: '#fff',
+                fontSize: '14px',
+                fontWeight: '500',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(0, 245, 212, 0.1)';
+                e.currentTarget.style.borderColor = 'rgba(0, 245, 212, 0.5)';
+                e.currentTarget.style.boxShadow = '0 0 15px rgba(0, 245, 212, 0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)';
+                e.currentTarget.style.borderColor = 'rgba(0, 245, 212, 0.3)';
+                e.currentTarget.style.boxShadow = 'none';
               }}
               onClick={() => setConnectionType('new')}
             >
-              <div style={{ fontSize: '40px' }}>✨</div>
-              <div style={{ textAlign: 'left' }}>
-                <h3 style={{ color: '#000', margin: 0, fontSize: '16px' }}>Create New Wallet</h3>
-                <p style={{ color: 'rgba(0, 0, 0, 0.7)', margin: '5px 0 0 0', fontSize: '14px' }}>Easy setup with email or social login</p>
-              </div>
+              Create New Wallet
             </button>
           </div>
         </div>
@@ -181,7 +217,7 @@ export function WalletConnectionModal({ onClose }) {
             left: '15px',
             background: 'transparent',
             color: '#00f5d4',
-            border: '1px solid #00f5d4',
+            border: '1px solid rgba(0, 245, 212, 0.4)',
             padding: '5px 12px',
             borderRadius: '20px',
             fontSize: '12px',
@@ -212,19 +248,27 @@ export function WalletConnectionModal({ onClose }) {
           onClick={onClose}
         >×</button>
         
-        <ConnectButton
-          client={client}
-          chain={chain}
-          wallets={wallets}
-          connectModal={{
-            size: "wide",
-            showThirdwebBranding: false,
-          }}
-          onConnect={(wallet) => {
-            // Don't close here - let the parent component handle it
-            // The parent will detect wallet connection and handle modal transitions
-          }}
-        />
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+          <ConnectButton
+            client={client}
+            chain={chain}
+            wallets={wallets}
+            theme={customTheme}
+            connectModal={{
+              size: "compact",
+              showThirdwebBranding: false,
+              titleIcon: "",
+            }}
+            detailsModal={{
+              showThirdwebBranding: false,
+            }}
+            onConnect={(wallet) => {
+              // Don't close here - let the parent component handle it
+              // The parent will detect wallet connection and handle modal transitions
+            }}
+          />
+        </div>
+        <WalletModalStyles />
       </div>
     </div>
   );
@@ -233,6 +277,23 @@ export function WalletConnectionModal({ onClose }) {
 // Add styles
 export const WalletModalStyles = () => (
   <style jsx global>{`
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&display=swap');
+    
+    /* Style Thirdweb modal components */
+    [data-theme="dark"] {
+      font-family: 'Orbitron', monospace !important;
+    }
+    
+    /* Make the wallet details look better */
+    .tw-connected-wallet {
+      padding: 1.5rem !important;
+    }
+    
+    /* Add Orbitron font to all Thirdweb components */
+    [role="dialog"] {
+      font-family: 'Orbitron', monospace !important;
+    }
+    
     .wallet-modal-overlay {
       position: fixed;
       top: 0;
