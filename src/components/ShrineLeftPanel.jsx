@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useImperativeHandle, forwardRef } from 'react'
 import Link from 'next/link'
 import styles from './Matchstick.module.css'
 
@@ -8,19 +8,26 @@ import styles from './Matchstick.module.css'
  * Consolidated left-side panel for the shrine page
  * Combines: Title, CTA text, and Matchstick into one cohesive unit
  */
-export default function ShrineLeftPanel({ 
+const ShrineLeftPanel = forwardRef(({ 
   is80sMode = false, 
   isMobile = false,
   onLightCandle,
   router 
-}) {
+}, ref) => {
   const [isLit, setIsLit] = useState(false)
   
+  // Expose reset method via ref
+  useImperativeHandle(ref, () => ({
+    resetMatchstick: () => {
+      setIsLit(false)
+    }
+  }), [])
+  
   const handleMatchClick = () => {
-    if (!isLit && onLightCandle) {
+    setIsLit(true)  // Light it immediately
+    if (onLightCandle) {
       onLightCandle()
     }
-    setIsLit(!isLit)
   }
 
   // Don't render on mobile (phones), but keep for tablets and desktop
@@ -266,4 +273,7 @@ export default function ShrineLeftPanel({
       </div>
     </>
   )
-}
+})
+
+ShrineLeftPanel.displayName = 'ShrineLeftPanel'
+export default ShrineLeftPanel

@@ -18,7 +18,7 @@ import { Html } from '@react-three/drei'
 import EmojiRain from './EmojiRain'
 
 
-export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView, offerings, hoveredOffering, justLitOffering, onJustLitComplete, userRotation = 0, priceChange = 0, hasActiveClick = false, is80sMode = false, onPhoneClick }) {
+export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView, offerings, hoveredOffering, justLitOffering, onJustLitComplete, userRotation = 0, priceChange = 0, hasActiveClick = false, is80sMode = false, onPhoneClick, user = null }) {
   // Debug: Log all props on mount
   // useEffect(() => {
   //   if (onPhoneClick) {
@@ -670,6 +670,7 @@ return (
         hoveredOffering={hoveredOffering}
         justLitOffering={justLitOffering}
         hasActiveClick={hasActiveClick}
+        user={user}
       />
     )}
     
@@ -798,7 +799,7 @@ export function CameraController({ focusMode, controlsRef }) {
 
 // Removed LoadingBox - no fallback cube needed
 
-export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffering, justLitOffering, onJustLitComplete, priceChange = 0, is80sMode = false }) {
+export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffering, justLitOffering, onJustLitComplete, priceChange = 0, is80sMode = false, user = null }) {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
   // Scroll tracking removed - no longer needed
   const [isMobile, setIsMobile] = useState(false)
@@ -964,6 +965,7 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
             onJustLitComplete={onJustLitComplete}
             priceChange={priceChange}
             is80sMode={is80sMode}
+            user={user}
             onPhoneClick={() => {
               setFocusMode(!focusMode);
             }}

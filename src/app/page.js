@@ -172,11 +172,11 @@ export default function Home() {
               cursor: "pointer",
               userSelect: "none",
             }}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              window.location.href = "/about";
-            }}
+            // onClick={(e) => {
+            //   e.preventDefault();
+            //   e.stopPropagation();
+            //   window.location.href = "/about";
+            // }}
           >
             RL80
             {Array.from({length: 100}).map((_, i) => {

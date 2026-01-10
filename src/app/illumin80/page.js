@@ -1,23 +1,29 @@
 'use client'
 
-import React, { useState, useEffect, useRef, Suspense } from 'react'
+import React, { useState, useEffect, useRef, Suspense, useCallback } from 'react'
 import NavControlsHome from '@/components/NavControlsHome'
 import CyberNav from '@/components/CyberNav'
 import Link from 'next/link'
-import { useUser } from '@clerk/nextjs'
+import { useUser, SignInButton } from '@clerk/nextjs'
 import { useMusic } from '@/components/MusicContext'
+import { useWalletAuth } from '@/components/WalletAuthProvider'
 import UnifiedShrine from '@/components/UnifiedShrine'
 import ThirdwebBuyModal from '@/components/ThirdwebBuyModal'
+import LightCandleModal from '@/components/LightCandleModal'
+import { WalletConnectionModal } from '@/components/WalletConnectionModal'
 import CoinLoader from '@/components/CoinLoader'
 import { useRouter } from 'next/navigation'
 import ShrineLeftPanel from '@/components/ShrineLeftPanel'
+import { db, collection, addDoc, serverTimestamp, getDocs, query, orderBy, limit, onSnapshot } from '@/lib/firebaseClient'
 
 // Tiny Votive Model Component
 
 export default function ShrinePage() {
   const router = useRouter()
-  const { user } = useUser()
+  const { user, isLoaded: userLoaded, isSignedIn } = useUser()
+  const { isWalletConnected, walletAddress, connectWallet } = useWalletAuth()
   const unifiedShrineRef = useRef()
+  const shrineLeftPanelRef = useRef()
   const { 
     play, 
     pause, 
@@ -30,59 +36,138 @@ export default function ShrinePage() {
   const [isMobileDevice, setIsMobileDevice] = useState(false)
   const [fontLoaded, setFontLoaded] = useState(false)
   const [showBuyModal, setShowBuyModal] = useState(false)
+  const [showLightCandleModal, setShowLightCandleModal] = useState(false)
+  const [showWalletModal, setShowWalletModal] = useState(false)
+  const [showAuthMessage, setShowAuthMessage] = useState(null)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [currentView, setCurrentView] = useState('shrine')
   const [mounted, setMounted] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [mobileMatchstickLit, setMobileMatchstickLit] = useState(false)
+  const [remountKey, setRemountKey] = useState(0)
   const is80sMode = context80sMode
   
   // State for offerings data
   const [hoveredOffering, setHoveredOffering] = useState(null)
   const [justLitOffering, setJustLitOffering] = useState(null)
   const [priceChange, setPriceChange] = useState(0)
-  
-  // Mock offerings data
-  const [mockOfferings, setMockOfferings] = useState([
-    { 
-      name: 'chelleville', 
-      type: 'petition', 
-      message: 'May my bags pump eternally', 
-      tokensBurned: 1000,
-      timestamp: '2m ago'
-    },
-    { 
-      name: 'degen_mike', 
-      type: 'appreciation', 
-      message: 'Thanks for the 10x Our Lady 🚀', 
-      tokensBurned: 5000,
-      timestamp: '5m ago'
-    },
-    { 
-      name: 'cryptopriest', 
-      type: 'confession', 
-      message: 'I sold the bottom... forgive me', 
-      tokensBurned: 2500,
-      timestamp: '12m ago'
-    },
-    { 
-      name: 'hodlqueen', 
-      type: 'petition', 
-      message: 'Deliver us from paper hands', 
-      tokensBurned: 10000,
-      timestamp: '1h ago'
-    },
-    { 
-      name: 'anonymous', 
-      type: 'appreciation', 
-      message: null, 
-      tokensBurned: 500,
-      timestamp: '2h ago'
-    },
-  ])
+  const [offerings, setOfferings] = useState([])
+  const [isLoadingOfferings, setIsLoadingOfferings] = useState(true)
+
+  // Fetch offerings from Firestore
+  const fetchOfferings = useCallback(async () => {
+    try {
+      setIsLoadingOfferings(true)
+      const offeringsQuery = query(
+        collection(db, 'offerings'),
+        orderBy('createdAt', 'desc'),
+        limit(20)
+      )
+      
+      const snapshot = await getDocs(offeringsQuery)
+      const fetchedOfferings = []
+      
+      snapshot.forEach((doc) => {
+        const data = doc.data()
+        const offering = {
+          id: doc.id,
+          name: data.name || 'Anonymous',
+          type: data.type || 'petition',
+          message: data.message || '',
+          tokensBurned: data.tokensBurned || 0,
+          userId: data.userId,
+          walletAddress: data.walletAddress,
+          userImageUrl: data.userImageUrl,
+          timestamp: data.timestamp || 'just now',
+          icon: data.type === 'petition' ? '🙏' : 
+                data.type === 'appreciation' ? '✨' : '🖤'
+        }
+        
+        // Format timestamp
+        if (data.createdAt) {
+          const date = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt)
+          const now = new Date()
+          const diff = now - date
+          const minutes = Math.floor(diff / 60000)
+          const hours = Math.floor(minutes / 60)
+          const days = Math.floor(hours / 24)
+          
+          if (minutes < 1) {
+            offering.timestamp = 'just now'
+          } else if (minutes < 60) {
+            offering.timestamp = `${minutes} minute${minutes > 1 ? 's' : ''} ago`
+          } else if (hours < 24) {
+            offering.timestamp = `${hours} hour${hours > 1 ? 's' : ''} ago`
+          } else {
+            offering.timestamp = `${days} day${days > 1 ? 's' : ''} ago`
+          }
+        }
+        
+        fetchedOfferings.push(offering)
+      })
+      
+      setOfferings(fetchedOfferings)
+    } catch (error) {
+      console.error('Error fetching offerings:', error)
+      // Fallback to empty array on error
+      setOfferings([])
+    } finally {
+      setIsLoadingOfferings(false)
+    }
+  }, [])
+
+  // Set up real-time listener for new offerings
+  useEffect(() => {
+    // Initial fetch
+    fetchOfferings()
+    
+    // Set up real-time listener for new offerings
+    const offeringsQuery = query(
+      collection(db, 'offerings'),
+      orderBy('createdAt', 'desc'),
+      limit(1)
+    )
+    
+    let lastOfferingId = null
+    const unsubscribe = onSnapshot(offeringsQuery, (snapshot) => {
+      if (!snapshot.empty) {
+        const latestDoc = snapshot.docs[0]
+        const latestOffering = {
+          id: latestDoc.id,
+          ...latestDoc.data()
+        }
+        
+        // Check if this is a new offering (not initial load and different from last)
+        if (lastOfferingId && lastOfferingId !== latestDoc.id) {
+          console.log('New offering detected from another user!')
+          
+          // Trigger the pulse effect for all candles
+          if (unifiedShrineRef.current) {
+            unifiedShrineRef.current.triggerCandleEffect(latestOffering)
+          }
+          
+          // Fetch all offerings to update the list
+          fetchOfferings()
+        }
+        
+        lastOfferingId = latestDoc.id
+      }
+    })
+    
+    // Refresh offerings every 30 seconds as backup
+    const interval = setInterval(fetchOfferings, 30000)
+    
+    return () => {
+      unsubscribe()
+      clearInterval(interval)
+    }
+  }, [fetchOfferings, unifiedShrineRef])
 
   // Set mounted state after hydration and handle loading
   useEffect(() => {
+    // Force remount of UnifiedShrine on navigation
+    setRemountKey(prev => prev + 1);
+    
     // Check mobile status immediately before mounting
     const checkMobile = () => {
       const isMobile = window.innerWidth <= 768;
@@ -131,6 +216,70 @@ export default function ShrinePage() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+  
+  // Handle light candle button click with auth check
+  const handleLightCandleClick = () => {
+    // Light the matchstick immediately for visual feedback
+    setMobileMatchstickLit(true);
+    
+    // Check if user is signed in
+    if (!isSignedIn) {
+      setShowAuthMessage('sign-in');
+      // Reset matchstick after a delay if not signed in
+      setTimeout(() => setMobileMatchstickLit(false), 1000);
+      return;
+    }
+
+    // Check if wallet is connected
+    if (!isWalletConnected || !walletAddress) {
+      setShowWalletModal(true);
+      setWaitingForWallet(true); // Set flag that we're waiting for wallet connection
+      return;
+    }
+
+    // Both signed in and wallet connected - show the modal
+    setShowLightCandleModal(true);
+  };
+  
+  // Track if we're waiting for wallet connection
+  const [waitingForWallet, setWaitingForWallet] = useState(false);
+  
+  // Watch for wallet connection
+  useEffect(() => {
+    if (isWalletConnected && (showWalletModal || waitingForWallet)) {
+      setShowWalletModal(false);
+      setWaitingForWallet(false);
+      setShowLightCandleModal(true);
+    }
+  }, [isWalletConnected, showWalletModal, waitingForWallet]);
+
+  // Handle light candle from modal
+  const handleLightCandle = async (newOffering) => {
+    // Set the just lit offering for visual effects
+    setJustLitOffering(newOffering)
+    setTimeout(() => setJustLitOffering(null), 3000)
+    
+    // Trigger the candle launch animation
+    if (unifiedShrineRef.current) {
+      unifiedShrineRef.current.triggerCandleEffect(newOffering)
+    }
+    
+    // Mobile haptic feedback
+    if (isMobileView && window.navigator && window.navigator.vibrate) {
+      window.navigator.vibrate([50, 50, 50]) // Pattern vibration
+    }
+    
+    // Refresh offerings to include the new one
+    await fetchOfferings()
+    
+    // Reset the matchstick to unlit state after all effects complete
+    setTimeout(() => {
+      setMobileMatchstickLit(false);  // Reset mobile matchstick
+      if (shrineLeftPanelRef.current) {
+        shrineLeftPanelRef.current.resetMatchstick();  // Reset desktop matchstick
+      }
+    }, 3500);
+  };
   
   // Listen for openBuyModal event
   useEffect(() => {
@@ -187,11 +336,10 @@ export default function ShrinePage() {
         }>
           <UnifiedShrine 
             ref={unifiedShrineRef}
-            key="shrine-scene"
-            offerings={mockOfferings}
+            key={`shrine-scene-${remountKey}`}
+            offerings={offerings}
             onSelectOffering={setHoveredOffering}
             onLightCandle={(offering) => {
-              setMockOfferings(prev => [offering, ...prev].slice(0, 20))
               setJustLitOffering(offering)
               setTimeout(() => setJustLitOffering(null), 3000)
             }}
@@ -200,6 +348,7 @@ export default function ShrinePage() {
             hoveredOffering={hoveredOffering}
             justLitOffering={justLitOffering}
             onJustLitComplete={() => setJustLitOffering(null)}
+            user={user}
           />
         </Suspense>
       </div>
@@ -207,37 +356,11 @@ export default function ShrinePage() {
       {/* Only render ShrineLeftPanel on desktop/tablet after we know device type */}
       {mounted && !isMobileView && (
         <ShrineLeftPanel 
+          ref={shrineLeftPanelRef}
           is80sMode={is80sMode}
           isMobile={false}
-          onLightCandle={() => {
-          // Create a new offering
-          const messages = [
-            'Please pump my bags to the moon 🚀',
-            'Grant me diamond hands in these trying times',
-            'May the green candles be ever in my favor',
-          ]
-          const names = ['anon_trader', 'crypto_believer', 'hodl_warrior']
-          const types = ['petition', 'confession', 'appreciation']
-          
-          const newOffering = {
-            name: names[Math.floor(Math.random() * names.length)],
-            type: types[Math.floor(Math.random() * types.length)],
-            message: messages[Math.floor(Math.random() * messages.length)],
-            tokensBurned: Math.floor(Math.random() * 10000) + 500,
-            timestamp: 'just now'
-          }
-          
-          // Add offering to the list (limit to 20 to prevent memory issues)
-          setMockOfferings(prev => [newOffering, ...prev].slice(0, 20))
-          setJustLitOffering(newOffering)
-          setTimeout(() => setJustLitOffering(null), 3000)
-          
-          // Trigger the candle launch animation
-          if (unifiedShrineRef.current) {
-            unifiedShrineRef.current.triggerCandleEffect(newOffering)
-          }
-        }}
-        router={router}
+          onLightCandle={handleLightCandleClick}
+          router={router}
         />
       )}
       
@@ -299,42 +422,8 @@ export default function ShrinePage() {
                 window.navigator.vibrate(50) // Short vibration
               }
               
-              if (!mobileMatchstickLit) {
-                // Create a new offering
-                const messages = [
-                  'Please pump my bags to the moon 🚀',
-                  'Grant me diamond hands in these trying times',
-                  'May the green candles be ever in my favor',
-                ]
-                const names = ['anon_trader', 'crypto_believer', 'hodl_warrior']
-                const types = ['petition', 'confession', 'appreciation']
-                
-                const newOffering = {
-                  name: names[Math.floor(Math.random() * names.length)],
-                  type: types[Math.floor(Math.random() * types.length)],
-                  message: messages[Math.floor(Math.random() * messages.length)],
-                  tokensBurned: Math.floor(Math.random() * 10000) + 500,
-                  timestamp: 'just now'
-                }
-                
-                // Add offering to the list (limit to 20 to prevent memory issues)
-                setMockOfferings(prev => [newOffering, ...prev].slice(0, 20))
-                setJustLitOffering(newOffering)
-                setTimeout(() => setJustLitOffering(null), 3000)
-                
-                // Trigger the candle launch animation
-                if (unifiedShrineRef.current) {
-                  unifiedShrineRef.current.triggerCandleEffect(newOffering)
-                }
-                
-                setMobileMatchstickLit(true)
-                
-                // Longer haptic for successful lighting
-                if (window.navigator && window.navigator.vibrate) {
-                  window.navigator.vibrate([50, 50, 50]) // Pattern vibration
-                }
-              }
-              setMobileMatchstickLit(!mobileMatchstickLit)
+              // Use the auth check handler
+              handleLightCandleClick()
             }}
             style={{
               width: '60px',
@@ -361,7 +450,7 @@ export default function ShrinePage() {
               overflow: 'hidden',
             }}
           >
-            {/* Simple mobile matchstick - lit or unlit based on state */}
+            {/* Mobile matchstick - lit or unlit based on state */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -886,6 +975,73 @@ export default function ShrinePage() {
         isOpen={showBuyModal} 
         onClose={() => setShowBuyModal(false)}
       />
+      
+      {/* Light Candle Modal */}
+      <LightCandleModal
+        isOpen={showLightCandleModal}
+        onClose={() => setShowLightCandleModal(false)}
+        onLightCandle={handleLightCandle}
+      />
+      
+      {/* Sign-In Message Overlay */}
+      {showAuthMessage === 'sign-in' && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(10px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 100,
+          }}
+          onClick={() => setShowAuthMessage(null)}
+        >
+          <div 
+            style={{
+              background: 'linear-gradient(135deg, #1a0525 0%, #2a0a3a 100%)',
+              border: '2px solid rgba(255, 0, 255, 0.3)',
+              borderRadius: '20px',
+              padding: '2rem',
+              maxWidth: '400px',
+              textAlign: 'center',
+              color: '#fff',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem', color: '#ff00ff' }}>
+              🕯️ Sign In Required
+            </h2>
+            <p style={{ marginBottom: '1.5rem', opacity: 0.9 }}>
+              Please sign in to light a candle and share your message with Our Lady.
+            </p>
+            <SignInButton mode="modal">
+              <button style={{
+                padding: '0.75rem 2rem',
+                background: 'linear-gradient(135deg, #ff006e 0%, #8338ec 100%)',
+                border: 'none',
+                borderRadius: '10px',
+                color: '#fff',
+                fontSize: '1rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                width: '100%'
+              }}>
+                Sign In
+              </button>
+            </SignInButton>
+          </div>
+        </div>
+      )}
+      
+      {/* Wallet Connection Modal */}
+      {showWalletModal && (
+        <WalletConnectionModal onClose={() => setShowWalletModal(false)} />
+      )}
       
     </>
   )

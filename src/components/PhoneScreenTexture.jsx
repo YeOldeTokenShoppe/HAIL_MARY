@@ -8,7 +8,8 @@ export function PhoneScreenTexture({
   offerings = [], 
   hoveredOffering = null, 
   justLitOffering = null,
-  hasActiveClick = false 
+  hasActiveClick = false,
+  user = null // Clerk user object
 }) {
   const canvasRef = useRef(document.createElement('canvas'))
   const textureRef = useRef()
@@ -52,6 +53,26 @@ export function PhoneScreenTexture({
       material.dispose()
     }
   }, [meshRef])
+  
+  // Helper to load and cache user avatar image
+  const avatarImageRef = useRef(null)
+  const avatarLoadedRef = useRef(false)
+  
+  useEffect(() => {
+    if (user?.imageUrl && !avatarLoadedRef.current) {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => {
+        avatarImageRef.current = img
+        avatarLoadedRef.current = true
+      }
+      img.onerror = () => {
+        console.log('Failed to load avatar image')
+        avatarLoadedRef.current = true // Mark as loaded even on error
+      }
+      img.src = user.imageUrl
+    }
+  }, [user?.imageUrl])
   
   // Draw the phone interface
   const drawPhoneInterface = () => {
@@ -212,49 +233,80 @@ export function PhoneScreenTexture({
     }
     const config = typeConfig[offering.type] || typeConfig.petition
     
-    // Add a colored accent pill/badge at the top
-    const pillY = y + 30
-    const pillHeight = 40
-    const pillWidth = 180
-    roundedRect(padding + 40, pillY, pillWidth, pillHeight, 20)
+    // Draw user avatar if available (on the far left)
+    const avatarSize = 120
+    const avatarX = padding + 40  // Far left position
+    const avatarY = y + 90
+    
+    // Draw avatar circle background
+    ctx.save()
+    ctx.beginPath()
+    ctx.arc(avatarX + avatarSize/2, avatarY + avatarSize/2, avatarSize/2, 0, Math.PI * 2)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'
+    ctx.fill()
+    ctx.strokeStyle = config.color
+    ctx.lineWidth = 2
+    ctx.stroke()
+    ctx.clip()
+    
+    // Draw avatar image or initials
+    if (avatarImageRef.current) {
+      // Draw the loaded avatar image
+      ctx.drawImage(avatarImageRef.current, avatarX, avatarY, avatarSize, avatarSize)
+    } else if (user) {
+      // Draw initials as fallback
+      ctx.fillStyle = config.color
+      ctx.fillRect(avatarX, avatarY, avatarSize, avatarSize)
+      ctx.fillStyle = '#000'
+      ctx.font = 'bold 48px -apple-system, BlinkMacSystemFont, sans-serif'  // Doubled from 24px
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      const initials = (user.firstName?.[0] || '') + (user.lastName?.[0] || '') || user.username?.[0] || '?'
+      ctx.fillText(initials.toUpperCase(), avatarX + avatarSize/2, avatarY + avatarSize/2)
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'alphabetic'
+    }
+    ctx.restore()
+    
+    // Username text to the right of avatar
+    ctx.fillStyle = '#fff'
+    ctx.font = 'bold 64px -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.fillText(offering.name || 'Anonymous', avatarX + avatarSize + 30, y + 140)
+    
+    // Add a colored accent pill/badge on the right side
+    const pillY = y + 110
+    const pillHeight = 50
+    const pillWidth = 220
+    const pillX = width - padding - pillWidth - 40  // Position on right side
+    
+    roundedRect(pillX, pillY, pillWidth, pillHeight, 25)
     const pillGradient = ctx.createLinearGradient(0, pillY, 0, pillY + pillHeight)
     pillGradient.addColorStop(0, config.color)
     pillGradient.addColorStop(1, config.color + '99')  // Add transparency
     ctx.fillStyle = pillGradient
     ctx.fill()
     
-    // Type label inside pill
+    // Type label and icon inside pill (on right)
     ctx.fillStyle = '#000'
-    ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.font = 'bold 28px -apple-system, BlinkMacSystemFont, sans-serif'
     ctx.textAlign = 'center'
-    ctx.fillText(config.label, padding + 40 + pillWidth/2, pillY + 28)
+    ctx.fillText(`${config.icon} ${config.label}`, pillX + pillWidth/2, pillY + 34)
     ctx.textAlign = 'left'
-    
-    // Larger name text
-    ctx.fillStyle = '#fff'
-    ctx.font = 'bold 64px -apple-system, BlinkMacSystemFont, sans-serif'
-    ctx.fillText(config.icon, padding + 40, y + 120)
-    ctx.fillText(offering.name || 'Anonymous', padding + 160, y + 120)
     
     // Draw message if exists - much larger and more prominent
     if (offering.message) {
       ctx.fillStyle = '#ffffff'  // Brighter white for better visibility
       ctx.font = '52px -apple-system, BlinkMacSystemFont, sans-serif'  // Much larger font
       
-      // Word wrap the message - shifted right to avoid thumb
+      // Word wrap the message - below the avatar and name
       const words = offering.message.split(' ')
       let line = ''
-      let lineY = y + 240  // Adjusted for new layout with pill
-      const messageLeftOffset = 200  // Shift text right to avoid thumb
+      let lineY = y + 340  // Pushed lower (was 240)
+      const messageLeftOffset = padding + 130  // Indent message text
       const maxWidth = width - messageLeftOffset - padding * 2  // Adjust max width accordingly
       const lineHeight = 80  // Increased line spacing for larger text
       
-      // Add opening quote - positioned to the left but higher
-      ctx.fillStyle = config.color
-      ctx.font = 'bold 72px Georgia, serif'
-      ctx.fillText('"', padding + 100, lineY - 60)
-      
-      // Message text - shifted right
+      // Message text
       ctx.fillStyle = '#ffffff'
       ctx.font = '52px -apple-system, BlinkMacSystemFont, sans-serif'
       
@@ -274,11 +326,6 @@ export function PhoneScreenTexture({
       if (line.length > 0 && lineY < y + boxHeight - 150) {
         ctx.fillText(line.trim(), messageLeftOffset, lineY)
       }
-      
-      // Add closing quote
-      ctx.fillStyle = config.color
-      ctx.font = 'bold 72px Georgia, serif'
-      ctx.fillText('"', width - padding - 80, lineY + 40)
     }
     
     // Draw tokens burned - larger and at the bottom

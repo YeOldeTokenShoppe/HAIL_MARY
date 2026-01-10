@@ -40,7 +40,7 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
     <>
       <style dangerouslySetInnerHTML={{ __html: `
         .polaroid-gallery {
-          --d: 24s; 
+          --d: 30s; 
           display: grid;
           width: 17rem;
           position: fixed;

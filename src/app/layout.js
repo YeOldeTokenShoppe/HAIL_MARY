@@ -3,6 +3,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { MusicProvider } from "@/components/MusicContext";
 import { ThirdwebProvider } from "thirdweb/react";
 import { LanguageProvider } from "@/components/LanguageProvider";
+import { WalletAuthProvider } from "@/components/WalletAuthProvider";
 import { dark } from '@clerk/themes';
 
 // import ConditionalIllumin80 from "@/components/ConditionalIllumin80"
@@ -585,11 +586,13 @@ export default function RootLayout({ children }) {
               }
             }}
           >
-            <LanguageProvider>
-              <MusicProvider>
-                {children}
-              </MusicProvider>
-            </LanguageProvider>
+            <WalletAuthProvider>
+              <LanguageProvider>
+                <MusicProvider>
+                  {children}
+                </MusicProvider>
+              </LanguageProvider>
+            </WalletAuthProvider>
           </ClerkProvider>
         </ThirdwebProvider>
       </body>

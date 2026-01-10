@@ -35,6 +35,11 @@ export default function CarouselPage() {
   const [mounted, setMounted] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const is80sMode = context80sMode
+  
+  // Prefetch illumin80 route on mount for smoother navigation
+  useEffect(() => {
+    router.prefetch('/illumin80');
+  }, [router]);
 
   // Set mounted state after hydration and handle loading
   useEffect(() => {
@@ -323,7 +328,7 @@ export default function CarouselPage() {
           cursor: "pointer",
           transition: "transform 0.3s ease, filter 0.3s ease",
         }}
-        onClick={() => window.location.href = '/illumin80'}
+        onClick={() => router.push('/illumin80')}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = "scale(1.15) rotate(-5deg)";
           e.currentTarget.style.filter = "drop-shadow(0 0 20px #ff9500)";
@@ -358,7 +363,7 @@ export default function CarouselPage() {
           cursor: "pointer",
         }}
         viewBox="0 0 300 150"
-        onClick={() => window.location.href = '/illumin80'}
+        onClick={() => router.push('/illumin80')}
         onMouseEnter={(e) => {
           const text = e.currentTarget.querySelector('text');
           const arrow = e.currentTarget.querySelector('#arrowPath');

@@ -1,6 +1,7 @@
 'use client'
 import React, { useRef, useState, useEffect, Suspense, useCallback, useMemo, forwardRef, useImperativeHandle, Component } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { useFrame } from '@react-three/fiber'
+import CleanCanvas from './CleanCanvas'
 import { Stats } from '@react-three/drei'
 import * as THREE from 'three'
 import { HandsModel, CameraController } from './HandsGLTFScene'
@@ -185,7 +186,8 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   is80sMode,
   hoveredOffering,
   justLitOffering,
-  onJustLitComplete 
+  onJustLitComplete,
+  user = null 
 }, ref) {
   // Track if component is mounted for SSR safety
   const [mounted, setMounted] = useState(false)
@@ -253,8 +255,33 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   const lastHistoryUpdate = useRef(0)
   const HISTORY_UPDATE_INTERVAL = 500 // Update chart every 500ms
   
-  // Track total burned tokens
-  const [totalBurned, setTotalBurned] = useState(2847395) // Starting with a realistic number
+  // Calculate stats from offerings
+  const [displayedCandleCount, setDisplayedCandleCount] = useState(500)
+  const [displayedBurnTotal, setDisplayedBurnTotal] = useState(2847395) // Starting with a realistic number
+  const [candleCountAnimation, setCandleCountAnimation] = useState(false)
+  
+  // Calculate real stats from offerings
+  const realCandleCount = useMemo(() => 500 + offerings.length, [offerings.length])
+  const realBurnTotal = useMemo(() => {
+    const offeringsBurn = offerings.reduce((sum, offering) => sum + (offering.tokensBurned || 0), 0)
+    return 2847395 + offeringsBurn // Base amount + actual burns
+  }, [offerings])
+  
+  // Animate candle count when it increases
+  useEffect(() => {
+    if (realCandleCount > displayedCandleCount) {
+      setCandleCountAnimation(true)
+      setDisplayedCandleCount(realCandleCount)
+      setTimeout(() => setCandleCountAnimation(false), 600)
+    } else {
+      setDisplayedCandleCount(realCandleCount)
+    }
+  }, [realCandleCount, displayedCandleCount])
+  
+  // Animate burn total
+  useEffect(() => {
+    setDisplayedBurnTotal(realBurnTotal)
+  }, [realBurnTotal])
 
   // Store timeout refs for cleanup
   const timeoutRefs = useRef({})
@@ -343,10 +370,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
       rotation: Math.random() * Math.PI * 2
     }])
     
-    // Update total burned tokens
-    if (offering?.tokensBurned) {
-      setTotalBurned(prev => prev + (offering.tokensBurned || 0))
-    }
+    // Stats update automatically from offerings prop
     
     if (onLightCandle) {
       onLightCandle(offering)
@@ -623,7 +647,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
       
       {mounted && typeof window !== 'undefined' && (
       <CanvasErrorBoundary>
-      <Canvas
+      <CleanCanvas
         camera={{ position: [0, isMobile ? 0 : 0, isMobile ? 2 : 0], fov: isMobile ? 75 : 70 }}
         dpr={isMobile ? Math.min(window.devicePixelRatio || 1, 1.5) : Math.min(window.devicePixelRatio || 1, 2)}
         frameloop="always"
@@ -750,6 +774,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
                   userRotation={userRotation}
                   priceChange={displayPrice.change}
                   hasActiveClick={clickedCandleId !== null}
+                  user={user}
                   onPhoneClick={() => {
                     // console.log('Phone clicked in UnifiedShrine! Current focus:', focusMode, '-> New:', !focusMode);
                     setFocusMode(!focusMode);
@@ -802,7 +827,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
     )}
   </Suspense>
 
-      </Canvas>
+      </CleanCanvas>
       </CanvasErrorBoundary>
       )}
       </div>
@@ -1025,6 +1050,15 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
         </button>
       )} */}
       
+      {/* CSS for candle count animation */}
+      <style jsx>{`
+        @keyframes pulseScale {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.3); }
+          100% { transform: scale(1); }
+        }
+      `}</style>
+      
       {/* Unified Stats Box - Redesigned */}
       <div style={unifiedStatsStyle}>
         {/* Price Action - Prominent */}
@@ -1091,7 +1125,15 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
                   marginRight: '0.3em',
                   display: 'inline-block'
                 }}
-              /> {(500 + additionalCandles.length).toLocaleString()}
+              /> <span 
+                style={{
+                  display: 'inline-block',
+                  animation: candleCountAnimation ? 'pulseScale 0.6s ease-out' : 'none',
+                  color: candleCountAnimation ? '#ffee00' : 'inherit'
+                }}
+              >
+                {displayedCandleCount.toLocaleString()}
+              </span>
             </div>
             <div style={{
               fontSize: isMobile ? '10px' : '11px',
@@ -1117,11 +1159,11 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
               color: '#ff9500',
               marginBottom: '4px'
             }}>
-              <span style={{ fontSize: isMobile ? '20px' : '20px' }}>🔥</span> {totalBurned >= 1000000 
-                ? `${(totalBurned / 1000000).toFixed(1)}M`
-                : totalBurned >= 1000 
-                ? `${(totalBurned / 1000).toFixed(1)}K`
-                : totalBurned.toLocaleString()}
+              <span style={{ fontSize: isMobile ? '20px' : '20px' }}>🔥</span> {displayedBurnTotal >= 1000000 
+                ? `${(displayedBurnTotal / 1000000).toFixed(1)}M`
+                : displayedBurnTotal >= 1000 
+                ? `${(displayedBurnTotal / 1000).toFixed(1)}K`
+                : displayedBurnTotal.toLocaleString()}
             </div>
             <div style={{
               fontSize: isMobile ? '10px' : '11px',
