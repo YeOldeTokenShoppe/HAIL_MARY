@@ -45,6 +45,7 @@ export default function ShrinePage() {
   const [mounted, setMounted] = useState(false)
   const [mobileMatchstickLit, setMobileMatchstickLit] = useState(false)
   const [remountKey, setRemountKey] = useState(0)
+  const [isExpanded, setIsExpanded] = useState(false)
   const is80sMode = context80sMode
   
   // State for offerings data
@@ -52,6 +53,7 @@ export default function ShrinePage() {
   const [justLitOffering, setJustLitOffering] = useState(null)
   const [priceChange, setPriceChange] = useState(0)
   const [offerings, setOfferings] = useState([])
+  const [totalOfferingsCount, setTotalOfferingsCount] = useState(0)
   const [isLoadingOfferings, setIsLoadingOfferings] = useState(true)
 
 
@@ -78,10 +80,21 @@ useEffect(() => {
   const fetchOfferings = useCallback(async () => {
     try {
       setIsLoadingOfferings(true)
+      
+      // Get total count of all offerings (more efficient than fetching all docs)
+      // Note: If count() is not available in your Firebase version, uncomment the lines below
+      // const countSnapshot = await getDocs(collection(db, 'offerings'))
+      // setTotalOfferingsCount(countSnapshot.size)
+      
+      // For now, using getDocs until we verify Firebase version supports count()
+      const countSnapshot = await getDocs(collection(db, 'offerings'))
+      setTotalOfferingsCount(countSnapshot.size)
+      
+      // Get recent offerings for display
       const offeringsQuery = query(
         collection(db, 'offerings'),
         orderBy('createdAt', 'desc'),
-        limit(20)
+        limit(50)  // Increased from 20 to 50
       )
       
       const snapshot = await getDocs(offeringsQuery)
@@ -159,15 +172,18 @@ useEffect(() => {
         
         // Check if this is a new offering (not initial load and different from last)
         if (lastOfferingId && lastOfferingId !== latestDoc.id) {
-          console.log('New offering detected from another user!')
+          console.log('New offering detected from another user!', latestOffering)
           
           // Trigger the pulse effect for all candles
           if (unifiedShrineRef.current) {
             unifiedShrineRef.current.triggerCandleEffect(latestOffering)
           }
           
-          // Fetch all offerings to update the list
-          fetchOfferings()
+          // Delay fetching to sync count update with ripple effect
+          setTimeout(() => {
+            // Fetch will update both offerings list AND total count
+            fetchOfferings()
+          }, 3000) // 3 second delay - ripple is well visible before count updates
         }
         
         lastOfferingId = latestDoc.id
@@ -196,6 +212,34 @@ useEffect(() => {
     // Then mount
     setMounted(true);
   }, []);
+
+  // Auto-expand and collapse effect for mobile banner
+  useEffect(() => {
+    if (!isMobileView) return;
+    
+    // Initial expand after 2 seconds
+    const initialTimer = setTimeout(() => {
+      setIsExpanded(true);
+      
+      // Collapse after 4 seconds of being expanded
+      setTimeout(() => {
+        setIsExpanded(false);
+      }, 4000);
+    }, 2000);
+
+    // Then repeat the expand/collapse cycle every 60 seconds (less frequent after first show)
+    const interval = setInterval(() => {
+      setIsExpanded(true);
+      setTimeout(() => {
+        setIsExpanded(false);
+      }, 4000);
+    }, 60000); // Changed from 15000ms to 60000ms
+
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(interval);
+    };
+  }, [isMobileView]);
 
   // Check if font is loaded and add fonts-loaded class
   useEffect(() => {
@@ -275,8 +319,10 @@ useEffect(() => {
       window.navigator.vibrate([50, 50, 50]) // Pattern vibration
     }
     
-    // Refresh offerings to include the new one
-    await fetchOfferings()
+    // Delay refreshing offerings to sync with ripple animation
+    setTimeout(() => {
+      fetchOfferings()
+    }, 3000) // 3 second delay - same as remote offerings
     
     // Reset the matchstick to unlit state after all effects complete
     setTimeout(() => {
@@ -328,10 +374,11 @@ useEffect(() => {
             ref={unifiedShrineRef}
             // key={`shrine-scene-${remountKey}`}
             offerings={offerings}
+            totalOfferingsCount={totalOfferingsCount}
             onSelectOffering={setHoveredOffering}
             onLightCandle={(offering) => {
               setJustLitOffering(offering)
-              setTimeout(() => setJustLitOffering(null), 3000)
+              setTimeout(() => setJustLitOffering(null), 8000) // 1.5s for Prayer Received + 6.5s for user info
             }}
             onPriceChange={setPriceChange}
             is80sMode={is80sMode}
@@ -354,36 +401,53 @@ useEffect(() => {
         />
       )}
       
-      {/* Mobile CTA and Matchstick - Minimal Floating Design */}
+      {/* Mobile CTA and Matchstick - Sliding Design */}
       {isMobileView && (
-        <div style={{
-          position: 'fixed',
-          bottom: '16px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: 'calc(100% - 32px)',
-          maxWidth: '340px',
-          background: 'rgba(10, 10, 20, 0.4)',
-          border: '1px solid rgba(212, 175, 55, 0.15)',
-          borderRadius: '16px',
-          padding: '12px 16px',
-          boxShadow: `
-            0 4px 20px rgba(0, 0, 0, 0.3),
-            inset 0 1px 0 rgba(255, 255, 255, 0.05)
-          `,
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          zIndex: 100,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '16px',
-        }}>
-          {/* Left side - Text */}
+        <div 
+          onClick={() => {
+            // If collapsed, just expand. If already expanded, do nothing (let the button handle the click)
+            if (!isExpanded) {
+              setIsExpanded(true);
+            }
+          }}
+          style={{
+            position: 'fixed',
+            bottom: '16px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            width: isExpanded ? 'calc(100% - 32px)' : '80px',
+            maxWidth: isExpanded ? '340px' : '80px',
+            background: 'rgba(10, 10, 20, 0.4)',
+            border: '1px solid rgba(212, 175, 55, 0.15)',
+            borderRadius: '50px',
+            padding: isExpanded ? '12px 16px' : '10px',
+            boxShadow: `
+              0 4px 20px rgba(0, 0, 0, 0.3),
+              inset 0 1px 0 rgba(255, 255, 255, 0.05)
+            `,
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: isExpanded ? 'space-between' : 'center',
+            gap: isExpanded ? '16px' : '0',
+            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            cursor: 'pointer',
+            overflow: 'hidden',
+          }}>
+          {/* Left side - Text (slides in/out) */}
           <div style={{
-            flex: 1,
+            flex: isExpanded ? 1 : 0,
             fontFamily: "'Bebas Neue', sans-serif",
             color: 'rgba(246, 245, 241, 0.9)',
             textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)',
+            opacity: isExpanded ? 1 : 0,
+            transform: isExpanded ? 'translateX(0)' : 'translateX(-20px)',
+            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            width: isExpanded ? 'auto' : '0',
+            overflow: 'hidden',
+            whiteSpace: 'nowrap',
           }}>
             <div style={{ 
               fontSize: '1.5rem',
@@ -400,13 +464,22 @@ useEffect(() => {
               opacity: 0.7,
               fontWeight: 300,
             }}>
-              Light a candle - Join the Illumin80
+              Click the flame to Light a Candle!
             </div>
           </div>
           
-          {/* Right side - Matchstick Button */}
+          {/* Matchstick Button - Always visible */}
           <div 
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation(); // Prevent triggering the parent onClick
+              
+              // If banner is collapsed, expand it first instead of opening modal
+              if (!isExpanded) {
+                setIsExpanded(true);
+                return;
+              }
+              
+              // If banner is expanded, then open the modal
               // Haptic feedback if available
               if (window.navigator && window.navigator.vibrate) {
                 window.navigator.vibrate(50) // Short vibration
@@ -419,6 +492,7 @@ useEffect(() => {
               width: '60px',
               height: '60px',
               borderRadius: '50%',
+              flexShrink: 0,
               background: mobileMatchstickLit 
                 ? 'radial-gradient(circle, rgba(255, 149, 0, 0.2) 0%, rgba(255, 100, 0, 0.05) 70%, transparent 100%)'
                 : 'rgba(212, 175, 55, 0.1)',

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useWalletAuth } from './WalletAuthProvider';
 import { db, collection, addDoc, serverTimestamp } from '@/lib/firebaseClient';
+import ThirdwebBuyModal from './ThirdwebBuyModal';
 
 const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
   const { user } = useUser();
@@ -13,6 +14,8 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
   const [message, setMessage] = useState('');
   const [tokenAmount, setTokenAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showBuyModal, setShowBuyModal] = useState(false);
+  const [showNoBuyPrompt, setShowNoBuyPrompt] = useState(false);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -21,8 +24,16 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
       setMessage('');
       setTokenAmount('');
       setIsSubmitting(false);
+      // Check token balance immediately when modal opens
+      // tokenBalance is a string from the provider, so convert to number
+      const balance = parseInt(tokenBalance) || 0;
+      if (walletAddress && balance === 0) {
+        setShowNoBuyPrompt(true);
+      } else {
+        setShowNoBuyPrompt(false);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, walletAddress, tokenBalance]);
 
   if (!isOpen) return null;
 
@@ -37,6 +48,16 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
     const amount = parseInt(tokenAmount) || 0;
     if (amount < 1) {
       alert('Minimum 1 RL80 token required to light a candle');
+      return;
+    }
+
+    // Check if user has enough tokens
+    const currentBalance = parseInt(tokenBalance) || 0;
+    if (currentBalance === 0) {
+      setShowNoBuyPrompt(true);
+      return;
+    } else if (amount > currentBalance) {
+      alert(`You only have ${currentBalance} RL80 tokens. Please enter a valid amount.`);
       return;
     }
 
@@ -136,7 +157,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 50;
+          z-index: 5000;
           animation: fadeIn 0.3s ease-out;
         }
 
@@ -301,6 +322,80 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           margin-top: 0.5rem;
         }
 
+        .buy-prompt-overlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.95);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 100;
+          border-radius: 20px;
+        }
+
+        .buy-prompt-card {
+          background: rgba(30, 30, 40, 0.98);
+          border: 2px solid #8b5cf6;
+          border-radius: 16px;
+          padding: 2rem;
+          max-width: 400px;
+          width: 90%;
+          text-align: center;
+        }
+
+        .buy-prompt-title {
+          color: #fff;
+          font-size: 1.25rem;
+          margin-bottom: 1rem;
+          font-weight: 600;
+        }
+
+        .buy-prompt-text {
+          color: rgba(255, 255, 255, 0.8);
+          margin-bottom: 1.5rem;
+          line-height: 1.5;
+        }
+
+        .buy-prompt-buttons {
+          display: flex;
+          gap: 1rem;
+          justify-content: center;
+        }
+
+        .buy-prompt-button {
+          padding: 0.75rem 1.5rem;
+          border-radius: 50px;
+          border: none;
+          font-size: 0.9rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s;
+        }
+
+        .buy-prompt-button.primary {
+          background: linear-gradient(135deg, #8b5cf6, #ec4899);
+          color: white;
+        }
+
+        .buy-prompt-button.primary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
+        }
+
+        .buy-prompt-button.secondary {
+          background: rgba(255, 255, 255, 0.1);
+          color: rgba(255, 255, 255, 0.7);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .buy-prompt-button.secondary:hover {
+          background: rgba(255, 255, 255, 0.15);
+          color: white;
+        }
+
         .submit-button {
           width: 100%;
           padding: 0.875rem;
@@ -335,6 +430,38 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           <button className="close-button" onClick={onClose}>✕</button>
           
           <h2 className="modal-title">Light a Candle</h2>
+
+          {/* Buy RL80 Prompt Overlay */}
+          {showNoBuyPrompt && (
+            <div className="buy-prompt-overlay">
+              <div className="buy-prompt-card">
+                <h3 className="buy-prompt-title">No RL80 Tokens Detected</h3>
+                <p className="buy-prompt-text">
+                  You need RL80 tokens to light a candle. Would you like to purchase some RL80 tokens now?
+                </p>
+                <div className="buy-prompt-buttons">
+                  <button 
+                    className="buy-prompt-button primary"
+                    onClick={() => {
+                      setShowNoBuyPrompt(false);
+                      setShowBuyModal(true);
+                    }}
+                  >
+                    Buy RL80
+                  </button>
+                  <button 
+                    className="buy-prompt-button secondary"
+                    onClick={() => {
+                      setShowNoBuyPrompt(false);
+                      onClose(); // Close the entire LightCandleModal
+                    }}
+                  >
+                    Maybe Later
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
             {/* Offering Type Selection */}
@@ -386,7 +513,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                 type="number"
                 className="token-input"
                 min="1"
-                max={tokenBalance || 10000}
+                max={parseInt(tokenBalance) > 0 ? parseInt(tokenBalance) : 10000}
                 value={tokenAmount}
                 onChange={(e) => setTokenAmount(e.target.value)}
                 placeholder="1 RL80 minimum"
@@ -418,6 +545,22 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           </form>
         </div>
       </div>
+
+      {/* ThirdwebBuyModal */}
+      {showBuyModal && (
+        <ThirdwebBuyModal 
+          isOpen={showBuyModal} 
+          onClose={() => {
+            setShowBuyModal(false);
+            // Check if balance is still 0 after closing buy modal
+            const balance = parseInt(tokenBalance) || 0;
+            if (balance === 0) {
+              // User didn't complete purchase, close the LightCandleModal
+              onClose();
+            }
+          }} 
+        />
+      )}
     </>
   );
 };

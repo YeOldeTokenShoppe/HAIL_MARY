@@ -11,6 +11,7 @@ import PostProcessingEffects from '@/components/PostProcessingEffects';
 import CyborgTempleScene from '@/components/CyborgTempleScene';
 import { Illumin80ClerkButton } from "@/components/Illumin80Display";
 import VideoScreens from "@/components/VideoScreens";
+// import VideoScreensOptimized from "@/components/VideoScreensOptimized";
 import TickerDisplay3 from "@/components/TickerDisplay3";
 import { useMusic } from '@/components/MusicContext';
 import { useUser, SignInButton, UserButton, useClerk } from "@clerk/nextjs";
@@ -1095,6 +1096,7 @@ export default function CyborgTemple() {
               isVisible={true} 
             />
 
+            {/* Using optimized version with single video texture */}
             <VideoScreens is80sMode={context80sMode} />
 
               {/* <NeuralNetworkR3F 

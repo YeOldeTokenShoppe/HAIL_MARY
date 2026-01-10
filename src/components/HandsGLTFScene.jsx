@@ -48,6 +48,9 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
   const phoneScreenRef = useRef()
   const phoneCaseRef = useRef()
   const pacManRef = useRef() // Reference for PacMan parent object
+  const phoneSwipeHandlers = useRef(null)
+  const swipeStartY = useRef(0)
+  const isDragging = useRef(false)
   const pacMan2Ref = useRef() // Reference for second PacMan object
   const backdropRef = useRef() // Reference for Backdrop object
   const [phoneCaseWorldPos, setPhoneCaseWorldPos] = useState([0, 0, 0])
@@ -150,6 +153,40 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
     pacMan: null,
     pacMan2: null
   })
+  
+  // Add keyboard controls for browsing offerings
+  const isBrowsing = useRef(false);
+  
+  useEffect(() => {
+    const handleKeyPress = (e) => {
+      if (phoneSwipeHandlers.current) {
+        if (e.key === 'ArrowUp') {
+          console.log('Arrow Up - previous offering');
+          // Only start browsing once, not on every key press
+          if (!isBrowsing.current) {
+            phoneSwipeHandlers.current.startBrowsing();
+            isBrowsing.current = true;
+          }
+          phoneSwipeHandlers.current.swipeUp();
+        } else if (e.key === 'ArrowDown') {
+          console.log('Arrow Down - next offering');
+          // Only start browsing once, not on every key press
+          if (!isBrowsing.current) {
+            phoneSwipeHandlers.current.startBrowsing();
+            isBrowsing.current = true;
+          }
+          phoneSwipeHandlers.current.swipeDown();
+        } else if (e.key === 'Escape') {
+          console.log('Escape - stop browsing');
+          phoneSwipeHandlers.current.stopBrowsing();
+          isBrowsing.current = false;
+        }
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, []);
   
   // Debounced price for emoji changes (updates less frequently)
   
@@ -671,6 +708,9 @@ return (
         justLitOffering={justLitOffering}
         hasActiveClick={hasActiveClick}
         user={user}
+        onManualBrowse={(handlers) => {
+          phoneSwipeHandlers.current = handlers
+        }}
       />
     )}
     
@@ -679,17 +719,55 @@ return (
       position={[0, 0.3, 1.0]}  // Adjusted to better match phone position
       rotation={[0, 0, 0]}
       scale={[0.6, 1.0, 0.2]}
-      onClick={(e) => {
+      onPointerDown={(e) => {
         e.stopPropagation();
-        console.log('Phone click area clicked!');
-        handlePhoneClick();
+        isDragging.current = true;
+        swipeStartY.current = e.clientY;
+        
+        // For touch devices, track if it's a touch event
+        const isTouch = e.pointerType === 'touch';
+        if (isTouch) {
+          phoneSwipeHandlers.current?.startBrowsing();
+        }
+      }}
+      onPointerMove={(e) => {
+        if (isDragging.current && e.pointerType === 'touch' && phoneSwipeHandlers.current) {
+          e.stopPropagation();
+          const deltaY = e.clientY - swipeStartY.current;
+          
+          // Touch swipe threshold
+          if (Math.abs(deltaY) > 20) { // Higher threshold for touch
+            if (deltaY < 0) { // Swipe up = next
+              console.log('Touch swipe up - next offering');
+              phoneSwipeHandlers.current.swipeDown();
+            } else { // Swipe down = previous
+              console.log('Touch swipe down - previous offering');
+              phoneSwipeHandlers.current.swipeUp();
+            }
+            swipeStartY.current = e.clientY;
+          }
+        }
+      }}
+      onPointerUp={(e) => {
+        e.stopPropagation();
+        const wasDragging = isDragging.current;
+        isDragging.current = false;
+        
+        const deltaY = Math.abs(e.clientY - swipeStartY.current);
+        // For mouse/non-touch, any click toggles focus mode
+        // For touch, only tap (no movement) toggles focus mode
+        if (wasDragging && (e.pointerType !== 'touch' || deltaY < 10)) {
+          console.log('Phone tapped - toggling focus mode');
+          handlePhoneClick();
+        }
+      }}
+      onPointerLeave={(e) => {
+        isDragging.current = false;
       }}
       onPointerOver={() => {
-        console.log('Hovering over phone click area');
         document.body.style.cursor = 'pointer';
       }}
       onPointerOut={() => {
-        console.log('Left phone click area');
         document.body.style.cursor = 'default';
       }}
     >

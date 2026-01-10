@@ -91,7 +91,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               pointerEvents: 'none',
             }}
           >
-            <source src="/videos/84.mp4" type="video/mp4" />
+            <source src="/videos/85.mp4" type="video/mp4" />
           </video>
         )}
       
@@ -107,7 +107,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           left: '3%',
           zIndex: 20,
           maxWidth: '380px',
-          padding: '20px 25px',
+          padding: '10px',
           background: 'rgba(20, 15, 25, 0.85)',
           backdropFilter: 'blur(12px)',
           borderRadius: '8px',
@@ -120,6 +120,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             fontFamily: 'UnifrakturCook, serif',
             color: '#ffd700',
             marginBottom: '10px',
+            marginTop: '10px',
             letterSpacing: '0.5px',
             textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)',
           }}>

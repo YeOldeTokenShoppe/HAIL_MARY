@@ -182,6 +182,7 @@ function OptimizedPriceSimulator({ priceRef, shortTermPriceRef, continuousOffset
 // Main component
 const UnifiedShrine = forwardRef(function UnifiedShrine({ 
   offerings = [], 
+  totalOfferingsCount = 0,
   onSelectOffering, 
   onLightCandle, 
   onPriceChange, 
@@ -229,7 +230,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
         }
         // Activate ripple state to trigger purple screen and brighter aura
         setIsRippleActive(true)
-        setTimeout(() => setIsRippleActive(false), 3000) // Match the justLitOffering duration
+        setTimeout(() => setIsRippleActive(false), 8000) // Match the justLitOffering duration
       }
     }
   }), [onLightCandle])
@@ -275,7 +276,13 @@ useEffect(() => {
   const [candleCountAnimation, setCandleCountAnimation] = useState(false)
   
   // Calculate real stats from offerings
-  const realCandleCount = useMemo(() => 500 + offerings.length, [offerings.length])
+  const realCandleCount = useMemo(() => {
+    // Use totalOfferingsCount if provided, otherwise fall back to offerings.length
+    const offeringsCount = totalOfferingsCount > 0 ? totalOfferingsCount : offerings.length
+    const count = 500 + offeringsCount
+    console.log('Candle count updated:', count, 'total offerings:', offeringsCount)
+    return count
+  }, [totalOfferingsCount, offerings.length])
   const realBurnTotal = useMemo(() => {
     const offeringsBurn = offerings.reduce((sum, offering) => sum + (offering.tokensBurned || 0), 0)
     return 2847395 + offeringsBurn // Base amount + actual burns
@@ -283,10 +290,15 @@ useEffect(() => {
   
   // Animate candle count when it increases
   useEffect(() => {
+    console.log('Count animation check - real:', realCandleCount, 'displayed:', displayedCandleCount)
     if (realCandleCount > displayedCandleCount) {
+      // Start animation immediately since we're already delayed from page.js
+      console.log('Triggering candle count animation!')
       setCandleCountAnimation(true)
       setDisplayedCandleCount(realCandleCount)
-      setTimeout(() => setCandleCountAnimation(false), 600)
+      
+      // Keep animation active for longer (1.5 seconds)
+      setTimeout(() => setCandleCountAnimation(false), 1500)
     } else {
       setDisplayedCandleCount(realCandleCount)
     }
@@ -801,9 +813,26 @@ useEffect(() => {
       {/* CSS for candle count animation */}
       <style jsx>{`
         @keyframes pulseScale {
-          0% { transform: scale(1); }
-          50% { transform: scale(1.3); }
-          100% { transform: scale(1); }
+          0% { 
+            transform: scale(1);
+            filter: brightness(1) drop-shadow(0 0 0px #ffee00);
+          }
+          25% { 
+            transform: scale(1.5);
+            filter: brightness(1.8) drop-shadow(0 0 25px #ffee00);
+          }
+          50% { 
+            transform: scale(1.3);
+            filter: brightness(1.5) drop-shadow(0 0 15px #ffee00);
+          }
+          75% { 
+            transform: scale(1.4);
+            filter: brightness(1.6) drop-shadow(0 0 20px #ffee00);
+          }
+          100% { 
+            transform: scale(1);
+            filter: brightness(1) drop-shadow(0 0 0px #ffee00);
+          }
         }
       `}</style>
       
@@ -862,7 +891,7 @@ useEffect(() => {
               color: '#d4af37',
               marginBottom: '4px'
             }}>
-              <img 
+              {/* <img 
                 src="/images/GreenCandleIcon.webp"
                 alt=""
                 style={{
@@ -873,10 +902,11 @@ useEffect(() => {
                   marginRight: '0.3em',
                   display: 'inline-block'
                 }}
-              /> <span 
+              />  */}
+              <span 
                 style={{
                   display: 'inline-block',
-                  animation: candleCountAnimation ? 'pulseScale 0.6s ease-out' : 'none',
+                  animation: candleCountAnimation ? 'pulseScale 1.5s ease-out' : 'none',
                   color: candleCountAnimation ? '#ffee00' : 'inherit'
                 }}
               >
@@ -921,7 +951,7 @@ useEffect(() => {
               marginBottom: '-8px'
    
             }}>
-              Burned
+              Tokens Burned
             </div>
           </div>
         </div>

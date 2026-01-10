@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useMemo } from 'react'
+import React, { useRef, useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
 import { useFrame } from '@react-three/fiber'
 
@@ -9,7 +9,8 @@ export function PhoneScreenTexture({
   hoveredOffering = null, 
   justLitOffering = null,
   hasActiveClick = false,
-  user = null // Clerk user object
+  user = null, // Clerk user object
+  onManualBrowse = null // Callback when user manually browses
 }) {
   const canvasRef = useRef(document.createElement('canvas'))
   const textureRef = useRef()
@@ -18,6 +19,11 @@ export function PhoneScreenTexture({
   const currentOfferingIndex = useRef(0)
   const lastUpdateTime = useRef(Date.now())
   const lastInteractionTime = useRef(0) // Track when user last interacted
+  const prayerReceivedStartTime = useRef(0) // Track when Prayer Received animation started
+  const PRAYER_RECEIVED_DURATION = 1500 // Show Prayer Received for 1.5 seconds
+  const [manualBrowsing, setManualBrowsing] = useState(false)
+  const [manualIndex, setManualIndex] = useState(0)
+  const manualBrowsingRef = useRef(false) // Track browsing state in ref too
   
   // Initialize canvas
   useEffect(() => {
@@ -123,13 +129,34 @@ export function PhoneScreenTexture({
     let displayOffering = null
     if (justLitOffering) {
       displayOffering = justLitOffering
-      drawPrayerReceived(ctx, displayOffering, width, height)
+      const now = Date.now()
+      
+      // Check if we're in the Prayer Received phase or showing user info
+      if (now - prayerReceivedStartTime.current < PRAYER_RECEIVED_DURATION) {
+        // First phase: Show Prayer Received screen
+        drawPrayerReceivedOnly(ctx, width, height)
+      } else {
+        // Second phase: Show user's offering details
+        drawOffering(ctx, displayOffering, width, height, true)
+      }
     } else if (hoveredOffering) {
       displayOffering = hoveredOffering
       drawOffering(ctx, displayOffering, width, height, true)
     } else if (offerings.length > 0) {
-      displayOffering = offerings[currentOfferingIndex.current]
+      // Use manual index if manually browsing, otherwise auto-rotate
+      const index = manualBrowsing ? manualIndex : currentOfferingIndex.current
+      displayOffering = offerings[Math.min(index, offerings.length - 1)]
       drawOffering(ctx, displayOffering, width, height, false)
+      
+      // Show browse indicator when manually browsing
+      if (manualBrowsing) {
+        ctx.fillStyle = 'rgba(0, 255, 102, 0.8)'
+        ctx.font = '28px -apple-system, BlinkMacSystemFont, sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillText(`↑ Swipe to browse ↓`, width / 2, height - 40)
+        ctx.fillText(`${index + 1} / ${offerings.length}`, width / 2, height - 80)
+        ctx.textAlign = 'left'
+      }
     }
     
     // Update texture
@@ -334,7 +361,43 @@ export function PhoneScreenTexture({
     ctx.fillText(`🔥 ${offering.tokensBurned?.toLocaleString() || '???'} RL80`, padding + 40, y + boxHeight - 60)
   }
   
-  // Draw prayer received notification
+  // Draw prayer received notification ONLY (no user info)
+  const drawPrayerReceivedOnly = (ctx, width, height) => {
+    const centerX = width / 2
+    const centerY = height / 2
+    
+    // Draw glowing circle - much larger
+    const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 300)
+    gradient.addColorStop(0, 'rgba(0, 255, 102, 0.6)')
+    gradient.addColorStop(0.5, 'rgba(0, 255, 102, 0.3)')
+    gradient.addColorStop(1, 'rgba(0, 255, 102, 0)')
+    ctx.fillStyle = gradient
+    ctx.fillRect(0, 0, width, height)
+    
+    // Draw checkmark circle
+    ctx.beginPath()
+    ctx.arc(centerX, centerY - 100, 120, 0, Math.PI * 2)
+    ctx.fillStyle = '#00ff66'
+    ctx.fill()
+    
+    ctx.fillStyle = '#000'
+    ctx.font = 'bold 140px -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText('✓', centerX, centerY - 50)
+    
+    // Draw text
+    ctx.fillStyle = '#00ff66'
+    ctx.font = 'bold 64px -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.fillText('PRAYER RECEIVED', centerX, centerY + 120)
+    
+    ctx.fillStyle = '#fff'
+    ctx.font = '48px -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.fillText('Our Lady has heard you', centerX, centerY + 200)
+    
+    ctx.textAlign = 'left'
+  }
+  
+  // Draw prayer received notification with user info (DEPRECATED - keeping for reference)
   const drawPrayerReceived = (ctx, offering, width, height) => {
     const centerX = width / 2
     const centerY = height / 2
@@ -347,42 +410,142 @@ export function PhoneScreenTexture({
     ctx.fillStyle = gradient
     ctx.fillRect(0, 0, width, height)
     
-    // Draw checkmark circle - larger
+    // Draw checkmark circle - smaller and higher up
     ctx.beginPath()
-    ctx.arc(centerX, centerY - 100, 120, 0, Math.PI * 2)
+    ctx.arc(centerX, centerY - 200, 100, 0, Math.PI * 2)
     ctx.fillStyle = '#00ff66'
     ctx.fill()
     
     ctx.fillStyle = '#000'
-    ctx.font = 'bold 140px -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.font = 'bold 120px -apple-system, BlinkMacSystemFont, sans-serif'
     ctx.textAlign = 'center'
-    ctx.fillText('✓', centerX, centerY - 50)
+    ctx.fillText('✓', centerX, centerY - 160)
     
     // Draw text - much larger
     ctx.fillStyle = '#00ff66'
     ctx.font = 'bold 64px -apple-system, BlinkMacSystemFont, sans-serif'
-    ctx.fillText('PRAYER RECEIVED', centerX, centerY + 120)
+    ctx.fillText('PRAYER RECEIVED', centerX, centerY - 50)
     
-    ctx.fillStyle = '#fff'
-    ctx.font = '48px -apple-system, BlinkMacSystemFont, sans-serif'
-    ctx.fillText('Our Lady has heard you', centerX, centerY + 200)
+    // Show user's name prominently
+    if (offering && offering.name) {
+      ctx.fillStyle = '#fff'
+      ctx.font = 'bold 56px -apple-system, BlinkMacSystemFont, sans-serif'
+      ctx.fillText(`From: ${offering.name}`, centerX, centerY + 40)
+    }
     
+    // Show the user's message
+    if (offering && offering.message) {
+      ctx.fillStyle = '#ffffff'
+      ctx.font = '44px -apple-system, BlinkMacSystemFont, sans-serif'
+      
+      // Word wrap the message
+      const words = offering.message.split(' ')
+      let line = ''
+      let lineY = centerY + 120
+      const maxWidth = width - 160
+      const lineHeight = 60
+      let maxLines = 4 // Limit to 4 lines
+      let linesDrawn = 0
+      
+      for (let word of words) {
+        const testLine = line + word + ' '
+        const metrics = ctx.measureText(testLine)
+        if (metrics.width > maxWidth && line.length > 0) {
+          ctx.fillText(line.trim(), centerX, lineY)
+          line = word + ' '
+          lineY += lineHeight
+          linesDrawn++
+          if (linesDrawn >= maxLines) break
+        } else {
+          line = testLine
+        }
+      }
+      if (line.length > 0 && linesDrawn < maxLines) {
+        ctx.fillText(line.trim(), centerX, lineY)
+      }
+    }
+    
+    // Show tokens at the bottom
     if (offering && offering.tokensBurned) {
-      ctx.fillStyle = '#00ff66'
+      ctx.fillStyle = '#ff6b35'
       ctx.font = 'bold 40px -apple-system, BlinkMacSystemFont, sans-serif'
-      ctx.fillText(`🔥 ${offering.tokensBurned.toLocaleString()} RL80 sacrificed`, centerX, centerY + 280)
+      ctx.fillText(`🔥 ${offering.tokensBurned.toLocaleString()} RL80 sacrificed`, centerX, centerY + 380)
     }
     
     ctx.textAlign = 'left'
   }
   
-  // Track when hoveredOffering changes (user clicked a candle)
+  // Track when offerings change
   useEffect(() => {
     if (hoveredOffering) {
       lastInteractionTime.current = Date.now()
       console.log('User clicked candle, showing:', hoveredOffering.name, hoveredOffering.message)
     }
   }, [hoveredOffering])
+  
+  // Track when justLitOffering changes to start the Prayer Received animation
+  useEffect(() => {
+    if (justLitOffering) {
+      prayerReceivedStartTime.current = Date.now()
+      console.log('Starting Prayer Received animation for:', justLitOffering.name)
+    }
+  }, [justLitOffering])
+  
+  // Handle manual browsing
+  useEffect(() => {
+    if (manualBrowsing) {
+      lastInteractionTime.current = Date.now()
+      
+      // Exit manual browsing after 10 seconds of inactivity
+      const timeout = setTimeout(() => {
+        setManualBrowsing(false)
+        setManualIndex(currentOfferingIndex.current)
+      }, 10000)
+      
+      return () => clearTimeout(timeout)
+    }
+  }, [manualBrowsing, manualIndex])
+  
+  // Sync ref with state
+  useEffect(() => {
+    manualBrowsingRef.current = manualBrowsing;
+  }, [manualBrowsing]);
+  
+  // Expose swipe handlers via callback
+  useEffect(() => {
+    if (onManualBrowse) {
+      onManualBrowse({
+        startBrowsing: () => {
+          // Only set index on first start, not on every arrow press
+          if (!manualBrowsingRef.current) {
+            setManualBrowsing(true)
+            setManualIndex(currentOfferingIndex.current)
+          }
+        },
+        swipeUp: () => {
+          if (offerings.length > 0) {
+            setManualIndex(prev => {
+              const newIndex = (prev - 1 + offerings.length) % offerings.length;
+              console.log('SwipeUp: prev:', prev, 'new:', newIndex, 'total:', offerings.length);
+              return newIndex;
+            })
+            lastInteractionTime.current = Date.now()
+          }
+        },
+        swipeDown: () => {
+          if (offerings.length > 0) {
+            setManualIndex(prev => {
+              const newIndex = (prev + 1) % offerings.length;
+              console.log('SwipeDown: prev:', prev, 'new:', newIndex, 'total:', offerings.length);
+              return newIndex;
+            })
+            lastInteractionTime.current = Date.now()
+          }
+        },
+        stopBrowsing: () => setManualBrowsing(false)
+      })
+    }
+  }, [onManualBrowse, offerings.length])
   
   // Update canvas every frame
   useFrame(() => {
@@ -401,9 +564,10 @@ export function PhoneScreenTexture({
     // Only cycle through offerings if:
     // 1. No hoveredOffering (user hasn't clicked)
     // 2. No justLitOffering (no recent candle lighting animation)
-    // 3. Enough time has passed since last interaction
-    // 4. There are multiple offerings to cycle through
-    if (!hoveredOffering && !justLitOffering && offerings.length > 1) {
+    // 3. Not manually browsing
+    // 4. Enough time has passed since last interaction
+    // 5. There are multiple offerings to cycle through
+    if (!hoveredOffering && !justLitOffering && !manualBrowsing && offerings.length > 1) {
       if (timeSinceInteraction > autoRotateDelay && now - lastUpdateTime.current > 4000) {
         currentOfferingIndex.current = (currentOfferingIndex.current + 1) % offerings.length
         lastUpdateTime.current = now

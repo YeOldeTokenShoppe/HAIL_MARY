@@ -373,7 +373,7 @@ export default function NavControlsHome({
           color: #ffee00;
           font-weight: bold;
           padding: 2px 4px;
-          background: rgba(255, 238, 0, 0.1);
+          // background: rgba(255, 238, 0, 0.1);
           border-radius: 4px;
           border: 1px solid rgba(255, 238, 0, 0.2);
         }

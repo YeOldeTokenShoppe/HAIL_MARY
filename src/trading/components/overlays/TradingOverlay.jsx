@@ -512,7 +512,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
             </button>
             
             {/* Candle Display Button - Opens SingleCandleDisplay */}
-            <button
+            {/* <button
               onClick={() => {
                 setShowSingleCandleDisplay(true);
                 // Clear candle notifications when viewing
@@ -548,7 +548,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                 pulse={true}
                 position="top-right"
               />
-            </button>
+            </button> */}
           </div>
         )}
 

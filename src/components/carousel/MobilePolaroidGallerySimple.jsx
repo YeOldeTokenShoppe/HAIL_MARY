@@ -224,7 +224,7 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
         
         .mobile-gallery-heading {
           font-size: 24px;
-          margin-bottom: 8px;
+          margin-bottom: -5px;
           letter-spacing: 0.5px;
           text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
         }

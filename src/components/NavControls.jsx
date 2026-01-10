@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserButton, SignInButton } from '@clerk/nextjs';
+import { usePathname } from 'next/navigation';
 
 // Cyberpunk Nav Controls v4 - RL80
 // Separate toggles for Aurora shader and 80s mode
@@ -19,6 +20,7 @@ export default function NavControls({
   isMenuOpen = false  // Accept menu state from parent
 }) {
   const [emoji, setEmoji] = useState("😇");
+  const pathname = usePathname();
   
   // Alternate emoji
   useEffect(() => {
@@ -208,15 +210,22 @@ export default function NavControls({
           position: relative;
         }
 
-        /* Style Clerk's UserButton */
+        /* Style Clerk's UserButton - Override 60x60 default */
         .user-button-container :global(.cl-userButtonBox) {
-          height: 44px;
+          width: 2.5rem !important;
+          height: 2.5rem !important;
+          max-width: 2.5rem !important;
+          max-height: 2.5rem !important;
         }
 
         .user-button-container :global(.cl-userButtonTrigger) {
-          width: 44px;
-          height: 44px;
-          border-radius: 10px;
+          width: 2.5rem !important;
+          height: 2.5rem !important;
+          min-width: 2.5rem !important;
+          min-height: 2.5rem !important;
+          max-width: 2.5rem !important;
+          max-height: 2.5rem !important;
+          border-radius: 10px !important;
           border: 2px solid #00f5d4;
           box-shadow: 
             0 0 20px rgba(0, 245, 212, 0.4),
@@ -232,16 +241,34 @@ export default function NavControls({
           transform: scale(1.05);
         }
 
+        .user-button-container :global(.cl-avatarBox) {
+          width: 100% !important;
+          height: 100% !important;
+          max-width: 2.5rem !important;
+          max-height: 2.5rem !important;
+          border-radius: 8px !important;
+        }
+
         .user-button-container :global(.cl-avatarImage) {
-          width: 100%;
-          height: 100%;
-          border-radius: 8px;
+          width: 100% !important;
+          height: 100% !important;
+          max-width: 2.5rem !important;
+          max-height: 2.5rem !important;
+          border-radius: 8px !important;
+          object-fit: cover !important;
+        }
+        
+        /* Force override any Clerk inline styles */
+        .user-button-container :global(.cl-userButtonTrigger > button) {
+          width: 2.5rem !important;
+          height: 2.5rem !important;
+          padding: 0 !important;
         }
 
         /* Sign In Button */
         .sign-in-btn {
-          width: 44px;
-          height: 44px;
+          width: 2.5rem;
+          height: 2.5rem;
           border-radius: 10px;
           background: linear-gradient(135deg, #1a1a2e, #0d0d1a);
           border: 2px solid #00f5d4;
@@ -268,13 +295,13 @@ export default function NavControls({
           display: flex;
           flex-direction: column;
           gap: 4px;
-          min-height: 44px;
+          min-height: 2.5rem;
           justify-content: center;
         }
 
         .music-btn {
-          width: 40px;
-          height: 1.8rem;
+          width: 2.5rem;
+          height: 1.2rem;
           border-radius: 6px;
           background: rgba(0, 0, 0, 0.6);
           border: 1px solid rgba(255, 0, 110, 0.4);
@@ -288,7 +315,8 @@ export default function NavControls({
         }
 
         .music-btn.single {
-          height: 44px;
+          height: 2.5rem;
+          width: 2.5rem;
           border-radius: 10px;
           font-size: 18px;
           color: #ff006e;
@@ -310,8 +338,8 @@ export default function NavControls({
         /* HAMBURGER MENU - THE HERO */
         .menu-button {
           position: relative;
-          width: 56px;
-          height: 56px;
+          width: 2.5rem;
+          height: 2.5rem;
           border-radius: 12px;
           background: linear-gradient(135deg, rgba(255, 0, 110, 0.2), rgba(131, 56, 236, 0.2));
           border: 2px solid #ff006e;
@@ -352,7 +380,7 @@ export default function NavControls({
         }
 
         .menu-line {
-          width: 24px;
+          width: 1.2rem;
           height: 2px;
           background: #ff006e;
           border-radius: 2px;
@@ -448,7 +476,7 @@ export default function NavControls({
             className={`toggle-row toggle-aurora ${auroraOn ? 'active' : ''}`}
             onClick={() => setAuroraOn(!auroraOn)}
           >
-            <span className="icon icon-left">✨</span>
+            {/* <span className="icon icon-left">✨</span> */}
             <div className={`toggle-track ${auroraOn ? 'active' : ''}`}>
               <div className={`toggle-thumb ${auroraOn ? 'active' : ''}`} />
             </div>
@@ -459,9 +487,18 @@ export default function NavControls({
           {/* 80s Mode Toggle */}
           <div 
             className={`toggle-row toggle-80s ${is80s ? 'active' : ''}`}
-            onClick={() => setIs80s(!is80s)}
+            onClick={() => {
+              const newIs80s = !is80s;
+              setIs80s(newIs80s);
+              // Auto-toggle Aurora off when 80s mode is on, and back on when 80s is off
+              if (newIs80s) {
+                setAuroraOn(false);
+              } else {
+                setAuroraOn(true);
+              }
+            }}
           >
-            <span className="icon icon-left">🚀</span>
+            {/* <span className="icon icon-left">🚀</span> */}
             <div className={`toggle-track ${is80s ? 'active' : ''}`}>
               <div className={`toggle-thumb ${is80s ? 'active' : ''}`} />
             </div>
@@ -504,7 +541,7 @@ export default function NavControls({
         <div className="user-button-container">
           {isUserSignedIn ? (
             <UserButton 
-              afterSignOutUrl="/trade"
+              signOutOptions={{ redirectUrl: pathname || "/trade" }}
               appearance={{
                 elements: {
                   avatarBox: "user-avatar-box",
@@ -513,7 +550,7 @@ export default function NavControls({
               }}
             />
           ) : (
-            <SignInButton mode="modal" forceRedirectUrl="/trade">
+            <SignInButton mode="modal" forceRedirectUrl={pathname || "/trade"}>
               <button className="sign-in-btn">
                 <span style={{ fontSize: '24px' }}>{emoji}</span>
               </button>

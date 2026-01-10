@@ -4411,6 +4411,14 @@ body {
   border-radius: 10% !important;
 }
 
+.cl-internal-1v5sfok { 
+  border-radius: 12px !important;
+}
+
+.cl-internal-89wd6s {
+  border-radius: 12px !important;
+}
+
 .cl-avatarBox.cl-userButtonAvatarBox.cl-internal-1j7ahlv {
   display: flex;
   justify-content: center;
@@ -4420,7 +4428,10 @@ body {
   object-fit: cover;
   border-radius: 10% !important;
 }
-
+cl-internal-89wd6s {
+  width: 2.5rem !important;
+  height: 2.5rem !important;
+}
 @media (max-width: 760px) {
   .menu-wrapper {
     width: 100%;
@@ -6845,4 +6856,41 @@ div[data-three] {
 
 /* Remove the overly broad rule that was blocking everything */
 /* Only target specific drei/stats elements if needed */
+
+/* Override Clerk's UserButton 60x60 default size globally */
+.cl-userButtonBox {
+  width: 2.5rem !important;
+  height: 2.5rem !important;
+  max-width: 2.5rem !important;
+  max-height: 2.5rem !important;
+}
+
+.cl-userButtonTrigger {
+  width: 2.5rem !important;
+  height: 2.5rem !important;
+  min-width: 2.5rem !important;
+  min-height: 2.5rem !important;
+  max-width: 2.5rem !important;
+  max-height: 2.5rem !important;
+}
+
+.cl-userButtonTrigger button {
+  width: 2.5rem !important;
+  height: 2.5rem !important;
+  padding: 0 !important;
+}
+
+.cl-avatarBox {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 2.5rem !important;
+  max-height: 2.5rem !important;
+}
+
+.cl-avatarImage {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 2.5rem !important;
+  max-height: 2.5rem !important;
+}
 

@@ -74,7 +74,7 @@ function VideoScreens({ is80sMode = false }) {
     // Determine which video to play based on mode
     // Using Firebase Storage CDN URLs with auth tokens
     const videoSource = is80sMode 
-      ? 'https://firebasestorage.googleapis.com/v0/b/hailmary-3ff6c.firebasestorage.app/o/video%2Fsynthosaur.mp4?alt=media&token=f972ca48-199c-4aa3-848b-b4c4492be049'
+      ? 'https://firebasestorage.googleapis.com/v0/b/hailmary-3ff6c.firebasestorage.app/o/video%2Fsynthosaur2.mp4?alt=media&token=f972ca48-199c-4aa3-848b-b4c4492be049'
       : '/videos/23.mp4';
     const boomboxSource = is80sMode 
       ? 'https://firebasestorage.googleapis.com/v0/b/hailmary-3ff6c.firebasestorage.app/o/video%2Fboombox.mp4?alt=media&token=3c51b29d-ec93-4770-bac4-b1a42c306ab1'

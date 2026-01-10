@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useUser, useClerk, UserButton } from '@clerk/nextjs';
+import { usePathname } from 'next/navigation';
 import { useWalletAuth } from './WalletAuthProvider';
 import { WalletConnectionModal } from './WalletConnectionModal';
 import { WalletDetailsModal } from './WalletDetailsModal';
@@ -9,6 +10,7 @@ import { WalletDetailsModal } from './WalletDetailsModal';
 export function UnifiedAccountModal({ isOpen, onClose }) {
   const { user } = useUser();
   const { signOut } = useClerk();
+  const pathname = usePathname();
   const { 
     walletAddress, 
     isWalletConnected, 
@@ -35,7 +37,7 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   const handleSignOut = async () => {
-    await signOut();
+    await signOut({ redirectUrl: pathname || '/' });
     onClose();
   };
 
@@ -82,7 +84,7 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
                 <div className="account-actions">
                   {/* Hidden UserButton that we'll trigger programmatically */}
                   <div style={{ position: 'absolute', visibility: 'hidden', pointerEvents: 'none' }}>
-                    <UserButton afterSignOutUrl="/" />
+                    <UserButton afterSignOutUrl={pathname || "/"} />
                   </div>
                   
                   <button 
@@ -143,7 +145,7 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
                       </div>
                       <div className="wallet-balance" style={{ flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
                         <span className="wallet-label" style={{ textAlign: 'center', width: '100%' }}>Balance</span>
-                        <strong className="balance-amount" style={{ width: '100%' }}>{tokenBalance?.toLocaleString() || '0'} RL80</strong>
+                        <strong className="balance-amount" style={{ width: '100%' }}>{tokenBalance?.toLocaleString() || '0'} <span style={{color: '#fff'}}>RL80</span></strong>
                       </div>
                     </div>
                     
@@ -477,13 +479,13 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
         .balance-amount {
           color: #00f5d4 !important;
           font-family: 'Orbitron', monospace;
-          font-size: 1.1rem;
+          font-size: 1rem;
           font-weight: 600;
           text-shadow: 0 0 10px rgba(0, 245, 212, 0.3);
-          background: rgba(0, 245, 212, 0.05) !important;
+          // background: rgba(0, 245, 212, 0.05) !important;
           padding: 0.4rem 0.75rem;
           border-radius: 8px;
-          border: 1px solid rgba(0, 245, 212, 0.2) !important;
+          // border: 1px solid rgba(0, 245, 212, 0.2) !important;
           flex: 1;
           text-align: center;
           margin-left: 0.5rem;

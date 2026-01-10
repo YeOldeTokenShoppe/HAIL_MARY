@@ -69,15 +69,15 @@ export default function NavControlsMobile({
         .music-stack-mobile {
           display: flex;
           flex-direction: column;
-          gap: 3px;
-          min-height: 36px;
+          gap: 4px;
+          min-height: 2.5rem;
           justify-content: center;
         }
 
         .music-btn-mobile {
-          width: 32px;
-          height: 16px;
-          border-radius: 4px;
+          width: 2.5rem;
+          height: 1.2rem;
+          border-radius: 6px;
           background: rgba(0, 0, 0, 0.6);
           border: 1px solid rgba(255, 0, 110, 0.4);
           display: flex;
@@ -86,14 +86,17 @@ export default function NavControlsMobile({
           cursor: pointer;
           transition: all 0.2s ease;
           color: rgba(255, 255, 255, 0.7);
-          font-size: 8px;
+          font-size: 10px;
         }
 
         .music-btn-mobile.single {
-          height: 36px;
-          border-radius: 8px;
-          font-size: 14px;
+          height: 2.5rem;
+          width: 2.5rem;
+          border-radius: 10px;
+          font-size: 18px;
           color: #ff006e;
+            border: 2px solid #ff006e;
+          
         }
         
         .music-btn-mobile:hover,
@@ -109,11 +112,11 @@ export default function NavControlsMobile({
           box-shadow: 0 0 8px rgba(255, 0, 110, 0.3);
         }
 
-        /* Avatar - Smaller */
+        /* Avatar - Consistent size */
         .avatar-mobile {
-          width: 36px;
-          height: 36px;
-          border-radius: 8px;
+          width: 2.5rem;
+          height: 2.5rem;
+          border-radius: 10px;
           background: linear-gradient(135deg, #1a1a2e, #0d0d1a);
           border: 2px solid #00f5d4;
           display: flex;
@@ -142,11 +145,11 @@ export default function NavControlsMobile({
           box-shadow: none;
         }
 
-        /* Hamburger - Still the hero but smaller */
+        /* Hamburger - Consistent size */
         .menu-button-mobile {
           position: relative;
-          width: 44px;
-          height: 44px;
+          width: 2.5rem;
+          height: 2.5rem;
           border-radius: 10px;
           background: linear-gradient(135deg, rgba(255, 0, 110, 0.2), rgba(131, 56, 236, 0.2));
           border: 2px solid #ff006e;
@@ -184,12 +187,13 @@ export default function NavControlsMobile({
         }
 
         .menu-line-mobile {
-          width: 18px;
+          width: 1.2rem;
           height: 2px;
           background: #ff006e;
           border-radius: 2px;
           transition: all 0.3s ease;
           box-shadow: 0 0 6px rgba(255, 0, 110, 0.8);
+          
         }
 
         .menu-button-mobile.open .menu-line-mobile:nth-child(1) {
@@ -285,7 +289,7 @@ export default function NavControlsMobile({
               }} 
             />
           ) : (
-            <span style={{ fontSize: '18px' }}>
+            <span style={{ fontSize: '1.5rem' }}>
               {isUserSignedIn ? '👤' : emoji}
             </span>
           )}
