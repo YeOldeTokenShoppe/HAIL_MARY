@@ -156,12 +156,13 @@ export default function TokenomicsPage() {
             pointerEvents: 'none',
           }}>
             
-           <h1 className='custom-title footer-title'
-              id="main-title"
-              style={{ 
-              position: "relative",
-              // left: isMobile ? "5%" : "10%",
+           <h1 className='custom-title'
+            id="main-title"
+            // onClick={() => router?.push('/about')}
+            style={{ 
+              pointerEvents: 'auto',  // Enable clicks on the title
               color: is80sMode ? "#ffffff" : "#d4af37",
+              fontFamily: 'UnifrakturCook, serif',
               textShadow: is80sMode 
                 ? `
                   0 0 20px rgba(201, 55, 255, 0.9),
@@ -183,24 +184,22 @@ export default function TokenomicsPage() {
                   rgba(255, 192, 203, 0.4) -1px -1px 5px,
                   rgba(0, 0, 0, 0.8) 10px 10px 15px
                 `,
-              fontSize:  "3.5rem",
-              fontFamily: "'UnifrakturCook', serif",
+              fontSize: "3rem",
               fontWeight: 900,
               lineHeight: 0.8,
-              transform: isMobileDevice ? "rotate(-5deg)" : "rotate(-8deg) skew(-15deg)",
-              zIndex: 10,
-              whiteSpace: isMobileDevice ? 'normal' : 'nowrap',
+              transform: "rotate(-8deg) skew(-15deg)",
               cursor: 'pointer',
               margin: 0,
-              pointerEvents: 'auto',
-            }}>
-              <span  style={{ display: 'block',  marginLeft: isMobileDevice ? "0rem" : "-2rem",position: 'relative' }}>Our Lady</span>
-              <span  style={{ display: 'block', position: 'relative' }}>
-                <span style={{ fontSize: isMobileDevice ? "1.2rem" : "1.3rem" }}>of    </span>
-                Perpetual
-              </span>
-              <span  style={{ display: 'block', marginLeft: isMobileDevice ? "0rem" : "0rem", position: 'relative' }}>Profit</span>
-            </h1>
+              marginBottom: '20px',
+            }}
+          >
+            <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
+            <span className="title-line" style={{ display: 'block', position: 'relative' }}>
+              <span style={{ fontSize: "2rem" }}>of    </span>
+              Perpetual
+            </span>
+            <span className="title-line" style={{ display: 'block', marginLeft: "4rem", position: 'relative' }}>Profit</span>
+          </h1>
 
           </div>
         </div>
@@ -208,58 +207,94 @@ export default function TokenomicsPage() {
       
       {/* RL80 Logo - Mobile Only */}
       {!isSceneLoading && isMobile && (
-        <div style={{
-          position: "absolute",
-          top: "20px", 
-          left: "20px",
-          borderRadius: "8px",
-          padding: "10px",
-          pointerEvents: "auto",
-          zIndex: 1,
-        }}>
-          <div 
-            id="text"
-            className="logo-text"
-                 style={{
-              position: "relative",
-              fontFamily: "'UnifrakturMaguntia', serif",
-              fontSize: "3rem",
-              color: "#ffffff",
-              cursor: "pointer",
+        <>
+          {/* NavControls for Mobile */}
+          <div
+            style={{
+              position: "absolute",
+              top: "20px",
+              right: "20px",
+              zIndex: 9,
+              pointerEvents: "auto"
             }}
           >
-            <Link href="/" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
-              RL80
-            </Link>
-            {Array.from({length: 100}).map((_, i) => {
-              const index = i + 1;
-              return (
-               <div
-                  key={index}
-                  className="text__copy"
-                  style={{
-                    position: "absolute",
-                    pointerEvents: "none",
-                    zIndex: -1,
-                    top: 0,
-                    left: 0,
-                    color: is80sMode 
-                      ? `rgba(${201 - index * 2}, ${55 - index * 3}, ${256 - index * 2})` 
-                      : `rgba(${255 - index * 2}, ${255 - index * 3}, ${255 - index * 2})`,
-                    filter: "blur(0.1rem)",
-                    transform: `translate(
-                      ${index * 0.1}rem, 
-                      ${index * 0.1}rem
-                    ) scale(${1 + index * 0.01})`,
-                    opacity: (1 / index) * 1.5,
-                  }}
-                >
-                  RL80
-                </div>
-              );
-            })}
+            <NavControlsHome 
+              isPlaying={contextIsPlaying}
+              onPlayMusic={() => play()}
+              onStopMusic={() => pause()}
+              onSkipTrack={() => nextTrack()}
+              onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
+              onUserClick={() => {}}
+              isUserSignedIn={!!user}
+              isMenuOpen={isMenuOpen}
+              is80sMode={is80sMode}
+              onToggle80sMode={() => setIs80sMode(!is80sMode)}
+            />
           </div>
-        </div>
+
+          {/* CyberNav Menu Panel for Mobile */}
+          <CyberNav 
+            is80sMode={is80sMode}
+            position="fixed"
+            isOpen={isMenuOpen}
+            onClose={() => setIsMenuOpen(false)}
+            showButton={false}
+          />
+
+          {/* RL80 Logo */}
+          <div style={{
+            position: "absolute",
+            top: "20px", 
+            left: "20px",
+            borderRadius: "8px",
+            padding: "10px",
+            pointerEvents: "auto",
+            zIndex: 1,
+          }}>
+            <div 
+              id="text"
+              className="logo-text"
+                   style={{
+                position: "relative",
+                fontFamily: "'UnifrakturMaguntia', serif",
+                fontSize: "3rem",
+                color: "#ffffff",
+                cursor: "pointer",
+              }}
+            >
+              <Link href="/" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
+                RL80
+              </Link>
+              {Array.from({length: 100}).map((_, i) => {
+                const index = i + 1;
+                return (
+                 <div
+                    key={index}
+                    className="text__copy"
+                    style={{
+                      position: "absolute",
+                      pointerEvents: "none",
+                      zIndex: -1,
+                      top: 0,
+                      left: 0,
+                      color: is80sMode 
+                        ? `rgba(${201 - index * 2}, ${55 - index * 3}, ${256 - index * 2})` 
+                        : `rgba(${255 - index * 2}, ${255 - index * 3}, ${255 - index * 2})`,
+                      filter: "blur(0.1rem)",
+                      transform: `translate(
+                        ${index * 0.1}rem, 
+                        ${index * 0.1}rem
+                      ) scale(${1 + index * 0.01})`,
+                      opacity: (1 / index) * 1.5,
+                    }}
+                  >
+                    RL80
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
       )}
 
             <motion.div

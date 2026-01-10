@@ -2260,7 +2260,7 @@ const PalmsScene = ({ onLoadingChange }) => {
             {/* Use MorphingWebGLText for final stage, WebGLStandaloneText for others */}
             {currentCameraStage === 4 ? (
               <MorphingWebGLText 
-                startTextArray={[t('palmTreeDrive.reality')]}
+                startTextArray={["your", "REAL80"]}
                 endText="RL80"
                 shouldMorph={shouldMorph}
                 morphDelay={500}
@@ -2310,16 +2310,16 @@ const PalmsScene = ({ onLoadingChange }) => {
               />
             )}
           </div>
-          {/* Hide dots when morph animation is complete and Enter button appears */}
-          {!(currentCameraStage === 4 && shouldMorph) && (
-            <div 
-              className="progress-dots"
-              style={{
-                display: 'flex',
-                gap: '8px',
-                marginTop: '1rem',
-                justifyContent: 'center',
-              }}>
+          {/* Make dots invisible instead of removing them to prevent layout shift */}
+          <div 
+            className="progress-dots"
+            style={{
+              display: 'flex',
+              gap: '8px',
+              marginTop: '1rem',
+              justifyContent: 'center',
+              visibility: (currentCameraStage === 4 && shouldMorph) ? 'hidden' : 'visible',
+            }}>
               {[0, 1, 2, 3, 4].map((index) => (
                 <div
                   key={index}
@@ -2335,7 +2335,6 @@ const PalmsScene = ({ onLoadingChange }) => {
                 />
               ))}
             </div>
-          )}
           
           {/* Scroll hint - fades out when user scrolls */}
           <div style={{

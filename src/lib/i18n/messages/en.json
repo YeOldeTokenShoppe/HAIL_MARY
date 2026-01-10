@@ -7,7 +7,7 @@
   "palmTreeDrive": {
     "reality": "your\nREAL80",
     "buyButton": "Buy",
-    "about": "About",
+    "about": "Lore",
     "tokenomics": "Tokenomics",
     "illuminati": "Illumin80",
     "more": "More...",
@@ -34,8 +34,8 @@
 
     },
     "stage5": {
-      "line1": "is now",
-      "line2": "REAL80",
+      "line1": " ",
+      "line2": " ",
       "line3": " "
     },
     "scrollPrompt": "scroll up to continue"

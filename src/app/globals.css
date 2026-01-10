@@ -633,7 +633,7 @@ body.rocket-page {
   }
 } */
 
-body,
+/* body,
 input,
 select,
 textarea {
@@ -641,7 +641,7 @@ textarea {
   font-weight: 400;
   font-size: 1.2rem;
   line-height: 1.65;
-}
+} */
 
 input,
 select,
@@ -1926,7 +1926,7 @@ body {
   color: rgba(255, 255, 255, 0.7);
 }
 
-body,
+/* body,
 input,
 select,
 textarea {
@@ -1934,7 +1934,7 @@ textarea {
   font-weight: 400;
   font-size: 1.2rem;
   line-height: 1.65;
-}
+} */
 
 input,
 select,
@@ -6014,10 +6014,10 @@ header,
 }
 
 /* Add this near the top of the file, after the imports */
-body {
+/* body {
   overflow-y: auto !important;
   position: relative !important;
-}
+} */
 
 .css-1v6i4q9 {
   position: relative !important;

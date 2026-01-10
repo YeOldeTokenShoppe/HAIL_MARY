@@ -265,11 +265,7 @@ useEffect(() => {
 
   // Handle light candle from modal
   const handleLightCandle = async (newOffering) => {
-    // Set the just lit offering for visual effects
-    setJustLitOffering(newOffering)
-    setTimeout(() => setJustLitOffering(null), 3000)
-    
-    // Trigger the candle launch animation
+    // Trigger the candle launch animation (this will also show on phone via onLightCandle callback)
     if (unifiedShrineRef.current) {
       unifiedShrineRef.current.triggerCandleEffect(newOffering)
     }

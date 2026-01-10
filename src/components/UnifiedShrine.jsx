@@ -216,15 +216,23 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   
   const [additionalCandles, setAdditionalCandles] = useState([])
   const [clickedCandleId, setClickedCandleId] = useState(null)
+  const [isRippleActive, setIsRippleActive] = useState(false)
   
   // Expose method to trigger candle effect
   useImperativeHandle(ref, () => ({
     triggerCandleEffect: (offering) => {
       if (effectRef.current) {
         effectRef.current.triggerEffect(offering)
+        // Immediately show on phone when effect starts
+        if (onLightCandle) {
+          onLightCandle(offering)
+        }
+        // Activate ripple state to trigger purple screen and brighter aura
+        setIsRippleActive(true)
+        setTimeout(() => setIsRippleActive(false), 3000) // Match the justLitOffering duration
       }
     }
-  }), [])
+  }), [onLightCandle])
   const [userRotation, setUserRotation] = useState(0)
   const isDragging = useRef(false)
   const dragStart = useRef({ x: 0, rotation: 0 })
@@ -580,7 +588,7 @@ useEffect(() => {
   
 
   return (
-    <div style={{ width: '100vw', height: isMobile ? '100vh' : '100vh', background: '#000', position: 'fixed'}}>
+    <div style={{ width: '100vw', height: isMobile ? '100vh' : '100vh', background: is80sMode ? 'transparent' : '#000', position: 'fixed'}}>
       {/* 80s mode background */}
       {is80sMode && (
         <img
@@ -608,7 +616,8 @@ useEffect(() => {
           width: '100vw', 
           height: '100vh', 
           position: 'fixed', 
-          zIndex: 1
+          zIndex: 2,
+          background: is80sMode ? 'transparent' : '#000'
         }}
       >
       {/* Focus Mode Indicator */}
@@ -645,7 +654,7 @@ useEffect(() => {
           antialias: true, // Enable for better quality on all devices
           toneMapping: THREE.ACESFilmicToneMapping, // Use proper tone mapping for better visuals
           powerPreference: isMobile ? "default" : "high-performance",
-          alpha: false,
+          alpha: true,
           premultipliedAlpha: false,
           preserveDrawingBuffer: false,
           failIfMajorPerformanceCaveat: false,
@@ -732,7 +741,7 @@ useEffect(() => {
                   onJustLitComplete={onJustLitComplete}
                   userRotation={userRotation}
                   priceChange={displayPrice.change}
-                  hasActiveClick={clickedCandleId !== null}
+                  hasActiveClick={clickedCandleId !== null || isRippleActive}
                   user={user}
                   onPhoneClick={() => {
                     setFocusMode(!focusMode);

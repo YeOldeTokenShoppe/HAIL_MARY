@@ -736,7 +736,7 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onLight
   }
   
   return (
-    <div style={{ width: '100%', height: '100vh', background: '#000', position: 'relative' }}>
+    <div style={{ width: '100%', height: '100vh', background: is80sMode ? 'transparent' : '#000', position: 'relative' }}>
       {is80sMode && (
         <img
           src="/images/retro.webp"

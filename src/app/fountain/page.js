@@ -170,7 +170,8 @@ export default function FountainPage() {
                 id="main-title"
                 style={{ 
                 position: "relative",
-                left: "-35%",
+                left: "5%",
+                top: "-2rem",
                 color: is80sMode ? "#ffffff" : "#f6f5f1ff",
                 fontFamily: 'UnifrakturCook, serif',
                 textShadow: is80sMode 

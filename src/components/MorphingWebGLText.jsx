@@ -5,7 +5,7 @@ import WebGLStandaloneText from './WebGLStandaloneText';
 import gsap from 'gsap';
 
 const MorphingWebGLText = ({ 
-  startTextArray = ["and shared it", "with everybody"],
+  startTextArray = ["your", "REAL80"],
   endText = "RL80",
   shouldMorph = false,
   morphDelay = 500,
@@ -60,6 +60,7 @@ const MorphingWebGLText = ({
         position: 'relative',
         width: '100%',
         height: '100%',
+        minHeight: '580px',
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center'

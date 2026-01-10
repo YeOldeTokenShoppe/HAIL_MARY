@@ -236,7 +236,7 @@ export function PhoneScreenTexture({
     // Draw user avatar if available (on the far left)
     const avatarSize = 120
     const avatarX = padding + 40  // Far left position
-    const avatarY = y + 90
+    const avatarY = y + 50
     
     // Draw avatar circle background
     ctx.save()

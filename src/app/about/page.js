@@ -668,13 +668,13 @@ export default function CarouselPage() {
             pointerEvents: 'none',
           }}>
             
-            <h1 className='custom-title footer-title'
-              id="main-title"
-              onClick={() => router.push('/#final')}
-              style={{ 
-              position: "relative",
-              // left: isMobile ? "5%" : "10%",
+             <h1 className='custom-title'
+            id="main-title"
+            // onClick={() => router?.push('/about')}
+            style={{ 
+              pointerEvents: 'auto',  // Enable clicks on the title
               color: is80sMode ? "#ffffff" : "#d4af37",
+              fontFamily: 'UnifrakturCook, serif',
               textShadow: is80sMode 
                 ? `
                   0 0 20px rgba(201, 55, 255, 0.9),
@@ -696,28 +696,22 @@ export default function CarouselPage() {
                   rgba(255, 192, 203, 0.4) -1px -1px 5px,
                   rgba(0, 0, 0, 0.8) 10px 10px 15px
                 `,
-              fontSize:  "3.5rem",
-              fontFamily: "'UnifrakturCook', serif",
+              fontSize: "3rem",
               fontWeight: 900,
               lineHeight: 0.8,
-              transform: isMobileDevice ? "rotate(-5deg)" : "rotate(-8deg) skew(-15deg)",
-              zIndex: 10,
-              whiteSpace: isMobileDevice ? 'normal' : 'nowrap',
+              transform: "rotate(-8deg) skew(-15deg)",
               cursor: 'pointer',
               margin: 0,
-              pointerEvents: 'auto',
-            }}>
-              <span  style={{ display: 'block',  marginLeft: isMobileDevice ? "0rem" : "-2rem",position: 'relative' }}>{t('heading.ourLady') || 'Our Lady'}</span>
-              <span  style={{ display: 'block', position: 'relative' }}>
-                {t('heading.of') && t('heading.of') !== 'heading.of' && (
-                  <span style={{ fontSize: isMobileDevice ? "1.2rem" : "1.3rem" }}>{t('heading.of')}    </span>
-                )}
-                {t('heading.perpetual') || 'Perpetual'}
-              </span>
-              {t('heading.profit') && t('heading.profit') !== 'heading.profit' && (
-                <span  style={{ display: 'block', marginLeft: isMobileDevice ? "0rem" : "0rem", position: 'relative' }}>{t('heading.profit')}</span>
-              )}
-            </h1>
+              marginBottom: '20px',
+            }}
+          >
+            <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
+            <span className="title-line" style={{ display: 'block', position: 'relative' }}>
+              <span style={{ fontSize: "2rem" }}>of    </span>
+              Perpetual
+            </span>
+            <span className="title-line" style={{ display: 'block', marginLeft: "4rem", position: 'relative' }}>Profit</span>
+          </h1>
 
           </div>
         </div>,
