@@ -13,6 +13,9 @@ class FloatingGallery extends THREE.Group {
     super()
     
     this.images = []
+    this.textures = [] // Track textures for disposal
+    this.materials = [] // Track materials for disposal
+    this.geometries = [] // Track geometries for disposal
     this.imageData = [
       { 
         url: '/carousel_images/img1.jpg', 
@@ -195,8 +198,14 @@ class FloatingGallery extends THREE.Group {
       })
       
       loader.load(imageInfo.url, (texture) => {
+        // Optimize texture size
+        texture.minFilter = THREE.LinearMipMapLinearFilter
+        texture.magFilter = THREE.LinearFilter
+        texture.generateMipmaps = true
+        
         material.map = texture
         material.needsUpdate = true
+        this.textures.push(texture) // Track for disposal
       })
       
       const mesh = new THREE.Mesh(geometry, material)
@@ -246,6 +255,11 @@ class FloatingGallery extends THREE.Group {
       yearMesh.position.set(0, -(imageInfo.height/2 + 0.1), 0.1)
       mesh.add(yearMesh)
       
+      // Track for disposal
+      this.textures.push(yearTexture)
+      this.materials.push(material, yearMaterial, edgeMaterial)
+      this.geometries.push(geometry, yearGeometry, edgeGeometry)
+      
       mesh.userData = {
         initPosition: mesh.position.clone(),
         year: imageInfo.year,
@@ -268,6 +282,19 @@ class FloatingGallery extends THREE.Group {
       const floatY = Math.sin(t * userData.floatSpeed + userData.floatOffset) * userData.floatAmplitude
       image.position.y = userData.initPosition.y + floatY
     })
+  }
+  
+  dispose() {
+    // Dispose of all tracked resources
+    this.textures.forEach(texture => texture.dispose())
+    this.materials.forEach(material => material.dispose())
+    this.geometries.forEach(geometry => geometry.dispose())
+    
+    // Clear arrays
+    this.textures = []
+    this.materials = []
+    this.geometries = []
+    this.images = []
   }
 }
 
@@ -457,32 +484,31 @@ export default function OldsCoolTunnel() {
     let t = 0
     let isPausedLocal = false
     let lastTime = performance.now()
+    const targetFPS = 60
+    const frameInterval = 1000 / targetFPS
 
     const animate = () => {
       frameIdRef.current = requestAnimationFrame(animate)
       
       const currentTime = performance.now()
-      const dt = (currentTime - lastTime) / 1000 // Convert to seconds
-      lastTime = currentTime
+      const elapsed = currentTime - lastTime
       
-      if (!isPausedLocal) {
-        t += dt
-        flyThrough.update(t)
+      // Throttle to target FPS
+      if (elapsed > frameInterval) {
+        const dt = elapsed / 1000 // Convert to seconds
+        lastTime = currentTime - (elapsed % frameInterval)
         
-
-      }
-      
-      // Removed arrow and overview mode updates
-      
-      gallery.update(t)
-      
-      if (composer) {
-        composer.render()
-        if (frameIdRef.current % 60 === 0) {
+        if (!isPausedLocal) {
+          t += dt
+          flyThrough.update(t)
         }
-      } else {
-        renderer.render(scene, camera)
-        if (frameIdRef.current % 60 === 0) {
+        
+        gallery.update(t)
+        
+        if (composer) {
+          composer.render()
+        } else {
+          renderer.render(scene, camera)
         }
       }
     }
@@ -520,15 +546,40 @@ export default function OldsCoolTunnel() {
         cancelAnimationFrame(frameIdRef.current)
       }
       
+      // Dispose of gallery resources
+      if (gallery && gallery.dispose) {
+        gallery.dispose()
+      }
+      
+      // Dispose of composer and passes
+      if (composer) {
+        composer.passes.forEach(pass => {
+          if (pass.dispose) pass.dispose()
+        })
+      }
+      
+      // Traverse and dispose all scene objects
+      if (sceneRef.current) {
+        sceneRef.current.traverse((object) => {
+          if (object.geometry) object.geometry.dispose()
+          if (object.material) {
+            if (Array.isArray(object.material)) {
+              object.material.forEach(material => material.dispose())
+            } else {
+              object.material.dispose()
+            }
+          }
+          if (object.texture) object.texture.dispose()
+        })
+        sceneRef.current.clear()
+      }
+      
       if (rendererRef.current) {
         rendererRef.current.dispose()
+        rendererRef.current.forceContextLoss()
         if (mountRef.current && rendererRef.current.domElement) {
           mountRef.current.removeChild(rendererRef.current.domElement)
         }
-      }
-      
-      if (sceneRef.current) {
-        sceneRef.current.clear()
       }
     }
   }, [])
