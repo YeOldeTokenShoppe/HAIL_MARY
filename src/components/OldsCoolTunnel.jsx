@@ -49,6 +49,7 @@ class FloatingGallery extends THREE.Group {
   constructor(curve) {
     super()
     
+    this.curve = curve // Store curve reference
     this.images = []
     this.textures = [] // Track textures for disposal
     this.materials = [] // Track materials for disposal
@@ -56,8 +57,8 @@ class FloatingGallery extends THREE.Group {
     this.imageData = [
       { 
         url: '/carousel_images/img1.jpg', 
-        year: '1970',
-        description: 'The Dawn of Digital Dreams',
+        year: '2200 BCE',
+        description: 'Driving back a bear market',
         curvePosition: 0.11,  // Position along curve (0-1)
         width: 1.2,
         height: 1.2,
@@ -81,8 +82,8 @@ class FloatingGallery extends THREE.Group {
       // },
       { 
         url: '/carousel_images/img3.jpg', 
-        year: '1980',
-        description: 'Neon Nights and Arcade Lights',
+        year: '1350 CE',
+        description: 'Early clown encounter turns ugly',
         curvePosition: 0.27,
         width: 1,
         height: 1,
@@ -94,8 +95,8 @@ class FloatingGallery extends THREE.Group {
       },
       { 
         url: '/carousel_images/img4.jpg', 
-        year: '1985',
-        description: 'Synthwave Sunset Boulevard',
+        year: '2010',
+        description: 'Featured in popular manga series',
         curvePosition: 0.37,
         width: 1,
         height: 1,
@@ -108,8 +109,8 @@ class FloatingGallery extends THREE.Group {
       },
       { 
         url: '/carousel_images/img5.jpg', 
-        year: '1990',
-        description: 'Grunge Meets the Grid',
+        year: '2031',
+        description: 'Laying down DeFi Beats',
         curvePosition: 0.46,
         width: 1,
         height: 1,
@@ -122,8 +123,8 @@ class FloatingGallery extends THREE.Group {
       },
       { 
         url: '/carousel_images/img6.jpg', 
-        year: '1995',
-        description: 'The Internet Awakens',
+        year: '2077',
+        description: 'Autonomous artisans provide laser-inscripted devotions',
         curvePosition: 0.55,
         width: 1.3,
         height: 1.3,
@@ -134,9 +135,9 @@ class FloatingGallery extends THREE.Group {
 
       },
       { 
-        url: '/carousel_images/img7.jpg', 
-        year: '2000',
-        description: 'Y2K Millennium Vibes',
+        url: '/carousel_images/img13.jpg', 
+        year: '1100 CE',
+        description: 'Our Lady repels Carpathian Scampire',
         curvePosition: 0.66,
         width: 1.4,
         height: 1.4,
@@ -148,8 +149,8 @@ class FloatingGallery extends THREE.Group {
       },
       { 
         url: '/carousel_images/img8.jpg', 
-        year: '2005',
-        description: 'Web 2.0 Revolution',
+        year: '380 CE',
+        description: 'Pre-meme era patronage of the arts',
         curvePosition: 0.74,
         width: 1.2,
         height: 1.2,
@@ -161,8 +162,8 @@ class FloatingGallery extends THREE.Group {
       },
       { 
         url: '/carousel_images/img9.jpg', 
-        year: '2010',
-        description: 'The Social Network Era',
+        year: '1680',
+        description: 'Monetary theory for a young privateer',
         curvePosition: 0.83,
         width: 1,
         height: 1,
@@ -174,8 +175,8 @@ class FloatingGallery extends THREE.Group {
       },
       { 
         url: '/carousel_images/img11.jpg', 
-        year: '2015',
-        description: 'Mobile-First World',
+        year: '1790',
+        description: 'Heroine of Mythology',
         curvePosition: 0.98,
         width: 1,
         height: 1,
@@ -451,6 +452,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
   const [isPaused, setIsPaused] = React.useState(false)
   const [focusedImage, setFocusedImage] = React.useState(null)
   const [focusedIndex, setFocusedIndex] = React.useState(-1)
+  const [focusedImageData, setFocusedImageData] = React.useState(null)
   const galleryRef = useRef(null)
   const cameraRef = useRef(null)
   const raycasterRef = useRef(new THREE.Raycaster())
@@ -601,6 +603,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
         focusStateRef.current = { image: null, index: -1 }
         setFocusedImage(null)
         setFocusedIndex(-1)
+        setFocusedImageData(null)
         isPausedLocal = false
         setIsPaused(false)
       }
@@ -613,6 +616,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
           focusStateRef.current = { image: galleryRef.current.images[prevIndex], index: prevIndex }
           setFocusedImage(galleryRef.current.images[prevIndex])
           setFocusedIndex(prevIndex)
+          setFocusedImageData(galleryRef.current.imageData[prevIndex])
         }
         if (e.code === 'ArrowRight') {
           e.preventDefault()
@@ -620,6 +624,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
           focusStateRef.current = { image: galleryRef.current.images[nextIndex], index: nextIndex }
           setFocusedImage(galleryRef.current.images[nextIndex])
           setFocusedIndex(nextIndex)
+          setFocusedImageData(galleryRef.current.imageData[nextIndex])
         }
       }
       
@@ -634,6 +639,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
         focusStateRef.current = { image: null, index: -1 }
         setFocusedImage(null)
         setFocusedIndex(-1)
+        setFocusedImageData(null)
         isPausedLocal = false
         setIsPaused(false)
         return
@@ -666,6 +672,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
               focusStateRef.current = { image: clickedImage, index: imageIndex }
               setFocusedImage(clickedImage)
               setFocusedIndex(imageIndex)
+              setFocusedImageData(galleryRef.current.imageData[imageIndex])
               return
             }
           }
@@ -685,6 +692,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
           focusStateRef.current = { image: null, index: -1 }
           setFocusedImage(null)
           setFocusedIndex(-1)
+          setFocusedImageData(null)
           isPausedLocal = false
           setIsPaused(false)
         }
@@ -759,42 +767,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
     }
   }, [])
 
-  // Handle camera animation for focused image
-  useEffect(() => {
-    if (!cameraRef.current || !focusedImage) return
-    
-    const camera = cameraRef.current
-    const targetPosition = new THREE.Vector3()
-    const targetLookAt = new THREE.Vector3()
-    
-    if (focusedImage) {
-      // Calculate position in front of the image
-      targetPosition.copy(focusedImage.position)
-      const normal = new THREE.Vector3(0, 0, 1)
-      normal.applyQuaternion(focusedImage.quaternion)
-      targetPosition.add(normal.multiplyScalar(4)) // Move camera 4 units in front
-      
-      targetLookAt.copy(focusedImage.position)
-    }
-    
-    // Animate camera to target position
-    let animationFrame
-    const animateCamera = () => {
-      // Smooth interpolation
-      camera.position.lerp(targetPosition, 0.1)
-      camera.lookAt(targetLookAt)
-      
-      if (camera.position.distanceTo(targetPosition) > 0.1) {
-        animationFrame = requestAnimationFrame(animateCamera)
-      }
-    }
-    
-    animateCamera()
-    
-    return () => {
-      if (animationFrame) cancelAnimationFrame(animationFrame)
-    }
-  }, [focusedImage])
+  // No camera animation needed - we'll display the image separately
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
@@ -837,37 +810,73 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
         </div>
       )}
       
-      {/* Focused Image UI */}
-      {isFullscreen && focusedImage && galleryRef.current && (
+      {/* Focused Image Overlay */}
+      {isFullscreen && focusedImageData && (
         <div 
           style={{
-            position: 'absolute',
-            bottom: '20px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            backgroundColor: 'rgba(0, 0, 0, 0.85)',
-            color: '#fa0',
-            padding: '20px 30px',
-            borderRadius: '10px',
-            fontFamily: 'Tourney, monospace',
-            fontSize: '20px',
-            border: '2px solid #41f',
-            zIndex: 1000,
-            textAlign: 'center',
-            minWidth: '300px'
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.95)',
+            zIndex: 2000,
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            cursor: 'pointer'
+          }}
+          onClick={() => {
+            focusStateRef.current = { image: null, index: -1 }
+            setFocusedImage(null)
+            setFocusedIndex(-1)
+            setFocusedImageData(null)
+            setIsPaused(false)
           }}
         >
-          <div style={{ fontSize: '28px', marginBottom: '10px', color: '#fff' }}>
-            {galleryRef.current.imageData[focusedIndex]?.year || ''}
-          </div>
-          {galleryRef.current.imageData[focusedIndex]?.description && (
-            <div style={{ fontSize: '16px', color: '#fa0', marginBottom: '15px', fontStyle: 'italic' }}>
-              "{galleryRef.current.imageData[focusedIndex].description}"
+          {/* Image Display */}
+          <img 
+            src={focusedImageData.url} 
+            alt={focusedImageData.year}
+            style={{
+              maxWidth: '90%',
+              maxHeight: '60vh',
+              objectFit: 'contain',
+              border: '3px solid #41f',
+              borderRadius: '10px',
+              boxShadow: '0 0 30px rgba(65, 17, 255, 0.5)'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+          
+          {/* Info Panel */}
+          <div 
+            style={{
+              marginTop: '30px',
+              backgroundColor: 'rgba(0, 0, 0, 0.85)',
+              color: '#fa0',
+              padding: '20px 30px',
+              borderRadius: '10px',
+              fontFamily: 'Tourney, monospace',
+              fontSize: '20px',
+              // border: '2px solid #41f',
+              textAlign: 'center',
+              minWidth: '300px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: '28px', marginBottom: '10px', color: '#fff' }}>
+              {focusedImageData.year}
             </div>
-          )}
-          <div style={{ fontSize: '14px', color: '#8af', marginTop: '15px' }}>
-            {typeof window !== 'undefined' && 'ontouchstart' in window ? 'Tap outside to exit' : 'Click outside or ESC to exit'}
-          </div>
+            {focusedImageData.description && (
+              <div style={{ fontSize: '16px', color: '#fa0', marginBottom: '15px', fontStyle: 'italic' }}>
+                "{focusedImageData.description}"
+              </div>
+            )}
+            <div style={{ fontSize: '14px', color: '#8af', marginTop: '15px' }}>
+              {typeof window !== 'undefined' && 'ontouchstart' in window ? 'Tap outside to exit' : 'Click outside or ESC to exit'}
+            </div>
           <div style={{ 
             display: 'flex', 
             justifyContent: 'space-between', 
@@ -881,6 +890,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
                 focusStateRef.current = { image: galleryRef.current.images[prevIndex], index: prevIndex }
                 setFocusedImage(galleryRef.current.images[prevIndex])
                 setFocusedIndex(prevIndex)
+                setFocusedImageData(galleryRef.current.imageData[prevIndex])
               }}
               style={{
                 background: 'transparent',
@@ -901,6 +911,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
                 focusStateRef.current = { image: galleryRef.current.images[nextIndex], index: nextIndex }
                 setFocusedImage(galleryRef.current.images[nextIndex])
                 setFocusedIndex(nextIndex)
+                setFocusedImageData(galleryRef.current.imageData[nextIndex])
               }}
               style={{
                 background: 'transparent',
@@ -914,6 +925,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
             >
               Next →
             </button>
+          </div>
           </div>
         </div>
       )}
