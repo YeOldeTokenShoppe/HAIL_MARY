@@ -467,8 +467,8 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
     sceneRef.current = scene
 
     // Get container dimensions first
-    const containerWidth = mountRef.current?.clientWidth || window.innerWidth
-    const containerHeight = mountRef.current?.clientHeight || window.innerHeight
+    const containerWidth = mountRef.current?.clientWidth || (typeof window !== 'undefined' ? window.innerWidth : 800)
+    const containerHeight = mountRef.current?.clientHeight || (typeof window !== 'undefined' ? window.innerHeight : 600)
     
     const camera = new THREE.PerspectiveCamera(
       45,
@@ -491,7 +491,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
       powerPreference: 'high-performance'
     })
     
-    renderer.setPixelRatio(window.devicePixelRatio)
+    renderer.setPixelRatio(typeof window !== 'undefined' ? window.devicePixelRatio : 1)
     renderer.setSize(containerWidth, containerHeight)
     renderer.toneMapping = THREE.ReinhardToneMapping
     renderer.toneMappingExposure = Math.pow(0.9, 4.0)
@@ -580,8 +580,8 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
     }
 
     const handleResize = () => {
-      const width = mountRef.current?.clientWidth || window.innerWidth
-      const height = mountRef.current?.clientHeight || window.innerHeight
+      const width = mountRef.current?.clientWidth || (typeof window !== 'undefined' ? window.innerWidth : 800)
+      const height = mountRef.current?.clientHeight || (typeof window !== 'undefined' ? window.innerHeight : 600)
       camera.aspect = width / height
       camera.updateProjectionMatrix()
       renderer.setSize(width, height)
@@ -696,8 +696,10 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
       }
     }
 
-    window.addEventListener('resize', handleResize)
-    window.addEventListener('keydown', handleKeyPress)
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', handleResize)
+      window.addEventListener('keydown', handleKeyPress)
+    }
     
     // Add touch and click event listeners to the renderer's canvas
     renderer.domElement.addEventListener('touchstart', handleTouch)
@@ -707,8 +709,10 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
     animate()
 
     return () => {
-      window.removeEventListener('resize', handleResize)
-      window.removeEventListener('keydown', handleKeyPress)
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', handleResize)
+        window.removeEventListener('keydown', handleKeyPress)
+      }
       if (renderer.domElement) {
         renderer.domElement.removeEventListener('touchstart', handleTouch)
         renderer.domElement.removeEventListener('click', handleClick)
@@ -826,8 +830,8 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
           <div>{isPaused ? '⏸ PAUSED' : '▶ PLAYING'}</div>
           <div style={{ fontSize: '14px', marginTop: '5px', color: '#8af' }}>
             {isPaused ? 
-              ('ontouchstart' in window ? 'Tap an image to focus' : 'Click an image to focus') :
-              ('ontouchstart' in window ? 'Tap to Pause' : 'Press SPACE to Pause')
+              (typeof window !== 'undefined' && 'ontouchstart' in window ? 'Tap an image to focus' : 'Click an image to focus') :
+              (typeof window !== 'undefined' && 'ontouchstart' in window ? 'Tap to Pause' : 'Press SPACE to Pause')
             }
           </div>
         </div>
@@ -862,7 +866,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
             </div>
           )}
           <div style={{ fontSize: '14px', color: '#8af', marginTop: '15px' }}>
-            {'ontouchstart' in window ? 'Tap outside to exit' : 'Click outside or ESC to exit'}
+            {typeof window !== 'undefined' && 'ontouchstart' in window ? 'Tap outside to exit' : 'Click outside or ESC to exit'}
           </div>
           <div style={{ 
             display: 'flex', 
