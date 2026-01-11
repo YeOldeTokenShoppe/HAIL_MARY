@@ -16,6 +16,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [showNoBuyPrompt, setShowNoBuyPrompt] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -24,6 +25,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
       setMessage('');
       setTokenAmount('');
       setIsSubmitting(false);
+      setShowInfo(false); // Reset info state
       // Check token balance immediately when modal opens
       // tokenBalance is a string from the provider, so convert to number
       const balance = parseInt(tokenBalance) || 0;
@@ -324,16 +326,17 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
 
         .buy-prompt-overlay {
           position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.95);
+          top: -2px;
+          left: -2px;
+          right: -2px;
+          bottom: -2px;
+          background: rgba(20, 20, 30, 0.98);
           display: flex;
           align-items: center;
           justify-content: center;
           z-index: 100;
           border-radius: 20px;
+          backdrop-filter: blur(10px);
         }
 
         .buy-prompt-card {
@@ -426,44 +429,183 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
       `}</style>
 
       <div className="modal-overlay" onClick={onClose}>
-        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-          <button className="close-button" onClick={onClose}>✕</button>
-          
-          <h2 className="modal-title">Light a Candle</h2>
-
-          {/* Buy RL80 Prompt Overlay */}
-          {showNoBuyPrompt && (
-            <div className="buy-prompt-overlay">
-              <div className="buy-prompt-card">
-                <h3 className="buy-prompt-title">No RL80 Tokens Detected</h3>
-                <p className="buy-prompt-text">
-                  You need RL80 tokens to light a candle. Would you like to purchase some RL80 tokens now?
-                </p>
-                <div className="buy-prompt-buttons">
-                  <button 
-                    className="buy-prompt-button primary"
-                    onClick={() => {
-                      setShowNoBuyPrompt(false);
-                      setShowBuyModal(true);
-                    }}
-                  >
-                    Buy RL80
-                  </button>
-                  <button 
-                    className="buy-prompt-button secondary"
-                    onClick={() => {
-                      setShowNoBuyPrompt(false);
-                      onClose(); // Close the entire LightCandleModal
-                    }}
-                  >
-                    Maybe Later
-                  </button>
-                </div>
+        {/* Buy RL80 Prompt - Show this INSTEAD of the modal content */}
+        {showNoBuyPrompt ? (
+          <div 
+            style={{
+              background: 'rgba(20, 20, 30, 0.98)',
+              border: '1px solid rgba(138, 43, 226, 0.4)',
+              borderRadius: '24px',
+              padding: '1rem',
+              maxWidth: '420px',
+              textAlign: 'center',
+              color: '#fff',
+              boxShadow: '0 0 60px rgba(138, 43, 226, 0.3)',
+              position: 'relative',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              style={{
+                position: 'absolute',
+                top: '1rem',
+                right: '1rem',
+                background: 'transparent',
+                border: 'none',
+                color: '#ff006e',
+                fontSize: '2rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'transform 0.2s',
+              }}
+              onClick={onClose}
+              onMouseEnter={(e) => e.target.style.transform = 'scale(1.1)'}
+              onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+            >
+              ×
+            </button>
+            
+            {/* Icon */}
+            {/* <div style={{ marginBottom: '1rem' }}>
+              <div style={{
+                fontSize: '4rem',
+                filter: 'drop-shadow(0 0 20px rgba(253, 237, 0, 0.5))',
+              }}>
+                🪙
               </div>
+            </div> */}
+            
+            {/* Title */}
+            <h2 style={{
+              fontFamily: "'Orbitron', monospace",
+              fontSize: '1.2rem',
+              fontWeight: '700',
+              color: '#fff',
+              textTransform: 'uppercase',
+              letterSpacing: '3px',
+              marginBottom: '1.5rem',
+            }}>
+              RL80 TOKENS REQUIRED
+            </h2>
+            
+            {/* Description */}
+            <p style={{
+              color: '#00f5d4',
+              fontSize: '1.1rem',
+              marginBottom: '2.5rem',
+              lineHeight: '1.5',
+            }}>
+              You need RL80 tokens to light a candle.
+            </p>
+            
+            {/* Info message for test mode */}
+            <div style={{
+              background: 'rgba(139, 92, 246, 0.1)',
+              border: '1px solid rgba(139, 92, 246, 0.3)',
+              borderRadius: '12px',
+              padding: '1rem',
+              marginBottom: '2rem'
+            }}>
+              <p style={{
+                color: '#fff',
+                fontSize: '0.9rem',
+                margin: 0
+              }}>
+                💡 Test tokens have been provided for this demo. Please close this window and try lighting a candle again.
+              </p>
             </div>
-          )}
-
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+            
+            {/* Secondary link */}
+            <button 
+              onClick={() => {
+                setShowNoBuyPrompt(false);
+                onClose();
+              }}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'rgba(255, 255, 255, 0.5)',
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                padding: '0.5rem 1rem',
+                transition: 'color 0.3s',
+                textDecoration: 'underline',
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.color = 'rgba(255, 255, 255, 0.8)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.color = 'rgba(255, 255, 255, 0.5)';
+              }}
+            >
+              Maybe Later
+            </button>
+          </div>
+        ) : (
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="close-button" onClick={onClose}>✕</button>
+            <h2 className="modal-title">Light a Candle</h2>
+            
+            {/* Info Toggle Button */}
+            <div style={{ 
+              textAlign: 'center', 
+              marginBottom: '1rem',
+              marginTop: '-0.5rem'
+            }}>
+              <button
+                type="button"
+                onClick={() => setShowInfo(!showInfo)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#00f5d4',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  opacity: 0.8,
+                  transition: 'opacity 0.2s',
+                  padding: '0.25rem',
+                }}
+                onMouseEnter={(e) => e.target.style.opacity = '1'}
+                onMouseLeave={(e) => e.target.style.opacity = '0.8'}
+              >
+                {showInfo ? '▼ Hide Rules' : '▶ View Rules'}
+              </button>
+            </div>
+            
+            {/* Collapsible Info Section */}
+            {showInfo && (
+              <div style={{
+                background: 'rgba(139, 92, 246, 0.05)',
+                border: '1px solid rgba(139, 92, 246, 0.2)',
+                borderRadius: '12px',
+                padding: '1rem',
+                marginBottom: '1.5rem',
+                fontSize: '0.7rem',
+                color: 'rgba(255, 255, 255, 0.8)',
+                lineHeight: '1.6',
+              }}>
+                <ul style={{ 
+                  margin: 0, 
+                  paddingLeft: '1.2rem',
+                  listStyle: 'none'
+                }}>
+                  <li style={{ marginBottom: '0.4rem' }}>💎 1 token minimum to light a candle</li>
+                  <li style={{ marginBottom: '0.4rem' }}>⏱️ Candles expire after 80 hours</li>
+                  <li style={{ marginBottom: '0.4rem' }}>🕯️ One candle per wallet address at a time</li>
+                  <li style={{ marginBottom: '0.4rem' }}>🔄 New candles replace existing ones & restart timer</li>
+                  <li>🌍 All candles are publicly displayed</li>
+                </ul>
+              </div>
+            )}
+            
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
             {/* Offering Type Selection */}
             <div className="offering-types">
               {Object.entries(offeringTypes).map(([type, config]) => (
@@ -542,8 +684,10 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
             >
               {isSubmitting ? 'Lighting...' : 'Light Candle'}
             </button>
-          </form>
-        </div>
+            </form>
+            
+          </div>
+        )}
       </div>
 
       {/* ThirdwebBuyModal */}

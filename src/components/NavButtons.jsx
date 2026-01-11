@@ -121,7 +121,7 @@ const styles = {
     transform: 'scale(1.05) translateY(-2px)',
   },
   label: {
-    fontFamily: '"Pirata One", serif',
+    fontFamily: '"Permanent Marker", serif',
     fontSize: '1.2rem',
     color: '#000000',
     transition: 'all 0.3s ease',

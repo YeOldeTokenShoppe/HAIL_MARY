@@ -109,7 +109,7 @@ export default function TokenomicsPage() {
           top: 0,
           left: 0,
           width: '100%',
-          minHeight: '100vh',
+          height: 'auto',
           zIndex: 10,
           pointerEvents: 'none',
         }}>
@@ -152,8 +152,9 @@ export default function TokenomicsPage() {
             // flexDirection: 'column',
             width: '100%',
             paddingTop: '2rem',
-            minHeight: '100vh',
             pointerEvents: 'none',
+            left: '2rem',
+            // top: '2rem'
           }}>
             
            <h1 className='custom-title'

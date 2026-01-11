@@ -9,14 +9,18 @@ import './util'
 import ExperienceControls from './ExperienceControls'
 import { useMusic } from '../MusicContext'
 import { useLanguage } from '../LanguageProvider'
+import SkewedHeading from '../SkewedHeading'
 
 import MobilePolaroidGallerySimple from './MobilePolaroidGallerySimple'
+import OldsCoolTunnel from '../OldsCoolTunnel'
 
 export default function CarouselComponent({ onReady, disableScrollControls = false }) {
   const [hoveredCaption, setHoveredCaption] = useState(null)
   const [sceneReady, setSceneReady] = useState(false)
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
   const [isMobilePhone, setIsMobilePhone] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 480 : false)
+  const [isSmallPhone, setIsSmallPhone] = useState(() => typeof window !== 'undefined' ? window.innerHeight <= 700 : false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const { is80sMode } = useMusic()
   const { t } = useLanguage()
   
@@ -25,6 +29,8 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
       setIsMobile(window.innerWidth <= 768)
       // Check specifically for mobile phones (not tablets)
       setIsMobilePhone(window.innerWidth <= 480)
+      // Check for small phones like iPhone SE
+      setIsSmallPhone(window.innerHeight <= 700)
     }
     checkMobile()
     window.addEventListener('resize', checkMobile)
@@ -64,13 +70,30 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             transform: translateY(0);
           }
         }
+        
+        @keyframes gradientShift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        
+        @keyframes glow {
+          0%, 100% { 
+            filter: drop-shadow(0 0 20px rgba(255, 0, 255, 0.6)) 
+                    drop-shadow(0 0 40px rgba(0, 255, 255, 0.4));
+          }
+          50% { 
+            filter: drop-shadow(0 0 30px rgba(255, 0, 255, 0.8)) 
+                    drop-shadow(0 0 60px rgba(0, 255, 255, 0.6));
+          }
+        }
       `}</style>
       <div style={{ 
         width: '100%', 
         height: '100vh', 
         backgroundColor: (is80sMode && isMobilePhone) ? 'transparent' : '#000',
         position: 'relative',
-        overflow: 'hidden'
+        overflow: isMobilePhone ? 'visible' : 'hidden'
       }}>
         {/* Video background for 80s mode - desktop only */}
         {is80sMode && !isMobilePhone && (
@@ -135,27 +158,238 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           }}>
             {t('carousel.subtitle') || 'A visual canon of Our Lady of Perpetual Profit, from antiquity to the future.'}
           </p>
+          <p style={{
+            fontSize: '14px',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            color: 'rgba(255, 255, 255, 0.85)',
+            lineHeight: '1.5',
+            marginTop: '10px',
+          }}>
+            Or read the Techno-Mythic Whitepaper <a href="/philosophy" style={{
+              color: '#ffd700',
+              textDecoration: 'underline',
+            }}>here ↗</a>
+          </p>
         </div>
       )}
       
-      {/* Mobile Phone Gallery - replaces 3D carousel on phones */}
-      {isMobilePhone ? (
-        <div style={{ position: 'relative', zIndex: 10 }}>
-          <MobilePolaroidGallerySimple 
-            is80sMode={is80sMode}
-            images={[
-              { url: '/carousel_images/img1.jpg' },
-              { url: '/carousel_images/img2.jpg' },
-              { url: '/carousel_images/img3.jpg' },
-              { url: '/carousel_images/img4.jpg' },
-              { url: '/carousel_images/img5.jpg' },
-              { url: '/carousel_images/img6.jpg' },
-              { url: '/carousel_images/img7.jpg' },
-              { url: '/carousel_images/img8.jpg' },
-            ]}
-          />
+      {/* Mobile Portal View */}
+      {isMobilePhone && !isFullscreen ? (
+        <div style={{
+          position: 'relative',
+          width: '100%',
+          height: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: is80sMode ? 'transparent' : 'radial-gradient(ellipse at center, #1a1a2e 0%, #000 100%)',
+          zIndex: 2
+        }}>
+          {/* Heading */}
+          {/* <h2 style={{
+            fontFamily: "'UnifrakturMaguntia', serif",
+            fontSize: isMobilePhone ? '2.5rem' : '3rem',
+            color: '#ffd700',
+            textAlign: 'center',
+            marginBottom: '2rem',
+            marginTop: '-2rem',
+            textShadow: '0 0 30px rgba(255, 215, 0, 0.5), 3px 3px 6px rgba(0, 0, 0, 0.9)',
+            letterSpacing: '0.08em',
+            fontWeight: 'normal',
+            animation: 'glow 3s ease-in-out infinite'
+          }}>
+            An Icon for the Ages
+          </h2> */}
+                     <SkewedHeading
+              lines={["A TIMELESS", "ICON FOR", "THE AGES"]}
+              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : "3.5rem"}
+              color="#00ff9d"
+              skewAngle={-2}
+              shadowColor="#000"
+            />
+          
+          {/* Sub-heading */}
+          <p style={{
+            fontFamily: "'Courier New', monospace",
+            fontSize: isSmallPhone ? '0.7rem' : isMobilePhone ? '0.9rem' : '1.2rem',
+            color: '#ffd700',
+            textAlign: 'center',
+            marginTop: isSmallPhone ? '0.3rem' : '0.5rem',
+            marginBottom: isSmallPhone ? '0.8rem' : '1rem',
+            letterSpacing: '0.05em',
+            textTransform: 'uppercase',
+            opacity: 0.9,
+            textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
+          }}>
+            Journey Through the Digital Renaissance
+          </p>
+          
+          {/* Portal Preview Container with Frame Image */}
+          <div 
+            onClick={() => setIsFullscreen(true)}
+            style={{
+              position: 'relative',
+              width: '90%',
+              maxWidth: isSmallPhone ? '280px' : isMobilePhone ? '380px' : '450px',
+              aspectRatio: '4/3',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease',
+              transform: `perspective(1000px) rotateX(5deg) scale(${isSmallPhone ? 0.85 : 1})`,
+              filter: 'drop-shadow(0 0 30px rgba(255, 215, 0, 0.5))'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'perspective(1000px) rotateX(2deg) scale(1.05)'
+              e.currentTarget.style.filter = 'drop-shadow(0 0 60px rgba(255, 215, 0, 0.9)) brightness(1.2)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'perspective(1000px) rotateX(5deg) scale(1)'
+              e.currentTarget.style.filter = 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.6)) brightness(1)'
+            }}
+          >
+            {/* Portal frame image */}
+            <img 
+              src="/images/timePortal.webp"
+              alt="Time Portal"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'contain',
+                zIndex: 2,
+                pointerEvents: 'none'
+              }}
+            />
+            
+            {/* OldsCoolTunnel animation inside the frame with perspective */}
+            <div style={{
+              position: 'absolute',
+              top: '7%',  // Fine-tuned to center in frame
+              left: '13%',  // Fine-tuned to center in frame
+              width: '76%',  // Smaller to fit better
+              height: '78%',  // Smaller to fit better
+              overflow: 'hidden',
+              background: is80sMode ? 'rgba(0, 0, 0, 0.7)' : '#000',
+              // Apply 3D transform to match the frame's perspective
+              transform: `
+                perspective(800px)
+                rotateX(349deg)
+                rotateY(4deg)
+                rotateZ(356deg)
+                scale3d(1, 1, 1)
+              `,
+              transformStyle: 'preserve-3d',
+              borderRadius: '2px',
+              boxShadow: 'inset 0 0 50px rgba(0, 0, 0, 0.8)'
+            }}>
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                width: '300%',  // Wider to show more of the tunnel
+                height: '300%',  // Taller to show more of the tunnel
+                transform: 'translate(-50%, -50%) scale(0.3)',  // Center and scale down
+                transformOrigin: 'center center'
+              }}>
+                <OldsCoolTunnel />
+              </div>
+            </div>
+            
+            {/* Portal Text Overlay */}
+            <div style={{
+              position: 'absolute',
+              bottom: '-60px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              textAlign: 'center',
+              pointerEvents: 'none'
+            }}>
+              <h3 style={{
+                fontFamily: "'UnifrakturMaguntia', serif",
+                fontSize: '1.8rem',
+                color: '#ffd700',
+                margin: '0 0 5px 0',
+                textShadow: '0 0 30px rgba(255, 215, 0, 0.8), 2px 2px 4px rgba(0, 0, 0, 0.8)',
+                animation: 'glow 2s ease-in-out infinite',
+                letterSpacing: '0.05em'
+              }}>
+                {/* ENTER THE TIME PORTAL */}
+              </h3>
+              {/* <p style={{
+                fontFamily: "'Courier New', monospace",
+                fontSize: '0.9rem',
+                color: '#fff',
+                margin: 0,
+                textShadow: '0 0 10px rgba(255, 255, 255, 0.6), 1px 1px 2px rgba(0, 0, 0, 0.8)'
+              }}>
+                Tap to explore RL80 through the ages
+              </p> */}
+            </div>
+          </div>
+          
+          {/* Additional info below portal */}
+          <p style={{
+            marginTop: '1rem',
+            marginBottom: '1rem',
+            fontFamily: "'Courier New', monospace",
+            fontSize: isMobilePhone ? '0.75rem' : '0.9rem',
+            color: '#888',
+            textAlign: 'center',
+            lineHeight: '1.4'
+          }}>
+            Tap to enter • <a href="/philosophy" style={{ color: '#ffff00', textDecoration: 'underline' }}>Read whitepaper</a>
+          </p>
+        </div>
+      ) : isMobilePhone && isFullscreen ? (
+        /* Fullscreen mobile view */
+        <div style={{ 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          width: '100vw', 
+          height: '100vh', 
+          zIndex: 9999,
+          pointerEvents: 'auto'
+        }}>
+          <OldsCoolTunnel />
+          
+          {/* Exit fullscreen button */}
+          <button
+            onClick={() => setIsFullscreen(false)}
+            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              width: '50px',
+              height: '50px',
+              borderRadius: '50%',
+              background: 'rgba(0, 0, 0, 0.8)',
+              border: '2px solid #00ffff',
+              color: '#00ffff',
+              fontSize: '24px',
+              cursor: 'pointer',
+              zIndex: 10000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 255, 255, 0.2)'
+              e.currentTarget.style.transform = 'scale(1.1)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.8)'
+              e.currentTarget.style.transform = 'scale(1)'
+            }}
+          >
+            ✕
+          </button>
         </div>
       ) : (
+        /* Desktop view - Original Canvas */
       <Canvas 
         style={{ position: 'relative', zIndex: 2 }}
         camera={{ position: [0, 0, 100], fov: 15 }}
@@ -271,7 +505,7 @@ function Carousel({ radius = 1.4, count = 8, setHoveredCaption }) {
       {
         year: "2200 BCE",
         location: "High Pass of the Fertile Crescent",
-        description: "Driving back bear market chaos with a vector of luminous intent"
+        description: "Driving back a bear market"
       },
       {
         year: "1981 CE",
@@ -281,7 +515,7 @@ function Carousel({ radius = 1.4, count = 8, setHoveredCaption }) {
       {
         year: "circa 1350–1450 CE",
         location: "Eastern Mediterranean",
-        description: "Early clown encounter turns ugly."
+        description: "Early clown encounter turns ugly"
       },
       {
         year: "2019 CE",
@@ -291,22 +525,22 @@ function Carousel({ radius = 1.4, count = 8, setHoveredCaption }) {
       {
         year: "2031 CE",
         location: "Neo-Miami",
-        description: "Our Lady establishes a new musical sub-genre, 'DeFi Beats'"
+        description: "Laying down DeFi Beats"
       },
       {
         year: "2077 CE",
         location: "Night City",
-        description: "Autonomous artisans inscribe digital sigils."
+        description: "Autonomous artisans provide laser-inscripted devotions"
       },
       {
         year: "87 CE",
         location: "Peloponnesian Peninsula",
-        description: "A timeless tutelage between good and evil"
+        description: "Offering guidance for the attention economy"
       },
       {
         year: "4th century CE",
         location: "Transtiberim, Rome",
-        description: "Pre-meme era patronage of the arts, mimes were gaining cultural traction."
+        description: "Pre-meme era patronage of the arts"
       }
     ]
   }, [t])

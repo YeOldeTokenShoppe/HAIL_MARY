@@ -46,6 +46,7 @@ export default function ShrinePage() {
   const [mobileMatchstickLit, setMobileMatchstickLit] = useState(false)
   const [remountKey, setRemountKey] = useState(0)
   const [isExpanded, setIsExpanded] = useState(false)
+  const [hasLitCandleThisSession, setHasLitCandleThisSession] = useState(false)
   const is80sMode = context80sMode
   
   // State for offerings data
@@ -217,6 +218,9 @@ useEffect(() => {
   useEffect(() => {
     if (!isMobileView) return;
     
+    // Don't show animations if user has already lit a candle this session
+    if (hasLitCandleThisSession) return;
+    
     // Initial expand after 2 seconds
     const initialTimer = setTimeout(() => {
       setIsExpanded(true);
@@ -239,7 +243,7 @@ useEffect(() => {
       clearTimeout(initialTimer);
       clearInterval(interval);
     };
-  }, [isMobileView]);
+  }, [isMobileView, hasLitCandleThisSession]);
 
   // Check if font is loaded and add fonts-loaded class
   useEffect(() => {
@@ -273,14 +277,12 @@ useEffect(() => {
   
   // Handle light candle button click with auth check
   const handleLightCandleClick = () => {
-    // Light the matchstick immediately for visual feedback
-    setMobileMatchstickLit(true);
+    // Don't light the matchstick here - only light it when candle is actually lit
+    // This prevents the flame from showing if user cancels
     
     // Check if user is signed in
     if (!isSignedIn) {
       setShowAuthMessage('sign-in');
-      // Reset matchstick after a delay if not signed in
-      setTimeout(() => setMobileMatchstickLit(false), 1000);
       return;
     }
 
@@ -314,6 +316,18 @@ useEffect(() => {
       unifiedShrineRef.current.triggerCandleEffect(newOffering)
     }
     
+    // Set the matchstick to lit state when candle is successfully lit
+    if (isMobileView) {
+      setMobileMatchstickLit(true);
+      // Mark that user has lit a candle this session
+      setHasLitCandleThisSession(true);
+      // Collapse the banner if it's expanded
+      setIsExpanded(false);
+    } else if (shrineLeftPanelRef.current) {
+      // Light the desktop matchstick
+      shrineLeftPanelRef.current.lightMatchstick();
+    }
+    
     // Mobile haptic feedback
     if (isMobileView && window.navigator && window.navigator.vibrate) {
       window.navigator.vibrate([50, 50, 50]) // Pattern vibration
@@ -324,13 +338,9 @@ useEffect(() => {
       fetchOfferings()
     }, 3000) // 3 second delay - same as remote offerings
     
-    // Reset the matchstick to unlit state after all effects complete
-    setTimeout(() => {
-      setMobileMatchstickLit(false);  // Reset mobile matchstick
-      if (shrineLeftPanelRef.current) {
-        shrineLeftPanelRef.current.resetMatchstick();  // Reset desktop matchstick
-      }
-    }, 3500);
+    // Don't reset matchsticks anymore - they stay lit after user lights a candle
+    // The desktop matchstick will stay lit via hasLitCandleThisSession state
+    // The mobile matchstick already stays lit
   };
   
   // Listen for openBuyModal event
@@ -405,6 +415,9 @@ useEffect(() => {
       {isMobileView && (
         <div 
           onClick={() => {
+            // Don't expand if user has already lit a candle
+            if (hasLitCandleThisSession) return;
+            
             // If collapsed, just expand. If already expanded, do nothing (let the button handle the click)
             if (!isExpanded) {
               setIsExpanded(true);
@@ -415,8 +428,8 @@ useEffect(() => {
             bottom: '16px',
             left: '50%',
             transform: 'translateX(-50%)',
-            width: isExpanded ? 'calc(100% - 32px)' : '80px',
-            maxWidth: isExpanded ? '340px' : '80px',
+            width: (isExpanded && !hasLitCandleThisSession) ? 'calc(100% - 32px)' : '80px',
+            maxWidth: (isExpanded && !hasLitCandleThisSession) ? '340px' : '80px',
             background: 'rgba(10, 10, 20, 0.4)',
             border: '1px solid rgba(212, 175, 55, 0.15)',
             borderRadius: '50px',
@@ -436,19 +449,20 @@ useEffect(() => {
             cursor: 'pointer',
             overflow: 'hidden',
           }}>
-          {/* Left side - Text (slides in/out) */}
-          <div style={{
-            flex: isExpanded ? 1 : 0,
-            fontFamily: "'Bebas Neue', sans-serif",
-            color: 'rgba(246, 245, 241, 0.9)',
-            textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)',
-            opacity: isExpanded ? 1 : 0,
-            transform: isExpanded ? 'translateX(0)' : 'translateX(-20px)',
-            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-            width: isExpanded ? 'auto' : '0',
-            overflow: 'hidden',
-            whiteSpace: 'nowrap',
-          }}>
+          {/* Left side - Text (slides in/out, hidden if user has lit candle) */}
+          {!hasLitCandleThisSession && (
+            <div style={{
+              flex: isExpanded ? 1 : 0,
+              fontFamily: "'Bebas Neue', sans-serif",
+              color: 'rgba(246, 245, 241, 0.9)',
+              textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)',
+              opacity: isExpanded ? 1 : 0,
+              transform: isExpanded ? 'translateX(0)' : 'translateX(-20px)',
+              transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+              width: isExpanded ? 'auto' : '0',
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+            }}>
             <div style={{ 
               fontSize: '1.5rem',
               fontWeight: 400,
@@ -464,14 +478,33 @@ useEffect(() => {
               opacity: 0.7,
               fontWeight: 300,
             }}>
-              Click the flame to Light a Candle!
+              Strike match to Light a Green Candle!
+            </div>
+            <div style={{ 
+              fontSize: '0.65rem',
+              opacity: 0.5,
+              fontWeight: 300,
+              marginTop: '0.3rem',
+              fontStyle: 'italic',
+              textAlign: 'center',
+              width: '100%',
+            }}>
+              Sign in + hold RL80 to participate
             </div>
           </div>
+          )}
           
           {/* Matchstick Button - Always visible */}
           <div 
             onClick={(e) => {
               e.stopPropagation(); // Prevent triggering the parent onClick
+              
+              // If user has lit a candle, clicking the flame does nothing (or could reopen modal)
+              if (hasLitCandleThisSession) {
+                // Optionally, you could still allow them to light another candle:
+                // handleLightCandleClick();
+                return; // For now, just do nothing
+              }
               
               // If banner is collapsed, expand it first instead of opening modal
               if (!isExpanded) {

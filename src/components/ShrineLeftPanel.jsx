@@ -15,16 +15,25 @@ const ShrineLeftPanel = forwardRef(({
   router 
 }, ref) => {
   const [isLit, setIsLit] = useState(false)
+  const [hasLitCandleThisSession, setHasLitCandleThisSession] = useState(false)
   
-  // Expose reset method via ref
+  // Expose methods via ref
   useImperativeHandle(ref, () => ({
     resetMatchstick: () => {
-      setIsLit(false)
+      // Don't reset if user has lit a candle this session
+      if (!hasLitCandleThisSession) {
+        setIsLit(false)
+      }
+    },
+    lightMatchstick: () => {
+      // Light the matchstick and mark session as having lit a candle
+      setIsLit(true)
+      setHasLitCandleThisSession(true)
     }
-  }), [])
+  }), [hasLitCandleThisSession])
   
   const handleMatchClick = () => {
-    setIsLit(true)  // Light it immediately
+    // Don't light immediately - only trigger the candle lighting flow
     if (onLightCandle) {
       onLightCandle()
     }
@@ -177,7 +186,17 @@ const ShrineLeftPanel = forwardRef(({
             fontWeight: 300,
             fontStyle: 'italic',
           }}>
-            Light a candle to Join the Illumin80
+            Strike the match to light a green candle!
+          </span>
+          <span style={{ 
+            display: 'block', 
+            fontSize: '0.65rem',
+            opacity: 0.5,
+            marginTop: '0.5rem',
+            fontWeight: 300,
+            fontStyle: 'italic',
+          }}>
+            Sign in + hold RL80 to participate
           </span>
         </div>
 

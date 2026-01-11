@@ -937,7 +937,7 @@ useEffect(() => {
               color: '#ff9500',
               marginBottom: '4px'
             }}>
-              <span style={{ fontSize: isMobile ? '20px' : '20px' }}>🔥</span> {displayedBurnTotal >= 1000000 
+               {displayedBurnTotal >= 1000000 
                 ? `${(displayedBurnTotal / 1000000).toFixed(1)}M`
                 : displayedBurnTotal >= 1000 
                 ? `${(displayedBurnTotal / 1000).toFixed(1)}K`

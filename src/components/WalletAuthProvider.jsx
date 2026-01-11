@@ -8,6 +8,10 @@ import { createWallet } from "thirdweb/wallets";
 import { client, tokenFunctions } from '@/lib/contract';
 import { logWalletConnection, logWalletDisconnection } from '@/lib/authLogger';
 import { useAuthLogger } from '@/hooks/useAuthLogger';
+import { getTestWalletForEmail, isAuthorizedTestUser } from '@/lib/testWallets';
+
+// Enable test mode for simplified wallet experience
+const TEST_MODE = true; // Set to false for production
 
 const WalletAuthContext = createContext({});
 
@@ -23,6 +27,7 @@ export function WalletAuthProvider({ children }) {
   const [tokenBalance, setTokenBalance] = useState(null);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [testWallet, setTestWallet] = useState(null);
 
   // Fetch token balance when wallet is connected
   const fetchTokenBalance = useCallback(async (address) => {
@@ -169,10 +174,33 @@ export function WalletAuthProvider({ children }) {
     }
   }, [disconnect, user, walletAddress, activeWallet]);
 
-  // Auto-reconnect previously connected wallet (but don't auto-create new ones)
+  // Auto-connect test wallet in test mode for authorized users only
   useEffect(() => {
-    if (clerkLoaded && user && !activeAccount && !isConnecting) {
-      // Check localStorage for previous wallet connection
+    if (TEST_MODE && clerkLoaded && user && !activeAccount && !isConnecting && !walletAddress) {
+      const userEmail = user.primaryEmailAddress?.emailAddress;
+      
+      // Check if user is authorized for test wallet
+      if (!userEmail || !isAuthorizedTestUser(userEmail)) {
+        console.log(`User ${userEmail || 'unknown'} is not authorized for test wallets`);
+        return;
+      }
+      
+      const assignedWallet = getTestWalletForEmail(userEmail);
+      
+      if (assignedWallet) {
+        setTestWallet(assignedWallet);
+        setWalletAddress(assignedWallet.address);
+        
+        // Fetch balance for test wallet
+        fetchTokenBalance(assignedWallet.address);
+        
+        // Log connection (optional)
+        console.log(`Test wallet assigned to ${user.firstName || userEmail}: ${assignedWallet.address}`);
+      } else {
+        console.log(`No test wallet available for ${userEmail}`);
+      }
+    } else if (!TEST_MODE && clerkLoaded && user && !activeAccount && !isConnecting) {
+      // Original auto-reconnect logic for production
       const storedData = localStorage.getItem(`wallet_${user.id}`);
       
       if (storedData) {
@@ -187,7 +215,7 @@ export function WalletAuthProvider({ children }) {
         }
       }
     }
-  }, [clerkLoaded, user, activeAccount, isConnecting]);
+  }, [clerkLoaded, user, activeAccount, isConnecting, walletAddress, fetchTokenBalance]);
 
   // Update wallet address when active account changes
   useEffect(() => {
@@ -212,6 +240,10 @@ export function WalletAuthProvider({ children }) {
     return () => clearInterval(interval);
   }, [walletAddress, fetchTokenBalance]);
 
+  // Check if current user is authorized for test wallets
+  const userEmail = user?.primaryEmailAddress?.emailAddress;
+  const isTestUser = TEST_MODE && userEmail && isAuthorizedTestUser(userEmail);
+  
   const value = {
     // Clerk user data
     user,
@@ -221,8 +253,13 @@ export function WalletAuthProvider({ children }) {
     // Wallet data
     walletAddress,
     tokenBalance,
-    isWalletConnected: !!(activeAccount && walletAddress),
+    isWalletConnected: isTestUser ? !!walletAddress : !!(activeAccount && walletAddress),
     activeAccount,
+    
+    // Test mode
+    isTestMode: TEST_MODE,
+    isTestUser, // Whether this specific user gets test wallet
+    testWallet,
     
     // Loading states
     isConnecting,
@@ -235,7 +272,7 @@ export function WalletAuthProvider({ children }) {
     refreshBalance: () => fetchTokenBalance(walletAddress),
     
     // Combined status
-    isFullyAuthenticated: !!user && !!activeAccount,
+    isFullyAuthenticated: !!user && (isTestUser ? !!walletAddress : !!activeAccount),
     displayName: user?.firstName || user?.username || walletAddress?.slice(0, 6) + '...' + walletAddress?.slice(-4) || 'Anonymous'
   };
 

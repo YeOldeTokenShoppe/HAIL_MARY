@@ -20,12 +20,12 @@ export const useMusic = () => {
 
 // Track lists
 const non80sTracks = [
-  { name: "Utopia", path: "audio/08 Utopia.m4a", bpm: 100 },
-  { name: "Lifetimes", path: "audio/07 Lifetimes.m4a", bpm: 135 },
+  { name: "Paradise City - GnR", path: "audio/06 Paradise City.mp3", bpm: 140 },
+  { name: "Utopia - Goldfrapp", path: "audio/08 Utopia.m4a", bpm: 100 },
+  { name: "Lifetimes", path: "audio/07 Lifetimes.m4a", bpm: 105 },
   { name: "Magnetic - Tunde Adebimpe", path: "audio/01 Magnetic.m4a", bpm: 130 },
   { name: "Rocket Man - Steven Drozd", path: "audio/rocketMan.m4a", bpm: 45 }
 ];
-
 const eightyTracks = [
   { name: "Girls on Film - Duran Duran", path: "audio/Girls On Film.mp3", bpm: 100 },
   { name: "For Those About To Rock - AC/DC", path: "audio/for-those-about-to-rock-ac-dc.m4a", bpm: 75 },
@@ -35,7 +35,8 @@ const eightyTracks = [
   { name: "Like A Prayer - Madonna", path: "audio/like-a-prayer-madonna.m4a", bpm: 85 },
   { name: "99 Luftballoons - Nena", path: "audio/99 Luftballoons Nena.m4a", bpm: 85 },
   { name: "Sweet Dreams - Eurythmics", path: "audio/Sweet Dreams Eurythmics.m4a", bpm: 85 },
-  { name: "Every Little Thing She Does (Is Magic) - The Police", path: "audio/EveryLittleThing.mp3", bpm: 85 }
+  { name: "Every Little Thing She Does (Is Magic) - The Police", path: "audio/EveryLittleThing.mp3", bpm: 85 },
+  { name: "Paradise City - GnR", path: "audio/06 Paradise City.mp3", bpm: 140 },
 ];
 
 // Music Provider component

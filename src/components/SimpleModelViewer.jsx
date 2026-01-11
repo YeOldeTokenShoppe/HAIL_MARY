@@ -442,7 +442,7 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
   // Add glow effects to scroll objects and make them clickable
   useEffect(() => {
     if (scene) {
-      const scrollObjects = ['Scroll1', 'Scroll2', 'Scroll3'];
+      const scrollObjects = ['Scroll1', 'Scroll2', 'Scroll3', 'SM_Prop_Shelf_Scroll'];
       scrollMaterialsRef.current = []; // Reset materials array
       scrollMeshesRef.current = {}; // Reset meshes object
       
@@ -464,8 +464,13 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
             event.stopPropagation();
             // console.log(`${scrollName} clicked!`);
             if (onScrollClick) {
-              const scrollNumber = scrollName.toLowerCase().replace('scroll', '');
-              onScrollClick(`scroll${scrollNumber}.html`);
+              // Special handling for SM_Prop_Shelf_Scroll
+              if (scrollName === 'SM_Prop_Shelf_Scroll') {
+                onScrollClick('scroll.html');
+              } else {
+                const scrollNumber = scrollName.toLowerCase().replace('scroll', '');
+                onScrollClick(`scroll${scrollNumber}.html`);
+              }
             }
           };
           
@@ -1339,7 +1344,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
   };
   
   const iframePos = getIframePositioning(deviceType);
-  const [currentScrollSrc, setCurrentScrollSrc] = useState(`/scroll.html?device=${deviceType}`); // Default scroll with device info
+  const [currentScrollSrc, setCurrentScrollSrc] = useState(`/scroll5.html?device=${deviceType}`); // Default scroll with device info
   const [showNumerology, setShowNumerology] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [nextScrollSrc, setNextScrollSrc] = useState(null);
@@ -1644,7 +1649,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
                       fontStyle: 'italic',
                       pointerEvents: 'none'
                     }}>
-                      "Here you can find the works of devout RL80 devotee, Saint GR80, the anachronistic android, mystic and medieval scholar."
+                      Here you can find the works of devout RL80 devotee, Saint GR80, the anachronistic android, mystic and medieval scholar.
                     </p>
                     
                     {/* Additional flavor text */}
@@ -2105,7 +2110,8 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
             lineHeight: 1.6,
             textShadow: '1px 1px 2px rgba(0, 0, 0, 0.8)'
           }}>
-            Consult the mystical 8-ball for divine numerological insights and ancient wisdom. 
+            Consult the mystical 8-ball for divine numerological insights and ancient wisdom.<br/>
+            (Not financial advice.)
             {/* The sacred sphere reveals wisdom through the ancient art of numbers. */}
           </p>
         </div>
@@ -2189,7 +2195,14 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
               textAlign: 'center',
               fontFamily: '"UnifrakturCook", serif'
             }}>
-              {currentScrollSrc.replace('.html', '').replace('/', '')} - Magnified View
+              {(() => {
+                const cleanTitle = currentScrollSrc
+                  .split('?')[0] // Remove query parameters
+                  .replace('.html', '')
+                  .replace('/', '')
+                  .replace(/scroll(\d+)?/i, (match, num) => num ? `Scroll ${num}` : 'Scroll');
+                return `${cleanTitle} - Magnified View`;
+              })()}
             </div>
             
             {/* Magnified iframe with zoom controls */}

@@ -25,14 +25,14 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
     
     // Otherwise fallback to hardcoded captions
     return [
-      { year: "2200 BCE", location: "Fertile Crescent", description: "Driving back bear market" },
+      { year: "2200 BCE", location: "Fertile Crescent", description: "Driving back a bear market" },
       { year: "1982 CE", location: "Los Angeles", description: "The Guardian of Good Times" },
       { year: "circa 1350–1450 CE", location: "Wartburg Castle, Thuringia", description: "Early clown encounter turns ugly" },
       { year: "2019 CE", location: "Tokyo", description: "Featured in popular manga series" },
       { year: "2081 CE", location: "Neo-Miami", description: "Laying down DeFi Beats" },
-      { year: "2077 CE", location: "Night City", description: "Popular among cyberpunk-cyborgs" },
-      { year: "87 CE", location: "Peloponnesian Peninsula", description: "Advising on making good choices" },
-      { year: "4th century CE", location: "Transtiberim, Rome", description: "Patron of the arts - pre-meme era" }
+      { year: "2077 CE", location: "Night City", description: "Still popular in cyberpunk culture" },
+      { year: "87 CE", location: "Peloponnesian Peninsula", description: "Managing the attention economy" },
+      { year: "4th century CE", location: "Transtiberim, Rome", description: "Supporting the arts - pre-meme era" }
     ]
   }, [t])
   
@@ -72,14 +72,32 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.1);
           position: relative;
           z-index: 2;
-          animation: 
-            polaroid-slide var(--d) infinite,
-            polaroid-z-order var(--d) infinite steps(1);
+          
+          // animation: 
+          //   polaroid-slide var(--d) infinite,
+          //   polaroid-z-order var(--d) infinite steps(1);
         }
+          @keyframes z1 { 0%,87.5% { z-index: 8 } 6.25%,12.5% { z-index: 0 } }
+@keyframes z2 { 0%,87.5% { z-index: 8 } 6.25%,12.5% { z-index: 0 } }
+@keyframes z3 { 0%,87.5% { z-index: 8 } 6.25%,12.5% { z-index: 0 } }
+@keyframes z4 { 0%,87.5% { z-index: 8 } 6.25%,12.5% { z-index: 0 } }
+@keyframes z5 { 0%,87.5% { z-index: 8 } 6.25%,12.5% { z-index: 0 } }
+@keyframes z6 { 0%,87.5% { z-index: 8 } 6.25%,12.5% { z-index: 0 } }
+@keyframes z7 { 0%,87.5% { z-index: 8 } 6.25%,12.5% { z-index: 0 } }
+@keyframes z8 { 0%,93.75% { z-index: 8 } 6.25%,12.5% { z-index: 0 } }
+
+.polaroid-gallery > .polaroid-frame:nth-child(1) { animation: polaroid-slide var(--d) infinite, z1 var(--d) infinite steps(1); }
+.polaroid-gallery > .polaroid-frame:nth-child(2) { animation: polaroid-slide var(--d) infinite, z2 var(--d) infinite steps(1); }
+.polaroid-gallery > .polaroid-frame:nth-child(3) { animation: polaroid-slide var(--d) infinite, z3 var(--d) infinite steps(1); }
+.polaroid-gallery > .polaroid-frame:nth-child(4) { animation: polaroid-slide var(--d) infinite, z4 var(--d) infinite steps(1); }
+.polaroid-gallery > .polaroid-frame:nth-child(5) { animation: polaroid-slide var(--d) infinite, z5 var(--d) infinite steps(1); }
+.polaroid-gallery > .polaroid-frame:nth-child(6) { animation: polaroid-slide var(--d) infinite, z6 var(--d) infinite steps(1); }
+.polaroid-gallery > .polaroid-frame:nth-child(7) { animation: polaroid-slide var(--d) infinite, z7 var(--d) infinite steps(1); }
+.polaroid-gallery > .polaroid-frame:nth-child(8) { animation: polaroid-slide var(--d) infinite, z8 var(--d) infinite steps(1); }
         
-        .polaroid-gallery .polaroid-frame:last-child {
-          animation-name: polaroid-slide, polaroid-z-order-last;
-        }
+        // .polaroid-gallery .polaroid-frame:last-child {
+        //   animation-name: polaroid-slide, polaroid-z-order-last;
+        // }
         
         .polaroid-frame img {
           width: 100%;
@@ -161,17 +179,17 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
           12.5% { transform: translateX(0%) rotate(var(--r)) }
         }
         
-        @keyframes polaroid-z-order {
-          6.25%,
-          12.5% { z-index: 1 }
-          87.5% { z-index: 2 }
-        }
-        
-        @keyframes polaroid-z-order-last {
-          6.25%,
-          12.5% { z-index: 1 }
-          93.75% { z-index: 2 }
-        }
+@keyframes polaroid-z-order {
+  0%, 6.24% { z-index: 10 }
+  6.25%, 87.49% { z-index: 1 }
+  87.5%, 100% { z-index: 10 }
+}
+
+@keyframes polaroid-z-order-last {
+  0%, 6.24% { z-index: 10 }
+  6.25%, 93.74% { z-index: 1 }
+  93.75%, 100% { z-index: 10 }
+}
         
         .polaroid-container {
           height: 100vh;
@@ -265,6 +283,9 @@ const MobilePolaroidGallerySimple = ({ images = [], is80sMode = false }) => {
           <h2 className="mobile-gallery-heading">{t('carousel.title') || 'Iconography'}</h2>
           <p className="mobile-gallery-description">
             {t('carousel.subtitle') || 'A visual canon of Our Lady of Perpetual Profit, from antiquity to the future.'}
+          </p>
+          <p className="mobile-gallery-description" style={{ marginTop: '10px' }}>
+            Or read the Techno-Mythic Whitepaper <a href="/philosophy" style={{ color: '#ffd700', textDecoration: 'underline' }}>here ↗</a>
           </p>
         </div>
       </div>
