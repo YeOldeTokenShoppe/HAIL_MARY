@@ -593,6 +593,9 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
     }
 
     const handleKeyPress = (e) => {
+      // Only handle key presses in fullscreen mode
+      if (!isFullscreen) return
+      
       if (e.code === 'Space') {
         e.preventDefault()
         isPausedLocal = !isPausedLocal
@@ -632,6 +635,11 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
     }
     
     const handleTouch = (e) => {
+      // In portal view, don't handle touch events - let parent handle opening fullscreen
+      if (!isFullscreen) {
+        return
+      }
+      
       e.preventDefault()
       
       // If already focused on an image, unfocus first
@@ -685,6 +693,11 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
     }
     
     const handleClick = (e) => {
+      // In portal view, don't handle click events - let parent handle opening fullscreen
+      if (!isFullscreen) {
+        return
+      }
+      
       // Handle click when focused to exit focus mode
       if (focusStateRef.current.image && !e.touches) {
         // Check if clicking on UI buttons (they have stopPropagation)
@@ -765,7 +778,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
         }
       }
     }
-  }, [])
+  }, [isFullscreen])
 
   // No camera animation needed - we'll display the image separately
 

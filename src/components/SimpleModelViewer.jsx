@@ -1524,7 +1524,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
       {windowWidth < 768 && !isLoading && (
         <div style={{
           position: 'absolute',
-          top: '2rem',
+          top: '5rem',
           left: '1rem',
           right: '1rem',
           zIndex: 100,
@@ -1931,7 +1931,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
                 }}
                 style={{
                   position: 'absolute',
-                  top: '-2.5rem',
+                  top: isMobile ? '0' : '-2.5rem',
                   right: '0.5rem',
                   background: 'rgba(212, 175, 55, 0.4)',
                   border: '2px solid rgba(212, 175, 55, 0.8)',
@@ -1939,11 +1939,11 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
                   padding: '0.4rem',
                   borderRadius: '50%',
                   cursor: 'pointer',
-                  fontSize: '1.5rem',
+                  fontSize: isMobile ? '2.5rem' : '2.5rem',
                   zIndex: 10,
                   pointerEvents: 'auto',
-                  width: '2.5rem',
-                  height: '2.5rem',
+                  width: isMobile ? '3.5rem' : '2.5rem',
+                  height: isMobile ? '3.5rem' : '2.5rem',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',

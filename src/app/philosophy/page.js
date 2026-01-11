@@ -58,7 +58,7 @@ export default function ModelViewerPage() {
         <>
           <div style={{
             position: "absolute",
-            top: "1rem",
+            top: isMobileDevice ? "calc(1rem + env(safe-area-inset-top))" : "1rem",
             right: "1rem",
             zIndex: 10000,
           }}>
