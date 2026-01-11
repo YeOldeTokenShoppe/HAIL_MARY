@@ -1351,7 +1351,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
   const [showMagnifiedScroll, setShowMagnifiedScroll] = useState(false);
   const [examinedObject, setExaminedObject] = useState(null); // For examining the pyramid
   const [showIntroText, setShowIntroText] = useState(true); // Control intro text visibility
-  const [magnifiedZoom, setMagnifiedZoom] = useState(1.5); // Track zoom level for magnified view
+  const [magnifiedZoom, setMagnifiedZoom] = useState(1.25); // Track zoom level for magnified view
   const scrollIframeRef = useRef(null);
   const mobileScrollIframeRef = useRef(null);
   const magnifiedIframeRef = useRef(null); // Add ref for magnified iframe
@@ -1722,7 +1722,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
                 {/* Double-click magnify button */}
                 <button
                   onClick={() => {
-                    setMagnifiedZoom(1.5); // Reset zoom to default when opening
+                    setMagnifiedZoom(1.25); // Reset zoom to default when opening
                     setShowMagnifiedScroll(true);
                   }}
                   style={{
@@ -1926,7 +1926,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
               {/* Mobile magnify button - positioned better */}
               <button
                 onClick={() => {
-                  setMagnifiedZoom(1.5); // Reset zoom to default when opening
+                  setMagnifiedZoom(1.25); // Reset zoom to default when opening
                   setShowMagnifiedScroll(true);
                 }}
                 style={{
@@ -2172,7 +2172,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
                 justifyContent: 'center',
                 alignItems: 'center',
                 transition: 'all 0.3s ease',
-                zIndex: 10001
+                zIndex: 10003
               }}
               onMouseEnter={(e) => {
                 e.target.style.background = 'rgba(212, 175, 55, 0.2)';
@@ -2253,7 +2253,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  const newZoom = Math.min(3, magnifiedZoom + 0.25);
+                  const newZoom = Math.min(1.5, magnifiedZoom + 0.25);
                   console.log('Zoom In clicked, new zoom:', newZoom);
                   setMagnifiedZoom(newZoom);
                 }}

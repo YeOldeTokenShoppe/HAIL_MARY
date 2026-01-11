@@ -137,7 +137,7 @@ class FloatingGallery extends THREE.Group {
       { 
         url: '/carousel_images/img13.jpg', 
         year: '1100 CE',
-        description: 'Our Lady repels Carpathian Scampire',
+      description: 'Early Carpathian staking protocol',
         curvePosition: 0.66,
         width: 1.4,
         height: 1.4,

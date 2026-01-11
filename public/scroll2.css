@@ -292,8 +292,8 @@ div {
 
 /* Mobile and Desktop remain the same */
 #container.device-mobile {
-  width: 65% !important;
-  height: 52vh !important;
+  width: 90% !important;
+  /* height: 52vh !important; */
   max-height: none !important;
   font-size: 1em !important;
   transform: translate(-50%, -50%) rotateY(20deg) !important;
