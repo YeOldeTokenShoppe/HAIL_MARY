@@ -1,5 +1,5 @@
 import OldsCoolTunnel from '@/components/OldsCoolTunnel'
 
 export default function OldsCoolPage() {
-  return <OldsCoolTunnel />
+  return <OldsCoolTunnel isFullscreen={true} />
 }

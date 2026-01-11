@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, Suspense } from 'react'
 import dynamic from 'next/dynamic'
-import { createPortal } from 'react-dom'
 import CyberNav from '@/components/CyberNav'
 import Link from 'next/link'
 import { useUser } from '@clerk/nextjs'
@@ -295,7 +294,7 @@ export default function CarouselPage() {
       {/* Buy RL80 Button */}
       {deviceDetected && (
         <div style={{
-          position: "fixed",
+          position: "absolute",
           top: isMobileDevice ? "85%" : "6rem",
           right: isMobileDevice ? "67%" : "1.5rem",
           zIndex: 298,
@@ -326,7 +325,7 @@ export default function CarouselPage() {
       <div 
         className="candle-button"
         style={{
-          position: "fixed",
+          position: "absolute",
           bottom: isMobileDevice ? "40px" : "30px",
           right: isMobileDevice ? "20px" : "30px",
           width: isMobileDevice ? "50px" : "80px",
@@ -364,7 +363,7 @@ export default function CarouselPage() {
       <svg
         className="luminarium-arrow"
         style={{
-          position: "fixed",
+          position: "absolute",
           bottom: isMobileDevice ? "20px" : "20px",
           right: isMobileDevice ? "10px" : "20px",
           width: isMobileDevice ? "220px" : "300px",
@@ -647,15 +646,15 @@ export default function CarouselPage() {
         onClose={() => setShowBuyModal(false)}
       />
       
-      {/* Our Lady of Perpetual Profit Logo - Top Left (Desktop/Tablet) - Using Portal to ensure it's on top */}
-      {typeof document !== 'undefined' && deviceDetected && !isMobileDevice && createPortal(
+      {/* Our Lady of Perpetual Profit Logo - Top Left (Desktop/Tablet) */}
+      {deviceDetected && !isMobileDevice && (
         <div style={{
-          position: 'fixed',
+          position: 'absolute',
           top: 0,
           left: 0,
           width: '100%',
           height: '100vh',
-          zIndex: 99999,
+          zIndex: 299,
           pointerEvents: 'none',
         }}>
           <div style={{
@@ -714,14 +713,13 @@ export default function CarouselPage() {
           </h1>
 
           </div>
-        </div>,
-        document.body
+        </div>
       )}
       
-      {/* RL80 Logo - Mobile Only - Using Portal */}
-      {typeof document !== 'undefined' && deviceDetected && isMobileDevice && createPortal(
+      {/* RL80 Logo - Mobile Only */}
+      {deviceDetected && isMobileDevice && (
         <div style={{
-          position: "fixed",
+          position: "absolute",
           top: "20px", 
           left: "20px",
           borderRadius: "8px",
@@ -767,8 +765,7 @@ export default function CarouselPage() {
               );
             })}
           </div>
-        </div>,
-        document.body
+        </div>
       )}
     </div>
   )

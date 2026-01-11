@@ -293,7 +293,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                 transform: 'translate(-50%, -50%) scale(0.3)',  // Center and scale down
                 transformOrigin: 'center center'
               }}>
-                <OldsCoolTunnel />
+                <OldsCoolTunnel isFullscreen={false} />
               </div>
             </div>
             
@@ -353,7 +353,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           zIndex: 9999,
           pointerEvents: 'auto'
         }}>
-          <OldsCoolTunnel />
+          <OldsCoolTunnel isFullscreen={true} />
           
           {/* Exit fullscreen button */}
           <button
