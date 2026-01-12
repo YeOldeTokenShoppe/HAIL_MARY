@@ -29,7 +29,6 @@ const useRL80Data = (refreshInterval = 30000) => { // 30 seconds refresh
         if (response.ok) {
           const analysisData = await response.json()
           setData(analysisData)
-          console.log('[RL80Screen] Updated analysis data')
         }
       } catch (err) {
         console.error('[RL80Screen] Error fetching analysis:', err)
@@ -101,7 +100,6 @@ const RL80Screen = () => {
       
       // Log once when we start drawing
       if (!hasStartedDrawing) {
-        console.log('[RL80Screen] Started drawing to Screen4!')
         setHasStartedDrawing(true)
       }
       

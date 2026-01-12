@@ -11,7 +11,7 @@ import { useAuthLogger } from '@/hooks/useAuthLogger';
 import { getTestWalletForEmail, isAuthorizedTestUser } from '@/lib/testWallets';
 
 // Enable test mode for simplified wallet experience
-const TEST_MODE = true; // Set to false for production
+const TEST_MODE = false; // Set to false for production
 
 const WalletAuthContext = createContext({});
 

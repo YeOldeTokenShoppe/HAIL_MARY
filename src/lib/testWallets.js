@@ -3,8 +3,8 @@
 
 // IMPORTANT: Update these email addresses with your actual testers
 export const AUTHORIZED_TEST_EMAILS = [
-  'your-alternate@example.com', // YOUR TEST EMAIL - Replace this first!
-  'tester2@example.com', // Replace with actual tester email
+  'mpaulsonx@gmail.com', // YOUR TEST EMAIL - Replace this first!
+  '503crj@gmail.com', // Replace with actual tester email
   'tester3@example.com', // Replace with actual tester email
   'tester4@example.com', // Replace with actual tester email
   'tester5@example.com', // Replace with actual tester email
@@ -16,7 +16,7 @@ export const TEST_WALLETS = [
     id: 'tester1',
     assignedEmail: AUTHORIZED_TEST_EMAILS[0],
     name: 'Test User 1',
-    address: '0x1234567890123456789012345678901234567891', // Replace with actual address
+    address: '0x1156EF864262543A4AC1A95D1EB37AC4199a2DbC', // Replace with actual address
     privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_1, // Store in .env.local
     prefundedAmount: 1000
   },
@@ -24,42 +24,42 @@ export const TEST_WALLETS = [
     id: 'tester2',
     assignedEmail: AUTHORIZED_TEST_EMAILS[1],
     name: 'Test User 2',
-    address: '0x1234567890123456789012345678901234567892', // Replace with actual address
+    address: '0xF8a047db6D5315c3C36cd6FaBC129e28b4C2eDF4', // Replace with actual address
     privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_2, // Store in .env.local
     prefundedAmount: 1000
   },
-  {
-    id: 'tester3',
-    assignedEmail: AUTHORIZED_TEST_EMAILS[2],
-    name: 'Test User 3',
-    address: '0x1234567890123456789012345678901234567893', // Replace with actual address
-    privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_3, // Store in .env.local
-    prefundedAmount: 1000
-  },
-  {
-    id: 'tester4',
-    assignedEmail: AUTHORIZED_TEST_EMAILS[3],
-    name: 'Test User 4',
-    address: '0x1234567890123456789012345678901234567894', // Replace with actual address
-    privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_4, // Store in .env.local
-    prefundedAmount: 1000
-  },
-  {
-    id: 'tester5',
-    assignedEmail: AUTHORIZED_TEST_EMAILS[4],
-    name: 'Test User 5',
-    address: '0x1234567890123456789012345678901234567895', // Replace with actual address
-    privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_5, // Store in .env.local
-    prefundedAmount: 1000
-  },
-  {
-    id: 'tester6',
-    assignedEmail: AUTHORIZED_TEST_EMAILS[5],
-    name: 'Test User 6',
-    address: '0x1234567890123456789012345678901234567896', // Replace with actual address
-    privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_6, // Store in .env.local
-    prefundedAmount: 1000
-  }
+  // {
+  //   id: 'tester3',
+  //   assignedEmail: AUTHORIZED_TEST_EMAILS[2],
+  //   name: 'Test User 3',
+  //   address: '0xEf52603090De93a4E8B22b06641E2B9C7a4240b4', // Replace with actual address
+  //   privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_3, // Store in .env.local
+  //   prefundedAmount: 1000
+  // },
+  // {
+  //   id: 'tester4',
+  //   assignedEmail: AUTHORIZED_TEST_EMAILS[3],
+  //   name: 'Test User 4',
+  //   address: '0x326C6209fF1df4C42f1EF5B37751cf34bc4208b9', // Replace with actual address
+  //   privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_4, // Store in .env.local
+  //   prefundedAmount: 1000
+  // },
+  // {
+  //   id: 'tester5',
+  //   assignedEmail: AUTHORIZED_TEST_EMAILS[4],
+  //   name: 'Test User 5',
+  //   address: '0x6a5014974D9d80e589c5F700e4c5FFcf18F45986', // Replace with actual address
+  //   privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_5, // Store in .env.local
+  //   prefundedAmount: 1000
+  // },
+  // {
+  //   id: 'tester6',
+  //   assignedEmail: AUTHORIZED_TEST_EMAILS[5],
+  //   name: 'Test User 6',
+  //   address: '0x92289816f2c1147E46465892e5122393CeBC0eac', // Replace with actual address
+  //   privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_6, // Store in .env.local
+  //   prefundedAmount: 1000
+  // }
 ];
 
 // Function to check if an email is authorized for test wallets

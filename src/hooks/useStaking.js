@@ -12,9 +12,12 @@ export function useStaking() {
   const [stakingData, setStakingData] = useState({
     stakedBalance: '0',
     earnedRewards: '0',
-    apr: '0',
+    rewardPerToken: '0',
     totalStaked: '0',
-    minClaimAmount: '0',
+    lockDuration: '600',
+    unlockTime: '0',
+    canWithdraw: false,
+    timeUntilUnlock: 0,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -25,9 +28,12 @@ export function useStaking() {
       setStakingData({
         stakedBalance: '0',
         earnedRewards: '0',
-        apr: '0',
+        rewardPerToken: '0',
         totalStaked: '0',
-        minClaimAmount: '0',
+        lockDuration: '600',
+        unlockTime: '0',
+        canWithdraw: false,
+        timeUntilUnlock: 0,
       });
       return;
     }
@@ -88,8 +94,8 @@ export function useStaking() {
     }
   };
 
-  // Unstake tokens
-  const unstakeTokens = async (amount) => {
+  // Withdraw tokens (testnet uses 'withdraw' not 'unstake')
+  const withdrawTokens = async (amount) => {
     if (!account) throw new Error('No wallet connected');
     
     try {
@@ -99,7 +105,7 @@ export function useStaking() {
       const amountInWei = toWei(amount.toString());
       
       // Prepare the transaction
-      const transaction = stakingTransactions.prepareUnstake(amountInWei);
+      const transaction = stakingTransactions.prepareWithdraw(amountInWei);
       
       // Send and confirm
       const result = await sendAndConfirmTransaction(transaction);
@@ -109,21 +115,21 @@ export function useStaking() {
       
       return result;
     } catch (err) {
-      console.error('Error unstaking tokens:', err);
+      console.error('Error withdrawing tokens:', err);
       setError(err.message);
       throw err;
     }
   };
 
-  // Unstake all tokens
-  const unstakeAll = async () => {
+  // Withdraw all tokens
+  const withdrawAll = async () => {
     if (!account) throw new Error('No wallet connected');
     
     try {
       setError(null);
       
       // Prepare the transaction
-      const transaction = stakingTransactions.prepareUnstakeAll();
+      const transaction = stakingTransactions.prepareWithdrawAll();
       
       // Send and confirm
       const result = await sendAndConfirmTransaction(transaction);
@@ -133,7 +139,7 @@ export function useStaking() {
       
       return result;
     } catch (err) {
-      console.error('Error unstaking all tokens:', err);
+      console.error('Error withdrawing all tokens:', err);
       setError(err.message);
       throw err;
     }
@@ -147,7 +153,7 @@ export function useStaking() {
       setError(null);
       
       // Prepare the transaction
-      const transaction = stakingTransactions.prepareClaim();
+      const transaction = stakingTransactions.prepareClaimRewards();
       
       // Send and confirm
       const result = await sendAndConfirmTransaction(transaction);
@@ -172,6 +178,19 @@ export function useStaking() {
     }
   };
 
+  // Format time for display
+  const formatTime = (seconds) => {
+    if (seconds <= 0) return 'Unlocked';
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    if (days > 0) return `${days} day${days > 1 ? 's' : ''}`;
+    if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''}`;
+    if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''}`;
+    return `${seconds} seconds`;
+  };
+
   return {
     // Account info
     account: account?.address,
@@ -179,9 +198,14 @@ export function useStaking() {
     // Staking data
     stakedBalance: formatValue(stakingData.stakedBalance),
     earnedRewards: formatValue(stakingData.earnedRewards),
-    apr: stakingData.apr,
     totalStaked: formatValue(stakingData.totalStaked),
-    minClaimAmount: formatValue(stakingData.minClaimAmount),
+    
+    // Testnet specific data
+    lockDuration: stakingData.lockDuration,
+    unlockTime: stakingData.unlockTime,
+    canWithdraw: stakingData.canWithdraw,
+    timeUntilUnlock: stakingData.timeUntilUnlock,
+    timeUntilUnlockFormatted: formatTime(stakingData.timeUntilUnlock),
     
     // Raw values (in wei)
     rawStakedBalance: stakingData.stakedBalance,
@@ -196,9 +220,13 @@ export function useStaking() {
     
     // Actions
     stakeTokens,
-    unstakeTokens,
-    unstakeAll,
+    withdrawTokens, // Changed from unstakeTokens
+    withdrawAll,    // Changed from unstakeAll
     claimRewards,
     refreshData: fetchStakingData,
+    
+    // Legacy aliases for compatibility
+    unstakeTokens: withdrawTokens,
+    unstakeAll: withdrawAll,
   };
 }

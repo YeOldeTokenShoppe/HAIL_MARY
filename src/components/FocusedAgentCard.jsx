@@ -26,12 +26,9 @@ const FocusedAgentCard = ({ agentId, onClose }) => {
   };
 
   useEffect(() => {
-    console.log('FocusedAgentCard received agentId:', agentId);
     if (agentId && agentsDatabase[agentId]) {
-      console.log('Loading data for:', agentId, agentsDatabase[agentId]);
       setAgentData(agentsDatabase[agentId]);
     } else {
-      console.log('No data found for agentId:', agentId);
       setAgentData(null);
     }
   }, [agentId]);

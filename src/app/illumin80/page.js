@@ -10,6 +10,7 @@ import { useMusic } from '@/components/MusicContext'
 import { useWalletAuth } from '@/components/WalletAuthProvider'
 import ThirdwebBuyModal from '@/components/ThirdwebBuyModal'
 import LightCandleModal from '@/components/LightCandleModal'
+import StakeModal from '@/components/StakeModal'
 import { WalletConnectionModal } from '@/components/WalletConnectionModal'
 import { useRouter } from 'next/navigation'
 import ShrineLeftPanel from '@/components/ShrineLeftPanel'
@@ -38,6 +39,7 @@ export default function ShrinePage() {
   const [fontLoaded, setFontLoaded] = useState(false)
   const [showBuyModal, setShowBuyModal] = useState(false)
   const [showLightCandleModal, setShowLightCandleModal] = useState(false)
+  const [showStakeModal, setShowStakeModal] = useState(false)
   const [showWalletModal, setShowWalletModal] = useState(false)
   const [showAuthMessage, setShowAuthMessage] = useState(null)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -290,6 +292,7 @@ useEffect(() => {
     if (!isWalletConnected || !walletAddress) {
       setShowWalletModal(true);
       setWaitingForWallet(true); // Set flag that we're waiting for wallet connection
+      setWalletActionType('candle'); // Track that this is for lighting a candle
       return;
     }
 
@@ -297,17 +300,46 @@ useEffect(() => {
     setShowLightCandleModal(true);
   };
   
-  // Track if we're waiting for wallet connection
+  // Handle stake button click with auth check
+  const handleStakeClick = () => {
+    // Check if user is signed in
+    if (!isSignedIn) {
+      setShowAuthMessage('sign-in-stake');
+      return;
+    }
+
+    // Check if wallet is connected
+    if (!isWalletConnected || !walletAddress) {
+      setShowWalletModal(true);
+      setWaitingForWallet(true); // Set flag that we're waiting for wallet connection for staking
+      setWalletActionType('stake'); // Track that this is for staking
+      return;
+    }
+
+    // Both signed in and wallet connected - show the modal
+    setShowStakeModal(true);
+  };
+  
+  // Track if we're waiting for wallet connection and what action triggered it
   const [waitingForWallet, setWaitingForWallet] = useState(false);
+  const [walletActionType, setWalletActionType] = useState(null); // 'candle' or 'stake'
   
   // Watch for wallet connection
   useEffect(() => {
     if (isWalletConnected && (showWalletModal || waitingForWallet)) {
       setShowWalletModal(false);
       setWaitingForWallet(false);
-      setShowLightCandleModal(true);
+      
+      // Open the appropriate modal based on what action triggered wallet connection
+      if (walletActionType === 'stake') {
+        setShowStakeModal(true);
+      } else if (walletActionType === 'candle') {
+        setShowLightCandleModal(true);
+      }
+      
+      setWalletActionType(null); // Reset the action type
     }
-  }, [isWalletConnected, showWalletModal, waitingForWallet]);
+  }, [isWalletConnected, showWalletModal, waitingForWallet, walletActionType]);
 
   // Handle light candle from modal
   const handleLightCandle = async (newOffering) => {
@@ -407,6 +439,7 @@ useEffect(() => {
           is80sMode={is80sMode}
           isMobile={false}
           onLightCandle={handleLightCandleClick}
+          onStakeClick={handleStakeClick}
           router={router}
         />
       )}
@@ -1044,8 +1077,18 @@ useEffect(() => {
         onLightCandle={handleLightCandle}
       />
       
+      {/* Stake Modal */}
+      <StakeModal
+        isOpen={showStakeModal}
+        onClose={() => setShowStakeModal(false)}
+        onStake={async (stakeData) => {
+          console.log('Stake submitted:', stakeData);
+          // TODO: Implement actual staking logic here
+        }}
+      />
+      
       {/* Sign-In Message Overlay */}
-      {showAuthMessage === 'sign-in' && (
+      {(showAuthMessage === 'sign-in' || showAuthMessage === 'sign-in-stake') && (
         <div 
           style={{
             position: 'fixed',
@@ -1132,7 +1175,7 @@ useEffect(() => {
               fontSize: '0.95rem',
               lineHeight: '1.5'
             }}>
-              Please sign in to light a candle.
+              Please sign in to {showAuthMessage === 'sign-in-stake' ? 'stake tokens' : 'light a candle'}.
             </p>
             <SignInButton mode="modal">
               <button style={{

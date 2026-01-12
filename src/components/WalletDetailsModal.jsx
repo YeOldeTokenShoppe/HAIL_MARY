@@ -22,12 +22,11 @@ export function WalletDetailsModal({ onClose }) {
   const {
     stakedBalance,
     earnedRewards,
-    apr,
     totalStaked,
-    minClaimAmount,
+    canWithdraw,
+    timeUntilUnlockFormatted,
     claimRewards,
-    unstakeTokens,
-    unstakeAll,
+    withdrawAll,
     isLoading: isLoadingStaking,
     refreshData: refreshStaking
   } = useStaking();
@@ -40,6 +39,7 @@ export function WalletDetailsModal({ onClose }) {
   const [isApproving, setIsApproving] = useState(false);
   const [transactionStatus, setTransactionStatus] = useState(''); // 'approving', 'waiting', 'confirmed', etc.
   const [isUpdatingBalance, setIsUpdatingBalance] = useState(false);
+  const [isUpdatingStaking, setIsUpdatingStaking] = useState(false);
   
   const { mutate: sendTransactionHook } = useSendAndConfirmTransaction();
   const activeAccount = useActiveAccount();
@@ -245,9 +245,23 @@ export function WalletDetailsModal({ onClose }) {
 
         {/* Staking Section */}
         <div className="wallet-section">
-          <h3 style={{ display: 'block', width: '100%', marginBottom: '12px' }}>Staking Activity</h3>
-          {isLoadingStaking ? (
-            <div className="loading-spinner">Loading staking data...</div>
+          <h3 style={{ display: 'block', width: '100%', marginBottom: '12px' }}>
+            Staking Activity
+            {isUpdatingStaking && (
+              <span style={{ 
+                marginLeft: '10px', 
+                fontSize: '10px', 
+                color: '#00f5d4',
+                animation: 'pulse 1s infinite'
+              }}>
+                🔄 Updating...
+              </span>
+            )}
+          </h3>
+          {isLoadingStaking || isUpdatingStaking ? (
+            <div className="loading-spinner">
+              {isUpdatingStaking ? '⏳ Updating blockchain data...' : 'Loading staking data...'}
+            </div>
           ) : (
             <div style={{ width: '100%' }}>
               <div className="staking-grid">
@@ -258,12 +272,16 @@ export function WalletDetailsModal({ onClose }) {
                   </span>
                 </div>
                 <div className="staking-item">
-                  <span className="staking-label">Rewards Earned</span>
-                  <span className="staking-value rewards">{earnedRewards || '0'} ETH</span>
+                  <span className="staking-label">Lock Status</span>
+                  <span className="staking-value" style={{ 
+                    color: canWithdraw ? '#00ff88' : '#ff6b6b' 
+                  }}>
+                    {canWithdraw ? 'Unlocked' : timeUntilUnlockFormatted}
+                  </span>
                 </div>
                 <div className="staking-item">
-                  <span className="staking-label">APR</span>
-                  <span className="staking-value apr">{apr || '0'}%</span>
+                  <span className="staking-label">Rewards Earned</span>
+                  <span className="staking-value rewards">{earnedRewards || '0'} ETH</span>
                 </div>
                 <div className="staking-item">
                   <span className="staking-label">Total Pool</span>
@@ -291,57 +309,88 @@ export function WalletDetailsModal({ onClose }) {
           </button>
           
           {stakedBalance && parseFloat(stakedBalance) > 0 && (
-            <TransactionButton
-              transaction={() => stakingTransactions.prepareUnstakeAll()}
-              onTransactionSent={() => {
-                console.log("Unstake transaction sent");
-                setTransactionStatus('waiting');
-              }}
-              onTransactionConfirmed={async () => {
-                console.log("Unstake successful");
-                setTransactionStatus('confirmed');
-                
-                // Wait 2 seconds showing confirmed
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                
-                setTransactionStatus('updating');
-                setIsUpdatingBalance(true);
-                
-                await refreshStaking();
-                await refreshBalance();
-                
-                setIsUpdatingBalance(false);
-                setTransactionStatus('');
-              }}
-              onError={(error) => {
-                console.error("Unstake failed:", error);
-                alert("Failed to unstake: " + error.message);
-              }}
-              className="action-button unstake"
-              style={{ backgroundColor: '#ff6b6b' }}
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                <span>Unstake All</span>
-                <span style={{ fontSize: '9px', opacity: 0.8 }}>({stakedBalance} RL80)</span>
-              </div>
-            </TransactionButton>
+            canWithdraw ? (
+              <TransactionButton
+                transaction={() => stakingTransactions.prepareWithdrawAll()}
+                onTransactionSent={() => {
+                  console.log("Withdraw transaction sent");
+                  setTransactionStatus('waiting');
+                }}
+                onTransactionConfirmed={async () => {
+                  console.log("Withdraw successful");
+                  setTransactionStatus('confirmed');
+                  
+                  // Wait 2 seconds showing confirmed
+                  await new Promise(resolve => setTimeout(resolve, 2000));
+                  
+                  setTransactionStatus('updating');
+                  setIsUpdatingBalance(true);
+                  setIsUpdatingStaking(true);
+                  
+                  // Show updating message for a bit
+                  await new Promise(resolve => setTimeout(resolve, 1000));
+                  
+                  await refreshStaking();
+                  await refreshBalance();
+                  
+                  // Keep showing update message to ensure data propagates
+                  await new Promise(resolve => setTimeout(resolve, 2000));
+                  
+                  setIsUpdatingBalance(false);
+                  setIsUpdatingStaking(false);
+                  setTransactionStatus('');
+                }}
+                onError={(error) => {
+                  console.error("Withdraw failed:", error);
+                  alert("Failed to withdraw: " + error.message);
+                }}
+                className="action-button unstake"
+                style={{ backgroundColor: '#ff6b6b' }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                  <span>Withdraw All</span>
+                  <span style={{ fontSize: '9px', opacity: 0.8 }}>({stakedBalance} RL80)</span>
+                </div>
+              </TransactionButton>
+            ) : (
+              <button 
+                className="action-button unstake" 
+                disabled 
+                style={{ 
+                  backgroundColor: '#666',
+                  opacity: 0.5,
+                  cursor: 'not-allowed' 
+                }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                  <span>🔒 Locked</span>
+                  <span style={{ fontSize: '9px', opacity: 0.8 }}>{timeUntilUnlockFormatted}</span>
+                </div>
+              </button>
+            )
           )}
           
           {earnedRewards && parseFloat(earnedRewards) > 0 ? (
-            <TransactionButton
-              transaction={() => stakingTransactions.prepareClaim()}
-              onTransactionConfirmed={async () => {
-                await refreshStaking();
-                await refreshBalance();
-              }}
-              onError={(error) => {
-                console.error("Claim failed:", error);
-                alert("Failed to claim rewards: " + error.message);
-              }}
-              className="action-button claim"
-            >
-              Claim {earnedRewards} ETH
-            </TransactionButton>
+            canWithdraw ? (
+              <TransactionButton
+                transaction={() => stakingTransactions.prepareClaimRewards()}
+                onTransactionConfirmed={async () => {
+                  await refreshStaking();
+                  await refreshBalance();
+                }}
+                onError={(error) => {
+                  console.error("Claim failed:", error);
+                  alert("Failed to claim rewards: " + error.message);
+                }}
+                className="action-button claim"
+              >
+                Claim {earnedRewards} ETH
+              </TransactionButton>
+            ) : (
+              <button className="action-button claim" disabled style={{ opacity: 0.5 }}>
+                🔒 Claim Locked
+              </button>
+            )
           ) : (
             <button className="action-button claim" disabled style={{ opacity: 0.5 }}>
               No Rewards
@@ -402,8 +451,8 @@ export function WalletDetailsModal({ onClose }) {
               </div>
               
               <div className="stake-info">
-                <div>Min Claim Amount: {minClaimAmount || '0.005'} ETH</div>
-                <div>Current APR: {apr || '0'}%</div>
+                <div>Lock Period: 10 minutes (Testnet)</div>
+                <div>Rewards: ETH from protocol</div>
                 {needsApproval && (
                   <button 
                     onClick={handleManualApprove}
@@ -498,13 +547,22 @@ export function WalletDetailsModal({ onClose }) {
                       
                       setTransactionStatus('updating');
                       setIsUpdatingBalance(true);
+                      setIsUpdatingStaking(true);
+                      setShowStakeModal(false);
+                      setStakeAmount('');
                       
+                      // Show updating message for a bit before refreshing
+                      await new Promise(resolve => setTimeout(resolve, 1000));
+                      
+                      // Refresh data (this takes time due to blockchain reads)
                       await refreshStaking();
                       await refreshBalance();
                       
+                      // Keep showing update message for a bit longer to ensure data propagates
+                      await new Promise(resolve => setTimeout(resolve, 2000));
+                      
                       setIsUpdatingBalance(false);
-                      setShowStakeModal(false);
-                      setStakeAmount('');
+                      setIsUpdatingStaking(false);
                       setTransactionStatus('');
                     }}
                     onError={(error) => {

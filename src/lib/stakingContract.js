@@ -10,14 +10,16 @@ const client = createThirdwebClient({
 const chain = defineChain(84532);
 
 // TODO: Replace with your actual staking contract address
-const STAKING_CONTRACT_ADDRESS = "0x5cBceA7A9Eb4a5EeF23b3033651fB69545611Ba2"; // Replace this
-const REWARDS_SPLITTER_ADDRESS = "0xfEe402E3c7be6b179967C2B5551c2bcFb402B7e3"; // Replace this
+const STAKING_CONTRACT_ADDRESS = "0xf87213077825b221581646fBC041F4dE8cF32f7e"; // Replace this
+const REWARDS_SPLITTER_ADDRESS = "0x197655c3c1b1CB217504FF624326b841183298D4"; // Replace this
+const STAKING_ABI = [{"inputs":[{"internalType":"address","name":"_rl80Token","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[],"name":"EnforcedPause","type":"error"},{"inputs":[],"name":"ExpectedPause","type":"error"},{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"OwnableInvalidOwner","type":"error"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"OwnableUnauthorizedAccount","type":"error"},{"inputs":[],"name":"ReentrancyGuardReentrantCall","type":"error"},{"inputs":[{"internalType":"address","name":"token","type":"address"}],"name":"SafeERC20FailedOperation","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"account","type":"address"}],"name":"Paused","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"RewardsClaimed","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"distributor","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"RewardsDistributed","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"unlockAt","type":"uint256"}],"name":"Staked","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"account","type":"address"}],"name":"Unpaused","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"Withdrawn","type":"event"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"balances","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"claimRewards","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"distributeRewards","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"earned","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"emergencyWithdraw","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"exit","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"getUnlockStatus","outputs":[{"internalType":"uint256","name":"timeLeft","type":"uint256"},{"internalType":"string","name":"readable","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"lockDuration","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pause","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"paused","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"rescueETH","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"rescueTokens","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"rewardPerTokenStored","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"rewards","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"rl80Token","outputs":[{"internalType":"contract IERC20","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"_lockDuration","type":"uint256"}],"name":"setLockDuration","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"_seconds","type":"uint256"}],"name":"setTestnetLockDuration","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"tester","type":"address"}],"name":"skipLockForTester","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"stake","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"stakedOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"totalStaked","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"unlockTime","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"unpause","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"userRewardPerTokenPaid","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdraw","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"withdrawAll","outputs":[],"stateMutability":"nonpayable","type":"function"},{"stateMutability":"payable","type":"receive"}]
 
-// Staking contract instance
+// Staking contract instance with explicit ABI
 export const stakingContract = getContract({
   client,
   chain,
   address: STAKING_CONTRACT_ADDRESS,
+  abi: STAKING_ABI, // Explicitly provide the ABI
 });
 
 // Rewards splitter contract instance
@@ -28,18 +30,18 @@ export const rewardsSplitterContract = getContract({
 });
 
 // Staking contract ABI
-const STAKING_ABI = [{"inputs":[{"internalType":"address","name":"_rl80Token","type":"address"},{"internalType":"address","name":"_distributor","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[],"name":"EnforcedPause","type":"error"},{"inputs":[],"name":"ExpectedPause","type":"error"},{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"OwnableInvalidOwner","type":"error"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"OwnableUnauthorizedAccount","type":"error"},{"inputs":[],"name":"ReentrancyGuardReentrantCall","type":"error"},{"inputs":[{"internalType":"address","name":"token","type":"address"}],"name":"SafeERC20FailedOperation","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"DirectETHReceived","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"distributor","type":"address"},{"indexed":false,"internalType":"bool","name":"restrictDeposits","type":"bool"}],"name":"DistributorUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"ETHClaimed","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newDuration","type":"uint256"}],"name":"LockDurationUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newMin","type":"uint256"}],"name":"MinClaimUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newMinTVL","type":"uint256"}],"name":"MinTVLUpdated","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferStarted","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"account","type":"address"}],"name":"Paused","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"amountDistributed","type":"uint256"}],"name":"QueuedFlushed","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newETH","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"distributed","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"queuedAfter","type":"uint256"}],"name":"RewardAdded","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"unlockAt","type":"uint256"}],"name":"Staked","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"token","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"TokensRescued","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"account","type":"address"}],"name":"Unpaused","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"Unstaked","type":"event"},{"inputs":[],"name":"PRECISION","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"acceptOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"accruedETH","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"canUnstake","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"claim","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"claimableRewards","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"distributor","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"earned","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"emergencyUnstakeAll","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"ethPerTokenStored","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"flushQueued","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"getStakedBalance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"lockDuration","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"minClaimAmount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"minTvlToDistribute","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"notifyRewardETH","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pause","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"paused","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"pendingETH","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"pendingOwner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"queuedETH","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"rescueTokens","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"restrictDeposits","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"rl80Token","outputs":[{"internalType":"contract IERC20","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"_distributor","type":"address"},{"internalType":"bool","name":"_restrictDeposits","type":"bool"}],"name":"setDistributor","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"_seconds","type":"uint256"}],"name":"setLockDuration","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"_min","type":"uint256"}],"name":"setMinClaimAmount","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"_minTVL","type":"uint256"}],"name":"setMinTvlToDistribute","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"stake","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"stakedBalance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"timeToUnlock","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"totalStaked","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"unlockTime","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"unlockTimeRemaining","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"unpause","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"unstake","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"unstakeAll","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"userEthPerTokenPaid","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"stateMutability":"payable","type":"receive"}];
-
 // Staking read functions
 export const stakingFunctions = {
-  // Get user's staked balance
+  // Get user's staked balance - using 'balances' from the ABI
   getStakedBalance: async (address) => {
     try {
+      console.log("Getting staked balance for address:", address);
       const result = await readContract({
         contract: stakingContract,
-        method: "function getStakedBalance(address user) view returns (uint256)",
+        method: "function balances(address) view returns (uint256)",
         params: [address],
       });
+      console.log("Staked balance result:", result?.toString());
       return result;
     } catch (error) {
       console.error("Error getting staked balance:", error);
@@ -62,17 +64,17 @@ export const stakingFunctions = {
     }
   },
 
-  // Get ETH per token stored (for APR calculation)
-  getEthPerTokenStored: async () => {
+  // Get reward per token stored (for APR calculation) - using 'rewardPerTokenStored' from ABI
+  getRewardPerTokenStored: async () => {
     try {
       const result = await readContract({
         contract: stakingContract,
-        method: "function ethPerTokenStored() view returns (uint256)",
+        method: "function rewardPerTokenStored() view returns (uint256)",
         params: [],
       });
       return result;
     } catch (error) {
-      console.error("Error getting ETH per token:", error);
+      console.error("Error getting reward per token:", error);
       return "0";
     }
   },
@@ -92,17 +94,32 @@ export const stakingFunctions = {
     }
   },
 
-  // Get minimum claim amount
-  getMinClaimAmount: async () => {
+  // Get lock duration
+  getLockDuration: async () => {
     try {
       const result = await readContract({
         contract: stakingContract,
-        method: "function minClaimAmount() view returns (uint256)",
+        method: "function lockDuration() view returns (uint256)",
         params: [],
       });
       return result;
     } catch (error) {
-      console.error("Error getting minimum claim amount:", error);
+      console.error("Error getting lock duration:", error);
+      return "600"; // Default to 10 minutes for testnet
+    }
+  },
+  
+  // Get unlock time for user
+  getUnlockTime: async (address) => {
+    try {
+      const result = await readContract({
+        contract: stakingContract,
+        method: "function unlockTime(address) view returns (uint256)",
+        params: [address],
+      });
+      return result;
+    } catch (error) {
+      console.error("Error getting unlock time:", error);
       return "0";
     }
   },
@@ -134,29 +151,29 @@ export const stakingTransactions = {
     });
   },
 
-  // Prepare unstake transaction
-  prepareUnstake: (amount) => {
+  // Prepare withdraw transaction (testnet uses 'withdraw' not 'unstake')
+  prepareWithdraw: (amount) => {
     return prepareContractCall({
       contract: stakingContract,
-      method: "function unstake(uint256 amount)",
+      method: "function withdraw(uint256 amount)",
       params: [amount],
     });
   },
 
-  // Prepare unstakeAll transaction
-  prepareUnstakeAll: () => {
+  // Prepare withdrawAll transaction
+  prepareWithdrawAll: () => {
     return prepareContractCall({
       contract: stakingContract,
-      method: "function unstakeAll()",
+      method: "function withdrawAll()",
       params: [],
     });
   },
 
   // Prepare claim rewards transaction
-  prepareClaim: () => {
+  prepareClaimRewards: () => {
     return prepareContractCall({
       contract: stakingContract,
-      method: "function claim()",
+      method: "function claimRewards()",
       params: [],
     });
   },
@@ -165,34 +182,52 @@ export const stakingTransactions = {
 // Helper function to format staking data
 export const formatStakingData = async (userAddress) => {
   try {
-    const [stakedBalance, earnedRewards, ethPerToken, totalStaked, minClaimAmount] = await Promise.all([
+    console.log("Formatting staking data for:", userAddress);
+    
+    const [stakedBalance, earnedRewards, rewardPerToken, totalStaked, lockDuration, unlockTime] = await Promise.all([
       stakingFunctions.getStakedBalance(userAddress),
       stakingFunctions.getEarnedRewards(userAddress),
-      stakingFunctions.getEthPerTokenStored(),
+      stakingFunctions.getRewardPerTokenStored(),
       stakingFunctions.getTotalStaked(),
-      stakingFunctions.getMinClaimAmount(),
+      stakingFunctions.getLockDuration(),
+      stakingFunctions.getUnlockTime(userAddress),
     ]);
 
-    // Calculate APR (simplified - you may need to adjust based on actual reward distribution)
-    // This assumes ethPerToken accumulates over time
-    const apr = ethPerToken && totalStaked ? 
-      (Number(ethPerToken) * 365 * 100) / 1e18 : 0;
+    console.log("Raw staking data:", {
+      stakedBalance: stakedBalance?.toString(),
+      earnedRewards: earnedRewards?.toString(),
+      totalStaked: totalStaked?.toString(),
+      unlockTime: unlockTime?.toString(),
+    });
 
-    return {
+    // Calculate if user can withdraw
+    const canWithdraw = Number(unlockTime) <= Math.floor(Date.now() / 1000);
+    const timeUntilUnlock = canWithdraw ? 0 : Number(unlockTime) - Math.floor(Date.now() / 1000);
+
+    const formattedData = {
       stakedBalance: stakedBalance.toString(),
       earnedRewards: earnedRewards.toString(),
-      apr: apr.toFixed(2),
+      rewardPerToken: rewardPerToken.toString(),
       totalStaked: totalStaked.toString(),
-      minClaimAmount: minClaimAmount.toString(),
+      lockDuration: lockDuration.toString(),
+      unlockTime: unlockTime.toString(),
+      canWithdraw,
+      timeUntilUnlock,
     };
+    
+    console.log("Formatted staking data:", formattedData);
+    return formattedData;
   } catch (error) {
     console.error("Error formatting staking data:", error);
     return {
       stakedBalance: "0",
       earnedRewards: "0",
-      apr: "0",
+      rewardPerToken: "0",
       totalStaked: "0",
-      minClaimAmount: "0",
+      lockDuration: "600",
+      unlockTime: "0",
+      canWithdraw: false,
+      timeUntilUnlock: 0,
     };
   }
 };

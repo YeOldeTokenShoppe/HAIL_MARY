@@ -73,7 +73,6 @@ export function PhoneScreenTexture({
         avatarLoadedRef.current = true
       }
       img.onerror = () => {
-        console.log('Failed to load avatar image')
         avatarLoadedRef.current = true // Mark as loaded even on error
       }
       img.src = user.imageUrl
@@ -479,7 +478,6 @@ export function PhoneScreenTexture({
   useEffect(() => {
     if (hoveredOffering) {
       lastInteractionTime.current = Date.now()
-      console.log('User clicked candle, showing:', hoveredOffering.name, hoveredOffering.message)
     }
   }, [hoveredOffering])
   
@@ -487,7 +485,6 @@ export function PhoneScreenTexture({
   useEffect(() => {
     if (justLitOffering) {
       prayerReceivedStartTime.current = Date.now()
-      console.log('Starting Prayer Received animation for:', justLitOffering.name)
     }
   }, [justLitOffering])
   
@@ -526,7 +523,6 @@ export function PhoneScreenTexture({
           if (offerings.length > 0) {
             setManualIndex(prev => {
               const newIndex = (prev - 1 + offerings.length) % offerings.length;
-              console.log('SwipeUp: prev:', prev, 'new:', newIndex, 'total:', offerings.length);
               return newIndex;
             })
             lastInteractionTime.current = Date.now()
@@ -536,7 +532,6 @@ export function PhoneScreenTexture({
           if (offerings.length > 0) {
             setManualIndex(prev => {
               const newIndex = (prev + 1) % offerings.length;
-              console.log('SwipeDown: prev:', prev, 'new:', newIndex, 'total:', offerings.length);
               return newIndex;
             })
             lastInteractionTime.current = Date.now()

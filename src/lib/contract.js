@@ -15,7 +15,7 @@ const chain = defineChain(84532);
 export const erc20Contract = getContract({
   client,
   chain,
-  address: "0x71e90d43a3f00b02d140D5c714422E8Eb78459FA",
+  address: "0xc6F05f95278c6E0b71F28fC602ff7869D4916a05",
 });
 
 // Export commonly used functions

@@ -249,24 +249,26 @@ export function WalletConnectionModal({ onClose }) {
         >×</button>
         
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
-          <ConnectButton
-            client={client}
-            chain={chain}
-            wallets={wallets}
-            theme={customTheme}
-            connectModal={{
-              size: "compact",
-              showThirdwebBranding: false,
-              titleIcon: "",
-            }}
-            detailsModal={{
-              showThirdwebBranding: false,
-            }}
-            onConnect={(wallet) => {
-              // Don't close here - let the parent component handle it
-              // The parent will detect wallet connection and handle modal transitions
-            }}
-          />
+          <div> {/* Extra wrapper to prevent button nesting issues */}
+            <ConnectButton
+              client={client}
+              chain={chain}
+              wallets={wallets}
+              theme={customTheme}
+              connectModal={{
+                size: "compact",
+                showThirdwebBranding: false,
+                titleIcon: "",
+              }}
+              detailsModal={{
+                showThirdwebBranding: false,
+              }}
+              onConnect={(wallet) => {
+                // Don't close here - let the parent component handle it
+                // The parent will detect wallet connection and handle modal transitions
+              }}
+            />
+          </div>
         </div>
         <WalletModalStyles />
       </div>

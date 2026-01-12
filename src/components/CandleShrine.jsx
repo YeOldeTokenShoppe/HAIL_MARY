@@ -583,6 +583,18 @@ export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUN
   const { geometries, textures, localMatrices } = useClonedGeometries('/models/tinyVotiveOnly.glb')
   const basePositions = usePositions(count, exclusionZone)
   
+  // Clean up cloned geometries on unmount
+  useEffect(() => {
+    return () => {
+      // Dispose cloned geometries when component unmounts
+      Object.values(geometries).forEach(geometry => {
+        if (geometry && geometry.dispose) {
+          geometry.dispose()
+        }
+      })
+    }
+  }, [geometries])
+  
   // Combine positions
   const positions = useMemo(() => {
     const additional = additionalCandles.map(c => ({
@@ -601,6 +613,17 @@ export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUN
     wick: createWobbleMaterial('#222222'),
     flame: createFlameMaterial(),  // Or createFlameMaterialPriceReactive() for tinted flames
   }), [])
+  
+  // Clean up materials on unmount
+  useEffect(() => {
+    return () => {
+      // Dispose materials when component unmounts
+      if (materials.xbase) materials.xbase.dispose()
+      if (materials.glass) materials.glass.dispose()
+      if (materials.wick) materials.wick.dispose()
+      if (materials.flame) materials.flame.dispose()
+    }
+  }, [materials])
   
   // Update clicked ID in shared uniforms
   useEffect(() => {

@@ -3,6 +3,7 @@
 import React, { useState, useImperativeHandle, forwardRef } from 'react'
 import Link from 'next/link'
 import styles from './Matchstick.module.css'
+import { useStaking } from '@/hooks/useStaking'
 
 /**
  * Consolidated left-side panel for the shrine page
@@ -12,10 +13,13 @@ const ShrineLeftPanel = forwardRef(({
   is80sMode = false, 
   isMobile = false,
   onLightCandle,
+  onStakeClick,
   router 
 }, ref) => {
   const [isLit, setIsLit] = useState(false)
   const [hasLitCandleThisSession, setHasLitCandleThisSession] = useState(false)
+  const { stakedBalance } = useStaking()
+  const hasStakedTokens = parseFloat(stakedBalance || 0) > 0
   
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
@@ -102,7 +106,7 @@ const ShrineLeftPanel = forwardRef(({
         top: '5%',
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'flex-start',
+        alignItems: 'center',
         gap: '24px',
         zIndex: 100,
         pointerEvents: 'none',  // Allow clicks to pass through to canvas
@@ -166,9 +170,10 @@ const ShrineLeftPanel = forwardRef(({
             2px 2px 4px rgba(0, 0, 0, 0.6)
           `,
           letterSpacing: '0.08em',
-          textAlign: isMobile ? 'center' : 'center',
+          textAlign: 'center',
           lineHeight: 1.4,
           maxWidth: isMobile ? '280px' : '320px',
+          alignSelf: 'center',
         }}>
           <span style={{ 
             display: 'block',
@@ -205,8 +210,6 @@ const ShrineLeftPanel = forwardRef(({
           onClick={handleMatchClick}
           style={{
             pointerEvents: 'auto',  // Enable clicks on the matchstick
-            marginTop: 'calc(16px + 2rem)',  // Combine margin and padding offset
-            marginLeft: '15%',  // Center under CTA text
             width: '8rem',
             height: '8rem',
             borderRadius: '50%',
@@ -288,6 +291,143 @@ const ShrineLeftPanel = forwardRef(({
             }} />
           )}
         </div>
+
+        {/* Stake Token Frame - Duplicate style below matchstick */}
+        <div style={{
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: isMobile ? '1.2rem' : '1.4rem',
+          fontWeight: 300,
+          color: 'rgba(246, 245, 241, 0.95)',
+          textShadow: `
+            0 0 20px rgba(212, 175, 55, 0.4),
+            0 0 40px rgba(212, 175, 55, 0.2),
+            2px 2px 4px rgba(0, 0, 0, 0.6)
+          `,
+          letterSpacing: '0.08em',
+          textAlign: 'center',
+          lineHeight: 1.4,
+          maxWidth: isMobile ? '280px' : '320px',
+          alignSelf: 'center',
+        }}>
+          <span style={{ 
+            display: 'block',
+            fontWeight: 400,
+            textTransform: 'uppercase',
+            letterSpacing: '0.12em',
+          }}>
+            STAKE RL80
+          </span>
+          <span style={{ 
+            display: 'block', 
+            fontSize: isMobile ? '0.9rem' : '0.9rem',
+            opacity: 0.8,
+            marginTop: '6px',
+            fontWeight: 300,
+            fontStyle: 'italic',
+          }}>
+            Earn rewards
+          </span>
+          <span style={{ 
+            display: 'block', 
+            fontSize: '0.65rem',
+            opacity: 0.5,
+            marginTop: '0.5rem',
+            fontWeight: 300,
+            fontStyle: 'italic',
+          }}>
+            Sign in + hold RL80 to participate
+          </span>
+        </div>
+        
+        {/* Stake button - circular background matching matchstick style */}
+        <div 
+          onClick={() => {
+            if (onStakeClick) {
+              onStakeClick()
+            }
+          }}
+          style={{
+            pointerEvents: 'auto',  // Enable clicks on the stake button
+            width: '8rem',
+            height: '8rem',
+            borderRadius: '50%',
+            background: 'rgba(212, 175, 55, 0.1)',
+            border: '1.5px solid rgba(212, 175, 55, 0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            boxShadow: '0 0 0 0 rgba(212, 175, 55, 0)',
+            animation: 'buttonPulse 2s ease-in-out infinite',
+            position: 'relative',
+            overflow: 'hidden',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.animation = 'none';
+            e.currentTarget.style.background = 'rgba(212, 175, 55, 0.15)';
+            e.currentTarget.style.border = '1.5px solid rgba(212, 175, 55, 0.25)';
+            e.currentTarget.style.boxShadow = '0 0 20px rgba(212, 175, 55, 0.3)';
+            e.currentTarget.style.transform = 'scale(1.05)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.animation = 'buttonPulse 2s ease-in-out infinite';
+            e.currentTarget.style.background = 'rgba(212, 175, 55, 0.1)';
+            e.currentTarget.style.border = '1.5px solid rgba(212, 175, 55, 0.15)';
+            e.currentTarget.style.boxShadow = '0 0 0 0 rgba(212, 175, 55, 0)';
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+        >
+          <img 
+            src="/images/stakeIcon.webp"
+            alt="Stake Tokens"
+            style={{
+              width: '60%',
+              height: '60%',
+              objectFit: 'contain',
+              opacity: 0.9,
+              filter: 'brightness(1.1)',
+              pointerEvents: 'none',
+            }}
+          />
+          {/* Indicator for staked tokens */}
+          {hasStakedTokens && (
+            <div style={{
+              position: 'absolute',
+              top: '-5px',
+              right: '-5px',
+              background: 'linear-gradient(135deg, #ffd700, #ffed4e)',
+              width: '18px',
+              height: '18px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '10px',
+              fontWeight: 'bold',
+              color: '#000',
+              boxShadow: '0 2px 8px rgba(255, 215, 0, 0.5)',
+              animation: 'pulse 2s infinite',
+              zIndex: 1,
+            }}>
+              ✓
+            </div>
+          )}
+          
+          {/* Subtle glow ring animation */}
+          <div style={{
+            position: 'absolute',
+            width: '100%',
+            height: '100%',
+            borderRadius: '50%',
+            boxShadow: '0 0 0 0 rgba(212, 175, 55, 0.4)',
+            animation: 'inviteGlow 3s ease-in-out infinite',
+            pointerEvents: 'none',
+          }} />
+        </div>
+   
 
       </div>
     </>

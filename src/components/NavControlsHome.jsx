@@ -84,10 +84,10 @@ export default function NavControlsHome({
 
         /* 80s Mode Button */
         .eighties-btn-mobile {
-          width: 2.5rem;
-          height: 2.5rem;
-          min-width: 2.5rem;
-          min-height: 2.5rem;
+          width: 40px;
+          height: 40px;
+          min-width: 40px;
+          min-height: 40px;
           flex-shrink: 0;
           border-radius: 10px;
           background: ${is80sMode 
@@ -149,16 +149,16 @@ export default function NavControlsHome({
           display: flex;
           flex-direction: column;
           gap: 2px;
-          min-height: 2.5rem;
-          width: 2.5rem;
-          min-width: 2.5rem;
+          min-height: 40px;
+          width: 40px;
+          min-width: 40px;
           flex-shrink: 0;
           justify-content: center;
         }
 
         .music-btn-mobile {
-          width: 2.5rem;
-          height: 1.4rem;
+          width: 40px;
+          height: 22px;
           border-radius: 6px;
           background: rgba(212, 175, 55, 0.05);
           border: 1.5px solid rgba(212, 175, 55, 0.2);
@@ -172,7 +172,8 @@ export default function NavControlsHome({
         }
 
         .music-btn-mobile.single {
-          height: 2.5rem;
+          height: 40px;
+          width: 40px;
           border-radius: 10px;
           font-size: 2rem;
           color: rgba(212, 175, 55, 0.8);
@@ -193,7 +194,7 @@ export default function NavControlsHome({
 
         /* Unified Account/Wallet Container */
         .unified-account-container {
-          height: 2.5rem;
+          height: 40px;
           min-width: fit-content;
           flex-shrink: 0;
         }
@@ -247,10 +248,12 @@ export default function NavControlsHome({
         
         /* Avatar - Consistent size */
         .avatar-mobile {
-          width: 2.5rem;
-          height: 2.5rem;
-          min-width: 2.5rem;
-          min-height: 2.5rem;
+          width: 40px;
+          height: 40px;
+          min-width: 40px;
+          min-height: 40px;
+          max-width: 40px;
+          max-height: 40px;
           flex-shrink: 0;
           border-radius: 10px;
           background: rgba(212, 175, 55, 0.05);
@@ -278,8 +281,8 @@ export default function NavControlsHome({
         /* Wallet button when not connected */
         .wallet-button-mobile {
           width: auto;
-          min-width: 2.5rem;
-          height: 2.5rem;
+          min-width: 40px;
+          height: 40px;
           padding: 0 10px;
           flex-shrink: 0;
           border-radius: 10px;
@@ -320,9 +323,9 @@ export default function NavControlsHome({
         
         /* Wallet info display */
         .wallet-icon-mobile {
-          width: 2.5rem;
-          height: 2.5rem;
-          min-width: 2.5rem;
+          width: 40px;
+          height: 40px;
+          min-width: 40px;
           border-radius: 10px;
           background: rgba(0, 0, 0, 0.4);
           border: 1.5px solid rgba(0, 245, 212, 0.2);
@@ -347,7 +350,7 @@ export default function NavControlsHome({
           align-items: center;
           gap: 4px;
           padding: 0 6px;
-          height: 2.5rem;
+          height: 40px;
           border-radius: 10px;
           background: rgba(0, 0, 0, 0.4);
           border: 1.5px solid rgba(0, 245, 212, 0.2);
@@ -439,10 +442,10 @@ export default function NavControlsHome({
         /* Hamburger - Consistent with other buttons */
         .menu-button-mobile {
           position: relative;
-          width: 2.5rem;
-          height: 2.5rem;
-          min-width: 2.5rem;
-          min-height: 2.5rem;
+          width: 40px;
+          height: 40px;
+          min-width: 40px;
+          min-height: 40px;
           flex-shrink: 0;
           border-radius: 10px;
           background: rgba(212, 175, 55, 0.05);
@@ -466,7 +469,7 @@ export default function NavControlsHome({
         }
 
         .menu-line-mobile {
-          width: 1.6rem;
+          width: 26px;
           height: 4px;
           background: rgba(212, 175, 55, 0.7);
           border-radius: 1px;
@@ -610,10 +613,15 @@ export default function NavControlsHome({
                   src={clerkUser.imageUrl} 
                   alt="Avatar" 
                   style={{ 
-                    width: '100%', 
-                    height: '100%',
+                    width: '40px', 
+                    height: '40px',
+                    minWidth: '40px',
+                    minHeight: '40px',
+                    maxWidth: '40px',
+                    maxHeight: '40px',
                     objectFit: 'cover',
-                    borderRadius: '8px'
+                    borderRadius: '8px',
+                    display: 'block'
                   }}
                 />
               ) : (

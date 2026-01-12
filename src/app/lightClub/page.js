@@ -162,24 +162,20 @@ const ClickHandler = () => {
     };
     
     const handleClick = (event) => {
-      console.log('Manual click handler triggered');
       
       // Calculate mouse position in normalized device coordinates
       const rect = gl.domElement.getBoundingClientRect();
       mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       
-      console.log('Mouse coords:', mouse.x, mouse.y);
       
       // Update raycaster
       raycaster.setFromCamera(mouse, camera);
       
       // Calculate intersections
       const intersects = raycaster.intersectObjects(scene.children, true);
-      console.log('Manual intersections found:', intersects.length);
       
       intersects.forEach((intersect, index) => {
-        console.log(`Manual intersection ${index}:`, intersect.object.name, intersect.object.type);
       });
       
       if (intersects.length > 0) {
@@ -187,20 +183,16 @@ const ClickHandler = () => {
         const screen1Intersect = intersects.find(intersect => intersect.object.name === 'Screen1');
         
         if (screen1Intersect && screen1Intersect.object.userData.handleClick) {
-          console.log('Manual: Found Screen1 with click handler');
           const uv = screen1Intersect.uv;
           if (uv) {
             // Account for texture rotation (-90 degrees)
             // Original texture rotation transforms coordinates differently
             const screenX = uv.y * 512;
             const screenY = (1 - uv.x) * 512;
-            console.log('Manual: Screen clicked at UV:', uv.x, uv.y, '-> Screen coords:', screenX, screenY);
             screen1Intersect.object.userData.handleClick(screenX, screenY);
           } else {
-            console.log('Manual: No UV coordinates found for Screen1');
           }
         } else {
-          console.log('Manual: No Screen1 found in intersections');
         }
       }
     };
@@ -333,7 +325,6 @@ const Model = React.memo(function Model({ scrollY, scrollProgress, isMobile, onL
   React.useEffect(() => {
     // Detect any large scroll drop (more than 7000px drop to under 100)
     if (prevScrollRef.current > 7000 && scrollY < 100) {
-      // console.log('Scroll drop detected - at bottom:', prevScrollRef.current, '->', scrollY);
       scrollDroppedRef.current = true;
       setHideAtBottom(true);
     } 
@@ -360,13 +351,6 @@ const Model = React.memo(function Model({ scrollY, scrollProgress, isMobile, onL
   
   // Hide when scrolled far OR when at bottom (adjusted for longer page)
   const shouldHide = scrollY > 9500 || hideAtBottom;
-  
-  // Debug logging
-  // useEffect(() => {
-  //   if (scrollY > 3000 || scrollY <= 20 || hideAtBottom) {
-  //     console.log('Scroll:', scrollY, 'shouldHide:', shouldHide, 'hideAtBottom:', hideAtBottom);
-  //   }
-  // }, [scrollY, shouldHide, hideAtBottom]);
   
   // Animate based on scroll (from Simple3DScene)
   useFrame((state, delta) => {
@@ -635,7 +619,6 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
       const timer = setTimeout(() => {
         if (groupRef.current) {
           window.globalDroneGroup = groupRef.current;
-          // console.log('DroneModel: Set global drone group:', groupRef.current);
           // Force trigger CSS3D init if it's waiting
           window.dispatchEvent(new CustomEvent('droneReady'));
         }
@@ -650,23 +633,14 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
       // Find the Screen1 object
       let screenFound = false;
       scene.traverse((object) => {
-        // Log all object names to help debug
-        // if (object.name) {
-        //   console.log('Drone object found:', object.name, object.type);
-        // }
+
         
         if (object.name === 'Screen1' || object.name.includes('Screen')) {
           screenFound = true;
           screenRef.current = object;
-          // console.log('✅ Found Screen1 on drone:', object);
-          // console.log('Screen1 type:', object.type);
-          // console.log('Screen1 parent:', object.parent?.name);
-          // console.log('Screen1 position:', object.position);
-          // console.log('Screen1 scale:', object.scale);
           
           // Set up interactive navigation/video system for Screen1
           if (object.isMesh) {
-            // console.log('Setting up interactive screen on Screen1:', object.name);
             
             // Store language in userData so drawing functions can access it
             object.userData.language = language;
@@ -928,7 +902,6 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
                         setTimeout(showNextAsciiLine, 50); // Faster for more lines
                       } else {
                         // ASCII art complete, show final message
-                        console.log('ASCII art complete, lines shown:', asciiLineIndex);
                         
                         // Display "TRANSMISSION COMPLETE" after ASCII art
                         setTimeout(() => {
@@ -941,7 +914,6 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
                           
                           // Then show token prompt after a pause
                           setTimeout(() => {
-                            console.log('CRT Terminal complete, showing token prompt');
                             screenMode = 'token-prompt';
                             drawTokenPromptScreen();
                           }, 2000);
@@ -1495,7 +1467,6 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
               clickAreas = [];
               
               // Debug: Log button drawing
-              console.log('Drawing token prompt, hoveredButton:', hoveredButton);
               
               // Draw buttons - standard horizontal layout
               const buttonY = centerY + 70;
@@ -1506,7 +1477,6 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
               // Draw YES button on LEFT in canvas space
               const yesX = centerX - buttonWidth - buttonSpacing/2;
               const yesHovered = hoveredButton === 'yes';
-              console.log('Drawing YES button at X:', yesX, 'hovered:', yesHovered);
               
               // Draw YES button box
               ctx.strokeStyle = yesHovered ? '#00ff41' : 'rgba(0, 255, 65, 0.5)';
@@ -1535,7 +1505,6 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
               // Draw NO button on RIGHT in canvas space
               const noX = centerX + buttonSpacing/2;
               const noHovered = hoveredButton === 'no';
-              console.log('Drawing NO button at X:', noX, 'hovered:', noHovered);
               
               // Draw NO button box
               ctx.strokeStyle = noHovered ? '#00ff41' : 'rgba(0, 255, 65, 0.5)';
@@ -1810,7 +1779,6 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
                   if (swappedX >= area.x && swappedX <= area.x + area.width && 
                       y >= area.y && y <= area.y + area.height) {
                     newHoveredButton = area.button; // 'yes' or 'no'
-                    console.log('Hovering over button:', area.button, 'swapped X:', swappedX);
                     break;
                   }
                 }
@@ -1831,7 +1799,6 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
                 if (newHoveredButton !== null && hoveredButton === null && screenMode !== 'crt-terminal') {
                   // Clone and play to allow rapid hover sounds
                   sounds.hover.cloneNode(true).play().catch(err => {
-                    console.log('Hover sound play failed:', err);
                   });
                 }
                 
@@ -1850,9 +1817,6 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
             
             // Handle screen clicks
             const handleScreenClick = (x, y) => {
-              console.log('Screen click at:', x, y);
-              console.log('Screen mode:', screenMode);
-              console.log('Available click areas:', clickAreas.length);
               
               // Check terminal button in navigation or post-video mode (for replay)
               if (screenMode === 'navigation' || screenMode === 'post-video') {
@@ -1861,12 +1825,9 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
                     x >= terminalArea.x && x <= terminalArea.x + terminalArea.width && 
                     y >= terminalArea.y && y <= terminalArea.y + terminalArea.height) {
                   
-                  console.log('Clicked TERMINAL button area:', terminalArea);
-                  console.log('Activating CRT Terminal');
                   
                   // Play accept sound for terminal activation
                   sounds.accept.cloneNode(true).play().catch(err => {
-                    console.log('Accept sound play failed:', err);
                   });
                   
                   screenMode = 'crt-terminal';
@@ -1878,18 +1839,13 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
               // Handle token prompt clicks
               if (screenMode === 'token-prompt') {
                 const swappedX = 512 - x;  // Mirror the X coordinate due to rotation
-                console.log('Token prompt click at original X:', x, 'swapped X:', swappedX, 'Y:', y);
-                console.log('Available click areas:', clickAreas);
                 
                 for (const area of clickAreas) {
-                  console.log('Checking area:', area.button, 'at', area.x, area.y, 'to', area.x + area.width, area.y + area.height);
                   if (swappedX >= area.x && swappedX <= area.x + area.width && 
                       y >= area.y && y <= area.y + area.height) {
                     
-                    console.log('Clicked on button:', area.button, 'with action:', area.action);
                     
                     if (area.action === 'buyTokens') {
-                      console.log('User clicked YES to buy RL80 tokens');
                       // Play accept sound
                       sounds.accept.cloneNode(true).play().catch(() => {});
                       
@@ -1905,7 +1861,6 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
                       }, 500);
                       
                     } else if (area.action === 'declineTokens') {
-                      console.log('User clicked NO to buying RL80 tokens');
                       // Play reject sound
                       sounds.reject.cloneNode(true).play().catch(() => {});
                       
@@ -1922,34 +1877,27 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
               
               // Check other areas
               for (const area of clickAreas) {
-                console.log('Checking area:', area);
                 if (x >= area.x && x <= area.x + area.width && 
                     y >= area.y && y <= area.y + area.height) {
                   
-                  console.log('Clicked area action:', area.action, area.url);
                   
                   if (area.action === 'navigate' && area.url) {
-                    console.log('Navigating to:', area.url);
                     // Play accept sound for navigation
                     sounds.accept.cloneNode(true).play().catch(err => {
-                      console.log('Accept sound play failed:', err);
                     });
                     // Small delay to let sound play before navigation
                     setTimeout(() => {
                       window.location.href = area.url;
                     }, 200);
                   } else if (area.action === 'openBuyModal') {
-                    console.log('Opening Buy Modal');
                     // Play accept sound
                     sounds.accept.cloneNode(true).play().catch(err => {
-                      console.log('Accept sound play failed:', err);
                     });
                     // Call the prop function to open the modal
                     if (onOpenBuyModal) {
                       onOpenBuyModal();
                     }
                   } else if (area.action === 'checkAccess') {
-                    console.log('Checking access for ILLUMIN80');
                     // Check if user is authenticated
                     const isAuthenticated = isSignedIn;
                     
@@ -1976,7 +1924,6 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
                       drawAccessDeniedScreen();
                     }
                   } else if (area.action === 'returnToNav') {
-                    console.log('Returning to navigation');
                     sounds.accept.cloneNode(true).play().catch(() => {});
                     screenMode = 'navigation';
                     hoveredButton = null; // Reset hover state when returning
@@ -1987,18 +1934,14 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
                     ctx.restore();
                     drawNavigationScreen();
                   } else if (area.action === 'replay') {
-                    console.log('Replaying CRT terminal');
                     // Play accept sound for replay
                     sounds.accept.cloneNode(true).play().catch(err => {
-                      console.log('Accept sound play failed:', err);
                     });
                     screenMode = 'crt-terminal';
                     startCRTTerminal();
                   } else if (area.action === 'stopVideo') {
-                    console.log('Stopping video, returning to navigation');
                     // Play reject/back sound for stopping video
                     sounds.reject.cloneNode(true).play().catch(err => {
-                      console.log('Reject sound play failed:', err);
                     });
                     // Clean up video if reference exists
                     if (area.video) {
@@ -2010,10 +1953,8 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
                     screenMode = 'navigation';
                     drawNavigationScreen();
                   } else if (area.action === 'playVideo' && area.video) {
-                    console.log('Playing video:', area.video);
                     // Play special accept sound for video
                     sounds.accept.cloneNode(true).play().catch(err => {
-                      console.log('Accept sound play failed:', err);
                     });
                     // Create and play video
                     const video = document.createElement('video');
@@ -2026,7 +1967,6 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
                     let currentVideo = video;
                     
                     video.addEventListener('loadeddata', () => {
-                      console.log('Video loaded, playing on screen');
                       screenMode = 'video';
                       
                       // Set click areas for video mode (back button in bottom area)
@@ -2045,7 +1985,6 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
                       // Draw video to canvas
                       const drawVideo = () => {
                         if (!currentVideo || currentVideo.paused || currentVideo.ended || screenMode !== 'video') {
-                          console.log('Video ended or stopped, returning to navigation');
                           if (currentVideo) {
                             currentVideo.pause();
                             // Properly clean up video without causing errors
@@ -2119,7 +2058,6 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
                     });
                     
                     video.addEventListener('ended', () => {
-                      console.log('Video playback complete');
                       screenMode = 'navigation';
                       drawNavigationScreen();
                     });
@@ -2145,8 +2083,6 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
             object.raycast = THREE.Mesh.prototype.raycast;
             object.visible = true;
             
-            // console.log('Applied interactive screen material to Screen1');
-            // console.log('Screen1 setup complete - name:', object.name, 'visible:', object.visible, 'geometry:', !!object.geometry);
             
             // Update texture in render loop
             object.userData.updateTexture = () => {
@@ -2206,13 +2142,10 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
       });
       
       if (!screenFound) {
-        // console.log('⚠️ Screen1 not found in drone model!');
-        // console.log('Looking for any mesh that could be a screen...');
         scene.traverse((object) => {
           if (object.isMesh && (object.name.toLowerCase().includes('screen') || 
                                 object.name.toLowerCase().includes('display') ||
                                 object.name.toLowerCase().includes('panel'))) {
-            // console.log('Possible screen mesh:', object.name);
             // Use this as fallback
             screenRef.current = object;
             window.globalScreenMesh = object;
@@ -2225,7 +2158,6 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
       
       // Set up hover animation
       if (animations && animations.length > 0) {
-        // console.log('Drone animations:', animations.map(clip => clip.name));
         mixerRef.current = new THREE.AnimationMixer(scene);
         
         // Find the hover animation
@@ -2235,14 +2167,11 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
         );
         
         if (hoverAnimation) {
-          // console.log('Playing drone hover animation:', hoverAnimation.name);
           const action = mixerRef.current.clipAction(hoverAnimation);
           action.reset();
           action.play();
           action.setLoop(THREE.LoopRepeat);
         } else if (animations.length > 0) {
-          // Play first animation if hover not found
-          // console.log('Playing first drone animation');
           const action = mixerRef.current.clipAction(animations[0]);
           action.reset();
           action.play();
@@ -2428,17 +2357,6 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
           scrolledY = baseY + scrollProgress * 350;
         }
         
-        // Debug log to see where it is
-        // if (scrollY > 1400 && scrollY < 1600) {
-        //   console.log('Drone position calc:', {
-        //     baseY,
-        //     scrolledY,
-        //     scrollY,
-        //     approachProgress,
-        //     easedProgress,
-        //     visible: groupRef.current.visible
-        //   });
-        // }
         
         // Approach animation with two phases: vertical rise, then forward approach
         
@@ -2446,9 +2364,6 @@ const DroneModel = React.memo(function DroneModel({ position = [0, 0, 10], scrol
         const endZ = position[2] || -5; // Final Z position (close)
         const farZ = -30; // Far position to approach from
         
-        // Smoothly transition Z position through both phases
-        // During rise: gradually move from close to far
-        // During forward: move from far back to close
         const currentZ = riseProgress < 1
           ? endZ + (farZ - endZ) * easedRiseProgress  // Move away during rise
           : farZ + (endZ - farZ) * easedForwardProgress; // Come back during approach
@@ -3871,7 +3786,6 @@ export default function Home() {
   //     }
   //   };
   //   navigator.clipboard.writeText(JSON.stringify(allValues, null, 2));
-  //   console.log('All lighting values copied to clipboard');
   // };
 
   // Client-side hydration check
@@ -4906,21 +4820,9 @@ export default function Home() {
         /* Canvas pointer events handled inline */
       `}</style>
       
-      {/* <CompactCandleModal 
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onCandleCreated={() => {
-          // Monitor real memory usage
-          if (performance.memory) {
-            console.log('Memory:', (performance.memory.usedJSHeapSize / 1048576).toFixed(1) + 'MB');
-          }
-        }}
-      /> */}
+
       
-      {/* Floating Action Bar - Only show after scrolling past halfway point */}
-      {/* {scrollY > (isMobile ? 1800 : 2400) && (
-        <CyberFloatingBar isMobile={isMobile} />
-      )} */}
+
       
     </div>
     </>

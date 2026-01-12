@@ -246,20 +246,81 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   const [contextLost, setContextLost] = useState(false)
   
   
-  // Clean up WebGL context on unmount
+  // Clean up WebGL context and Three.js resources on unmount
 useEffect(() => {
   return () => {
-    // Defer cleanup to allow React to finish unmounting
-    const glRef = canvasRef.current?.gl
-    if (glRef) {
-      requestAnimationFrame(() => {
-        try {
-          glRef.dispose()
-        } catch (err) {
-          // Silent fail - context might already be gone
+    // Comprehensive cleanup function
+    const cleanupResources = () => {
+      try {
+        const canvas = canvasRef.current
+        if (!canvas) return
+
+        // Dispose of the entire Three.js scene
+        if (canvas.scene) {
+          // Traverse and dispose all objects in the scene
+          canvas.scene.traverse((child) => {
+            if (child.geometry) {
+              child.geometry.dispose()
+            }
+            if (child.material) {
+              if (Array.isArray(child.material)) {
+                child.material.forEach(mat => {
+                  if (mat.map) mat.map.dispose()
+                  if (mat.normalMap) mat.normalMap.dispose()
+                  if (mat.roughnessMap) mat.roughnessMap.dispose()
+                  if (mat.metalnessMap) mat.metalnessMap.dispose()
+                  if (mat.alphaMap) mat.alphaMap.dispose()
+                  if (mat.emissiveMap) mat.emissiveMap.dispose()
+                  mat.dispose()
+                })
+              } else {
+                if (child.material.map) child.material.map.dispose()
+                if (child.material.normalMap) child.material.normalMap.dispose()
+                if (child.material.roughnessMap) child.material.roughnessMap.dispose()
+                if (child.material.metalnessMap) child.material.metalnessMap.dispose()
+                if (child.material.alphaMap) child.material.alphaMap.dispose()
+                if (child.material.emissiveMap) child.material.emissiveMap.dispose()
+                child.material.dispose()
+              }
+            }
+            // Remove from parent
+            if (child.parent) {
+              child.parent.remove(child)
+            }
+          })
+          
+          // Clear the scene
+          while(canvas.scene.children.length > 0) {
+            canvas.scene.remove(canvas.scene.children[0])
+          }
         }
-      })
+
+        // Clean up global uniforms if they exist
+        if (window.sharedUniforms) {
+          // Reset values but don't delete - other instances might use them
+          if (window.sharedUniforms.uTime) window.sharedUniforms.uTime.value = 0
+          if (window.sharedUniforms.uClickedId) window.sharedUniforms.uClickedId.value = -1
+          if (window.sharedUniforms.uPriceDirection) window.sharedUniforms.uPriceDirection.value = 0
+          if (window.sharedUniforms.uContinuousOffset) window.sharedUniforms.uContinuousOffset.value = 0
+          if (window.sharedUniforms.uShortTermPrice) window.sharedUniforms.uShortTermPrice.value = 0
+          if (window.sharedUniforms.uPulseTime) window.sharedUniforms.uPulseTime.value = -1
+          if (window.sharedUniforms.uPulsePosition) window.sharedUniforms.uPulsePosition.value.set(0, 0, 0)
+        }
+
+        // Dispose WebGL renderer
+        if (canvas.gl) {
+          canvas.gl.dispose()
+          canvas.gl.forceContextLoss()
+          canvas.gl.context = null
+          canvas.gl.domElement = null
+        }
+      } catch (err) {
+        console.warn('Cleanup error (non-critical):', err)
+      }
     }
+
+    // Defer cleanup to next frame to allow React to finish
+    requestAnimationFrame(cleanupResources)
   }
 }, [])
   
@@ -280,7 +341,6 @@ useEffect(() => {
     // Use totalOfferingsCount if provided, otherwise fall back to offerings.length
     const offeringsCount = totalOfferingsCount > 0 ? totalOfferingsCount : offerings.length
     const count = 500 + offeringsCount
-    console.log('Candle count updated:', count, 'total offerings:', offeringsCount)
     return count
   }, [totalOfferingsCount, offerings.length])
   const realBurnTotal = useMemo(() => {
@@ -290,10 +350,8 @@ useEffect(() => {
   
   // Animate candle count when it increases
   useEffect(() => {
-    console.log('Count animation check - real:', realCandleCount, 'displayed:', displayedCandleCount)
     if (realCandleCount > displayedCandleCount) {
       // Start animation immediately since we're already delayed from page.js
-      console.log('Triggering candle count animation!')
       setCandleCountAnimation(true)
       setDisplayedCandleCount(realCandleCount)
       
@@ -480,7 +538,6 @@ useEffect(() => {
       
       recoveryTimer = setTimeout(() => {
         if (contextLost && reloadAttempts.current < 3) {
-          console.log(`Context recovery timeout (attempt ${reloadAttempts.current + 1}/3)`)
           reloadAttempts.current++
           // Disabled automatic reload - let user manually reload if needed
           // window.location.reload()
