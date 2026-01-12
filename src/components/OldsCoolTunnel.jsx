@@ -887,9 +887,9 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
                 "{focusedImageData.description}"
               </div>
             )}
-            <div style={{ fontSize: '14px', color: '#8af', marginTop: '15px' }}>
+            {/* <div style={{ fontSize: '14px', color: '#8af', marginTop: '15px' }}>
               {typeof window !== 'undefined' && 'ontouchstart' in window ? 'Tap outside to exit' : 'Click outside or ESC to exit'}
-            </div>
+            </div> */}
           <div style={{ 
             display: 'flex', 
             justifyContent: 'space-between', 

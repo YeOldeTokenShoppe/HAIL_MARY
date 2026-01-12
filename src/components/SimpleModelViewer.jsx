@@ -1524,7 +1524,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
       {windowWidth < 768 && !isLoading && (
         <div style={{
           position: 'absolute',
-          top: '5rem',
+          // top: '5rem',
           left: '1rem',
           right: '1rem',
           zIndex: 100,

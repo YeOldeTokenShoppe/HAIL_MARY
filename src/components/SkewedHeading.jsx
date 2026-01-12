@@ -39,8 +39,7 @@ export default function SkewedHeading({
         
         .title-letter-${stableId} {
           transform: skew(-10deg);
-          display: block;
-          float: left;
+          display: inline-block;
           font-family: 'Fjalla One', sans-serif !important;
         text-shadow: rgba(83, 61, 74, 0.8) 1px 1px,
                        rgba(83, 61, 74, 0.8) 2px 2px,
@@ -56,7 +55,7 @@ export default function SkewedHeading({
         }
         
         .title-letter-${stableId}:first-child {
-          margin-left: 10px; /* Extra margin for first letter to show shadow */
+          margin-left: 0; /* Remove extra margin since we have padding on container */
         }
       `}</style>
       <h1 style={{
@@ -76,7 +75,7 @@ export default function SkewedHeading({
               justifyContent: 'center',
               margin: '0 auto',
               width: 'fit-content',
-              paddingLeft: '10px', // Add padding to ensure shadow visibility
+              // padding: '0 10px', // Add padding on both sides for shadow visibility
               overflow: 'visible',
             }}
           >

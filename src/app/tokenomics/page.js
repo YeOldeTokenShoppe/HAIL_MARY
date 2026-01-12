@@ -319,7 +319,7 @@ export default function TokenomicsPage() {
             backdropFilter: 'blur(10px)',
             boxShadow: '0 0 40px rgba(0, 255, 0, 0.3), inset 0 0 40px rgba(0, 255, 0, 0.05)',
             position: 'relative',
-            overflow: 'hidden'
+            overflow: 'visible'
           }}>
             
             {/* Grid pattern overlay */}

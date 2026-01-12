@@ -456,16 +456,19 @@ Data Protection:
         }}>
           <div style={{
             display: 'flex',
-            justifyContent: 'space-between',
+            justifyContent: isMobile ? 'center' : 'space-between',
             alignItems: 'center',
-            marginBottom: '10px'
+            marginBottom: '10px',
+            flexDirection: isMobile ? 'column' : 'row',
+            gap: isMobile ? '8px' : '0'
           }}>
             <div style={{
               fontSize: '12px',
               color: '#00ff00',
               fontFamily: 'monospace',
               opacity: 0.7,
-              letterSpacing: '2px'
+              letterSpacing: '2px',
+              textAlign: 'center'
             }}>
               [ORACLE.DIVINE.WISDOM.v2.0]
             </div>
@@ -493,13 +496,19 @@ Data Protection:
             </div>
           </div>
           
-   <SkewedHeading 
-      lines={["FAQ::TERMINAL"]}
-      // colors={["#d4af37", "#f4e4c1", "#ffd700"]}
-          colors={["#00ff00"]}
-      fontSize={{ mobile: "2.5rem", desktop: "3rem" }}
-      isMobile={isMobile}
-    />
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            width: '100%'
+          }}>
+            <SkewedHeading 
+              lines={["FAQ::TERMINAL"]}
+              // colors={["#d4af37", "#f4e4c1", "#ffd700"]}
+              colors={["#00ff00"]}
+              fontSize={{ mobile: "2.5rem", desktop: "3rem" }}
+              isMobile={isMobile}
+            />
+          </div>
           
           <div style={{
             textAlign: 'center',

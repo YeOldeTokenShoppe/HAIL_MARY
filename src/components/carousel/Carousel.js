@@ -202,7 +202,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             An Icon for the Ages
           </h2> */}
                      <SkewedHeading
-              lines={["A TIMELESS", "ICON FOR", "THE AGES"]}
+              lines={["A TIMELESS", "ICON FOR THE", "DIGITAL AGE"]}
               fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : "3.5rem"}
               color="#00ff9d"
               skewAngle={-2}
@@ -222,7 +222,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             opacity: 0.9,
             textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
           }}>
-            Journey Through the Digital Renaissance
+            Journey Through Her Illustrious History
           </p>
           
           {/* Portal Preview Container with Frame Image */}
@@ -337,9 +337,15 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             fontSize: isMobilePhone ? '0.75rem' : '0.9rem',
             color: '#888',
             textAlign: 'center',
-            lineHeight: '1.4'
+            lineHeight: '1.4',
+            
           }}>
-            Tap to enter • <a href="/philosophy" style={{ color: '#ffff00', textDecoration: 'underline' }}>Read whitepaper</a>
+            <span style={{            
+            color: '#01ff00',
+            textAlign: 'center',
+            // fontFamily: 'monospace',
+            animation: 'pulse 2s ease-in-out infinite',
+}}>Tap to enter</span> • <a href="/philosophy" style={{ color: '#ffff00', textDecoration: 'underline' }}>Read whitepaper</a>
           </p>
         </div>
       ) : isMobilePhone && isFullscreen ? (
