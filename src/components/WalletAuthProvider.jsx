@@ -181,7 +181,6 @@ export function WalletAuthProvider({ children }) {
       
       // Check if user is authorized for test wallet
       if (!userEmail || !isAuthorizedTestUser(userEmail)) {
-        console.log(`User ${userEmail || 'unknown'} is not authorized for test wallets`);
         return;
       }
       

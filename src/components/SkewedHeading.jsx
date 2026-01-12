@@ -25,7 +25,7 @@ export default function SkewedHeading({
       display: 'inline-block',
       width: '100%',
       textAlign: textAlign,
-      padding: '10px ', // Add padding to prevent shadow clipping
+      padding: '5px 10px', // Reduced vertical padding to minimize extra space
       overflow: 'visible', // Ensure shadows are visible
     }}>
       <style jsx>{`
@@ -35,6 +35,15 @@ export default function SkewedHeading({
           font-weight: normal;
           font-style: normal;
           font-display: swap;
+        }
+        
+        .skewed-heading-${stableId} {
+          font-size: ${typeof fontSize === 'string' ? fontSize : (isMobile ? fontSize.mobile : fontSize.desktop)} !important;
+          margin: 0 !important;
+          margin-block-start: 0 !important;
+          margin-block-end: 0 !important;
+          margin-top: 0 !important;
+          margin-bottom: 0 !important;
         }
         
         .title-letter-${stableId} {
@@ -58,11 +67,13 @@ export default function SkewedHeading({
           margin-left: 0; /* Remove extra margin since we have padding on container */
         }
       `}</style>
-      <h1 style={{
+      <h2 className={`skewed-heading-${stableId}`} style={{
         color: '#fff',
         textTransform: 'uppercase',
-        fontSize: isMobile ? fontSize.mobile : fontSize.desktop,
-        margin: 0,
+        fontSize: typeof fontSize === 'string' ? fontSize : (isMobile ? fontSize.mobile : fontSize.desktop),
+        margin: '0 !important',
+        marginBlockStart: '0 !important',
+        marginBlockEnd: '0 !important',
         lineHeight: 1.12,
         letterSpacing: '2px',
         fontFamily: fontFamily,
@@ -75,7 +86,7 @@ export default function SkewedHeading({
               justifyContent: 'center',
               margin: '0 auto',
               width: 'fit-content',
-              // padding: '0 10px', // Add padding on both sides for shadow visibility
+            // padding: '0 10px', // Add padding on both sides for shadow visibility
               overflow: 'visible',
             }}
           >
@@ -102,7 +113,7 @@ export default function SkewedHeading({
             ))}
           </div>
         ))}
-      </h1>
+      </h2>
     </div>
   );
 }

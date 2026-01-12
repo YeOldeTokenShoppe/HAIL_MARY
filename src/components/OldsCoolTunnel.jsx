@@ -460,7 +460,6 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
   const focusStateRef = useRef({ image: null, index: -1 })
 
   useEffect(() => {
-    console.log('OldsCoolTunnel mounting, mountRef.current =', mountRef.current)
     if (!mountRef.current) return
 
     const scene = new THREE.Scene()
@@ -507,7 +506,6 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
     renderer.domElement.style.height = '100%'
     
     mountRef.current.appendChild(renderer.domElement)
-    console.log('Renderer DOM element added, size:', containerWidth, 'x', containerHeight)
     
     // Removed OrbitControls - no longer needed
 
@@ -726,7 +724,6 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
     renderer.domElement.addEventListener('touchstart', handleTouch)
     renderer.domElement.addEventListener('click', handleClick)
     
-    console.log('Starting animation loop')
     animate()
 
     return () => {
@@ -820,6 +817,11 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
               (typeof window !== 'undefined' && 'ontouchstart' in window ? 'Tap to Pause' : 'Press SPACE to Pause')
             }
           </div>
+          {isPaused && (
+            <div style={{ fontSize: '12px', marginTop: '3px', color: '#fa0' }}>
+              🔍 Select image for detailed view
+            </div>
+          )}
         </div>
       )}
       

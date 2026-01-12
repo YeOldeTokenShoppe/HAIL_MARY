@@ -1,10 +1,10 @@
 'use client'
 
-import * as THREE from 'three'
-import { useRef, useState, Suspense, useMemo, useEffect, useCallback } from 'react'
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Image, Environment, ScrollControls, useScroll, useTexture, Text } from '@react-three/drei'
-import { easing } from 'maath'
+// import * as THREE from 'three' // Not needed when using OldsCoolTunnel
+import { useRef, useState, Suspense, useMemo, useEffect } from 'react'
+// import { Canvas, useFrame, useThree } from '@react-three/fiber' // Not needed when using OldsCoolTunnel
+// import { Image, Environment, ScrollControls, useScroll, useTexture, Text } from '@react-three/drei' // Not needed when using OldsCoolTunnel
+// import { easing } from 'maath' // Not needed when using OldsCoolTunnel
 import './util'
 import ExperienceControls from './ExperienceControls'
 import { useMusic } from '../MusicContext'
@@ -14,21 +14,31 @@ import SkewedHeading from '../SkewedHeading'
 import MobilePolaroidGallerySimple from './MobilePolaroidGallerySimple'
 import OldsCoolTunnel from '../OldsCoolTunnel'
 
-export default function CarouselComponent({ onReady, disableScrollControls = false }) {
+export default function CarouselComponent({ onReady, disableScrollControls = false, buyButton }) {
   const [hoveredCaption, setHoveredCaption] = useState(null)
   const [sceneReady, setSceneReady] = useState(false)
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
   const [isMobilePhone, setIsMobilePhone] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 480 : false)
   const [isSmallPhone, setIsSmallPhone] = useState(() => typeof window !== 'undefined' ? window.innerHeight <= 700 : false)
+  const [isTablet, setIsTablet] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 480 && window.innerWidth <= 1024 : false)
+  const [isTabletPortrait, setIsTabletPortrait] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 480 && window.innerWidth <= 1024 && window.innerHeight > window.innerWidth : false)
+  const [isTabletLandscape, setIsTabletLandscape] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 768 && window.innerWidth <= 1024 : false)
+  const [isLargeTablet, setIsLargeTablet] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 820 && window.innerWidth <= 1024 : false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const { is80sMode } = useMusic()
   const { t } = useLanguage()
   
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768)
+      const width = window.innerWidth
+      setIsMobile(width <= 768)
       // Check specifically for mobile phones (not tablets)
-      setIsMobilePhone(window.innerWidth <= 480)
+      setIsMobilePhone(width <= 480)
+      // Check for tablets
+      setIsTablet(width > 480 && width <= 1024)
+      setIsTabletPortrait(width > 480 && width <= 1024 && window.innerHeight > width)
+      setIsTabletLandscape(width > 768 && width <= 1024)
+      setIsLargeTablet(width >= 820 && width <= 1024)
       // Check for small phones like iPhone SE
       setIsSmallPhone(window.innerHeight <= 700)
     }
@@ -36,6 +46,27 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
+  
+  // Set scene ready when using OldsCoolTunnel for desktop
+  useEffect(() => {
+    if (!isMobilePhone) {
+      setTimeout(() => setSceneReady(true), 100)
+    }
+  }, [isMobilePhone])
+  
+  // Add ESC key handler to exit fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false)
+      }
+    }
+    
+    if (!isMobilePhone && isFullscreen) {
+      document.addEventListener('keydown', handleKeyDown)
+      return () => document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isFullscreen, isMobilePhone])
   
   // Cleanup on unmount
   useEffect(() => {
@@ -114,7 +145,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               pointerEvents: 'none',
             }}
           >
-            <source src="/videos/85.mp4" type="video/mp4" />
+            <source src="/videos/84.mp4" type="video/mp4" />
           </video>
         )}
       
@@ -123,7 +154,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
       {!isMobilePhone && <ExperienceControls isMobile={isMobile} />}
       
       {/* Desktop Intro Section - bottom-left overlay */}
-      {!isMobilePhone && (
+      {/* {!isMobilePhone && (
         <div style={{
           position: 'fixed',
           bottom: '8%',
@@ -171,10 +202,10 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             }}>here ↗</a>
           </p>
         </div>
-      )}
+      )} */}
       
-      {/* Mobile Portal View */}
-      {isMobilePhone && !isFullscreen ? (
+      {/* Mobile and Tablet Portrait Portal View */}
+      {(isMobilePhone || isTabletPortrait) && !isFullscreen ? (
         <div style={{
           position: 'relative',
           width: '100%',
@@ -184,7 +215,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           alignItems: 'center',
           justifyContent: 'center',
           background: is80sMode ? 'transparent' : 'radial-gradient(ellipse at center, #1a1a2e 0%, #000 100%)',
-          zIndex: 2
+          zIndex: 2,
         }}>
           {/* Heading */}
           {/* <h2 style={{
@@ -201,22 +232,24 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           }}>
             An Icon for the Ages
           </h2> */}
-                     <SkewedHeading
+          <div style={{ marginBottom: (isMobilePhone || isTabletPortrait) ? '1.5rem' : '0' }}>
+            <SkewedHeading
               lines={["A TIMELESS", "ICON FOR THE", "DIGITAL AGE"]}
-              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : "3.5rem"}
+              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : isLargeTablet ? "3rem" : isTabletPortrait ? "2.5rem" : "3.5rem"}
               color="#00ff9d"
               skewAngle={-2}
               shadowColor="#000"
             />
+          </div>
           
           {/* Sub-heading */}
           <p style={{
             fontFamily: "'Courier New', monospace",
-            fontSize: isSmallPhone ? '0.7rem' : isMobilePhone ? '0.9rem' : '1.2rem',
+            fontSize: isSmallPhone ? '0.7rem' : isMobilePhone ? '0.9rem' : isLargeTablet ? '1.2rem' : isTabletPortrait ? '1rem' : '1.2rem',
             color: '#ffd700',
             textAlign: 'center',
-            marginTop: isSmallPhone ? '0.3rem' : '0.5rem',
-            marginBottom: isSmallPhone ? '0.8rem' : '1rem',
+            marginTop: isSmallPhone ? '0.3rem' : isTabletPortrait ? '0.8rem' : '0.5rem',
+            marginBottom: isSmallPhone ? '0.8rem' : isTabletPortrait ? '2rem' : '1rem',
             letterSpacing: '0.05em',
             textTransform: 'uppercase',
             opacity: 0.9,
@@ -231,7 +264,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             style={{
               position: 'relative',
               width: '90%',
-              maxWidth: isSmallPhone ? '280px' : isMobilePhone ? '380px' : '450px',
+              maxWidth: isSmallPhone ? '280px' : isMobilePhone ? '380px' : isLargeTablet ? '550px' : isTabletPortrait ? '450px' : '450px',
               aspectRatio: '4/3',
               cursor: 'pointer',
               transition: 'all 0.3s ease',
@@ -268,21 +301,14 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               position: 'absolute',
               top: '7%',  // Fine-tuned to center in frame
               left: '13%',  // Fine-tuned to center in frame
-              width: '76%',  // Smaller to fit better
-              height: '78%',  // Smaller to fit better
+              width: '75%',  // Smaller to fit better
+              height: '75%',  // Smaller to fit better
               overflow: 'hidden',
               background: is80sMode ? 'rgba(0, 0, 0, 0.7)' : '#000',
-              // Apply 3D transform to match the frame's perspective
-              transform: `
-                perspective(800px)
-                rotateX(349deg)
-                rotateY(4deg)
-                rotateZ(356deg)
-                scale3d(1, 1, 1)
-              `,
-              transformStyle: 'preserve-3d',
               borderRadius: '2px',
-              boxShadow: 'inset 0 0 50px rgba(0, 0, 0, 0.8)'
+              boxShadow: 'inset 0 0 50px rgba(0, 0, 0, 0.8)',
+              transformStyle: 'preserve-3d',
+              perspective: '800px'
             }}>
               <div style={{
                 position: 'absolute',
@@ -290,7 +316,14 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                 left: '50%',
                 width: '300%',  // Wider to show more of the tunnel
                 height: '300%',  // Taller to show more of the tunnel
-                transform: 'translate(-50%, -50%) scale(0.3)',  // Center and scale down
+                // Combine all transforms in the correct order
+                transform: `
+                  translate(-50%, -50%)
+                  rotateX(349deg)
+                  rotateY(4deg)
+                  rotateZ(356deg)
+                  scale(0.3)
+                `,
                 transformOrigin: 'center center'
               }}>
                 <OldsCoolTunnel isFullscreen={false} />
@@ -348,7 +381,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
 }}>Tap to enter</span> • <a href="/philosophy" style={{ color: '#ffff00', textDecoration: 'underline' }}>Read whitepaper</a>
           </p>
         </div>
-      ) : isMobilePhone && isFullscreen ? (
+      ) : (isMobilePhone || isTabletPortrait) && isFullscreen ? (
         /* Fullscreen mobile view */
         <div style={{ 
           position: 'fixed', 
@@ -394,482 +427,280 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             ✕
           </button>
         </div>
+      ) : !isFullscreen && !isTabletPortrait ? (
+        /* Desktop and Tablet Landscape Portal View - 2-column layout */
+        <div style={{
+          position: 'relative',
+          width: '100%',
+          height: '100vh',
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: isTabletLandscape ? '2rem' : isTabletPortrait ? '1.5rem' : '5rem',
+          padding: isTabletLandscape ? '0 3%' : isTabletPortrait ? '0 2%' : '0 5%',
+          ...(is80sMode ? {
+            backgroundImage: 'url("/images/retro.webp")',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat'
+          } : {
+            background: 'radial-gradient(ellipse at center, #1a1a2e 0%, #000 100%)'
+          }),
+          zIndex: 2
+        }}>
+          {/* Left Column - Portal and Whitepaper Link */}
+          <div style={{
+            flex: isTabletPortrait ? '0 0 45%' : '1 1 50%',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'flex-end',
+            gap: isTablet ? '1rem' : '2rem',
+            top: '5%',
+            position: 'relative',
+            maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : '650px'
+          }}>
+            {/* Portal Preview Container with Frame Image */}
+            <div 
+              onClick={() => setIsFullscreen(true)}
+              style={{
+                position: 'relative',
+                width: '100%',
+                maxWidth: isTabletLandscape ? '400px' : isTabletPortrait ? '300px' : '600px',
+                aspectRatio: '4/3',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                transform: `perspective(1000px) rotateX(5deg) scale(${isTabletLandscape ? 0.9 : isTabletPortrait ? 0.85 : 1})`,
+                filter: 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.6))'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'perspective(1000px) rotateX(2deg) scale(1.05)'
+                e.currentTarget.style.filter = 'drop-shadow(0 0 80px rgba(255, 215, 0, 1)) brightness(1.2)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'perspective(1000px) rotateX(5deg) scale(1)'
+                e.currentTarget.style.filter = 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.6)) brightness(1)'
+              }}
+            >
+              {/* Portal frame image */}
+              <img 
+                src="/images/timePortal.webp"
+                alt="Time Portal"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  zIndex: 2,
+                  pointerEvents: 'none'
+                }}
+              />
+              
+              {/* OldsCoolTunnel animation inside the frame */}
+              <div style={{
+                position: 'absolute',
+                top: '9%',
+                left: '13%',
+                width: '75%',
+                height: '73%',
+                overflow: 'hidden',
+                background: is80sMode ? 'rgba(0, 0, 0, 0.7)' : '#000',
+                borderRadius: '2px',
+                boxShadow: 'inset 0 0 50px rgba(0, 0, 0, 0.8)',
+                transformStyle: 'preserve-3d',
+                perspective: '800px'
+              }}>
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  width: '300%',
+                  height: '300%',
+                  // Combine all transforms in the correct order
+                  transform: `
+                    translate(-50%, -50%)
+                    rotateX(2deg)
+                    rotateY(358deg)
+                    rotateZ(351deg)
+                    scale(0.3)
+                  `,
+                  transformOrigin: 'center center'
+                }}>
+                  <OldsCoolTunnel isFullscreen={false} />
+                </div>
+              </div>
+            </div>
+             <div style={{
+              transform: 'rotate(-11deg)',
+              display: 'inline-block',
+                  position: 'relative',
+                top: '-3rem',
+                // left: '-1rem'
+                alignContent: 'center'
+            }}>
+              <p style={{
+            
+                fontFamily: "'Courier New', monospace",
+                fontSize: '1rem',
+                color: '#01ff00',
+                animation: 'pulse 2s ease-in-out infinite',
+              }}>
+                Click the portal to enter
+              </p>
+            {/* </div> */}
+            {/* Link to whitepaper - Under the portal */}
+            <p style={{
+              fontFamily: "'Courier New', monospace",
+              fontSize: isTablet ? '0.85rem' : '1rem',
+              color: '#888',
+              textAlign: 'center',
+              width: '100%',
+              maxWidth: isTabletLandscape ? '400px' : isTabletPortrait ? '300px' : '600px'
+            }}>
+              📜 Read the <a href="/philosophy" style={{ 
+                color: '#ffff00', 
+                textDecoration: 'none',
+                borderBottom: '1px solid #ffff00',
+                transition: 'all 0.3s ease' 
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = '#fff'
+                e.currentTarget.style.borderBottomColor = '#fff'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = '#ffff00'
+                e.currentTarget.style.borderBottomColor = '#ffff00'
+              }}
+              >Techno-Mythic Whitepaper</a>
+            </p>
+          </div>
+          </div>
+          
+          {/* Right Column - Text Content */}
+          <div style={{
+            flex: isTabletPortrait ? '1 1 50%' : '1 1 50%',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : '550px',
+            paddingLeft: isTabletLandscape ? '1rem' : '2rem',
+            paddingTop: '0',
+  
+          }}>
+            {/* Heading for desktop */}
+            <SkewedHeading
+              lines={["A TIMELESS", "ICON FOR THE", "DIGITAL AGE"]}
+              fontSize={isTabletLandscape ? "2.5rem" : isTabletPortrait ? "3rem" : "3.5rem"}
+              color="#00ff9d"
+              skewAngle={-2}
+              shadowColor="#000"
+            />
+            
+            {/* Sub-heading */}
+            <p style={{
+              fontFamily: "'Courier New', monospace",
+              fontSize: isTabletLandscape ? '1rem' : isTabletPortrait ? '0.9rem' : '1.2rem',
+              color: '#ffd700',
+              textAlign: 'center',
+              // marginTop: isTablet ? '1rem' : '1.5rem',
+              // marginBottom: isTablet ? '1.5rem' : '2rem',
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+              opacity: 0.9,
+              textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
+            }}>
+              Journey Through Her Illustrious History
+            </p>
+            
+            {/* Description text */}
+            <p style={{
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              fontSize: isTabletLandscape ? '0.95rem' : isTabletPortrait ? '0.9rem' : '1.1rem',
+              color: 'rgba(255, 255, 255, 0.85)',
+              lineHeight: '1.6',
+              marginBottom: isTablet ? '1.5rem' : '2rem',
+              maxWidth: '450px',
+              textAlign: 'center'
+            }}>
+              Explore the visual canon of Our Lady of Perpetual Profit, 
+              from antiquity to the future. Witness her eternal presence 
+              across millennia of human achievement.
+            </p>
+            
+            {/* Click instruction */}
+            
+            {/* Buy Button for Desktop */}
+            {buyButton}
+          </div>
+        </div>
       ) : (
-        /* Desktop view - Original Canvas */
-      <Canvas 
-        style={{ position: 'relative', zIndex: 2 }}
-        camera={{ position: [0, 0, 100], fov: 15 }}
-        gl={{
-          antialias: true,
-          alpha: true,
-          preserveDrawingBuffer: false, // Don't preserve buffer for better memory
-          powerPreference: "high-performance",
-          failIfMajorPerformanceCaveat: false,
-          stencil: false, // Disable stencil buffer if not needed
-        }}
-        onCreated={({ gl }) => {
-          gl.toneMapping = THREE.ACESFilmicToneMapping
-          gl.toneMappingExposure = 1
-          // Mark scene as ready after canvas is created
-          setTimeout(() => setSceneReady(true), 100)
-        }}
-      >
-        <fog attach="fog" args={['#a79', 8.5, 12]} />
-        <Suspense fallback={null}>
-          {disableScrollControls ? (
-            <>
-              <AutoRotatingRig rotation={[0, 0, isMobile ? 0.03 : 0.15]}>
-                <Carousel setHoveredCaption={setHoveredCaption} />
-              </AutoRotatingRig>
-              {!isMobile && <Banner position={[0, -0.15, 0]} is80sMode={is80sMode} disableScrollControls={true} />}
-            </>
-          ) : (
-            <ScrollControls pages={4} infinite>
-              <Rig rotation={[0, 0, isMobile ? 0.03 : 0.15]}>
-                <Carousel setHoveredCaption={setHoveredCaption} />
-              </Rig>
-              {!isMobile && <Banner position={[0, -0.15, 0]} is80sMode={is80sMode} disableScrollControls={false} />}
-            </ScrollControls>
-          )}
-          {!is80sMode && <Environment preset="dawn" background blur={0.5} />}
-        </Suspense>
-      </Canvas>
+        /* Desktop Fullscreen view */
+        <div style={{ 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          width: '100vw', 
+          height: '100vh', 
+          zIndex: 9999,
+          background: is80sMode ? 'transparent' : '#000'
+        }}>
+          <OldsCoolTunnel isFullscreen={true} />
+          
+          {/* Exit fullscreen button - styled for desktop */}
+          <button
+            onClick={() => setIsFullscreen(false)}
+            style={{
+              position: 'absolute',
+              top: '30px',
+              right: '30px',
+              width: '60px',
+              height: '60px',
+              borderRadius: '50%',
+              background: 'rgba(0, 0, 0, 0.8)',
+              border: '2px solid #00ffff',
+              color: '#00ffff',
+              fontSize: '28px',
+              cursor: 'pointer',
+              zIndex: 10000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 255, 255, 0.2)'
+              e.currentTarget.style.transform = 'scale(1.1) rotate(90deg)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.8)'
+              e.currentTarget.style.transform = 'scale(1) rotate(0deg)'
+            }}
+          >
+            ✕
+          </button>
+          
+          {/* Optional: Add "Press ESC to exit" hint */}
+          {/* <div style={{
+            position: 'absolute',
+            bottom: '30px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            color: '#00ffff',
+            fontSize: '14px',
+            fontFamily: "'Courier New', monospace",
+            opacity: 0.7,
+            textShadow: '0 0 10px rgba(0, 255, 255, 0.5)'
+          }}>
+            Press ESC to exit fullscreen
+          </div> */}
+        </div>
       )}
       
       </div>
     </>
-  )
-}
-
-function Rig(props) {
-  const ref = useRef()
-  const scroll = useScroll()
-  const frameCount = useRef(0)
-  
-  useFrame((state, delta) => {
-    if (!ref.current) return
-    
-    frameCount.current++
-    
-    ref.current.rotation.y = -scroll.offset * (Math.PI * 2)
-    
-    // Throttle camera updates to every 2 frames
-    if (frameCount.current % 2 === 0) {
-      state.events.update()
-      easing.damp3(state.camera.position, [-state.pointer.x * 2, state.pointer.y + 1.5, 10], 0.3, delta * 2)
-      state.camera.lookAt(0, 0, 0)
-    }
-  })
-  
-  return <group ref={ref} {...props} />
-}
-
-function AutoRotatingRig(props) {
-  const ref = useRef()
-  const frameCount = useRef(0)
-  
-  useFrame((state, delta) => {
-    if (!ref.current) return
-    
-    frameCount.current++
-    
-    // Auto-rotate the carousel
-    ref.current.rotation.y += delta * 0.1
-    
-    // Throttle camera updates to every 2 frames
-    if (frameCount.current % 2 === 0) {
-      state.events.update()
-      easing.damp3(state.camera.position, [-state.pointer.x * 2, state.pointer.y + 1.5, 10], 0.3, delta * 2)
-      state.camera.lookAt(0, 0, 0)
-    }
-  })
-  
-  return <group ref={ref} {...props} />
-}
-
-function Carousel({ radius = 1.4, count = 8, setHoveredCaption }) {
-  const { t } = useLanguage()
-  
-  // Memoize captions to prevent recreation
-  const captions = useMemo(() => {
-    // Try to get captions from translations, fallback to hardcoded if not available
-    const translatedCaptions = []
-    for (let i = 0; i < 8; i++) {
-      const caption = t(`carousel.captions.${i}`)
-      if (caption && typeof caption === 'object') {
-        translatedCaptions.push(caption)
-      }
-    }
-    
-    // If we got all 8 captions from translations, use them
-    if (translatedCaptions.length === 8) {
-      return translatedCaptions
-    }
-    
-    // Otherwise fallback to hardcoded captions
-    return [
-      {
-        year: "2200 BCE",
-        location: "High Pass of the Fertile Crescent",
-        description: "Driving back a bear market"
-      },
-      {
-        year: "1981 CE",
-        location: "Los Angeles",
-        description: "The Guardian of Good Times"
-      },
-      {
-        year: "circa 1350–1450 CE",
-        location: "Eastern Mediterranean",
-        description: "Early clown encounter turns ugly"
-      },
-      {
-        year: "2019 CE",
-        location: "Tokyo",
-        description: "Featured in popular manga series'"
-      },
-      {
-        year: "2031 CE",
-        location: "Neo-Miami",
-        description: "Laying down DeFi Beats"
-      },
-      {
-        year: "2077 CE",
-        location: "Night City",
-        description: "Autonomous artisans provide laser-inscripted devotions"
-      },
-      {
-        year: "87 CE",
-        location: "Peloponnesian Peninsula",
-        description: "Offering guidance for the attention economy"
-      },
-      {
-        year: "4th century CE",
-        location: "Transtiberim, Rome",
-        description: "Pre-meme era patronage of the arts"
-      }
-    ]
-  }, [t])
-  
-  return (
-    <>
-      {Array.from({ length: count }, (_, i) => (
-        <Card
-          key={i}
-          url={`/carousel_images/img${(i % 9) + 1}.${i === 8 ? 'jpeg' : 'jpg'}`}
-          position={[Math.sin((i / count) * Math.PI * 2) * radius, 0, Math.cos((i / count) * Math.PI * 2) * radius]}
-          rotation={[0, (i / count) * Math.PI * 2, 0]}
-          caption={captions[i]}
-          setHoveredCaption={setHoveredCaption}
-        />
-      ))}
-    </>
-  )
-}
-
-function Card({ url, caption, setHoveredCaption, ...props }) {
-  const groupRef = useRef()
-  const imageRef = useRef()
-  const [hovered, hover] = useState(false)
-  const frameCount = useRef(0)
-  
-  const pointerOver = useCallback((e) => {
-    e.stopPropagation()
-    hover(true)
-    if (setHoveredCaption && caption) {
-      setHoveredCaption(caption)
-    }
-  }, [setHoveredCaption, caption])
-  
-  const pointerOut = useCallback(() => {
-    hover(false)
-    if (setHoveredCaption) {
-      setHoveredCaption(null)
-    }
-  }, [setHoveredCaption])
-  
-  useFrame((_, delta) => {
-    if (!groupRef.current) return
-    
-    frameCount.current++
-    
-    // Throttle animations to every 2 frames for better performance
-    if (frameCount.current % 2 === 0) {
-      easing.damp3(groupRef.current.scale, hovered ? 1.15 : 1, 0.1, delta * 2)
-      
-      if (imageRef.current?.material) {
-        easing.damp(imageRef.current.material, 'radius', hovered ? 0 : 0, 0.2, delta * 2)
-        easing.damp(imageRef.current.material, 'zoom', hovered ? 1 : 1.5, 0.2, delta * 2)
-      }
-    }
-  })
-  
-  return (
-    <group ref={groupRef} {...props}>
-      {/* White polaroid frame background */}
-      <mesh position={[0, -0.08, -0.001]}>
-        <planeGeometry args={[1.05, 1.3]} />
-        <meshBasicMaterial color="#ffffff" side={THREE.DoubleSide} toneMapped={false} fog={false} />
-      </mesh>
-      
-      {/* The actual image - front side only */}
-      <Image 
-        ref={imageRef} 
-        url={url} 
-        transparent 
-        side={THREE.FrontSide} 
-        onPointerOver={pointerOver} 
-        onPointerOut={pointerOut} 
-        position={[0, 0.05, 0.001]}
-      >
-        <planeGeometry args={[0.85, 0.85]} />
-      </Image>
-      
-      {/* Black back of the entire polaroid */}
-      <mesh position={[0, -0.08, -0.002]}>
-        <planeGeometry args={[1.05, 1.3]} />
-        <meshBasicMaterial color="#000000" side={THREE.BackSide} toneMapped={false} fog={false} />
-      </mesh>
-      
-      {/* Caption text on the bottom border */}
-      {caption && (
-        <>
-          <Text
-            position={[0, -0.45, 0.001]}
-            fontSize={0.06}
-            color="black"
-            anchorX="center"
-            anchorY="middle"
-            maxWidth={1.2}
-            lineHeight={1.2}
-            font="/fonts/HomemadeApple-Regular.ttf"
-          >
-            {caption.year}
-          </Text>
-          <Text
-            position={[0, -0.52, 0.001]}
-            fontSize={0.04}
-            color="#444444"
-            anchorX="center"
-            anchorY="middle"
-            maxWidth={1.2}
-            lineHeight={1.4}
-            font="/fonts/HomemadeApple-Regular.ttf"
-          >
-            {caption.location}
-          </Text>
-          <Text
-            position={[0, -0.61, 0.001]}
-            fontSize={0.04}
-            color="#666666"
-            anchorX="center"
-            anchorY="middle"
-            maxWidth={1}
-            lineHeight={1.4}
-            font="/fonts/HomemadeApple-Regular.ttf"
-            textAlign="center"
-          >
-            {caption.description}
-          </Text>
-        </>
-      )}
-      
-      {/* Shadow effect */}
-      <mesh position={[0.02, -0.1, -0.002]}>
-        <planeGeometry args={[1.08, 1.33]} />
-        <meshBasicMaterial color="#000000" opacity={0.15} transparent side={THREE.DoubleSide} />
-      </mesh>
-    </group>
-  )
-}
-
-// Video Card component - use this if you want video support
-function VideoCard({ videoUrl, ...props }) {
-  const ref = useRef()
-  const [hovered, hover] = useState(false)
-  const [videoReady, setVideoReady] = useState(false)
-  
-  const [video] = useState(() => {
-    const vid = document.createElement('video')
-    vid.crossOrigin = 'anonymous'
-    vid.loop = true
-    vid.muted = true
-    vid.playsInline = true
-    vid.autoplay = true
-    vid.setAttribute('muted', '')
-    vid.setAttribute('playsinline', '')
-    return vid
-  })
-  
-  const texture = useMemo(() => {
-    if (!videoReady) return null
-    const videoTexture = new THREE.VideoTexture(video)
-    videoTexture.minFilter = THREE.LinearFilter
-    videoTexture.magFilter = THREE.LinearFilter
-    videoTexture.format = THREE.RGBAFormat
-    return videoTexture
-  }, [video, videoReady])
-  
-  useEffect(() => {
-    const handleLoadedData = () => {
-      setVideoReady(true)
-      video.play().catch(e => {
-        console.log('Video autoplay failed, trying muted play:', e)
-        video.muted = true
-        video.play().catch(err => console.error('Video play still failed:', err))
-      })
-    }
-    
-    const handleError = () => {
-      console.log('Video not available, using fallback image')
-      setVideoReady(false)
-    }
-    
-    video.addEventListener('loadeddata', handleLoadedData)
-    video.addEventListener('error', handleError)
-    
-    video.src = videoUrl
-    video.load()
-    
-    return () => {
-      video.removeEventListener('loadeddata', handleLoadedData)
-      video.removeEventListener('error', handleError)
-      video.pause()
-      video.src = ''
-      video.load() // Reset video element
-      if (texture) texture.dispose()
-    }
-  }, [video, videoUrl, texture])
-  
-  useFrame((_, delta) => {
-    if (!ref.current) return
-    easing.damp3(ref.current.scale, hovered ? 1.15 : 1, 0.1, delta)
-  })
-  
-  // Fallback to image while video loads or if it fails
-  if (!texture) {
-    return (
-      <Card url="/carousel_images/img1.jpg" {...props} />
-    )
-  }
-  
-  return (
-    <mesh 
-      ref={ref} 
-      onPointerOver={(e) => {
-        e.stopPropagation()
-        hover(true)
-        video.play()
-      }}
-      onPointerOut={() => {
-        hover(false)
-      }}
-      {...props}
-    >
-      <planeGeometry args={[0.85, 1]} />
-      <meshBasicMaterial map={texture} side={THREE.DoubleSide} toneMapped={false} />
-    </mesh>
-  )
-}
-
-
-function Banner(props) {
-  const { is80sMode, disableScrollControls } = props
-  const ref = useRef()
-  const scroll = disableScrollControls ? null : useScroll()
-  
-  // Create text texture using canvas
-  const texture = useMemo(() => {
-    const canvas = document.createElement('canvas')
-    const context = canvas.getContext('2d')
-    
-    // Configuration for exact phrase repetitions
-    const DESIRED_PHRASE_COUNT = 5  // Exactly 5 complete phrases around cylinder
-    const CYLINDER_RADIUS = 1.6
-    const CYLINDER_CIRCUMFERENCE = 2 * Math.PI * CYLINDER_RADIUS  // ≈ 10.05
-    
-    // Set up canvas styling first
-    const fontSize = 84
-    context.font = `bold ${fontSize}px UnifrakturCook, serif`
-    
-    // Single instance of text for texture
-    const text = 'Our Lady of Perpetual Profit • Domina Nostra Lucri Perpetui • ';
-    
-    // Measure text to determine canvas dimensions
-    const metrics = context.measureText(text)
-    const textWidth = metrics.width
-    
-    // Calculate canvas width to fit exact number of phrases
-    // We want the texture to contain exactly enough text for the desired repetitions
-    const texturePhraseCount = Math.ceil(DESIRED_PHRASE_COUNT)
-    canvas.width = Math.ceil(textWidth * texturePhraseCount)
-    canvas.height = 128
-    
-    // Style the canvas - neon blue in 80s mode, white normally
-    context.fillStyle = is80sMode ? '#00ffff' : '#ffffff'
-    context.fillRect(0, 0, canvas.width, canvas.height)
-    
-    // Re-set font after canvas resize (canvas resize resets context state)
-    context.font = `bold ${fontSize}px UnifrakturCook, serif`
-    context.fillStyle = is80sMode ? '#000000' : '#000000'
-    context.textAlign = 'left'
-    context.textBaseline = 'middle'
-    
-    // Draw exactly the right number of phrases
-    for (let i = 0; i < texturePhraseCount; i++) {
-      context.fillText(text, i * textWidth, canvas.height / 2)
-    }
-    
-    // Create texture from canvas
-    const canvasTexture = new THREE.CanvasTexture(canvas)
-    canvasTexture.wrapS = THREE.RepeatWrapping
-    canvasTexture.wrapT = THREE.ClampToEdgeWrapping
-    
-    // Set texture repeat to exactly 1 to use the full texture once around the cylinder
-    // This ensures exactly DESIRED_PHRASE_COUNT phrases appear
-    canvasTexture.repeat.set(1, 1)
-    canvasTexture.needsUpdate = true
-    
-    return canvasTexture
-  }, [is80sMode])
-  
-  // Cleanup texture on unmount
-  useEffect(() => {
-    return () => {
-      if (texture) {
-        texture.dispose()
-      }
-    }
-  }, [texture])
-  
-  // Add frame counter for throttling
-  const frameCount = useRef(0)
-  
-  useFrame((_, delta) => {
-    frameCount.current++
-    
-    // Update texture offset every frame for smooth scrolling
-    if (texture) {
-      texture.offset.x += delta / 24
-    }
-    
-    // Throttle material time updates
-    if (frameCount.current % 3 === 0 && ref.current?.material?.time) {
-      // Use a default animation speed when scroll is not available
-      const scrollDelta = scroll ? Math.abs(scroll.delta) : 0.01
-      ref.current.material.time.value += scrollDelta * 4 * 3 // Multiply by 3 to compensate for throttling
-    }
-  })
-  
-  return (
-    <mesh ref={ref} {...props}>
-      <cylinderGeometry args={[1.6, 1.6, 0.14, 128, 16, true]} />
-      <meshSineMaterial 
-        map={texture} 
-        side={THREE.DoubleSide} 
-        transparent={true}
-        toneMapped={false}
-      />
-    </mesh>
   )
 }

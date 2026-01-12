@@ -289,20 +289,45 @@ export default function CarouselPage() {
       `}} />
       
       {/* Main carousel */}
-      <CarouselComponent disableScrollControls={false} />
+      <CarouselComponent 
+        disableScrollControls={false}
+        buyButton={!isMobileDevice && deviceDetected ? (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            width: '100%',
+ 
+            // marginTop: '2rem'
+          }}>
+            <div className="cyber-candle-btn" style={{ 
+              opacity: mounted ? 1 : 0, 
+              transition: 'opacity 0.3s',
+              display: 'inline-block',
+        
+            }}>
+              <CyberGlitchButton
+                key={`button-desktop`}
+                text={t('buttons.buy') || 'Buy'}
+                text2="RL80"
+                onClick={() => setShowBuyModal(true)}
+                label="RL80"
+                mobile={false}
+              />
+            </div>
+          </div>
+        ) : null}
+      />
       
-      {/* Buy RL80 Button */}
-      {deviceDetected && (
+      {/* Buy RL80 Button - Only show absolutely positioned version on Mobile */}
+      {deviceDetected && isMobileDevice && (
         <div style={{
           position: "absolute",
-          top: isMobileDevice ? "85%" : "6rem",
-          right: isMobileDevice ? "67%" : "1.5rem",
-          zIndex: 298,
+          top: "85%",
+          right: "67%",
           marginTop: '0rem',
+          zIndex: 298,
           overflow: 'visible',
-
         }}>
-
           <div className="cyber-candle-btn" style={{ 
             opacity: mounted ? 1 : 0, 
             transition: 'opacity 0.3s',

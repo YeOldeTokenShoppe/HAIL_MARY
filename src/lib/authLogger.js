@@ -18,7 +18,6 @@ export async function logAuthEvent(eventType, userData) {
     // Add to auth_events collection
     const docRef = await addDoc(collection(db, 'auth_events'), authEvent);
     
-    console.log(`Auth event logged: ${eventType}`, docRef.id);
     return docRef.id;
   } catch (error) {
     console.error('Error logging auth event:', error);
