@@ -2,6 +2,7 @@
 
 // import * as THREE from 'three' // Not needed when using OldsCoolTunnel
 import { useRef, useState, Suspense, useMemo, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 // import { Canvas, useFrame, useThree } from '@react-three/fiber' // Not needed when using OldsCoolTunnel
 // import { Image, Environment, ScrollControls, useScroll, useTexture, Text } from '@react-three/drei' // Not needed when using OldsCoolTunnel
 // import { easing } from 'maath' // Not needed when using OldsCoolTunnel
@@ -15,6 +16,7 @@ import MobilePolaroidGallerySimple from './MobilePolaroidGallerySimple'
 import OldsCoolTunnel from '../OldsCoolTunnel'
 
 export default function CarouselComponent({ onReady, disableScrollControls = false, buyButton }) {
+  const router = useRouter()
   const [hoveredCaption, setHoveredCaption] = useState(null)
   const [sceneReady, setSceneReady] = useState(false)
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
@@ -23,6 +25,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
   const [isTablet, setIsTablet] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 480 && window.innerWidth <= 1024 : false)
   const [isTabletPortrait, setIsTabletPortrait] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 480 && window.innerWidth <= 1024 && window.innerHeight > window.innerWidth : false)
   const [isTabletLandscape, setIsTabletLandscape] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 768 && window.innerWidth <= 1024 : false)
+  const [isPortraitOrientation, setIsPortraitOrientation] = useState(() => typeof window !== 'undefined' ? window.innerHeight > window.innerWidth : false)
   const [isLargeTablet, setIsLargeTablet] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 820 && window.innerWidth <= 1024 : false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const { is80sMode } = useMusic()
@@ -39,6 +42,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
       setIsTabletPortrait(width > 480 && width <= 1024 && window.innerHeight > width)
       setIsTabletLandscape(width > 768 && width <= 1024)
       setIsLargeTablet(width >= 820 && width <= 1024)
+      setIsPortraitOrientation(window.innerHeight > width)
       // Check for small phones like iPhone SE
       setIsSmallPhone(window.innerHeight <= 700)
     }
@@ -204,8 +208,8 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
         </div>
       )} */}
       
-      {/* Mobile and Tablet Portrait Portal View */}
-      {(isMobilePhone || isTabletPortrait) && !isFullscreen ? (
+      {/* Mobile and Portrait Portal View */}
+      {(isMobilePhone || isPortraitOrientation) && !isFullscreen ? (
         <div style={{
           position: 'relative',
           width: '100%',
@@ -217,6 +221,56 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           background: is80sMode ? 'transparent' : 'radial-gradient(ellipse at center, #1a1a2e 0%, #000 100%)',
           zIndex: 2,
         }}>
+          {/* Our Lady of Perpetual Profit Logo - Top Left (Portrait view) */}
+          {!isMobilePhone && (
+            <h1 className='custom-title'
+              id="main-title-portrait"
+              style={{ 
+                position: 'absolute',
+                top: '2rem',
+                left: '1.5rem',
+                pointerEvents: 'auto',
+                color: is80sMode ? "#ffffff" : "#d4af37",
+                fontFamily: 'UnifrakturCook, serif',
+                textShadow: is80sMode 
+                  ? `
+                    0 0 20px rgba(201, 55, 255, 0.9),
+                    0 0 40px rgba(201, 55, 255, 0.8),
+                    0 0 60px rgba(201, 55, 255, 0.7),
+                    4px 4px 12px rgba(201, 55, 255, 1),
+                    -2px -2px 8px rgba(255, 0, 255, 0.8),
+                    0 0 100px rgba(201, 55, 255, 0.5)
+                  `
+                  : `
+                    rgba(83, 61, 74, 0.9) 1px 1px,
+                    rgba(83, 61, 74, 0.9) 2px 2px,
+                    rgba(83, 61, 74, 0.8) 3px 3px,
+                    rgba(83, 61, 74, 0.8) 4px 4px,
+                    rgba(83, 61, 74, 0.7) 5px 5px,
+                    rgba(83, 61, 74, 0.7) 6px 6px,
+                    rgba(83, 61, 74, 0.6) 7px 7px,
+                    rgba(83, 61, 74, 0.6) 8px 8px,
+                    rgba(255, 192, 203, 0.4) -1px -1px 5px,
+                    rgba(0, 0, 0, 0.8) 10px 10px 15px
+                  `,
+                fontSize: isTabletPortrait ? "2rem" : "2.5rem",
+                fontWeight: 900,
+                lineHeight: 0.8,
+                transform: "rotate(-8deg) skew(-15deg)",
+                cursor: 'pointer',
+                margin: 0,
+                marginBottom: '20px',
+                zIndex: 10
+              }}
+            >
+              <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
+              <span className="title-line" style={{ display: 'block', position: 'relative' }}>
+                <span style={{ fontSize: isTabletPortrait ? "1.3rem" : "1.6rem" }}>of    </span>
+                Perpetual
+              </span>
+              <span className="title-line" style={{ display: 'block', marginLeft: isTabletPortrait ? "3rem" : "3.5rem", position: 'relative' }}>Profit</span>
+            </h1>
+          )}
           {/* Heading */}
           {/* <h2 style={{
             fontFamily: "'UnifrakturMaguntia', serif",
@@ -319,9 +373,9 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                 // Combine all transforms in the correct order
                 transform: `
                   translate(-50%, -50%)
-                  rotateX(349deg)
-                  rotateY(4deg)
-                  rotateZ(356deg)
+                  rotateX(-5deg)
+                  rotateY(2deg)
+                  rotateZ(-2deg)
                   scale(0.3)
                 `,
                 transformOrigin: 'center center'
@@ -380,8 +434,183 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             animation: 'pulse 2s ease-in-out infinite',
 }}>Tap to enter</span> • <a href="/philosophy" style={{ color: '#ffff00', textDecoration: 'underline' }}>Read whitepaper</a>
           </p>
+          
+          {/* Navigation Group for Mobile */}
+          <div 
+            className="navigation-group-mobile"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0',
+              transform: 'scale(0.95)',
+              transformOrigin: 'center',
+              marginTop: '1rem',
+              justifyContent: 'center',
+              position: 'relative',
+              right: '-20%',
+              bottom: '-5%'
+            }}
+          >
+            {/* Arrow with text */}
+            <svg
+              style={{
+                width: '200px',
+                height: '80px',
+                marginRight: '-25%',
+                pointerEvents: 'auto',
+                cursor: 'pointer',
+              }}
+              viewBox="0 0 300 150"
+              onClick={() => router.push('/illumin80')}
+            >
+              {/* Define gradients and filters */}
+              <defs>
+                <linearGradient id="arrowGradientMobile" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
+                  <stop offset="50%" stopColor="#ffcc00" stopOpacity="0.8" />
+                  <stop offset="100%" stopColor="#ff9500" stopOpacity="1" />
+                </linearGradient>
+                <filter id="glowMobile">
+                  <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+                  <feMerge>
+                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+                <filter id="candleGlowMobile">
+                  <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                  <feFlood floodColor="#ff9500" floodOpacity="0.4"/>
+                  <feComposite in2="coloredBlur" operator="in"/>
+                  <feMerge>
+                    <feMergeNode/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+              </defs>
+              
+              {/* Curved arrow path */}
+              <path
+                id="arrowPathMobile"
+                d="M 20 100 Q 100 40, 200 60"
+                stroke="url(#arrowGradientMobile)"
+                strokeWidth="2.5"
+                fill="none"
+                filter="url(#glowMobile)"
+                strokeLinecap="round"
+                opacity="0.9"
+              >
+                <animate
+                  attributeName="stroke-opacity"
+                  values="0.6;1;0.6"
+                  dur="2.5s"
+                  repeatCount="indefinite"
+                />
+              </path>
+              
+              {/* Invisible path for text */}
+              <path
+                id="textPathMobile"
+                d="M 20 85 Q 100 25, 200 45"
+                fill="none"
+                stroke="none"
+              />
+              
+              {/* Arrow head */}
+              <path
+                className="arrow-head-mobile"
+                d="M 195 55 L 205 60 L 195 65"
+                stroke="url(#arrowGradientMobile)"
+                strokeWidth="2.5"
+                fill="none"
+                filter="url(#glowMobile)"
+                strokeLinecap="round"
+              >
+                <animate
+                  attributeName="stroke-opacity"
+                  values="0.6;1;0.6"
+                  dur="2.5s"
+                  repeatCount="indefinite"
+                />
+              </path>
+              
+              {/* Text along path */}
+              <text
+                fill="#ffcc00"
+                fontSize="24"
+                fontFamily="'UnifrakturMaguntia', cursive"
+                filter="url(#candleGlowMobile)"
+                style={{ 
+                  transition: "all 0.3s ease",
+                  textShadow: "2px 2px 8px rgba(0, 0, 0, 0.9), 4px 4px 12px rgba(0, 0, 0, 0.7)",
+                }}
+              >
+                <textPath href="#textPathMobile" startOffset="0">
+                  The Illumin80
+                </textPath>
+                <animate
+                  attributeName="fill-opacity"
+                  values="0.7;1;0.7"
+                  dur="3s"
+                  repeatCount="indefinite"
+                />
+              </text>
+              
+              {/* Floating particles */}
+              {[...Array(3)].map((_, i) => (
+                <circle
+                  key={i}
+                  r="1.5"
+                  fill="#ffcc00"
+                  filter="url(#glowMobile)"
+                >
+                  <animateMotion
+                    dur={`${4 + i}s`}
+                    repeatCount="indefinite"
+                    path="M 20 100 Q 100 40, 200 60"
+                  />
+                  <animate
+                    attributeName="opacity"
+                    values="0;1;0"
+                    dur={`${4 + i}s`}
+                    repeatCount="indefinite"
+                  />
+                  <animate
+                    attributeName="r"
+                    values="0.5;2;0.5"
+                    dur={`${4 + i}s`}
+                    repeatCount="indefinite"
+                  />
+                </circle>
+              ))}
+            </svg>
+            
+            {/* Skull Button */}
+            <div 
+              style={{
+                width: "50px",
+                height: "50px",
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                transition: "transform 0.3s ease",
+              }}
+              onClick={() => router.push('/illumin80')}
+            >
+              <img 
+                src="/images/SKULL_TATTOO.webp"
+                alt="Navigate to Illumin80"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "contain",
+                }}
+              />
+            </div>
+          </div>
         </div>
-      ) : (isMobilePhone || isTabletPortrait) && isFullscreen ? (
+      ) : (isMobilePhone || isPortraitOrientation) && isFullscreen ? (
         /* Fullscreen mobile view */
         <div style={{ 
           position: 'fixed', 
@@ -427,11 +656,11 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             ✕
           </button>
         </div>
-      ) : !isFullscreen && !isTabletPortrait ? (
+      ) : !isFullscreen && !isPortraitOrientation ? (
         /* Desktop and Tablet Landscape Portal View - 2-column layout */
         <div style={{
           position: 'relative',
-          width: '100%',
+          // width: '100%',
           height: '100vh',
           display: 'flex',
           flexDirection: 'row',
@@ -449,6 +678,55 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           }),
           zIndex: 2
         }}>
+          {/* Our Lady of Perpetual Profit Logo - Top Left */}
+          <h1 className='custom-title'
+            id="main-title"
+            style={{ 
+              position: 'absolute',
+              top: '3rem',
+              left: '2rem',
+              pointerEvents: 'auto',
+              color: is80sMode ? "#ffffff" : "#d4af37",
+              fontFamily: 'UnifrakturCook, serif',
+              textShadow: is80sMode 
+                ? `
+                  0 0 20px rgba(201, 55, 255, 0.9),
+                  0 0 40px rgba(201, 55, 255, 0.8),
+                  0 0 60px rgba(201, 55, 255, 0.7),
+                  4px 4px 12px rgba(201, 55, 255, 1),
+                  -2px -2px 8px rgba(255, 0, 255, 0.8),
+                  0 0 100px rgba(201, 55, 255, 0.5)
+                `
+                : `
+                  rgba(83, 61, 74, 0.9) 1px 1px,
+                  rgba(83, 61, 74, 0.9) 2px 2px,
+                  rgba(83, 61, 74, 0.8) 3px 3px,
+                  rgba(83, 61, 74, 0.8) 4px 4px,
+                  rgba(83, 61, 74, 0.7) 5px 5px,
+                  rgba(83, 61, 74, 0.7) 6px 6px,
+                  rgba(83, 61, 74, 0.6) 7px 7px,
+                  rgba(83, 61, 74, 0.6) 8px 8px,
+                  rgba(255, 192, 203, 0.4) -1px -1px 5px,
+                  rgba(0, 0, 0, 0.8) 10px 10px 15px
+                `,
+              fontSize: isTabletLandscape ? "2.5rem" : isTabletPortrait ? "2.2rem" : "3rem",
+              fontWeight: 900,
+              lineHeight: 0.8,
+              transform: "rotate(-8deg) skew(-15deg)",
+              cursor: 'pointer',
+              margin: 0,
+              marginBottom: '20px',
+              zIndex: 10
+            }}
+          >
+            <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
+            <span className="title-line" style={{ display: 'block', position: 'relative' }}>
+              <span style={{ fontSize: isTabletLandscape ? "1.6rem" : isTabletPortrait ? "1.4rem" : "2rem" }}>of    </span>
+              Perpetual
+            </span>
+            <span className="title-line" style={{ display: 'block', marginLeft: "4rem", position: 'relative' }}>Profit</span>
+          </h1>
+
           {/* Left Column - Portal and Whitepaper Link */}
           <div style={{
             flex: isTabletPortrait ? '0 0 45%' : '1 1 50%',
@@ -523,8 +801,8 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                   transform: `
                     translate(-50%, -50%)
                     rotateX(2deg)
-                    rotateY(358deg)
-                    rotateZ(351deg)
+                    rotateY(7deg)
+                    rotateZ(353deg)
                     scale(0.3)
                   `,
                   transformOrigin: 'center center'
@@ -588,7 +866,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             alignItems: 'center',
             maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : '550px',
             paddingLeft: isTabletLandscape ? '1rem' : '2rem',
-            paddingTop: '0',
+            paddingTop: '10%',
   
           }}>
             {/* Heading for desktop */}
@@ -626,15 +904,235 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               maxWidth: '450px',
               textAlign: 'center'
             }}>
-              Explore the visual canon of Our Lady of Perpetual Profit, 
-              from antiquity to the future. Witness her eternal presence 
-              across millennia of human achievement.
+              Take a roller coaster ride through time and see a collection of Our Lady of Perpetual Profit's most iconic moments,
+              from antiquity to the future. 
             </p>
             
             {/* Click instruction */}
             
             {/* Buy Button for Desktop */}
             {buyButton}
+            
+            {/* Navigation Group - In content flow below buy button */}
+            {!isMobilePhone && (
+              <div 
+                className="navigation-group"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0',
+                  transform: 'scale(1.2)',
+                  transformOrigin: 'center',
+                  marginTop: '15%',
+                  justifyContent: 'center',
+                  position: 'relative',
+                  right: '-20%'
+                }}
+              >
+                {/* Arrow with text */}
+                <svg
+                  style={{
+                    width: '260px',
+                    height: '110px',
+                    marginRight: '-25%',
+                    pointerEvents: 'auto',
+                    cursor: 'pointer',
+                  }}
+                  viewBox="0 0 300 150"
+                  onClick={() => router.push('/illumin80')}
+                  onMouseEnter={(e) => {
+                    const text = e.currentTarget.querySelector('text');
+                    const arrow = e.currentTarget.querySelector('#arrowPath');
+                    const arrowHead = e.currentTarget.querySelector('.arrow-head');
+                    if (text) {
+                      text.style.fontSize = '32';
+                      text.style.fill = '#ffffff';
+                      text.style.filter = 'url(#glow) drop-shadow(0 0 10px #ffcc00)';
+                    }
+                    if (arrow) {
+                      arrow.style.strokeWidth = '3.5';
+                      arrow.style.filter = 'url(#glow) drop-shadow(0 0 15px #ff9500)';
+                    }
+                    if (arrowHead) {
+                      arrowHead.style.strokeWidth = '3.5';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    const text = e.currentTarget.querySelector('text');
+                    const arrow = e.currentTarget.querySelector('#arrowPath');
+                    const arrowHead = e.currentTarget.querySelector('.arrow-head');
+                    if (text) {
+                      text.style.fontSize = '28';
+                      text.style.fill = '#ffcc00';
+                      text.style.filter = 'url(#candleGlow)';
+                    }
+                    if (arrow) {
+                      arrow.style.strokeWidth = '2.5';
+                      arrow.style.filter = 'url(#glow)';
+                    }
+                    if (arrowHead) {
+                      arrowHead.style.strokeWidth = '2.5';
+                    }
+                  }}
+                >
+                  {/* Define gradients and filters */}
+                  <defs>
+                    <linearGradient id="arrowGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
+                      <stop offset="50%" stopColor="#ffcc00" stopOpacity="0.8" />
+                      <stop offset="100%" stopColor="#ff9500" stopOpacity="1" />
+                    </linearGradient>
+                    <filter id="glow">
+                      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+                      <feMerge>
+                        <feMergeNode in="coloredBlur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                      </feMerge>
+                    </filter>
+                    <filter id="candleGlow">
+                      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                      <feFlood floodColor="#ff9500" floodOpacity="0.4"/>
+                      <feComposite in2="coloredBlur" operator="in"/>
+                      <feMerge>
+                        <feMergeNode/>
+                        <feMergeNode in="SourceGraphic"/>
+                      </feMerge>
+                    </filter>
+                  </defs>
+                  
+                  {/* Curved arrow path */}
+                  <path
+                    id="arrowPath"
+                    d="M 20 100 Q 100 40, 200 60"
+                    stroke="url(#arrowGradient)"
+                    strokeWidth="2.5"
+                    fill="none"
+                    filter="url(#glow)"
+                    strokeLinecap="round"
+                    opacity="0.9"
+                  >
+                    <animate
+                      attributeName="stroke-opacity"
+                      values="0.6;1;0.6"
+                      dur="2.5s"
+                      repeatCount="indefinite"
+                    />
+                  </path>
+                  
+                  {/* Invisible path for text (offset above the arrow) */}
+                  <path
+                    id="textPath"
+                    d="M 20 85 Q 100 25, 200 45"
+                    fill="none"
+                    stroke="none"
+                  />
+                  
+                  {/* Arrow head */}
+                  <path
+                    className="arrow-head"
+                    d="M 195 55 L 205 60 L 195 65"
+                    stroke="url(#arrowGradient)"
+                    strokeWidth="2.5"
+                    fill="none"
+                    filter="url(#glow)"
+                    strokeLinecap="round"
+                  >
+                    <animate
+                      attributeName="stroke-opacity"
+                      values="0.6;1;0.6"
+                      dur="2.5s"
+                      repeatCount="indefinite"
+                    />
+                  </path>
+                  
+                  {/* Text along path */}
+                  <text
+                    fill="#ffcc00"
+                    fontSize="28"
+                    fontFamily="'UnifrakturMaguntia', cursive"
+                    filter="url(#candleGlow)"
+                    style={{ 
+                      transition: "all 0.3s ease",
+                      textShadow: "2px 2px 8px rgba(0, 0, 0, 0.9), 4px 4px 12px rgba(0, 0, 0, 0.7)",
+                      filter: "url(#candleGlow) drop-shadow(3px 3px 6px rgba(0, 0, 0, 0.8))"
+                    }}
+                  >
+                    <textPath href="#textPath" startOffset="0">
+                      The Illumin80
+                    </textPath>
+                    <animate
+                      attributeName="fill-opacity"
+                      values="0.7;1;0.7"
+                      dur="3s"
+                      repeatCount="indefinite"
+                    />
+                  </text>
+                  
+                  {/* Floating particles */}
+                  {[...Array(6)].map((_, i) => (
+                    <circle
+                      key={i}
+                      r="1.5"
+                      fill="#ffcc00"
+                      filter="url(#glow)"
+                    >
+                      <animateMotion
+                        dur={`${4 + i}s`}
+                        repeatCount="indefinite"
+                        path="M 20 100 Q 100 40, 200 60"
+                      >
+                        <mpath href="#arrowPath" />
+                      </animateMotion>
+                      <animate
+                        attributeName="opacity"
+                        values="0;1;0"
+                        dur={`${4 + i}s`}
+                        repeatCount="indefinite"
+                      />
+                      <animate
+                        attributeName="r"
+                        values="0.5;2;0.5"
+                        dur={`${4 + i}s`}
+                        repeatCount="indefinite"
+                      />
+                    </circle>
+                  ))}
+                </svg>
+                
+                {/* Skull button */}
+                <div 
+                  style={{
+                    width: '70px',
+                    height: '70px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    transition: 'transform 0.3s ease, filter 0.3s ease',
+                  }}
+                  onClick={() => router.push('/illumin80')}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'scale(1.15) rotate(-5deg)';
+                    e.currentTarget.style.filter = 'drop-shadow(0 0 20px #ff9500)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1) rotate(0deg)';
+                    e.currentTarget.style.filter = 'none';
+                  }}
+                >
+                  <img 
+                    src="/images/SKULL_TATTOO.webp"
+                    alt="Navigate to Illumin80"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'contain',
+                    }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -649,6 +1147,55 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           background: is80sMode ? 'transparent' : '#000'
         }}>
           <OldsCoolTunnel isFullscreen={true} />
+          
+          {/* Our Lady of Perpetual Profit Logo - Top Left (in fullscreen) */}
+          <h1 className='custom-title'
+            id="main-title-fullscreen"
+            style={{ 
+              position: 'absolute',
+              top: '3rem',
+              left: '2rem',
+              pointerEvents: 'auto',
+              color: is80sMode ? "#ffffff" : "#d4af37",
+              fontFamily: 'UnifrakturCook, serif',
+              textShadow: is80sMode 
+                ? `
+                  0 0 20px rgba(201, 55, 255, 0.9),
+                  0 0 40px rgba(201, 55, 255, 0.8),
+                  0 0 60px rgba(201, 55, 255, 0.7),
+                  4px 4px 12px rgba(201, 55, 255, 1),
+                  -2px -2px 8px rgba(255, 0, 255, 0.8),
+                  0 0 100px rgba(201, 55, 255, 0.5)
+                `
+                : `
+                  rgba(83, 61, 74, 0.9) 1px 1px,
+                  rgba(83, 61, 74, 0.9) 2px 2px,
+                  rgba(83, 61, 74, 0.8) 3px 3px,
+                  rgba(83, 61, 74, 0.8) 4px 4px,
+                  rgba(83, 61, 74, 0.7) 5px 5px,
+                  rgba(83, 61, 74, 0.7) 6px 6px,
+                  rgba(83, 61, 74, 0.6) 7px 7px,
+                  rgba(83, 61, 74, 0.6) 8px 8px,
+                  rgba(255, 192, 203, 0.4) -1px -1px 5px,
+                  rgba(0, 0, 0, 0.8) 10px 10px 15px
+                `,
+              fontSize: isTabletLandscape ? "2.5rem" : isTabletPortrait ? "2.2rem" : "3rem",
+              fontWeight: 900,
+              lineHeight: 0.8,
+              transform: "rotate(-8deg) skew(-15deg)",
+              cursor: 'pointer',
+              margin: 0,
+              marginBottom: '20px',
+              zIndex: 10001
+            }}
+          >
+            <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
+            <span className="title-line" style={{ display: 'block', position: 'relative' }}>
+              <span style={{ fontSize: isTabletLandscape ? "1.6rem" : isTabletPortrait ? "1.4rem" : "2rem" }}>of    </span>
+              Perpetual
+            </span>
+            <span className="title-line" style={{ display: 'block', marginLeft: "4rem", position: 'relative' }}>Profit</span>
+          </h1>
           
           {/* Exit fullscreen button - styled for desktop */}
           <button
@@ -697,7 +1244,124 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           }}>
             Press ESC to exit fullscreen
           </div> */}
+           <style dangerouslySetInnerHTML={{ __html: `
+        @font-face {
+          font-family: 'UnifrakturMaguntia';
+          src: url('/fonts/UnifrakturMaguntia-Regular.ttf') format('truetype');
+          font-weight: normal;
+          font-style: normal;
+          font-display: swap;
+        }
+        
+        /* Responsive scaling for smaller viewports */
+        @media screen and (max-width: 1400px), screen and (max-height: 800px) {
+          .navigation-group {
+            transform: scale(1.0) !important;
+          }
+        }
+        
+        /* Medium viewports */
+        @media screen and (max-width: 1200px), screen and (max-height: 700px) {
+          .navigation-group {
+            transform: scale(0.85) !important;
+          }
+        }
+        
+        /* Prevent overlaps on very small windows */
+        @media screen and (max-width: 900px) and (max-height: 600px) {
+          .navigation-group {
+            transform: scale(0.65) !important;
+            bottom: 10px !important;
+            right: 10px !important;
+          }
+        }
+        
+        #text, .text__copy {
+          font-family: 'UnifrakturMaguntia', serif !important;
+
+  
+          .cyber-candle-btn {
+            position: relative;
+          }
+          
+          .cyber-candle-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 150%;
+            height: 150%;
+            background: radial-gradient(ellipse at center, 
+              rgba(153, 69, 255, 0.9) 0%,
+              rgba(0, 255, 255, 0.7) 20%,
+              rgba(153, 69, 255, 0.4) 40%,
+              rgba(0, 255, 255, 0.2) 60%,
+              transparent 80%
+            );
+            filter: blur(30px);
+            animation: pulseGlow 2s ease-in-out infinite;
+            pointer-events: none;
+            z-index: -1;
+          }
+          
+          @keyframes pulseGlow {
+            0%, 100% {
+              opacity: 0.8;
+              transform: translate(-50%, -50%) scale(1);
+            }
+            50% {
+              opacity: 1;
+              transform: translate(-50%, -50%) scale(1.1);
+            }
+          }
+          
+          .cyber-candle-btn:hover::before {
+            animation: pulseGlow 1s ease-in-out infinite;
+            filter: blur(25px);
+            background: radial-gradient(ellipse at center, 
+              rgba(153, 69, 255, 0.8) 0%,
+              rgba(0, 255, 255, 0.6) 25%,
+              rgba(255, 0, 102, 0.3) 50%,
+              transparent 70%
+            );
+          }
+          
+          .cyber-candle-btn :global(.cybr-btn) {
+            --primary: #9945ff;
+            --shadow-primary: #00ffff;
+            --shadow-secondary-hue: 340;
+            --color: white;
+            position: relative;
+            z-index: 1;
+          }
+          .cyber-candle-btn :global(.cybr-btn:hover) {
+            --primary: #7c37d0;
+            --shadow-primary: #00ffff;
+            box-shadow: 
+              0 0 30px rgba(153, 69, 255, 0.8),
+              0 0 60px rgba(0, 255, 255, 0.6),
+              0 0 90px rgba(153, 69, 255, 0.4);
+          }
+          .cyber-candle-btn :global(.cybr-btn:active) {
+            --primary: #6b2fb5;
+            --shadow-primary: #00ffff;
+          }
+          .cyber-candle-btn :global(.cybr-btn__glitch) {
+            background: linear-gradient(45deg, #00ffff, #9945ff);
+            text-shadow: 2px 2px #ff0066, -2px -2px #00ffff;
+          }
+          .cyber-candle-btn :global(.cybr-label) {
+            background: linear-gradient(45deg, #00ffff, #ff0066);
+            color: #000;
+            font-weight: 900;
+          }
+
+        }
+      `}} />
+      
         </div>
+        
       )}
       
       </div>

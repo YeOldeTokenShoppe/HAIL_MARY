@@ -11,7 +11,7 @@ import { useAuthLogger } from '@/hooks/useAuthLogger';
 import { getTestWalletForEmail, isAuthorizedTestUser } from '@/lib/testWallets';
 
 // Enable test mode for simplified wallet experience
-const TEST_MODE = false; // Set to false for production
+const TEST_MODE = true; // Set to false for production
 
 const WalletAuthContext = createContext({});
 
@@ -156,10 +156,12 @@ export function WalletAuthProvider({ children }) {
       
       setWalletAddress(null);
       setTokenBalance(null);
+      setTestWallet(null);
       
       // Clear wallet from localStorage
       if (user) {
         localStorage.removeItem(`wallet_${user.id}`);
+        // Don't clear preference on disconnect - user may want to reconnect same type
         
         // Log wallet disconnection to Firebase
         logWalletDisconnection(user, currentAddress).then(docId => {
@@ -174,21 +176,109 @@ export function WalletAuthProvider({ children }) {
     }
   }, [disconnect, user, walletAddress, activeWallet]);
 
+  // Switch to test wallet (for users with both options)
+  const switchToTestWallet = useCallback(() => {
+    if (!user) return;
+    
+    const userEmail = user.primaryEmailAddress?.emailAddress;
+    if (!userEmail || !isAuthorizedTestUser(userEmail)) {
+      console.log('User not authorized for test wallet');
+      return;
+    }
+    
+    // Disconnect current wallet if connected
+    if (activeWallet || walletAddress) {
+      disconnectWallet();
+    }
+    
+    // Set preference to test wallet
+    localStorage.setItem(`wallet_preference_${user.id}`, 'test_wallet');
+    
+    // Assign test wallet
+    const assignedWallet = getTestWalletForEmail(userEmail);
+    if (assignedWallet) {
+      setTestWallet(assignedWallet);
+      setWalletAddress(assignedWallet.address);
+      
+      const walletData = {
+        walletAddress: assignedWallet.address,
+        lastWalletSync: new Date().toISOString(),
+        userId: user.id,
+        isTestWallet: true
+      };
+      localStorage.setItem(`wallet_${user.id}`, JSON.stringify(walletData));
+      
+      fetchTokenBalance(assignedWallet.address);
+      console.log(`Switched to test wallet: ${assignedWallet.address}`);
+    }
+  }, [user, activeWallet, walletAddress, disconnectWallet, fetchTokenBalance]);
+
+  // Switch to own wallet (MetaMask, etc.)
+  const switchToOwnWallet = useCallback(async () => {
+    if (!user) return;
+    
+    // Disconnect test wallet if connected
+    if (testWallet) {
+      setTestWallet(null);
+      setWalletAddress(null);
+      setTokenBalance(null);
+      localStorage.removeItem(`wallet_${user.id}`);
+    }
+    
+    // Set preference to own wallet
+    localStorage.setItem(`wallet_preference_${user.id}`, 'own_wallet');
+    
+    // Open wallet connection modal
+    return connectWallet('metamask'); // or could show a selection modal
+  }, [user, testWallet, connectWallet]);
+
   // Auto-connect test wallet in test mode for authorized users only
   useEffect(() => {
+    console.log('Test wallet auto-connect check:', {
+      TEST_MODE,
+      clerkLoaded,
+      hasUser: !!user,
+      userEmail: user?.primaryEmailAddress?.emailAddress,
+      hasActiveAccount: !!activeAccount,
+      isConnecting,
+      hasWalletAddress: !!walletAddress
+    });
+    
     if (TEST_MODE && clerkLoaded && user && !activeAccount && !isConnecting && !walletAddress) {
       const userEmail = user.primaryEmailAddress?.emailAddress;
       
+      console.log('Checking test wallet for email:', userEmail);
+      
       // Check if user is authorized for test wallet
       if (!userEmail || !isAuthorizedTestUser(userEmail)) {
+        console.log('User not authorized for test wallet:', userEmail);
+        return;
+      }
+      
+      // Check if user prefers to use their own wallet
+      const walletPreference = localStorage.getItem(`wallet_preference_${user.id}`);
+      if (walletPreference === 'own_wallet') {
+        console.log('User prefers to use their own wallet, skipping test wallet assignment');
         return;
       }
       
       const assignedWallet = getTestWalletForEmail(userEmail);
       
       if (assignedWallet) {
+        // Only auto-assign if user hasn't explicitly chosen to use their own wallet
+        console.log('Assigning test wallet:', assignedWallet);
         setTestWallet(assignedWallet);
         setWalletAddress(assignedWallet.address);
+        
+        // Sync with localStorage for persistence
+        const walletData = {
+          walletAddress: assignedWallet.address,
+          lastWalletSync: new Date().toISOString(),
+          userId: user.id,
+          isTestWallet: true
+        };
+        localStorage.setItem(`wallet_${user.id}`, JSON.stringify(walletData));
+        localStorage.setItem(`wallet_preference_${user.id}`, 'test_wallet');
         
         // Fetch balance for test wallet
         fetchTokenBalance(assignedWallet.address);
@@ -197,6 +287,31 @@ export function WalletAuthProvider({ children }) {
         console.log(`Test wallet assigned to ${user.firstName || userEmail}: ${assignedWallet.address}`);
       } else {
         console.log(`No test wallet available for ${userEmail}`);
+      }
+    } else if (TEST_MODE && clerkLoaded && user && !activeAccount && !isConnecting && !walletAddress) {
+      // Check if we have a stored test wallet for this user
+      const storedData = localStorage.getItem(`wallet_${user.id}`);
+      
+      if (storedData) {
+        try {
+          const walletData = JSON.parse(storedData);
+          if (walletData.isTestWallet && walletData.walletAddress) {
+            console.log('Restoring test wallet from localStorage:', walletData.walletAddress);
+            
+            // Verify this user is still authorized for test wallet
+            const userEmail = user.primaryEmailAddress?.emailAddress;
+            if (userEmail && isAuthorizedTestUser(userEmail)) {
+              const assignedWallet = getTestWalletForEmail(userEmail);
+              if (assignedWallet && assignedWallet.address === walletData.walletAddress) {
+                setTestWallet(assignedWallet);
+                setWalletAddress(assignedWallet.address);
+                fetchTokenBalance(assignedWallet.address);
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error parsing stored wallet data:', error);
+        }
       }
     } else if (!TEST_MODE && clerkLoaded && user && !activeAccount && !isConnecting) {
       // Original auto-reconnect logic for production
@@ -268,6 +383,8 @@ export function WalletAuthProvider({ children }) {
     // Actions
     connectWallet,
     disconnectWallet,
+    switchToTestWallet,
+    switchToOwnWallet,
     refreshBalance: () => fetchTokenBalance(walletAddress),
     
     // Combined status

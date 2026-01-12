@@ -7,6 +7,7 @@ import { client } from '@/lib/contract';
 import { defineChain } from "thirdweb/chains";
 import { inAppWallet } from "thirdweb/wallets/in-app";
 import { createWallet } from "thirdweb/wallets";
+import { useWalletAuth } from '@/components/WalletAuthProvider';
 
 const chain = defineChain(84532); // Base Sepolia
 
@@ -28,6 +29,7 @@ const customTheme = darkTheme({
 
 export function WalletConnectionModal({ onClose }) {
   const [connectionType, setConnectionType] = useState(null);
+  const { isTestUser, switchToTestWallet, switchToOwnWallet } = useWalletAuth();
 
   const wallets = connectionType === 'existing' 
     ? [
@@ -113,6 +115,56 @@ export function WalletConnectionModal({ onClose }) {
             flexDirection: 'column',
             gap: '10px',
           }}>
+            {isTestUser && (
+              <button 
+                style={{
+                  background: 'rgba(255, 215, 0, 0.1)',
+                  border: '1px solid rgba(255, 215, 0, 0.3)',
+                  borderRadius: '8px',
+                  padding: '12px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  width: '100%',
+                  color: '#ffd700',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  position: 'relative',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 215, 0, 0.15)';
+                  e.currentTarget.style.borderColor = 'rgba(255, 215, 0, 0.5)';
+                  e.currentTarget.style.boxShadow = '0 0 15px rgba(255, 215, 0, 0.3)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 215, 0, 0.1)';
+                  e.currentTarget.style.borderColor = 'rgba(255, 215, 0, 0.3)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+                onClick={() => {
+                  switchToTestWallet();
+                  onClose();
+                }}
+              >
+                Use Test Wallet (Pre-funded)
+                <span style={{
+                  position: 'absolute',
+                  top: '-8px',
+                  right: '10px',
+                  background: 'linear-gradient(135deg, #ffd700, #ffed4e)',
+                  color: '#000',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  fontSize: '10px',
+                  fontWeight: 'bold',
+                }}>
+                  RECOMMENDED
+                </span>
+              </button>
+            )}
+            
             <button 
               style={{
                 background: 'rgba(255, 255, 255, 0.05)',
@@ -139,9 +191,18 @@ export function WalletConnectionModal({ onClose }) {
                 e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
                 e.currentTarget.style.boxShadow = 'none';
               }}
-              onClick={() => setConnectionType('existing')}
+              onClick={() => {
+                if (isTestUser) {
+                  // For test users, save preference for own wallet
+                  const user = JSON.parse(localStorage.getItem('clerk-user') || '{}');
+                  if (user?.id) {
+                    localStorage.setItem(`wallet_preference_${user.id}`, 'own_wallet');
+                  }
+                }
+                setConnectionType('existing');
+              }}
             >
-              Connect Existing Wallet
+              Connect Existing Wallet {isTestUser && '(MetaMask, etc.)'}
             </button>
             
             <button 

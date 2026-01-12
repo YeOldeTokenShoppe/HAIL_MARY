@@ -204,6 +204,29 @@ export default function CarouselPage() {
           font-display: swap;
         }
         
+        /* Responsive scaling for smaller viewports */
+        @media screen and (max-width: 1400px), screen and (max-height: 800px) {
+          .navigation-group {
+            transform: scale(1.0) !important;
+          }
+        }
+        
+        /* Medium viewports */
+        @media screen and (max-width: 1200px), screen and (max-height: 700px) {
+          .navigation-group {
+            transform: scale(0.85) !important;
+          }
+        }
+        
+        /* Prevent overlaps on very small windows */
+        @media screen and (max-width: 900px) and (max-height: 600px) {
+          .navigation-group {
+            transform: scale(0.65) !important;
+            bottom: 10px !important;
+            right: 10px !important;
+          }
+        }
+        
         #text, .text__copy {
           font-family: 'UnifrakturMaguntia', serif !important;
 
@@ -322,8 +345,8 @@ export default function CarouselPage() {
       {deviceDetected && isMobileDevice && (
         <div style={{
           position: "absolute",
-          top: "85%",
-          right: "67%",
+          top: "80%",
+          right: "62%",
           marginTop: '0rem',
           zIndex: 298,
           overflow: 'visible',
@@ -346,217 +369,6 @@ export default function CarouselPage() {
         </div>
       )}
       
-      {/* Tiny Candle Button with Glowing Arrow - Bottom Right */}
-      <div 
-        className="candle-button"
-        style={{
-          position: "absolute",
-          bottom: isMobileDevice ? "40px" : "30px",
-          right: isMobileDevice ? "20px" : "30px",
-          width: isMobileDevice ? "50px" : "80px",
-          height: isMobileDevice ? "50px" : "80px",
-          zIndex: 297,
-          borderRadius: "50%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-          transition: "transform 0.3s ease, filter 0.3s ease",
-        }}
-        onClick={() => router.push('/illumin80')}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = "scale(1.15) rotate(-5deg)";
-          e.currentTarget.style.filter = "drop-shadow(0 0 20px #ff9500)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = "scale(1) rotate(0deg)";
-          e.currentTarget.style.filter = "none";
-        }}
-      >
-        <img 
-          src="/images/SKULL_TATTOO.webp"
-          alt="Tiny Candle Button"
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "contain",
-          }}
-        />
-      </div>
-      
-      {/* Glowing Arrow with Luminarium Text */}
-      <svg
-        className="luminarium-arrow"
-        style={{
-          position: "absolute",
-          bottom: isMobileDevice ? "20px" : "20px",
-          right: isMobileDevice ? "10px" : "20px",
-          width: isMobileDevice ? "220px" : "300px",
-          height: isMobileDevice ? "100px" : "150px",
-          zIndex: 296,
-          pointerEvents: "auto",
-          cursor: "pointer",
-        }}
-        viewBox="0 0 300 150"
-        onClick={() => router.push('/illumin80')}
-        onMouseEnter={(e) => {
-          const text = e.currentTarget.querySelector('text');
-          const arrow = e.currentTarget.querySelector('#arrowPath');
-          const arrowHead = e.currentTarget.querySelector('.arrow-head');
-          if (text) {
-            text.style.fontSize = '32';
-            text.style.fill = '#ffffff';
-            text.style.filter = 'url(#glow) drop-shadow(0 0 10px #ffcc00)';
-          }
-          if (arrow) {
-            arrow.style.strokeWidth = '3.5';
-            arrow.style.filter = 'url(#glow) drop-shadow(0 0 15px #ff9500)';
-          }
-          if (arrowHead) {
-            arrowHead.style.strokeWidth = '3.5';
-          }
-        }}
-        onMouseLeave={(e) => {
-          const text = e.currentTarget.querySelector('text');
-          const arrow = e.currentTarget.querySelector('#arrowPath');
-          const arrowHead = e.currentTarget.querySelector('.arrow-head');
-          if (text) {
-            text.style.fontSize = '28';
-            text.style.fill = '#ffcc00';
-            text.style.filter = 'url(#candleGlow)';
-          }
-          if (arrow) {
-            arrow.style.strokeWidth = '2.5';
-            arrow.style.filter = 'url(#glow)';
-          }
-          if (arrowHead) {
-            arrowHead.style.strokeWidth = '2.5';
-          }
-        }}
-      >
-        {/* Define gradients and filters */}
-        <defs>
-          <linearGradient id="arrowGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
-            <stop offset="50%" stopColor="#ffcc00" stopOpacity="0.8" />
-            <stop offset="100%" stopColor="#ff9500" stopOpacity="1" />
-          </linearGradient>
-          <filter id="glow">
-            <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
-            <feMerge>
-              <feMergeNode in="coloredBlur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-          <filter id="candleGlow">
-            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-            <feFlood floodColor="#ff9500" floodOpacity="0.4"/>
-            <feComposite in2="coloredBlur" operator="in"/>
-            <feMerge>
-              <feMergeNode/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-        </defs>
-        
-        {/* Curved arrow path */}
-        <path
-          id="arrowPath"
-          d="M 20 100 Q 100 40, 200 60"
-          stroke="url(#arrowGradient)"
-          strokeWidth="2.5"
-          fill="none"
-          filter="url(#glow)"
-          strokeLinecap="round"
-          opacity="0.9"
-        >
-          <animate
-            attributeName="stroke-opacity"
-            values="0.6;1;0.6"
-            dur="2.5s"
-            repeatCount="indefinite"
-          />
-        </path>
-        
-        {/* Invisible path for text (offset above the arrow) */}
-        <path
-          id="textPath"
-          d="M 20 85 Q 100 25, 200 45"
-          fill="none"
-          stroke="none"
-        />
-        
-        {/* Arrow head */}
-        <path
-          className="arrow-head"
-          d="M 195 55 L 205 60 L 195 65"
-          stroke="url(#arrowGradient)"
-          strokeWidth="2.5"
-          fill="none"
-          filter="url(#glow)"
-          strokeLinecap="round"
-        >
-          <animate
-            attributeName="stroke-opacity"
-            values="0.6;1;0.6"
-            dur="2.5s"
-            repeatCount="indefinite"
-          />
-        </path>
-        
-        {/* Text along path */}
-        <text
-          fill="#ffcc00"
-          fontSize="28"
-          fontFamily="'UnifrakturMaguntia', cursive"
-          filter="url(#candleGlow)"
-          style={{ 
-            transition: "all 0.3s ease",
-            textShadow: "2px 2px 8px rgba(0, 0, 0, 0.9), 4px 4px 12px rgba(0, 0, 0, 0.7)",
-            filter: "url(#candleGlow) drop-shadow(3px 3px 6px rgba(0, 0, 0, 0.8))"
-          }}
-        >
-          <textPath href="#textPath" startOffset="0">
-            The Illumin80
-          </textPath>
-          <animate
-            attributeName="fill-opacity"
-            values="0.7;1;0.7"
-            dur="3s"
-            repeatCount="indefinite"
-          />
-        </text>
-        
-        {/* Floating particles */}
-        {[...Array(6)].map((_, i) => (
-          <circle
-            key={i}
-            r="1.5"
-            fill="#ffcc00"
-            filter="url(#glow)"
-          >
-            <animateMotion
-              dur={`${4 + i}s`}
-              repeatCount="indefinite"
-              path="M 20 100 Q 100 40, 200 60"
-            >
-              <mpath href="#arrowPath" />
-            </animateMotion>
-            <animate
-              attributeName="opacity"
-              values="0;1;0"
-              dur={`${4 + i}s`}
-              repeatCount="indefinite"
-            />
-            <animate
-              attributeName="r"
-              values="0.5;2;0.5"
-              dur={`${4 + i}s`}
-              repeatCount="indefinite"
-            />
-          </circle>
-        ))}
-      </svg>
       
       {/* Navigation Toggle */}
       {/* <div style={{
@@ -671,75 +483,6 @@ export default function CarouselPage() {
         onClose={() => setShowBuyModal(false)}
       />
       
-      {/* Our Lady of Perpetual Profit Logo - Top Left (Desktop/Tablet) */}
-      {deviceDetected && !isMobileDevice && (
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100vh',
-          zIndex: 299,
-          pointerEvents: 'none',
-        }}>
-          <div style={{
-            position: 'relative',
-            display: 'flex',
-            // flexDirection: 'column',
-            width: '100%',
-            paddingTop: '3rem',
-            minHeight: '100vh',
-            pointerEvents: 'none',
-          }}>
-            
-             <h1 className='custom-title'
-            id="main-title"
-            // onClick={() => router?.push('/about')}
-            style={{ 
-              pointerEvents: 'auto',  // Enable clicks on the title
-              color: is80sMode ? "#ffffff" : "#d4af37",
-              fontFamily: 'UnifrakturCook, serif',
-              textShadow: is80sMode 
-                ? `
-                  0 0 20px rgba(201, 55, 255, 0.9),
-                  0 0 40px rgba(201, 55, 255, 0.8),
-                  0 0 60px rgba(201, 55, 255, 0.7),
-                  4px 4px 12px rgba(201, 55, 255, 1),
-                  -2px -2px 8px rgba(255, 0, 255, 0.8),
-                  0 0 100px rgba(201, 55, 255, 0.5)
-                `
-                : `
-                  rgba(83, 61, 74, 0.9) 1px 1px,
-                  rgba(83, 61, 74, 0.9) 2px 2px,
-                  rgba(83, 61, 74, 0.8) 3px 3px,
-                  rgba(83, 61, 74, 0.8) 4px 4px,
-                  rgba(83, 61, 74, 0.7) 5px 5px,
-                  rgba(83, 61, 74, 0.7) 6px 6px,
-                  rgba(83, 61, 74, 0.6) 7px 7px,
-                  rgba(83, 61, 74, 0.6) 8px 8px,
-                  rgba(255, 192, 203, 0.4) -1px -1px 5px,
-                  rgba(0, 0, 0, 0.8) 10px 10px 15px
-                `,
-              fontSize: "3rem",
-              fontWeight: 900,
-              lineHeight: 0.8,
-              transform: "rotate(-8deg) skew(-15deg)",
-              cursor: 'pointer',
-              margin: 0,
-              marginBottom: '20px',
-            }}
-          >
-            <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
-            <span className="title-line" style={{ display: 'block', position: 'relative' }}>
-              <span style={{ fontSize: "2rem" }}>of    </span>
-              Perpetual
-            </span>
-            <span className="title-line" style={{ display: 'block', marginLeft: "4rem", position: 'relative' }}>Profit</span>
-          </h1>
-
-          </div>
-        </div>
-      )}
       
       {/* RL80 Logo - Mobile Only */}
       {deviceDetected && isMobileDevice && (

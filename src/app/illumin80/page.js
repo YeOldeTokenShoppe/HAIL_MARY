@@ -342,6 +342,33 @@ useEffect(() => {
     }
   }, [isWalletConnected, showWalletModal, waitingForWallet, walletActionType]);
 
+  // Watch for successful sign-in and resume the intended action
+  useEffect(() => {
+    if (isSignedIn && userLoaded && showAuthMessage) {
+      // Clear the auth message
+      const actionType = showAuthMessage;
+      setShowAuthMessage(null);
+      
+      // Small delay to allow test wallet auto-assignment to complete
+      setTimeout(() => {
+        // After sign-in, check wallet connection
+        if (!isWalletConnected || !walletAddress) {
+          // Need wallet connection
+          setShowWalletModal(true);
+          setWaitingForWallet(true);
+          setWalletActionType(actionType === 'sign-in-stake' ? 'stake' : 'candle');
+        } else {
+          // Already have wallet, show the appropriate modal
+          if (actionType === 'sign-in-stake') {
+            setShowStakeModal(true);
+          } else {
+            setShowLightCandleModal(true);
+          }
+        }
+      }, 500); // 500ms delay for test wallet assignment
+    }
+  }, [isSignedIn, userLoaded, showAuthMessage, isWalletConnected, walletAddress]);
+
   // Handle light candle from modal
   const handleLightCandle = async (newOffering) => {
     // Trigger the candle launch animation (this will also show on phone via onLightCandle callback)
@@ -1256,7 +1283,7 @@ useEffect(() => {
             }}>
               Please sign in to {showAuthMessage === 'sign-in-stake' ? 'stake tokens' : 'light a candle'}.
             </p>
-            <SignInButton mode="modal">
+            <SignInButton mode="modal" forceRedirectUrl="/illumin80">
               <button style={{
                 padding: '1rem 2rem',
                 background: '#fff',
