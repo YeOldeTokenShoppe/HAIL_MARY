@@ -231,7 +231,7 @@ export function WalletDetailsModal({ onClose }) {
           <div className="balance-grid">
             <div className="balance-item">
               <span className="balance-label">RL80 Tokens</span>
-              <span className="balance-value">{tokenBalance || '0'}</span>
+              <span className="balance-value">{tokenBalance ? parseFloat(tokenBalance).toLocaleString() : '0'}</span>
             </div>
             <button 
               className="refresh-button"
@@ -268,7 +268,7 @@ export function WalletDetailsModal({ onClose }) {
                 <div className="staking-item">
                   <span className="staking-label">Staked Amount</span>
                   <span className="staking-value">
-                    {isUpdatingBalance ? '⏳ Updating...' : `${stakedBalance || '0'} RL80`}
+                    {isUpdatingBalance ? '⏳ Updating...' : `${stakedBalance ? parseFloat(stakedBalance).toLocaleString() : '0'} RL80`}
                   </span>
                 </div>
                 <div className="staking-item">
@@ -281,17 +281,17 @@ export function WalletDetailsModal({ onClose }) {
                 </div>
                 <div className="staking-item">
                   <span className="staking-label">Rewards Earned</span>
-                  <span className="staking-value rewards">{earnedRewards || '0'} ETH</span>
+                  <span className="staking-value rewards">{earnedRewards ? parseFloat(earnedRewards).toFixed(6) : '0'} ETH</span>
                 </div>
                 <div className="staking-item">
                   <span className="staking-label">Total Pool</span>
-                  <span className="staking-value">{totalStaked || '0'} RL80</span>
+                  <span className="staking-value">{totalStaked ? parseFloat(totalStaked).toLocaleString() : '0'} RL80</span>
                 </div>
               </div>
               
               {earnedRewards && parseFloat(earnedRewards) > 0 && (
                 <div className="next-reward-box">
-                  <span>Claimable Rewards: {earnedRewards} ETH</span>
+                  <span>Claimable Rewards: {parseFloat(earnedRewards).toFixed(6)} ETH</span>
                   <span className="time-label">Ready to claim!</span>
                 </div>
               )}
@@ -384,7 +384,7 @@ export function WalletDetailsModal({ onClose }) {
                 }}
                 className="action-button claim"
               >
-                Claim {earnedRewards} ETH
+                Claim {parseFloat(earnedRewards).toFixed(6)} ETH
               </TransactionButton>
             ) : (
               <button className="action-button claim" disabled style={{ opacity: 0.5 }}>

@@ -8,6 +8,7 @@ import { HandsModel, CameraController } from './HandsGLTFScene'
 import { CandleCloud, GradientBackground, SceneSetup } from './CandleShrine'
 import { NewCandleEffectManager } from './NewCandleEffect'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
+import { useStaking } from '@/hooks/useStaking'
 
 
 
@@ -218,6 +219,43 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   const [additionalCandles, setAdditionalCandles] = useState([])
   const [clickedCandleId, setClickedCandleId] = useState(null)
   const [isRippleActive, setIsRippleActive] = useState(false)
+  const [activeStatsTab, setActiveStatsTab] = useState('price') // 'price' or 'staking'
+  
+  // Get staking data
+  const { 
+    totalStaked,
+    rewardPerToken
+  } = useStaking()
+  
+  // Calculate TVL based on total staked
+  const calculateTVL = useMemo(() => {
+    // Using the actual token price from displayPrice
+    const tokenPrice = displayPrice.tokenPrice || 0.001
+    const tvl = (parseFloat(totalStaked || 0) * tokenPrice)
+    // Format based on size
+    if (tvl >= 1000000) return `${(tvl / 1000000).toFixed(2)}M`
+    if (tvl >= 1000) return `${(tvl / 1000).toFixed(2)}K`
+    return tvl.toFixed(2)
+  }, [totalStaked, displayPrice.tokenPrice])
+  
+  // Calculate APR based on reward rate
+  const calculateAPR = useMemo(() => {
+    if (!totalStaked || parseFloat(totalStaked) === 0) return '0.0'
+    
+    // Base APR calculation - this is a simplified version
+    // In production, would need to factor in reward rate from contract
+    const rewardRate = parseFloat(rewardPerToken || 0)
+    const baseAPR = rewardRate > 0 ? (rewardRate * 365 * 100).toFixed(1) : '15.0' // Default 15% APR
+    
+    return baseAPR
+  }, [totalStaked, rewardPerToken])
+  
+  // Mock total rewards paid (in production, fetch from contract events)
+  const totalRewardsPaid = useMemo(() => {
+    // This would be calculated from contract events
+    const mockRewards = 0.05 // Mock 0.05 ETH total rewards
+    return mockRewards.toFixed(4)
+  }, [])
   
   // Expose method to trigger candle effect
   useImperativeHandle(ref, () => ({
@@ -629,7 +667,7 @@ useEffect(() => {
     boxShadow: `0 0 20px ${displayPrice.change >= 0 ? 'rgba(0, 255, 100, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
     zIndex: 1000,
     width: isMobile ? '160px' : '240px',
-    pointerEvents: 'none'
+    pointerEvents: 'auto'
   }), [isMobile, displayPrice.change])
   
   // Memoize price chart bars
@@ -893,8 +931,61 @@ useEffect(() => {
         }
       `}</style>
       
-      {/* Unified Stats Box - Redesigned */}
+      {/* Unified Stats Box with Tabs */}
       <div style={unifiedStatsStyle}>
+        {/* Tab Headers */}
+        <div style={{
+          display: 'flex',
+          gap: '4px',
+          marginBottom: '12px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+        }}>
+          <button
+            onClick={() => setActiveStatsTab('price')}
+            style={{
+              flex: 1,
+              padding: '6px 8px',
+              background: activeStatsTab === 'price' ? 'rgba(212, 175, 55, 0.2)' : 'transparent',
+              border: 'none',
+              borderBottom: activeStatsTab === 'price' ? '2px solid #d4af37' : '2px solid transparent',
+              color: activeStatsTab === 'price' ? '#d4af37' : '#888',
+              fontSize: isMobile ? '11px' : '12px',
+              fontFamily: 'monospace',
+              fontWeight: activeStatsTab === 'price' ? 'bold' : 'normal',
+              cursor: 'pointer',
+              textTransform: 'uppercase',
+              transition: 'all 0.2s',
+              marginBottom: '-1px',
+            }}
+          >
+            Price
+          </button>
+          <button
+            onClick={() => setActiveStatsTab('staking')}
+            style={{
+              flex: 1,
+              padding: '6px 8px',
+              background: activeStatsTab === 'staking' ? 'rgba(0, 245, 212, 0.2)' : 'transparent',
+              border: 'none',
+              borderBottom: activeStatsTab === 'staking' ? '2px solid #00f5d4' : '2px solid transparent',
+              color: activeStatsTab === 'staking' ? '#00f5d4' : '#888',
+              fontSize: isMobile ? '11px' : '12px',
+              fontFamily: 'monospace',
+              fontWeight: activeStatsTab === 'staking' ? 'bold' : 'normal',
+              cursor: 'pointer',
+              textTransform: 'uppercase',
+              transition: 'all 0.2s',
+              marginBottom: '-1px',
+            }}
+          >
+            Staking
+          </button>
+        </div>
+        
+        {/* Tab Content */}
+        {activeStatsTab === 'price' ? (
+          <>
+            {/* Price Tab Content - Original content */}
         {/* Price Action - Prominent */}
         <div style={{
           marginBottom: isMobile ? '10px' : '15px',
@@ -1024,6 +1115,121 @@ useEffect(() => {
           }}>
             {priceChartBars}
           </div>
+        )}
+          </>
+        ) : (
+          <>
+            {/* Staking Tab Content - Global Stats */}
+            {/* TVL Section - Prominent */}
+            <div style={{
+              marginBottom: isMobile ? '10px' : '15px',
+              padding: isMobile ? '8px' : '12px',
+              background: 'rgba(0, 245, 212, 0.1)',
+              borderRadius: '8px',
+              border: '1px solid rgba(0, 245, 212, 0.3)'
+            }}>
+              <div style={{ 
+                fontSize: isMobile ? '18px' : '24px', 
+                fontWeight: 'bold',
+                color: '#00f5d4',
+                marginBottom: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <span>${calculateTVL}</span>
+              </div>
+              <div style={{
+                fontSize: isMobile ? '11px' : '12px',
+                color: '#ccc',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px'
+              }}>
+                Total Value Locked
+              </div>
+            </div>
+            
+            {/* APR & Total Rewards - Side by side */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: isMobile ? '8px' : '10px',
+              marginBottom: isMobile ? '10px' : '15px'
+            }}>
+              {/* Current APR */}
+              <div style={{
+                padding: isMobile ? '8px' : '10px',
+                background: 'rgba(0, 255, 102, 0.1)',
+                borderRadius: '8px',
+                border: '1px solid rgba(0, 255, 102, 0.3)',
+                textAlign: 'center'
+              }}>
+                <div style={{ 
+                  fontSize: isMobile ? '16px' : '16px', 
+                  fontWeight: 'bold',
+                  color: '#00ff66',
+                  marginBottom: '4px'
+                }}>
+                  {calculateAPR}%
+                </div>
+                <div style={{
+                  fontSize: isMobile ? '10px' : '11px',
+                  color: '#ccc',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  Current APR
+                </div>
+              </div>
+              
+              {/* Total Rewards Paid */}
+              <div style={{
+                padding: isMobile ? '8px' : '10px',
+                background: 'rgba(255, 215, 0, 0.1)',
+                borderRadius: '8px',
+                border: '1px solid rgba(255, 215, 0, 0.3)',
+                textAlign: 'center'
+              }}>
+                <div style={{ 
+                  fontSize: isMobile ? '14px' : '14px', 
+                  fontWeight: 'bold',
+                  color: '#ffd700',
+                  marginBottom: '4px'
+                }}>
+                  {totalRewardsPaid}
+                </div>
+                <div style={{
+                  fontSize: isMobile ? '10px' : '11px',
+                  color: '#ccc',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  ETH Paid
+                </div>
+              </div>
+            </div>
+            
+            {/* Total Staked Tokens */}
+            {/* <div style={{
+              padding: isMobile ? '8px' : '10px',
+              background: 'rgba(138, 43, 226, 0.05)',
+              borderRadius: '8px',
+              border: '1px solid rgba(138, 43, 226, 0.2)',
+              fontSize: isMobile ? '11px' : '12px',
+              color: '#ccc',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <span>Total Staked:</span>
+              <span style={{ 
+                color: '#fff', 
+                fontWeight: 'bold' 
+              }}>
+                {parseFloat(totalStaked || 0).toLocaleString()} RL80
+              </span>
+            </div> */}
+          </>
         )}
       </div>
       

@@ -146,7 +146,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
       setShowNoBuyPrompt(true);
       return;
     } else if (amount > currentBalance) {
-      alert(`You only have ${currentBalance} RL80 tokens. Please enter a valid amount.`);
+      alert(`You only have ${currentBalance.toLocaleString()} RL80 tokens. Please enter a valid amount.`);
       return;
     }
     
@@ -297,14 +297,14 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
           background: rgba(20, 20, 30, 0.98);
           border: 2px solid transparent;
           background-image: linear-gradient(rgba(20, 20, 30, 0.98), rgba(20, 20, 30, 0.98)),
-                           linear-gradient(90deg, #d4af37, #ffd700);
+                           linear-gradient(90deg, #00f5d4, #00bbff);
           background-origin: border-box;
           background-clip: padding-box, border-box;
           border-radius: 20px;
           padding: 1.5rem;
           padding-bottom: 2rem;
           width: 90%;
-          max-width: 600px;
+          max-width: 500px;
           height: auto;
           max-height: 85vh;
           overflow-y: auto;
@@ -313,7 +313,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
           animation: fadeIn 0.4s ease-out;
           display: flex;
           flex-direction: column;
-          box-shadow: 0 20px 60px rgba(212, 175, 55, 0.3);
+          box-shadow: 0 20px 60px rgba(0, 245, 212, 0.3);
         }
         
         @media (max-height: 800px) {
@@ -335,7 +335,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
           right: 1rem;
           background: none;
           border: none;
-          color: #d4af37;
+          color: #00f5d4;
           font-size: 1.5rem;
           cursor: pointer;
           transition: all 0.2s;
@@ -348,7 +348,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
 
         .close-button:hover {
           transform: scale(1.1);
-          color: #ffd700;
+          color: #00f5d4;
         }
 
         .modal-title {
@@ -367,7 +367,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
 
         .form-label {
           display: block;
-          color: #d4af37;
+          color: #00f5d4;
           margin-bottom: 0.5rem;
           font-size: 0.75rem;
           text-transform: uppercase;
@@ -388,8 +388,8 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
 
         .stake-input:focus {
           outline: none;
-          border-color: #d4af37;
-          background: rgba(212, 175, 55, 0.05);
+          border-color: #00f5d4;
+          background: rgba(0, 245, 212, 0.05);
         }
 
         .token-balance {
@@ -401,7 +401,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
         .submit-button {
           width: 100%;
           padding: 0.875rem;
-          background: linear-gradient(135deg, #d4af37, #ffd700);
+          background: linear-gradient(135deg, #00f5d4, #00bbff);
           border: none;
           border-radius: 50px;
           color: #000;
@@ -416,7 +416,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
 
         .submit-button:hover:not(:disabled) {
           transform: translateY(-2px);
-          box-shadow: 0 10px 30px rgba(212, 175, 55, 0.3);
+          box-shadow: 0 10px 30px rgba(0, 245, 212, 0.3);
         }
 
         .submit-button:disabled {
@@ -442,13 +442,13 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
           <div 
             style={{
               background: 'rgba(20, 20, 30, 0.98)',
-              border: '1px solid rgba(212, 175, 55, 0.4)',
+              border: '1px solid rgba(0, 245, 212, 0.4)',
               borderRadius: '24px',
               padding: '1rem',
               maxWidth: '420px',
               textAlign: 'center',
               color: '#fff',
-              boxShadow: '0 0 60px rgba(212, 175, 55, 0.3)',
+              boxShadow: '0 0 60px rgba(0, 245, 212, 0.3)',
               position: 'relative',
             }}
             onClick={(e) => e.stopPropagation()}
@@ -461,7 +461,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                 right: '1rem',
                 background: 'transparent',
                 border: 'none',
-                color: '#d4af37',
+                color: '#00f5d4',
                 fontSize: '2rem',
                 fontWeight: 'bold',
                 cursor: 'pointer',
@@ -494,7 +494,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
             
             {/* Description */}
             <p style={{
-              color: '#d4af37',
+              color: '#00f5d4',
               fontSize: '1.1rem',
               marginBottom: '2.5rem',
               lineHeight: '1.5',
@@ -504,8 +504,8 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
             
             {/* Info message for test mode */}
             <div style={{
-              background: 'rgba(212, 175, 55, 0.1)',
-              border: '1px solid rgba(212, 175, 55, 0.3)',
+              background: 'rgba(0, 245, 212, 0.1)',
+              border: '1px solid rgba(0, 245, 212, 0.3)',
               borderRadius: '12px',
               padding: '1rem',
               marginBottom: '2rem'
@@ -548,7 +548,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
         ) : showSuccess ? (
           // Success Dashboard with Staking Info
           <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
-            maxWidth: '500px'
+            maxWidth: '500px !important'
           }}>
             <button 
               onClick={onClose}
@@ -595,210 +595,248 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
               <h2 style={{
                 fontSize: '1.3rem',
                 fontWeight: '600',
-                color: successData?.showDashboard ? '#d4af37' : '#00ff66',
-                fontFamily: 'Orbitron, monospace'
+                color: '#fff',
+                fontFamily: 'Orbitron, monospace',
+                textTransform: 'uppercase',
+                letterSpacing: '2px'
               }}>
                 {successData?.showDashboard ? 'STAKING DASHBOARD' : 'Staking Successful!'}
               </h2>
             </div>
             
-            {/* Your Staking Position */}
+            {/* Staking Activity Section */}
             <div style={{
-              background: 'rgba(20, 20, 30, 0.5)',
-              border: '2px solid rgba(212, 175, 55, 0.3)',
-              borderRadius: '12px',
-              padding: '1rem',
-              marginBottom: '1rem'
+              marginBottom: '1.5rem'
             }}>
               <h3 style={{
                 fontSize: '0.9rem',
-                color: '#d4af37',
+                color: '#00f5d4',
                 marginBottom: '1rem',
                 textAlign: 'center',
-                fontWeight: '600'
+                fontWeight: '600',
+                textTransform: 'uppercase',
+                letterSpacing: '1px'
               }}>
-                YOUR STAKING POSITION
+                STAKING ACTIVITY
               </h3>
               
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(2, 1fr)',
-                gap: '1rem',
-                marginBottom: '1rem'
+                gap: '1.5rem',
+                marginBottom: '1.5rem'
               }}>
-                <div style={{
-                  background: 'rgba(0, 245, 212, 0.05)',
-                  border: '1px solid rgba(0, 245, 212, 0.2)',
-                  borderRadius: '8px',
-                  padding: '0.75rem',
-                  textAlign: 'center'
-                }}>
+                <div>
                   <div style={{
-                    fontSize: '0.65rem',
-                    color: 'rgba(255, 255, 255, 0.6)',
-                    marginBottom: '0.25rem'
+                    fontSize: '0.7rem',
+                    color: 'rgba(255, 255, 255, 0.5)',
+                    marginBottom: '0.25rem',
+                    textTransform: 'uppercase'
                   }}>
-                    Total Staked
+                    Staked Amount
                   </div>
                   <div style={{
-                    fontSize: '1.1rem',
-                    fontWeight: '700',
-                    color: '#00f5d4'
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#fff'
                   }}>
-                    {parseFloat(stakedBalance || 0).toFixed(2)} RL80
+                    {parseFloat(stakedBalance || 0).toLocaleString()} RL80
                   </div>
                 </div>
                 
-                <div style={{
-                  background: 'rgba(255, 215, 0, 0.05)',
-                  border: '1px solid rgba(255, 215, 0, 0.2)',
-                  borderRadius: '8px',
-                  padding: '0.75rem',
-                  textAlign: 'center'
-                }}>
+                <div>
                   <div style={{
-                    fontSize: '0.65rem',
-                    color: 'rgba(255, 255, 255, 0.6)',
-                    marginBottom: '0.25rem'
+                    fontSize: '0.7rem',
+                    color: 'rgba(255, 255, 255, 0.5)',
+                    marginBottom: '0.25rem',
+                    textTransform: 'uppercase'
                   }}>
-                    Pending Rewards
+                    Lock Status
                   </div>
                   <div style={{
-                    fontSize: '1.1rem',
-                    fontWeight: '700',
-                    color: '#ffd700'
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: canWithdraw ? '#00ff88' : '#ff6b6b'
+                  }}>
+                    {canWithdraw ? 'Unlocked' : timeUntilUnlockFormatted}
+                  </div>
+                </div>
+                
+                <div>
+                  <div style={{
+                    fontSize: '0.7rem',
+                    color: 'rgba(255, 255, 255, 0.5)',
+                    marginBottom: '0.25rem',
+                    textTransform: 'uppercase'
+                  }}>
+                    Rewards Earned
+                  </div>
+                  <div style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#00f5d4'
                   }}>
                     {parseFloat(earnedRewards || 0).toFixed(6)} ETH
                   </div>
                 </div>
+                
+                <div>
+                  <div style={{
+                    fontSize: '0.7rem',
+                    color: 'rgba(255, 255, 255, 0.5)',
+                    marginBottom: '0.25rem',
+                    textTransform: 'uppercase'
+                  }}>
+                    Total Pool
+                  </div>
+                  <div style={{
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    color: '#fff'
+                  }}>
+                    600 RL80
+                  </div>
+                </div>
               </div>
-              
+            </div>
+            
+            {/* Claimable Rewards Box - matching WalletDetails style */}
+            {parseFloat(earnedRewards || 0) > 0 && (
               <div style={{
-                background: 'rgba(138, 43, 226, 0.05)',
-                border: '1px solid rgba(138, 43, 226, 0.2)',
+                background: 'rgba(0, 245, 212, 0.1)',
+                border: '1px solid rgba(0, 245, 212, 0.3)',
                 borderRadius: '8px',
-                padding: '0.75rem',
-                textAlign: 'center'
+                padding: '0.75rem 1rem',
+                marginBottom: '1rem',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
               }}>
-                <div style={{
-                  fontSize: '0.65rem',
-                  color: 'rgba(255, 255, 255, 0.6)',
-                  marginBottom: '0.25rem'
+                <span style={{
+                  fontSize: '0.85rem',
+                  color: '#00f5d4'
                 }}>
-                  {canWithdraw ? 'Status' : 'Unlock In'}
-                </div>
-                <div style={{
-                  fontSize: '0.9rem',
-                  fontWeight: '600',
-                  color: canWithdraw ? '#00ff66' : '#ff6b6b'
+                  Claimable Rewards: {parseFloat(earnedRewards).toFixed(6)} ETH
+                </span>
+                <span style={{
+                  fontSize: '0.75rem',
+                  color: '#00f5d4'
                 }}>
-                  {canWithdraw ? '🔓 Unlocked' : `🔒 ${timeUntilUnlockFormatted}`}
-                </div>
+                  Ready to claim!
+                </span>
               </div>
-            </div>
+            )}
             
-            {/* Token Balance */}
-            <div style={{
-              background: 'rgba(59, 130, 246, 0.05)',
-              border: '1px solid rgba(59, 130, 246, 0.2)',
-              borderRadius: '8px',
-              padding: '0.75rem',
-              marginBottom: '1rem',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <span style={{
-                fontSize: '0.75rem',
-                color: 'rgba(255, 255, 255, 0.7)'
-              }}>
-                Wallet Balance:
-              </span>
-              <span style={{
-                fontSize: '0.9rem',
-                fontWeight: '600',
-                color: '#3b82f6'
-              }}>
-                {tokenBalance?.toLocaleString() || '0'} RL80
-              </span>
-            </div>
-            
-            {/* Action Buttons */}
+            {/* Action Buttons - matching WalletDetails style */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: parseFloat(earnedRewards || 0) > 0 ? 'repeat(2, 1fr)' : '1fr',
-              gap: '0.75rem',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: '1rem',
               marginBottom: '1rem'
             }}>
-              {parseFloat(earnedRewards || 0) > 0 && (
-                <button
-                  onClick={async () => {
-                    try {
-                      setIsClaimingRewards(true);
-                      await claimRewards();
-                      await refreshStakingData();
-                      alert('Rewards claimed successfully!');
-                    } catch (err) {
-                      console.error('Error claiming rewards:', err);
-                      alert('Failed to claim rewards');
-                    } finally {
-                      setIsClaimingRewards(false);
-                    }
-                  }}
-                  disabled={isClaimingRewards}
-                  style={{
-                    padding: '0.75rem',
-                    background: 'linear-gradient(135deg, #ffd700, #ffed4e)',
-                    border: 'none',
-                    borderRadius: '8px',
-                    color: '#000',
-                    fontSize: '0.85rem',
-                    fontWeight: '600',
-                    cursor: isClaimingRewards ? 'not-allowed' : 'pointer',
-                    opacity: isClaimingRewards ? 0.5 : 1,
-                    transition: 'all 0.3s'
-                  }}
-                >
-                  {isClaimingRewards ? 'Claiming...' : '💰 Claim Rewards'}
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  setShowSuccess(false);
+                  setStakeAmount('');
+                }}
+                style={{
+                  padding: '0.9rem',
+                  background: '#00f5d4',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#000',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s',
+                  textTransform: 'uppercase'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.opacity = '0.9';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.opacity = '1';
+                }}
+              >
+                STAKE MORE
+              </button>
               
-              {canWithdraw && parseFloat(stakedBalance || 0) > 0 && (
-                <button
-                  onClick={async () => {
-                    if (!confirm('Are you sure you want to withdraw all staked tokens?')) return;
-                    try {
-                      setIsWithdrawing(true);
-                      await withdrawAll();
-                      await refreshStakingData();
-                      alert('Tokens withdrawn successfully!');
-                    } catch (err) {
-                      console.error('Error withdrawing tokens:', err);
-                      alert('Failed to withdraw tokens');
-                    } finally {
-                      setIsWithdrawing(false);
-                    }
-                  }}
-                  disabled={isWithdrawing || !canWithdraw}
-                  style={{
-                    padding: '0.75rem',
-                    background: canWithdraw 
-                      ? 'linear-gradient(135deg, #00f5d4, #00bbff)'
-                      : 'rgba(100, 100, 100, 0.3)',
-                    border: 'none',
-                    borderRadius: '8px',
-                    color: canWithdraw ? '#000' : 'rgba(255, 255, 255, 0.5)',
-                    fontSize: '0.85rem',
-                    fontWeight: '600',
-                    cursor: canWithdraw && !isWithdrawing ? 'pointer' : 'not-allowed',
-                    opacity: isWithdrawing ? 0.5 : 1,
-                    transition: 'all 0.3s'
-                  }}
-                >
-                  {isWithdrawing ? 'Withdrawing...' : canWithdraw ? '📤 Withdraw All' : `🔒 Locked`}
-                </button>
-              )}
+              <button
+                onClick={async () => {
+                  if (!canWithdraw) {
+                    alert(`Tokens are locked. ${timeUntilUnlockFormatted}`);
+                    return;
+                  }
+                  if (!confirm('Are you sure you want to withdraw all staked tokens?')) return;
+                  try {
+                    setIsWithdrawing(true);
+                    await withdrawAll();
+                    await refreshStakingData();
+                    await refreshBalance();
+                    alert('Tokens withdrawn successfully!');
+                  } catch (err) {
+                    console.error('Error withdrawing tokens:', err);
+                    alert('Failed to withdraw tokens');
+                  } finally {
+                    setIsWithdrawing(false);
+                  }
+                }}
+                disabled={isWithdrawing}
+                style={{
+                  padding: '0.9rem',
+                  background: canWithdraw ? '#ff6b6b' : 'rgba(100, 100, 100, 0.3)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: canWithdraw ? '#fff' : 'rgba(255, 255, 255, 0.5)',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  cursor: canWithdraw && !isWithdrawing ? 'pointer' : 'not-allowed',
+                  opacity: isWithdrawing ? 0.5 : 1,
+                  transition: 'all 0.3s',
+                  textTransform: 'uppercase'
+                }}
+              >
+                {isWithdrawing ? 'WITHDRAWING...' : canWithdraw ? `WITHDRAW ALL (${parseFloat(stakedBalance).toLocaleString()} RL80)` : `🔒 LOCKED`}
+              </button>
             </div>
+            
+            {/* Claim Rewards Button - full width when available */}
+            {parseFloat(earnedRewards || 0) > 0 && (
+              <button
+                onClick={async () => {
+                  try {
+                    setIsClaimingRewards(true);
+                    await claimRewards();
+                    await refreshStakingData();
+                    await refreshBalance();
+                    alert('Rewards claimed successfully!');
+                  } catch (err) {
+                    console.error('Error claiming rewards:', err);
+                    alert('Failed to claim rewards');
+                  } finally {
+                    setIsClaimingRewards(false);
+                  }
+                }}
+                disabled={isClaimingRewards || !canWithdraw}
+                style={{
+                  width: '100%',
+                  padding: '0.9rem',
+                  background: canWithdraw ? '#00f5d4' : 'rgba(100, 100, 100, 0.3)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: canWithdraw ? '#000' : 'rgba(255, 255, 255, 0.5)',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  cursor: canWithdraw && !isClaimingRewards ? 'pointer' : 'not-allowed',
+                  opacity: isClaimingRewards ? 0.5 : 1,
+                  transition: 'all 0.3s',
+                  textTransform: 'uppercase',
+                  marginBottom: '1rem'
+                }}
+              >
+                {isClaimingRewards ? 'CLAIMING...' : `CLAIM ${parseFloat(earnedRewards).toFixed(6)} ETH`}
+              </button>
+            )}
             
             {/* Transaction Link */}
             {successData?.txHash && (
@@ -821,33 +859,6 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                 </a>
               </div>
             )}
-            
-            <button
-              onClick={() => {
-                setShowSuccess(false);
-                setStakeAmount('');
-              }}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                background: 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                borderRadius: '8px',
-                color: '#fff',
-                fontSize: '0.85rem',
-                fontWeight: '500',
-                cursor: 'pointer',
-                transition: 'all 0.3s'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.background = 'rgba(255, 255, 255, 0.2)';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.background = 'rgba(255, 255, 255, 0.1)';
-              }}
-            >
-              Stake More
-            </button>
           </div>
         ) : (
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -896,7 +907,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                 textShadow: '0 2px 10px rgba(0,0,0,0.7)',
                 width: '100%',
               }}>
-                Stake RL80 Tokens {IS_TESTNET && <span style={{ fontSize: '0.7em', color: '#ffd700' }}>(Testnet)</span>}
+                Stake RL80 Tokens {IS_TESTNET && <span style={{ fontSize: '0.7em', color: '#00f5d4' }}>(Testnet)</span>}
               </h2>
               
               {/* Close button on image */}
@@ -990,7 +1001,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                 style={{
                   background: 'none',
                   border: 'none',
-                  color: '#d4af37',
+                  color: '#00f5d4',
                   fontSize: '0.65rem',
                   cursor: 'pointer',
                   opacity: 0.7,
@@ -1007,8 +1018,8 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
             {/* Collapsible Info Section - More Compact */}
             {showInfo && (
               <div style={{
-                background: 'rgba(212, 175, 55, 0.05)',
-                border: '1px solid rgba(212, 175, 55, 0.2)',
+                background: 'rgba(0, 245, 212, 0.05)',
+                border: '1px solid rgba(0, 245, 212, 0.2)',
                 borderRadius: '8px',
                 padding: '0.75rem',
                 marginBottom: '1rem',
@@ -1052,7 +1063,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                     borderRadius: '6px',
                     border: '1px solid rgba(255, 215, 0, 0.3)',
                     fontSize: '0.6rem',
-                    color: '#ffd700',
+                    color: '#00f5d4',
                     fontWeight: '600'
                   }}>
                     TESTNET

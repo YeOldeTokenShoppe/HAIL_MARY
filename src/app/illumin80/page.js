@@ -49,6 +49,7 @@ export default function ShrinePage() {
   const [remountKey, setRemountKey] = useState(0)
   const [isExpanded, setIsExpanded] = useState(false)
   const [hasLitCandleThisSession, setHasLitCandleThisSession] = useState(false)
+  const [mobileBannerType, setMobileBannerType] = useState('candle') // 'candle' or 'staking'
   const is80sMode = context80sMode
   
   // State for offerings data
@@ -384,6 +385,17 @@ useEffect(() => {
     window.addEventListener('openBuyModal', handleOpenBuyModal);
     return () => window.removeEventListener('openBuyModal', handleOpenBuyModal);
   }, []);
+  
+  // Auto-alternate between candle and staking banners on mobile
+  useEffect(() => {
+    if (!isMobileView || hasLitCandleThisSession) return;
+    
+    const interval = setInterval(() => {
+      setMobileBannerType(prev => prev === 'candle' ? 'staking' : 'candle');
+    }, 8000); // Switch every 8 seconds
+    
+    return () => clearInterval(interval);
+  }, [isMobileView, hasLitCandleThisSession]);
 
   return (
     <>
@@ -464,7 +476,9 @@ useEffect(() => {
             width: (isExpanded && !hasLitCandleThisSession) ? 'calc(100% - 32px)' : '80px',
             maxWidth: (isExpanded && !hasLitCandleThisSession) ? '340px' : '80px',
             background: 'rgba(10, 10, 20, 0.4)',
-            border: '1px solid rgba(212, 175, 55, 0.15)',
+            border: mobileBannerType === 'candle' 
+              ? '1px solid rgba(212, 175, 55, 0.15)'
+              : '1px solid rgba(0, 245, 212, 0.15)',
             borderRadius: '50px',
             padding: isExpanded ? '12px 16px' : '10px',
             boxShadow: `
@@ -496,38 +510,77 @@ useEffect(() => {
               overflow: 'hidden',
               whiteSpace: 'nowrap',
             }}>
-            <div style={{ 
-              fontSize: '1.5rem',
-              fontWeight: 400,
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              marginBottom: '2px',
-              color: 'rgba(212, 175, 55, 0.9)',
-            }}>
-              Get On Her Watchlist
-            </div>
-            <div style={{ 
-              fontSize: '1rem',
-              opacity: 0.7,
-              fontWeight: 300,
-            }}>
-              Strike match to Light a Green Candle!
-            </div>
-            <div style={{ 
-              fontSize: '0.65rem',
-              opacity: 0.5,
-              fontWeight: 300,
-              marginTop: '0.3rem',
-              fontStyle: 'italic',
-              textAlign: 'center',
-              width: '100%',
-            }}>
-              Sign in + hold RL80 to participate
-            </div>
+            {mobileBannerType === 'candle' ? (
+              <>
+                <div style={{ 
+                  fontSize: '1.5rem',
+                  fontWeight: 400,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  marginBottom: '2px',
+                  color: 'rgba(212, 175, 55, 0.9)',
+                  textAlign: 'center',
+                }}>
+                  Get On Her Watchlist
+                </div>
+                <div style={{ 
+                  fontSize: '1rem',
+                  opacity: 0.7,
+                  fontWeight: 300,
+                  textAlign: 'center',
+                }}>
+                  Strike match to Light a Green Candle!
+                </div>
+                <div style={{ 
+                  fontSize: '0.65rem',
+                  opacity: 0.5,
+                  fontWeight: 300,
+                  marginTop: '0.3rem',
+                  fontStyle: 'italic',
+                  textAlign: 'center',
+                  width: '100%',
+                }}>
+                  Sign in + hold RL80 to participate
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ 
+                  fontSize: '1.5rem',
+                  fontWeight: 400,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  marginBottom: '2px',
+                  color: 'rgba(0, 245, 212, 0.9)',
+                  textAlign: 'center',
+                }}>
+                  STAKE RL80 TOKENS
+                </div>
+                <div style={{ 
+                  fontSize: '1rem',
+                  opacity: 0.7,
+                  fontWeight: 300,
+                  textAlign: 'center',
+                }}>
+                  Earn ETH Rewards!
+                </div>
+                <div style={{ 
+                  fontSize: '0.65rem',
+                  opacity: 0.5,
+                  fontWeight: 300,
+                  marginTop: '0.3rem',
+                  fontStyle: 'italic',
+                  textAlign: 'center',
+                  width: '100%',
+                }}>
+                  Sign in + connect wallet to stake
+                </div>
+              </>
+            )}
           </div>
           )}
           
-          {/* Matchstick Button - Always visible */}
+          {/* Matchstick or Stake Button - Changes based on banner type */}
           <div 
             onClick={(e) => {
               e.stopPropagation(); // Prevent triggering the parent onClick
@@ -545,34 +598,44 @@ useEffect(() => {
                 return;
               }
               
-              // If banner is expanded, then open the modal
+              // If banner is expanded, then open the appropriate modal
               // Haptic feedback if available
               if (window.navigator && window.navigator.vibrate) {
                 window.navigator.vibrate(50) // Short vibration
               }
               
-              // Use the auth check handler
-              handleLightCandleClick()
+              // Open different modal based on banner type
+              if (mobileBannerType === 'candle') {
+                handleLightCandleClick();
+              } else {
+                handleStakeClick();
+              }
             }}
             style={{
               width: '60px',
               height: '60px',
               borderRadius: '50%',
               flexShrink: 0,
-              background: mobileMatchstickLit 
-                ? 'radial-gradient(circle, rgba(255, 149, 0, 0.2) 0%, rgba(255, 100, 0, 0.05) 70%, transparent 100%)'
-                : 'rgba(212, 175, 55, 0.1)',
-              border: mobileMatchstickLit 
-                ? '1.5px solid rgba(255, 149, 0, 0.4)' 
-                : '1.5px solid rgba(212, 175, 55, 0.15)',
+              background: mobileBannerType === 'candle' 
+                ? (mobileMatchstickLit 
+                  ? 'radial-gradient(circle, rgba(255, 149, 0, 0.2) 0%, rgba(255, 100, 0, 0.05) 70%, transparent 100%)'
+                  : 'rgba(212, 175, 55, 0.1)')
+                : 'rgba(0, 245, 212, 0.1)',
+              border: mobileBannerType === 'candle'
+                ? (mobileMatchstickLit 
+                  ? '1.5px solid rgba(255, 149, 0, 0.4)' 
+                  : '1.5px solid rgba(212, 175, 55, 0.15)')
+                : '1.5px solid rgba(0, 245, 212, 0.15)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
               transition: 'all 0.3s ease',
-              boxShadow: mobileMatchstickLit
-                ? '0 0 15px rgba(255, 149, 0, 0.3)'
-                : '0 0 0 0 rgba(212, 175, 55, 0)',
+              boxShadow: mobileBannerType === 'candle'
+                ? (mobileMatchstickLit
+                  ? '0 0 15px rgba(255, 149, 0, 0.3)'
+                  : '0 0 0 0 rgba(212, 175, 55, 0)')
+                : '0 0 0 0 rgba(0, 245, 212, 0)',
               animation: mobileMatchstickLit
                 ? 'none'
                 : 'buttonPulse 2s ease-in-out infinite',
@@ -580,7 +643,7 @@ useEffect(() => {
               overflow: 'hidden',
             }}
           >
-            {/* Mobile matchstick - lit or unlit based on state */}
+            {/* Mobile button icon - changes based on banner type */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -589,24 +652,40 @@ useEffect(() => {
               height: '100%',
               pointerEvents: 'none',  // Prevent internal click handling
             }}>
-              {mobileMatchstickLit ? (
-                // Lit state - flame emoji
-                <div style={{
-                  fontSize: '32px',
-                  animation: 'flicker 0.5s ease-in-out infinite',
-                }}>
-                  🔥
-                </div>
+              {mobileBannerType === 'candle' ? (
+                // Candle mode - show matchstick or flame
+                mobileMatchstickLit ? (
+                  // Lit state - flame emoji
+                  <div style={{
+                    fontSize: '32px',
+                    animation: 'flicker 0.5s ease-in-out infinite',
+                  }}>
+                    🔥
+                  </div>
+                ) : (
+                  // Unlit state - matchstick SVG
+                  <img 
+                    src="/images/matchstick.svg"
+                    alt="Matchstick"
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      opacity: 0.9,
+                      filter: 'brightness(1.2)',
+                    }}
+                  />
+                )
               ) : (
-                // Unlit state - matchstick SVG
+                // Staking mode - show stake icon
                 <img 
-                  src="/images/matchstick.svg"
-                  alt="Matchstick"
+                  src="/images/stakeIcon.webp"
+                  alt="Stake"
                   style={{
-                    width: '28px',
-                    height: '28px',
+                    width: '44px',
+                    height: '44px',
+                    objectFit: 'contain',
                     opacity: 0.9,
-                    filter: 'brightness(1.2)',
+                    filter: 'brightness(1.1)',
                   }}
                 />
               )}

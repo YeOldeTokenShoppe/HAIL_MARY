@@ -308,6 +308,7 @@ const ShrineLeftPanel = forwardRef(({
           lineHeight: 1.4,
           maxWidth: isMobile ? '280px' : '320px',
           alignSelf: 'center',
+          marginTop: '2rem'
         }}>
           <span style={{ 
             display: 'block',
@@ -315,9 +316,9 @@ const ShrineLeftPanel = forwardRef(({
             textTransform: 'uppercase',
             letterSpacing: '0.12em',
           }}>
-            STAKE RL80
+            STAKE RL80 - EARN REWARDS
           </span>
-          <span style={{ 
+          {/* <span style={{ 
             display: 'block', 
             fontSize: isMobile ? '0.9rem' : '0.9rem',
             opacity: 0.8,
@@ -326,8 +327,8 @@ const ShrineLeftPanel = forwardRef(({
             fontStyle: 'italic',
           }}>
             Earn rewards
-          </span>
-          <span style={{ 
+          </span> */}
+          {/* <span style={{ 
             display: 'block', 
             fontSize: '0.65rem',
             opacity: 0.5,
@@ -336,7 +337,7 @@ const ShrineLeftPanel = forwardRef(({
             fontStyle: 'italic',
           }}>
             Sign in + hold RL80 to participate
-          </span>
+          </span> */}
         </div>
         
         {/* Stake button - circular background matching matchstick style */}
