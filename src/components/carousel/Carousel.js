@@ -369,7 +369,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                 top: '50%',
                 left: '50%',
                 width: '300%',  // Wider to show more of the tunnel
-                height: '300%',  // Taller to show more of the tunnel
+                height: 'auto',  // Taller to show more of the tunnel
                 // Combine all transforms in the correct order
                 transform: `
                   translate(-50%, -50%)

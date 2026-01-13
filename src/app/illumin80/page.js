@@ -4,7 +4,6 @@ import React, { useState, useEffect, useRef, Suspense, useCallback } from 'react
 import dynamic from 'next/dynamic'
 import NavControlsHome from '@/components/NavControlsHome'
 import CyberNav from '@/components/CyberNav'
-import Link from 'next/link'
 import { useUser, SignInButton } from '@clerk/nextjs'
 import { useMusic } from '@/components/MusicContext'
 import { useWalletAuth } from '@/components/WalletAuthProvider'
@@ -563,6 +562,55 @@ useEffect(() => {
           />
         ) : null}
       </div>
+      
+      {/* Title - positioned at top left, visible on all screen sizes */}
+      <h1 className='custom-title'
+          id="main-title"
+          style={{ 
+            position: 'fixed',
+            left: isMobileView ? '20px' : '40px',
+            top: isMobileView ? '20px' : '40px',
+            pointerEvents: 'auto',
+            color: is80sMode ? "#ffffff" : "#d4af37",
+            fontFamily: 'UnifrakturCook, serif',
+            textShadow: is80sMode 
+              ? `
+                0 0 20px rgba(201, 55, 255, 0.9),
+                0 0 40px rgba(201, 55, 255, 0.8),
+                0 0 60px rgba(201, 55, 255, 0.7),
+                4px 4px 12px rgba(201, 55, 255, 1),
+                -2px -2px 8px rgba(255, 0, 255, 0.8),
+                0 0 100px rgba(201, 55, 255, 0.5)
+              `
+              : `
+                rgba(83, 61, 74, 0.9) 1px 1px,
+                rgba(83, 61, 74, 0.9) 2px 2px,
+                rgba(83, 61, 74, 0.8) 3px 3px,
+                rgba(83, 61, 74, 0.8) 4px 4px,
+                rgba(83, 61, 74, 0.7) 5px 5px,
+                rgba(83, 61, 74, 0.7) 6px 6px,
+                rgba(83, 61, 74, 0.6) 7px 7px,
+                rgba(83, 61, 74, 0.6) 8px 8px,
+                rgba(255, 192, 203, 0.4) -1px -1px 5px,
+                rgba(0, 0, 0, 0.8) 10px 10px 15px
+              `,
+            fontSize: isMobileView ? "1.5rem" : "2rem",
+            fontWeight: 900,
+            lineHeight: 0.75,
+            transform: "rotate(-8deg) skew(-15deg)",
+            cursor: 'pointer',
+            margin: 0,
+            zIndex: 100,
+          }}
+          onClick={() => router?.push('/about')}
+        >
+          <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
+          <span className="title-line" style={{ display: 'block', position: 'relative' }}>
+            <span style={{ fontSize: isMobileView ? "1.2rem" : "1.6rem" }}>of    </span>
+            Perpetual
+          </span>
+          <span className="title-line" style={{ display: 'block', marginLeft: isMobileView ? "2rem" : "3rem", position: 'relative' }}>Profit</span>
+        </h1>
       
       {/* Only render ShrineLeftPanel on desktop/tablet after we know device type */}
       {mounted && !isMobileView && (
@@ -1188,9 +1236,9 @@ useEffect(() => {
               cursor: "pointer",
             }}
           >
-            <Link href="/about" style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
+            <span style={{ textDecoration: 'none', color: 'inherit', display: 'inline-block' }}>
               RL80
-            </Link>
+            </span>
             {Array.from({length: 100}).map((_, i) => {
               const index = i + 1;
               const r80s = 201 - index * 2;

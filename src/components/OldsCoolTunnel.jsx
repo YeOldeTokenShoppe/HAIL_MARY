@@ -458,6 +458,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
   const raycasterRef = useRef(new THREE.Raycaster())
   const mouseRef = useRef(new THREE.Vector2())
   const focusStateRef = useRef({ image: null, index: -1 })
+  const wasManuallyPausedRef = useRef(false) // Track if pause was user-initiated
 
   useEffect(() => {
     if (!mountRef.current) return
@@ -597,6 +598,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
       if (e.code === 'Space') {
         e.preventDefault()
         isPausedLocal = !isPausedLocal
+        wasManuallyPausedRef.current = isPausedLocal // Track manual pause state
         setIsPaused(isPausedLocal)
       }
       
@@ -605,8 +607,9 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
         setFocusedImage(null)
         setFocusedIndex(-1)
         setFocusedImageData(null)
-        isPausedLocal = false
-        setIsPaused(false)
+        // Restore the pause state from before entering gallery
+        isPausedLocal = wasManuallyPausedRef.current
+        setIsPaused(wasManuallyPausedRef.current)
       }
       
       // Arrow keys for navigation when focused
@@ -687,6 +690,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
       
       // Default behavior - toggle pause
       isPausedLocal = !isPausedLocal
+      wasManuallyPausedRef.current = isPausedLocal // Track manual pause state
       setIsPaused(isPausedLocal)
     }
     
@@ -704,8 +708,9 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
           setFocusedImage(null)
           setFocusedIndex(-1)
           setFocusedImageData(null)
-          isPausedLocal = false
-          setIsPaused(false)
+          // Restore the pause state from before entering gallery
+          isPausedLocal = wasManuallyPausedRef.current
+          setIsPaused(wasManuallyPausedRef.current)
         }
         return
       }
@@ -847,7 +852,8 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
             setFocusedImage(null)
             setFocusedIndex(-1)
             setFocusedImageData(null)
-            setIsPaused(false)
+            // Restore the pause state from before entering gallery
+            setIsPaused(wasManuallyPausedRef.current)
           }}
         >
           {/* Image Display */}

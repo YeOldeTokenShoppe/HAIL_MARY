@@ -120,7 +120,7 @@ export default function NavControlsHome({
         }
 
         .eighties-btn-text {
-          font-size: 11px;
+          font-size: 12px;
           font-weight: bold;
           color: ${is80sMode ? '#00ff41' : '#67e8f9'};
           text-shadow: ${is80sMode ? '0 0 10px #00ff41' : 'none'};
@@ -129,7 +129,7 @@ export default function NavControlsHome({
         }
 
         .eighties-btn-text-small {
-          font-size: 0.7rem;
+          font-size: 0.5rem;
           font-weight: bold;
           color: ${is80sMode ? '#00ff41' : '#67e8f9'};
           text-shadow: ${is80sMode ? '0 0 10px #00ff41' : 'none'};

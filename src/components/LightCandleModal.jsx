@@ -107,11 +107,11 @@ function SimpleCandleViewer({ customImageUrl, offeringType }) {
   }, [scene, customImageUrl, offeringType]);
   
   // Auto-rotate the model
-  useFrame((_state, delta) => {
-    if (modelRef.current) {
-      modelRef.current.rotation.y += delta * 0.5;
-    }
-  });
+  // useFrame((_state, delta) => {
+  //   if (modelRef.current) {
+  //     modelRef.current.rotation.y += delta * 0.5;
+  //   }
+  // });
   
   return <group ref={groupRef} />;
 }
@@ -1253,9 +1253,11 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                       </Suspense>
                       <OrbitControls 
                         enablePan={false}
-                        enableZoom={false}
-                        autoRotate={true}
-                        autoRotateSpeed={1}
+                        maxDistance={5}
+                        minDistance={2}
+                        enableZoom={true}
+                        autoRotate={false}
+                        // autoRotateSpeed={1}
                       />
                     </Canvas>
                   </Suspense>

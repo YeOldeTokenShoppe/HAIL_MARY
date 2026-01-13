@@ -29,7 +29,15 @@ const NavButtons = () => {
   const handleItemClick = (e, item) => {
     if (item.openCyberNav) {
       e.preventDefault();
+      e.stopPropagation();
       setIsCyberNavOpen(true);
+      // Prevent any scroll behavior on mobile
+      if (isMobile) {
+        document.body.style.overflow = 'hidden';
+        setTimeout(() => {
+          document.body.style.overflow = '';
+        }, 100);
+      }
     }
   };
 
@@ -64,16 +72,26 @@ const NavButtons = () => {
           ) : (
             <button
               key={item.label}
+              type="button"
               style={{
                 ...styles.navBtn,
                 ...(hoveredIndex === index ? styles.navBtnHover : {}),
                 background: 'none',
                 border: 'none',
                 font: 'inherit',
+                WebkitTapHighlightColor: 'transparent',
+                touchAction: 'manipulation',
               }}
               onClick={(e) => handleItemClick(e, item)}
               onMouseEnter={() => setHoveredIndex(index)}
               onMouseLeave={() => setHoveredIndex(null)}
+              onTouchStart={(e) => {
+                e.currentTarget.style.transform = 'scale(0.95)';
+              }}
+              onTouchEnd={(e) => {
+                e.currentTarget.style.transform = '';
+                handleItemClick(e, item);
+              }}
             >
               <span
                 style={{

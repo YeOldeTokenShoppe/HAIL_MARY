@@ -99,69 +99,26 @@ const ShrineLeftPanel = forwardRef(({
         zIndex: 3,
       }} />
 
-      {/* Main content container - positioned as one cohesive unit */}
+      {/* Main content container - centered elements */}
       <div style={{
         position: 'fixed',
         left: '40px',
-        top: '5%',
+        top: '50%',
+        transform: 'translateY(-50%)',  // Center vertically
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: '24px',
+        justifyContent: 'center',
+        gap: '15px',  // Reduced gap
         zIndex: 100,
         pointerEvents: 'none',  // Allow clicks to pass through to canvas
+        maxHeight: '90vh',  // Ensure it doesn't overflow viewport
       }}>
-        
-        {/* Title */}
-        <h1 className='custom-title'
-            id="main-title"
-            // onClick={() => router?.push('/about')}
-            style={{ 
-              pointerEvents: 'auto',  // Enable clicks on the title
-              color: is80sMode ? "#ffffff" : "#d4af37",
-              fontFamily: 'UnifrakturCook, serif',
-              textShadow: is80sMode 
-                ? `
-                  0 0 20px rgba(201, 55, 255, 0.9),
-                  0 0 40px rgba(201, 55, 255, 0.8),
-                  0 0 60px rgba(201, 55, 255, 0.7),
-                  4px 4px 12px rgba(201, 55, 255, 1),
-                  -2px -2px 8px rgba(255, 0, 255, 0.8),
-                  0 0 100px rgba(201, 55, 255, 0.5)
-                `
-                : `
-                  rgba(83, 61, 74, 0.9) 1px 1px,
-                  rgba(83, 61, 74, 0.9) 2px 2px,
-                  rgba(83, 61, 74, 0.8) 3px 3px,
-                  rgba(83, 61, 74, 0.8) 4px 4px,
-                  rgba(83, 61, 74, 0.7) 5px 5px,
-                  rgba(83, 61, 74, 0.7) 6px 6px,
-                  rgba(83, 61, 74, 0.6) 7px 7px,
-                  rgba(83, 61, 74, 0.6) 8px 8px,
-                  rgba(255, 192, 203, 0.4) -1px -1px 5px,
-                  rgba(0, 0, 0, 0.8) 10px 10px 15px
-                `,
-              fontSize: "3rem",
-              fontWeight: 900,
-              lineHeight: 0.8,
-              transform: "rotate(-8deg) skew(-15deg)",
-              cursor: 'pointer',
-              margin: 0,
-              marginBottom: '20px',
-            }}
-          >
-            <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
-            <span className="title-line" style={{ display: 'block', position: 'relative' }}>
-              <span style={{ fontSize: "2rem" }}>of    </span>
-              Perpetual
-            </span>
-            <span className="title-line" style={{ display: 'block', marginLeft: "4rem", position: 'relative' }}>Profit</span>
-          </h1>
 
         {/* CTA Text - Clean modern font */}
         <div style={{
           fontFamily: "'Bebas Neue', sans-serif",
-          fontSize: isMobile ? '1.2rem' : '1.4rem',
+          fontSize: isMobile ? '1rem' : '1.1rem',
           fontWeight: 300,
           color: 'rgba(246, 245, 241, 0.95)',
           textShadow: `
@@ -169,10 +126,10 @@ const ShrineLeftPanel = forwardRef(({
             0 0 40px rgba(212, 175, 55, 0.2),
             2px 2px 4px rgba(0, 0, 0, 0.6)
           `,
-          letterSpacing: '0.08em',
+          letterSpacing: '0.06em',
           textAlign: 'center',
-          lineHeight: 1.4,
-          maxWidth: isMobile ? '280px' : '320px',
+          lineHeight: 1.2,
+          maxWidth: isMobile ? '260px' : '280px',
           alignSelf: 'center',
         }}>
           <span style={{ 
@@ -210,8 +167,8 @@ const ShrineLeftPanel = forwardRef(({
           onClick={handleMatchClick}
           style={{
             pointerEvents: 'auto',  // Enable clicks on the matchstick
-            width: '8rem',
-            height: '8rem',
+            width: '5.5rem',
+            height: '5.5rem',
             borderRadius: '50%',
             background: isLit 
               ? 'radial-gradient(circle, rgba(255, 149, 0, 0.2) 0%, rgba(255, 100, 0, 0.05) 70%, transparent 100%)'
@@ -295,7 +252,7 @@ const ShrineLeftPanel = forwardRef(({
         {/* Stake Token Frame - Duplicate style below matchstick */}
         <div style={{
           fontFamily: "'Bebas Neue', sans-serif",
-          fontSize: isMobile ? '1.2rem' : '1.4rem',
+          fontSize: isMobile ? '1rem' : '1rem',
           fontWeight: 300,
           color: 'rgba(246, 245, 241, 0.95)',
           textShadow: `
@@ -303,20 +260,21 @@ const ShrineLeftPanel = forwardRef(({
             0 0 40px rgba(212, 175, 55, 0.2),
             2px 2px 4px rgba(0, 0, 0, 0.6)
           `,
-          letterSpacing: '0.08em',
+          letterSpacing: '0.06em',
           textAlign: 'center',
-          lineHeight: 1.4,
-          maxWidth: isMobile ? '280px' : '320px',
+          lineHeight: 1.2,
+          maxWidth: isMobile ? '260px' : '280px',
           alignSelf: 'center',
-          marginTop: '2rem'
+          marginTop: '0.5rem'
         }}>
           <span style={{ 
             display: 'block',
             fontWeight: 400,
             textTransform: 'uppercase',
-            letterSpacing: '0.12em',
+            letterSpacing: '0.08em',
+            fontSize: '0.95rem',
           }}>
-            STAKE RL80 - EARN REWARDS
+            STAKE RL80 - EARN ETH
           </span>
           {/* <span style={{ 
             display: 'block', 
@@ -349,8 +307,8 @@ const ShrineLeftPanel = forwardRef(({
           }}
           style={{
             pointerEvents: 'auto',  // Enable clicks on the stake button
-            width: '8rem',
-            height: '8rem',
+            width: '5.5rem',
+            height: '5.5rem',
             borderRadius: '50%',
             background: 'rgba(212, 175, 55, 0.1)',
             border: '1.5px solid rgba(212, 175, 55, 0.15)',
