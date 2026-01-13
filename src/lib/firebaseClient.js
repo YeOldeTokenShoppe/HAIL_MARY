@@ -8,6 +8,7 @@ import {
   deleteDoc,
   doc,
   addDoc,
+  updateDoc,
   orderBy,
   limit as limitFn,
   writeBatch,
@@ -232,7 +233,8 @@ export {
   getDocs, 
   deleteDoc, 
   doc, 
-  addDoc, 
+  addDoc,
+  updateDoc, 
   orderBy, 
   // Rename limitFn to limit to avoid naming conflicts
   limitFn as limit, 

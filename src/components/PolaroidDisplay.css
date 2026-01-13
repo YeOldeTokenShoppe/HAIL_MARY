@@ -1,0 +1,120 @@
+.polaroid-display {
+  position: fixed;
+  z-index: 9999;
+  animation: slideIn 0.5s ease-out;
+  pointer-events: all;
+}
+
+.polaroid-display.bottom-right {
+  bottom: 20px;
+  right: 20px;
+}
+
+.polaroid-display.bottom-left {
+  bottom: 20px;
+  left: 20px;
+}
+
+.polaroid-display.top-right {
+  top: 80px;
+  right: 20px;
+}
+
+.polaroid-display.top-left {
+  top: 80px;
+  left: 20px;
+}
+
+.polaroid-wrapper {
+  position: relative;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  transform: rotate(-2deg);
+  transition: transform 0.3s ease;
+  cursor: default;
+  display: inline-block;
+}
+
+.polaroid-wrapper:hover {
+  transform: rotate(-1deg) scale(1.05);
+}
+
+.polaroid-image {
+  width: 320px;
+  height: auto;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  border-radius: 2px;
+}
+
+.polaroid-image.visible {
+  opacity: 1;
+}
+
+.polaroid-actions {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 10px;
+  animation: fadeIn 0.5s ease;
+}
+
+.action-button {
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 18px;
+}
+
+.action-button:hover {
+  background: rgba(0, 0, 0, 0.9);
+  transform: scale(1.1);
+}
+
+.action-button.close {
+  background: rgba(200, 0, 0, 0.8);
+}
+
+.action-button.close:hover {
+  background: rgba(200, 0, 0, 0.9);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .polaroid-image {
+    width: 240px;
+  }
+  
+  .polaroid-display {
+    bottom: 10px !important;
+    right: 10px !important;
+  }
+}

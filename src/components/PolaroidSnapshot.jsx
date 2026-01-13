@@ -26,7 +26,9 @@ const PolaroidSnapshot = ({
   const polaroidRef = useRef(null);
 
   useEffect(() => {
+    console.log(`[PolaroidSnapshot-${instanceId.current}] Trigger changed to:`, trigger);
     if (trigger) {
+      console.log(`[PolaroidSnapshot-${instanceId.current}] Trigger is true - calling captureSnapshot()`);
       captureSnapshot();
     }
   }, [trigger]);
@@ -404,15 +406,21 @@ const PolaroidSnapshot = ({
     }
   };
   
+  // Track if we've called onComplete
+  const hasCalledOnCompleteRef = useRef(false);
+  
   // Capture polaroid when it's fully visible and deblurred
   useEffect(() => {
     // For backgrounds, wait for compositedImageUrl; otherwise use imageUrl
     const requiredImage = backgroundImage ? compositedImageUrl : imageUrl;
     
-    if (isVisible && !isBlurred && polaroidRef.current && !polaroidImageUrl && requiredImage) {
+    console.log('[PolaroidSnapshot] Capture check - visible:', isVisible, 'blurred:', isBlurred, 'hasRef:', !!polaroidRef.current, 'hasCalledOnComplete:', hasCalledOnCompleteRef.current, 'hasRequired:', !!requiredImage);
+    
+    if (isVisible && !isBlurred && polaroidRef.current && !hasCalledOnCompleteRef.current && requiredImage) {
+      console.log('[PolaroidSnapshot] All conditions met, setting timer for capture');
       // Wait longer to ensure the composited image is ready
       const timer = setTimeout(async () => {
-        console.log('[PolaroidSnapshot] Starting polaroid capture, has background:', !!backgroundImage, 'composited:', !!compositedImageUrl);
+        console.log('[PolaroidSnapshot] Timer fired - Starting polaroid capture for onComplete callback');
         
         // ONLY capture and call onComplete if we have the right image
         if (backgroundImage && !compositedImageUrl) {
@@ -421,16 +429,20 @@ const PolaroidSnapshot = ({
         }
         
         const capturedUrl = await capturePolaroid();
+        console.log('[PolaroidSnapshot] capturePolaroid returned:', capturedUrl ? 'URL' : 'null', 'length:', capturedUrl?.length);
+        
         // Pass the complete polaroid to onComplete after it's captured
-        if (onComplete && capturedUrl) {
-          // We now use JPEG compression, so file sizes are intentionally smaller (50-200KB instead of 700KB-2MB)
-          console.log('[PolaroidSnapshot] Calling onComplete with compressed JPEG image size:', capturedUrl.length, 'composited:', !!compositedImageUrl);
+        if (onComplete && capturedUrl && !hasCalledOnCompleteRef.current) {
+          hasCalledOnCompleteRef.current = true; // Mark as called
+          console.log('[PolaroidSnapshot] ✅ Calling onComplete with compressed JPEG image size:', capturedUrl.length);
           onComplete(capturedUrl);
+        } else {
+          console.log('[PolaroidSnapshot] ❌ Not calling onComplete - onComplete:', !!onComplete, 'capturedUrl:', !!capturedUrl, 'hasCalledOnComplete:', hasCalledOnCompleteRef.current);
         }
       }, 1500); // Increased delay to ensure background is fully composited
       return () => clearTimeout(timer);
     }
-  }, [isVisible, isBlurred, polaroidImageUrl, imageUrl, compositedImageUrl, backgroundImage, onComplete]);
+  }, [isVisible, isBlurred]); // Reduce dependencies to prevent re-triggers
   
   const handleClick = (e) => {
     // Don't close if clicking on action buttons

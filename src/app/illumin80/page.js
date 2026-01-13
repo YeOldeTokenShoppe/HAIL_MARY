@@ -16,6 +16,7 @@ import { useRouter } from 'next/navigation'
 import ShrineLeftPanel from '@/components/ShrineLeftPanel'
 import { db, collection, addDoc, serverTimestamp, getDocs, query, orderBy, limit, onSnapshot } from '@/lib/firebaseClient'
 import UnifiedShrine from '@/components/UnifiedShrine'
+import PolaroidDisplay from '@/components/PolaroidDisplay'
 
 
 // Tiny Votive Model Component
@@ -48,6 +49,9 @@ export default function ShrinePage() {
   const [mobileMatchstickLit, setMobileMatchstickLit] = useState(false)
   const [remountKey, setRemountKey] = useState(0)
   const [isExpanded, setIsExpanded] = useState(false)
+  const [polaroidUrl, setPolaroidUrl] = useState(null)
+  const [showPolaroid, setShowPolaroid] = useState(false)
+  const [hasDismissedPolaroid, setHasDismissedPolaroid] = useState(false)
   const [hasLitCandleThisSession, setHasLitCandleThisSession] = useState(false)
   const [mobileBannerType, setMobileBannerType] = useState('candle') // 'candle' or 'staking'
   const is80sMode = context80sMode
@@ -176,13 +180,21 @@ useEffect(() => {
         
         // Check if this is a new offering (not initial load and different from last)
         if (lastOfferingId && lastOfferingId !== latestDoc.id) {
-          console.log('New offering detected from another user!', latestOffering)
+          // Only trigger the effect if this is from ANOTHER user (not the current user)
+          // The current user's candle effect is already triggered in handleLightCandle
+          const isCurrentUser = latestOffering.userId === user?.id || 
+                               latestOffering.walletAddress === walletAddress
           
-          // Trigger the pulse effect for all candles
-          if (unifiedShrineRef.current) {
-            unifiedShrineRef.current.triggerCandleEffect(latestOffering)
+          if (!isCurrentUser) {
+            console.log('New offering detected from another user!', latestOffering)
+            
+            // Trigger the pulse effect for all candles
+            if (unifiedShrineRef.current) {
+              unifiedShrineRef.current.triggerCandleEffect(latestOffering)
+            }
           }
           
+          // Always update the offerings list regardless of who lit the candle
           // Delay fetching to sync count update with ripple effect
           setTimeout(() => {
             // Fetch will update both offerings list AND total count
@@ -201,7 +213,7 @@ useEffect(() => {
       unsubscribe()
       clearInterval(interval)
     }
-  }, [fetchOfferings, unifiedShrineRef])
+  }, [fetchOfferings, unifiedShrineRef, user?.id, walletAddress])
 
   // Set mounted state after hydration
   useEffect(() => {
@@ -371,6 +383,41 @@ useEffect(() => {
 
   // Handle light candle from modal
   const handleLightCandle = async (newOffering) => {
+    // Reset previous polaroid state when lighting a new candle
+    setShowPolaroid(false);
+    setHasDismissedPolaroid(false);
+    setPolaroidUrl(null);
+    
+    // Set up a listener for when the polaroid is ready
+    window.onPolaroidReady = (url) => {
+      console.log('[ShrinePage] Polaroid ready:', url);
+      setPolaroidUrl(url);
+      
+      // Save to localStorage for retrieval in account modal
+      try {
+        const savedPolaroids = JSON.parse(localStorage.getItem('userPolaroids') || '[]');
+        const newPolaroid = {
+          url,
+          timestamp: Date.now(),
+          username: user?.username || user?.firstName || 'Anonymous',
+          burnedAmount: newOffering.tokensBurned || 1
+        };
+        // Keep only last 10 polaroids
+        const updated = [newPolaroid, ...savedPolaroids].slice(0, 10);
+        localStorage.setItem('userPolaroids', JSON.stringify(updated));
+      } catch (e) {
+        console.error('Failed to save polaroid to localStorage:', e);
+      }
+      
+      // Show the polaroid on the side after the candle effect completes
+      // NewCandleEffect takes about 10 seconds (5s rise + 5s glow)
+      setTimeout(() => {
+        console.log('[ShrinePage] Triggering polaroid snapshot display');
+        setShowPolaroid(true);
+        setHasDismissedPolaroid(false);
+      }, 1000); // 3 seconds - shows shortly after candle lands
+    };
+    
     // Trigger the candle launch animation (this will also show on phone via onLightCandle callback)
     if (unifiedShrineRef.current) {
       unifiedShrineRef.current.triggerCandleEffect(newOffering)
@@ -1176,7 +1223,7 @@ useEffect(() => {
         onClose={() => setShowBuyModal(false)}
       />
       
-      {/* Light Candle Modal */}
+      {/* Light Candle Modal - Always mounted to allow snapshot renderer to complete */}
       <LightCandleModal
         isOpen={showLightCandleModal}
         onClose={() => setShowLightCandleModal(false)}
@@ -1318,6 +1365,20 @@ useEffect(() => {
       {showWalletModal && (
         <WalletConnectionModal onClose={() => setShowWalletModal(false)} />
       )}
+      
+      {/* Polaroid Display - Shows the saved polaroid after candle effect completes */}
+      {showPolaroid && polaroidUrl && (
+        <PolaroidDisplay
+          imageUrl={polaroidUrl}
+          isVisible={showPolaroid}
+          position={isMobileView ? 'bottom-right' : 'bottom-right'}
+          onClose={() => {
+            setShowPolaroid(false);
+            setHasDismissedPolaroid(true);
+          }}
+        />
+      )}
+      
       
     </>
   )

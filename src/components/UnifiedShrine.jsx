@@ -373,6 +373,7 @@ useEffect(() => {
   const [displayedCandleCount, setDisplayedCandleCount] = useState(500)
   const [displayedBurnTotal, setDisplayedBurnTotal] = useState(2847395) // Starting with a realistic number
   const [candleCountAnimation, setCandleCountAnimation] = useState(false)
+  const [showLatestPolaroid, setShowLatestPolaroid] = useState(true) // Always show polaroids
   
   // Calculate real stats from offerings
   const realCandleCount = useMemo(() => {
@@ -491,6 +492,15 @@ useEffect(() => {
       id: Date.now(),
       rotation: Math.random() * Math.PI * 2
     }])
+    
+    // Show the latest polaroid on the phone screen after a delay
+    setTimeout(() => {
+      setShowLatestPolaroid(true);
+      // Hide it after 8 seconds
+      setTimeout(() => {
+        setShowLatestPolaroid(false);
+      }, 8000);
+    }, 2000); // Show after 2 seconds (when burst is complete)
     
     // Stats update automatically from offerings prop
     
@@ -854,6 +864,7 @@ useEffect(() => {
                     setFocusMode(!focusMode);
                   }}
                   is80sMode={is80sMode}
+                  showLatestPolaroid={showLatestPolaroid}
                 />
               </group>
             </Suspense>
@@ -1204,7 +1215,7 @@ useEffect(() => {
                   textTransform: 'uppercase',
                   letterSpacing: '0.5px'
                 }}>
-                  ETH Paid
+                  Rewards Claimed
                 </div>
               </div>
             </div>

@@ -1076,11 +1076,12 @@ function SimpleCandleViewer({ modelPath, customImageUrl, backgroundTexturePath, 
                   texture.wrapT = THREE.ClampToEdgeWrapping;
                   texture.needsUpdate = true;
                   
-                  // Enable transparency for PNG images
+                  // Enable transparency for PNG images with alpha channel
                   child.material.map = texture;
                   child.material.transparent = true;
                   child.material.opacity = 1;
-                  child.material.alphaTest = 0.1; // Helps with transparency edges
+                  child.material.alphaTest = 0.5; // Discard transparent pixels
+                  child.material.side = THREE.DoubleSide;
                   child.material.needsUpdate = true;
                 },
                 undefined,

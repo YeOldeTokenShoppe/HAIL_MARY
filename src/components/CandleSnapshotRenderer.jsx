@@ -58,26 +58,21 @@ function getModelPath(userData, includeBox = false) {
 
 
 // Scene component for both candles and tattoos
-function CandleScene({ userData, onReady }) {
-  // At the start of CandleScene function:
-  console.log('[Snapshot] FULL userData received:', JSON.stringify(userData, null, 2));
+const CandleScene = React.memo(({ userData, onReady }) => {
+  // Debug logging - commented out to reduce console noise
+  // console.log('[Snapshot] userData - has image:', !!userData?.image, 'candleType:', userData?.candleType);
   
   const modelPath = getModelPath(userData, false);
   
   let scene, animations;
   try {
     const model = useGLTF(modelPath);
-    console.log('[Snapshot] Loaded model from:', modelPath);
-    console.log('[Snapshot] Model object:', model);
-    console.log('[Snapshot] Model animations:', model.animations);
     
     // Check if Character_Rig has animations
     let characterRig = null;
     model.scene.traverse((child) => {
-      console.log('[Snapshot] Checking child:', child.name, 'type:', child.type);
       if (child.name === 'Character_Rig') {
         characterRig = child;
-        console.log('[Snapshot] Found Character_Rig!', child);
       }
     });
     
@@ -175,12 +170,9 @@ function CandleScene({ userData, onReady }) {
         
         // Look for the appropriate animation based on selectedPose
         if (userData.selectedPose === 'run') {
-          console.log('[Snapshot] Looking for run animation...');
-          console.log('[Snapshot] All animation names:', animations.map(a => a.name));
           
           targetAnimation = animations.find(a => {
             const name = a.name;
-            console.log('[Snapshot] Checking animation:', name, 'duration:', a.duration);
             // Check various possible names
             return name === 'Run_Pose' || 
                    name === 'RunPose' || 
@@ -274,7 +266,6 @@ function CandleScene({ userData, onReady }) {
         }
         
         if (targetAnimation) {
-          console.log('[Snapshot] Found animation:', targetAnimation.name, 'duration:', targetAnimation.duration, 'for pose:', userData.selectedPose);
           
           const mixer = new THREE.AnimationMixer(clonedScene);
           
@@ -295,7 +286,6 @@ function CandleScene({ userData, onReady }) {
           // Store mixer to potentially update it later if needed
           mixerRef.current = mixer;
           
-          console.log('[Snapshot] Animation applied:', targetAnimation.name, 'duration:', targetAnimation.duration);
         } else {
           console.warn('[Snapshot] No animation found for pose:', userData.selectedPose);
         }
@@ -306,11 +296,6 @@ function CandleScene({ userData, onReady }) {
     if (userData?.devotionType === 'tattoo' && userData?.tattooPlacement) {
       isTattooScene = true;
       
-      console.log('[Snapshot] Processing tattoo devotion');
-      console.log('[Snapshot] Selected pose:', userData.selectedPose);
-      console.log('[Snapshot] Animations available:', animations?.map(a => a.name));
-      console.log('[Snapshot] Tattoo placement data:', userData.tattooPlacement);
-      console.log('[Snapshot] Selected pose:', userData.selectedPose || 'tpose');
       
       if (userData.tattooDesign && userData.tattooPlacement) {
         const textureLoader = new THREE.TextureLoader();
@@ -346,7 +331,6 @@ function CandleScene({ userData, onReady }) {
             
             if (useAnimation && hasBoneData) {
               // For animated poses, use bone-relative positioning
-              console.log('[Snapshot] Using bone-relative positioning for pose:', userData.selectedPose);
               
               // Find the bone in the animated model
               let targetBone = null;
@@ -390,7 +374,6 @@ function CandleScene({ userData, onReady }) {
                 quaternion.setFromUnitVectors(defaultNormal, worldNormal);
                 tattooPlane.quaternion.copy(quaternion);
                 
-                console.log('[Snapshot] Tattoo positioned on bone:', placement.boneName);
               } else {
                 console.warn('[Snapshot] Bone not found:', placement.boneName, 'falling back to world position');
                 // Fallback to world position
@@ -398,12 +381,6 @@ function CandleScene({ userData, onReady }) {
               }
             } else if (worldPos && worldNormal) {
               // For T-pose or if no bone data, use world position directly
-              console.log('[Snapshot] Using world position for T-pose');
-              tattooPlane.position.set(
-                worldPos.x || 0,
-                worldPos.y || 0,
-                worldPos.z || 0
-              );
               
             }
             
@@ -425,18 +402,15 @@ function CandleScene({ userData, onReady }) {
               tattooPlane.quaternion.copy(quaternion);
             }
             
-            console.log('[Snapshot] Tattoo positioned at:', tattooPlane.position.toArray().map(v => v.toFixed(3)));
             
             // Add to candleRef (parent of clonedScene) so it's in world space
             if (candleRef.current) {
               candleRef.current.add(tattooPlane);
-              console.log('[Snapshot] Tattoo plane added to scene');
             }
             
             // Trigger ready callback after tattoo is applied
             if (onReady) {
               setTimeout(() => {
-                console.log('[Snapshot] Triggering snapshot after tattoo application');
                 onReady();
               }, 500);
             }
@@ -691,7 +665,6 @@ function CandleScene({ userData, onReady }) {
           // Call onReady after background is loaded
           if (onReady && !isTattooScene) {
             setTimeout(() => {
-              console.log('[Snapshot] Triggering ready after background load for candle');
               onReady();
             }, 500);
           }
@@ -700,7 +673,6 @@ function CandleScene({ userData, onReady }) {
     } else if (!isTattooScene && onReady) {
       // If no background needed, still call onReady for candles
       setTimeout(() => {
-        console.log('[Snapshot] Triggering ready for candle (no background)');
         onReady();
       }, 500);
     }
@@ -739,7 +711,7 @@ function CandleScene({ userData, onReady }) {
         backgroundTextureRef.current = null;
       }
     };
-  }, [scene, animations, userData, onReady, modelPath]);
+  }, [modelPath]); // Only re-run when model changes, not on every prop change
   
   // Animation frame update
   useEffect(() => {
@@ -765,7 +737,7 @@ function CandleScene({ userData, onReady }) {
     return () => {
       if (animationId) cancelAnimationFrame(animationId);
     };
-  }, [userData?.candleType]);
+  }, []); // Remove dependency to prevent re-renders
   
   return (
     <>
@@ -779,7 +751,7 @@ function CandleScene({ userData, onReady }) {
       <group ref={candleRef} scale={[1, 1, 1]} position={[0, 0, 0]} />
     </>
   );
-}
+});
 
 // Main component
 export default function CandleSnapshotRenderer({ 
@@ -794,13 +766,26 @@ export default function CandleSnapshotRenderer({
   onFirebaseUploadComplete = null,
 }) {
   const renderInstanceId = useRef(Math.random().toString(36).substring(7));
-  console.log(`[CandleSnapshotRenderer-${renderInstanceId.current}] Rendering with background:`, userData?.background, 'saveToFirebase:', saveToFirebase, 'instantCapture:', instantCapture);
   const [triggerSnapshot, setTriggerSnapshot] = useState(false);
   const [sceneReady, setSceneReady] = useState(false);
   const [showLoading, setShowLoading] = useState(!preloadOnly && !instantCapture);
   const [loadingMessage, setLoadingMessage] = useState('Preparing your devotion...');
   const canvasRef = useRef();
   const hasUploadedRef = useRef(false); // Prevent duplicate uploads
+  
+  // Log when component mounts
+  useEffect(() => {
+    console.log(`[CandleSnapshotRenderer-${renderInstanceId.current}] Component mounted with props:`, {
+      isVisible,
+      userData,
+      preloadOnly,
+      instantCapture,
+      saveToFirebase
+    });
+    return () => {
+      console.log(`[CandleSnapshotRenderer-${renderInstanceId.current}] Component unmounting`);
+    };
+  }, []);
   
   useEffect(() => {
     // Update loading message based on devotion type
@@ -812,6 +797,7 @@ export default function CandleSnapshotRenderer({
   }, [userData?.devotionType]);
 
   useEffect(() => {
+    console.log(`[CandleSnapshotRenderer] State check - sceneReady: ${sceneReady}, isVisible: ${isVisible}, preloadOnly: ${preloadOnly}`);
     if (sceneReady && isVisible) {
       if (preloadOnly && onReady) {
         onReady();
@@ -819,6 +805,7 @@ export default function CandleSnapshotRenderer({
       }
       
       if (instantCapture) {
+        console.log('[CandleSnapshotRenderer] Instant capture mode - triggering snapshot');
         setShowLoading(false);
         setTriggerSnapshot(true);
         return;
@@ -827,7 +814,9 @@ export default function CandleSnapshotRenderer({
       // Update message when scene is ready
       setLoadingMessage('Creating your snapshot...');
       
+      console.log('[CandleSnapshotRenderer] Setting timer to trigger snapshot in 1.5s');
       const timer = setTimeout(() => {
+        console.log('[CandleSnapshotRenderer] Timer fired - triggering snapshot');
         setShowLoading(false);
         setTriggerSnapshot(true);
       }, 1500);
@@ -837,12 +826,16 @@ export default function CandleSnapshotRenderer({
   }, [sceneReady, isVisible, preloadOnly, instantCapture, onReady]);
   
   const handleSceneReady = () => {
+    console.log('[CandleSnapshotRenderer] Scene ready - calling setSceneReady(true)');
     setSceneReady(true);
   };
   
   const handleSnapshotComplete = async (imageData) => {
+    console.log(`[CandleSnapshotRenderer-${renderInstanceId.current}] handleSnapshotComplete called, imageData:`, imageData ? 'yes' : 'no', 'length:', imageData?.length);
+    
     // Still call the original callback
     if (onComplete) {
+      console.log(`[CandleSnapshotRenderer-${renderInstanceId.current}] Calling onComplete callback`);
       onComplete(imageData);
     }
     
@@ -886,6 +879,7 @@ export default function CandleSnapshotRenderer({
           metadata.baseColor = userData?.baseColor;
         }
         
+        console.log('[CandleSnapshotRenderer] Calling /api/upload-polaroid...');
         const response = await fetch('/api/upload-polaroid', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -894,6 +888,7 @@ export default function CandleSnapshotRenderer({
             metadata: metadata,
           }),
         });
+        console.log('[CandleSnapshotRenderer] Upload response status:', response.status);
         
         const result = await response.json();
         
@@ -926,7 +921,7 @@ export default function CandleSnapshotRenderer({
           <div style={{
             position: 'fixed',
             top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0, 0, 0, 0.75)',
+            // background: 'rgba(0, 0, 0, 0.75)',
             backdropFilter: 'blur(8px)',
             WebkitBackdropFilter: 'blur(8px)',
             zIndex: 99997,
@@ -938,7 +933,7 @@ export default function CandleSnapshotRenderer({
             top: '50%', left: '50%',
             transform: 'translate(-50%, -50%)',
             zIndex: 99998,
-            background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.95) 0%, rgba(0, 20, 0, 0.9) 100%)',
+            // background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.95) 0%, rgba(0, 20, 0, 0.9) 100%)',
             padding: '40px 50px',
             borderRadius: '20px',
             border: '2px solid rgba(0, 255, 0, 0.3)',
@@ -1016,28 +1011,30 @@ export default function CandleSnapshotRenderer({
         <Canvas 
           ref={canvasRef} 
           camera={{ 
-            position: userData?.devotionType === 'tattoo' ? [0, 2, 6] : [0, -1.7, 5], 
+            position: [0, -1.7, 5], 
             fov: 40 
           }}
           gl={{ alpha: true, preserveDrawingBuffer: true }}
         >
           {/* Only set black background if NOT a tattoo devotion with background */}
-          {!(userData?.devotionType === 'tattoo' && userData?.background) && (
+          {/* {!(userData?.devotionType === 'tattoo' && userData?.background) && (
             <color attach="background" args={['#000000']} />
-          )}
+          )} */}
           <CandleScene userData={userData} onReady={handleSceneReady} />
         </Canvas>
       </div>
       
       {!preloadOnly && (
-        <PolaroidSnapshot 
-          trigger={triggerSnapshot}
-          onComplete={handleSnapshotComplete}
-          captureElementId="candle-snapshot-container"
-          label={userData?.burnedAmount ? `Burned ${parseInt(userData.burnedAmount).toLocaleString()} RL80 tokens!` : `${userData?.username || 'Anonymous'}'s Candle`}
-          backgroundImage={userData?.background && SKYBOX_TEXTURES[userData.background] ? SKYBOX_TEXTURES[userData.background] : null}
-          key={`polaroid-${userData?.background || 'none'}-${triggerSnapshot}`} // Force new instance when background changes
-        />
+        <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', pointerEvents: 'none' }}>
+          <PolaroidSnapshot 
+            trigger={triggerSnapshot}
+            onComplete={handleSnapshotComplete}
+            captureElementId="candle-snapshot-container"
+            label={userData?.burnedAmount ? `Burned ${parseInt(userData.burnedAmount).toLocaleString()} RL80 tokens!` : `${userData?.username || 'Anonymous'}'s Candle`}
+            backgroundImage={userData?.background && SKYBOX_TEXTURES[userData.background] ? SKYBOX_TEXTURES[userData.background] : null}
+            key={`polaroid-${userData?.background || 'none'}-${triggerSnapshot}`} // Force new instance when background changes
+          />
+        </div>
       )}
     </>
   );

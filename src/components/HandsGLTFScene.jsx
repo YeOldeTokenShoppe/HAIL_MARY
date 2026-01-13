@@ -18,7 +18,7 @@ import { Html } from '@react-three/drei'
 import EmojiRain from './EmojiRain'
 
 
-export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView, offerings, hoveredOffering, justLitOffering, onJustLitComplete, userRotation = 0, priceChange = 0, hasActiveClick = false, is80sMode = false, onPhoneClick, user = null }) {
+export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView, offerings, hoveredOffering, justLitOffering, onJustLitComplete, userRotation = 0, priceChange = 0, hasActiveClick = false, is80sMode = false, onPhoneClick, user = null, showLatestPolaroid = false }) {
   // Debug: Log all props on mount
   // useEffect(() => {
   //   if (onPhoneClick) {
@@ -708,6 +708,7 @@ return (
         justLitOffering={justLitOffering}
         hasActiveClick={hasActiveClick}
         user={user}
+        showPolaroid={showLatestPolaroid}
         onManualBrowse={(handlers) => {
           phoneSwipeHandlers.current = handlers
         }}

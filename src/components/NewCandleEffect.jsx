@@ -7,18 +7,21 @@ import * as THREE from 'three'
 // CONFIG
 // ============================================
 const ANIMATION_DURATION = 2.5 // seconds
-const TRAIL_PARTICLE_COUNT = 20
-const TRAIL_LIFETIME = 0.8 // How long each particle lives
+const TRAIL_PARTICLE_COUNT = 30 // Increased for more sparkle
+const TRAIL_LIFETIME = 1.2 // Particles live longer for better trail
 const ARC_HEIGHT = 3 // How high the arc goes above the midpoint
 const MOBILE_ARC_HEIGHT = 1.5 // Lower arc for mobile visibility
 const MOBILE_BREAKPOINT = 768 // px
+const BRIGHT_GLOW_DURATION = 5.0 // How long the candle stays bright after landing (seconds)
 
-// Arctic Rings config - matching original vanilla Three.js
-const RING_COUNT = 5
+// Arctic Rings config - enhanced for more fanfare
+const RING_COUNT = 7  // More rings for bigger impact
 const RING_COLORS = [
   new THREE.Color(0x00ffff),  // Cyan
   new THREE.Color(0x87ceeb),  // Sky blue
-  new THREE.Color(0xffffff)   // White
+  new THREE.Color(0xffffff),  // White
+  new THREE.Color(0x00ff66),  // Bright green
+  new THREE.Color(0xff00ff)   // Magenta for extra pop
 ]
 
 // Easing function - ease out cubic for smooth deceleration
@@ -59,27 +62,27 @@ export function ArcticRingsEffect({ position, isActive, onComplete, onBloomPulse
       onBloomPulse?.(4.0) // Start at peak intensity
       onRingsStart?.() // Notify that rings animation has started
       
-      // Create rings exactly like the original
+      // Create rings with subtle, ethereal parameters
       for (let r = 0; r < RING_COUNT; r++) {
         const ringGeo = new THREE.RingGeometry(
-          0.5 + r * 0.3,  // inner radius
-          0.6 + r * 0.3,  // outer radius
-          32              // segments
+          0.8 + r * 0.4,  // inner radius - start further out
+          0.85 + r * 0.4,  // outer radius - very thin rings (0.05 thickness)
+          48              // more segments for smoother rings
         )
         const col = RING_COLORS[r % RING_COLORS.length]
         const mat = new THREE.MeshBasicMaterial({
           color: col,
           transparent: true,
-          opacity: 1.0,
+          opacity: 0.6,  // More subtle initial opacity
           blending: THREE.AdditiveBlending,
           side: THREE.DoubleSide,
           depthWrite: false,
           toneMapped: false  // Critical for bloom to work!
         })
         const ring = new THREE.Mesh(ringGeo, mat)
-        ring.rotation.x = Math.PI / 2  // Same as original
-        ring.userData.speed = 0.03 + r * 0.02  // Same as original
-        ring.userData.life = 1.0
+        ring.rotation.x = Math.PI / 2
+        ring.userData.speed = 0.04 + r * 0.02  // Faster expansion for more ethereal feel
+        ring.userData.life = 1.0  // Standard life
         
         groupRef.current.add(ring)
       }
@@ -182,9 +185,11 @@ export function NewCandleEffect({
 }) {
   const groupRef = useRef()
   const trailRef = useRef()
-  const [phase, setPhase] = useState('emerging') // 'emerging' | 'traveling' | 'arriving' | 'complete'
+  const [phase, setPhase] = useState('emerging') // 'emerging' | 'traveling' | 'arriving' | 'glowing' | 'complete'
   const progressRef = useRef(0)
   const trailParticles = useRef([])
+  const glowTimeRef = useRef(0) // Track how long we've been glowing
+  const hasTriggeredRipple = useRef(false) // Track if ripple has been triggered
   
   // Calculate arc path control point
   const controlPoint = useMemo(() => {
@@ -215,8 +220,10 @@ export function NewCandleEffect({
   useEffect(() => {
     if (isActive) {
       progressRef.current = 0
+      glowTimeRef.current = 0
       setPhase('emerging')
       trailParticles.current = []
+      hasTriggeredRipple.current = false // Reset ripple trigger
     }
   }, [isActive])
   
@@ -225,7 +232,26 @@ export function NewCandleEffect({
     
     const time = state.clock.elapsedTime
     
-    // Update progress
+    // Handle glowing phase separately
+    if (phase === 'glowing') {
+      glowTimeRef.current += delta
+      
+      // Pulsing effect during glow
+      const pulseIntensity = 1 + Math.sin(glowTimeRef.current * 3) * 0.2
+      groupRef.current.scale.setScalar(1.1 * pulseIntensity)
+      
+      // Continue gentle rotation
+      groupRef.current.rotation.y += delta * 0.5
+      
+      // After glow duration, complete
+      if (glowTimeRef.current >= BRIGHT_GLOW_DURATION) {
+        setPhase('complete')
+        // onComplete already called when landing, don't call again
+      }
+      return
+    }
+    
+    // Update progress for travel phases
     progressRef.current += delta / ANIMATION_DURATION
     const rawProgress = Math.min(progressRef.current, 1)
     const easedProgress = easeInOutCubic(rawProgress)
@@ -238,8 +264,15 @@ export function NewCandleEffect({
     } else if (rawProgress < 1) {
       setPhase('arriving')
     } else {
-      setPhase('complete')
-      onComplete()
+      // Instead of completing, enter glowing phase
+      setPhase('glowing')
+      glowTimeRef.current = 0
+      
+      // Trigger the ripple effect immediately when candle lands (only once)
+      if (!hasTriggeredRipple.current) {
+        hasTriggeredRipple.current = true
+        onComplete()
+      }
       return
     }
     
@@ -282,18 +315,21 @@ export function NewCandleEffect({
     }
     
     // Update trail particles
-    if (phase === 'traveling' || phase === 'emerging') {
-      // Spawn new particle
-      if (Math.random() < 0.6) { // 60% chance each frame
+    if (phase === 'traveling' || phase === 'emerging' || phase === 'arriving') {
+      // Spawn new particle - more particles during arrival for fanfare
+      const spawnChance = phase === 'arriving' ? 0.9 : 0.7
+      if (Math.random() < spawnChance) {
         trailParticles.current.push({
           position: currentPos.clone(),
           birth: time,
           velocity: new THREE.Vector3(
-            (Math.random() - 0.5) * 0.5,
-            (Math.random() - 0.5) * 0.5,
-            (Math.random() - 0.5) * 0.5
+            (Math.random() - 0.5) * (phase === 'arriving' ? 0.8 : 0.5),
+            (Math.random() - 0.5) * (phase === 'arriving' ? 0.8 : 0.5),
+            (Math.random() - 0.5) * (phase === 'arriving' ? 0.8 : 0.5)
           ),
-          size: 0.05 + Math.random() * 0.1
+          size: phase === 'arriving' ? 0.08 + Math.random() * 0.15 : 0.05 + Math.random() * 0.1,
+          color: phase === 'arriving' ? 
+            (Math.random() > 0.5 ? '#00ff66' : '#00ffff') : '#00ff66'
         })
       }
     }
@@ -348,22 +384,16 @@ export function NewCandleEffect({
           phase={phase}
         />
         
-        {/* Glow sphere around candle */}
-        <mesh>
-          <sphereGeometry args={[0.5, 16, 16]} />
-          <meshBasicMaterial
-            color="#00ff66"
-            transparent
-            opacity={phase === 'arriving' ? 0.3 : 0.15}
-            blending={THREE.AdditiveBlending}
-          />
-        </mesh>
+        {/* No glow spheres - let the candle model itself and the light provide the glow */}
         
-        {/* Point light that follows */}
+        {/* Point light that follows - extra bright during glow */}
         <pointLight
-          color="#00ff66"
-          intensity={phase === 'arriving' ? 2 : 1}
-          distance={3}
+          color={phase === 'glowing' ? '#00ffff' : '#00ff66'}
+          intensity={
+            phase === 'glowing' ? 3 + Math.sin(glowTimeRef.current * 3) :
+            phase === 'arriving' ? 2 : 1
+          }
+          distance={phase === 'glowing' ? 5 : 3}
         />
       </group>
       
@@ -453,7 +483,8 @@ function CandleModel({ modelPath, phase }) {
     const emissionIntensity = 
       phase === 'emerging' ? 1.5 :
       phase === 'traveling' ? 2.0 :
-      phase === 'arriving' ? 3.0 : 1.0
+      phase === 'arriving' ? 3.0 :
+      phase === 'glowing' ? 4.0 : 1.0
     
     clonedScene.traverse((child) => {
       if (child.isMesh && child.material) {
@@ -511,7 +542,7 @@ export function ArrivalBurst({ position, isActive, onComplete }) {
     }
   }, [isActive])
   
-  useFrame((state, delta) => {
+  useFrame((_state, delta) => {
     if (!isActive || !groupRef.current) return
     
     progressRef.current += delta / BURST_DURATION

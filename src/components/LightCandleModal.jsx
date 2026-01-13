@@ -1,14 +1,128 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense, useRef, useMemo } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useWalletAuth } from './WalletAuthProvider';
-import { db, collection, addDoc, serverTimestamp } from '@/lib/firebaseClient';
+import { db, collection, addDoc, updateDoc, doc, serverTimestamp, storage } from '@/lib/firebaseClient';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import ThirdwebBuyModal from './ThirdwebBuyModal';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { OrbitControls, useGLTF } from '@react-three/drei';
+import * as THREE from 'three';
+import { tokenFunctions, erc20Contract } from '@/lib/contract';
+import { useSendTransaction } from 'thirdweb/react';
+import { burn } from 'thirdweb/extensions/erc20';
+
+// Lazy load CandleSnapshotRenderer to avoid SSR issues
+const CandleSnapshotRenderer = lazy(() => import('./CandleSnapshotRenderer'));
+
+// Preload the model
+if (typeof window !== 'undefined') {
+  useGLTF.preload('/models/tinyVotiveOnly.glb');
+}
+
+// Simple candle viewer for preview
+function SimpleCandleViewer({ customImageUrl, offeringType }) {
+  const { scene } = useGLTF('/models/tinyVotiveOnly.glb');
+  const modelRef = useRef();
+  const groupRef = useRef();
+  
+  useEffect(() => {
+    if (!scene) return;
+    
+    // Clone the model
+    const clonedModel = scene.clone(true);
+    
+    // Set scale and position
+    clonedModel.scale.set(2, 2, 2);
+    clonedModel.position.set(0, 0, 0);
+    
+    // Apply custom image to senora mesh if available
+    if (customImageUrl) {
+      const textureLoader = new THREE.TextureLoader();
+      
+      clonedModel.traverse((child) => {
+        if (child.isMesh) {
+          const meshName = child.name?.toLowerCase() || '';
+          const isSenoraObject = meshName.includes('senora') || 
+                                meshName.includes('label') || 
+                                meshName.includes('maria');
+          
+          if (isSenoraObject) {
+            textureLoader.load(customImageUrl, (texture) => {
+              texture.colorSpace = THREE.SRGBColorSpace;
+              texture.flipY = false;
+              
+              const imageAspect = texture.image.width / texture.image.height;
+              const targetAspect = 1;
+              
+              if (imageAspect > targetAspect) {
+                texture.repeat.set(1, imageAspect / targetAspect);
+              } else {
+                texture.repeat.set(targetAspect / imageAspect, 1);
+              }
+              
+              texture.center.set(0.5, 0.5);
+              texture.needsUpdate = true;
+              
+              if (child.material) {
+                child.material = child.material.clone();
+                child.material.map = texture;
+                child.material.transparent = true;
+                child.material.alphaTest = 0.5; // Discard transparent pixels
+                child.material.side = THREE.DoubleSide;
+                child.material.needsUpdate = true;
+              }
+            });
+          }
+          
+          // Color the base based on offering type
+          const isBaseMesh = meshName === 'xbase' || 
+                            meshName.includes('base') || 
+                            meshName.includes('wax');
+          
+          if (isBaseMesh && offeringType) {
+            const colors = {
+              petition: '#ffaa00',
+              confession: '#aa66ff',
+              appreciation: '#00ff66'
+            };
+            
+            if (colors[offeringType]) {
+              child.material = child.material.clone();
+              child.material.color = new THREE.Color(colors[offeringType]);
+              child.material.needsUpdate = true;
+            }
+          }
+        }
+      });
+    }
+    
+    if (groupRef.current) {
+      // Clear previous model
+      while (groupRef.current.children.length > 0) {
+        groupRef.current.remove(groupRef.current.children[0]);
+      }
+      // Add new model
+      groupRef.current.add(clonedModel);
+      modelRef.current = clonedModel;
+    }
+  }, [scene, customImageUrl, offeringType]);
+  
+  // Auto-rotate the model
+  useFrame((_state, delta) => {
+    if (modelRef.current) {
+      modelRef.current.rotation.y += delta * 0.5;
+    }
+  });
+  
+  return <group ref={groupRef} />;
+}
 
 const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
   const { user } = useUser();
   const { walletAddress, tokenBalance } = useWalletAuth();
+  const { mutate: sendTransaction, data: txResult, status: txStatus } = useSendTransaction();
   
   const [offeringType, setOfferingType] = useState('petition');
   const [message, setMessage] = useState('');
@@ -17,6 +131,17 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [showNoBuyPrompt, setShowNoBuyPrompt] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [uploadedImage, setUploadedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const [showSnapshot, setShowSnapshot] = useState(false);
+  const [snapshotData, setSnapshotData] = useState(null);
+  const [modalHidden, setModalHidden] = useState(false); // Hide modal content during snapshot
+  const [selectedPrayer, setSelectedPrayer] = useState('');
+  const [prayerFor, setPrayerFor] = useState('self'); // 'self' or 'other'
+  const [recipientName, setRecipientName] = useState('');
+  const [transactionStatus, setTransactionStatus] = useState(''); // 'processing', 'success', 'error', ''
+  const progressTimeoutRef = useRef(null);
+  const [isBurnInProgress, setIsBurnInProgress] = useState(false); // Track entire burn flow
 
   // Reset form when modal opens
   useEffect(() => {
@@ -26,6 +151,14 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
       setTokenAmount('');
       setIsSubmitting(false);
       setShowInfo(false); // Reset info state
+      setUploadedImage(null);
+      setImagePreview(null);
+      setShowSnapshot(false);
+      setPrayerFor('self');
+      setRecipientName(user?.username || user?.firstName || '');
+      setTransactionStatus(''); // Reset transaction status
+      setModalHidden(false); // Reset modal visibility
+      setIsBurnInProgress(false); // Reset burn flow flag
       // Check token balance immediately when modal opens
       // tokenBalance is a string from the provider, so convert to number
       const balance = parseInt(tokenBalance) || 0;
@@ -35,98 +168,350 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
         setShowNoBuyPrompt(false);
       }
     }
+    
+    // Cleanup timeout on unmount or modal close
+    return () => {
+      if (progressTimeoutRef.current) {
+        clearTimeout(progressTimeoutRef.current);
+        progressTimeoutRef.current = null;
+      }
+    };
   }, [isOpen, walletAddress, tokenBalance]);
 
-  if (!isOpen) return null;
+  // We'll control the progress indicator manually after transaction is signed
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // Create the callback outside of conditional rendering
+  const handleSnapshotComplete = React.useCallback((imageData) => {
+    // Modal is already closed, just clean up state
+    setIsSubmitting(false);
     
-    if (!message.trim()) {
-      alert('Please enter a message for your candle');
-      return;
-    }
+    // Reset form data after snapshot is complete
+    setMessage('');
+    setTokenAmount('');
+    setUploadedImage(null);
+    setImagePreview(null);
+    setOfferingType('petition');
+    setPrayerFor('self');
+    setRecipientName('');
+    setShowSnapshot(false);
+    setSnapshotData(null);
+  }, []);
 
-    const amount = parseInt(tokenAmount) || 0;
-    if (amount < 1) {
-      alert('Minimum 1 RL80 token required to light a candle');
-      return;
-    }
+  // Show progress indicator even when modal is closed if transaction is processing
+  if (!isOpen && transactionStatus !== 'processing') return null;
 
-    // Check if user has enough tokens
-    const currentBalance = parseInt(tokenBalance) || 0;
-    if (currentBalance === 0) {
-      setShowNoBuyPrompt(true);
-      return;
-    } else if (amount > currentBalance) {
-      alert(`You only have ${currentBalance} RL80 tokens. Please enter a valid amount.`);
-      return;
-    }
-
-    setIsSubmitting(true);
-
+  // Function to handle actions after successful burn
+  const handlePostBurnActions = async () => {
     try {
-      const newOffering = {
-        name: user?.firstName || user?.username || 'Anonymous',
+      // Prepare offering data
+      const baseOffering = {
+        name: user?.username || user?.firstName || 'Anonymous',
         type: offeringType,
         message: message.trim(),
         tokensBurned: parseInt(tokenAmount) || 0,
         userId: user?.id,
         walletAddress: walletAddress,
         userImageUrl: user?.imageUrl || null,
+        prayerFor: prayerFor,
+        recipientName: prayerFor === 'self' ? (user?.username || user?.firstName || 'Anonymous') : (recipientName || 'Someone'),
         createdAt: serverTimestamp(),
-        timestamp: new Date().toISOString() // For immediate display
+        timestamp: new Date().toISOString()
       };
-
-      // Save to Firestore
-      try {
-        const docRef = await addDoc(collection(db, 'offerings'), newOffering);
-        console.log('Offering saved to Firestore with ID:', docRef.id);
-        
-        // Add the Firestore ID to the offering
-        newOffering.id = docRef.id;
-        newOffering.timestamp = 'just now'; // For display
-      } catch (firestoreError) {
-        console.error('Error saving to Firestore:', firestoreError);
-        // Continue anyway - don't block the user from lighting candle
+      
+      // Keep base64 for local display
+      if (uploadedImage) {
+        baseOffering.customImage = uploadedImage;
       }
 
-      // Call the parent's light candle handler
+      // First trigger the NewCandleEffect and Prayer Received animation
+      // WITHOUT saving to Firebase yet
+      const newOffering = {...baseOffering};
+      if (uploadedImage) {
+        newOffering.customImage = uploadedImage;
+      }
+      
+      // Trigger the effect immediately (this will show "Prayer Received")
       await onLightCandle(newOffering);
       
-      // Close modal after successful submission
-      onClose();
+      // Wait for the "Prayer Received" animation to show (1.5 seconds)
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // NOW save to Firestore after the animation
+      let docRef = null;
+      try {
+        docRef = await addDoc(collection(db, 'offerings'), baseOffering);
+        baseOffering.id = docRef.id;
+      } catch (firestoreError) {
+        console.error('Error saving to Firestore:', firestoreError);
+      }
+
+      // Store snapshot data for renderer (following CompactCandleModal pattern)
+      const snapData = {
+        name: newOffering.name,
+        message: newOffering.message,
+        type: newOffering.type,
+        image: uploadedImage || null,  // CandleSnapshotRenderer expects 'image', not 'customImageUrl'
+        burnedAmount: newOffering.tokensBurned,
+        devotionType: 'candle',
+        candleType: 'votive',
+        background: 'synthwave',
+        username: user?.username || user?.firstName || 'Anonymous',
+        createdBy: user?.id || '',
+      };
+      
+      // Set snapshot data to trigger background capture
+      console.log('[LightCandleModal] Triggering snapshot capture with data:', snapData);
+      setSnapshotData(snapData);
+      setShowSnapshot(true);
+      console.log('[LightCandleModal] showSnapshot set to true');
+      
+      // Store the polaroid URL in the offering when it's ready
+      const polaroidPromise = new Promise((resolve) => {
+        window.polaroidUploadResolve = resolve;
+      });
+      
+      // Wait for polaroid URL to be available (with timeout)
+      const polaroidUrl = await Promise.race([
+        polaroidPromise,
+        new Promise(resolve => setTimeout(() => resolve(null), 20000))  // Increased to 20 seconds
+      ]);
+      
+      if (polaroidUrl) {
+        console.log('[LightCandleModal] Polaroid URL received:', polaroidUrl);
+        newOffering.polaroidUrl = polaroidUrl;
+        
+        // Update Firestore document with polaroidUrl
+        if (docRef) {
+          try {
+            await updateDoc(doc(db, 'offerings', docRef.id), {
+              polaroidUrl: polaroidUrl
+            });
+          } catch (updateError) {
+            console.error('Error updating offering with polaroidUrl:', updateError);
+          }
+        }
+        
+        // Notify that polaroid is ready
+        if (window.onPolaroidReady) {
+          console.log('[LightCandleModal] Calling window.onPolaroidReady with URL:', polaroidUrl);
+          window.onPolaroidReady(polaroidUrl);
+        } else {
+          console.warn('[LightCandleModal] window.onPolaroidReady is not set!');
+        }
+      } else {
+        console.warn('[LightCandleModal] No polaroid URL received after timeout');
+      }
     } catch (error) {
-      console.error('Error lighting candle:', error);
-      alert('Failed to light candle. Please try again.');
+      console.error('Error in post-burn actions:', error);
+      alert('Failed to complete candle lighting. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // This is now only used for the form onSubmit - actual transaction is handled by TransactionButton
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    // The TransactionButton will handle everything
+  };
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        alert('Image size must be less than 5MB');
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          // Compress image to max 800px width/height
+          const maxSize = 800;
+          let width = img.width;
+          let height = img.height;
+          
+          if (width > height) {
+            if (width > maxSize) {
+              height = (height * maxSize) / width;
+              width = maxSize;
+            }
+          } else {
+            if (height > maxSize) {
+              width = (width * maxSize) / height;
+              height = maxSize;
+            }
+          }
+          
+          // Create canvas for compression
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          
+          // Preserve transparency by not filling background
+          ctx.clearRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Use PNG format to preserve transparency
+          const compressedDataUrl = canvas.toDataURL('image/png');
+          
+          // Check if compressed image is still too large (>900KB to be safe)
+          if (compressedDataUrl.length > 900000) {
+            // For large images, try WebP if supported, otherwise stick with PNG
+            const webpSupported = canvas.toDataURL('image/webp').indexOf('image/webp') > -1;
+            if (webpSupported) {
+              const webpCompressed = canvas.toDataURL('image/webp', 0.8);
+              setUploadedImage(webpCompressed);
+              setImagePreview(webpCompressed);
+            } else {
+              // If still too large, reduce size further
+              const smallerCanvas = document.createElement('canvas');
+              smallerCanvas.width = width * 0.7;
+              smallerCanvas.height = height * 0.7;
+              const smallerCtx = smallerCanvas.getContext('2d');
+              smallerCtx.clearRect(0, 0, smallerCanvas.width, smallerCanvas.height);
+              smallerCtx.drawImage(img, 0, 0, smallerCanvas.width, smallerCanvas.height);
+              const smallerPng = smallerCanvas.toDataURL('image/png');
+              setUploadedImage(smallerPng);
+              setImagePreview(smallerPng);
+            }
+          } else {
+            setUploadedImage(compressedDataUrl);
+            setImagePreview(compressedDataUrl);
+          }
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setUploadedImage(null);
+    setImagePreview(null);
+  };
+
   const offeringTypes = {
     petition: { 
-      icon: '🙏', 
+      // icon: '🙏', 
       color: '#ffaa00', 
       label: 'PETITION',
       description: 'Ask for guidance or help'
     },
     confession: { 
-      icon: '❤️‍🔥', 
+      // icon: '❤️‍🔥', 
       color: '#aa66ff', 
       label: 'CONFESSION',
-      description: 'Share what weighs on your heart'
+      description: 'Unburden your heart'
     },
     appreciation: { 
-      icon: '✨', 
+      // icon: '✨', 
       color: '#00ff66', 
       label: 'THANKS',
-      description: 'Express gratitude'
+      description: 'Express gratitude for good fortune'
     }
   };
 
+  const prayerTemplates = [
+    {
+      id: 'scalper',
+      title: "Scalper's Prayer",
+      text: "Oh Lady of Perpetual Profit, bless my lightning fingers and low-latency reflexes. Protect me from fat-fingered orders and grant me the stamina to chase micro-movements without losing my soul. May every scalp be green, and every exit perfectly timed. Amen."
+    },
+    {
+      id: 'leverage',
+      title: "Leverage Prayer",
+      text: "Oh Blessed Virgin of Margin, shield me from the wicked lure of 100x leverage. Guard my trades from sudden liquidation, and deliver me from the temptation of adding 'just a little more.' Grant me the humility to close in profit, and the grace to walk away before the exchange claims my soul. Amen."
+    },
+    {
+      id: 'swing',
+      title: "Swing Trader's Prayer",
+      text: "Oh Lady of Perpetual Profit, grant me patience to ride the waves of volatility, and the wisdom to know when to take profit and when to let it run. Bless my charts, my Fibonacci retracements, and my RSI settings, that I may always enter at the bottom and exit at the top. Amen."
+    },
+    {
+      id: 'hodler',
+      title: "Hodler's Prayer",
+      text: "Oh Glorious Mother of Diamond Hands, let me never succumb to weak paper hands. Guard my seed phrase, strengthen my resolve, and remind me that one day the line shall go up forever. May my wallet survive bear markets, hacks, and exchange collapses, until the moon and beyond. Amen."
+    },
+    {
+      id: 'chart',
+      title: "Chart Mystic's Prayer",
+      text: "Oh Oracle of Eternal Candles, Our Lady of Perpetual Profit, guide my eyes as I read the sacred indicators. Grant me the gift of vision to see wedges before they break, triangles before they tighten, and golden crosses before they shine. Deliver me from false signals, and sanctify my trading view with holy confluence. Amen."
+    }
+  ];
+
   return (
     <>
+      {/* CandleSnapshotRenderer must be outside modal so it persists after modal closes */}
+      {(() => {
+        console.log('[LightCandleModal] Render - showSnapshot:', showSnapshot, 'snapshotData:', !!snapshotData);
+        if (showSnapshot && snapshotData) {
+          console.log('[LightCandleModal] RENDERING CandleSnapshotRenderer container');
+        }
+        return null;
+      })()}
+      {showSnapshot && snapshotData && (
+        <div style={{ 
+          position: 'fixed', 
+          left: '-9999px', 
+          top: '-9999px',
+          width: '800px',  // Need proper dimensions for WebGL
+          height: '600px', // Need proper dimensions for WebGL
+          overflow: 'hidden',
+          pointerEvents: 'none',
+          opacity: 0,
+          zIndex: -9999
+        }}>
+          <Suspense fallback={null}>
+            <CandleSnapshotRenderer
+              isVisible={true}
+              userData={snapshotData}
+              instantCapture={false}
+              onComplete={(imageData) => {
+                // Handle polaroid capture completion
+                if (imageData) {
+                  setIsSubmitting(false);
+                }
+              }}
+              saveToFirebase={true}
+              onFirebaseUploadComplete={(result) => {
+                console.log('[LightCandleModal] Firebase upload complete:', result);
+                if (result?.storageUrl) {
+                  // Resolve the promise with the URL
+                  if (window.polaroidUploadResolve) {
+                    console.log('[LightCandleModal] Resolving polaroid promise with URL:', result.storageUrl);
+                    window.polaroidUploadResolve(result.storageUrl);
+                  }
+                  
+                  // Clean up state
+                  setShowSnapshot(false);
+                  setSnapshotData(null);
+                  setIsBurnInProgress(false); // Clear burn flow flag
+                  // Now close the modal completely
+                  onClose();
+                } else {
+                  console.error('[LightCandleModal] Firebase upload failed:', result);
+                  
+                  // Resolve with null on error
+                  if (window.polaroidUploadResolve) {
+                    window.polaroidUploadResolve(null);
+                  }
+                  
+                  // Clean up state on error too
+                  setShowSnapshot(false);
+                  setSnapshotData(null);
+                  setIsBurnInProgress(false); // Clear burn flow flag on error
+                  // Close modal on error too
+                  onClose();
+                }
+              }}
+            />
+          </Suspense>
+        </div>
+      )}
+      
       <style jsx>{`
         @keyframes fadeIn {
           from {
@@ -145,6 +530,17 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           }
           50% {
             box-shadow: 0 0 30px currentColor, 0 0 40px currentColor;
+          }
+        }
+
+        @keyframes pulse {
+          0%, 80%, 100% {
+            opacity: 0.3;
+            transform: scale(0.8);
+          }
+          40% {
+            opacity: 1;
+            transform: scale(1.2);
           }
         }
 
@@ -284,13 +680,13 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
 
         .message-textarea {
           width: 100%;
-          height: 80px;
+          height: 140px;
           padding: 0.75rem;
           background: rgba(255, 255, 255, 0.03);
           border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 12px;
           color: #fff;
-          font-size: 0.9rem;
+          font-size: 0.6rem;
           resize: none;
           transition: all 0.3s;
         }
@@ -399,6 +795,98 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           color: white;
         }
 
+        .image-upload-section {
+          margin: 1rem 0;
+        }
+
+        .image-upload-label {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.5rem 1rem;
+          background: rgba(139, 92, 246, 0.1);
+          border: 1px solid rgba(139, 92, 246, 0.3);
+          border-radius: 25px;
+          color: #8b5cf6;
+          cursor: pointer;
+          transition: all 0.3s;
+          font-size: 0.85rem;
+        }
+
+        .image-upload-label:hover {
+          background: rgba(139, 92, 246, 0.2);
+          border-color: #8b5cf6;
+        }
+
+        .image-preview {
+          margin-top: 1rem;
+          position: relative;
+          display: inline-block;
+        }
+
+        .image-preview img {
+          max-width: 100%;
+          max-height: 200px;
+          border-radius: 12px;
+          border: 2px solid rgba(139, 92, 246, 0.3);
+        }
+
+        .remove-image-btn {
+          position: absolute;
+          top: -8px;
+          right: -8px;
+          background: #ff4444;
+          color: white;
+          border: none;
+          border-radius: 50%;
+          width: 24px;
+          height: 24px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 16px;
+          line-height: 1;
+        }
+
+        .preview-box {
+          width: 120px;
+          height: 120px;
+          background: rgba(20, 20, 30, 0.8);
+          border: 2px solid rgba(139, 92, 246, 0.3);
+          border-radius: 12px;
+          overflow: hidden;
+          position: relative;
+          flex-shrink: 0;
+        }
+
+        .preview-label {
+          position: absolute;
+          top: 4px;
+          left: 4px;
+          background: rgba(139, 92, 246, 0.9);
+          color: white;
+          padding: 2px 8px;
+          border-radius: 12px;
+          font-size: 0.6rem;
+          font-weight: 600;
+          z-index: 10;
+        }
+        
+        .form-row {
+          display: flex;
+          gap: 1rem;
+          align-items: flex-start;
+          margin-bottom: 1rem;
+        }
+        
+        .form-column {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+        }
+
         .submit-button {
           width: 100%;
           padding: 0.875rem;
@@ -428,9 +916,98 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
 
       `}</style>
 
-      <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-overlay" onClick={onClose} style={{ display: isBurnInProgress ? (transactionStatus === 'processing' ? 'flex' : 'none') : (modalHidden ? 'none' : 'flex') }}>
+        {/* Transaction Progress Indicator - show only when processing */}
+        {transactionStatus === 'processing' && (
+          <div 
+            style={{
+              position: 'fixed',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              background: 'rgba(20, 20, 30, 0.98)',
+              border: '2px solid transparent',
+              backgroundImage: 'linear-gradient(rgba(20, 20, 30, 0.98), rgba(20, 20, 30, 0.98)), linear-gradient(135deg, #8b5cf6, #ec4899)',
+              backgroundOrigin: 'border-box',
+              backgroundClip: 'padding-box, border-box',
+              borderRadius: '24px',
+              padding: '3rem',
+              textAlign: 'center',
+              color: '#fff',
+              boxShadow: '0 20px 60px rgba(139, 92, 246, 0.5)',
+              zIndex: 10000,
+              minWidth: '320px',
+              animation: 'fadeIn 0.3s ease-out'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Animated Flame Icon */}
+            <div style={{
+              fontSize: '4rem',
+              marginBottom: '1.5rem',
+              filter: 'drop-shadow(0 0 30px rgba(255, 170, 0, 0.8)) drop-shadow(0 0 60px rgba(255, 100, 0, 0.4))',
+              animation: 'pulse 2s ease-in-out infinite',
+              display: 'inline-block'
+            }}>
+              🔥
+            </div>
+            
+            {/* Processing Message */}
+            <h3 style={{
+              fontFamily: "'Orbitron', monospace",
+              fontSize: '1.4rem',
+              fontWeight: '700',
+              color: '#fff',
+              marginBottom: '1rem',
+              textTransform: 'uppercase',
+              letterSpacing: '2px'
+            }}>
+              Lighting Your Candle
+            </h3>
+            
+            <p style={{
+              color: '#00f5d4',
+              fontSize: '1rem',
+              marginBottom: '1.5rem',
+              lineHeight: '1.5'
+            }}>
+              Burning {tokenAmount || '0'} RL80 token{parseInt(tokenAmount) !== 1 ? 's' : ''}...
+            </p>
+            
+            {/* Loading Animation */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              marginTop: '2rem'
+            }}>
+              {[0, 1, 2].map(i => (
+                <div 
+                  key={i}
+                  style={{
+                    width: '12px',
+                    height: '12px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #8b5cf6, #ec4899)',
+                    animation: `pulse 1.4s ease-in-out ${i * 0.16}s infinite`
+                  }}
+                />
+              ))}
+            </div>
+            
+            <p style={{
+              color: 'rgba(255, 255, 255, 0.5)',
+              fontSize: '0.85rem',
+              marginTop: '2rem',
+              fontStyle: 'italic'
+            }}>
+              Transaction submitted, waiting for confirmation...
+            </p>
+          </div>
+        )}
+        
         {/* Buy RL80 Prompt - Show this INSTEAD of the modal content */}
-        {showNoBuyPrompt ? (
+        {showNoBuyPrompt && transactionStatus !== 'processing' ? (
           <div 
             style={{
               background: 'rgba(20, 20, 30, 0.98)',
@@ -547,7 +1124,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
               Maybe Later
             </button>
           </div>
-        ) : (
+        ) : !transactionStatus ? (
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <button className="close-button" onClick={onClose}>✕</button>
             <h2 className="modal-title">Light a Candle</h2>
@@ -605,8 +1182,12 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
               </div>
             )}
             
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'auto' }}>
+            
             {/* Offering Type Selection */}
+            <label className="form-label" style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
+              Choose Prayer Protocol:
+            </label>
             <div className="offering-types">
               {Object.entries(offeringTypes).map(([type, config]) => (
                 <button
@@ -626,27 +1207,216 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
               ))}
             </div>
 
-            {/* Message Input */}
-            <div className="form-group">
-              <label className="form-label" htmlFor="message">
-                Your Message
-              </label>
-              <textarea
-                id="message"
-                className="message-textarea"
-                placeholder=""
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                maxLength={280}
-                required
-              />
-              <div style={{ textAlign: 'right', fontSize: '0.6rem', color: '#666', marginTop: '0.1rem' }}>
-                {message.length}/280
+            {/* Prayer Recipient Toggle */}
+            <div style={{ marginTop: '1rem', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <label className="form-label" style={{ margin: 0 }}>
+                  Who is this prayer for?
+                </label>
+                <div style={{ display: 'flex', gap: '1.5rem', marginLeft: '1rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="prayerFor"
+                      value="self"
+                      checked={prayerFor === 'self'}
+                      onChange={() => {
+                        setPrayerFor('self');
+                        setRecipientName(user?.username || user?.firstName || '');
+                      }}
+                      style={{
+                        marginRight: '0.3rem',
+                        cursor: 'pointer',
+                        accentColor: '#8b5cf6'
+                      }}
+                    />
+                    <span style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.7)' }}>For Me</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="prayerFor"
+                      value="other"
+                      checked={prayerFor === 'other'}
+                      onChange={() => {
+                        setPrayerFor('other');
+                        setRecipientName('');
+                      }}
+                      style={{
+                        marginRight: '0.3rem',
+                        cursor: 'pointer',
+                        accentColor: '#8b5cf6'
+                      }}
+                    />
+                    <span style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.7)' }}>For Someone Else</span>
+                  </label>
+                </div>
               </div>
+              
+              {/* Name Input */}
+              <input
+                type="text"
+                placeholder="Name"
+                value={prayerFor === 'self' ? (user?.username || user?.firstName || '') : recipientName}
+                onChange={(e) => setRecipientName(e.target.value)}
+                disabled={prayerFor === 'self'}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  background: prayerFor === 'self' ? 'rgba(139, 92, 246, 0.05)' : 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(139, 92, 246, 0.3)',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  fontSize: '0.85rem',
+                  opacity: prayerFor === 'self' ? 0.7 : 1,
+                  cursor: prayerFor === 'self' ? 'not-allowed' : 'text',
+                  boxSizing: 'border-box'
+                }}
+              />
+            </div>
+
+            {/* Message Input and Preview */}
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+              {/* Message Input */}
+              <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+                <label className="form-label" htmlFor="message">
+                  Your Message
+                </label>
+                <textarea
+                  id="message"
+                  className="message-textarea"
+                  placeholder="Write your own or select a template below"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  maxLength={280}
+                  required
+                />
+                <div style={{ textAlign: 'right', fontSize: '0.6rem', color: '#666', marginTop: '0.1rem' }}>
+                  {message.length}/280
+                </div>
+                
+                {/* Prayer Templates Dropdown */}
+                <select 
+                  value={selectedPrayer}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSelectedPrayer(value);
+                    if (value) {
+                      const prayer = prayerTemplates.find(p => p.id === value);
+                      if (prayer) {
+                        setMessage(prayer.text);
+                      }
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    marginTop: '0.5rem',
+                    padding: '0.5rem',
+                    background: 'rgba(139, 92, 246, 0.1)',
+                    border: '1px solid rgba(139, 92, 246, 0.3)',
+                    borderRadius: '8px',
+                    color: '#8b5cf6',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="">Select a template...</option>
+                  {prayerTemplates.map(prayer => (
+                    <option key={prayer.id} value={prayer.id}>
+                      {prayer.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* Preview and Image Upload */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'center' }}>
+                {/* 3D Preview Box */}
+                <div className="preview-box" style={{ width: '180px', height: '180px' }}>
+                  <span className="preview-label">Preview</span>
+                {typeof window !== 'undefined' ? (
+                  <Suspense fallback={
+                    <div style={{ 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      height: '100%',
+                      color: 'rgba(255, 255, 255, 0.5)',
+                      fontSize: '0.7rem'
+                    }}>
+                      Loading...
+                    </div>
+                  }>
+                    <Canvas
+                      camera={{ position: [0, 0, 5], fov: 50 }}
+                      style={{ width: '100%', height: '100%' }}
+                      gl={{ preserveDrawingBuffer: true }}
+                    >
+                      <ambientLight intensity={0.5} />
+                      <directionalLight position={[10, 10, 5]} intensity={1} />
+                      <Suspense fallback={null}>
+                        <SimpleCandleViewer 
+                          customImageUrl={imagePreview}
+                          offeringType={offeringType}
+                        />
+                      </Suspense>
+                      <OrbitControls 
+                        enablePan={false}
+                        enableZoom={false}
+                        autoRotate={true}
+                        autoRotateSpeed={1}
+                      />
+                    </Canvas>
+                  </Suspense>
+                ) : (
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    height: '100%',
+                    color: 'rgba(255, 255, 255, 0.5)',
+                    fontSize: '0.7rem'
+                  }}>
+                    Loading...
+                  </div>
+                )}
+                </div>
+                
+                {/* Image Upload Button */}
+                <input
+                  type="file"
+                  id="image-upload"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  style={{ display: 'none' }}
+                />
+                <label htmlFor="image-upload" className="image-upload-label" style={{ width: '100%' }}>
+                  <span>📷</span>
+                  <span>Add Image</span>
+                </label>
+                {imagePreview && (
+                  <button
+                    type="button"
+                    style={{
+                      background: '#ff4444',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '20px',
+                      padding: '0.3rem 0.8rem',
+                      fontSize: '0.7rem',
+                      cursor: 'pointer'
+                    }}
+                    onClick={removeImage}
+                  >
+                    Remove Image
+                  </button>
+                )}
+              </div>
+              
             </div>
 
             {/* Token Amount */}
-            <div className="form-group">
+            <div className="form-group" style={{ marginBottom: '1rem' }}>
               <label className="form-label" htmlFor="tokens">
                 RL80 Tokens to Burn
               </label>
@@ -676,18 +1446,118 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
               )}
             </div>
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              className="submit-button"
-              disabled={isSubmitting || !message.trim() || !tokenAmount || parseInt(tokenAmount) < 1}
-            >
-              {isSubmitting ? 'Lighting...' : 'Light Candle'}
-            </button>
             </form>
             
+            {/* Submit Button - Light Candle with token burn */}
+            <button
+              onClick={async () => {
+                const amount = parseInt(tokenAmount) || 0;
+                const amountInWei = BigInt(amount) * 1000000000000000000n; // 18 decimals
+                const currentBalance = parseInt(tokenBalance) || 0; // tokenBalance is already in tokens, not wei
+                const currentBalanceInWei = BigInt(currentBalance) * 1000000000000000000n;
+                
+                if (!message.trim()) {
+                  alert('Please enter a message for your candle');
+                  return;
+                }
+                if (amount < 1) {
+                  alert('Minimum 1 RL80 token required to light a candle');
+                  return;
+                }
+                if (currentBalance === 0) {
+                  setShowNoBuyPrompt(true);
+                  return;
+                }
+                if (amountInWei > currentBalanceInWei) {
+                  alert(`You only have ${currentBalance} RL80 tokens. Please enter a valid amount.`);
+                  return;
+                }
+                
+                // Show user-friendly confirmation
+                const confirmMessage = `You are about to burn ${amount} RL80 token${amount !== 1 ? 's' : ''} to light your candle.\n\nThis action cannot be undone.\n\nDo you want to proceed?`;
+                if (!confirm(confirmMessage)) {
+                  return;
+                }
+                
+                setIsSubmitting(true);
+                setIsBurnInProgress(true); // Mark burn flow as in progress
+                
+                // Hide the modal UI but keep component mounted for snapshot
+                setModalHidden(true);
+                
+                try {
+                  const transaction = burn({
+                    contract: erc20Contract,
+                    amount: amountInWei,
+                  });
+                  
+                  console.log('[LightCandleModal] Sending transaction for user to sign...');
+                  
+                  // Send transaction - this opens the wallet for user to sign
+                  sendTransaction(transaction, {
+                    onSuccess: async (result) => {
+                      console.log('[LightCandleModal] Transaction signed and sent to blockchain');
+                      // Transaction is signed and sent to blockchain
+                      // NOW show the progress indicator
+                      setTransactionStatus('processing');
+                      
+                      // Wait for transaction to be actually mined/confirmed
+                      if (result?.transactionHash || result?.hash) {
+                        // Transaction takes ~10 seconds to confirm
+                        
+                        // Check if we have a wait method or need to poll
+                        if (result.wait) {
+                          // If there's a wait method, use it
+                          await result.wait();
+                        } else {
+                          // Otherwise wait for a reasonable time for confirmation
+                          await new Promise(resolve => setTimeout(resolve, 10000));
+                        }
+                      }
+                      
+                      // Clear progress indicator
+                      console.log('[LightCandleModal] Transaction confirmed, hiding progress indicator');
+                      setTransactionStatus('');
+                      
+                      // Now save to Firebase after actual blockchain confirmation
+                      await handlePostBurnActions();
+                      
+                      setIsSubmitting(false);
+                    },
+                    onError: (error) => {
+                      // Clear progress indicator if it was shown
+                      setTransactionStatus('');
+                      setIsBurnInProgress(false); // Clear burn flow flag on error
+                      
+                      // Check if user rejected the transaction
+                      if (!error?.message?.includes('User rejected') && 
+                          !error?.message?.includes('User denied') &&
+                          !error?.message?.includes('rejected') &&
+                          error?.code !== 4001) {
+                        alert('Failed to burn tokens. Please try again.');
+                      }
+                      
+                      setIsSubmitting(false);
+                    }
+                  });
+                } catch (error) {
+                  console.error('Failed to create burn transaction:', error);
+                  alert('Failed to burn tokens. Please try again.');
+                  setIsSubmitting(false);
+                  setTransactionStatus('');
+                }
+              }}
+              disabled={isSubmitting || !message.trim() || !tokenAmount || parseInt(tokenAmount) < 1}
+              className="submit-button"
+              style={{
+                marginTop: '1rem'
+              }}
+            >
+              {isSubmitting ? 'Processing...' : 'Light Candle'}
+            </button>
+            
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* ThirdwebBuyModal */}
@@ -705,6 +1575,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           }} 
         />
       )}
+      
     </>
   );
 };

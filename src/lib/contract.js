@@ -15,7 +15,7 @@ const chain = defineChain(84532);
 export const erc20Contract = getContract({
   client,
   chain,
-  address: "0xc6F05f95278c6E0b71F28fC602ff7869D4916a05",
+  address: "0x3841c83409714e0ba0ea33444a0d4354da19a084",
 });
 
 // Export commonly used functions
@@ -63,6 +63,13 @@ export const tokenFunctions = {
   // Prepare approve transaction (for TransactionButton)
   prepareApprove: (spender, amount) => {
     return approve({ contract: erc20Contract, spender, amount });
+  },
+  
+  // Burn tokens by sending to dead address
+  burnTokens: (amount) => {
+    // Send to the burn address (0x000...dead)
+    const BURN_ADDRESS = "0x000000000000000000000000000000000000dEaD";
+    return transfer({ contract: erc20Contract, to: BURN_ADDRESS, amount });
   },
 };
 

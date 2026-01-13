@@ -23,6 +23,7 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
   const [showWalletConnection, setShowWalletConnection] = useState(false);
   const [showWalletDetails, setShowWalletDetails] = useState(false);
   const [showClerkDropdown, setShowClerkDropdown] = useState(false);
+  const [userPolaroids, setUserPolaroids] = useState([]);
   
   // Listen for external wallet details event
   useEffect(() => {
@@ -33,6 +34,20 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
     window.addEventListener('openWalletDetails', handleOpenWalletDetails);
     return () => window.removeEventListener('openWalletDetails', handleOpenWalletDetails);
   }, []);
+  
+  // Load polaroids from localStorage when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      try {
+        const saved = localStorage.getItem('userPolaroids');
+        if (saved) {
+          setUserPolaroids(JSON.parse(saved));
+        }
+      } catch (e) {
+        console.error('Failed to load polaroids:', e);
+      }
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -60,6 +75,12 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
               onClick={() => setActiveTab('wallet')}
             >
               Wallet
+            </button>
+            <button 
+              className={`modal-tab ${activeTab === 'polaroids' ? 'active' : ''}`}
+              onClick={() => setActiveTab('polaroids')}
+            >
+              Polaroids {userPolaroids.length > 0 && `(${userPolaroids.length})`}
             </button>
           </div>
 
@@ -118,7 +139,7 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
                   </button>
                 </div>
               </div>
-            ) : (
+            ) : activeTab === 'wallet' ? (
               <div className="wallet-content">
                 {isWalletConnected ? (
                   <>
@@ -178,7 +199,98 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
                   </div>
                 )}
               </div>
-            )}
+            ) : activeTab === 'polaroids' ? (
+              <div className="polaroids-content">
+                {userPolaroids.length > 0 ? (
+                  <>
+                    <p style={{ marginBottom: '20px', color: '#aaa', textAlign: 'center' }}>
+                      Your recent prayer candle polaroids
+                    </p>
+                    {/* <div className="polaroids-grid" style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+                      gap: '15px',
+                      maxHeight: '400px',
+                      overflowY: 'auto',
+                      padding: '10px'
+                    }}> */}
+                      {userPolaroids.map((polaroid, index) => (
+                        <div 
+                          key={index}
+                          // className="polaroid-thumbnail"
+                          // style={{
+                          //   background: 'white',
+                          //   padding: '5px',
+                          //   borderRadius: '2px',
+                          //   cursor: 'pointer',
+                          //   transition: 'transform 0.2s',
+                          //   position: 'relative'
+                          // }}
+                          onClick={() => {
+                            // Open polaroid in new tab
+                            window.open(polaroid.url, '_blank');
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = 'scale(1.05) rotate(-1deg)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'scale(1) rotate(0deg)';
+                          }}
+                        >
+                          <img 
+                            src={polaroid.url} 
+                            alt={`Polaroid ${index + 1}`}
+                            style={{
+                              width: '100%',
+                              height: 'auto',
+                              display: 'block'
+                            }}
+                          />
+                          <div style={{
+                            fontSize: '9px',
+                            textAlign: 'center',
+                            marginTop: '3px',
+                            color: '#666'
+                          }}>
+                            {polaroid.burnedAmount} RL80
+                          </div>
+                          <div style={{
+                            fontSize: '8px',
+                            textAlign: 'center',
+                            color: '#999'
+                          }}>
+                            {new Date(polaroid.timestamp).toLocaleDateString()}
+                          </div>
+                        </div>
+                      ))}
+                    {/* </div> */}
+                    <button 
+                      className="action-button"
+                      style={{ 
+                        marginTop: '20px',
+                        width: '100%',
+                        opacity: 0.7
+                      }}
+                      onClick={() => {
+                        if (confirm('Clear all saved polaroids?')) {
+                          localStorage.removeItem('userPolaroids');
+                          setUserPolaroids([]);
+                        }
+                      }}
+                    >
+                      Clear All
+                    </button>
+                  </>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
+                    <p>No polaroids yet</p>
+                    <p style={{ fontSize: '14px', marginTop: '10px' }}>
+                      Light a candle to create your first polaroid
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

@@ -16,7 +16,7 @@ export const TEST_WALLETS = [
     id: 'tester1',
     assignedEmail: AUTHORIZED_TEST_EMAILS[0],
     name: 'Test User 1',
-    address: '0x1156EF864262543A4AC1A95D1EB37AC4199a2DbC', // Replace with actual address
+    address: '0x7E49a282E315F20964f3A6b79CA840161BBa3F77', // Replace with actual address
     privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_1, // Store in .env.local
     prefundedAmount: 1000
   },
@@ -24,7 +24,7 @@ export const TEST_WALLETS = [
     id: 'tester2',
     assignedEmail: AUTHORIZED_TEST_EMAILS[1],
     name: 'Test User 2',
-    address: '0xF8a047db6D5315c3C36cd6FaBC129e28b4C2eDF4', // Replace with actual address
+    address: '0xd83a7011479e2650677507b4fAcEb5520F8838E5', // Replace with actual address
     privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_2, // Store in .env.local
     prefundedAmount: 1000
   },
@@ -32,7 +32,7 @@ export const TEST_WALLETS = [
   //   id: 'tester3',
   //   assignedEmail: AUTHORIZED_TEST_EMAILS[2],
   //   name: 'Test User 3',
-  //   address: '0xEf52603090De93a4E8B22b06641E2B9C7a4240b4', // Replace with actual address
+  //   address: '0xc1089C2FE7A0B399562eC55655BBD13C3FD1F35f', // Replace with actual address
   //   privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_3, // Store in .env.local
   //   prefundedAmount: 1000
   // },
@@ -40,7 +40,7 @@ export const TEST_WALLETS = [
   //   id: 'tester4',
   //   assignedEmail: AUTHORIZED_TEST_EMAILS[3],
   //   name: 'Test User 4',
-  //   address: '0x326C6209fF1df4C42f1EF5B37751cf34bc4208b9', // Replace with actual address
+  //   address: '0x71c4FCf5fdC7987Afc851D3d713Cf4B6Fe0b02Be', // Replace with actual address
   //   privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_4, // Store in .env.local
   //   prefundedAmount: 1000
   // },
@@ -48,7 +48,7 @@ export const TEST_WALLETS = [
   //   id: 'tester5',
   //   assignedEmail: AUTHORIZED_TEST_EMAILS[4],
   //   name: 'Test User 5',
-  //   address: '0x6a5014974D9d80e589c5F700e4c5FFcf18F45986', // Replace with actual address
+  //   address: '0xA79957279fAC216B87B120C719E9f90454B050B5', // Replace with actual address
   //   privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_5, // Store in .env.local
   //   prefundedAmount: 1000
   // },
@@ -56,7 +56,7 @@ export const TEST_WALLETS = [
   //   id: 'tester6',
   //   assignedEmail: AUTHORIZED_TEST_EMAILS[5],
   //   name: 'Test User 6',
-  //   address: '0x92289816f2c1147E46465892e5122393CeBC0eac', // Replace with actual address
+  //   address: '0xc07A03Fb19f6912E0aE16b1d286F527e0819dcB3', // Replace with actual address
   //   privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_6, // Store in .env.local
   //   prefundedAmount: 1000
   // }
