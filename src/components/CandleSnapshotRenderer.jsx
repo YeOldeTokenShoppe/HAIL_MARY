@@ -292,153 +292,7 @@ const CandleScene = React.memo(({ userData, onReady }) => {
       }
     }
     
-    // Handle tattoo devotions - add tattoo as plane mesh
-    if (userData?.devotionType === 'tattoo' && userData?.tattooPlacement) {
-      isTattooScene = true;
-      
-      
-      if (userData.tattooDesign && userData.tattooPlacement) {
-        const textureLoader = new THREE.TextureLoader();
-        const tattooPath = `/images/${userData.tattooDesign}.png`;
-        
-        textureLoader.load(
-          tattooPath,
-          (texture) => {
-            texture.colorSpace = THREE.SRGBColorSpace;
-            texture.needsUpdate = true;
-            
-            // Create plane geometry for tattoo - scaled for snapshot
-            const planeGeom = new THREE.PlaneGeometry(0.5, 0.5);
-            const planeMat = new THREE.MeshBasicMaterial({
-              map: texture,
-              transparent: true,
-              side: THREE.DoubleSide,
-              depthTest: true,
-              depthWrite: false,
-              alphaTest: 0.1,
-            });
-            
-            const tattooPlane = new THREE.Mesh(planeGeom, planeMat);
-            tattooPlane.renderOrder = 999;
-            
-            const placement = userData.tattooPlacement;
-            const worldPos = placement.worldPosition;
-            const worldNormal = placement.worldNormal;
-            
-            // Check if we should use bone-relative positioning for animated poses
-            const useAnimation = userData.selectedPose && userData.selectedPose !== 'tpose';
-            const hasBoneData = placement.boneName && placement.offsetLocal && placement.normalLocal;
-            
-            if (useAnimation && hasBoneData) {
-              // For animated poses, use bone-relative positioning
-              
-              // Find the bone in the animated model
-              let targetBone = null;
-              clonedScene.traverse((child) => {
-                if (child.isBone && child.name === placement.boneName) {
-                  targetBone = child;
-                }
-              });
-              
-              if (targetBone) {
-                // Get bone's world transform
-                targetBone.updateMatrixWorld(true);
-                const boneWorldPos = new THREE.Vector3();
-                const boneWorldQuat = new THREE.Quaternion();
-                targetBone.getWorldPosition(boneWorldPos);
-                targetBone.getWorldQuaternion(boneWorldQuat);
-                
-                // Apply local offset
-                const offsetVec = new THREE.Vector3(
-                  placement.offsetLocal.x || 0,
-                  placement.offsetLocal.y || 0,
-                  placement.offsetLocal.z || 0
-                );
-                const worldOffset = offsetVec.clone().applyQuaternion(boneWorldQuat);
-                
-                // Set tattoo position
-                tattooPlane.position.copy(boneWorldPos).add(worldOffset);
-                
-                // Apply normal offset
-                const normalVec = new THREE.Vector3(
-                  placement.normalLocal.x || 0,
-                  placement.normalLocal.y || 0,
-                  placement.normalLocal.z || 1
-                );
-                const worldNormal = normalVec.clone().applyQuaternion(boneWorldQuat).normalize();
-                tattooPlane.position.add(worldNormal.clone().multiplyScalar(0.02));
-                
-                // Orient tattoo
-                const defaultNormal = new THREE.Vector3(0, 0, 1);
-                const quaternion = new THREE.Quaternion();
-                quaternion.setFromUnitVectors(defaultNormal, worldNormal);
-                tattooPlane.quaternion.copy(quaternion);
-                
-              } else {
-                console.warn('[Snapshot] Bone not found:', placement.boneName, 'falling back to world position');
-                // Fallback to world position
-                tattooPlane.position.set(worldPos.x || 0, worldPos.y || 0, worldPos.z || 0);
-              }
-            } else if (worldPos && worldNormal) {
-              // For T-pose or if no bone data, use world position directly
-              
-            }
-            
-            if (!useAnimation || !hasBoneData) {
-              // For T-pose, also apply the normal and orientation
-              const normal = new THREE.Vector3(
-                worldNormal.x || 0,
-                worldNormal.y || 0,
-                worldNormal.z || 1
-              ).normalize();
-              
-              // Offset along normal to prevent z-fighting
-              tattooPlane.position.add(normal.clone().multiplyScalar(0.02));
-              
-              // Orient using quaternion (NOT lookAt!)
-              const defaultNormal = new THREE.Vector3(0, 0, 1);
-              const quaternion = new THREE.Quaternion();
-              quaternion.setFromUnitVectors(defaultNormal, normal);
-              tattooPlane.quaternion.copy(quaternion);
-            }
-            
-            
-            // Add to candleRef (parent of clonedScene) so it's in world space
-            if (candleRef.current) {
-              candleRef.current.add(tattooPlane);
-            }
-            
-            // Trigger ready callback after tattoo is applied
-            if (onReady) {
-              setTimeout(() => {
-                onReady();
-              }, 500);
-            }
-          },
-          undefined,
-          () => {
-            console.error('[Snapshot] Failed to load tattoo texture');
-            if (onReady) onReady();
-          }
-        );
-      }
-      
-      // Apply optimal rotation for tattoo display
-      const getOptimalRotation = (meshName) => {
-        if (!meshName) return 0;
-        const name = meshName.toLowerCase();
-        if (name.includes('armleft') || name.includes('arm_left')) return -Math.PI / 5;
-        if (name.includes('armright') || name.includes('arm_right')) return Math.PI / 5;
-        if (name.includes('legleft') || name.includes('leg_left')) return -Math.PI / 8;
-        if (name.includes('legright') || name.includes('leg_right')) return Math.PI / 8;
-        if (name.includes('back')) return Math.PI;
-        return 0;
-      };
-      
-      if (userData.tattooPlacement.meshName) {
-        clonedScene.rotation.y = getOptimalRotation(userData.tattooPlacement.meshName);
-      }
-    }
+
     
     // =====================================================
     // CANDLE HANDLING (unchanged from original)
@@ -1006,6 +860,7 @@ export default function CandleSnapshotRenderer({
           opacity: 0.01,
           pointerEvents: 'none',
           zIndex: 1,
+          background: 'transparent',
         }}
       >
         <Canvas 
@@ -1014,12 +869,15 @@ export default function CandleSnapshotRenderer({
             position: [0, -1.7, 5], 
             fov: 40 
           }}
-          gl={{ alpha: true, preserveDrawingBuffer: true }}
+          gl={{ 
+            alpha: true, 
+            preserveDrawingBuffer: true, 
+            antialias: true,
+            premultipliedAlpha: false,
+            clearColor: [0, 0, 0, 0]  // Transparent clear color
+          }}
         >
-          {/* Only set black background if NOT a tattoo devotion with background */}
-          {/* {!(userData?.devotionType === 'tattoo' && userData?.background) && (
-            <color attach="background" args={['#000000']} />
-          )} */}
+          {/* Don't set any background color - let it be transparent for compositing */}
           <CandleScene userData={userData} onReady={handleSceneReady} />
         </Canvas>
       </div>

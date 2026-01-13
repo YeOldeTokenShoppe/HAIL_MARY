@@ -13,9 +13,6 @@ import { tokenFunctions, erc20Contract } from '@/lib/contract';
 import { useSendTransaction } from 'thirdweb/react';
 import { burn } from 'thirdweb/extensions/erc20';
 
-// Lazy load CandleSnapshotRenderer to avoid SSR issues
-const CandleSnapshotRenderer = lazy(() => import('./CandleSnapshotRenderer'));
-
 // Preload the model
 if (typeof window !== 'undefined') {
   useGLTF.preload('/models/tinyVotiveOnly.glb');
@@ -133,15 +130,15 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
   const [showInfo, setShowInfo] = useState(false);
   const [uploadedImage, setUploadedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  const [showSnapshot, setShowSnapshot] = useState(false);
-  const [snapshotData, setSnapshotData] = useState(null);
-  const [modalHidden, setModalHidden] = useState(false); // Hide modal content during snapshot
+  const [modalHidden, setModalHidden] = useState(false); // Hide modal content during transaction
   const [selectedPrayer, setSelectedPrayer] = useState('');
   const [prayerFor, setPrayerFor] = useState('self'); // 'self' or 'other'
   const [recipientName, setRecipientName] = useState('');
   const [transactionStatus, setTransactionStatus] = useState(''); // 'processing', 'success', 'error', ''
   const progressTimeoutRef = useRef(null);
   const [isBurnInProgress, setIsBurnInProgress] = useState(false); // Track entire burn flow
+  const [forceHidden, setForceHidden] = useState(false); // Force modal to stay hidden
+  const [hasCompletedBurn, setHasCompletedBurn] = useState(false); // Permanently hide after burn completes
 
   // Reset form when modal opens
   useEffect(() => {
@@ -153,12 +150,13 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
       setShowInfo(false); // Reset info state
       setUploadedImage(null);
       setImagePreview(null);
-      setShowSnapshot(false);
       setPrayerFor('self');
       setRecipientName(user?.username || user?.firstName || '');
       setTransactionStatus(''); // Reset transaction status
       setModalHidden(false); // Reset modal visibility
       setIsBurnInProgress(false); // Reset burn flow flag
+      setForceHidden(false); // Allow modal to show
+      setHasCompletedBurn(false); // Reset completed flag to allow modal to show again
       // Check token balance immediately when modal opens
       // tokenBalance is a string from the provider, so convert to number
       const balance = parseInt(tokenBalance) || 0;
@@ -193,12 +191,16 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
     setOfferingType('petition');
     setPrayerFor('self');
     setRecipientName('');
-    setShowSnapshot(false);
-    setSnapshotData(null);
   }, []);
 
+  // Permanently hide modal after burn completes
+  if (hasCompletedBurn) return null;
+  
   // Show progress indicator even when modal is closed if transaction is processing
   if (!isOpen && transactionStatus !== 'processing') return null;
+  
+  // Force hide the modal completely if forceHidden is set (except for progress indicator)
+  if (forceHidden && transactionStatus !== 'processing') return null;
 
   // Function to handle actions after successful burn
   const handlePostBurnActions = async () => {
@@ -245,62 +247,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
         console.error('Error saving to Firestore:', firestoreError);
       }
 
-      // Store snapshot data for renderer (following CompactCandleModal pattern)
-      const snapData = {
-        name: newOffering.name,
-        message: newOffering.message,
-        type: newOffering.type,
-        image: uploadedImage || null,  // CandleSnapshotRenderer expects 'image', not 'customImageUrl'
-        burnedAmount: newOffering.tokensBurned,
-        devotionType: 'candle',
-        candleType: 'votive',
-        background: 'synthwave',
-        username: user?.username || user?.firstName || 'Anonymous',
-        createdBy: user?.id || '',
-      };
-      
-      // Set snapshot data to trigger background capture
-      console.log('[LightCandleModal] Triggering snapshot capture with data:', snapData);
-      setSnapshotData(snapData);
-      setShowSnapshot(true);
-      console.log('[LightCandleModal] showSnapshot set to true');
-      
-      // Store the polaroid URL in the offering when it's ready
-      const polaroidPromise = new Promise((resolve) => {
-        window.polaroidUploadResolve = resolve;
-      });
-      
-      // Wait for polaroid URL to be available (with timeout)
-      const polaroidUrl = await Promise.race([
-        polaroidPromise,
-        new Promise(resolve => setTimeout(() => resolve(null), 20000))  // Increased to 20 seconds
-      ]);
-      
-      if (polaroidUrl) {
-        console.log('[LightCandleModal] Polaroid URL received:', polaroidUrl);
-        newOffering.polaroidUrl = polaroidUrl;
-        
-        // Update Firestore document with polaroidUrl
-        if (docRef) {
-          try {
-            await updateDoc(doc(db, 'offerings', docRef.id), {
-              polaroidUrl: polaroidUrl
-            });
-          } catch (updateError) {
-            console.error('Error updating offering with polaroidUrl:', updateError);
-          }
-        }
-        
-        // Notify that polaroid is ready
-        if (window.onPolaroidReady) {
-          console.log('[LightCandleModal] Calling window.onPolaroidReady with URL:', polaroidUrl);
-          window.onPolaroidReady(polaroidUrl);
-        } else {
-          console.warn('[LightCandleModal] window.onPolaroidReady is not set!');
-        }
-      } else {
-        console.warn('[LightCandleModal] No polaroid URL received after timeout');
-      }
+      // The illumin80 page will handle snapshot capture independently
     } catch (error) {
       console.error('Error in post-burn actions:', error);
       alert('Failed to complete candle lighting. Please try again.');
@@ -444,74 +391,6 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
 
   return (
     <>
-      {/* CandleSnapshotRenderer must be outside modal so it persists after modal closes */}
-      {(() => {
-        console.log('[LightCandleModal] Render - showSnapshot:', showSnapshot, 'snapshotData:', !!snapshotData);
-        if (showSnapshot && snapshotData) {
-          console.log('[LightCandleModal] RENDERING CandleSnapshotRenderer container');
-        }
-        return null;
-      })()}
-      {showSnapshot && snapshotData && (
-        <div style={{ 
-          position: 'fixed', 
-          left: '-9999px', 
-          top: '-9999px',
-          width: '800px',  // Need proper dimensions for WebGL
-          height: '600px', // Need proper dimensions for WebGL
-          overflow: 'hidden',
-          pointerEvents: 'none',
-          opacity: 0,
-          zIndex: -9999
-        }}>
-          <Suspense fallback={null}>
-            <CandleSnapshotRenderer
-              isVisible={true}
-              userData={snapshotData}
-              instantCapture={false}
-              onComplete={(imageData) => {
-                // Handle polaroid capture completion
-                if (imageData) {
-                  setIsSubmitting(false);
-                }
-              }}
-              saveToFirebase={true}
-              onFirebaseUploadComplete={(result) => {
-                console.log('[LightCandleModal] Firebase upload complete:', result);
-                if (result?.storageUrl) {
-                  // Resolve the promise with the URL
-                  if (window.polaroidUploadResolve) {
-                    console.log('[LightCandleModal] Resolving polaroid promise with URL:', result.storageUrl);
-                    window.polaroidUploadResolve(result.storageUrl);
-                  }
-                  
-                  // Clean up state
-                  setShowSnapshot(false);
-                  setSnapshotData(null);
-                  setIsBurnInProgress(false); // Clear burn flow flag
-                  // Now close the modal completely
-                  onClose();
-                } else {
-                  console.error('[LightCandleModal] Firebase upload failed:', result);
-                  
-                  // Resolve with null on error
-                  if (window.polaroidUploadResolve) {
-                    window.polaroidUploadResolve(null);
-                  }
-                  
-                  // Clean up state on error too
-                  setShowSnapshot(false);
-                  setSnapshotData(null);
-                  setIsBurnInProgress(false); // Clear burn flow flag on error
-                  // Close modal on error too
-                  onClose();
-                }
-              }}
-            />
-          </Suspense>
-        </div>
-      )}
-      
       <style jsx>{`
         @keyframes fadeIn {
           from {
@@ -521,6 +400,15 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           to {
             opacity: 1;
             transform: translateY(0);
+          }
+        }
+        
+        @keyframes fadeInNoMove {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
           }
         }
 
@@ -916,9 +804,9 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
 
       `}</style>
 
-      <div className="modal-overlay" onClick={onClose} style={{ display: isBurnInProgress ? (transactionStatus === 'processing' ? 'flex' : 'none') : (modalHidden ? 'none' : 'flex') }}>
-        {/* Transaction Progress Indicator - show only when processing */}
-        {transactionStatus === 'processing' && (
+      {/* Separate overlay for transaction progress to prevent layout shifts */}
+      {transactionStatus === 'processing' && (
+        <div className="modal-overlay" style={{ display: 'flex' }}>
           <div 
             style={{
               position: 'fixed',
@@ -937,7 +825,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
               boxShadow: '0 20px 60px rgba(139, 92, 246, 0.5)',
               zIndex: 10000,
               minWidth: '320px',
-              animation: 'fadeIn 0.3s ease-out'
+              animation: 'fadeInNoMove 0.3s ease-out'
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1004,8 +892,11 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
               Transaction submitted, waiting for confirmation...
             </p>
           </div>
-        )}
-        
+        </div>
+      )}
+      
+      {/* Main modal overlay */}
+      <div className="modal-overlay" onClick={onClose} style={{ display: (!forceHidden && !modalHidden) ? 'flex' : 'none' }}>
         {/* Buy RL80 Prompt - Show this INSTEAD of the modal content */}
         {showNoBuyPrompt && transactionStatus !== 'processing' ? (
           <div 
@@ -1481,9 +1372,11 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                 
                 setIsSubmitting(true);
                 setIsBurnInProgress(true); // Mark burn flow as in progress
+                setForceHidden(true); // Force modal to stay hidden
                 
                 // Hide the modal UI but keep component mounted for snapshot
                 setModalHidden(true);
+                // Don't show progress indicator yet - wait for transaction to be signed
                 
                 try {
                   const transaction = burn({
@@ -1523,6 +1416,14 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                       await handlePostBurnActions();
                       
                       setIsSubmitting(false);
+                      // Permanently hide the modal after burn completes
+                      setHasCompletedBurn(true);
+                      // Keep forceHidden as true to prevent modal from reappearing
+                      // Don't reset isBurnInProgress to prevent any re-renders showing modal
+                      
+                      // Don't call onClose() here - the modal is already hidden via forceHidden
+                      // Calling onClose triggers state changes that might cause the modal to briefly reappear
+                      // onClose();
                     },
                     onError: (error) => {
                       // Clear progress indicator if it was shown

@@ -203,67 +203,85 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
               <div className="polaroids-content">
                 {userPolaroids.length > 0 ? (
                   <>
-                    <p style={{ marginBottom: '20px', color: '#aaa', textAlign: 'center' }}>
+                    <p style={{ marginBottom: '20px', color: '#aaa', textAlign: 'center', width: '100%' }}>
                       Your recent prayer candle polaroids
                     </p>
-                    {/* <div className="polaroids-grid" style={{
+                    <div className="polaroids-grid" style={{
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-                      gap: '15px',
-                      maxHeight: '400px',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
+                      gap: '12px',
+                      maxHeight: '350px',
                       overflowY: 'auto',
-                      padding: '10px'
-                    }}> */}
+                      padding: '10px',
+                      marginBottom: '20px',
+                      width: '100%'
+                    }}>
                       {userPolaroids.map((polaroid, index) => (
                         <div 
                           key={index}
-                          // className="polaroid-thumbnail"
-                          // style={{
-                          //   background: 'white',
-                          //   padding: '5px',
-                          //   borderRadius: '2px',
-                          //   cursor: 'pointer',
-                          //   transition: 'transform 0.2s',
-                          //   position: 'relative'
-                          // }}
+                          className="polaroid-thumbnail"
+                          style={{
+                            background: 'white',
+                            padding: '4px',
+                            borderRadius: '2px',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                            position: 'relative'
+                          }}
                           onClick={() => {
                             // Open polaroid in new tab
                             window.open(polaroid.url, '_blank');
                           }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.transform = 'scale(1.05) rotate(-1deg)';
+                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
                           }}
                           onMouseLeave={(e) => {
                             e.currentTarget.style.transform = 'scale(1) rotate(0deg)';
+                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
                           }}
                         >
-                          <img 
-                            src={polaroid.url} 
-                            alt={`Polaroid ${index + 1}`}
-                            style={{
-                              width: '100%',
-                              height: 'auto',
-                              display: 'block'
-                            }}
-                          />
+                          <div style={{
+                            width: '100%',
+                            paddingBottom: '100%',
+                            position: 'relative',
+                            overflow: 'hidden',
+                            backgroundColor: '#f0f0f0'
+                          }}>
+                            <img 
+                              src={polaroid.url} 
+                              alt={`Polaroid ${index + 1}`}
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover'
+                              }}
+                            />
+                          </div>
                           <div style={{
                             fontSize: '9px',
                             textAlign: 'center',
-                            marginTop: '3px',
-                            color: '#666'
+                            marginTop: '4px',
+                            color: '#666',
+                            fontWeight: 'bold'
                           }}>
                             {polaroid.burnedAmount} RL80
                           </div>
                           <div style={{
-                            fontSize: '8px',
+                            fontSize: '7px',
                             textAlign: 'center',
-                            color: '#999'
+                            color: '#999',
+                            marginTop: '2px'
                           }}>
                             {new Date(polaroid.timestamp).toLocaleDateString()}
                           </div>
                         </div>
                       ))}
-                    {/* </div> */}
+                    </div>
                     <button 
                       className="action-button"
                       style={{ 
@@ -282,7 +300,7 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
                     </button>
                   </>
                 ) : (
-                  <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa' }}>
+                  <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa', width: '100%' }}>
                     <p>No polaroids yet</p>
                     <p style={{ fontSize: '14px', marginTop: '10px' }}>
                       Light a candle to create your first polaroid
@@ -372,9 +390,12 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
           border-radius: 16px;
           padding: 1.5rem;
           width: 90%;
-          max-width: 420px;
+          max-width: 480px;
+          max-height: 80vh;
           position: relative;
           box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+          display: flex;
+          flex-direction: column;
         }
 
         .modal-close-btn {
@@ -405,24 +426,26 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
           gap: 0;
           margin-bottom: 1.5rem;
           border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-          justify-content: center;
+          justify-content: stretch;
         }
 
         .modal-tab {
           background: transparent;
           border: none;
           color: rgba(255, 255, 255, 0.5);
-          padding: 0.75rem 2rem;
-          font-size: 0.9rem;
+          padding: 0.75rem 1rem;
+          font-size: 0.85rem;
           font-weight: 500;
           font-family: 'Orbitron', monospace;
           text-transform: uppercase;
-          letter-spacing: 1px;
+          letter-spacing: 0.5px;
           cursor: pointer;
           transition: all 0.2s;
           border-bottom: 2px solid transparent;
           margin-bottom: -1px;
           position: relative;
+          flex: 1;
+          text-align: center;
         }
 
         .modal-tab.active {
@@ -436,7 +459,39 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
         }
 
         .modal-content {
-          min-height: 250px;
+          min-height: 300px;
+          max-height: 450px;
+          overflow-y: auto;
+          overflow-x: hidden;
+          padding: 0.5rem;
+        }
+        
+        .modal-content::-webkit-scrollbar {
+          width: 6px;
+        }
+        
+        .modal-content::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 3px;
+        }
+        
+        .modal-content::-webkit-scrollbar-thumb {
+          background: rgba(0, 245, 212, 0.3);
+          border-radius: 3px;
+        }
+        
+        .modal-content::-webkit-scrollbar-thumb:hover {
+          background: rgba(0, 245, 212, 0.5);
+        }
+        
+        .account-content,
+        .wallet-content,
+        .polaroids-content {
+          animation: fadeIn 0.3s;
+          display: flex;
+          flex-direction: column;
+          align-items: stretch;
+          width: 100%;
         }
 
         .user-info {
@@ -446,6 +501,7 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
           gap: 1rem;
           margin-bottom: 2rem;
           text-align: center;
+          align-self: center;
         }
 
         .user-avatar {
@@ -489,6 +545,7 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
           display: flex;
           flex-direction: column;
           gap: 0.75rem;
+          width: 100%;
         }
 
         .action-button {
@@ -504,6 +561,7 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
           letter-spacing: 0.5px;
           cursor: pointer;
           transition: all 0.2s;
+          width: 100%;
         }
 
         .action-button:hover {
@@ -532,6 +590,7 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
           border-radius: 12px;
           padding: 1.5rem;
           margin-bottom: 1.5rem;
+          width: 100%;
         }
 
         .wallet-address,
@@ -606,11 +665,20 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
         .wallet-connect {
           text-align: center;
           padding: 2rem;
+          width: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
         }
 
         .wallet-connect p {
           color: rgba(255, 255, 255, 0.6);
           margin-bottom: 1.5rem;
+        }
+        
+        .wallet-connect .action-button {
+          width: 100%;
+          max-width: 280px;
         }
 
         .action-button.connect {

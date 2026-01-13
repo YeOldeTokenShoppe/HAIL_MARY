@@ -18,6 +18,10 @@ import { db, collection, addDoc, serverTimestamp, getDocs, query, orderBy, limit
 import UnifiedShrine from '@/components/UnifiedShrine'
 import PolaroidDisplay from '@/components/PolaroidDisplay'
 
+// Lazy load CandleSnapshotRenderer to avoid SSR issues
+const CandleSnapshotRenderer = dynamic(() => import('@/components/CandleSnapshotRenderer'), {
+  ssr: false
+})
 
 // Tiny Votive Model Component
 
@@ -40,6 +44,8 @@ export default function ShrinePage() {
   const [fontLoaded, setFontLoaded] = useState(false)
   const [showBuyModal, setShowBuyModal] = useState(false)
   const [showLightCandleModal, setShowLightCandleModal] = useState(false)
+  const [isProcessingCandle, setIsProcessingCandle] = useState(false) // Prevent modal from reopening during processing
+  const [hasProcessedCandle, setHasProcessedCandle] = useState(false) // Track if candle was already processed this session
   const [showStakeModal, setShowStakeModal] = useState(false)
   const [showWalletModal, setShowWalletModal] = useState(false)
   const [showAuthMessage, setShowAuthMessage] = useState(null)
@@ -53,6 +59,8 @@ export default function ShrinePage() {
   const [showPolaroid, setShowPolaroid] = useState(false)
   const [hasDismissedPolaroid, setHasDismissedPolaroid] = useState(false)
   const [hasLitCandleThisSession, setHasLitCandleThisSession] = useState(false)
+  const [showSnapshot, setShowSnapshot] = useState(false)
+  const [snapshotData, setSnapshotData] = useState(null)
   const [mobileBannerType, setMobileBannerType] = useState('candle') // 'candle' or 'staking'
   const is80sMode = context80sMode
   
@@ -295,6 +303,16 @@ useEffect(() => {
     // Don't light the matchstick here - only light it when candle is actually lit
     // This prevents the flame from showing if user cancels
     
+    // Prevent opening modal if we're already processing a candle
+    if (isProcessingCandle) {
+      console.log('[ShrinePage] Candle processing in progress, ignoring click');
+      return;
+    }
+    
+    // Reset the flags when user explicitly clicks to light a new candle
+    setHasProcessedCandle(false);
+    setIsProcessingCandle(false);
+    
     // Check if user is signed in
     if (!isSignedIn) {
       setShowAuthMessage('sign-in');
@@ -344,15 +362,16 @@ useEffect(() => {
       setWaitingForWallet(false);
       
       // Open the appropriate modal based on what action triggered wallet connection
+      // But only if we're not already processing a candle and haven't processed one
       if (walletActionType === 'stake') {
         setShowStakeModal(true);
-      } else if (walletActionType === 'candle') {
+      } else if (walletActionType === 'candle' && !isProcessingCandle && !hasProcessedCandle) {
         setShowLightCandleModal(true);
       }
       
       setWalletActionType(null); // Reset the action type
     }
-  }, [isWalletConnected, showWalletModal, waitingForWallet, walletActionType]);
+  }, [isWalletConnected, showWalletModal, waitingForWallet, walletActionType, isProcessingCandle, hasProcessedCandle]);
 
   // Watch for successful sign-in and resume the intended action
   useEffect(() => {
@@ -371,22 +390,49 @@ useEffect(() => {
           setWalletActionType(actionType === 'sign-in-stake' ? 'stake' : 'candle');
         } else {
           // Already have wallet, show the appropriate modal
+          // But only if we're not already processing a candle and haven't processed one
           if (actionType === 'sign-in-stake') {
             setShowStakeModal(true);
-          } else {
+          } else if (!isProcessingCandle && !hasProcessedCandle) {
             setShowLightCandleModal(true);
           }
         }
       }, 500); // 500ms delay for test wallet assignment
     }
-  }, [isSignedIn, userLoaded, showAuthMessage, isWalletConnected, walletAddress]);
+  }, [isSignedIn, userLoaded, showAuthMessage, isWalletConnected, walletAddress, isProcessingCandle, hasProcessedCandle]);
 
   // Handle light candle from modal
   const handleLightCandle = async (newOffering) => {
+    // Immediately close the modal and set processing flags
+    setShowLightCandleModal(false);
+    setIsProcessingCandle(true);
+    setHasProcessedCandle(true); // Mark that we've processed a candle this session
+    // Clear any pending wallet action to prevent modal from reopening
+    setWalletActionType(null);
+    setShowAuthMessage(null);
+    
     // Reset previous polaroid state when lighting a new candle
     setShowPolaroid(false);
     setHasDismissedPolaroid(false);
     setPolaroidUrl(null);
+    
+    // Trigger snapshot capture with the offering data
+    const snapData = {
+      name: newOffering.name,
+      message: newOffering.message,
+      type: newOffering.type,
+      image: newOffering.customImage || null,
+      burnedAmount: newOffering.tokensBurned,
+      devotionType: 'candle',
+      candleType: 'votive',
+      background: 'synthwave',
+      username: user?.username || user?.firstName || 'Anonymous',
+      createdBy: user?.id || '',
+    };
+    
+    console.log('[ShrinePage] Triggering snapshot capture with data:', snapData);
+    setSnapshotData(snapData);
+    setShowSnapshot(true);
     
     // Set up a listener for when the polaroid is ready
     window.onPolaroidReady = (url) => {
@@ -1225,9 +1271,18 @@ useEffect(() => {
       
       {/* Light Candle Modal - Always mounted to allow snapshot renderer to complete */}
       <LightCandleModal
-        isOpen={showLightCandleModal}
-        onClose={() => setShowLightCandleModal(false)}
-        onLightCandle={handleLightCandle}
+        isOpen={showLightCandleModal && !isProcessingCandle}
+        onClose={() => {
+          setShowLightCandleModal(false);
+          // Also clear any pending actions when modal is closed
+          setWalletActionType(null);
+          setShowAuthMessage(null);
+        }}
+        onLightCandle={(offering) => {
+          // Close modal immediately when Light Candle is clicked
+          setShowLightCandleModal(false);
+          handleLightCandle(offering);
+        }}
       />
       
       {/* Stake Modal */}
@@ -1379,6 +1434,52 @@ useEffect(() => {
         />
       )}
       
+      {/* Hidden CandleSnapshotRenderer for background capture - Independent of modal */}
+      {showSnapshot && snapshotData && (
+        <div style={{ 
+          position: 'fixed', 
+          left: '-9999px', 
+          top: '-9999px',
+          width: '800px',
+          height: '600px',
+          overflow: 'hidden',
+          pointerEvents: 'none',
+          opacity: 0,
+          zIndex: -9999
+        }}>
+          <Suspense fallback={null}>
+            <CandleSnapshotRenderer
+              isVisible={true}
+              userData={snapshotData}
+              instantCapture={false}
+              onComplete={(imageData) => {
+                console.log('[ShrinePage] Snapshot complete');
+              }}
+              saveToFirebase={true}
+              onFirebaseUploadComplete={(result) => {
+                console.log('[ShrinePage] Firebase upload complete:', result);
+                if (result?.storageUrl) {
+                  // Trigger the polaroid ready callback
+                  if (window.onPolaroidReady) {
+                    console.log('[ShrinePage] Calling onPolaroidReady with URL:', result.storageUrl);
+                    window.onPolaroidReady(result.storageUrl);
+                  }
+                  
+                  // Clean up state
+                  setShowSnapshot(false);
+                  setSnapshotData(null);
+                  // Don't reset isProcessingCandle to prevent modal from reappearing
+                } else {
+                  console.error('[ShrinePage] Firebase upload failed:', result);
+                  setShowSnapshot(false);
+                  setSnapshotData(null);
+                  // Don't reset isProcessingCandle to prevent modal from reappearing
+                }
+              }}
+            />
+          </Suspense>
+        </div>
+      )}
       
     </>
   )

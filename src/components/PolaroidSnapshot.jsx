@@ -326,7 +326,7 @@ const PolaroidSnapshot = ({
       if (actionBtns) actionBtns.style.visibility = 'hidden';
       if (shadow) shadow.style.visibility = 'hidden';
       
-      // Create a temporary container with dark background
+      // Create a temporary container with transparent background
       const tempContainer = document.createElement('div');
       tempContainer.style.cssText = `
         position: fixed;
@@ -334,7 +334,7 @@ const PolaroidSnapshot = ({
         left: 0;
         width: ${polaroidRef.current.offsetWidth + 200}px;
         height: ${polaroidRef.current.offsetHeight + 200}px;
-        background: #1a1a1a;
+        background: transparent;
         z-index: -1;
         visibility: hidden;
       `;
@@ -370,9 +370,9 @@ const PolaroidSnapshot = ({
       // Small delay to ensure rendering
       await new Promise(resolve => setTimeout(resolve, 50));
       
-      // Capture the cloned element with dark background
+      // Capture the cloned element with transparent background
       const canvas = await html2canvas(clonedPolaroid, {
-        backgroundColor: '#1a1a1a', // Dark background to show polaroid borders
+        backgroundColor: null, // Transparent background
         scale: 2, // High quality
         logging: false,
         useCORS: true,
@@ -391,9 +391,9 @@ const PolaroidSnapshot = ({
       if (actionBtns) actionBtns.style.visibility = '';
       if (shadow) shadow.style.visibility = '';
       
-      // Store both data URL and blob for reuse
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.6));
+      // Store both data URL and blob for reuse - using WebP for transparency and better compression
+      const dataUrl = canvas.toDataURL('image/webp', 0.9);
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.9));
       
       setPolaroidImageUrl(dataUrl);
       setPolaroidBlob(blob);
@@ -466,7 +466,7 @@ const PolaroidSnapshot = ({
     if (capturedUrl) {
       const link = document.createElement('a');
       link.href = capturedUrl;
-      link.download = `polaroid-${Date.now()}.png`;
+      link.download = `polaroid-${Date.now()}.webp`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -474,7 +474,7 @@ const PolaroidSnapshot = ({
       // Fallback to original image if capture failed
       const link = document.createElement('a');
       link.href = imageUrl;
-      link.download = `polaroid-${Date.now()}.png`;
+      link.download = `polaroid-${Date.now()}.webp`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -496,7 +496,7 @@ const PolaroidSnapshot = ({
         // Use the cached polaroid blob
         try {
           if (polaroidBlob && navigator.clipboard && window.ClipboardItem) {
-            const item = new ClipboardItem({ 'image/png': polaroidBlob });
+            const item = new ClipboardItem({ 'image/webp': polaroidBlob });
             await navigator.clipboard.write([item]);
             
             // Show notification
@@ -519,7 +519,7 @@ const PolaroidSnapshot = ({
             const blob = await response.blob();
             
             if (navigator.clipboard && window.ClipboardItem) {
-              const item = new ClipboardItem({ 'image/png': blob });
+              const item = new ClipboardItem({ 'image/webp': blob });
               await navigator.clipboard.write([item]);
               showNotification('Image copied! You can paste it in your tweet 📋');
             }
@@ -545,7 +545,7 @@ const PolaroidSnapshot = ({
         // Use the cached polaroid blob
         try {
           if (polaroidBlob && navigator.clipboard && window.ClipboardItem) {
-            const item = new ClipboardItem({ 'image/png': polaroidBlob });
+            const item = new ClipboardItem({ 'image/webp': polaroidBlob });
             await navigator.clipboard.write([item]);
             showNotification('Polaroid copied to clipboard! 📋');
           }
@@ -557,7 +557,7 @@ const PolaroidSnapshot = ({
             const blob = await response.blob();
             
             if (navigator.clipboard && window.ClipboardItem) {
-              const item = new ClipboardItem({ 'image/png': blob });
+              const item = new ClipboardItem({ 'image/webp': blob });
               await navigator.clipboard.write([item]);
               showNotification('Image copied to clipboard! 📋');
             }
@@ -580,7 +580,7 @@ const PolaroidSnapshot = ({
             
             // Use the cached polaroid blob or fallback to original
             const blob = polaroidBlob || await fetch(imageUrl).then(r => r.blob());
-            const file = new File([blob], 'polaroid.png', { type: 'image/png' });
+            const file = new File([blob], 'polaroid.webp', { type: 'image/webp' });
             
             await navigator.share({
               title: 'RL80 Capture',
@@ -765,7 +765,7 @@ const PolaroidSnapshot = ({
             </button>
           </div>
         </div>
-        <div className={styles.polaroidShadow} />
+        {/* <div className={styles.polaroidShadow} /> */}
       </div>
     </div>
   );
