@@ -481,7 +481,15 @@ useEffect(() => {
     
     if (offerings?.length > 0 && onSelectOffering) {
       const randomIndex = Math.floor(Math.random() * offerings.length)
-      onSelectOffering(offerings[randomIndex])
+      const selectedOffering = offerings[randomIndex]
+      console.log('[UnifiedShrine] Candle clicked, selecting offering:', {
+        randomIndex,
+        totalOfferings: offerings.length,
+        selectedId: selectedOffering?.id,
+        selectedName: selectedOffering?.name,
+        selectedMessage: selectedOffering?.message?.substring(0, 50)
+      })
+      onSelectOffering(selectedOffering)
     }
   }, [offerings, onSelectOffering])
 

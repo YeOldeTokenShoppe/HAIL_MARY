@@ -22,15 +22,28 @@ export function PhoneScreenTexture({
   const lastUpdateTime = useRef(Date.now())
   const lastInteractionTime = useRef(0) // Track when user last interacted
   const prayerReceivedStartTime = useRef(0) // Track when Prayer Received animation started
-  const PRAYER_RECEIVED_DURATION = 1500 // Show Prayer Received for 1.5 seconds
+  const PRAYER_RECEIVED_DURATION = 3500 // Show Prayer Received for 3.5 seconds to let effects complete
   const [manualBrowsing, setManualBrowsing] = useState(false)
   const [manualIndex, setManualIndex] = useState(0)
   const manualBrowsingRef = useRef(false) // Track browsing state in ref too
   const [latestPolaroid, setLatestPolaroid] = useState(null)
   const polaroidImageRef = useRef(null)
   const polaroidLoadedRef = useRef(false)
+  const polaroidReadyRef = useRef(false)
+  
+  // Separate state for hovered offering polaroid
+  const [hoveredPolaroid, setHoveredPolaroid] = useState(null)
+  const hoveredPolaroidImageRef = useRef(null)
+  const hoveredPolaroidLoadedRef = useRef(false) // Track when image is ready to display
   const [allPolaroids, setAllPolaroids] = useState([]) // Store all polaroids for cycling
   const polaroidIndexRef = useRef(0) // Track current polaroid index
+  
+  // Transition animation state
+  const [isTransitioning, setIsTransitioning] = useState(false)
+  const transitionProgressRef = useRef(0)
+  const transitionStartTimeRef = useRef(0)
+  const previousPolaroidRef = useRef(null)
+  const previousPolaroidImageRef = useRef(null)
   const lastPolaroidUpdateRef = useRef(Date.now()) // Track when we last cycled polaroids
   const userAvatarRef = useRef(null) // Store current user avatar image
   const userAvatarLoadedRef = useRef(false) // Track if avatar is loaded
@@ -38,8 +51,8 @@ export function PhoneScreenTexture({
   // Initialize canvas
   useEffect(() => {
     const canvas = canvasRef.current
-    canvas.width = 1024  // Higher resolution for sharper text
-    canvas.height = 2048
+    canvas.width = 768  // Even higher resolution for better quality
+    canvas.height = 1536  // Double the resolution
     
     // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas)
@@ -48,6 +61,7 @@ export function PhoneScreenTexture({
     texture.minFilter = THREE.LinearFilter  // Sharper filtering
     texture.magFilter = THREE.LinearFilter
     texture.generateMipmaps = false  // Disable mipmaps for sharper text
+    texture.anisotropy = 16  // Maximum anisotropic filtering for better quality at angles
     textureRef.current = texture
     
     // Create material with the texture
@@ -55,7 +69,8 @@ export function PhoneScreenTexture({
       map: texture,
       side: THREE.FrontSide,
       transparent: false,  // No transparency for better contrast
-      toneMapped: false,  // Disable tone mapping for true colors
+      toneMapped: true,  // Enable tone mapping to control brightness
+      color: 0xeeeeee,  // Slightly darken the material (93% brightness)
     })
     materialRef.current = material
     
@@ -91,10 +106,15 @@ export function PhoneScreenTexture({
   
   // Subscribe to recent offerings and load their images
   useEffect(() => {
-    // Always load offerings to show them with images
-    // Query for recent offerings
+    // Load offerings - they also have polaroid images in polaroidUrl field
+    // Query for recent offerings (client-side filtering for polaroidUrl)
     const offeringsRef = collection(db, 'offerings');
-    const q = query(offeringsRef, orderBy('createdAt', 'desc'), limit(20)); // Get last 20 offerings
+    // Simple query without where clause to avoid index requirement
+    const q = query(
+      offeringsRef,
+      orderBy('createdAt', 'desc'), 
+      limit(30) // Get more to account for filtering
+    ); // Get recent offerings, filter for polaroids client-side
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const polaroidsWithData = [];
@@ -102,46 +122,56 @@ export function PhoneScreenTexture({
       snapshot.forEach((doc) => {
         const data = doc.data();
         
-        // Check for either customImage (base64) or polaroidUrl (Storage URL)
-        const imageData = data.customImage || data.polaroidUrl;
-        
-        if (imageData) {
-          polaroidsWithData.push({
-            id: doc.id,
-            imageUrl: imageData, // Can be either base64 or URL
-            message: data.message || '',
-            username: data.name || data.recipientName || 'Anonymous',
-            userImageUrl: data.userImageUrl || null, // Add user avatar
-            burnedAmount: data.tokensBurned || 1,
-            type: data.type || 'petition',
-            createdAt: data.createdAt,
-            prayerFor: data.prayerFor || 'self',
-            recipientName: data.recipientName || data.name || 'Someone'
-          });
 
-        } else if (data.message) {
-          // Include offerings with messages even if no image
-          polaroidsWithData.push({
-            id: doc.id,
-            imageUrl: null,
-            message: data.message || '',
-            username: data.name || data.recipientName || 'Anonymous',
-            userImageUrl: data.userImageUrl || null, // Add user avatar
-            burnedAmount: data.tokensBurned || 1,
-            type: data.type || 'petition',
-            createdAt: data.createdAt,
-            prayerFor: data.prayerFor || 'self',
-            recipientName: data.recipientName || data.name || 'Someone'
-          });
+        
+        // The offerings collection uses 'polaroidUrl' field for the image
+        const imageData = data.polaroidUrl;
+        
+        // Skip offerings without polaroid images
+        if (!imageData) {
+          return; // Skip offerings that don't have polaroid images yet
         }
+        
+        // Additional validation: polaroidUrl must be a valid string URL
+        if (typeof imageData !== 'string' || imageData.length < 10) {
+          return;
+        }
+        
+        // Check if it's a complete polaroid URL (not a placeholder)
+        const isCompletePolaroid = imageData.includes('firebasestorage.googleapis.com') || 
+                                   imageData.startsWith('data:image');
+        
+        if (!isCompletePolaroid) {
+          return;
+        }
+        
+
+        
+        // Include offering with polaroid
+        polaroidsWithData.push({
+          id: doc.id,
+          imageUrl: imageData, // This is the polaroidUrl from offerings
+          message: data.message || '',
+          username: data.name || data.recipientName || 'Anonymous', // offerings uses 'name'
+          userImageUrl: data.userImageUrl || null, // Add user avatar
+          burnedAmount: data.tokensBurned || '1', // offerings uses 'tokensBurned'
+          type: data.type || 'petition', // offerings uses 'type'
+          createdAt: data.createdAt,
+          prayerFor: data.prayerFor || 'self',
+          recipientName: data.recipientName || data.name || 'Someone'
+        });
       });
+      
+
       
       setAllPolaroids(polaroidsWithData);
       
       // Set the first one as current
       if (polaroidsWithData.length > 0) {
+
         setLatestPolaroid(polaroidsWithData[0]);
         polaroidIndexRef.current = 0;
+      } else {
       }
     });
     
@@ -150,14 +180,16 @@ export function PhoneScreenTexture({
   
   // Load current polaroid image
   useEffect(() => {
+    // IMMEDIATELY reset states when polaroid changes
+    polaroidLoadedRef.current = false;
+    polaroidReadyRef.current = false;
+    polaroidImageRef.current = null;
     
     if (latestPolaroid?.imageUrl) {
       const isBase64 = latestPolaroid.imageUrl.startsWith('data:');
       const imagePreview = latestPolaroid.imageUrl.substring(0, 100) + '...';
-
       
-      polaroidLoadedRef.current = false; // Reset loading state
-      polaroidImageRef.current = null; // Clear previous image
+
       
       const img = new Image();
       
@@ -168,8 +200,11 @@ export function PhoneScreenTexture({
       
       img.onload = () => {
         polaroidImageRef.current = img;
-        polaroidLoadedRef.current = true;
-
+        // Small delay just for canvas formatting
+        requestAnimationFrame(() => {
+          polaroidLoadedRef.current = true;
+          polaroidReadyRef.current = true;
+        });
       };
       
       img.onerror = (error) => {
@@ -179,6 +214,7 @@ export function PhoneScreenTexture({
           imageUrl: latestPolaroid.imageUrl.substring(0, 100) + '...'
         });
         polaroidLoadedRef.current = false;
+        polaroidReadyRef.current = false;
         polaroidImageRef.current = null;
       };
       
@@ -191,8 +227,13 @@ export function PhoneScreenTexture({
     } else if (latestPolaroid) {
       console.warn('[PhoneScreen] ⚠️ Polaroid data missing imageUrl:', latestPolaroid);
       polaroidLoadedRef.current = false;
+      polaroidReadyRef.current = false;
       polaroidImageRef.current = null;
     } else {
+      // No polaroid at all - reset states
+      polaroidLoadedRef.current = false;
+      polaroidReadyRef.current = false;
+      polaroidImageRef.current = null;
     }
   }, [latestPolaroid])
   
@@ -241,9 +282,17 @@ export function PhoneScreenTexture({
   // Draw the phone interface
   const drawPhoneInterface = () => {
     const canvas = canvasRef.current
-    const ctx = canvas.getContext('2d')
+    const ctx = canvas.getContext('2d', { 
+      alpha: false,
+      desynchronized: false,
+      willReadFrequently: false
+    })
     const width = canvas.width
     const height = canvas.height
+    
+    // Set high quality image rendering
+    ctx.imageSmoothingEnabled = true
+    ctx.imageSmoothingQuality = 'high'
     
     // Save context state and flip horizontally
     ctx.save()
@@ -259,23 +308,23 @@ export function PhoneScreenTexture({
       gradient.addColorStop(1, '#1a0525')  // Deep purple bottom
     } else {
       // Normal dark blue gradient
-      gradient.addColorStop(0, '#0a0a14')  // Darker gradient
-      gradient.addColorStop(0.5, '#06081a')
-      gradient.addColorStop(1, '#000005')
+      gradient.addColorStop(0, '#2525efff')  // Darker gradient
+      gradient.addColorStop(0.5, '#0c1a92ff')
+      gradient.addColorStop(1, '#2525efff')
     }
     ctx.fillStyle = gradient
     ctx.fillRect(0, 0, width, height)
     
-    // Draw status bar (larger fonts for better readability)
+    // Draw status bar (adjusted for 768px width)
     ctx.fillStyle = '#aaa'
-    ctx.font = '36px -apple-system, BlinkMacSystemFont, sans-serif'
-    ctx.fillText('9:41', 50, 80)
-    ctx.fillText('📶 🔋', width - 150, 80)
+    ctx.font = '28px -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.fillText('9:41', 40, 60)
+    ctx.fillText('📶 🔋', width - 110, 60)
     
     // Draw app header
     ctx.fillStyle = '#fff'
-    ctx.font = 'bold 48px -apple-system, BlinkMacSystemFont, sans-serif'
-    ctx.fillText("Our Lady's Inbox", 50, 230)
+    ctx.font = 'bold 36px -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.fillText("Our Lady's Inbox", 40, 170)
     
     // Show prayer type badge instead of status
     if (latestPolaroid) {
@@ -288,26 +337,26 @@ export function PhoneScreenTexture({
       
       // Draw prayer type badge
       const badgeText = `${config.icon} ${config.label}`
-      ctx.font = 'bold 36px -apple-system, BlinkMacSystemFont, sans-serif'
+      ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, sans-serif'
       
       // Measure text for badge background
       const metrics = ctx.measureText(badgeText)
-      const badgeX = 50
-      const badgeY = 270
-      const padding = 20
+      const badgeX = 40
+      const badgeY = 200
+      const padding = 12
       
       // Draw badge background
       ctx.fillStyle = config.color + '22' // Low opacity background
       ctx.strokeStyle = config.color
       ctx.lineWidth = 2
       ctx.beginPath()
-      ctx.roundRect(badgeX, badgeY, metrics.width + padding * 2, 50, 10)
+      ctx.roundRect(badgeX, badgeY, metrics.width + padding * 2, 35, 8)
       ctx.fill()
       ctx.stroke()
       
       // Draw badge text
       ctx.fillStyle = config.color
-      ctx.fillText(badgeText, badgeX + padding, badgeY + 35)
+      ctx.fillText(badgeText, badgeX + padding, badgeY + 24)
     } else if (hasActiveClick) {
       // Fallback when no polaroid
       ctx.fillStyle = '#ff00ff'
@@ -316,20 +365,19 @@ export function PhoneScreenTexture({
     }
     
     // Determine what to show
+    const now = Date.now();
+    const inPrayerReceivedPhase = justLitOffering && (now - prayerReceivedStartTime.current < PRAYER_RECEIVED_DURATION);
+    
     // Show polaroid display when we have data and showPolaroid is true
-    if (showPolaroid && latestPolaroid) {
+    // The drawPolaroid function handles all timing and ready checks internally
+    if (showPolaroid && latestPolaroid && !inPrayerReceivedPhase) {
       // Show the polaroid-style display (with or without image)
       drawPolaroid(ctx, width, height)
-    } else if (latestPolaroid && !hoveredOffering && !justLitOffering) {
+    } else if (latestPolaroid && !hoveredOffering && !justLitOffering && !inPrayerReceivedPhase) {
       // Also show polaroid when not hovering/just lit (fallback)
       drawPolaroid(ctx, width, height)
     } else {
-      // console.log('[PhoneScreen] Not drawing polaroid:', {
-      //   showPolaroid,
-      //   hasLatestPolaroid: !!latestPolaroid,
-      //   hoveredOffering: !!hoveredOffering,
-      //   justLitOffering: !!justLitOffering
-      // });
+
       // Show specific offering when hovered or just lit
       let displayOffering = null
       if (justLitOffering) {
@@ -345,8 +393,43 @@ export function PhoneScreenTexture({
           drawOffering(ctx, displayOffering, width, height, true)
         }
       } else if (hoveredOffering) {
-        displayOffering = hoveredOffering
-        drawOffering(ctx, displayOffering, width, height, true)
+        // Check if we have hovered polaroid data ready
+        console.log('[PhoneScreen] 🖼️ Drawing hovered offering:', {
+          hasHoveredPolaroid: !!hoveredPolaroid,
+          isLoaded: hoveredPolaroidLoadedRef.current,
+          hasImage: !!hoveredPolaroidImageRef.current,
+          hoveredId: hoveredPolaroid?.id,
+          hoveredUsername: hoveredPolaroid?.username
+        });
+        
+        if (hoveredPolaroid && hoveredPolaroidLoadedRef.current && hoveredPolaroidImageRef.current) {
+          // Temporarily swap in the hovered polaroid data
+          const savedPolaroid = latestPolaroid;
+          const savedImage = polaroidImageRef.current;
+          const savedLoaded = polaroidLoadedRef.current;
+          const savedReady = polaroidReadyRef.current;
+          
+          // Use hovered polaroid data for drawing
+          setLatestPolaroid(hoveredPolaroid);
+          polaroidImageRef.current = hoveredPolaroidImageRef.current;
+          polaroidLoadedRef.current = true;
+          polaroidReadyRef.current = true;
+          
+          console.log('[PhoneScreen] 🎨 Drawing polaroid for:', hoveredPolaroid.username);
+          // Draw the hovered offering as a polaroid
+          drawPolaroid(ctx, width, height);
+          
+          // Restore original polaroid data
+          setLatestPolaroid(savedPolaroid);
+          polaroidImageRef.current = savedImage;
+          polaroidLoadedRef.current = savedLoaded;
+          polaroidReadyRef.current = savedReady;
+        } else {
+          console.log('[PhoneScreen] 📝 Falling back to text display');
+          // No polaroid data or still loading, use regular offering display
+          displayOffering = hoveredOffering;
+          drawOffering(ctx, displayOffering, width, height, true);
+        }
       } else if (offerings.length > 0) {
         // Use manual index if manually browsing, otherwise auto-rotate
         const index = manualBrowsing ? manualIndex : currentOfferingIndex.current
@@ -386,12 +469,42 @@ export function PhoneScreenTexture({
   
   // Draw the latest polaroid from Firebase with message
   const drawPolaroid = (ctx, width, height) => {
+
+    
     if (!latestPolaroid) {
       return;
     }
     
-    if (!polaroidImageRef.current) {
-      // Continue to draw the rest without the image
+    // Check if image is ready - if not, don't draw ANYTHING (including text)
+    if (latestPolaroid.imageUrl && (!polaroidReadyRef.current || !polaroidLoadedRef.current)) {
+      // Image exists but isn't ready - don't draw anything at all
+
+      return;
+    }
+    
+
+    
+    // Apply transition effects
+    ctx.save();
+    
+    if (isTransitioning) {
+      // Calculate slide offset
+      const slideDistance = width; // Slide across the full width
+      const currentX = -slideDistance * transitionProgressRef.current;
+      const previousX = slideDistance * (1 - transitionProgressRef.current);
+      
+      // Draw previous polaroid sliding out to the left
+      if (previousPolaroidRef.current) {
+        ctx.save();
+        ctx.translate(previousX, 0);
+        ctx.globalAlpha = 1 - transitionProgressRef.current * 0.3; // Fade out slightly
+        // We'll draw the previous polaroid here (simplified for now)
+        ctx.restore();
+      }
+      
+      // Apply offset for current polaroid sliding in from right
+      ctx.translate(currentX, 0);
+      ctx.globalAlpha = 0.7 + transitionProgressRef.current * 0.3; // Fade in
     }
     
     // Removed the title to have more space for content
@@ -404,11 +517,11 @@ export function PhoneScreenTexture({
     }
     const config = typeConfig[latestPolaroid.type] || typeConfig.petition
     
-    // Draw user avatar if available - EVEN BIGGER and LEFT ALIGNED
+    // Draw user avatar if available - adjusted for 768px width
     if (userAvatarRef.current && userAvatarLoadedRef.current) {
-      const avatarSize = 160; // Even bigger!
-      const avatarX = 60; // Far left position
-      const avatarY = 370; // Moved down by 20
+      const avatarSize = 100; // Appropriate size for 768px canvas
+      const avatarX = 40; // Left position
+      const avatarY = 260; // Position below badge
       
       // Draw avatar circle with glow effect
       ctx.save();
@@ -431,58 +544,136 @@ export function PhoneScreenTexture({
       ctx.drawImage(userAvatarRef.current, avatarX, avatarY, avatarSize, avatarSize);
       ctx.restore();
       
-      // Draw username next to avatar - MUCH BIGGER
-      ctx.font = 'bold 72px -apple-system, BlinkMacSystemFont, sans-serif'
+      // Draw username next to avatar - adjusted for 768px width
+      ctx.font = 'bold 48px -apple-system, BlinkMacSystemFont, sans-serif'
       ctx.fillStyle = '#ffffff'
       ctx.textAlign = 'left'
-      ctx.fillText(latestPolaroid.username, avatarX + avatarSize + 30, avatarY + avatarSize/2 + 15)
+      ctx.fillText(latestPolaroid.username, avatarX + avatarSize + 30, avatarY + avatarSize/2 + 10)
       ctx.textAlign = 'center'
     } else {
-      // No avatar - just show larger username on the left
-      ctx.font = 'bold 72px -apple-system, BlinkMacSystemFont, sans-serif'
+      // No avatar - just show username on the left
+      ctx.font = 'bold 48px -apple-system, BlinkMacSystemFont, sans-serif'
       ctx.fillStyle = '#ffffff'
       ctx.textAlign = 'left'
-      ctx.fillText(latestPolaroid.username, 60, 370) // Moved down by 20
+      ctx.fillText(latestPolaroid.username, 40, 310) // Position below badge
       ctx.textAlign = 'center'
     }
     
     // Removed prayer type line to simplify the display
     
-    // Only draw image if it's loaded
+    // Only draw image if it's loaded AND ready
     let imageBottomY = 540; // Moved down by 20
     
-    if (polaroidImageRef.current && polaroidLoadedRef.current) {
+    if (polaroidImageRef.current && polaroidLoadedRef.current && polaroidReadyRef.current) {
+      // IMPORTANT: Save context state to prevent any clipping from affecting our image
+      ctx.save();
+      
+      // Ensure high quality image rendering for this specific image
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      
       const img = polaroidImageRef.current
-      const maxWidth = width - 80  // Use more width
-      const maxHeight = 600 // More height available now
+      const canvasWidth = canvasRef.current.width;  // Get actual canvas width (768)
+      const maxWidth = canvasWidth + 10  // Small padding for wider image (768 - 60 = 708px)
+      const maxHeight = 300 // Limit height for wide aspect ratio
       
-      // Calculate scaling to fit - allow up to 90% scale for bigger display
-      const scale = Math.min(maxWidth / img.width, maxHeight / img.height, 0.9)
-      const scaledWidth = img.width * scale
-      const scaledHeight = img.height * scale
+      // ADJUSTABLE CROP SETTINGS - Tweak these values to get perfect framing
+      // For polaroid images, crop to zoom in and exclude borders
+      const cropRatio = 0.65; // How much of the image to use (0.65 = 65% to exclude borders)
+      const cropOffsetY = 0.0; // Shift crop area down slightly (0.05 = 5% down)
       
-      // Center the image
+      // Calculate crop area - take a wider section from the center
+      // Use most of the width but less height to create a wider aspect ratio
+      const sourceWidth = img.width * cropRatio;
+      const sourceHeight = img.height * (cropRatio * 0.65); // Take less height to make it wider
+      const sourceX = (img.width - sourceWidth) / 2;  // Center horizontally
+      const sourceY = (img.height - sourceHeight) / 2 + (img.height * cropOffsetY); // Center vertically with offset
+      
+      // Calculate destination size - fill the available width
+      const aspectRatio = sourceWidth / sourceHeight;
+      const scaledWidth = maxWidth;  // Use full available width
+      const scaledHeight = scaledWidth / aspectRatio;
+      
+
+      
+      // Center the image horizontally
       const imgX = (width - scaledWidth) / 2
-      const imgY = 540 // Moved down by 20
+      const imgY = 380 // Position below username (adjusted for 768px canvas)
       
-      // Draw shadow
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)'
-      ctx.shadowBlur = 20
-      ctx.shadowOffsetX = 0
-      ctx.shadowOffsetY = 10
+      // Draw shadow for the frame
+      ctx.save();
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+      ctx.shadowBlur = 20;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 10;
       
-      // Draw the polaroid image
+      // Draw polaroid frame background (white border) - straight, not rotated
+      const framePaddingSide = 15;
+      const framePaddingTop = 0; // Reduced top padding to eliminate gap
+      const framePaddingBottom = 0;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(imgX - framePaddingSide, imgY - framePaddingTop, 
+                   scaledWidth + framePaddingSide * 2, scaledHeight + framePaddingTop + framePaddingBottom);
+      
+      // Reset shadow
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+      ctx.restore();
+      
+      // Set up clipping region for the image area
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(imgX, imgY, scaledWidth, scaledHeight);
+      ctx.clip();
+      
+      // Apply counter-rotation to straighten the tilted polaroid image
+      ctx.save();
+      const imageCenterX = imgX + scaledWidth / 2;
+      const imageCenterY = imgY + scaledHeight / 2;
+      ctx.translate(imageCenterX, imageCenterY);
+      ctx.rotate(5 * Math.PI / 180); // Rotate 5 degrees to counter the original tilt
+      ctx.translate(-imageCenterX, -imageCenterY);
+      
+      // Draw the cropped polaroid image (rotated to appear straight)
       try {
-        ctx.drawImage(img, imgX, imgY, scaledWidth, scaledHeight)
+        // Draw the image with a larger scale to ensure it fills the frame after rotation
+        const scaleCompensation = 1.15; // Scale up more to fill gaps from rotation
+        const compensatedWidth = scaledWidth * scaleCompensation;
+        const compensatedHeight = scaledHeight * scaleCompensation;
+        const compensatedX = imgX - (compensatedWidth - scaledWidth) / 2;
+        const compensatedY = imgY - (compensatedHeight - scaledHeight) / 2 - 12; // Shift up more to fully cover top gap
+        
+        ctx.drawImage(
+          img, 
+          sourceX, sourceY, sourceWidth, sourceHeight,  // Source rectangle (cropped)
+          compensatedX, compensatedY, compensatedWidth, compensatedHeight  // Destination rectangle
+        )
+        
+        // Apply a very slight darkening overlay to reduce brightness
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.fillStyle = 'rgba(245, 245, 245, 1)'; // Darken to about 96% brightness
+        ctx.fillRect(compensatedX, compensatedY, compensatedWidth, compensatedHeight);
+        ctx.globalCompositeOperation = 'source-over';
+        
         imageBottomY = imgY + scaledHeight; // Update bottom position
       } catch (e) {
         console.error('[PhoneScreen] ❌ Failed to draw image:', e);
       }
       
+      // Restore rotation context
+      ctx.restore();
+      
+      // Restore clipping context
+      ctx.restore();
+      
       // Reset shadow
       ctx.shadowBlur = 0
       ctx.shadowOffsetX = 0
       ctx.shadowOffsetY = 0
+      
+      // IMPORTANT: Restore context to clear any clipping paths
+      ctx.restore();
     } else {
       // // Show placeholder or loading text
       // ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'
@@ -494,17 +685,17 @@ export function PhoneScreenTexture({
       // });
     }
     
-    // Draw message below the image - bigger text
+    // Draw message below the image
     if (latestPolaroid.message) {
       ctx.fillStyle = '#ffffff'
-      ctx.font = '60px -apple-system, BlinkMacSystemFont, sans-serif'
+      ctx.font = '64px -apple-system, BlinkMacSystemFont, sans-serif'
       
       // Word wrap the message
       const words = latestPolaroid.message.split(' ')
       let line = ''
-      let lineY = imageBottomY + 100
-      const maxTextWidth = width - 80
-      const lineHeight = 60
+      let lineY = imageBottomY + 60
+      const maxTextWidth = width - 60
+      const lineHeight = 36
       let linesDrawn = 0
       const maxLines = 5
       
@@ -542,13 +733,16 @@ export function PhoneScreenTexture({
     }
     
     // Add navigation hint if multiple polaroids
-    if (allPolaroids.length > 1) {
-      ctx.fillStyle = 'rgba(0, 255, 102, 0.6)'
-      ctx.font = '28px -apple-system, BlinkMacSystemFont, sans-serif'
-      ctx.fillText('Auto-cycling every 5s', width / 2, height - 40)
-    }
+    // if (allPolaroids.length > 1) {
+    //   ctx.fillStyle = 'rgba(0, 255, 102, 0.6)'
+    //   ctx.font = '28px -apple-system, BlinkMacSystemFont, sans-serif'
+    //   ctx.fillText('Auto-cycling every 5s', width / 2, height - 40)
+    // }
     
     ctx.textAlign = 'left'
+    
+    // Restore transition context
+    ctx.restore();
   }
   
   // Helper function to get relative time
@@ -882,10 +1076,71 @@ export function PhoneScreenTexture({
     ctx.textAlign = 'left'
   }
   
-  // Track when offerings change
+  // Track when offerings change and load hovered offering's polaroid
   useEffect(() => {
     if (hoveredOffering) {
       lastInteractionTime.current = Date.now()
+      
+      console.log('[PhoneScreen] 🎯 Hovered offering changed:', {
+        id: hoveredOffering.id,
+        name: hoveredOffering.name,
+        message: hoveredOffering.message?.substring(0, 50),
+        hasPolaroidUrl: !!hoveredOffering.polaroidUrl,
+        hasImageUrl: !!hoveredOffering.imageUrl,
+        polaroidUrl: hoveredOffering.polaroidUrl?.substring(0, 100)
+      });
+      
+      // Check if hoveredOffering has polaroid data
+      if (hoveredOffering.polaroidUrl || hoveredOffering.imageUrl) {
+        const tempPolaroid = {
+          id: hoveredOffering.id,
+          username: hoveredOffering.name || hoveredOffering.recipientName || 'Anonymous',
+          message: hoveredOffering.message,
+          imageUrl: hoveredOffering.polaroidUrl || hoveredOffering.imageUrl,
+          userImageUrl: hoveredOffering.userImageUrl,
+          tokensBurned: hoveredOffering.tokensBurned,
+          type: hoveredOffering.type,
+          timestamp: hoveredOffering.timestamp
+        };
+        
+        console.log('[PhoneScreen] 📸 Creating hovered polaroid:', {
+          id: tempPolaroid.id,
+          username: tempPolaroid.username,
+          imageUrl: tempPolaroid.imageUrl?.substring(0, 100)
+        });
+        
+        setHoveredPolaroid(tempPolaroid);
+        
+        // Load the image for the hovered polaroid
+        if (tempPolaroid.imageUrl) {
+          hoveredPolaroidLoadedRef.current = false;
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          
+          img.onload = () => {
+            console.log('[PhoneScreen] ✅ Hovered polaroid image loaded:', tempPolaroid.id);
+            hoveredPolaroidImageRef.current = img;
+            hoveredPolaroidLoadedRef.current = true;
+          };
+          
+          img.onerror = () => {
+            console.error('[PhoneScreen] Failed to load hovered polaroid image');
+            hoveredPolaroidLoadedRef.current = false;
+            hoveredPolaroidImageRef.current = null;
+          };
+          
+          img.src = tempPolaroid.imageUrl;
+        }
+      } else {
+        setHoveredPolaroid(null);
+        hoveredPolaroidImageRef.current = null;
+        hoveredPolaroidLoadedRef.current = false;
+      }
+    } else {
+      // Clear hovered polaroid when not hovering
+      setHoveredPolaroid(null);
+      hoveredPolaroidImageRef.current = null;
+      hoveredPolaroidLoadedRef.current = false;
     }
   }, [hoveredOffering])
   
@@ -962,16 +1217,44 @@ export function PhoneScreenTexture({
     
     // Auto-cycle through polaroids when not showing a specific offering
     if (!hoveredOffering && !justLitOffering && allPolaroids.length > 1) {
-      // Cycle every 5 seconds
+      // Cycle every 5 seconds with transition
       if (now - lastPolaroidUpdateRef.current > 5000) {
+        // Store the current polaroid as previous
+        previousPolaroidRef.current = latestPolaroid
+        previousPolaroidImageRef.current = polaroidImageRef.current
+        
+        // Start transition
+        setIsTransitioning(true)
+        transitionStartTimeRef.current = now
+        transitionProgressRef.current = 0
+        
+        // Update to next polaroid
         polaroidIndexRef.current = (polaroidIndexRef.current + 1) % allPolaroids.length
         const nextPolaroid = allPolaroids[polaroidIndexRef.current]
         setLatestPolaroid(nextPolaroid)
         lastPolaroidUpdateRef.current = now
+        
+        // End transition after animation completes
+        setTimeout(() => {
+          setIsTransitioning(false)
+        }, 500) // 500ms transition duration
       }
     }
     
     // Removed old auto-rotation logic - now using polaroid cycling above
+    
+    // Update transition progress
+    if (isTransitioning) {
+      const elapsed = now - transitionStartTimeRef.current
+      const duration = 500 // 500ms transition
+      transitionProgressRef.current = Math.min(elapsed / duration, 1)
+      
+      // Use easing function for smooth animation
+      const easeInOutCubic = (t) => {
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
+      }
+      transitionProgressRef.current = easeInOutCubic(transitionProgressRef.current)
+    }
   })
   
   return null

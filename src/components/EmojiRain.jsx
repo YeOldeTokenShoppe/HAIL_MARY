@@ -33,7 +33,7 @@ export default function EmojiRain({
   isActive = true,
   position = { x: '50%', y: '20%' },
   spread = 180,
-  maxEmojis = 8
+  maxEmojis = 5
 }) {
   const containerRef = useRef(null)
   const intervalRef = useRef(null)

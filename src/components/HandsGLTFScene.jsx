@@ -808,13 +808,13 @@ return (
           pointerEvents: 'none'
         }}
       >
-        <EmojiRain 
+        {/* <EmojiRain 
           priceChange={priceChange}
           isActive={!is80sMode}
           position={{ x: '50%', y: '50%' }}
           spread={100}
           maxEmojis={8}
-        />
+        /> */}
       </Html>
     )}
   </group>

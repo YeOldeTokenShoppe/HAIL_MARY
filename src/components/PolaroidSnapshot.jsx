@@ -126,20 +126,47 @@ const PolaroidSnapshot = ({
           tempCtx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
           tempCtx.drawImage(characterCanvas, 0, 0);
           
-          // Convert to data URL with high quality
-          const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
-          console.log('[PolaroidSnapshot] Composite image created with background, length:', dataUrl.length);
-          console.log('[PolaroidSnapshot] Background was:', backgroundImage);
-          
-          if (dataUrl) {
-            setImageUrl(dataUrl);
-            setCompositedImageUrl(dataUrl); // Store the composited version
-            setIsVisible(true);
+          // Add RL80 logo overlay
+          const logoImg = new Image();
+          logoImg.crossOrigin = 'anonymous';
+          logoImg.onload = () => {
+            // Draw logo in top left corner
+            const logoSize = 200; // Increased size to match
+            const logoMargin = 30; // Increased margin to match
+            tempCtx.drawImage(logoImg, logoMargin, logoMargin, logoSize, logoSize);
             
-            setTimeout(() => {
-              setIsBlurred(false);
-            }, 300);
-          }
+            // Convert to data URL with high quality after logo is added
+            const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
+            console.log('[PolaroidSnapshot] Composite image created with background and logo, length:', dataUrl.length);
+            console.log('[PolaroidSnapshot] Background was:', backgroundImage);
+            
+            if (dataUrl) {
+              setImageUrl(dataUrl);
+              setCompositedImageUrl(dataUrl); // Store the composited version
+              setIsVisible(true);
+              
+              setTimeout(() => {
+                setIsBlurred(false);
+              }, 300);
+            }
+          };
+          logoImg.onerror = (err) => {
+            console.error('[PolaroidSnapshot] Failed to load logo:', err);
+            // Still create image without logo
+            const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
+            console.log('[PolaroidSnapshot] Composite image created with background (no logo), length:', dataUrl.length);
+            
+            if (dataUrl) {
+              setImageUrl(dataUrl);
+              setCompositedImageUrl(dataUrl); // Store the composited version
+              setIsVisible(true);
+              
+              setTimeout(() => {
+                setIsBlurred(false);
+              }, 300);
+            }
+          };
+          logoImg.src = '/images/polaroidLogo.svg';
         };
         bgImg.onerror = (err) => {
           console.error('[PolaroidSnapshot] Failed to load background:', err);
@@ -160,20 +187,49 @@ const PolaroidSnapshot = ({
         // No background image, just draw the canvas
         tempCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height);
         
-        // Convert to data URL with high quality
-        const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
-        
-        if (dataUrl) {
-          setImageUrl(dataUrl);
-          setIsVisible(true);
+        // Add RL80 logo overlay even without background
+        const logoImg = new Image();
+        logoImg.crossOrigin = 'anonymous';
+        logoImg.onload = () => {
+          // Draw logo in top left corner
+          const logoSize = 200; // Adjust size as needed
+          const logoMargin = 30; // Margin from edges
+          tempCtx.drawImage(logoImg, logoMargin, logoMargin, logoSize, logoSize);
           
-          setTimeout(() => {
-            setIsBlurred(false);
-          }, 300);
-        } else {
-          console.warn('Canvas capture was empty, trying alternate method');
-          captureWithDelay();
-        }
+          // Convert to data URL with high quality after logo is added
+          const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
+          console.log('[PolaroidSnapshot] Image created with logo (no background), length:', dataUrl.length);
+          
+          if (dataUrl) {
+            setImageUrl(dataUrl);
+            setIsVisible(true);
+            
+            setTimeout(() => {
+              setIsBlurred(false);
+            }, 300);
+          } else {
+            console.warn('Canvas capture was empty, trying alternate method');
+            captureWithDelay();
+          }
+        };
+        logoImg.onerror = (err) => {
+          console.error('[PolaroidSnapshot] Failed to load logo:', err);
+          // Still create image without logo
+          const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
+          
+          if (dataUrl) {
+            setImageUrl(dataUrl);
+            setIsVisible(true);
+            
+            setTimeout(() => {
+              setIsBlurred(false);
+            }, 300);
+          } else {
+            console.warn('Canvas capture was empty, trying alternate method');
+            captureWithDelay();
+          }
+        };
+        logoImg.src = '/images/polaroidLogo.svg';
       }
     } catch (error) {
       console.error('Canvas capture failed:', error);

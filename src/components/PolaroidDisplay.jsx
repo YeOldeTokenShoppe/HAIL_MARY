@@ -46,8 +46,9 @@ export default function PolaroidDisplay({ imageUrl, isVisible, position = 'botto
         const file = new File([blob], 'candle.jpg', { type: 'image/jpeg' });
         
         await navigator.share({
-          title: 'My Prayer Candle',
-          text: 'Check out my prayer candle!',
+          title: '❤️‍🔥 Get Lit with $RL80!',
+          text: '❤️‍🔥 Get Lit with $RL80!',
+          url: 'https://rl80.com',
           files: [file]
         });
       } catch (error) {

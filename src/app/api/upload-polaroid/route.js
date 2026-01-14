@@ -72,60 +72,15 @@ export async function POST(request) {
     // Generate public URL
     const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o/${encodeURIComponent(filename)}?alt=media`;
     
-    // Save to Firestore using REST API
-    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/polaroids?key=${apiKey}`;
+    // Skip creating a polaroids document - the client will update the offerings document
+    // This prevents duplicate data in two collections
+    console.log('[Upload API] Skipping polaroids collection - client will update offerings');
     
-    // Build Firestore document - only include relevant fields for devotion type
-    const firestoreFields = {
-      imageUrl: { stringValue: publicUrl },
-      storagePath: { stringValue: filename },
-      username: { stringValue: metadata?.username || 'Anonymous' },
-      createdBy: { stringValue: metadata?.createdBy || '' },  // Clerk user ID
-      devotionType: { stringValue: metadata?.devotionType || 'candle' },
-      background: { stringValue: metadata?.background || '' },
-      burnedAmount: { stringValue: String(metadata?.burnedAmount || '0') },
-      createdAt: { timestampValue: new Date().toISOString() },
-    };
-    
-    // Add tattoo-specific fields only for tattoo devotions
-    if (metadata?.devotionType === 'tattoo') {
-      firestoreFields.tattooDesign = { stringValue: metadata?.tattooDesign || '' };
-      firestoreFields.tattooCharacter = { stringValue: metadata?.tattooCharacter || '' };
-      firestoreFields.selectedPose = { stringValue: metadata?.selectedPose || '' };
-      // Don't add candleType or baseColor for tattoos
-    } else {
-      // Add candle-specific fields only for candle devotions
-      firestoreFields.candleType = { stringValue: metadata?.candleType || 'votive' };
-      firestoreFields.baseColor = { stringValue: metadata?.baseColor || '#ffffff' };
-    }
-    
-    const firestoreDoc = {
-      fields: firestoreFields
-    };
-    
-    const firestoreResponse = await fetch(firestoreUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ fields: firestoreDoc.fields }),
-    });
-    
-    if (!firestoreResponse.ok) {
-      const errorText = await firestoreResponse.text();
-      console.error('[Upload API] Firestore save failed:', errorText);
-      // Continue anyway since the image was uploaded
-    }
-    
-    const firestoreResult = await firestoreResponse.json();
-    const docId = firestoreResult.name?.split('/').pop() || 'unknown';
-    
-    console.log('[Upload API] Successfully saved to Firebase');
+    // Just return the storage URL so the client can update the offering
     
     return NextResponse.json({
       success: true,
       storageUrl: publicUrl,
-      docId: docId,
       storagePath: filename,
     });
 

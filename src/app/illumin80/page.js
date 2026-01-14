@@ -13,7 +13,7 @@ import StakeModal from '@/components/StakeModal'
 import { WalletConnectionModal } from '@/components/WalletConnectionModal'
 import { useRouter } from 'next/navigation'
 import ShrineLeftPanel from '@/components/ShrineLeftPanel'
-import { db, collection, addDoc, serverTimestamp, getDocs, query, orderBy, limit, onSnapshot } from '@/lib/firebaseClient'
+import { db, collection, addDoc, serverTimestamp, getDocs, query, orderBy, limit, onSnapshot, updateDoc, doc } from '@/lib/firebaseClient'
 import UnifiedShrine from '@/components/UnifiedShrine'
 import PolaroidDisplay from '@/components/PolaroidDisplay'
 
@@ -30,6 +30,7 @@ export default function ShrinePage() {
   const { isWalletConnected, walletAddress, connectWallet } = useWalletAuth()
   const unifiedShrineRef = useRef()
   const shrineLeftPanelRef = useRef()
+  const latestOfferingRef = useRef(null) // Track the latest offering ID for updating with polaroid URL
   const { 
     play, 
     pause, 
@@ -126,6 +127,8 @@ useEffect(() => {
           userId: data.userId,
           walletAddress: data.walletAddress,
           userImageUrl: data.userImageUrl,
+          polaroidUrl: data.polaroidUrl, // Add polaroidUrl field
+          imageUrl: data.imageUrl, // Also check for imageUrl field
           timestamp: data.timestamp || 'just now',
           icon: data.type === 'petition' ? '🙏' : 
                 data.type === 'appreciation' ? '✨' : '🖤'
@@ -415,16 +418,24 @@ useEffect(() => {
     setHasDismissedPolaroid(false);
     setPolaroidUrl(null);
     
+    // Map offering types to background images
+    const backgroundMap = {
+      petition: 'aurora',      // Hopeful, asking for guidance
+      confession: 'cyberpunk', // Darker, introspective
+      appreciation: 'sunset'    // Warm, grateful
+    };
+    
     // Trigger snapshot capture with the offering data
     const snapData = {
       name: newOffering.name,
       message: newOffering.message,
+      polaroidMessage: newOffering.polaroidMessage || `Burned ${newOffering.tokensBurned} RL80 tokens!`, // Use custom message or fallback
       type: newOffering.type,
       image: newOffering.customImage || null,
       burnedAmount: newOffering.tokensBurned,
       devotionType: 'candle',
       candleType: 'votive',
-      background: 'synthwave',
+      background: backgroundMap[newOffering.type] || 'synthwave', // Use type-specific background or default
       username: user?.username || user?.firstName || 'Anonymous',
       createdBy: user?.id || '',
     };
@@ -433,10 +444,39 @@ useEffect(() => {
     setSnapshotData(snapData);
     setShowSnapshot(true);
     
+    // Set up a function to receive the offering ID
+    window.setLatestOfferingId = (id) => {
+      console.log('[ShrinePage] Setting latest offering ID:', id);
+      latestOfferingRef.current = id;
+    };
+    
     // Set up a listener for when the polaroid is ready
-    window.onPolaroidReady = (url) => {
+    window.onPolaroidReady = async (url) => {
       console.log('[ShrinePage] Polaroid ready:', url);
       setPolaroidUrl(url);
+      
+      // Update the offerings document with the polaroid URL
+      if (latestOfferingRef.current) {
+        try {
+          const offeringDoc = doc(db, 'offerings', latestOfferingRef.current);
+          // First update with URL but not ready
+          await updateDoc(offeringDoc, {
+            polaroidUrl: url,
+            polaroidReady: false
+          });
+          console.log('[ShrinePage] Updated offering with polaroid URL');
+          
+          // After delay, mark as ready for display
+          setTimeout(async () => {
+            await updateDoc(offeringDoc, {
+              polaroidReady: true
+            });
+            console.log('[ShrinePage] Marked polaroid as ready for display');
+          }, 5000); // 5 second delay for effects to complete
+        } catch (error) {
+          console.error('[ShrinePage] Failed to update offering with polaroid URL:', error);
+        }
+      }
       
       // Save to localStorage for retrieval in account modal
       try {

@@ -3,8 +3,7 @@
 import React, { useState, useEffect, lazy, Suspense, useRef, useMemo } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useWalletAuth } from './WalletAuthProvider';
-import { db, collection, addDoc, updateDoc, doc, serverTimestamp, storage } from '@/lib/firebaseClient';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, collection, addDoc, updateDoc, doc, serverTimestamp, storage, ref, uploadBytes, getDownloadURL } from '@/lib/firebaseClient';
 import ThirdwebBuyModal from './ThirdwebBuyModal';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, useGLTF } from '@react-three/drei';
@@ -123,6 +122,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
   
   const [offeringType, setOfferingType] = useState('petition');
   const [message, setMessage] = useState('');
+  const [polaroidMessage, setPolaroidMessage] = useState('I added a green candle to the charts🙏 $RL80'); // Default for petition
   const [tokenAmount, setTokenAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
@@ -139,12 +139,22 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
   const [isBurnInProgress, setIsBurnInProgress] = useState(false); // Track entire burn flow
   const [forceHidden, setForceHidden] = useState(false); // Force modal to stay hidden
   const [hasCompletedBurn, setHasCompletedBurn] = useState(false); // Permanently hide after burn completes
+  const [showConfirmation, setShowConfirmation] = useState(false); // Show custom confirmation modal
+  const [showWalletLoading, setShowWalletLoading] = useState(false); // Show wallet loading indicator
+  const [pendingBurnAmount, setPendingBurnAmount] = useState(0); // Store amount for confirmation
 
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
+      // Don't reset if we're in the middle of burning or have completed
+      if (isBurnInProgress || hasCompletedBurn || forceHidden) {
+        console.log('[LightCandleModal] Preventing reset - burn in progress or completed');
+        return;
+      }
+      
       setOfferingType('petition');
       setMessage('');
+      setPolaroidMessage(offeringTypes.petition.defaultPolaroidMessage);
       setTokenAmount('');
       setIsSubmitting(false);
       setShowInfo(false); // Reset info state
@@ -157,6 +167,9 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
       setIsBurnInProgress(false); // Reset burn flow flag
       setForceHidden(false); // Allow modal to show
       setHasCompletedBurn(false); // Reset completed flag to allow modal to show again
+      setShowConfirmation(false); // Reset confirmation modal
+      setShowWalletLoading(false); // Reset wallet loading
+      setPendingBurnAmount(0); // Reset pending amount
       // Check token balance immediately when modal opens
       // tokenBalance is a string from the provider, so convert to number
       const balance = parseInt(tokenBalance) || 0;
@@ -210,6 +223,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
         name: user?.username || user?.firstName || 'Anonymous',
         type: offeringType,
         message: message.trim(),
+        polaroidMessage: polaroidMessage.trim(), // Add polaroid message
         tokensBurned: parseInt(tokenAmount) || 0,
         userId: user?.id,
         walletAddress: walletAddress,
@@ -220,7 +234,9 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
         timestamp: new Date().toISOString()
       };
       
-      // Keep base64 for local display
+      // For now, just save the plain image as base64
+      // The polaroid-formatted version will be created and uploaded separately
+      // by CandleSnapshotRenderer, and then the polaroidUrl will be updated
       if (uploadedImage) {
         baseOffering.customImage = uploadedImage;
       }
@@ -243,6 +259,11 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
       try {
         docRef = await addDoc(collection(db, 'offerings'), baseOffering);
         baseOffering.id = docRef.id;
+        
+        // Return the offering ID so parent can update it with polaroid URL later
+        if (window.setLatestOfferingId) {
+          window.setLatestOfferingId(docRef.id);
+        }
       } catch (firestoreError) {
         console.error('Error saving to Firestore:', firestoreError);
       }
@@ -345,19 +366,22 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
       // icon: '🙏', 
       color: '#ffaa00', 
       label: 'PETITION',
-      description: 'Ask for guidance or help'
+      description: 'Ask for guidance or help',
+      defaultPolaroidMessage: 'I added a green candle to the charts🙏 $RL80'
     },
     confession: { 
       // icon: '❤️‍🔥', 
       color: '#aa66ff', 
       label: 'CONFESSION',
-      description: 'Unburden your heart'
+      description: 'Unburden your heart',
+      defaultPolaroidMessage: 'I told Her everything 💔 $RL80'
     },
     appreciation: { 
       // icon: '✨', 
       color: '#00ff66', 
       label: 'THANKS',
-      description: 'Express gratitude for good fortune'
+      description: 'Express gratitude for good fortune',
+      defaultPolaroidMessage: 'She came through 🕯️ $RL80'
     }
   };
 
@@ -1089,7 +1113,10 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                     borderColor: offeringType === type ? config.color : 'transparent',
                     color: offeringType === type ? config.color : '#fff'
                   }}
-                  onClick={() => setOfferingType(type)}
+                  onClick={() => {
+                    setOfferingType(type);
+                    setPolaroidMessage(config.defaultPolaroidMessage);
+                  }}
                 >
                   <span className="type-icon">{config.icon}</span>
                   <span className="type-label">{config.label}</span>
@@ -1308,6 +1335,25 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
               
             </div>
 
+            {/* Polaroid Message */}
+            <div className="form-group" style={{ marginBottom: '1rem' }}>
+              <label className="form-label" htmlFor="polaroid-message">
+                Polaroid Caption (editable)
+              </label>
+              <input
+                id="polaroid-message"
+                type="text"
+                className="token-input"
+                value={polaroidMessage}
+                onChange={(e) => setPolaroidMessage(e.target.value)}
+                maxLength={50}
+                style={{ fontSize: '0.8rem' }}
+              />
+              <div style={{ textAlign: 'right', fontSize: '0.6rem', color: '#666', marginTop: '0.1rem' }}>
+                {polaroidMessage.length}/50
+              </div>
+            </div>
+
             {/* Token Amount */}
             <div className="form-group" style={{ marginBottom: '1rem' }}>
               <label className="form-label" htmlFor="tokens">
@@ -1345,9 +1391,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
             <button
               onClick={async () => {
                 const amount = parseInt(tokenAmount) || 0;
-                const amountInWei = BigInt(amount) * 1000000000000000000n; // 18 decimals
-                const currentBalance = parseInt(tokenBalance) || 0; // tokenBalance is already in tokens, not wei
-                const currentBalanceInWei = BigInt(currentBalance) * 1000000000000000000n;
+                const currentBalance = parseInt(tokenBalance) || 0;
                 
                 if (!message.trim()) {
                   alert('Please enter a message for your candle');
@@ -1361,36 +1405,250 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                   setShowNoBuyPrompt(true);
                   return;
                 }
-                if (amountInWei > currentBalanceInWei) {
+                if (amount > currentBalance) {
                   alert(`You only have ${currentBalance} RL80 tokens. Please enter a valid amount.`);
                   return;
                 }
                 
-                // Show user-friendly confirmation
-                const confirmMessage = `You are about to burn ${amount} RL80 token${amount !== 1 ? 's' : ''} to light your candle.\n\nThis action cannot be undone.\n\nDo you want to proceed?`;
-                if (!confirm(confirmMessage)) {
-                  return;
-                }
-                
-                setIsSubmitting(true);
-                setIsBurnInProgress(true); // Mark burn flow as in progress
-                setForceHidden(true); // Force modal to stay hidden
-                
-                // Hide the modal UI but keep component mounted for snapshot
-                setModalHidden(true);
-                // Don't show progress indicator yet - wait for transaction to be signed
-                
-                try {
-                  const transaction = burn({
-                    contract: erc20Contract,
-                    amount: amountInWei,
-                  });
+                // Show custom confirmation modal
+                setPendingBurnAmount(amount);
+                setShowConfirmation(true);
+              }}
+              disabled={isSubmitting || !message.trim() || !tokenAmount || parseInt(tokenAmount) < 1}
+              className="submit-button"
+              style={{
+                marginTop: '1rem'
+              }}
+            >
+              {isSubmitting ? 'Processing...' : 'Light Candle'}
+            </button>
+            
+          </div>
+        ) : null}
+      </div>
+
+      {/* Wallet Loading Indicator */}
+      {showWalletLoading && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10002,
+          animation: 'fadeIn 0.3s ease-out'
+        }}>
+          <div style={{
+            background: 'rgba(20, 20, 30, 0.98)',
+            border: '2px solid transparent',
+            backgroundImage: 'linear-gradient(rgba(20, 20, 30, 0.98), rgba(20, 20, 30, 0.98)), linear-gradient(135deg, #8b5cf6, #ec4899)',
+            backgroundOrigin: 'border-box',
+            backgroundClip: 'padding-box, border-box',
+            borderRadius: '24px',
+            padding: '3rem',
+            textAlign: 'center',
+            color: '#fff',
+            boxShadow: '0 20px 60px rgba(139, 92, 246, 0.4)',
+            maxWidth: '380px',
+            width: '90%'
+          }}>
+            {/* Wallet Icon Animation */}
+            <div style={{
+              fontSize: '4rem',
+              marginBottom: '1.5rem',
+              animation: 'pulse 1.5s ease-in-out infinite'
+            }}>
+              💳
+            </div>
+            
+            {/* Title */}
+            <h3 style={{
+              fontFamily: "'Orbitron', monospace",
+              fontSize: '1.2rem',
+              fontWeight: '700',
+              color: '#00f5d4',
+              marginBottom: '1rem',
+              textTransform: 'uppercase',
+              letterSpacing: '2px'
+            }}>
+              Opening Wallet
+            </h3>
+            
+            {/* Message */}
+            <p style={{
+              color: '#fff',
+              fontSize: '0.95rem',
+              marginBottom: '2rem',
+              lineHeight: '1.5'
+            }}>
+              Please sign the transaction in your wallet to continue...
+            </p>
+            
+            {/* Loading dots */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: '0.5rem'
+            }}>
+              {[0, 1, 2].map(i => (
+                <div 
+                  key={i}
+                  style={{
+                    width: '10px',
+                    height: '10px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #8b5cf6, #ec4899)',
+                    animation: `pulse 1.4s ease-in-out ${i * 0.16}s infinite`
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Confirmation Modal */}
+      {showConfirmation && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10001,
+          animation: 'fadeIn 0.3s ease-out'
+        }}>
+          <div style={{
+            background: 'rgba(20, 20, 30, 0.98)',
+            border: '2px solid transparent',
+            backgroundImage: 'linear-gradient(rgba(20, 20, 30, 0.98), rgba(20, 20, 30, 0.98)), linear-gradient(135deg, #8b5cf6, #ec4899)',
+            backgroundOrigin: 'border-box',
+            backgroundClip: 'padding-box, border-box',
+            borderRadius: '24px',
+            padding: '3rem',
+            textAlign: 'center',
+            color: '#fff',
+            boxShadow: '0 20px 60px rgba(139, 92, 246, 0.5)',
+            maxWidth: '400px',
+            width: '90%'
+          }}>
+            {/* Flame Icon */}
+            <div style={{
+              fontSize: '4rem',
+              marginBottom: '1.5rem',
+              filter: 'drop-shadow(0 0 30px rgba(255, 170, 0, 0.8)) drop-shadow(0 0 60px rgba(255, 100, 0, 0.4))',
+              animation: 'pulse 2s ease-in-out infinite',
+              display: 'inline-block'
+            }}>
+              🕯️
+            </div>
+            
+            {/* Title */}
+            <h3 style={{
+              fontFamily: "'Orbitron', monospace",
+              fontSize: '1.4rem',
+              fontWeight: '700',
+              color: '#fff',
+              marginBottom: '1rem',
+              textTransform: 'uppercase',
+              letterSpacing: '2px'
+            }}>
+              Ready to Light?
+            </h3>
+            
+            {/* Message */}
+            <p style={{
+              color: '#00f5d4',
+              fontSize: '1rem',
+              marginBottom: '1.5rem',
+              lineHeight: '1.6'
+            }}>
+              You're about to burn <strong style={{ color: '#fff', fontSize: '1.2rem' }}>{pendingBurnAmount}</strong> RL80 token{pendingBurnAmount !== 1 ? 's' : ''} to light your candle.
+            </p>
+            
+            <p style={{
+              color: 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.9rem',
+              marginBottom: '2rem',
+              fontStyle: 'italic'
+            }}>
+              This offering will be permanent and cannot be undone.
+            </p>
+            
+            {/* Buttons */}
+            <div style={{
+              display: 'flex',
+              gap: '1rem',
+              justifyContent: 'center'
+            }}>
+              <button
+                onClick={() => {
+                  setShowConfirmation(false);
+                  setPendingBurnAmount(0);
+                }}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '12px',
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                  e.currentTarget.style.color = '#fff';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                  e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                Cancel
+              </button>
+              
+              <button
+                onClick={async () => {
+                  setShowConfirmation(false);
+                  setShowWalletLoading(true);
                   
-                  console.log('[LightCandleModal] Sending transaction for user to sign...');
+                  // Proceed with the burn
+                  const amount = pendingBurnAmount;
+                  const amountInWei = BigInt(amount) * 1000000000000000000n;
                   
-                  // Send transaction - this opens the wallet for user to sign
-                  sendTransaction(transaction, {
-                    onSuccess: async (result) => {
+                  setIsSubmitting(true);
+                  setIsBurnInProgress(true);
+                  setForceHidden(true);
+                  setModalHidden(true);
+                  
+                  // Small delay to show wallet loading state
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                  
+                  try {
+                    const transaction = burn({
+                      contract: erc20Contract,
+                      amount: amountInWei,
+                    });
+                    
+                    console.log('[LightCandleModal] Sending transaction for user to sign...');
+                    setShowWalletLoading(false); // Hide wallet loading when wallet opens
+                    
+                    sendTransaction(transaction, {
+                      onSuccess: async (result) => {
                       console.log('[LightCandleModal] Transaction signed and sent to blockchain');
                       // Transaction is signed and sent to blockchain
                       // NOW show the progress indicator
@@ -1421,11 +1679,12 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                       // Permanently hide the modal after burn completes
                       setHasCompletedBurn(true);
                       // Keep forceHidden as true to prevent modal from reappearing
-                      // Don't reset isBurnInProgress to prevent any re-renders showing modal
                       
-                      // Don't call onClose() here - the modal is already hidden via forceHidden
-                      // Calling onClose triggers state changes that might cause the modal to briefly reappear
-                      // onClose();
+                      // Call onClose after a delay to notify parent component
+                      // This ensures the modal is properly closed in the parent's state
+                      setTimeout(() => {
+                        onClose();
+                      }, 100);
                     },
                     onError: (error) => {
                       // Clear progress indicator if it was shown
@@ -1441,6 +1700,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                       }
                       
                       setIsSubmitting(false);
+                      setShowWalletLoading(false);
                     }
                   });
                 } catch (error) {
@@ -1448,20 +1708,35 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                   alert('Failed to burn tokens. Please try again.');
                   setIsSubmitting(false);
                   setTransactionStatus('');
+                  setShowWalletLoading(false);
                 }
               }}
-              disabled={isSubmitting || !message.trim() || !tokenAmount || parseInt(tokenAmount) < 1}
-              className="submit-button"
               style={{
-                marginTop: '1rem'
+                padding: '0.75rem 1.5rem',
+                background: 'linear-gradient(135deg, #8b5cf6, #ec4899)',
+                border: 'none',
+                borderRadius: '12px',
+                color: '#fff',
+                fontSize: '0.9rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.3s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 10px 30px rgba(139, 92, 246, 0.3)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
               }}
             >
-              {isSubmitting ? 'Processing...' : 'Light Candle'}
+              Light My Candle
             </button>
-            
           </div>
-        ) : null}
-      </div>
+        </div>
+        </div>
+      )}
 
       {/* ThirdwebBuyModal */}
       {showBuyModal && (

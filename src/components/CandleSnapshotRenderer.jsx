@@ -744,10 +744,16 @@ export default function CandleSnapshotRenderer({
         });
         console.log('[CandleSnapshotRenderer] Upload response status:', response.status);
         
-        const result = await response.json();
+        let result;
+        try {
+          result = await response.json();
+        } catch (e) {
+          console.error('[CandleSnapshotRenderer] Failed to parse response:', e);
+          result = { error: 'Failed to parse response' };
+        }
         
         if (!response.ok) {
-          console.error('[CandleSnapshotRenderer] Upload failed:', result);
+          console.error('[CandleSnapshotRenderer] Upload failed:', response.status, result);
           if (onFirebaseUploadComplete) {
             onFirebaseUploadComplete({ success: false, ...result });
           }
@@ -866,7 +872,7 @@ export default function CandleSnapshotRenderer({
         <Canvas 
           ref={canvasRef} 
           camera={{ 
-            position: [0, -1.7, 5], 
+            position: [0, -0.5, 5], 
             fov: 40 
           }}
           gl={{ 
@@ -884,14 +890,14 @@ export default function CandleSnapshotRenderer({
       
       {!preloadOnly && (
         <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', pointerEvents: 'none' }}>
-          <PolaroidSnapshot 
-            trigger={triggerSnapshot}
-            onComplete={handleSnapshotComplete}
-            captureElementId="candle-snapshot-container"
-            label={userData?.burnedAmount ? `Burned ${parseInt(userData.burnedAmount).toLocaleString()} RL80 tokens!` : `${userData?.username || 'Anonymous'}'s Candle`}
-            backgroundImage={userData?.background && SKYBOX_TEXTURES[userData.background] ? SKYBOX_TEXTURES[userData.background] : null}
-            key={`polaroid-${userData?.background || 'none'}-${triggerSnapshot}`} // Force new instance when background changes
-          />
+        <PolaroidSnapshot 
+          trigger={triggerSnapshot}
+          onComplete={handleSnapshotComplete}
+          captureElementId="candle-snapshot-container"
+          label={userData?.polaroidMessage || (userData?.burnedAmount ? `Burned ${parseInt(userData.burnedAmount).toLocaleString()} RL80 tokens!` : `${userData?.username || 'Anonymous'}'s Candle`)}
+          backgroundImage={userData?.background && SKYBOX_TEXTURES[userData.background] ? SKYBOX_TEXTURES[userData.background] : null}
+          key={`polaroid-${userData?.background || 'none'}-${triggerSnapshot}`} // Force new instance when background changes
+        />
         </div>
       )}
     </>

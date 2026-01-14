@@ -8,7 +8,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  /* background: rgba(0, 0, 0, 0.6); */
+  background: rgba(0, 0, 0, 0.6);
   /* backdrop-filter: blur(8px); */
   opacity: 0;
   transition: opacity 0.5s ease-out;
@@ -22,14 +22,14 @@
 .polaroid {
   position: relative;
   background: white;
-  padding: 15px 15px 60px 15px;
+  padding: 15px 15px 75px 15px; /* Increased bottom padding from 60px to 75px */
   border: 1px solid #d0d0d0; /* Subtle gray border for visibility on white backgrounds */
   /* box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); */
   transform: rotate(-5deg) translateY(-100vh);
   transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
   max-width: 400px;
   width: 90%;
-  max-height: 500px;
+  max-height: 520px; /* Slightly increased to accommodate larger bottom */
 }
 
 .polaroid.dropped {
@@ -55,7 +55,7 @@
   position: relative;
   width: 100%;
   padding-bottom: 100%;
-  /* background: #000; */
+  background: #000;
   overflow: hidden;
 }
 
@@ -74,20 +74,26 @@
 }
 
 .polaroidBottom {
-  padding: 20px 10px 10px;
+  padding: 15px 10px 20px;
   background: white;
   text-align: center;
+  min-height: 80px; /* Increased space for 2 lines */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .polaroidText {
   font-family: "Homemade Apple", cursive;
-  font-size: 16px;
+  font-size: 14px; /* Slightly smaller */
   color: #333;
   margin: 0;
   font-weight: 400;
   text-transform: none;
-  letter-spacing: 0.5px;
-  line-height: 1.4;
+  letter-spacing: 0.3px;
+  line-height: 1.4; /* More line spacing */
+  word-wrap: break-word;
+  max-width: 90%; /* Prevent text from touching edges */
 }
 
 .polaroidShadow {
@@ -143,7 +149,7 @@
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  /* box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .actionButton:hover {
