@@ -223,7 +223,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   const [additionalCandles, setAdditionalCandles] = useState([])
   const [clickedCandleId, setClickedCandleId] = useState(null)
   const [isRippleActive, setIsRippleActive] = useState(false)
-  const [activeStatsTab, setActiveStatsTab] = useState('price') // 'price' or 'staking'
+  const [activeStatsTab, setActiveStatsTab] = useState('price') // 'price', 'staking', or 'mood'
   
   // Get staking data
   const { 
@@ -1030,6 +1030,26 @@ useEffect(() => {
           >
             Staking
           </button>
+          <button
+            onClick={() => setActiveStatsTab('mood')}
+            style={{
+              flex: 1,
+              padding: '6px 8px',
+              background: activeStatsTab === 'mood' ? 'rgba(167, 139, 250, 0.2)' : 'transparent',
+              border: 'none',
+              borderBottom: activeStatsTab === 'mood' ? '2px solid #a78bfa' : '2px solid transparent',
+              color: activeStatsTab === 'mood' ? '#a78bfa' : '#888',
+              fontSize: isMobile ? '11px' : '12px',
+              fontFamily: 'monospace',
+              fontWeight: activeStatsTab === 'mood' ? 'bold' : 'normal',
+              cursor: 'pointer',
+              textTransform: 'uppercase',
+              transition: 'all 0.2s',
+              marginBottom: '-1px',
+            }}
+          >
+            Mood
+          </button>
         </div>
         
         {/* Tab Content */}
@@ -1167,7 +1187,7 @@ useEffect(() => {
           </div>
         )}
           </>
-        ) : (
+        ) : activeStatsTab === 'staking' ? (
           <>
             {/* Staking Tab Content - Global Stats */}
             {/* TVL Section - Prominent */}
@@ -1280,19 +1300,14 @@ useEffect(() => {
               </span>
             </div> */}
           </>
-        )}
-      </div>
-      
-      {/* Sentiment Analysis Component */}
-      <div style={{
-        position: 'absolute',
-        top: isMobile ? '380px' : '400px', // Position below the unified stats with proper spacing
-        right: isMobile ? '10px' : '20px',
-        zIndex: 1000,
-        pointerEvents: 'auto',
-        width: isMobile ? '160px' : '240px', // Match the stats panel width
-      }}>
-        <CongregationSentiment />
+        ) : activeStatsTab === 'mood' ? (
+          <>
+            {/* Mood Tab Content */}
+            <div style={{ padding: 0, margin: '-10px' }}>
+              <CongregationSentiment />
+            </div>
+          </>
+        ) : null}
       </div>
       
     </div>

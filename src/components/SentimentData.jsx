@@ -28,7 +28,6 @@ const sentimentLevels = [
 export default function CongregationSentiment() {
   const [data, setData] = useState(mockSentimentData);
   const [activeKeyword, setActiveKeyword] = useState(0);
-  const [isExpanded, setIsExpanded] = useState(false);
 
   // Rotate through keywords
   useEffect(() => {
@@ -42,17 +41,6 @@ export default function CongregationSentiment() {
   
   return (
     <div className="sentiment-panel">
-      {/* Header */}
-      <div className="panel-header">
-        <div className="header-icon">✦</div>
-        <span className="header-title">Congregation's Mood</span>
-        <button 
-          className="expand-btn"
-          onClick={() => setIsExpanded(!isExpanded)}
-        >
-          {isExpanded ? '−' : '+'}
-        </button>
-      </div>
 
       {/* Main Gauge */}
       <div className="gauge-container">
@@ -163,7 +151,7 @@ export default function CongregationSentiment() {
       <div className="whispers-section">
         <div className="whispers-label">
           <span className="whisper-icon">🕯</span>
-          Whispers from the Faithful
+          Whispers
         </div>
         <div className="keyword-display">
           {data.keywords.map((keyword, i) => (
@@ -177,9 +165,8 @@ export default function CongregationSentiment() {
         </div>
       </div>
 
-      {/* Expanded Section */}
-      {isExpanded && (
-        <div className="expanded-content">
+      {/* Expanded content - always visible in tab view */}
+      <div className="expanded-content">
           {/* Emotion Breakdown */}
           <div className="emotions-section">
             <span className="section-label">Prayer Themes</span>
@@ -216,65 +203,24 @@ export default function CongregationSentiment() {
             </div>
           </div>
         </div>
-      )}
 
       <style>{`
         .sentiment-panel {
           font-family: monospace;
-          background: rgba(0, 0, 0, 0.8);
+          background: transparent;
           border: none;
-          border-radius: 12px;
-          padding: 18px;
+          padding: 0;
           width: 100%;
           color: #fff;
         }
 
-        .panel-header {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          padding-bottom: 8px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-          margin-bottom: 8px;
-        }
-
-        .header-icon {
-          color: #d4af37;
-          font-size: 14px;
-          animation: pulse-glow 2s ease-in-out infinite;
-        }
-
-        .header-title {
-          font-size: 11px;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-          color: #d4af37;
-          flex: 1;
-        }
-
-        .expand-btn {
-          background: rgba(212, 175, 55, 0.2);
-          border: 1px solid rgba(212, 175, 55, 0.3);
-          color: #d4af37;
-          width: 20px;
-          height: 20px;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 14px;
-          line-height: 1;
-          transition: all 0.2s;
-        }
-
-        .expand-btn:hover {
-          background: rgba(212, 175, 55, 0.3);
-          box-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
-        }
 
         .gauge-container {
           position: relative;
           display: flex;
           flex-direction: column;
           align-items: center;
+          margin-bottom: 8px;
         }
 
         .gauge-svg {
@@ -298,6 +244,7 @@ export default function CongregationSentiment() {
         .sentiment-label {
           text-align: center;
           margin-top: -10px;
+          margin-bottom: 10px;
         }
 
         .label-text {
@@ -318,7 +265,8 @@ export default function CongregationSentiment() {
           display: flex;
           align-items: center;
           gap: 8px;
-          padding: 8px 0;
+          padding: 6px 0;
+          margin-bottom: 8px;
           border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
@@ -340,7 +288,9 @@ export default function CongregationSentiment() {
         }
 
         .whispers-section {
-          padding: 10px 0;
+          padding: 8px 0;
+          margin-bottom: 8px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .whispers-label {
@@ -383,10 +333,7 @@ export default function CongregationSentiment() {
         }
 
         .expanded-content {
-          border-top: 1px solid rgba(255, 255, 255, 0.1);
-          padding-top: 12px;
-          margin-top: 8px;
-          animation: expand-in 0.3s ease-out;
+          padding-top: 8px;
         }
 
         .section-label {
@@ -479,11 +426,6 @@ export default function CongregationSentiment() {
         @keyframes pulse-dot {
           0%, 100% { r: 3; opacity: 1; }
           50% { r: 5; opacity: 0.8; }
-        }
-
-        @keyframes expand-in {
-          from { opacity: 0; transform: translateY(-10px); }
-          to { opacity: 1; transform: translateY(0); }
         }
 
         @keyframes draw-gauge {
