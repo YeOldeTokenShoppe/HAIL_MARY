@@ -12,6 +12,7 @@ import { useStaking } from '@/hooks/useStaking'
 import { useReadContract } from 'thirdweb/react'
 import { totalSupply } from 'thirdweb/extensions/erc20'
 import { erc20Contract } from '@/lib/contract'
+import CongregationSentiment from './SentimentData';
 
 
 
@@ -978,7 +979,7 @@ useEffect(() => {
             filter: brightness(1) drop-shadow(0 0 0px #ffee00);
           }
         }
-      `}</style>
+    `}</style>
       
       {/* Unified Stats Box with Tabs */}
       <div style={unifiedStatsStyle}>
@@ -1280,6 +1281,18 @@ useEffect(() => {
             </div> */}
           </>
         )}
+      </div>
+      
+      {/* Sentiment Analysis Component */}
+      <div style={{
+        position: 'absolute',
+        top: isMobile ? '380px' : '400px', // Position below the unified stats with proper spacing
+        right: isMobile ? '10px' : '20px',
+        zIndex: 1000,
+        pointerEvents: 'auto',
+        width: isMobile ? '160px' : '240px', // Match the stats panel width
+      }}>
+        <CongregationSentiment />
       </div>
       
     </div>

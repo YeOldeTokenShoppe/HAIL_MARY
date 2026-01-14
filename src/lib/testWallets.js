@@ -3,7 +3,7 @@
 
 // IMPORTANT: Update these email addresses with your actual testers
 export const AUTHORIZED_TEST_EMAILS = [
-  '503crj@gmail.com', // YOUR TEST EMAIL - Replace this first!
+  'mpaulsonx@gmail.com', // YOUR TEST EMAIL - Replace this first!
   '503crj@gmail.com', // Replace with actual tester email
   'tester3@example.com', // Replace with actual tester email
   'tester4@example.com', // Replace with actual tester email
@@ -12,6 +12,7 @@ export const AUTHORIZED_TEST_EMAILS = [
 ];
 
 export const TEST_WALLETS = [
+  // Commented out old wallet - using the new pregenerated one instead
   // {
   //   id: 'tester1',
   //   assignedEmail: AUTHORIZED_TEST_EMAILS[0],
@@ -21,10 +22,10 @@ export const TEST_WALLETS = [
   //   prefundedAmount: 1000
   // },
   {
-    id: 'tester2',
-    assignedEmail: AUTHORIZED_TEST_EMAILS[1],
-    name: 'Test User 2',
-    address: '0xf4bb7642F20615d097a61710E479544fEA8BdA4D', // Replace with actual address
+    id: 'tester1',
+    assignedEmail: AUTHORIZED_TEST_EMAILS[0], // mpaulsonx@gmail.com
+    name: 'Test User 1',
+    address: '0xf4bb7642F20615d097a61710E479544fEA8BdA4D', // Your new pregenerated wallet
     privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_2, // Store in .env.local
     prefundedAmount: 1000
   },
@@ -77,6 +78,15 @@ export const getTestWalletForEmail = (email) => {
   const wallet = TEST_WALLETS.find(w => 
     w.assignedEmail.toLowerCase() === email.toLowerCase()
   );
+  
+  // Debug logging
+  if (wallet) {
+    console.log('[testWallets] Found wallet for', email, ':', {
+      ...wallet,
+      privateKey: wallet.privateKey ? 'EXISTS' : 'MISSING'
+    });
+    console.log('[testWallets] Env var NEXT_PUBLIC_TEST_WALLET_2:', process.env.NEXT_PUBLIC_TEST_WALLET_2 ? 'EXISTS' : 'MISSING');
+  }
   
   return wallet || null;
 };

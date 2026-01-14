@@ -280,6 +280,10 @@ export function WalletAuthProvider({ children }) {
       
       const assignedWallet = getTestWalletForEmail(userEmail);
       
+      console.log('Assigned wallet for', userEmail, ':', assignedWallet);
+      console.log('Private key exists?', !!assignedWallet?.privateKey);
+      console.log('Private key value:', assignedWallet?.privateKey ? 'REDACTED' : 'undefined');
+      
       if (assignedWallet && assignedWallet.privateKey) {
         // Only auto-assign if user hasn't explicitly chosen to use their own wallet
         console.log('Assigning test wallet:', assignedWallet);
@@ -289,6 +293,9 @@ export function WalletAuthProvider({ children }) {
           privateKey: assignedWallet.privateKey,
           client
         });
+        
+        console.log('Created ThirdWeb account:', account);
+        console.log('Account address:', account.address);
         
         setTestWallet(assignedWallet);
         setTestWalletAccount(account);
@@ -391,6 +398,17 @@ export function WalletAuthProvider({ children }) {
   const userEmail = user?.primaryEmailAddress?.emailAddress;
   const isTestUser = TEST_MODE && userEmail && isAuthorizedTestUser(userEmail);
   
+  // Debug logging for context value
+  console.log('[WalletAuthProvider] Context value debug:', {
+    isTestUser,
+    hasTestWalletAccount: !!testWalletAccount,
+    testWalletAccountAddress: testWalletAccount?.address,
+    hasActiveAccount: !!activeAccount,
+    activeAccountAddress: activeAccount?.address,
+    finalActiveAccount: testWalletAccount || activeAccount,
+    walletAddress
+  });
+
   const value = {
     // Clerk user data
     user,

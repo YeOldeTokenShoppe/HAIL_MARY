@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { tokenFunctions, erc20Contract } from '@/lib/contract';
 import { useSendTransaction } from 'thirdweb/react';
 import { burn } from 'thirdweb/extensions/erc20';
+import { sendAndConfirmTransaction } from 'thirdweb';
 
 // Preload the model
 if (typeof window !== 'undefined') {
@@ -1640,6 +1641,10 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                   
                   try {
                     // Check if we have an active account
+                    console.log('[LightCandleModal] Checking activeAccount:', activeAccount);
+                    console.log('[LightCandleModal] Wallet address:', walletAddress);
+                    console.log('[LightCandleModal] Token balance:', tokenBalance);
+                    
                     if (!activeAccount) {
                       console.error('[LightCandleModal] No active account available');
                       alert('Please connect your wallet first');
@@ -1659,8 +1664,47 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                     console.log('[LightCandleModal] Sending transaction for user to sign with account:', activeAccount.address);
                     setShowWalletLoading(false); // Hide wallet loading when wallet opens
                     
-                    sendTransaction(transaction, {
-                      onSuccess: async (result) => {
+                    // Check if this is a test wallet account (has sendTransaction method)
+                    if (activeAccount.sendTransaction) {
+                      console.log('[LightCandleModal] Using test wallet account to send transaction');
+                      
+                      try {
+                        // For test wallets, use the account's sendTransaction directly
+                        const result = await sendAndConfirmTransaction({
+                          transaction,
+                          account: activeAccount
+                        });
+                        
+                        console.log('[LightCandleModal] Transaction confirmed:', result);
+                        
+                        // Clear progress indicator
+                        setTransactionStatus('');
+                        
+                        // Now save to Firebase after actual blockchain confirmation
+                        await handlePostBurnActions();
+                        
+                        setIsSubmitting(false);
+                        // Permanently hide the modal after burn completes
+                        setHasCompletedBurn(true);
+                        
+                        // Call onClose after a delay
+                        setTimeout(() => {
+                          onClose();
+                        }, 100);
+                      } catch (error) {
+                        console.error('[LightCandleModal] Test wallet transaction error:', error);
+                        setTransactionStatus('');
+                        setIsBurnInProgress(false);
+                        alert('Failed to burn tokens: ' + (error?.message || 'Unknown error'));
+                        setIsSubmitting(false);
+                        setShowWalletLoading(false);
+                        setForceHidden(false);
+                        setModalHidden(false);
+                      }
+                    } else {
+                      // For regular wallets, use the sendTransaction hook
+                      sendTransaction(transaction, {
+                        onSuccess: async (result) => {
                       console.log('[LightCandleModal] Transaction signed and sent to blockchain');
                       // Transaction is signed and sent to blockchain
                       // NOW show the progress indicator
@@ -1699,6 +1743,14 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                       }, 100);
                     },
                     onError: (error) => {
+                      console.error('[LightCandleModal] Transaction error:', error);
+                      console.error('[LightCandleModal] Error details:', {
+                        message: error?.message,
+                        code: error?.code,
+                        cause: error?.cause,
+                        stack: error?.stack
+                      });
+                      
                       // Clear progress indicator if it was shown
                       setTransactionStatus('');
                       setIsBurnInProgress(false); // Clear burn flow flag on error
@@ -1708,14 +1760,15 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                           !error?.message?.includes('User denied') &&
                           !error?.message?.includes('rejected') &&
                           error?.code !== 4001) {
-                        alert('Failed to burn tokens. Please try again.');
+                        alert('Failed to burn tokens: ' + (error?.message || 'Unknown error'));
                       }
                       
                       setIsSubmitting(false);
                       setShowWalletLoading(false);
                     }
-                  });
-                } catch (error) {
+                      });
+                    }
+                  } catch (error) {
                   console.error('Failed to create burn transaction:', error);
                   alert('Failed to burn tokens. Please try again.');
                   setIsSubmitting(false);
