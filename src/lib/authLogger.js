@@ -1,4 +1,4 @@
-import { db, collection, addDoc, serverTimestamp, setDoc, doc } from './firebaseServer';
+import { db, collection, addDoc, serverTimestamp, setDoc, doc } from './firebaseClient';
 
 // Log user authentication events
 export async function logAuthEvent(eventType, userData) {

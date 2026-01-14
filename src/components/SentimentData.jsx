@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from 'react';
+import { db, doc, getDoc, onSnapshot } from '@/lib/firebaseClient';
 
-// Mock data - this would come from your AI analysis endpoint
-const mockSentimentData = {
-  overall: 0.72, // 0-1 scale
-  label: 'Hopeful',
+// Default data structure for when loading or no data
+const defaultSentimentData = {
+  overall: 0.5,
+  label: 'Loading...',
   emotions: [
-    { name: 'Hope', value: 34, color: '#4ade80' },
-    { name: 'Gratitude', value: 28, color: '#a78bfa' },
-    { name: 'Desperation', value: 18, color: '#f87171' },
-    { name: 'Confession', value: 12, color: '#60a5fa' },
-    { name: 'Celebration', value: 8, color: '#fbbf24' },
+    { name: 'Hope', value: 20, color: '#4ade80' },
+    { name: 'Gratitude', value: 20, color: '#a78bfa' },
+    { name: 'Desperation', value: 20, color: '#f87171' },
+    { name: 'Confession', value: 20, color: '#60a5fa' },
+    { name: 'Celebration', value: 20, color: '#fbbf24' },
   ],
-  prayersPerHour: 47,
-  trend: [0.45, 0.52, 0.48, 0.61, 0.58, 0.65, 0.72],
-  keywords: ['moon', 'lambo', 'blessed', 'diamond hands', 'forgive me', 'hold', 'believe'],
-  lastUpdate: '2 min ago'
+  prayersPerHour: 0,
+  trend: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+  keywords: ['analyzing', 'prayers', '...'],
+  lastUpdate: 'loading...'
 };
 
 const sentimentLevels = [
@@ -26,8 +27,82 @@ const sentimentLevels = [
 ];
 
 export default function CongregationSentiment() {
-  const [data, setData] = useState(mockSentimentData);
+  const [data, setData] = useState(defaultSentimentData);
   const [activeKeyword, setActiveKeyword] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isMobile, setIsMobile] = useState(false);
+  
+  // Detect mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Fetch sentiment data from Firebase and listen for real-time updates
+  useEffect(() => {
+    if (!db) {
+      console.warn('Firebase not initialized');
+      setIsLoading(false);
+      return;
+    }
+    
+    // Reference to the latest sentiment analysis document
+    const sentimentRef = doc(db, 'sentiment_analysis', 'latest');
+    
+    // Set up real-time listener for sentiment updates
+    const unsubscribe = onSnapshot(
+      sentimentRef,
+      (docSnapshot) => {
+        if (docSnapshot.exists()) {
+          const sentimentData = docSnapshot.data();
+          console.log('[Sentiment] Received update from Firebase:', sentimentData.label);
+          
+          // Update data with real analysis from Firebase
+          setData({
+            overall: sentimentData.overall || 0.5,
+            label: sentimentData.label || 'Unknown',
+            emotions: sentimentData.emotions || defaultSentimentData.emotions,
+            prayersPerHour: sentimentData.prayersPerHour || 0,
+            trend: sentimentData.trend || defaultSentimentData.trend,
+            keywords: sentimentData.keywords || ['no', 'data', 'yet'],
+            lastUpdate: sentimentData.lastUpdate ? 
+              new Date(sentimentData.lastUpdate).toLocaleTimeString() : 'just now',
+            totalAnalyzed: sentimentData.totalAnalyzed || 0,
+            nextUpdate: sentimentData.nextUpdate
+          });
+          setError(null);
+        } else {
+          console.log('[Sentiment] No sentiment data available yet');
+          setData({
+            ...defaultSentimentData,
+            label: 'No Analysis Yet',
+            keywords: ['run', 'cron', 'job'],
+            lastUpdate: 'never'
+          });
+        }
+        setIsLoading(false);
+      },
+      (error) => {
+        console.error('[Sentiment] Error fetching sentiment data:', error);
+        setError(error.message);
+        setData({
+          ...defaultSentimentData,
+          label: 'Data Error',
+          keywords: ['error', 'loading'],
+          lastUpdate: 'error'
+        });
+        setIsLoading(false);
+      }
+    );
+    
+    // Cleanup listener on unmount
+    return () => unsubscribe();
+  }, []);
 
   // Rotate through keywords
   useEffect(() => {
@@ -42,9 +117,21 @@ export default function CongregationSentiment() {
   return (
     <div className="sentiment-panel">
 
+      {/* Loading Indicator */}
+      {isLoading && !data.totalAnalyzed && (
+        <div style={{
+          textAlign: 'center',
+          padding: '20px',
+          color: '#888',
+          fontSize: '12px'
+        }}>
+          Analyzing congregation prayers...
+        </div>
+      )}
+
       {/* Main Gauge */}
       <div className="gauge-container">
-        <svg viewBox="0 0 200 120" className="gauge-svg">
+        <svg viewBox={isMobile ? "0 0 200 110" : "0 0 200 120"} className="gauge-svg">
           {/* Background arc segments */}
           {sentimentLevels.map((level, i) => (
             <path
@@ -112,7 +199,13 @@ export default function CongregationSentiment() {
         
         {/* Sentiment Label */}
         <div className="sentiment-label">
-          <span className="label-text">{data.label}</span>
+          <span className="label-text" style={{
+            maxWidth: isMobile ? '140px' : '200px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            display: 'inline-block'
+          }}>{data.label}</span>
           <span className="label-value">{Math.round(data.overall * 100)}%</span>
         </div>
       </div>
@@ -198,8 +291,13 @@ export default function CongregationSentiment() {
             </div>
             <div className="stat-divider" />
             <div className="stat-item">
+              <span className="stat-value">{data.totalAnalyzed || 0}</span>
+              <span className="stat-label">analyzed</span>
+            </div>
+            <div className="stat-divider" />
+            <div className="stat-item">
               <span className="stat-value">{data.lastUpdate}</span>
-              <span className="stat-label">last analyzed</span>
+              <span className="stat-label">updated</span>
             </div>
           </div>
         </div>
@@ -212,6 +310,13 @@ export default function CongregationSentiment() {
           padding: 0;
           width: 100%;
           color: #fff;
+          font-size: 12px;
+        }
+        
+        @media (max-width: 768px) {
+          .sentiment-panel {
+            font-size: 10px;
+          }
         }
 
 
@@ -220,13 +325,28 @@ export default function CongregationSentiment() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          margin-bottom: 8px;
+          margin-bottom: 10px;
+          height: 110px;
+          overflow: hidden;
+        }
+        
+        @media (max-width: 768px) {
+          .gauge-container {
+            height: 90px;
+            margin-bottom: 8px;
+          }
         }
 
         .gauge-svg {
           width: 100%;
           height: auto;
-          margin-bottom: -20px;
+          max-height: 80px;
+        }
+        
+        @media (max-width: 768px) {
+          .gauge-svg {
+            max-height: 60px;
+          }
         }
 
         .gauge-segment {
@@ -243,31 +363,66 @@ export default function CongregationSentiment() {
 
         .sentiment-label {
           text-align: center;
-          margin-top: -10px;
-          margin-bottom: 10px;
+          margin-top: 0;
+          margin-bottom: 5px;
+          position: absolute;
+          bottom: 5px;
+          left: 0;
+          right: 0;
+        }
+        
+        @media (max-width: 768px) {
+          .sentiment-label {
+            bottom: 0;
+            margin-bottom: 2px;
+          }
         }
 
         .label-text {
           display: block;
-          font-size: 18px;
+          font-size: 14px;
           font-weight: bold;
           color: #4ade80;
-          text-shadow: 0 0 20px rgba(74, 222, 128, 0.6);
-          letter-spacing: 2px;
+          text-shadow: 0 0 10px rgba(74, 222, 128, 0.4);
+          letter-spacing: 0.5px;
+          margin: 0;
+          padding: 0;
+        }
+        
+        @media (max-width: 768px) {
+          .label-text {
+            font-size: 12px;
+            letter-spacing: 0;
+            text-shadow: 0 0 5px rgba(74, 222, 128, 0.3);
+          }
         }
 
         .label-value {
-          font-size: 12px;
+          font-size: 11px;
           color: #ccc;
+        }
+        
+        @media (max-width: 768px) {
+          .label-value {
+            font-size: 10px;
+          }
         }
 
         .trend-section {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 6px;
           padding: 6px 0;
           margin-bottom: 8px;
           border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        @media (max-width: 768px) {
+          .trend-section {
+            gap: 4px;
+            padding: 4px 0;
+            margin-bottom: 6px;
+          }
         }
 
         .trend-label {
@@ -275,7 +430,14 @@ export default function CongregationSentiment() {
           text-transform: uppercase;
           letter-spacing: 0.5px;
           color: #888;
-          width: 50px;
+          width: 40px;
+        }
+        
+        @media (max-width: 768px) {
+          .trend-label {
+            font-size: 8px;
+            width: 35px;
+          }
         }
 
         .sparkline {
@@ -291,6 +453,13 @@ export default function CongregationSentiment() {
           padding: 8px 0;
           margin-bottom: 8px;
           border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        @media (max-width: 768px) {
+          .whispers-section {
+            padding: 6px 0;
+            margin-bottom: 6px;
+          }
         }
 
         .whispers-label {
@@ -333,7 +502,13 @@ export default function CongregationSentiment() {
         }
 
         .expanded-content {
-          padding-top: 8px;
+          padding-top: 6px;
+        }
+        
+        @media (max-width: 768px) {
+          .expanded-content {
+            padding-top: 4px;
+          }
         }
 
         .section-label {
@@ -342,33 +517,65 @@ export default function CongregationSentiment() {
           letter-spacing: 0.5px;
           color: #888;
           display: block;
-          margin-bottom: 10px;
+          margin-bottom: 8px;
+        }
+        
+        @media (max-width: 768px) {
+          .section-label {
+            font-size: 9px;
+            margin-bottom: 6px;
+          }
         }
 
         .emotion-bars {
           display: flex;
           flex-direction: column;
-          gap: 6px;
+          gap: 4px;
+        }
+        
+        @media (max-width: 768px) {
+          .emotion-bars {
+            gap: 3px;
+          }
         }
 
         .emotion-row {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 6px;
+        }
+        
+        @media (max-width: 768px) {
+          .emotion-row {
+            gap: 4px;
+          }
         }
 
         .emotion-name {
           font-size: 10px;
-          width: 70px;
+          width: 60px;
           color: #ccc;
+        }
+        
+        @media (max-width: 768px) {
+          .emotion-name {
+            font-size: 9px;
+            width: 50px;
+          }
         }
 
         .emotion-bar-bg {
           flex: 1;
-          height: 6px;
+          height: 5px;
           background: rgba(0, 0, 0, 0.4);
           border-radius: 3px;
           overflow: hidden;
+        }
+        
+        @media (max-width: 768px) {
+          .emotion-bar-bg {
+            height: 4px;
+          }
         }
 
         .emotion-bar-fill {
@@ -388,34 +595,63 @@ export default function CongregationSentiment() {
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 16px;
-          margin-top: 12px;
-          padding-top: 12px;
+          gap: 8px;
+          margin-top: 8px;
+          padding-top: 8px;
           border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        @media (max-width: 768px) {
+          .stats-row {
+            gap: 4px;
+            margin-top: 4px;
+            padding-top: 4px;
+          }
         }
 
         .stat-item {
           text-align: center;
+          flex: 1;
         }
 
         .stat-value {
           display: block;
-          font-size: 16px;
+          font-size: 14px;
           color: #fbbf24;
           text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
         }
+        
+        @media (max-width: 768px) {
+          .stat-value {
+            font-size: 12px;
+            text-shadow: 0 0 5px rgba(251, 191, 36, 0.3);
+          }
+        }
 
         .stat-label {
-          font-size: 9px;
+          font-size: 8px;
           text-transform: uppercase;
           letter-spacing: 0.5px;
           color: #888;
         }
+        
+        @media (max-width: 768px) {
+          .stat-label {
+            font-size: 7px;
+            letter-spacing: 0;
+          }
+        }
 
         .stat-divider {
           width: 1px;
-          height: 30px;
+          height: 20px;
           background: rgba(255, 255, 255, 0.1);
+        }
+        
+        @media (max-width: 768px) {
+          .stat-divider {
+            height: 15px;
+          }
         }
 
         @keyframes pulse-glow {

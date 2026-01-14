@@ -986,26 +986,29 @@ useEffect(() => {
         {/* Tab Headers */}
         <div style={{
           display: 'flex',
-          gap: '4px',
-          marginBottom: '12px',
+          gap: isMobile ? '2px' : '4px',
+          marginBottom: isMobile ? '8px' : '12px',
           borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+          overflow: 'hidden',
         }}>
           <button
             onClick={() => setActiveStatsTab('price')}
             style={{
               flex: 1,
-              padding: '6px 8px',
+              padding: isMobile ? '4px 4px' : '6px 8px',
               background: activeStatsTab === 'price' ? 'rgba(212, 175, 55, 0.2)' : 'transparent',
               border: 'none',
               borderBottom: activeStatsTab === 'price' ? '2px solid #d4af37' : '2px solid transparent',
               color: activeStatsTab === 'price' ? '#d4af37' : '#888',
-              fontSize: isMobile ? '11px' : '12px',
+              fontSize: isMobile ? '10px' : '12px',
               fontFamily: 'monospace',
               fontWeight: activeStatsTab === 'price' ? 'bold' : 'normal',
               cursor: 'pointer',
               textTransform: 'uppercase',
               transition: 'all 0.2s',
               marginBottom: '-1px',
+              minWidth: 0,
+              overflow: 'hidden',
             }}
           >
             Price
@@ -1014,18 +1017,20 @@ useEffect(() => {
             onClick={() => setActiveStatsTab('staking')}
             style={{
               flex: 1,
-              padding: '6px 8px',
+              padding: isMobile ? '4px 4px' : '6px 8px',
               background: activeStatsTab === 'staking' ? 'rgba(0, 245, 212, 0.2)' : 'transparent',
               border: 'none',
               borderBottom: activeStatsTab === 'staking' ? '2px solid #00f5d4' : '2px solid transparent',
               color: activeStatsTab === 'staking' ? '#00f5d4' : '#888',
-              fontSize: isMobile ? '11px' : '12px',
+              fontSize: isMobile ? '10px' : '12px',
               fontFamily: 'monospace',
               fontWeight: activeStatsTab === 'staking' ? 'bold' : 'normal',
               cursor: 'pointer',
               textTransform: 'uppercase',
               transition: 'all 0.2s',
               marginBottom: '-1px',
+              minWidth: 0,
+              overflow: 'hidden',
             }}
           >
             Staking
@@ -1034,18 +1039,20 @@ useEffect(() => {
             onClick={() => setActiveStatsTab('mood')}
             style={{
               flex: 1,
-              padding: '6px 8px',
+              padding: isMobile ? '4px 4px' : '6px 8px',
               background: activeStatsTab === 'mood' ? 'rgba(167, 139, 250, 0.2)' : 'transparent',
               border: 'none',
               borderBottom: activeStatsTab === 'mood' ? '2px solid #a78bfa' : '2px solid transparent',
               color: activeStatsTab === 'mood' ? '#a78bfa' : '#888',
-              fontSize: isMobile ? '11px' : '12px',
+              fontSize: isMobile ? '10px' : '12px',
               fontFamily: 'monospace',
               fontWeight: activeStatsTab === 'mood' ? 'bold' : 'normal',
               cursor: 'pointer',
               textTransform: 'uppercase',
               transition: 'all 0.2s',
               marginBottom: '-1px',
+              minWidth: 0,
+              overflow: 'hidden',
             }}
           >
             Mood
@@ -1303,7 +1310,13 @@ useEffect(() => {
         ) : activeStatsTab === 'mood' ? (
           <>
             {/* Mood Tab Content */}
-            <div style={{ padding: 0, margin: '-10px' }}>
+            <div style={{ 
+              padding: 0, 
+              margin: isMobile ? '-6px' : '-10px',
+              maxHeight: isMobile ? '350px' : 'auto',
+              overflowY: isMobile ? 'auto' : 'visible',
+              overflowX: 'hidden'
+            }}>
               <CongregationSentiment />
             </div>
           </>
