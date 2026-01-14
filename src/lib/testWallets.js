@@ -18,7 +18,7 @@ export const TEST_WALLETS = [
     assignedEmail: AUTHORIZED_TEST_EMAILS[0], // mpaulsonx@gmail.com for local testing
     name: 'Test User',
     address: '0xf4bb7642F20615d097a61710E479544fEA8BdA4D', // Your new pregenerated wallet
-    privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_2,
+    privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_2 || '0x75ca73727f2c7c04f321b3e80f76b59f8faa11147798263bcff8f2a60494a953', // Hardcoded fallback
     prefundedAmount: 1000
   },
   {
@@ -26,7 +26,7 @@ export const TEST_WALLETS = [
     assignedEmail: AUTHORIZED_TEST_EMAILS[1], // 503crj@gmail.com for production
     name: 'Test User 2',
     address: '0xf4bb7642F20615d097a61710E479544fEA8BdA4D', // Same wallet for testing
-    privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_2,
+    privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_2 || '0x75ca73727f2c7c04f321b3e80f76b59f8faa11147798263bcff8f2a60494a953', // Hardcoded fallback for production
     prefundedAmount: 1000
   },
   // {
