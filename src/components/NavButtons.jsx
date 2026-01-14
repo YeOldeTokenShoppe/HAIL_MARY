@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLanguage } from './LanguageProvider';
 import CyberNav from './CyberNav';
 import Link from 'next/link';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 
 const NavButtons = () => {
@@ -30,14 +31,23 @@ const NavButtons = () => {
     if (item.openCyberNav) {
       e.preventDefault();
       e.stopPropagation();
+      
+      // Disable all ScrollTriggers temporarily
+      const triggers = ScrollTrigger.getAll();
+      triggers.forEach(trigger => trigger.disable());
+      
+      // Store current scroll position
+      const currentScroll = window.scrollY;
+      
+      // Open the CyberNav
       setIsCyberNavOpen(true);
-      // Prevent any scroll behavior on mobile
-      if (isMobile) {
-        document.body.style.overflow = 'hidden';
-        setTimeout(() => {
-          document.body.style.overflow = '';
-        }, 100);
-      }
+      
+      // Re-enable ScrollTriggers after a brief delay
+      setTimeout(() => {
+        triggers.forEach(trigger => trigger.enable());
+        // Ensure we're still at the same scroll position
+        window.scrollTo(0, currentScroll);
+      }, 100);
     }
   };
 
@@ -90,7 +100,9 @@ const NavButtons = () => {
               }}
               onTouchEnd={(e) => {
                 e.currentTarget.style.transform = '';
-                handleItemClick(e, item);
+                if (item.openCyberNav) {
+                  handleItemClick(e, item);
+                }
               }}
             >
               <span
@@ -108,7 +120,12 @@ const NavButtons = () => {
       </nav>
       <CyberNav 
         isOpen={isCyberNavOpen}
-        onClose={() => setIsCyberNavOpen(false)}
+        onClose={() => {
+          setIsCyberNavOpen(false);
+          // Re-enable all ScrollTriggers when closing
+          const triggers = ScrollTrigger.getAll();
+          triggers.forEach(trigger => trigger.enable());
+        }}
         showButton={false}
       />
     </>
