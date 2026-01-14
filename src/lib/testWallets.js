@@ -13,17 +13,17 @@ export const AUTHORIZED_TEST_EMAILS = [
 
 export const TEST_WALLETS = [
   // Commented out old wallet - using the new pregenerated one instead
-  // {
-  //   id: 'tester1',
-  //   assignedEmail: AUTHORIZED_TEST_EMAILS[0],
-  //   name: 'Test User 1',
-  //   address: '0x7E49a282E315F20964f3A6b79CA840161BBa3F77', // Replace with actual address
-  //   privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_1, // Store in .env.local
-  //   prefundedAmount: 1000
-  // },
   {
     id: 'tester1',
-    assignedEmail: AUTHORIZED_TEST_EMAILS[0], // mpaulsonx@gmail.com
+    assignedEmail: AUTHORIZED_TEST_EMAILS[0],
+    name: 'Test User 1',
+    address: '0x7E49a282E315F20964f3A6b79CA840161BBa3F77', // Replace with actual address
+    privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_1, // Store in .env.local
+    prefundedAmount: 1000
+  },
+  {
+    id: 'tester1',
+    assignedEmail: AUTHORIZED_TEST_EMAILS[1], // 503crj@gmail.com
     name: 'Test User 1',
     address: '0xf4bb7642F20615d097a61710E479544fEA8BdA4D', // Your new pregenerated wallet
     privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_2, // Store in .env.local
