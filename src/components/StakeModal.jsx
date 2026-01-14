@@ -1279,8 +1279,9 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                 >
                   {transactionStatus === 'confirming' ? 'Confirming...' : `Step 2: Stake ${stakeAmount || '0'} RL80`}
                 </TransactionButton>
-            </form>
-            
+              )}
+              </form>
+              
           </div>
         )}
       </div>
