@@ -315,7 +315,33 @@ const PalmsScene = ({ onLoadingChange }) => {
   const skipAnimation = useCallback(() => {
     console.log('Skip animation clicked');
     
-    // Detect if mobile
+    // First, ensure scrolling is enabled on the body and html
+    document.body.style.overflow = 'auto';
+    document.body.style.height = 'auto';
+    document.documentElement.style.overflow = 'auto';
+    document.documentElement.style.height = 'auto';
+    
+    // Immediately set to final stage
+    setCurrentCameraStage(4);
+    scrollProgressRef.current = 1;
+    setShouldMorph(true);
+    
+    // Mark as scrolled to hide the button
+    setHasScrolled(true);
+    hasScrolledRef.current = true;
+    
+    // Get all ScrollTriggers and update their progress
+    const triggers = ScrollTrigger.getAll();
+    triggers.forEach(trigger => {
+      if (trigger.animation) {
+        // Jump the timeline to the end
+        trigger.animation.progress(1);
+        trigger.progress(1);
+        trigger.animation.pause();
+      }
+    });
+    
+    // Detect if mobile for scroll distance
     const userAgent = navigator.userAgent.toLowerCase();
     const isIPhone = /iphone/i.test(userAgent);
     const isAndroid = /android/i.test(userAgent) && /mobile/i.test(userAgent);
@@ -323,23 +349,33 @@ const PalmsScene = ({ onLoadingChange }) => {
     const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     const isMobileDevice = (isIPhone || isAndroid) && hasSmallScreen && hasTouch;
     
-    // Use the known scroll container height instead of calculating
-    // The scroll container is 400vh on desktop, 800vh on mobile
-    const viewportHeight = window.innerHeight;
-    const targetScroll = isMobileDevice ? (viewportHeight * 8) - viewportHeight : (viewportHeight * 4) - viewportHeight;
+    // Get the actual scroll container and calculate its height
+    const scrollContainer = document.getElementById('scroll-container');
+    let targetScroll;
     
-    console.log('Scrolling to:', targetScroll, 'from:', window.scrollY, 'isMobile:', isMobileDevice);
+    if (scrollContainer) {
+      // Use the actual height of the scroll container
+      const containerHeight = scrollContainer.offsetHeight;
+      targetScroll = containerHeight - window.innerHeight;
+      console.log('Using scroll container height:', containerHeight, 'target:', targetScroll);
+    } else {
+      // Fallback to calculated height
+      const viewportHeight = window.innerHeight;
+      targetScroll = isMobileDevice ? (viewportHeight * 7) : (viewportHeight * 3);
+      console.log('Using calculated height, target:', targetScroll);
+    }
     
-    // Use smooth scroll to bottom
-    window.scrollTo({
-      top: targetScroll,
-      behavior: 'smooth'
-    });
+    console.log('Jumping to final stage, scrolling to:', targetScroll);
     
-    // Also mark as scrolled to hide the button
-    setHasScrolled(true);
-    hasScrolledRef.current = true;
-  }, []);
+    // Instant scroll to the end
+    window.scrollTo(0, targetScroll);
+    document.documentElement.scrollTop = targetScroll;
+    document.body.scrollTop = targetScroll;
+    
+    // Update ScrollTrigger to recognize the new scroll position
+    ScrollTrigger.refresh();
+    ScrollTrigger.update();
+  }, [setShouldMorph]);
   
   // Detect if device is mobile for routing
   const detectMobileDevice = useCallback(() => {

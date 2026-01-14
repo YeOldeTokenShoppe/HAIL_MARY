@@ -1010,44 +1010,190 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
               )}
 
               {/* Approve Button - First step */}
-              <TransactionButton
-                  transaction={() => {
-                    const amountInWei = toWei(stakeAmount || "0");
-                    console.log("Approving amount:", amountInWei.toString());
-                    console.log("Spender:", stakingContract.address);
-                    
-                    return approve({
-                      contract: erc20Contract,
-                      spender: stakingContract.address,
-                      amount: amountInWei,
-                    });
+              {activeAccount?.sendTransaction ? (
+                // Test wallet - handle approve directly
+                <button
+                  onClick={async () => {
+                    try {
+                      setIsSubmitting(true);
+                      const amountInWei = toWei(stakeAmount || "0");
+                      console.log("Test wallet approving amount:", amountInWei.toString());
+                      
+                      const approveTx = approve({
+                        contract: erc20Contract,
+                        spender: stakingContract.address,
+                        amount: amountInWei,
+                      });
+                      
+                      const result = await sendAndConfirmTransaction({
+                        transaction: approveTx,
+                        account: activeAccount
+                      });
+                      
+                      console.log("Approval confirmed!");
+                      alert("Approval successful! You can now stake your tokens.");
+                      setIsSubmitting(false);
+                    } catch (error) {
+                      console.error("Approval failed:", error);
+                      alert("Failed to approve tokens: " + (error?.message || 'Unknown error'));
+                      setIsSubmitting(false);
+                    }
                   }}
-                  onTransactionConfirmed={() => {
-                    console.log("Approval confirmed!");
-                    alert("Approval successful! You can now stake your tokens.");
-                  }}
-                  onError={(error) => {
-                    console.error("Approval failed:", error);
-                  }}
-                  disabled={!stakeAmount || parseInt(stakeAmount) < 1}
+                  disabled={!stakeAmount || parseInt(stakeAmount) < 1 || isSubmitting}
                   style={{
                     width: '100%',
                     padding: '0.875rem',
-                    background: 'linear-gradient(135deg, #ff9500, #ff6200)',
+                    background: isSubmitting ? 'gray' : 'linear-gradient(135deg, #ff9500, #ff6200)',
                     border: 'none',
                     borderRadius: '50px',
                     color: '#000',
                     fontSize: '0.9rem',
                     fontWeight: '600',
-                    cursor: 'pointer',
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
                     marginBottom: '0.5rem',
                   }}
                 >
-                  Step 1: Approve {stakeAmount || '0'} RL80
-              </TransactionButton>
+                  {isSubmitting ? 'Approving...' : `Step 1: Approve ${stakeAmount || '0'} RL80`}
+                </button>
+              ) : (
+                // Regular wallet - use TransactionButton
+                <TransactionButton
+                    transaction={() => {
+                      const amountInWei = toWei(stakeAmount || "0");
+                      console.log("Approving amount:", amountInWei.toString());
+                      console.log("Spender:", stakingContract.address);
+                      
+                      return approve({
+                        contract: erc20Contract,
+                        spender: stakingContract.address,
+                        amount: amountInWei,
+                      });
+                    }}
+                    onTransactionConfirmed={() => {
+                      console.log("Approval confirmed!");
+                      alert("Approval successful! You can now stake your tokens.");
+                    }}
+                    onError={(error) => {
+                      console.error("Approval failed:", error);
+                    }}
+                    disabled={!stakeAmount || parseInt(stakeAmount) < 1}
+                    style={{
+                      width: '100%',
+                      padding: '0.875rem',
+                      background: 'linear-gradient(135deg, #ff9500, #ff6200)',
+                      border: 'none',
+                      borderRadius: '50px',
+                      color: '#000',
+                      fontSize: '0.9rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      marginBottom: '0.5rem',
+                    }}
+                  >
+                    Step 1: Approve {stakeAmount || '0'} RL80
+                </TransactionButton>
+              )}
 
               {/* Stake Button - Second step */}
-              <TransactionButton
+              {activeAccount?.sendTransaction ? (
+                // Test wallet - handle stake directly
+                <button
+                  onClick={async () => {
+                    try {
+                      setIsSubmitting(true);
+                      setTransactionStatus('confirming');
+                      const amountInWei = toWei(stakeAmount || "0");
+                      console.log("Test wallet staking amount:", amountInWei.toString());
+                      
+                      const stakeTx = prepareContractCall({
+                        contract: stakingContract,
+                        method: "stake",
+                        params: [amountInWei]
+                      });
+                      
+                      const result = await sendAndConfirmTransaction({
+                        transaction: stakeTx,
+                        account: activeAccount
+                      });
+                      
+                      console.log("Stake successful!", result);
+                      setTransactionStatus('success');
+                      
+                      // Save to Firestore
+                      const stakeData = {
+                        amount: parseInt(stakeAmount),
+                        duration: LOCK_DURATION_MINUTES,
+                        durationUnit: 'minutes',
+                        userId: user?.id,
+                        walletAddress: walletAddress,
+                        userImageUrl: user?.imageUrl || null,
+                        userName: user?.firstName || user?.username || 'Anonymous',
+                        createdAt: serverTimestamp(),
+                        timestamp: new Date().toISOString(),
+                        isTestnet: IS_TESTNET,
+                        txHash: result.transactionHash
+                      };
+
+                      try {
+                        const docRef = await addDoc(collection(db, 'stakes'), stakeData);
+                        console.log('Stake saved to Firestore with ID:', docRef.id);
+                        stakeData.id = docRef.id;
+                      } catch (firestoreError) {
+                        console.error('Error saving stake to Firestore:', firestoreError);
+                      }
+
+                      // Refresh data
+                      await refreshStakingData();
+                      if (refreshBalance) {
+                        await refreshBalance();
+                      }
+                      
+                      // Call parent handler
+                      if (onStake) {
+                        await onStake(stakeData);
+                      }
+                      
+                      // Show success
+                      setSuccessData({
+                        amount: parseInt(stakeAmount),
+                        unlockTime: IS_TESTNET 
+                          ? new Date(Date.now() + LOCK_DURATION_MINUTES * 60 * 1000)
+                          : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                        txHash: result.transactionHash
+                      });
+                      setShowSuccess(true);
+                      setStakeAmount('');
+                      setIsSubmitting(false);
+                    } catch (error) {
+                      console.error("Staking failed:", error);
+                      setTransactionStatus('');
+                      if (error.message?.includes('insufficient')) {
+                        alert('Insufficient tokens or gas. Please check your balance.');
+                      } else {
+                        alert('Failed to stake tokens: ' + (error?.message || 'Unknown error'));
+                      }
+                      setIsSubmitting(false);
+                    }
+                  }}
+                  disabled={!stakeAmount || parseInt(stakeAmount) < 1 || isSubmitting}
+                  className="submit-button"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    background: isSubmitting ? 'gray' : 'linear-gradient(135deg, #8b5cf6, #ec4899)',
+                    border: 'none',
+                    borderRadius: '50px',
+                    color: '#fff',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {transactionStatus === 'confirming' ? 'Confirming...' : `Step 2: Stake ${stakeAmount || '0'} RL80`}
+                </button>
+              ) : (
+                // Regular wallet - use TransactionButton
+                <TransactionButton
                   transaction={() => {
                     const amountInWei = toWei(stakeAmount || "0");
                     console.log("Staking amount:", amountInWei.toString());
