@@ -315,11 +315,20 @@ const PalmsScene = ({ onLoadingChange }) => {
   const skipAnimation = useCallback(() => {
     console.log('Skip animation clicked');
     
-    // Scroll to the bottom of the document
-    const scrollHeight = document.documentElement.scrollHeight;
-    const targetScroll = scrollHeight - window.innerHeight;
+    // Detect if mobile
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isIPhone = /iphone/i.test(userAgent);
+    const isAndroid = /android/i.test(userAgent) && /mobile/i.test(userAgent);
+    const hasSmallScreen = window.innerWidth < 600 || window.innerHeight < 600;
+    const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const isMobileDevice = (isIPhone || isAndroid) && hasSmallScreen && hasTouch;
     
-    console.log('Scrolling to:', targetScroll, 'from:', window.scrollY);
+    // Use the known scroll container height instead of calculating
+    // The scroll container is 400vh on desktop, 800vh on mobile
+    const viewportHeight = window.innerHeight;
+    const targetScroll = isMobileDevice ? (viewportHeight * 8) - viewportHeight : (viewportHeight * 4) - viewportHeight;
+    
+    console.log('Scrolling to:', targetScroll, 'from:', window.scrollY, 'isMobile:', isMobileDevice);
     
     // Use smooth scroll to bottom
     window.scrollTo({
