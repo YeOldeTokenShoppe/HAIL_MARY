@@ -117,7 +117,7 @@ function SimpleCandleViewer({ customImageUrl, offeringType }) {
 
 const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
   const { user } = useUser();
-  const { walletAddress, tokenBalance } = useWalletAuth();
+  const { walletAddress, tokenBalance, activeAccount } = useWalletAuth();
   const { mutate: sendTransaction, data: txResult, status: txStatus } = useSendTransaction();
   
   const [offeringType, setOfferingType] = useState('petition');
@@ -1639,12 +1639,24 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                   await new Promise(resolve => setTimeout(resolve, 500));
                   
                   try {
+                    // Check if we have an active account
+                    if (!activeAccount) {
+                      console.error('[LightCandleModal] No active account available');
+                      alert('Please connect your wallet first');
+                      setIsSubmitting(false);
+                      setIsBurnInProgress(false);
+                      setForceHidden(false);
+                      setModalHidden(false);
+                      setShowWalletLoading(false);
+                      return;
+                    }
+                    
                     const transaction = burn({
                       contract: erc20Contract,
                       amount: amountInWei,
                     });
                     
-                    console.log('[LightCandleModal] Sending transaction for user to sign...');
+                    console.log('[LightCandleModal] Sending transaction for user to sign with account:', activeAccount.address);
                     setShowWalletLoading(false); // Hide wallet loading when wallet opens
                     
                     sendTransaction(transaction, {

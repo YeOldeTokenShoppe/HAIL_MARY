@@ -3,7 +3,7 @@
 
 // IMPORTANT: Update these email addresses with your actual testers
 export const AUTHORIZED_TEST_EMAILS = [
-  'mpaulsonx@gmail.com', // YOUR TEST EMAIL - Replace this first!
+  '503crj@gmail.com', // YOUR TEST EMAIL - Replace this first!
   '503crj@gmail.com', // Replace with actual tester email
   'tester3@example.com', // Replace with actual tester email
   'tester4@example.com', // Replace with actual tester email
@@ -12,19 +12,19 @@ export const AUTHORIZED_TEST_EMAILS = [
 ];
 
 export const TEST_WALLETS = [
-  {
-    id: 'tester1',
-    assignedEmail: AUTHORIZED_TEST_EMAILS[0],
-    name: 'Test User 1',
-    address: '0x7E49a282E315F20964f3A6b79CA840161BBa3F77', // Replace with actual address
-    privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_1, // Store in .env.local
-    prefundedAmount: 1000
-  },
+  // {
+  //   id: 'tester1',
+  //   assignedEmail: AUTHORIZED_TEST_EMAILS[0],
+  //   name: 'Test User 1',
+  //   address: '0x7E49a282E315F20964f3A6b79CA840161BBa3F77', // Replace with actual address
+  //   privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_1, // Store in .env.local
+  //   prefundedAmount: 1000
+  // },
   {
     id: 'tester2',
     assignedEmail: AUTHORIZED_TEST_EMAILS[1],
     name: 'Test User 2',
-    address: '0xd83a7011479e2650677507b4fAcEb5520F8838E5', // Replace with actual address
+    address: '0xf4bb7642F20615d097a61710E479544fEA8BdA4D', // Replace with actual address
     privateKey: process.env.NEXT_PUBLIC_TEST_WALLET_2, // Store in .env.local
     prefundedAmount: 1000
   },

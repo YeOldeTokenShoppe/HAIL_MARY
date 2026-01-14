@@ -6,7 +6,6 @@ import { useWalletAuth } from './WalletAuthProvider';
 import { db, collection, addDoc, serverTimestamp } from '@/lib/firebaseClient';
 import ThirdwebBuyModal from './ThirdwebBuyModal';
 import { 
-  useActiveAccount,
   TransactionButton
 } from "thirdweb/react";
 import { prepareContractCall, sendAndConfirmTransaction } from "thirdweb";
@@ -18,8 +17,7 @@ import { useStaking } from '@/hooks/useStaking';
 
 const StakeModal = ({ isOpen, onClose, onStake }) => {
   const { user } = useUser();
-  const { walletAddress, tokenBalance, refreshBalance } = useWalletAuth();
-  const activeAccount = useActiveAccount();
+  const { walletAddress, tokenBalance, refreshBalance, activeAccount } = useWalletAuth();
   const { 
     stakedBalance, 
     earnedRewards, 

@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { useUser } from '@clerk/nextjs';
 import { useConnect, useActiveAccount, useDisconnect, useActiveWallet } from "thirdweb/react";
 import { inAppWallet } from "thirdweb/wallets/in-app";
-import { createWallet } from "thirdweb/wallets";
+import { createWallet, privateKeyToAccount } from "thirdweb/wallets";
 import { client, tokenFunctions } from '@/lib/contract';
 import { logWalletConnection, logWalletDisconnection } from '@/lib/authLogger';
 import { useAuthLogger } from '@/hooks/useAuthLogger';
@@ -28,6 +28,7 @@ export function WalletAuthProvider({ children }) {
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [testWallet, setTestWallet] = useState(null);
+  const [testWalletAccount, setTestWalletAccount] = useState(null); // Store the ThirdWeb account object for test wallets
 
   // Fetch token balance when wallet is connected
   const fetchTokenBalance = useCallback(async (address) => {
@@ -157,6 +158,7 @@ export function WalletAuthProvider({ children }) {
       setWalletAddress(null);
       setTokenBalance(null);
       setTestWallet(null);
+      setTestWalletAccount(null);
       
       // Clear wallet from localStorage
       if (user) {
@@ -196,20 +198,33 @@ export function WalletAuthProvider({ children }) {
     
     // Assign test wallet
     const assignedWallet = getTestWalletForEmail(userEmail);
-    if (assignedWallet) {
+    if (assignedWallet && assignedWallet.privateKey) {
+      // Create a ThirdWeb account from the private key
+      const account = privateKeyToAccount({
+        privateKey: assignedWallet.privateKey,
+        client
+      });
+      
       setTestWallet(assignedWallet);
-      setWalletAddress(assignedWallet.address);
+      setTestWalletAccount(account);
+      setWalletAddress(account.address);
       
       const walletData = {
-        walletAddress: assignedWallet.address,
+        walletAddress: account.address,
         lastWalletSync: new Date().toISOString(),
         userId: user.id,
         isTestWallet: true
       };
       localStorage.setItem(`wallet_${user.id}`, JSON.stringify(walletData));
       
+      fetchTokenBalance(account.address);
+      console.log(`Switched to test wallet: ${account.address}`);
+    } else if (assignedWallet) {
+      // Fallback for wallets without private key (shouldn't happen in production)
+      console.error('Test wallet missing private key:', assignedWallet.id);
+      setTestWallet(assignedWallet);
+      setWalletAddress(assignedWallet.address);
       fetchTokenBalance(assignedWallet.address);
-      console.log(`Switched to test wallet: ${assignedWallet.address}`);
     }
   }, [user, activeWallet, walletAddress, disconnectWallet, fetchTokenBalance]);
 
@@ -220,6 +235,7 @@ export function WalletAuthProvider({ children }) {
     // Disconnect test wallet if connected
     if (testWallet) {
       setTestWallet(null);
+      setTestWalletAccount(null);
       setWalletAddress(null);
       setTokenBalance(null);
       localStorage.removeItem(`wallet_${user.id}`);
@@ -264,15 +280,23 @@ export function WalletAuthProvider({ children }) {
       
       const assignedWallet = getTestWalletForEmail(userEmail);
       
-      if (assignedWallet) {
+      if (assignedWallet && assignedWallet.privateKey) {
         // Only auto-assign if user hasn't explicitly chosen to use their own wallet
         console.log('Assigning test wallet:', assignedWallet);
+        
+        // Create a ThirdWeb account from the private key
+        const account = privateKeyToAccount({
+          privateKey: assignedWallet.privateKey,
+          client
+        });
+        
         setTestWallet(assignedWallet);
-        setWalletAddress(assignedWallet.address);
+        setTestWalletAccount(account);
+        setWalletAddress(account.address);
         
         // Sync with localStorage for persistence
         const walletData = {
-          walletAddress: assignedWallet.address,
+          walletAddress: account.address,
           lastWalletSync: new Date().toISOString(),
           userId: user.id,
           isTestWallet: true
@@ -281,10 +305,12 @@ export function WalletAuthProvider({ children }) {
         localStorage.setItem(`wallet_preference_${user.id}`, 'test_wallet');
         
         // Fetch balance for test wallet
-        fetchTokenBalance(assignedWallet.address);
+        fetchTokenBalance(account.address);
         
         // Log connection (optional)
-        console.log(`Test wallet assigned to ${user.firstName || userEmail}: ${assignedWallet.address}`);
+        console.log(`Test wallet assigned to ${user.firstName || userEmail}: ${account.address}`);
+      } else if (assignedWallet) {
+        console.log('Test wallet missing private key:', assignedWallet.id);
       } else {
         console.log(`No test wallet available for ${userEmail}`);
       }
@@ -302,10 +328,17 @@ export function WalletAuthProvider({ children }) {
             const userEmail = user.primaryEmailAddress?.emailAddress;
             if (userEmail && isAuthorizedTestUser(userEmail)) {
               const assignedWallet = getTestWalletForEmail(userEmail);
-              if (assignedWallet && assignedWallet.address === walletData.walletAddress) {
+              if (assignedWallet && assignedWallet.address === walletData.walletAddress && assignedWallet.privateKey) {
+                // Create a ThirdWeb account from the private key
+                const account = privateKeyToAccount({
+                  privateKey: assignedWallet.privateKey,
+                  client
+                });
+                
                 setTestWallet(assignedWallet);
-                setWalletAddress(assignedWallet.address);
-                fetchTokenBalance(assignedWallet.address);
+                setTestWalletAccount(account);
+                setWalletAddress(account.address);
+                fetchTokenBalance(account.address);
               }
             }
           }
@@ -368,12 +401,13 @@ export function WalletAuthProvider({ children }) {
     walletAddress,
     tokenBalance,
     isWalletConnected: isTestUser ? !!walletAddress : !!(activeAccount && walletAddress),
-    activeAccount,
+    activeAccount: testWalletAccount || activeAccount, // Use test wallet account if available, otherwise regular account
     
     // Test mode
     isTestMode: TEST_MODE,
     isTestUser, // Whether this specific user gets test wallet
     testWallet,
+    testWalletAccount, // Expose test wallet account
     
     // Loading states
     isConnecting,
