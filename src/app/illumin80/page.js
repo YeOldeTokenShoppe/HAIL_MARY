@@ -603,7 +603,8 @@ useEffect(() => {
         ) : null}
       </div>
       
-      {/* Title - positioned at top left, visible on all screen sizes */}
+      {/* Title - positioned at top left, desktop/tablet only */}
+      {!isMobileView && (
       <h1 className='custom-title'
           id="main-title"
           style={{ 
@@ -634,7 +635,7 @@ useEffect(() => {
                 rgba(255, 192, 203, 0.4) -1px -1px 5px,
                 rgba(0, 0, 0, 0.8) 10px 10px 15px
               `,
-            fontSize: isMobileView ? "1.5rem" : "2rem",
+            fontSize: isMobileView ? "1.5rem" : "3rem",
             fontWeight: 900,
             lineHeight: 0.75,
             transform: "rotate(-8deg) skew(-15deg)",
@@ -651,6 +652,7 @@ useEffect(() => {
           </span>
           <span className="title-line" style={{ display: 'block', marginLeft: isMobileView ? "2rem" : "3rem", position: 'relative' }}>Profit</span>
         </h1>
+      )}
       
       {/* Only render ShrineLeftPanel on desktop/tablet after we know device type */}
       {mounted && !isMobileView && (

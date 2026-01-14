@@ -37,6 +37,7 @@ export function PhoneScreenTexture({
   const hoveredPolaroidLoadedRef = useRef(false) // Track when image is ready to display
   const [allPolaroids, setAllPolaroids] = useState([]) // Store all polaroids for cycling
   const polaroidIndexRef = useRef(0) // Track current polaroid index
+  const [isLoadingInitialData, setIsLoadingInitialData] = useState(true) // Track initial loading state
   
   // Transition animation state
   const [isTransitioning, setIsTransitioning] = useState(false)
@@ -47,6 +48,8 @@ export function PhoneScreenTexture({
   const lastPolaroidUpdateRef = useRef(Date.now()) // Track when we last cycled polaroids
   const userAvatarRef = useRef(null) // Store current user avatar image
   const userAvatarLoadedRef = useRef(false) // Track if avatar is loaded
+  const [fadeInProgress, setFadeInProgress] = useState(0) // Track fade-in animation from loading to content
+  const fadeInStartRef = useRef(0)
   
   // Initialize canvas
   useEffect(() => {
@@ -171,8 +174,17 @@ export function PhoneScreenTexture({
 
         setLatestPolaroid(polaroidsWithData[0]);
         polaroidIndexRef.current = 0;
+        
+        // If this is the first load, start fade-in transition
+        if (isLoadingInitialData) {
+          fadeInStartRef.current = Date.now();
+          setFadeInProgress(0);
+        }
       } else {
       }
+      
+      // Mark loading as complete after first data arrives
+      setIsLoadingInitialData(false);
     });
     
     return () => unsubscribe();
@@ -279,6 +291,58 @@ export function PhoneScreenTexture({
     })
   }, [offerings])
   
+  // Draw loading animation
+  const drawLoadingState = (ctx, width, height) => {
+    // Draw shimmer/skeleton effect
+    const shimmerTime = Date.now() / 1000 // Time in seconds for animation
+    
+    // Draw header skeleton
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'
+    ctx.fillRect(40, 260, 200, 40) // User avatar placeholder
+    ctx.fillRect(260, 270, 300, 30) // Username placeholder
+    
+    // Draw polaroid frame skeleton with shimmer effect
+    const shimmerOffset = (Math.sin(shimmerTime * 2) + 1) * 0.5 // 0 to 1
+    const gradient = ctx.createLinearGradient(0, 380, width, 680)
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.05)')
+    gradient.addColorStop(shimmerOffset * 0.5, 'rgba(255, 255, 255, 0.1)')
+    gradient.addColorStop(shimmerOffset, 'rgba(255, 255, 255, 0.15)')
+    gradient.addColorStop(Math.min(shimmerOffset + 0.1, 1), 'rgba(255, 255, 255, 0.1)')
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0.05)')
+    
+    ctx.fillStyle = gradient
+    ctx.fillRect(40, 380, width - 80, 300) // Image placeholder
+    
+    // Draw message skeleton lines
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)'
+    ctx.fillRect(60, 720, width - 120, 25)
+    ctx.fillRect(60, 760, width - 180, 25)
+    ctx.fillRect(60, 800, width - 240, 25)
+    
+    // Draw loading text with pulsing effect
+    const pulseAlpha = (Math.sin(shimmerTime * 3) + 1) * 0.25 + 0.25 // 0.25 to 0.75
+    ctx.fillStyle = `rgba(138, 43, 226, ${pulseAlpha})` // Purple glow
+    ctx.font = 'bold 42px -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText('Loading prayers...', width / 2, height / 2 + 200)
+    
+    // Add some floating dots animation
+    const dotCount = 3
+    for (let i = 0; i < dotCount; i++) {
+      const dotAlpha = Math.sin(shimmerTime * 2 - i * 0.5) * 0.5 + 0.5
+      ctx.fillStyle = `rgba(255, 255, 255, ${dotAlpha * 0.5})`
+      ctx.beginPath()
+      ctx.arc(
+        width / 2 - 40 + i * 40, 
+        height / 2 + 250 + Math.sin(shimmerTime * 2 + i) * 10,
+        5, 0, Math.PI * 2
+      )
+      ctx.fill()
+    }
+    
+    ctx.textAlign = 'left'
+  }
+  
   // Draw the phone interface
   const drawPhoneInterface = () => {
     const canvas = canvasRef.current
@@ -368,11 +432,27 @@ export function PhoneScreenTexture({
     const now = Date.now();
     const inPrayerReceivedPhase = justLitOffering && (now - prayerReceivedStartTime.current < PRAYER_RECEIVED_DURATION);
     
-    // Show polaroid display when we have data and showPolaroid is true
-    // The drawPolaroid function handles all timing and ready checks internally
-    if (showPolaroid && latestPolaroid && !inPrayerReceivedPhase) {
-      // Show the polaroid-style display (with or without image)
-      drawPolaroid(ctx, width, height)
+    // Show loading state if still loading initial data
+    if (isLoadingInitialData && !hoveredOffering && !justLitOffering) {
+      drawLoadingState(ctx, width, height)
+    } else if (showPolaroid && latestPolaroid && !inPrayerReceivedPhase) {
+      // Apply fade-in effect if transitioning from loading
+      if (fadeInProgress < 1 && fadeInStartRef.current > 0) {
+        // Draw loading state with decreasing opacity
+        ctx.save()
+        ctx.globalAlpha = 1 - fadeInProgress
+        drawLoadingState(ctx, width, height)
+        ctx.restore()
+        
+        // Draw content with increasing opacity
+        ctx.save()
+        ctx.globalAlpha = fadeInProgress
+        drawPolaroid(ctx, width, height)
+        ctx.restore()
+      } else {
+        // Show the polaroid-style display (with or without image)
+        drawPolaroid(ctx, width, height)
+      }
     } else if (latestPolaroid && !hoveredOffering && !justLitOffering && !inPrayerReceivedPhase) {
       // Also show polaroid when not hovering/just lit (fallback)
       drawPolaroid(ctx, width, height)
@@ -688,7 +768,7 @@ export function PhoneScreenTexture({
     // Draw message below the image
     if (latestPolaroid.message) {
       ctx.fillStyle = '#ffffff'
-      ctx.font = '64px -apple-system, BlinkMacSystemFont, sans-serif'
+      ctx.font = '42px -apple-system, BlinkMacSystemFont, sans-serif'
       
       // Word wrap the message
       const words = latestPolaroid.message.split(' ')
@@ -1037,7 +1117,7 @@ export function PhoneScreenTexture({
     // Show the user's message
     if (offering && offering.message) {
       ctx.fillStyle = '#ffffff'
-      ctx.font = '44px -apple-system, BlinkMacSystemFont, sans-serif'
+      ctx.font = '28px -apple-system, BlinkMacSystemFont, sans-serif'
       
       // Word wrap the message
       const words = offering.message.split(' ')
@@ -1210,8 +1290,17 @@ export function PhoneScreenTexture({
     frameCount.current++
     const now = Date.now()
     
-    // Update every 10 frames or when offerings change
-    if (frameCount.current % 10 === 0 || hoveredOffering || justLitOffering || showPolaroid) {
+    // Update fade-in progress
+    if (fadeInStartRef.current > 0 && fadeInProgress < 1) {
+      const elapsed = now - fadeInStartRef.current
+      const duration = 800 // 800ms fade-in
+      const newProgress = Math.min(elapsed / duration, 1)
+      setFadeInProgress(newProgress)
+      
+      // Force redraw during fade-in
+      drawPhoneInterface()
+    } else if (frameCount.current % 10 === 0 || hoveredOffering || justLitOffering || showPolaroid || isLoadingInitialData) {
+      // Update every 10 frames or when offerings change
       drawPhoneInterface()
     }
     

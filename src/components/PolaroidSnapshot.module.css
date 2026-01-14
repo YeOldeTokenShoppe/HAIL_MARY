@@ -22,7 +22,7 @@
 .polaroid {
   position: relative;
   background: white;
-  padding: 15px 15px 75px 15px; /* Increased bottom padding from 60px to 75px */
+  padding: 15px 15px 60px 15px; /* Increased bottom padding from 60px to 75px */
   border: 1px solid #d0d0d0; /* Subtle gray border for visibility on white backgrounds */
   /* box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); */
   transform: rotate(-5deg) translateY(-100vh);
@@ -77,7 +77,7 @@
   padding: 15px 10px 20px;
   background: white;
   text-align: center;
-  min-height: 80px; /* Increased space for 2 lines */
+  min-height: 60px; /* Increased space for 2 lines */
   display: flex;
   align-items: center;
   justify-content: center;

@@ -9,6 +9,9 @@ import { CandleCloud, GradientBackground, SceneSetup } from './CandleShrine'
 import { NewCandleEffectManager } from './NewCandleEffect'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { useStaking } from '@/hooks/useStaking'
+import { useReadContract } from 'thirdweb/react'
+import { totalSupply } from 'thirdweb/extensions/erc20'
+import { erc20Contract } from '@/lib/contract'
 
 
 
@@ -371,7 +374,7 @@ useEffect(() => {
   
   // Calculate stats from offerings
   const [displayedCandleCount, setDisplayedCandleCount] = useState(500)
-  const [displayedBurnTotal, setDisplayedBurnTotal] = useState(2847395) // Starting with a realistic number
+  const [displayedBurnTotal, setDisplayedBurnTotal] = useState(0) // Will be updated with real data
   const [candleCountAnimation, setCandleCountAnimation] = useState(false)
   const [showLatestPolaroid, setShowLatestPolaroid] = useState(true) // Always show polaroids
   
@@ -382,10 +385,37 @@ useEffect(() => {
     const count = 500 + offeringsCount
     return count
   }, [totalOfferingsCount, offerings.length])
+  // Read total supply from the contract using the proper thirdweb extension
+  const { data: totalSupplyData, isLoading: isLoadingSupply } = useReadContract(
+    totalSupply,
+    { 
+      contract: erc20Contract 
+    }
+  )
+
+  // Calculate real burn total from contract data
+  const INITIAL_SUPPLY = 80_000_000_000 // 80 billion initial supply
   const realBurnTotal = useMemo(() => {
-    const offeringsBurn = offerings.reduce((sum, offering) => sum + (offering.tokensBurned || 0), 0)
-    return 2847395 + offeringsBurn // Base amount + actual burns
-  }, [offerings])
+    console.log('Total Supply from contract:', totalSupplyData)
+    console.log('Is Loading Supply:', isLoadingSupply)
+    
+    if (totalSupplyData !== undefined && totalSupplyData !== null) {
+      // Convert BigInt to number and calculate burned amount
+      const currentSupply = Number(totalSupplyData / BigInt(10 ** 18)) // Convert from wei to tokens
+      const burnedFromContract = INITIAL_SUPPLY - currentSupply
+      
+      console.log('Current Supply:', currentSupply)
+      console.log('Burned from contract:', burnedFromContract)
+      
+      // Add any local offerings burns (for immediate UI feedback)
+      const offeringsBurn = offerings.reduce((sum, offering) => sum + (offering.tokensBurned || 0), 0)
+      
+      return burnedFromContract + offeringsBurn
+    }
+    
+    // Return 0 while loading, no mock data
+    return 0
+  }, [offerings, totalSupplyData, isLoadingSupply])
   
   // Animate candle count when it increases
   useEffect(() => {
@@ -1105,7 +1135,7 @@ useEffect(() => {
               marginBottom: '4px'
             }}>
                {displayedBurnTotal >= 1000000 
-                ? `${(displayedBurnTotal / 1000000).toFixed(1)}M`
+                ? `${(displayedBurnTotal / 1000000).toFixed(2)}M`
                 : displayedBurnTotal >= 1000 
                 ? `${(displayedBurnTotal / 1000).toFixed(1)}K`
                 : displayedBurnTotal.toLocaleString()}

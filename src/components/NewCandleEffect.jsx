@@ -12,7 +12,7 @@ const TRAIL_LIFETIME = 1.2 // Particles live longer for better trail
 const ARC_HEIGHT = 3 // How high the arc goes above the midpoint
 const MOBILE_ARC_HEIGHT = 1.5 // Lower arc for mobile visibility
 const MOBILE_BREAKPOINT = 768 // px
-const BRIGHT_GLOW_DURATION = 5.0 // How long the candle stays bright after landing (seconds)
+const BRIGHT_GLOW_DURATION = 30.0 // How long the candle stays bright after landing (seconds)
 
 // Arctic Rings config - enhanced for more fanfare
 const RING_COUNT = 7  // More rings for bigger impact
@@ -179,6 +179,7 @@ export function NewCandleEffect({
   startPosition = [0, 0, 0], // Phone screen position
   endPosition = [5, 2, -3],   // Target in candle cloud
   onComplete = () => {},
+  onFullyComplete = () => {},
   candleModelPath = '/models/tinyVotiveOnly.glb',
   isActive = true,
   isMobile = false
@@ -247,59 +248,69 @@ export function NewCandleEffect({
       if (glowTimeRef.current >= BRIGHT_GLOW_DURATION) {
         setPhase('complete')
         // onComplete already called when landing, don't call again
+        // But do call onFullyComplete to signal the effect is truly done
+        onFullyComplete()
       }
-      return
+      // Don't return early - let trail particles continue updating below
     }
     
-    // Update progress for travel phases
-    progressRef.current += delta / ANIMATION_DURATION
-    const rawProgress = Math.min(progressRef.current, 1)
-    const easedProgress = easeInOutCubic(rawProgress)
+    // Only update travel progress if not glowing
+    let currentPos = groupRef.current.position.clone()
+    let easedProgress = 1
     
-    // Update phase
-    if (rawProgress < 0.1) {
-      setPhase('emerging')
-    } else if (rawProgress < 0.9) {
-      setPhase('traveling')
-    } else if (rawProgress < 1) {
-      setPhase('arriving')
-    } else {
-      // Instead of completing, enter glowing phase
-      setPhase('glowing')
-      glowTimeRef.current = 0
+    if (phase !== 'glowing') {
+      // Update progress for travel phases
+      progressRef.current += delta / ANIMATION_DURATION
+      const rawProgress = Math.min(progressRef.current, 1)
+      easedProgress = easeInOutCubic(rawProgress)
       
-      // Trigger the ripple effect immediately when candle lands (only once)
-      if (!hasTriggeredRipple.current) {
-        hasTriggeredRipple.current = true
-        onComplete()
+      // Update phase
+      if (rawProgress < 0.1) {
+        setPhase('emerging')
+      } else if (rawProgress < 0.9) {
+        setPhase('traveling')
+      } else if (rawProgress < 1) {
+        setPhase('arriving')
+      } else {
+        // Instead of completing, enter glowing phase
+        setPhase('glowing')
+        glowTimeRef.current = 0
+        
+        // Trigger the ripple effect immediately when candle lands (only once)
+        if (!hasTriggeredRipple.current) {
+          hasTriggeredRipple.current = true
+          onComplete()
+        }
+        return
       }
-      return
+      
+      // Calculate position on curve
+      currentPos = getPointOnCurve(easedProgress)
+      groupRef.current.position.copy(currentPos)
     }
     
-    // Calculate position on curve
-    const currentPos = getPointOnCurve(easedProgress)
-    groupRef.current.position.copy(currentPos)
-    
-    // Scale animation
-    // Start small (emerging from phone), grow during travel, full size at end
-    let scale
-    if (rawProgress < 0.15) {
-      // Emerge: 0 -> 0.6
-      scale = easeOutCubic(rawProgress / 0.15) * 0.6
-    } else if (rawProgress < 0.85) {
-      // Travel: 0.6 -> 0.9
-      const travelProgress = (rawProgress - 0.15) / 0.7
-      scale = 0.6 + travelProgress * 0.3
-    } else {
-      // Arrive: 0.9 -> 1.0 with slight overshoot
-      const arriveProgress = (rawProgress - 0.85) / 0.15
-      scale = 0.9 + easeOutCubic(arriveProgress) * 0.15
-      // Add slight "plop" overshoot
-      if (arriveProgress < 0.5) {
-        scale += Math.sin(arriveProgress * Math.PI) * 0.1
+    // Scale animation - skip if glowing (already handled above)
+    if (phase !== 'glowing') {
+      const rawProgress = progressRef.current
+      let scale
+      if (rawProgress < 0.15) {
+        // Emerge: 0 -> 0.6
+        scale = easeOutCubic(rawProgress / 0.15) * 0.6
+      } else if (rawProgress < 0.85) {
+        // Travel: 0.6 -> 0.9
+        const travelProgress = (rawProgress - 0.15) / 0.7
+        scale = 0.6 + travelProgress * 0.3
+      } else {
+        // Arrive: 0.9 -> 1.0 with slight overshoot
+        const arriveProgress = (rawProgress - 0.85) / 0.15
+        scale = 0.9 + easeOutCubic(arriveProgress) * 0.15
+        // Add slight "plop" overshoot
+        if (arriveProgress < 0.5) {
+          scale += Math.sin(arriveProgress * Math.PI) * 0.1
+        }
       }
+      groupRef.current.scale.setScalar(scale)
     }
-    groupRef.current.scale.setScalar(scale)
     
     // Rotation - gentle spin during travel
     groupRef.current.rotation.y += delta * (phase === 'traveling' ? 2 : 0.5)
@@ -314,21 +325,21 @@ export function NewCandleEffect({
       groupRef.current.rotation.x *= 0.9
     }
     
-    // Update trail particles
-    if (phase === 'traveling' || phase === 'emerging' || phase === 'arriving') {
-      // Spawn new particle - more particles during arrival for fanfare
-      const spawnChance = phase === 'arriving' ? 0.9 : 0.7
+    // Update trail particles - including during glowing phase
+    if (phase === 'traveling' || phase === 'emerging' || phase === 'arriving' || phase === 'glowing') {
+      // Spawn new particle - more particles during arrival and glowing for fanfare
+      const spawnChance = (phase === 'arriving' || phase === 'glowing') ? 0.9 : 0.7
       if (Math.random() < spawnChance) {
         trailParticles.current.push({
           position: currentPos.clone(),
           birth: time,
           velocity: new THREE.Vector3(
-            (Math.random() - 0.5) * (phase === 'arriving' ? 0.8 : 0.5),
-            (Math.random() - 0.5) * (phase === 'arriving' ? 0.8 : 0.5),
-            (Math.random() - 0.5) * (phase === 'arriving' ? 0.8 : 0.5)
+            (Math.random() - 0.5) * ((phase === 'arriving' || phase === 'glowing') ? 0.8 : 0.5),
+            (Math.random() - 0.5) * ((phase === 'arriving' || phase === 'glowing') ? 0.8 : 0.5),
+            (Math.random() - 0.5) * ((phase === 'arriving' || phase === 'glowing') ? 0.8 : 0.5)
           ),
-          size: phase === 'arriving' ? 0.08 + Math.random() * 0.15 : 0.05 + Math.random() * 0.1,
-          color: phase === 'arriving' ? 
+          size: (phase === 'arriving' || phase === 'glowing') ? 0.08 + Math.random() * 0.15 : 0.05 + Math.random() * 0.1,
+          color: (phase === 'arriving' || phase === 'glowing') ? 
             (Math.random() > 0.5 ? '#00ff66' : '#00ffff') : '#00ff66'
         })
       }
@@ -675,11 +686,15 @@ export const NewCandleEffectManager = forwardRef(({
     setBurstPosition(effectState.endPosition)
     setShowBurst(true)
     
-    // Notify parent to add permanent candle
-    onNewCandle?.(effectState.endPosition, effectState.offering)
+    // DON'T add permanent candle yet - wait until after glow phase
+    // Store the position and offering for later
+    setEffectState(prev => ({ 
+      ...prev, 
+      pendingCandle: { position: effectState.endPosition, offering: effectState.offering }
+    }))
     
-    // Reset effect state
-    setEffectState(prev => ({ ...prev, isActive: false }))
+    // DON'T reset isActive here - let the glowing phase complete first
+    // The NewCandleEffect will handle its own completion after glowing
   }
   
   const handleBurstComplete = () => {
@@ -704,6 +719,14 @@ export const NewCandleEffectManager = forwardRef(({
         endPosition={effectState.endPosition}
         isActive={effectState.isActive}
         onComplete={handleEffectComplete}
+        onFullyComplete={() => {
+          // Add the permanent candle now that glow is done
+          if (effectState.pendingCandle) {
+            onNewCandle?.(effectState.pendingCandle.position, effectState.pendingCandle.offering)
+          }
+          // Now reset the effect state
+          setEffectState(prev => ({ ...prev, isActive: false, pendingCandle: null }))
+        }}
         candleModelPath={candleModelPath}
         isMobile={isMobile}
       />

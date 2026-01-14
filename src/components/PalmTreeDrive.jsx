@@ -311,6 +311,27 @@ const PalmsScene = ({ onLoadingChange }) => {
   const mouse = useRef(new THREE.Vector2());
   const previousCameraStage = useRef(0);
   
+  // Skip animation function
+  const skipAnimation = useCallback(() => {
+    console.log('Skip animation clicked');
+    
+    // Scroll to the bottom of the document
+    const scrollHeight = document.documentElement.scrollHeight;
+    const targetScroll = scrollHeight - window.innerHeight;
+    
+    console.log('Scrolling to:', targetScroll, 'from:', window.scrollY);
+    
+    // Use smooth scroll to bottom
+    window.scrollTo({
+      top: targetScroll,
+      behavior: 'smooth'
+    });
+    
+    // Also mark as scrolled to hide the button
+    setHasScrolled(true);
+    hasScrolledRef.current = true;
+  }, []);
+  
   // Detect if device is mobile for routing
   const detectMobileDevice = useCallback(() => {
     const userAgent = navigator.userAgent;
@@ -2355,6 +2376,42 @@ const PalmsScene = ({ onLoadingChange }) => {
       
       {/* Scroll Camera Indicator removed for production */}
       </div>
+      
+      {/* Skip Animation Button - bottom right - Outside pointer-events:none container */}
+      {!hasScrolled && currentCameraStage < 4 && (
+        <button
+          onClick={skipAnimation}
+          style={{
+            position: 'fixed',
+            bottom: '30px',
+            right: '30px',
+            backgroundColor: 'transparent',
+            border: '1px solid rgba(255, 255, 255, 0.5)',
+            color: 'white',
+            padding: '10px 20px',
+            fontSize: '14px',
+            fontFamily: 'monospace',
+            cursor: 'pointer',
+            borderRadius: '4px',
+            transition: 'all 0.3s ease',
+            opacity: 0.8,
+            zIndex: 10000,
+            backdropFilter: 'blur(5px)',
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            e.target.style.borderColor = 'rgba(255, 255, 255, 0.8)';
+            e.target.style.opacity = '1';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.backgroundColor = 'transparent';
+            e.target.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+            e.target.style.opacity = '0.8';
+          }}
+        >
+          Skip Animation
+        </button>
+      )}
       
       {/* Scroll spacer to enable scrolling - outside fixed viewport */}
       <div 
