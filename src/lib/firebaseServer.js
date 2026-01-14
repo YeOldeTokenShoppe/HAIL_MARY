@@ -10,7 +10,8 @@ import {
   doc,
   setDoc,
   addDoc,
-  serverTimestamp
+  serverTimestamp,
+  writeBatch
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -47,4 +48,4 @@ try {
   db = null;
 }
 
-export { db, collection, query, orderBy, limit, getDocs, doc, setDoc, addDoc, serverTimestamp };
+export { db, collection, query, orderBy, limit, getDocs, doc, setDoc, addDoc, serverTimestamp, writeBatch };
