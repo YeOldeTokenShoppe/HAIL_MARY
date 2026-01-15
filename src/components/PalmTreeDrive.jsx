@@ -2443,7 +2443,7 @@ const PalmsScene = ({ onLoadingChange }) => {
             borderRadius: '4px',
             transition: 'all 0.3s ease',
             opacity: 0.8,
-            zIndex: 10000,
+            zIndex: 1,
             backdropFilter: 'blur(5px)',
           }}
           onMouseEnter={(e) => {

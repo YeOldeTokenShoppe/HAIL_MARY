@@ -796,13 +796,13 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                   top: '50%',
                   left: '50%',
                   width: '300%',
-                  height: '300%',
+                  height: 'auto',
                   // Combine all transforms in the correct order
                   transform: `
                     translate(-50%, -50%)
-                    rotateX(2deg)
-                    rotateY(7deg)
-                    rotateZ(353deg)
+                    rotateX(5deg)
+                    rotateY(12deg)
+                    rotateZ(352deg)
                     scale(0.3)
                   `,
                   transformOrigin: 'center center'
