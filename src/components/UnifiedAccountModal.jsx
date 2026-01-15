@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useWalletAuth } from './WalletAuthProvider';
 import { WalletConnectionModal } from './WalletConnectionModal';
 import { WalletDetailsModal } from './WalletDetailsModal';
+import { collection, query, where, orderBy, getDocs, db } from '@/lib/firebaseClient';
 
 export function UnifiedAccountModal({ isOpen, onClose }) {
   const { user } = useUser();
@@ -24,6 +25,8 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
   const [showWalletDetails, setShowWalletDetails] = useState(false);
   const [showClerkDropdown, setShowClerkDropdown] = useState(false);
   const [userPolaroids, setUserPolaroids] = useState([]);
+  const [loadingPolaroids, setLoadingPolaroids] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(null);
   
   // Listen for external wallet details event
   useEffect(() => {
@@ -35,21 +38,147 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
     return () => window.removeEventListener('openWalletDetails', handleOpenWalletDetails);
   }, []);
   
-  // Load polaroids from localStorage when modal opens
+  // Load polaroids from Firestore when modal opens
   useEffect(() => {
-    if (isOpen) {
+    const fetchUserPolaroids = async () => {
+      if (!isOpen || !walletAddress) return;
+      
+
+      setLoadingPolaroids(true);
+      
       try {
-        const saved = localStorage.getItem('userPolaroids');
-        if (saved) {
-          setUserPolaroids(JSON.parse(saved));
+        const offeringsRef = collection(db, 'offerings');
+
+        
+        // Query without orderBy to avoid needing a composite index
+        const simpleQuery = query(
+          offeringsRef,
+          where('walletAddress', '==', walletAddress)
+        );
+        
+        const querySnapshot = await getDocs(simpleQuery);
+        
+        const polaroids = [];
+        let offeringsWithPolaroids = 0;
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+
+          
+          if (data.polaroidUrl) {
+            offeringsWithPolaroids++;
+            polaroids.push({
+              id: doc.id,
+              url: data.polaroidUrl,
+              burnedAmount: data.tokensBurned || 0,
+              timestamp: data.createdAt?.toDate?.() || new Date(data.timestamp),
+              message: data.message || '',
+              name: data.name || 'Anonymous'
+            });
+          }
+        });
+        
+        
+        // If no results, try with lowercase wallet address
+        if (querySnapshot.size === 0) {
+          const lowercaseQuery = query(
+            offeringsRef,
+            where('walletAddress', '==', walletAddress.toLowerCase())
+          );
+          
+          const lowercaseSnapshot = await getDocs(lowercaseQuery);
+          
+          lowercaseSnapshot.forEach((doc) => {
+            const data = doc.data();
+
+            
+            if (data.polaroidUrl) {
+              polaroids.push({
+                id: doc.id,
+                url: data.polaroidUrl,
+                burnedAmount: data.tokensBurned || 0,
+                timestamp: data.createdAt?.toDate?.() || new Date(data.timestamp),
+                message: data.message || '',
+                name: data.name || 'Anonymous'
+              });
+            }
+          });
         }
-      } catch (e) {
-        console.error('Failed to load polaroids:', e);
+        
+        // Sort polaroids by timestamp (newest first) since we can't use orderBy in Firestore
+        polaroids.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        
+        setUserPolaroids(polaroids);
+        
+        // Calculate time remaining for the most recent candle (if any)
+        if (polaroids.length > 0) {
+          const mostRecentCandle = polaroids[0];
+          const createdAt = new Date(mostRecentCandle.timestamp);
+          const expirationTime = new Date(createdAt.getTime() + (80 * 60 * 60 * 1000)); // 80 hours
+          const now = new Date();
+          const remaining = expirationTime.getTime() - now.getTime();
+          
+          setTimeRemaining(remaining > 0 ? remaining : 0);
+        } else {
+          setTimeRemaining(null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch polaroids:', error);
+        // Fallback to localStorage as backup
+        try {
+          const saved = localStorage.getItem('userPolaroids');
+          if (saved) {
+            setUserPolaroids(JSON.parse(saved));
+          }
+        } catch (localError) {
+          console.error('Failed localStorage fallback:', localError);
+        }
+      } finally {
+        setLoadingPolaroids(false);
       }
-    }
-  }, [isOpen]);
+    };
+    
+    fetchUserPolaroids();
+  }, [isOpen, walletAddress]);
+
+  // Update time remaining every minute
+  useEffect(() => {
+    if (!timeRemaining || timeRemaining <= 0) return;
+    
+    const interval = setInterval(() => {
+      if (userPolaroids.length > 0) {
+        const mostRecentCandle = userPolaroids[0];
+        const createdAt = new Date(mostRecentCandle.timestamp);
+        const expirationTime = new Date(createdAt.getTime() + (80 * 60 * 60 * 1000)); // 80 hours
+        const now = new Date();
+        const remaining = expirationTime.getTime() - now.getTime();
+        
+        setTimeRemaining(remaining > 0 ? remaining : 0);
+      }
+    }, 60000); // Update every minute
+    
+    return () => clearInterval(interval);
+  }, [timeRemaining, userPolaroids]);
 
   if (!isOpen) return null;
+
+  // Helper function to format time remaining
+  const formatTimeRemaining = (ms) => {
+    if (!ms || ms <= 0) return 'Expired';
+    
+    const hours = Math.floor(ms / (1000 * 60 * 60));
+    const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (hours > 24) {
+      const days = Math.floor(hours / 24);
+      const remainingHours = hours % 24;
+      return `${days}d ${remainingHours}h`;
+    } else if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else {
+      return `${minutes}m`;
+    }
+  };
 
   const handleSignOut = async () => {
     await signOut({ redirectUrl: pathname || '/' });
@@ -78,9 +207,9 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
             </button>
             <button 
               className={`modal-tab ${activeTab === 'polaroids' ? 'active' : ''}`}
-              onClick={() => setActiveTab('polaroids')}
+              onClick={() => setActiveTab('candle')}
             >
-              Polaroids {userPolaroids.length > 0 && `(${userPolaroids.length})`}
+              Candle {userPolaroids.length > 0 && `(${userPolaroids.length})`}
             </button>
           </div>
 
@@ -181,7 +310,14 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
                       </button>
                       <button 
                         className="action-button disconnect"
-                        onClick={disconnectWallet}
+                        onClick={async () => {
+                          await disconnectWallet();
+                          // Small delay to let state updates propagate
+                          setTimeout(() => {
+                            // This will cause the modal to re-render with updated state
+                            setActiveTab('wallet');
+                          }, 200);
+                        }}
                       >
                         Disconnect Wallet
                       </button>
@@ -199,19 +335,70 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
                   </div>
                 )}
               </div>
-            ) : activeTab === 'polaroids' ? (
+            ) : activeTab === 'candle' ? (
               <div className="polaroids-content">
-                {userPolaroids.length > 0 ? (
+                {loadingPolaroids ? (
+                  <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa', width: '100%' }}>
+                    <div style={{ 
+                      width: '32px', 
+                      height: '32px', 
+                      border: '3px solid rgba(0, 245, 212, 0.3)', 
+                      borderTop: '3px solid #00f5d4', 
+                      borderRadius: '50%', 
+                      animation: 'spin 1s linear infinite',
+                      margin: '0 auto 16px auto'
+                    }}></div>
+                    <p>Loading your candle...</p>
+                  </div>
+                ) : userPolaroids.length > 0 ? (
                   <>
                     <p style={{ marginBottom: '20px', color: '#aaa', textAlign: 'center', width: '100%' }}>
-                      Your recent prayer candle polaroids
+                      Your current prayer candle
                     </p>
+                    
+                    {/* Current Candle Timer */}
+                    {timeRemaining !== null && (
+                      <div style={{
+                        background: 'rgba(139, 92, 246, 0.1)',
+                        border: '1px solid rgba(139, 92, 246, 0.3)',
+                        borderRadius: '12px',
+                        padding: '16px',
+                        marginBottom: '20px',
+                        textAlign: 'center'
+                      }}>
+                        <div style={{
+                          fontSize: '14px',
+                          color: '#aaa',
+                          marginBottom: '4px'
+                        }}>
+                          Current Candle Status
+                        </div>
+                        <div style={{
+                          fontSize: '18px',
+                          fontWeight: 'bold',
+                          color: timeRemaining > 0 ? '#8b5cf6' : '#ff6b6b'
+                        }}>
+                          {timeRemaining > 0 ? (
+                            <>🕯️ {formatTimeRemaining(timeRemaining)} remaining</>
+                          ) : (
+                            <>⏰ Expired - Light a new candle</>
+                          )}
+                        </div>
+                        {timeRemaining > 0 && (
+                          <div style={{
+                            fontSize: '12px',
+                            color: '#666',
+                            marginTop: '4px'
+                          }}>
+                            Your candle will expire in {formatTimeRemaining(timeRemaining)}
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <div className="polaroids-grid" style={{
                       display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
+                      // gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
                       gap: '12px',
-                      maxHeight: '350px',
-                      overflowY: 'auto',
                       padding: '10px',
                       marginBottom: '20px',
                       width: '100%'
@@ -221,7 +408,7 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
                           key={index}
                           className="polaroid-thumbnail"
                           style={{
-                            background: 'white',
+                            // background: 'white',
                             padding: '4px',
                             borderRadius: '2px',
                             cursor: 'pointer',
@@ -247,7 +434,7 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
                             paddingBottom: '100%',
                             position: 'relative',
                             overflow: 'hidden',
-                            backgroundColor: '#f0f0f0'
+                            // backgroundColor: '#f0f0f0'
                           }}>
                             <img 
                               src={polaroid.url} 
@@ -263,7 +450,7 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
                             />
                           </div>
                           <div style={{
-                            fontSize: '9px',
+                            fontSize: '16px',
                             textAlign: 'center',
                             marginTop: '4px',
                             color: '#666',
@@ -272,7 +459,7 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
                             {polaroid.burnedAmount} RL80
                           </div>
                           <div style={{
-                            fontSize: '7px',
+                            fontSize: '16px',
                             textAlign: 'center',
                             color: '#999',
                             marginTop: '2px'
@@ -282,22 +469,6 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
                         </div>
                       ))}
                     </div>
-                    <button 
-                      className="action-button"
-                      style={{ 
-                        marginTop: '20px',
-                        width: '100%',
-                        opacity: 0.7
-                      }}
-                      onClick={() => {
-                        if (confirm('Clear all saved polaroids?')) {
-                          localStorage.removeItem('userPolaroids');
-                          setUserPolaroids([]);
-                        }
-                      }}
-                    >
-                      Clear All
-                    </button>
                   </>
                 ) : (
                   <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa', width: '100%' }}>
@@ -370,6 +541,11 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
 
       <style jsx>{`
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&display=swap');
+        
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
         .modal-overlay {
           position: fixed;
           top: 0;

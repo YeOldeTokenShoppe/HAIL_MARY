@@ -131,6 +131,46 @@ function basicAnalysis(text) {
   };
 }
 
+// Generate AI summary of prayer themes and sentiment
+export async function generatePrayerSummary(prayers, apiKey) {
+  try {
+    const openai = new OpenAI({ apiKey });
+    
+    // Get a sample of prayers for summary (limit to avoid token limits)
+    const samplePrayers = prayers.slice(0, 20).map(p => p.message || p.text || p);
+    
+    const prompt = `Analyze these recent prayers to 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙 and write a 2-3 sentence summary of the congregation's spiritual temperature and common themes.
+
+Recent prayers:
+${samplePrayers.map((p, i) => `${i + 1}. "${p}"`).join('\n')}
+
+Write a summary that captures:
+- Overall mood/sentiment of the traders/congregation
+- Common themes or concerns
+- Spiritual atmosphere
+
+Keep it mystical and trading-themed. Respond with ONLY the summary text, no additional formatting.`;
+
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-3.5-turbo',
+      messages: [
+        { 
+          role: 'system', 
+          content: 'You are a mystical analyst of trader prayers to Our Lady of Perpetual Profit. Write poetic but insightful summaries of the congregation\'s spiritual state.'
+        },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.7,
+      max_tokens: 150,
+    });
+
+    return completion.choices[0].message.content.trim();
+  } catch (error) {
+    console.error('Summary generation failed:', error);
+    return null;
+  }
+}
+
 // Analyze multiple prayers and aggregate results
 export async function analyzePrayerBatch(prayers, apiKey) {
   const analyses = [];

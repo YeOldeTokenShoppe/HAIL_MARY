@@ -266,16 +266,15 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
     triggerCandleEffect: (offering) => {
       if (effectRef.current) {
         effectRef.current.triggerEffect(offering)
-        // Immediately show on phone when effect starts
-        if (onLightCandle) {
-          onLightCandle(offering)
-        }
+        // NOTE: onLightCandle is NOT called here to prevent duplicate Prayer Received
+        // The onLightCandle callback should be called by the component that triggers this effect
+        
         // Activate ripple state to trigger purple screen and brighter aura
         setIsRippleActive(true)
         setTimeout(() => setIsRippleActive(false), 8000) // Match the justLitOffering duration
       }
     }
-  }), [onLightCandle])
+  }), [])
   const [userRotation, setUserRotation] = useState(0)
   const isDragging = useRef(false)
   const dragStart = useRef({ x: 0, rotation: 0 })
@@ -397,16 +396,11 @@ useEffect(() => {
   // Calculate real burn total from contract data
   const INITIAL_SUPPLY = 80_000_000_000 // 80 billion initial supply
   const realBurnTotal = useMemo(() => {
-    console.log('Total Supply from contract:', totalSupplyData)
-    console.log('Is Loading Supply:', isLoadingSupply)
-    
     if (totalSupplyData !== undefined && totalSupplyData !== null) {
       // Convert BigInt to number and calculate burned amount
       const currentSupply = Number(totalSupplyData / BigInt(10 ** 18)) // Convert from wei to tokens
       const burnedFromContract = INITIAL_SUPPLY - currentSupply
       
-      console.log('Current Supply:', currentSupply)
-      console.log('Burned from contract:', burnedFromContract)
       
       // Add any local offerings burns (for immediate UI feedback)
       const offeringsBurn = offerings.reduce((sum, offering) => sum + (offering.tokensBurned || 0), 0)
@@ -513,13 +507,7 @@ useEffect(() => {
     if (offerings?.length > 0 && onSelectOffering) {
       const randomIndex = Math.floor(Math.random() * offerings.length)
       const selectedOffering = offerings[randomIndex]
-      console.log('[UnifiedShrine] Candle clicked, selecting offering:', {
-        randomIndex,
-        totalOfferings: offerings.length,
-        selectedId: selectedOffering?.id,
-        selectedName: selectedOffering?.name,
-        selectedMessage: selectedOffering?.message?.substring(0, 50)
-      })
+
       onSelectOffering(selectedOffering)
     }
   }, [offerings, onSelectOffering])
@@ -999,7 +987,7 @@ useEffect(() => {
               background: activeStatsTab === 'price' ? 'rgba(212, 175, 55, 0.2)' : 'transparent',
               border: 'none',
               borderBottom: activeStatsTab === 'price' ? '2px solid #d4af37' : '2px solid transparent',
-              color: activeStatsTab === 'price' ? '#d4af37' : '#888',
+              color: activeStatsTab === 'price' ? '#d4af37' : '#ccc',
               fontSize: isMobile ? '10px' : '12px',
               fontFamily: 'monospace',
               fontWeight: activeStatsTab === 'price' ? 'bold' : 'normal',
@@ -1021,7 +1009,7 @@ useEffect(() => {
               background: activeStatsTab === 'staking' ? 'rgba(0, 245, 212, 0.2)' : 'transparent',
               border: 'none',
               borderBottom: activeStatsTab === 'staking' ? '2px solid #00f5d4' : '2px solid transparent',
-              color: activeStatsTab === 'staking' ? '#00f5d4' : '#888',
+              color: activeStatsTab === 'staking' ? '#00f5d4' : '#ccc',
               fontSize: isMobile ? '10px' : '12px',
               fontFamily: 'monospace',
               fontWeight: activeStatsTab === 'staking' ? 'bold' : 'normal',
@@ -1043,7 +1031,7 @@ useEffect(() => {
               background: activeStatsTab === 'mood' ? 'rgba(167, 139, 250, 0.2)' : 'transparent',
               border: 'none',
               borderBottom: activeStatsTab === 'mood' ? '2px solid #a78bfa' : '2px solid transparent',
-              color: activeStatsTab === 'mood' ? '#a78bfa' : '#888',
+              color: activeStatsTab === 'mood' ? '#a78bfa' : '#ccc',
               fontSize: isMobile ? '10px' : '12px',
               fontFamily: 'monospace',
               fontWeight: activeStatsTab === 'mood' ? 'bold' : 'normal',

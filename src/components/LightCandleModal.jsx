@@ -3,7 +3,7 @@
 import React, { useState, useEffect, lazy, Suspense, useRef, useMemo } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useWalletAuth } from './WalletAuthProvider';
-import { db, collection, addDoc, updateDoc, doc, serverTimestamp, storage, ref, uploadBytes, getDownloadURL } from '@/lib/firebaseClient';
+import { db, collection, addDoc, updateDoc, doc, serverTimestamp, storage, ref, uploadBytes, getDownloadURL, query, where, getDocs, deleteDoc } from '@/lib/firebaseClient';
 import ThirdwebBuyModal from './ThirdwebBuyModal';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, useGLTF } from '@react-three/drei';
@@ -218,6 +218,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
 
   // Function to handle actions after successful burn
   const handlePostBurnActions = async () => {
+    console.log('🔥 POST-BURN ACTIONS CALLED - This should only happen AFTER successful transaction!');
     try {
       // Prepare offering data
       const baseOffering = {
@@ -249,15 +250,82 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
         newOffering.customImage = uploadedImage;
       }
       
+      console.log('🎬 Triggering candle animation and Prayer Received');
       // Trigger the effect immediately (this will show "Prayer Received")
       await onLightCandle(newOffering);
       
+      console.log('⏱️ Waiting for Prayer Received animation to complete');
       // Wait for the "Prayer Received" animation to show (1.5 seconds)
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       // NOW save to Firestore after the animation
+      // First, check for existing active offering for this wallet
+      const EXPIRATION_HOURS = 80;
+      const EXPIRATION_MS = EXPIRATION_HOURS * 60 * 60 * 1000; // 80 hours in milliseconds
+      
       let docRef = null;
       try {
+        console.log('🕐 Checking for existing offerings for wallet:', walletAddress);
+        console.log('🔐 Current user auth:', {
+          userId: user?.id,
+          isAuthenticated: !!user,
+          email: user?.primaryEmailAddress?.emailAddress
+        });
+        
+        // Query for existing offerings from this wallet
+        const existingQuery = query(
+          collection(db, 'offerings'),
+          where('walletAddress', '==', walletAddress)
+        );
+        
+        const existingSnapshot = await getDocs(existingQuery);
+        console.log('📊 Found existing offerings:', existingSnapshot.size);
+        
+        // Delete ALL existing offerings for this wallet (expired and active)
+        // New candle will replace any existing ones and restart the timer
+        const now = new Date();
+        const allOfferingsToDelete = [];
+        
+        existingSnapshot.forEach((docSnapshot) => {
+          const data = docSnapshot.data();
+          const createdAt = data.createdAt?.toDate?.() || new Date(data.timestamp);
+          const ageMs = now.getTime() - createdAt.getTime();
+          
+          console.log('🔍 Existing offering:', {
+            id: docSnapshot.id,
+            ageHours: Math.round(ageMs / (1000 * 60 * 60)),
+            willBeReplaced: true,
+            offeringUserId: data.userId,
+            currentUserId: user?.id,
+            userIdsMatch: data.userId === user?.id
+          });
+          
+          allOfferingsToDelete.push(docSnapshot.id);
+        });
+        
+        // Clean up ALL existing offerings (replacement model)
+        if (allOfferingsToDelete.length > 0) {
+          console.log('🔄 Attempting to replace existing offerings:', allOfferingsToDelete);
+          for (const offeringId of allOfferingsToDelete) {
+            try {
+              console.log('🗑️ Attempting to delete offering:', offeringId);
+              await deleteDoc(doc(db, 'offerings', offeringId));
+              console.log('✅ Successfully deleted existing offering:', offeringId);
+            } catch (deleteError) {
+              console.error('❌ Failed to delete existing offering:', offeringId, deleteError);
+              console.error('❌ Error details:', {
+                code: deleteError.code,
+                message: deleteError.message,
+                name: deleteError.name
+              });
+              // Continue with other deletions even if one fails
+            }
+          }
+          console.log('🕯️ Deletion attempts completed');
+        }
+        
+        // Now create the new offering
+        console.log('✨ Creating new offering for wallet:', walletAddress);
         docRef = await addDoc(collection(db, 'offerings'), baseOffering);
         baseOffering.id = docRef.id;
         
@@ -267,6 +335,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
         }
       } catch (firestoreError) {
         console.error('Error saving to Firestore:', firestoreError);
+        // Log error but continue - don't block the user experience
       }
 
       // The illumin80 page will handle snapshot capture independently
@@ -483,7 +552,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           padding: 2rem;
           width: 90%;
           max-width: 500px;
-          height: auto;
+          height: 85vh;
           max-height: 85vh;
           overflow: hidden;
           position: relative;
@@ -491,6 +560,40 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           display: flex;
           flex-direction: column;
           box-shadow: 0 20px 60px rgba(139, 92, 246, 0.3);
+        }
+        
+        /* Desktop scaling - keep modal reasonable size */
+        @media (min-width: 1200px) and (min-height: 800px) {
+          .modal-content {
+            max-width: 550px;
+            height: 90vh;
+            max-height: 90vh;
+          }
+        }
+        
+        @media (min-width: 1600px) and (min-height: 900px) {
+          .modal-content {
+            max-width: 600px;
+            height: 90vh;
+            max-height: 90vh;
+          }
+        }
+        
+        /* Height-based media queries */
+        @media (max-height: 800px) {
+          .modal-content {
+            height: 90vh;
+            max-height: 90vh;
+            padding: 1.5rem;
+          }
+        }
+        
+        @media (max-height: 700px) {
+          .modal-content {
+            height: 95vh;
+            max-height: 95vh;
+            padding: 1rem;
+          }
         }
 
         .close-button {
@@ -599,7 +702,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           border: 1px solid rgba(255, 255, 255, 0.1);
           border-radius: 12px;
           color: #fff;
-          font-size: 0.6rem;
+          font-size: 0.7rem;
           resize: none;
           transition: all 0.3s;
         }
@@ -1098,7 +1201,22 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
               </div>
             )}
             
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'auto' }}>
+            <form onSubmit={handleSubmit} style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              flex: 1, 
+              minHeight: 0,
+              overflow: 'hidden' 
+            }}>
+            {/* Scrollable content area */}
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              paddingRight: '0.5rem',
+              marginRight: '-0.5rem',
+              minHeight: 0
+            }}>
             
             {/* Offering Type Selection */}
             <label className="form-label" style={{ textAlign: 'center', marginBottom: '0.5rem' }}>
@@ -1385,9 +1503,14 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                 </div>
               )}
             </div>
+            </div>
 
-            </form>
-            
+            {/* Button Container - Sticky at bottom */}
+            <div style={{
+              marginTop: 'auto',
+              paddingTop: '1rem',
+              flexShrink: 0
+            }}>
             {/* Submit Button - Light Candle with token burn */}
             <button
               onClick={async () => {
@@ -1423,6 +1546,8 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
             >
               {isSubmitting ? 'Processing...' : 'Light Candle'}
             </button>
+            </div>
+            </form>
             
           </div>
         ) : null}

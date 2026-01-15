@@ -59,8 +59,6 @@ function getModelPath(userData, includeBox = false) {
 
 // Scene component for both candles and tattoos
 const CandleScene = React.memo(({ userData, onReady }) => {
-  // Debug logging - commented out to reduce console noise
-  // console.log('[Snapshot] userData - has image:', !!userData?.image, 'candleType:', userData?.candleType);
   
   const modelPath = getModelPath(userData, false);
   
@@ -120,15 +118,10 @@ const CandleScene = React.memo(({ userData, onReady }) => {
       candleRef.current.add(clonedScene);
     }
     
-    // Apply animation for tattoo characters (if not T-pose)
-    console.log('[Snapshot] Checking animation - devotionType:', userData?.devotionType, 'selectedPose:', userData?.selectedPose);
-    console.log('[Snapshot] Animations object:', animations);
-    console.log('[Snapshot] Number of animations:', animations?.length);
+
     
     // Simplified condition for debugging
     if (userData?.devotionType === 'tattoo') {
-      console.log('[Snapshot] Tattoo detected, will try to apply pose:', userData?.selectedPose);
-      console.log('[Snapshot] Available animations:', animations?.map(a => a.name));
       
       // Handle skateboard, platform, and dumbell visibility
       if (clonedScene) {
@@ -627,19 +620,7 @@ export default function CandleSnapshotRenderer({
   const canvasRef = useRef();
   const hasUploadedRef = useRef(false); // Prevent duplicate uploads
   
-  // Log when component mounts
-  useEffect(() => {
-    console.log(`[CandleSnapshotRenderer-${renderInstanceId.current}] Component mounted with props:`, {
-      isVisible,
-      userData,
-      preloadOnly,
-      instantCapture,
-      saveToFirebase
-    });
-    return () => {
-      console.log(`[CandleSnapshotRenderer-${renderInstanceId.current}] Component unmounting`);
-    };
-  }, []);
+
   
   useEffect(() => {
     // Update loading message based on devotion type
@@ -651,7 +632,6 @@ export default function CandleSnapshotRenderer({
   }, [userData?.devotionType]);
 
   useEffect(() => {
-    console.log(`[CandleSnapshotRenderer] State check - sceneReady: ${sceneReady}, isVisible: ${isVisible}, preloadOnly: ${preloadOnly}`);
     if (sceneReady && isVisible) {
       if (preloadOnly && onReady) {
         onReady();
@@ -659,7 +639,6 @@ export default function CandleSnapshotRenderer({
       }
       
       if (instantCapture) {
-        console.log('[CandleSnapshotRenderer] Instant capture mode - triggering snapshot');
         setShowLoading(false);
         setTriggerSnapshot(true);
         return;
@@ -668,9 +647,7 @@ export default function CandleSnapshotRenderer({
       // Update message when scene is ready
       setLoadingMessage('Creating your snapshot...');
       
-      console.log('[CandleSnapshotRenderer] Setting timer to trigger snapshot in 1.5s');
       const timer = setTimeout(() => {
-        console.log('[CandleSnapshotRenderer] Timer fired - triggering snapshot');
         setShowLoading(false);
         setTriggerSnapshot(true);
       }, 1500);
@@ -680,39 +657,24 @@ export default function CandleSnapshotRenderer({
   }, [sceneReady, isVisible, preloadOnly, instantCapture, onReady]);
   
   const handleSceneReady = () => {
-    console.log('[CandleSnapshotRenderer] Scene ready - calling setSceneReady(true)');
     setSceneReady(true);
   };
   
   const handleSnapshotComplete = async (imageData) => {
-    console.log(`[CandleSnapshotRenderer-${renderInstanceId.current}] handleSnapshotComplete called, imageData:`, imageData ? 'yes' : 'no', 'length:', imageData?.length);
     
     // Still call the original callback
     if (onComplete) {
-      console.log(`[CandleSnapshotRenderer-${renderInstanceId.current}] Calling onComplete callback`);
       onComplete(imageData);
     }
     
     // Upload to Firebase via API - but only once per instance
     if (saveToFirebase && imageData && !hasUploadedRef.current) {
       hasUploadedRef.current = true; // Mark as uploaded to prevent duplicates
-      console.log(`[CandleSnapshotRenderer-${renderInstanceId.current}] Starting Firebase upload`);
       try {
         // Check if this image has a background by looking at its content
         const hasBackground = imageData && imageData.length > 2000000; // Composited images are larger
-        console.log('[CandleSnapshotRenderer] Image size:', imageData?.length, 'Has background:', hasBackground);
         
-        console.log('[CandleSnapshotRenderer] Uploading to Firebase with metadata:', {
-          username: userData?.username,
-          createdBy: userData?.createdBy,
-          devotionType: userData?.devotionType,
-          background: userData?.background,
-          burnedAmount: userData?.burnedAmount,
-          tattooDesign: userData?.tattooDesign,
-          tattooCharacter: userData?.tattooCharacter,
-          candleType: userData?.candleType,
-          baseColor: userData?.baseColor,
-        });
+
         
         // Build metadata based on devotion type
         const metadata = {
@@ -733,16 +695,7 @@ export default function CandleSnapshotRenderer({
           metadata.baseColor = userData?.baseColor;
         }
         
-        console.log('[CandleSnapshotRenderer] Calling /api/upload-polaroid...');
-        const response = await fetch('/api/upload-polaroid', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageData: imageData,
-            metadata: metadata,
-          }),
-        });
-        console.log('[CandleSnapshotRenderer] Upload response status:', response.status);
+
         
         let result;
         try {
@@ -758,7 +711,6 @@ export default function CandleSnapshotRenderer({
             onFirebaseUploadComplete({ success: false, ...result });
           }
         } else if (onFirebaseUploadComplete) {
-          console.log('[CandleSnapshotRenderer] Upload succeeded:', result);
           onFirebaseUploadComplete(result);
         }
       } catch (error) {
@@ -768,7 +720,6 @@ export default function CandleSnapshotRenderer({
         }
       }
     } else if (saveToFirebase && imageData && hasUploadedRef.current) {
-      console.log(`[CandleSnapshotRenderer-${renderInstanceId.current}] Skipping duplicate Firebase upload`);
     }
   };
   

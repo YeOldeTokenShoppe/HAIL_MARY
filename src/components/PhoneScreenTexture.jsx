@@ -3,6 +3,9 @@ import * as THREE from 'three'
 import { useFrame } from '@react-three/fiber'
 import { db, collection, query, orderBy, limit, onSnapshot } from '@/lib/firebaseClient'
 
+// Global tracker to prevent duplicate Prayer Received for the same offering
+let shownPrayerForOfferings = new Set()
+
 // Component that renders the phone feed as a texture on the mesh
 export function PhoneScreenTexture({ 
   meshRef, 
@@ -14,6 +17,12 @@ export function PhoneScreenTexture({
   onManualBrowse = null, // Callback when user manually browses
   showPolaroid = false // New prop to control polaroid display
 }) {
+  // Add unique ID to track multiple instances
+  const instanceId = useRef(Math.random().toString(36).substring(7));
+  
+  useEffect(() => {
+    return () => console.log(`[PhoneScreenTexture-${instanceId.current}] Component unmounting`);
+  }, []);
   const canvasRef = useRef(document.createElement('canvas'))
   const textureRef = useRef()
   const materialRef = useRef()
@@ -372,9 +381,9 @@ export function PhoneScreenTexture({
       gradient.addColorStop(1, '#1a0525')  // Deep purple bottom
     } else {
       // Normal dark blue gradient
-      gradient.addColorStop(0, '#2525efff')  // Darker gradient
-      gradient.addColorStop(0.5, '#0c1a92ff')
-      gradient.addColorStop(1, '#2525efff')
+      gradient.addColorStop(0, '#03a700ff')  // Darker gradient
+      gradient.addColorStop(0.5, '#04495eff')
+      gradient.addColorStop(1, '#0000eeff')
     }
     ctx.fillStyle = gradient
     ctx.fillRect(0, 0, width, height)
@@ -388,7 +397,7 @@ export function PhoneScreenTexture({
     // Draw app header
     ctx.fillStyle = '#fff'
     ctx.font = 'bold 36px -apple-system, BlinkMacSystemFont, sans-serif'
-    ctx.fillText("Our Lady's Inbox", 40, 170)
+    ctx.fillText("𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙 Inbox", 40, 170)
     
     // Show prayer type badge instead of status
     if (latestPolaroid) {
@@ -465,7 +474,8 @@ export function PhoneScreenTexture({
         const now = Date.now()
         
         // Check if we're in the Prayer Received phase or showing user info
-        if (now - prayerReceivedStartTime.current < PRAYER_RECEIVED_DURATION) {
+        const timeInPhase = now - prayerReceivedStartTime.current;
+        if (timeInPhase < PRAYER_RECEIVED_DURATION) {
           // First phase: Show Prayer Received screen
           drawPrayerReceivedOnly(ctx, width, height)
         } else {
@@ -505,10 +515,9 @@ export function PhoneScreenTexture({
           polaroidLoadedRef.current = savedLoaded;
           polaroidReadyRef.current = savedReady;
         } else {
-          console.log('[PhoneScreen] 📝 Falling back to text display');
-          // No polaroid data or still loading, use regular offering display
-          displayOffering = hoveredOffering;
-          drawOffering(ctx, displayOffering, width, height, true);
+          console.log('[PhoneScreen] 📝 Polaroid not ready, skipping render');
+          // No polaroid data or still loading, don't render anything
+          return;
         }
       } else if (offerings.length > 0) {
         // Use manual index if manually browsing, otherwise auto-rotate
@@ -1225,10 +1234,44 @@ export function PhoneScreenTexture({
   }, [hoveredOffering])
   
   // Track when justLitOffering changes to start the Prayer Received animation
+  // Only show Prayer Received once per offering using a unique identifier
+  const previousJustLitOffering = useRef(null)
   useEffect(() => {
-    if (justLitOffering) {
-      prayerReceivedStartTime.current = Date.now()
+    const now = Date.now()
+    
+    // Create a unique identifier for this offering (using timestamp + username or id)
+    const offeringId = justLitOffering ? 
+      `${justLitOffering.id || justLitOffering.createdBy || justLitOffering.username}-${justLitOffering.tokensBurned}-${Math.floor(now / 60000)}` : // Round to minute to group rapid changes
+      null
+    
+    console.log(`[PhoneScreen-${instanceId.current}] 📊 justLitOffering changed:`, {
+      current: justLitOffering?.username || 'null',
+      previous: previousJustLitOffering.current?.username || 'null', 
+      offeringId,
+      alreadyShown: offeringId ? shownPrayerForOfferings.has(offeringId) : false,
+      willStartTimer: !!(justLitOffering && !previousJustLitOffering.current && offeringId && !shownPrayerForOfferings.has(offeringId)),
+      currentTime: now
+    })
+    
+    // Only start timer if:
+    // 1. We have a justLitOffering 
+    // 2. Previous was null (new offering)
+    // 3. We haven't shown Prayer Received for this specific offering yet
+    if (justLitOffering && !previousJustLitOffering.current && offeringId && !shownPrayerForOfferings.has(offeringId)) {
+      console.log(`[PhoneScreen-${instanceId.current}] 🙏 Starting Prayer Received timer for:`, justLitOffering.username || 'Anonymous', 'ID:', offeringId)
+      prayerReceivedStartTime.current = now
+      shownPrayerForOfferings.add(offeringId)
+      
+      // Clean up old offerings after 5 minutes to prevent memory leaks
+      setTimeout(() => {
+        shownPrayerForOfferings.delete(offeringId)
+        console.log(`[PhoneScreen] 🧹 Cleaned up offering ID:`, offeringId)
+      }, 5 * 60 * 1000)
+    } else if (justLitOffering && !previousJustLitOffering.current && offeringId && shownPrayerForOfferings.has(offeringId)) {
+      console.log(`[PhoneScreen-${instanceId.current}] ⏭️ Skipping Prayer Received - already shown for offering:`, offeringId)
     }
+    
+    previousJustLitOffering.current = justLitOffering
   }, [justLitOffering])
   
   // Handle manual browsing

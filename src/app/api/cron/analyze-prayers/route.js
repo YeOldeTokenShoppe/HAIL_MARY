@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { analyzePrayerBatch, aggregateAnalyses } from '@/lib/prayerAnalysis';
+import { analyzePrayerBatch, aggregateAnalyses, generatePrayerSummary } from '@/lib/prayerAnalysis';
 import { db, collection, query, orderBy, limit, getDocs } from '@/lib/firebaseServer';
 import { doc, setDoc } from 'firebase/firestore';
 
@@ -111,8 +111,16 @@ export async function GET(request) {
       }
     });
     
+    // Generate AI summary
+    const summary = await generatePrayerSummary(prayers, apiKey);
+    
     // Aggregate results
     const aggregatedStats = aggregateAnalyses(analyses);
+    
+    // Add summary to stats
+    if (summary) {
+      aggregatedStats.summary = summary;
+    }
     
     // Calculate actual prayers per hour
     aggregatedStats.prayersPerHour = recentCount;

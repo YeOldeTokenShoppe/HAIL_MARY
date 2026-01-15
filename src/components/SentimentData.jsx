@@ -70,6 +70,7 @@ export default function CongregationSentiment() {
             prayersPerHour: sentimentData.prayersPerHour || 0,
             trend: sentimentData.trend || defaultSentimentData.trend,
             keywords: sentimentData.keywords || ['no', 'data', 'yet'],
+            summary: sentimentData.summary || null,
             lastUpdate: sentimentData.lastUpdate ? 
               new Date(sentimentData.lastUpdate).toLocaleTimeString() : 'just now',
             totalAnalyzed: sentimentData.totalAnalyzed || 0,
@@ -77,7 +78,6 @@ export default function CongregationSentiment() {
           });
           setError(null);
         } else {
-          console.log('[Sentiment] No sentiment data available yet');
           setData({
             ...defaultSentimentData,
             label: 'No Analysis Yet',
@@ -125,18 +125,18 @@ export default function CongregationSentiment() {
           color: '#888',
           fontSize: '12px'
         }}>
-          Analyzing congregation prayers...
+          Analyzing trader prayers...
         </div>
       )}
 
       {/* Main Gauge */}
       <div className="gauge-container">
         <svg viewBox={isMobile ? "0 0 200 110" : "0 0 200 120"} className="gauge-svg">
-          {/* Background arc segments */}
+          {/* Background arc segments - bottom semicircle */}
           {sentimentLevels.map((level, i) => (
             <path
               key={level.label}
-              d={describeArc(100, 100, 70, -90 + (i * 36), -90 + ((i + 1) * 36))}
+              d={describeArc(100, 100, 70, 180 + (i * 36), 180 + ((i + 1) * 36))}
               fill="none"
               stroke={level.color}
               strokeWidth="16"
@@ -147,7 +147,7 @@ export default function CongregationSentiment() {
           
           {/* Active arc */}
           <path
-            d={describeArc(100, 100, 70, -90, gaugeRotation)}
+            d={describeArc(100, 100, 70, 180, gaugeRotation)}
             fill="none"
             stroke="url(#gaugeGradient)"
             strokeWidth="16"
@@ -157,7 +157,7 @@ export default function CongregationSentiment() {
           
           {/* Glow effect */}
           <path
-            d={describeArc(100, 100, 70, -90, gaugeRotation)}
+            d={describeArc(100, 100, 70, 180, gaugeRotation)}
             fill="none"
             stroke="url(#gaugeGradient)"
             strokeWidth="20"
@@ -206,7 +206,11 @@ export default function CongregationSentiment() {
             whiteSpace: 'nowrap',
             display: 'inline-block'
           }}>{data.label}</span>
-          <span className="label-value">{Math.round(data.overall * 100)}%</span>
+        </div>
+        
+        {/* Percentage in center bottom */}
+        <div className="gauge-percentage">
+          {Math.round(data.overall * 100)}%
         </div>
       </div>
 
@@ -243,7 +247,7 @@ export default function CongregationSentiment() {
       {/* Whispers - Rotating Keywords */}
       <div className="whispers-section">
         <div className="whispers-label">
-          <span className="whisper-icon">🕯</span>
+          {/* <span className="whisper-icon">🕯</span> */}
           Whispers
         </div>
         <div className="keyword-display">
@@ -260,26 +264,11 @@ export default function CongregationSentiment() {
 
       {/* Expanded content - always visible in tab view */}
       <div className="expanded-content">
-          {/* Emotion Breakdown */}
-          <div className="emotions-section">
-            <span className="section-label">Prayer Themes</span>
-            <div className="emotion-bars">
-              {data.emotions.map(emotion => (
-                <div key={emotion.name} className="emotion-row">
-                  <span className="emotion-name">{emotion.name}</span>
-                  <div className="emotion-bar-bg">
-                    <div 
-                      className="emotion-bar-fill"
-                      style={{ 
-                        width: `${emotion.value}%`,
-                        backgroundColor: emotion.color,
-                        boxShadow: `0 0 10px ${emotion.color}80`
-                      }}
-                    />
-                  </div>
-                  <span className="emotion-value">{emotion.value}%</span>
-                </div>
-              ))}
+          {/* AI Summary */}
+          <div className="summary-section">
+            <span className="section-label">Trader Pulse</span>
+            <div className="summary-text">
+              {data.summary || "The AI is analyzing recent prayers and messages to 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙 to understand the spiritual temperature of the traders. Patterns in hope, gratitude, and requests are being processed..."}
             </div>
           </div>
 
@@ -327,7 +316,7 @@ export default function CongregationSentiment() {
           align-items: center;
           margin-bottom: 10px;
           height: 110px;
-          overflow: hidden;
+
         }
         
         @media (max-width: 768px) {
@@ -366,15 +355,33 @@ export default function CongregationSentiment() {
           margin-top: 0;
           margin-bottom: 5px;
           position: absolute;
-          bottom: 5px;
+          bottom: -25px;
           left: 0;
           right: 0;
         }
         
         @media (max-width: 768px) {
           .sentiment-label {
-            bottom: 0;
+            bottom: 20px;
             margin-bottom: 2px;
+          }
+        }
+
+        .gauge-percentage {
+          position: absolute;
+          bottom: 5px;
+          left: 50%;
+          transform: translateX(-50%);
+          font-size: 16px;
+          font-weight: bold;
+          color: #fff;
+          text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+        
+        @media (max-width: 768px) {
+          .gauge-percentage {
+            bottom: 2px;
+            font-size: 14px;
           }
         }
 
@@ -527,68 +534,33 @@ export default function CongregationSentiment() {
           }
         }
 
-        .emotion-bars {
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
+        .summary-section {
+          margin-bottom: 12px;
         }
         
         @media (max-width: 768px) {
-          .emotion-bars {
-            gap: 3px;
+          .summary-section {
+            margin-bottom: 8px;
           }
         }
 
-        .emotion-row {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        }
-        
-        @media (max-width: 768px) {
-          .emotion-row {
-            gap: 4px;
-          }
-        }
-
-        .emotion-name {
-          font-size: 10px;
-          width: 60px;
+        .summary-text {
+          font-size: 11px;
+          line-height: 1.4;
           color: #ccc;
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 6px;
+          padding: 8px;
+          border-left: 3px solid #a78bfa;
+          font-style: italic;
         }
         
         @media (max-width: 768px) {
-          .emotion-name {
-            font-size: 9px;
-            width: 50px;
+          .summary-text {
+            font-size: 10px;
+            line-height: 1.3;
+            padding: 6px;
           }
-        }
-
-        .emotion-bar-bg {
-          flex: 1;
-          height: 5px;
-          background: rgba(0, 0, 0, 0.4);
-          border-radius: 3px;
-          overflow: hidden;
-        }
-        
-        @media (max-width: 768px) {
-          .emotion-bar-bg {
-            height: 4px;
-          }
-        }
-
-        .emotion-bar-fill {
-          height: 100%;
-          border-radius: 3px;
-          transition: width 0.8s ease-out;
-        }
-
-        .emotion-value {
-          font-size: 10px;
-          width: 30px;
-          text-align: right;
-          color: #888;
         }
 
         .stats-row {

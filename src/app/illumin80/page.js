@@ -66,7 +66,17 @@ export default function ShrinePage() {
   
   // State for offerings data
   const [hoveredOffering, setHoveredOffering] = useState(null)
-  const [justLitOffering, setJustLitOffering] = useState(null)
+  const [justLitOffering, setJustLitOfferingOriginal] = useState(null)
+  
+  // Wrap setJustLitOffering to log ALL calls
+  const setJustLitOffering = (offering) => {
+    console.log('🚨 [ALL CALLS] setJustLitOffering called with:', {
+      offering: offering?.username || offering,
+      timestamp: Date.now(),
+      stack: new Error().stack?.split('\n')[2]?.trim()
+    })
+    setJustLitOfferingOriginal(offering)
+  }
   const [priceChange, setPriceChange] = useState(0)
   const [offerings, setOfferings] = useState([])
   const [totalOfferingsCount, setTotalOfferingsCount] = useState(0)
@@ -405,6 +415,11 @@ useEffect(() => {
 
   // Handle light candle from modal
   const handleLightCandle = async (newOffering) => {
+    console.log('🚀 [HANDLE LIGHT CANDLE] Starting handleLightCandle with offering:', {
+      offering: newOffering?.username || 'Anonymous',
+      timestamp: Date.now()
+    })
+    
     // Immediately close the modal and set processing flags
     setShowLightCandleModal(false);
     setIsProcessingCandle(true);
@@ -420,9 +435,9 @@ useEffect(() => {
     
     // Map offering types to background images
     const backgroundMap = {
-      petition: 'aurora',      // Hopeful, asking for guidance
-      confession: 'cyberpunk', // Darker, introspective
-      appreciation: 'sunset'    // Warm, grateful
+      petition: 'tradingView',      // Hopeful, asking for guidance
+      confession: 'sunset', // Darker, introspective
+      appreciation: 'chart'    // Warm, grateful
     };
     
     // Trigger snapshot capture with the offering data
@@ -503,7 +518,11 @@ useEffect(() => {
       }, 1000); // 3 seconds - shows shortly after candle lands
     };
     
-    // Trigger the candle launch animation (this will also show on phone via onLightCandle callback)
+    // Trigger the candle launch animation
+    console.log('🎨 [TRIGGER EFFECT] Calling triggerCandleEffect with offering:', {
+      offering: newOffering?.username || 'Anonymous', 
+      timestamp: Date.now()
+    })
     if (unifiedShrineRef.current) {
       unifiedShrineRef.current.triggerCandleEffect(newOffering)
     }
@@ -590,14 +609,25 @@ useEffect(() => {
             totalOfferingsCount={totalOfferingsCount}
             onSelectOffering={setHoveredOffering}
             onLightCandle={(offering) => {
+              console.log('🔥 [SHRINE CALLBACK] setJustLitOffering called from UnifiedShrine onLightCandle:', {
+                offering: offering?.username || 'Anonymous',
+                timestamp: Date.now(),
+                stack: new Error().stack?.split('\n')[1]?.trim()
+              })
               setJustLitOffering(offering)
-              setTimeout(() => setJustLitOffering(null), 8000) // 1.5s for Prayer Received + 6.5s for user info
+              setTimeout(() => {
+                console.log('⏰ [TIMEOUT] setJustLitOffering(null) called after 8000ms')
+                setJustLitOffering(null)
+              }, 8000) // 1.5s for Prayer Received + 6.5s for user info
             }}
             onPriceChange={setPriceChange}
             is80sMode={is80sMode}
             hoveredOffering={hoveredOffering}
             justLitOffering={justLitOffering}
-            onJustLitComplete={() => setJustLitOffering(null)}
+            onJustLitComplete={() => {
+              console.log('✅ [COMPLETE CALLBACK] setJustLitOffering(null) called from onJustLitComplete')
+              setJustLitOffering(null)
+            }}
             user={user}
           />
         ) : null}
@@ -1369,6 +1399,10 @@ useEffect(() => {
           setShowAuthMessage(null);
         }}
         onLightCandle={(offering) => {
+          console.log('💡 [MODAL CALLBACK] setJustLitOffering will be called from LightCandleModal onLightCandle:', {
+            offering: offering?.username || 'Anonymous',
+            timestamp: Date.now()
+          })
           // Close modal immediately when Light Candle is clicked
           setShowLightCandleModal(false);
           handleLightCandle(offering);

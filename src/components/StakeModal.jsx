@@ -151,14 +151,12 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
           background-origin: border-box;
           background-clip: padding-box, border-box;
           border-radius: 20px;
-          padding: 1.5rem;
-          padding-bottom: 2rem;
+          padding: 1rem;
+          padding-bottom: 1.25rem;
           width: 90%;
-          max-width: 500px;
+          max-width: 30vw;
           height: auto;
-          max-height: 85vh;
-          overflow-y: auto;
-          overflow-x: hidden;
+         
           position: relative;
           animation: fadeIn 0.4s ease-out;
           display: flex;
@@ -169,29 +167,26 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
         /* Desktop scaling - keep modal reasonable size */
         @media (min-width: 1200px) and (min-height: 800px) {
           .modal-content {
-            max-width: 550px;
-            max-height: 90vh;
+     
           }
         }
         
         @media (min-width: 1600px) and (min-height: 900px) {
           .modal-content {
-            max-width: 600px;
-            max-height: 90vh;
+    
           }
         }
         
         /* Height-based media queries */
         @media (max-height: 800px) {
           .modal-content {
-            max-height: 90vh;
-            padding: 1rem;
+ 
           }
         }
         
         @media (max-height: 700px) {
           .modal-content {
-            max-height: 95vh;
+     
           }
         }
 
@@ -727,16 +722,15 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
             {/* Decorative Image with Title Overlay */}
             <div style={{
               width: '100%',
-              height: window.innerHeight < 700 ? '12rem' : 
-                      window.innerHeight < 800 ? '16rem' : 
-                      window.innerHeight < 900 ? '18rem' : '20rem',
-              marginBottom: '1rem',
+              height: '22rem',
+              marginBottom: '0.5rem',
               borderRadius: '12px',
               overflow: 'hidden',
               position: 'relative',
               background: 'linear-gradient(180deg, rgba(20,20,30,0) 0%, rgba(20,20,30,0.9) 100%)',
               flexShrink: 0,
             }}>
+        
               <img 
                 src="/carousel_images/img13.jpg" 
                 alt="Stake" 
@@ -747,6 +741,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                   opacity: 0.7,
                 }}
               />
+  
               <div style={{
                 position: 'absolute',
                 bottom: 0,
@@ -827,7 +822,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
               }}>
                 <div style={{
                   fontSize: '1.5rem',
-                  marginBottom: '0.5rem',
+                  marginBottom: '3.5rem',
                   animation: transactionStatus === 'confirming' ? 'spin 2s linear infinite' : 'none'
                 }}>
                   {transactionStatus === 'signing' ? '✍️' : '⏳'}
@@ -856,8 +851,8 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
             {/* Compact Info Toggle Button */}
             <div style={{ 
               textAlign: 'right', 
-              marginBottom: '0.5rem',
-              marginTop: '-0.5rem'
+              marginBottom: '0.25rem',
+              marginTop: '-0.75rem'
             }}>
               <button
                 type="button"
@@ -907,50 +902,72 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
               </div>
             )}
             
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-              {/* Compact Lock Period Display */}
+            <form onSubmit={handleSubmit} style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              flex: 1, 
+              minHeight: 0,
+              overflow: 'hidden' 
+            }}>
+              {/* Scrollable content area */}
               <div style={{
-                background: 'rgba(255, 215, 0, 0.03)',
-                border: '1px solid rgba(255, 215, 0, 0.2)',
-                borderRadius: '8px',
-                padding: '0.75rem',
-                marginBottom: '1rem',
+                flex: 1,
+                overflowY: 'auto',
+                overflowX: 'hidden',
+                paddingRight: '0.5rem',
+                marginRight: '-0.5rem',
+                minHeight: 0
+              }}>
+              {/* Compact Lock Period Display - Info Banner Style */}
+              <div style={{
+                background: 'linear-gradient(90deg, rgba(0, 245, 212, 0.05), rgba(0, 187, 255, 0.05))',
+                border: 'none',
+                borderLeft: '3px solid #00f5d4',
+                borderRadius: '4px',
+                padding: '0.5rem 0.75rem',
+                marginBottom: '0.5rem',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 gap: '1rem'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   <span style={{ 
-                    background: '#1a1a2a',
-                    padding: '2px 8px',
-                    borderRadius: '6px',
-                    border: '1px solid rgba(255, 215, 0, 0.3)',
-                    fontSize: '0.6rem',
+                    fontSize: '0.65rem',
                     color: '#00f5d4',
-                    fontWeight: '600'
+                    fontWeight: '600',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px'
                   }}>
-                    TESTNET
+                    🔐 Testnet Mode
                   </span>
                   <span style={{ 
-                    color: '#fff', 
-                    fontSize: '0.85rem',
-                    fontWeight: '500'
+                    color: 'rgba(255, 255, 255, 0.7)', 
+                    fontSize: '0.75rem'
                   }}>
-                    10 min lock
+                    •
+                  </span>
+                  <span style={{ 
+                    color: 'rgba(255, 255, 255, 0.7)', 
+                    fontSize: '0.75rem'
+                  }}>
+                    10 minute lock period
                   </span>
                 </div>
                 <div style={{ 
                   color: '#00ff66', 
-                  fontSize: '0.85rem',
-                  fontWeight: '500'
+                  fontSize: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.3rem'
                 }}>
+                  <span>💰</span>
                   ETH Rewards
                 </div>
               </div>
 
               {/* Stake Amount Input */}
-              <div className="form-group">
+              <div className="form-group" style={{ marginBottom: '0.5rem', maxHeight: '8rem' }}>
                 <label className="form-label" htmlFor="stakeAmount">
                   Amount to Stake
                 </label>
@@ -986,8 +1003,8 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                   background: 'rgba(255, 215, 0, 0.03)',
                   border: '1px solid rgba(255, 215, 0, 0.2)',
                   borderRadius: '8px',
-                  padding: '0.5rem',
-                  marginBottom: '0.75rem',
+                  padding: '0.35rem 0.5rem',
+                  marginBottom: '0.4rem',
                   fontSize: '0.75rem',
                   color: 'rgba(255, 255, 255, 0.8)',
                 }}>
@@ -1008,103 +1025,42 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                   </div>
                 </div>
               )}
+              </div>
 
-              {/* Approve Button - First step */}
+              {/* Button Container - Sticky at bottom */}
+              <div style={{
+                // marginTop: 'auto',
+                paddingTop: '0.5rem',
+                flexShrink: 0
+              }}>
+              {/* Single Stake Button - handles approval automatically */}
               {activeAccount?.sendTransaction ? (
-                // Test wallet - handle approve directly
+                // Test wallet - handle approve and stake in one flow
                 <button
                   onClick={async () => {
                     try {
                       setIsSubmitting(true);
+                      setTransactionStatus('signing');
                       const amountInWei = toWei(stakeAmount || "0");
-                      console.log("Test wallet approving amount:", amountInWei.toString());
+                      console.log("Test wallet staking amount:", amountInWei.toString());
                       
+                      // First approve the tokens
+                      console.log("Approving tokens...");
                       const approveTx = approve({
                         contract: erc20Contract,
                         spender: stakingContract.address,
                         amount: amountInWei,
                       });
                       
-                      const result = await sendAndConfirmTransaction({
+                      await sendAndConfirmTransaction({
                         transaction: approveTx,
                         account: activeAccount
                       });
                       
-                      console.log("Approval confirmed!");
-                      alert("Approval successful! You can now stake your tokens.");
-                      setIsSubmitting(false);
-                    } catch (error) {
-                      console.error("Approval failed:", error);
-                      alert("Failed to approve tokens: " + (error?.message || 'Unknown error'));
-                      setIsSubmitting(false);
-                    }
-                  }}
-                  disabled={!stakeAmount || parseInt(stakeAmount) < 1 || isSubmitting}
-                  style={{
-                    width: '100%',
-                    padding: '0.875rem',
-                    background: isSubmitting ? 'gray' : 'linear-gradient(135deg, #ff9500, #ff6200)',
-                    border: 'none',
-                    borderRadius: '50px',
-                    color: '#000',
-                    fontSize: '0.9rem',
-                    fontWeight: '600',
-                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                    marginBottom: '0.5rem',
-                  }}
-                >
-                  {isSubmitting ? 'Approving...' : `Step 1: Approve ${stakeAmount || '0'} RL80`}
-                </button>
-              ) : (
-                // Regular wallet - use TransactionButton
-                <TransactionButton
-                    transaction={() => {
-                      const amountInWei = toWei(stakeAmount || "0");
-                      console.log("Approving amount:", amountInWei.toString());
-                      console.log("Spender:", stakingContract.address);
-                      
-                      return approve({
-                        contract: erc20Contract,
-                        spender: stakingContract.address,
-                        amount: amountInWei,
-                      });
-                    }}
-                    onTransactionConfirmed={() => {
-                      console.log("Approval confirmed!");
-                      alert("Approval successful! You can now stake your tokens.");
-                    }}
-                    onError={(error) => {
-                      console.error("Approval failed:", error);
-                    }}
-                    disabled={!stakeAmount || parseInt(stakeAmount) < 1}
-                    style={{
-                      width: '100%',
-                      padding: '0.875rem',
-                      background: 'linear-gradient(135deg, #ff9500, #ff6200)',
-                      border: 'none',
-                      borderRadius: '50px',
-                      color: '#000',
-                      fontSize: '0.9rem',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      marginBottom: '0.5rem',
-                    }}
-                  >
-                    Step 1: Approve {stakeAmount || '0'} RL80
-                </TransactionButton>
-              )}
-
-              {/* Stake Button - Second step */}
-              {activeAccount?.sendTransaction ? (
-                // Test wallet - handle stake directly
-                <button
-                  onClick={async () => {
-                    try {
-                      setIsSubmitting(true);
+                      console.log("Approval confirmed, now staking...");
                       setTransactionStatus('confirming');
-                      const amountInWei = toWei(stakeAmount || "0");
-                      console.log("Test wallet staking amount:", amountInWei.toString());
                       
+                      // Then stake the tokens
                       const stakeTx = prepareContractCall({
                         contract: stakingContract,
                         method: "stake",
@@ -1169,7 +1125,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                       setTransactionStatus('');
                       if (error.message?.includes('insufficient')) {
                         alert('Insufficient tokens or gas. Please check your balance.');
-                      } else {
+                      } else if (!error.message?.includes('User rejected') && !error.message?.includes('User denied')) {
                         alert('Failed to stake tokens: ' + (error?.message || 'Unknown error'));
                       }
                       setIsSubmitting(false);
@@ -1180,19 +1136,21 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                   style={{
                     width: '100%',
                     padding: '0.875rem',
-                    background: isSubmitting ? 'gray' : 'linear-gradient(135deg, #8b5cf6, #ec4899)',
+                    background: isSubmitting ? 'gray' : 'linear-gradient(135deg, #00f5d4, #00bbff)',
                     border: 'none',
                     borderRadius: '50px',
-                    color: '#fff',
+                    color: '#000',
                     fontSize: '0.9rem',
                     fontWeight: '600',
                     cursor: isSubmitting ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  {transactionStatus === 'confirming' ? 'Confirming...' : `Step 2: Stake ${stakeAmount || '0'} RL80`}
+                  {transactionStatus === 'signing' ? 'Approving...' : 
+                   transactionStatus === 'confirming' ? 'Staking...' : 
+                   `Stake ${stakeAmount || '0'} RL80`}
                 </button>
               ) : (
-                // Regular wallet - use TransactionButton
+                // Regular wallet - use TransactionButton with automatic approval
                 <TransactionButton
                   transaction={() => {
                     const amountInWei = toWei(stakeAmount || "0");
@@ -1211,6 +1169,17 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                     
                     console.log("Prepared transaction:", tx);
                     return tx;
+                  }}
+                  getApprovalForTransaction={async (tx) => {
+                    // This will automatically handle approval if needed
+                    const amountInWei = toWei(stakeAmount || "0");
+                    console.log("Getting approval for amount:", amountInWei.toString());
+                    
+                    return approve({
+                      contract: erc20Contract,
+                      spender: stakingContract.address,
+                      amount: amountInWei,
+                    });
                   }}
                   onTransactionSent={() => {
                     console.log("Stake transaction sent!");
@@ -1276,10 +1245,23 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                   }}
                   disabled={!stakeAmount || parseInt(stakeAmount) < 1}
                   className="submit-button"
+                  style={{
+                    width: '100%',
+                    padding: '0.875rem',
+                    background: 'linear-gradient(135deg, #00f5d4, #00bbff)',
+                    border: 'none',
+                    borderRadius: '50px',
+                    color: '#000',
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s'
+                  }}
                 >
-                  {transactionStatus === 'confirming' ? 'Confirming...' : `Step 2: Stake ${stakeAmount || '0'} RL80`}
+                  {transactionStatus === 'confirming' ? 'Processing...' : `Stake ${stakeAmount || '0'} RL80`}
                 </TransactionButton>
               )}
+              </div>
               </form>
               
           </div>

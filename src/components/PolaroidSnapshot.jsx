@@ -12,10 +12,8 @@ const PolaroidSnapshot = ({
 }) => {
   const instanceId = React.useRef(Math.random().toString(36).substring(7));
   React.useEffect(() => {
-    console.log(`[PolaroidSnapshot-${instanceId.current}] Mounted with backgroundImage:`, backgroundImage);
   }, []);
   React.useEffect(() => {
-    console.log(`[PolaroidSnapshot-${instanceId.current}] backgroundImage changed to:`, backgroundImage);
   }, [backgroundImage]);
   const [isVisible, setIsVisible] = useState(false);
   const [imageUrl, setImageUrl] = useState(null);
@@ -26,9 +24,7 @@ const PolaroidSnapshot = ({
   const polaroidRef = useRef(null);
 
   useEffect(() => {
-    console.log(`[PolaroidSnapshot-${instanceId.current}] Trigger changed to:`, trigger);
     if (trigger) {
-      console.log(`[PolaroidSnapshot-${instanceId.current}] Trigger is true - calling captureSnapshot()`);
       captureSnapshot();
     }
   }, [trigger]);
@@ -50,13 +46,19 @@ const PolaroidSnapshot = ({
           return;
         }
         
+        
         // Find the canvas - either the element itself or a canvas inside it
         const canvas = element.tagName === 'CANVAS' ? element : element.querySelector('canvas');
         
         if (!canvas) {
           console.error(`No canvas found in element with id "${captureElementId}"`);
+          // List all canvases for debugging
+          const allCanvases = document.querySelectorAll('canvas');
+          allCanvases.forEach((c, i) => {
+          });
           return;
         }
+        
         
         try {
           // Just capture the canvas directly
@@ -83,15 +85,12 @@ const PolaroidSnapshot = ({
       
       // Don't try to get WebGL context - it will conflict with React Three Fiber's existing context
       // Just note that we're working with a WebGL canvas
-      console.log('[PolaroidSnapshot] Processing WebGL canvas for snapshot');
       
       // If we have a background image, draw it first
       if (backgroundImage) {
-        console.log('[PolaroidSnapshot] Compositing with background:', backgroundImage);
         const bgImg = new Image();
         bgImg.crossOrigin = 'anonymous'; // Allow CORS for image loading
         bgImg.onload = () => {
-          console.log('[PolaroidSnapshot] Background loaded, compositing...');
           
           // First, capture the character from the canvas
           const characterCanvas = document.createElement('canvas');
@@ -106,15 +105,23 @@ const PolaroidSnapshot = ({
           const imageData = characterCtx.getImageData(0, 0, canvas.width, canvas.height);
           const data = imageData.data;
           
-          // Process pixels: make pure black pixels transparent
+          // Process pixels: make dark pixels and shadow artifacts transparent
           for (let i = 0; i < data.length; i += 4) {
             const r = data[i];
             const g = data[i + 1];
             const b = data[i + 2];
+            const alpha = data[i + 3];
             
-            // If pixel is very dark (near black), make it transparent
-            if (r < 10 && g < 10 && b < 10) {
+            // Calculate luminance for better shadow detection
+            const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
+            
+            // Remove dark pixels, shadows, and low-contrast artifacts
+            if (luminance < 25 || (r < 30 && g < 30 && b < 30)) {
               data[i + 3] = 0; // Set alpha to 0 (transparent)
+            }
+            // Also remove pixels that are very close to the background color (soft shadows)
+            else if (Math.abs(r - g) < 10 && Math.abs(g - b) < 10 && Math.abs(r - b) < 10 && luminance < 50) {
+              data[i + 3] = 0; // Remove grayish shadow artifacts
             }
           }
           
@@ -137,8 +144,6 @@ const PolaroidSnapshot = ({
             
             // Convert to data URL with high quality after logo is added
             const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
-            console.log('[PolaroidSnapshot] Composite image created with background and logo, length:', dataUrl.length);
-            console.log('[PolaroidSnapshot] Background was:', backgroundImage);
             
             if (dataUrl) {
               setImageUrl(dataUrl);
@@ -154,7 +159,6 @@ const PolaroidSnapshot = ({
             console.error('[PolaroidSnapshot] Failed to load logo:', err);
             // Still create image without logo
             const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
-            console.log('[PolaroidSnapshot] Composite image created with background (no logo), length:', dataUrl.length);
             
             if (dataUrl) {
               setImageUrl(dataUrl);
@@ -198,7 +202,6 @@ const PolaroidSnapshot = ({
           
           // Convert to data URL with high quality after logo is added
           const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
-          console.log('[PolaroidSnapshot] Image created with logo (no background), length:', dataUrl.length);
           
           if (dataUrl) {
             setImageUrl(dataUrl);
@@ -406,7 +409,6 @@ const PolaroidSnapshot = ({
       if (clonedImg) {
         // Use the composited image if we have it, otherwise use the regular image
         const srcToUse = compositedImageUrl || imageUrl;
-        console.log('[PolaroidSnapshot] Using image for polaroid, composited:', !!compositedImageUrl, 'src length:', srcToUse?.length);
         clonedImg.src = srcToUse;
         
         // Wait for the image to actually load
@@ -470,30 +472,23 @@ const PolaroidSnapshot = ({
     // For backgrounds, wait for compositedImageUrl; otherwise use imageUrl
     const requiredImage = backgroundImage ? compositedImageUrl : imageUrl;
     
-    console.log('[PolaroidSnapshot] Capture check - visible:', isVisible, 'blurred:', isBlurred, 'hasRef:', !!polaroidRef.current, 'hasCalledOnComplete:', hasCalledOnCompleteRef.current, 'hasRequired:', !!requiredImage);
     
     if (isVisible && !isBlurred && polaroidRef.current && !hasCalledOnCompleteRef.current && requiredImage) {
-      console.log('[PolaroidSnapshot] All conditions met, setting timer for capture');
       // Wait longer to ensure the composited image is ready
       const timer = setTimeout(async () => {
-        console.log('[PolaroidSnapshot] Timer fired - Starting polaroid capture for onComplete callback');
         
         // ONLY capture and call onComplete if we have the right image
         if (backgroundImage && !compositedImageUrl) {
-          console.log('[PolaroidSnapshot] Skipping capture - waiting for composite');
           return; // Don't capture yet
         }
         
         const capturedUrl = await capturePolaroid();
-        console.log('[PolaroidSnapshot] capturePolaroid returned:', capturedUrl ? 'URL' : 'null', 'length:', capturedUrl?.length);
         
         // Pass the complete polaroid to onComplete after it's captured
         if (onComplete && capturedUrl && !hasCalledOnCompleteRef.current) {
           hasCalledOnCompleteRef.current = true; // Mark as called
-          console.log('[PolaroidSnapshot] ✅ Calling onComplete with compressed JPEG image size:', capturedUrl.length);
           onComplete(capturedUrl);
         } else {
-          console.log('[PolaroidSnapshot] ❌ Not calling onComplete - onComplete:', !!onComplete, 'capturedUrl:', !!capturedUrl, 'hasCalledOnComplete:', hasCalledOnCompleteRef.current);
         }
       }, 1500); // Increased delay to ensure background is fully composited
       return () => clearTimeout(timer);
@@ -701,11 +696,9 @@ const PolaroidSnapshot = ({
   };
 
   if (!isVisible || !imageUrl) {
-    // console.log('PolaroidSnapshot not showing:', { isVisible, hasImageUrl: !!imageUrl });
     return null;
   }
 
-  // console.log('PolaroidSnapshot rendering with image');
   
   return (
     <div 

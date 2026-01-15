@@ -16,7 +16,9 @@ export function UnifiedAuthButton() {
     walletAddress,
     tokenBalance,
     isWalletConnected,
-    displayName
+    displayName,
+    testWallet,
+    isTestUser
   } = useWalletAuth();
 
   // If user is not signed in with Clerk, show sign in
@@ -38,48 +40,50 @@ export function UnifiedAuthButton() {
   return (
     <div className="flex items-center gap-3">
       {/* Wallet connection/display */}
-      {!isWalletConnected ? (
-        <ConnectButton
-          client={client}
-          chain={chain}
-          wallets={[
-            inAppWallet({
-              auth: {
-                options: ["email", "google", "apple", "facebook"],
-              },
-            }),
-          ]}
-          connectButton={{
-            label: "Connect Wallet",
-            style: {
-              background: 'linear-gradient(135deg, #00f5d4, #00bbf9)',
-              color: '#000',
-              borderRadius: '9999px',
-              padding: '10px 20px',
-              fontSize: '12px',
-              fontWeight: 'bold',
-              textTransform: 'uppercase',
-              letterSpacing: '1px',
-              fontFamily: 'Orbitron, monospace',
-              boxShadow: '0 0 20px rgba(0, 245, 212, 0.4)',
-              border: 'none'
-            }
-          }}
-          detailsButton={{
-            style: {
-              background: 'rgba(20, 20, 30, 0.98)',
-              backdropFilter: 'blur(20px)',
-              border: '2px solid rgba(138, 43, 226, 0.4)',
-              borderRadius: '16px',
-              color: '#fff',
-              fontFamily: 'Orbitron, monospace'
-            }
-          }}
-          onConnect={(wallet) => {
-            // Wallet is connected, it will auto-sync with Clerk via our provider
-            console.log('Wallet connected:', wallet.getAccount()?.address);
-          }}
-        />
+      {!isWalletConnected && !testWallet ? (
+        <div style={{ display: 'contents' }}> {/* Use display: contents to avoid creating a wrapper element */}
+          <ConnectButton
+            client={client}
+            chain={chain}
+            wallets={[
+              inAppWallet({
+                auth: {
+                  options: ["email", "google", "apple", "facebook"],
+                },
+              }),
+            ]}
+            connectButton={{
+              label: "Connect Wallet",
+              style: {
+                background: 'linear-gradient(135deg, #00f5d4, #00bbf9)',
+                color: '#000',
+                borderRadius: '9999px',
+                padding: '10px 20px',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                fontFamily: 'Orbitron, monospace',
+                boxShadow: '0 0 20px rgba(0, 245, 212, 0.4)',
+                border: 'none'
+              }
+            }}
+            detailsButton={{
+              style: {
+                background: 'rgba(20, 20, 30, 0.98)',
+                backdropFilter: 'blur(20px)',
+                border: '2px solid rgba(138, 43, 226, 0.4)',
+                borderRadius: '16px',
+                color: '#fff',
+                fontFamily: 'Orbitron, monospace'
+              }
+            }}
+            onConnect={(wallet) => {
+              // Wallet is connected, it will auto-sync with Clerk via our provider
+              console.log('Wallet connected:', wallet.getAccount()?.address);
+            }}
+          />
+        </div>
       ) : (
         <div className="flex items-center gap-2">
           <div className="px-3 py-2 bg-black/70 backdrop-blur-md rounded-full border border-cyan-500/40 flex items-center gap-2"
