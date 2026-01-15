@@ -336,8 +336,11 @@ const PalmsScene = ({ onLoadingChange }) => {
       if (trigger.animation) {
         // Jump the timeline to the end
         trigger.animation.progress(1);
-        trigger.progress(1);
         trigger.animation.pause();
+      }
+      // Update ScrollTrigger progress using the correct API
+      if (typeof trigger.progress === 'function') {
+        trigger.progress(1);
       }
     });
     

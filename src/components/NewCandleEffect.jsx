@@ -180,9 +180,12 @@ export function NewCandleEffect({
   endPosition = [5, 2, -3],   // Target in candle cloud
   onComplete = () => {},
   onFullyComplete = () => {},
-  candleModelPath = '/models/tinyVotiveOnly.glb',
+  candleModelPath = '/models/tinyJapCanOnly.glb',
   isActive = true,
-  isMobile = false
+  isMobile = false,
+  offering = null, // Pass offering data for metadata
+  onHover = () => {}, // Hover callback
+  onClick = () => {} // Click callback
 }) {
   const groupRef = useRef()
   const trailRef = useRef()
@@ -393,6 +396,9 @@ export function NewCandleEffect({
         <CandleModel 
           modelPath={candleModelPath} 
           phase={phase}
+          offering={offering}
+          onHover={onHover}
+          onClick={onClick}
         />
         
         {/* No glow spheres - let the candle model itself and the light provide the glow */}
@@ -485,7 +491,7 @@ function TrailParticleMaterial() {
 // ============================================
 // CANDLE MODEL FOR THE EFFECT
 // ============================================
-function CandleModel({ modelPath, phase }) {
+function CandleModel({ modelPath, phase, offering, onHover, onClick }) {
   const { scene } = useGLTF(modelPath)
   const clonedScene = useMemo(() => scene.clone(true), [scene])
   
@@ -498,26 +504,118 @@ function CandleModel({ modelPath, phase }) {
       phase === 'glowing' ? 4.0 : 1.0
     
     clonedScene.traverse((child) => {
+      // Skip the parent empty object
+      if (child.name === 'Candle_Empty') return
+      
       if (child.isMesh && child.material) {
+        // Clone material to avoid affecting other instances
         child.material = child.material.clone()
         
-        const meshName = child.name.toLowerCase()
+        // Get exact mesh name (case-sensitive)
+        const meshName = child.name
         
-        if (meshName.includes('xbase')) {
-          child.material.emissive = new THREE.Color('#8bec03')
-          child.material.emissiveIntensity = emissionIntensity
-        } else if (meshName.includes('flame') || meshName.includes('fire')) {
-          child.material.emissive = new THREE.Color('#ffaa00')
+        // Check for Wax mesh
+        if (meshName === 'Wax') {
+          // Bright cyan-green glow for candle wax body
+          child.material.emissive = new THREE.Color('#00ffcc')
+          child.material.emissiveIntensity = emissionIntensity * 1.5
+          child.material.toneMapped = false
+          // Add extra properties for better glow
+          if (child.material.metalness !== undefined) {
+            child.material.metalness = 0.2
+            child.material.roughness = 0.6
+          }
+        }
+        // Check for Flame mesh
+        else if (meshName === 'Flame') {
+          // Bright orange-yellow glow for flame
+          child.material.emissive = new THREE.Color('#ffcc00')
+          child.material.emissiveIntensity = emissionIntensity * 3.0
+          child.material.toneMapped = false
+          // Make flame extra bright during glowing phase
+          if (phase === 'glowing') {
+            child.material.emissiveIntensity = emissionIntensity * 4.0
+            child.material.emissive = new THREE.Color('#ffff00')
+          }
+          // Make flame material more emissive
+          if (child.material.metalness !== undefined) {
+            child.material.metalness = 0
+            child.material.roughness = 0
+          }
+        }
+        // Check for Wick mesh
+        else if (meshName === 'Wick') {
+          // Dark orange glow for wick
+          child.material.emissive = new THREE.Color('#ff6600')
           child.material.emissiveIntensity = emissionIntensity * 1.5
           child.material.toneMapped = false
         }
         
+        // Ensure material updates
         child.material.needsUpdate = true
+        
+        // Store complete offering and user data on the mesh for raycasting
+        if (offering) {
+          child.userData.offering = offering
+          child.userData.isNewCandleEffect = true // Flag to identify this is from the effect
+          
+          // Store user-specific data for avatar/name display
+          child.userData.userId = offering.userId || offering.uid
+          child.userData.userName = offering.name || offering.userName || offering.username || 'Anonymous'
+          child.userData.userImageUrl = offering.userImageUrl || offering.userImage || offering.avatar || null
+          child.userData.message = offering.message || offering.text || ''
+          child.userData.type = offering.type || 'petition'
+          child.userData.tokensBurned = offering.tokensBurned || 0
+          child.userData.recipientName = offering.recipientName || offering.prayerFor || ''
+          child.userData.createdAt = offering.createdAt || offering.timestamp || new Date()
+        }
       }
     })
-  }, [clonedScene, phase])
+  }, [clonedScene, phase, offering])
   
-  return <primitive object={clonedScene} scale={[0.5, 0.5, 0.5]} />
+  return (
+    <primitive 
+      object={clonedScene} 
+      scale={[0.5, 0.5, 0.5]}
+      onPointerOver={(e) => {
+        e.stopPropagation()
+        if (offering) {
+          // Pass the complete user data structure
+          const enrichedOffering = {
+            ...offering,
+            userName: offering.name || offering.userName || offering.username || 'Anonymous',
+            userImageUrl: offering.userImageUrl || offering.userImage || offering.avatar || null,
+            userId: offering.userId || offering.uid,
+            message: offering.message || offering.text || '',
+            type: offering.type || 'petition'
+          }
+          onHover?.(e, enrichedOffering)
+        }
+      }}
+      onPointerOut={(e) => {
+        e.stopPropagation()
+        onHover?.(null)
+      }}
+      onClick={(e) => {
+        e.stopPropagation()
+        if (offering) {
+          // Pass the complete user data structure for display
+          const enrichedOffering = {
+            ...offering,
+            userName: offering.name || offering.userName || offering.username || 'Anonymous',
+            userImageUrl: offering.userImageUrl || offering.userImage || offering.avatar || null,
+            userId: offering.userId || offering.uid,
+            message: offering.message || offering.text || '',
+            type: offering.type || 'petition',
+            tokensBurned: offering.tokensBurned || 0,
+            recipientName: offering.recipientName || offering.prayerFor || '',
+            createdAt: offering.createdAt || offering.timestamp || new Date()
+          }
+          onClick?.(e, enrichedOffering)
+        }
+      }}
+    />
+  )
 }
 
 // ============================================
@@ -629,10 +727,12 @@ export const NewCandleEffectManager = forwardRef(({
   phonePosition = [0, 0, 0],
   cloudBounds = { x: 20, y: 15, z: 10 },
   onNewCandle,
-  candleModelPath = '/models/tinyVotiveOnly.glb',
+  candleModelPath = '/models/tinyJapCanOnly.glb',
   useArcticRings = true, // Toggle between Arctic Rings and original burst
   onBloomPulse, // Callback to update bloom intensity: (intensity) => setBloomIntensity(intensity)
-  onCandlePulse // Callback to trigger pulse effect in candle cloud: (position) => triggerPulse(position)
+  onCandlePulse, // Callback to trigger pulse effect in candle cloud: (position) => triggerPulse(position)
+  onHover, // Hover handler for metadata display
+  onClick // Click handler for metadata display
 }, ref) => {
   const [effectState, setEffectState] = useState({
     isActive: false,
@@ -718,6 +818,7 @@ export const NewCandleEffectManager = forwardRef(({
         startPosition={effectState.startPosition}
         endPosition={effectState.endPosition}
         isActive={effectState.isActive}
+        offering={effectState.offering}
         onComplete={handleEffectComplete}
         onFullyComplete={() => {
           // Add the permanent candle now that glow is done
@@ -729,6 +830,8 @@ export const NewCandleEffectManager = forwardRef(({
         }}
         candleModelPath={candleModelPath}
         isMobile={isMobile}
+        onHover={onHover}
+        onClick={onClick}
       />
       
       {/* Arctic Rings or original burst based on prop */}

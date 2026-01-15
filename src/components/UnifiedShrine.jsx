@@ -1,7 +1,7 @@
 'use client'
 import React, { useRef, useState, useEffect, Suspense, useCallback, useMemo, forwardRef, useImperativeHandle, Component } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Stats, useGLTF } from '@react-three/drei'
+import { Stats, useGLTF, Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { HandsModel, CameraController } from './HandsGLTFScene'
 // IMPORTANT: Import from the optimized version!
@@ -62,6 +62,282 @@ class CanvasErrorBoundary extends Component {
 
     return this.props.children
   }
+}
+
+// Circle highlight for candle
+function HighlightedCandleParticles({ position }) {
+  return (
+    <group position={position}>
+      {/* Glowing ring at ground level */}
+      <mesh position={[0, -0.5, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[1.5, 2, 32, 1]} />
+        <meshBasicMaterial
+          color="#00ff44"
+          transparent
+          opacity={0.3}
+          side={THREE.DoubleSide}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+    </group>
+  )
+}
+
+// Camera animator for smooth look-at transitions and reset to default
+function CameraAnimator({ targetPosition, resetToDefault, isMobile }) {
+  const { camera } = useThree()
+  const startQuaternion = useRef(null)
+  const startPosition = useRef(null)
+  const targetQuaternion = useRef(new THREE.Quaternion())
+  const targetPositionVec = useRef(new THREE.Vector3())
+  const tempMatrix = useRef(new THREE.Matrix4())
+  const progress = useRef(0)
+  const isResetting = useRef(false)
+  const initialCameraState = useRef(null)
+  
+  // Store the initial camera state on first render
+  useEffect(() => {
+    if (!initialCameraState.current) {
+      initialCameraState.current = {
+        position: camera.position.clone(),
+        quaternion: camera.quaternion.clone()
+      }
+      console.log('Stored initial camera state:', initialCameraState.current.position)
+    }
+  }, [camera])
+  
+  // Default camera settings (fallback if initial state not captured)
+  const defaultPosition = initialCameraState.current?.position || new THREE.Vector3(0, 0, isMobile ? 2 : 0)
+  const defaultQuaternion = initialCameraState.current?.quaternion || new THREE.Quaternion()
+  
+  useEffect(() => {
+    if (resetToDefault && initialCameraState.current) {
+      // Reset to initial camera position and rotation
+      startPosition.current = camera.position.clone()
+      startQuaternion.current = camera.quaternion.clone()
+      
+      // Use the stored initial camera state
+      targetQuaternion.current.copy(initialCameraState.current.quaternion)
+      targetPositionVec.current.copy(initialCameraState.current.position)
+      
+      progress.current = 0
+      isResetting.current = true
+    } else if (targetPosition && initialCameraState.current) {
+      // First move camera to initial position, then look at candle
+      startPosition.current = camera.position.clone()
+      startQuaternion.current = camera.quaternion.clone()
+      
+      // Move to initial position first
+      targetPositionVec.current.copy(initialCameraState.current.position)
+      
+      // Calculate rotation to look at candle from initial position
+      const lookAtPos = new THREE.Vector3(
+        targetPosition.target[0],
+        targetPosition.target[1],
+        targetPosition.target[2]
+      )
+      
+      tempMatrix.current.lookAt(initialCameraState.current.position, lookAtPos, camera.up)
+      targetQuaternion.current.setFromRotationMatrix(tempMatrix.current)
+      
+      progress.current = 0
+      isResetting.current = false
+    }
+  }, [targetPosition, resetToDefault, camera])
+  
+  useFrame((state, delta) => {
+    if ((targetPosition || isResetting.current) && startQuaternion.current) {
+      if (progress.current < 1) {
+        // Animate over 1.5 seconds
+        progress.current = Math.min(progress.current + delta * 0.67, 1)
+        
+        const easeProgress = 1 - Math.pow(1 - progress.current, 3) // Ease out cubic
+        
+        // Always interpolate rotation
+        camera.quaternion.slerpQuaternions(
+          startQuaternion.current,
+          targetQuaternion.current,
+          easeProgress
+        )
+        
+        // Always interpolate position (for both reset and look-at)
+        if (startPosition.current) {
+          camera.position.lerpVectors(
+            startPosition.current,
+            targetPositionVec.current,
+            easeProgress
+          )
+        }
+        
+        camera.updateProjectionMatrix()
+      } else if (targetPosition && !isResetting.current) {
+        // Keep looking at target after animation from initial position
+        camera.lookAt(
+          targetPosition.target[0],
+          targetPosition.target[1],
+          targetPosition.target[2]
+        )
+        camera.updateProjectionMatrix()
+      } else if (isResetting.current && initialCameraState.current) {
+        // Ensure we're at initial position after reset
+        camera.position.copy(initialCameraState.current.position)
+        camera.quaternion.copy(initialCameraState.current.quaternion)
+        camera.updateProjectionMatrix()
+        isResetting.current = false
+      }
+    } else if (!targetPosition) {
+      // Smoothly reset to look at center
+      const center = new THREE.Vector3(0, 0, 0)
+      const currentLookAt = new THREE.Vector3(0, 0, -1)
+      currentLookAt.applyQuaternion(camera.quaternion)
+      currentLookAt.add(camera.position)
+      
+      currentLookAt.lerp(center, 0.05)
+      camera.lookAt(currentLookAt)
+      camera.updateProjectionMatrix()
+    }
+  })
+  
+  return null
+}
+
+// Candle label component - shows info on hover
+function CandleLabel({ position, data, visible }) {
+  if (!visible || !position || !data) return null
+  
+  // Format the date nicely
+  const formatDate = (date) => {
+    if (!date) return 'Unknown'
+    
+    // Handle Firestore Timestamp objects
+    let d
+    if (date && typeof date.toDate === 'function') {
+      d = date.toDate()
+    } else if (date instanceof Date) {
+      d = date
+    } else if (typeof date === 'string' || typeof date === 'number') {
+      d = new Date(date)
+    } else {
+      return 'Unknown'
+    }
+    
+    // Check if date is valid
+    if (isNaN(d.getTime())) return 'Unknown'
+    
+    const now = new Date()
+    const diff = now.getTime() - d.getTime()
+    const minutes = Math.floor(diff / (1000 * 60))
+    const hours = Math.floor(diff / (1000 * 60 * 60))
+    const days = Math.floor(hours / 24)
+    
+    if (minutes < 1) return 'Just now'
+    if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`
+    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`
+    if (days < 7) return `${days} day${days > 1 ? 's' : ''} ago`
+    return d.toLocaleDateString()
+  }
+  
+  // Lift the label higher above the candle
+  const adjustedPosition = Array.isArray(position) 
+    ? [position[2], position[1] + 3, position[2]]
+    : [position.x, position.y + 4, position.z]
+  
+  return (
+    <group position={adjustedPosition}>
+      <Html
+        center
+        distanceFactor={15}
+        style={{
+          transition: 'opacity 0.2s',
+          opacity: visible ? 1 : 0,
+          pointerEvents: 'none'
+        }}
+      >
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(20, 20, 20, 0.95), rgba(40, 40, 40, 0.95))',
+          color: '#fff',
+          padding: '16px',
+          borderRadius: '16px',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+          fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+          fontSize: '14px',
+          minWidth: '200px',
+          border: '1px solid rgba(255, 215, 0, 0.3)'
+        }}>
+          {/* User info header */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '12px',
+            marginBottom: '12px',
+            paddingBottom: '12px',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+          }}>
+            {/* Avatar */}
+            {data.userImageUrl ? (
+              <img 
+                src={data.userImageUrl} 
+                alt={data.username}
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  border: '2px solid rgba(255, 215, 0, 0.5)',
+                  objectFit: 'cover'
+                }}
+              />
+            ) : (
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #ffaa00, #ff8800)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '20px',
+                fontWeight: 'bold',
+                color: '#fff',
+                border: '2px solid rgba(255, 215, 0, 0.5)'
+              }}>
+                {data.username?.charAt(0).toUpperCase() || '?'}
+              </div>
+            )}
+            
+            {/* Name and time */}
+            <div style={{ flex: 1 }}>
+              <div style={{ 
+                fontWeight: 'bold', 
+                fontSize: '15px',
+                color: '#ffcc00'
+              }}>
+                {data.username}
+              </div>
+              <div style={{ 
+                fontSize: '12px', 
+                opacity: 0.7,
+                marginTop: '2px'
+              }}>
+                🕯️ Lit {formatDate(data.litDate)}
+              </div>
+            </div>
+          </div>
+          
+          {/* Message */}
+          {data.message && (
+            <div style={{ 
+              fontSize: '13px', 
+              fontStyle: 'italic',
+              opacity: 0.9,
+              lineHeight: '1.4'
+            }}>
+              "{data.message}"
+            </div>
+          )}
+        </div>
+      </Html>
+    </group>
+  )
 }
 
 // Scene rotation controller - handles rotation without blocking clicks
@@ -190,7 +466,8 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   totalOfferingsCount = 0,
   onSelectOffering, 
   onLightCandle, 
-  onPriceChange, 
+  onPriceChange,
+  currentUserId = 'testUser123', 
   is80sMode,
   hoveredOffering,
   justLitOffering,
@@ -221,9 +498,61 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   // const [showTestControls, setShowTestControls] = useState(true)
   
   const [additionalCandles, setAdditionalCandles] = useState([])
+  
+  // Convert offerings to candle positions for CandleCloud
+  const offeringCandles = useMemo(() => {
+    if (!offerings || offerings.length === 0) return []
+    
+    // Simple hash function to generate consistent random values from a string
+    const hashCode = (str) => {
+      let hash = 0
+      for (let i = 0; i < str.length; i++) {
+        const char = str.charCodeAt(i)
+        hash = ((hash << 5) - hash) + char
+        hash = hash & hash // Convert to 32bit integer
+      }
+      return Math.abs(hash)
+    }
+    
+    // Seeded random generator
+    const seededRandom = (seed, min = 0, max = 1) => {
+      const x = Math.sin(seed) * 10000
+      return min + (x - Math.floor(x)) * (max - min)
+    }
+    
+    return offerings.map((offering, index) => {
+      // Use offering ID or index as seed for consistent randomness
+      const seed = hashCode(offering.id || `offering_${index}`)
+      
+      // Use stored position from Firestore if available
+      const storedPos = offering.position
+      const x = storedPos?.x ?? seededRandom(seed + 1, -15, 15)
+      const y = storedPos?.y ?? seededRandom(seed + 2, -10, 10)
+      const z = storedPos?.z ?? seededRandom(seed + 3, -7.5, 7.5)
+      
+      return {
+        position: [x, y, z],
+        x: x,
+        y: y,
+        z: z,
+        rotation: seededRandom(seed + 4, 0, Math.PI * 2),
+        scale: seededRandom(seed + 5, 0.8, 1.2),
+        offering: offering,
+        userId: offering.userId || offering.uid || `user_${index}`,
+        username: offering.userName || offering.username || 'Anonymous',
+        id: offering.id || `offering_${index}`
+      }
+    })
+  }, [offerings])
   const [clickedCandleId, setClickedCandleId] = useState(null)
   const [isRippleActive, setIsRippleActive] = useState(false)
   const [activeStatsTab, setActiveStatsTab] = useState('price') // 'price', 'staking', or 'mood'
+  const [userCandleData, setUserCandleData] = useState(null) // Store user's candle data for tooltip
+  const [hoveredCandleId, setHoveredCandleId] = useState(null)
+  const [targetCameraPosition, setTargetCameraPosition] = useState(null) // For camera movement
+  const [userCandlePosition, setUserCandlePosition] = useState(null) // Store 3D position
+  const [resetCameraToDefault, setResetCameraToDefault] = useState(false) // Reset camera flag
+  const [overrideCameraControl, setOverrideCameraControl] = useState(false) // Override all camera controls
   
   // Get staking data
   const { 
@@ -261,6 +590,115 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
     return mockRewards.toFixed(4)
   }, [])
   
+  // Store the user's rotation before resetting
+  const savedUserRotation = useRef(0)
+  const userRotationRef = useRef(0)
+  
+  // Method to find and highlight user's candle
+  const findUserCandle = useCallback(() => {
+    console.log('Finding user candle...')
+    console.log('Current user ID:', currentUserId)
+    console.log('Offerings:', offerings)
+    
+    // Override all camera controls
+    setOverrideCameraControl(true)
+    
+    // Save current rotation and reset scene to default rotation
+    savedUserRotation.current = userRotationRef.current
+    setUserRotation(0)
+    
+    // Find user's candle directly from the offeringCandles computed in the component
+    const userCandleIndex = offeringCandles.findIndex(c => c.userId === currentUserId)
+    
+    if (userCandleIndex !== -1) {
+      const userCandle = offeringCandles[userCandleIndex]
+      console.log('Found user candle at index:', userCandleIndex, userCandle)
+      
+      // Calculate the actual instance ID (base candles + offering index)
+      // Base candles are 0-499, then offerings start at 500
+      const actualInstanceId = 500 + userCandleIndex
+      
+      console.log('DEBUG: Candle lookup details:', {
+        userCandleIndex,
+        actualInstanceId,
+        totalOfferings: offeringCandles.length,
+        userCandle,
+        baseCandles: 500,
+        sharedUniformsExists: !!window.sharedUniforms
+      })
+      
+      // Use the position from the userCandle (already converted)
+      const candlePosition = userCandle.position || [userCandle.x, userCandle.y, userCandle.z]
+      
+      setUserCandlePosition(candlePosition)
+      
+      console.log('DEBUG: Candle position:', candlePosition)
+      
+      // Set camera to look at the candle (rotation only, no position change)
+      setTargetCameraPosition({
+        target: candlePosition
+      })
+      
+      // Update the highlight uniform with enhanced effect
+      if (window.sharedUniforms) {
+        // First clear any previous highlight
+        window.sharedUniforms.uHighlightedId.value = -1
+        
+        // Then set the new highlight after a brief moment to ensure update
+        setTimeout(() => {
+          window.sharedUniforms.uHighlightedId.value = actualInstanceId
+          console.log('Highlighted candle ID set to:', actualInstanceId)
+        }, 100)
+        
+        console.log('Highlighted candle ID set to:', actualInstanceId)
+      }
+      
+      // Store candle data for tooltip
+      const litAt = userCandle.offering.createdAt?.toDate?.() || userCandle.offering.createdAt || new Date()
+      const formattedDate = litAt instanceof Date ? litAt.toLocaleString() : 'Unknown time'
+      setUserCandleData({
+        instanceId: actualInstanceId,
+        litAt: formattedDate,
+        litDate: litAt,
+        message: userCandle.offering.message || userCandle.offering.text,
+        username: userCandle.offering.name || userCandle.username || 'Anonymous',
+        userImageUrl: userCandle.offering.userImageUrl || userCandle.offering.imageUrl || null,
+        userId: userCandle.userId
+      })
+      
+      // Don't show tooltip immediately - wait for hover
+      // Just store the data for when user hovers
+    } else {
+      // Clear any existing highlight
+      if (window.sharedUniforms) {
+        window.sharedUniforms.uHighlightedId.value = -1
+      }
+      setUserCandleData(null)
+      alert(`No candle found for user ID: ${currentUserId}\nYou need to light a candle first!`)
+    }
+  }, [currentUserId, offerings, offeringCandles])
+
+  // Method to reset view back to main
+  const resetView = useCallback(() => {
+    setTargetCameraPosition(null)
+    setResetCameraToDefault(true)
+    
+    // Restore the user's scene rotation
+    setUserRotation(0) // First reset to 0 to match initial state
+    
+    // Reset flags after animation completes
+    setTimeout(() => {
+      setResetCameraToDefault(false)
+      setOverrideCameraControl(false)
+    }, 1600)
+    if (window.sharedUniforms) {
+      window.sharedUniforms.uHighlightedId.value = -1
+    }
+    setUserCandleData(null)
+    setHoveredCandleId(null)
+    console.log('Returning to main view and camera position')
+  }, [])
+
   // Expose method to trigger candle effect
   useImperativeHandle(ref, () => ({
     triggerCandleEffect: (offering) => {
@@ -273,9 +711,17 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
         setIsRippleActive(true)
         setTimeout(() => setIsRippleActive(false), 8000) // Match the justLitOffering duration
       }
-    }
-  }), [])
+    },
+    findUserCandle,
+    resetView
+  }), [findUserCandle, resetView])
   const [userRotation, setUserRotation] = useState(0)
+  
+  // Keep ref in sync with state
+  useEffect(() => {
+    userRotationRef.current = userRotation
+  }, [userRotation])
+  
   const isDragging = useRef(false)
   const dragStart = useRef({ x: 0, rotation: 0 })
   const hasDraggedEnough = useRef(false) // Track if we've moved enough to start rotating
@@ -460,9 +906,23 @@ useEffect(() => {
     // Generate random initial values only on client side
     setPriceHistory(Array(20).fill(0).map(() => 0.00042 + Math.random() * 0.00001 - 0.000005))
     
+    // Add ESC key handler for tooltip and view reset
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') {
+        // Reset everything
+        setHoveredCandleId(null)
+        setTargetCameraPosition(null)
+        if (window.sharedUniforms) {
+          window.sharedUniforms.uHighlightedId.value = -1
+        }
+      }
+    }
+    window.addEventListener('keydown', handleEscape)
+    
     return () => {
       // Cleanup on unmount
       setMounted(false)
+      window.removeEventListener('keydown', handleEscape)
     }
   }, [])
 
@@ -491,7 +951,7 @@ useEffect(() => {
     }
   }, [onPriceChange, testPriceOverride])
 
-  const handleCandleClick = useCallback((instanceId) => {
+  const handleCandleClick = useCallback((instanceId, position) => {
     if (timeoutRefs.current[instanceId]) {
       clearTimeout(timeoutRefs.current[instanceId])
       delete timeoutRefs.current[instanceId]
@@ -499,18 +959,32 @@ useEffect(() => {
     
     setClickedCandleId(instanceId)
     
-    timeoutRefs.current[instanceId] = setTimeout(() => {
-      setClickedCandleId(null)
-      delete timeoutRefs.current[instanceId]
-    }, 2000)
-    
-    if (offerings?.length > 0 && onSelectOffering) {
-      const randomIndex = Math.floor(Math.random() * offerings.length)
-      const selectedOffering = offerings[randomIndex]
-
-      onSelectOffering(selectedOffering)
+    // Check if this is the user's candle
+    if (userCandleData && instanceId === userCandleData.instanceId) {
+      // Toggle hover state for user's candle
+      setHoveredCandleId(prev => prev === instanceId ? null : instanceId)
+    } else {
+      timeoutRefs.current[instanceId] = setTimeout(() => {
+        setClickedCandleId(null)
+        delete timeoutRefs.current[instanceId]
+      }, 2000)
+      
+      if (offerings?.length > 0 && onSelectOffering) {
+        // If clicking on offering candles (ID >= 500), show that specific offering
+        if (instanceId >= 500) {
+          const offeringIndex = instanceId - 500
+          if (offeringIndex < offerings.length) {
+            onSelectOffering(offerings[offeringIndex])
+          }
+        } else {
+          // Random offering for base candles
+          const randomIndex = Math.floor(Math.random() * offerings.length)
+          const selectedOffering = offerings[randomIndex]
+          onSelectOffering(selectedOffering)
+        }
+      }
     }
-  }, [offerings, onSelectOffering])
+  }, [offerings, onSelectOffering, userCandleData])
 
   const handleNewCandle = useCallback((position, offering) => {
     setAdditionalCandles(prev => [...prev, {
@@ -847,7 +1321,12 @@ useEffect(() => {
         {/* Background gradient - reads from ref */}
         <GradientBackground is80sMode={is80sMode} />
 
-        
+        {/* Camera animator for smooth transitions */}
+        <CameraAnimator 
+          targetPosition={targetCameraPosition} 
+          resetToDefault={resetCameraToDefault}
+          isMobile={isMobile}
+        />
         
         {/* Rotatable scene content */}
         <SceneRotator 
@@ -864,12 +1343,36 @@ useEffect(() => {
                 priceRef={priceRef}
                 shortTermPriceRef={shortTermPriceRef}
                 continuousOffsetRef={continuousOffsetRef}
-                additionalCandles={additionalCandles}
+                additionalCandles={[...offeringCandles, ...additionalCandles]}
                 onCandleClick={handleCandleClick}
                 clickedCandleId={clickedCandleId}
                 isMobile={isMobile}
                 exclusionZone={exclusionZone}
+                onCandleHover={(id) => {
+                  console.log('Hover on candle ID:', id, 'User candle ID:', userCandleData?.instanceId)
+                  // Only show hover for user's candle
+                  if (userCandleData && id === userCandleData.instanceId) {
+                    console.log('Setting hovered candle ID:', id)
+                    setHoveredCandleId(id)
+                  }
+                }}
+                onCandleLeave={() => {
+                  console.log('Mouse left candle')
+                  setHoveredCandleId(null)
+                }}
               />
+              
+              {/* Show label for user's candle when hovered or when highlighted */}
+              <CandleLabel 
+                position={userCandlePosition}
+                data={userCandleData}
+                visible={(hoveredCandleId === userCandleData?.instanceId) || (userCandleData && targetCameraPosition)}
+              />
+              
+              {/* Particle effects for highlighted candle */}
+              {userCandlePosition && targetCameraPosition && (
+                <HighlightedCandleParticles position={userCandlePosition} />
+              )}
             </Suspense> 
             
         
@@ -884,6 +1387,7 @@ useEffect(() => {
                   justLitOffering={justLitOffering}
                   onJustLitComplete={onJustLitComplete}
                   userRotation={userRotation}
+                  isHighlighting={!!targetCameraPosition}
                   priceChange={displayPrice.change}
                   hasActiveClick={clickedCandleId !== null || isRippleActive}
                   user={user}
@@ -918,8 +1422,8 @@ useEffect(() => {
   onCandlePulse={handleCandlePulse}  // Trigger pulse in candle cloud
 />
         
-            {/* Camera controller for focus mode */}
-            <CameraController focusMode={focusMode} />
+            {/* Camera controller for focus mode - disabled when overriding camera control */}
+            {!overrideCameraControl && <CameraController focusMode={focusMode} />}
             
      
 
@@ -969,8 +1473,24 @@ useEffect(() => {
         }
     `}</style>
       
-      {/* Unified Stats Box with Tabs */}
-      <div style={unifiedStatsStyle}>
+      {/* Container for Stats Box and Find My Candle button on mobile */}
+      <div style={{
+        position: 'fixed',
+        top: isMobile ? '100px' : '105px',
+        right: isMobile ? '10px' : '20px',
+        zIndex: 1000,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+        alignItems: 'flex-end',
+      }}>
+        {/* Unified Stats Box with Tabs */}
+        <div style={{
+          ...unifiedStatsStyle,
+          position: 'relative',
+          top: 0,
+          right: 0,
+        }}>
         {/* Tab Headers */}
         <div style={{
           display: 'flex',
@@ -1309,7 +1829,58 @@ useEffect(() => {
             </div>
           </>
         ) : null}
+        </div>
+        
+        {/* Find My Candle button for mobile - positioned below stats box */}
+        {isMobile && currentUserId && (
+          <button
+            onClick={() => {
+              if (targetCameraPosition) {
+                resetView()
+              } else {
+                findUserCandle()
+              }
+            }}
+            style={{
+              background: targetCameraPosition 
+                ? 'linear-gradient(135deg, #666 0%, #444 100%)'
+                : 'linear-gradient(135deg, #ffaa00 0%, #ff8800 100%)',
+              border: targetCameraPosition
+                ? '2px solid rgba(255, 255, 255, 0.2)'
+                : '2px solid rgba(255, 170, 0, 0.3)',
+              borderRadius: '12px',
+              padding: '10px 16px',
+              color: targetCameraPosition ? '#fff' : '#000',
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              fontSize: '13px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              boxShadow: targetCameraPosition
+                ? '0 4px 24px rgba(0, 0, 0, 0.5)'
+                : '0 0 20px rgba(255, 170, 0, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.3s ease',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              width: '160px', // Match stats box width
+            }}
+          >
+            {targetCameraPosition ? (
+              <>
+                ↩️ <span style={{ fontSize: '11px' }}>BACK</span>
+              </>
+            ) : (
+              <>
+                🔍 <span style={{ fontSize: '11px' }}>FIND MY CANDLE</span>
+              </>
+            )}
+          </button>
+        )}
       </div>
+      
+      {/* Removed tooltip - will be added as Html in 3D space */}
       
     </div>
   )

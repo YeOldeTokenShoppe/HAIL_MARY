@@ -14,7 +14,10 @@ const ShrineLeftPanel = forwardRef(({
   isMobile = false,
   onLightCandle,
   onStakeClick,
-  router 
+  router,
+  onFindCandle,
+  onResetView,
+  isHighlighting = false
 }, ref) => {
   const [isLit, setIsLit] = useState(false)
   const [hasLitCandleThisSession, setHasLitCandleThisSession] = useState(false)
@@ -103,7 +106,7 @@ const ShrineLeftPanel = forwardRef(({
       <div style={{
         position: 'fixed',
         left: '40px',
-        top: '50%',
+        top: '60%',
         transform: 'translateY(-50%)',  // Center vertically
         display: 'flex',
         flexDirection: 'column',
@@ -386,7 +389,66 @@ const ShrineLeftPanel = forwardRef(({
             pointerEvents: 'none',
           }} />
         </div>
-   
+        
+        {/* Dual-purpose Find My Candle / Return to Main View button */}
+        <button
+          onClick={() => {
+            if (isHighlighting) {
+              onResetView?.()
+            } else {
+              onFindCandle?.()
+            }
+          }}
+          style={{
+            width: '220px',
+            background: isHighlighting 
+              ? 'linear-gradient(135deg, #666 0%, #444 100%)'
+              : 'linear-gradient(135deg, #ffaa00 0%, #ff8800 100%)',
+            border: isHighlighting
+              ? '2px solid rgba(255, 255, 255, 0.2)'
+              : 'none',
+            borderRadius: '12px',
+            padding: '12px 24px',
+            color: isHighlighting ? '#fff' : '#000',
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: '14px',
+            fontWeight: 'bold',
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+            cursor: 'pointer',
+            boxShadow: isHighlighting
+              ? '0 4px 24px rgba(0, 0, 0, 0.5)'
+              : '0 0 30px rgba(255, 170, 0, 0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            transition: 'all 0.3s ease',
+            marginTop: '1rem',
+            pointerEvents: 'auto',
+          }}
+          onMouseEnter={(e) => {
+            if (!isHighlighting) {
+              e.currentTarget.style.transform = 'scale(1.05)'
+              e.currentTarget.style.boxShadow = '0 0 40px rgba(255, 170, 0, 0.6)'
+            }
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'scale(1)'
+            e.currentTarget.style.boxShadow = isHighlighting
+              ? '0 4px 24px rgba(0, 0, 0, 0.5)'
+              : '0 0 30px rgba(255, 170, 0, 0.4)'
+          }}
+        >
+          {isHighlighting ? (
+            <>
+              ↩️ Return to Main View
+              <span style={{ fontSize: '11px', opacity: 0.7, fontWeight: 'normal' }}>(ESC)</span>
+            </>
+          ) : (
+            <>🔍 Highlight My Candle</>
+          )}
+        </button>
 
       </div>
     </>

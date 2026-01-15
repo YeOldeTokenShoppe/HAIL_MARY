@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useEffect, useState } from 'react'
+import React, { useRef, useMemo, useEffect, useState, useCallback } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
@@ -17,6 +17,8 @@ const sharedUniforms = {
   uShortTermPrice: { value: 0 }, // Short-term price change for dynamic movement
   uPulseTime: { value: -1 }, // Time when pulse started, -1 = no pulse
   uPulsePosition: { value: new THREE.Vector3(0, 0, 0) }, // Position of pulse origin
+  uHighlightedId: { value: -1 }, // ID of highlighted candle (user's candle)
+  uCurrentTime: { value: Date.now() }, // Current time for melting calculations
 }
 
 // Expose globally for pulse triggers
@@ -153,7 +155,7 @@ function createWobbleMaterial(baseColor, options = {}) {
   })
 }
 
-// XBase material with click glow effect AND price-reactive color
+// XBase material with click glow effect AND price-reactive color AND user highlight
 function createXBaseMaterial() {
   return new THREE.ShaderMaterial({
     uniforms: {
@@ -162,6 +164,7 @@ function createXBaseMaterial() {
       uBullColor: { value: new THREE.Color('#00ff66') },    // bright green for gains
       uBearColor: { value: new THREE.Color('#ff4444') },    // red for losses
       uGlowColor: { value: new THREE.Color('#ff00ff') },    // purple for clicked
+      uUserColor: { value: new THREE.Color('#ffaa00') },    // golden for user's candle
     },
     vertexShader: `
       ${wobbleVertexChunk}
@@ -184,13 +187,16 @@ function createXBaseMaterial() {
       uniform vec3 uBullColor;
       uniform vec3 uBearColor;
       uniform vec3 uGlowColor;
+      uniform vec3 uUserColor;
       uniform float uClickedId;
+      uniform float uHighlightedId;
       uniform float uTime;
       uniform float uPriceDirection;
       varying float vInstanceId;
       
       void main() {
         bool isClicked = uClickedId >= 0.0 && abs(uClickedId - vInstanceId) < 1.0;
+        bool isHighlighted = uHighlightedId >= 0.0 && abs(uHighlightedId - vInstanceId) < 1.0;
         
         // Price-reactive wax color
         // uPriceDirection roughly ranges from -1 to 1
@@ -203,6 +209,13 @@ function createXBaseMaterial() {
         
         vec3 color = priceColor;
         float intensity = 1.0;
+        
+        // User's candle - bright green emissive glow
+        if (isHighlighted) {
+          float pulse = sin(uTime * 2.0) * 0.1 + 0.9; // Subtle pulse
+          color = vec3(0.0, 1.0, 0.2) * pulse; // Bright green
+          intensity = 3.0; // Very bright emissive
+        }
         
         // Clicked candle override - purple glow effect
         if (isClicked) {
@@ -277,12 +290,13 @@ function createFlameMaterial() {
         vInstanceId = id;
         vPhase = hash(id) * 6.28318;
         
+        vec3 pos = position;
+        
         // Height normalized 0-1
-        vHeight = clamp((position.y + 0.1) / 0.6, 0.0, 1.0);
+        vHeight = clamp((pos.y + 0.1) / 0.6, 0.0, 1.0);
         
         // Flame flicker animation
         float flameTime = uTime * 3.0 + vPhase;
-        vec3 pos = position;
         
         // Strong sway side to side
         float sway = sin(flameTime * 1.5) * 0.06 * vHeight * vHeight;
@@ -386,17 +400,14 @@ function useClonedGeometries(modelPath) {
     scene.traverse((child) => {
       if (!child.isMesh) return
       
-      const name = child.name.toLowerCase()
+      const name = child.name
       let key = null
       
-      if (name.includes('xbase') || name.includes('base')) key = 'xbase'
-      else if (name.includes('glass')) key = 'glass'
-      else if (name.includes('wick')) key = 'wick'
-      else if (name.includes('senora')) {
-        // Skip senora mesh - we don't want to include it in clones
-        return
-      }
-      else if (name.includes('flame')) key = 'flame'
+      // Map the new model's part names
+      if (name === 'Wax') key = 'wax'
+      else if (name === 'Wick') key = 'wick'
+      else if (name === 'Flame') key = 'flame'
+      // Candle_Empty is the parent group, not a mesh
       
       if (key) {
         const clonedGeometry = child.geometry.clone()
@@ -467,32 +478,74 @@ function usePositions(count, exclusionZone = null) {
         y,
         z,
         rotation: Math.random() * Math.PI * 2,
+        scale: 0.8 + Math.random() * 0.4, // Vary size between 0.8 and 1.2
+        litAt: Date.now() - Math.random() * 72 * 3600 * 1000, // Random age up to 72 hours old
+        userId: null, // Will be assigned when user lights a candle
+        username: null,
+        offering: null,
       })
     }
     return positions
   }, [count, exclusionZone])
 }
 
-// Simplified InstancedPart - NO per-frame matrix updates!
-function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.5, maxCount, onCandleClick }) {
+// InstancedPart with melting animation
+function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.9, maxCount, onCandleClick, onCandleHover, onCandleLeave, enableMelting = false }) {
   const meshRef = useRef()
   const actualCount = positions.length
   const capacity = maxCount || actualCount
   
-  // Calculate static base matrices ONCE
+  // Update matrices per frame for melting effect
+  useFrame(() => {
+    if (!meshRef.current || !enableMelting) return
+    
+    const now = Date.now()
+    const tempMatrix = new THREE.Matrix4()
+    const tempPosition = new THREE.Vector3()
+    const tempQuaternion = new THREE.Quaternion()
+    const tempScale = new THREE.Vector3()
+    
+    for (let i = 0; i < actualCount; i++) {
+      const pos = positions[i]
+      if (pos.litAt) {
+        const elapsed = (now - pos.litAt) / 1000 // seconds
+        const meltProgress = Math.min(elapsed / (80 * 3600), 0.9) // 0-0.9 over 80 hours
+        const yScale = Math.max(0.1, 1.0 - meltProgress) // Keep at least 10% height
+        
+        const instanceScale = pos.scale || scale
+        tempPosition.set(pos.x, pos.y, pos.z)
+        tempQuaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pos.rotation)
+        tempScale.set(instanceScale, instanceScale * yScale, instanceScale)
+        
+        tempMatrix.compose(tempPosition, tempQuaternion, tempScale)
+        if (localMatrix) {
+          tempMatrix.multiply(localMatrix)
+        }
+        meshRef.current.setMatrixAt(i, tempMatrix)
+      }
+    }
+    meshRef.current.instanceMatrix.needsUpdate = true
+    
+    // Update current time uniform for shader effects
+    sharedUniforms.uCurrentTime.value = now
+  })
+  
+  // Calculate initial matrices
   const baseMatrices = useMemo(() => {
     const matrices = []
     const tempMatrix = new THREE.Matrix4()
     const tempPosition = new THREE.Vector3()
     const tempQuaternion = new THREE.Quaternion()
-    const tempScale = new THREE.Vector3(scale, scale, scale)
+    const tempScale = new THREE.Vector3()
     const hiddenMatrix = new THREE.Matrix4().makeTranslation(0, -10000, 0)
     
     for (let i = 0; i < capacity; i++) {
       if (i < positions.length) {
         const pos = positions[i]
+        const instanceScale = pos.scale || scale
         tempPosition.set(pos.x, pos.y, pos.z)
         tempQuaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pos.rotation)
+        tempScale.set(instanceScale, instanceScale, instanceScale)
         tempMatrix.compose(tempPosition, tempQuaternion, tempScale)
         if (localMatrix) {
           tempMatrix.multiply(localMatrix)
@@ -542,7 +595,18 @@ function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.5
           onCandleClick(event.instanceId, positions[event.instanceId])
         }
       }}
-
+      onPointerOver={(event) => {
+        event.stopPropagation()
+        if (onCandleHover && event.instanceId !== undefined && event.instanceId < positions.length) {
+          onCandleHover(event.instanceId)
+        }
+      }}
+      onPointerOut={(event) => {
+        event.stopPropagation()
+        if (onCandleLeave) {
+          onCandleLeave()
+        }
+      }}
     />
   )
 }
@@ -561,7 +625,7 @@ function AnimationController({ priceDirection, priceRef, shortTermPriceRef, cont
   return null
 }
 
-export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, priceRef, shortTermPriceRef, continuousOffsetRef, additionalCandles = [], onCandleClick, clickedCandleId, isMobile = false, exclusionZone = null }) {
+export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, priceRef, shortTermPriceRef, continuousOffsetRef, additionalCandles = [], onCandleClick, onCandleHover, onCandleLeave, clickedCandleId, isMobile = false, exclusionZone = null }) {
   
   // Reset uniforms on mount to ensure clean state
   useEffect(() => {
@@ -580,7 +644,7 @@ export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUN
     }
   }, [])
   
-  const { geometries, textures, localMatrices } = useClonedGeometries('/models/tinyVotiveOnly.glb')
+  const { geometries, textures, localMatrices } = useClonedGeometries('/models/tinyJapCanOnly.glb')
   const basePositions = usePositions(count, exclusionZone)
   
   // Clean up cloned geometries on unmount
@@ -598,18 +662,22 @@ export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUN
   // Combine positions
   const positions = useMemo(() => {
     const additional = additionalCandles.map(c => ({
-      x: c.position[0],
-      y: c.position[1],
-      z: c.position[2],
-      rotation: c.rotation || Math.random() * Math.PI * 2
+      x: c.position ? c.position[0] : c.x,
+      y: c.position ? c.position[1] : c.y,
+      z: c.position ? c.position[2] : c.z,
+      rotation: c.rotation || Math.random() * Math.PI * 2,
+      scale: c.scale || 1.0,
+      litAt: c.litAt,
+      userId: c.userId,
+      username: c.username,
+      offering: c.offering
     }))
     return [...basePositions, ...additional]
   }, [basePositions, additionalCandles])
   
   // Create materials ONCE
   const materials = useMemo(() => ({
-    xbase: createXBaseMaterial(),  // Now price-reactive!
-    glass: createWobbleMaterial('#888888', { transparent: true, opacity: 0.3 }),
+    wax: createXBaseMaterial(),  // Now price-reactive!
     wick: createWobbleMaterial('#222222'),
     flame: createFlameMaterial(),  // Or createFlameMaterialPriceReactive() for tinted flames
   }), [])
@@ -618,8 +686,7 @@ export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUN
   useEffect(() => {
     return () => {
       // Dispose materials when component unmounts
-      if (materials.xbase) materials.xbase.dispose()
-      if (materials.glass) materials.glass.dispose()
+      if (materials.wax) materials.wax.dispose()
       if (materials.wick) materials.wick.dispose()
       if (materials.flame) materials.flame.dispose()
     }
@@ -643,10 +710,9 @@ export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUN
         isMobile={isMobile} 
       />
       
-      <InstancedPart geometry={geometries.xbase} material={materials.xbase} positions={positions} localMatrix={localMatrices.xbase} maxCount={maxCount} />
-      <InstancedPart geometry={geometries.wick} material={materials.wick} positions={positions} localMatrix={localMatrices.wick} maxCount={maxCount} />
-      <InstancedPart geometry={geometries.flame} material={materials.flame} positions={positions} localMatrix={localMatrices.flame} maxCount={maxCount} />
-      <InstancedPart geometry={geometries.glass} material={materials.glass} positions={positions} localMatrix={localMatrices.glass} maxCount={maxCount} onCandleClick={onCandleClick} />
+      <InstancedPart geometry={geometries.wax} material={materials.wax} positions={positions} localMatrix={localMatrices.wax} maxCount={maxCount} onCandleClick={onCandleClick} onCandleHover={onCandleHover} onCandleLeave={onCandleLeave} enableMelting={true} />
+      <InstancedPart geometry={geometries.wick} material={materials.wick} positions={positions} localMatrix={localMatrices.wick} maxCount={maxCount} enableMelting={true} />
+      <InstancedPart geometry={geometries.flame} material={materials.flame} positions={positions} localMatrix={localMatrices.flame} maxCount={maxCount} enableMelting={true} />
     </group>
   )
 })
@@ -724,39 +790,135 @@ export function PriceSimulator({ onPriceChange }) {
   return null
 }
 
-useGLTF.preload('/models/tinyVotiveOnly.glb')
+useGLTF.preload('/models/tinyJapCanOnly.glb')
 
-export default function CandleShrine({ offerings = [], onSelectOffering, onLightCandle, onPriceChange, is80sMode }) {
+export default function CandleShrine({ offerings = [], onSelectOffering, onLightCandle, onPriceChange, is80sMode, currentUserId = 'testUser123' }) {
   const [priceDirection, setPriceDirection] = useState(0)
   const [additionalCandles, setAdditionalCandles] = useState([])
+  const [highlightedCandleId, setHighlightedCandleId] = useState(-1)
+  const [selectedCandle, setSelectedCandle] = useState(null)
+  const [allPositions, setAllPositions] = useState([])
+  const [offeringCandles, setOfferingCandles] = useState([])
   const pricePercent = (priceDirection * 5).toFixed(2)
   const effectManagerRef = useRef()
   const [clickedCandleId, setClickedCandleId] = useState(null)
   
+  // Cleanup expired candles every minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now()
+      setAdditionalCandles(prev => prev.filter(candle => {
+        if (!candle.litAt) return true
+        const elapsed = (now - candle.litAt) / (1000 * 3600)
+        return elapsed < 80 // Keep if less than 80 hours old
+      }))
+    }, 60000) // Check every minute
+    
+    return () => clearInterval(interval)
+  }, [])
+  
+  // Find and focus on user's candle
+  const findUserCandle = useCallback(() => {
+    console.log('Finding candle for user:', currentUserId)
+    console.log('All positions:', allPositions)
+    const userCandleIndex = allPositions.findIndex(p => p.userId === currentUserId)
+    if (userCandleIndex !== -1) {
+      const candle = allPositions[userCandleIndex]
+      console.log('Found user candle at index:', userCandleIndex, candle)
+      setHighlightedCandleId(userCandleIndex)
+      setSelectedCandle({ ...candle, instanceId: userCandleIndex })
+      
+      // Update shader uniform to highlight the candle
+      sharedUniforms.uHighlightedId.value = userCandleIndex
+    } else {
+      console.log('No candle found for user:', currentUserId)
+      // No candle found
+      sharedUniforms.uHighlightedId.value = -1
+      setHighlightedCandleId(-1)
+      setSelectedCandle(null)
+      alert(`No candle found for user: ${currentUserId}. Check that your Firestore offering has a matching userId field.`)
+    }
+  }, [allPositions, currentUserId])
+  
   const handleNewCandle = (position, offering) => {
-    setAdditionalCandles(prev => [...prev, {
+    const newCandle = {
       position,
       offering,
       id: Date.now(),
-      rotation: Math.random() * Math.PI * 2
-    }])
+      rotation: Math.random() * Math.PI * 2,
+      scale: 0.8 + Math.random() * 0.4,
+      litAt: Date.now(),
+      userId: currentUserId,
+      username: 'Test User',
+      x: position[0],
+      y: position[1],
+      z: position[2]
+    }
+    setAdditionalCandles(prev => [...prev, newCandle])
   }
   
   const triggerNewCandle = () => {
     if (effectManagerRef.current) {
       effectManagerRef.current.triggerEffect({ name: 'Test User', type: 'petition' })
     }
+    // Also create a user candle when triggered
+    const position = [
+      (Math.random() - 0.5) * 20,
+      (Math.random() - 0.5) * 15,
+      (Math.random() - 0.5) * 10
+    ]
+    handleNewCandle(position, { text: 'User offering', type: 'petition' })
   }
   
   const handleCandleClick = (instanceId, position) => {
     setClickedCandleId(instanceId)
     setTimeout(() => setClickedCandleId(null), 2000)
     
-    if (offerings?.length > 0 && onSelectOffering) {
+    const candle = allPositions[instanceId]
+    if (candle) {
+      setSelectedCandle({ ...candle, instanceId })
+      if (candle.offering && onSelectOffering) {
+        onSelectOffering(candle.offering)
+      }
+    } else if (offerings?.length > 0 && onSelectOffering) {
       const randomIndex = Math.floor(Math.random() * offerings.length)
       onSelectOffering(offerings[randomIndex])
     }
   }
+  
+  // Convert Firestore offerings to candles
+  useEffect(() => {
+    if (offerings && offerings.length > 0) {
+      const candlesFromOfferings = offerings.map((offering, index) => {
+        // Use stored position from Firestore if available, otherwise generate random
+        const storedPos = offering.position
+        const x = storedPos?.x ?? (Math.random() - 0.5) * 30
+        const y = storedPos?.y ?? (Math.random() - 0.5) * 20  
+        const z = storedPos?.z ?? (Math.random() - 0.5) * 15
+        
+        return {
+          x: x,
+          y: y,
+          z: z,
+          rotation: Math.random() * Math.PI * 2,
+          scale: 0.8 + Math.random() * 0.4,
+          litAt: offering.createdAt?.toDate?.() || offering.timestamp?.toDate?.() || new Date(Date.now() - Math.random() * 72 * 3600 * 1000),
+          userId: offering.userId || offering.uid || `user_${index}`,
+          username: offering.userName || offering.username || 'Anonymous',
+          offering: offering,
+          position: [x, y, z],
+          id: offering.id || `offering_${index}`
+        }
+      })
+      setOfferingCandles(candlesFromOfferings)
+    }
+  }, [offerings])
+  
+  // Update allPositions when positions change
+  useEffect(() => {
+    // Combine offering candles and additional candles
+    setAllPositions([...offeringCandles, ...additionalCandles])
+  }, [offeringCandles, additionalCandles])
   
   return (
     <div style={{ width: '100%', height: '100vh', background: is80sMode ? 'transparent' : '#000', position: 'relative' }}>
@@ -802,7 +964,7 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onLight
         <CandleCloud 
           count={CANDLE_COUNT} 
           priceDirection={priceDirection} 
-          additionalCandles={additionalCandles} 
+          additionalCandles={allPositions} 
           onCandleClick={handleCandleClick} 
           clickedCandleId={clickedCandleId}
           exclusionZone={{
@@ -822,7 +984,7 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onLight
           phonePosition={[0, -3, 5]}
           cloudBounds={{ x: 20, y: 10, z: 10 }}
           onNewCandle={handleNewCandle}
-          candleModelPath="/models/tinyVotiveOnly.glb"
+          candleModelPath="/models/tinyJapCanOnly.glb"
         />
         
         <EffectComposer>
@@ -861,26 +1023,72 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onLight
         </div>
       </div>
       
-      <button
-        onClick={triggerNewCandle}
-        style={{
+      {/* Candle info overlay */}
+      {selectedCandle && (
+        <div style={{
           position: 'absolute',
-          bottom: '20px',
+          top: '20px',
           right: '20px',
-          background: 'linear-gradient(135deg, #00ff66 0%, #00aa44 100%)',
-          border: 'none',
+          background: 'rgba(0, 0, 0, 0.8)',
+          border: '1px solid rgba(255, 170, 0, 0.5)',
           borderRadius: '8px',
-          padding: '16px 32px',
+          padding: '16px',
+          color: '#fff',
+          fontFamily: 'monospace',
+          fontSize: '12px',
+          zIndex: 3,
+          minWidth: '200px',
+        }}>
+          <h3 style={{ margin: '0 0 8px 0', color: '#ffaa00' }}>
+            {selectedCandle.userId === currentUserId ? 'Your Candle' : 'Candle Info'}
+          </h3>
+          {selectedCandle.username && (
+            <div style={{ marginBottom: '4px' }}>
+              User: {selectedCandle.username}
+            </div>
+          )}
+          {selectedCandle.litAt && (
+            <>
+              <div style={{ marginBottom: '4px' }}>
+                Lit: {new Date(selectedCandle.litAt).toLocaleTimeString()}
+              </div>
+              <div style={{ marginBottom: '4px', color: '#00ff66' }}>
+                Remaining: {Math.max(0, 80 - (Date.now() - selectedCandle.litAt) / (1000 * 3600)).toFixed(1)} hours
+              </div>
+            </>
+          )}
+          {selectedCandle.offering && (
+            <div style={{ marginTop: '8px', fontStyle: 'italic' }}>
+              "{selectedCandle.offering.text || 'Offering'}"
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Find My Candle button - positioned at bottom left above stake button */}
+      <button
+        onClick={findUserCandle}
+        style={{
+          position: 'fixed',
+          bottom: '120px',
+          left: '30px',
+          background: 'linear-gradient(135deg, #ffaa00 0%, #ff8800 100%)',
+          border: 'none',
+          borderRadius: '12px',
+          padding: '12px 24px',
           color: '#000',
           fontFamily: 'monospace',
-          fontSize: '16px',
+          fontSize: '14px',
           fontWeight: 'bold',
           cursor: 'pointer',
-          boxShadow: '0 0 30px rgba(0, 255, 100, 0.4)',
-          zIndex: 3,
+          boxShadow: '0 0 30px rgba(255, 170, 0, 0.4)',
+          zIndex: 10000,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
         }}
       >
-        🕯️ Light a Candle
+        🔍 Find My Candle
       </button>
     </div>
   )

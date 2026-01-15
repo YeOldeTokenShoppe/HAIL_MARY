@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useEffect, useRef, Suspense, useCallback } from 'react'
-import dynamic from 'next/dynamic'
 import NavControlsHome from '@/components/NavControlsHome'
 import CyberNav from '@/components/CyberNav'
 import { useUser, SignInButton } from '@clerk/nextjs'
@@ -13,14 +12,12 @@ import StakeModal from '@/components/StakeModal'
 import { WalletConnectionModal } from '@/components/WalletConnectionModal'
 import { useRouter } from 'next/navigation'
 import ShrineLeftPanel from '@/components/ShrineLeftPanel'
-import { db, collection, addDoc, serverTimestamp, getDocs, query, orderBy, limit, onSnapshot, updateDoc, doc } from '@/lib/firebaseClient'
+import { db, collection, getDocs, query, orderBy, limit, onSnapshot, updateDoc, doc } from '@/lib/firebaseClient'
 import UnifiedShrine from '@/components/UnifiedShrine'
 import PolaroidDisplay from '@/components/PolaroidDisplay'
+import CoinLoader from '@/components/CoinLoader'
 
-// Lazy load CandleSnapshotRenderer to avoid SSR issues
-const CandleSnapshotRenderer = dynamic(() => import('@/components/CandleSnapshotRenderer'), {
-  ssr: false
-})
+// CandleSnapshotRenderer removed - no longer needed
 
 // Tiny Votive Model Component
 
@@ -59,8 +56,7 @@ export default function ShrinePage() {
   const [showPolaroid, setShowPolaroid] = useState(false)
   const [hasDismissedPolaroid, setHasDismissedPolaroid] = useState(false)
   const [hasLitCandleThisSession, setHasLitCandleThisSession] = useState(false)
-  const [showSnapshot, setShowSnapshot] = useState(false)
-  const [snapshotData, setSnapshotData] = useState(null)
+  // Snapshot functionality removed - no longer needed
   const [mobileBannerType, setMobileBannerType] = useState('candle') // 'candle' or 'staking'
   const is80sMode = context80sMode
   
@@ -81,10 +77,12 @@ export default function ShrinePage() {
   const [offerings, setOfferings] = useState([])
   const [totalOfferingsCount, setTotalOfferingsCount] = useState(0)
   const [isLoadingOfferings, setIsLoadingOfferings] = useState(true)
+  const [isHighlightingCandle, setIsHighlightingCandle] = useState(false)
 
 
   const [isClient, setIsClient] = useState(false)
   const [delayedMount, setDelayedMount] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
 useEffect(() => {
   setIsClient(true)
@@ -94,7 +92,8 @@ useEffect(() => {
   // Small delay to let previous page fully cleanup
   const timer = setTimeout(() => {
     setDelayedMount(true)
-  }, 100)
+    setIsLoading(false)
+  }, 500)
   
   return () => {
     clearTimeout(timer)
@@ -140,6 +139,7 @@ useEffect(() => {
           polaroidUrl: data.polaroidUrl, // Add polaroidUrl field
           imageUrl: data.imageUrl, // Also check for imageUrl field
           timestamp: data.timestamp || 'just now',
+          createdAt: data.createdAt, // Preserve the original Firestore timestamp
           icon: data.type === 'petition' ? '🙏' : 
                 data.type === 'appreciation' ? '✨' : '🖤'
         }
@@ -362,6 +362,24 @@ useEffect(() => {
     // Both signed in and wallet connected - show the modal
     setShowStakeModal(true);
   };
+
+  // Handle finding user's candle
+  const handleFindCandle = () => {
+    setIsHighlightingCandle(true);
+    // Call the UnifiedShrine's findUserCandle method
+    if (unifiedShrineRef.current) {
+      unifiedShrineRef.current.findUserCandle();
+    }
+  };
+
+  // Handle returning to main view
+  const handleResetView = () => {
+    setIsHighlightingCandle(false);
+    // Call the UnifiedShrine's resetView method
+    if (unifiedShrineRef.current) {
+      unifiedShrineRef.current.resetView();
+    }
+  };
   
   // Track if we're waiting for wallet connection and what action triggered it
   const [waitingForWallet, setWaitingForWallet] = useState(false);
@@ -433,6 +451,18 @@ useEffect(() => {
     setHasDismissedPolaroid(false);
     setPolaroidUrl(null);
     
+    // IMMEDIATELY set notification to sync with arctic rings (2.5s after candle is lit)
+    setTimeout(() => {
+      console.log('🔔 [NOTIFICATION] Showing notification when arctic rings appear');
+      setJustLitOffering(newOffering);
+      
+      // Clear notification after display duration
+      setTimeout(() => {
+        console.log('⏰ [NOTIFICATION] Clearing notification');
+        setJustLitOffering(null);
+      }, 10000); // Show for 10 seconds - nice long display time
+    }, 3500); // 2.5s to match when arctic rings appear
+    
     // Map offering types to background images
     const backgroundMap = {
       petition: 'tradingView',      // Hopeful, asking for guidance
@@ -455,9 +485,8 @@ useEffect(() => {
       createdBy: user?.id || '',
     };
     
-    console.log('[ShrinePage] Triggering snapshot capture with data:', snapData);
-    setSnapshotData(snapData);
-    setShowSnapshot(true);
+    // Snapshot functionality removed - no longer capturing polaroids
+    console.log('[ShrinePage] Snapshot capture disabled - feature removed');
     
     // Set up a function to receive the offering ID
     window.setLatestOfferingId = (id) => {
@@ -577,6 +606,9 @@ useEffect(() => {
 
   return (
     <>
+      {/* CoinLoader */}
+      <CoinLoader loading={isLoading} />
+      
       <style dangerouslySetInnerHTML={{ __html: `
         @font-face {
           font-family: 'UnifrakturMaguntia';
@@ -607,18 +639,16 @@ useEffect(() => {
             // key={`shrine-scene-${remountKey}`}
             offerings={offerings}
             totalOfferingsCount={totalOfferingsCount}
+            currentUserId={user?.id}
             onSelectOffering={setHoveredOffering}
             onLightCandle={(offering) => {
-              console.log('🔥 [SHRINE CALLBACK] setJustLitOffering called from UnifiedShrine onLightCandle:', {
+              console.log('🔥 [SHRINE CALLBACK] onLightCandle called from UnifiedShrine:', {
                 offering: offering?.username || 'Anonymous',
                 timestamp: Date.now(),
                 stack: new Error().stack?.split('\n')[1]?.trim()
               })
-              setJustLitOffering(offering)
-              setTimeout(() => {
-                console.log('⏰ [TIMEOUT] setJustLitOffering(null) called after 8000ms')
-                setJustLitOffering(null)
-              }, 8000) // 1.5s for Prayer Received + 6.5s for user info
+              // Don't set justLitOffering here - it's already set in handleLightCandle
+              // This callback happens AFTER the effect completes, which is too late
             }}
             onPriceChange={setPriceChange}
             is80sMode={is80sMode}
@@ -693,6 +723,9 @@ useEffect(() => {
           onLightCandle={handleLightCandleClick}
           onStakeClick={handleStakeClick}
           router={router}
+          onFindCandle={handleFindCandle}
+          onResetView={handleResetView}
+          isHighlighting={isHighlightingCandle}
         />
       )}
       
@@ -1545,65 +1578,9 @@ useEffect(() => {
         <WalletConnectionModal onClose={() => setShowWalletModal(false)} />
       )}
       
-      {/* Polaroid Display - Shows the saved polaroid after candle effect completes */}
-      {showPolaroid && polaroidUrl && (
-        <PolaroidDisplay
-          imageUrl={polaroidUrl}
-          isVisible={showPolaroid}
-          position={isMobileView ? 'bottom-right' : 'bottom-right'}
-          onClose={() => {
-            setShowPolaroid(false);
-            setHasDismissedPolaroid(true);
-          }}
-        />
-      )}
+
       
-      {/* Hidden CandleSnapshotRenderer for background capture - Independent of modal */}
-      {showSnapshot && snapshotData && (
-        <div style={{ 
-          position: 'fixed', 
-          left: '-9999px', 
-          top: '-9999px',
-          width: '800px',
-          height: '600px',
-          overflow: 'hidden',
-          pointerEvents: 'none',
-          opacity: 0,
-          zIndex: -9999
-        }}>
-          <Suspense fallback={null}>
-            <CandleSnapshotRenderer
-              isVisible={true}
-              userData={snapshotData}
-              instantCapture={false}
-              onComplete={(imageData) => {
-                console.log('[ShrinePage] Snapshot complete');
-              }}
-              saveToFirebase={true}
-              onFirebaseUploadComplete={(result) => {
-                console.log('[ShrinePage] Firebase upload complete:', result);
-                if (result?.storageUrl) {
-                  // Trigger the polaroid ready callback
-                  if (window.onPolaroidReady) {
-                    console.log('[ShrinePage] Calling onPolaroidReady with URL:', result.storageUrl);
-                    window.onPolaroidReady(result.storageUrl);
-                  }
-                  
-                  // Clean up state
-                  setShowSnapshot(false);
-                  setSnapshotData(null);
-                  // Don't reset isProcessingCandle to prevent modal from reappearing
-                } else {
-                  console.error('[ShrinePage] Firebase upload failed:', result);
-                  setShowSnapshot(false);
-                  setSnapshotData(null);
-                  // Don't reset isProcessingCandle to prevent modal from reappearing
-                }
-              }}
-            />
-          </Suspense>
-        </div>
-      )}
+      {/* CandleSnapshotRenderer removed - snapshots no longer needed */}
       
     </>
   )

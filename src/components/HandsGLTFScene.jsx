@@ -16,9 +16,11 @@ import { PhoneScreenTexture } from './PhoneScreenTexture'
 import { PhoneAura } from './PhoneAura'
 import { Html } from '@react-three/drei'
 import EmojiRain from './EmojiRain'
+import { AnimatedChatPhoneTexture } from './AnimatedChatPhoneTexture'
 
 
-export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView, offerings, hoveredOffering, justLitOffering, onJustLitComplete, userRotation = 0, priceChange = 0, hasActiveClick = false, is80sMode = false, onPhoneClick, user = null, showLatestPolaroid = false }) {
+
+export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView, offerings, hoveredOffering, justLitOffering, onJustLitComplete, userRotation = 0, priceChange = 0, hasActiveClick = false, is80sMode = false, onPhoneClick, user = null, showLatestPolaroid = false, isHighlighting = false }) {
   // Debug: Log all props on mount
   // useEffect(() => {
   //   if (onPhoneClick) {
@@ -53,6 +55,7 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
   const isDragging = useRef(false)
   const pacMan2Ref = useRef() // Reference for second PacMan object
   const backdropRef = useRef() // Reference for Backdrop object
+  const circleRef = useRef() // Reference for Circle object
   const [phoneCaseWorldPos, setPhoneCaseWorldPos] = useState([0, 0, 0])
   const [phoneCaseWorldQuat, setPhoneCaseWorldQuat] = useState([0, 0, 0, 1])
   const [phoneCaseWorldRotation, setPhoneCaseWorldRotation] = useState([0, 0, 0])
@@ -63,6 +66,23 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
   const randomUserImagesRef = useRef([])
   const currentImageIndexRef = useRef(0)
   
+  // Toggle visibility of Backdrop and Circle meshes based on highlighting state
+  useEffect(() => {
+    if (backdropRef.current) {
+      backdropRef.current.visible = !isHighlighting
+      backdropRef.current.traverse((node) => {
+        node.visible = !isHighlighting
+      })
+    }
+    
+    if (circleRef.current) {
+      circleRef.current.visible = !isHighlighting
+      circleRef.current.traverse((node) => {
+        node.visible = !isHighlighting
+      })
+    }
+  }, [isHighlighting])
+
   // Traverse the model to find specific meshes including phoneScreen
   useEffect(() => {
     if (!gltf) return
@@ -113,21 +133,14 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
 
 
       
-      // Look for Backdrop object and set it to always render behind everything
+      // Store reference to Backdrop mesh
       if (child.name === 'Backdrop' || child.name === 'backdrop' || child.name.toLowerCase().includes('backdrop')) {
-        // console.log('Found Backdrop mesh:', child.name)
         backdropRef.current = child
-        // Set renderOrder to ensure it renders first (behind everything)
-        child.renderOrder = -10
-        child.traverse((node) => {
-          if (node.isMesh) {
-            node.renderOrder = -10
-            if (node.material) {
-              node.material.depthWrite = true
-              node.material.depthTest = true
-            }
-          }
-        })
+      }
+      
+      // Store reference to Circle mesh
+      if (child.name === 'Circle' || child.name === 'circle' || child.name.toLowerCase().includes('circle')) {
+        circleRef.current = child
       }
     })
     
@@ -701,18 +714,32 @@ return (
     
     {/* Phone Screen Feed - Rendered as texture on the mesh */}
     {phoneScreenRef.current && (
-      <PhoneScreenTexture
-        meshRef={phoneScreenRef.current}
-        offerings={offerings}
-        hoveredOffering={hoveredOffering}
-        justLitOffering={justLitOffering}
-        hasActiveClick={hasActiveClick}
-        user={user}
-        showPolaroid={showLatestPolaroid}
-        onManualBrowse={(handlers) => {
-          phoneSwipeHandlers.current = handlers
-        }}
-      />
+<AnimatedChatPhoneTexture
+  // Existing props
+ meshRef={phoneScreenRef.current}
+  hoveredOffering={hoveredOffering}
+  justLitOffering={justLitOffering}
+  hasActiveClick={hasActiveClick}
+  user={user}
+  
+  // NEW: Trade School alerts
+  // tradeAlerts={{
+  //   action: 'LONG',        // 'LONG' | 'SHORT' | 'CLOSE'
+  //   asset: 'ETH/USD',
+  //   leverage: '3x',
+  //   pnl: '+87%'            // Only for CLOSE action
+  // }}
+  
+  // NEW: Stats for mood & milestones
+  candleCount={522}
+  totalBurned={280000}
+  priceChange={-2.5}       // 24h % change
+  prayerStats={{
+    petitions: 150,
+    confessions: 80,
+    thanks: 45
+  }}
+/>
     )}
     
     {/* Clickable overlay for phone - positioned approximately where the phone is */}
@@ -842,33 +869,61 @@ function MouseTracker({ setMousePosition }) {
 // Camera controller for focus mode animation
 export function CameraController({ focusMode, controlsRef }) {
   const { camera } = useThree()
-  const targetPosition = useRef(new THREE.Vector3(0, 0, 2))  // Match the original closer position
-  const currentPosition = useRef(new THREE.Vector3(0, 0, 2))  // Start at the original position
+  const targetPosition = useRef(new THREE.Vector3(0, 0, 5))  // Start from default camera position
+  const currentPosition = useRef(new THREE.Vector3(0, 0, 5))  // Initialize at camera default
+  const targetLookAt = useRef(new THREE.Vector3(0, 0, 0))
+  const currentLookAt = useRef(new THREE.Vector3(0, 0, 0))
+  const targetFOV = useRef(45)  // Default FOV
+  const currentFOV = useRef(45)
   const hasLoggedRef = useRef(false)
   
-  // Log when focus mode changes
-  // useEffect(() => {
-  //   console.log('CameraController: focusMode changed to:', focusMode)
-  // }, [focusMode])
+  // Initialize camera position
+  useEffect(() => {
+    camera.position.set(0, 0, 5)
+    currentPosition.current.set(0, 0, 5)
+    targetPosition.current.set(0, 0, 5)
+    camera.fov = 45
+    currentFOV.current = 45
+    camera.updateProjectionMatrix()
+  }, [camera])
   
   useFrame(() => {
-    // Set target position based on focus mode
+    // Set target position, look-at, and FOV based on focus mode
     if (focusMode) {
-      targetPosition.current.set(0, -0.8, -2) // Negative z for extreme close-up, raised Y for better angle
+      // Move camera closer to the phone while maintaining forward view
+      // Reduce FOV for zoom effect (like telephoto lens)
+      targetPosition.current.set(0, 0.7, 2.5) // Get closer to phone
+      targetLookAt.current.set(0, 0.0, 0) // Look slightly up at phone
+      targetFOV.current = 30 // Narrow FOV for dramatic zoom effect
       if (!hasLoggedRef.current) {
+        console.log('Entering focus mode - zooming to phone')
         hasLoggedRef.current = true
       }
     } else {
-      targetPosition.current.set(0, 0, 2) // Default position - closer to match original
+      // Default view position
+      targetPosition.current.set(0, 0, 5) 
+      targetLookAt.current.set(0, 0, 0)
+      targetFOV.current = 45 // Normal FOV
       hasLoggedRef.current = false
     }
     
-    // Smooth lerp to target position
-    currentPosition.current.lerp(targetPosition.current, 0.1)
+    // Smooth lerp to target position and FOV
+    currentPosition.current.lerp(targetPosition.current, 0.08)
+    currentLookAt.current.lerp(targetLookAt.current, 0.08)
+    currentFOV.current = THREE.MathUtils.lerp(currentFOV.current, targetFOV.current, 0.08)
+    
     camera.position.copy(currentPosition.current)
+    camera.lookAt(currentLookAt.current)
+    
+    // Update FOV if it changed significantly
+    if (Math.abs(camera.fov - currentFOV.current) > 0.01) {
+      camera.fov = currentFOV.current
+      camera.updateProjectionMatrix()
+    }
     
     // Update OrbitControls to prevent conflicts
     if (controlsRef?.current) {
+      controlsRef.current.target.copy(currentLookAt.current)
       controlsRef.current.update()
     }
   })
@@ -1011,7 +1066,7 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
       
       {/* 3D Canvas */}
       <Canvas
-        camera={{ position: [0, -0.5, 5], fov: 45 }}
+        camera={{ position: [0, 0, 5], fov: 45 }}
         style={{ 
           width: '100%', 
           height: '100%',

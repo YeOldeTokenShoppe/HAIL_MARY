@@ -24,9 +24,7 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
   const [showWalletConnection, setShowWalletConnection] = useState(false);
   const [showWalletDetails, setShowWalletDetails] = useState(false);
   const [showClerkDropdown, setShowClerkDropdown] = useState(false);
-  const [userPolaroids, setUserPolaroids] = useState([]);
-  const [loadingPolaroids, setLoadingPolaroids] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState(null);
+  // Polaroid and candle functionality removed
   
   // Listen for external wallet details event
   useEffect(() => {
@@ -38,7 +36,8 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
     return () => window.removeEventListener('openWalletDetails', handleOpenWalletDetails);
   }, []);
   
-  // Load polaroids from Firestore when modal opens
+  // Polaroid fetching removed
+  /* Removed useEffect for fetching polaroids
   useEffect(() => {
     const fetchUserPolaroids = async () => {
       if (!isOpen || !walletAddress) return;
@@ -138,9 +137,10 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
       }
     };
     
-    fetchUserPolaroids();
-  }, [isOpen, walletAddress]);
+    // fetchUserPolaroids();
+  }, [isOpen, walletAddress]); */
 
+  /* Timer functionality removed
   // Update time remaining every minute
   useEffect(() => {
     if (!timeRemaining || timeRemaining <= 0) return;
@@ -158,10 +158,11 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
     }, 60000); // Update every minute
     
     return () => clearInterval(interval);
-  }, [timeRemaining, userPolaroids]);
+  }, [timeRemaining, userPolaroids]); */
 
   if (!isOpen) return null;
 
+  /* Helper function removed
   // Helper function to format time remaining
   const formatTimeRemaining = (ms) => {
     if (!ms || ms <= 0) return 'Expired';
@@ -178,7 +179,7 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
     } else {
       return `${minutes}m`;
     }
-  };
+  }; */
 
   const handleSignOut = async () => {
     await signOut({ redirectUrl: pathname || '/' });
@@ -204,12 +205,6 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
               onClick={() => setActiveTab('wallet')}
             >
               Wallet
-            </button>
-            <button 
-              className={`modal-tab ${activeTab === 'polaroids' ? 'active' : ''}`}
-              onClick={() => setActiveTab('candle')}
-            >
-              Candle {userPolaroids.length > 0 && `(${userPolaroids.length})`}
             </button>
           </div>
 
@@ -335,151 +330,7 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
                   </div>
                 )}
               </div>
-            ) : activeTab === 'candle' ? (
-              <div className="polaroids-content">
-                {loadingPolaroids ? (
-                  <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa', width: '100%' }}>
-                    <div style={{ 
-                      width: '32px', 
-                      height: '32px', 
-                      border: '3px solid rgba(0, 245, 212, 0.3)', 
-                      borderTop: '3px solid #00f5d4', 
-                      borderRadius: '50%', 
-                      animation: 'spin 1s linear infinite',
-                      margin: '0 auto 16px auto'
-                    }}></div>
-                    <p>Loading your candle...</p>
-                  </div>
-                ) : userPolaroids.length > 0 ? (
-                  <>
-                    <p style={{ marginBottom: '20px', color: '#aaa', textAlign: 'center', width: '100%' }}>
-                      Your current prayer candle
-                    </p>
-                    
-                    {/* Current Candle Timer */}
-                    {timeRemaining !== null && (
-                      <div style={{
-                        background: 'rgba(139, 92, 246, 0.1)',
-                        border: '1px solid rgba(139, 92, 246, 0.3)',
-                        borderRadius: '12px',
-                        padding: '16px',
-                        marginBottom: '20px',
-                        textAlign: 'center'
-                      }}>
-                        <div style={{
-                          fontSize: '14px',
-                          color: '#aaa',
-                          marginBottom: '4px'
-                        }}>
-                          Current Candle Status
-                        </div>
-                        <div style={{
-                          fontSize: '18px',
-                          fontWeight: 'bold',
-                          color: timeRemaining > 0 ? '#8b5cf6' : '#ff6b6b'
-                        }}>
-                          {timeRemaining > 0 ? (
-                            <>🕯️ {formatTimeRemaining(timeRemaining)} remaining</>
-                          ) : (
-                            <>⏰ Expired - Light a new candle</>
-                          )}
-                        </div>
-                        {timeRemaining > 0 && (
-                          <div style={{
-                            fontSize: '12px',
-                            color: '#666',
-                            marginTop: '4px'
-                          }}>
-                            Your candle will expire in {formatTimeRemaining(timeRemaining)}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    <div className="polaroids-grid" style={{
-                      display: 'grid',
-                      // gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))',
-                      gap: '12px',
-                      padding: '10px',
-                      marginBottom: '20px',
-                      width: '100%'
-                    }}>
-                      {userPolaroids.map((polaroid, index) => (
-                        <div 
-                          key={index}
-                          className="polaroid-thumbnail"
-                          style={{
-                            // background: 'white',
-                            padding: '4px',
-                            borderRadius: '2px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                            position: 'relative'
-                          }}
-                          onClick={() => {
-                            // Open polaroid in new tab
-                            window.open(polaroid.url, '_blank');
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = 'scale(1.05) rotate(-1deg)';
-                            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = 'scale(1) rotate(0deg)';
-                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-                          }}
-                        >
-                          <div style={{
-                            width: '100%',
-                            paddingBottom: '100%',
-                            position: 'relative',
-                            overflow: 'hidden',
-                            // backgroundColor: '#f0f0f0'
-                          }}>
-                            <img 
-                              src={polaroid.url} 
-                              alt={`Polaroid ${index + 1}`}
-                              style={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                width: '100%',
-                                height: '100%',
-                                objectFit: 'cover'
-                              }}
-                            />
-                          </div>
-                          <div style={{
-                            fontSize: '16px',
-                            textAlign: 'center',
-                            marginTop: '4px',
-                            color: '#666',
-                            fontWeight: 'bold'
-                          }}>
-                            {polaroid.burnedAmount} RL80
-                          </div>
-                          <div style={{
-                            fontSize: '16px',
-                            textAlign: 'center',
-                            color: '#999',
-                            marginTop: '2px'
-                          }}>
-                            {new Date(polaroid.timestamp).toLocaleDateString()}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <div style={{ textAlign: 'center', padding: '40px 20px', color: '#aaa', width: '100%' }}>
-                    <p>No polaroids yet</p>
-                    <p style={{ fontSize: '14px', marginTop: '10px' }}>
-                      Light a candle to create your first polaroid
-                    </p>
-                  </div>
-                )}
-              </div>
-            ) : null}
+            ) : null /* Candle tab content removed */}
           </div>
         </div>
       </div>
@@ -661,8 +512,7 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
         }
         
         .account-content,
-        .wallet-content,
-        .polaroids-content {
+        .wallet-content {
           animation: fadeIn 0.3s;
           display: flex;
           flex-direction: column;

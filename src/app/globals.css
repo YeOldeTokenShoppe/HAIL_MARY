@@ -6780,6 +6780,10 @@ body [data-clerk-portal] > div > div {
   overflow: hidden !important;
 }
 
+.cl-internal-170nzcq {
+margin-top: -15% !important;
+}
+
 /* Removed corner bracket attempts - keeping clean rounded design */
 
 /* Subtle magenta glow pulse animation */

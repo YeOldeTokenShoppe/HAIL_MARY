@@ -151,12 +151,11 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
           background-origin: border-box;
           background-clip: padding-box, border-box;
           border-radius: 20px;
-          padding: 1rem;
-          padding-bottom: 1.25rem;
+          padding: 1.5rem;
           width: 90%;
-          max-width: 30vw;
-          height: auto;
-         
+          max-width: 480px;
+          max-height: 90vh;
+          overflow: hidden;
           position: relative;
           animation: fadeIn 0.4s ease-out;
           display: flex;
@@ -164,29 +163,11 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
           box-shadow: 0 20px 60px rgba(0, 245, 212, 0.3);
         }
         
-        /* Desktop scaling - keep modal reasonable size */
-        @media (min-width: 1200px) and (min-height: 800px) {
-          .modal-content {
-     
-          }
-        }
-        
-        @media (min-width: 1600px) and (min-height: 900px) {
-          .modal-content {
-    
-          }
-        }
-        
         /* Height-based media queries */
-        @media (max-height: 800px) {
-          .modal-content {
- 
-          }
-        }
-        
         @media (max-height: 700px) {
           .modal-content {
-     
+            max-height: 95vh;
+            padding: 1rem;
           }
         }
 
@@ -223,7 +204,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
 
 
         .form-group {
-          margin-bottom: 1rem;
+          margin-bottom: 0.75rem;
         }
 
         .form-label {
@@ -408,9 +389,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
           </div>
         ) : showSuccess ? (
           // Success Dashboard with Staking Info
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{
-            maxWidth: '500px !important'
-          }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <button 
               onClick={onClose}
               style={{
@@ -722,8 +701,8 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
             {/* Decorative Image with Title Overlay */}
             <div style={{
               width: '100%',
-              height: '22rem',
-              marginBottom: '0.5rem',
+              height: '240px',
+              marginBottom: '0.75rem',
               borderRadius: '12px',
               overflow: 'hidden',
               position: 'relative',
@@ -880,8 +859,8 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                 background: 'rgba(0, 245, 212, 0.05)',
                 border: '1px solid rgba(0, 245, 212, 0.2)',
                 borderRadius: '8px',
-                padding: '0.75rem',
-                marginBottom: '1rem',
+                padding: '0.5rem',
+                marginBottom: '0.5rem',
                 fontSize: '0.65rem',
                 color: 'rgba(255, 255, 255, 0.8)',
                 lineHeight: '1.4',
@@ -905,27 +884,16 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
             <form onSubmit={handleSubmit} style={{ 
               display: 'flex', 
               flexDirection: 'column', 
-              flex: 1, 
-              minHeight: 0,
-              overflow: 'hidden' 
+              gap: '0.5rem'
             }}>
-              {/* Scrollable content area */}
-              <div style={{
-                flex: 1,
-                overflowY: 'auto',
-                overflowX: 'hidden',
-                paddingRight: '0.5rem',
-                marginRight: '-0.5rem',
-                minHeight: 0
-              }}>
               {/* Compact Lock Period Display - Info Banner Style */}
               <div style={{
                 background: 'linear-gradient(90deg, rgba(0, 245, 212, 0.05), rgba(0, 187, 255, 0.05))',
                 border: 'none',
                 borderLeft: '3px solid #00f5d4',
                 borderRadius: '4px',
-                padding: '0.5rem 0.75rem',
-                marginBottom: '0.5rem',
+                padding: '0.4rem 0.6rem',
+                marginBottom: '0.4rem',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
@@ -967,7 +935,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
               </div>
 
               {/* Stake Amount Input */}
-              <div className="form-group" style={{ marginBottom: '0.5rem', maxHeight: '8rem' }}>
+              <div className="form-group" style={{ marginBottom: '0' }}>
                 <label className="form-label" htmlFor="stakeAmount">
                   Amount to Stake
                 </label>
@@ -1003,8 +971,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                   background: 'rgba(255, 215, 0, 0.03)',
                   border: '1px solid rgba(255, 215, 0, 0.2)',
                   borderRadius: '8px',
-                  padding: '0.35rem 0.5rem',
-                  marginBottom: '0.4rem',
+                  padding: '0.5rem 0.75rem',
                   fontSize: '0.75rem',
                   color: 'rgba(255, 255, 255, 0.8)',
                 }}>
@@ -1025,14 +992,6 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                   </div>
                 </div>
               )}
-              </div>
-
-              {/* Button Container - Sticky at bottom */}
-              <div style={{
-                // marginTop: 'auto',
-                paddingTop: '0.5rem',
-                flexShrink: 0
-              }}>
               {/* Single Stake Button - handles approval automatically */}
               {activeAccount?.sendTransaction ? (
                 // Test wallet - handle approve and stake in one flow
@@ -1161,16 +1120,16 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                     console.log("Contract chain:", stakingContract.chain?.id);
                     
                     // Prepare the stake transaction
-                    const tx = prepareContractCall({
+                    const stakeTx = prepareContractCall({
                       contract: stakingContract,
                       method: "stake",
                       params: [amountInWei]
                     });
                     
-                    console.log("Prepared transaction:", tx);
-                    return tx;
+                    console.log("Prepared transaction:", stakeTx);
+                    return stakeTx;
                   }}
-                  getApprovalForTransaction={async (tx) => {
+                  getApprovalForTransaction={async () => {
                     // This will automatically handle approval if needed
                     const amountInWei = toWei(stakeAmount || "0");
                     console.log("Getting approval for amount:", amountInWei.toString());
@@ -1261,7 +1220,6 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                   {transactionStatus === 'confirming' ? 'Processing...' : `Stake ${stakeAmount || '0'} RL80`}
                 </TransactionButton>
               )}
-              </div>
               </form>
               
           </div>

@@ -1,10 +1,11 @@
-import React, { useRef, useEffect, useMemo, useState } from 'react'
-import * as THREE from 'three'
-import { useFrame } from '@react-three/fiber'
-import { db, collection, query, orderBy, limit, onSnapshot } from '@/lib/firebaseClient'
+import React, { useRef, useEffect, useMemo, useState } from 'react';
+import * as THREE from 'three';
+import { useFrame } from '@react-three/fiber';
+import { db, collection, query, orderBy, limit, onSnapshot } from '@/lib/firebaseClient';
 
 // Global tracker to prevent duplicate Prayer Received for the same offering
-let shownPrayerForOfferings = new Set()
+// Use WeakSet to allow garbage collection of old offerings
+const shownPrayerForOfferings = new Map() // Use Map with timestamp cleanup
 
 // Component that renders the phone feed as a texture on the mesh
 export function PhoneScreenTexture({ 
@@ -20,8 +21,40 @@ export function PhoneScreenTexture({
   // Add unique ID to track multiple instances
   const instanceId = useRef(Math.random().toString(36).substring(7));
   
+  // Cleanup refs for proper disposal
+  const imagesToCleanup = useRef([]);
+  const listenersToCleanup = useRef([]);
+  
   useEffect(() => {
-    return () => console.log(`[PhoneScreenTexture-${instanceId.current}] Component unmounting`);
+    return () => {
+      console.log(`[PhoneScreenTexture-${instanceId.current}] Component unmounting - cleaning up`);
+      
+      // Clean up image objects
+      imagesToCleanup.current.forEach(img => {
+        if (img && img.src) {
+          img.onload = null;
+          img.onerror = null;
+          img.src = '';
+        }
+      });
+      imagesToCleanup.current = [];
+      
+      // Clean up listeners
+      listenersToCleanup.current.forEach(cleanup => {
+        if (typeof cleanup === 'function') cleanup();
+      });
+      listenersToCleanup.current = [];
+      
+      // Clean up canvas context reference
+      canvasContextRef.current = null;
+      
+      // Clear other refs
+      polaroidImageRef.current = null;
+      userAvatarRef.current = null;
+      hoveredPolaroidImageRef.current = null;
+      previousPolaroidImageRef.current = null;
+      customImagesRef.current = {};
+    };
   }, []);
   const canvasRef = useRef(document.createElement('canvas'))
   const textureRef = useRef()
@@ -63,8 +96,9 @@ export function PhoneScreenTexture({
   // Initialize canvas
   useEffect(() => {
     const canvas = canvasRef.current
-    canvas.width = 768  // Even higher resolution for better quality
-    canvas.height = 1536  // Double the resolution
+    // Balanced resolution for memory usage and visual quality
+    canvas.width = 640  // Compromise between 512 and 768
+    canvas.height = 1280  // Compromise between 1024 and 1536
     
     // Create texture from canvas
     const texture = new THREE.CanvasTexture(canvas)
@@ -92,8 +126,15 @@ export function PhoneScreenTexture({
     }
     
     return () => {
-      texture.dispose()
-      material.dispose()
+      // Proper cleanup of THREE.js resources
+      if (texture && !texture.disposed) {
+        texture.dispose()
+      }
+      if (material && material.dispose) {
+        material.dispose()
+      }
+      textureRef.current = null
+      materialRef.current = null
     }
   }, [meshRef])
   
@@ -105,6 +146,10 @@ export function PhoneScreenTexture({
     if (user?.imageUrl && !avatarLoadedRef.current) {
       const img = new Image()
       img.crossOrigin = 'anonymous'
+      
+      // Add to cleanup list
+      imagesToCleanup.current.push(img)
+      
       img.onload = () => {
         avatarImageRef.current = img
         avatarLoadedRef.current = true
@@ -113,6 +158,15 @@ export function PhoneScreenTexture({
         avatarLoadedRef.current = true // Mark as loaded even on error
       }
       img.src = user.imageUrl
+      
+      return () => {
+        // Cleanup on unmount or when imageUrl changes
+        if (img) {
+          img.onload = null
+          img.onerror = null
+          img.src = ''
+        }
+      }
     }
   }, [user?.imageUrl])
   
@@ -133,8 +187,6 @@ export function PhoneScreenTexture({
       
       snapshot.forEach((doc) => {
         const data = doc.data();
-        
-
         
         // The offerings collection uses 'polaroidUrl' field for the image
         const imageData = data.polaroidUrl;
@@ -157,8 +209,6 @@ export function PhoneScreenTexture({
           return;
         }
         
-
-        
         // Include offering with polaroid
         polaroidsWithData.push({
           id: doc.id,
@@ -174,14 +224,13 @@ export function PhoneScreenTexture({
         });
       });
       
-
-      
-      setAllPolaroids(polaroidsWithData);
+      // Limit to prevent memory issues - only keep most recent 10 polaroids
+      const limitedPolaroids = polaroidsWithData.slice(0, 10);
+      setAllPolaroids(limitedPolaroids);
       
       // Set the first one as current
-      if (polaroidsWithData.length > 0) {
-
-        setLatestPolaroid(polaroidsWithData[0]);
+      if (limitedPolaroids.length > 0) {
+        setLatestPolaroid(limitedPolaroids[0]);
         polaroidIndexRef.current = 0;
         
         // If this is the first load, start fade-in transition
@@ -189,14 +238,21 @@ export function PhoneScreenTexture({
           fadeInStartRef.current = Date.now();
           setFadeInProgress(0);
         }
-      } else {
       }
       
       // Mark loading as complete after first data arrives
       setIsLoadingInitialData(false);
+    }, (error) => {
+      console.error('PhoneScreenTexture: Firebase listener error:', error);
+      setIsLoadingInitialData(false);
     });
     
-    return () => unsubscribe();
+    // Add to cleanup listeners
+    listenersToCleanup.current.push(unsubscribe);
+    
+    return () => {
+      unsubscribe();
+    };
   }, []) // Always run this effect
   
   // Load current polaroid image
@@ -213,6 +269,9 @@ export function PhoneScreenTexture({
 
       
       const img = new Image();
+      
+      // Add to cleanup list
+      imagesToCleanup.current.push(img);
       
       // Only set crossOrigin for URLs, not base64
       if (!isBase64) {
@@ -245,6 +304,15 @@ export function PhoneScreenTexture({
       } catch (e) {
         console.error('[PhoneScreen] Error setting image src:', e);
       }
+      
+      return () => {
+        // Cleanup on effect change
+        if (img) {
+          img.onload = null;
+          img.onerror = null;
+          img.src = '';
+        }
+      };
     } else if (latestPolaroid) {
       console.warn('[PhoneScreen] ⚠️ Polaroid data missing imageUrl:', latestPolaroid);
       polaroidLoadedRef.current = false;
@@ -266,6 +334,9 @@ export function PhoneScreenTexture({
       const avatarImg = new Image();
       avatarImg.crossOrigin = 'anonymous';
       
+      // Add to cleanup list
+      imagesToCleanup.current.push(avatarImg);
+      
       avatarImg.onload = () => {
         userAvatarRef.current = avatarImg;
         userAvatarLoadedRef.current = true;
@@ -278,6 +349,15 @@ export function PhoneScreenTexture({
       };
       
       avatarImg.src = latestPolaroid.userImageUrl;
+      
+      return () => {
+        // Cleanup on effect change
+        if (avatarImg) {
+          avatarImg.onload = null;
+          avatarImg.onerror = null;
+          avatarImg.src = '';
+        }
+      };
     } else {
       userAvatarLoadedRef.current = false;
       userAvatarRef.current = null;
@@ -288,16 +368,37 @@ export function PhoneScreenTexture({
   const customImagesRef = useRef({})
   
   useEffect(() => {
+    const loadedImages = []
+    
     offerings.forEach(offering => {
       if (offering.customImage && !customImagesRef.current[offering.id]) {
         const img = new Image()
         img.crossOrigin = 'anonymous'
+        
+        // Add to cleanup list
+        imagesToCleanup.current.push(img)
+        loadedImages.push(img)
+        
         img.onload = () => {
           customImagesRef.current[offering.id] = img
+        }
+        img.onerror = () => {
+          console.error('[PhoneScreen] Failed to load custom image for offering:', offering.id)
         }
         img.src = offering.customImage
       }
     })
+    
+    return () => {
+      // Cleanup custom images on offerings change
+      loadedImages.forEach(img => {
+        if (img) {
+          img.onload = null
+          img.onerror = null
+          img.src = ''
+        }
+      })
+    }
   }, [offerings])
   
   // Draw loading animation
@@ -352,14 +453,22 @@ export function PhoneScreenTexture({
     ctx.textAlign = 'left'
   }
   
+  // Memoize canvas context to avoid repeated creation
+  const canvasContextRef = useRef(null);
+  
   // Draw the phone interface
   const drawPhoneInterface = () => {
     const canvas = canvasRef.current
-    const ctx = canvas.getContext('2d', { 
-      alpha: false,
-      desynchronized: false,
-      willReadFrequently: false
-    })
+    
+    // Reuse canvas context instead of creating new one each time
+    if (!canvasContextRef.current) {
+      canvasContextRef.current = canvas.getContext('2d', { 
+        alpha: false,
+        desynchronized: false,
+        willReadFrequently: false
+      });
+    }
+    const ctx = canvasContextRef.current;
     const width = canvas.width
     const height = canvas.height
     
@@ -966,10 +1075,10 @@ export function PhoneScreenTexture({
     // Username text to the right of avatar
     ctx.fillStyle = '#fff'
     ctx.font = 'bold 64px -apple-system, BlinkMacSystemFont, sans-serif'
-    ctx.fillText(offering.name || 'Anonymous', avatarX + avatarSize + 30, y + 140)
+    ctx.fillText(offering.name || 'Anonymous', avatarX + avatarSize + 70, y + 100)
     
     // Add a colored accent pill/badge on the right side
-    const pillY = y + 110
+    const pillY = y + 70
     const pillHeight = 50
     const pillWidth = 220
     const pillX = width - padding - pillWidth - 40  // Position on right side
@@ -1023,26 +1132,6 @@ export function PhoneScreenTexture({
       }
       
       // Draw custom image if available
-      if (offering.customImage && customImagesRef.current[offering.id]) {
-        const customImg = customImagesRef.current[offering.id]
-        const imgWidth = 400
-        const imgHeight = 300
-        const imgX = width / 2 - imgWidth / 2
-        const imgY = lineY + 40
-        
-        // Draw rounded border for image
-        ctx.save()
-        roundedRect(imgX - 5, imgY - 5, imgWidth + 10, imgHeight + 10, 15)
-        ctx.strokeStyle = config.accent
-        ctx.lineWidth = 3
-        ctx.stroke()
-        
-        // Clip and draw image
-        roundedRect(imgX, imgY, imgWidth, imgHeight, 12)
-        ctx.clip()
-        ctx.drawImage(customImg, imgX, imgY, imgWidth, imgHeight)
-        ctx.restore()
-      }
     }
     
     // Draw tokens burned - larger and at the bottom
@@ -1166,72 +1255,7 @@ export function PhoneScreenTexture({
   }
   
   // Track when offerings change and load hovered offering's polaroid
-  useEffect(() => {
-    if (hoveredOffering) {
-      lastInteractionTime.current = Date.now()
-      
-      console.log('[PhoneScreen] 🎯 Hovered offering changed:', {
-        id: hoveredOffering.id,
-        name: hoveredOffering.name,
-        message: hoveredOffering.message?.substring(0, 50),
-        hasPolaroidUrl: !!hoveredOffering.polaroidUrl,
-        hasImageUrl: !!hoveredOffering.imageUrl,
-        polaroidUrl: hoveredOffering.polaroidUrl?.substring(0, 100)
-      });
-      
-      // Check if hoveredOffering has polaroid data
-      if (hoveredOffering.polaroidUrl || hoveredOffering.imageUrl) {
-        const tempPolaroid = {
-          id: hoveredOffering.id,
-          username: hoveredOffering.name || hoveredOffering.recipientName || 'Anonymous',
-          message: hoveredOffering.message,
-          imageUrl: hoveredOffering.polaroidUrl || hoveredOffering.imageUrl,
-          userImageUrl: hoveredOffering.userImageUrl,
-          tokensBurned: hoveredOffering.tokensBurned,
-          type: hoveredOffering.type,
-          timestamp: hoveredOffering.timestamp
-        };
-        
-        console.log('[PhoneScreen] 📸 Creating hovered polaroid:', {
-          id: tempPolaroid.id,
-          username: tempPolaroid.username,
-          imageUrl: tempPolaroid.imageUrl?.substring(0, 100)
-        });
-        
-        setHoveredPolaroid(tempPolaroid);
-        
-        // Load the image for the hovered polaroid
-        if (tempPolaroid.imageUrl) {
-          hoveredPolaroidLoadedRef.current = false;
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          
-          img.onload = () => {
-            console.log('[PhoneScreen] ✅ Hovered polaroid image loaded:', tempPolaroid.id);
-            hoveredPolaroidImageRef.current = img;
-            hoveredPolaroidLoadedRef.current = true;
-          };
-          
-          img.onerror = () => {
-            console.error('[PhoneScreen] Failed to load hovered polaroid image');
-            hoveredPolaroidLoadedRef.current = false;
-            hoveredPolaroidImageRef.current = null;
-          };
-          
-          img.src = tempPolaroid.imageUrl;
-        }
-      } else {
-        setHoveredPolaroid(null);
-        hoveredPolaroidImageRef.current = null;
-        hoveredPolaroidLoadedRef.current = false;
-      }
-    } else {
-      // Clear hovered polaroid when not hovering
-      setHoveredPolaroid(null);
-      hoveredPolaroidImageRef.current = null;
-      hoveredPolaroidLoadedRef.current = false;
-    }
-  }, [hoveredOffering])
+ 
   
   // Track when justLitOffering changes to start the Prayer Received animation
   // Only show Prayer Received once per offering using a unique identifier
@@ -1260,13 +1284,23 @@ export function PhoneScreenTexture({
     if (justLitOffering && !previousJustLitOffering.current && offeringId && !shownPrayerForOfferings.has(offeringId)) {
       console.log(`[PhoneScreen-${instanceId.current}] 🙏 Starting Prayer Received timer for:`, justLitOffering.username || 'Anonymous', 'ID:', offeringId)
       prayerReceivedStartTime.current = now
-      shownPrayerForOfferings.add(offeringId)
+      shownPrayerForOfferings.set(offeringId, now)
       
       // Clean up old offerings after 5 minutes to prevent memory leaks
-      setTimeout(() => {
+      const cleanupTimer = setTimeout(() => {
         shownPrayerForOfferings.delete(offeringId)
         console.log(`[PhoneScreen] 🧹 Cleaned up offering ID:`, offeringId)
       }, 5 * 60 * 1000)
+      
+      // Add cleanup timer to cleanup list
+      listenersToCleanup.current.push(() => clearTimeout(cleanupTimer))
+      
+      // Clean up old entries regularly to prevent map from growing indefinitely
+      for (const [id, timestamp] of shownPrayerForOfferings.entries()) {
+        if (now - timestamp > 10 * 60 * 1000) { // Remove entries older than 10 minutes
+          shownPrayerForOfferings.delete(id)
+        }
+      }
     } else if (justLitOffering && !previousJustLitOffering.current && offeringId && shownPrayerForOfferings.has(offeringId)) {
       console.log(`[PhoneScreen-${instanceId.current}] ⏭️ Skipping Prayer Received - already shown for offering:`, offeringId)
     }
@@ -1328,7 +1362,7 @@ export function PhoneScreenTexture({
     }
   }, [onManualBrowse, offerings.length])
   
-  // Update canvas every frame
+  // Update canvas every frame with throttling
   useFrame(() => {
     frameCount.current++
     const now = Date.now()
@@ -1342,8 +1376,8 @@ export function PhoneScreenTexture({
       
       // Force redraw during fade-in
       drawPhoneInterface()
-    } else if (frameCount.current % 10 === 0 || hoveredOffering || justLitOffering || showPolaroid || isLoadingInitialData) {
-      // Update every 10 frames or when offerings change
+    } else if (frameCount.current % 15 === 0 || hoveredOffering || justLitOffering || showPolaroid || isLoadingInitialData) {
+      // Update every 15 frames (instead of 10) or when offerings change - reduced for better performance
       drawPhoneInterface()
     }
     
