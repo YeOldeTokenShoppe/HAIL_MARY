@@ -35,10 +35,14 @@ class LighterStandaloneService {
     // Lighter configuration - following SignerClient pattern
     this.lighterConfig = {
       baseUrl: process.env.NEXT_PUBLIC_LIGHTER_BASE_URL || 'https://testnet.zklighter.elliot.ai',
+      // New dual-key configuration
+      apiKey: process.env.LIGHTER_API_KEY,                           // 80-char API key for authentication
+      walletPrivateKey: process.env.LIGHTER_WALLET_PRIVATE_KEY,      // 64-char wallet key for signing
+      // Legacy support (fallback to old env vars if new ones not set)
       apiKeyPrivateKey: process.env.LIGHTER_API_KEY_PRIVATE_KEY,
       apiKeyPublicKey: process.env.LIGHTER_API_KEY_PUBLIC_KEY,
       accountIndex: parseInt(process.env.LIGHTER_ACCOUNT_INDEX || '0'),
-      apiKeyIndex: parseInt(process.env.LIGHTER_API_KEY_INDEX || '2') // Updated to match your .env
+      apiKeyIndex: parseInt(process.env.LIGHTER_API_KEY_INDEX || '2')
     };
     
     // Validate configuration
@@ -57,31 +61,57 @@ class LighterStandaloneService {
   }
 
   validateConfiguration() {
+    console.log('🔐 Validating Lighter configuration...');
+    
+    // Check for new dual-key configuration
+    if (this.lighterConfig.apiKey && this.lighterConfig.walletPrivateKey) {
+      console.log('✅ Found dual-key configuration (API key + wallet private key)');
+      
+      // Validate API key (should be 80 characters)
+      const apiKey = this.lighterConfig.apiKey.trim();
+      if (apiKey.length === 80 && /^[0-9a-fA-F]+$/.test(apiKey)) {
+        console.log('✅ API key format valid (80 hex characters)');
+      } else {
+        console.error('❌ API key format invalid. Expected 80 hex characters, got:', apiKey.length);
+      }
+      
+      // Validate wallet private key (should be 64 characters)
+      let walletKey = this.lighterConfig.walletPrivateKey.trim();
+      if (walletKey.startsWith('0x')) {
+        walletKey = walletKey.slice(2);
+      }
+      
+      if (walletKey.length === 64 && /^[0-9a-fA-F]+$/.test(walletKey)) {
+        console.log('✅ Wallet private key format valid (64 hex characters)');
+      } else {
+        console.error('❌ Wallet private key format invalid. Expected 64 hex characters, got:', walletKey.length);
+      }
+      
+      return;
+    }
+    
+    // Fallback to legacy configuration
     if (!this.lighterConfig.apiKeyPrivateKey) {
-      console.log('⚠️ LIGHTER_API_KEY_PRIVATE_KEY not configured - service will run in read-only mode');
+      console.log('⚠️ No Lighter keys configured - service will run in read-only mode');
       return;
     }
 
-    // Check private key format - should be 64 hex characters (without 0x prefix)
+    console.log('⚠️ Using legacy key configuration - consider updating to dual-key setup');
+    
+    // Legacy validation (for backward compatibility)
     let privateKey = this.lighterConfig.apiKeyPrivateKey.trim();
     if (privateKey.startsWith('0x')) {
       privateKey = privateKey.slice(2);
     }
 
-    console.log('🔐 Validating private key format...');
-    console.log('🔐 Raw private key length:', this.lighterConfig.apiKeyPrivateKey.length);
-    console.log('🔐 Processed key length:', privateKey.length);
+    console.log('🔐 Legacy key length:', privateKey.length);
 
-    // Standard private key should be 64 hex characters
     if (privateKey.length === 64 && /^[0-9a-fA-F]+$/.test(privateKey)) {
-      console.log('✅ Standard private key format detected (64 hex chars)');
-    } else if (privateKey.length > 64) {
-      console.log('⚠️ Extended private key format detected - this might be an API key rather than a wallet private key');
-      console.log('⚠️ Please verify with Lighter documentation that this is the correct format');
+      console.log('✅ Legacy standard private key format detected');
+    } else if (privateKey.length === 80 && /^[0-9a-fA-F]+$/.test(privateKey)) {
+      console.log('✅ Legacy extended API key format detected');
     } else {
-      console.error('❌ Invalid private key format detected');
-      console.error('❌ Expected: 64 hex characters or extended API key format');
-      console.error('❌ Current length:', privateKey.length);
+      console.error('❌ Invalid legacy key format');
     }
   }
 
@@ -265,9 +295,81 @@ class LighterStandaloneService {
   }
 
   async createLighterAuthToken() {
+    // Check for dual-key configuration first
+    if (this.lighterConfig.apiKey && this.lighterConfig.walletPrivateKey) {
+      return this.createDualKeyAuthToken();
+    }
+    
+    // Fallback to legacy configuration
     if (!this.lighterConfig.apiKeyPrivateKey) {
       throw new Error('Lighter API key not configured');
     }
+    
+    return this.createLegacyAuthToken();
+  }
+
+  async createDualKeyAuthToken() {
+    // Check if we have a cached token that's still valid
+    if (this.cachedAuthToken && this.cachedAuthToken.expiry > Math.floor(Date.now() / 1000) + 300) {
+      console.log('🔐 Using cached auth token (expires at:', new Date(this.cachedAuthToken.expiry * 1000).toISOString() + ')');
+      return this.cachedAuthToken;
+    }
+
+    console.log('🔐 Creating new dual-key authentication token...');
+    console.log('🔐 Account Index:', this.lighterConfig.accountIndex);
+    console.log('🔐 API Key Index:', this.lighterConfig.apiKeyIndex);
+    
+    // Following Lighter auth token structure: {expiry_unix}:{account_index}:{api_key_index}:{random_hex}
+    const currentTime = Math.floor(Date.now() / 1000);
+    const expiry = currentTime + (6 * 60 * 60); // 6 hours (under the 8-hour max)
+    
+    // Generate random hex (32 characters)
+    const randomHex = Math.random().toString(16).slice(2).padEnd(32, '0').slice(0, 32);
+    
+    // Create auth token in the format specified by Lighter docs
+    const authToken = `${expiry}:${this.lighterConfig.accountIndex}:${this.lighterConfig.apiKeyIndex}:${randomHex}`;
+    
+    console.log('🔐 Generated auth token structure:', authToken);
+    console.log('🔐 Token expires at:', new Date(expiry * 1000).toISOString());
+    
+    try {
+      // Use wallet private key for signing
+      const walletKey = this.lighterConfig.walletPrivateKey.startsWith('0x') 
+        ? this.lighterConfig.walletPrivateKey 
+        : `0x${this.lighterConfig.walletPrivateKey}`;
+      
+      const wallet = new Wallet(walletKey);
+      
+      // Sign the auth token with wallet private key
+      const signature = await wallet.signMessage(authToken);
+      
+      console.log('🔐 Dual-key authentication successful');
+      console.log('🔑 Wallet address:', wallet.address);
+      console.log('🔑 API Key length:', this.lighterConfig.apiKey.length);
+      
+      const authResponse = {
+        authToken,
+        signature,
+        timestamp: currentTime,
+        expiry,
+        address: wallet.address,
+        apiKey: this.lighterConfig.apiKey, // Include API key for authentication
+        apiKeyIndex: this.lighterConfig.apiKeyIndex,
+        accountIndex: this.lighterConfig.accountIndex,
+        keyFormat: 'dual-key'
+      };
+      
+      // Cache the token for reuse
+      this.cachedAuthToken = authResponse;
+      return authResponse;
+      
+    } catch (error) {
+      console.error('❌ Failed to create dual-key authentication token:', error.message);
+      throw error;
+    }
+  }
+
+  async createLegacyAuthToken() {
 
     // Check if we have a cached token that's still valid
     if (this.cachedAuthToken && this.cachedAuthToken.expiry > Math.floor(Date.now() / 1000) + 300) {
@@ -418,15 +520,21 @@ class LighterStandaloneService {
         'Authorization': `Bearer ${auth.authToken}` // Use the auth token as specified in docs
       };
       
-      if (auth.signature) {
-        // If we have a signature, include it (wallet-based authentication)
+      if (auth.keyFormat === 'dual-key') {
+        // Dual-key authentication: API key + signed auth token
+        headers['X-API-Key'] = auth.apiKey;
         headers['X-Signature'] = auth.signature;
         headers['X-Address'] = auth.address;
-        console.log(`🔑 Using signed auth token with wallet: ${auth.address} (${auth.keyFormat} format)`);
+        console.log(`🔑 Using dual-key authentication - API key + signed token (wallet: ${auth.address})`);
+      } else if (auth.signature) {
+        // Legacy wallet-based authentication
+        headers['X-Signature'] = auth.signature;
+        headers['X-Address'] = auth.address;
+        console.log(`🔑 Using legacy signed auth token with wallet: ${auth.address} (${auth.keyFormat} format)`);
       } else if (auth.apiKey) {
-        // Direct API key authentication (for extended keys or fallback)
+        // Legacy direct API key authentication
         headers['X-API-Key'] = auth.apiKey;
-        console.log(`🔑 Using direct API key authentication (${auth.keyFormat} format)`);
+        console.log(`🔑 Using legacy direct API key authentication (${auth.keyFormat} format)`);
       }
       
       // Always include these based on the auth token structure
