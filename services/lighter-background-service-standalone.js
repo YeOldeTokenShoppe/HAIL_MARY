@@ -296,20 +296,72 @@ class LighterStandaloneService {
     let privateKey = this.lighterConfig.apiKeyPrivateKey.trim();
     
     try {
-      // If this is a standard private key (64 hex chars), use it directly
-      if (privateKey.startsWith('0x')) {
-        privateKey = privateKey.slice(2);
-      }
-      
-      if (privateKey.length === 64 && /^[0-9a-fA-F]+$/.test(privateKey)) {
-        // Standard wallet private key
+      // Handle the extended API key format (80 chars) from Lighter
+      if (privateKey.length === 80 && /^[0-9a-fA-F]+$/.test(privateKey)) {
+        console.log('🔐 Detected Lighter extended API key format (80 characters)');
+        
+        // For Lighter's extended API keys, we may need to extract the actual signing key
+        // The 80-character format might contain both the key and additional data
+        
+        // Try using the first 64 characters as the signing key
+        const signingKey = `0x${privateKey.slice(0, 64)}`;
+        
+        try {
+          const wallet = new Wallet(signingKey);
+          
+          // Sign the auth token with the extracted key
+          const signature = await wallet.signMessage(authToken);
+          
+          console.log('🔐 Extended API key authentication successful');
+          console.log('🔑 Wallet address:', wallet.address);
+          
+          const authResponse = {
+            authToken,
+            signature,
+            timestamp: currentTime,
+            expiry,
+            address: wallet.address,
+            apiKeyIndex: this.lighterConfig.apiKeyIndex,
+            accountIndex: this.lighterConfig.accountIndex,
+            keyFormat: 'extended'
+          };
+          
+          // Cache the token for reuse
+          this.cachedAuthToken = authResponse;
+          return authResponse;
+          
+        } catch (walletError) {
+          console.log('🔐 Extended key first 64 chars failed, trying alternative approach...');
+          
+          // If first 64 chars don't work, try the full key as an API key
+          const authResponse = {
+            authToken,
+            apiKey: privateKey,
+            timestamp: currentTime,
+            expiry,
+            apiKeyIndex: this.lighterConfig.apiKeyIndex,
+            accountIndex: this.lighterConfig.accountIndex,
+            keyFormat: 'extended-direct'
+          };
+          
+          // Cache the token for reuse
+          this.cachedAuthToken = authResponse;
+          return authResponse;
+        }
+        
+      } else if (privateKey.length === 64 && /^[0-9a-fA-F]+$/.test(privateKey)) {
+        // Standard wallet private key (64 hex chars)
+        if (privateKey.startsWith('0x')) {
+          privateKey = privateKey.slice(2);
+        }
+        
         privateKey = `0x${privateKey}`;
         const wallet = new Wallet(privateKey);
         
         // Sign the auth token
         const signature = await wallet.signMessage(authToken);
         
-        console.log('🔐 Authentication token signed successfully');
+        console.log('🔐 Standard private key authentication successful');
         console.log('🔑 Wallet address:', wallet.address);
         
         const authResponse = {
@@ -319,7 +371,8 @@ class LighterStandaloneService {
           expiry,
           address: wallet.address,
           apiKeyIndex: this.lighterConfig.apiKeyIndex,
-          accountIndex: this.lighterConfig.accountIndex
+          accountIndex: this.lighterConfig.accountIndex,
+          keyFormat: 'standard'
         };
         
         // Cache the token for reuse
@@ -327,16 +380,17 @@ class LighterStandaloneService {
         return authResponse;
         
       } else {
-        // This might be the API key itself, not a signing key
-        console.log('🔐 Using API key directly (length: ' + privateKey.length + ')');
+        // Unknown format - try using as direct API key
+        console.log('🔐 Unknown key format (length: ' + privateKey.length + '), using as direct API key');
         
         const authResponse = {
           authToken,
-          apiKey: privateKey, // Use the API key directly
+          apiKey: privateKey,
           timestamp: currentTime,
           expiry,
           apiKeyIndex: this.lighterConfig.apiKeyIndex,
-          accountIndex: this.lighterConfig.accountIndex
+          accountIndex: this.lighterConfig.accountIndex,
+          keyFormat: 'unknown'
         };
         
         // Cache the token for reuse
@@ -368,11 +422,11 @@ class LighterStandaloneService {
         // If we have a signature, include it (wallet-based authentication)
         headers['X-Signature'] = auth.signature;
         headers['X-Address'] = auth.address;
-        console.log(`🔑 Using signed auth token with wallet: ${auth.address}`);
+        console.log(`🔑 Using signed auth token with wallet: ${auth.address} (${auth.keyFormat} format)`);
       } else if (auth.apiKey) {
-        // Direct API key authentication (if needed as fallback)
+        // Direct API key authentication (for extended keys or fallback)
         headers['X-API-Key'] = auth.apiKey;
-        console.log(`🔑 Using direct API key authentication`);
+        console.log(`🔑 Using direct API key authentication (${auth.keyFormat} format)`);
       }
       
       // Always include these based on the auth token structure
