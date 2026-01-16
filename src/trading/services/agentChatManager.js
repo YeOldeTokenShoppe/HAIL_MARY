@@ -7,25 +7,25 @@ class AgentChatManager {
     this.intervals = {};
     this.lastTriggerTimes = {};
     
-    // Agent configuration with different intervals
+    // Agent configuration with smart intervals (cost-optimized)
     this.agentConfig = {
       'TEKNO': {
-        interval: 180000, // 3 minutes
+        interval: 300000, // 5 minutes - technical analysis
         priority: 1,
         description: 'Market Analysis & Technical Signals'
       },
       'EMO': {
-        interval: 240000, // 4 minutes
+        interval: 420000, // 7 minutes - sentiment analysis  
         priority: 2,
         description: 'Sentiment Analysis & Market Psychology'
       },
       'MACRO': {
-        interval: 300000, // 5 minutes
+        interval: 600000, // 10 minutes - macro events change slower
         priority: 3,
         description: 'Macroeconomic Analysis & Global Events'
       },
       'RL80': {
-        interval: 360000, // 6 minutes
+        interval: 480000, // 8 minutes - trading decisions
         priority: 4,
         description: 'Trading Decisions & Portfolio Management'
       }

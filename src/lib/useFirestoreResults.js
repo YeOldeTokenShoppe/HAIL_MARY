@@ -61,7 +61,16 @@ export function useFirestoreResults(collectionName = "results", sortBy = "burned
           });
         },
         (error) => {
+          console.error("🔥 FIRESTORE ERROR DETAILS:");
           console.error("Error fetching Firestore data:", error);
+          console.error("Collection:", collectionName, "SortBy:", sortBy);
+          console.error("Full error:", error.code, error.message);
+          console.error("Query attempting:", 
+            sortBy === "mostLiked" ? `orderBy("likes", "desc"), limit(80)` :
+            sortBy === "newest" ? `orderBy("createdAt", "desc"), limit(80)` :
+            sortBy === "smallest" ? `orderBy("burnedAmount", "asc"), limit(80)` :
+            `orderBy("burnedAmount", "desc"), limit(80)`
+          );
           setResults([]);
         }
       );

@@ -39,35 +39,8 @@ export function useRandomCandles(maxCandles = 20) {
           
           allCandles.push(...userCandles);
           
-          // Get from new polaroids collection (for both candles and tattoos)
-          // First try by createdBy (user ID) which is most reliable
-          let polaroidQuery = query(
-            collection(db, "polaroids"),
-            where("createdBy", "==", user.id),
-            limit(10) // Limit user's own polaroids to 10
-          );
-          
-          let polaroidSnapshot = await getDocs(polaroidQuery);
-          
-          // If no results with createdBy, try username as fallback
-          if (polaroidSnapshot.size === 0) {
-            polaroidQuery = query(
-              collection(db, "polaroids"),
-              where("username", "==", user.username || user.firstName || user.fullName),
-              limit(10)
-            );
-            polaroidSnapshot = await getDocs(polaroidQuery);
-          }
-          
-          const userPolaroids = polaroidSnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            isUserCandle: true,
-            isPolaroid: true, // Mark as from polaroids collection
-            createdAt: doc.data().createdAt?.toDate() || new Date()
-          }));
-          
-          allCandles.push(...userPolaroids);
+          // Skip polaroids collection for now (disabled)
+          // TODO: Re-enable when polaroids collection is ready
         }
         
         // Calculate how many random candles we need
@@ -97,29 +70,8 @@ export function useRandomCandles(maxCandles = 20) {
           
           poolCandles.push(...legacyCandles);
           
-          // Get from new polaroids collection
-          const polaroidQuery = query(
-            collection(db, "polaroids"),
-            limit(50) // Get a pool of 50 polaroids
-          );
-          
-          const polaroidSnapshot = await getDocs(polaroidQuery);
-          const polaroids = polaroidSnapshot.docs
-            .map(doc => ({
-              id: doc.id,
-              ...doc.data(),
-              isUserCandle: false,
-              isPolaroid: true,
-              createdAt: doc.data().createdAt?.toDate() || new Date()
-            }))
-            .filter(item => 
-              // Filter out user's items from the pool (check both createdBy and username)
-              !isSignedIn || !user || 
-              (item.createdBy !== user.id && 
-               item.username !== (user.username || user.firstName || user.fullName))
-            );
-          
-          poolCandles.push(...polaroids);
+          // Skip polaroids collection for random pool (disabled)
+          // TODO: Re-enable when polaroids collection is ready
           
           // Randomly shuffle and select from combined pool
           const shuffled = poolCandles.sort(() => 0.5 - Math.random());

@@ -1,0 +1,10 @@
+[build]
+builder = "nixpacks"
+buildCommand = "cd services && npm install"
+
+[deploy]
+startCommand = "cd services && npm start"
+restartPolicyType = "always"
+
+[env]
+NODE_ENV = "production"

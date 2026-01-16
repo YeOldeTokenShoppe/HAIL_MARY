@@ -1,7 +1,7 @@
 // API Route to trigger agent conversations and save to Firebase
 import { NextResponse } from 'next/server';
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
 
 // Import agent functions
 import { callSentimentOracle } from '../../../trading/agents/sentiment-oracle';
@@ -88,6 +88,72 @@ async function getRecentMessages() {
   }
 }
 
+async function getLiveMarketData() {
+  if (!db) return null;
+  
+  try {
+    // Get market data from Railway service
+    const marketDataRef = doc(db, 'marketData', 'latest');
+    const marketDataSnap = await getDoc(marketDataRef);
+    
+    // Get agent context data
+    const agentContextRef = doc(db, 'agentContext', 'market');
+    const agentContextSnap = await getDoc(agentContextRef);
+    
+    // Get Lighter trading data
+    const lighterAccountRef = doc(db, 'lighterData', 'account');
+    const lighterTradingRef = doc(db, 'lighterData', 'trading');
+    const lighterAccountSnap = await getDoc(lighterAccountRef);
+    const lighterTradingSnap = await getDoc(lighterTradingRef);
+    
+    const marketData = marketDataSnap.exists() ? marketDataSnap.data() : {};
+    const agentContext = agentContextSnap.exists() ? agentContextSnap.data() : {};
+    const lighterAccount = lighterAccountSnap.exists() ? lighterAccountSnap.data() : {};
+    const lighterTrading = lighterTradingSnap.exists() ? lighterTradingSnap.data() : {};
+    
+    return {
+      btcPrice: marketData.btcPrice || 95000,
+      ethPrice: marketData.ethPrice || 3500,
+      fearGreed: agentContext.fearGreed || 50,
+      fundingRate: agentContext.fundingRate || 0.01,
+      vix: agentContext.vix || 22.5,
+      marketSentiment: agentContext.marketSentiment || 'neutral',
+      trend: agentContext.trend || 'sideways',
+      timestamp: new Date().toISOString(),
+      lastUpdate: marketData.lastUpdate || agentContext.lastUpdate,
+      // Add Lighter trading data for agents
+      trading: {
+        balance: lighterAccount.balance || 0,
+        positions: lighterTrading.positions || [],
+        orders: lighterTrading.orders || [],
+        positionCount: lighterTrading.positionCount || 0,
+        orderCount: lighterTrading.orderCount || 0
+      }
+    };
+    
+  } catch (error) {
+    console.error('Failed to get live market data:', error);
+    // Return mock data as fallback
+    return {
+      btcPrice: 95000,
+      ethPrice: 3500, 
+      fearGreed: 50,
+      fundingRate: 0.01,
+      vix: 22.5,
+      marketSentiment: 'neutral',
+      trend: 'sideways',
+      timestamp: new Date().toISOString(),
+      trading: {
+        balance: 0,
+        positions: [],
+        orders: [],
+        positionCount: 0,
+        orderCount: 0
+      }
+    };
+  }
+}
+
 export async function POST(request) {
   try {
     const { agent, force = false } = await request.json();
@@ -111,21 +177,17 @@ export async function POST(request) {
       });
     }
 
-    // Get recent messages for context
+    // Get recent messages and live market data for context
     const recentMessages = await getRecentMessages();
+    const liveMarketData = await getLiveMarketData();
+    
     const context = {
       recentMessages,
       lastMessages: recentMessages.slice(-5), // For RL80 trader compatibility
-      marketData: {
-        timestamp: new Date().toISOString(),
-        // Mock market data - replace with real data when available
-        fearGreed: 45, // Fear & Greed index (0-100)
-        fundingRate: 0.01, // Funding rate percentage
-        vix: 22.5, // Volatility index
-        btcPrice: 95000, // Mock BTC price
-        trend: 'sideways' // Mock trend
-      }
+      marketData: liveMarketData
     };
+
+    console.log(`[Agent Context] Using live data: BTC=${liveMarketData.btcPrice}, F&G=${liveMarketData.fearGreed}, Sentiment=${liveMarketData.marketSentiment}`);
 
     let response, messageType, sentiment;
 

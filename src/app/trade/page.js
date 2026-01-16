@@ -27,6 +27,7 @@ import { useLighterAPI } from '@/hooks/useLighterAPI'; // API-based Lighter inte
 // import MobileDevTabs from '@/components/MobileDevTabs';
 // import RotatingPnL from '@/components/RotatingPnL'; // Replaced with stats panel
 import FocusedAgentCard from '@/components/FocusedAgentCard';
+import LighterBalanceWidget from '@/components/LighterBalanceWidget';
 
 
 export default function CyborgTemple() {
@@ -1149,6 +1150,8 @@ export default function CyborgTemple() {
           />
         )}
         
+        {/* Lighter Balance Widget - Top Right */}
+        <LighterBalanceWidget show={true} />
 
         {/* Top Controls Container - Music, User, and Nav */}
         {mounted && (

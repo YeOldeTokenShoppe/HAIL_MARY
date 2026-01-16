@@ -438,6 +438,21 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
     }
   }, [db]);
 
+  // Auto-start agent chat system when component mounts
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Start agent system automatically after 3 seconds
+      const timer = setTimeout(() => {
+        if (!agentChatManager.isRunning()) {
+          console.log('🚀 Auto-starting agent chat system');
+          agentChatManager.start();
+        }
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, []);
+
   // Remove the random data update effect - data should only come from API
   // Real-time updates will come from the Lighter API websocket connection
 
@@ -1585,58 +1600,35 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                 ))}
               </div>
 
-              {/* Agent Control Panel */}
+              {/* Auto-Agent Status Panel */}
               <div style={{
                 display: 'flex',
-                justifyContent: 'space-between',
+                justifyContent: 'center',
                 alignItems: 'center',
                 marginBottom: '15px',
-                padding: '0 12px',
-                gap: '8px'
+                padding: '8px 12px',
+                background: 'rgba(0, 255, 0, 0.05)',
+                borderRadius: '8px',
+                border: '1px solid rgba(0, 255, 0, 0.2)'
               }}>
-                <button
-                  onClick={() => {
-                    if (agentChatManager.isRunning()) {
-                      agentChatManager.stop();
-                    } else {
-                      agentChatManager.start();
-                    }
-                  }}
-                  style={{
-                    background: agentChatManager.isRunning() ? 
-                      'rgba(255, 0, 0, 0.1)' : 'rgba(0, 255, 0, 0.1)',
-                    border: `1px solid ${agentChatManager.isRunning() ? '#ff6666' : '#00ff00'}`,
-                    borderRadius: '6px',
-                    padding: '6px 10px',
-                    color: agentChatManager.isRunning() ? '#ff6666' : '#00ff00',
-                    fontSize: '10px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  {agentChatManager.isRunning() ? '⏹️ STOP' : '▶️ START'}
-                </button>
-                
-                <button
-                  onClick={() => {
-                    ['RL80', 'EMO', 'TEKNO', 'MACRO'].forEach(agent => {
-                      agentChatManager.manualTrigger(agent);
-                    });
-                  }}
-                  style={{
-                    background: 'rgba(255, 215, 0, 0.1)',
-                    border: '1px solid #FFD700',
-                    borderRadius: '6px',
-                    padding: '6px 10px',
-                    color: '#FFD700',
-                    fontSize: '10px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  🚀 TRIGGER ALL
-                </button>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  color: '#00ff00',
+                  fontSize: '10px',
+                  fontWeight: 'bold'
+                }}>
+                  <div style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: '#00ff00',
+                    boxShadow: '0 0 8px rgba(0, 255, 0, 0.8)',
+                    animation: 'pulse 2s infinite'
+                  }} />
+                  AUTO-ANALYSIS ACTIVE
+                </div>
               </div>
               
               {/* Chat Messages Container */}
@@ -1860,7 +1852,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
         )}
         
         {/* Compact Candle Modal - Renders on top when opened */}
-        <CompactCandleModal
+        {/* <CompactCandleModal
           isOpen={showCompactCandleModal}
           onClose={() => {
             setShowCompactCandleModal(false);
@@ -1870,7 +1862,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
             setShowCompactCandleModal(false);
             setShowMobileMenu(false);  // Also close the menu panel
           }}
-        />
+        /> */}
       </>
     );
   }

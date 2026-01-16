@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { db, collection, onSnapshot, query, orderBy, limit } from '@/lib/firebaseClient';
+import { db, collection, onSnapshot, query, orderBy, limit, doc, getDoc } from '@/lib/firebaseClient';
 
 const PerformanceDashboard = ({ show = true, onClose }) => {
   const [isMobile, setIsMobile] = useState(false);
@@ -30,6 +30,8 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
 
   const [timeFrame, setTimeFrame] = useState('24h'); // 24h, 7d, 30d, all
   const [isLoading, setIsLoading] = useState(true);
+  const [lighterAccount, setLighterAccount] = useState(null);
+  const [lighterTradingData, setLighterTradingData] = useState(null);
 
   // Check for mobile viewport
   useEffect(() => {
@@ -41,6 +43,34 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Load live Lighter data from Firebase
+  useEffect(() => {
+    if (!db || !show) return;
+
+    // Set up real-time listeners for Lighter data
+    const accountRef = doc(db, 'lighterData', 'account');
+    const tradingRef = doc(db, 'lighterData', 'trading');
+
+    const unsubscribeAccount = onSnapshot(accountRef, (doc) => {
+      if (doc.exists()) {
+        setLighterAccount(doc.data());
+        console.log('Lighter account data loaded:', doc.data());
+      }
+    });
+
+    const unsubscribeTrading = onSnapshot(tradingRef, (doc) => {
+      if (doc.exists()) {
+        setLighterTradingData(doc.data());
+        console.log('Lighter trading data loaded:', doc.data());
+      }
+    });
+
+    return () => {
+      unsubscribeAccount();
+      unsubscribeTrading();
+    };
+  }, [db, show]);
 
   // Fetch and calculate metrics from Firestore
   useEffect(() => {
@@ -455,6 +485,208 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
         </div>
       ) : (
         <div>
+          {/* Current Account Balance - Prominent Display */}
+          {lighterAccount && (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.15) 0%, rgba(147, 51, 234, 0.05) 100%)',
+              backdropFilter: 'blur(15px)',
+              WebkitBackdropFilter: 'blur(15px)',
+              padding: isMobile ? '20px' : '25px',
+              borderRadius: '20px',
+              border: '2px solid rgba(147, 51, 234, 0.4)',
+              boxShadow: '0 8px 40px rgba(147, 51, 234, 0.2), inset 0 0 20px rgba(147, 51, 234, 0.1)',
+              marginBottom: '20px',
+              textAlign: 'center',
+              position: 'relative',
+              overflow: 'hidden'
+            }}>
+              {/* Animated background glow */}
+              <div style={{
+                position: 'absolute',
+                top: '-50%',
+                left: '-50%',
+                width: '200%',
+                height: '200%',
+                background: 'radial-gradient(circle, rgba(147, 51, 234, 0.1) 0%, transparent 70%)',
+                animation: 'pulse 4s ease-in-out infinite',
+                zIndex: 0
+              }} />
+              
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                <div style={{ 
+                  color: 'rgba(255, 255, 255, 0.6)', 
+                  fontSize: isMobile ? '12px' : '14px', 
+                  marginBottom: '8px', 
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  fontWeight: '600'
+                }}>
+                  💳 Current Account Balance
+                </div>
+                
+                <div style={{
+                  fontSize: isMobile ? '36px' : '48px',
+                  fontWeight: '900',
+                  color: '#fff',
+                  marginBottom: '8px',
+                  textShadow: '0 0 30px rgba(147, 51, 234, 0.8), 0 0 60px rgba(147, 51, 234, 0.4)',
+                  fontFamily: 'monospace'
+                }}>
+                  ${lighterAccount.balance?.toLocaleString(undefined, { 
+                    minimumFractionDigits: 2, 
+                    maximumFractionDigits: 2 
+                  }) || '0.00'}
+                </div>
+                
+                <div style={{ 
+                  color: 'rgba(147, 51, 234, 0.8)', 
+                  fontSize: isMobile ? '11px' : '12px',
+                  fontWeight: '500',
+                  marginBottom: '15px'
+                }}>
+                  Lighter Testnet • Account #{lighterAccount.accountIndex || 'N/A'}
+                </div>
+
+                {/* Balance status indicator */}
+                <div style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: 'rgba(0, 255, 0, 0.1)',
+                  border: '1px solid rgba(0, 255, 0, 0.3)',
+                  borderRadius: '20px',
+                  padding: '4px 12px',
+                  fontSize: '10px',
+                  color: '#00ff00',
+                  fontWeight: '600'
+                }}>
+                  <div style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: '#00ff00',
+                    boxShadow: '0 0 8px rgba(0, 255, 0, 0.8)',
+                    animation: 'pulse 2s infinite'
+                  }} />
+                  LIVE DATA
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Trading Status - Positions & Orders */}
+          {lighterTradingData && (
+            <div style={{
+              background: 'rgba(0, 255, 255, 0.05)',
+              backdropFilter: 'blur(15px)',
+              WebkitBackdropFilter: 'blur(15px)',
+              padding: isMobile ? '12px' : '15px',
+              borderRadius: '15px',
+              border: '1px solid rgba(0, 255, 255, 0.2)',
+              boxShadow: '0 4px 20px rgba(0, 255, 255, 0.1)',
+              marginBottom: '15px',
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(180px, 1fr))',
+              gap: '15px'
+            }}>
+              <div>
+                <div style={{ color: '#888', fontSize: '10px', marginBottom: '6px', textTransform: 'uppercase' }}>
+                  📊 Open Positions
+                </div>
+                <div style={{
+                  fontSize: isMobile ? '20px' : '24px',
+                  fontWeight: 'bold',
+                  color: '#00ffff',
+                  marginBottom: '4px'
+                }}>
+                  {lighterTradingData.positionCount || 0}
+                </div>
+                <div style={{ 
+                  color: 'rgba(255, 255, 255, 0.3)', 
+                  fontSize: '9px'
+                }}>
+                  {lighterTradingData.positions?.length > 0 ? 
+                    lighterTradingData.positions.map(p => p.symbol).join(', ') : 
+                    'No positions'
+                  }
+                </div>
+              </div>
+
+              {lighterTradingData && (
+                <>
+                  <div>
+                    <div style={{ color: '#888', fontSize: '10px', marginBottom: '6px', textTransform: 'uppercase' }}>
+                      📊 Open Positions
+                    </div>
+                    <div style={{
+                      fontSize: isMobile ? '20px' : '24px',
+                      fontWeight: 'bold',
+                      color: '#00ffff',
+                      marginBottom: '4px'
+                    }}>
+                      {lighterTradingData.positionCount || 0}
+                    </div>
+                    <div style={{ 
+                      color: 'rgba(255, 255, 255, 0.3)', 
+                      fontSize: '9px'
+                    }}>
+                      {lighterTradingData.positions?.length > 0 ? 
+                        lighterTradingData.positions.map(p => p.symbol).join(', ') : 
+                        'No positions'
+                      }
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ color: '#888', fontSize: '10px', marginBottom: '6px', textTransform: 'uppercase' }}>
+                      ⏳ Pending Orders
+                    </div>
+                    <div style={{
+                      fontSize: isMobile ? '20px' : '24px',
+                      fontWeight: 'bold',
+                      color: '#ffaa00',
+                      marginBottom: '4px'
+                    }}>
+                      {lighterTradingData.orderCount || 0}
+                    </div>
+                    <div style={{ 
+                      color: 'rgba(255, 255, 255, 0.3)', 
+                      fontSize: '9px'
+                    }}>
+                      {lighterTradingData.orders?.length > 0 ? 
+                        `${lighterTradingData.orders.filter(o => o.side === 'buy').length} buy, ${lighterTradingData.orders.filter(o => o.side === 'sell').length} sell` :
+                        'No orders'
+                      }
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ color: '#888', fontSize: '10px', marginBottom: '6px', textTransform: 'uppercase' }}>
+                      🔄 Last Update
+                    </div>
+                    <div style={{
+                      fontSize: isMobile ? '16px' : '18px',
+                      fontWeight: 'bold',
+                      color: '#00ff00',
+                      marginBottom: '4px'
+                    }}>
+                      {lighterTradingData.lastUpdate ? 
+                        new Date(lighterTradingData.lastUpdate).toLocaleTimeString() : 
+                        'Never'
+                      }
+                    </div>
+                    <div style={{ 
+                      color: 'rgba(255, 255, 255, 0.3)', 
+                      fontSize: '9px'
+                    }}>
+                      Live Testnet Data
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           {/* Main P&L Card - Full Width */}
           <div style={{
             background: 'rgba(0, 40, 30, 0.3)',
