@@ -11,6 +11,8 @@
 const axios = require('axios');
 const admin = require('firebase-admin');
 const { Wallet } = require('ethers');
+const fs = require('fs');
+const path = require('path');
 
 // Load environment variables
 require('dotenv').config();
@@ -18,10 +20,63 @@ require('dotenv').config();
 // Firebase Admin configuration
 let serviceAccount;
 try {
-  // Try to parse service account from environment variable
-  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || '{}');
+  // Try multiple possible service account file locations
+  const possiblePaths = [
+    path.join(__dirname, '..', 'serviceAccountKey.json'),           // ../serviceAccountKey.json
+    path.join(__dirname, 'serviceAccountKey.json'),                // ./serviceAccountKey.json  
+    path.join(process.cwd(), 'serviceAccountKey.json'),            // root/serviceAccountKey.json
+    '/app/serviceAccountKey.json'                                   // Railway absolute path
+  ];
+  
+  console.log('🔍 Checking for service account file in these locations:');
+  let foundServiceAccount = false;
+  
+  for (const filePath of possiblePaths) {
+    console.log(`  📁 Checking: ${filePath} - exists: ${fs.existsSync(filePath)}`);
+    if (fs.existsSync(filePath)) {
+      console.log(`🔑 Loading service account from: ${filePath}`);
+      serviceAccount = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      console.log(`✅ Service account loaded - project: ${serviceAccount.project_id}, email: ${serviceAccount.client_email}`);
+      foundServiceAccount = true;
+      break;
+    }
+  }
+  
+  if (!foundServiceAccount) {
+    console.log('📂 No service account file found, trying environment variable');
+    // Fallback to environment variable
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+      console.log('🔑 Loading service account from environment variable');
+      console.log('🔍 Environment key length:', process.env.FIREBASE_SERVICE_ACCOUNT_KEY?.length);
+      console.log('🔍 Environment key preview:', process.env.FIREBASE_SERVICE_ACCOUNT_KEY?.substring(0, 50) + '...');
+      
+      try {
+        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+        
+        // Fix private key formatting - ensure proper newlines
+        if (serviceAccount.private_key) {
+          serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+          console.log('🔧 Fixed private key newlines');
+        }
+        
+        console.log(`✅ Service account loaded from env - project: ${serviceAccount.project_id}`);
+        console.log(`📧 Service account email: ${serviceAccount.client_email}`);
+        console.log(`🔑 Private key preview: ${serviceAccount.private_key?.substring(0, 50)}...`);
+        console.log('🔑 Private key ends with:', serviceAccount.private_key?.substring(-50));
+      } catch (parseError) {
+        console.error('❌ Failed to parse FIREBASE_SERVICE_ACCOUNT_KEY JSON:', parseError.message);
+        console.log('🔍 Raw env value:', JSON.stringify(process.env.FIREBASE_SERVICE_ACCOUNT_KEY?.substring(0, 100)));
+        serviceAccount = null;
+      }
+    } else {
+      console.log('❌ No FIREBASE_SERVICE_ACCOUNT_KEY environment variable found');
+      console.log('🔍 Available Firebase env vars:', Object.keys(process.env).filter(k => k.includes('FIREBASE')));
+      serviceAccount = null;
+    }
+  }
 } catch (error) {
-  console.warn('⚠️ Could not parse FIREBASE_SERVICE_ACCOUNT_KEY, will try alternative auth methods');
+  console.error('❌ Error loading service account:', error.message);
+  console.warn('⚠️ Could not load service account from file or environment, will try alternative auth methods');
   serviceAccount = null;
 }
 
@@ -31,6 +86,14 @@ class LighterStandaloneService {
     this.db = null;
     this.lighterClient = null;
     this.cachedAuthToken = null; // Cache auth tokens since they last up to 8 hours
+    
+    // Debug Railway environment
+    console.log('🔍 Railway Environment Debug:');
+    console.log('  NODE_ENV:', process.env.NODE_ENV);
+    console.log('  Has FIREBASE_SERVICE_ACCOUNT_KEY:', !!process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+    console.log('  Has GOOGLE_APPLICATION_CREDENTIALS:', !!process.env.GOOGLE_APPLICATION_CREDENTIALS);
+    console.log('  Firebase Project ID:', process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID);
+    console.log('  Available env vars:', Object.keys(process.env).filter(k => k.includes('FIREBASE')).join(', '));
     
     // Lighter configuration - following SignerClient pattern
     this.lighterConfig = {
@@ -120,24 +183,38 @@ class LighterStandaloneService {
       if (!admin.apps.length) {
         console.log('🔥 Initializing Firebase Admin...');
         
-        // Try service account credentials first
+        // Try service account credentials first (from file or environment)
         if (serviceAccount && serviceAccount.project_id) {
-          console.log('🔥 Using local service account credentials');
-          admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
-            projectId: serviceAccount.project_id
-          });
-          console.log('✅ Firebase Admin initialized with service account');
+          console.log('🔥 Using service account credentials');
+          console.log('📄 Service account project:', serviceAccount.project_id);
+          console.log('📧 Service account email:', serviceAccount.client_email);
+          console.log('🔍 Service account has private_key:', !!serviceAccount.private_key);
+          console.log('🔍 Service account has client_email:', !!serviceAccount.client_email);
+          console.log('🔍 Service account has project_id:', !!serviceAccount.project_id);
+          
+          try {
+            const credential = admin.credential.cert(serviceAccount);
+            console.log('✅ Firebase credential created successfully');
+            
+            admin.initializeApp({
+              credential: credential,
+              projectId: serviceAccount.project_id,
+              // Explicitly set database URL if available
+              databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL
+            });
+            console.log('✅ Firebase Admin initialized with service account credentials');
+          } catch (credentialError) {
+            console.error('❌ Failed to create Firebase credential:', credentialError.message);
+            throw credentialError;
+          }
         } 
-        // Try environment variable service account (Railway)
-        else if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-          console.log('🔥 Using environment service account credentials');
-          const serviceAccountFromEnv = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+        // Try Google Application Default Credentials (Railway alternative)
+        else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+          console.log('🔥 Using Google Application Default Credentials');
           admin.initializeApp({
-            credential: admin.credential.cert(serviceAccountFromEnv),
-            projectId: serviceAccountFromEnv.project_id
+            projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'hailmary-3ff6c'
           });
-          console.log('✅ Firebase Admin initialized with environment service account');
+          console.log('✅ Firebase Admin initialized with Google Application Credentials');
         }
         // Fallback: use project ID only (limited functionality)
         else {
@@ -165,7 +242,8 @@ class LighterStandaloneService {
       });
       
       // Don't exit - continue without Firebase (service will skip saves)
-      console.log('⚠️ Continuing without Firebase - data will not be saved');
+      console.log('⚠️ Continuing without Firebase - Lighter data will be logged only');
+      console.log('⚠️ To fix: Upload serviceAccountKey.json to Railway or check environment variables');
       this.db = null;
     }
   }
