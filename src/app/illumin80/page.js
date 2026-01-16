@@ -10,7 +10,7 @@ import ThirdwebBuyModal from '@/components/ThirdwebBuyModal'
 import LightCandleModal from '@/components/LightCandleModal'
 import StakeModal from '@/components/StakeModal'
 import { WalletConnectionModal } from '@/components/WalletConnectionModal'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import ShrineLeftPanel from '@/components/ShrineLeftPanel'
 import { db, collection, getDocs, query, orderBy, limit, onSnapshot, updateDoc, doc } from '@/lib/firebaseClient'
 import UnifiedShrine from '@/components/UnifiedShrine'
@@ -23,6 +23,7 @@ import CoinLoader from '@/components/CoinLoader'
 
 export default function ShrinePage() {
   const router = useRouter()
+  const pathname = usePathname()
   const { user, isLoaded: userLoaded, isSignedIn } = useUser()
   const { isWalletConnected, walletAddress, connectWallet } = useWalletAuth()
   const unifiedShrineRef = useRef()
@@ -89,14 +90,43 @@ useEffect(() => {
 }, [])
 
 useEffect(() => {
-  // Small delay to let previous page fully cleanup
-  const timer = setTimeout(() => {
-    setDelayedMount(true)
-    setIsLoading(false)
-  }, 500)
+  let mounted = true
+  
+  // Preload the candle model immediately when component mounts
+  const preloadModel = async () => {
+    try {
+      const { useGLTF } = await import('@react-three/drei')
+      useGLTF.preload('/models/tinyJapCanOnly.glb')
+      console.log('[Illumin80] Model preload initiated')
+      
+      // Wait a bit more to ensure model is loaded
+      if (mounted) {
+        setTimeout(() => {
+          if (mounted) {
+            setDelayedMount(true)
+            setIsLoading(false)
+            console.log('[Illumin80] DelayedMount set to true')
+          }
+        }, 1000) // Increased to 1000ms to ensure model loads properly
+      }
+    } catch (error) {
+      console.error('[Illumin80] Error preloading model:', error)
+      // Fallback - still mount even if preload fails
+      if (mounted) {
+        setTimeout(() => {
+          if (mounted) {
+            setDelayedMount(true)
+            setIsLoading(false)
+          }
+        }, 500)
+      }
+    }
+  }
+  
+  preloadModel()
   
   return () => {
-    clearTimeout(timer)
+    mounted = false
     setDelayedMount(false)
   }
 }, [])
@@ -636,7 +666,7 @@ useEffect(() => {
         {isClient && delayedMount ? (
           <UnifiedShrine 
             ref={unifiedShrineRef}
-            // key={`shrine-scene-${remountKey}`}
+            key={`shrine-scene-${pathname}`} // Force remount when navigating to this page
             offerings={offerings}
             totalOfferingsCount={totalOfferingsCount}
             currentUserId={user?.id}

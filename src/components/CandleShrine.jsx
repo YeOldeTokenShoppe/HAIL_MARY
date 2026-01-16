@@ -629,6 +629,7 @@ export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUN
   
   // Reset uniforms on mount to ensure clean state
   useEffect(() => {
+    console.log('[CandleCloud] Component mounting, resetting uniforms')
     // Reset uniforms on mount to ensure clean state
     sharedUniforms.uTime.value = 0
     sharedUniforms.uClickedId.value = -1
@@ -637,10 +638,19 @@ export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUN
     sharedUniforms.uShortTermPrice.value = 0
     sharedUniforms.uPulseTime.value = -1
     sharedUniforms.uPulsePosition.value.set(0, 0, 0)
+    sharedUniforms.uHighlightedId.value = -1
+    sharedUniforms.uCurrentTime.value = Date.now()
     
     return () => {
+      console.log('[CandleCloud] Component unmounting, resetting uniforms')
       // Reset on unmount too
       sharedUniforms.uTime.value = 0
+      sharedUniforms.uClickedId.value = -1
+      sharedUniforms.uPriceDirection.value = 0
+      sharedUniforms.uContinuousOffset.value = 0
+      sharedUniforms.uShortTermPrice.value = 0
+      sharedUniforms.uPulseTime.value = -1
+      sharedUniforms.uHighlightedId.value = -1
     }
   }, [])
   

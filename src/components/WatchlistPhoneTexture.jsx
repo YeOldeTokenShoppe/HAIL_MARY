@@ -16,8 +16,8 @@ const CONFIG = {
   
   // Thresholds for whale status
   WHALE_THRESHOLDS: {
-    CANDLE: 100,        // 100+ tokens burned = whale
-    STAKE: 50000,       // 50K+ staked = whale
+    CANDLE: 1,          // 1+ tokens burned = whale  
+    STAKE: 50,          // 50+ staked = whale
     MEGA_MULTIPLIER: 10 // 10x threshold = mega whale
   },
   
@@ -34,7 +34,7 @@ const CONFIG = {
 const ACTIVITY_TYPES = {
   CANDLE: { 
     icon: '🕯️', 
-    verb: 'Lit', 
+    verb: 'Dedicated a Green Candle', 
     unit: 'candle',
     pluralUnit: 'candles',
     color: '#00ff66' 
@@ -173,6 +173,9 @@ export function WatchlistPhoneTexture({
   
   // User avatar cache for activity items
   const activityAvatarsRef = useRef({});
+  
+  // Background image ref
+  const backgroundImageRef = useRef(null);
   
   // Scroll state
   const scrollPositionRef = useRef(0);
@@ -432,7 +435,48 @@ export function WatchlistPhoneTexture({
       console.error('Error fetching offerings:', error);
     });
     
-    return () => unsubscribe();
+    // Subscribe to Firebase stakes
+    const stakesRef = collection(db, 'stakes');
+    const stakesQuery = query(stakesRef, orderBy('createdAt', 'desc'), limit(30));
+    
+    const unsubscribeStakes = onSnapshot(stakesQuery, (snapshot) => {
+      const stakingActivities = [];
+      
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        
+        // Determine staking action type
+        let actionType = 'STAKE';
+        if (data.action === 'unstake') actionType = 'UNSTAKE';
+        if (data.action === 'claim') actionType = 'CLAIM';
+        
+        stakingActivities.push({
+          id: doc.id,
+          type: actionType,
+          username: data.name || truncateAddress(data.walletAddress),
+          userImageUrl: data.userImageUrl,
+          amount: parseFloat(data.amount) || 0,
+          timestamp: data.createdAt?.toMillis?.() || Date.now(),
+          isNew: false,
+        });
+      });
+      
+      if (stakingActivities.length > 0) {
+        setActivities(prev => {
+          // Merge with existing candle activities
+          const candleActivities = prev.filter(a => a.type === 'CANDLE');
+          const merged = [...candleActivities, ...stakingActivities];
+          return merged.sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
+        });
+      }
+    }, (error) => {
+      console.error('Error fetching stakes:', error);
+    });
+    
+    return () => {
+      unsubscribe();
+      unsubscribeStakes();
+    };
   }, []);
   
   // ===========================================
@@ -534,6 +578,15 @@ export function WatchlistPhoneTexture({
     
   }, [tradeAlerts]);
   
+  // Load background image
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => {
+      backgroundImageRef.current = img;
+    };
+    img.src = '/images/screen1flat.svg';
+  }, []);
+  
   // ===========================================
   // FILTER ACTIVITIES BY TAB
   // ===========================================
@@ -564,7 +617,7 @@ export function WatchlistPhoneTexture({
     ctx.fillRect(0, 0, width, height);
     
     const centerX = width / 2;
-    const centerY = height / 2;
+    const centerY = height / 2 - 120; // Move content higher up
     
     // Draw glowing circle effect on top of background
     const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 250);
@@ -586,7 +639,7 @@ export function WatchlistPhoneTexture({
     ctx.fillText('PRAYER RECEIVED', centerX, centerY + 40);
     
     // Draw user avatar or initial
-    const avatarSize = 80;
+    const avatarSize = 100;
     const avatarY = centerY + 120;
     
     // Check if we have a loaded image for this notification
@@ -677,50 +730,49 @@ export function WatchlistPhoneTexture({
     // BACKGROUND
     // ===========================================
     
-    // Create a beautiful gradient background
-    const backgroundGradient = ctx.createLinearGradient(0, 0, 0, height);
-    backgroundGradient.addColorStop(0, '#1a1a2e');    // Dark blue-purple top
-    backgroundGradient.addColorStop(0.3, '#16213e');  // Deep blue
-    backgroundGradient.addColorStop(0.7, '#0f3460');  // Ocean blue
-    backgroundGradient.addColorStop(1, '#0a0a0a');    // Dark bottom
+    // Draw background image if loaded, otherwise fallback to gradient
+    if (backgroundImageRef.current) {
+      const img = backgroundImageRef.current;
+      
+      // Scale up to ensure full coverage (like CSS object-fit: cover)
+      const imgAspect = img.naturalWidth / img.naturalHeight;
+      const canvasAspect = width / height;
+      
+      let drawWidth, drawHeight, offsetX = 0, offsetY = 0;
+      
+      if (imgAspect > canvasAspect) {
+        // Image is wider - scale by height and center horizontally
+        drawHeight = height;
+        drawWidth = height * imgAspect;
+        offsetX = (width - drawWidth) / 2;
+      } else {
+        // Image is taller - scale by width and center vertically  
+        drawWidth = width;
+        drawHeight = width / imgAspect;
+        offsetY = (height - drawHeight) / 2;
+      }
+      
+      // Add 10% padding to ensure full coverage
+      const padding = 1.01;
+      drawWidth *= padding;
+      drawHeight *= padding;
+      offsetX -= (drawWidth - width) / 2;
+      offsetY -= (drawHeight - height) / 2;
+      
+      ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+    } else {
+      // Fallback gradient
+      const backgroundGradient = ctx.createLinearGradient(0, 0, 0, height);
+      backgroundGradient.addColorStop(0, '#1d065aff');    // Dark blue-purple top
+      backgroundGradient.addColorStop(0.3, '#4005c9ff');  // Deep blue
+      backgroundGradient.addColorStop(0.7, '#1967c7ff');  // Ocean blue
+      backgroundGradient.addColorStop(1, '#190b62ff');    // Dark bottom
+      
+      ctx.fillStyle = backgroundGradient;
+      ctx.fillRect(0, 0, width, height);
+    }
     
-    ctx.fillStyle = backgroundGradient;
-    ctx.fillRect(0, 0, width, height);
-    
-    // ===========================================
-    // STATUS BAR
-    // ===========================================
-    
-    ctx.fillStyle = '#666';
-    ctx.font = '26px -apple-system, BlinkMacSystemFont, sans-serif';
-    ctx.fillText('9:41', 40, 48);
-    ctx.fillText('📶 🔋', width - 110, 48);
-    
-    // ===========================================
-    // HEADER
-    // ===========================================
-    
-    // Header background
-    const headerGradient = ctx.createLinearGradient(0, 60, 0, 160);
-    headerGradient.addColorStop(0, '#212dd8ff');
-    headerGradient.addColorStop(1, '#460beaff');
-    ctx.fillStyle = headerGradient;
-    ctx.fillRect(0, 60, width, 100);
-    
-    // App title with icon (adjusted for horizontal flip)
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 32px -apple-system, BlinkMacSystemFont, sans-serif';
-    ctx.textAlign = 'right'; // Right align for the flipped canvas
-    ctx.fillText('✨ Our Lady\'s Watchlist', width - 30, 105);
-    
-    // Online count (adjusted for horizontal flip)
-    const onlineText = `● ${onlineCount || 47} faithful online`;
-    ctx.fillStyle = '#00ff66';
-    ctx.font = '22px -apple-system, BlinkMacSystemFont, sans-serif';
-    ctx.textAlign = 'right'; // Right align for the flipped canvas
-    ctx.fillText(onlineText, width - 30, 140);
-    
-    // Reset text alignment
+    // Reset text alignment for content below
     ctx.textAlign = 'left';
     
     // ===========================================
@@ -741,16 +793,19 @@ export function WatchlistPhoneTexture({
       const tabX = 30 + index * tabWidth;
       const isActive = activeTab === tab.id;
       
-      // Tab background
-      if (isActive) {
-        ctx.fillStyle = '#8a2be2';
-        ctx.beginPath();
-        ctx.roundRect(tabX, tabY, tabWidth - 10, tabHeight, 8);
-        ctx.fill();
-      }
+      // Tab background with strong contrast
+      ctx.fillStyle = isActive ? '#1a1a2e' : 'rgba(0, 0, 0, 0.4)';
+      ctx.beginPath();
+      ctx.roundRect(tabX, tabY, tabWidth - 10, tabHeight, 8);
+      ctx.fill();
       
-      // Tab text
-      ctx.fillStyle = isActive ? '#fff' : '#888';
+      // Tab border for extra definition
+      ctx.strokeStyle = isActive ? '#6c5ce7' : 'rgba(255, 255, 255, 0.2)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Tab text with strong contrast
+      ctx.fillStyle = '#fff';
       ctx.font = `${isActive ? 'bold ' : ''}20px -apple-system, BlinkMacSystemFont, sans-serif`;
       ctx.textAlign = 'center';
       ctx.fillText(tab.label, tabX + (tabWidth - 10) / 2, tabY + 30);
@@ -851,9 +906,19 @@ export function WatchlistPhoneTexture({
       }
       
       // Item background
+      // Use different colors based on activity type
       const bgGradient = ctx.createLinearGradient(20, itemY, 20, itemY + itemHeight);
-      bgGradient.addColorStop(0, style.bgGradient[0]);
-      bgGradient.addColorStop(1, style.bgGradient[1]);
+      
+      if (activity.type === 'CANDLE') {
+        bgGradient.addColorStop(0, '#c86d35ff');  // Orange for candles/burns
+        bgGradient.addColorStop(1, '#89380cff');
+      } else if (['STAKE', 'UNSTAKE', 'CLAIM'].includes(activity.type)) {
+        bgGradient.addColorStop(0, '#071f39ff');  // Blue for staking
+        bgGradient.addColorStop(1, '#357abd');
+      } else {
+        bgGradient.addColorStop(0, style.bgGradient[0]);
+        bgGradient.addColorStop(1, style.bgGradient[1]);
+      }
       
       ctx.fillStyle = bgGradient;
       ctx.beginPath();
