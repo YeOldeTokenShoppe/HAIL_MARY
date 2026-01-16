@@ -30,18 +30,59 @@ class LighterStandaloneService {
     this.isRunning = false;
     this.db = null;
     this.lighterClient = null;
+    this.cachedAuthToken = null; // Cache auth tokens since they last up to 8 hours
     
-    // Lighter configuration
+    // Lighter configuration - following SignerClient pattern
     this.lighterConfig = {
       baseUrl: process.env.NEXT_PUBLIC_LIGHTER_BASE_URL || 'https://testnet.zklighter.elliot.ai',
       apiKeyPrivateKey: process.env.LIGHTER_API_KEY_PRIVATE_KEY,
       apiKeyPublicKey: process.env.LIGHTER_API_KEY_PUBLIC_KEY,
       accountIndex: parseInt(process.env.LIGHTER_ACCOUNT_INDEX || '0'),
-      apiKeyIndex: parseInt(process.env.LIGHTER_API_KEY_INDEX || '3')
+      apiKeyIndex: parseInt(process.env.LIGHTER_API_KEY_INDEX || '2') // Updated to match your .env
     };
+    
+    // Validate configuration
+    this.validateConfiguration();
+    
+    console.log('⚙️ Lighter Configuration:', {
+      baseUrl: this.lighterConfig.baseUrl,
+      accountIndex: this.lighterConfig.accountIndex,
+      apiKeyIndex: this.lighterConfig.apiKeyIndex,
+      hasPrivateKey: !!this.lighterConfig.apiKeyPrivateKey,
+      privateKeyLength: this.lighterConfig.apiKeyPrivateKey?.length
+    });
     
     // Initialize Firebase
     this.initializeFirebase();
+  }
+
+  validateConfiguration() {
+    if (!this.lighterConfig.apiKeyPrivateKey) {
+      console.log('⚠️ LIGHTER_API_KEY_PRIVATE_KEY not configured - service will run in read-only mode');
+      return;
+    }
+
+    // Check private key format - should be 64 hex characters (without 0x prefix)
+    let privateKey = this.lighterConfig.apiKeyPrivateKey.trim();
+    if (privateKey.startsWith('0x')) {
+      privateKey = privateKey.slice(2);
+    }
+
+    console.log('🔐 Validating private key format...');
+    console.log('🔐 Raw private key length:', this.lighterConfig.apiKeyPrivateKey.length);
+    console.log('🔐 Processed key length:', privateKey.length);
+
+    // Standard private key should be 64 hex characters
+    if (privateKey.length === 64 && /^[0-9a-fA-F]+$/.test(privateKey)) {
+      console.log('✅ Standard private key format detected (64 hex chars)');
+    } else if (privateKey.length > 64) {
+      console.log('⚠️ Extended private key format detected - this might be an API key rather than a wallet private key');
+      console.log('⚠️ Please verify with Lighter documentation that this is the correct format');
+    } else {
+      console.error('❌ Invalid private key format detected');
+      console.error('❌ Expected: 64 hex characters or extended API key format');
+      console.error('❌ Current length:', privateKey.length);
+    }
   }
 
   initializeFirebase() {
@@ -228,42 +269,85 @@ class LighterStandaloneService {
       throw new Error('Lighter API key not configured');
     }
 
-    console.log('🔐 Raw private key length:', this.lighterConfig.apiKeyPrivateKey?.length);
-    console.log('🔐 Private key starts with 0x:', this.lighterConfig.apiKeyPrivateKey?.startsWith('0x'));
+    // Check if we have a cached token that's still valid
+    if (this.cachedAuthToken && this.cachedAuthToken.expiry > Math.floor(Date.now() / 1000) + 300) {
+      console.log('🔐 Using cached auth token (expires at:', new Date(this.cachedAuthToken.expiry * 1000).toISOString() + ')');
+      return this.cachedAuthToken;
+    }
+
+    console.log('🔐 Creating new Lighter authentication token...');
+    console.log('🔐 Account Index:', this.lighterConfig.accountIndex);
+    console.log('🔐 API Key Index:', this.lighterConfig.apiKeyIndex);
     
+    // Following Lighter auth token structure: {expiry_unix}:{account_index}:{api_key_index}:{random_hex}
+    const currentTime = Math.floor(Date.now() / 1000);
+    const expiry = currentTime + (6 * 60 * 60); // 6 hours (under the 8-hour max)
+    
+    // Generate random hex (32 characters)
+    const randomHex = Math.random().toString(16).slice(2).padEnd(32, '0').slice(0, 32);
+    
+    // Create auth token in the format specified by Lighter docs
+    const authToken = `${expiry}:${this.lighterConfig.accountIndex}:${this.lighterConfig.apiKeyIndex}:${randomHex}`;
+    
+    console.log('🔐 Generated auth token structure:', authToken);
+    console.log('🔐 Token expires at:', new Date(expiry * 1000).toISOString());
+    
+    // For signing, we still need the actual private key
     let privateKey = this.lighterConfig.apiKeyPrivateKey.trim();
     
-    // Remove 0x prefix if present, then add it back
-    if (privateKey.startsWith('0x')) {
-      privateKey = privateKey.slice(2);
+    try {
+      // If this is a standard private key (64 hex chars), use it directly
+      if (privateKey.startsWith('0x')) {
+        privateKey = privateKey.slice(2);
+      }
+      
+      if (privateKey.length === 64 && /^[0-9a-fA-F]+$/.test(privateKey)) {
+        // Standard wallet private key
+        privateKey = `0x${privateKey}`;
+        const wallet = new Wallet(privateKey);
+        
+        // Sign the auth token
+        const signature = await wallet.signMessage(authToken);
+        
+        console.log('🔐 Authentication token signed successfully');
+        console.log('🔑 Wallet address:', wallet.address);
+        
+        const authResponse = {
+          authToken,
+          signature,
+          timestamp: currentTime,
+          expiry,
+          address: wallet.address,
+          apiKeyIndex: this.lighterConfig.apiKeyIndex,
+          accountIndex: this.lighterConfig.accountIndex
+        };
+        
+        // Cache the token for reuse
+        this.cachedAuthToken = authResponse;
+        return authResponse;
+        
+      } else {
+        // This might be the API key itself, not a signing key
+        console.log('🔐 Using API key directly (length: ' + privateKey.length + ')');
+        
+        const authResponse = {
+          authToken,
+          apiKey: privateKey, // Use the API key directly
+          timestamp: currentTime,
+          expiry,
+          apiKeyIndex: this.lighterConfig.apiKeyIndex,
+          accountIndex: this.lighterConfig.accountIndex
+        };
+        
+        // Cache the token for reuse
+        this.cachedAuthToken = authResponse;
+        return authResponse;
+      }
+      
+    } catch (error) {
+      console.error('❌ Failed to create authentication token:', error.message);
+      throw error;
     }
-    
-    // Validate length (should be 64 hex characters)
-    if (privateKey.length !== 64) {
-      throw new Error(`Invalid private key length: ${privateKey.length} (expected 64 hex characters)`);
-    }
-    
-    // Validate hex format
-    if (!/^[0-9a-fA-F]+$/.test(privateKey)) {
-      throw new Error('Private key contains invalid characters (must be hex)');
-    }
-    
-    privateKey = `0x${privateKey}`;
-    console.log('🔐 Processed private key length:', privateKey.length);
-    
-    const wallet = new Wallet(privateKey);
-    const timestamp = Math.floor(Date.now() / 1000);
-    const expiry = timestamp + 3600;
-    
-    const message = `Lighter Authentication\nTimestamp: ${timestamp}\nExpiry: ${expiry}`;
-    const signature = await wallet.signMessage(message);
-    
-    return {
-      signature,
-      timestamp,
-      expiry,
-      address: wallet.address
-    };
   }
 
   async getLighterAccount() {
@@ -273,15 +357,32 @@ class LighterStandaloneService {
       
       const url = `${this.lighterConfig.baseUrl}/api/v1/accounts/${this.lighterConfig.accountIndex}`;
       console.log(`🌐 Fetching Lighter account from: ${url}`);
-      console.log(`🔑 Using address: ${auth.address}`);
+      
+      // Build headers based on Lighter authentication requirements
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${auth.authToken}` // Use the auth token as specified in docs
+      };
+      
+      if (auth.signature) {
+        // If we have a signature, include it (wallet-based authentication)
+        headers['X-Signature'] = auth.signature;
+        headers['X-Address'] = auth.address;
+        console.log(`🔑 Using signed auth token with wallet: ${auth.address}`);
+      } else if (auth.apiKey) {
+        // Direct API key authentication (if needed as fallback)
+        headers['X-API-Key'] = auth.apiKey;
+        console.log(`🔑 Using direct API key authentication`);
+      }
+      
+      // Always include these based on the auth token structure
+      headers['X-Account-Index'] = auth.accountIndex;
+      headers['X-API-Key-Index'] = auth.apiKeyIndex;
+      
+      console.log('📋 Request headers:', Object.keys(headers).join(', '));
       
       const response = await axios.get(url, {
-        headers: {
-          'Authorization': `Bearer ${auth.signature}`,
-          'X-Timestamp': auth.timestamp,
-          'X-Expiry': auth.expiry,
-          'X-Address': auth.address
-        },
+        headers,
         timeout: 10000
       });
 
@@ -293,6 +394,7 @@ class LighterStandaloneService {
       if (error.response) {
         console.error('❌ Response status:', error.response.status);
         console.error('❌ Response data:', error.response.data);
+        console.error('❌ Response headers:', error.response.headers);
       }
       return null;
     }
