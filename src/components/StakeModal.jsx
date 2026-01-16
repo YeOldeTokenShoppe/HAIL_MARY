@@ -978,12 +978,17 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                         amount: amountInWei,
                       });
                       
-                      await sendAndConfirmTransaction({
+                      const approvalResult = await sendAndConfirmTransaction({
                         transaction: approveTx,
                         account: activeAccount
                       });
                       
-                      console.log("Approval confirmed, now staking...");
+                      console.log("Approval confirmed:", approvalResult);
+                      
+                      // Small delay to ensure approval is fully processed
+                      await new Promise(resolve => setTimeout(resolve, 1000));
+                      
+                      console.log("Now staking...");
                       setTransactionStatus('confirming');
                       
                       // Then stake the tokens
@@ -1057,7 +1062,11 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                     } catch (error) {
                       console.error("Staking failed:", error);
                       setTransactionStatus('');
-                      if (error.message?.includes('insufficient')) {
+                      
+                      // Check for specific error signatures
+                      if (error?.message?.includes('0xfb8f41b2')) {
+                        alert('Insufficient token allowance. The approval transaction may have failed. Please try again.');
+                      } else if (error.message?.includes('insufficient')) {
                         alert('Insufficient tokens or gas. Please check your balance.');
                       } else if (!error.message?.includes('User rejected') && !error.message?.includes('User denied')) {
                         alert('Failed to stake tokens: ' + (error?.message || 'Unknown error'));
@@ -1116,6 +1125,10 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                           if (approvalResult?.wait) {
                             console.log("Waiting for approval to be mined...");
                             await approvalResult.wait();
+                          } else {
+                            // For networks that don't return a wait function, wait a bit
+                            console.log("Waiting for approval to propagate...");
+                            await new Promise(resolve => setTimeout(resolve, 3000));
                           }
                           
                           console.log("Approval CONFIRMED on blockchain!");
@@ -1135,7 +1148,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                           
                           console.log("About to call sendTransaction for stake...");
                           
-                          // Add a delay to ensure the UI has updated to show Step 2
+                          // Add a longer delay to ensure approval is fully processed before staking
                           setTimeout(() => {
                             console.log("Now calling sendTransaction for stake - wallet will prompt user...");
                             
@@ -1214,13 +1227,16 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                                 // setTransactionStatus('');
                                 setIsSubmitting(false);
                                 
-                                if (!error?.message?.includes('User rejected') && 
+                                // Check for specific error signatures
+                                if (error?.message?.includes('0xfb8f41b2')) {
+                                  alert('Insufficient token allowance. Please try again - the approval may not have been fully processed.');
+                                } else if (!error?.message?.includes('User rejected') && 
                                     !error?.message?.includes('User denied')) {
                                   alert('Failed to stake tokens: ' + (error?.message || 'Unknown error'));
                                 }
                               }
                             });
-                          }, 500); // Delay to ensure UI updates
+                          }, 2000); // Longer delay to ensure approval is fully processed
                         },
                         onError: (error) => {
                           console.error("Approval transaction failed:", error);

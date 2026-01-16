@@ -92,6 +92,16 @@ try {
   storage = getStorage(app);
   rtdb = getDatabase(app);
   
+  // Verify services are properly initialized
+  console.log("🔥 Firebase services initialized:", {
+    app: !!app,
+    db: !!db,
+    auth: !!auth,
+    storage: !!storage,
+    rtdb: !!rtdb,
+    dbCollectionMethod: typeof db?.collection
+  });
+  
   // console.log("Firebase initialized successfully", {
   //   appInitialized: !!app,
   //   dbInitialized: !!db,
@@ -100,10 +110,12 @@ try {
   //   rtdbInitialized: !!rtdb
   // });
 } catch (error) {
-  console.error("Error initializing Firebase:", error);
-  console.error("Firebase initialization details:", {
+  console.error("❌ CRITICAL: Error initializing Firebase:", error);
+  console.error("❌ Firebase initialization details:", {
     error: error.message,
     stack: error.stack,
+    hasEnvVars: hasRequiredEnvironmentVariables(),
+    isBrowser,
     config: JSON.stringify(firebaseConfig).replace(/[^{}:,[\]"]/g, '*') // Mask actual values for security
   });
   
@@ -118,7 +130,8 @@ try {
 // Create dummy implementations for when Firebase is unavailable
 // This helps prevent errors when Firebase fails to initialize
 if (!db) {
-  console.warn("Creating dummy Firebase implementations");
+  console.warn("⚠️ CRITICAL: Creating dummy Firebase implementations - DATA WILL NOT BE SAVED!");
+  console.warn("⚠️ This means Firebase failed to initialize. Check the error above and your environment variables.");
   
   // Create a more comprehensive dummy implementation
   const dummySnapshot = {

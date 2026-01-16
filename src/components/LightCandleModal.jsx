@@ -318,6 +318,18 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
       
       let docRef = null;
       try {
+        // First, verify Firebase is properly initialized
+        if (!db || typeof db.collection !== 'function') {
+          throw new Error('Firebase Firestore is not properly initialized. Please check your environment variables.');
+        }
+        
+        // Test Firestore connectivity
+        console.log('🔥 Firebase DB status:', {
+          db: !!db,
+          hasCollection: typeof db.collection === 'function',
+          hasAddDoc: typeof addDoc === 'function'
+        });
+        
         console.log('🕐 Checking for existing offerings for wallet:', walletAddress);
         console.log('🔐 Current user auth:', {
           userId: user?.id,
@@ -387,7 +399,20 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           window.setLatestOfferingId(docRef.id);
         }
       } catch (firestoreError) {
-        console.error('Error saving to Firestore:', firestoreError);
+        console.error('❌ CRITICAL: Error saving to Firestore offerings collection:', firestoreError);
+        console.error('❌ Firebase DB instance:', db ? 'initialized' : 'NOT INITIALIZED');
+        console.error('❌ Error details:', {
+          name: firestoreError?.name,
+          code: firestoreError?.code,
+          message: firestoreError?.message,
+          stack: firestoreError?.stack
+        });
+        // Log the offering data that failed to save
+        console.error('❌ Failed offering data:', baseOffering);
+        
+        // Show user-friendly error
+        alert('Failed to save your candle to the shrine. Please try again or contact support if the issue persists.');
+        
         // Log error but continue - don't block the user experience
       }
 

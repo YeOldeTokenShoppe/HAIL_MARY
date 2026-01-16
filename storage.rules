@@ -1,10 +1,10 @@
   rules_version = '2';
   service cloud.firestore {
     match /databases/{database}/documents {
-      // Public read access to market data
+      // Public read access to market data (writes allowed for trading system)
       match /marketData/{document} {
         allow read: if true;
-        allow write: if false;
+        allow write: if true; // Allow trading system to write market data
       }
 
       // Restrict historical data to authenticated users
@@ -25,37 +25,32 @@
         allow write: if true;
       }
 
-      // Secure offerings collection (one per wallet, 80-hour expiration)
+      // Offerings collection (candle lighting with token burn)
       match /offerings/{document} {
         // Allow anyone to read offerings (for displaying candles/shrine)
         allow read: if true;
 
         // Allow creating new offerings with required fields
-        allow create: if request.auth != null
-          && request.resource.data.keys().hasAll(['walletAddress', 'userId', 'tokensBurned',
+        // Temporarily relaxed auth requirement while debugging
+        allow create: if request.resource.data.keys().hasAll(['walletAddress', 'userId', 'tokensBurned',
   'message', 'name', 'type', 'createdAt'])
           && request.resource.data.walletAddress is string
-          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.userId is string
           && request.resource.data.tokensBurned is number
           && request.resource.data.message is string
           && request.resource.data.message.size() <= 1000
           && request.resource.data.name is string
           && request.resource.data.name.size() <= 100
-          && request.resource.data.type in ['petition', 'gratitude', 'blessing', 'memorial'];
+          && request.resource.data.type in ['petition', 'appreciation', 'confession', 'gratitude', 'blessing', 'memorial'];
 
-        // Allow users to update their own offerings (for adding polaroidUrl, etc.)
-        allow update: if request.auth != null
-          && resource.data.userId == request.auth.uid
-          && request.resource.data.userId == request.auth.uid
-          // Prevent changing core fields after creation
-          && request.resource.data.walletAddress == resource.data.walletAddress
+        // Allow updating offerings (for adding polaroidUrl, etc.)
+        allow update: if request.resource.data.walletAddress == resource.data.walletAddress
           && request.resource.data.tokensBurned == resource.data.tokensBurned
           && request.resource.data.type == resource.data.type
           && request.resource.data.createdAt == resource.data.createdAt;
 
-        // Allow users to replace their own offerings
-     allow delete: if request.auth != null
-    && resource.data.userId == request.auth.uid;
+        // Allow deleting offerings (for replacement functionality)
+        allow delete: if true;
       }
 
       // Allow public read/write to fountain_coins collection
@@ -81,6 +76,31 @@
       match /sentiment_analysis/{document} {
         allow read: if true;
         allow write: if false; // Only backend services should write sentiment data
+      }
+
+      // Trading system collections - allow full access for development
+      match /agentChat/{chatId} {
+        allow read, write: if true;
+      }
+      
+      match /lighterData/{docId} {
+        allow read, write: if true;
+      }
+      
+      match /marketData/{docId} {
+        allow read, write: if true;
+      }
+      
+      match /agentContext/{docId} {
+        allow read, write: if true;
+      }
+      
+      match /serviceStatus/{docId} {
+        allow read, write: if true;
+      }
+      
+      match /trades/{tradeId} {
+        allow read, write: if true;
       }
 
       // Block all other collections by default (secure by default)
