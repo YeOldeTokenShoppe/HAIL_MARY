@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useWalletAuth } from './WalletAuthProvider';
 import { db, collection, addDoc, serverTimestamp } from '@/lib/firebaseClient';
 import ThirdwebBuyModal from './ThirdwebBuyModal';
 import { 
+  useSendTransaction,
   TransactionButton
 } from "thirdweb/react";
 import { prepareContractCall, sendAndConfirmTransaction } from "thirdweb";
@@ -33,7 +34,10 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
   const [showInfo, setShowInfo] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [successData, setSuccessData] = useState(null);
-  const [transactionStatus, setTransactionStatus] = useState(''); // 'signing', 'confirming', 'success'
+  const [transactionStatus, setTransactionStatus] = useState(''); // 'approving', 'staking', 'confirming', 'success'
+  const [isDataRefreshing, setIsDataRefreshing] = useState(false);
+  const { mutate: sendTransaction } = useSendTransaction();
+  const isStakeSignedRef = useRef(false); // Track if stake was actually signed
   
   // Testnet contract has a 10-minute lock period by default
   const LOCK_DURATION_MINUTES = 10;
@@ -46,27 +50,20 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
       setIsSubmitting(false);
       setShowInfo(false);
       setTransactionStatus('');
+      isStakeSignedRef.current = false;
+      setShowSuccess(false);
+      setSuccessData(null);
+      setIsDataRefreshing(false);
       
-      // If user has staked balance, show the dashboard directly
-      if (parseFloat(stakedBalance) > 0) {
-        setShowSuccess(true);
-        setSuccessData({ 
-          showDashboard: true 
-        });
-        setShowNoBuyPrompt(false);
+      // Check token balance immediately when modal opens
+      const balance = parseInt(tokenBalance) || 0;
+      if (walletAddress && balance === 0) {
+        setShowNoBuyPrompt(true);
       } else {
-        setShowSuccess(false);
-        setSuccessData(null);
-        // Check token balance immediately when modal opens
-        const balance = parseInt(tokenBalance) || 0;
-        if (walletAddress && balance === 0) {
-          setShowNoBuyPrompt(true);
-        } else {
-          setShowNoBuyPrompt(false);
-        }
+        setShowNoBuyPrompt(false);
       }
     }
-  }, [isOpen, walletAddress, tokenBalance, stakedBalance]);
+  }, [isOpen, walletAddress, tokenBalance]);
   
   // No auto-close anymore since we have actionable content
   
@@ -272,8 +269,14 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
         }
         
         @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.6; }
+          0%, 80%, 100% {
+            opacity: 0.3;
+            transform: scale(0.8);
+          }
+          40% {
+            opacity: 1;
+            transform: scale(1.2);
+          }
         }
 
       `}</style>
@@ -442,6 +445,17 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
               }}>
                 {successData?.showDashboard ? 'STAKING DASHBOARD' : 'Staking Successful!'}
               </h2>
+              {isDataRefreshing && (
+                <div style={{
+                  fontSize: '0.75rem',
+                  color: '#00f5d4',
+                  marginTop: '0.5rem',
+                  opacity: 0.8,
+                  animation: 'pulse 1.5s ease-in-out infinite'
+                }}>
+                  Updating balances...
+                </div>
+              )}
             </div>
             
             {/* Staking Activity Section */}
@@ -480,7 +494,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                     fontWeight: '600',
                     color: '#fff'
                   }}>
-                    {parseFloat(stakedBalance || 0).toLocaleString()} RL80
+                    {parseFloat(successData?.optimisticStakedAmount || stakedBalance || 0).toLocaleString()} RL80
                   </div>
                 </div>
                 
@@ -575,10 +589,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
               marginBottom: '1rem'
             }}>
               <button
-                onClick={() => {
-                  setShowSuccess(false);
-                  setStakeAmount('');
-                }}
+                onClick={onClose}
                 style={{
                   padding: '0.9rem',
                   background: '#00f5d4',
@@ -598,7 +609,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                   e.currentTarget.style.opacity = '1';
                 }}
               >
-                STAKE MORE
+                CLOSE
               </button>
               
               <TransactionButton
@@ -632,7 +643,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                   width: '100%'
                 }}
               >
-                {canWithdraw ? `WITHDRAW ALL (${parseFloat(stakedBalance).toLocaleString()} RL80)` : `🔒 LOCKED`}
+                {canWithdraw ? `WITHDRAW ALL (${parseFloat(successData?.optimisticStakedAmount || stakedBalance || 0).toLocaleString()} RL80)` : `🔒 LOCKED`}
               </TransactionButton>
             </div>
             
@@ -782,50 +793,6 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
               </button>
             </div>
             
-            {/* Compact Transaction Status Indicator - positioned absolutely */}
-            {transactionStatus && transactionStatus !== 'success' && (
-              <div style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                background: transactionStatus === 'confirming' ? 'rgba(0, 123, 255, 0.95)' : 'rgba(255, 193, 7, 0.95)',
-                border: `2px solid ${transactionStatus === 'confirming' ? '#007bff' : '#ffc107'}`,
-                borderRadius: '12px',
-                padding: '1.5rem',
-                minWidth: '250px',
-                textAlign: 'center',
-                zIndex: 100,
-                boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
-                backdropFilter: 'blur(5px)',
-              }}>
-                <div style={{
-                  fontSize: '1.5rem',
-                  marginBottom: '3.5rem',
-                  animation: transactionStatus === 'confirming' ? 'spin 2s linear infinite' : 'none'
-                }}>
-                  {transactionStatus === 'signing' ? '✍️' : '⏳'}
-                </div>
-                <div style={{
-                  color: '#fff',
-                  fontSize: '0.9rem',
-                  fontWeight: '600',
-                  marginBottom: '0.25rem'
-                }}>
-                  {transactionStatus === 'signing' ? 'Please sign the transaction in your wallet' :
-                   'Transaction submitted! Waiting for blockchain confirmation...'}
-                </div>
-                {transactionStatus === 'confirming' && (
-                  <div style={{
-                    color: 'rgba(255, 255, 255, 0.8)',
-                    fontSize: '0.75rem',
-                    marginTop: '0.5rem'
-                  }}>
-                    This usually takes 10-30 seconds
-                  </div>
-                )}
-              </div>
-            )}
             
             {/* Compact Info Toggle Button */}
             <div style={{ 
@@ -1057,28 +1024,36 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                         console.error('Error saving stake to Firestore:', firestoreError);
                       }
 
-                      // Refresh data
-                      await refreshStakingData();
-                      if (refreshBalance) {
-                        await refreshBalance();
-                      }
-                      
-                      // Call parent handler
-                      if (onStake) {
-                        await onStake(stakeData);
-                      }
-                      
-                      // Show success
+                      // Show success immediately with optimistic update
                       setSuccessData({
                         amount: parseInt(stakeAmount),
                         unlockTime: IS_TESTNET 
                           ? new Date(Date.now() + LOCK_DURATION_MINUTES * 60 * 1000)
                           : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-                        txHash: result.transactionHash
+                        txHash: result.transactionHash,
+                        optimisticStakedAmount: (parseFloat(stakedBalance || 0) + parseInt(stakeAmount)).toString()
                       });
                       setShowSuccess(true);
                       setStakeAmount('');
                       setIsSubmitting(false);
+                      
+                      // Refresh data in the background
+                      setIsDataRefreshing(true);
+                      Promise.all([
+                        refreshStakingData(),
+                        refreshBalance ? refreshBalance() : Promise.resolve()
+                      ]).then(() => {
+                        console.log('Data refreshed after staking');
+                        setIsDataRefreshing(false);
+                      }).catch(err => {
+                        console.error('Error refreshing data:', err);
+                        setIsDataRefreshing(false);
+                      });
+                      
+                      // Call parent handler
+                      if (onStake) {
+                        await onStake(stakeData);
+                      }
                     } catch (error) {
                       console.error("Staking failed:", error);
                       setTransactionStatus('');
@@ -1104,101 +1079,164 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                     cursor: isSubmitting ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  {transactionStatus === 'signing' ? 'Approving...' : 
-                   transactionStatus === 'confirming' ? 'Staking...' : 
+                  {transactionStatus === 'signing' || transactionStatus === 'approving' ? 'Approving...' : 
+                   transactionStatus === 'staking' ? 'Signing Stake...' :
+                   transactionStatus === 'confirming' ? 'Confirming...' : 
                    `Stake ${stakeAmount || '0'} RL80`}
                 </button>
               ) : (
-                // Regular wallet - use TransactionButton with automatic approval
-                <TransactionButton
-                  transaction={() => {
-                    const amountInWei = toWei(stakeAmount || "0");
-                    console.log("Staking amount:", amountInWei.toString());
-                    console.log("User token balance:", tokenBalance);
-                    console.log("Active account:", activeAccount?.address);
-                    console.log("Staking contract:", stakingContract.address);
-                    console.log("Contract chain:", stakingContract.chain?.id);
+                // Regular wallet - manual approval and stake flow
+                <button
+                  onClick={async () => {
+                    if (isSubmitting) return;
                     
-                    // Prepare the stake transaction
-                    const stakeTx = prepareContractCall({
-                      contract: stakingContract,
-                      method: "stake",
-                      params: [amountInWei]
-                    });
-                    
-                    console.log("Prepared transaction:", stakeTx);
-                    return stakeTx;
-                  }}
-                  getApprovalForTransaction={async () => {
-                    // This will automatically handle approval if needed
-                    const amountInWei = toWei(stakeAmount || "0");
-                    console.log("Getting approval for amount:", amountInWei.toString());
-                    
-                    return approve({
-                      contract: erc20Contract,
-                      spender: stakingContract.address,
-                      amount: amountInWei,
-                    });
-                  }}
-                  onTransactionSent={() => {
-                    console.log("Stake transaction sent!");
-                    setTransactionStatus('confirming');
-                  }}
-                  onTransactionConfirmed={async (result) => {
-                    console.log("Stake successful!", result);
-                    setTransactionStatus('success');
-                    
-                    // Save to Firestore
-                    const stakeData = {
-                      amount: parseInt(stakeAmount),
-                      duration: LOCK_DURATION_MINUTES,
-                      durationUnit: 'minutes',
-                      userId: user?.id,
-                      walletAddress: walletAddress,
-                      userImageUrl: user?.imageUrl || null,
-                      userName: user?.firstName || user?.username || 'Anonymous',
-                      createdAt: serverTimestamp(),
-                      timestamp: new Date().toISOString(),
-                      isTestnet: IS_TESTNET,
-                      txHash: result.transactionHash
-                    };
-
                     try {
-                      const docRef = await addDoc(collection(db, 'stakes'), stakeData);
-                      console.log('Stake saved to Firestore with ID:', docRef.id);
-                      stakeData.id = docRef.id;
-                    } catch (firestoreError) {
-                      console.error('Error saving stake to Firestore:', firestoreError);
-                    }
+                      setIsSubmitting(true);
+                      const amountInWei = toWei(stakeAmount || "0");
+                      
+                      // Step 1: Approval
+                      console.log("Starting approval process...");
+                      // Don't set transaction status for regular wallets
+                      // setTransactionStatus('approving');
+                      
+                      const approvalTx = approve({
+                        contract: erc20Contract,
+                        spender: stakingContract.address,
+                        amount: amountInWei,
+                      });
+                      
+                      // Send approval transaction
+                      sendTransaction(approvalTx, {
+                        onSuccess: async (approvalResult) => {
+                          console.log("Approval SIGNED by user and sent to blockchain");
+                          
+                          // Keep showing Step 1 while approval confirms
+                          
+                          // Wait for approval confirmation
+                          if (approvalResult?.wait) {
+                            console.log("Waiting for approval to be mined...");
+                            await approvalResult.wait();
+                          }
+                          
+                          console.log("Approval CONFIRMED on blockchain!");
+                          
+                          // Don't set transaction status for regular wallets
+                          // setTransactionStatus('staking');
+                          
+                          // Small delay to ensure UI updates
+                          await new Promise(resolve => setTimeout(resolve, 200));
+                          
+                          // Prepare stake transaction
+                          const stakeTx = prepareContractCall({
+                            contract: stakingContract,
+                            method: "stake",
+                            params: [amountInWei]
+                          });
+                          
+                          console.log("About to call sendTransaction for stake...");
+                          
+                          // Add a delay to ensure the UI has updated to show Step 2
+                          setTimeout(() => {
+                            console.log("Now calling sendTransaction for stake - wallet will prompt user...");
+                            
+                            // Send stake transaction - this will prompt the user
+                            sendTransaction(stakeTx, {
+                              onSuccess: async (stakeResult) => {
+                                console.log("Stake onSuccess fired - user has signed the stake!");
+                                
+                                // Don't show confirming box for regular wallets
+                                // setTransactionStatus('confirming');
+                              
+                              // Wait for confirmation
+                              if (stakeResult?.wait) {
+                                await stakeResult.wait();
+                              }
+                              
+                              console.log("Stake confirmed!");
+                              
+                              // Save to Firestore
+                              const stakeData = {
+                                amount: parseInt(stakeAmount),
+                                duration: LOCK_DURATION_MINUTES,
+                                durationUnit: 'minutes',
+                                userId: user?.id,
+                                walletAddress: walletAddress,
+                                userImageUrl: user?.imageUrl || null,
+                                userName: user?.firstName || user?.username || 'Anonymous',
+                                createdAt: serverTimestamp(),
+                                timestamp: new Date().toISOString(),
+                                isTestnet: IS_TESTNET,
+                                txHash: stakeResult.transactionHash || stakeResult.hash
+                              };
 
-                    // Refresh data
-                    await refreshStakingData();
-                    if (refreshBalance) {
-                      await refreshBalance();
-                    }
-                    
-                    // Call parent handler
-                    if (onStake) {
-                      await onStake(stakeData);
-                    }
-                    
-                    // Show success
-                    setSuccessData({
-                      amount: parseInt(stakeAmount),
-                      unlockTime: IS_TESTNET 
-                        ? new Date(Date.now() + LOCK_DURATION_MINUTES * 60 * 1000)
-                        : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-                      txHash: result.transactionHash
-                    });
-                    setShowSuccess(true);
-                    setStakeAmount('');
-                  }}
-                  onError={(error) => {
-                    console.error("Staking failed:", error);
-                    setTransactionStatus('');
-                    if (error.message?.includes('insufficient')) {
-                      alert('Insufficient tokens or gas. Please check your balance.');
-                    } else {
+                              try {
+                                const docRef = await addDoc(collection(db, 'stakes'), stakeData);
+                                console.log('Stake saved to Firestore with ID:', docRef.id);
+                                stakeData.id = docRef.id;
+                              } catch (firestoreError) {
+                                console.error('Error saving stake to Firestore:', firestoreError);
+                              }
+
+                              // Show success immediately with optimistic update
+                              // setTransactionStatus('success');
+                              setSuccessData({
+                                amount: parseInt(stakeAmount),
+                                unlockTime: IS_TESTNET 
+                                  ? new Date(Date.now() + LOCK_DURATION_MINUTES * 60 * 1000)
+                                  : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                                txHash: stakeResult.transactionHash || stakeResult.hash,
+                                optimisticStakedAmount: (parseFloat(stakedBalance || 0) + parseInt(stakeAmount)).toString()
+                              });
+                              setShowSuccess(true);
+                              setStakeAmount('');
+                              setIsSubmitting(false);
+                              
+                              // Refresh data in the background
+                              setIsDataRefreshing(true);
+                              Promise.all([
+                                refreshStakingData(),
+                                refreshBalance ? refreshBalance() : Promise.resolve()
+                              ]).then(() => {
+                                console.log('Data refreshed after staking');
+                                setIsDataRefreshing(false);
+                              }).catch(err => {
+                                console.error('Error refreshing data:', err);
+                                setIsDataRefreshing(false);
+                              });
+                              
+                              // Call parent handler
+                              if (onStake) {
+                                await onStake(stakeData);
+                              }
+                            },
+                              onError: (error) => {
+                                console.error("Stake transaction failed:", error);
+                                // setTransactionStatus('');
+                                setIsSubmitting(false);
+                                
+                                if (!error?.message?.includes('User rejected') && 
+                                    !error?.message?.includes('User denied')) {
+                                  alert('Failed to stake tokens: ' + (error?.message || 'Unknown error'));
+                                }
+                              }
+                            });
+                          }, 500); // Delay to ensure UI updates
+                        },
+                        onError: (error) => {
+                          console.error("Approval transaction failed:", error);
+                          // setTransactionStatus('');
+                          setIsSubmitting(false);
+                          
+                          if (!error?.message?.includes('User rejected') && 
+                              !error?.message?.includes('User denied')) {
+                            alert('Failed to approve tokens: ' + (error?.message || 'Unknown error'));
+                          }
+                        }
+                      });
+                    } catch (error) {
+                      console.error("Failed to initiate staking:", error);
+                      // setTransactionStatus('');
+                      setIsSubmitting(false);
                       alert('Failed to stake tokens. Please try again.');
                     }
                   }}
@@ -1217,8 +1255,8 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                     transition: 'all 0.3s'
                   }}
                 >
-                  {transactionStatus === 'confirming' ? 'Processing...' : `Stake ${stakeAmount || '0'} RL80`}
-                </TransactionButton>
+                  {isSubmitting ? 'Processing...' : `Stake ${stakeAmount || '0'} RL80`}
+                </button>
               )}
               </form>
               

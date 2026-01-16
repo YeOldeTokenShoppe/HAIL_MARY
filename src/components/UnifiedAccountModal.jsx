@@ -435,7 +435,7 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
           width: 28px;
           height: 28px;
           border-radius: 6px;
-          font-size: 20px;
+          font-size: 2rem;
           cursor: pointer;
           transition: all 0.2s;
           display: flex;

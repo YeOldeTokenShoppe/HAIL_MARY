@@ -16,7 +16,7 @@ import { PhoneScreenTexture } from './PhoneScreenTexture'
 import { PhoneAura } from './PhoneAura'
 import { Html } from '@react-three/drei'
 import EmojiRain from './EmojiRain'
-import { AnimatedChatPhoneTexture } from './AnimatedChatPhoneTexture'
+import { WatchlistPhoneTexture } from './WatchlistPhoneTexture'
 
 
 
@@ -53,7 +53,6 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
   const phoneSwipeHandlers = useRef(null)
   const swipeStartY = useRef(0)
   const isDragging = useRef(false)
-  const pacMan2Ref = useRef() // Reference for second PacMan object
   const backdropRef = useRef() // Reference for Backdrop object
   const circleRef = useRef() // Reference for Circle object
   const [phoneCaseWorldPos, setPhoneCaseWorldPos] = useState([0, 0, 0])
@@ -97,8 +96,18 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
           child.raycast = THREE.Mesh.prototype.raycast
           child.material.side = THREE.DoubleSide // Make sure both sides are clickable
         }
-        // Add click handler for focus mode
-        child.userData.onClick = () => {
+        // Add click handler for focus mode with watchlist check
+        child.userData.onClick = (event) => {
+          // Check if this is the phone screen mesh and if watchlist handled the click
+          if (child.userData.onWatchlistClick && event && event.uv) {
+            const watchlistHandled = child.userData.onWatchlistClick(event.uv);
+            if (watchlistHandled) {
+              // Watchlist handled the click, don't trigger focus mode
+              return;
+            }
+          }
+          
+          // No watchlist interaction, proceed with focus mode
           if (onPhoneClick) {
             // console.log('Calling onPhoneClick')
             onPhoneClick()
@@ -582,7 +591,8 @@ const handleClick = useCallback((event) => {
   while (current) {
     if (current.userData.onClick) {
       // console.log('Found onClick handler on:', current.name, 'triggering onClick')
-      current.userData.onClick()
+      // Pass the full event (including UV coordinates) to the handler
+      current.userData.onClick(event)
       break
     }
     current = current.parent
@@ -702,10 +712,10 @@ const handlePhoneClick = useCallback(() => {
 // Return with swivel animation applied
 
 return (
-  <group position={[0, isMobileLocal ? -0.3 : -0.3, 0]}> {/* Position hands higher on mobile */}
+  <group position={[0, isMobileLocal ? -0.4 : -0.3, 0]}> {/* Position hands higher on mobile */}
     <primitive 
       object={gltf.scene} 
-      scale={[0.65, 0.65, 0.65]}
+      scale={ isMobileLocal ? [0.45, 0.45, 0.45] : [0.65, 0.65, 0.65] }
       rotation={[0, userRotation, 0]} // Apply user rotation to hands
       onClick={handleClick}
       onPointerOver={handlePointerOver}
@@ -714,31 +724,21 @@ return (
     
     {/* Phone Screen Feed - Rendered as texture on the mesh */}
     {phoneScreenRef.current && (
-<AnimatedChatPhoneTexture
-  // Existing props
- meshRef={phoneScreenRef.current}
-  hoveredOffering={hoveredOffering}
+<WatchlistPhoneTexture
+  meshRef={phoneScreenRef.current}
+  
+  // Activity triggers
   justLitOffering={justLitOffering}
-  hasActiveClick={hasActiveClick}
-  user={user}
+  // stakingEvents={stakingEvent}  // Add when staking events are available
+  // tradeAlerts={tradeAlert}      // Add when Trade School integration is ready
   
-  // NEW: Trade School alerts
-  // tradeAlerts={{
-  //   action: 'LONG',        // 'LONG' | 'SHORT' | 'CLOSE'
-  //   asset: 'ETH/USD',
-  //   leverage: '3x',
-  //   pnl: '+87%'            // Only for CLOSE action
-  // }}
-  
-  // NEW: Stats for mood & milestones
+  // Stats for footer
   candleCount={522}
   totalBurned={280000}
-  priceChange={-2.5}       // 24h % change
-  prayerStats={{
-    petitions: 150,
-    confessions: 80,
-    thanks: 45
-  }}
+  totalStaked={15000000}
+  onlineCount={47}
+  
+  user={user}
 />
     )}
     

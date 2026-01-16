@@ -926,7 +926,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                   marginTop: '15%',
                   justifyContent: 'center',
                   position: 'relative',
-                  right: '-20%'
+                  right: '-35%'
                 }}
               >
                 {/* Arrow with text */}

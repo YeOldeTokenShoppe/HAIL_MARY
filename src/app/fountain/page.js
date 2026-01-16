@@ -161,7 +161,7 @@ export default function FountainPage() {
             display: 'flex',
             flexDirection: 'column',
             width: '100%',
-            paddingTop: '2rem',
+            // paddingTop: '2rem',
             minHeight: '100vh',
             pointerEvents: 'none',
           }}>
@@ -170,7 +170,7 @@ export default function FountainPage() {
                 id="main-title"
                 style={{ 
                 position: "relative",
-                left: "5%",
+                left: "2rem",
                 top: "-2rem",
                 color: is80sMode ? "#ffffff" : "#f6f5f1ff",
                 fontFamily: 'UnifrakturCook, serif',
@@ -201,7 +201,7 @@ export default function FountainPage() {
                 marginTop: '1rem',
                 pointerEvents: 'auto',
               }}
-              onClick={() => window.location.href = '/about'}
+              // onClick={() => window.location.href = '/about'}
             >
               <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
               <span className="title-line" style={{ display: 'block', position: 'relative' }}>
@@ -274,7 +274,7 @@ export default function FountainPage() {
         position: "absolute",
         top: "1rem",
         right: "1rem",
-        zIndex: 300
+        zIndex: 30000
       }}>
         <NavControlsHome 
           isPlaying={contextIsPlaying}

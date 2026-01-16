@@ -384,15 +384,15 @@ export const WalletModalStyles = () => (
 
     .wallet-modal-close {
       position: absolute;
-      top: 15px;
-      right: 15px;
+      top: 5px;
+      right: 5px;
       background: #ffee00;
       color: #000;
       width: 30px;
       height: 30px;
       border-radius: 4px;
       border: none;
-      font-size: 20px;
+      font-size: 2rem;
       font-weight: bold;
       cursor: pointer;
       display: flex;

@@ -21,16 +21,16 @@ exports.analyzePrayersDaily = onSchedule({
   schedule: "0 6 * * *",
   timeZone: "UTC",
   memory: "256MiB",
-  timeoutSeconds: 540
+  timeoutSeconds: 540,
+  secrets: ["OPENAI_API_KEY"]
 }, async (event) => {
   try {
     logger.info("[Prayer Analysis] Starting daily prayer analysis...");
     
-    // Get OpenAI API key from environment
+    // Get OpenAI API key from environment (optional)
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      logger.error("[Prayer Analysis] OpenAI API key not configured");
-      return;
+      logger.info("[Prayer Analysis] OpenAI API key not configured, using basic sentiment analysis");
     }
     
     // Fetch recent offerings from Firestore
@@ -46,12 +46,12 @@ exports.analyzePrayersDaily = onSchedule({
       // Store empty state
       const emptyAnalysis = {
         overall: 0.5,
-        label: 'Awaiting Prayers',
+        label: 'Awaiting Traders',
         emotions: [{ name: 'Hope', value: 100, color: '#4ade80' }],
         prayersPerHour: 0,
         trend: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
-        keywords: ['waiting', 'for', 'prayers'],
-        summary: 'The congregation awaits the faithful to share their trading prayers and offerings to Our Lady of Perpetual Profit.',
+        keywords: ['waiting', 'for', 'traders'],
+        summary: 'The trading floor awaits new messages and market sentiments from the community.',
         lastUpdate: new Date().toISOString(),
         totalAnalyzed: 0,
         totalOfferings: 0,
@@ -67,30 +67,35 @@ exports.analyzePrayersDaily = onSchedule({
     const prayers = [];
     const hourAgo = Date.now() - (60 * 60 * 1000);
     let recentCount = 0;
+    let totalOfferingsCount = 0;
     
     snapshot.forEach(doc => {
       const data = doc.data();
-      if (data.message) {
-        const timestamp = data.createdAt?.toMillis ? data.createdAt.toMillis() : 
-                         data.timestamp || Date.now();
-        
+      totalOfferingsCount++;
+      
+      const timestamp = data.createdAt?.toMillis ? data.createdAt.toMillis() : 
+                       data.timestamp || Date.now();
+      
+      // Count recent offerings (with or without messages)
+      if (timestamp > hourAgo) {
+        recentCount++;
+      }
+      
+      // Only add to prayers array if there's a message
+      if (data.message && data.message.trim().length > 0) {
         prayers.push({
           id: doc.id,
           message: data.message,
           timestamp: timestamp,
           name: data.name || 'Anonymous'
         });
-        
-        if (timestamp > hourAgo) {
-          recentCount++;
-        }
       }
     });
     
     // Analyze prayers using our helper functions
     const { analyzePrayers, generateSummary } = require('./prayerAnalysisUtils');
     
-    logger.info("[Prayer Analysis] Analyzing", prayers.length, "prayers...");
+    logger.info("[Prayer Analysis] Found", prayers.length, "prayers with messages out of", totalOfferingsCount, "total offerings");
     const analysis = await analyzePrayers(prayers.slice(0, 100), apiKey);
     
     // Generate AI summary
@@ -99,7 +104,7 @@ exports.analyzePrayersDaily = onSchedule({
     // Prepare final analysis
     const finalAnalysis = {
       ...analysis,
-      summary: summary || 'The congregation\'s prayers reflect the eternal dance of hope and fear in the markets.',
+      summary: summary || 'The trading community\'s messages reflect the ongoing balance between bullish hope and bearish fear.',
       prayersPerHour: recentCount,
       lastUpdate: new Date().toISOString(),
       totalOfferings: snapshot.size,
@@ -132,7 +137,7 @@ exports.analyzePrayersDaily = onSchedule({
       prayersPerHour: 0,
       trend: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
       keywords: ['error', 'occurred'],
-      summary: 'Our mystical algorithms encountered turbulence in the digital ether. The analysis will resume tomorrow.',
+      summary: 'The sentiment algorithms encountered technical turbulence. The analysis will resume on the next scheduled run.',
       lastUpdate: new Date().toISOString(),
       totalAnalyzed: 0,
       error: error.message,
@@ -144,7 +149,9 @@ exports.analyzePrayersDaily = onSchedule({
 });
 
 // Manual trigger endpoint for testing
-exports.analyzePrayersManual = onRequest(async (req, res) => {
+exports.analyzePrayersManual = onRequest({
+  secrets: ["OPENAI_API_KEY"]
+}, async (req, res) => {
   try {
     logger.info("[Prayer Analysis] Manual trigger requested");
     

@@ -5,8 +5,8 @@ import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { NewCandleEffectManager } from './NewCandleEffect'
 
-const CANDLE_COUNT = 500
-const MAX_ADDITIONAL = 100
+const CANDLE_COUNT = 100
+const MAX_ADDITIONAL = 500
 
 // Shared time uniform - all materials reference this single object
 const sharedUniforms = {
@@ -729,49 +729,17 @@ export function SceneSetup({ is80sMode }) {
 }
 
 export function GradientBackground({ is80sMode = false }) {
-  const { viewport, camera } = useThree()
-  
-  const material = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: {
-      uColorBottom: { value: new THREE.Color('#1a1a2e') },
-      uColorTop: { value: new THREE.Color('#2d2d4a') },
-    },
-    vertexShader: `
-      varying vec2 vUv;
-      void main() {
-        vUv = uv;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `,
-    fragmentShader: `
-      uniform vec3 uColorBottom;
-      uniform vec3 uColorTop;
-      varying vec2 vUv;
-      
-      void main() {
-        float mixFactor = smoothstep(0.0, 1.0, vUv.y);
-        vec3 color = mix(uColorBottom, uColorTop, mixFactor);
-        vec2 center = vUv - 0.5;
-        float vignette = 1.0 - dot(center, center) * 0.5;
-        color *= vignette;
-        gl_FragColor = vec4(color, 1.0);
-      }
-    `,
+  const material = useMemo(() => new THREE.MeshBasicMaterial({
+    color: '#1a1a2e',
+    side: THREE.BackSide,
     depthWrite: false,
   }), [])
   
   if (is80sMode) return null
   
-  // Position the plane far behind everything and scale it to cover the full viewport
-  // Using viewport dimensions at the plane's z-distance to ensure full coverage
-  const distance = 50
-  const fov = camera.fov * (Math.PI / 180)
-  const planeHeight = 2 * Math.tan(fov / 2) * distance
-  const planeWidth = planeHeight * viewport.aspect
-  
   return (
-    <mesh position={[0, 0, -distance]} material={material}>
-      <planeGeometry args={[planeWidth * 1.5, planeHeight * 1.5]} />
+    <mesh material={material}>
+      <sphereGeometry args={[100, 32, 16]} />
     </mesh>
   )
 }
@@ -792,10 +760,9 @@ export function PriceSimulator({ onPriceChange }) {
 
 useGLTF.preload('/models/tinyJapCanOnly.glb')
 
-export default function CandleShrine({ offerings = [], onSelectOffering, onLightCandle, onPriceChange, is80sMode, currentUserId = 'testUser123' }) {
+export default function CandleShrine({ offerings = [], onSelectOffering, onPriceChange, is80sMode, currentUserId = 'testUser123' }) {
   const [priceDirection, setPriceDirection] = useState(0)
   const [additionalCandles, setAdditionalCandles] = useState([])
-  const [highlightedCandleId, setHighlightedCandleId] = useState(-1)
   const [selectedCandle, setSelectedCandle] = useState(null)
   const [allPositions, setAllPositions] = useState([])
   const [offeringCandles, setOfferingCandles] = useState([])
@@ -857,20 +824,7 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onLight
     setAdditionalCandles(prev => [...prev, newCandle])
   }
   
-  const triggerNewCandle = () => {
-    if (effectManagerRef.current) {
-      effectManagerRef.current.triggerEffect({ name: 'Test User', type: 'petition' })
-    }
-    // Also create a user candle when triggered
-    const position = [
-      (Math.random() - 0.5) * 20,
-      (Math.random() - 0.5) * 15,
-      (Math.random() - 0.5) * 10
-    ]
-    handleNewCandle(position, { text: 'User offering', type: 'petition' })
-  }
-  
-  const handleCandleClick = (instanceId, position) => {
+  const handleCandleClick = (instanceId) => {
     setClickedCandleId(instanceId)
     setTimeout(() => setClickedCandleId(null), 2000)
     

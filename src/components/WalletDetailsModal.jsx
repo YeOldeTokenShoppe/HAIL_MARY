@@ -969,15 +969,15 @@ export const WalletDetailsStyles = () => (
     /* Close Button */
     .wallet-modal-close {
       position: absolute;
-      top: 12px;
-      right: 12px;
+      top: 5px;
+      right: 5px;
       background: transparent;
       color: rgba(255, 255, 255, 0.5);
       width: 28px;
       height: 28px;
       border-radius: 6px;
       border: none;
-      font-size: 20px;
+      font-size: 2rem;
       cursor: pointer;
       display: flex;
       align-items: center;

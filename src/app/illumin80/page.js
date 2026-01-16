@@ -659,6 +659,9 @@ useEffect(() => {
               setJustLitOffering(null)
             }}
             user={user}
+            onViewReset={() => {
+              setIsHighlightingCandle(false)
+            }}
           />
         ) : null}
       </div>

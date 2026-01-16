@@ -1,9 +1,10 @@
 'use client'
 
-import React, { useState, useImperativeHandle, forwardRef } from 'react'
+import React, { useState, useEffect, useImperativeHandle, forwardRef } from 'react'
 import Link from 'next/link'
 import styles from './Matchstick.module.css'
 import { useStaking } from '@/hooks/useStaking'
+import SkewedHeading from './SkewedHeading'
 
 /**
  * Consolidated left-side panel for the shrine page
@@ -21,8 +22,16 @@ const ShrineLeftPanel = forwardRef(({
 }, ref) => {
   const [isLit, setIsLit] = useState(false)
   const [hasLitCandleThisSession, setHasLitCandleThisSession] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  const [isHoveringMatchstick, setIsHoveringMatchstick] = useState(false)
+  const [isHoveringStake, setIsHoveringStake] = useState(false)
   const { stakedBalance } = useStaking()
   const hasStakedTokens = parseFloat(stakedBalance || 0) > 0
+  
+  // Set mounted state after component mounts
+  useEffect(() => {
+    setMounted(true)
+  }, [])
   
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
@@ -88,6 +97,17 @@ const ShrineLeftPanel = forwardRef(({
               0 0 20px 4px rgba(212, 175, 55, 0.3);
           }
         }
+        
+        @keyframes slideIn {
+          from {
+            transform: translateY(-50%) translateX(-20px);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(-50%) translateX(0);
+            opacity: 1;
+          }
+        }
       `}</style>
       
       {/* Vignette overlay - creates breathing room on the left */}
@@ -101,12 +121,14 @@ const ShrineLeftPanel = forwardRef(({
         pointerEvents: 'none',
         zIndex: 3,
       }} />
+   
+     
 
       {/* Main content container - centered elements */}
       <div style={{
         position: 'fixed',
         left: '40px',
-        top: '60%',
+        top: '55%',
         transform: 'translateY(-50%)',  // Center vertically
         display: 'flex',
         flexDirection: 'column',
@@ -117,9 +139,165 @@ const ShrineLeftPanel = forwardRef(({
         pointerEvents: 'none',  // Allow clicks to pass through to canvas
         maxHeight: '90vh',  // Ensure it doesn't overflow viewport
       }}>
+               {mounted && (
+              <SkewedHeading 
+                lines={["Get on her", "watchlist"]}
+                // colors={["#d4af37", "#f4e4c1", "#ffd700"]}
+                colors={["#f0f4f0ff"]}
+                fontSize="1.5rem" 
+                // isMobile={isMobile}
+              />
+            )}
 
         {/* CTA Text - Clean modern font */}
+       
+
+        {/* Stake Token Frame - Duplicate style below matchstick */}
         <div style={{
+          fontFamily: "'Bebas Neue', sans-serif",
+          fontSize: isMobile ? '1rem' : '1rem',
+          fontWeight: 300,
+          color: 'rgba(246, 245, 241, 0.95)',
+          textShadow: `
+            0 0 20px rgba(212, 175, 55, 0.4),
+            0 0 40px rgba(212, 175, 55, 0.2),
+            2px 2px 4px rgba(0, 0, 0, 0.6)
+          `,
+          letterSpacing: '0.06em',
+          textAlign: 'center',
+          lineHeight: 1.2,
+          maxWidth: isMobile ? '260px' : '280px',
+          alignSelf: 'center',
+          marginTop: '0.5rem'
+        }}>
+          <span style={{ 
+            display: 'block',
+            fontWeight: 400,
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            fontSize: '0.95rem',
+          }}>
+            STAKE RL80
+          </span>
+          {/* <span style={{ 
+            display: 'block', 
+            fontSize: isMobile ? '0.9rem' : '0.9rem',
+            opacity: 0.8,
+            marginTop: '6px',
+            fontWeight: 300,
+            fontStyle: 'italic',
+          }}>
+            Earn rewards
+          </span> */}
+          {/* <span style={{ 
+            display: 'block', 
+            fontSize: '0.65rem',
+            opacity: 0.5,
+            marginTop: '0.5rem',
+            fontWeight: 300,
+            fontStyle: 'italic',
+          }}>
+            Sign in + hold RL80 to participate
+          </span> */}
+        </div>
+        
+        {/* Stake button - circular background matching matchstick style */}
+        <div 
+          onClick={() => {
+            if (onStakeClick) {
+              onStakeClick()
+            }
+          }}
+          style={{
+            pointerEvents: 'auto',  // Enable clicks on the stake button
+            width: '5.5rem',
+            height: '5.5rem',
+            borderRadius: '50%',
+            background: 'rgba(212, 175, 55, 0.1)',
+            border: '1.5px solid rgba(212, 175, 55, 0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease',
+            boxShadow: '0 0 0 0 rgba(212, 175, 55, 0)',
+            animation: 'buttonPulse 2s ease-in-out infinite',
+            position: 'relative',
+            overflow: 'visible',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+          }}
+          onMouseEnter={(e) => {
+            setIsHoveringStake(true);
+            e.currentTarget.style.animation = 'none';
+            e.currentTarget.style.background = 'rgba(212, 175, 55, 0.15)';
+            e.currentTarget.style.border = '1.5px solid rgba(212, 175, 55, 0.25)';
+            e.currentTarget.style.boxShadow = '0 0 20px rgba(212, 175, 55, 0.3)';
+            e.currentTarget.style.transform = 'scale(1.05)';
+          }}
+          onMouseLeave={(e) => {
+            setIsHoveringStake(false);
+            e.currentTarget.style.animation = 'buttonPulse 2s ease-in-out infinite';
+            e.currentTarget.style.background = 'rgba(212, 175, 55, 0.1)';
+            e.currentTarget.style.border = '1.5px solid rgba(212, 175, 55, 0.15)';
+            e.currentTarget.style.boxShadow = '0 0 0 0 rgba(212, 175, 55, 0)';
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+        >
+          {/* Hover text that slides out for staking */}
+          {isHoveringStake && (
+            <div style={{
+              position: 'absolute',
+              left: '110%',
+              top: '50%',
+              whiteSpace: 'nowrap',
+              backgroundColor: 'rgba(10, 10, 20, 0.9)',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              border: '1px solid rgba(212, 175, 55, 0.3)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+              animation: 'slideIn 0.3s ease-out forwards',
+              pointerEvents: 'none',
+              zIndex: 1000,
+            }}>
+              <div style={{
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: '0.9rem',
+                fontWeight: 300,
+                color: 'rgba(246, 245, 241, 0.95)',
+                textShadow: '0 0 10px rgba(212, 175, 55, 0.3)',
+                letterSpacing: '0.05em',
+                lineHeight: 1.4,
+              }}>
+                <div style={{ marginBottom: '4px' }}>Lock RL80 and earn Eth.</div>
+              </div>
+            </div>
+          )}
+          <img 
+            src="/images/stakeIcon.webp"
+            alt="Stake Tokens"
+            style={{
+              width: '70%',
+              height: '70%',
+              objectFit: 'contain',
+              opacity: 0.9,
+              filter: 'brightness(1.1)',
+              pointerEvents: 'none',
+            }}
+          />
+          
+          {/* Subtle glow ring animation */}
+          <div style={{
+            position: 'absolute',
+            width: '100%',
+            height: '100%',
+            borderRadius: '50%',
+            boxShadow: '0 0 0 0 rgba(212, 175, 55, 0.4)',
+            animation: 'inviteGlow 3s ease-in-out infinite',
+            pointerEvents: 'none',
+          }} />
+        </div>
+         <div style={{
           fontFamily: "'Bebas Neue', sans-serif",
           fontSize: isMobile ? '1rem' : '1.1rem',
           fontWeight: 300,
@@ -135,25 +313,17 @@ const ShrineLeftPanel = forwardRef(({
           maxWidth: isMobile ? '260px' : '280px',
           alignSelf: 'center',
         }}>
-          <span style={{ 
+ 
+      <span style={{ 
             display: 'block',
             fontWeight: 400,
             textTransform: 'uppercase',
-            letterSpacing: '0.12em',
+            letterSpacing: '0.08em',
+            fontSize: '0.95rem',
           }}>
-            Get on Her Watchlist 
+            Get Lit
           </span>
-          <span style={{ 
-            display: 'block', 
-            fontSize: isMobile ? '0.9rem' : '0.9rem',
-            opacity: 0.8,
-            marginTop: '6px',
-            fontWeight: 300,
-            fontStyle: 'italic',
-          }}>
-            Strike the match to light a green candle!
-          </span>
-          <span style={{ 
+          {/* <span style={{ 
             display: 'block', 
             fontSize: '0.65rem',
             opacity: 0.5,
@@ -162,12 +332,34 @@ const ShrineLeftPanel = forwardRef(({
             fontStyle: 'italic',
           }}>
             Sign in + hold RL80 to participate
-          </span>
+          </span> */}
         </div>
 
         {/* Matchstick with circular background - matching mobile style */}
         <div 
           onClick={handleMatchClick}
+          onMouseEnter={(e) => {
+            setIsHoveringMatchstick(true);
+            if (!isLit) {
+              e.currentTarget.style.animation = 'none';
+              e.currentTarget.style.background = 'rgba(212, 175, 55, 0.15)';
+              e.currentTarget.style.border = '1.5px solid rgba(212, 175, 55, 0.25)';
+              e.currentTarget.style.boxShadow = '0 0 20px rgba(212, 175, 55, 0.3)';
+              e.currentTarget.style.transform = 'scale(1.05)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            setIsHoveringMatchstick(false);
+            if (!isLit) {
+              e.currentTarget.style.animation = 'buttonPulse 2s ease-in-out infinite';
+              e.currentTarget.style.background = 'rgba(212, 175, 55, 0.1)';
+              e.currentTarget.style.border = '1.5px solid rgba(212, 175, 55, 0.15)';
+              e.currentTarget.style.boxShadow = '0 0 0 0 rgba(212, 175, 55, 0)';
+              e.currentTarget.style.transform = 'scale(1)';
+            } else {
+              e.currentTarget.style.transform = 'scale(1)';
+            }
+          }}
           style={{
             pointerEvents: 'auto',  // Enable clicks on the matchstick
             width: '5.5rem',
@@ -191,11 +383,45 @@ const ShrineLeftPanel = forwardRef(({
               ? 'none'
               : 'buttonPulse 2s ease-in-out infinite',
             position: 'relative',
-            overflow: 'hidden',
+            overflow: 'visible',
             backdropFilter: 'blur(10px)',
             WebkitBackdropFilter: 'blur(10px)',
           }}
         >
+          {/* Hover text that slides out */}
+          {isHoveringMatchstick && (
+            <div style={{
+              position: 'absolute',
+              left: '110%',
+              top: '50%',
+              whiteSpace: 'nowrap',
+              backgroundColor: 'rgba(10, 10, 20, 0.9)',
+              padding: '10px 20px',
+              borderRadius: '8px',
+              border: '1px solid rgba(212, 175, 55, 0.3)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+              animation: 'slideIn 0.3s ease-out forwards',
+              pointerEvents: 'none',
+              zIndex: 1000,
+            }}>
+              <div style={{
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: '0.9rem',
+                fontWeight: 300,
+                color: 'rgba(246, 245, 241, 0.95)',
+                textShadow: '0 0 10px rgba(212, 175, 55, 0.3)',
+                letterSpacing: '0.05em',
+                lineHeight: 1.4,
+              }}>
+                <div style={{ marginBottom: '4px' }}>Light a green candle.</div>
+                <div style={{ 
+                  fontSize: '0.8rem', 
+                  opacity: 0.8,
+                  color: 'rgba(212, 175, 55, 0.9)'
+                }}>RL80 tokens required.</div>
+              </div>
+            </div>
+          )}
           <div className={styles.wrapper} style={{
             transform: 'scale(0.75)',  // Just scale, no translation needed
             pointerEvents: 'none',
@@ -251,204 +477,44 @@ const ShrineLeftPanel = forwardRef(({
             }} />
           )}
         </div>
-
-        {/* Stake Token Frame - Duplicate style below matchstick */}
-        <div style={{
-          fontFamily: "'Bebas Neue', sans-serif",
-          fontSize: isMobile ? '1rem' : '1rem',
-          fontWeight: 300,
-          color: 'rgba(246, 245, 241, 0.95)',
-          textShadow: `
-            0 0 20px rgba(212, 175, 55, 0.4),
-            0 0 40px rgba(212, 175, 55, 0.2),
-            2px 2px 4px rgba(0, 0, 0, 0.6)
-          `,
-          letterSpacing: '0.06em',
-          textAlign: 'center',
-          lineHeight: 1.2,
-          maxWidth: isMobile ? '260px' : '280px',
-          alignSelf: 'center',
-          marginTop: '0.5rem'
-        }}>
-          <span style={{ 
-            display: 'block',
-            fontWeight: 400,
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-            fontSize: '0.95rem',
-          }}>
-            STAKE RL80 - EARN ETH
-          </span>
-          {/* <span style={{ 
-            display: 'block', 
-            fontSize: isMobile ? '0.9rem' : '0.9rem',
-            opacity: 0.8,
-            marginTop: '6px',
-            fontWeight: 300,
-            fontStyle: 'italic',
-          }}>
-            Earn rewards
-          </span> */}
-          {/* <span style={{ 
-            display: 'block', 
-            fontSize: '0.65rem',
-            opacity: 0.5,
-            marginTop: '0.5rem',
-            fontWeight: 300,
-            fontStyle: 'italic',
-          }}>
-            Sign in + hold RL80 to participate
-          </span> */}
-        </div>
-        
-        {/* Stake button - circular background matching matchstick style */}
-        <div 
-          onClick={() => {
-            if (onStakeClick) {
-              onStakeClick()
-            }
-          }}
-          style={{
-            pointerEvents: 'auto',  // Enable clicks on the stake button
-            width: '5.5rem',
-            height: '5.5rem',
-            borderRadius: '50%',
-            background: 'rgba(212, 175, 55, 0.1)',
-            border: '1.5px solid rgba(212, 175, 55, 0.15)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            transition: 'all 0.3s ease',
-            boxShadow: '0 0 0 0 rgba(212, 175, 55, 0)',
-            animation: 'buttonPulse 2s ease-in-out infinite',
-            position: 'relative',
-            overflow: 'hidden',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.animation = 'none';
-            e.currentTarget.style.background = 'rgba(212, 175, 55, 0.15)';
-            e.currentTarget.style.border = '1.5px solid rgba(212, 175, 55, 0.25)';
-            e.currentTarget.style.boxShadow = '0 0 20px rgba(212, 175, 55, 0.3)';
-            e.currentTarget.style.transform = 'scale(1.05)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.animation = 'buttonPulse 2s ease-in-out infinite';
-            e.currentTarget.style.background = 'rgba(212, 175, 55, 0.1)';
-            e.currentTarget.style.border = '1.5px solid rgba(212, 175, 55, 0.15)';
-            e.currentTarget.style.boxShadow = '0 0 0 0 rgba(212, 175, 55, 0)';
-            e.currentTarget.style.transform = 'scale(1)';
-          }}
-        >
-          <img 
-            src="/images/stakeIcon.webp"
-            alt="Stake Tokens"
+        {/* Find My Candle button - hide when highlighting/viewing candle */}
+        {onFindCandle && !isHighlighting && (
+          <button
+            onClick={() => onFindCandle?.()}
             style={{
-              width: '60%',
-              height: '60%',
-              objectFit: 'contain',
-              opacity: 0.9,
-              filter: 'brightness(1.1)',
-              pointerEvents: 'none',
-            }}
-          />
-          {/* Indicator for staked tokens */}
-          {hasStakedTokens && (
-            <div style={{
-              position: 'absolute',
-              top: '-5px',
-              right: '-5px',
-              background: 'linear-gradient(135deg, #ffd700, #ffed4e)',
-              width: '18px',
-              height: '18px',
-              borderRadius: '50%',
+              width: '220px',
+              background: 'linear-gradient(135deg, #ffaa00 0%, #ff8800 100%)',
+              border: 'none',
+              borderRadius: '12px',
+              padding: '12px 24px',
+              color: '#000',
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: '14px',
+              fontWeight: 'bold',
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+              boxShadow: '0 0 30px rgba(255, 170, 0, 0.4)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: '10px',
-              fontWeight: 'bold',
-              color: '#000',
-              boxShadow: '0 2px 8px rgba(255, 215, 0, 0.5)',
-              animation: 'pulse 2s infinite',
-              zIndex: 1,
-            }}>
-              ✓
-            </div>
-          )}
-          
-          {/* Subtle glow ring animation */}
-          <div style={{
-            position: 'absolute',
-            width: '100%',
-            height: '100%',
-            borderRadius: '50%',
-            boxShadow: '0 0 0 0 rgba(212, 175, 55, 0.4)',
-            animation: 'inviteGlow 3s ease-in-out infinite',
-            pointerEvents: 'none',
-          }} />
-        </div>
-        
-        {/* Dual-purpose Find My Candle / Return to Main View button */}
-        <button
-          onClick={() => {
-            if (isHighlighting) {
-              onResetView?.()
-            } else {
-              onFindCandle?.()
-            }
-          }}
-          style={{
-            width: '220px',
-            background: isHighlighting 
-              ? 'linear-gradient(135deg, #666 0%, #444 100%)'
-              : 'linear-gradient(135deg, #ffaa00 0%, #ff8800 100%)',
-            border: isHighlighting
-              ? '2px solid rgba(255, 255, 255, 0.2)'
-              : 'none',
-            borderRadius: '12px',
-            padding: '12px 24px',
-            color: isHighlighting ? '#fff' : '#000',
-            fontFamily: "'Bebas Neue', sans-serif",
-            fontSize: '14px',
-            fontWeight: 'bold',
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-            cursor: 'pointer',
-            boxShadow: isHighlighting
-              ? '0 4px 24px rgba(0, 0, 0, 0.5)'
-              : '0 0 30px rgba(255, 170, 0, 0.4)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            transition: 'all 0.3s ease',
-            marginTop: '1rem',
-            pointerEvents: 'auto',
-          }}
-          onMouseEnter={(e) => {
-            if (!isHighlighting) {
+              gap: '8px',
+              transition: 'all 0.3s ease',
+              marginTop: '1rem',
+              pointerEvents: 'auto',
+            }}
+            onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'scale(1.05)'
               e.currentTarget.style.boxShadow = '0 0 40px rgba(255, 170, 0, 0.6)'
-            }
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'scale(1)'
-            e.currentTarget.style.boxShadow = isHighlighting
-              ? '0 4px 24px rgba(0, 0, 0, 0.5)'
-              : '0 0 30px rgba(255, 170, 0, 0.4)'
-          }}
-        >
-          {isHighlighting ? (
-            <>
-              ↩️ Return to Main View
-              <span style={{ fontSize: '11px', opacity: 0.7, fontWeight: 'normal' }}>(ESC)</span>
-            </>
-          ) : (
-            <>🔍 Highlight My Candle</>
-          )}
-        </button>
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)'
+              e.currentTarget.style.boxShadow = '0 0 30px rgba(255, 170, 0, 0.4)'
+            }}
+          >
+            <>Find My Candle</>
+          </button>
+        )}
 
       </div>
     </>

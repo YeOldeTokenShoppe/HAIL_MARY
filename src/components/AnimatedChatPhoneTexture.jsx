@@ -1,11 +1,9 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
-import { db, collection, query, orderBy, limit, onSnapshot } from '@/lib/firebaseClient';
 
 export function AnimatedChatPhoneTexture({ 
   meshRef,
-  hoveredOffering = null,
   justLitOffering = null,
   hasActiveClick = false,
   user = null
@@ -20,11 +18,11 @@ export function AnimatedChatPhoneTexture({
   const [displayedMessages, setDisplayedMessages] = useState([]);
   const messageQueueRef = useRef([]);
   const currentMessageIndexRef = useRef(0);
-  const typingAnimationRef = useRef(null);
   const scrollPositionRef = useRef(0);
   const targetScrollRef = useRef(0);
   const lastUpdateTimeRef = useRef(Date.now());
   const messageHeightsRef = useRef({});
+  const messageImagesRef = useRef({});
   
   // Notification state
   const [notifications, setNotifications] = useState([]);
@@ -75,9 +73,8 @@ export function AnimatedChatPhoneTexture({
     };
   }, [meshRef]);
   
-  // Subscribe to Firebase offerings
+  // Set up example messages only (no Firebase subscription)
   useEffect(() => {
-    // Start with some example messages for testing
     const exampleMessages = [
       {
         id: 'example-1',
@@ -151,47 +148,8 @@ export function AnimatedChatPhoneTexture({
       }
     ];
     
-    // Set initial example messages
+    // Set example messages only
     setMessages(exampleMessages);
-    
-    const offeringsRef = collection(db, 'offerings');
-    const q = query(
-      offeringsRef,
-      orderBy('createdAt', 'desc'),
-      limit(20)
-    );
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const newMessages = [];
-      
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data.message) {
-          newMessages.push({
-            id: doc.id,
-            text: data.message,
-            username: data.name || 'Anonymous',
-            userImageUrl: data.userImageUrl || null,
-            type: data.type || 'petition',
-            tokensBurned: data.tokensBurned || '1',
-            align: data.prayerFor === 'self' ? 'right' : 'left',
-            timestamp: data.createdAt,
-            showTyping: true
-          });
-        }
-      });
-      
-      // If we have real messages, use them instead of examples
-      if (newMessages.length > 0) {
-        // Reverse to show oldest first (like a real chat)
-        setMessages(newMessages.reverse());
-      }
-    }, (error) => {
-      console.error('Error fetching offerings:', error);
-      // Keep example messages on error
-    });
-    
-    return () => unsubscribe();
   }, []);
   
   // Process message queue with typing animation
@@ -202,6 +160,25 @@ export function AnimatedChatPhoneTexture({
     if (displayedMessages.length === 0 || messages.length !== messageQueueRef.current.length) {
       messageQueueRef.current = [...messages];
       currentMessageIndexRef.current = 0;
+      
+      // Preload all user images
+      messages.forEach((message) => {
+        if (message.userImageUrl && !messageImagesRef.current[message.id]) {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            messageImagesRef.current[message.id] = img;
+            // Force a redraw when image loads
+            if (textureRef.current) {
+              textureRef.current.needsUpdate = true;
+            }
+          };
+          img.onerror = () => {
+            console.error('Failed to load message user image:', message.userImageUrl);
+          };
+          img.src = message.userImageUrl;
+        }
+      });
       
       const processNextMessage = () => {
         if (currentMessageIndexRef.current >= messageQueueRef.current.length) {
@@ -313,9 +290,9 @@ export function AnimatedChatPhoneTexture({
     ctx.font = '36px -apple-system, BlinkMacSystemFont, sans-serif';
     ctx.fillText('⋯', width - 70, 140);
     
-    // Chat container area - adjusted for new header
+    // Chat container area
     const chatStartY = 200;
-    const chatEndY = height - 120; // Leave space for footer
+    const chatEndY = height - 120;
     const chatHeight = chatEndY - chatStartY;
     const padding = 20;
     
@@ -328,7 +305,7 @@ export function AnimatedChatPhoneTexture({
     ctx.clip();
     
     // Draw messages within clipped area
-    let currentY = chatStartY - scrollPositionRef.current + 10; // Small padding from top
+    let currentY = chatStartY - scrollPositionRef.current + 10;
     
     displayedMessages.forEach((message, index) => {
       const isRight = message.align === 'right';
@@ -361,18 +338,24 @@ export function AnimatedChatPhoneTexture({
         bubbleMaxWidth
       );
       
-      // Only draw if visible (clipping will handle boundaries)
+      // Only draw if visible
       if (currentY + bubbleHeight > 0 && currentY < height) {
-        // Draw message bubble
-        const bubbleX = isRight ? width - bubbleWidth - padding - 20 : padding + 20;
-        const bubbleY = currentY;
+        const bubbleX = isRight 
+          ? width - bubbleWidth - padding 
+          : padding;
+        const bubbleY = currentY + 10;
         
-        // Bubble background with better colors
+        // Draw username above bubble
+        if (!message.isTyping && message.username) {
+          ctx.fillStyle = isRight ? '#666' : '#999';
+          ctx.font = '22px -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.fillText(message.username, bubbleX, currentY);
+        }
+        
+        // Draw bubble background
         if (isRight) {
-          // Green for sent messages (user's prayers)
           ctx.fillStyle = '#00d757';
         } else {
-          // Gray for received messages (others' prayers)
           ctx.fillStyle = '#211fb7ff';
         }
         
@@ -492,59 +475,67 @@ export function AnimatedChatPhoneTexture({
     ctx.fillText('↑', width - 50, chatEndY + 63);
     ctx.textAlign = 'left';
     
-    // Draw notification popup if active
+    // Draw full-screen notification if active
     if (notifications.length > 0) {
       const notif = notifications[0];
       const elapsed = Date.now() - notif.timestamp;
       
-      // Slide and fade animation
-      let slideY = 0;
+      // Animation timing
       let opacity = 1;
+      let scale = 1;
       
       if (elapsed < 300) {
-        // Slide in from top
-        slideY = -100 + (elapsed / 300) * 100;
+        // Fade in and scale up
         opacity = elapsed / 300;
-      } else if (elapsed > NOTIFICATION_DURATION - 300) {
+        scale = 0.8 + (elapsed / 300) * 0.2;
+      } else if (elapsed > NOTIFICATION_DURATION - 500) {
         // Fade out
-        const fadeTime = elapsed - (NOTIFICATION_DURATION - 300);
-        opacity = 1 - (fadeTime / 300);
-        slideY = 0;
+        const fadeTime = elapsed - (NOTIFICATION_DURATION - 500);
+        opacity = 1 - (fadeTime / 500);
+        scale = 1 - (fadeTime / 500) * 0.1;
       }
       
-      // Notification position
-      const notifY = 220 + slideY;
-      const notifX = 40;
-      const notifWidth = width - 80;
-      const notifHeight = 80;
-      
-      // Draw notification background with shadow
       ctx.save();
       ctx.globalAlpha = opacity;
       
-      // Shadow
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-      ctx.shadowBlur = 15;
-      ctx.shadowOffsetY = 5;
+      // Fully opaque dark purple background to completely cover chat
+      const bgGradient = ctx.createLinearGradient(0, 0, 0, height);
+      bgGradient.addColorStop(0, '#1a0033');
+      bgGradient.addColorStop(0.5, '#2d1b69');
+      bgGradient.addColorStop(1, '#1a0033');
+      ctx.fillStyle = bgGradient;
+      ctx.fillRect(0, 0, width, height);
       
-      // Background gradient
-      const notifGradient = ctx.createLinearGradient(notifX, notifY, notifX, notifY + notifHeight);
-      notifGradient.addColorStop(0, '#8a2be2');
-      notifGradient.addColorStop(1, '#6a1ba2');
+      const centerX = width / 2;
+      const centerY = height / 2;
       
-      ctx.fillStyle = notifGradient;
-      ctx.beginPath();
-      ctx.roundRect(notifX, notifY, notifWidth, notifHeight, 15);
-      ctx.fill();
+      // Apply scale transform
+      ctx.translate(centerX, centerY);
+      ctx.scale(scale, scale);
+      ctx.translate(-centerX, -centerY);
       
-      // Reset shadow
-      ctx.shadowBlur = 0;
-      ctx.shadowOffsetY = 0;
+      // Draw glowing circle effect on top of background
+      const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, 250);
+      gradient.addColorStop(0, 'rgba(139, 43, 226, 0.8)');
+      gradient.addColorStop(0.5, 'rgba(139, 43, 226, 0.4)');
+      gradient.addColorStop(1, 'rgba(139, 43, 226, 0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+      
+      // Draw large flame icon
+      ctx.fillStyle = '#ffeb3b';
+      ctx.font = 'bold 180px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('🔥', centerX, centerY - 80);
+      
+      // Draw "NEW CANDLE" text
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 56px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.fillText('PRAYER RECEIVED', centerX, centerY + 40);
       
       // Draw user avatar or initial
-      const avatarSize = 50;
-      const avatarX = notifX + 15;
-      const avatarY = notifY + 15;
+      const avatarSize = 80;
+      const avatarY = centerY + 100;
       
       // Check if we have a loaded image for this notification
       const userImage = notificationImagesRef.current[notif.id];
@@ -553,51 +544,58 @@ export function AnimatedChatPhoneTexture({
         // Draw actual user image
         ctx.save();
         ctx.beginPath();
-        ctx.arc(avatarX + avatarSize/2, avatarY + avatarSize/2, avatarSize/2, 0, Math.PI * 2);
+        ctx.arc(centerX, avatarY, avatarSize/2, 0, Math.PI * 2);
         ctx.closePath();
         ctx.clip();
         
         // Draw the image
-        ctx.drawImage(userImage, avatarX, avatarY, avatarSize, avatarSize);
+        ctx.drawImage(userImage, centerX - avatarSize/2, avatarY - avatarSize/2, avatarSize, avatarSize);
         
         // Add a border
         ctx.restore();
         ctx.beginPath();
-        ctx.arc(avatarX + avatarSize/2, avatarY + avatarSize/2, avatarSize/2, 0, Math.PI * 2);
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
+        ctx.arc(centerX, avatarY, avatarSize/2, 0, Math.PI * 2);
+        ctx.strokeStyle = '#ffeb3b';
+        ctx.lineWidth = 3;
         ctx.stroke();
       } else {
-        // Fallback to initial
+        // Fallback to initial circle
         ctx.beginPath();
-        ctx.arc(avatarX + avatarSize/2, avatarY + avatarSize/2, avatarSize/2, 0, Math.PI * 2);
-        ctx.fillStyle = '#fff';
+        ctx.arc(centerX, avatarY, avatarSize/2, 0, Math.PI * 2);
+        ctx.fillStyle = '#8a2be2';
         ctx.fill();
         
+        // Border
+        ctx.strokeStyle = '#ffeb3b';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        
         // Draw initial in avatar
-        ctx.fillStyle = '#8a2be2';
-        ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 36px -apple-system, BlinkMacSystemFont, sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const initial = notif.username ? notif.username[0].toUpperCase() : '?';
-        ctx.fillText(initial, avatarX + avatarSize/2, avatarY + avatarSize/2);
-        ctx.textAlign = 'left';
+        ctx.fillText(initial, centerX, avatarY);
         ctx.textBaseline = 'alphabetic';
       }
       
-      // Draw notification text
+      // Draw username
       ctx.fillStyle = '#fff';
-      ctx.font = 'bold 22px -apple-system, BlinkMacSystemFont, sans-serif';
-      ctx.fillText(`${notif.username}`, avatarX + avatarSize + 15, notifY + 35);
+      ctx.font = '36px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(notif.username, centerX, avatarY + 70);
       
+      // Draw token amount with glow effect
+      ctx.shadowColor = '#ffeb3b';
+      ctx.shadowBlur = 20;
       ctx.fillStyle = '#ffeb3b';
-      ctx.font = '20px -apple-system, BlinkMacSystemFont, sans-serif';
-      ctx.fillText('🔥 New Candle Alert!', avatarX + avatarSize + 15, notifY + 58);
+      ctx.font = 'bold 48px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.fillText(`${notif.tokensBurned} RL80`, centerX, avatarY + 130);
       
-      // Draw token amount
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 18px -apple-system, BlinkMacSystemFont, sans-serif';
-      ctx.fillText(`${notif.tokensBurned} RL80`, notifWidth - 80, notifY + 45);
+      // Reset shadow
+      ctx.shadowBlur = 0;
+      ctx.textAlign = 'left';
       
       ctx.restore();
     }
@@ -671,30 +669,7 @@ export function AnimatedChatPhoneTexture({
         delete notificationImagesRef.current[notifId];
       }, NOTIFICATION_DURATION);
       
-      // Also add as a message if it has text
-      if (justLitOffering.message) {
-        // Add message immediately to the queue
-        const newMessage = {
-          id: `just-lit-${Date.now()}`,
-          text: justLitOffering.message,
-          username: justLitOffering.name || user?.firstName || 'You',
-          type: justLitOffering.type || 'petition',
-          tokensBurned: justLitOffering.tokensBurned || '1',
-          align: 'right',
-          timestamp: new Date(),
-          showTyping: false,
-          isSpecial: true
-        };
-        
-        // Add to displayed messages immediately
-        setDisplayedMessages(prev => [...prev, newMessage]);
-        
-        // Auto-scroll to bottom
-        requestAnimationFrame(() => {
-          const totalHeight = Object.values(messageHeightsRef.current).reduce((sum, h) => sum + h, 0);
-          targetScrollRef.current = Math.max(0, totalHeight - 800);
-        });
-      }
+      // Don't add the actual prayer message to the chat
     }
   }, [justLitOffering, user]);
   

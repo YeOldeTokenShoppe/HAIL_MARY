@@ -64,21 +64,139 @@ class CanvasErrorBoundary extends Component {
   }
 }
 
-// Circle highlight for candle
-function HighlightedCandleParticles({ position }) {
+// Highlighted candle with attached label
+function HighlightedCandleGroup({ position, userData, visible }) {
+  if (!position) return null
+  
+  // Format the date nicely
+  const formatDate = (date) => {
+    if (!date) return 'Unknown'
+    
+    // Handle Firestore Timestamp objects
+    let d
+    if (date && typeof date.toDate === 'function') {
+      d = date.toDate()
+    } else if (date instanceof Date) {
+      d = date
+    } else if (typeof date === 'string' || typeof date === 'number') {
+      d = new Date(date)
+    } else {
+      return 'Unknown'
+    }
+    
+    // Check if date is valid
+    if (isNaN(d.getTime())) return 'Unknown'
+    
+    const now = new Date()
+    const diff = now.getTime() - d.getTime()
+    const minutes = Math.floor(diff / (1000 * 60))
+    const hours = Math.floor(diff / (1000 * 60 * 60))
+    const days = Math.floor(hours / 24)
+    
+    if (minutes < 1) return 'Just now'
+    if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`
+    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`
+    if (days < 7) return `${days} day${days > 1 ? 's' : ''} ago`
+    return d.toLocaleDateString()
+  }
+
   return (
     <group position={position}>
-      {/* Glowing ring at ground level */}
+      {/* Subtle highlight ring at ground level */}
       <mesh position={[0, -0.5, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[1.5, 2, 32, 1]} />
         <meshBasicMaterial
-          color="#00ff44"
+          color="#ffaa00"
           transparent
-          opacity={0.3}
+          opacity={0.2}
           side={THREE.DoubleSide}
           blending={THREE.AdditiveBlending}
         />
       </mesh>
+      
+      {/* Html label attached to candle group */}
+      {userData && visible && (
+        <Html
+          position={[0, 1.2, 0]}
+          center
+          style={{
+            transition: 'opacity 0.2s',
+            opacity: visible ? 1 : 0,
+            pointerEvents: 'none',
+            transform: 'scale(0.8)'
+          }}
+        >
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(20, 20, 20, 0.95), rgba(40, 40, 40, 0.95))',
+            color: '#fff',
+            padding: '8px 10px',
+            borderRadius: '8px',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.8)',
+            fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+            fontSize: '11px',
+            width: '120px',
+            border: '1px solid rgba(255, 215, 0, 0.6)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)'
+          }}>
+            {/* User info header */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+            }}>
+              {/* Avatar */}
+              {userData.userImageUrl ? (
+                <img 
+                  src={userData.userImageUrl} 
+                  alt={userData.username}
+                  style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    border: '2px solid rgba(255, 215, 0, 0.5)',
+                    objectFit: 'cover'
+                  }}
+                />
+              ) : (
+                <div style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #ffaa00, #ff8800)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  color: '#fff',
+                  border: '2px solid rgba(255, 215, 0, 0.5)'
+                }}>
+                  {userData.username?.charAt(0).toUpperCase() || '?'}
+                </div>
+              )}
+              
+              {/* Name and time */}
+              <div style={{ flex: 1 }}>
+                <div style={{ 
+                  fontWeight: 'bold', 
+                  fontSize: '11px',
+                  color: '#ffcc00'
+                }}>
+                  {userData.username}
+                </div>
+                <div style={{ 
+                  fontSize: '9px', 
+                  opacity: 0.7,
+                  marginTop: '2px'
+                }}>
+                  Lit {formatDate(userData.litDate)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Html>
+      )}
     </group>
   )
 }
@@ -94,15 +212,17 @@ function CameraAnimator({ targetPosition, resetToDefault, isMobile }) {
   const progress = useRef(0)
   const isResetting = useRef(false)
   const initialCameraState = useRef(null)
+  const startFOV = useRef(null)
+  const targetFOV = useRef(null)
   
   // Store the initial camera state on first render
   useEffect(() => {
     if (!initialCameraState.current) {
       initialCameraState.current = {
         position: camera.position.clone(),
-        quaternion: camera.quaternion.clone()
+        quaternion: camera.quaternion.clone(),
+        fov: camera.fov
       }
-      console.log('Stored initial camera state:', initialCameraState.current.position)
     }
   }, [camera])
   
@@ -115,10 +235,12 @@ function CameraAnimator({ targetPosition, resetToDefault, isMobile }) {
       // Reset to initial camera position and rotation
       startPosition.current = camera.position.clone()
       startQuaternion.current = camera.quaternion.clone()
+      startFOV.current = camera.fov
       
       // Use the stored initial camera state
       targetQuaternion.current.copy(initialCameraState.current.quaternion)
       targetPositionVec.current.copy(initialCameraState.current.position)
+      targetFOV.current = initialCameraState.current.fov
       
       progress.current = 0
       isResetting.current = true
@@ -126,24 +248,28 @@ function CameraAnimator({ targetPosition, resetToDefault, isMobile }) {
       // First move camera to initial position, then look at candle
       startPosition.current = camera.position.clone()
       startQuaternion.current = camera.quaternion.clone()
+      startFOV.current = camera.fov
       
-      // Move to initial position first
+      // Keep camera at initial position but look at candle
       targetPositionVec.current.copy(initialCameraState.current.position)
       
       // Calculate rotation to look at candle from initial position
       const lookAtPos = new THREE.Vector3(
         targetPosition.target[0],
-        targetPosition.target[1],
+        targetPosition.target[1] + 1,  // Look slightly above the candle base
         targetPosition.target[2]
       )
       
       tempMatrix.current.lookAt(initialCameraState.current.position, lookAtPos, camera.up)
       targetQuaternion.current.setFromRotationMatrix(tempMatrix.current)
       
+      // Modest zoom in by reducing FOV when looking at candle
+      targetFOV.current = isMobile ? 50 : 45  // Less aggressive zoom
+      
       progress.current = 0
       isResetting.current = false
     }
-  }, [targetPosition, resetToDefault, camera])
+  }, [targetPosition, resetToDefault, camera, isMobile])
   
   useFrame((state, delta) => {
     if ((targetPosition || isResetting.current) && startQuaternion.current) {
@@ -167,6 +293,11 @@ function CameraAnimator({ targetPosition, resetToDefault, isMobile }) {
             targetPositionVec.current,
             easeProgress
           )
+        }
+        
+        // Interpolate FOV for zoom effect
+        if (startFOV.current && targetFOV.current) {
+          camera.fov = THREE.MathUtils.lerp(startFOV.current, targetFOV.current, easeProgress)
         }
         
         camera.updateProjectionMatrix()
@@ -237,41 +368,46 @@ function CandleLabel({ position, data, visible }) {
     return d.toLocaleDateString()
   }
   
-  // Lift the label higher above the candle
+  // Position the label above the candle with better spacing
   const adjustedPosition = Array.isArray(position) 
-    ? [position[2], position[1] + 3, position[2]]
-    : [position.x, position.y + 4, position.z]
+    ? [position[0], position[1] + 0.8, position[2]]
+    : [position.x, position.y + 0.8, position.z]
   
   return (
-    <group position={adjustedPosition}>
-      <Html
-        center
-        distanceFactor={15}
-        style={{
-          transition: 'opacity 0.2s',
-          opacity: visible ? 1 : 0,
-          pointerEvents: 'none'
-        }}
-      >
+    <Html
+      position={adjustedPosition}
+      sprite
+      center
+      distanceFactor={25}
+      style={{
+        transition: 'opacity 0.2s',
+        opacity: visible ? 1 : 0,
+        pointerEvents: 'none',
+        zIndex: 1000,
+        transform: 'scale(0.8)'
+      }}
+    >
         <div style={{
           background: 'linear-gradient(135deg, rgba(20, 20, 20, 0.95), rgba(40, 40, 40, 0.95))',
           color: '#fff',
-          padding: '16px',
-          borderRadius: '16px',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+          padding: '8px 10px',
+          borderRadius: '8px',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.8)',
           fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
-          fontSize: '14px',
-          minWidth: '200px',
-          border: '1px solid rgba(255, 215, 0, 0.3)'
+          fontSize: '11px',
+          width: '120px',
+          border: '1px solid rgba(255, 215, 0, 0.6)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)'
         }}>
           {/* User info header */}
           <div style={{ 
             display: 'flex', 
             alignItems: 'center', 
-            gap: '12px',
-            marginBottom: '12px',
-            paddingBottom: '12px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+            gap: '8px',
+            // marginBottom: '12px',
+            // paddingBottom: '12px',
+            // borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
           }}>
             {/* Avatar */}
             {data.userImageUrl ? (
@@ -279,8 +415,8 @@ function CandleLabel({ position, data, visible }) {
                 src={data.userImageUrl} 
                 alt={data.username}
                 style={{
-                  width: '40px',
-                  height: '40px',
+                  width: '24px',
+                  height: '24px',
                   borderRadius: '50%',
                   border: '2px solid rgba(255, 215, 0, 0.5)',
                   objectFit: 'cover'
@@ -288,14 +424,14 @@ function CandleLabel({ position, data, visible }) {
               />
             ) : (
               <div style={{
-                width: '40px',
-                height: '40px',
+                width: '24px',
+                height: '24px',
                 borderRadius: '50%',
                 background: 'linear-gradient(135deg, #ffaa00, #ff8800)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '20px',
+                fontSize: '12px',
                 fontWeight: 'bold',
                 color: '#fff',
                 border: '2px solid rgba(255, 215, 0, 0.5)'
@@ -308,23 +444,23 @@ function CandleLabel({ position, data, visible }) {
             <div style={{ flex: 1 }}>
               <div style={{ 
                 fontWeight: 'bold', 
-                fontSize: '15px',
+                fontSize: '11px',
                 color: '#ffcc00'
               }}>
                 {data.username}
               </div>
               <div style={{ 
-                fontSize: '12px', 
+                fontSize: '9px', 
                 opacity: 0.7,
                 marginTop: '2px'
               }}>
-                🕯️ Lit {formatDate(data.litDate)}
+                Lit {formatDate(data.litDate)}
               </div>
             </div>
           </div>
           
           {/* Message */}
-          {data.message && (
+          {/* {data.message && (
             <div style={{ 
               fontSize: '13px', 
               fontStyle: 'italic',
@@ -333,10 +469,9 @@ function CandleLabel({ position, data, visible }) {
             }}>
               "{data.message}"
             </div>
-          )}
+          )} */}
         </div>
       </Html>
-    </group>
   )
 }
 
@@ -472,10 +607,13 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   hoveredOffering,
   justLitOffering,
   onJustLitComplete,
-  user = null 
+  user = null,
+  onViewReset 
 }, ref) {
   // Track if component is mounted for SSR safety
   const [mounted, setMounted] = useState(false)
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(false)
   // Focus mode for phone zoom
   const [focusMode, setFocusMode] = useState(false)
   // Use refs for real-time price and movement (no re-renders)
@@ -596,9 +734,6 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   
   // Method to find and highlight user's candle
   const findUserCandle = useCallback(() => {
-    console.log('Finding user candle...')
-    console.log('Current user ID:', currentUserId)
-    console.log('Offerings:', offerings)
     
     // Override all camera controls
     setOverrideCameraControl(true)
@@ -612,27 +747,19 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
     
     if (userCandleIndex !== -1) {
       const userCandle = offeringCandles[userCandleIndex]
-      console.log('Found user candle at index:', userCandleIndex, userCandle)
       
       // Calculate the actual instance ID (base candles + offering index)
-      // Base candles are 0-499, then offerings start at 500
-      const actualInstanceId = 500 + userCandleIndex
+      // Base candles are 0-299 on mobile, 0-499 on desktop
+      const baseCandles = isMobile ? 100 : 100
+      const actualInstanceId = baseCandles + userCandleIndex
       
-      console.log('DEBUG: Candle lookup details:', {
-        userCandleIndex,
-        actualInstanceId,
-        totalOfferings: offeringCandles.length,
-        userCandle,
-        baseCandles: 500,
-        sharedUniformsExists: !!window.sharedUniforms
-      })
+
       
       // Use the position from the userCandle (already converted)
       const candlePosition = userCandle.position || [userCandle.x, userCandle.y, userCandle.z]
       
       setUserCandlePosition(candlePosition)
       
-      console.log('DEBUG: Candle position:', candlePosition)
       
       // Set camera to look at the candle (rotation only, no position change)
       setTargetCameraPosition({
@@ -647,10 +774,8 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
         // Then set the new highlight after a brief moment to ensure update
         setTimeout(() => {
           window.sharedUniforms.uHighlightedId.value = actualInstanceId
-          console.log('Highlighted candle ID set to:', actualInstanceId)
         }, 100)
         
-        console.log('Highlighted candle ID set to:', actualInstanceId)
       }
       
       // Store candle data for tooltip
@@ -676,7 +801,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
       setUserCandleData(null)
       alert(`No candle found for user ID: ${currentUserId}\nYou need to light a candle first!`)
     }
-  }, [currentUserId, offerings, offeringCandles])
+  }, [currentUserId, offerings, offeringCandles, isMobile])
 
   // Method to reset view back to main
   const resetView = useCallback(() => {
@@ -696,8 +821,13 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
     }
     setUserCandleData(null)
     setHoveredCandleId(null)
-    console.log('Returning to main view and camera position')
-  }, [])
+    
+    // Notify parent component that view has been reset
+    if (onViewReset) {
+      onViewReset()
+    }
+    
+  }, [onViewReset])
 
   // Expose method to trigger candle effect
   useImperativeHandle(ref, () => ({
@@ -726,7 +856,6 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   const dragStart = useRef({ x: 0, rotation: 0 })
   const hasDraggedEnough = useRef(false) // Track if we've moved enough to start rotating
   const DRAG_THRESHOLD = 5 // Pixels to move before rotation starts
-  const [isMobile, setIsMobile] = useState(false)
   const hasReachedSection = true // const [hasReachedSection, setHasReachedSection] = useState(true)
   const isInView = true // const [isInView, setIsInView] = useState(true)
   const canvasRef = useRef()
@@ -819,7 +948,7 @@ useEffect(() => {
   const HISTORY_UPDATE_INTERVAL = 500 // Update chart every 500ms
   
   // Calculate stats from offerings
-  const [displayedCandleCount, setDisplayedCandleCount] = useState(500)
+  const [displayedCandleCount, setDisplayedCandleCount] = useState(100)
   const [displayedBurnTotal, setDisplayedBurnTotal] = useState(0) // Will be updated with real data
   const [candleCountAnimation, setCandleCountAnimation] = useState(false)
   const [showLatestPolaroid, setShowLatestPolaroid] = useState(true) // Always show polaroids
@@ -828,7 +957,7 @@ useEffect(() => {
   const realCandleCount = useMemo(() => {
     // Use totalOfferingsCount if provided, otherwise fall back to offerings.length
     const offeringsCount = totalOfferingsCount > 0 ? totalOfferingsCount : offerings.length
-    const count = 500 + offeringsCount
+    const count = 100 + offeringsCount
     return count
   }, [totalOfferingsCount, offerings.length])
   // Read total supply from the contract using the proper thirdweb extension
@@ -971,8 +1100,8 @@ useEffect(() => {
       
       if (offerings?.length > 0 && onSelectOffering) {
         // If clicking on offering candles (ID >= 500), show that specific offering
-        if (instanceId >= 500) {
-          const offeringIndex = instanceId - 500
+        if (instanceId >= 100) {
+          const offeringIndex = instanceId - 100
           if (offeringIndex < offerings.length) {
             onSelectOffering(offerings[offeringIndex])
           }
@@ -1235,7 +1364,14 @@ useEffect(() => {
           height: '100vh', 
           position: 'fixed', 
           zIndex: 2,
-          background: is80sMode ? 'transparent' : '#000'
+          background: is80sMode ? 'transparent' : '#000',
+          cursor: targetCameraPosition ? 'pointer' : 'auto'
+        }}
+        onClick={() => {
+          // If viewing user's candle, click anywhere to return
+          if (targetCameraPosition) {
+            resetView()
+          }
         }}
       >
       {/* Focus Mode Indicator */}
@@ -1259,6 +1395,31 @@ useEffect(() => {
           }}
         >
           📱 Focus Mode • Click phone to exit
+        </div>
+      )}
+      
+      {/* Hint for returning from candle view */}
+      {targetCameraPosition && (
+        <div
+          style={{
+            position: 'absolute',
+            top: isMobile ? '70%' : '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(0, 0, 0, 0.7)',
+            color: '#ffaa00',
+            padding: '10px 20px',
+            borderRadius: '20px',
+            fontSize: '14px',
+            fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+            zIndex: 100,
+            pointerEvents: 'none',
+            border: '1px solid rgba(255, 170, 0, 0.5)',
+            backdropFilter: 'blur(10px)',
+            animation: 'fadeIn 0.5s ease-in'
+          }}
+        >
+          Click anywhere to return
         </div>
       )}
       
@@ -1339,7 +1500,7 @@ useEffect(() => {
           <group position={[0, 0, 0]}>
             <Suspense fallback={null}>
               <CandleCloud
-                count={isMobile ? 300 : 500}
+                count={isMobile ? 100 : 100}
                 priceRef={priceRef}
                 shortTermPriceRef={shortTermPriceRef}
                 continuousOffsetRef={continuousOffsetRef}
@@ -1349,15 +1510,12 @@ useEffect(() => {
                 isMobile={isMobile}
                 exclusionZone={exclusionZone}
                 onCandleHover={(id) => {
-                  console.log('Hover on candle ID:', id, 'User candle ID:', userCandleData?.instanceId)
                   // Only show hover for user's candle
                   if (userCandleData && id === userCandleData.instanceId) {
-                    console.log('Setting hovered candle ID:', id)
                     setHoveredCandleId(id)
                   }
                 }}
                 onCandleLeave={() => {
-                  console.log('Mouse left candle')
                   setHoveredCandleId(null)
                 }}
               />
@@ -1369,10 +1527,10 @@ useEffect(() => {
                 visible={(hoveredCandleId === userCandleData?.instanceId) || (userCandleData && targetCameraPosition)}
               />
               
-              {/* Particle effects for highlighted candle */}
-              {userCandlePosition && targetCameraPosition && (
+              {/* Particle effects for highlighted candle - Removed green ring */}
+              {/* {userCandlePosition && targetCameraPosition && (
                 <HighlightedCandleParticles position={userCandlePosition} />
-              )}
+              )} */}
             </Suspense> 
             
         
@@ -1447,7 +1605,7 @@ useEffect(() => {
       </div>
       
       
-      {/* CSS for candle count animation */}
+      {/* CSS for animations */}
       <style jsx>{`
         @keyframes pulseScale {
           0% { 
@@ -1471,19 +1629,31 @@ useEffect(() => {
             filter: brightness(1) drop-shadow(0 0 0px #ffee00);
           }
         }
+        
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateX(-50%) translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+          }
+        }
     `}</style>
       
       {/* Container for Stats Box and Find My Candle button on mobile */}
-      <div style={{
-        position: 'fixed',
-        top: isMobile ? '100px' : '105px',
-        right: isMobile ? '10px' : '20px',
-        zIndex: 1000,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '10px',
-        alignItems: 'flex-end',
-      }}>
+      {!targetCameraPosition && (
+        <div style={{
+          position: 'fixed',
+          top: isMobile ? '100px' : '105px',
+          right: isMobile ? '10px' : '20px',
+          zIndex: 1000,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '10px',
+          alignItems: 'flex-end',
+        }}>
         {/* Unified Stats Box with Tabs */}
         <div style={{
           ...unifiedStatsStyle,
@@ -1832,32 +2002,20 @@ useEffect(() => {
         </div>
         
         {/* Find My Candle button for mobile - positioned below stats box */}
-        {isMobile && currentUserId && (
+        {isMobile && currentUserId && !targetCameraPosition && (
           <button
-            onClick={() => {
-              if (targetCameraPosition) {
-                resetView()
-              } else {
-                findUserCandle()
-              }
-            }}
+            onClick={() => findUserCandle()}
             style={{
-              background: targetCameraPosition 
-                ? 'linear-gradient(135deg, #666 0%, #444 100%)'
-                : 'linear-gradient(135deg, #ffaa00 0%, #ff8800 100%)',
-              border: targetCameraPosition
-                ? '2px solid rgba(255, 255, 255, 0.2)'
-                : '2px solid rgba(255, 170, 0, 0.3)',
+              background: 'linear-gradient(135deg, #ffaa00 0%, #ff8800 100%)',
+              border: '2px solid rgba(255, 170, 0, 0.3)',
               borderRadius: '12px',
               padding: '10px 16px',
-              color: targetCameraPosition ? '#fff' : '#000',
+              color: '#000',
               fontFamily: 'system-ui, -apple-system, sans-serif',
               fontSize: '13px',
               fontWeight: 'bold',
               cursor: 'pointer',
-              boxShadow: targetCameraPosition
-                ? '0 4px 24px rgba(0, 0, 0, 0.5)'
-                : '0 0 20px rgba(255, 170, 0, 0.3)',
+              boxShadow: '0 0 20px rgba(255, 170, 0, 0.3)',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
@@ -1867,18 +2025,11 @@ useEffect(() => {
               width: '160px', // Match stats box width
             }}
           >
-            {targetCameraPosition ? (
-              <>
-                ↩️ <span style={{ fontSize: '11px' }}>BACK</span>
-              </>
-            ) : (
-              <>
-                🔍 <span style={{ fontSize: '11px' }}>FIND MY CANDLE</span>
-              </>
-            )}
+            🔍 <span style={{ fontSize: '11px' }}>FIND MY CANDLE</span>
           </button>
         )}
-      </div>
+        </div>
+      )}
       
       {/* Removed tooltip - will be added as Html in 3D space */}
       

@@ -20,8 +20,14 @@ export default function NavControlsHome({
 }) {
   const [emoji, setEmoji] = useState("😇");
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
   const pathname = usePathname(); // Get current path
   const { user: clerkUser } = useUser();
+  
+  // Fix hydration mismatch by ensuring client and server render the same initially
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
   const { 
     walletAddress, 
     tokenBalance, 
@@ -602,11 +608,11 @@ export default function NavControlsHome({
 
         {/* Unified Account/Wallet Button */}
         <div className="unified-account-container">
-          {clerkUser ? (
+          {isHydrated && clerkUser ? (
             <button 
               className="avatar-mobile"
               onClick={() => setShowUnifiedModal(true)}
-              title={`Account${isWalletConnected ? ` | ${walletAddress?.slice(0, 6)}...${walletAddress?.slice(-4)}` : ''}`}
+              title="Account"
             >
               {clerkUser?.imageUrl ? (
                 <img 
@@ -642,10 +648,10 @@ export default function NavControlsHome({
               mode="modal" 
               forceRedirectUrl={pathname || "/"}
             >
-              <div className="avatar-mobile" style={{ cursor: 'pointer' }}>
+              <button className="avatar-mobile" style={{ cursor: 'pointer', background: 'transparent', border: 'none' }}>
                 <span style={{ fontSize: '2rem' }}>{emoji}</span>
                 <div className="avatar-status-mobile offline" />
-              </div>
+              </button>
             </SignInButton>
           )}
         </div>

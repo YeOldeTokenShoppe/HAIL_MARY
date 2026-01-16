@@ -49,6 +49,17 @@
         allow delete: if false;
       }
 
+      // Stakes collection - for tracking staking transactions
+      match /stakes/{document} {
+        allow read: if true;
+        allow create: if true
+          && request.resource.data.keys().hasAll(['amount', 'walletAddress', 'timestamp'])
+          && request.resource.data.amount is int
+          && request.resource.data.amount > 0;
+        allow update: if false;
+        allow delete: if false;
+      }
+
       // Default rules for other documents
       match /{document=**} {
         allow read: if true;

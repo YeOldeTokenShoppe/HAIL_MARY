@@ -3,14 +3,14 @@
 
 // Emotion categories we track
 const EMOTION_CATEGORIES = {
-  hope: ['hope', 'hopeful', 'optimistic', 'faith', 'believe', 'trust', 'confident'],
-  gratitude: ['thank', 'grateful', 'blessed', 'appreciate', 'thankful', 'grace'],
+  hope: ['hope', 'hopeful', 'optimistic', 'bullish', 'believe', 'trust', 'confident'],
+  gratitude: ['thank', 'grateful', 'appreciate', 'thankful', 'nice', 'good'],
   desperation: ['desperate', 'please', 'need', 'help', 'save', 'rescue', 'urgent'],
-  confession: ['forgive', 'sorry', 'regret', 'mistake', 'wrong', 'confess', 'sin'],
+  regret: ['sorry', 'regret', 'mistake', 'wrong', 'bad', 'loss', 'rekt'],
   celebration: ['moon', 'lambo', 'rich', 'wealth', 'success', 'profit', 'gains'],
   fear: ['scared', 'afraid', 'worry', 'anxious', 'nervous', 'fear', 'panic'],
-  greed: ['more', 'want', 'need', 'must have', 'gimme', 'mine', 'rich'],
-  devotion: ['worship', 'praise', 'honor', 'serve', 'devoted', 'loyal', 'faithful']
+  greed: ['more', 'want', 'need', 'pump', 'gimme', 'mine', 'rich'],
+  conviction: ['hodl', 'diamond', 'strong', 'never', 'always', 'loyal', 'long']
 };
 
 // Common crypto prayer keywords
@@ -51,8 +51,8 @@ function analyzeBasicSentiment(text) {
   }
   
   // Calculate overall sentiment
-  const positiveScore = (emotions.hope || 0) + (emotions.gratitude || 0) + (emotions.celebration || 0) + (emotions.devotion || 0);
-  const negativeScore = (emotions.desperation || 0) + (emotions.fear || 0) + (emotions.confession || 0);
+  const positiveScore = (emotions.hope || 0) + (emotions.gratitude || 0) + (emotions.celebration || 0) + (emotions.conviction || 0);
+  const negativeScore = (emotions.desperation || 0) + (emotions.fear || 0) + (emotions.regret || 0);
   const overall = (positiveScore - negativeScore) / 200; // Normalize to -1 to 1
   
   // Extract keywords
@@ -148,31 +148,57 @@ async function generateSummary(prayers, apiKey) {
   // For now, generate a basic summary based on sentiment
   // We can add OpenAI integration later if needed
   
-  const messages = prayers.map(p => p.message || p.text || p);
-  const sampleMessage = messages[0] || '';
+  const messages = prayers.map(p => p.message || p.text || p).filter(m => m && m.length > 0);
+  
+  // Handle case when there are no prayers with messages
+  if (messages.length === 0) {
+    const silentOfferingsMessages = [
+      "The trading floor stands quiet, awaiting the next wave of market sentiment.",
+      "Silent positions have been taken, their strategies known only to the algorithm.",
+      "Traders observe a moment of market silence, their positions speaking without words.",
+      "Candles burn quietly in the digital exchange, each flame a silent trade.",
+      "The community has lit their candles in silence, letting the charts speak their hopes."
+    ];
+    return silentOfferingsMessages[Math.floor(Math.random() * silentOfferingsMessages.length)];
+  }
   
   // Basic sentiment-based summary
   const commonThemes = [];
-  const lowerMessages = messages.map(m => m.toLowerCase()).join(' ');
+  const lowerMessages = messages.join(' ').toLowerCase();
   
   if (lowerMessages.includes('moon') || lowerMessages.includes('pump')) {
-    commonThemes.push('celestial ascension');
+    commonThemes.push('bullish momentum');
   }
   if (lowerMessages.includes('help') || lowerMessages.includes('please')) {
-    commonThemes.push('desperate supplication');
+    commonThemes.push('urgent requests');
   }
-  if (lowerMessages.includes('thank') || lowerMessages.includes('blessed')) {
-    commonThemes.push('grateful devotion');
+  if (lowerMessages.includes('thank') || lowerMessages.includes('grateful')) {
+    commonThemes.push('appreciation');
   }
   if (lowerMessages.includes('forgive') || lowerMessages.includes('sorry')) {
-    commonThemes.push('penitent confessions');
+    commonThemes.push('regretful positions');
+  }
+  if (lowerMessages.includes('profit') || lowerMessages.includes('gains')) {
+    commonThemes.push('profit seeking');
+  }
+  if (lowerMessages.includes('hodl') || lowerMessages.includes('diamond')) {
+    commonThemes.push('diamond hands');
+  }
+  if (lowerMessages.includes('loss') || lowerMessages.includes('rekt')) {
+    commonThemes.push('capitulation');
   }
   
-  const themes = commonThemes.length > 0 ? commonThemes.join(' and ') : 'hopeful prayers';
-  
-  return `The faithful congregation's prayers reveal ${themes} flowing through the digital sanctuary. ` +
-         `Their offerings to Our Lady of Perpetual Profit echo with the eternal rhythms of market devotion, ` +
-         `where spiritual yearning meets financial aspiration.`;
+  // Generate more contextual summary based on number of prayers
+  if (messages.length === 1) {
+    const themes = commonThemes.length > 0 ? commonThemes.join(' and ') : 'market reflection';
+    return `A single trader's message echoes through the digital exchange, expressing ${themes}. The position stands alone in the order book.`;
+  } else if (messages.length < 5) {
+    const themes = commonThemes.length > 0 ? commonThemes.join(' and ') : 'quiet trading';
+    return `A small group of ${messages.length} traders share ${themes} in the digital marketplace. The trading floor remains calm and focused.`;
+  } else {
+    const themes = commonThemes.length > 0 ? commonThemes.join(' and ') : 'market sentiment';
+    return `The trading community's ${messages.length} messages reveal ${themes} flowing through the digital exchange. Their candles illuminate the eternal dance between fear and greed in the markets.`;
+  }
 }
 
 // Get emotion color for visualization
@@ -181,11 +207,11 @@ function getEmotionColor(emotion) {
     hope: '#4ade80',
     gratitude: '#a78bfa',
     desperation: '#f87171',
-    confession: '#60a5fa',
+    regret: '#60a5fa',
     celebration: '#fbbf24',
     fear: '#ef4444',
     greed: '#f97316',
-    devotion: '#e879f9'
+    conviction: '#e879f9'
   };
   return colors[emotion] || '#9ca3af';
 }
@@ -217,11 +243,11 @@ function getDefaultStats() {
       { name: 'Hope', value: 30, color: '#4ade80' },
       { name: 'Gratitude', value: 25, color: '#a78bfa' },
       { name: 'Desperation', value: 20, color: '#f87171' },
-      { name: 'Confession', value: 15, color: '#60a5fa' },
+      { name: 'Regret', value: 15, color: '#60a5fa' },
       { name: 'Celebration', value: 10, color: '#fbbf24' },
     ],
     trend: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
-    keywords: ['waiting', 'for', 'prayers'],
+    keywords: ['waiting', 'for', 'traders'],
     totalAnalyzed: 0
   };
 }

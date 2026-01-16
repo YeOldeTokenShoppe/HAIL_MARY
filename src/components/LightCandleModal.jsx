@@ -11,6 +11,188 @@ import { burn } from 'thirdweb/extensions/erc20';
 import { sendAndConfirmTransaction } from 'thirdweb';
 
 
+const PRAYERS_BY_LANGUAGE = {
+  en: {
+    heading: ['Prayer to Our Lady', 'of Perpetual Profit'],
+    prayers: [{
+      id: 'scalper',
+      title: "Scalper's Prayer",
+      text: "Oh Lady of Perpetual Profit, bless my lightning fingers and low-latency reflexes. Protect me from fat-fingered orders and grant me the stamina to chase micro-movements without losing my soul. May every scalp be green, and every exit perfectly timed. Amen."
+    }, {
+      id: 'leverage',
+      title: "Leverage Prayer",
+      text: "Oh Blessed Virgin of Margin, shield me from the wicked lure of 100x leverage. Guard my trades from sudden liquidation, and deliver me from the temptation of adding 'just a little more.' Grant me the humility to close in profit, and the grace to walk away before the exchange claims my soul. Amen."
+    }, {
+      id: 'swing',
+      title: "Swing Trader's Prayer",
+      text: "Oh Lady of Perpetual Profit, grant me patience to ride the waves of volatility, and the wisdom to know when to take profit and when to let it run. Bless my charts, my Fibonacci retracements, and my RSI settings, that I may always enter at the bottom and exit at the top. Amen."
+    }, {
+      id: 'hodler',
+      title: "Hodler's Prayer",
+      text: "Oh Glorious Mother of Diamond Hands, let me never succumb to weak paper hands. Guard my seed phrase, strengthen my resolve, and remind me that one day the line shall go up forever. May my wallet survive bear markets, hacks, and exchange collapses, until the moon and beyond. Amen."
+    }, {
+      id: 'chart',
+      title: "Chart Mystic's Prayer",
+      text: "Oh Oracle of Eternal Candles, Our Lady of Perpetual Profit, guide my eyes as I read the sacred indicators. Grant me the gift of vision to see wedges before they break, triangles before they tighten, and golden crosses before they shine. Deliver me from false signals, and sanctify my trading view with holy confluence. Amen."
+    }]
+  },
+  es: {
+    heading: ['Oración a Nuestra Señora', 'del Beneficio Perpetuo'],
+    prayers: [{
+      id: 'scalper',
+      title: "Oración del Scalper",
+      text: "Oh Señora del Beneficio Perpetuo, bendice mis dedos relámpago y mis reflejos de baja latencia. Protégeme de las órdenes mal digitadas y concédeme la resistencia para perseguir micromovimientos sin perder mi alma. Que cada scalp sea verde y cada salida perfectamente cronometrada. Amén."
+    }, {
+      id: 'leverage',
+      title: "Oración del Apalancamiento",
+      text: "Oh Bendita Virgen del Margen, protégeme del malvado señuelo del apalancamiento 100x. Guarda mis operaciones de la liquidación repentina y líbrame de la tentación de añadir 'solo un poco más'. Concédeme la humildad de cerrar en beneficio y la gracia de alejarme antes de que el exchange reclame mi alma. Amén."
+    }, {
+      id: 'swing',
+      title: "Oración del Swing Trader",
+      text: "Oh Señora del Beneficio Perpetuo, concédeme paciencia para surfear las olas de volatilidad y la sabiduría para saber cuándo tomar ganancias y cuándo dejar correr. Bendice mis gráficos, mis retrocesos de Fibonacci y mis configuraciones RSI, para que siempre entre en el fondo y salga en la cima. Amén."
+    }, {
+      id: 'hodler',
+      title: "Oración del Hodler",
+      text: "Oh Gloriosa Madre de las Manos de Diamante, no me dejes sucumbir a las débiles manos de papel. Guarda mi frase semilla, fortalece mi determinación y recuérdame que un día la línea subirá para siempre. Que mi cartera sobreviva a los mercados bajistas, hackeos y colapsos de exchanges, hasta la luna y más allá. Amén."
+    }, {
+      id: 'chart',
+      title: "Oración del Místico de Gráficos",
+      text: "Oh Oráculo de las Velas Eternas, Nuestra Señora del Beneficio Perpetuo, guía mis ojos mientras leo los indicadores sagrados. Concédeme el don de ver cuñas antes de que rompan, triángulos antes de que se estrechen y cruces doradas antes de que brillen. Líbrame de señales falsas y santifica mi vista de trading con confluencia sagrada. Amén."
+    }]
+  },
+  pt: {
+    heading: ['Oração a Nossa Senhora', 'do Lucro Perpétuo'],
+    prayers: [{
+      id: 'scalper',
+      title: "Oração do Scalper",
+      text: "Oh Senhora do Lucro Perpétuo, abençoe meus dedos relâmpago e meus reflexos de baixa latência. Proteja-me de ordens mal digitadas e conceda-me a resistência para perseguir micromovimentos sem perder minha alma. Que cada scalp seja verde e cada saída perfeitamente cronometrada. Amém."
+    }, {
+      id: 'leverage',
+      title: "Oração da Alavancagem",
+      text: "Oh Bendita Virgem da Margem, proteja-me da tentação maligna da alavancagem 100x. Guarde minhas operações da liquidação repentina e livre-me da tentação de adicionar 'só um pouco mais'. Conceda-me a humildade de fechar no lucro e a graça de me afastar antes que a exchange reclame minha alma. Amém."
+    }, {
+      id: 'swing',
+      title: "Oração do Swing Trader",
+      text: "Oh Senhora do Lucro Perpétuo, conceda-me paciência para surfar as ondas de volatilidade e sabedoria para saber quando realizar lucros e quando deixar correr. Abençoe meus gráficos, minhas retrações de Fibonacci e minhas configurações RSI, para que eu sempre entre no fundo e saia no topo. Amém."
+    }, {
+      id: 'hodler',
+      title: "Oração do Hodler",
+      text: "Oh Gloriosa Mãe das Mãos de Diamante, não me deixe sucumbir às fracas mãos de papel. Guarde minha seed phrase, fortaleça minha determinação e lembre-me que um dia a linha subirá para sempre. Que minha carteira sobreviva aos mercados em baixa, hacks e colapsos de exchanges, até a lua e além. Amém."
+    }, {
+      id: 'chart',
+      title: "Oração do Místico dos Gráficos",
+      text: "Oh Oráculo das Velas Eternas, Nossa Senhora do Lucro Perpétuo, guie meus olhos enquanto leio os indicadores sagrados. Conceda-me o dom de ver cunhas antes que rompam, triângulos antes que se estreitem e cruzes douradas antes que brilhem. Livre-me de sinais falsos e santifique minha visão de trading com confluência sagrada. Amém."
+    }]
+  },
+  fr: {
+    heading: ['Prière à Notre-Dame', 'du Profit Perpétuel'],
+    prayers: [{
+      id: 'scalper',
+      title: "Prière du Scalper",
+      text: "Oh Dame du Profit Perpétuel, bénis mes doigts éclair et mes réflexes à faible latence. Protège-moi des ordres mal saisis et accorde-moi l'endurance de poursuivre les micro-mouvements sans perdre mon âme. Que chaque scalp soit vert et chaque sortie parfaitement chronométrée. Amen."
+    }, {
+      id: 'leverage',
+      title: "Prière du Levier",
+      text: "Oh Bienheureuse Vierge de la Marge, protège-moi du leurre maléfique du levier 100x. Garde mes trades de la liquidation soudaine et délivre-moi de la tentation d'ajouter 'juste un peu plus'. Accorde-moi l'humilité de clôturer en profit et la grâce de m'éloigner avant que l'exchange ne réclame mon âme. Amen."
+    }, {
+      id: 'swing',
+      title: "Prière du Swing Trader",
+      text: "Oh Dame du Profit Perpétuel, accorde-moi la patience de surfer sur les vagues de volatilité et la sagesse de savoir quand prendre des profits et quand laisser courir. Bénis mes graphiques, mes retracements de Fibonacci et mes paramètres RSI, pour que j'entre toujours au plus bas et sorte au plus haut. Amen."
+    }, {
+      id: 'hodler',
+      title: "Prière du Hodler",
+      text: "Oh Glorieuse Mère aux Mains de Diamant, ne me laisse jamais succomber aux faibles mains de papier. Garde ma phrase de récupération, renforce ma détermination et rappelle-moi qu'un jour la ligne montera pour toujours. Que mon portefeuille survive aux marchés baissiers, aux piratages et aux effondrements d'exchanges, jusqu'à la lune et au-delà. Amen."
+    }, {
+      id: 'chart',
+      title: "Prière du Mystique des Graphiques",
+      text: "Oh Oracle des Chandelles Éternelles, Notre-Dame du Profit Perpétuel, guide mes yeux pendant que je lis les indicateurs sacrés. Accorde-moi le don de voir les biseaux avant qu'ils ne cassent, les triangles avant qu'ils ne se resserrent et les croix dorées avant qu'elles ne brillent. Délivre-moi des faux signaux et sanctifie ma vue de trading avec une confluence sacrée. Amen."
+    }]
+  },
+  zh: {
+    heading: ['永恒利润圣母', '祈祷文'],
+    prayers: [{
+      id: 'scalper',
+      title: "剥头皮交易者祈祷",
+      text: "永恒利润圣母啊，请保佑我闪电般的手指和低延迟的反应。保护我免受手滑下单之苦，赐予我追逐微小波动的耐力而不失去灵魂。愿每次剥头皮都是绿色，每次退出都恰到好处。阿门。"
+    }, {
+      id: 'leverage',
+      title: "杠杆祈祷",
+      text: "神圣的保证金圣母啊，请保护我远离100倍杠杆的邪恶诱惑。守护我的交易免受突然爆仓，让我摆脱'再加一点点'的诱惑。赐予我在盈利时平仓的谦逊，以及在交易所夺走我灵魂之前离开的恩典。阿门。"
+    }, {
+      id: 'swing',
+      title: "波段交易者祈祷",
+      text: "永恒利润圣母啊，请赐予我乘风破浪的耐心，以及知道何时止盈何时持有的智慧。保佑我的图表、斐波那契回撤和RSI设置，让我总能在底部进入，在顶部退出。阿门。"
+    }, {
+      id: 'hodler',
+      title: "持币者祈祷",
+      text: "光荣的钻石之手圣母啊，永远不要让我屈服于软弱的纸手。守护我的助记词，坚定我的决心，提醒我总有一天曲线会永远向上。愿我的钱包能够在熊市、黑客攻击和交易所崩溃中幸存，直到月球甚至更远。阿门。"
+    }, {
+      id: 'chart',
+      title: "图表神秘主义者祈祷",
+      text: "永恒蜡烛的神谕，永恒利润圣母啊，在我解读神圣指标时引导我的双眼。赐予我在楔形突破前看到它们、在三角形收紧前看到它们、在金叉闪耀前看到它们的天赋。让我远离虚假信号，用神圣的汇合点净化我的交易视野。阿门。"
+    }]
+  },
+  hi: {
+    heading: ['शाश्वत लाभ की माता', 'की प्रार्थना'],
+    prayers: [{
+      id: 'scalper',
+      title: "स्कैल्पर की प्रार्थना",
+      text: "हे शाश्वत लाभ की माता, मेरी बिजली जैसी उंगलियों और कम विलंबता वाले रिफ्लेक्स को आशीर्वाद दें। मुझे गलत ऑर्डर से बचाएं और मुझे अपनी आत्मा खोए बिना सूक्ष्म गतिविधियों का पीछा करने की सहनशक्ति प्रदान करें। हर स्कैल्प हरा हो और हर निकास पूरी तरह से समयबद्ध हो। आमीन।"
+    }, {
+      id: 'leverage',
+      title: "लीवरेज प्रार्थना",
+      text: "हे मार्जिन की धन्य कुंवारी, मुझे 100x लीवरेज के दुष्ट प्रलोभन से बचाएं। मेरे ट्रेडों को अचानक लिक्विडेशन से बचाएं और मुझे 'बस थोड़ा और' जोड़ने के प्रलोभन से मुक्त करें। मुझे लाभ में बंद करने की विनम्रता और एक्सचेंज मेरी आत्मा का दावा करने से पहले दूर चले जाने की कृपा प्रदान करें। आमीन।"
+    }, {
+      id: 'swing',
+      title: "स्विंग ट्रेडर की प्रार्थना",
+      text: "हे शाश्वत लाभ की माता, मुझे अस्थिरता की लहरों की सवारी करने का धैर्य और कब लाभ लेना है और कब चलने देना है यह जानने की बुद्धि प्रदान करें। मेरे चार्ट, मेरे फिबोनाची रिट्रेसमेंट और मेरी RSI सेटिंग्स को आशीर्वाद दें, ताकि मैं हमेशा नीचे प्रवेश करूं और शीर्ष पर निकलूं। आमीन।"
+    }, {
+      id: 'hodler',
+      title: "होडलर की प्रार्थना",
+      text: "हे हीरे के हाथों की महिमामयी माता, मुझे कभी भी कमजोर कागज के हाथों के आगे झुकने न दें। मेरे सीड फ्रेज़ की रक्षा करें, मेरे संकल्प को मजबूत करें और मुझे याद दिलाएं कि एक दिन लाइन हमेशा के लिए ऊपर जाएगी। मेरा वॉलेट भालू बाजारों, हैक और एक्सचेंज के पतन से बचे, चांद तक और उससे आगे। आमीन।"
+    }, {
+      id: 'chart',
+      title: "चार्ट रहस्यवादी की प्रार्थना",
+      text: "हे शाश्वत मोमबत्तियों के दैवज्ञ, शाश्वत लाभ की माता, पवित्र संकेतकों को पढ़ते समय मेरी आंखों का मार्गदर्शन करें। मुझे वेज के टूटने से पहले, त्रिकोण के कसने से पहले और गोल्डन क्रॉस के चमकने से पहले देखने का वरदान दें। मुझे झूठे संकेतों से मुक्त करें और पवित्र संगम के साथ मेरे ट्रेडिंग दृश्य को पवित्र करें। आमीन।"
+    }]
+  },
+  it: {
+    heading: ['Preghiera a Nostra Signora', 'del Profitto Perpetuo'],
+    prayers: [{
+      id: 'scalper',
+      title: "Preghiera dello Scalper",
+      text: "Oh Signora del Profitto Perpetuo, benedici le mie dita fulminee e i miei riflessi a bassa latenza. Proteggimi dagli ordini mal digitati e concedimi la resistenza per inseguire i micro-movimenti senza perdere la mia anima. Che ogni scalp sia verde e ogni uscita perfettamente cronometrata. Amen."
+    }, {
+      id: 'leverage',
+      title: "Preghiera della Leva",
+      text: "Oh Benedetta Vergine del Margine, proteggimi dal malvagio richiamo della leva 100x. Custodisci i miei trade dalla liquidazione improvvisa e liberami dalla tentazione di aggiungere 'solo un po' di più'. Concedimi l'umiltà di chiudere in profitto e la grazia di allontanarmi prima che l'exchange reclami la mia anima. Amen."
+    }, {
+      id: 'swing',
+      title: "Preghiera dello Swing Trader",
+      text: "Oh Signora del Profitto Perpetuo, concedimi la pazienza di cavalcare le onde della volatilità e la saggezza di sapere quando prendere profitto e quando lasciarlo correre. Benedici i miei grafici, i miei ritracciamenti di Fibonacci e le mie impostazioni RSI, affinché io possa sempre entrare in basso e uscire in alto. Amen."
+    }, {
+      id: 'hodler',
+      title: "Preghiera dell'Hodler",
+      text: "Oh Gloriosa Madre delle Mani di Diamante, non lasciarmi mai soccombere alle deboli mani di carta. Custodisci la mia seed phrase, rafforza la mia determinazione e ricordami che un giorno la linea salirà per sempre. Che il mio portafoglio sopravviva ai mercati orso, agli hack e ai crolli degli exchange, fino alla luna e oltre. Amen."
+    }, {
+      id: 'chart',
+      title: "Preghiera del Mistico dei Grafici",
+      text: "Oh Oracolo delle Candele Eterne, Nostra Signora del Profitto Perpetuo, guida i miei occhi mentre leggo gli indicatori sacri. Concedimi il dono di vedere i cunei prima che si rompano, i triangoli prima che si stringano e le croci dorate prima che brillino. Liberami dai falsi segnali e santifica la mia visione di trading con la sacra confluenza. Amen."
+    }]
+  }
+};
+
+
+const getUserLanguage = () => {
+  if (typeof window === 'undefined') {
+    return 'en';
+  }
+  const lang = navigator.language || navigator.userLanguage || 'en';
+  const shortLang = lang.substring(0, 2).toLowerCase();
+  return ['es', 'pt', 'zh', 'hi', 'fr', 'it'].includes(shortLang) ? shortLang : 'en';
+};
+
+
 const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
   const { user } = useUser();
   const { walletAddress, tokenBalance, activeAccount } = useWalletAuth();
@@ -24,6 +206,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
   const [showNoBuyPrompt, setShowNoBuyPrompt] = useState(false);
   const [modalHidden, setModalHidden] = useState(false); // Hide modal content during transaction
   const [selectedPrayer, setSelectedPrayer] = useState('');
+  const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [prayerFor, setPrayerFor] = useState('self'); // 'self' or 'other'
   const [recipientName, setRecipientName] = useState('');
   const [transactionStatus, setTransactionStatus] = useState(''); // 'processing', 'success', 'error', ''
@@ -217,6 +400,9 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
     }
   };
 
+  // Get prayer templates based on selected language
+  const prayerTemplates = PRAYERS_BY_LANGUAGE[selectedLanguage]?.prayers || PRAYERS_BY_LANGUAGE.en.prayers;
+
   // This is now only used for the form onSubmit - actual transaction is handled by TransactionButton
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -241,34 +427,6 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
       description: 'Express gratitude for good fortune'
     }
   };
-
-  const prayerTemplates = [
-    {
-      id: 'scalper',
-      title: "Scalper's Prayer",
-      text: "Oh Lady of Perpetual Profit, bless my lightning fingers and low-latency reflexes. Protect me from fat-fingered orders and grant me the stamina to chase micro-movements without losing my soul. May every scalp be green, and every exit perfectly timed. Amen."
-    },
-    {
-      id: 'leverage',
-      title: "Leverage Prayer",
-      text: "Oh Blessed Virgin of Margin, shield me from the wicked lure of 100x leverage. Guard my trades from sudden liquidation, and deliver me from the temptation of adding 'just a little more.' Grant me the humility to close in profit, and the grace to walk away before the exchange claims my soul. Amen."
-    },
-    {
-      id: 'swing',
-      title: "Swing Trader's Prayer",
-      text: "Oh Lady of Perpetual Profit, grant me patience to ride the waves of volatility, and the wisdom to know when to take profit and when to let it run. Bless my charts, my Fibonacci retracements, and my RSI settings, that I may always enter at the bottom and exit at the top. Amen."
-    },
-    {
-      id: 'hodler',
-      title: "Hodler's Prayer",
-      text: "Oh Glorious Mother of Diamond Hands, let me never succumb to weak paper hands. Guard my seed phrase, strengthen my resolve, and remind me that one day the line shall go up forever. May my wallet survive bear markets, hacks, and exchange collapses, until the moon and beyond. Amen."
-    },
-    {
-      id: 'chart',
-      title: "Chart Mystic's Prayer",
-      text: "Oh Oracle of Eternal Candles, Our Lady of Perpetual Profit, guide my eyes as I read the sacred indicators. Grant me the gift of vision to see wedges before they break, triangles before they tighten, and golden crosses before they shine. Deliver me from false signals, and sanctify my trading view with holy confluence. Amen."
-    }
-  ];
 
   return (
     <>
@@ -311,6 +469,11 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
             opacity: 1;
             transform: scale(1.2);
           }
+        }
+        
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
 
         .modal-overlay {
@@ -602,7 +765,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
 
       `}</style>
 
-      {/* Separate overlay for transaction progress to prevent layout shifts */}
+      {/* Separate overlay for transaction progress with Blue Guidance Box */}
       {transactionStatus === 'processing' && (
         <div className="modal-overlay" style={{ display: 'flex' }}>
           <div 
@@ -617,7 +780,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
               backgroundOrigin: 'border-box',
               backgroundClip: 'padding-box, border-box',
               borderRadius: '24px',
-              padding: '3rem',
+              padding: '2rem',
               textAlign: 'center',
               color: '#fff',
               boxShadow: '0 20px 60px rgba(139, 92, 246, 0.5)',
@@ -627,10 +790,41 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
             }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Blue Guidance Box for Transaction Confirming */}
+            <div style={{
+              background: 'rgba(0, 123, 255, 0.95)',
+              borderRadius: '12px',
+              padding: '1rem',
+              marginBottom: '1.5rem',
+              boxShadow: '0 4px 20px rgba(0, 123, 255, 0.3)'
+            }}>
+              <div style={{
+                fontSize: '1.5rem',
+                marginBottom: '0.5rem',
+                animation: 'spin 2s linear infinite'
+              }}>
+                ⏳
+              </div>
+              <div style={{
+                color: '#fff',
+                fontSize: '0.9rem',
+                fontWeight: '600',
+                marginBottom: '0.25rem'
+              }}>
+                Transaction submitted!
+              </div>
+              <div style={{
+                color: 'rgba(255, 255, 255, 0.9)',
+                fontSize: '0.75rem'
+              }}>
+                Waiting for blockchain confirmation...
+              </div>
+            </div>
+            
             {/* Animated Flame Icon */}
             <div style={{
-              fontSize: '4rem',
-              marginBottom: '1.5rem',
+              fontSize: '3rem',
+              marginBottom: '1rem',
               filter: 'drop-shadow(0 0 30px rgba(255, 170, 0, 0.8)) drop-shadow(0 0 60px rgba(255, 100, 0, 0.4))',
               animation: 'pulse 2s ease-in-out infinite',
               display: 'inline-block'
@@ -641,53 +835,30 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
             {/* Processing Message */}
             <h3 style={{
               fontFamily: "'Orbitron', monospace",
-              fontSize: '1.4rem',
-              fontWeight: '700',
+              fontSize: '1.2rem',
+              fontWeight: '600',
               color: '#fff',
-              marginBottom: '1rem',
+              marginBottom: '0.75rem',
               textTransform: 'uppercase',
-              letterSpacing: '2px'
+              letterSpacing: '1px'
             }}>
               Lighting Your Candle
             </h3>
             
             <p style={{
-              color: '#00f5d4',
-              fontSize: '1rem',
-              marginBottom: '1.5rem',
-              lineHeight: '1.5'
+              color: 'rgba(255, 255, 255, 0.8)',
+              fontSize: '0.9rem',
+              marginBottom: '1rem'
             }}>
               Burning {tokenAmount || '0'} RL80 token{parseInt(tokenAmount) !== 1 ? 's' : ''}...
             </p>
             
-            {/* Loading Animation */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: '0.5rem',
-              marginTop: '2rem'
-            }}>
-              {[0, 1, 2].map(i => (
-                <div 
-                  key={i}
-                  style={{
-                    width: '12px',
-                    height: '12px',
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #8b5cf6, #ec4899)',
-                    animation: `pulse 1.4s ease-in-out ${i * 0.16}s infinite`
-                  }}
-                />
-              ))}
-            </div>
-            
             <p style={{
               color: 'rgba(255, 255, 255, 0.5)',
-              fontSize: '0.85rem',
-              marginTop: '2rem',
+              fontSize: '0.75rem',
               fontStyle: 'italic'
             }}>
-              Transaction submitted, waiting for confirmation...
+              This usually takes 10-30 seconds
             </p>
           </div>
         </div>
@@ -961,39 +1132,71 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                 {message.length}/300
               </div>
               
-              {/* Prayer Templates Dropdown - Only for Petitions */}
+              {/* Prayer Templates Section - Only for Petitions */}
               {offeringType === 'petition' && (
-                <select 
-                  value={selectedPrayer}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setSelectedPrayer(value);
-                    if (value) {
-                      const prayer = prayerTemplates.find(p => p.id === value);
-                      if (prayer) {
-                        setMessage(prayer.text);
-                      }
-                    }
-                  }}
-                  style={{
-                    width: '100%',
-                    marginTop: '0.3rem',
-                    padding: '0.4rem',
-                    background: 'rgba(139, 92, 246, 0.1)',
-                    border: '1px solid rgba(139, 92, 246, 0.3)',
-                    borderRadius: '8px',
-                    color: '#8b5cf6',
-                    fontSize: '0.85rem',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="">Select a prayer template...</option>
-                  {prayerTemplates.map(prayer => (
-                    <option key={prayer.id} value={prayer.id}>
-                      {prayer.title}
-                    </option>
-                  ))}
-                </select>
+                <>
+                  {/* Language Selector */}
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.3rem' }}>
+                    <select 
+                      value={selectedLanguage}
+                      onChange={(e) => {
+                        setSelectedLanguage(e.target.value);
+                        setSelectedPrayer(''); // Clear selected prayer when language changes
+                        setMessage(''); // Clear message to let user pick a new prayer
+                      }}
+                      style={{
+                        flex: '0 0 auto',
+                        padding: '0.4rem',
+                        background: 'rgba(139, 92, 246, 0.1)',
+                        border: '1px solid rgba(139, 92, 246, 0.3)',
+                        borderRadius: '8px',
+                        color: '#8b5cf6',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="en">English</option>
+                      <option value="es">Español</option>
+                      <option value="pt">Português</option>
+                      <option value="fr">Français</option>
+                      <option value="zh">中文</option>
+                      <option value="hi">हिंदी</option>
+                      <option value="it">Italiano</option>
+                    </select>
+                    
+                    {/* Prayer Template Selector */}
+                    <select 
+                      value={selectedPrayer}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSelectedPrayer(value);
+                        if (value) {
+                          const prayer = prayerTemplates.find(p => p.id === value);
+                          if (prayer) {
+                            setMessage(prayer.text);
+                          }
+                        }
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '0.4rem',
+                        background: 'rgba(139, 92, 246, 0.1)',
+                        border: '1px solid rgba(139, 92, 246, 0.3)',
+                        borderRadius: '8px',
+                        color: '#8b5cf6',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="">Select a prayer template...</option>
+                      {prayerTemplates.map(prayer => (
+                        <option key={prayer.id} value={prayer.id}>
+                          {prayer.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
               )}
             </div>
 
@@ -1066,7 +1269,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
         ) : null}
       </div>
 
-      {/* Wallet Loading Indicator */}
+      {/* Wallet Loading Indicator with Yellow Guidance Box */}
       {showWalletLoading && (
         <div style={{
           position: 'fixed',
@@ -1089,64 +1292,77 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
             backgroundOrigin: 'border-box',
             backgroundClip: 'padding-box, border-box',
             borderRadius: '24px',
-            padding: '3rem',
+            padding: '2rem',
             textAlign: 'center',
             color: '#fff',
             boxShadow: '0 20px 60px rgba(139, 92, 246, 0.4)',
             maxWidth: '380px',
-            width: '90%'
+            width: '90%',
+            position: 'relative'
           }}>
-            {/* Wallet Icon Animation */}
+            {/* Yellow Guidance Box */}
             <div style={{
-              fontSize: '4rem',
+              background: 'rgba(255, 193, 7, 0.95)',
+              borderRadius: '12px',
+              padding: '1rem',
               marginBottom: '1.5rem',
+              boxShadow: '0 4px 20px rgba(255, 193, 7, 0.3)'
+            }}>
+              <div style={{
+                fontSize: '1.5rem',
+                marginBottom: '0.5rem'
+              }}>
+                ✍️
+              </div>
+              <div style={{
+                color: '#000',
+                fontSize: '0.95rem',
+                fontWeight: '600'
+              }}>
+                Please sign the transaction in your wallet
+              </div>
+            </div>
+            
+            {/* Flame Icon */}
+            <div style={{
+              fontSize: '3rem',
+              marginBottom: '1rem',
+              filter: 'drop-shadow(0 0 20px rgba(255, 170, 0, 0.8))',
               animation: 'pulse 1.5s ease-in-out infinite'
             }}>
-              💳
+              🕯️
             </div>
             
             {/* Title */}
             <h3 style={{
               fontFamily: "'Orbitron', monospace",
-              fontSize: '1.2rem',
-              fontWeight: '700',
-              color: '#00f5d4',
-              marginBottom: '1rem',
+              fontSize: '1.1rem',
+              fontWeight: '600',
+              color: '#fff',
+              marginBottom: '0.75rem',
               textTransform: 'uppercase',
-              letterSpacing: '2px'
+              letterSpacing: '1px'
             }}>
-              Opening Wallet
+              Light a Candle
             </h3>
             
-            {/* Message */}
+            {/* Amount Info */}
             <p style={{
-              color: '#fff',
-              fontSize: '0.95rem',
-              marginBottom: '2rem',
-              lineHeight: '1.5'
+              color: 'rgba(255, 255, 255, 0.8)',
+              fontSize: '0.85rem',
+              marginBottom: '1rem'
             }}>
-              Please sign the transaction in your wallet to continue...
+              Amount: <strong>{tokenAmount} RL80</strong>
             </p>
             
-            {/* Loading dots */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: '0.5rem'
+            {/* Status */}
+            <p style={{
+              color: 'rgba(255, 255, 255, 0.6)',
+              fontSize: '0.75rem',
+              fontStyle: 'italic'
             }}>
-              {[0, 1, 2].map(i => (
-                <div 
-                  key={i}
-                  style={{
-                    width: '10px',
-                    height: '10px',
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #8b5cf6, #ec4899)',
-                    animation: `pulse 1.4s ease-in-out ${i * 0.16}s infinite`
-                  }}
-                />
-              ))}
-            </div>
+              Waiting for wallet confirmation...
+            </p>
           </div>
         </div>
       )}
@@ -1205,24 +1421,31 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
               Ready to Light?
             </h3>
             
-            {/* Message */}
-            <p style={{
-              color: '#00f5d4',
-              fontSize: '1rem',
-              marginBottom: '1.5rem',
-              lineHeight: '1.6'
+            {/* Yellow Info Box */}
+            <div style={{
+              background: 'rgba(255, 193, 7, 0.15)',
+              border: '1px solid rgba(255, 193, 7, 0.4)',
+              borderRadius: '10px',
+              padding: '1rem',
+              marginBottom: '2rem'
             }}>
-              You're about to burn <strong style={{ color: '#fff', fontSize: '1.2rem' }}>{pendingBurnAmount}</strong> RL80 token{pendingBurnAmount !== 1 ? 's' : ''} to light your candle.
-            </p>
-            
-            <p style={{
-              color: 'rgba(255, 255, 255, 0.7)',
-              fontSize: '0.9rem',
-              marginBottom: '2rem',
-              fontStyle: 'italic'
-            }}>
-              This offering will be permanent and cannot be undone.
-            </p>
+              <p style={{
+                color: '#fff',
+                fontSize: '1rem',
+                marginBottom: '0.5rem',
+                lineHeight: '1.6'
+              }}>
+                You're about to burn <strong style={{ fontSize: '1.2rem', color: '#ffc107' }}>{pendingBurnAmount}</strong> RL80 token{pendingBurnAmount !== 1 ? 's' : ''}
+              </p>
+              <p style={{
+                color: 'rgba(255, 193, 7, 0.9)',
+                fontSize: '0.85rem',
+                margin: 0,
+                fontWeight: '500'
+              }}>
+                ⚠️ This action is permanent and cannot be undone
+              </p>
+            </div>
             
             {/* Buttons */}
             <div style={{
@@ -1343,67 +1566,70 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                       // For regular wallets, use the sendTransaction hook
                       sendTransaction(transaction, {
                         onSuccess: async (result) => {
-                      console.log('[LightCandleModal] Transaction signed and sent to blockchain');
-                      // Transaction is signed and sent to blockchain
-                      // NOW show the progress indicator
-                      setTransactionStatus('processing');
-                      
-                      // Wait for transaction to be actually mined/confirmed
-                      if (result?.transactionHash || result?.hash) {
-                        // Transaction takes ~10 seconds to confirm
-                        
-                        // Check if we have a wait method or need to poll
-                        if (result.wait) {
-                          // If there's a wait method, use it
-                          await result.wait();
-                        } else {
-                          // Otherwise wait for a reasonable time for confirmation
-                          await new Promise(resolve => setTimeout(resolve, 10000));
+                          console.log('[LightCandleModal] Transaction signed and sent to blockchain');
+                          // Hide wallet loading immediately after signing
+                          setShowWalletLoading(false);
+                          // NOW show the progress indicator for blockchain confirmation
+                          setTransactionStatus('processing');
+                          
+                          // Wait for transaction to be actually mined/confirmed
+                          if (result?.transactionHash || result?.hash) {
+                            // Transaction takes ~10 seconds to confirm
+                            
+                            // Check if we have a wait method or need to poll
+                            if (result.wait) {
+                              // If there's a wait method, use it
+                              await result.wait();
+                            } else {
+                              // Otherwise wait for a reasonable time for confirmation
+                              await new Promise(resolve => setTimeout(resolve, 10000));
+                            }
+                          }
+                          
+                          // Clear progress indicator
+                          console.log('[LightCandleModal] Transaction confirmed, hiding progress indicator');
+                          setTransactionStatus('');
+                          
+                          // Now save to Firebase after actual blockchain confirmation
+                          await handlePostBurnActions();
+                          
+                          setIsSubmitting(false);
+                          // Permanently hide the modal after burn completes
+                          setHasCompletedBurn(true);
+                          // Keep forceHidden as true to prevent modal from reappearing
+                          
+                          // Call onClose after a delay to notify parent component
+                          // This ensures the modal is properly closed in the parent's state
+                          setTimeout(() => {
+                            onClose();
+                          }, 100);
+                        },
+                        onError: (error) => {
+                          console.error('[LightCandleModal] Transaction error:', error);
+                          console.error('[LightCandleModal] Error details:', {
+                            message: error?.message,
+                            code: error?.code,
+                            cause: error?.cause,
+                            stack: error?.stack
+                          });
+                          
+                          // Clear all loading states
+                          setTransactionStatus('');
+                          setShowWalletLoading(false);
+                          setIsBurnInProgress(false);
+                          setForceHidden(false);
+                          setModalHidden(false);
+                          
+                          // Check if user rejected the transaction
+                          if (!error?.message?.includes('User rejected') && 
+                              !error?.message?.includes('User denied') &&
+                              !error?.message?.includes('rejected') &&
+                              error?.code !== 4001) {
+                            alert('Failed to burn tokens: ' + (error?.message || 'Unknown error'));
+                          }
+                          
+                          setIsSubmitting(false);
                         }
-                      }
-                      
-                      // Clear progress indicator
-                      console.log('[LightCandleModal] Transaction confirmed, hiding progress indicator');
-                      setTransactionStatus('');
-                      
-                      // Now save to Firebase after actual blockchain confirmation
-                      await handlePostBurnActions();
-                      
-                      setIsSubmitting(false);
-                      // Permanently hide the modal after burn completes
-                      setHasCompletedBurn(true);
-                      // Keep forceHidden as true to prevent modal from reappearing
-                      
-                      // Call onClose after a delay to notify parent component
-                      // This ensures the modal is properly closed in the parent's state
-                      setTimeout(() => {
-                        onClose();
-                      }, 100);
-                    },
-                    onError: (error) => {
-                      console.error('[LightCandleModal] Transaction error:', error);
-                      console.error('[LightCandleModal] Error details:', {
-                        message: error?.message,
-                        code: error?.code,
-                        cause: error?.cause,
-                        stack: error?.stack
-                      });
-                      
-                      // Clear progress indicator if it was shown
-                      setTransactionStatus('');
-                      setIsBurnInProgress(false); // Clear burn flow flag on error
-                      
-                      // Check if user rejected the transaction
-                      if (!error?.message?.includes('User rejected') && 
-                          !error?.message?.includes('User denied') &&
-                          !error?.message?.includes('rejected') &&
-                          error?.code !== 4001) {
-                        alert('Failed to burn tokens: ' + (error?.message || 'Unknown error'));
-                      }
-                      
-                      setIsSubmitting(false);
-                      setShowWalletLoading(false);
-                    }
                       });
                     }
                   } catch (error) {
