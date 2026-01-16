@@ -7,6 +7,7 @@ import TradingCardsDisplay from '@/components/TradingCardsDisplay';
 import PerformanceDashboard from '../PerformanceDashboard';
 import { useUser } from '@clerk/nextjs';
 import { db, collection, onSnapshot, query, orderBy, limit } from '@/lib/firebaseClient';
+import { agentChatManager } from '../../services/agentChatManager';
 
 // Dynamically import SingleCandleDisplay to avoid SSR issues with Three.js
 const SingleCandleDisplay = dynamic(() => import('../displays/SingleCandleDisplay'), {
@@ -363,48 +364,79 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
     return () => window.removeEventListener('features/tradingTeamMessage', handleTradingTeamMessage);
   }, []);
   
-  // Load chat history on mount
+  // Load chat history from Firebase on mount
   useEffect(() => {
-    const loadChatHistory = async () => {
-      try {
-        const response = await fetch('/api/team-chat-history?limit=20');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.messages && data.messages.length > 0) {
-            // console.log(`Loaded ${data.messages.length} historical chat messages`);
-            
-            // Convert historical messages to the format expected by modelThoughts
-            const historicalThoughts = data.messages.map(msg => ({
-              id: msg.id,
-              agent: msg.agent,
-              type: msg.agent,
-              consultant: msg.agent,
-              message: msg.message,
-              timestamp: new Date(msg.createdAt || msg.timestamp).toLocaleTimeString(),
-              icon: msg.agent === 'rl80' ? '🤖' : 
-                    msg.agent === 'sentiment' ? '📊' :
-                    msg.agent === 'market' ? '📈' :
-                    msg.agent === 'macro' ? '🌍' : '💬',
-              color: msg.agent === 'rl80' ? '#00ff00' :
-                     msg.agent === 'sentiment' ? '#ff9800' :
-                     msg.agent === 'market' ? '#2196f3' :
-                     msg.agent === 'macro' ? '#9c27b0' : '#888'
-            }));
-            
-            // Update the features/trading data with historical messages
-            setTradingData(prev => ({
-              ...prev,
-              modelThoughts: [...historicalThoughts, ...prev.modelThoughts]
-            }));
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load chat history:', error);
-      }
-    };
-    
-    loadChatHistory();
-  }, []);
+    if (!db) {
+      console.log('Firebase not available for chat history');
+      return;
+    }
+
+    try {
+      // Set up real-time listener for agent chat messages
+      const chatQuery = query(
+        collection(db, 'agentChat'),
+        orderBy('timestamp', 'desc'),
+        limit(50)
+      );
+
+      const unsubscribe = onSnapshot(chatQuery, (snapshot) => {
+        const chatMessages = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          chatMessages.push({
+            id: doc.id,
+            agent: data.agent,
+            type: data.type || data.agent,
+            consultant: data.agent,
+            message: data.message,
+            timestamp: (() => {
+              try {
+                if (data.timestamp?.toDate) {
+                  return data.timestamp.toDate().toLocaleTimeString();
+                } else if (data.timestamp) {
+                  return new Date(data.timestamp).toLocaleTimeString();
+                } else if (data.createdAt) {
+                  return new Date(data.createdAt).toLocaleTimeString();
+                } else {
+                  return new Date().toLocaleTimeString();
+                }
+              } catch (error) {
+                console.warn('Timestamp conversion failed:', error);
+                return new Date().toLocaleTimeString();
+              }
+            })(),
+            icon: data.agent === 'RL80' ? '⚡' : 
+                  data.agent === 'EMO' ? '🔮' :
+                  data.agent === 'TEKNO' ? '📊' :
+                  data.agent === 'MACRO' ? '🌍' : '💬',
+            color: data.agent === 'RL80' ? '#FFD700' :
+                   data.agent === 'EMO' ? '#9333ea' :
+                   data.agent === 'TEKNO' ? '#00ffff' :
+                   data.agent === 'MACRO' ? '#00ff00' : '#888',
+            sentiment: data.sentiment || 'neutral'
+          });
+        });
+
+        // Reverse to show oldest first (since we queried newest first)
+        chatMessages.reverse();
+
+        // Update trading data with live chat messages
+        setTradingData(prev => ({
+          ...prev,
+          modelThoughts: chatMessages
+        }));
+
+        console.log(`Loaded ${chatMessages.length} agent chat messages from Firebase`);
+      }, (error) => {
+        console.error('Firebase chat listener error:', error);
+      });
+
+      // Return cleanup function
+      return unsubscribe;
+    } catch (error) {
+      console.error('Failed to set up Firebase chat listener:', error);
+    }
+  }, [db]);
 
   // Remove the random data update effect - data should only come from API
   // Real-time updates will come from the Lighter API websocket connection
@@ -1012,7 +1044,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                 overflowY: 'auto',
                 paddingRight: '5px'
               }}>
-                {features/tradingData.modelThoughts.map((thought, idx) => (
+                {tradingData.modelThoughts.map((thought, idx) => (
                   <div key={idx} style={{
                     marginBottom: '10px',
                     padding: '8px',
@@ -1552,6 +1584,60 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                   </div>
                 ))}
               </div>
+
+              {/* Agent Control Panel */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '15px',
+                padding: '0 12px',
+                gap: '8px'
+              }}>
+                <button
+                  onClick={() => {
+                    if (agentChatManager.isRunning()) {
+                      agentChatManager.stop();
+                    } else {
+                      agentChatManager.start();
+                    }
+                  }}
+                  style={{
+                    background: agentChatManager.isRunning() ? 
+                      'rgba(255, 0, 0, 0.1)' : 'rgba(0, 255, 0, 0.1)',
+                    border: `1px solid ${agentChatManager.isRunning() ? '#ff6666' : '#00ff00'}`,
+                    borderRadius: '6px',
+                    padding: '6px 10px',
+                    color: agentChatManager.isRunning() ? '#ff6666' : '#00ff00',
+                    fontSize: '10px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {agentChatManager.isRunning() ? '⏹️ STOP' : '▶️ START'}
+                </button>
+                
+                <button
+                  onClick={() => {
+                    ['RL80', 'EMO', 'TEKNO', 'MACRO'].forEach(agent => {
+                      agentChatManager.manualTrigger(agent);
+                    });
+                  }}
+                  style={{
+                    background: 'rgba(255, 215, 0, 0.1)',
+                    border: '1px solid #FFD700',
+                    borderRadius: '6px',
+                    padding: '6px 10px',
+                    color: '#FFD700',
+                    fontSize: '10px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  🚀 TRIGGER ALL
+                </button>
+              </div>
               
               {/* Chat Messages Container */}
               <div style={{
@@ -1578,7 +1664,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                     Waiting for agent communications...
                   </div>
                 ) : (
-                  features/tradingData.modelThoughts.map((thought, idx) => (
+                  tradingData.modelThoughts.map((thought, idx) => (
                     <div key={idx} style={{
                       marginBottom: '10px',
                       padding: '10px',
@@ -1626,10 +1712,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                           {thought.icon} {thought.agent}
                         </span>
                         <span style={{ color: '#666', fontSize: '9px' }}>
-                          {new Date(thought.timestamp).toLocaleTimeString('en-US', { 
-                            hour: '2-digit', 
-                            minute: '2-digit'
-                          })}
+                          {thought.timestamp || 'Now'}
                         </span>
                       </div>
                       <div style={{ 
@@ -2962,7 +3045,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
             flexDirection: 'column',
             gap: '8px'
           }}>
-            {features/tradingData.modelThoughts.map((thought, idx) => {
+            {tradingData.modelThoughts.map((thought, idx) => {
               // Determine sender based on consultant field or type
               const sender = thought.consultant || 
                            (thought.type === 'sentiment' ? 'sentiment' :

@@ -2,7 +2,7 @@
  * RL80 Trader - Lead Trading AI
  * 
  * The decision-making head trader that synthesizes input from all team members
- * and executes features/trading strategies with proper risk management.
+ * and executes trading strategies with proper risk management.
  */
 
 // ============================================================================

@@ -6,7 +6,7 @@
  */
 
 // Import external knowledge base
-import features/tradingKnowledge from './configs/knowledge/features/trading-knowledge.json';
+import tradingKnowledge from './configs/knowledge/trading-knowledge.json';
 
 // ============================================================================
 // PERSONALITY CONFIGURATION
@@ -175,8 +175,8 @@ export function generateMarketPrompt(context) {
 }
 
 function buildSystemPrompt(config) {
-  return `You are ${config.name}, a technical analysis expert advisor for a crypto features/trading AI named RL80.
-You're in a live features/trading room chat with RL80 (the lead trader), Sentiment (crowd psychology), and Macro (global economics).
+  return `You are ${config.name}, a technical analysis expert advisor for a crypto trading AI named RL80.
+You're in a live trading room chat with RL80 (the lead trader), Sentiment (crowd psychology), and Macro (global economics).
 
 Your personality:
 ${config.personality.traits.map(t => `- ${t}`).join('\n')}

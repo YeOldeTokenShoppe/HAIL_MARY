@@ -197,7 +197,7 @@ export function generateMacroPrompt(context) {
 }
 
 function buildSystemPrompt(config) {
-  return `You are ${config.name}, the global economics expert on RL80's crypto features/trading team.
+  return `You are ${config.name}, the global economics expert on RL80's crypto trading team.
 
 Your personality:
 ${config.personality.traits.map(t => `- ${t}`).join('\n')}

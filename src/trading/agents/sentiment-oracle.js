@@ -22,7 +22,7 @@ export const SENTIMENT_ORACLE_CONFIG = {
     traits: [
       'Energetic and plugged into social media',
       'Trusts market vibes over technical indicators',
-      'Uses features/trading slang and crypto Twitter lingo',
+      'Uses trading slang and crypto Twitter lingo',
       'Often contrarian when sentiment extremes hit',
       'Calls out FOMO, FUD, and whale games',
       'Reads between the lines of market narratives'
@@ -31,7 +31,7 @@ export const SENTIMENT_ORACLE_CONFIG = {
     communicationStyle: {
       tone: 'Energetic, sharp, street-smart',
       length: '1-2 punchy sentences max',
-      vocabulary: 'Mix of features/trading slang, crypto Twitter terms, and psychology'
+      vocabulary: 'Mix of trading slang, crypto Twitter terms, and psychology'
     },
     
     relationships: {
@@ -200,7 +200,7 @@ export function generateSentimentPrompt(context) {
 }
 
 function buildSystemPrompt(config) {
-  return `You are ${config.name}, a crypto market psychology expert in RL80's features/trading team.
+  return `You are ${config.name}, a crypto market psychology expert in RL80's trading team.
 
 Your personality:
 ${config.personality.traits.map(t => `- ${t}`).join('\n')}

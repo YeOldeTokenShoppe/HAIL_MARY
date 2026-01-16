@@ -385,11 +385,19 @@ function createFlameMaterial() {
   })
 }
 
-// Extract geometries from GLB
+// Extract geometries from GLB with enhanced error handling
 function useClonedGeometries(modelPath) {
-  const { scene } = useGLTF(modelPath)
+  // useGLTF should be called directly - it handles Suspense automatically
+  const gltf = useGLTF(modelPath)
+  const { scene } = gltf
   
   return useMemo(() => {
+    
+    if (!scene) {
+      console.error('[useClonedGeometries] No scene found in GLTF')
+      return { geometries: {}, textures: {}, localMatrices: {} }
+    }
+    
     const geometries = {}
     const textures = {}
     const localMatrices = {}
@@ -397,10 +405,13 @@ function useClonedGeometries(modelPath) {
     scene.updateWorldMatrix(true, false)
     const rootInverse = new THREE.Matrix4().copy(scene.matrixWorld).invert()
     
+    let foundParts = []
+    
     scene.traverse((child) => {
       if (!child.isMesh) return
       
       const name = child.name
+      foundParts.push(name)
       let key = null
       
       // Map the new model's part names
@@ -418,6 +429,7 @@ function useClonedGeometries(modelPath) {
         localMatrices[key] = new THREE.Matrix4().copy(child.matrixWorld).premultiply(rootInverse)
       }
     })
+    
     
     return { geometries, textures, localMatrices }
   }, [scene])
@@ -627,45 +639,53 @@ function AnimationController({ priceDirection, priceRef, shortTermPriceRef, cont
 
 export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, priceRef, shortTermPriceRef, continuousOffsetRef, additionalCandles = [], onCandleClick, onCandleHover, onCandleLeave, clickedCandleId, isMobile = false, exclusionZone = null }) {
   
+  // ALL HOOKS MUST BE CALLED UNCONDITIONALLY - NO EARLY RETURNS BEFORE ALL HOOKS
+  
   // Reset uniforms on mount to ensure clean state
   useEffect(() => {
-    console.log('[CandleCloud] Component mounting, resetting uniforms')
-    // Reset uniforms on mount to ensure clean state
-    sharedUniforms.uTime.value = 0
-    sharedUniforms.uClickedId.value = -1
-    sharedUniforms.uPriceDirection.value = 0
-    sharedUniforms.uContinuousOffset.value = 0
-    sharedUniforms.uShortTermPrice.value = 0
-    sharedUniforms.uPulseTime.value = -1
-    sharedUniforms.uPulsePosition.value.set(0, 0, 0)
-    sharedUniforms.uHighlightedId.value = -1
-    sharedUniforms.uCurrentTime.value = Date.now()
     
-    return () => {
-      console.log('[CandleCloud] Component unmounting, resetting uniforms')
-      // Reset on unmount too
+    // Force complete reset of all uniforms
+    const resetUniforms = () => {
       sharedUniforms.uTime.value = 0
       sharedUniforms.uClickedId.value = -1
       sharedUniforms.uPriceDirection.value = 0
       sharedUniforms.uContinuousOffset.value = 0
       sharedUniforms.uShortTermPrice.value = 0
       sharedUniforms.uPulseTime.value = -1
+      sharedUniforms.uPulsePosition.value.set(0, 0, 0)
       sharedUniforms.uHighlightedId.value = -1
+      sharedUniforms.uCurrentTime.value = Date.now()
+    }
+    
+    // Immediate reset
+    resetUniforms()
+    
+    // Additional reset after small delay to ensure clean state
+    const resetTimer = setTimeout(resetUniforms, 100)
+    
+    return () => {
+      clearTimeout(resetTimer)
+      // Final cleanup on unmount
+      resetUniforms()
     }
   }, [])
   
+  // Load geometries - must be called unconditionally (Rules of Hooks)
   const { geometries, textures, localMatrices } = useClonedGeometries('/models/tinyJapCanOnly.glb')
+  
   const basePositions = usePositions(count, exclusionZone)
   
   // Clean up cloned geometries on unmount
   useEffect(() => {
     return () => {
       // Dispose cloned geometries when component unmounts
-      Object.values(geometries).forEach(geometry => {
-        if (geometry && geometry.dispose) {
-          geometry.dispose()
-        }
-      })
+      if (geometries) {
+        Object.values(geometries).forEach(geometry => {
+          if (geometry && geometry.dispose) {
+            geometry.dispose()
+          }
+        })
+      }
     }
   }, [geometries])
   
@@ -707,7 +727,14 @@ export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUN
     sharedUniforms.uClickedId.value = clickedCandleId ?? -1
   }, [clickedCandleId])
   
+  // ALL HOOKS CALLED - useGLTF with Suspense handles loading automatically
+  
+  // Now continue with the main render logic
   const maxCount = CANDLE_COUNT + MAX_ADDITIONAL
+
+
+
+  // Geometries are guaranteed to be ready at this point due to the check above
 
   return (
     <group>
@@ -796,19 +823,15 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onPrice
   
   // Find and focus on user's candle
   const findUserCandle = useCallback(() => {
-    console.log('Finding candle for user:', currentUserId)
-    console.log('All positions:', allPositions)
     const userCandleIndex = allPositions.findIndex(p => p.userId === currentUserId)
     if (userCandleIndex !== -1) {
       const candle = allPositions[userCandleIndex]
-      console.log('Found user candle at index:', userCandleIndex, candle)
       setHighlightedCandleId(userCandleIndex)
       setSelectedCandle({ ...candle, instanceId: userCandleIndex })
       
       // Update shader uniform to highlight the candle
       sharedUniforms.uHighlightedId.value = userCandleIndex
     } else {
-      console.log('No candle found for user:', currentUserId)
       // No candle found
       sharedUniforms.uHighlightedId.value = -1
       setHighlightedCandleId(-1)

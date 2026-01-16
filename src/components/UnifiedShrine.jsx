@@ -29,8 +29,12 @@ class CanvasErrorBoundary extends Component {
     return { hasError: true }
   }
 
-  componentDidCatch(_error, errorInfo) {
-    console.warn('Canvas error details:', errorInfo)
+  componentDidCatch(error, errorInfo) {
+    console.error('Canvas error details:', {
+      error,
+      errorInfo,
+      componentStack: errorInfo.componentStack
+    })
   }
 
   render() {
@@ -1030,8 +1034,14 @@ useEffect(() => {
   
   // Mount immediately on client-side - no delay that could be interrupted
   useEffect(() => {
-    // Mount immediately - don't delay
-    setMounted(true)
+    console.log('[UnifiedShrine] Component effect running, setting mounted = true')
+    
+    // Small delay to ensure parent is fully ready and GLTF is preloaded
+    const timer = setTimeout(() => {
+      setMounted(true)
+      console.log('[UnifiedShrine] mounted state set to true')
+    }, 200) // Small delay to let parent preloading complete
+    
     // Generate random initial values only on client side
     setPriceHistory(Array(20).fill(0).map(() => 0.00042 + Math.random() * 0.00001 - 0.000005))
     
@@ -1050,6 +1060,7 @@ useEffect(() => {
     
     return () => {
       // Cleanup on unmount
+      clearTimeout(timer)
       setMounted(false)
       window.removeEventListener('keydown', handleEscape)
     }
@@ -1498,7 +1509,12 @@ useEffect(() => {
         >
           {/* Combined group for hands and surrounding candles */}
           <group position={[0, 0, 0]}>
-            <Suspense fallback={null}>
+            <Suspense fallback={
+              <mesh>
+                <sphereGeometry args={[0.1]} />
+                <meshBasicMaterial color="#ff0000" />
+              </mesh>
+            }>
               <CandleCloud
                 count={isMobile ? 100 : 100}
                 priceRef={priceRef}

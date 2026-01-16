@@ -84,46 +84,91 @@ export default function ShrinePage() {
   const [isClient, setIsClient] = useState(false)
   const [delayedMount, setDelayedMount] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [mountKey, setMountKey] = useState(0)
 
 useEffect(() => {
+  console.log('[Illumin80] Setting isClient to true')
   setIsClient(true)
 }, [])
 
 useEffect(() => {
   let mounted = true
   
-  // Preload the candle model immediately when component mounts
-  const preloadModel = async () => {
+  // Enhanced preload for navigation issues
+  const handleMount = async () => {
     try {
-      const { useGLTF } = await import('@react-three/drei')
-      useGLTF.preload('/models/tinyJapCanOnly.glb')
-      console.log('[Illumin80] Model preload initiated')
+      console.log('[Illumin80] Page mounting, checking for navigation issues...')
       
-      // Wait a bit more to ensure model is loaded
-      if (mounted) {
-        setTimeout(() => {
-          if (mounted) {
-            setDelayedMount(true)
-            setIsLoading(false)
-            console.log('[Illumin80] DelayedMount set to true')
-          }
-        }, 1000) // Increased to 1000ms to ensure model loads properly
+      // Import and preload the model
+      const { useGLTF } = await import('@react-three/drei')
+      
+      // Clear the GLTF cache completely to ensure fresh load
+      if (useGLTF.clear) {
+        useGLTF.clear()  // Clear all cached models
+        console.log('[Illumin80] Cleared all GLTF cache')
       }
+      
+      // Force fresh preload of the model
+      useGLTF.preload('/models/tinyJapCanOnly.glb')
+      console.log('[Illumin80] Model preload initiated after cache clear')
+      
+      // Reset any existing Three.js state that might interfere
+      if (typeof window !== 'undefined') {
+        // Reset shared uniforms if they exist
+        if (window.sharedUniforms) {
+          console.log('[Illumin80] Resetting shared uniforms for fresh start')
+          window.sharedUniforms.uTime.value = 0
+          window.sharedUniforms.uClickedId.value = -1
+          window.sharedUniforms.uPriceDirection.value = 0
+          window.sharedUniforms.uContinuousOffset.value = 0
+          window.sharedUniforms.uShortTermPrice.value = 0
+          window.sharedUniforms.uPulseTime.value = -1
+          window.sharedUniforms.uHighlightedId.value = -1
+        }
+        
+        // Clear any Three.js renderer cache that might exist
+        if (window.__THREE_DEVTOOLS__) {
+          console.log('[Illumin80] Clearing Three.js devtools cache')
+        }
+        
+        // Force garbage collection if available (for debugging)
+        if (window.gc && typeof window.gc === 'function') {
+          try {
+            window.gc()
+            console.log('[Illumin80] Triggered garbage collection')
+          } catch (e) {
+            // GC not available, ignore
+          }
+        }
+      }
+      
+      // Delay mounting to ensure everything is ready
+      setTimeout(() => {
+        if (mounted) {
+          setMountKey(Date.now()) // Ensure fresh component mount
+          setDelayedMount(true)
+          setIsLoading(false)
+          console.log('[Illumin80] Ready to mount UnifiedShrine')
+        }
+      }, 800) // Reasonable delay for model preload
+      
     } catch (error) {
-      console.error('[Illumin80] Error preloading model:', error)
+      console.error('[Illumin80] Error in mounting process:', error)
       // Fallback - still mount even if preload fails
       if (mounted) {
         setTimeout(() => {
           if (mounted) {
+            setMountKey(Date.now())
             setDelayedMount(true)
             setIsLoading(false)
+            console.log('[Illumin80] Fallback mount after error')
           }
         }, 500)
       }
     }
   }
   
-  preloadModel()
+  handleMount()
   
   return () => {
     mounted = false
@@ -666,7 +711,7 @@ useEffect(() => {
         {isClient && delayedMount ? (
           <UnifiedShrine 
             ref={unifiedShrineRef}
-            key={`shrine-scene-${pathname}`} // Force remount when navigating to this page
+            key={`shrine-scene-${pathname}-${mountKey}`} // Force complete remount when cache cleared
             offerings={offerings}
             totalOfferingsCount={totalOfferingsCount}
             currentUserId={user?.id}
