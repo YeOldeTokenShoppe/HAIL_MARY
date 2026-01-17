@@ -33,8 +33,8 @@ export const AGENT_CONFIG = {
       enabled: process.env.NEXT_PUBLIC_AGENT_MARKET !== 'false',
       provider: 'openai',
       rateLimit: {
-        enabled: false,
-        cooldownMs: 0,
+        enabled: true,
+        cooldownMs: 60 * 60 * 1000, // 1 hour
       },
       mockMode: process.env.NEXT_PUBLIC_MOCK_MARKET === 'true',
       mockResponse: 'BTC testing key support at 95k, RSI neutral at 50.'
@@ -44,8 +44,8 @@ export const AGENT_CONFIG = {
       enabled: process.env.NEXT_PUBLIC_AGENT_MACRO !== 'false',
       provider: 'anthropic',
       rateLimit: {
-        enabled: false,
-        cooldownMs: 0,
+        enabled: true,
+        cooldownMs: 60 * 60 * 1000, // 1 hour
       },
       mockMode: process.env.NEXT_PUBLIC_MOCK_MACRO === 'true',
       mockResponse: 'DXY stable at 104, macro conditions neutral for risk assets.'

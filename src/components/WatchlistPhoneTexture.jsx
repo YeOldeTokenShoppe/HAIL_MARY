@@ -177,6 +177,9 @@ export function WatchlistPhoneTexture({
   // Background image ref
   const backgroundImageRef = useRef(null);
   
+  // Avatar image ref
+  const avatarImageRef = useRef(null);
+  
   // Scroll state
   const scrollPositionRef = useRef(0);
   const targetScrollRef = useRef(0);
@@ -587,6 +590,15 @@ export function WatchlistPhoneTexture({
     img.src = '/images/screen1flat.svg';
   }, []);
   
+  // Load avatar image
+  useEffect(() => {
+    const img = new Image();
+    img.onload = () => {
+      avatarImageRef.current = img;
+    };
+    img.src = '/images/electricRL80.png';
+  }, []);
+  
   // ===========================================
   // FILTER ACTIVITIES BY TAB
   // ===========================================
@@ -774,6 +786,49 @@ export function WatchlistPhoneTexture({
     
     // Reset text alignment for content below
     ctx.textAlign = 'left';
+    
+    // ===========================================
+    // HEADER WITH AVATAR AND TITLE
+    // ===========================================
+    
+    const headerY = 120;
+    const avatarSize = 80;
+    const avatarX = 80;
+    
+    // Draw avatar if loaded
+    if (avatarImageRef.current) {
+      ctx.save();
+      
+      // Create circular clip for avatar
+      ctx.beginPath();
+      ctx.arc(avatarX, headerY, avatarSize / 2, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+      
+      // Draw avatar image
+      ctx.drawImage(
+        avatarImageRef.current,
+        avatarX - avatarSize / 2,
+        headerY - avatarSize / 2,
+        avatarSize,
+        avatarSize
+      );
+      
+      ctx.restore();
+      
+      // Draw border around avatar
+      ctx.strokeStyle = '#ffd700';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(avatarX, headerY, avatarSize / 2, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    
+    // Draw title text
+    ctx.fillStyle = '#060606ff';
+    ctx.font = 'bold 28px serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙', avatarX + avatarSize / 2 + 15, headerY + 8);
     
     // ===========================================
     // TABS

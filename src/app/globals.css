@@ -6860,10 +6860,9 @@ div[data-three] {
 
 /* Override Clerk's UserButton 60x60 default size globally */
 .cl-userButtonBox {
-  width: 2.5rem !important;
-  height: 2.5rem !important;
-  max-width: 2.5rem !important;
-  max-height: 2.5rem !important;
+  width: 2.5rem;
+  height: 2.5rem;
+
 }
 
 .cl-userButtonTrigger {
@@ -6882,8 +6881,8 @@ div[data-three] {
 }
 
 .cl-avatarBox {
-  width: 100% !important;
-  height: 100% !important;
+  width: 100%;
+  height: 100%;
   max-width: 2.5rem !important;
   max-height: 2.5rem !important;
 }
@@ -6891,7 +6890,6 @@ div[data-three] {
 .cl-avatarImage {
   width: 100% !important;
   height: 100% !important;
-  max-width: 2.5rem !important;
-  max-height: 2.5rem !important;
+
 }
 

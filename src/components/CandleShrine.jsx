@@ -418,7 +418,8 @@ function useClonedGeometries(modelPath) {
       if (name === 'Wax') key = 'wax'
       else if (name === 'Wick') key = 'wick'
       else if (name === 'Flame') key = 'flame'
-      // Candle_Empty is the parent group, not a mesh
+      else if (name === 'Candle_Empty') key = 'candle_empty'
+      // Additional mapping for candle body parts
       
       if (key) {
         const clonedGeometry = child.geometry.clone()
@@ -429,7 +430,6 @@ function useClonedGeometries(modelPath) {
         localMatrices[key] = new THREE.Matrix4().copy(child.matrixWorld).premultiply(rootInverse)
       }
     })
-    
     
     return { geometries, textures, localMatrices }
   }, [scene])
@@ -491,7 +491,7 @@ function usePositions(count, exclusionZone = null) {
         z,
         rotation: Math.random() * Math.PI * 2,
         scale: 0.8 + Math.random() * 0.4, // Vary size between 0.8 and 1.2
-        litAt: Date.now() - Math.random() * 72 * 3600 * 1000, // Random age up to 72 hours old
+        litAt: null, // Base candles should NOT melt - only user-lit candles with Firestore litAt should melt
         userId: null, // Will be assigned when user lights a candle
         username: null,
         offering: null,
@@ -511,20 +511,24 @@ function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.9
   useFrame(() => {
     if (!meshRef.current || !enableMelting) return
     
+    
     const now = Date.now()
     const tempMatrix = new THREE.Matrix4()
     const tempPosition = new THREE.Vector3()
     const tempQuaternion = new THREE.Quaternion()
     const tempScale = new THREE.Vector3()
     
+    let candlesWithLitAt = 0
     for (let i = 0; i < actualCount; i++) {
       const pos = positions[i]
       if (pos.litAt) {
+        candlesWithLitAt++
         const elapsed = (now - pos.litAt) / 1000 // seconds
-        const meltProgress = Math.min(elapsed / (80 * 3600), 0.9) // 0-0.9 over 80 hours
-        const yScale = Math.max(0.1, 1.0 - meltProgress) // Keep at least 10% height
+        const meltProgress = Math.min(elapsed / 300, 1.0) // 0-1.0 over 5 minutes (300 seconds) - TESTING
+        const yScale = Math.max(0.01, 1.0 - meltProgress) // Scale down to almost nothing when melted
         
         const instanceScale = pos.scale || scale
+        
         tempPosition.set(pos.x, pos.y, pos.z)
         tempQuaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pos.rotation)
         tempScale.set(instanceScale, instanceScale * yScale, instanceScale)
@@ -710,6 +714,7 @@ export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUN
     wax: createXBaseMaterial(),  // Now price-reactive!
     wick: createWobbleMaterial('#222222'),
     flame: createFlameMaterial(),  // Or createFlameMaterialPriceReactive() for tinted flames
+    candle_empty: createWobbleMaterial('#ffddaa'), // Candle body material
   }), [])
   
   // Clean up materials on unmount
@@ -719,6 +724,7 @@ export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUN
       if (materials.wax) materials.wax.dispose()
       if (materials.wick) materials.wick.dispose()
       if (materials.flame) materials.flame.dispose()
+      if (materials.candle_empty) materials.candle_empty.dispose()
     }
   }, [materials])
   
@@ -750,6 +756,7 @@ export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUN
       <InstancedPart geometry={geometries.wax} material={materials.wax} positions={positions} localMatrix={localMatrices.wax} maxCount={maxCount} onCandleClick={onCandleClick} onCandleHover={onCandleHover} onCandleLeave={onCandleLeave} enableMelting={true} />
       <InstancedPart geometry={geometries.wick} material={materials.wick} positions={positions} localMatrix={localMatrices.wick} maxCount={maxCount} enableMelting={true} />
       <InstancedPart geometry={geometries.flame} material={materials.flame} positions={positions} localMatrix={localMatrices.flame} maxCount={maxCount} enableMelting={true} />
+      {geometries.candle_empty && <InstancedPart geometry={geometries.candle_empty} material={materials.candle_empty} positions={positions} localMatrix={localMatrices.candle_empty} maxCount={maxCount} enableMelting={true} />}
     </group>
   )
 })
@@ -813,8 +820,8 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onPrice
       const now = Date.now()
       setAdditionalCandles(prev => prev.filter(candle => {
         if (!candle.litAt) return true
-        const elapsed = (now - candle.litAt) / (1000 * 3600)
-        return elapsed < 80 // Keep if less than 80 hours old
+        const elapsed = (now - candle.litAt) / 1000
+        return elapsed < 300 // Keep if less than 5 minutes old - TESTING
       }))
     }, 60000) // Check every minute
     
@@ -823,16 +830,26 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onPrice
   
   // Find and focus on user's candle
   const findUserCandle = useCallback(() => {
+    console.log('🔍 Finding candle for userId:', currentUserId)
+    console.log('📊 Total positions:', allPositions.length)
+    console.log('🕯️ Positions with litAt:', allPositions.filter(p => p.litAt).length)
+    
     const userCandleIndex = allPositions.findIndex(p => p.userId === currentUserId)
     if (userCandleIndex !== -1) {
       const candle = allPositions[userCandleIndex]
+      console.log('✅ Found user candle at index:', userCandleIndex)
+      console.log('🕯️ Candle data:', { userId: candle.userId, litAt: candle.litAt, hasLitAt: !!candle.litAt })
+      
       setHighlightedCandleId(userCandleIndex)
       setSelectedCandle({ ...candle, instanceId: userCandleIndex })
       
       // Update shader uniform to highlight the candle
       sharedUniforms.uHighlightedId.value = userCandleIndex
+      console.log('🎯 Set highlighted candle ID to:', userCandleIndex)
     } else {
       // No candle found
+      console.log('❌ No candle found for userId:', currentUserId)
+      console.log('📋 Available userIds:', allPositions.map(p => p.userId).filter(Boolean))
       sharedUniforms.uHighlightedId.value = -1
       setHighlightedCandleId(-1)
       setSelectedCandle(null)
@@ -889,7 +906,7 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onPrice
           z: z,
           rotation: Math.random() * Math.PI * 2,
           scale: 0.8 + Math.random() * 0.4,
-          litAt: offering.createdAt?.toDate?.() || offering.timestamp?.toDate?.() || new Date(Date.now() - Math.random() * 72 * 3600 * 1000),
+          litAt: offering.litAt || offering.createdAt?.toDate?.()?.getTime?.() || offering.timestamp?.toDate?.()?.getTime?.() || Date.now(),
           userId: offering.userId || offering.uid || `user_${index}`,
           username: offering.userName || offering.username || 'Anonymous',
           offering: offering,
@@ -1040,7 +1057,7 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onPrice
                 Lit: {new Date(selectedCandle.litAt).toLocaleTimeString()}
               </div>
               <div style={{ marginBottom: '4px', color: '#00ff66' }}>
-                Remaining: {Math.max(0, 80 - (Date.now() - selectedCandle.litAt) / (1000 * 3600)).toFixed(1)} hours
+                Remaining: {Math.max(0, 300 - (Date.now() - selectedCandle.litAt) / 1000).toFixed(1)} seconds ({Math.max(0, 100 * (1 - (Date.now() - selectedCandle.litAt) / (1000 * 300))).toFixed(1)}%)
               </div>
             </>
           )}

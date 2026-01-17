@@ -1,0 +1,222 @@
+{
+  "risk_management": {
+    "position_sizing": {
+      "methods": {
+        "fixed_fractional": {
+          "description": "Fixed percentage of capital per trade",
+          "typical_range": "1-2% per trade",
+          "pros": ["Simple", "Consistent"],
+          "cons": ["Ignores volatility"]
+        },
+        
+        "volatility_adjusted": {
+          "description": "Size based on asset volatility",
+          "calculation": "Target risk / (ATR * multiplier)",
+          "pros": ["Accounts for risk", "Consistent dollar risk"],
+          "cons": ["More complex"]
+        },
+        
+        "kelly_criterion": {
+          "description": "Optimal size based on win rate and avg win/loss",
+          "formula": "f = (bp - q) / b",
+          "caution": "Can suggest large sizes",
+          "practical": "Use fraction of Kelly"
+        }
+      },
+      
+      "portfolio_limits": {
+        "single_position": "Maximum 5% of portfolio",
+        "sector_concentration": "Maximum 20% in related assets",
+        "correlation_limit": "Limit correlated positions",
+        "total_heat": "Maximum 15% portfolio risk"
+      }
+    },
+    
+    "stop_loss_strategies": {
+      "initial_stops": {
+        "technical": "Below support/above resistance",
+        "volatility": "1.5-2x ATR from entry",
+        "percentage": "2-3% from entry price",
+        "time": "Exit if no progress in X days"
+      },
+      
+      "trailing_stops": {
+        "percentage": "Trail by fixed percentage",
+        "atr": "Trail by ATR multiple", 
+        "technical": "Trail to new support/resistance",
+        "profit_based": "Trail after reaching profit targets"
+      }
+    },
+    
+    "take_profit": {
+      "systematic_levels": {
+        "first_target": "25% at 1R (1:1 risk/reward)",
+        "second_target": "25% at 2R",
+        "third_target": "25% at 3R", 
+        "final_portion": "25% trail with stops"
+      },
+      
+      "dynamic_exits": {
+        "momentum_based": "Exit when momentum wanes",
+        "time_based": "Exit after X days regardless",
+        "volatility_based": "Exit when volatility contracts",
+        "signal_based": "Exit when entry signal reverses"
+      }
+    }
+  },
+  
+  "team_synthesis": {
+    "signal_weighting": {
+      "equal_weight": "Each agent gets 25% vote",
+      "expertise_weight": "Weight by domain expertise",
+      "performance_weight": "Weight by recent accuracy",
+      "conviction_weight": "Weight by agent confidence"
+    },
+    
+    "consensus_scenarios": {
+      "unanimous_bullish": {
+        "action": "Full position",
+        "sizing": "3-5% portfolio risk",
+        "stops": "Technical levels",
+        "confidence": "High"
+      },
+      
+      "majority_bullish": {
+        "action": "Partial position",
+        "sizing": "2-3% portfolio risk", 
+        "stops": "Tight stops",
+        "confidence": "Medium"
+      },
+      
+      "split_decision": {
+        "action": "Wait or hedge",
+        "sizing": "Minimal risk",
+        "stops": "Very tight",
+        "confidence": "Low"
+      },
+      
+      "majority_bearish": {
+        "action": "Reduce positions",
+        "sizing": "Cut risk 50%",
+        "stops": "Tighten existing",
+        "confidence": "Medium"
+      },
+      
+      "unanimous_bearish": {
+        "action": "Exit all positions",
+        "sizing": "Move to cash",
+        "stops": "Immediate",
+        "confidence": "High"
+      }
+    },
+    
+    "conflict_resolution": {
+      "emo_vs_tekno": "Weight technical if clear levels, sentiment if extreme",
+      "tekno_vs_macro": "Weight macro for regime changes, technical for timing",
+      "macro_vs_emo": "Weight macro for structural, sentiment for tactical",
+      "tie_breaker": "Default to risk-off unless compelling bull case"
+    }
+  },
+  
+  "market_regimes": {
+    "bull_market": {
+      "characteristics": ["Rising lows", "Breaking resistance", "High volume on advances"],
+      "strategy": "Buy dips, add to winners",
+      "position_sizing": "Standard to aggressive",
+      "stop_management": "Wide stops, trail aggressively"
+    },
+    
+    "bear_market": {
+      "characteristics": ["Falling highs", "Breaking support", "High volume on declines"],
+      "strategy": "Sell rallies, cut losers quickly",
+      "position_sizing": "Conservative to minimal",
+      "stop_management": "Tight stops, quick profits"
+    },
+    
+    "sideways_market": {
+      "characteristics": ["Range-bound", "Mixed volume", "Choppy action"],
+      "strategy": "Buy support, sell resistance",
+      "position_sizing": "Reduced size",
+      "stop_management": "Tight stops outside range"
+    },
+    
+    "volatile_market": {
+      "characteristics": ["High ATR", "Whipsaw action", "Emotional extremes"],
+      "strategy": "Reduced exposure, wider stops",
+      "position_sizing": "Half normal size",
+      "stop_management": "Volatility-adjusted stops"
+    }
+  },
+  
+  "execution_tactics": {
+    "entry_execution": {
+      "market_orders": "When signal is time-sensitive",
+      "limit_orders": "When price precision matters",
+      "stop_orders": "For breakout entries",
+      "scale_in": "Build position over time"
+    },
+    
+    "timing_optimization": {
+      "liquidity_sessions": "Trade during high liquidity",
+      "avoid_news": "Pause around major events",
+      "weekend_gaps": "Manage weekend risk",
+      "correlation_timing": "Consider other asset moves"
+    },
+    
+    "slippage_management": {
+      "order_size": "Break large orders into pieces",
+      "market_impact": "Assess depth before trading",
+      "timing": "Trade during optimal liquidity",
+      "venue_selection": "Choose best execution venues"
+    }
+  },
+  
+  "portfolio_construction": {
+    "correlation_management": {
+      "crypto_correlation": "BTC/ETH correlation typically high",
+      "traditional_assets": "Monitor stock/bond correlation",
+      "sector_rotation": "Rotate between uncorrelated themes",
+      "hedge_positions": "Use negatively correlated assets"
+    },
+    
+    "rebalancing": {
+      "time_based": "Monthly rebalancing review",
+      "threshold_based": "Rebalance when allocation drifts >X%",
+      "volatility_based": "Adjust for changing volatility",
+      "signal_based": "Rebalance on new signals"
+    },
+    
+    "concentration_limits": {
+      "single_asset": "Maximum 25% in any one asset",
+      "crypto_total": "Maximum 10-20% in crypto total",
+      "leverage": "Maximum 2:1 leverage if any",
+      "cash_minimum": "Maintain 10% cash minimum"
+    }
+  },
+  
+  "performance_monitoring": {
+    "key_metrics": {
+      "total_return": "Absolute performance",
+      "sharpe_ratio": "Risk-adjusted return",
+      "maximum_drawdown": "Peak to trough loss",
+      "win_rate": "Percentage of profitable trades",
+      "profit_factor": "Gross profit / gross loss",
+      "expectancy": "Average win - (Average loss * Win rate)"
+    },
+    
+    "regime_performance": {
+      "bull_market_alpha": "Outperformance in rising markets",
+      "bear_market_protection": "Downside protection",
+      "sideways_efficiency": "Performance in choppy markets",
+      "volatility_adjustment": "Performance vs volatility"
+    }
+  },
+  
+  "decision_templates": {
+    "team_consensus": "[Direction] consensus from team. [Action] with [risk]% allocation.",
+    "team_split": "Mixed signals from team. [Conservative action] until clarity.",
+    "high_conviction": "Strong [direction] signals across all timeframes. [Aggressive action].",
+    "risk_off": "Multiple risk factors identified. Moving to defensive positioning.",
+    "execution": "Executing [action] based on [reasoning]. Stop at [level]."
+  }
+}

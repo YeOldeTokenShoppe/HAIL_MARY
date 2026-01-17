@@ -55,9 +55,9 @@ const hasRequiredEnvironmentVariables = () => {
 };
 
 try {
-  // Skip Firebase initialization on the server
+  // Only initialize Firebase in the browser environment
   if (!isBrowser) {
-    // console.log("Skipping Firebase initialization on server");
+    console.log("🌍 Skipping Firebase initialization on server side");
     throw new Error('Firebase initialization skipped on server');
   }
   
@@ -71,7 +71,6 @@ try {
     console.warn('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=...');
     console.warn('NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...');
     console.warn('NEXT_PUBLIC_FIREBASE_APP_ID=...');
-    console.warn('See .env.example for the full list');
     throw new Error('Missing required Firebase environment variables');
   }
   
@@ -80,43 +79,40 @@ try {
   const missingKeys = requiredKeys.filter(key => !firebaseConfig[key]);
   
   if (missingKeys.length > 0) {
-    console.error("Missing required Firebase config keys:", missingKeys);
+    console.error("❌ Missing required Firebase config keys:", missingKeys);
     throw new Error(`Missing required Firebase config: ${missingKeys.join(', ')}`);
   }
   
+  // Initialize Firebase app
   app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
   
-  // Connect to Firestore, Auth, Storage, and Realtime Database
+  // Connect to Firebase services
   db = getFirestore(app);
   auth = getAuth(app);
   storage = getStorage(app);
   rtdb = getDatabase(app);
   
-  // Verify services are properly initialized
-  console.log("🔥 Firebase services initialized:", {
+  // Verify Firestore is working by attempting to create a collection reference
+  const testCollection = collection(db, 'test');
+  
+  console.log("✅ Firebase services initialized successfully:", {
     app: !!app,
     db: !!db,
     auth: !!auth,
     storage: !!storage,
     rtdb: !!rtdb,
-    dbCollectionMethod: typeof db?.collection
+    testCollection: !!testCollection,
+    projectId: app.options.projectId
   });
   
-  // console.log("Firebase initialized successfully", {
-  //   appInitialized: !!app,
-  //   dbInitialized: !!db,
-  //   authInitialized: !!auth,
-  //   storageInitialized: !!storage,
-  //   rtdbInitialized: !!rtdb
-  // });
 } catch (error) {
   console.error("❌ CRITICAL: Error initializing Firebase:", error);
   console.error("❌ Firebase initialization details:", {
     error: error.message,
-    stack: error.stack,
+    stack: error.stack?.substring(0, 500),
     hasEnvVars: hasRequiredEnvironmentVariables(),
     isBrowser,
-    config: JSON.stringify(firebaseConfig).replace(/[^{}:,[\]"]/g, '*') // Mask actual values for security
+    configProjectId: firebaseConfig.projectId
   });
   
   // Set services to null when initialization fails
@@ -130,8 +126,10 @@ try {
 // Create dummy implementations for when Firebase is unavailable
 // This helps prevent errors when Firebase fails to initialize
 if (!db) {
-  console.warn("⚠️ CRITICAL: Creating dummy Firebase implementations - DATA WILL NOT BE SAVED!");
-  console.warn("⚠️ This means Firebase failed to initialize. Check the error above and your environment variables.");
+  if (isBrowser) {
+    console.warn("⚠️ CRITICAL: Creating dummy Firebase implementations - DATA WILL NOT BE SAVED!");
+    console.warn("⚠️ This means Firebase failed to initialize in the browser. Check the error above and your environment variables.");
+  }
   
   // Create a more comprehensive dummy implementation
   const dummySnapshot = {
@@ -188,6 +186,9 @@ if (!db) {
     }),
     runTransaction: () => Promise.resolve()
   };
+  
+  // Mark the db as a dummy for runtime detection
+  db._isDummy = true;
   
   // Extend the global Firebase namespace to include these functions
   if (typeof window !== 'undefined') {

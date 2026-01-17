@@ -40,6 +40,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
   const [showAddCandleModal, setShowAddCandleModal] = useState(false); // Modal for adding user's candle
   const [showCompactCandleModal, setShowCompactCandleModal] = React.useState(false); // Modal for CompactCandleModal
   const [showSingleCandleDisplay, setShowSingleCandleDisplay] = useState(false); // For showing the petite SingleCandleDisplay
+  const [selectedAgent, setSelectedAgent] = useState('all'); // For filtering chat by agent: 'all', 'rl80', 'emo', 'tekno', 'macro'
   
   // Notification states for all buttons
   const [notifications, setNotifications] = useState({
@@ -1573,31 +1574,75 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                 padding: '0 12px'
               }}>
                 {[
-                  { name: 'RL80', icon: '⚡', color: '#FFD700' },
-                  { name: 'EMO', icon: '🔮', color: '#9333ea' },
-                  { name: 'TEKNO', icon: '📊', color: '#00ffff' },
-                  { name: 'MACRO', icon: '🌍', color: '#00ff00' }
-                ].map(agent => (
-                  <div key={agent.name} style={{
-                    background: `rgba(${
-                      agent.color === '#FFD700' ? '255, 215, 0' : 
-                      agent.color === '#9333ea' ? '147, 51, 234' :
-                      agent.color === '#00ffff' ? '0, 255, 255' : '0, 255, 0'
-                    }, 0.05)`,
-                    backdropFilter: 'blur(10px)',
-                    WebkitBackdropFilter: 'blur(10px)',
-                    padding: '8px',
-                    borderRadius: '8px',
-                    textAlign: 'center',
-                    border: `1px solid ${agent.color}33`,
-                    boxShadow: `0 0 10px ${agent.color}1A`
-                  }}>
-                    <div style={{ fontSize: '14px', marginBottom: '2px' }}>{agent.icon}</div>
-                    <div style={{ color: agent.color, fontSize: '9px', fontWeight: 'bold' }}>
-                      {agent.name}
+                  { name: 'RL80', icon: '⚡', color: '#FFD700', id: 'rl80' },
+                  { name: 'EMO', icon: '🔮', color: '#9333ea', id: 'emo' },
+                  { name: 'TEKNO', icon: '📊', color: '#00ffff', id: 'tekno' },
+                  { name: 'MACRO', icon: '🌍', color: '#00ff00', id: 'macro' }
+                ].map(agent => {
+                  const isSelected = selectedAgent === agent.id;
+                  const isAllSelected = selectedAgent === 'all';
+                  
+                  return (
+                    <div 
+                      key={agent.name} 
+                      onClick={() => {
+                        // Toggle between specific agent and 'all'
+                        setSelectedAgent(selectedAgent === agent.id ? 'all' : agent.id);
+                      }}
+                      style={{
+                        background: `rgba(${
+                          agent.color === '#FFD700' ? '255, 215, 0' : 
+                          agent.color === '#9333ea' ? '147, 51, 234' :
+                          agent.color === '#00ffff' ? '0, 255, 255' : '0, 255, 0'
+                        }, ${isSelected ? '0.15' : isAllSelected ? '0.05' : '0.02'})`,
+                        backdropFilter: 'blur(10px)',
+                        WebkitBackdropFilter: 'blur(10px)',
+                        padding: '8px',
+                        borderRadius: '8px',
+                        textAlign: 'center',
+                        border: `${isSelected ? '2px' : '1px'} solid ${agent.color}${isSelected ? '88' : '33'}`,
+                        boxShadow: isSelected ? 
+                          `0 0 15px ${agent.color}40, inset 0 0 10px ${agent.color}20` : 
+                          `0 0 10px ${agent.color}1A`,
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        transform: isSelected ? 'scale(1.05)' : 'scale(1)',
+                        opacity: isAllSelected || isSelected ? 1 : 0.6,
+                        position: 'relative'
+                      }}
+                    >
+                      <div style={{ 
+                        fontSize: isSelected ? '16px' : '14px', 
+                        marginBottom: '2px',
+                        transition: 'font-size 0.3s ease'
+                      }}>
+                        {agent.icon}
+                      </div>
+                      <div style={{ 
+                        color: agent.color, 
+                        fontSize: '9px', 
+                        fontWeight: isSelected ? '900' : 'bold',
+                        textShadow: isSelected ? `0 0 8px ${agent.color}80` : 'none',
+                        transition: 'all 0.3s ease'
+                      }}>
+                        {agent.name}
+                      </div>
+                      {isSelected && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '-2px',
+                          right: '-2px',
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          background: agent.color,
+                          boxShadow: `0 0 8px ${agent.color}`,
+                          animation: 'pulse 1s infinite'
+                        }} />
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Auto-Agent Status Panel */}
@@ -1631,6 +1676,58 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                 </div>
               </div>
               
+              {/* Filter Status Indicator */}
+              {selectedAgent !== 'all' && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '8px 12px',
+                  margin: '0 12px 8px',
+                  background: `rgba(${
+                    selectedAgent === 'rl80' ? '255, 215, 0' : 
+                    selectedAgent === 'emo' ? '147, 51, 234' :
+                    selectedAgent === 'tekno' ? '0, 255, 255' : 
+                    selectedAgent === 'macro' ? '0, 255, 0' : '255, 255, 255'
+                  }, 0.1)`,
+                  border: `1px solid ${
+                    selectedAgent === 'rl80' ? '#FFD700' : 
+                    selectedAgent === 'emo' ? '#9333ea' :
+                    selectedAgent === 'tekno' ? '#00ffff' : 
+                    selectedAgent === 'macro' ? '#00ff00' : '#fff'
+                  }33`,
+                  borderRadius: '8px',
+                  fontSize: '10px',
+                  color: selectedAgent === 'rl80' ? '#FFD700' : 
+                         selectedAgent === 'emo' ? '#9333ea' :
+                         selectedAgent === 'tekno' ? '#00ffff' : 
+                         selectedAgent === 'macro' ? '#00ff00' : '#fff'
+                }}>
+                  <span>
+                    {selectedAgent === 'rl80' ? '⚡' : 
+                     selectedAgent === 'emo' ? '🔮' :
+                     selectedAgent === 'tekno' ? '📊' : 
+                     selectedAgent === 'macro' ? '🌍' : ''}
+                  </span>
+                  <span style={{ fontWeight: 'bold', textTransform: 'uppercase' }}>
+                    Showing {selectedAgent} messages only
+                  </span>
+                  <span 
+                    onClick={() => setSelectedAgent('all')}
+                    style={{ 
+                      cursor: 'pointer', 
+                      opacity: 0.7,
+                      fontSize: '12px',
+                      marginLeft: '4px'
+                    }}
+                    title="Show all messages"
+                  >
+                    ✕
+                  </span>
+                </div>
+              )}
+
               {/* Chat Messages Container */}
               <div style={{
                 background: 'rgba(255, 255, 255, 0.02)',
@@ -1646,17 +1743,74 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                 scrollbarWidth: 'thin',
                 scrollbarColor: 'rgba(147, 51, 234, 0.3) transparent'
               }}>
-                {tradingData.modelThoughts.length === 0 ? (
-                  <div style={{
-                    textAlign: 'center',
-                    padding: '30px 15px',
-                    color: 'rgba(255, 255, 255, 0.3)',
-                    fontSize: '11px'
-                  }}>
-                    Waiting for agent communications...
-                  </div>
-                ) : (
-                  tradingData.modelThoughts.map((thought, idx) => (
+                {(() => {
+                  // Filter messages based on selected agent and limit to last 50
+                  const filterMessages = (thoughts) => {
+                    if (!thoughts) return [];
+                    
+                    // First, limit to last 50 messages for performance
+                    const recentThoughts = thoughts.slice(-50);
+                    
+                    if (selectedAgent === 'all') {
+                      return recentThoughts;
+                    }
+                    
+                    return recentThoughts.filter(thought => {
+                      const agentType = thought.agent?.toLowerCase() || '';
+                      const thoughtType = thought.type?.toLowerCase() || '';
+                      
+                      switch (selectedAgent) {
+                        case 'rl80':
+                          return agentType.includes('rl80') || 
+                                 thoughtType.includes('trading') || 
+                                 thoughtType.includes('features') ||
+                                 agentType === 'rl80-lighter';
+                        case 'emo':
+                          return agentType.includes('emo') || 
+                                 thoughtType.includes('sentiment') ||
+                                 agentType === 'sentiment oracle';
+                        case 'tekno':
+                          return agentType.includes('tekno') || 
+                                 thoughtType.includes('market') ||
+                                 thoughtType.includes('technical') ||
+                                 agentType === 'market analyst';
+                        case 'macro':
+                          return agentType.includes('macro') || 
+                                 thoughtType.includes('macro') ||
+                                 agentType === 'macro specialist';
+                        default:
+                          return true;
+                      }
+                    });
+                  };
+                  
+                  const filteredThoughts = filterMessages(tradingData.modelThoughts);
+                  
+                  if (filteredThoughts.length === 0) {
+                    const agentNames = {
+                      'rl80': 'RL80',
+                      'emo': 'EMO',
+                      'tekno': 'TEKNO',
+                      'macro': 'MACRO',
+                      'all': 'any agents'
+                    };
+                    
+                    return (
+                      <div style={{
+                        textAlign: 'center',
+                        padding: '30px 15px',
+                        color: 'rgba(255, 255, 255, 0.3)',
+                        fontSize: '11px'
+                      }}>
+                        {selectedAgent === 'all' ? 
+                          'Waiting for agent communications...' : 
+                          `No messages from ${agentNames[selectedAgent]} yet...`
+                        }
+                      </div>
+                    );
+                  }
+                  
+                  return filteredThoughts.map((thought, idx) => (
                     <div key={idx} style={{
                       marginBottom: '10px',
                       padding: '10px',
@@ -1750,7 +1904,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                       )}
                     </div>
                   ))
-                )}
+                })()}
               </div>
             </div>
             </>

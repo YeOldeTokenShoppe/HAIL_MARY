@@ -145,25 +145,14 @@ export default function CongregationSentiment() {
             />
           ))}
           
-          {/* Active arc */}
+          {/* Active arc - fixed to use same parameters as background */}
           <path
-            d={describeArc(100, 100, 70, 180, gaugeRotation)}
+            d={describeArc(100, 100, 70, 180, 180 + (data.overall * 180))}
             fill="none"
             stroke="url(#gaugeGradient)"
             strokeWidth="16"
             strokeLinecap="round"
             className="gauge-active"
-          />
-          
-          {/* Glow effect */}
-          <path
-            d={describeArc(100, 100, 70, 180, gaugeRotation)}
-            fill="none"
-            stroke="url(#gaugeGradient)"
-            strokeWidth="20"
-            strokeLinecap="round"
-            filter="url(#glow)"
-            opacity="0.6"
           />
           
           {/* Needle */}

@@ -137,8 +137,19 @@ curl http://localhost:3000/api/agent-status
 
 ## Development
 
+### Adding Weekly Market Analysis
+Upload YouTube transcripts via the admin interface at `/admin`:
+
+1. **Navigate to Admin Page**: Visit `/admin` and authenticate with admin password
+2. **Upload Tab**: Use the transcript uploader to submit weekly market analysis
+3. **Automatic Processing**: System extracts insights for each agent:
+   - EMO: Sentiment indicators, fear/greed levels, social psychology
+   - TEKNO: Support/resistance levels, technical patterns, indicators
+   - MACRO: Economic policy, Fed commentary, global trends
+   - RL80: Trading strategies, risk management, position sizing
+
 ### Adding Knowledge
-Edit `configs/knowledge/trading-knowledge.json`:
+Edit agent-specific knowledge files in `configs/knowledge/`:
 
 ```json
 {
@@ -153,7 +164,7 @@ Edit `configs/knowledge/trading-knowledge.json`:
 
 ### Customizing Agents
 Edit individual agent files to modify:
-- Personality traits
+- Personality traits (see `configs/personalities/`)
 - Response patterns
 - Analysis methods
 - Trading strategies

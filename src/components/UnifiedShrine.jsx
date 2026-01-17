@@ -458,7 +458,7 @@ function CandleLabel({ position, data, visible }) {
                 opacity: 0.7,
                 marginTop: '2px'
               }}>
-                Lit {formatDate(data.litDate)}
+{data.litAt}
               </div>
             </div>
           </div>
@@ -682,10 +682,63 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
         offering: offering,
         userId: offering.userId || offering.uid || `user_${index}`,
         username: offering.userName || offering.username || 'Anonymous',
-        id: offering.id || `offering_${index}`
+        id: offering.id || `offering_${index}`,
+        litAt: offering.litAt || offering.createdAt?.toDate?.()?.getTime?.() || offering.timestamp?.toDate?.()?.getTime?.()
       }
     })
   }, [offerings])
+  
+  // Cleanup expired candles every minute
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const now = Date.now()
+      console.log('🧹 Running candle cleanup check...')
+      
+      // Find expired offerings
+      const expiredOfferings = offerings.filter(offering => {
+        const litAtTime = offering.litAt || offering.createdAt?.toDate?.()?.getTime?.() || offering.timestamp?.toDate?.()?.getTime?.()
+        
+        console.log(`🔍 Offering ${offering.id}: litAt=${offering.litAt}, litAtTime=${litAtTime}, now=${now}`)
+        
+        if (!litAtTime) {
+          console.log(`❌ No litAtTime found for offering ${offering.id}`)
+          return false
+        }
+        
+        const elapsed = (now - litAtTime) / 1000
+        const isExpired = elapsed >= 299 // Remove at 99.7% melted (just before 5 minutes) - TESTING
+        
+        console.log(`📏 Offering ${offering.id}: elapsed=${elapsed.toFixed(1)}s, isExpired=${isExpired}`)
+        
+        if (isExpired) {
+          console.log(`⏰ Found expired candle: ${offering.id}, elapsed: ${elapsed.toFixed(1)}s`)
+        }
+        
+        return isExpired
+      })
+      
+      console.log(`📊 Checked ${offerings.length} offerings, found ${expiredOfferings.length} expired`)
+      
+      // Remove expired offerings from Firestore
+      if (expiredOfferings.length > 0) {
+        console.log(`🗑️ Removing ${expiredOfferings.length} expired candles`)
+        
+        for (const offering of expiredOfferings) {
+          try {
+            // Import deleteDoc and doc from firebaseClient
+            const { deleteDoc, doc, db } = await import('@/lib/firebaseClient')
+            await deleteDoc(doc(db, 'offerings', offering.id))
+            console.log(`✅ Removed expired candle: ${offering.id}`)
+          } catch (error) {
+            console.error(`❌ Failed to remove expired candle ${offering.id}:`, error)
+          }
+        }
+      }
+    }, 10000) // Check every 10 seconds for testing
+    
+    return () => clearInterval(interval)
+  }, [offerings])
+  
   const [clickedCandleId, setClickedCandleId] = useState(null)
   const [isRippleActive, setIsRippleActive] = useState(false)
   const [activeStatsTab, setActiveStatsTab] = useState('price') // 'price', 'staking', or 'mood'
@@ -738,7 +791,6 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   
   // Method to find and highlight user's candle
   const findUserCandle = useCallback(() => {
-    
     // Override all camera controls
     setOverrideCameraControl(true)
     
@@ -784,7 +836,23 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
       
       // Store candle data for tooltip
       const litAt = userCandle.offering.createdAt?.toDate?.() || userCandle.offering.createdAt || new Date()
-      const formattedDate = litAt instanceof Date ? litAt.toLocaleString() : 'Unknown time'
+      const litAtTime = userCandle.litAt || litAt.getTime()
+      const now = Date.now()
+      const elapsed = (now - litAtTime) / 1000
+      
+      // Format time ago
+      let timeAgo
+      if (elapsed < 60) {
+        timeAgo = `${Math.floor(elapsed)}s ago`
+      } else if (elapsed < 3600) {
+        timeAgo = `${Math.floor(elapsed / 60)}m ago`
+      } else {
+        timeAgo = `${Math.floor(elapsed / 3600)}h ago`
+      }
+      
+      // Calculate melt percentage (how much has melted, not remaining)
+      const meltPercentage = Math.min(100, (elapsed / 300) * 100).toFixed(1) // 5 minutes test duration
+      const formattedDate = `lit ${timeAgo}, ${meltPercentage}% melted`
       setUserCandleData({
         instanceId: actualInstanceId,
         litAt: formattedDate,
@@ -1509,12 +1577,7 @@ useEffect(() => {
         >
           {/* Combined group for hands and surrounding candles */}
           <group position={[0, 0, 0]}>
-            <Suspense fallback={
-              <mesh>
-                <sphereGeometry args={[0.1]} />
-                <meshBasicMaterial color="#ff0000" />
-              </mesh>
-            }>
+            <Suspense >
               <CandleCloud
                 count={isMobile ? 100 : 100}
                 priceRef={priceRef}
@@ -2007,7 +2070,8 @@ useEffect(() => {
             <div style={{ 
               padding: 0, 
               margin: isMobile ? '-6px' : '-10px',
-              maxHeight: isMobile ? '350px' : 'auto',
+              maxHeight: isMobile ? '400px' : 'auto',
+              minHeight: isMobile ? '300px' : '320px', 
               overflowY: isMobile ? 'auto' : 'visible',
               overflowX: 'hidden'
             }}>

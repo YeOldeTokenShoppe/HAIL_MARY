@@ -230,10 +230,100 @@ export function analyzeTeamConsensus(lastMessages) {
 }
 
 // ============================================================================
+// TEAM ANALYSIS HELPERS
+// ============================================================================
+
+// Extract signals from structured agent analysis
+function extractAgentSignals(teamAnalysis) {
+  const signals = {};
+  
+  // EMO (Sentiment) Analysis
+  if (teamAnalysis.emoAnalysis) {
+    signals.sentiment = extractSentimentSignal(teamAnalysis.emoAnalysis);
+  }
+  
+  // TEKNO (Technical) Analysis  
+  if (teamAnalysis.teknoAnalysis) {
+    signals.technical = extractTechnicalSignal(teamAnalysis.teknoAnalysis);
+  }
+  
+  // MACRO Analysis
+  if (teamAnalysis.macroAnalysis) {
+    signals.macro = extractMacroSignal(teamAnalysis.macroAnalysis);
+  }
+  
+  return signals;
+}
+
+// Extract sentiment signal from EMO analysis
+function extractSentimentSignal(emoText) {
+  const text = emoText.toLowerCase();
+  
+  if (text.includes('bullish') || text.includes('optimistic') || text.includes('positive')) {
+    return 'bullish';
+  } else if (text.includes('bearish') || text.includes('pessimistic') || text.includes('negative')) {
+    return 'bearish';
+  } else if (text.includes('fear') && text.includes('extreme')) {
+    return 'bullish'; // Contrarian signal
+  } else if (text.includes('greed') && text.includes('extreme')) {
+    return 'bearish'; // Contrarian signal
+  }
+  
+  return 'neutral';
+}
+
+// Extract technical signal from TEKNO analysis
+function extractTechnicalSignal(teknoText) {
+  const text = teknoText.toLowerCase();
+  
+  if (text.includes('breakout') || text.includes('support') || text.includes('bullish')) {
+    return 'bullish';
+  } else if (text.includes('breakdown') || text.includes('resistance') || text.includes('bearish')) {
+    return 'bearish';
+  } else if (text.includes('oversold')) {
+    return 'bullish';
+  } else if (text.includes('overbought')) {
+    return 'bearish';
+  }
+  
+  return 'neutral';
+}
+
+// Extract macro signal from MACRO analysis
+function extractMacroSignal(macroText) {
+  const text = macroText.toLowerCase();
+  
+  if (text.includes('dovish') || text.includes('stimulus') || text.includes('supportive')) {
+    return 'bullish';
+  } else if (text.includes('hawkish') || text.includes('tightening') || text.includes('restrictive')) {
+    return 'bearish';
+  } else if (text.includes('stable') || text.includes('neutral')) {
+    return 'neutral';
+  }
+  
+  return 'neutral';
+}
+
+// Calculate overall team consensus from agent signals
+function calculateTeamConsensus(agentSignals) {
+  const signals = Object.values(agentSignals);
+  const bullishCount = signals.filter(s => s === 'bullish').length;
+  const bearishCount = signals.filter(s => s === 'bearish').length;
+  
+  if (bullishCount > bearishCount) {
+    return 'bullish';
+  } else if (bearishCount > bullishCount) {
+    return 'bearish';
+  }
+  
+  return 'neutral';
+}
+
+// ============================================================================
 // RESPONSE GENERATOR
 // ============================================================================
 
-export async function generateRL80Response(context, teamMessages) {
+export async function generateRL80Response(context, teamMessages, teamAnalysis = null) {
   const { marketData } = context;
   const { btcPrice, fearGreed, fundingRate, openInterest, vix } = marketData || {};
   
@@ -242,8 +332,25 @@ export async function generateRL80Response(context, teamMessages) {
     return null;
   }
   
-  // Analyze team consensus
-  const consensus = analyzeTeamConsensus(teamMessages);
+  // Analyze team consensus from either messages or structured analysis
+  let consensus = 'neutral';
+  let agentSignals = {};
+  
+  if (teamAnalysis) {
+    // Use structured team analysis from sequential workflow
+    console.log('🧠 RL80 analyzing team input:', {
+      emo: teamAnalysis.emoAnalysis ? 'received' : 'missing',
+      tekno: teamAnalysis.teknoAnalysis ? 'received' : 'missing', 
+      macro: teamAnalysis.macroAnalysis ? 'received' : 'missing'
+    });
+    
+    agentSignals = extractAgentSignals(teamAnalysis);
+    consensus = calculateTeamConsensus(agentSignals);
+  } else {
+    // Fallback to legacy message analysis
+    consensus = analyzeTeamConsensus(teamMessages);
+  }
+  
   const config = RL80_TRADER_CONFIG;
   
   // Build response based on multiple factors
@@ -358,14 +465,15 @@ export async function generateRL80Response(context, teamMessages) {
 // EXPORT MAIN FUNCTION
 // ============================================================================
 
-export function callRL80Trader(context, teamMessages) {
+export function callRL80Trader(context, teamMessages, teamAnalysis = null) {
   console.log('RL80 processing:', {
     btcPrice: context.marketData?.btcPrice,
     fearGreed: context.marketData?.fearGreed,
-    teamConsensus: analyzeTeamConsensus(teamMessages)
+    teamConsensus: teamAnalysis ? 'sequential analysis' : analyzeTeamConsensus(teamMessages),
+    hasTeamAnalysis: !!teamAnalysis
   });
   
-  return generateRL80Response(context, teamMessages);
+  return generateRL80Response(context, teamMessages, teamAnalysis);
 }
 
 export default RL80_TRADER_CONFIG;

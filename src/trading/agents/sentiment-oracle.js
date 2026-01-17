@@ -5,6 +5,9 @@
  * and crowd psychology to provide insights on market sentiment.
  */
 
+// Enhanced personality and knowledge system
+import { buildEnhancedPrompt } from './configs/enhancedPromptBuilder.js';
+
 // ============================================================================
 // PERSONALITY CONFIGURATION
 // ============================================================================
@@ -304,44 +307,76 @@ function enhanceResponse(baseResponse, marketData) {
   return baseResponse;
 }
 
+// Enhanced fallback response generator using personality system
+function generateEnhancedSentimentResponse(marketData) {
+  const { fearGreed, fundingRate } = marketData || {};
+  
+  // Use EMO character knowledge to generate response
+  if (fearGreed !== undefined) {
+    if (fearGreed < 25) {
+      return "Blood in the streets = opportunity knocking.";
+    } else if (fearGreed > 75) {
+      return "Peak euphoria detected. Exit stage left.";
+    } else if (fearGreed >= 40 && fearGreed <= 60) {
+      return "Sentiment sideways, waiting for catalyst.";
+    }
+  }
+  
+  // Funding rate based response
+  if (fundingRate !== undefined) {
+    const fundingPercent = fundingRate * 100;
+    if (Math.abs(fundingPercent) > 0.1) {
+      return `Funding ${fundingPercent > 0 ? 'longs' : 'shorts'} getting squeezed at ${fundingPercent.toFixed(3)}%.`;
+    }
+  }
+  
+  // Default EMO-style response
+  return "Reading the vibes - crowd's in thinking mode.";
+}
+
 // ============================================================================
 // EXPORT MAIN FUNCTION
 // ============================================================================
 
 export async function callSentimentOracle(context, apiKey) {
-  const { system, user } = generateSentimentPrompt(context);
+  // Use enhanced personality system for better character consistency
+  const enhancedPrompt = buildEnhancedPrompt('EMO', context, context.lastMessages || []);
   
-  console.log('Sentiment Oracle analyzing:', {
+  console.log('EMO (Enhanced) analyzing:', {
     fearGreed: context.marketData?.fearGreed,
     funding: context.marketData?.fundingRate,
     vix: context.marketData?.vix
   });
   
-  const response = await fetch('https://api.x.ai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: user }
-      ],
-      model: SENTIMENT_ORACLE_CONFIG.model,
-      temperature: SENTIMENT_ORACLE_CONFIG.temperature,
-      max_tokens: SENTIMENT_ORACLE_CONFIG.maxTokens
-    })
-  });
-  
-  if (!response.ok) {
-    // Fallback to generated response if API fails
-    console.log('Grok API failed, using generated response');
-    return generateSentimentResponse(context.marketData);
+  try {
+    const response = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: enhancedPrompt.systemPrompt },
+          { role: 'user', content: enhancedPrompt.userPrompt }
+        ],
+        model: 'grok-2-1212',
+        temperature: enhancedPrompt.temperature,
+        max_tokens: enhancedPrompt.maxTokens
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API responded with status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    return data.choices[0].message.content;
+  } catch (error) {
+    // Enhanced fallback with personality-aware response
+    console.log('Grok API failed, using enhanced generated response:', error.message);
+    return generateEnhancedSentimentResponse(context.marketData);
   }
-  
-  const data = await response.json();
-  return data.choices[0].message.content;
 }
 
 export default SENTIMENT_ORACLE_CONFIG;

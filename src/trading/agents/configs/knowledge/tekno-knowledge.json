@@ -1,0 +1,235 @@
+{
+  "technical_indicators": {
+    "momentum": {
+      "rsi": {
+        "calculation": "Relative Strength Index (14 period)",
+        "overbought": "> 70",
+        "oversold": "< 30",
+        "divergence_signals": [
+          "Price makes higher high, RSI makes lower high (bearish)",
+          "Price makes lower low, RSI makes higher low (bullish)"
+        ],
+        "interpretation": {
+          "above_50": "Bullish momentum",
+          "below_50": "Bearish momentum",
+          "extreme_readings": "Potential reversal zones"
+        }
+      },
+      
+      "macd": {
+        "calculation": "12 EMA - 26 EMA, with 9 EMA signal line",
+        "signals": [
+          "MACD line crosses above signal line = Bullish",
+          "MACD line crosses below signal line = Bearish",
+          "MACD crosses zero line = Trend confirmation"
+        ],
+        "divergences": "Price vs MACD momentum divergences"
+      },
+      
+      "stochastic": {
+        "calculation": "(Close - Low) / (High - Low) * 100",
+        "overbought": "> 80",
+        "oversold": "< 20",
+        "signals": "%K crosses above %D in oversold = Bullish"
+      }
+    },
+    
+    "trend": {
+      "moving_averages": {
+        "ema_8": "Short-term trend",
+        "ema_21": "Medium-term trend", 
+        "ema_50": "Intermediate trend",
+        "ema_200": "Long-term trend",
+        "signals": [
+          "Price above all EMAs = Strong uptrend",
+          "Price below all EMAs = Strong downtrend",
+          "EMA crossovers = Trend change signals"
+        ]
+      },
+      
+      "ichimoku": {
+        "components": {
+          "tenkan_sen": "9-period conversion line",
+          "kijun_sen": "26-period base line", 
+          "senkou_span_a": "Leading span A",
+          "senkou_span_b": "Leading span B",
+          "chikou_span": "Lagging span"
+        },
+        "signals": [
+          "Price above cloud = Bullish trend",
+          "Price below cloud = Bearish trend",
+          "TK cross = Short-term momentum change"
+        ]
+      }
+    },
+    
+    "volume": {
+      "volume_profile": {
+        "poc": "Point of Control - highest volume level",
+        "hvn": "High Volume Nodes - support/resistance",
+        "lvn": "Low Volume Nodes - breakout levels"
+      },
+      
+      "obv": {
+        "calculation": "On Balance Volume",
+        "interpretation": "Volume flow confirmation",
+        "divergence": "OBV vs Price divergence signals"
+      }
+    }
+  },
+  
+  "chart_patterns": {
+    "reversal_patterns": {
+      "head_and_shoulders": {
+        "structure": "Left shoulder, Head (higher), Right shoulder",
+        "confirmation": "Break below neckline with volume",
+        "target": "Distance from head to neckline"
+      },
+      
+      "double_top": {
+        "structure": "Two peaks at similar levels",
+        "confirmation": "Break below valley between peaks",
+        "target": "Height of pattern projected down"
+      },
+      
+      "triple_top": {
+        "structure": "Three peaks at similar resistance",
+        "confirmation": "Break below support with volume",
+        "reliability": "Very strong reversal signal"
+      }
+    },
+    
+    "continuation_patterns": {
+      "bull_flag": {
+        "structure": "Sharp up move + downward sloping consolidation",
+        "confirmation": "Break above flag with volume",
+        "target": "Height of pole added to breakout point"
+      },
+      
+      "ascending_triangle": {
+        "structure": "Horizontal resistance + rising support",
+        "confirmation": "Break above resistance",
+        "bias": "Typically bullish"
+      },
+      
+      "pennant": {
+        "structure": "Converging trendlines after strong move",
+        "duration": "Usually 1-3 weeks",
+        "target": "Height of flagpole"
+      }
+    }
+  },
+  
+  "support_resistance": {
+    "identification": {
+      "horizontal_levels": [
+        "Previous highs and lows",
+        "Round psychological numbers",
+        "Volume profile POC levels",
+        "Pivot points"
+      ],
+      
+      "dynamic_levels": [
+        "Moving averages",
+        "Trendlines", 
+        "Ichimoku cloud",
+        "Bollinger Bands"
+      ]
+    },
+    
+    "strength_factors": [
+      "Number of times tested",
+      "Volume at level", 
+      "Time frame significance",
+      "Multiple confluences"
+    ],
+    
+    "break_confirmation": [
+      "Volume expansion on break",
+      "Follow-through after break",
+      "Retest and hold pattern",
+      "Time-based confirmation"
+    ]
+  },
+  
+  "market_structure": {
+    "trend_definition": {
+      "uptrend": "Series of higher highs and higher lows",
+      "downtrend": "Series of lower highs and lower lows", 
+      "sideways": "Equal highs and lows"
+    },
+    
+    "structure_breaks": {
+      "bullish_break": "Break above previous swing high",
+      "bearish_break": "Break below previous swing low",
+      "confirmation": "Close beyond structure + volume"
+    },
+    
+    "swing_points": {
+      "swing_high": "High with lower highs on both sides",
+      "swing_low": "Low with higher lows on both sides",
+      "significance": "Determines trend structure"
+    }
+  },
+  
+  "fibonacci_retracements": {
+    "key_levels": {
+      "23.6": "Shallow retracement",
+      "38.2": "Moderate retracement",
+      "50.0": "Half retracement", 
+      "61.8": "Golden ratio retracement",
+      "78.6": "Deep retracement"
+    },
+    
+    "usage": [
+      "Draw from swing high to swing low",
+      "Watch for bounces at key levels",
+      "Combine with other support/resistance",
+      "Use for target projections"
+    ]
+  },
+  
+  "candlestick_patterns": {
+    "single_candles": {
+      "doji": "Open = Close, indecision",
+      "hammer": "Long lower wick, bullish reversal",
+      "shooting_star": "Long upper wick, bearish reversal",
+      "marubozu": "No wicks, strong momentum"
+    },
+    
+    "multi_candle": {
+      "engulfing": "Second candle body engulfs first",
+      "morning_star": "Three candle bullish reversal",
+      "evening_star": "Three candle bearish reversal",
+      "three_soldiers": "Three consecutive strong candles"
+    }
+  },
+  
+  "risk_management": {
+    "stop_loss_methods": [
+      "Below/above key structure",
+      "ATR-based stops",
+      "Percentage-based stops",
+      "Time-based stops"
+    ],
+    
+    "position_sizing": [
+      "1-2% risk per trade",
+      "Volatility-adjusted sizing",
+      "R-multiple position sizing"
+    ],
+    
+    "take_profit": [
+      "1:2 risk-reward minimum",
+      "Scale out at targets",
+      "Trail stops on winners"
+    ]
+  },
+  
+  "response_frameworks": {
+    "analysis_pattern": "[Price] testing [level]. [Pattern] suggests [direction].",
+    "alert_pattern": "Watch [level] for [type] signal. Risk at [price].",
+    "confirmation_pattern": "[Indicator] confirms [pattern]. Target [level].",
+    "warning_pattern": "Fake out risk at [level]. Wait for [confirmation]."
+  }
+}

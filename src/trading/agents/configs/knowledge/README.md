@@ -2,7 +2,26 @@
 
 ## Ways to Add Knowledge to Agents
 
-### 1. **Static Knowledge (In the Agent File)**
+### 1. **Weekly Market Analysis (Recommended)**
+Upload YouTube transcripts via the admin interface at `/admin`:
+
+**How to Use:**
+1. Navigate to `/admin` and authenticate with admin password
+2. Click "Upload Transcripts" tab
+3. Fill in video details and paste transcript content
+4. System automatically extracts insights for each agent:
+   - **EMO**: Sentiment, fear/greed, social psychology
+   - **TEKNO**: Technical levels, patterns, indicators  
+   - **MACRO**: Economic policy, Fed commentary, trends
+   - **RL80**: Trading strategies, risk management
+
+**Benefits:**
+- Keeps agents updated with current market conditions
+- Automatically categorizes insights by agent expertise
+- Persistent storage in Firebase for historical reference
+- Integrated into agent prompts via `buildEnhancedPrompt()`
+
+### 2. **Static Knowledge (In the Agent File)**
 Edit the agent's configuration directly:
 ```javascript
 // In market-analyst.js
@@ -15,7 +34,7 @@ expertise: {
 }
 ```
 
-### 2. **Knowledge Files (JSON/Markdown)**
+### 3. **Knowledge Files (JSON/Markdown)**
 Create separate knowledge files that agents can import:
 
 ```javascript
@@ -33,7 +52,7 @@ Create separate knowledge files that agents can import:
 import marketPatterns from './knowledge/market-patterns.json';
 ```
 
-### 3. **Dynamic Knowledge (Database/API)**
+### 4. **Dynamic Knowledge (Database/API)**
 Store knowledge in Firestore and load it:
 
 ```javascript
@@ -43,7 +62,7 @@ const agentKnowledge = await db.collection('agent-knowledge')
   .get();
 ```
 
-### 4. **Context Injection**
+### 5. **Context Injection**
 Add specific knowledge in the prompt:
 
 ```javascript
@@ -59,7 +78,7 @@ Recent important events:
 user: buildUserPrompt(marketData, lastMessages, specificKnowledge)
 ```
 
-### 5. **Vector Database (Advanced)**
+### 6. **Vector Database (Advanced)**
 For large knowledge bases, use embeddings:
 - Store documents as embeddings
 - Retrieve relevant context based on query
@@ -68,10 +87,11 @@ For large knowledge bases, use embeddings:
 ## Recommended Approach
 
 For most cases, use a combination:
-1. **Core personality** → In agent file
-2. **Domain knowledge** → JSON files
-3. **Current events** → Firestore or API
-4. **Large documents** → Vector database
+1. **Weekly market updates** → Admin interface `/admin` (recommended)
+2. **Core personality** → In agent file (`configs/personalities/`)
+3. **Domain knowledge** → JSON files (`configs/knowledge/`)
+4. **Current events** → Firestore or API
+5. **Large documents** → Vector database
 
 ## Example Knowledge File Structure
 

@@ -15,7 +15,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { context, agent, lastMessages } = req.body;
+  const { context, agent, lastMessages, teamAnalysis, isSequentialWorkflow } = req.body;
 
   // Get API keys from environment
   const openaiKey = process.env.OPENAI_API_KEY;
@@ -166,7 +166,15 @@ export default async function handler(req, res) {
         } else {
           // RL80 makes decisions based on team input
           logApiCall('rl80', context);
-          response = callRL80Trader(context, lastMessages);
+          
+          // Pass team analysis if this is a sequential workflow call
+          if (isSequentialWorkflow && teamAnalysis) {
+            console.log('🤖 RL80 analyzing team input from sequential workflow');
+            response = callRL80Trader(context, lastMessages, teamAnalysis);
+          } else {
+            response = callRL80Trader(context, lastMessages);
+          }
+          
           logResponse('rl80', response);
         }
         break;

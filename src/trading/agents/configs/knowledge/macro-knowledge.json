@@ -1,0 +1,226 @@
+{
+  "central_banks": {
+    "federal_reserve": {
+      "mandate": "Dual mandate - price stability and full employment",
+      "tools": {
+        "fed_funds_rate": "Primary policy tool",
+        "quantitative_easing": "Asset purchases to inject liquidity",
+        "forward_guidance": "Communication about future policy",
+        "repo_operations": "Short-term liquidity management"
+      },
+      "key_events": [
+        "FOMC meetings (8 per year)",
+        "Quarterly dot plot",
+        "Semi-annual testimony",
+        "Jackson Hole symposium"
+      ],
+      "current_focus": [
+        "Inflation targeting (2%)",
+        "Labor market strength",
+        "Financial stability",
+        "Global economic conditions"
+      ]
+    },
+    
+    "european_central_bank": {
+      "mandate": "Price stability (below but close to 2%)",
+      "tools": {
+        "main_refinancing_rate": "Primary policy rate",
+        "deposit_facility": "Rate on overnight deposits", 
+        "app": "Asset Purchase Programme",
+        "tltros": "Targeted lending operations"
+      },
+      "challenges": [
+        "Fragmentation across eurozone",
+        "Energy crisis impacts",
+        "Peripheral spreads management"
+      ]
+    },
+    
+    "bank_of_japan": {
+      "mandate": "Price and financial system stability",
+      "tools": {
+        "negative_rates": "Negative policy rate",
+        "yield_curve_control": "10-year yield targeting",
+        "etf_purchases": "Equity market intervention"
+      },
+      "unique_aspects": [
+        "Ultra-accommodative for decades",
+        "Fighting deflation",
+        "Massive balance sheet"
+      ]
+    }
+  },
+  
+  "economic_indicators": {
+    "inflation": {
+      "cpi": {
+        "description": "Consumer Price Index",
+        "frequency": "Monthly",
+        "importance": "Primary inflation measure",
+        "components": ["Core CPI", "Headline CPI", "Services", "Goods"]
+      },
+      
+      "pce": {
+        "description": "Personal Consumption Expenditures",
+        "frequency": "Monthly", 
+        "importance": "Fed's preferred inflation measure",
+        "variants": ["Core PCE", "Headline PCE"]
+      },
+      
+      "breakevens": {
+        "description": "Market-based inflation expectations",
+        "timeframes": ["5Y5Y", "10Y", "5Y"],
+        "interpretation": "What market expects for inflation"
+      }
+    },
+    
+    "employment": {
+      "nfp": {
+        "description": "Non-farm Payrolls",
+        "frequency": "Monthly (first Friday)",
+        "importance": "Key labor market indicator",
+        "components": ["Job creation", "Unemployment rate", "Wage growth"]
+      },
+      
+      "jolts": {
+        "description": "Job Openings and Labor Turnover",
+        "importance": "Labor market tightness",
+        "key_metric": "Quits rate indicates confidence"
+      }
+    },
+    
+    "growth": {
+      "gdp": {
+        "description": "Gross Domestic Product",
+        "frequency": "Quarterly",
+        "importance": "Economic growth measure",
+        "components": ["Consumption", "Investment", "Government", "Net exports"]
+      },
+      
+      "pmi": {
+        "description": "Purchasing Managers Index",
+        "frequency": "Monthly",
+        "threshold": "Above 50 = expansion",
+        "variants": ["Manufacturing PMI", "Services PMI"]
+      }
+    }
+  },
+  
+  "market_indicators": {
+    "yield_curve": {
+      "normal": "Upward sloping (long rates > short rates)",
+      "flat": "Little difference between short and long rates", 
+      "inverted": "Short rates > long rates (recession signal)",
+      "steepening": "Long rates rising faster than short",
+      "flattening": "Long-short spread narrowing"
+    },
+    
+    "credit_spreads": {
+      "investment_grade": "IG corporate vs Treasury spread",
+      "high_yield": "HY corporate vs Treasury spread", 
+      "interpretation": "Wider = more risk aversion"
+    },
+    
+    "currency": {
+      "dxy": {
+        "description": "Dollar Index vs major currencies",
+        "composition": "EUR, JPY, GBP, CAD, SEK, CHF",
+        "crypto_impact": "Strong dollar typically negative for crypto"
+      },
+      
+      "carry_trades": {
+        "description": "Borrow low-yield, invest high-yield currencies",
+        "risk": "Unwind during stress periods",
+        "impact": "Major risk-on/risk-off driver"
+      }
+    }
+  },
+  
+  "liquidity_conditions": {
+    "fed_balance_sheet": {
+      "components": ["Treasuries", "MBS", "Other assets"],
+      "expansion": "QE periods increase liquidity",
+      "contraction": "QT periods reduce liquidity"
+    },
+    
+    "rrp": {
+      "description": "Reverse Repo Operations", 
+      "function": "Fed tool to manage excess liquidity",
+      "interpretation": "High usage = excess system liquidity"
+    },
+    
+    "bank_reserves": {
+      "description": "Banks' deposits at Fed",
+      "importance": "System liquidity measure",
+      "threshold": "Below certain level = funding stress"
+    }
+  },
+  
+  "policy_regimes": {
+    "dovish": {
+      "characteristics": ["Low rates", "QE", "Accommodative language"],
+      "market_impact": ["Risk-on", "Dollar weakness", "Asset inflation"],
+      "crypto_impact": "Positive - alternative store of value narrative"
+    },
+    
+    "hawkish": {
+      "characteristics": ["Rate hikes", "QT", "Restrictive language"],
+      "market_impact": ["Risk-off", "Dollar strength", "Multiple compression"],
+      "crypto_impact": "Negative - risk asset derating"
+    },
+    
+    "neutral": {
+      "characteristics": ["Data dependent", "Balanced risks", "Flexible"],
+      "market_impact": ["Range-bound", "Fundamentals matter"],
+      "crypto_impact": "Mixed - depends on other factors"
+    }
+  },
+  
+  "geopolitical_factors": {
+    "us_china": {
+      "trade_relations": "Tariffs and trade agreements",
+      "technology": "Semiconductor and tech restrictions",
+      "currency": "Yuan manipulation concerns"
+    },
+    
+    "energy": {
+      "oil_price": "Inflation and growth impact",
+      "russia_ukraine": "Energy supply disruptions",
+      "middle_east": "Regional stability risks"
+    },
+    
+    "europe": {
+      "brexit": "UK-EU relationship", 
+      "italy": "Peripheral spreads and political risk",
+      "germany": "Economic engine health"
+    }
+  },
+  
+  "crypto_macro_factors": {
+    "institutional_adoption": {
+      "etf_flows": "Bitcoin and Ethereum ETF demand",
+      "corporate_treasuries": "Companies adding crypto to balance sheet",
+      "sovereign_adoption": "Countries adopting Bitcoin"
+    },
+    
+    "regulation": {
+      "us_clarity": "SEC and CFTC regulatory framework",
+      "global_coordination": "G20 and FSB guidance",
+      "stablecoin_regulation": "Reserve requirements and oversight"
+    },
+    
+    "cbdc": {
+      "development": "Central bank digital currencies",
+      "competition": "CBDC vs private crypto",
+      "privacy": "Surveillance vs financial privacy"
+    }
+  },
+  
+  "response_frameworks": {
+    "analysis_pattern": "[Economic indicator] suggests [policy direction]. Implication: [market impact].",
+    "forecast_pattern": "Fed likely to [action] given [data]. Expect [market reaction].",
+    "warning_pattern": "[Risk factor] building. Monitor [indicators] for confirmation.", 
+    "opportunity_pattern": "[Policy shift] creates [opportunity] in [asset class]."
+  }
+}

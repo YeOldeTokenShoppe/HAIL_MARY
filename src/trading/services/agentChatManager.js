@@ -7,32 +7,52 @@ class AgentChatManager {
     this.intervals = {};
     this.lastTriggerTimes = {};
     
-    // Agent configuration with smart intervals (cost-optimized)
+    // Sequential agent workflow configuration (EMO → TEKNO → MACRO → RL80)
     this.agentConfig = {
-      'TEKNO': {
-        interval: 300000, // 5 minutes - technical analysis
-        priority: 1,
-        description: 'Market Analysis & Technical Signals'
-      },
       'EMO': {
-        interval: 420000, // 7 minutes - sentiment analysis  
-        priority: 2,
+        interval: 3600000, // 1 hour - sentiment analysis first
+        priority: 1,
+        next: 'TEKNO',
         description: 'Sentiment Analysis & Market Psychology'
       },
+      'TEKNO': {
+        interval: 3600000, // 1 hour - technical analysis after EMO
+        priority: 2,
+        next: 'MACRO',
+        description: 'Market Analysis & Technical Signals',
+        waitForPrevious: true
+      },
       'MACRO': {
-        interval: 600000, // 10 minutes - macro events change slower
+        interval: 3600000, // 1 hour - macro analysis after TEKNO
         priority: 3,
-        description: 'Macroeconomic Analysis & Global Events'
+        next: 'RL80',
+        description: 'Macroeconomic Analysis & Global Events',
+        waitForPrevious: true
       },
       'RL80': {
-        interval: 480000, // 8 minutes - trading decisions
+        interval: 3600000, // 1 hour - final trading decision
         priority: 4,
-        description: 'Trading Decisions & Portfolio Management'
+        next: null,
+        description: 'Trading Decisions & Portfolio Management',
+        waitForPrevious: true
       }
+    };
+    
+    // Track workflow state
+    this.workflowState = {
+      currentAgent: null,
+      lastWorkflowStart: null,
+      agentResponses: {
+        'EMO': null,
+        'TEKNO': null, 
+        'MACRO': null,
+        'RL80': null
+      },
+      isWorkflowRunning: false
     };
   }
 
-  // Start the agent chat system
+  // Start the agent chat system with sequential workflow
   start() {
     if (this.isActive) {
       console.log('Agent Chat Manager already running');
@@ -40,15 +60,14 @@ class AgentChatManager {
     }
 
     this.isActive = true;
-    console.log('🤖 Starting Agent Chat Manager...');
+    console.log('🤖 Starting Sequential Agent Chat Manager...');
+    console.log('📋 Workflow: EMO → TEKNO → MACRO → RL80 (every hour)');
 
-    // Start each agent on their own schedule
-    Object.keys(this.agentConfig).forEach(agent => {
-      this.startAgent(agent);
-    });
+    // Start the main workflow interval (every hour)
+    this.startWorkflowTimer();
 
-    // Initial trigger for all agents (staggered)
-    this.triggerInitialMessages();
+    // Trigger initial workflow immediately
+    this.startWorkflow();
   }
 
   // Stop the agent chat system
@@ -56,7 +75,8 @@ class AgentChatManager {
     if (!this.isActive) return;
 
     this.isActive = false;
-    console.log('🛑 Stopping Agent Chat Manager...');
+    this.workflowState.isWorkflowRunning = false;
+    console.log('🛑 Stopping Sequential Agent Chat Manager...');
 
     // Clear all intervals
     Object.keys(this.intervals).forEach(agent => {
@@ -67,39 +87,90 @@ class AgentChatManager {
     });
   }
 
-  // Start a specific agent's periodic messaging
-  startAgent(agent) {
-    if (this.intervals[agent]) {
-      clearInterval(this.intervals[agent]);
+  // Start the main workflow timer (every hour)
+  startWorkflowTimer() {
+    // Clear existing interval
+    if (this.intervals.main) {
+      clearInterval(this.intervals.main);
     }
 
-    const config = this.agentConfig[agent];
-    if (!config) {
-      console.error(`Unknown agent: ${agent}`);
+    // Start hourly workflow
+    this.intervals.main = setInterval(() => {
+      if (this.isActive && !this.workflowState.isWorkflowRunning) {
+        this.startWorkflow();
+      }
+    }, 3600000); // 1 hour
+
+    console.log('⏰ Workflow timer started (every 1 hour)');
+  }
+
+  // Start the sequential agent workflow: EMO → TEKNO → MACRO → RL80
+  async startWorkflow() {
+    if (this.workflowState.isWorkflowRunning) {
+      console.log('⚠️ Workflow already running, skipping...');
       return;
     }
 
-    console.log(`🚀 Starting ${agent} agent (every ${config.interval/1000}s)`);
+    console.log('🔄 Starting agent analysis workflow...');
+    this.workflowState.isWorkflowRunning = true;
+    this.workflowState.lastWorkflowStart = Date.now();
+    
+    // Reset agent responses
+    Object.keys(this.workflowState.agentResponses).forEach(agent => {
+      this.workflowState.agentResponses[agent] = null;
+    });
 
-    this.intervals[agent] = setInterval(() => {
-      if (this.isActive) {
-        this.triggerAgent(agent);
-      }
-    }, config.interval);
+    try {
+      // Step 1: EMO (Sentiment Analysis)
+      console.log('📍 Step 1/4: EMO starting sentiment analysis...');
+      this.workflowState.currentAgent = 'EMO';
+      const emoResponse = await this.triggerAgent('EMO', true);
+      this.workflowState.agentResponses.EMO = emoResponse;
+      
+      // Wait 30 seconds for EMO to complete
+      await this.delay(30000);
+      
+      // Step 2: TEKNO (Technical Analysis)
+      console.log('📍 Step 2/4: TEKNO starting technical analysis...');
+      this.workflowState.currentAgent = 'TEKNO';
+      const teknoResponse = await this.triggerAgent('TEKNO', true);
+      this.workflowState.agentResponses.TEKNO = teknoResponse;
+      
+      // Wait 30 seconds for TEKNO to complete
+      await this.delay(30000);
+      
+      // Step 3: MACRO (Macroeconomic Analysis)
+      console.log('📍 Step 3/4: MACRO starting macro analysis...');
+      this.workflowState.currentAgent = 'MACRO';
+      const macroResponse = await this.triggerAgent('MACRO', true);
+      this.workflowState.agentResponses.MACRO = macroResponse;
+      
+      // Wait 30 seconds for MACRO to complete
+      await this.delay(30000);
+      
+      // Step 4: RL80 (Final Trading Decision)
+      console.log('📍 Step 4/4: RL80 making final trading decision...');
+      this.workflowState.currentAgent = 'RL80';
+      const rl80Response = await this.triggerAgentWithContext('RL80', {
+        emoAnalysis: this.workflowState.agentResponses.EMO,
+        teknoAnalysis: this.workflowState.agentResponses.TEKNO,
+        macroAnalysis: this.workflowState.agentResponses.MACRO
+      });
+      this.workflowState.agentResponses.RL80 = rl80Response;
+      
+      console.log('✅ Agent workflow completed successfully!');
+      
+    } catch (error) {
+      console.error('❌ Agent workflow failed:', error);
+    } finally {
+      this.workflowState.isWorkflowRunning = false;
+      this.workflowState.currentAgent = null;
+    }
   }
 
-  // Trigger initial messages with staggered timing
-  triggerInitialMessages() {
-    const agents = Object.keys(this.agentConfig);
-    
-    agents.forEach((agent, index) => {
-      // Stagger initial messages by 30 seconds each
-      setTimeout(() => {
-        if (this.isActive) {
-          this.triggerAgent(agent, true);
-        }
-      }, index * 30000);
-    });
+  // Helper method for delays
+  delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   // Trigger a specific agent
@@ -150,6 +221,58 @@ class AgentChatManager {
 
     } catch (error) {
       console.error(`❌ Error triggering ${agent}:`, error);
+    }
+  }
+
+  // Trigger RL80 agent with context from other agents
+  async triggerAgentWithContext(agent, context = {}) {
+    try {
+      const now = Date.now();
+      const config = this.agentConfig[agent];
+
+      console.log(`🎯 Triggering ${agent} agent with team context...`);
+
+      const response = await fetch('/api/agent-chat-service', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          agent,
+          context,
+          teamAnalysis: context, // Pass team analysis to RL80
+          isSequentialWorkflow: true
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log(`✅ ${agent} made final decision:`, result.message?.substring(0, 100) + '...');
+        this.lastTriggerTimes[agent] = now;
+        
+        // Dispatch custom event for UI updates with trading decision flag
+        window.dispatchEvent(new CustomEvent('agentChatUpdate', {
+          detail: {
+            agent,
+            message: result.message,
+            type: result.type,
+            sentiment: result.sentiment,
+            timestamp: result.timestamp,
+            isTradingDecision: agent === 'RL80',
+            teamAnalysis: context
+          }
+        }));
+
+        return result.message;
+      } else {
+        console.warn(`⚠️ ${agent} failed:`, result.error);
+        return null;
+      }
+
+    } catch (error) {
+      console.error(`❌ Error triggering ${agent} with context:`, error);
+      return null;
     }
   }
 

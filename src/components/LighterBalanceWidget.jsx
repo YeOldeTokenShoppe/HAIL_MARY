@@ -40,50 +40,57 @@ const LighterBalanceWidget = ({ show = true }) => {
   return (
     <div style={{
       position: 'fixed',
-      top: '20px',
+      top: '100px',
       right: '20px',
-      zIndex: 1000,
-      background: 'rgba(147, 51, 234, 0.15)',
+      zIndex: 10000,
+      background: balance !== null ? 'rgba(0, 255, 0, 0.2)' : 'rgba(255, 0, 0, 0.2)',
       backdropFilter: 'blur(15px)',
       WebkitBackdropFilter: 'blur(15px)',
-      border: '1px solid rgba(147, 51, 234, 0.4)',
+      border: `3px solid ${balance !== null ? '#00ff00' : '#ff0000'}`,
       borderRadius: '12px',
-      padding: '12px 16px',
-      boxShadow: '0 4px 20px rgba(147, 51, 234, 0.2)',
-      minWidth: '180px',
-      fontFamily: 'monospace'
+      padding: '16px 20px',
+      boxShadow: balance !== null ? 
+        '0 4px 30px rgba(0, 255, 0, 0.5)' : 
+        '0 4px 30px rgba(255, 0, 0, 0.5)',
+      minWidth: '220px',
+      fontFamily: 'monospace',
+      animation: 'pulse 2s infinite'
     }}>
       <div style={{
         display: 'flex',
         alignItems: 'center',
         gap: '8px',
-        marginBottom: '4px'
+        marginBottom: '8px'
       }}>
         <div style={{
-          width: '8px',
-          height: '8px',
+          width: '12px',
+          height: '12px',
           borderRadius: '50%',
-          background: balance !== null ? '#00ff00' : '#666',
-          boxShadow: balance !== null ? '0 0 8px rgba(0, 255, 0, 0.6)' : 'none',
-          animation: balance !== null ? 'pulse 2s infinite' : 'none'
+          background: balance !== null ? '#00ff00' : '#ff0000',
+          boxShadow: balance !== null ? 
+            '0 0 12px rgba(0, 255, 0, 0.8)' : 
+            '0 0 12px rgba(255, 0, 0, 0.8)',
+          animation: 'pulse 1s infinite'
         }} />
         <div style={{
-          color: '#9333ea',
-          fontSize: '11px',
+          color: balance !== null ? '#00ff00' : '#ff0000',
+          fontSize: '13px',
           fontWeight: 'bold',
           textTransform: 'uppercase',
           letterSpacing: '0.5px'
         }}>
-          Testnet Balance
+          LIGHTER BALANCE WIDGET
         </div>
       </div>
       
       <div style={{
-        fontSize: '18px',
+        fontSize: '22px',
         fontWeight: 'bold',
         color: '#fff',
-        marginBottom: '2px',
-        textShadow: '0 0 10px rgba(147, 51, 234, 0.5)'
+        marginBottom: '4px',
+        textShadow: balance !== null ? 
+          '0 0 15px rgba(0, 255, 0, 0.7)' : 
+          '0 0 15px rgba(255, 0, 0, 0.7)'
       }}>
         {balance !== null ? (
           `$${balance.toLocaleString(undefined, { 
@@ -91,14 +98,31 @@ const LighterBalanceWidget = ({ show = true }) => {
             maximumFractionDigits: 2 
           })}`
         ) : (
-          'Connecting...'
+          'CONNECTION FAILED'
         )}
+      </div>
+      
+      <div style={{
+        color: 'rgba(255, 255, 255, 0.8)',
+        fontSize: '11px',
+        marginBottom: '8px'
+      }}>
+        Status: {isLoading ? 'Loading...' : (balance !== null ? 'Connected' : 'Error')}
+      </div>
+      
+      <div style={{
+        color: 'rgba(255, 255, 255, 0.6)',
+        fontSize: '10px',
+        fontStyle: 'italic'
+      }}>
+        DB Status: {!db ? 'Firebase Failed' : 'Firebase OK'}
       </div>
       
       {lastUpdate && (
         <div style={{
           color: 'rgba(255, 255, 255, 0.4)',
-          fontSize: '9px'
+          fontSize: '9px',
+          marginTop: '4px'
         }}>
           Updated {new Date(lastUpdate).toLocaleTimeString()}
         </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useWalletAuth } from './WalletAuthProvider';
 import { db, collection, addDoc, doc, serverTimestamp, query, where, getDocs, deleteDoc } from '@/lib/firebaseClient';
@@ -9,6 +9,7 @@ import { erc20Contract } from '@/lib/contract';
 import { useSendTransaction } from 'thirdweb/react';
 import { burn } from 'thirdweb/extensions/erc20';
 import { sendAndConfirmTransaction } from 'thirdweb';
+import { validateAmount, validateMessage, validateName, validateTransaction, checkRateLimit, formatSafeErrorMessage, sanitizeText } from '@/utils/security';
 
 
 const PRAYERS_BY_LANGUAGE = {
@@ -217,6 +218,57 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
   const [showConfirmation, setShowConfirmation] = useState(false); // Show custom confirmation modal
   const [showWalletLoading, setShowWalletLoading] = useState(false); // Show wallet loading indicator
   const [pendingBurnAmount, setPendingBurnAmount] = useState(0); // Store amount for confirmation
+  const [validationError, setValidationError] = useState(''); // Store validation errors
+  const lastTransactionRef = useRef(0); // For rate limiting
+
+  // Safe error display function - moved to top with other hooks
+  const showError = useCallback((message) => {
+    setValidationError(message);
+    setTimeout(() => setValidationError(''), 5000); // Clear after 5 seconds
+  }, []);
+
+  // Enhanced validation function for candle lighting - moved to top with other hooks
+  const validateCandleForm = useCallback(() => {
+    const currentBalance = parseInt(tokenBalance) || 0;
+    
+    // Rate limiting check
+    const rateLimitResult = checkRateLimit(walletAddress, 2, 120000); // 2 attempts per 2 minutes
+    if (!rateLimitResult.allowed) {
+      showError(rateLimitResult.error);
+      return false;
+    }
+    
+    // Message validation
+    if (message) {
+      const messageValidation = validateMessage(message);
+      if (!messageValidation.isValid) {
+        showError(messageValidation.error);
+        return false;
+      }
+    }
+    
+    // Name validation
+    if (prayerFor === 'other') {
+      const nameValidation = validateName(recipientName);
+      if (!nameValidation.isValid) {
+        showError(nameValidation.error);
+        return false;
+      }
+    }
+    
+    // Transaction validation
+    const transactionValidation = validateTransaction(tokenAmount, currentBalance, walletAddress);
+    if (!transactionValidation.isValid) {
+      if (currentBalance === 0) {
+        setShowNoBuyPrompt(true);
+        return false;
+      }
+      showError(transactionValidation.error);
+      return false;
+    }
+    
+    return true;
+  }, [tokenAmount, tokenBalance, walletAddress, message, prayerFor, recipientName, showError]);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -283,20 +335,27 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
         z: (Math.random() - 0.5) * 15
       };
       
-      // Prepare offering data
+      // Prepare offering data with sanitization
+      const sanitizedMessage = sanitizeText(message || '');
+      const sanitizedRecipientName = prayerFor === 'self' 
+        ? sanitizeText(user?.username || user?.firstName || 'Anonymous')
+        : sanitizeText(recipientName || 'Someone');
+      const validatedAmount = validateAmount(tokenAmount);
+      
       const baseOffering = {
-        name: user?.username || user?.firstName || 'Anonymous',
-        type: offeringType,
-        message: message.trim() || '',
-        tokensBurned: parseInt(tokenAmount) || 0,
+        name: sanitizeText(user?.username || user?.firstName || 'Anonymous'),
+        type: offeringType, // This is from a controlled enum
+        message: sanitizedMessage,
+        tokensBurned: validatedAmount.isValid ? validatedAmount.value : 0,
         userId: user?.id,
         walletAddress: walletAddress,
         userImageUrl: user?.imageUrl || null,
-        prayerFor: prayerFor,
-        recipientName: prayerFor === 'self' ? (user?.username || user?.firstName || 'Anonymous') : (recipientName || 'Someone'),
+        prayerFor: prayerFor, // This is from a controlled enum
+        recipientName: sanitizedRecipientName,
         position: candlePosition, // Store the 3D position
         createdAt: serverTimestamp(),
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        litAt: Date.now() // Add the litAt timestamp for candle melting logic
       };
       
 
@@ -318,24 +377,27 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
       
       let docRef = null;
       try {
-        // First, verify Firebase is properly initialized
-        if (!db || typeof db.collection !== 'function') {
-          throw new Error('Firebase Firestore is not properly initialized. Please check your environment variables.');
+        // First, verify Firebase is properly initialized (not a dummy)
+        if (!db || db._isDummy) {
+          throw new Error('Firebase Firestore is not properly initialized. Please refresh the page and try again.');
+        }
+        
+        // Test Firestore connectivity by creating a collection reference
+        const testCollection = collection(db, 'test');
+        if (!testCollection) {
+          throw new Error('Firebase Firestore collection function is not working properly.');
         }
         
         // Test Firestore connectivity
-        console.log('🔥 Firebase DB status:', {
+        console.log('✅ Firebase DB status:', {
           db: !!db,
-          hasCollection: typeof db.collection === 'function',
+          isDummy: !!db._isDummy,
+          testCollection: !!testCollection,
           hasAddDoc: typeof addDoc === 'function'
         });
         
-        console.log('🕐 Checking for existing offerings for wallet:', walletAddress);
-        console.log('🔐 Current user auth:', {
-          userId: user?.id,
-          isAuthenticated: !!user,
-          email: user?.primaryEmailAddress?.emailAddress
-        });
+        console.log('🕐 Checking for existing offerings for user');
+        // User authenticated - proceeding with offering creation
         
         // Query for existing offerings from this wallet
         const existingQuery = query(
@@ -428,10 +490,11 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
   // Get prayer templates based on selected language
   const prayerTemplates = PRAYERS_BY_LANGUAGE[selectedLanguage]?.prayers || PRAYERS_BY_LANGUAGE.en.prayers;
 
+
   // This is now only used for the form onSubmit - actual transaction is handled by TransactionButton
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // The TransactionButton will handle everything
+    // Validation is now handled by validateCandleForm
   };
 
 
@@ -1014,6 +1077,22 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
             <button className="close-button" onClick={onClose}>✕</button>
             <h2 className="modal-title">Light a Candle</h2>
             
+            {/* Validation Error Display */}
+            {validationError && (
+              <div style={{
+                background: 'rgba(255, 107, 107, 0.1)',
+                border: '1px solid rgba(255, 107, 107, 0.3)',
+                borderRadius: '8px',
+                padding: '0.75rem',
+                marginBottom: '1rem',
+                fontSize: '0.8rem',
+                color: '#ff6b6b',
+                textAlign: 'center'
+              }}>
+                ⚠️ {validationError}
+              </div>
+            )}
+
             {/* Compact Info Section - Always visible */}
             <div style={{
               background: 'rgba(139, 92, 246, 0.05)',
@@ -1117,7 +1196,10 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                 type="text"
                 placeholder="Name"
                 value={prayerFor === 'self' ? (user?.username || user?.firstName || '') : recipientName}
-                onChange={(e) => setRecipientName(e.target.value)}
+                onChange={(e) => {
+                  const sanitized = sanitizeText(e.target.value);
+                  setRecipientName(sanitized);
+                }}
                 disabled={prayerFor === 'self'}
                 style={{
                   width: '100%',
@@ -1150,7 +1232,10 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                     : "Express your gratitude..."
                 }
                 value={message}
-                onChange={(e) => setMessage(e.target.value)}
+                onChange={(e) => {
+                  const sanitized = sanitizeText(e.target.value);
+                  setMessage(sanitized);
+                }}
                 maxLength={300}
               />
               <div style={{ textAlign: 'right', fontSize: '0.6rem', color: '#666', marginTop: '0.1rem' }}>
@@ -1260,25 +1345,21 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
             {/* Submit Button - Light Candle with token burn */}
             <button
               onClick={async () => {
-                const amount = parseInt(tokenAmount) || 0;
-                const currentBalance = parseInt(tokenBalance) || 0;
+                // Validate before proceeding
+                if (!validateCandleForm()) {
+                  return;
+                }
                 
-                if (amount < 1) {
-                  alert('Minimum 1 RL80 token required to light a candle');
-                  return;
-                }
-                if (currentBalance === 0) {
-                  setShowNoBuyPrompt(true);
-                  return;
-                }
-                if (amount > currentBalance) {
-                  alert(`You only have ${currentBalance} RL80 tokens. Please enter a valid amount.`);
+                const validation = validateAmount(tokenAmount, parseInt(tokenBalance));
+                if (!validation.isValid) {
+                  showError(validation.error);
                   return;
                 }
                 
                 // Show custom confirmation modal
-                setPendingBurnAmount(amount);
+                setPendingBurnAmount(validation.value);
                 setShowConfirmation(true);
+                setValidationError(''); // Clear any existing errors
               }}
               disabled={isSubmitting || !tokenAmount || parseInt(tokenAmount) < 1}
               className="submit-button"
@@ -1514,7 +1595,14 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                   setShowWalletLoading(true);
                   
                   // Proceed with the burn
-                  const amount = pendingBurnAmount;
+                  const validation = validateAmount(pendingBurnAmount);
+                  if (!validation.isValid) {
+                    showError(validation.error);
+                    setShowConfirmation(false);
+                    return;
+                  }
+                  
+                  const amount = validation.value;
                   const amountInWei = BigInt(amount) * 1000000000000000000n;
                   
                   setIsSubmitting(true);
@@ -1578,10 +1666,10 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                           onClose();
                         }, 100);
                       } catch (error) {
-                        console.error('[LightCandleModal] Test wallet transaction error:', error);
+                        console.error('[LightCandleModal] Test wallet transaction error');
                         setTransactionStatus('');
                         setIsBurnInProgress(false);
-                        alert('Failed to burn tokens: ' + (error?.message || 'Unknown error'));
+                        showError(formatSafeErrorMessage(error));
                         setIsSubmitting(false);
                         setShowWalletLoading(false);
                         setForceHidden(false);
@@ -1650,7 +1738,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                               !error?.message?.includes('User denied') &&
                               !error?.message?.includes('rejected') &&
                               error?.code !== 4001) {
-                            alert('Failed to burn tokens: ' + (error?.message || 'Unknown error'));
+                            showError(formatSafeErrorMessage(error));
                           }
                           
                           setIsSubmitting(false);
@@ -1658,8 +1746,8 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                       });
                     }
                   } catch (error) {
-                  console.error('Failed to create burn transaction:', error);
-                  alert('Failed to burn tokens. Please try again.');
+                  console.error('Failed to create burn transaction');
+                  showError('Failed to burn tokens. Please try again.');
                   setIsSubmitting(false);
                   setTransactionStatus('');
                   setShowWalletLoading(false);

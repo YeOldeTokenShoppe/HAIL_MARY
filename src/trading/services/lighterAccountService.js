@@ -11,7 +11,24 @@ class LighterAccountService {
     this.cacheTimeout = 30000; // 30 seconds
   }
 
+  // Check if we're on a trading page - if not, return mock data instead of making API calls
+  shouldAllowApiCalls() {
+    if (typeof window !== 'undefined') {
+      const pathname = window.location.pathname;
+      return pathname.includes('/trade') || pathname.includes('/trading');
+    }
+    return true; // Allow on server side
+  }
+
   async fetchAccountData() {
+    if (!this.shouldAllowApiCalls()) {
+      console.log('Lighter API calls disabled on non-trading pages');
+      return {
+        account: { freeCollateral: 0, totalValue: 0, availableToWithdraw: 0 },
+        overview: { totalPnl: 0, freeCollateral: 0, totalValue: 0 }
+      };
+    }
+
     const cacheKey = 'account_overview';
     const cached = this.cache.get(cacheKey);
     
@@ -45,6 +62,10 @@ class LighterAccountService {
   }
 
   async fetchPositions() {
+    if (!this.shouldAllowApiCalls()) {
+      return { positions: [], totalPositions: 0, totalValue: 0 };
+    }
+
     const cacheKey = 'positions';
     const cached = this.cache.get(cacheKey);
     
@@ -93,6 +114,10 @@ class LighterAccountService {
   }
 
   async fetchOrders() {
+    if (!this.shouldAllowApiCalls()) {
+      return { orders: [], totalOrders: 0, totalVolume: 0 };
+    }
+
     const cacheKey = 'orders';
     const cached = this.cache.get(cacheKey);
     
@@ -139,6 +164,14 @@ class LighterAccountService {
   }
 
   async fetchActiveOrders() {
+    if (!this.shouldAllowApiCalls()) {
+      return {
+        activeOrders: [],
+        activeOrderCount: 0,
+        totalOrderValue: 0
+      };
+    }
+
     const cacheKey = 'active_orders';
     const cached = this.cache.get(cacheKey);
     
@@ -147,10 +180,15 @@ class LighterAccountService {
     }
 
     try {
-      const response = await fetch(`${LIGHTER_API_BASE}/accountActiveOrders?by=l1_address&value=${ACCOUNT_ADDRESS}`);
+      const url = `${LIGHTER_API_BASE}/accountActiveOrders?by=l1_address&value=${ACCOUNT_ADDRESS}`;
+      console.log('Fetching active orders from:', url);
+      
+      const response = await fetch(url);
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error(`API Error ${response.status}:`, errorText);
+        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
@@ -175,6 +213,10 @@ class LighterAccountService {
   }
 
   async fetchTradeHistory() {
+    if (!this.shouldAllowApiCalls()) {
+      return { trades: [], totalTrades: 0, totalVolume: 0 };
+    }
+
     const cacheKey = 'trade_history';
     const cached = this.cache.get(cacheKey);
     
@@ -225,6 +267,10 @@ class LighterAccountService {
   }
 
   async fetchPnL(accountIndex, resolution = '1d', startTs = null, endTs = null) {
+    if (!this.shouldAllowApiCalls()) {
+      return { pnlData: [], totalPnl: 0, dailyPnl: 0 };
+    }
+
     const cacheKey = `pnl_${accountIndex}_${resolution}_${startTs}_${endTs}`;
     const cached = this.cache.get(cacheKey);
     

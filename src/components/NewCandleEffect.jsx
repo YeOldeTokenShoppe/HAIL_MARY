@@ -12,7 +12,7 @@ const TRAIL_LIFETIME = 1.2 // Particles live longer for better trail
 const ARC_HEIGHT = 3 // How high the arc goes above the midpoint
 const MOBILE_ARC_HEIGHT = 1.5 // Lower arc for mobile visibility
 const MOBILE_BREAKPOINT = 768 // px
-const BRIGHT_GLOW_DURATION = 30.0 // How long the candle stays bright after landing (seconds)
+const BRIGHT_GLOW_DURATION = 15.0 // How long the candle stays bright after landing (seconds)
 
 // Arctic Rings config - enhanced for more fanfare
 const RING_COUNT = 7  // More rings for bigger impact

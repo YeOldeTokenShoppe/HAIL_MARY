@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useWalletAuth } from './WalletAuthProvider';
 import { db, collection, addDoc, serverTimestamp } from '@/lib/firebaseClient';
@@ -15,6 +15,7 @@ import { stakingContract } from '@/lib/stakingContract';
 import { erc20Contract } from '@/lib/contract';
 import { toWei } from "thirdweb/utils";
 import { useStaking } from '@/hooks/useStaking';
+import { validateAmount, validateTransaction, checkRateLimit, formatSafeErrorMessage } from '@/utils/security';
 
 const StakeModal = ({ isOpen, onClose, onStake }) => {
   const { user } = useUser();
@@ -36,8 +37,10 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
   const [successData, setSuccessData] = useState(null);
   const [transactionStatus, setTransactionStatus] = useState(''); // 'approving', 'staking', 'confirming', 'success'
   const [isDataRefreshing, setIsDataRefreshing] = useState(false);
+  const [validationError, setValidationError] = useState('');
   const { mutate: sendTransaction } = useSendTransaction();
   const isStakeSignedRef = useRef(false); // Track if stake was actually signed
+  const lastTransactionRef = useRef(0); // For rate limiting
   
   // Testnet contract has a 10-minute lock period by default
   const LOCK_DURATION_MINUTES = 10;
@@ -51,22 +54,67 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
       setShowInfo(false);
       setTransactionStatus('');
       isStakeSignedRef.current = false;
-      setShowSuccess(false);
-      setSuccessData(null);
       setIsDataRefreshing(false);
       
-      // Check token balance immediately when modal opens
-      const balance = parseInt(tokenBalance) || 0;
-      if (walletAddress && balance === 0) {
-        setShowNoBuyPrompt(true);
-      } else {
+      // Check if user has existing stakes and should see dashboard
+      const hasExistingStakes = parseFloat(stakedBalance || 0) > 0;
+      
+      if (hasExistingStakes) {
+        // Show dashboard view for users with existing stakes
+        setShowSuccess(true);
+        setSuccessData({
+          showDashboard: true,
+          optimisticStakedAmount: stakedBalance
+        });
         setShowNoBuyPrompt(false);
+      } else {
+        // Show form view for new stakers
+        setShowSuccess(false);
+        setSuccessData(null);
+        
+        // Check token balance for new stakers
+        const balance = parseInt(tokenBalance) || 0;
+        if (walletAddress && balance === 0) {
+          setShowNoBuyPrompt(true);
+        } else {
+          setShowNoBuyPrompt(false);
+        }
       }
     }
-  }, [isOpen, walletAddress, tokenBalance]);
+  }, [isOpen, walletAddress, tokenBalance, stakedBalance]);
   
+  // Safe error display function - moved before early return
+  const showError = useCallback((message) => {
+    setValidationError(message);
+    setTimeout(() => setValidationError(''), 5000); // Clear after 5 seconds
+  }, []);
+
+  // Enhanced validation function - moved before early return
+  const validateStakeForm = useCallback(() => {
+    const currentBalance = parseInt(tokenBalance) || 0;
+    
+    // Rate limiting check
+    const rateLimitResult = checkRateLimit(walletAddress, 3, 60000);
+    if (!rateLimitResult.allowed) {
+      showError(rateLimitResult.error);
+      return false;
+    }
+    
+    // Transaction validation
+    const transactionValidation = validateTransaction(stakeAmount, currentBalance, walletAddress);
+    if (!transactionValidation.isValid) {
+      if (currentBalance === 0) {
+        setShowNoBuyPrompt(true);
+        return false;
+      }
+      showError(transactionValidation.error);
+      return false;
+    }
+    
+    return true;
+  }, [stakeAmount, tokenBalance, walletAddress, showError]);
+
   // No auto-close anymore since we have actionable content
-  
   // No longer need to check approval separately - getApprovalForTransaction handles it
 
   if (!isOpen) return null;
@@ -75,30 +123,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
-    const amount = parseInt(stakeAmount) || 0;
-    if (amount < 1) {
-      alert('Minimum 1 RL80 token required to stake');
-      return;
-    }
-
-    // Check if user has enough tokens
-    const currentBalance = parseInt(tokenBalance) || 0;
-    if (currentBalance === 0) {
-      setShowNoBuyPrompt(true);
-      return;
-    } else if (amount > currentBalance) {
-      alert(`You only have ${currentBalance.toLocaleString()} RL80 tokens. Please enter a valid amount.`);
-      return;
-    }
-    
-    if (!activeAccount) {
-      alert('Please connect your wallet first');
-      return;
-    }
-    
-    // The actual transaction is handled by TransactionButton
-    // This function now just validates the form
+    // Validation is now handled by validateStakeForm
   };
 
 
@@ -482,7 +507,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
               }}>
                 <div>
                   <div style={{
-                    fontSize: '0.7rem',
+                    fontSize: '0.8rem',
                     color: 'rgba(255, 255, 255, 0.5)',
                     marginBottom: '0.25rem',
                     textTransform: 'uppercase'
@@ -490,7 +515,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                     Staked Amount
                   </div>
                   <div style={{
-                    fontSize: '1rem',
+                    fontSize: '1.2rem',
                     fontWeight: '600',
                     color: '#fff'
                   }}>
@@ -500,7 +525,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                 
                 <div>
                   <div style={{
-                    fontSize: '0.7rem',
+                    fontSize: '0.8rem',
                     color: 'rgba(255, 255, 255, 0.5)',
                     marginBottom: '0.25rem',
                     textTransform: 'uppercase'
@@ -508,7 +533,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                     Lock Status
                   </div>
                   <div style={{
-                    fontSize: '1rem',
+                    fontSize: '1.2rem',
                     fontWeight: '600',
                     color: canWithdraw ? '#00ff88' : '#ff6b6b'
                   }}>
@@ -518,7 +543,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                 
                 <div>
                   <div style={{
-                    fontSize: '0.7rem',
+                    fontSize: '0.8rem',
                     color: 'rgba(255, 255, 255, 0.5)',
                     marginBottom: '0.25rem',
                     textTransform: 'uppercase'
@@ -526,7 +551,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                     Rewards Earned
                   </div>
                   <div style={{
-                    fontSize: '1rem',
+                    fontSize: '1.2rem',
                     fontWeight: '600',
                     color: '#00f5d4'
                   }}>
@@ -536,7 +561,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                 
                 <div>
                   <div style={{
-                    fontSize: '0.7rem',
+                    fontSize: '0.8rem',
                     color: 'rgba(255, 255, 255, 0.5)',
                     marginBottom: '0.25rem',
                     textTransform: 'uppercase'
@@ -544,7 +569,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                     Total Pool
                   </div>
                   <div style={{
-                    fontSize: '1rem',
+                    fontSize: '1.2rem',
                     fontWeight: '600',
                     color: '#fff'
                   }}>
@@ -589,7 +614,10 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
               marginBottom: '1rem'
             }}>
               <button
-                onClick={onClose}
+                onClick={() => {
+                  setShowSuccess(false);
+                  setSuccessData(null);
+                }}
                 style={{
                   padding: '0.9rem',
                   background: '#00f5d4',
@@ -609,7 +637,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                   e.currentTarget.style.opacity = '1';
                 }}
               >
-                CLOSE
+                STAKE MORE
               </button>
               
               <TransactionButton
@@ -932,6 +960,22 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                 )}
               </div>
 
+              {/* Validation Error Display */}
+              {validationError && (
+                <div style={{
+                  background: 'rgba(255, 107, 107, 0.1)',
+                  border: '1px solid rgba(255, 107, 107, 0.3)',
+                  borderRadius: '8px',
+                  padding: '0.75rem',
+                  marginBottom: '1rem',
+                  fontSize: '0.8rem',
+                  color: '#ff6b6b',
+                  textAlign: 'center'
+                }}>
+                  ⚠️ {validationError}
+                </div>
+              )}
+
               {/* Compact Staking Info Preview */}
               {stakeAmount && parseInt(stakeAmount) >= 1 && (
                 <div style={{
@@ -965,9 +1009,23 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                 <button
                   onClick={async () => {
                     try {
+                      // Validate before proceeding
+                      if (!validateStakeForm()) {
+                        return;
+                      }
+                      
                       setIsSubmitting(true);
                       setTransactionStatus('signing');
-                      const amountInWei = toWei(stakeAmount || "0");
+                      setValidationError(''); // Clear any existing errors
+                      
+                      const validation = validateAmount(stakeAmount, parseInt(tokenBalance));
+                      if (!validation.isValid) {
+                        showError(validation.error);
+                        setIsSubmitting(false);
+                        return;
+                      }
+                      
+                      const amountInWei = toWei(validation.value.toString());
                       console.log("Test wallet staking amount:", amountInWei.toString());
                       
                       // First approve the tokens
@@ -1060,16 +1118,13 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                         await onStake(stakeData);
                       }
                     } catch (error) {
-                      console.error("Staking failed:", error);
+                      console.error("Staking failed");
                       setTransactionStatus('');
                       
-                      // Check for specific error signatures
-                      if (error?.message?.includes('0xfb8f41b2')) {
-                        alert('Insufficient token allowance. The approval transaction may have failed. Please try again.');
-                      } else if (error.message?.includes('insufficient')) {
-                        alert('Insufficient tokens or gas. Please check your balance.');
-                      } else if (!error.message?.includes('User rejected') && !error.message?.includes('User denied')) {
-                        alert('Failed to stake tokens: ' + (error?.message || 'Unknown error'));
+                      // Use safe error messaging
+                      const safeErrorMessage = formatSafeErrorMessage(error);
+                      if (!error?.message?.includes('User rejected') && !error?.message?.includes('User denied')) {
+                        showError(safeErrorMessage);
                       }
                       setIsSubmitting(false);
                     }
@@ -1099,9 +1154,23 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                   onClick={async () => {
                     if (isSubmitting) return;
                     
+                    // Validate before proceeding
+                    if (!validateStakeForm()) {
+                      return;
+                    }
+                    
                     try {
                       setIsSubmitting(true);
-                      const amountInWei = toWei(stakeAmount || "0");
+                      setValidationError(''); // Clear any existing errors
+                      
+                      const validation = validateAmount(stakeAmount, parseInt(tokenBalance));
+                      if (!validation.isValid) {
+                        showError(validation.error);
+                        setIsSubmitting(false);
+                        return;
+                      }
+                      
+                      const amountInWei = toWei(validation.value.toString());
                       
                       // Step 1: Approval
                       console.log("Starting approval process...");
@@ -1229,10 +1298,10 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                                 
                                 // Check for specific error signatures
                                 if (error?.message?.includes('0xfb8f41b2')) {
-                                  alert('Insufficient token allowance. Please try again - the approval may not have been fully processed.');
+                                  showError('Insufficient token allowance. Please try again.');
                                 } else if (!error?.message?.includes('User rejected') && 
                                     !error?.message?.includes('User denied')) {
-                                  alert('Failed to stake tokens: ' + (error?.message || 'Unknown error'));
+                                  showError(formatSafeErrorMessage(error));
                                 }
                               }
                             });
@@ -1245,18 +1314,17 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                           
                           if (!error?.message?.includes('User rejected') && 
                               !error?.message?.includes('User denied')) {
-                            alert('Failed to approve tokens: ' + (error?.message || 'Unknown error'));
+                            showError(formatSafeErrorMessage(error));
                           }
                         }
                       });
                     } catch (error) {
-                      console.error("Failed to initiate staking:", error);
-                      // setTransactionStatus('');
+                      console.error("Failed to initiate staking");
                       setIsSubmitting(false);
-                      alert('Failed to stake tokens. Please try again.');
+                      showError('Failed to stake tokens. Please try again.');
                     }
                   }}
-                  disabled={!stakeAmount || parseInt(stakeAmount) < 1}
+                  disabled={!stakeAmount || parseInt(stakeAmount) < 1 || isSubmitting}
                   className="submit-button"
                   style={{
                     width: '100%',

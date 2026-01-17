@@ -156,7 +156,7 @@ async function getLiveMarketData() {
 
 export async function POST(request) {
   try {
-    const { agent, force = false } = await request.json();
+    const { agent, force = false, context: clientContext, teamAnalysis, isSequentialWorkflow } = await request.json();
 
     if (!agent) {
       return NextResponse.json({
@@ -165,10 +165,10 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    // Check rate limiting unless force is true
+    // Check rate limiting unless force is true - Updated to hourly intervals
     const now = Date.now();
     const lastCall = lastCallTimes[agent] || 0;
-    const rateLimit = RATE_LIMIT_MS[agent] || 120000;
+    const rateLimit = 3600000; // 1 hour for sequential workflow
 
     if (!force && (now - lastCall) < rateLimit) {
       return NextResponse.json({
@@ -184,10 +184,16 @@ export async function POST(request) {
     const context = {
       recentMessages,
       lastMessages: recentMessages.slice(-5), // For RL80 trader compatibility
-      marketData: liveMarketData
+      marketData: liveMarketData,
+      ...clientContext // Merge any additional context from client
     };
 
-    console.log(`[Agent Context] Using live data: BTC=${liveMarketData.btcPrice}, F&G=${liveMarketData.fearGreed}, Sentiment=${liveMarketData.marketSentiment}`);
+    console.log(`[Sequential Workflow] ${agent} triggered with context:`, {
+      btcPrice: liveMarketData.btcPrice,
+      fearGreed: liveMarketData.fearGreed,
+      hasTeamAnalysis: !!teamAnalysis,
+      isSequentialWorkflow
+    });
 
     let response, messageType, sentiment;
 
@@ -199,6 +205,7 @@ export async function POST(request) {
     try {
       switch (agent) {
         case 'TEKNO':
+        case 'market': // Support both naming conventions
           if (!openaiKey) {
             throw new Error('OpenAI API key not configured');
           }
@@ -208,6 +215,7 @@ export async function POST(request) {
           break;
 
         case 'EMO':
+        case 'sentiment': // Support both naming conventions
           if (!grokKey) {
             throw new Error('Grok API key not configured');
           }
@@ -217,6 +225,7 @@ export async function POST(request) {
           break;
 
         case 'MACRO':
+        case 'macro': // Support both naming conventions
           if (!anthropicKey) {
             throw new Error('Anthropic API key not configured');
           }
@@ -226,7 +235,14 @@ export async function POST(request) {
           break;
 
         case 'RL80':
-          response = await callRL80Trader(context, recentMessages);
+        case 'rl80': // Support both naming conventions
+          // RL80 can process team analysis in sequential workflow
+          if (isSequentialWorkflow && teamAnalysis) {
+            console.log('🧠 RL80 processing team analysis from sequential workflow');
+            response = await callRL80Trader(context, recentMessages, teamAnalysis);
+          } else {
+            response = await callRL80Trader(context, recentMessages);
+          }
           messageType = 'trading';
           sentiment = 'positive';
           break;
@@ -250,7 +266,8 @@ export async function POST(request) {
           messageId,
           type: messageType,
           sentiment,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          isSequentialWorkflow
         });
       } else {
         const errorMsg = `${agent} returned empty response. Response type: ${typeof response}, Value: ${JSON.stringify(response)}`;

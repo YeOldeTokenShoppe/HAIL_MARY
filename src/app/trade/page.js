@@ -27,7 +27,7 @@ import { useLighterAPI } from '@/hooks/useLighterAPI'; // API-based Lighter inte
 // import MobileDevTabs from '@/components/MobileDevTabs';
 // import RotatingPnL from '@/components/RotatingPnL'; // Replaced with stats panel
 import FocusedAgentCard from '@/components/FocusedAgentCard';
-import LighterBalanceWidget from '@/components/LighterBalanceWidget';
+import { useMainnetReadiness } from '@/hooks/useMainnetReadiness';
 
 
 export default function CyborgTemple() {
@@ -79,6 +79,9 @@ export default function CyborgTemple() {
   } = useLighterAPI({
     initialBalance: 0 // Will be replaced with actual balance from API
   });
+  
+  // Get real mainnet readiness metrics
+  const mainnetMetrics = useMainnetReadiness();
   
   // Initialize market data fetching after a delay
   useEffect(() => {
@@ -669,7 +672,7 @@ export default function CyborgTemple() {
                 <span style={{
                   fontSize: "1.5rem",
                   color: "#ffffff",
-                }}>47</span>
+                }}>{mainnetMetrics.loading ? '...' : mainnetMetrics.totalTrades}</span>
                 <span style={{
                   fontSize: isMobileView && userHasInteracted ? "0.7rem" : (isMobileView ? "0.9rem" : "1rem"),
                   color: "rgba(255, 255, 255, 0.5)",
@@ -701,7 +704,7 @@ export default function CyborgTemple() {
                 <span style={{
                   fontSize: "1.5rem",
                   color: "#ffffff",
-                }}>52%</span>
+                }}>{mainnetMetrics.loading ? '...' : `${mainnetMetrics.winRate.toFixed(1)}%`}</span>
                 <span style={{
                   fontSize: isMobileView && userHasInteracted ? "0.7rem" : (isMobileView ? "0.9rem" : "1rem"),
                   color: "rgba(255, 255, 255, 0.5)",
@@ -733,7 +736,7 @@ export default function CyborgTemple() {
                 <span style={{
                   fontSize: "1.5rem",
                   color: "#ffffff",
-                }}>8.2%</span>
+                }}>{mainnetMetrics.loading ? '...' : `${mainnetMetrics.maxDrawdown.toFixed(1)}%`}</span>
                 <span style={{
                   fontSize: isMobileView && userHasInteracted ? "0.7rem" : (isMobileView ? "0.9rem" : "1rem"),
                   color: "rgba(255, 255, 255, 0.5)",
@@ -765,7 +768,7 @@ export default function CyborgTemple() {
                 <span style={{
                   fontSize: "1.5rem",
                   color: "#ffffff",
-                }}>7</span>
+                }}>{mainnetMetrics.loading ? '...' : mainnetMetrics.daysLive}</span>
                 <span style={{
                   fontSize: isMobileView && userHasInteracted ? "0.7rem" : (isMobileView ? "0.9rem" : "1rem"),
                   color: "rgba(255, 255, 255, 0.5)",
@@ -1150,8 +1153,6 @@ export default function CyborgTemple() {
           />
         )}
         
-        {/* Lighter Balance Widget - Top Right */}
-        <LighterBalanceWidget show={true} />
 
         {/* Top Controls Container - Music, User, and Nav */}
         {mounted && (

@@ -315,11 +315,12 @@ export default function NavControls({
         }
 
         .music-btn.single {
-          height: 40px;
-          width: 40px;
+          height: 2.5rem;
+          width: 2.5rem;
           border-radius: 10px;
-          font-size: 18px;
+          font-size: 24px;
           color: #ff006e;
+          border: 2px solid #ff006e;
         }
         
         .music-btn:hover {
@@ -338,8 +339,8 @@ export default function NavControls({
         /* HAMBURGER MENU - THE HERO */
         .menu-button {
           position: relative;
-          width: 40px;
-          height: 40px;
+          width: 2.5rem;
+          height: 2.5rem;
           border-radius: 12px;
           background: linear-gradient(135deg, rgba(255, 0, 110, 0.2), rgba(131, 56, 236, 0.2));
           border: 2px solid #ff006e;

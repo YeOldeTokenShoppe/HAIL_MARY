@@ -1,0 +1,167 @@
+{
+  "sentiment_indicators": {
+    "fear_greed_index": {
+      "extreme_fear": {
+        "range": "0-25",
+        "interpretation": "Capitulation opportunity",
+        "contrarian_signal": "Bullish",
+        "keywords": ["blood", "capitulation", "despair", "bottom", "pain"]
+      },
+      "fear": {
+        "range": "26-45", 
+        "interpretation": "Bearish sentiment building",
+        "signal": "Bearish",
+        "keywords": ["nervous", "FUD", "shaky", "weak hands"]
+      },
+      "neutral": {
+        "range": "46-54",
+        "interpretation": "Balanced sentiment",
+        "signal": "Neutral",
+        "keywords": ["sideways", "waiting", "calm", "balanced"]
+      },
+      "greed": {
+        "range": "55-74",
+        "interpretation": "Bullish momentum",
+        "signal": "Bullish",
+        "keywords": ["optimistic", "FOMO building", "bullish"]
+      },
+      "extreme_greed": {
+        "range": "75-100",
+        "interpretation": "Euphoria top warning",
+        "contrarian_signal": "Bearish",
+        "keywords": ["euphoria", "moon", "everyone expert", "parabolic"]
+      }
+    },
+    
+    "funding_rates": {
+      "highly_negative": {
+        "range": "< -0.1%",
+        "interpretation": "Extreme short bias",
+        "contrarian_signal": "Bullish",
+        "meaning": "Shorts paying longs heavily"
+      },
+      "negative": {
+        "range": "-0.1% to -0.01%",
+        "interpretation": "Short bias",
+        "signal": "Potentially bullish",
+        "meaning": "More shorts than longs"
+      },
+      "neutral": {
+        "range": "-0.01% to 0.01%",
+        "interpretation": "Balanced positioning",
+        "signal": "Neutral",
+        "meaning": "Balanced long/short interest"
+      },
+      "positive": {
+        "range": "0.01% to 0.1%",
+        "interpretation": "Long bias",
+        "signal": "Potentially bearish",
+        "meaning": "More longs than shorts"
+      },
+      "highly_positive": {
+        "range": "> 0.1%",
+        "interpretation": "Extreme long bias",
+        "contrarian_signal": "Bearish", 
+        "meaning": "Longs paying shorts heavily"
+      }
+    },
+
+    "social_sentiment": {
+      "platforms": {
+        "twitter": {
+          "bullish_keywords": ["moon", "diamond hands", "HODL", "buying dip", "accumulating"],
+          "bearish_keywords": ["dump", "crash", "rekt", "capitulation", "selling"],
+          "neutral_keywords": ["crab", "sideways", "waiting", "watching"]
+        },
+        "reddit": {
+          "bullish_keywords": ["bullish", "moon soon", "accumulation", "DCA"],
+          "bearish_keywords": ["bearish", "dump incoming", "selling pressure"],
+          "neutral_keywords": ["sideways", "consolidation", "wait and see"]
+        }
+      }
+    }
+  },
+
+  "behavioral_patterns": {
+    "fomo_cycles": {
+      "early_fomo": "First wave of retail interest",
+      "peak_fomo": "Everyone becoming experts",
+      "fomo_exhaustion": "Late buyers getting rekt",
+      "fomo_capitulation": "Retail giving up"
+    },
+    
+    "whale_behavior": {
+      "accumulation_signs": [
+        "Large buys on dips",
+        "OTC buying pressure", 
+        "Exchange outflows",
+        "Low volume distribution"
+      ],
+      "distribution_signs": [
+        "Large sells into strength",
+        "Exchange inflows",
+        "High volume selling",
+        "Retail FOMO buying"
+      ]
+    },
+    
+    "narrative_cycles": {
+      "adoption": ["institutional", "ETF", "mainstream"],
+      "technology": ["upgrades", "scalability", "innovation"],
+      "regulation": ["clarity", "acceptance", "compliance"],
+      "macro": ["inflation hedge", "debasement", "store of value"]
+    }
+  },
+
+  "contrarian_signals": {
+    "bullish_contrarian": [
+      "Peak pessimism in social media",
+      "Crypto obituaries published", 
+      "Google searches for 'crypto crash'",
+      "Retail panic selling",
+      "Influencer capitulation tweets"
+    ],
+    
+    "bearish_contrarian": [
+      "Your hairdresser giving crypto advice",
+      "Crypto ads everywhere",
+      "Everyone becomes day trader",
+      "FOMO-driven buying at highs",
+      "Parabolic social media excitement"
+    ]
+  },
+
+  "slang_dictionary": {
+    "bullish_slang": {
+      "diamond_hands": "Holding through volatility",
+      "HODL": "Hold On for Dear Life",
+      "moon": "Price going very high",
+      "wen_lambo": "When will I get rich",
+      "number_go_up": "Price increasing",
+      "WAGMI": "We're All Gonna Make It"
+    },
+    
+    "bearish_slang": {
+      "rekt": "Lost money badly",
+      "paper_hands": "Selling at first sign of trouble", 
+      "dump": "Sharp price decline",
+      "dead_cat_bounce": "Temporary bounce in downtrend",
+      "falling_knife": "Catching a falling price",
+      "NGMI": "Not Gonna Make It"
+    },
+    
+    "neutral_slang": {
+      "crab_market": "Sideways price action",
+      "chop": "Volatile sideways movement",
+      "consolidation": "Sideways after big move",
+      "range_bound": "Trading in a range"
+    }
+  },
+
+  "response_frameworks": {
+    "observation_pattern": "Current vibe: [sentiment]. [Evidence]. [Implication].",
+    "contrarian_pattern": "Everyone saying [X], but [Y] tells the real story.",
+    "warning_pattern": "Red flag: [situation]. [Why retail should be careful].",
+    "opportunity_pattern": "Smart money move: [action] while crowd [opposite_action]."
+  }
+}
