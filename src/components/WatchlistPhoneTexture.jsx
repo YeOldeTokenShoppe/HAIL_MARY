@@ -32,30 +32,30 @@ const CONFIG = {
 // ===========================================
 
 const ACTIVITY_TYPES = {
-  CANDLE: { 
-    icon: '🕯️', 
-    verb: 'Dedicated a Green Candle', 
+  CANDLE: {
+    icon: '🕯️',
+    verb: 'Dedicated a Green Candle',
     unit: 'candle',
     pluralUnit: 'candles',
-    color: '#00ff66' 
+    color: '#00ff66'
   },
-  STAKE: { 
-    icon: '💎', 
-    verb: 'Staked', 
+  STAKE: {
+    icon: '💎',
+    verb: 'Staked RL80',
     unit: 'RL80',
-    color: '#00bfff' 
+    color: '#00bfff'
   },
-  UNSTAKE: { 
-    icon: '📤', 
-    verb: 'Unstaked', 
+  UNSTAKE: {
+    icon: '📤',
+    verb: 'Unstaked RL80',
     unit: 'RL80',
-    color: '#ff9500' 
+    color: '#ff9500'
   },
-  CLAIM: { 
-    icon: '💰', 
-    verb: 'Claimed', 
+  CLAIM: {
+    icon: '💰',
+    verb: 'Claimed ETH',
     unit: 'ETH',
-    color: '#ffeb3b' 
+    color: '#ffeb3b'
   },
 };
 
@@ -165,6 +165,9 @@ export function WatchlistPhoneTexture({
   const [activities, setActivities] = useState([]);
   const [activeTab, setActiveTab] = useState('ALL'); // ALL | CANDLES | STAKING
   const [breakthroughEvent, setBreakthroughEvent] = useState(null);
+
+  // Live time display state
+  const [currentTime, setCurrentTime] = useState(new Date());
   
   // Prayer Received notification state
   const [showPrayerReceived, setShowPrayerReceived] = useState(false);
@@ -598,6 +601,15 @@ export function WatchlistPhoneTexture({
     };
     img.src = '/images/electricRL80.png';
   }, []);
+
+  // Update time every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
   
   // ===========================================
   // FILTER ACTIVITIES BY TAB
@@ -786,7 +798,20 @@ export function WatchlistPhoneTexture({
     
     // Reset text alignment for content below
     ctx.textAlign = 'left';
-    
+
+    // ===========================================
+    // STATUS BAR - LIVE TIME DISPLAY
+    // ===========================================
+
+    const hours = currentTime.getHours();
+    const minutes = currentTime.getMinutes();
+    const formattedTime = `${hours % 12 || 12}:${minutes.toString().padStart(2, '0')}`;
+
+    ctx.fillStyle = '#000';
+    ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(formattedTime, 60, 40);
+
     // ===========================================
     // HEADER WITH AVATAR AND TITLE
     // ===========================================
@@ -992,7 +1017,7 @@ export function WatchlistPhoneTexture({
       // Emoji removed - shown in prayer type badge instead
       
       // User avatar (if available) - bigger size
-      const avatarSize = 48;
+      const avatarSize = 70;
       const avatarX = 70;
       const avatarY = itemY + itemHeight / 2;
       let usernameX = 130; // Default position if no avatar
@@ -1051,7 +1076,7 @@ export function WatchlistPhoneTexture({
       // Username
       ctx.textAlign = 'left';
       ctx.textBaseline = 'alphabetic';
-      ctx.fillStyle = style.textColor;
+      ctx.fillStyle = '#fff';
       ctx.font = 'bold 26px -apple-system, BlinkMacSystemFont, sans-serif';
       ctx.fillText(activity.username, usernameX, itemY + 35);
       
@@ -1063,13 +1088,10 @@ export function WatchlistPhoneTexture({
       
       // Action description (align with username)
       ctx.textAlign = 'left';
-      ctx.fillStyle = tier === 'mega' ? '#444' : '#aaa';
+      ctx.fillStyle = '#000';
       ctx.font = '22px -apple-system, BlinkMacSystemFont, sans-serif';
-      
-      const actionText = activity.type === 'CANDLE' && activity.amount > 1
-        ? `${activityType.verb} ${activity.amount} ${activityType.pluralUnit || activityType.unit}`
-        : `${activityType.verb}`;
-      ctx.fillText(actionText, usernameX, itemY + 62);
+
+      ctx.fillText(activityType.verb, usernameX, itemY + 62);
       
       // Amount (bottom right)
       ctx.textAlign = 'right';
@@ -1198,7 +1220,7 @@ export function WatchlistPhoneTexture({
     }
     
     ctx.restore();
-  }, [filteredActivities, activeTab, breakthroughEvent, candleCount, totalBurned, totalStaked, onlineCount, showPrayerReceived, currentNotification, drawPrayerReceived]);
+  }, [filteredActivities, activeTab, breakthroughEvent, candleCount, totalBurned, totalStaked, onlineCount, showPrayerReceived, currentNotification, drawPrayerReceived, currentTime]);
   
   // ===========================================
   // ANIMATION LOOP

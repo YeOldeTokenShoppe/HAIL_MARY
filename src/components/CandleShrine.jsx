@@ -491,6 +491,7 @@ function usePositions(count, exclusionZone = null) {
         z,
         rotation: Math.random() * Math.PI * 2,
         scale: 0.8 + Math.random() * 0.4, // Vary size between 0.8 and 1.2
+        heightScale: 0.5 + Math.random() * 0.8, // Vary height between 0.5 and 1.3 for visual variety
         litAt: null, // Base candles should NOT melt - only user-lit candles with Firestore litAt should melt
         userId: null, // Will be assigned when user lights a candle
         username: null,
@@ -559,9 +560,12 @@ function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.9
       if (i < positions.length) {
         const pos = positions[i]
         const instanceScale = pos.scale || scale
+        // Use heightScale for Y dimension if available (for varied heights on base candles)
+        // User candles with litAt will have their Y scale overridden by melting logic in useFrame
+        const instanceHeightScale = pos.heightScale !== undefined ? pos.heightScale : instanceScale
         tempPosition.set(pos.x, pos.y, pos.z)
         tempQuaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pos.rotation)
-        tempScale.set(instanceScale, instanceScale, instanceScale)
+        tempScale.set(instanceScale, instanceHeightScale, instanceScale)
         tempMatrix.compose(tempPosition, tempQuaternion, tempScale)
         if (localMatrix) {
           tempMatrix.multiply(localMatrix)
@@ -1069,31 +1073,33 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onPrice
         </div>
       )}
       
-      {/* Find My Candle button - positioned at bottom left above stake button */}
-      <button
-        onClick={findUserCandle}
-        style={{
-          position: 'fixed',
-          bottom: '120px',
-          left: '30px',
-          background: 'linear-gradient(135deg, #ffaa00 0%, #ff8800 100%)',
-          border: 'none',
-          borderRadius: '12px',
-          padding: '12px 24px',
-          color: '#000',
-          fontFamily: 'monospace',
-          fontSize: '14px',
-          fontWeight: 'bold',
-          cursor: 'pointer',
-          boxShadow: '0 0 30px rgba(255, 170, 0, 0.4)',
-          zIndex: 10000,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-        }}
-      >
-        🔍 Find My Candle
-      </button>
+      {/* Find My Candle button - only visible when user has an active lit candle */}
+      {allPositions.some(p => p.userId === currentUserId && p.litAt && (Date.now() - p.litAt) / 1000 < 300) && (
+        <button
+          onClick={findUserCandle}
+          style={{
+            position: 'fixed',
+            bottom: '120px',
+            left: '30px',
+            background: 'linear-gradient(135deg, #ffaa00 0%, #ff8800 100%)',
+            border: 'none',
+            borderRadius: '12px',
+            padding: '12px 24px',
+            color: '#000',
+            fontFamily: 'monospace',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            boxShadow: '0 0 30px rgba(255, 170, 0, 0.4)',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          🔍 Find My Candle
+        </button>
+      )}
     </div>
   )
 }

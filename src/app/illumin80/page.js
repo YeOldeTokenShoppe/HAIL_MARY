@@ -42,6 +42,7 @@ export default function ShrinePage() {
   const [fontLoaded, setFontLoaded] = useState(false)
   const [showBuyModal, setShowBuyModal] = useState(false)
   const [showLightCandleModal, setShowLightCandleModal] = useState(false)
+  const [modalKey, setModalKey] = useState(0) // Force modal to remount by changing key
   const [isProcessingCandle, setIsProcessingCandle] = useState(false) // Prevent modal from reopening during processing
   const [hasProcessedCandle, setHasProcessedCandle] = useState(false) // Track if candle was already processed this session
   const [showStakeModal, setShowStakeModal] = useState(false)
@@ -387,27 +388,33 @@ useEffect(() => {
   
   // Handle light candle button click with auth check
   const handleLightCandleClick = () => {
+    console.log('🔥 [BUTTON CLICK] handleLightCandleClick called', {
+      isProcessingCandle,
+      hasProcessedCandle,
+      showLightCandleModal,
+      isSignedIn,
+      isWalletConnected,
+      walletAddress
+    });
+
     // Don't light the matchstick here - only light it when candle is actually lit
     // This prevents the flame from showing if user cancels
-    
-    // Prevent opening modal if we're already processing a candle
-    if (isProcessingCandle) {
-      console.log('[ShrinePage] Candle processing in progress, ignoring click');
-      return;
-    }
-    
+
     // Reset the flags when user explicitly clicks to light a new candle
+    // This allows users to light multiple candles in a session
     setHasProcessedCandle(false);
     setIsProcessingCandle(false);
-    
+
     // Check if user is signed in
     if (!isSignedIn) {
+      console.log('❌ [AUTH CHECK] User not signed in');
       setShowAuthMessage('sign-in');
       return;
     }
 
     // Check if wallet is connected
     if (!isWalletConnected || !walletAddress) {
+      console.log('❌ [WALLET CHECK] Wallet not connected');
       setShowWalletModal(true);
       setWaitingForWallet(true); // Set flag that we're waiting for wallet connection
       setWalletActionType('candle'); // Track that this is for lighting a candle
@@ -415,6 +422,8 @@ useEffect(() => {
     }
 
     // Both signed in and wallet connected - show the modal
+    console.log('✅ [OPENING MODAL] Setting showLightCandleModal to true');
+    setModalKey(prev => prev + 1); // Force modal to remount with fresh state
     setShowLightCandleModal(true);
   };
   
@@ -652,7 +661,15 @@ useEffect(() => {
     setTimeout(() => {
       fetchOfferings()
     }, 3000) // 3 second delay - same as remote offerings
-    
+
+    // Reset processing flags after candle effect completes (about 15 seconds total)
+    // This allows the user to light another candle if they want
+    setTimeout(() => {
+      console.log('✅ [CLEANUP] Resetting candle processing flags');
+      setIsProcessingCandle(false);
+      setHasProcessedCandle(false);
+    }, 15000); // 15 seconds - enough time for the full candle effect to complete
+
     // Don't reset matchsticks anymore - they stay lit after user lights a candle
     // The desktop matchstick will stay lit via hasLitCandleThisSession state
     // The mobile matchstick already stays lit
@@ -794,7 +811,7 @@ useEffect(() => {
       
       {/* Only render ShrineLeftPanel on desktop/tablet after we know device type */}
       {mounted && !isMobileView && (
-        <ShrineLeftPanel 
+        <ShrineLeftPanel
           ref={shrineLeftPanelRef}
           is80sMode={is80sMode}
           isMobile={false}
@@ -804,6 +821,12 @@ useEffect(() => {
           onFindCandle={handleFindCandle}
           onResetView={handleResetView}
           isHighlighting={isHighlightingCandle}
+          hasActiveCandle={offerings.some(o => {
+            if (o.userId !== user?.id) return false
+            const litAt = o.createdAt?.toDate?.()?.getTime?.() || o.createdAt
+            if (!litAt) return false
+            return (Date.now() - litAt) / 1000 < 300
+          })}
         />
       )}
       
@@ -1502,15 +1525,17 @@ useEffect(() => {
       
       {/* Light Candle Modal - Always mounted to allow snapshot renderer to complete */}
       <LightCandleModal
-        isOpen={showLightCandleModal && !isProcessingCandle}
+        key={modalKey}
+        isOpen={showLightCandleModal}
         onClose={() => {
+          console.log('🚪 [MODAL] Closing modal via onClose');
           setShowLightCandleModal(false);
           // Also clear any pending actions when modal is closed
           setWalletActionType(null);
           setShowAuthMessage(null);
         }}
         onLightCandle={(offering) => {
-          console.log('💡 [MODAL CALLBACK] setJustLitOffering will be called from LightCandleModal onLightCandle:', {
+          console.log('💡 [MODAL CALLBACK] onLightCandle called from LightCandleModal:', {
             offering: offering?.username || 'Anonymous',
             timestamp: Date.now()
           })

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useWalletAuth } from './WalletAuthProvider';
-import { db, collection, addDoc, doc, serverTimestamp, query, where, getDocs, deleteDoc } from '@/lib/firebaseClient';
+import { db, collection, addDoc, doc, serverTimestamp, query, where, getDocs, deleteDoc, setDoc, increment } from '@/lib/firebaseClient';
 import ThirdwebBuyModal from './ThirdwebBuyModal';
 import { erc20Contract } from '@/lib/contract';
 import { useSendTransaction } from 'thirdweb/react';
@@ -273,12 +273,14 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
-      // Don't reset if we're in the middle of burning or have completed
-      if (isBurnInProgress || hasCompletedBurn || forceHidden) {
-        console.log('[LightCandleModal] Preventing reset - burn in progress or completed');
+      // Only prevent reset if we're in the middle of burning (don't check hasCompletedBurn)
+      // This allows the modal to be reopened after a burn completes
+      if (isBurnInProgress) {
+        console.log('[LightCandleModal] Preventing reset - burn in progress');
         return;
       }
-      
+
+      console.log('[LightCandleModal] Resetting modal state on open');
       setOfferingType('petition');
       setMessage('');
       setTokenAmount('');
@@ -302,7 +304,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
         setShowNoBuyPrompt(false);
       }
     }
-    
+
     // Cleanup timeout on unmount or modal close
     return () => {
       if (progressTimeoutRef.current) {
@@ -314,14 +316,12 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
 
   // We'll control the progress indicator manually after transaction is signed
 
-  // Permanently hide modal after burn completes
-  if (hasCompletedBurn) return null;
-  
   // Show progress indicator even when modal is closed if transaction is processing
   if (!isOpen && transactionStatus !== 'processing') return null;
-  
+
   // Force hide the modal completely if forceHidden is set (except for progress indicator)
-  if (forceHidden && transactionStatus !== 'processing') return null;
+  // But allow it to reopen when explicitly opened (isOpen becomes true again)
+  if (forceHidden && transactionStatus !== 'processing' && !isOpen) return null;
 
   // Function to handle actions after successful burn
   const handlePostBurnActions = async () => {
@@ -455,7 +455,25 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
         console.log('✨ Creating new offering for wallet:', walletAddress);
         docRef = await addDoc(collection(db, 'offerings'), baseOffering);
         baseOffering.id = docRef.id;
-        
+
+        // Update user's lifetime stats for leaderboard
+        try {
+          const userStatsRef = doc(db, 'userStats', user.id);
+          await setDoc(userStatsRef, {
+            totalBurned: increment(baseOffering.tokensBurned || 0),
+            candlesLit: increment(1),
+            lastCandle: serverTimestamp(),
+            username: baseOffering.name,
+            userImageUrl: baseOffering.userImageUrl,
+            walletAddress: walletAddress,
+            userId: user.id
+          }, { merge: true });
+          console.log('📊 Updated user stats for leaderboard');
+        } catch (statsError) {
+          // Don't block the main flow if stats update fails
+          console.error('⚠️ Failed to update user stats (non-blocking):', statsError);
+        }
+
         // Return the offering ID so parent can update it with polaroid URL later
         if (window.setLatestOfferingId) {
           window.setLatestOfferingId(docRef.id);
@@ -1120,7 +1138,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
             }}>
             
             {/* Offering Type Selection */}
-            <label className="form-label" style={{ textAlign: 'center', marginBottom: '0.3rem' }}>
+            <label className="form-label" style={{ textAlign: 'left', marginBottom: '0.3rem' }}>
               Prayer Protocol:
             </label>
             <div className="offering-types">
@@ -1219,7 +1237,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
             {/* Message Input */}
             <div className="form-group" style={{ marginBottom: '0.5rem' }}>
               <label className="form-label" htmlFor="message">
-                Your Message (Optional)
+                Your Message to 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙
               </label>
               <textarea
                 id="message"
@@ -1418,7 +1436,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                 fontSize: '1.5rem',
                 marginBottom: '0.5rem'
               }}>
-                ✍️
+                
               </div>
               <div style={{
                 color: '#000',
@@ -1436,7 +1454,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
               filter: 'drop-shadow(0 0 20px rgba(255, 170, 0, 0.8))',
               animation: 'pulse 1.5s ease-in-out infinite'
             }}>
-              🕯️
+              ✍️
             </div>
             
             {/* Title */}
@@ -1496,7 +1514,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
             backgroundOrigin: 'border-box',
             backgroundClip: 'padding-box, border-box',
             borderRadius: '24px',
-            padding: '3rem',
+            padding: '1.5rem',
             textAlign: 'center',
             color: '#fff',
             boxShadow: '0 20px 60px rgba(139, 92, 246, 0.5)',
@@ -1505,13 +1523,20 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           }}>
             {/* Flame Icon */}
             <div style={{
-              fontSize: '4rem',
               marginBottom: '1.5rem',
               filter: 'drop-shadow(0 0 30px rgba(255, 170, 0, 0.8)) drop-shadow(0 0 60px rgba(255, 100, 0, 0.4))',
-              animation: 'pulse 2s ease-in-out infinite',
+              // animation: 'pulse 2s ease-in-out infinite',
               display: 'inline-block'
             }}>
-              🕯️
+              <img
+                src="/images/candleIcon.webp"
+                alt="Candle"
+                style={{
+                  width: '4rem',
+                  height: 'auto',
+                  objectFit: 'contain',
+                }}
+              />
             </div>
             
             {/* Title */}
@@ -1524,7 +1549,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
               textTransform: 'uppercase',
               letterSpacing: '2px'
             }}>
-              Ready to Light?
+              Ready to Light it?
             </h3>
             
             {/* Yellow Info Box */}
@@ -1532,22 +1557,24 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
               background: 'rgba(255, 193, 7, 0.15)',
               border: '1px solid rgba(255, 193, 7, 0.4)',
               borderRadius: '10px',
-              padding: '1rem',
+              // padding: '1rem',
               marginBottom: '2rem'
             }}>
               <p style={{
                 color: '#fff',
                 fontSize: '1rem',
-                marginBottom: '0.5rem',
-                lineHeight: '1.6'
+                marginBottom: '1rem',
+                lineHeight: '1.2',
+       
               }}>
-                You're about to burn <strong style={{ fontSize: '1.2rem', color: '#ffc107' }}>{pendingBurnAmount}</strong> RL80 token{pendingBurnAmount !== 1 ? 's' : ''}
+                You're about to burn <strong style={{ fontSize: '1.2rem', color: '#ffc107' }}><br/>{pendingBurnAmount}<br/></strong> RL80 token{pendingBurnAmount !== 1 ? 's' : ''}
               </p>
               <p style={{
                 color: 'rgba(255, 193, 7, 0.9)',
                 fontSize: '0.85rem',
-                margin: 0,
-                fontWeight: '500'
+                margin: '0.5rem',
+                fontWeight: '500',
+                    
               }}>
                 ⚠️ This action is permanent and cannot be undone
               </p>
@@ -1564,19 +1591,20 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                   setShowConfirmation(false);
                   setPendingBurnAmount(0);
                 }}
-                style={{
-                  padding: '0.75rem 1.5rem',
-                  background: 'rgba(255, 255, 255, 0.1)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
-                  borderRadius: '12px',
-                  color: 'rgba(255, 255, 255, 0.7)',
+               style={{
+                  padding: '0.9rem',
+                  background: '#b61f2bff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#000',
                   fontSize: '0.9rem',
                   fontWeight: '600',
                   cursor: 'pointer',
-                  transition: 'all 0.3s'
+                  transition: 'all 0.3s',
+                  textTransform: 'uppercase'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)';
+                  e.currentTarget.style.background = 'rgba(175, 40, 40, 0.94)';
                   e.currentTarget.style.color = '#fff';
                   e.currentTarget.style.transform = 'translateY(-2px)';
                 }}
@@ -1634,10 +1662,10 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                       contract: erc20Contract,
                       amount: amountInWei,
                     });
-                    
+
                     console.log('[LightCandleModal] Sending transaction for user to sign with account:', activeAccount.address);
-                    setShowWalletLoading(false); // Hide wallet loading when wallet opens
-                    
+                    // Keep showWalletLoading visible while user signs in their wallet
+
                     // Check if this is a test wallet account (has sendTransaction method)
                     if (activeAccount.sendTransaction) {
                       console.log('[LightCandleModal] Using test wallet account to send transaction');
@@ -1650,17 +1678,20 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                         });
                         
                         console.log('[LightCandleModal] Transaction confirmed:', result);
-                        
+
+                        // Hide wallet loading after successful signing
+                        setShowWalletLoading(false);
+
                         // Clear progress indicator
                         setTransactionStatus('');
-                        
+
                         // Now save to Firebase after actual blockchain confirmation
                         await handlePostBurnActions();
-                        
+
                         setIsSubmitting(false);
                         // Permanently hide the modal after burn completes
                         setHasCompletedBurn(true);
-                        
+
                         // Call onClose after a delay
                         setTimeout(() => {
                           onClose();
@@ -1753,17 +1784,18 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                   setShowWalletLoading(false);
                 }
               }}
-              style={{
-                padding: '0.75rem 1.5rem',
-                background: 'linear-gradient(135deg, #8b5cf6, #ec4899)',
-                border: 'none',
-                borderRadius: '12px',
-                color: '#fff',
-                fontSize: '0.9rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.3s'
-              }}
+            style={{
+                  padding: '0.9rem',
+                  background: '#00f5d4',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#000',
+                  fontSize: '0.9rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s',
+                  textTransform: 'uppercase'
+                }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-2px)';
                 e.currentTarget.style.boxShadow = '0 10px 30px rgba(139, 92, 246, 0.3)';

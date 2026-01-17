@@ -275,16 +275,9 @@ export function useLighterAPI(config = {}) {
         fetchAccountState();
       }, 3600000); // 60 minutes * 60 seconds * 1000ms
       
-      // Generate AI team chat every 30 seconds for testing, then slow to 15 minutes
-      generateTeamChat();
-      const chatInterval = setInterval(() => {
-        generateTeamChat();
-      }, 30000); // 30 seconds for testing - change to 900000 for 15 minutes in production
-      
-      // Clean up chat interval on unmount
-      return () => {
-        clearInterval(chatInterval);
-      };
+      // Agent chat is now handled by AgentChatManager with hourly workflow:
+      // EMO → TEKNO → MACRO → RL80 (1 message per agent per hour)
+      // No automatic chat interval here - AgentChatManager is the single source
       
     } catch (err) {
       console.error('Failed to initialize Lighter API:', err);
@@ -680,7 +673,7 @@ export function useLighterAPI(config = {}) {
     executeStrategy,
     
     // Formatted data for UI
-    features/tradingData: formatTradingData()
+    tradingData: formatTradingData()
   };
 }
 

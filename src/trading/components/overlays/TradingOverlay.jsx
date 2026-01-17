@@ -52,6 +52,10 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
   
   // Track the last seen candle timestamp to detect new ones
   const lastCandleTimestamp = useRef(null);
+
+  // Ref for chat auto-scroll to bottom
+  const chatContainerRef = useRef(null);
+  const chatEndRef = useRef(null);
   
   // Simulate notifications for demo (remove in production)
   // DISABLED - Fake notifications turned off
@@ -453,6 +457,18 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
       return () => clearTimeout(timer);
     }
   }, []);
+
+  // Auto-scroll chat to bottom when new messages arrive or chat tab is opened
+  useEffect(() => {
+    if (activeTab === 'chat' && chatEndRef.current) {
+      // Small delay to ensure DOM has rendered
+      const timer = setTimeout(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
+      }, 50);
+
+      return () => clearTimeout(timer);
+    }
+  }, [tradingData.modelThoughts, activeTab]);
 
   // Remove the random data update effect - data should only come from API
   // Real-time updates will come from the Lighter API websocket connection
@@ -1470,7 +1486,8 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                 />
               )}
               
-              <div style={{
+              <div
+                style={{
                 width: '100%',
                 height: '100%',
                 background: isMobile ? 'rgba(10, 10, 20, 0.1)' : 'rgba(10, 10, 20, 0.1)',
@@ -1479,10 +1496,12 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                 borderRadius: isMobile ? '0' : '20px',
                 border: !isMobile ? '1px solid rgba(147, 51, 234, 0.3)' : 'none',
                 padding: '0',
-                overflowY: 'auto',
+                overflow: 'hidden',
                 boxShadow: !isMobile ? 'inset 0 0 30px rgba(147, 51, 234, 0.1)' : 'none',
                 position: 'relative',
-                zIndex: 999999
+                zIndex: 999999,
+                display: 'flex',
+                flexDirection: 'column'
               }}>
               {/* Header */}
               <div style={{
@@ -1729,16 +1748,19 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
               )}
 
               {/* Chat Messages Container */}
-              <div style={{
+              <div
+                ref={chatContainerRef}
+                style={{
                 background: 'rgba(255, 255, 255, 0.02)',
                 backdropFilter: 'blur(15px)',
                 WebkitBackdropFilter: 'blur(15px)',
                 borderRadius: '12px',
                 padding: '12px',
-                margin: '0 12px',
+                margin: '0 12px 12px 12px',
                 border: '1px solid rgba(255, 255, 255, 0.08)',
                 boxShadow: '0 4px 20px rgba(147, 51, 234, 0.05), inset 0 0 20px rgba(255, 255, 255, 0.02)',
-                maxHeight: 'calc(100vh - 350px)',
+                flex: 1,
+                minHeight: 0,
                 overflowY: 'auto',
                 scrollbarWidth: 'thin',
                 scrollbarColor: 'rgba(147, 51, 234, 0.3) transparent'
@@ -1905,6 +1927,8 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                     </div>
                   ))
                 })()}
+                {/* Marker for auto-scroll to bottom */}
+                <div ref={chatEndRef} />
               </div>
             </div>
             </>

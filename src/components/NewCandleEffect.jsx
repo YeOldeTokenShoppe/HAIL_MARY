@@ -12,7 +12,7 @@ const TRAIL_LIFETIME = 1.2 // Particles live longer for better trail
 const ARC_HEIGHT = 3 // How high the arc goes above the midpoint
 const MOBILE_ARC_HEIGHT = 1.5 // Lower arc for mobile visibility
 const MOBILE_BREAKPOINT = 768 // px
-const BRIGHT_GLOW_DURATION = 15.0 // How long the candle stays bright after landing (seconds)
+const BRIGHT_GLOW_DURATION = 5.0 // How long the candle stays bright after landing (seconds)
 
 // Arctic Rings config - enhanced for more fanfare
 const RING_COUNT = 7  // More rings for bigger impact
@@ -758,21 +758,31 @@ export const NewCandleEffectManager = forwardRef(({
     // Random target position in cloud - constrained for mobile
     let target;
     if (isMobile) {
-      // For mobile, keep the target more centered and closer
+      // For mobile, keep the target offset from center to avoid phone blocking view
+      // Randomly choose left or right side
+      const side = Math.random() > 0.5 ? 1 : -1;
+      // Offset from center: minimum 2 units, maximum 4 units to avoid going off-screen
+      const xOffset = side * (2 + Math.random() * 2); // ±(2 to 4)
+
       target = [
-        (Math.random() - 0.5) * cloudBounds.x * 0.4, // 40% of normal range
+        xOffset, // Left or right of center, avoiding the phone
         1.5 + Math.random() * 0.5, // Consistent Y around eye level (1.5 to 2.0)
         Math.random() * cloudBounds.z * 0.15 - 10 // Further in front (-10 to -11.5)
       ]
     } else {
-      // Desktop - bias toward front of view with consistent height
+      // Desktop - offset from center to avoid phone blocking view
+      // Randomly choose left or right side
+      const side = Math.random() > 0.5 ? 1 : -1;
+      // Offset from center: minimum 3 units, with random variation
+      const xOffset = side * (2 + Math.random() * cloudBounds.x * 0.25); // ±(3 to 3+30% of bounds)
+
       target = [
-        (Math.random() - 0.5) * cloudBounds.x * 0.7, // 70% of full width for better visibility
+        xOffset, // Left or right of center, avoiding the phone
         0 + Math.random() * -1.0, // Consistent Y near viewer level (0 to 1.0)
         Math.random() * cloudBounds.z * 0.2 - 12 // Further in front (-12 to -14)
       ]
     }
-    
+
     setEffectState({
       isActive: true,
       startPosition: isMobile ? [0, -2, 4] : phonePosition, // Adjust start position for mobile too

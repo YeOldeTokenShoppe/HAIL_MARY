@@ -12,7 +12,8 @@ import { useStaking } from '@/hooks/useStaking'
 import { useReadContract } from 'thirdweb/react'
 import { totalSupply } from 'thirdweb/extensions/erc20'
 import { erc20Contract } from '@/lib/contract'
-import CongregationSentiment from './SentimentData';
+import CongregationSentiment from './SentimentData'
+import { db, collection, query, orderBy, limit, getDocs } from '@/lib/firebaseClient'
 
 
 
@@ -741,14 +742,48 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   
   const [clickedCandleId, setClickedCandleId] = useState(null)
   const [isRippleActive, setIsRippleActive] = useState(false)
-  const [activeStatsTab, setActiveStatsTab] = useState('price') // 'price', 'staking', or 'mood'
+  const [activeStatsTab, setActiveStatsTab] = useState('price') // 'price', 'staking', 'mood', or 'leaders'
   const [userCandleData, setUserCandleData] = useState(null) // Store user's candle data for tooltip
   const [hoveredCandleId, setHoveredCandleId] = useState(null)
   const [targetCameraPosition, setTargetCameraPosition] = useState(null) // For camera movement
   const [userCandlePosition, setUserCandlePosition] = useState(null) // Store 3D position
   const [resetCameraToDefault, setResetCameraToDefault] = useState(false) // Reset camera flag
   const [overrideCameraControl, setOverrideCameraControl] = useState(false) // Override all camera controls
-  
+  const [clickedCandleData, setClickedCandleData] = useState(null) // Data for any clicked candle tooltip
+  const [leaderboardData, setLeaderboardData] = useState([]) // Top burners for leaderboard
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false)
+
+  // Fetch leaderboard data
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      if (!db) return
+      setLeaderboardLoading(true)
+      try {
+        const leaderboardQuery = query(
+          collection(db, 'userStats'),
+          orderBy('totalBurned', 'desc'),
+          limit(10)
+        )
+        const snapshot = await getDocs(leaderboardQuery)
+        const leaders = snapshot.docs.map((doc, index) => ({
+          id: doc.id,
+          rank: index + 1,
+          ...doc.data()
+        }))
+        setLeaderboardData(leaders)
+      } catch (error) {
+        console.error('Failed to fetch leaderboard:', error)
+      } finally {
+        setLeaderboardLoading(false)
+      }
+    }
+
+    fetchLeaderboard()
+    // Refresh leaderboard every 60 seconds
+    const interval = setInterval(fetchLeaderboard, 60000)
+    return () => clearInterval(interval)
+  }, [])
+
   // Get staking data
   const { 
     totalStaked,
@@ -1164,35 +1199,96 @@ useEffect(() => {
       clearTimeout(timeoutRefs.current[instanceId])
       delete timeoutRefs.current[instanceId]
     }
-    
+
+    // Clear any existing tooltip timeout
+    if (timeoutRefs.current['tooltip']) {
+      clearTimeout(timeoutRefs.current['tooltip'])
+      delete timeoutRefs.current['tooltip']
+    }
+
     setClickedCandleId(instanceId)
-    
+
     // Check if this is the user's candle
     if (userCandleData && instanceId === userCandleData.instanceId) {
       // Toggle hover state for user's candle
       setHoveredCandleId(prev => prev === instanceId ? null : instanceId)
+      setClickedCandleData(null) // Don't show tooltip for user's own candle
     } else {
+      // Check if this is an offering candle with real data
+      const baseCandles = 100
+      if (instanceId >= baseCandles && offeringCandles.length > 0) {
+        const offeringIndex = instanceId - baseCandles
+        if (offeringIndex < offeringCandles.length) {
+          const candle = offeringCandles[offeringIndex]
+          const offering = candle.offering
+
+          // Calculate time info
+          const litAtTime = candle.litAt || offering?.createdAt?.toDate?.()?.getTime?.() || Date.now()
+          const now = Date.now()
+          const elapsed = (now - litAtTime) / 1000
+
+          // Format time ago
+          let timeAgo
+          if (elapsed < 60) {
+            timeAgo = `${Math.floor(elapsed)}s ago`
+          } else if (elapsed < 3600) {
+            timeAgo = `${Math.floor(elapsed / 60)}m ago`
+          } else if (elapsed < 86400) {
+            timeAgo = `${Math.floor(elapsed / 3600)}h ago`
+          } else {
+            timeAgo = `${Math.floor(elapsed / 86400)}d ago`
+          }
+
+          // Calculate melt percentage
+          const meltPercentage = Math.min(100, (elapsed / 300) * 100).toFixed(1)
+
+          setClickedCandleData({
+            username: offering?.name || candle.username || 'Anonymous',
+            userImageUrl: offering?.userImageUrl || null,
+            litAt: `lit ${timeAgo}, ${meltPercentage}% melted`,
+            message: offering?.message || null,
+            isCurrentUser: candle.userId === currentUserId
+          })
+
+          // Auto-dismiss tooltip after 4 seconds
+          timeoutRefs.current['tooltip'] = setTimeout(() => {
+            setClickedCandleData(null)
+            delete timeoutRefs.current['tooltip']
+          }, 4000)
+        }
+      } else {
+        // Base candle (no owner data)
+        setClickedCandleData({
+          username: 'Eternal Flame',
+          userImageUrl: null,
+          litAt: 'burns forever',
+          message: null,
+          isCurrentUser: false
+        })
+
+        // Auto-dismiss tooltip after 3 seconds
+        timeoutRefs.current['tooltip'] = setTimeout(() => {
+          setClickedCandleData(null)
+          delete timeoutRefs.current['tooltip']
+        }, 3000)
+      }
+
+      // Clear purple glow after 2 seconds
       timeoutRefs.current[instanceId] = setTimeout(() => {
         setClickedCandleId(null)
         delete timeoutRefs.current[instanceId]
       }, 2000)
-      
+
       if (offerings?.length > 0 && onSelectOffering) {
-        // If clicking on offering candles (ID >= 500), show that specific offering
-        if (instanceId >= 100) {
-          const offeringIndex = instanceId - 100
+        if (instanceId >= baseCandles) {
+          const offeringIndex = instanceId - baseCandles
           if (offeringIndex < offerings.length) {
             onSelectOffering(offerings[offeringIndex])
           }
-        } else {
-          // Random offering for base candles
-          const randomIndex = Math.floor(Math.random() * offerings.length)
-          const selectedOffering = offerings[randomIndex]
-          onSelectOffering(selectedOffering)
         }
       }
     }
-  }, [offerings, onSelectOffering, userCandleData])
+  }, [offerings, onSelectOffering, userCandleData, offeringCandles, currentUserId])
 
   const handleNewCandle = useCallback((position, offering) => {
     setAdditionalCandles(prev => [...prev, {
@@ -1501,6 +1597,131 @@ useEffect(() => {
           Click anywhere to return
         </div>
       )}
+
+      {/* Fixed screen-space panel for user's candle info */}
+      {targetCameraPosition && userCandleData && (
+        <div
+          style={{
+            position: 'absolute',
+            top: isMobile ? '120px' : '80px',
+            right: isMobile ? '16px' : '24px',
+            background: 'rgba(20, 20, 30, 0.98)',
+            borderRadius: '24px',
+            padding: isMobile ? '1.5rem' : '2rem',
+            minWidth: isMobile ? '220px' : '280px',
+            maxWidth: isMobile ? '280px' : '320px',
+            border: '1px solid rgba(138, 43, 226, 0.4)',
+            boxShadow: '0 0 60px rgba(138, 43, 226, 0.3)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            zIndex: 101,
+            animation: 'slideInRight 0.4s ease-out',
+            pointerEvents: 'none',
+            textAlign: 'center',
+          }}
+        >
+          {/* Icon/Avatar */}
+          <div style={{ marginBottom: '1rem' }}>
+            {userCandleData.userImageUrl ? (
+              <img
+                src={userCandleData.userImageUrl}
+                alt={userCandleData.username}
+                style={{
+                  width: '60px',
+                  height: '60px',
+                  borderRadius: '50%',
+                  objectFit: 'cover',
+                  filter: 'drop-shadow(0 0 20px rgba(138, 43, 226, 0.8)) drop-shadow(0 0 40px rgba(138, 43, 226, 0.5))',
+                  border: '2px solid rgba(138, 43, 226, 0.6)'
+                }}
+              />
+            ) : (
+              <div style={{
+                width: '60px',
+                height: '60px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #8a2be2, #ff006e)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '24px',
+                fontWeight: 'bold',
+                color: '#fff',
+                margin: '0 auto',
+                filter: 'drop-shadow(0 0 20px rgba(138, 43, 226, 0.8)) drop-shadow(0 0 40px rgba(138, 43, 226, 0.5))',
+                border: '2px solid rgba(138, 43, 226, 0.6)'
+              }}>
+                {userCandleData.username?.charAt(0).toUpperCase() || '?'}
+              </div>
+            )}
+          </div>
+
+          {/* Title */}
+          <h2 style={{
+            fontSize: isMobile ? '1rem' : '1.2rem',
+            marginBottom: '0.5rem',
+            fontWeight: 'bold',
+            textTransform: 'uppercase',
+            letterSpacing: '2px',
+            fontFamily: "'Orbitron', monospace",
+            color: '#fff'
+          }}>
+            Your Candle
+          </h2>
+
+          {/* Username */}
+          <p style={{
+            marginBottom: '1rem',
+            color: '#00f5d4',
+            fontSize: isMobile ? '1rem' : '1.1rem',
+            fontWeight: '600',
+            lineHeight: '1.5'
+          }}>
+            {userCandleData.username}
+          </p>
+
+          {/* Candle stats */}
+          <div style={{
+            padding: '0.75rem 1rem',
+            background: 'rgba(138, 43, 226, 0.15)',
+            borderRadius: '12px',
+            border: '1px solid rgba(138, 43, 226, 0.3)',
+            marginBottom: userCandleData.message ? '1rem' : '0'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+            }}>
+              <span style={{ fontSize: '18px' }}>🕯️</span>
+              <span style={{
+                fontSize: isMobile ? '0.85rem' : '0.9rem',
+                color: '#fff',
+                fontFamily: "'Orbitron', monospace",
+                letterSpacing: '0.5px'
+              }}>
+                {userCandleData.litAt}
+              </span>
+            </div>
+          </div>
+
+          {/* Message if present */}
+          {userCandleData.message && (
+            <div style={{
+              padding: '0.75rem 1rem',
+              background: 'rgba(255, 255, 255, 0.05)',
+              borderRadius: '12px',
+              fontSize: isMobile ? '0.85rem' : '0.9rem',
+              color: 'rgba(255, 255, 255, 0.8)',
+              fontStyle: 'italic',
+              lineHeight: '1.5',
+            }}>
+              "{userCandleData.message}"
+            </div>
+          )}
+        </div>
+      )}
       
       {mounted && typeof window !== 'undefined' && (
       <CanvasErrorBoundary>
@@ -1599,12 +1820,7 @@ useEffect(() => {
                 }}
               />
               
-              {/* Show label for user's candle when hovered or when highlighted */}
-              <CandleLabel 
-                position={userCandlePosition}
-                data={userCandleData}
-                visible={(hoveredCandleId === userCandleData?.instanceId) || (userCandleData && targetCameraPosition)}
-              />
+              {/* User candle label moved to fixed screen-space panel below */}
               
               {/* Particle effects for highlighted candle - Removed green ring */}
               {/* {userCandlePosition && targetCameraPosition && (
@@ -1719,7 +1935,164 @@ useEffect(() => {
             transform: translateX(-50%) translateY(0);
           }
         }
+
+        @keyframes slideInRight {
+          from {
+            opacity: 0;
+            transform: translateX(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(0);
+          }
+        }
+
+        @keyframes slideUpFade {
+          from {
+            opacity: 0;
+            transform: translateX(-50%) translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+          }
+        }
+
+        @keyframes fadeOut {
+          from {
+            opacity: 1;
+          }
+          to {
+            opacity: 0;
+          }
+        }
     `}</style>
+
+      {/* Clicked candle tooltip - shows owner info */}
+      {clickedCandleData && !targetCameraPosition && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: isMobile ? '100px' : '40px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(20, 20, 30, 0.95)',
+            borderRadius: '16px',
+            padding: isMobile ? '12px 16px' : '14px 20px',
+            minWidth: isMobile ? '200px' : '240px',
+            maxWidth: isMobile ? '280px' : '320px',
+            border: clickedCandleData.isCurrentUser
+              ? '1px solid rgba(0, 245, 212, 0.5)'
+              : '1px solid rgba(138, 43, 226, 0.4)',
+            boxShadow: clickedCandleData.isCurrentUser
+              ? '0 0 40px rgba(0, 245, 212, 0.3)'
+              : '0 0 40px rgba(138, 43, 226, 0.3)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            zIndex: 102,
+            animation: 'slideUpFade 0.3s ease-out',
+            pointerEvents: 'none',
+          }}
+        >
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+          }}>
+            {/* Avatar */}
+            {clickedCandleData.userImageUrl ? (
+              <img
+                src={clickedCandleData.userImageUrl}
+                alt={clickedCandleData.username}
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  objectFit: 'cover',
+                  border: clickedCandleData.isCurrentUser
+                    ? '2px solid rgba(0, 245, 212, 0.6)'
+                    : '2px solid rgba(138, 43, 226, 0.6)',
+                  flexShrink: 0
+                }}
+              />
+            ) : (
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                background: clickedCandleData.isCurrentUser
+                  ? 'linear-gradient(135deg, #00f5d4, #00b894)'
+                  : 'linear-gradient(135deg, #8a2be2, #ff006e)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                color: '#fff',
+                border: clickedCandleData.isCurrentUser
+                  ? '2px solid rgba(0, 245, 212, 0.6)'
+                  : '2px solid rgba(138, 43, 226, 0.6)',
+                flexShrink: 0
+              }}>
+                {clickedCandleData.username?.charAt(0).toUpperCase() || '?'}
+              </div>
+            )}
+
+            {/* Info */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                fontWeight: 'bold',
+                fontSize: isMobile ? '14px' : '15px',
+                color: clickedCandleData.isCurrentUser ? '#00f5d4' : '#fff',
+                fontFamily: "'Orbitron', monospace",
+                marginBottom: '2px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
+                {clickedCandleData.username}
+                {clickedCandleData.isCurrentUser && (
+                  <span style={{
+                    fontSize: '10px',
+                    marginLeft: '6px',
+                    opacity: 0.8,
+                    fontWeight: 'normal'
+                  }}>
+                    (you)
+                  </span>
+                )}
+              </div>
+              <div style={{
+                fontSize: isMobile ? '11px' : '12px',
+                color: 'rgba(255, 255, 255, 0.7)',
+                fontFamily: 'monospace',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}>
+                <span>🕯️</span>
+                <span>{clickedCandleData.litAt}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Message if present */}
+          {clickedCandleData.message && (
+            <div style={{
+              marginTop: '10px',
+              paddingTop: '10px',
+              borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+              fontSize: isMobile ? '12px' : '13px',
+              color: 'rgba(255, 255, 255, 0.8)',
+              fontStyle: 'italic',
+              lineHeight: '1.4',
+              textAlign: 'center'
+            }}>
+              "{clickedCandleData.message}"
+            </div>
+          )}
+        </div>
+      )}
       
       {/* Container for Stats Box and Find My Candle button on mobile */}
       {!targetCameraPosition && (
@@ -1790,7 +2163,7 @@ useEffect(() => {
               overflow: 'hidden',
             }}
           >
-            Staking
+            Stake
           </button>
           <button
             onClick={() => setActiveStatsTab('mood')}
@@ -1813,6 +2186,28 @@ useEffect(() => {
             }}
           >
             Mood
+          </button>
+          <button
+            onClick={() => setActiveStatsTab('leaders')}
+            style={{
+              flex: 1,
+              padding: isMobile ? '4px 4px' : '6px 8px',
+              background: activeStatsTab === 'leaders' ? 'rgba(255, 149, 0, 0.2)' : 'transparent',
+              border: 'none',
+              borderBottom: activeStatsTab === 'leaders' ? '2px solid #ff9500' : '2px solid transparent',
+              color: activeStatsTab === 'leaders' ? '#ff9500' : '#ccc',
+              fontSize: isMobile ? '10px' : '12px',
+              fontFamily: 'monospace',
+              fontWeight: activeStatsTab === 'leaders' ? 'bold' : 'normal',
+              cursor: 'pointer',
+              textTransform: 'uppercase',
+              transition: 'all 0.2s',
+              marginBottom: '-1px',
+              minWidth: 0,
+              overflow: 'hidden',
+            }}
+          >
+            🔥
           </button>
         </div>
         
@@ -2067,15 +2462,173 @@ useEffect(() => {
         ) : activeStatsTab === 'mood' ? (
           <>
             {/* Mood Tab Content */}
-            <div style={{ 
-              padding: 0, 
+            <div style={{
+              padding: 0,
               margin: isMobile ? '-6px' : '-10px',
               maxHeight: isMobile ? '400px' : 'auto',
-              minHeight: isMobile ? '300px' : '320px', 
+              minHeight: isMobile ? '300px' : '320px',
               overflowY: isMobile ? 'auto' : 'visible',
               overflowX: 'hidden'
             }}>
               <CongregationSentiment />
+            </div>
+          </>
+        ) : activeStatsTab === 'leaders' ? (
+          <>
+            {/* Leaders Tab Content */}
+            <div style={{
+              padding: 0,
+              margin: isMobile ? '-2px' : '-4px',
+            }}>
+              {/* Header */}
+              <div style={{
+                textAlign: 'center',
+                marginBottom: isMobile ? '8px' : '12px',
+                padding: '8px',
+                background: 'rgba(255, 149, 0, 0.1)',
+                borderRadius: '8px',
+                border: '1px solid rgba(255, 149, 0, 0.2)'
+              }}>
+                <div style={{
+                  fontSize: isMobile ? '11px' : '12px',
+                  color: '#ff9500',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  fontFamily: "'Orbitron', monospace",
+                  fontWeight: 'bold'
+                }}>
+                  🔥 Illuminati 🔥
+                </div>
+                <div style={{
+                  fontSize: isMobile ? '9px' : '10px',
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  marginTop: '2px'
+                }}>
+                  Top Burners (All Time)
+                </div>
+              </div>
+
+              {/* Leaderboard List */}
+              {leaderboardLoading ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '20px',
+                  color: 'rgba(255, 255, 255, 0.5)',
+                  fontSize: '12px'
+                }}>
+                  Loading...
+                </div>
+              ) : leaderboardData.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '20px',
+                  color: 'rgba(255, 255, 255, 0.5)',
+                  fontSize: '12px'
+                }}>
+                  No data yet. Light a candle to join!
+                </div>
+              ) : (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: isMobile ? '4px' : '6px',
+                  maxHeight: isMobile ? '200px' : '240px',
+                  overflowY: 'auto'
+                }}>
+                  {leaderboardData.map((leader, index) => (
+                    <div
+                      key={leader.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: isMobile ? '6px 8px' : '8px 10px',
+                        background: index === 0
+                          ? 'linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 149, 0, 0.1))'
+                          : index === 1
+                          ? 'linear-gradient(135deg, rgba(192, 192, 192, 0.15), rgba(150, 150, 150, 0.05))'
+                          : index === 2
+                          ? 'linear-gradient(135deg, rgba(205, 127, 50, 0.15), rgba(180, 100, 40, 0.05))'
+                          : 'rgba(255, 255, 255, 0.03)',
+                        borderRadius: '8px',
+                        border: index < 3
+                          ? `1px solid ${index === 0 ? 'rgba(255, 215, 0, 0.4)' : index === 1 ? 'rgba(192, 192, 192, 0.3)' : 'rgba(205, 127, 50, 0.3)'}`
+                          : '1px solid rgba(255, 255, 255, 0.05)'
+                      }}
+                    >
+                      {/* Rank */}
+                      <div style={{
+                        width: '20px',
+                        textAlign: 'center',
+                        fontSize: index < 3 ? '14px' : '11px',
+                        fontWeight: 'bold',
+                        color: index === 0 ? '#ffd700' : index === 1 ? '#c0c0c0' : index === 2 ? '#cd7f32' : 'rgba(255, 255, 255, 0.5)'
+                      }}>
+                        {index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`}
+                      </div>
+
+                      {/* Avatar */}
+                      {leader.userImageUrl ? (
+                        <img
+                          src={leader.userImageUrl}
+                          alt={leader.username}
+                          style={{
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            objectFit: 'cover',
+                            border: index < 3 ? '2px solid rgba(255, 149, 0, 0.5)' : '1px solid rgba(255, 255, 255, 0.2)'
+                          }}
+                        />
+                      ) : (
+                        <div style={{
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          background: 'linear-gradient(135deg, #ff9500, #ff6600)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '10px',
+                          fontWeight: 'bold',
+                          color: '#fff'
+                        }}>
+                          {leader.username?.charAt(0).toUpperCase() || '?'}
+                        </div>
+                      )}
+
+                      {/* Name */}
+                      <div style={{
+                        flex: 1,
+                        fontSize: isMobile ? '11px' : '12px',
+                        color: index < 3 ? '#fff' : 'rgba(255, 255, 255, 0.8)',
+                        fontWeight: index < 3 ? 'bold' : 'normal',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {leader.username || 'Anonymous'}
+                      </div>
+
+                      {/* Burned Amount */}
+                      <div style={{
+                        fontSize: isMobile ? '10px' : '11px',
+                        color: '#ff9500',
+                        fontFamily: 'monospace',
+                        fontWeight: 'bold'
+                      }}>
+                        {leader.totalBurned >= 1000000000
+                          ? `${(leader.totalBurned / 1000000000).toFixed(1)}B`
+                          : leader.totalBurned >= 1000000
+                          ? `${(leader.totalBurned / 1000000).toFixed(1)}M`
+                          : leader.totalBurned >= 1000
+                          ? `${(leader.totalBurned / 1000).toFixed(1)}K`
+                          : leader.totalBurned?.toLocaleString() || '0'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </>
         ) : null}

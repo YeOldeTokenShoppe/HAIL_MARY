@@ -1,7 +1,7 @@
 import { initializeApp, getApps } from "firebase/app";
-import { 
-  getFirestore, 
-  collection, 
+import {
+  getFirestore,
+  collection,
   query,
   where,
   getDocs,
@@ -16,7 +16,8 @@ import {
   onSnapshot,
   getDoc,
   setDoc,
-  runTransaction
+  runTransaction,
+  increment
 } from "firebase/firestore";
 import { getAuth, signInWithCustomToken } from "firebase/auth";
 import { getStorage, ref, getDownloadURL, uploadBytes } from "firebase/storage";
@@ -240,26 +241,27 @@ const signInWithCustomTokenWrapper = async (authInstance, token) => {
   return signInWithCustomToken(authInstance, token);
 };
 
-export { 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  deleteDoc, 
-  doc, 
+export {
+  collection,
+  query,
+  where,
+  getDocs,
+  deleteDoc,
+  doc,
   addDoc,
-  updateDoc, 
-  orderBy, 
+  updateDoc,
+  orderBy,
   // Rename limitFn to limit to avoid naming conflicts
-  limitFn as limit, 
-  writeBatch, 
-  serverTimestamp, 
-  onSnapshot, 
-  getDoc, 
-  setDoc, 
-  ref, 
-  getDownloadURL, 
-  uploadBytes, 
+  limitFn as limit,
+  writeBatch,
+  serverTimestamp,
+  onSnapshot,
+  getDoc,
+  setDoc,
+  increment,
+  ref,
+  getDownloadURL,
+  uploadBytes,
   signInWithCustomTokenWrapper as signInWithCustomToken,
   runTransaction,
   // Realtime Database exports

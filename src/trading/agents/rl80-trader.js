@@ -357,7 +357,7 @@ export async function generateRL80Response(context, teamMessages, teamAnalysis =
   const factors = [];
   let riskLevel = 'normal';
   let action = 'HOLD';
-  let confidence = 0.5;
+  let confidence = 0.65; // Start higher to enable trading in normal conditions
   
   // Price analysis
   if (btcPrice) {

@@ -410,8 +410,8 @@ class RL80Agent:
             trade_size = analysis.get("size", self.min_trade_amount)
             source = analysis.get("source", "unknown")
             
-            # Only execute high-confidence trades from JS RL80
-            min_confidence = 0.8 if source == "firebase_rl80_js" else 0.9
+            # Only execute trades with sufficient confidence (lowered to enable trading)
+            min_confidence = 0.5 if source == "firebase_rl80_js" else 0.7
             
             if action == "BUY" and confidence >= min_confidence:
                 logger.info(f"🚀 {source.upper()}: High confidence BUY signal detected (confidence: {confidence})")

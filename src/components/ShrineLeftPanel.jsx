@@ -10,15 +10,16 @@ import SkewedHeading from './SkewedHeading'
  * Consolidated left-side panel for the shrine page
  * Combines: Title, CTA text, and Matchstick into one cohesive unit
  */
-const ShrineLeftPanel = forwardRef(({ 
-  is80sMode = false, 
+const ShrineLeftPanel = forwardRef(({
+  is80sMode = false,
   isMobile = false,
   onLightCandle,
   onStakeClick,
   router,
   onFindCandle,
   onResetView,
-  isHighlighting = false
+  isHighlighting = false,
+  hasActiveCandle = false
 }, ref) => {
   const [isLit, setIsLit] = useState(false)
   const [hasLitCandleThisSession, setHasLitCandleThisSession] = useState(false)
@@ -297,7 +298,40 @@ const ShrineLeftPanel = forwardRef(({
             pointerEvents: 'none',
           }} />
         </div>
-         <div style={{
+
+        {/* "Or" divider between Stake and Get Lit */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '12px',
+          margin: '0.75rem 0',
+          width: '100%',
+          maxWidth: '120px',
+        }}>
+          <div style={{
+            flex: 1,
+            height: '1px',
+            background: 'linear-gradient(to right, transparent, rgba(212, 175, 55, 0.4))',
+          }} />
+          <span style={{
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: '0.85rem',
+            color: 'rgba(212, 175, 55, 0.7)',
+            textTransform: 'lowercase',
+            letterSpacing: '0.1em',
+            fontStyle: 'italic',
+          }}>
+            or
+          </span>
+          <div style={{
+            flex: 1,
+            height: '1px',
+            background: 'linear-gradient(to left, transparent, rgba(212, 175, 55, 0.4))',
+          }} />
+        </div>
+
+        <div style={{
           fontFamily: "'Bebas Neue', sans-serif",
           fontSize: isMobile ? '1rem' : '1.1rem',
           fontWeight: 300,
@@ -313,8 +347,7 @@ const ShrineLeftPanel = forwardRef(({
           maxWidth: isMobile ? '260px' : '280px',
           alignSelf: 'center',
         }}>
- 
-      <span style={{ 
+          <span style={{
             display: 'block',
             fontWeight: 400,
             textTransform: 'uppercase',
@@ -422,35 +455,19 @@ const ShrineLeftPanel = forwardRef(({
               </div>
             </div>
           )}
-          <div className={styles.wrapper} style={{
-            transform: 'scale(0.75)',  // Just scale, no translation needed
-            pointerEvents: 'none',
-          }}>
-            <div className={styles.container}>
-              <input type="checkbox" className={styles.switch} checked={isLit} readOnly />
-              
-              {/* Organic ambient glow - replaces the harsh circle */}
-              <div className={styles.ambientGlow} />
-              
-              <div className={styles.flameContainer}>
-                <div className={`${styles.flame} ${styles.red}`}></div>
-                <div className={`${styles.flame} ${styles.orange}`}></div>
-                <div className={`${styles.flame} ${styles.yellow}`}></div>
-                <div className={`${styles.flame} ${styles.white}`}></div>
-                <div className={`${styles.circle} ${styles.black}`}></div>
-              </div>
-              
-              <div className={styles.woodWrapper}>
-                <div className={styles.tip}></div>
-                <div className={styles.wood}>
-                  <p>b</p>
-                </div>
-              </div>
-              
-              <div className={styles.glowingArea}></div>
-              <div className={styles.mainGlow}></div>
-            </div>
-          </div>
+          <img
+            src="/images/torchIcon.webp"
+            alt="Light Candle"
+            style={{
+              width: '70%',
+              height: '70%',
+              objectFit: 'contain',
+              opacity: isLit ? 1 : 0.9,
+              filter: isLit ? 'brightness(1.3) drop-shadow(0 0 10px rgba(255, 149, 0, 0.6))' : 'brightness(1.1)',
+              pointerEvents: 'none',
+              transition: 'all 0.3s ease',
+            }}
+          />
           
           {/* Pulse animation overlay */}
           {isLit ? (
@@ -477,8 +494,8 @@ const ShrineLeftPanel = forwardRef(({
             }} />
           )}
         </div>
-        {/* Find My Candle button - hide when highlighting/viewing candle */}
-        {onFindCandle && !isHighlighting && (
+        {/* Find My Candle button - only visible when user has an active lit candle */}
+        {onFindCandle && !isHighlighting && hasActiveCandle && (
           <button
             onClick={() => onFindCandle?.()}
             style={{
