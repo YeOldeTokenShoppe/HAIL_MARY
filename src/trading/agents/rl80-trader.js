@@ -233,7 +233,7 @@ export function analyzeTeamConsensus(lastMessages) {
 // RESPONSE GENERATOR
 // ============================================================================
 
-export function generateRL80Response(context, teamMessages) {
+export async function generateRL80Response(context, teamMessages) {
   const { marketData } = context;
   const { btcPrice, fearGreed, fundingRate, openInterest, vix } = marketData || {};
   
@@ -249,7 +249,8 @@ export function generateRL80Response(context, teamMessages) {
   // Build response based on multiple factors
   const factors = [];
   let riskLevel = 'normal';
-  let action = 'hold';
+  let action = 'HOLD';
+  let confidence = 0.5;
   
   // Price analysis
   if (btcPrice) {
@@ -261,10 +262,16 @@ export function generateRL80Response(context, teamMessages) {
   if (fearGreed !== undefined && fearGreed !== null) {
     if (fearGreed < 25) {
       factors.push(`extreme fear ${fearGreed}`);
-      if (consensus !== 'bearish') action = 'buy';
+      if (consensus !== 'bearish') {
+        action = 'BUY';
+        confidence = 0.8; // High confidence on extreme fear + bullish consensus
+      }
     } else if (fearGreed > 75) {
       factors.push(`extreme greed ${fearGreed}`);
-      if (consensus !== 'bullish') action = 'sell';
+      if (consensus !== 'bullish') {
+        action = 'SELL';
+        confidence = 0.8; // High confidence on extreme greed + bearish consensus
+      }
     }
   }
   
@@ -272,16 +279,48 @@ export function generateRL80Response(context, teamMessages) {
   if (vix && vix > 30) {
     factors.push(`VIX ${vix.toFixed(1)}`);
     riskLevel = 'high';
+    confidence *= 0.7; // Reduce confidence in high volatility
   }
   
   if (fundingRate && Math.abs(fundingRate) > 0.05) {
     factors.push(`funding ${(fundingRate * 100).toFixed(2)}%`);
     riskLevel = 'elevated';
+    confidence *= 0.8; // Slight confidence reduction
   }
   
   if (openInterest && openInterest > 35) {
     factors.push(`OI $${openInterest}B`);
     riskLevel = 'elevated';
+    confidence *= 0.9;
+  }
+  
+  // Adjust action based on consensus and risk
+  if (consensus === 'bullish' && riskLevel === 'normal' && action === 'HOLD') {
+    action = 'BUY';
+    confidence = Math.max(confidence, 0.7);
+  } else if ((consensus === 'bearish' || riskLevel === 'high') && action === 'HOLD') {
+    action = 'SELL';
+    confidence = Math.max(confidence, 0.6);
+  }
+  
+  // Post trading decision to Firebase for Python agent
+  if (typeof window !== 'undefined') { // Only run in browser
+    try {
+      // Dynamic import to avoid SSR issues
+      const { rl80DecisionBridge } = await import('../services/rl80DecisionBridge.js');
+      
+      await rl80DecisionBridge.postEnhancedDecision({
+        action,
+        symbol: 'ETH', // Default to ETH for now
+        confidence,
+        reasoning: `${factors.join(', ')}`,
+        marketContext: { btcPrice, fearGreed, vix, fundingRate, openInterest },
+        teamConsensus: consensus,
+        riskLevel
+      });
+    } catch (error) {
+      console.error('Failed to post RL80 decision to Firebase:', error);
+    }
   }
   
   // Generate response based on consensus and risk
@@ -304,8 +343,8 @@ export function generateRL80Response(context, teamMessages) {
     if (factors.length > 0) {
       response = `Analyzing: ${factors.join(', ')}. `;
       
-      if (action === 'buy') response += 'Building position.';
-      else if (action === 'sell') response += 'Reducing exposure.';
+      if (action === 'BUY') response += 'Building position.';
+      else if (action === 'SELL') response += 'Reducing exposure.';
       else response += 'Monitoring setup.';
     } else {
       return null; // Don't show generic messages, just return null

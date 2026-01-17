@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { db, collection, onSnapshot, query, orderBy, limit, doc, getDoc } from '@/lib/firebaseClient';
+import { lighterAccountService } from '../services/lighterAccountService';
 
 const PerformanceDashboard = ({ show = true, onClose }) => {
   const [isMobile, setIsMobile] = useState(false);
@@ -32,6 +33,8 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [lighterAccount, setLighterAccount] = useState(null);
   const [lighterTradingData, setLighterTradingData] = useState(null);
+  const [apiAccountData, setApiAccountData] = useState(null);
+  const [apiLoadingError, setApiLoadingError] = useState(null);
 
   // Check for mobile viewport
   useEffect(() => {
@@ -43,6 +46,33 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Fetch Lighter API data
+  useEffect(() => {
+    if (!show) return;
+
+    const fetchApiData = async () => {
+      try {
+        setApiLoadingError(null);
+        const data = await lighterAccountService.fetchAllData();
+        setApiAccountData(data);
+        console.log('Lighter API data loaded:', data);
+      } catch (error) {
+        console.error('Failed to load Lighter API data:', error);
+        setApiLoadingError(error.message);
+      }
+    };
+
+    // Initial fetch
+    fetchApiData();
+
+    // Set up periodic refresh (every 30 seconds)
+    const interval = setInterval(fetchApiData, 30000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, [show]);
 
   // Load live Lighter data from Firebase
   useEffect(() => {
@@ -485,8 +515,32 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
         </div>
       ) : (
         <div>
+          {/* API Error Display */}
+          {apiLoadingError && (
+            <div style={{
+              background: 'rgba(255, 0, 0, 0.1)',
+              backdropFilter: 'blur(15px)',
+              WebkitBackdropFilter: 'blur(15px)',
+              padding: isMobile ? '12px' : '15px',
+              borderRadius: '15px',
+              border: '1px solid rgba(255, 0, 0, 0.3)',
+              marginBottom: '15px',
+              textAlign: 'center'
+            }}>
+              <div style={{ color: '#ff6666', fontSize: '12px', marginBottom: '5px' }}>
+                ⚠️ API Connection Error
+              </div>
+              <div style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '10px' }}>
+                {apiLoadingError}
+              </div>
+              <div style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '9px', marginTop: '5px' }}>
+                Falling back to Firebase data
+              </div>
+            </div>
+          )}
+
           {/* Current Account Balance - Prominent Display */}
-          {lighterAccount && (
+          {(apiAccountData?.account || lighterAccount) && (
             <div style={{
               background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.15) 0%, rgba(147, 51, 234, 0.05) 100%)',
               backdropFilter: 'blur(15px)',
@@ -532,10 +586,10 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
                   textShadow: '0 0 30px rgba(147, 51, 234, 0.8), 0 0 60px rgba(147, 51, 234, 0.4)',
                   fontFamily: 'monospace'
                 }}>
-                  ${lighterAccount.balance?.toLocaleString(undefined, { 
+                  ${((apiAccountData?.account?.balance || lighterAccount?.balance || 0)).toLocaleString(undefined, { 
                     minimumFractionDigits: 2, 
                     maximumFractionDigits: 2 
-                  }) || '0.00'}
+                  })}
                 </div>
                 
                 <div style={{ 
@@ -544,7 +598,7 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
                   fontWeight: '500',
                   marginBottom: '15px'
                 }}>
-                  Lighter Testnet • Account #{lighterAccount.accountIndex || 'N/A'}
+                  Lighter Testnet • Account #{(apiAccountData?.account?.accountIndex || lighterAccount?.accountIndex || 'N/A')}
                 </div>
 
                 {/* Balance status indicator */}
@@ -568,14 +622,14 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
                     boxShadow: '0 0 8px rgba(0, 255, 0, 0.8)',
                     animation: 'pulse 2s infinite'
                   }} />
-                  LIVE DATA
+                  {apiAccountData ? 'LIVE API' : 'FIREBASE DATA'}
                 </div>
               </div>
             </div>
           )}
 
           {/* Trading Status - Positions & Orders */}
-          {lighterTradingData && (
+          {(apiAccountData?.combined || lighterTradingData) && (
             <div style={{
               background: 'rgba(0, 255, 255, 0.05)',
               backdropFilter: 'blur(15px)',
@@ -586,7 +640,7 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
               boxShadow: '0 4px 20px rgba(0, 255, 255, 0.1)',
               marginBottom: '15px',
               display: 'grid',
-              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(180px, 1fr))',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(160px, 1fr))',
               gap: '15px'
             }}>
               <div>
@@ -599,91 +653,97 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
                   color: '#00ffff',
                   marginBottom: '4px'
                 }}>
-                  {lighterTradingData.positionCount || 0}
+                  {apiAccountData?.combined?.positionCount || lighterTradingData?.positionCount || 0}
                 </div>
                 <div style={{ 
                   color: 'rgba(255, 255, 255, 0.3)', 
                   fontSize: '9px'
                 }}>
-                  {lighterTradingData.positions?.length > 0 ? 
-                    lighterTradingData.positions.map(p => p.symbol).join(', ') : 
+                  {(apiAccountData?.combined?.positions || lighterTradingData?.positions)?.length > 0 ? 
+                    (apiAccountData?.combined?.positions || lighterTradingData?.positions).map(p => p.symbol).join(', ') : 
                     'No positions'
                   }
                 </div>
               </div>
 
-              {lighterTradingData && (
-                <>
-                  <div>
-                    <div style={{ color: '#888', fontSize: '10px', marginBottom: '6px', textTransform: 'uppercase' }}>
-                      📊 Open Positions
-                    </div>
-                    <div style={{
-                      fontSize: isMobile ? '20px' : '24px',
-                      fontWeight: 'bold',
-                      color: '#00ffff',
-                      marginBottom: '4px'
-                    }}>
-                      {lighterTradingData.positionCount || 0}
-                    </div>
-                    <div style={{ 
-                      color: 'rgba(255, 255, 255, 0.3)', 
-                      fontSize: '9px'
-                    }}>
-                      {lighterTradingData.positions?.length > 0 ? 
-                        lighterTradingData.positions.map(p => p.symbol).join(', ') : 
-                        'No positions'
-                      }
-                    </div>
-                  </div>
+              <div>
+                <div style={{ color: '#888', fontSize: '10px', marginBottom: '6px', textTransform: 'uppercase' }}>
+                  ⏳ Active Orders
+                </div>
+                <div style={{
+                  fontSize: isMobile ? '20px' : '24px',
+                  fontWeight: 'bold',
+                  color: '#ffaa00',
+                  marginBottom: '4px'
+                }}>
+                  {apiAccountData?.combined?.activeOrderCount || lighterTradingData?.orderCount || 0}
+                </div>
+                <div style={{ 
+                  color: 'rgba(255, 255, 255, 0.3)', 
+                  fontSize: '9px'
+                }}>
+                  {(apiAccountData?.combined?.activeOrders || lighterTradingData?.orders)?.length > 0 ? 
+                    `${(apiAccountData?.combined?.activeOrders || lighterTradingData?.orders).filter(o => o.side === 'buy').length} buy, ${(apiAccountData?.combined?.activeOrders || lighterTradingData?.orders).filter(o => o.side === 'sell').length} sell` :
+                    'No orders'
+                  }
+                </div>
+              </div>
 
-                  <div>
-                    <div style={{ color: '#888', fontSize: '10px', marginBottom: '6px', textTransform: 'uppercase' }}>
-                      ⏳ Pending Orders
-                    </div>
-                    <div style={{
-                      fontSize: isMobile ? '20px' : '24px',
-                      fontWeight: 'bold',
-                      color: '#ffaa00',
-                      marginBottom: '4px'
+              {/* P&L Breakdown */}
+              {apiAccountData && !apiAccountData.pnl?.hasNoHistory && (
+                <div>
+                  <div style={{ color: '#888', fontSize: '10px', marginBottom: '6px', textTransform: 'uppercase' }}>
+                    💰 P&L Breakdown
+                  </div>
+                  <div style={{
+                    fontSize: isMobile ? '14px' : '16px',
+                    fontWeight: 'bold',
+                    marginBottom: '4px'
+                  }}>
+                    <div style={{ 
+                      color: apiAccountData.combined?.pnlRealizedPnl >= 0 ? '#00ff00' : '#ff3333',
+                      fontSize: '11px'
                     }}>
-                      {lighterTradingData.orderCount || 0}
+                      R: ${apiAccountData.combined?.pnlRealizedPnl?.toFixed(2) || '0.00'}
                     </div>
                     <div style={{ 
-                      color: 'rgba(255, 255, 255, 0.3)', 
-                      fontSize: '9px'
+                      color: apiAccountData.combined?.pnlUnrealizedPnl >= 0 ? '#00ff00' : '#ff3333',
+                      fontSize: '11px'
                     }}>
-                      {lighterTradingData.orders?.length > 0 ? 
-                        `${lighterTradingData.orders.filter(o => o.side === 'buy').length} buy, ${lighterTradingData.orders.filter(o => o.side === 'sell').length} sell` :
-                        'No orders'
-                      }
+                      U: ${apiAccountData.combined?.pnlUnrealizedPnl?.toFixed(2) || '0.00'}
                     </div>
                   </div>
-
-                  <div>
-                    <div style={{ color: '#888', fontSize: '10px', marginBottom: '6px', textTransform: 'uppercase' }}>
-                      🔄 Last Update
-                    </div>
-                    <div style={{
-                      fontSize: isMobile ? '16px' : '18px',
-                      fontWeight: 'bold',
-                      color: '#00ff00',
-                      marginBottom: '4px'
-                    }}>
-                      {lighterTradingData.lastUpdate ? 
-                        new Date(lighterTradingData.lastUpdate).toLocaleTimeString() : 
-                        'Never'
-                      }
-                    </div>
-                    <div style={{ 
-                      color: 'rgba(255, 255, 255, 0.3)', 
-                      fontSize: '9px'
-                    }}>
-                      Live Testnet Data
-                    </div>
+                  <div style={{ 
+                    color: 'rgba(255, 255, 255, 0.3)', 
+                    fontSize: '8px'
+                  }}>
+                    Realized | Unrealized
                   </div>
-                </>
+                </div>
               )}
+
+              <div>
+                <div style={{ color: '#888', fontSize: '10px', marginBottom: '6px', textTransform: 'uppercase' }}>
+                  🔄 Last Update
+                </div>
+                <div style={{
+                  fontSize: isMobile ? '16px' : '18px',
+                  fontWeight: 'bold',
+                  color: '#00ff00',
+                  marginBottom: '4px'
+                }}>
+                  {(apiAccountData?.combined?.lastUpdate || lighterTradingData?.lastUpdate) ? 
+                    new Date(apiAccountData?.combined?.lastUpdate || lighterTradingData?.lastUpdate).toLocaleTimeString() : 
+                    'Never'
+                  }
+                </div>
+                <div style={{ 
+                  color: 'rgba(255, 255, 255, 0.3)', 
+                  fontSize: '9px'
+                }}>
+                  Live Testnet Data
+                </div>
+              </div>
             </div>
           )}
 
@@ -705,26 +765,51 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
               <div style={{ color: '#888', fontSize: isMobile ? '9px' : '10px', marginBottom: '6px', textTransform: 'uppercase' }}>
                 Total P&L
               </div>
-              <div style={{
-                fontSize: isMobile ? '24px' : '28px',
-                fontWeight: 'bold',
-                color: metrics.totalPnL >= 0 ? '#00ff00' : '#ff3333',
-                marginBottom: '4px',
-                textShadow: metrics.totalPnL >= 0 ? '0 0 15px rgba(0, 255, 0, 0.6)' : '0 0 15px rgba(255, 51, 51, 0.6)'
-              }}>
-                {metrics.totalPnL >= 0 ? '+' : ''}{metrics.totalPnL.toFixed(2)}%
-              </div>
-              <div style={{ 
-                display: 'flex', 
-                gap: '8px', 
-                color: 'rgba(255, 255, 255, 0.3)', 
-                fontSize: '10px',
-                alignItems: 'center'
-              }}>
-                <span>{metrics.totalTrades} trades</span>
-                <span>•</span>
-                <span>{timeFrame.toUpperCase()}</span>
-              </div>
+              {apiAccountData?.pnl?.hasNoHistory ? (
+                <div>
+                  <div style={{
+                    fontSize: isMobile ? '24px' : '28px',
+                    fontWeight: 'bold',
+                    color: 'rgba(255, 255, 255, 0.3)',
+                    marginBottom: '4px'
+                  }}>
+                    $0.00
+                  </div>
+                  <div style={{ 
+                    color: 'rgba(255, 255, 255, 0.4)', 
+                    fontSize: '9px',
+                    fontStyle: 'italic'
+                  }}>
+                    No trading history yet
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{
+                    fontSize: isMobile ? '24px' : '28px',
+                    fontWeight: 'bold',
+                    color: (apiAccountData?.combined?.pnlTotalPnl || metrics.totalPnL) >= 0 ? '#00ff00' : '#ff3333',
+                    marginBottom: '4px',
+                    textShadow: (apiAccountData?.combined?.pnlTotalPnl || metrics.totalPnL) >= 0 ? '0 0 15px rgba(0, 255, 0, 0.6)' : '0 0 15px rgba(255, 51, 51, 0.6)'
+                  }}>
+                    {apiAccountData?.combined?.pnlTotalPnl !== undefined 
+                      ? `${apiAccountData.combined.pnlTotalPnl >= 0 ? '+' : ''}$${apiAccountData.combined.pnlTotalPnl.toFixed(2)}`
+                      : `${metrics.totalPnL >= 0 ? '+' : ''}${metrics.totalPnL.toFixed(2)}%`
+                    }
+                  </div>
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: '8px', 
+                    color: 'rgba(255, 255, 255, 0.3)', 
+                    fontSize: '10px',
+                    alignItems: 'center'
+                  }}>
+                    <span>{apiAccountData?.combined?.tradeCount || metrics.totalTrades} trades</span>
+                    <span>•</span>
+                    <span>{apiAccountData ? 'LIVE API' : timeFrame.toUpperCase()}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Win Rate with Visual Bar */}
@@ -814,17 +899,21 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
                 justifyContent: 'space-between',
                 alignItems: 'center'
               }}>
-                <span>📈 Equity Curve</span>
+                <span>📈 Equity Curve {apiAccountData?.pnl && !apiAccountData.pnl.hasNoHistory ? '(Live P&L)' : ''}</span>
                 <span style={{ color: '#00FFB8', fontSize: '12px' }}>
-                  {metrics.equityCurve.length > 0 ? 
-                    `${metrics.equityCurve[metrics.equityCurve.length - 1].value >= 0 ? '+' : ''}${metrics.equityCurve[metrics.equityCurve.length - 1].value.toFixed(2)}%` :
-                    'No data yet'
+                  {apiAccountData?.pnl?.hasNoHistory ? 
+                    'Waiting for trades...' :
+                    apiAccountData?.combined?.pnlHistory?.length > 0 ? 
+                      `$${apiAccountData.combined.pnlTotalPnl?.toFixed(2) || '0.00'}` :
+                      metrics.equityCurve.length > 0 ? 
+                        `${metrics.equityCurve[metrics.equityCurve.length - 1].value >= 0 ? '+' : ''}${metrics.equityCurve[metrics.equityCurve.length - 1].value.toFixed(2)}%` :
+                        'No data yet'
                   }
                 </span>
               </div>
               
               {/* SVG Chart */}
-              {metrics.equityCurve.length > 0 ? (
+              {(apiAccountData?.combined?.pnlHistory?.length > 0 || metrics.equityCurve.length > 0) && !apiAccountData?.pnl?.hasNoHistory ? (
               <>
               <div style={{ position: 'relative', width: '100%', height: isMobile ? '100px' : '120px' }}>
                 <svg 
@@ -1022,8 +1111,13 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
                 padding: isMobile ? '20px 15px' : '25px 20px',
                 fontSize: '11px'
               }}>
-                <div style={{ fontSize: '20px', marginBottom: '8px' }}>📊</div>
-                No equity curve data yet. Start features/trading to see your performance!
+                <div style={{ fontSize: '20px', marginBottom: '8px' }}>
+                  {apiAccountData?.pnl?.hasNoHistory ? '🤖' : '📊'}
+                </div>
+                {apiAccountData?.pnl?.hasNoHistory ? 
+                  'AI agents haven\'t started trading yet. Performance curve will appear when they make their first moves!' :
+                  'No equity curve data yet. Start trading to see your performance!'
+                }
               </div>
             )}
           </div>
