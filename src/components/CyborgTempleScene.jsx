@@ -952,15 +952,18 @@ const CyborgTempleScene = ({
     const handleTouchStart = (event) => {
       // Don't prevent default for better touch compatibility
       // event.preventDefault();
-      
+
+      // Safety check for groupRef
+      if (!groupRef.current) return;
+
       // For touchend events, use changedTouches instead of touches
       const touch = event.touches ? event.touches[0] : event.changedTouches[0];
       if (!touch) return; // Safety check
-      
+
       const rect = gl.domElement.getBoundingClientRect();
       mouse.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
-      
+
       raycaster.setFromCamera(mouse, camera);
       const intersects = raycaster.intersectObjects(groupRef.current.children, true);
       
@@ -1006,10 +1009,13 @@ const CyborgTempleScene = ({
     
     // Also set up hover detection for visual feedback
     const handlePointerMove = (event) => {
+      // Safety check for groupRef
+      if (!groupRef.current) return;
+
       const rect = gl.domElement.getBoundingClientRect();
       mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-      
+
       raycaster.setFromCamera(mouse, camera);
       const intersects = raycaster.intersectObjects(groupRef.current.children, true);
       
@@ -1145,16 +1151,19 @@ const CyborgTempleScene = ({
       // Prevent default to avoid any interference
       event.preventDefault();
       event.stopPropagation();
-      
+
+      // Safety check for groupRef
+      if (!groupRef.current) return;
+
       // Calculate mouse position in normalized device coordinates
       const rect = gl.domElement.getBoundingClientRect();
       mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-      
-      
+
+
       // Update the picking ray with the camera and mouse position
       raycaster.setFromCamera(mouse, camera);
-      
+
       // Calculate objects intersecting the picking ray
       const intersects = raycaster.intersectObjects(groupRef.current.children, true);
       
@@ -1333,12 +1342,15 @@ const CyborgTempleScene = ({
     
     // Add pointer events for better tablet support
     const handlePointerDown = (event) => {
+      // Safety check for groupRef
+      if (!groupRef.current) return;
+
       // Only handle if it's a touch/pen input (not mouse)
       if (event.pointerType === 'touch' || event.pointerType === 'pen') {
         const rect = gl.domElement.getBoundingClientRect();
         mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
         mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-        
+
         raycaster.setFromCamera(mouse, camera);
         const intersects = raycaster.intersectObjects(groupRef.current.children, true);
         
