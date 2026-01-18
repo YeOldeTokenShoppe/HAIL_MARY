@@ -3,6 +3,26 @@ import { defineChain } from "thirdweb/chains";
 import { balanceOf, transfer, approve, allowance, totalSupply, decimals } from "thirdweb/extensions/erc20";
 import { name, symbol } from "thirdweb/extensions/common";
 
+// Charity wallet addresses for fountain donations
+export const CHARITY_WALLETS = {
+  ST_JUDES: {
+    address: "0xbAC39697250cDF6A808Bd39D2D1828388DF87967",
+    name: "St. Jude Children's Research Hospital",
+    shortName: "St. Jude's",
+    givingBlockUrl: "https://thegivingblock.com/donate/st-judes-childrens-research-hospital/",
+    description: "Finding cures. Saving children.",
+    icon: "🏥"
+  },
+  ASPCA: {
+    address: "0xF9EAdD659e730BbC05f4BFfe618A98fB0b910fDD",
+    name: "American Society for the Prevention of Cruelty to Animals",
+    shortName: "ASPCA",
+    givingBlockUrl: "https://thegivingblock.com/donate/the-american-society-for-the-prevention-of-cruelty-to-animals/",
+    description: "We are their voice.",
+    icon: "🐾"
+  }
+};
+
 // Initialize Thirdweb client
 const client = createThirdwebClient({
   clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || "cbae42251fe95b7e26a19a326b96ce5c",
@@ -51,9 +71,10 @@ export const tokenFunctions = {
     return result;
   },
   
-  // Write functions (returns transaction object)
-  transfer: async (to, amount) => {
-    return transfer({ contract: erc20Contract, to, amount });
+  // Write functions (returns prepared transaction object)
+  // Use amountWei to pass raw wei amount (already multiplied by decimals)
+  transfer: (to, amountWei) => {
+    return transfer({ contract: erc20Contract, to, amountWei });
   },
   
   approve: (spender, amount) => {

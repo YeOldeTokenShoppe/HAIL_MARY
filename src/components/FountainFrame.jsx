@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
 
-const FountainFrame = forwardRef(({ is80sMode = false, onFullyLoaded }, ref) => {
+const FountainFrame = forwardRef(({ is80sMode = false, onFullyLoaded, onDonateClick }, ref) => {
   const iframeRef = useRef(null);
   const [isLoaded, setIsLoaded] = useState(false);
-  
+
   useImperativeHandle(ref, () => iframeRef.current);
 
   useEffect(() => {
@@ -15,11 +15,17 @@ const FountainFrame = forwardRef(({ is80sMode = false, onFullyLoaded }, ref) => 
           onFullyLoaded();
         }
       }
+      // Handle donation trigger from iframe
+      if (event.data?.type === 'openDonation') {
+        if (onDonateClick) {
+          onDonateClick(event.data?.charity || null);
+        }
+      }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [onFullyLoaded]);
+  }, [onFullyLoaded, onDonateClick]);
 
   useEffect(() => {
     // Send 80s mode state to iframe when it changes

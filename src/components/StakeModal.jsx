@@ -5,7 +5,8 @@ import { useUser } from '@clerk/nextjs';
 import { useWalletAuth } from './WalletAuthProvider';
 import { db, collection, addDoc, serverTimestamp } from '@/lib/firebaseClient';
 import ThirdwebBuyModal from './ThirdwebBuyModal';
-import { 
+import NoTokensPrompt from './NoTokensPrompt';
+import {
   useSendTransaction,
   TransactionButton
 } from "thirdweb/react";
@@ -38,6 +39,8 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
   const [transactionStatus, setTransactionStatus] = useState(''); // 'approving', 'staking', 'confirming', 'success'
   const [isDataRefreshing, setIsDataRefreshing] = useState(false);
   const [validationError, setValidationError] = useState('');
+  const [showWalletLoading, setShowWalletLoading] = useState(false);
+  const [showConfirmationMessage, setShowConfirmationMessage] = useState(null); // 'withdraw-success', 'withdraw-error', 'claim-success', 'claim-error'
   const { mutate: sendTransaction } = useSendTransaction();
   const isStakeSignedRef = useRef(false); // Track if stake was actually signed
   const lastTransactionRef = useRef(0); // For rate limiting
@@ -53,6 +56,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
       setIsSubmitting(false);
       setShowInfo(false);
       setTransactionStatus('');
+      setShowWalletLoading(false);
       isStakeSignedRef.current = false;
       setIsDataRefreshing(false);
       
@@ -309,112 +313,17 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
       <div className="modal-overlay" onClick={showSuccess ? undefined : onClose}>
         {/* Buy RL80 Prompt - Show this INSTEAD of the modal content */}
         {showNoBuyPrompt ? (
-          <div 
-            style={{
-              background: 'rgba(20, 20, 30, 0.98)',
-              border: '1px solid rgba(0, 245, 212, 0.4)',
-              borderRadius: '24px',
-              padding: '1rem',
-              maxWidth: '420px',
-              textAlign: 'center',
-              color: '#fff',
-              boxShadow: '0 0 60px rgba(0, 245, 212, 0.3)',
-              position: 'relative',
+          <NoTokensPrompt
+            message="You need RL80 tokens to stake."
+            onBuy={() => {
+              setShowNoBuyPrompt(false);
+              setShowBuyModal(true);
             }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Close button */}
-            <button
-              style={{
-                position: 'absolute',
-                top: '1rem',
-                right: '1rem',
-                background: 'transparent',
-                border: 'none',
-                color: '#00f5d4',
-                fontSize: '2rem',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                width: '32px',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'transform 0.2s',
-              }}
-              onClick={onClose}
-              onMouseEnter={(e) => e.target.style.transform = 'scale(1.1)'}
-              onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
-            >
-              ×
-            </button>
-            
-            {/* Title */}
-            <h2 style={{
-              fontFamily: "'Orbitron', monospace",
-              fontSize: '1.2rem',
-              fontWeight: '700',
-              color: '#fff',
-              textTransform: 'uppercase',
-              letterSpacing: '3px',
-              marginBottom: '1.5rem',
-            }}>
-              RL80 TOKENS REQUIRED
-            </h2>
-            
-            {/* Description */}
-            <p style={{
-              color: '#00f5d4',
-              fontSize: '1.1rem',
-              marginBottom: '2.5rem',
-              lineHeight: '1.5',
-            }}>
-              You need RL80 tokens to stake.
-            </p>
-            
-            {/* Info message for test mode */}
-            <div style={{
-              background: 'rgba(0, 245, 212, 0.1)',
-              border: '1px solid rgba(0, 245, 212, 0.3)',
-              borderRadius: '12px',
-              padding: '1rem',
-              marginBottom: '2rem'
-            }}>
-              <p style={{
-                color: '#fff',
-                fontSize: '0.9rem',
-                margin: 0
-              }}>
-                💡 Test tokens have been provided for this demo. Please close this window and try staking again.
-              </p>
-            </div>
-            
-            {/* Secondary link */}
-            <button 
-              onClick={() => {
-                setShowNoBuyPrompt(false);
-                onClose();
-              }}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'rgba(255, 255, 255, 0.5)',
-                fontSize: '0.9rem',
-                cursor: 'pointer',
-                padding: '0.5rem 1rem',
-                transition: 'color 0.3s',
-                textDecoration: 'underline',
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.color = 'rgba(255, 255, 255, 0.8)';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.color = 'rgba(255, 255, 255, 0.5)';
-              }}
-            >
-              Maybe Later
-            </button>
-          </div>
+            onClose={() => {
+              setShowNoBuyPrompt(false);
+              onClose();
+            }}
+          />
         ) : showSuccess ? (
           // Success Dashboard with Staking Info
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -535,9 +444,11 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                   <div style={{
                     fontSize: '1.2rem',
                     fontWeight: '600',
-                    color: canWithdraw ? '#00ff88' : '#ff6b6b'
+                    color: (successData?.isNewStake || !canWithdraw) ? '#ff6b6b' : '#00ff88'
                   }}>
-                    {canWithdraw ? 'Unlocked' : timeUntilUnlockFormatted}
+                    {successData?.isNewStake
+                      ? `${LOCK_DURATION_MINUTES} min`
+                      : (canWithdraw ? 'Unlocked' : timeUntilUnlockFormatted)}
                   </div>
                 </div>
                 
@@ -650,28 +561,28 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                   console.log('Withdrawn successfully!');
                   await refreshStakingData();
                   await refreshBalance();
-                  alert('Tokens withdrawn successfully!');
+                  setShowConfirmationMessage('withdraw-success');
                 }}
                 onError={(error) => {
                   console.error('Error withdrawing tokens:', error);
-                  alert('Failed to withdraw tokens');
+                  setShowConfirmationMessage('withdraw-error');
                 }}
-                disabled={!canWithdraw || parseFloat(stakedBalance) === 0}
+                disabled={successData?.isNewStake || !canWithdraw || parseFloat(stakedBalance) === 0}
                 style={{
                   padding: '0.9rem',
-                  background: canWithdraw ? '#ff6b6b' : 'rgba(100, 100, 100, 0.3)',
+                  background: (successData?.isNewStake || !canWithdraw) ? 'rgba(100, 100, 100, 0.3)' : '#ff6b6b',
                   border: 'none',
                   borderRadius: '8px',
-                  color: canWithdraw ? '#fff' : 'rgba(255, 255, 255, 0.5)',
+                  color: (successData?.isNewStake || !canWithdraw) ? 'rgba(255, 255, 255, 0.5)' : '#fff',
                   fontSize: '0.9rem',
                   fontWeight: '600',
-                  cursor: canWithdraw ? 'pointer' : 'not-allowed',
+                  cursor: (successData?.isNewStake || !canWithdraw) ? 'not-allowed' : 'pointer',
                   transition: 'all 0.3s',
                   textTransform: 'uppercase',
                   width: '100%'
                 }}
               >
-                {canWithdraw ? `WITHDRAW ALL (${parseFloat(successData?.optimisticStakedAmount || stakedBalance || 0).toLocaleString()} RL80)` : `🔒 LOCKED`}
+                {(successData?.isNewStake || !canWithdraw) ? `🔒 LOCKED` : `WITHDRAW ALL (${parseFloat(successData?.optimisticStakedAmount || stakedBalance || 0).toLocaleString()} RL80)`}
               </TransactionButton>
             </div>
             
@@ -687,23 +598,23 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                   console.log('Rewards claimed successfully!');
                   await refreshStakingData();
                   await refreshBalance();
-                  alert('Rewards claimed successfully!');
+                  setShowConfirmationMessage('claim-success');
                 }}
                 onError={(error) => {
                   console.error('Error claiming rewards:', error);
-                  alert('Failed to claim rewards');
+                  setShowConfirmationMessage('claim-error');
                 }}
-                disabled={!canWithdraw || parseFloat(earnedRewards) === 0}
+                disabled={parseFloat(earnedRewards) === 0}
                 style={{
                   width: '100%',
                   padding: '0.9rem',
-                  background: canWithdraw ? '#00f5d4' : 'rgba(100, 100, 100, 0.3)',
+                  background: '#00f5d4',
                   border: 'none',
                   borderRadius: '8px',
-                  color: canWithdraw ? '#000' : 'rgba(255, 255, 255, 0.5)',
+                  color: '#000',
                   fontSize: '0.9rem',
                   fontWeight: '600',
-                  cursor: canWithdraw ? 'pointer' : 'not-allowed',
+                  cursor: 'pointer',
                   transition: 'all 0.3s',
                   textTransform: 'uppercase',
                   marginBottom: '1rem'
@@ -1017,11 +928,13 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                       setIsSubmitting(true);
                       setTransactionStatus('signing');
                       setValidationError(''); // Clear any existing errors
-                      
+                      setShowWalletLoading(true); // Show wallet loading indicator
+
                       const validation = validateAmount(stakeAmount, parseInt(tokenBalance));
                       if (!validation.isValid) {
                         showError(validation.error);
                         setIsSubmitting(false);
+                        setShowWalletLoading(false);
                         return;
                       }
                       
@@ -1063,7 +976,8 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                       
                       console.log("Stake successful!", result);
                       setTransactionStatus('success');
-                      
+                      setShowWalletLoading(false); // Hide wallet loading after success
+
                       // Save to Firestore
                       const stakeData = {
                         amount: parseInt(stakeAmount),
@@ -1090,11 +1004,12 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                       // Show success immediately with optimistic update
                       setSuccessData({
                         amount: parseInt(stakeAmount),
-                        unlockTime: IS_TESTNET 
+                        unlockTime: IS_TESTNET
                           ? new Date(Date.now() + LOCK_DURATION_MINUTES * 60 * 1000)
                           : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
                         txHash: result.transactionHash,
-                        optimisticStakedAmount: (parseFloat(stakedBalance || 0) + parseInt(stakeAmount)).toString()
+                        optimisticStakedAmount: (parseFloat(stakedBalance || 0) + parseInt(stakeAmount)).toString(),
+                        isNewStake: true // Flag to show tokens as locked immediately
                       });
                       setShowSuccess(true);
                       setStakeAmount('');
@@ -1120,7 +1035,8 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                     } catch (error) {
                       console.error("Staking failed");
                       setTransactionStatus('');
-                      
+                      setShowWalletLoading(false); // Hide wallet loading on error
+
                       // Use safe error messaging
                       const safeErrorMessage = formatSafeErrorMessage(error);
                       if (!error?.message?.includes('User rejected') && !error?.message?.includes('User denied')) {
@@ -1162,11 +1078,13 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                     try {
                       setIsSubmitting(true);
                       setValidationError(''); // Clear any existing errors
-                      
+                      setShowWalletLoading(true); // Show wallet loading indicator
+
                       const validation = validateAmount(stakeAmount, parseInt(tokenBalance));
                       if (!validation.isValid) {
                         showError(validation.error);
                         setIsSubmitting(false);
+                        setShowWalletLoading(false);
                         return;
                       }
                       
@@ -1225,7 +1143,8 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                             sendTransaction(stakeTx, {
                               onSuccess: async (stakeResult) => {
                                 console.log("Stake onSuccess fired - user has signed the stake!");
-                                
+                                setShowWalletLoading(false); // Hide wallet loading after user signs
+
                                 // Don't show confirming box for regular wallets
                                 // setTransactionStatus('confirming');
                               
@@ -1263,11 +1182,12 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                               // setTransactionStatus('success');
                               setSuccessData({
                                 amount: parseInt(stakeAmount),
-                                unlockTime: IS_TESTNET 
+                                unlockTime: IS_TESTNET
                                   ? new Date(Date.now() + LOCK_DURATION_MINUTES * 60 * 1000)
                                   : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
                                 txHash: stakeResult.transactionHash || stakeResult.hash,
-                                optimisticStakedAmount: (parseFloat(stakedBalance || 0) + parseInt(stakeAmount)).toString()
+                                optimisticStakedAmount: (parseFloat(stakedBalance || 0) + parseInt(stakeAmount)).toString(),
+                                isNewStake: true // Flag to show tokens as locked immediately
                               });
                               setShowSuccess(true);
                               setStakeAmount('');
@@ -1295,11 +1215,12 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                                 console.error("Stake transaction failed:", error);
                                 // setTransactionStatus('');
                                 setIsSubmitting(false);
-                                
+                                setShowWalletLoading(false); // Hide wallet loading on error
+
                                 // Check for specific error signatures
                                 if (error?.message?.includes('0xfb8f41b2')) {
                                   showError('Insufficient token allowance. Please try again.');
-                                } else if (!error?.message?.includes('User rejected') && 
+                                } else if (!error?.message?.includes('User rejected') &&
                                     !error?.message?.includes('User denied')) {
                                   showError(formatSafeErrorMessage(error));
                                 }
@@ -1311,8 +1232,9 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                           console.error("Approval transaction failed:", error);
                           // setTransactionStatus('');
                           setIsSubmitting(false);
-                          
-                          if (!error?.message?.includes('User rejected') && 
+                          setShowWalletLoading(false); // Hide wallet loading on error
+
+                          if (!error?.message?.includes('User rejected') &&
                               !error?.message?.includes('User denied')) {
                             showError(formatSafeErrorMessage(error));
                           }
@@ -1321,6 +1243,7 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
                     } catch (error) {
                       console.error("Failed to initiate staking");
                       setIsSubmitting(false);
+                      setShowWalletLoading(false); // Hide wallet loading on error
                       showError('Failed to stake tokens. Please try again.');
                     }
                   }}
@@ -1350,8 +1273,8 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
 
       {/* ThirdwebBuyModal */}
       {showBuyModal && (
-        <ThirdwebBuyModal 
-          isOpen={showBuyModal} 
+        <ThirdwebBuyModal
+          isOpen={showBuyModal}
           onClose={() => {
             setShowBuyModal(false);
             // Check if balance is still 0 after closing buy modal
@@ -1360,8 +1283,234 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
               // User didn't complete purchase, close the StakeModal
               onClose();
             }
-          }} 
+          }}
         />
+      )}
+
+      {/* Wallet Loading Indicator with Yellow Guidance Box */}
+      {showWalletLoading && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10002,
+          animation: 'fadeIn 0.3s ease-out'
+        }}>
+          <div style={{
+            background: 'rgba(20, 20, 30, 0.98)',
+            border: '2px solid transparent',
+            backgroundImage: 'linear-gradient(rgba(20, 20, 30, 0.98), rgba(20, 20, 30, 0.98)), linear-gradient(90deg, #00f5d4, #00bbff)',
+            backgroundOrigin: 'border-box',
+            backgroundClip: 'padding-box, border-box',
+            borderRadius: '24px',
+            padding: '2rem',
+            textAlign: 'center',
+            color: '#fff',
+            boxShadow: '0 20px 60px rgba(0, 245, 212, 0.4)',
+            maxWidth: '380px',
+            width: '90%',
+            position: 'relative'
+          }}>
+            {/* Yellow Guidance Box */}
+            <div style={{
+              background: 'rgba(255, 193, 7, 0.95)',
+              borderRadius: '12px',
+              padding: '1rem',
+              marginBottom: '1.5rem',
+              boxShadow: '0 4px 20px rgba(255, 193, 7, 0.3)'
+            }}>
+              <div style={{
+                fontSize: '1.5rem',
+                marginBottom: '0.5rem'
+              }}>
+
+              </div>
+              <div style={{
+                color: '#000',
+                fontSize: '0.95rem',
+                fontWeight: '600'
+              }}>
+                Please sign the transaction in your wallet
+              </div>
+            </div>
+
+            {/* Icon */}
+            <div style={{
+              fontSize: '3rem',
+              marginBottom: '1rem',
+              filter: 'drop-shadow(0 0 20px rgba(0, 245, 212, 0.8))',
+              animation: 'pulse 1.5s ease-in-out infinite'
+            }}>
+              ✍️
+            </div>
+
+            {/* Title */}
+            <h3 style={{
+              fontFamily: "'Orbitron', monospace",
+              fontSize: '1.1rem',
+              fontWeight: '600',
+              color: '#fff',
+              marginBottom: '0.75rem',
+              textTransform: 'uppercase',
+              letterSpacing: '1px'
+            }}>
+              Stake RL80
+            </h3>
+
+            {/* Amount Info */}
+            <p style={{
+              color: 'rgba(255, 255, 255, 0.8)',
+              fontSize: '0.85rem',
+              marginBottom: '1rem'
+            }}>
+              Amount: <strong>{stakeAmount} RL80</strong>
+            </p>
+
+            {/* Status */}
+            <p style={{
+              color: 'rgba(255, 255, 255, 0.6)',
+              fontSize: '0.75rem',
+              fontStyle: 'italic'
+            }}>
+              Waiting for wallet confirmation...
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Messages */}
+      {showConfirmationMessage && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(10px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10003,
+          }}
+          onClick={() => setShowConfirmationMessage(null)}
+        >
+          <div
+            style={{
+              background: 'rgba(20, 20, 30, 0.98)',
+              border: showConfirmationMessage.includes('success')
+                ? '1px solid rgba(0, 245, 212, 0.4)'
+                : '1px solid rgba(255, 107, 107, 0.4)',
+              borderRadius: '24px',
+              padding: '3rem 2.5rem',
+              maxWidth: '420px',
+              textAlign: 'center',
+              color: '#fff',
+              boxShadow: showConfirmationMessage.includes('success')
+                ? '0 0 60px rgba(0, 245, 212, 0.3)'
+                : '0 0 60px rgba(255, 107, 107, 0.3)',
+              position: 'relative',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              style={{
+                position: 'absolute',
+                top: '1rem',
+                right: '1rem',
+                background: 'transparent',
+                border: 'none',
+                color: showConfirmationMessage.includes('success') ? '#00f5d4' : '#ff6b6b',
+                fontSize: '2rem',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                width: '32px',
+                height: '32px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'transform 0.2s',
+              }}
+              onClick={() => setShowConfirmationMessage(null)}
+              onMouseEnter={(e) => e.target.style.transform = 'scale(1.1)'}
+              onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+            >
+              ×
+            </button>
+
+            {/* Icon */}
+            <div style={{
+              marginBottom: '1.5rem',
+              fontSize: '3.5rem'
+            }}>
+              {showConfirmationMessage === 'withdraw-success' && '🎉'}
+              {showConfirmationMessage === 'withdraw-error' && '⚠️'}
+              {showConfirmationMessage === 'claim-success' && '💰'}
+              {showConfirmationMessage === 'claim-error' && '⚠️'}
+            </div>
+
+            <h2 style={{
+              fontSize: '1.2rem',
+              marginBottom: '0.5rem',
+              fontWeight: 'bold',
+              textTransform: 'uppercase',
+              letterSpacing: '2px',
+              fontFamily: "'Orbitron', monospace"
+            }}>
+              {showConfirmationMessage === 'withdraw-success' && 'Withdrawal Successful!'}
+              {showConfirmationMessage === 'withdraw-error' && 'Withdrawal Failed'}
+              {showConfirmationMessage === 'claim-success' && 'Rewards Claimed!'}
+              {showConfirmationMessage === 'claim-error' && 'Claim Failed'}
+            </h2>
+            <p style={{
+              marginBottom: '2rem',
+              color: showConfirmationMessage.includes('success') ? '#00f5d4' : '#ff6b6b',
+              fontSize: '0.95rem',
+              lineHeight: '1.5'
+            }}>
+              {showConfirmationMessage === 'withdraw-success' && 'Your tokens have been withdrawn successfully.'}
+              {showConfirmationMessage === 'withdraw-error' && 'Failed to withdraw tokens. Please try again.'}
+              {showConfirmationMessage === 'claim-success' && 'Your ETH rewards have been claimed successfully.'}
+              {showConfirmationMessage === 'claim-error' && 'Failed to claim rewards. Please try again.'}
+            </p>
+            <button
+              onClick={() => setShowConfirmationMessage(null)}
+              style={{
+                padding: '1rem 2rem',
+                background: showConfirmationMessage.includes('success') ? '#00f5d4' : '#ff6b6b',
+                border: 'none',
+                borderRadius: '50px',
+                color: showConfirmationMessage.includes('success') ? '#000' : '#fff',
+                fontSize: '1rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                width: '100%',
+                fontFamily: "'Orbitron', monospace",
+                letterSpacing: '1px',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.opacity = '0.9';
+                e.target.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.opacity = '1';
+                e.target.style.transform = 'translateY(0)';
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
       )}
     </>
   );

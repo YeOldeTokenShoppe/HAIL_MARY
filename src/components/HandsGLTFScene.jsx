@@ -64,6 +64,12 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
   const [hovered, setHovered] = useState(false)
   const randomUserImagesRef = useRef([])
   const currentImageIndexRef = useRef(0)
+
+  // MEMORY FIX: Refs to track values and throttle state updates
+  const lastUpdateTime = useRef(0)
+  const phoneCaseWorldPosRef = useRef([0, 0, 0])
+  const phoneCaseWorldRotationRef = useRef([0, 0, 0])
+  const raysVisibleRef = useRef(true)
   
   // Toggle visibility of Backdrop and Circle meshes based on highlighting state
   useEffect(() => {
@@ -365,73 +371,92 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
     let texture = null
     let material = null
     let previousMaterial = null
-    
+    let isMounted = true // Track if effect is still mounted
+
     // Simple texture loading with cleanup
     const canvas = document.createElement('canvas')
     canvas.width = 128
     canvas.height = 128
     const ctx = canvas.getContext('2d')
-    
+
     const img = new Image()
     img.crossOrigin = 'anonymous'
+
     img.onload = () => {
+      // MEMORY FIX: Check if component is still mounted before applying texture
+      if (!isMounted || !candleLabel2Ref.current) return
+
       // Draw image rotated to fix orientation
       ctx.save()
       ctx.translate(64, 64) // Move to center
-  
+
       ctx.drawImage(img, -64, -64, 128, 128) // Draw centered and rotated
       ctx.restore()
-      
+
       // Add username overlay AFTER image rotation (so text stays normal)
       if (imageData.username) {
         // Add semi-transparent background for text at bottom
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
         ctx.fillRect(0, 128 - 25, 128, 25)
-        
+
         // Draw username normally (not rotated)
         ctx.fillStyle = '#ffffff'
         ctx.font = 'bold 12px Arial'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
-        
+
         // Add text shadow for better readability
         ctx.shadowColor = 'rgba(0, 0, 0, 0.8)'
         ctx.shadowBlur = 2
         ctx.shadowOffsetX = 1
         ctx.shadowOffsetY = 1
-        
+
         ctx.fillText(imageData.username, 64, 128 - 12)
       }
-      
+
       texture = new THREE.CanvasTexture(canvas)
       texture.needsUpdate = true
       texture.generateMipmaps = false
       texture.flipY = false // No additional flipping needed
       texture.wrapS = THREE.ClampToEdgeWrapping
       texture.wrapT = THREE.ClampToEdgeWrapping
-      
+
       material = new THREE.MeshBasicMaterial({
         map: texture,
         side: THREE.DoubleSide
       })
-      
+
       // Store previous material for disposal
       if (candleLabel2Ref.current.material) {
         previousMaterial = candleLabel2Ref.current.material
       }
-      
+
       candleLabel2Ref.current.material = material
-      
+
       // Dispose previous material and texture
       if (previousMaterial) {
         if (previousMaterial.map) previousMaterial.map.dispose()
         previousMaterial.dispose()
       }
     }
+
+    // MEMORY FIX: Add error handler to prevent memory leaks on failed image loads
+    img.onerror = (error) => {
+      console.warn('Failed to load candle label image:', error)
+      // Clean up img and canvas references
+      img.src = '' // Clear src to prevent retries
+    }
+
     img.src = imageData.image
-    
+
     // Cleanup function
     return () => {
+      isMounted = false // Mark as unmounted
+      // Clear image src to cancel any pending loads
+      img.src = ''
+      img.onload = null
+      img.onerror = null
+
       if (texture) texture.dispose()
       if (material) {
         if (material.map) material.map.dispose()
@@ -450,33 +475,43 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
 // Combined animations useFrame
 useFrame((state, delta) => {
   // Update digital portal backdrop animation
-  
+
   // Track phoneCase world position and rotation for light rays
   if (phoneCaseRef.current) {
+    // MEMORY FIX: Reuse objects instead of creating new ones every frame
     const worldPos = new THREE.Vector3()
     const worldQuat = new THREE.Quaternion()
     const worldEuler = new THREE.Euler()
     phoneCaseRef.current.getWorldPosition(worldPos)
     phoneCaseRef.current.getWorldQuaternion(worldQuat)
     worldEuler.setFromQuaternion(worldQuat)
-    
-    setPhoneCaseWorldPos([worldPos.x, worldPos.y, worldPos.z])
-    setPhoneCaseWorldQuat([worldQuat.x, worldQuat.y, worldQuat.z, worldQuat.w])
-    setPhoneCaseWorldRotation([worldEuler.x, worldEuler.y, worldEuler.z])
-    
+
     // Check if phone is facing camera (rays should only be visible from front)
-    // Get phone's forward direction in world space
     const phoneForward = new THREE.Vector3(0, 0, 1)
     phoneForward.applyQuaternion(worldQuat)
-    
+
     // Get camera direction to phone
-    const cameraToPhone = worldPos.clone().sub(state.camera.position).normalize()
-    
-    // Calculate dot product - positive means facing camera, negative means facing away
+    const cameraToPhone = new THREE.Vector3()
+    cameraToPhone.copy(worldPos).sub(state.camera.position).normalize()
+
+    // Calculate dot product
     const dotProduct = phoneForward.dot(cameraToPhone)
-    
-    // Hide rays when viewing from behind (dot product negative)
-    setRaysVisible(dotProduct < 0.3) // Threshold of 0.3 gives a nice fade zone
+    const newRaysVisible = dotProduct < 0.3
+
+    // Update refs every frame
+    phoneCaseWorldPosRef.current = [worldPos.x, worldPos.y, worldPos.z]
+    phoneCaseWorldRotationRef.current = [worldEuler.x, worldEuler.y, worldEuler.z]
+    raysVisibleRef.current = newRaysVisible
+
+    // MEMORY FIX: Only update state every 100ms to reduce re-renders
+    const now = Date.now()
+    if (now - lastUpdateTime.current > 100) {
+      setPhoneCaseWorldPos([worldPos.x, worldPos.y, worldPos.z])
+      setPhoneCaseWorldQuat([worldQuat.x, worldQuat.y, worldQuat.z, worldQuat.w])
+      setPhoneCaseWorldRotation([worldEuler.x, worldEuler.y, worldEuler.z])
+      setRaysVisible(newRaysVisible)
+      lastUpdateTime.current = now
+    }
   }
   
   // Update all animation mixers efficiently

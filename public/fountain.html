@@ -91,15 +91,16 @@
 					padding: 20px 24px !important;
 					font-size: 16px !important;
 					line-height: 1.6 !important;
-					background: linear-gradient(135deg, 
-						rgba(255, 255, 255, 0.15) 0%, 
+					background: linear-gradient(135deg,
+						rgba(255, 255, 255, 0.15) 0%,
 						rgba(255, 215, 0, 0.12) 50%,
 						rgba(255, 183, 0, 0.10) 100%) !important;
 					border: 2px solid rgba(255, 215, 0, 0.4) !important;
 					border-radius: 24px !important;
 					height: auto !important;  /* Auto height to fit content */
 					min-height: 5rem !important;
-					max-height: 12rem !important;
+					max-height: 50vh !important;
+					overflow-y: auto !important;
 					display: flex;
 					flex-direction: column;
 					justify-content: center;
@@ -359,6 +360,425 @@
 				transform: translate(-50%, -50%) scale(1);
 			}
 		}
+
+		/* ===== CELEBRATION VFX STYLES ===== */
+		@keyframes goldenFlash {
+			0% { opacity: 0; }
+			15% { opacity: 0.6; }
+			100% { opacity: 0; }
+		}
+
+		@keyframes thankYouSlideIn {
+			0% {
+				opacity: 0;
+				transform: translate(-50%, -50%) scale(0.3) rotate(-10deg);
+			}
+			50% {
+				opacity: 1;
+				transform: translate(-50%, -50%) scale(1.1) rotate(2deg);
+			}
+			70% {
+				transform: translate(-50%, -50%) scale(0.95) rotate(-1deg);
+			}
+			100% {
+				opacity: 1;
+				transform: translate(-50%, -50%) scale(1) rotate(0deg);
+			}
+		}
+
+		@keyframes thankYouPulse {
+			0%, 100% {
+				text-shadow: 0 0 20px rgba(255, 215, 0, 0.8),
+							 0 0 40px rgba(255, 215, 0, 0.4),
+							 0 0 60px rgba(255, 215, 0, 0.2);
+			}
+			50% {
+				text-shadow: 0 0 30px rgba(255, 215, 0, 1),
+							 0 0 60px rgba(255, 215, 0, 0.6),
+							 0 0 90px rgba(255, 215, 0, 0.4);
+			}
+		}
+
+		@keyframes thankYouFadeOut {
+			0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+			100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+		}
+
+		@keyframes confettiFall {
+			0% {
+				transform: translateY(-100vh) rotate(0deg);
+				opacity: 1;
+			}
+			100% {
+				transform: translateY(100vh) rotate(720deg);
+				opacity: 0;
+			}
+		}
+
+		@keyframes confettiSway {
+			0%, 100% { margin-left: 0; }
+			25% { margin-left: 30px; }
+			75% { margin-left: -30px; }
+		}
+
+		@keyframes sparkleFloat {
+			0% {
+				opacity: 0;
+				transform: translateY(0) scale(0);
+			}
+			20% {
+				opacity: 1;
+				transform: translateY(-20px) scale(1);
+			}
+			100% {
+				opacity: 0;
+				transform: translateY(-100px) scale(0.5);
+			}
+		}
+
+		@keyframes starBurst {
+			0% {
+				transform: scale(0) rotate(0deg);
+				opacity: 1;
+			}
+			50% {
+				transform: scale(1.5) rotate(180deg);
+				opacity: 0.8;
+			}
+			100% {
+				transform: scale(0) rotate(360deg);
+				opacity: 0;
+			}
+		}
+
+		@keyframes ringExpand {
+			0% {
+				transform: translate(-50%, -50%) scale(0);
+				opacity: 0.8;
+				border-width: 8px;
+			}
+			100% {
+				transform: translate(-50%, -50%) scale(3);
+				opacity: 0;
+				border-width: 1px;
+			}
+		}
+
+		#celebrationOverlay {
+			position: fixed;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			pointer-events: none;
+			z-index: 9999;
+			overflow: hidden;
+		}
+
+		#goldenFlash {
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			background: radial-gradient(circle at center,
+				rgba(255, 215, 0, 0.4) 0%,
+				rgba(255, 180, 0, 0.3) 30%,
+				rgba(255, 140, 0, 0.1) 60%,
+				transparent 80%);
+			opacity: 0;
+			pointer-events: none;
+		}
+
+		#thankYouBanner {
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+			text-align: center;
+			opacity: 0;
+			z-index: 10001;
+			padding: 30px 40px;
+		}
+
+		#thankYouBanner .main-text {
+			font-size: clamp(2rem, 8vw, 4rem);
+			font-weight: 900;
+			font-family: 'Georgia', serif;
+			background: linear-gradient(135deg, #FFD700 0%, #FFA500 25%, #FFD700 50%, #FFEC8B 75%, #FFD700 100%);
+			background-size: 200% 200%;
+			-webkit-background-clip: text;
+			-webkit-text-fill-color: transparent;
+			background-clip: text;
+			animation: thankYouPulse 1.5s ease-in-out infinite;
+			text-transform: uppercase;
+			letter-spacing: 4px;
+			filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
+			padding-top: 20px;
+			margin-top: -10px;
+			margin-bottom: -10px;
+			padding-bottom: 20px;
+		}
+
+		#thankYouBanner .charity-text {
+			font-size: clamp(1rem, 4vw, 1.8rem);
+			color: white;
+			font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+			margin-top: 10px;
+			text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+			opacity: 0.95;
+		}
+
+		#thankYouBanner .emoji-burst {
+			font-size: clamp(1.5rem, 5vw, 2.5rem);
+			margin-top: 15px;
+			animation: sparkleFloat 2s ease-out infinite;
+		}
+
+		.confetti-piece {
+			position: absolute;
+			width: 12px;
+			height: 12px;
+			top: -20px;
+			animation: confettiFall linear forwards, confettiSway ease-in-out infinite;
+		}
+
+		.sparkle {
+			position: absolute;
+			font-size: 24px;
+			animation: sparkleFloat 1.5s ease-out forwards;
+			pointer-events: none;
+		}
+
+		.burst-ring {
+			position: absolute;
+			border: 4px solid rgba(255, 215, 0, 0.6);
+			border-radius: 50%;
+			animation: ringExpand 1s ease-out forwards;
+		}
+
+		.star-burst {
+			position: absolute;
+			font-size: 30px;
+			animation: starBurst 0.8s ease-out forwards;
+		}
+		/* ===== END CELEBRATION VFX STYLES ===== */
+
+		/* ===== DONATION TOAST NOTIFICATION STYLES ===== */
+		@keyframes toastSlideIn {
+			0% {
+				transform: translateX(-120%);
+				opacity: 0;
+			}
+			100% {
+				transform: translateX(0);
+				opacity: 1;
+			}
+		}
+
+		@keyframes toastSlideOut {
+			0% {
+				transform: translateX(0);
+				opacity: 1;
+			}
+			100% {
+				transform: translateX(-120%);
+				opacity: 0;
+			}
+		}
+
+		@keyframes toastShimmer {
+			0% { background-position: -200% 0; }
+			100% { background-position: 200% 0; }
+		}
+
+		#donationToastContainer {
+			position: fixed;
+			bottom: 10%;
+			left: 20px;
+			z-index: 9998;
+			display: flex;
+			flex-direction: column;
+			gap: 12px;
+			pointer-events: none;
+			/* max-width: 320px; */
+		}
+
+		@media (max-width: 768px) {
+			#donationToastContainer {
+				bottom: 0;
+				left: 1rem;
+				right: auto;
+				/* max-width: 135px; */
+				gap: 4px;
+			}
+
+			.donation-toast {
+				padding: 5px 6px;
+				gap: 5px;
+				border-radius: 8px;
+				border-width: 1px;
+			}
+
+			.donation-toast-avatar {
+				width: 1rem;
+				height: 1rem;
+				font-size: 0.6rem;
+				border-width: 1px;
+			}
+
+			.donation-toast-name {
+				font-size: 8px;
+				margin-bottom: 0;
+				line-height: 1.1;
+			}
+
+			.donation-toast-details {
+				font-size: 7px;
+				gap: 2px;
+				line-height: 1.1;
+			}
+
+			.donation-toast-amount {
+				font-size: 7px;
+			}
+
+			.donation-toast-charity {
+				display: none;
+			}
+
+			.donation-toast-charity-icon {
+				font-size: 8px;
+			}
+
+			.donation-toast-time {
+				display: none;
+			}
+		}
+
+		.donation-toast {
+			display: flex;
+			align-items: center;
+			gap: 12px;
+			padding: 12px 16px;
+			background: linear-gradient(135deg, rgba(30, 20, 50, 0.35) 0%, rgba(50, 30, 80, 0.95) 50%);
+			border: 1px solid rgba(255, 215, 0, 0.4);
+			border-radius: 16px;
+			backdrop-filter: blur(10px);
+			-webkit-backdrop-filter: blur(10px);
+			box-shadow:
+				0 4px 20px rgba(0, 0, 0, 0.4),
+				0 0 30px rgba(255, 215, 0, 0.15),
+				inset 0 1px 0 rgba(255, 255, 255, 0.1);
+			animation: toastSlideIn 0.5s cubic-bezier(0.68, -0.2, 0.265, 1.2) forwards;
+			pointer-events: auto;
+			position: relative;
+			overflow: hidden;
+			cursor: pointer;
+			transition: transform 0.2s ease, box-shadow 0.2s ease;
+		}
+
+		.donation-toast:hover {
+			transform: scale(1.02);
+			box-shadow:
+				0 6px 24px rgba(0, 0, 0, 0.5),
+				0 0 40px rgba(255, 215, 0, 0.25),
+				inset 0 1px 0 rgba(255, 255, 255, 0.15);
+		}
+
+		.donation-toast:active {
+			transform: scale(0.98);
+		}
+
+		.donation-toast::before {
+			content: '';
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background: linear-gradient(
+				90deg,
+				transparent 0%,
+				rgba(255, 215, 0, 0.1) 50%,
+				transparent 100%
+			);
+			background-size: 200% 100%;
+			animation: toastShimmer 3s ease-in-out infinite;
+			pointer-events: none;
+		}
+
+		.donation-toast.exiting {
+			animation: toastSlideOut 0.4s ease-in forwards;
+		}
+
+		.donation-toast-avatar {
+			width: 2rem;
+			height: 2rem;
+			border-radius: 50%;
+			border: 2px solid rgba(255, 215, 0, 0.6);
+			background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-size: 20px;
+			color: white;
+			flex-shrink: 0;
+			overflow: hidden;
+			box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+		}
+
+		.donation-toast-avatar img {
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+		}
+
+		.donation-toast-content {
+			flex: 1;
+			min-width: 0;
+		}
+
+		.donation-toast-name {
+			font-size: 0.5rem;
+			font-weight: 700;
+			color: #ffffff;
+			margin-bottom: 2px;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+		}
+
+		.donation-toast-details {
+			font-size: 12px;
+			color: rgba(255, 255, 255, 0.8);
+			display: flex;
+			align-items: center;
+			gap: 6px;
+		}
+
+		.donation-toast-amount {
+			color: #FFD700;
+			font-weight: 700;
+		}
+
+		.donation-toast-charity {
+			display: flex;
+			align-items: center;
+			gap: 4px;
+		}
+
+		.donation-toast-charity-icon {
+			font-size: 14px;
+		}
+
+		.donation-toast-time {
+			font-size: 10px;
+			color: rgba(255, 255, 255, 0.5);
+			margin-top: 2px;
+		}
+		/* ===== END DONATION TOAST STYLES ===== */
 		</style>
 		<script>
 			// Check if page is being viewed in portal
@@ -409,6 +829,20 @@
 			</div>
 		</div>
 
+		<!-- Celebration VFX Overlay -->
+		<div id="celebrationOverlay">
+			<div id="goldenFlash"></div>
+			<div id="confettiContainer"></div>
+			<div id="thankYouBanner">
+				<div class="main-text">Thank You!</div>
+				<div class="charity-text">Your wish supports <span id="charityName">charity</span></div>
+				<div class="emoji-burst">✨ 💫 ⭐ 💫 ✨</div>
+			</div>
+		</div>
+
+		<!-- Donation Toast Notifications Container -->
+		<div id="donationToastContainer"></div>
+
 		<!-- Loader -->
 
 
@@ -419,7 +853,9 @@
 			top: 50%;
 			transform: translateY(-50%);
 			z-index: 1000;
-			width: 280px;
+			width: 320px;
+			max-height: 80vh;
+			overflow-y: auto;
 			box-sizing: border-box;
 			font-size: 14px;
 			line-height: 1.6;
@@ -447,8 +883,26 @@
 				color: rgba(255, 255, 255, 0.95);
 				text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 			">
-				<span class="mobile-text">Amount of coins collected for charity. Resets at 200 Coins. Coins transferred to dedicated wallet and dispersed when cash value reaches $500. See more details <a href="#" style="color: #FFD700; text-decoration: underline;">here</a>.</span>
-				<span class="desktop-text">Amount of coins collected for charity. Resets at 200 Coins. Coins transferred to dedicated wallet and dispersed when cash value reaches $500. See more details <a href="#" style="color: #FFD700; text-decoration: underline;">here</a>.</span>
+				<span class="mobile-text" style="font-size: 11px; line-height: 1.5;">
+					<strong style="color: #FFD700;">How Your Donation Works:</strong><br>
+					• RL80 tokens go directly to charity wallets<br>
+					• At ~$500 value, tokens convert to ETH<br>
+					• ETH forwarded via <a href="https://thegivingblock.com" target="_blank" style="color: #FFD700; text-decoration: underline;">The Giving Block</a><br><br>
+					<strong style="color: #FFD700;">Charity Wallets (Base Sepolia):</strong><br>
+					🏥 <a href="https://sepolia.basescan.org/address/0xbAC39697250cDF6A808Bd39D2D1828388DF87967" target="_blank" style="color: #00e572; text-decoration: underline;">St. Jude's</a><br>
+					🐾 <a href="https://sepolia.basescan.org/address/0xF9EAdD659e730BbC05f4BFfe618A98fB0b910fDD" target="_blank" style="color: #00e572; text-decoration: underline;">ASPCA</a><br><br>
+					<span style="font-size: 9px; opacity: 0.8;">All transactions visible on-chain for full transparency.</span>
+				</span>
+				<span class="desktop-text" style="font-size: 12px; line-height: 1.6;">
+					<strong style="color: #FFD700;">How Your Donation Works:</strong><br>
+					• RL80 tokens are sent directly to charity wallets held by 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙<br>
+					• When pool value reaches ~$500, tokens are converted to ETH<br>
+					• ETH is forwarded to charities via <a href="https://thegivingblock.com" target="_blank" style="color: #FFD700; text-decoration: underline;">The Giving Block</a><br><br>
+					<strong style="color: #FFD700;">Verify Charity Wallets (Base Sepolia):</strong><br>
+					🏥 <a href="https://sepolia.basescan.org/address/0xbAC39697250cDF6A808Bd39D2D1828388DF87967" target="_blank" style="color: #00e572; text-decoration: underline;">St. Jude's Children's Research Hospital</a><br>
+					🐾 <a href="https://sepolia.basescan.org/address/0xF9EAdD659e730BbC05f4BFfe618A98fB0b910fDD" target="_blank" style="color: #00e572; text-decoration: underline;">ASPCA</a><br><br>
+					<span style="font-size: 10px; opacity: 0.8;">All transactions are recorded on-chain for complete transparency. Click wallet links to verify donations on BaseScan.</span>
+				</span>
 			</div>
 		</div>
 		
@@ -507,31 +961,49 @@
 					">Coin Cam</label>
 				</div>
 				
-				<!-- Right side: Pool counter and Info button -->
+				<!-- Right side: Pool counter, RL80 total, and Info button -->
 				<div style="
 					display: flex;
-					align-items: center;
-					gap: 6px;
+					align-items: flex-end;
+					gap: 10px;
 				">
-					<div style="
-						font-size: 11px;
-						font-weight: 600;
-						color: rgba(255, 255, 255, 0.8);
-						text-transform: uppercase;
-						letter-spacing: 0.5px;
-						text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
-						font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-					">Pool:</div>
-					<div style="
-						font-size: 18px;
-						font-weight: 700;
-						color: white;
-						line-height: 1;
-						letter-spacing: -0.5px;
-						font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-						text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
-					">
-						<span id="mobileCurrentCount">0</span><span style="font-size: 0.7em; opacity: 0.7;">/200</span>
+					<div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+						<div style="
+							font-size: 8px;
+							font-weight: 600;
+							color: rgba(255, 255, 255, 0.6);
+							text-transform: uppercase;
+							font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+							letter-spacing: 0.5px;
+						">🪙 Wishes</div>
+						<div style="
+							font-size: 16px;
+							font-weight: 700;
+							color: white;
+							line-height: 1;
+							font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+						">
+							<span id="mobileCurrentCount">0</span><span style="font-size: 0.7em; opacity: 0.7;">/200</span>
+						</div>
+					</div>
+					<div style="width: 1px; height: 28px; background: rgba(255,255,255,0.2);"></div>
+					<div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+						<div style="
+							font-size: 8px;
+							font-weight: 600;
+							color: rgba(255, 215, 0, 0.8);
+							font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+							letter-spacing: 0.5px;
+						">💎 Donated</div>
+						<div style="
+							font-size: 14px;
+							font-weight: 700;
+							color: #FFD700;
+							line-height: 1;
+							font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+						">
+							<span id="mobileRL80Total">0</span><span style="font-size: 0.65em; opacity: 0.8; margin-left: 2px;">RL80</span>
+						</div>
 					</div>
 					<!-- Info button -->
 					<button id="mobileInfoBtn" onclick="toggleInstructions()" class="pumpkin-info-button" style="
@@ -648,18 +1120,19 @@
 				border-radius: 10px;
 			">
 				<span class="coin-emoji" style="font-size: 16px;">🪙</span>
-				<span style="flex: 1; color: rgba(255, 255, 255, 0.95); font-size: 12px;"><span class="desktop-text">Pool: </span><span class="mobile-text">Pool: </span><span id="coinCount" style="font-weight: 700;">0</span> / 200</span>
+				<span style="flex: 1; color: rgba(255, 255, 255, 0.95); font-size: 12px;">Wishes: <span id="coinCount" style="font-weight: 700;">0</span> / 200</span>
 			</div>
 			<div style="
 				display: flex;
 				align-items: center;
 				gap: 8px;
 				padding: 6px 10px;
-				background: rgba(255, 255, 255, 0.05);
+				background: rgba(255, 215, 0, 0.15);
 				border-radius: 10px;
+				border: 1px solid rgba(255, 215, 0, 0.3);
 			">
-				<span class="coin-emoji" style="font-size: 16px;">💰</span>
-				<span style="flex: 1; color: rgba(255, 255, 255, 0.95); font-size: 12px;"><span class="desktop-text">Total: </span><span id="collectedCount" style="font-weight: 700;">0</span></span>
+				<span style="font-size: 16px;">💎</span>
+				<span style="flex: 1; color: #FFD700; font-size: 12px;">Donated: <span id="totalRL80Donated" style="font-weight: 700;">0</span> RL80</span>
 			</div>
 			<div style="
 				padding: 6px 10px;
@@ -667,8 +1140,8 @@
 				border-radius: 10px;
 			">
 				<div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
-					<span style="font-size: 14px;">🍽️</span>
-					<span style="flex: 1; color: rgba(255, 255, 255, 0.9); font-size: 11px;">WCK: <span id="wckPercentage" style="font-weight: 700;">0</span>%</span>
+					<span style="font-size: 14px;">🏥</span>
+					<span style="flex: 1; color: rgba(255, 255, 255, 0.9); font-size: 11px;">St. Jude's: <span id="stJudesPercentage" style="font-weight: 700;">0</span>%</span>
 				</div>
 				<div style="display: flex; align-items: center; gap: 6px;">
 					<span style="font-size: 14px;">🐾</span>
@@ -793,7 +1266,7 @@
 					info.style.position = 'absolute';
 					info.style.right = 'auto';
 					info.style.left = '85%';
-					info.style.top = '80%';
+					info.style.top = '50%';
 					info.style.bottom = 'auto';
 					info.style.transform = 'translateY(-50%)';
 					info.style.width = '280px';
@@ -879,7 +1352,374 @@
 			}
 			// Make it globally accessible
 			window.toggleInstructions = toggleInstructions
-			
+
+			// ===== CELEBRATION VFX SYSTEM =====
+			const celebrationConfig = {
+				confettiCount: 80,
+				confettiColors: ['#FFD700', '#FFA500', '#FF6347', '#00CED1', '#FF69B4', '#9370DB', '#00FA9A', '#FF4500'],
+				sparkleEmojis: ['✨', '💫', '⭐', '🌟', '💖', '🎉', '🪙'],
+				duration: 4000
+			};
+
+			function getCharityDisplayName(charityKey) {
+				const charityNames = {
+					'ST_JUDES': "St. Jude's Children's Hospital",
+					'ASPCA': 'the ASPCA',
+					'st-judes': "St. Jude's Children's Hospital",
+					'aspca': 'the ASPCA',
+					'donation': 'charity'
+				};
+				return charityNames[charityKey] || 'charity';
+			}
+
+			function getCharityEmoji(charityKey) {
+				const charityEmojis = {
+					'ST_JUDES': '🏥',
+					'ASPCA': '🐾',
+					'st-judes': '🏥',
+					'aspca': '🐾'
+				};
+				return charityEmojis[charityKey] || '💝';
+			}
+
+			function createConfetti() {
+				const container = document.getElementById('confettiContainer');
+				if (!container) return;
+
+				container.innerHTML = '';
+
+				for (let i = 0; i < celebrationConfig.confettiCount; i++) {
+					const confetti = document.createElement('div');
+					confetti.className = 'confetti-piece';
+
+					// Random properties
+					const left = Math.random() * 100;
+					const color = celebrationConfig.confettiColors[Math.floor(Math.random() * celebrationConfig.confettiColors.length)];
+					const size = Math.random() * 10 + 6;
+					const duration = Math.random() * 2 + 2;
+					const delay = Math.random() * 1.5;
+					const swayDuration = Math.random() * 1 + 0.5;
+
+					// Random shape
+					const shapes = ['circle', 'square', 'rectangle', 'star'];
+					const shape = shapes[Math.floor(Math.random() * shapes.length)];
+
+					confetti.style.cssText = `
+						left: ${left}%;
+						width: ${size}px;
+						height: ${shape === 'rectangle' ? size * 2 : size}px;
+						background: ${color};
+						animation-duration: ${duration}s, ${swayDuration}s;
+						animation-delay: ${delay}s, ${delay}s;
+						border-radius: ${shape === 'circle' ? '50%' : shape === 'star' ? '0' : '2px'};
+						${shape === 'star' ? `clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);` : ''}
+					`;
+
+					container.appendChild(confetti);
+				}
+
+				// Clean up after animation
+				setTimeout(() => {
+					container.innerHTML = '';
+				}, celebrationConfig.duration + 2000);
+			}
+
+			function createSparkles(centerX, centerY) {
+				const container = document.getElementById('celebrationOverlay');
+				if (!container) return;
+
+				for (let i = 0; i < 15; i++) {
+					setTimeout(() => {
+						const sparkle = document.createElement('div');
+						sparkle.className = 'sparkle';
+						sparkle.textContent = celebrationConfig.sparkleEmojis[Math.floor(Math.random() * celebrationConfig.sparkleEmojis.length)];
+
+						const offsetX = (Math.random() - 0.5) * 300;
+						const offsetY = (Math.random() - 0.5) * 200;
+
+						sparkle.style.left = `calc(50% + ${offsetX}px)`;
+						sparkle.style.top = `calc(50% + ${offsetY}px)`;
+						sparkle.style.fontSize = `${Math.random() * 20 + 16}px`;
+						sparkle.style.animationDuration = `${Math.random() * 1 + 1}s`;
+
+						container.appendChild(sparkle);
+
+						setTimeout(() => sparkle.remove(), 2000);
+					}, i * 100);
+				}
+			}
+
+			function createBurstRings() {
+				const container = document.getElementById('celebrationOverlay');
+				if (!container) return;
+
+				for (let i = 0; i < 3; i++) {
+					setTimeout(() => {
+						const ring = document.createElement('div');
+						ring.className = 'burst-ring';
+						ring.style.cssText = `
+							left: 50%;
+							top: 50%;
+							width: 100px;
+							height: 100px;
+						`;
+						container.appendChild(ring);
+						setTimeout(() => ring.remove(), 1000);
+					}, i * 200);
+				}
+			}
+
+			function createStarBurst() {
+				const container = document.getElementById('celebrationOverlay');
+				if (!container) return;
+
+				const stars = ['⭐', '🌟', '✨', '💫'];
+
+				for (let i = 0; i < 12; i++) {
+					const star = document.createElement('div');
+					star.className = 'star-burst';
+					star.textContent = stars[Math.floor(Math.random() * stars.length)];
+
+					const angle = (i / 12) * Math.PI * 2;
+					const distance = 150;
+					const x = Math.cos(angle) * distance;
+					const y = Math.sin(angle) * distance;
+
+					star.style.cssText = `
+						left: calc(50% + ${x}px);
+						top: calc(50% + ${y}px);
+						animation-delay: ${i * 0.05}s;
+					`;
+
+					container.appendChild(star);
+					setTimeout(() => star.remove(), 1000);
+				}
+			}
+
+			function triggerCelebration(charity) {
+				console.log('[Celebration] Triggering celebration for:', charity);
+
+				const flash = document.getElementById('goldenFlash');
+				const banner = document.getElementById('thankYouBanner');
+				const charityNameEl = document.getElementById('charityName');
+
+				if (!flash || !banner) {
+					console.warn('[Celebration] Missing celebration elements');
+					return;
+				}
+
+				// Update charity name
+				if (charityNameEl) {
+					const charityEmoji = getCharityEmoji(charity);
+					charityNameEl.textContent = `${charityEmoji} ${getCharityDisplayName(charity)}`;
+				}
+
+				// Golden flash
+				flash.style.animation = 'goldenFlash 1.2s ease-out forwards';
+
+				// Confetti explosion
+				createConfetti();
+
+				// Burst rings
+				setTimeout(() => createBurstRings(), 100);
+
+				// Star burst
+				setTimeout(() => createStarBurst(), 200);
+
+				// Thank you banner
+				setTimeout(() => {
+					banner.style.opacity = '1';
+					banner.style.animation = 'thankYouSlideIn 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards';
+
+					// Sparkles around banner
+					createSparkles();
+				}, 300);
+
+				// More sparkles
+				setTimeout(() => createSparkles(), 800);
+				setTimeout(() => createSparkles(), 1500);
+
+				// Fade out
+				setTimeout(() => {
+					banner.style.animation = 'thankYouFadeOut 0.5s ease-out forwards';
+					setTimeout(() => {
+						banner.style.opacity = '0';
+						banner.style.animation = '';
+					}, 500);
+				}, celebrationConfig.duration - 500);
+
+				// Reset flash
+				setTimeout(() => {
+					flash.style.animation = '';
+				}, 1500);
+			}
+
+			// Make celebration function globally accessible
+			window.triggerCelebration = triggerCelebration;
+			// ===== END CELEBRATION VFX SYSTEM =====
+
+			// ===== DONATION TOAST NOTIFICATION SYSTEM =====
+			const toastConfig = {
+				maxToasts: 3,
+				displayDuration: 6000,
+				cycleInterval: 15000, // Cycle through historical donations every 15 seconds
+				recentDonations: [], // Store recent donations for cycling
+				shownDonationIds: new Set(), // Track which donations have been shown as "new"
+				isInitialLoad: true // Flag to prevent showing all existing donations on load
+			};
+
+			function getCharityIcon(charityKey) {
+				const icons = {
+					'ST_JUDES': '🏥',
+					'ASPCA': '🐾',
+					'st-judes': '🏥',
+					'aspca': '🐾'
+				};
+				return icons[charityKey] || '💝';
+			}
+
+			function getCharityShortName(charityKey) {
+				const names = {
+					'ST_JUDES': "St. Jude's",
+					'ASPCA': 'ASPCA',
+					'st-judes': "St. Jude's",
+					'aspca': 'ASPCA'
+				};
+				return names[charityKey] || 'Charity';
+			}
+
+			function formatTimeAgo(timestamp) {
+				if (!timestamp) return '';
+
+				const now = new Date();
+				const then = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+				const diffMs = now - then;
+				const diffMins = Math.floor(diffMs / 60000);
+				const diffHours = Math.floor(diffMs / 3600000);
+				const diffDays = Math.floor(diffMs / 86400000);
+
+				if (diffMins < 1) return 'just now';
+				if (diffMins < 60) return `${diffMins}m ago`;
+				if (diffHours < 24) return `${diffHours}h ago`;
+				if (diffDays < 7) return `${diffDays}d ago`;
+				return then.toLocaleDateString();
+			}
+
+			function createDonationToast(donation, isNew = false) {
+				const container = document.getElementById('donationToastContainer');
+				if (!container) return;
+
+				// Limit number of toasts
+				const existingToasts = container.querySelectorAll('.donation-toast:not(.exiting)');
+				if (existingToasts.length >= toastConfig.maxToasts) {
+					// Remove oldest toast
+					const oldest = existingToasts[0];
+					oldest.classList.add('exiting');
+					setTimeout(() => oldest.remove(), 400);
+				}
+
+				const toast = document.createElement('div');
+				toast.className = 'donation-toast';
+
+				// Get user info with fallbacks
+				const userName = donation.userName ||
+					(donation.donor ? `${donation.donor.slice(0, 6)}...${donation.donor.slice(-4)}` : 'Anonymous');
+				const userAvatar = donation.userAvatar;
+				const charityIcon = getCharityIcon(donation.charity);
+				const charityName = getCharityShortName(donation.charity);
+				const amount = parseFloat(donation.amount) || 0;
+				const timeAgo = formatTimeAgo(donation.timestamp);
+
+				// Generate avatar content
+				let avatarContent;
+				if (userAvatar) {
+					avatarContent = `<img src="${userAvatar}" alt="${userName}" onerror="this.parentElement.innerHTML='🪙'">`;
+				} else {
+					// Use first letter of name or coin emoji
+					const initial = userName.charAt(0).toUpperCase();
+					avatarContent = /[A-Z]/.test(initial) ? initial : '🪙';
+				}
+
+				toast.innerHTML = `
+					<div class="donation-toast-avatar">${avatarContent}</div>
+					<div class="donation-toast-content">
+						<div class="donation-toast-name">${userName}</div>
+						<div class="donation-toast-details">
+							<span class="donation-toast-amount">${amount.toLocaleString()} RL80</span>
+							<span>→</span>
+							<span class="donation-toast-charity">
+								<span class="donation-toast-charity-icon">${charityIcon}</span>
+								${charityName}
+							</span>
+						</div>
+						${timeAgo ? `<div class="donation-toast-time">${isNew ? '✨ Just now!' : timeAgo}</div>` : ''}
+					</div>
+				`;
+
+				container.appendChild(toast);
+
+				// Add click handler to open BaseScan transaction
+				if (donation.txHash) {
+					toast.addEventListener('click', () => {
+						window.open(`https://sepolia.basescan.org/tx/${donation.txHash}`, '_blank');
+					});
+					toast.title = 'Click to view transaction on BaseScan';
+				}
+
+				// Auto-remove after duration
+				setTimeout(() => {
+					toast.classList.add('exiting');
+					setTimeout(() => toast.remove(), 400);
+				}, toastConfig.displayDuration);
+			}
+
+			function showNewDonationToast(donation) {
+				// Don't show if we've already shown this donation
+				if (donation.id && toastConfig.shownDonationIds.has(donation.id)) {
+					return;
+				}
+
+				// Mark as shown
+				if (donation.id) {
+					toastConfig.shownDonationIds.add(donation.id);
+				}
+
+				createDonationToast(donation, true);
+			}
+
+			function cycleHistoricalDonations() {
+				if (toastConfig.recentDonations.length === 0) return;
+
+				// Pick a random donation from recent ones
+				const randomIndex = Math.floor(Math.random() * toastConfig.recentDonations.length);
+				const donation = toastConfig.recentDonations[randomIndex];
+
+				createDonationToast(donation, false);
+			}
+
+			// Start cycling through historical donations
+			let donationCycleInterval = null;
+
+			function startDonationCycle() {
+				if (donationCycleInterval) return;
+
+				// Initial delay before starting to cycle
+				setTimeout(() => {
+					// Show first historical donation after 10 seconds
+					cycleHistoricalDonations();
+
+					// Then cycle periodically
+					donationCycleInterval = setInterval(() => {
+						cycleHistoricalDonations();
+					}, toastConfig.cycleInterval);
+				}, 10000);
+			}
+
+			// Make functions globally accessible
+			window.showNewDonationToast = showNewDonationToast;
+			window.createDonationToast = createDonationToast;
+			// ===== END DONATION TOAST SYSTEM =====
+
 			// Add click outside to close functionality
 			document.addEventListener('click', function(event) {
 				const info = document.getElementById('info');
@@ -1128,6 +1968,22 @@
 			let collectedCoinCount = 0;
 			let charityAllocation = { 'world-central-kitchen': 0, 'aspca': 0 };
 			let isResetting = false;
+
+			// --- RL80 Donation Tracking ---
+			let totalRL80Donated = 0;
+			let rl80ByCharity = { 'ST_JUDES': 0, 'ASPCA': 0 };
+
+			// Format large numbers (e.g., 1234567 -> "1.23M")
+			function formatNumber(num) {
+				if (num >= 1000000000) {
+					return (num / 1000000000).toFixed(2) + 'B';
+				} else if (num >= 1000000) {
+					return (num / 1000000).toFixed(2) + 'M';
+				} else if (num >= 1000) {
+					return (num / 1000).toFixed(1) + 'K';
+				}
+				return num.toString();
+			}
 			let staticCoinInstancedMesh = null;
 			let staticCoinData = [];
 			
@@ -1143,32 +1999,42 @@
 				const coinCountElement = document.getElementById('coinCount');
 				const collectedCountElement = document.getElementById('collectedCount');
 				const mobileCurrentCountElement = document.getElementById('mobileCurrentCount');
-				const wckPercentageElement = document.getElementById('wckPercentage');
+				const stJudesPercentageElement = document.getElementById('stJudesPercentage');
 				const aspcaPercentageElement = document.getElementById('aspcaPercentage');
-				
+				const totalRL80Element = document.getElementById('totalRL80Donated');
+				const mobileRL80Element = document.getElementById('mobileRL80Total');
+
 				if (coinCountElement) {
 					// Show actual count from database, even if we're only rendering some
 					coinCountElement.textContent = totalCoinCount;
 				}
-				
+
 				if (collectedCountElement) {
 					collectedCountElement.textContent = collectedCoinCount;
 				}
-				
+
 				// Update mobile counter with current pool count
 				if (mobileCurrentCountElement) {
 					mobileCurrentCountElement.textContent = totalCoinCount;
 				}
-				
-				// Update allocation percentages
-				const total = charityAllocation['world-central-kitchen'] + charityAllocation['aspca'];
-				if (total > 0 && wckPercentageElement && aspcaPercentageElement) {
-					const wckPercent = Math.round((charityAllocation['world-central-kitchen'] / total) * 100);
-					const aspcaPercent = Math.round((charityAllocation['aspca'] / total) * 100);
-					wckPercentageElement.textContent = wckPercent;
+
+				// Update RL80 totals
+				if (totalRL80Element) {
+					totalRL80Element.textContent = formatNumber(totalRL80Donated);
+				}
+				if (mobileRL80Element) {
+					mobileRL80Element.textContent = formatNumber(totalRL80Donated);
+				}
+
+				// Update allocation percentages based on RL80 amounts
+				const totalRL80 = rl80ByCharity['ST_JUDES'] + rl80ByCharity['ASPCA'];
+				if (totalRL80 > 0 && stJudesPercentageElement && aspcaPercentageElement) {
+					const stJudesPercent = Math.round((rl80ByCharity['ST_JUDES'] / totalRL80) * 100);
+					const aspcaPercent = Math.round((rl80ByCharity['ASPCA'] / totalRL80) * 100);
+					stJudesPercentageElement.textContent = stJudesPercent;
 					aspcaPercentageElement.textContent = aspcaPercent;
-				} else if (wckPercentageElement && aspcaPercentageElement) {
-					wckPercentageElement.textContent = '0';
+				} else if (stJudesPercentageElement && aspcaPercentageElement) {
+					stJudesPercentageElement.textContent = '0';
 					aspcaPercentageElement.textContent = '0';
 				}
 			}
@@ -1225,7 +2091,77 @@
 					}
 				);
 			}
-			
+
+			// Set up real-time listener for RL80 donation totals
+			function setupRealtimeDonationCounter() {
+				if (!donationsCollection || !db) {
+					console.warn("Firestore not initialized, cannot set up donation listener");
+					return;
+				}
+
+				// Track previously seen donation IDs to detect new ones
+				let previousDonationIds = new Set();
+				let isFirstSnapshot = true;
+
+				// Listen for changes to the donations collection
+				donationsCollection.orderBy('timestamp', 'desc').limit(50).onSnapshot(
+					(snapshot) => {
+						// Reset totals
+						totalRL80Donated = 0;
+						rl80ByCharity = { 'ST_JUDES': 0, 'ASPCA': 0 };
+
+						// Track current donation IDs and data
+						const currentDonationIds = new Set();
+						const allDonations = [];
+
+						// Sum up all donations
+						snapshot.forEach((doc) => {
+							const data = doc.data();
+							const donationWithId = { ...data, id: doc.id };
+							const amount = parseFloat(data.amount) || 0;
+							totalRL80Donated += amount;
+
+							// Track by charity
+							if (data.charity && rl80ByCharity[data.charity] !== undefined) {
+								rl80ByCharity[data.charity] += amount;
+							}
+
+							currentDonationIds.add(doc.id);
+							allDonations.push(donationWithId);
+
+							// Show toast for NEW donations (not on initial load)
+							if (!isFirstSnapshot && !previousDonationIds.has(doc.id)) {
+								console.log('[Toast] New donation detected:', donationWithId);
+								showNewDonationToast(donationWithId);
+							}
+						});
+
+						// Store recent donations for cycling (limit to 20 most recent)
+						toastConfig.recentDonations = allDonations.slice(0, 20);
+
+						// Update previous IDs for next comparison
+						previousDonationIds = currentDonationIds;
+
+						// After first snapshot, mark as not first and start cycling
+						if (isFirstSnapshot) {
+							isFirstSnapshot = false;
+							// Mark all existing IDs as "shown" so they don't appear as new
+							allDonations.forEach(d => toastConfig.shownDonationIds.add(d.id));
+							// Start the historical donation cycle
+							startDonationCycle();
+						}
+
+						// Update the display
+						updateCoinCounter();
+
+						console.log('Real-time donation update: Total RL80 =', totalRL80Donated, 'By charity:', rl80ByCharity, 'Donations:', allDonations.length);
+					},
+					(error) => {
+						console.error('Error with donation listener:', error);
+					}
+				);
+			}
+
 			// Archive and reset the fountain
 			async function archiveAndResetFountain() {
 				console.log('archiveAndResetFountain called, isResetting:', isResetting, 'totalCoinCount:', totalCoinCount);
@@ -1351,6 +2287,7 @@
 			// --- Firebase Configuration and Initialization ---
 			let db = null;
 			let coinsCollection = null;
+			let donationsCollection = null;
 			
 			// Initialize Firebase
 			async function initializeFirebase() {
@@ -1376,14 +2313,16 @@
 					
 					db = firebase.firestore();
 					coinsCollection = db.collection('fountain_coins');
-					
+					donationsCollection = db.collection('fountain_donations');
+
 					console.log("Firebase initialized successfully");
-					
+
 					// Load collected total first
 					await loadCollectedTotal();
-					
-					// Set up real-time listener for coin count
+
+					// Set up real-time listeners
 					setupRealtimeCoinCounter();
+					setupRealtimeDonationCounter();
 					
 					// Load existing coins
 					loadSavedCoins();
@@ -2206,7 +3145,7 @@
 				if (existingReminder) {
 					existingReminder.remove();
 				}
-				
+
 				const reminder = document.createElement('div');
 				reminder.id = 'aimReminder';
 				reminder.className = 'pumpkin-modal';
@@ -2220,7 +3159,7 @@
 					width: min(400px, 90vw);
 					animation: fadeIn 0.3s ease-out;
 				`;
-				
+
 				reminder.innerHTML = `
 					<h3>⚠️ Aim First! ⚠️</h3>
 					<p>Please click on the water to aim where you want to toss your coin!</p>
@@ -2228,15 +3167,61 @@
 						Got it!
 					</button>
 				`;
-				
+
 				document.body.appendChild(reminder);
-				
+
 				// Auto-remove after 3 seconds
 				setTimeout(() => {
 					if (document.getElementById('aimReminder')) {
 						document.getElementById('aimReminder').remove();
 					}
 				}, 3000);
+			}
+
+			// Show message after donation - instruct user to aim
+			function showAimForDonationMessage() {
+				const existingMsg = document.getElementById('donationAimMessage');
+				if (existingMsg) {
+					existingMsg.remove();
+				}
+
+				const msg = document.createElement('div');
+				msg.id = 'donationAimMessage';
+				msg.style.cssText = `
+					position: fixed;
+					top: 40%;
+					left: 50%;
+					transform: translateX(-50%);
+					z-index: 10001;
+					background: rgba(20, 20, 30, 0.35);
+					max-width: 20rem;
+					border: 2px solid rgba(255, 215, 0, 0.4);
+					color: #FFD700;
+					padding: 0.875rem 1.5rem;
+					border-radius: 16px;
+					font-family: 'Orbitron', monospace;
+					font-weight: 600;
+					font-size: 0.9rem;
+					text-align: center;
+					text-transform: uppercase;
+					letter-spacing: 1px;
+					box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 20px rgba(255, 215, 0, 0.2);
+					backdrop-filter: blur(10px);
+					-webkit-backdrop-filter: blur(10px);
+					animation: fadeIn 0.3s ease-out;
+				`;
+
+				msg.innerHTML = `Click the water to aim and toss your coin`;
+
+				document.body.appendChild(msg);
+			}
+
+			// Hide the donation aim message
+			function hideAimForDonationMessage() {
+				const msg = document.getElementById('donationAimMessage');
+				if (msg) {
+					msg.remove();
+				}
 			}
 			
 			function showCharityModal() {
@@ -2346,29 +3331,28 @@
 					label.addEventListener('click', function(e) {
 						const forId = this.getAttribute('for');
 						const radio = document.getElementById(forId);
-						
+
 						// If radio exists and clicking on already checked radio, trigger action
 						if (radio && radio.checked) {
-							// Check if user has aimed first
-							if (!hasAimed) {
-								showAimReminderModal();
-								return;
-							}
-							
 							switch(forId) {
 								case 'tossCoin':
+									// Free coin toss still requires aiming
+									if (!hasAimed) {
+										showAimReminderModal();
+										return;
+									}
 									console.log('[Toggle] Toss Coin selected - triggering free coin toss');
 									triggerCoinToss(true);
 									break;
 								case 'aspca':
-									console.log('[Toggle] ASPCA selected - triggering donation coin toss');
-									selectedCharity = 'aspca';
-									triggerCoinToss(false);
+									// Open donation modal immediately - coin toss happens after successful donation
+									console.log('[Toggle] ASPCA selected - opening donation modal');
+									window.parent.postMessage({ type: 'openDonation', charity: 'ASPCA' }, '*');
 									break;
 								case 'stlukes':
-									console.log('[Toggle] St. Lukes selected - triggering donation coin toss');
-									selectedCharity = 'st-lukes-hospital';
-									triggerCoinToss(false);
+									// Open donation modal immediately - coin toss happens after successful donation
+									console.log('[Toggle] St. Jude selected - opening donation modal');
+									window.parent.postMessage({ type: 'openDonation', charity: 'ST_JUDES' }, '*');
 									break;
 							}
 						}
@@ -2376,14 +3360,26 @@
 					});
 				})
 
-				// Listen for 80s mode changes from parent
+				// Listen for messages from parent
 				window.addEventListener('message', function(event) {
 					if (event.data) {
-						// Support both message formats
+						// Support both message formats for 80s mode
 						if (event.data.type === 'toggle80sMode') {
 							document.body.classList.toggle('mode-80s', event.data.enabled);
 						} else if (event.data.type === '80sMode') {
 							document.body.classList.toggle('mode-80s', event.data.value);
+						}
+						// Handle donation completion - let user aim, then toss
+						else if (event.data.type === 'donationComplete') {
+							console.log('[Fountain] Donation completed, waiting for user to aim...', event.data.donation);
+							selectedCharity = event.data.donation?.charity || 'donation';
+
+							// Store pending toss and wait for user to click water
+							window.pendingDonationToss = true;
+							hasAimed = false;
+
+							// Show aim instruction
+							showAimForDonationMessage();
 						}
 					}
 				});
@@ -3764,16 +4760,27 @@
 						if (firstHit === meshRay || firstHit === upperMeshRay) {
 							console.log("[Pointer Down] Water interaction plane clicked.");
 							// Update both mouseCoords (for water effect) and aimedCoords (for coin aiming)
-							mouseCoords.copy(currentPointerCoords); 
+							mouseCoords.copy(currentPointerCoords);
 							aimedCoords.copy(currentPointerCoords); // Save aimed position for coin tosses
 							hasAimed = true; // Mark that user has aimed
 							console.log(`[Pointer Down] Updated global mouseCoords: (${mouseCoords.x.toFixed(2)}, ${mouseCoords.y.toFixed(2)})`);
 							console.log(`[Pointer Down] Updated aimedCoords: (${aimedCoords.x.toFixed(2)}, ${aimedCoords.y.toFixed(2)})`);
 							mousedown = true; // Enable water disturbance via raycast() function
 							waterClicked = true;
-							
+
 							// Optional: Log hit point for debugging water interaction itself
 							console.log("Water raycast successful on click at:", waterIntersects[0].point);
+
+							// If there's a pending donation toss, trigger it now that user has aimed
+							if (window.pendingDonationToss) {
+								console.log('[Fountain] User aimed - triggering pending donation coin toss!');
+								hideAimForDonationMessage();
+								window.pendingDonationToss = false;
+								// Small delay so user sees the water ripple first
+								setTimeout(() => {
+									triggerCoinToss(false);
+								}, 300);
+							}
 						}
 					}
 				}
@@ -4439,12 +5446,15 @@
                                                 coin.userData.firestoreId = id;
                                                 totalCoinCount++;
                                                 updateCoinCounter();
-                                                
+
+                                                // Trigger celebration VFX for real donations!
+                                                triggerCelebration(coin.userData.charity);
+
                                                 // Add to instanced mesh but KEEP as invisible collision obstacle
                                                 addStaticCoinToInstances(coin.position.clone(), coin.rotation.clone(), id);
                                                 coin.visible = false; // Hide since instanced mesh shows it
                                                 coin.userData.isStaticObstacle = true; // Mark as static obstacle
-                                                
+
                                                 // Check if we've reached the reset threshold
                                                 console.log('Coin saved. Total count:', totalCoinCount, 'Threshold:', RESET_THRESHOLD);
                                                 if (totalCoinCount >= RESET_THRESHOLD && !isResetting) {
@@ -4455,7 +5465,7 @@
                                         });
                                     }
                                 }
-                                
+
                                 // If coin is stopped, continue to next coin
                                 if (coin.userData.stopped) {
                                     continue;
@@ -4599,12 +5609,15 @@
                                         coin.userData.firestoreId = id;
                                         totalCoinCount++;
                                         updateCoinCounter();
-                                        
+
+                                        // Trigger celebration VFX for real donations!
+                                        triggerCelebration(coin.userData.charity);
+
                                         // Add to instanced mesh but KEEP as invisible collision obstacle
                                         addStaticCoinToInstances(nextPosition.clone(), coin.rotation.clone(), id);
                                         coin.visible = false; // Hide since instanced mesh shows it
                                         coin.userData.isStaticObstacle = true; // Mark as static obstacle
-                                        
+
                                         // Check if we've reached the reset threshold
                                         console.log('Coin saved (stacked). Total count:', totalCoinCount, 'Threshold:', RESET_THRESHOLD);
                                         if (totalCoinCount >= RESET_THRESHOLD && !isResetting) {
@@ -4685,12 +5698,15 @@
                                          coin.userData.firestoreId = id;
                                          totalCoinCount++;
                                          updateCoinCounter();
-                                         
+
+                                         // Trigger celebration VFX for real donations!
+                                         triggerCelebration(coin.userData.charity);
+
                                          // Add to instanced mesh but KEEP as invisible collision obstacle
                                          addStaticCoinToInstances(coin.position.clone(), coin.rotation.clone(), id);
                                          coin.visible = false; // Hide since instanced mesh shows it
                                          coin.userData.isStaticObstacle = true; // Mark as static obstacle
-                                         
+
                                          // Check if we've reached the reset threshold
                                          console.log('Coin saved. Total count:', totalCoinCount, 'Threshold:', RESET_THRESHOLD);
                                          if (totalCoinCount >= RESET_THRESHOLD && !isResetting) {
@@ -4701,7 +5717,7 @@
                                  });
                              }
                         }
-                        
+
                         // --- Check if coin is stuck on statue ---
                         // Track position history
                         coin.userData.lastPositions.push(coin.position.clone());
@@ -5010,8 +6026,8 @@
 						</label>
 						<input class="sr-only" type="radio" name="fountainMode" id="aspca" />
 						<label for="stlukes">
-							<span>St. Luke's</span>
-							<span class="sr-only">Donate to St. Luke's</span>
+							<span>St. Jude</span>
+							<span class="sr-only">Donate to St. Jude</span>
 						</label>
 						<input class="sr-only" type="radio" name="fountainMode" id="stlukes" />
 					</div>
@@ -5226,7 +6242,7 @@
 			.fountain-toggle__track:has(#donate:checked) .donate-section .indicator {
 				opacity: 1;
 				clip-path: inset(0 0 0 0 round 100px);  /* Full pill */
-				translate: 0 0;  /* Position on right (St. Luke's) */
+				translate: 0 0;  /* Position on right (St. Jude) */
 				background: rgba(255, 255, 255, 0.95);
 			}
 			
@@ -5269,7 +6285,7 @@
 				background: rgba(255, 255, 255, 0.95);
 			}
 			
-			/* When St. Luke's is selected - white pill, positioned right */
+			/* When St. Jude is selected - white pill, positioned right */
 			.fountain-toggle__track:has(#stlukes:checked) .donate-section .indicator {
 				opacity: 1;
 				clip-path: inset(0 0 0 0 round 100px);  /* Full pill! */

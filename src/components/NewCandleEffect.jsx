@@ -332,7 +332,8 @@ export function NewCandleEffect({
     if (phase === 'traveling' || phase === 'emerging' || phase === 'arriving' || phase === 'glowing') {
       // Spawn new particle - more particles during arrival and glowing for fanfare
       const spawnChance = (phase === 'arriving' || phase === 'glowing') ? 0.9 : 0.7
-      if (Math.random() < spawnChance) {
+      // MEMORY FIX: Hard cap to prevent unbounded array growth
+      if (Math.random() < spawnChance && trailParticles.current.length < TRAIL_PARTICLE_COUNT) {
         trailParticles.current.push({
           position: currentPos.clone(),
           birth: time,
@@ -342,12 +343,12 @@ export function NewCandleEffect({
             (Math.random() - 0.5) * ((phase === 'arriving' || phase === 'glowing') ? 0.8 : 0.5)
           ),
           size: (phase === 'arriving' || phase === 'glowing') ? 0.08 + Math.random() * 0.15 : 0.05 + Math.random() * 0.1,
-          color: (phase === 'arriving' || phase === 'glowing') ? 
+          color: (phase === 'arriving' || phase === 'glowing') ?
             (Math.random() > 0.5 ? '#00ff66' : '#00ffff') : '#00ff66'
         })
       }
     }
-    
+
     // Clean up old particles
     trailParticles.current = trailParticles.current.filter(
       p => time - p.birth < TRAIL_LIFETIME
@@ -358,19 +359,22 @@ export function NewCandleEffect({
       const positions = trailRef.current.geometry.attributes.position
       const sizes = trailRef.current.geometry.attributes.size
       const opacities = trailRef.current.geometry.attributes.opacity
-      
+
+      // MEMORY FIX: Reuse vector objects instead of cloning every frame
+      const tempPos = new THREE.Vector3()
+      const tempVel = new THREE.Vector3()
+
       for (let i = 0; i < TRAIL_PARTICLE_COUNT; i++) {
         const particle = trailParticles.current[i]
         if (particle) {
           const age = time - particle.birth
           const life = age / TRAIL_LIFETIME
-          
-          // Update position with velocity
-          const pos = particle.position.clone().add(
-            particle.velocity.clone().multiplyScalar(age)
-          )
-          
-          positions.setXYZ(i, pos.x, pos.y, pos.z)
+
+          // Update position with velocity (reuse temp vectors)
+          tempVel.copy(particle.velocity).multiplyScalar(age)
+          tempPos.copy(particle.position).add(tempVel)
+
+          positions.setXYZ(i, tempPos.x, tempPos.y, tempPos.z)
           sizes.setX(i, particle.size * (1 - life * 0.5)) // Shrink over time
           opacities.setX(i, 1 - life) // Fade out
         } else {
@@ -380,7 +384,7 @@ export function NewCandleEffect({
           opacities.setX(i, 0)
         }
       }
-      
+
       positions.needsUpdate = true
       sizes.needsUpdate = true
       opacities.needsUpdate = true

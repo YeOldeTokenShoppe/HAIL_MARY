@@ -5,6 +5,7 @@ import { useUser } from '@clerk/nextjs';
 import { useWalletAuth } from './WalletAuthProvider';
 import { db, collection, addDoc, doc, serverTimestamp, query, where, getDocs, deleteDoc, setDoc, increment } from '@/lib/firebaseClient';
 import ThirdwebBuyModal from './ThirdwebBuyModal';
+import NoTokensPrompt from './NoTokensPrompt';
 import { erc20Contract } from '@/lib/contract';
 import { useSendTransaction } from 'thirdweb/react';
 import { burn } from 'thirdweb/extensions/erc20';
@@ -974,122 +975,17 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
       <div className="modal-overlay" onClick={onClose} style={{ display: (!forceHidden && !modalHidden) ? 'flex' : 'none' }}>
         {/* Buy RL80 Prompt - Show this INSTEAD of the modal content */}
         {showNoBuyPrompt && transactionStatus !== 'processing' ? (
-          <div 
-            style={{
-              background: 'rgba(20, 20, 30, 0.98)',
-              border: '1px solid rgba(138, 43, 226, 0.4)',
-              borderRadius: '24px',
-              padding: '1rem',
-              maxWidth: '420px',
-              textAlign: 'center',
-              color: '#fff',
-              boxShadow: '0 0 60px rgba(138, 43, 226, 0.3)',
-              position: 'relative',
+          <NoTokensPrompt
+            message="You need RL80 tokens to light a candle."
+            onBuy={() => {
+              setShowNoBuyPrompt(false);
+              setShowBuyModal(true);
             }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Close button */}
-            <button
-              style={{
-                position: 'absolute',
-                top: '1rem',
-                right: '1rem',
-                background: 'transparent',
-                border: 'none',
-                color: '#ff006e',
-                fontSize: '2rem',
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                width: '32px',
-                height: '32px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'transform 0.2s',
-              }}
-              onClick={onClose}
-              onMouseEnter={(e) => e.target.style.transform = 'scale(1.1)'}
-              onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
-            >
-              ×
-            </button>
-            
-            {/* Icon */}
-            {/* <div style={{ marginBottom: '1rem' }}>
-              <div style={{
-                fontSize: '4rem',
-                filter: 'drop-shadow(0 0 20px rgba(253, 237, 0, 0.5))',
-              }}>
-                🪙
-              </div>
-            </div> */}
-            
-            {/* Title */}
-            <h2 style={{
-              fontFamily: "'Orbitron', monospace",
-              fontSize: '1.2rem',
-              fontWeight: '700',
-              color: '#fff',
-              textTransform: 'uppercase',
-              letterSpacing: '3px',
-              marginBottom: '1.5rem',
-            }}>
-              RL80 TOKENS REQUIRED
-            </h2>
-            
-            {/* Description */}
-            <p style={{
-              color: '#00f5d4',
-              fontSize: '1.1rem',
-              marginBottom: '2.5rem',
-              lineHeight: '1.5',
-            }}>
-              You need RL80 tokens to light a candle.
-            </p>
-            
-            {/* Info message for test mode */}
-            <div style={{
-              background: 'rgba(139, 92, 246, 0.1)',
-              border: '1px solid rgba(139, 92, 246, 0.3)',
-              borderRadius: '12px',
-              padding: '1rem',
-              marginBottom: '2rem'
-            }}>
-              <p style={{
-                color: '#fff',
-                fontSize: '0.9rem',
-                margin: 0
-              }}>
-                💡 Test tokens have been provided for this demo. Please close this window and try lighting a candle again.
-              </p>
-            </div>
-            
-            {/* Secondary link */}
-            <button 
-              onClick={() => {
-                setShowNoBuyPrompt(false);
-                onClose();
-              }}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'rgba(255, 255, 255, 0.5)',
-                fontSize: '0.9rem',
-                cursor: 'pointer',
-                padding: '0.5rem 1rem',
-                transition: 'color 0.3s',
-                textDecoration: 'underline',
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.color = 'rgba(255, 255, 255, 0.8)';
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.color = 'rgba(255, 255, 255, 0.5)';
-              }}
-            >
-              Maybe Later
-            </button>
-          </div>
+            onClose={() => {
+              setShowNoBuyPrompt(false);
+              onClose();
+            }}
+          />
         ) : !transactionStatus ? (
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <button className="close-button" onClick={onClose}>✕</button>

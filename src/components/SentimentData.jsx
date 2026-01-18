@@ -13,8 +13,13 @@ const defaultSentimentData = {
     { name: 'Celebration', value: 20, color: '#fbbf24' },
   ],
   prayersPerHour: 0,
-  trend: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+  trend: [0.35, 0.42, 0.38, 0.55, 0.48, 0.52, 0.5], // Mock trending data
   keywords: ['analyzing', 'prayers', '...'],
+  prayerTypes: {
+    petition: 62,
+    confession: 18,
+    appreciation: 20
+  },
   lastUpdate: 'loading...'
 };
 
@@ -28,7 +33,6 @@ const sentimentLevels = [
 
 export default function CongregationSentiment() {
   const [data, setData] = useState(defaultSentimentData);
-  const [activeKeyword, setActiveKeyword] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -61,17 +65,28 @@ export default function CongregationSentiment() {
         if (docSnapshot.exists()) {
           const sentimentData = docSnapshot.data();
           console.log('[Sentiment] Received update from Firebase:', sentimentData.label);
-          
+
+          // Check if trend data has variation (not all the same value)
+          let trendData = sentimentData.trend || defaultSentimentData.trend;
+          if (trendData && trendData.length > 0) {
+            const allSame = trendData.every(val => val === trendData[0]);
+            if (allSame) {
+              // Use mock varied data if Firebase data is flat
+              trendData = defaultSentimentData.trend;
+            }
+          }
+
           // Update data with real analysis from Firebase
           setData({
             overall: sentimentData.overall || 0.5,
             label: sentimentData.label || 'Unknown',
             emotions: sentimentData.emotions || defaultSentimentData.emotions,
             prayersPerHour: sentimentData.prayersPerHour || 0,
-            trend: sentimentData.trend || defaultSentimentData.trend,
+            trend: trendData,
             keywords: sentimentData.keywords || ['no', 'data', 'yet'],
+            prayerTypes: sentimentData.prayerTypes || defaultSentimentData.prayerTypes,
             summary: sentimentData.summary || null,
-            lastUpdate: sentimentData.lastUpdate ? 
+            lastUpdate: sentimentData.lastUpdate ?
               new Date(sentimentData.lastUpdate).toLocaleTimeString() : 'just now',
             totalAnalyzed: sentimentData.totalAnalyzed || 0,
             nextUpdate: sentimentData.nextUpdate
@@ -104,14 +119,6 @@ export default function CongregationSentiment() {
     return () => unsubscribe();
   }, []);
 
-  // Rotate through keywords
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveKeyword(prev => (prev + 1) % data.keywords.length);
-    }, 2500);
-    return () => clearInterval(interval);
-  }, [data.keywords.length]);
-
   const gaugeRotation = -90 + (data.overall * 180);
   
   return (
@@ -131,7 +138,7 @@ export default function CongregationSentiment() {
 
       {/* Main Gauge */}
       <div className="gauge-container">
-        <svg viewBox={isMobile ? "0 0 200 110" : "0 0 200 120"} className="gauge-svg">
+        <svg viewBox={isMobile ? "0 0 200 90" : "0 0 200 100"} className="gauge-svg">
           {/* Background arc segments - bottom semicircle */}
           {sentimentLevels.map((level, i) => (
             <path
@@ -205,7 +212,7 @@ export default function CongregationSentiment() {
 
       {/* Trend Sparkline */}
       <div className="trend-section">
-        <span className="trend-label">7d Trend</span>
+        <div className="trend-label">7-Day Sentiment</div>
         <svg viewBox="0 0 100 30" className="sparkline">
           <polyline
             fill="none"
@@ -213,7 +220,7 @@ export default function CongregationSentiment() {
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            points={data.trend.map((v, i) => 
+            points={data.trend.map((v, i) =>
               `${(i / (data.trend.length - 1)) * 100},${30 - (v * 28)}`
             ).join(' ')}
           />
@@ -233,21 +240,51 @@ export default function CongregationSentiment() {
         </svg>
       </div>
 
-      {/* Whispers - Rotating Keywords */}
-      <div className="whispers-section">
-        <div className="whispers-label">
-          {/* <span className="whisper-icon">🕯</span> */}
-          Whispers
-        </div>
-        <div className="keyword-display">
-          {data.keywords.map((keyword, i) => (
-            <span
-              key={keyword}
-              className={`keyword ${i === activeKeyword ? 'active' : ''}`}
-            >
-              "{keyword}"
-            </span>
-          ))}
+      {/* Prayer Types Breakdown */}
+      <div className="prayer-types-section">
+        <div className="prayer-types-label">Prayer Types</div>
+        <div className="prayer-types-list">
+          <div className="prayer-type-item">
+            <div className="prayer-type-header">
+              <span className="prayer-icon">🙏</span>
+              <span className="prayer-name">Petition</span>
+              <span className="prayer-percentage">{data.prayerTypes?.petition || 0}%</span>
+            </div>
+            <div className="prayer-bar">
+              <div
+                className="prayer-bar-fill petition"
+                style={{ width: `${data.prayerTypes?.petition || 0}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="prayer-type-item">
+            <div className="prayer-type-header">
+              <span className="prayer-icon">💭</span>
+              <span className="prayer-name">Confession</span>
+              <span className="prayer-percentage">{data.prayerTypes?.confession || 0}%</span>
+            </div>
+            <div className="prayer-bar">
+              <div
+                className="prayer-bar-fill confession"
+                style={{ width: `${data.prayerTypes?.confession || 0}%` }}
+              />
+            </div>
+          </div>
+
+          <div className="prayer-type-item">
+            <div className="prayer-type-header">
+              <span className="prayer-icon">✨</span>
+              <span className="prayer-name">Appreciation</span>
+              <span className="prayer-percentage">{data.prayerTypes?.appreciation || 0}%</span>
+            </div>
+            <div className="prayer-bar">
+              <div
+                className="prayer-bar-fill appreciation"
+                style={{ width: `${data.prayerTypes?.appreciation || 0}%` }}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -255,7 +292,7 @@ export default function CongregationSentiment() {
       <div className="expanded-content">
           {/* AI Summary */}
           <div className="summary-section">
-            <span className="section-label">Trader Pulse</span>
+            <span className="section-label">Collective Consciousness</span>
             <div className="summary-text">
               {data.summary || "The AI is analyzing recent prayers and messages to 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙 to understand the spiritual temperature of the traders. Patterns in hope, gratitude, and requests are being processed..."}
             </div>
@@ -303,27 +340,27 @@ export default function CongregationSentiment() {
           display: flex;
           flex-direction: column;
           align-items: center;
-          margin-bottom: 10px;
-          height: 110px;
+          margin-bottom: 5px;
+          height: 85px;
 
         }
-        
+
         @media (max-width: 768px) {
           .gauge-container {
-            height: 90px;
-            margin-bottom: 8px;
+            height: 70px;
+            margin-bottom: 4px;
           }
         }
 
         .gauge-svg {
           width: 100%;
           height: auto;
-          max-height: 80px;
+          max-height: 65px;
         }
-        
+
         @media (max-width: 768px) {
           .gauge-svg {
-            max-height: 60px;
+            max-height: 50px;
           }
         }
 
@@ -405,18 +442,18 @@ export default function CongregationSentiment() {
         }
 
         .trend-section {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          padding: 6px 0;
+          padding: 8px;
+          margin-top: 25px;
           margin-bottom: 8px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          background: rgba(255, 255, 255, 0.02);
+          border-radius: 6px;
+          border: 1px solid rgba(255, 255, 255, 0.05);
         }
-        
+
         @media (max-width: 768px) {
           .trend-section {
-            gap: 4px;
-            padding: 4px 0;
+            padding: 6px;
+            margin-top: 8px;
             margin-bottom: 6px;
           }
         }
@@ -426,75 +463,160 @@ export default function CongregationSentiment() {
           text-transform: uppercase;
           letter-spacing: 0.5px;
           color: #888;
-          width: 40px;
+          margin-bottom: 6px;
+          display: block;
+          font-family: monospace;
         }
-        
+
         @media (max-width: 768px) {
           .trend-label {
             font-size: 8px;
-            width: 35px;
+            margin-bottom: 4px;
           }
         }
 
         .sparkline {
-          flex: 1;
+          width: 100%;
           height: 30px;
+          display: block;
+        }
+
+        @media (max-width: 768px) {
+          .sparkline {
+            height: 25px;
+          }
         }
 
         .sparkline-dot {
           animation: pulse-dot 1.5s ease-in-out infinite;
+          filter: drop-shadow(0 0 4px #4ade80);
         }
 
-        .whispers-section {
-          padding: 8px 0;
-          margin-bottom: 8px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        .sparkline polyline {
+          filter: drop-shadow(0 0 2px rgba(167, 139, 250, 0.4));
         }
-        
+
+        .prayer-types-section {
+          padding: 8px;
+          margin-bottom: 8px;
+          background: rgba(255, 255, 255, 0.02);
+          border-radius: 6px;
+          border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
         @media (max-width: 768px) {
-          .whispers-section {
-            padding: 6px 0;
+          .prayer-types-section {
+            padding: 6px;
             margin-bottom: 6px;
           }
         }
 
-        .whispers-label {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 10px;
+        .prayer-types-label {
+          font-size: 9px;
           text-transform: uppercase;
           letter-spacing: 0.5px;
           color: #888;
           margin-bottom: 8px;
+          font-family: monospace;
         }
 
-        .whisper-icon {
+        @media (max-width: 768px) {
+          .prayer-types-label {
+            font-size: 8px;
+            margin-bottom: 6px;
+          }
+        }
+
+        .prayer-types-list {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        @media (max-width: 768px) {
+          .prayer-types-list {
+            gap: 5px;
+          }
+        }
+
+        .prayer-type-item {
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+        }
+
+        .prayer-type-header {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 11px;
+        }
+
+        @media (max-width: 768px) {
+          .prayer-type-header {
+            font-size: 10px;
+            gap: 4px;
+          }
+        }
+
+        .prayer-icon {
           font-size: 12px;
+          flex-shrink: 0;
         }
 
-        .keyword-display {
-          height: 24px;
-          position: relative;
+        @media (max-width: 768px) {
+          .prayer-icon {
+            font-size: 11px;
+          }
+        }
+
+        .prayer-name {
+          flex: 1;
+          color: #ccc;
+          font-family: monospace;
+        }
+
+        .prayer-percentage {
+          color: #fbbf24;
+          font-weight: bold;
+          font-family: monospace;
+          min-width: 35px;
+          text-align: right;
+        }
+
+        .prayer-bar {
+          width: 100%;
+          height: 6px;
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 3px;
           overflow: hidden;
         }
 
-        .keyword {
-          position: absolute;
-          width: 100%;
-          text-align: center;
-          font-size: 14px;
-          font-style: italic;
-          color: #a78bfa;
-          opacity: 0;
-          transform: translateY(10px);
-          transition: all 0.5s ease;
+        @media (max-width: 768px) {
+          .prayer-bar {
+            height: 5px;
+          }
         }
 
-        .keyword.active {
-          opacity: 1;
-          transform: translateY(0);
-          text-shadow: 0 0 15px rgba(167, 139, 250, 0.6);
+        .prayer-bar-fill {
+          height: 100%;
+          border-radius: 3px;
+          transition: width 0.5s ease;
+        }
+
+        .prayer-bar-fill.petition {
+          background: linear-gradient(90deg, #4ade80, #22c55e);
+          box-shadow: 0 0 8px rgba(74, 222, 128, 0.5);
+        }
+
+        .prayer-bar-fill.confession {
+          background: linear-gradient(90deg, #60a5fa, #3b82f6);
+          box-shadow: 0 0 8px rgba(96, 165, 250, 0.5);
+        }
+
+        .prayer-bar-fill.appreciation {
+          background: linear-gradient(90deg, #fbbf24, #f59e0b);
+          box-shadow: 0 0 8px rgba(251, 191, 36, 0.5);
         }
 
         .expanded-content {
@@ -508,47 +630,47 @@ export default function CongregationSentiment() {
         }
 
         .section-label {
-          font-size: 10px;
+          font-size: 9px;
           text-transform: uppercase;
           letter-spacing: 0.5px;
           color: #888;
           display: block;
-          margin-bottom: 8px;
+          margin-bottom: 6px;
         }
-        
+
         @media (max-width: 768px) {
           .section-label {
-            font-size: 9px;
-            margin-bottom: 6px;
+            font-size: 8px;
+            margin-bottom: 5px;
           }
         }
 
         .summary-section {
-          margin-bottom: 12px;
+          margin-bottom: 8px;
         }
-        
+
         @media (max-width: 768px) {
           .summary-section {
-            margin-bottom: 8px;
+            margin-bottom: 6px;
           }
         }
 
         .summary-text {
-          font-size: 11px;
-          line-height: 1.4;
+          font-size: 10px;
+          line-height: 1.3;
           color: #ccc;
           background: rgba(255, 255, 255, 0.05);
           border-radius: 6px;
-          padding: 8px;
+          padding: 6px 8px;
           border-left: 3px solid #a78bfa;
           font-style: italic;
         }
-        
+
         @media (max-width: 768px) {
           .summary-text {
-            font-size: 10px;
-            line-height: 1.3;
-            padding: 6px;
+            font-size: 9px;
+            line-height: 1.2;
+            padding: 5px 6px;
           }
         }
 

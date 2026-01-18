@@ -153,44 +153,6 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
         }}
         onClick={onClose}
       >
-        {/* Close Button - Outside modal content to avoid glitch */}
-        <button
-            className="close-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            style={{
-              position: 'fixed',
-              top: isMobile ? 'calc(5vh + 20px)' : '15px',
-              right: isMobile ? '25px' : '15px',
-              background: '#000',
-              border: 'none',
-              color: '#000',
-              fontSize: isMobile ? '28px' : '24px',
-              width: isMobile ? '50px' : '40px',
-              height: isMobile ? '50px' : '40px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'transform 0.3s ease',
-              zIndex: 10002,
-              fontWeight: 'bold',
-              fontFamily: 'monospace',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'scale(1.1)';
-              e.currentTarget.style.color = '#ff184c';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-              e.currentTarget.style.color = '#000';
-            }}
-          >
-            ✕
-          </button>
-        
         {/* Glitch Lines Effect */}
         <div style={{
           position: 'absolute',
@@ -229,6 +191,44 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
           }}
           onClick={(e) => e.stopPropagation()}
         >
+          {/* Close Button */}
+          <button
+            className="close-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            style={{
+              position: 'absolute',
+              top: isMobile ? '15px' : '10px',
+              right: isMobile ? '15px' : '10px',
+              background: '#000',
+              border: 'none',
+              color: '#000',
+              fontSize: isMobile ? '28px' : '24px',
+              width: isMobile ? '50px' : '40px',
+              height: isMobile ? '50px' : '40px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'transform 0.3s ease',
+              zIndex: 10,
+              fontWeight: 'bold',
+              fontFamily: 'monospace',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.1)';
+              e.currentTarget.style.color = '#ff184c';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.color = '#000';
+            }}
+          >
+            ✕
+          </button>
+
           {/* Cyber Frame Borders */}
           <div style={{
             position: 'absolute',

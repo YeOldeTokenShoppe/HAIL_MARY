@@ -7,6 +7,7 @@ import { useMusic } from '@/components/MusicContext';
 import CoinLoader from '@/components/CoinLoader';
 import CyberNav from '@/components/CyberNav';
 import NavControlsHome from '@/components/NavControlsHome';
+import FountainDonationModal from '@/components/FountainDonationModal';
 import { useUser, SignInButton, UserButton } from '@clerk/nextjs';
 
 // Dynamic import for the FountainFrame component
@@ -25,6 +26,8 @@ export default function FountainPage() {
   const [isMobileView, setIsMobileView] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showDonationModal, setShowDonationModal] = useState(false);
+  const [preselectedCharity, setPreselectedCharity] = useState(null);
   const is80sMode = context80sMode;
   const iframeRef = useRef(null);
   const loadingTimeoutRef = useRef(null);
@@ -141,7 +144,15 @@ export default function FountainPage() {
       )}
 
       {/* The Fountain iframe */}
-      <FountainFrame is80sMode={is80sMode} ref={iframeRef} onFullyLoaded={handleFountainReady} />
+      <FountainFrame
+        is80sMode={is80sMode}
+        ref={iframeRef}
+        onFullyLoaded={handleFountainReady}
+        onDonateClick={(charity) => {
+          setPreselectedCharity(charity);
+          setShowDonationModal(true);
+        }}
+      />
 
       {/* UI Overlay - Our Lady of Perpetual Profit Logo (Desktop) / RL80 (Mobile) */}
       {fontLoaded && !isMobileView && (
@@ -292,12 +303,36 @@ export default function FountainPage() {
       </div>
       
       {/* CyberNav Menu Panel */}
-      <CyberNav 
+      <CyberNav
         is80sMode={is80sMode}
         position="fixed"
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
         showButton={false}
+      />
+
+      {/* Donation Modal */}
+      <FountainDonationModal
+        isOpen={showDonationModal}
+        onClose={() => {
+          setShowDonationModal(false);
+          setPreselectedCharity(null);
+        }}
+        preselectedCharity={preselectedCharity}
+        onDonationComplete={(donation) => {
+          console.log('Donation completed:', donation);
+          // Optionally notify the iframe about the successful donation
+          if (iframeRef.current) {
+            try {
+              iframeRef.current.contentWindow.postMessage(
+                { type: 'donationComplete', donation },
+                '*'
+              );
+            } catch (e) {
+              console.log('Could not send donation notification to iframe:', e);
+            }
+          }
+        }}
       />
 
       {/* Buy Token FAB */}

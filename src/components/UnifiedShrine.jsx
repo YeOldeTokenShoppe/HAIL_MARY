@@ -742,7 +742,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   
   const [clickedCandleId, setClickedCandleId] = useState(null)
   const [isRippleActive, setIsRippleActive] = useState(false)
-  const [activeStatsTab, setActiveStatsTab] = useState('price') // 'price', 'staking', 'mood', or 'leaders'
+  const [activeStatsTab, setActiveStatsTab] = useState('price') // 'price', 'staking', 'pulse', or 'leaders'
   const [userCandleData, setUserCandleData] = useState(null) // Store user's candle data for tooltip
   const [hoveredCandleId, setHoveredCandleId] = useState(null)
   const [targetCameraPosition, setTargetCameraPosition] = useState(null) // For camera movement
@@ -972,8 +972,9 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   // Clean up WebGL context and Three.js resources on unmount
 useEffect(() => {
   return () => {
-    // Comprehensive cleanup function
-    const cleanupResources = () => {
+    // MEMORY FIX: Use setTimeout instead of requestAnimationFrame for more reliable cleanup
+    // setTimeout with 0 delay is more reliable for cleanup than requestAnimationFrame
+    const timeoutId = setTimeout(() => {
       try {
         const canvas = canvasRef.current
         if (!canvas) return
@@ -1011,7 +1012,7 @@ useEffect(() => {
               child.parent.remove(child)
             }
           })
-          
+
           // Clear the scene
           while(canvas.scene.children.length > 0) {
             canvas.scene.remove(canvas.scene.children[0])
@@ -1040,10 +1041,10 @@ useEffect(() => {
       } catch (err) {
         console.warn('Cleanup error (non-critical):', err)
       }
-    }
+    }, 0)
 
-    // Defer cleanup to next frame to allow React to finish
-    requestAnimationFrame(cleanupResources)
+    // Return cleanup function to clear timeout if component remounts before timeout fires
+    return () => clearTimeout(timeoutId)
   }
 }, [])
   
@@ -1051,6 +1052,17 @@ useEffect(() => {
   const [priceHistory, setPriceHistory] = useState(() =>
     Array(20).fill(0.00042) // Start with consistent values for SSR
   )
+
+  // 7-day price history for sparkline - mock data until token launches
+  const [priceHistory7d] = useState(() => [
+    0.000410, // 7 days ago
+    0.000425, // 6 days ago
+    0.000418, // 5 days ago
+    0.000435, // 4 days ago
+    0.000428, // 3 days ago
+    0.000422, // 2 days ago
+    0.000416  // today (matches current price)
+  ])
   const lastHistoryUpdate = useRef(0)
   const HISTORY_UPDATE_INTERVAL = 500 // Update chart every 500ms
   
@@ -1472,42 +1484,36 @@ useEffect(() => {
     top: isMobile ? '100px' : '105px',
     right: isMobile ? '10px' : '20px',
     // background: 'rgba(0, 0, 0, 0.8)',
-    border: `2px solid ${displayPrice.change >= 0 ? '#00ff66' : '#ff4444'}`,
+    border: '2px solid rgba(212, 175, 55, 0.3)',
     borderRadius: '12px',
     padding: isMobile ? '10px 12px' : '18px',
     color: '#fff',
     fontFamily: 'monospace',
     fontSize: isMobile ? '11px' : '14px',
     backdropFilter: 'blur(20px)',
-    boxShadow: `0 0 20px ${displayPrice.change >= 0 ? 'rgba(0, 255, 100, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
+    boxShadow: '0 0 20px 4px rgba(212, 175, 55, 0.3)',
     zIndex: 1000,
     width: isMobile ? '160px' : '240px',
     pointerEvents: 'auto'
-  }), [isMobile, displayPrice.change])
+  }), [isMobile])
   
-  // Memoize price chart bars
-  const priceChartBars = useMemo(() => {
-    const recentPrices = priceHistory.slice(-20)
-    const min = Math.min(...recentPrices)
-    const max = Math.max(...recentPrices)
-    const range = max - min || 1
-    
-    return recentPrices.map((price, i) => {
-      const height = ((price - min) / range) * 35 + 5
-      return (
-        <div
-          key={i}
-          style={{
-            width: '8px',
-            height: `${height}px`,
-            background: i === 19 ? (displayPrice.change >= 0 ? '#00ff66' : '#ff4444') : '#444',
-            borderRadius: '2px'
-          }}
-        />
-      )
-    })
-  }, [priceHistory, displayPrice.change])
-  
+
+  // Memoize 7-day price sparkline
+  const priceSparkline = useMemo(() => {
+    const prices = priceHistory7d
+    const min = Math.min(...prices)
+    const max = Math.max(...prices)
+    const range = max - min || 0.000001 // Prevent division by zero
+
+    // Generate SVG points for polyline
+    const points = prices.map((price, i) => {
+      const x = (i / (prices.length - 1)) * 100
+      const y = 30 - ((price - min) / range) * 28 // Invert Y (SVG coords)
+      return `${x},${y}`
+    }).join(' ')
+
+    return { points, lastY: 30 - ((prices[prices.length - 1] - min) / range) * 28 }
+  }, [priceHistory7d])
 
   return (
     <div style={{ width: '100vw', height: isMobile ? '100vh' : '100vh', background: is80sMode ? 'transparent' : '#000', position: 'fixed'}}>
@@ -2166,17 +2172,17 @@ useEffect(() => {
             Stake
           </button>
           <button
-            onClick={() => setActiveStatsTab('mood')}
+            onClick={() => setActiveStatsTab('pulse')}
             style={{
               flex: 1,
               padding: isMobile ? '4px 4px' : '6px 8px',
-              background: activeStatsTab === 'mood' ? 'rgba(167, 139, 250, 0.2)' : 'transparent',
+              background: activeStatsTab === 'pulse' ? 'rgba(167, 139, 250, 0.2)' : 'transparent',
               border: 'none',
-              borderBottom: activeStatsTab === 'mood' ? '2px solid #a78bfa' : '2px solid transparent',
-              color: activeStatsTab === 'mood' ? '#a78bfa' : '#ccc',
+              borderBottom: activeStatsTab === 'pulse' ? '2px solid #a78bfa' : '2px solid transparent',
+              color: activeStatsTab === 'pulse' ? '#a78bfa' : '#ccc',
               fontSize: isMobile ? '10px' : '12px',
               fontFamily: 'monospace',
-              fontWeight: activeStatsTab === 'mood' ? 'bold' : 'normal',
+              fontWeight: activeStatsTab === 'pulse' ? 'bold' : 'normal',
               cursor: 'pointer',
               textTransform: 'uppercase',
               transition: 'all 0.2s',
@@ -2185,7 +2191,7 @@ useEffect(() => {
               overflow: 'hidden',
             }}
           >
-            Mood
+            Pulse
           </button>
           <button
             onClick={() => setActiveStatsTab('leaders')}
@@ -2333,18 +2339,44 @@ useEffect(() => {
           </div>
         </div>
         
-        {/* Mini chart - desktop only */}
-        {!isMobile && (
+        {/* 7-day price sparkline */}
+        <div style={{
+          marginTop: isMobile ? '8px' : '12px',
+          padding: isMobile ? '8px' : '10px',
+          background: 'rgba(255, 255, 255, 0.02)',
+          borderRadius: '6px',
+          border: '1px solid rgba(255, 255, 255, 0.05)'
+        }}>
           <div style={{
-            height: '30px',
-            display: 'flex',
-            alignItems: 'flex-end',
-            gap: '1px',
-            opacity: 0.6
+            fontSize: isMobile ? '9px' : '10px',
+            color: '#888',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            marginBottom: '6px',
+            fontFamily: 'monospace'
           }}>
-            {priceChartBars}
+            7-Day Chart
           </div>
-        )}
+          <svg viewBox="0 0 100 30" style={{ width: '100%', height: '30px' }}>
+            <polyline
+              fill="none"
+              stroke={displayPrice.change >= 0 ? '#4ade80' : '#f87171'}
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              points={priceSparkline.points}
+            />
+            <circle
+              cx="100"
+              cy={priceSparkline.lastY}
+              r="3"
+              fill={displayPrice.change >= 0 ? '#4ade80' : '#f87171'}
+              style={{
+                filter: `drop-shadow(0 0 4px ${displayPrice.change >= 0 ? '#4ade80' : '#f87171'})`
+              }}
+            />
+          </svg>
+        </div>
           </>
         ) : activeStatsTab === 'staking' ? (
           <>
@@ -2459,9 +2491,9 @@ useEffect(() => {
               </span>
             </div> */}
           </>
-        ) : activeStatsTab === 'mood' ? (
+        ) : activeStatsTab === 'pulse' ? (
           <>
-            {/* Mood Tab Content */}
+            {/* Pulse Tab Content */}
             <div style={{
               padding: 0,
               margin: isMobile ? '-6px' : '-10px',
@@ -2470,6 +2502,47 @@ useEffect(() => {
               overflowY: isMobile ? 'auto' : 'visible',
               overflowX: 'hidden'
             }}>
+              {/* Info Banner */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(167, 139, 250, 0.15), rgba(139, 92, 246, 0.1))',
+                border: '1px solid rgba(167, 139, 250, 0.3)',
+                borderRadius: '6px',
+                padding: isMobile ? '6px 8px' : '8px 10px',
+                marginBottom: isMobile ? '4px' : '1px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}>
+                <div style={{
+                  fontSize: isMobile ? '14px' : '16px',
+                  flexShrink: 0,
+                }}>
+                  🔮
+                </div>
+                <div style={{
+                  flex: 1,
+                }}>
+                  <div style={{
+                    fontSize: isMobile ? '9px' : '10px',
+                    color: '#a78bfa',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    marginBottom: '2px',
+                    textShadow: '0 0 8px rgba(167, 139, 250, 0.4)',
+                  }}>
+                    AI Sentiment Analysis
+                  </div>
+                  <div style={{
+                    fontSize: isMobile ? '8px' : '9px',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    lineHeight: '1.3',
+                    fontFamily: 'monospace',
+                  }}>
+                    Daily analysis of community prayers & candle messages
+                  </div>
+                </div>
+              </div>
               <CongregationSentiment />
             </div>
           </>
@@ -2497,7 +2570,7 @@ useEffect(() => {
                   fontFamily: "'Orbitron', monospace",
                   fontWeight: 'bold'
                 }}>
-                  🔥 Illuminati 🔥
+                  🔥 Illumin80 🔥
                 </div>
                 <div style={{
                   fontSize: isMobile ? '9px' : '10px',

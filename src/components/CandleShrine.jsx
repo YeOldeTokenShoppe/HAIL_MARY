@@ -21,8 +21,12 @@ const sharedUniforms = {
   uCurrentTime: { value: Date.now() }, // Current time for melting calculations
 }
 
-// Expose globally for pulse triggers
-if (typeof window !== 'undefined') {
+// MEMORY FIX: Export uniforms instead of storing on window to prevent multiple references
+export { sharedUniforms }
+
+// Expose globally for pulse triggers (backwards compatibility)
+// Only set if not already set to prevent duplicate references
+if (typeof window !== 'undefined' && !window.sharedUniforms) {
   window.sharedUniforms = sharedUniforms
 }
 
