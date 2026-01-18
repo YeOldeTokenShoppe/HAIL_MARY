@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
-import { db, collection, query, orderBy, limit, onSnapshot } from '@/lib/firebaseClient';
+import { db, collection, query, orderBy, limit, onSnapshot, getDocs } from '@/lib/firebaseClient';
 
 // ===========================================
 // CONFIGURATION
@@ -176,6 +176,10 @@ export function WatchlistPhoneTexture({
   
   // User avatar cache for activity items
   const activityAvatarsRef = useRef({});
+
+  // Illumin80 badge state
+  const [illumin80UserIds, setIllumin80UserIds] = useState(new Set());
+  const illumin80BadgeRef = useRef(null);
   
   // Background image ref
   const backgroundImageRef = useRef(null);
@@ -191,7 +195,46 @@ export function WatchlistPhoneTexture({
   
   // Touch/interaction state
   const isScrollingRef = useRef(false);
-  
+
+  // ===========================================
+  // ILLUMIN80 BADGE SETUP
+  // ===========================================
+
+  // Fetch Illumin80 top burners and load badge image
+  useEffect(() => {
+    // Load the badge image
+    const badgeImg = new Image();
+    badgeImg.crossOrigin = 'anonymous';
+    badgeImg.onload = () => {
+      illumin80BadgeRef.current = badgeImg;
+    };
+    badgeImg.src = '/images/ILLUMIN80_TATTOO.webp';
+
+    // Fetch top 20 burners from userStats
+    const fetchIllumin80 = async () => {
+      try {
+        const leaderboardQuery = query(
+          collection(db, 'userStats'),
+          orderBy('totalBurned', 'desc'),
+          limit(20)
+        );
+        const snapshot = await getDocs(leaderboardQuery);
+        const userIds = new Set();
+        snapshot.docs.forEach(doc => {
+          const data = doc.data();
+          if (data.userId) {
+            userIds.add(data.userId);
+          }
+        });
+        setIllumin80UserIds(userIds);
+      } catch (err) {
+        console.warn('Failed to fetch Illumin80 leaderboard:', err);
+      }
+    };
+
+    fetchIllumin80();
+  }, []);
+
   // ===========================================
   // CLICK HANDLING FOR TABS
   // ===========================================
@@ -421,6 +464,7 @@ export function WatchlistPhoneTexture({
           id: doc.id,
           type: 'CANDLE',
           username: data.name || truncateAddress(data.walletAddress),
+          userId: data.userId,
           userImageUrl: data.userImageUrl,
           prayerType: data.type || 'petition', // petition, confession, appreciation
           amount: parseInt(data.tokensBurned) || 1,
@@ -460,6 +504,7 @@ export function WatchlistPhoneTexture({
           id: doc.id,
           type: actionType,
           username: data.name || truncateAddress(data.walletAddress),
+          userId: data.userId,
           userImageUrl: data.userImageUrl,
           amount: parseFloat(data.amount) || 0,
           timestamp: data.createdAt?.toMillis?.() || Date.now(),
@@ -491,19 +536,29 @@ export function WatchlistPhoneTexture({
   
   useEffect(() => {
     if (!justLitOffering) return;
-    
+
     const newActivity = {
       id: `candle-${Date.now()}`,
       type: 'CANDLE',
       username: justLitOffering.name || user?.firstName || 'You',
+      userId: justLitOffering.userId,
       userImageUrl: justLitOffering.userImageUrl,
       prayerType: justLitOffering.type || 'petition', // petition, confession, appreciation
       amount: parseInt(justLitOffering.tokensBurned) || 1,
       timestamp: Date.now(),
       isNew: true,
     };
-    
-    setActivities(prev => [newActivity, ...prev].slice(0, 50));
+
+    setActivities(prev => {
+      // Check for duplicate (same user, same type, within 5 seconds)
+      const isDuplicate = prev.some(a =>
+        a.type === 'CANDLE' &&
+        a.userId === newActivity.userId &&
+        Math.abs(a.timestamp - newActivity.timestamp) < 5000
+      );
+      if (isDuplicate) return prev;
+      return [newActivity, ...prev].slice(0, 50);
+    });
     
     // Scroll to top to show new item
     targetScrollRef.current = 0;
@@ -1079,7 +1134,16 @@ export function WatchlistPhoneTexture({
       ctx.fillStyle = '#fff';
       ctx.font = 'bold 26px -apple-system, BlinkMacSystemFont, sans-serif';
       ctx.fillText(activity.username, usernameX, itemY + 35);
-      
+
+      // Illumin80 badge (if user is in top 20 burners)
+      if (activity.userId && illumin80UserIds.has(activity.userId) && illumin80BadgeRef.current) {
+        const badgeSize = 36;
+        const usernameWidth = ctx.measureText(activity.username).width;
+        const badgeX = usernameX + usernameWidth + 8;
+        const badgeY = itemY + 35 - badgeSize + 8;
+        ctx.drawImage(illumin80BadgeRef.current, badgeX, badgeY, badgeSize, badgeSize);
+      }
+
       // Time ago (top right)
       ctx.fillStyle = tier === 'mega' ? '#333' : '#888';
       ctx.font = '20px -apple-system, BlinkMacSystemFont, sans-serif';
@@ -1114,12 +1178,12 @@ export function WatchlistPhoneTexture({
         
         // Draw prayer type badge on the right side
         const badgeText = `${config.icon} ${config.label}`;
-        ctx.font = 'bold 18px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, sans-serif';
         
         // Measure text for badge background
         const metrics = ctx.measureText(badgeText);
-        const badgeX = width - 200;
-        const badgeY = itemY + 25;
+        const badgeX = width - 235;
+        const badgeY = itemY + 10;
         const padding = 8;
         
         // Draw badge background

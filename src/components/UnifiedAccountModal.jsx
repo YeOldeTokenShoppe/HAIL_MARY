@@ -392,11 +392,21 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
 
       <style jsx>{`
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&display=swap');
-        
+
         @keyframes spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
         }
+
+        @keyframes simpleFadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+
         .modal-overlay {
           position: fixed;
           top: 0;
@@ -412,15 +422,19 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
         }
 
         .unified-modal {
-          background: rgba(20, 20, 30, 0.95);
-          border: 1px solid rgba(138, 43, 226, 0.2);
-          border-radius: 16px;
+          background: rgba(20, 20, 30, 0.98);
+          border: 2px solid transparent;
+          background-image: linear-gradient(rgba(20, 20, 30, 0.98), rgba(20, 20, 30, 0.98)),
+                           linear-gradient(90deg, #00f5d4, #00bbff);
+          background-origin: border-box;
+          background-clip: padding-box, border-box;
+          border-radius: 20px;
           padding: 1.5rem;
           width: 90%;
           max-width: 480px;
           max-height: 80vh;
           position: relative;
-          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+          box-shadow: 0 20px 60px rgba(0, 245, 212, 0.3);
           display: flex;
           flex-direction: column;
         }
@@ -431,11 +445,11 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
           right: 0.75rem;
           background: transparent;
           border: none;
-          color: rgba(255, 255, 255, 0.5);
-          width: 28px;
-          height: 28px;
+          color: #00f5d4;
+          width: 32px;
+          height: 32px;
           border-radius: 6px;
-          font-size: 2rem;
+          font-size: 1.5rem;
           cursor: pointer;
           transition: all 0.2s;
           display: flex;
@@ -444,8 +458,8 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
         }
 
         .modal-close-btn:hover {
-          color: rgba(255, 255, 255, 0.9);
-          background: rgba(255, 255, 255, 0.1);
+          transform: scale(1.1);
+          color: #00f5d4;
         }
 
         .modal-tabs {
@@ -513,7 +527,7 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
         
         .account-content,
         .wallet-content {
-          animation: fadeIn 0.3s;
+          animation: simpleFadeIn 0.3s ease-out;
           display: flex;
           flex-direction: column;
           align-items: stretch;
@@ -534,8 +548,8 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
           width: 60px;
           height: 60px;
           border-radius: 12px;
-          background: rgba(138, 43, 226, 0.1);
-          border: 1px solid rgba(138, 43, 226, 0.3);
+          background: rgba(0, 245, 212, 0.1);
+          border: 1px solid rgba(0, 245, 212, 0.3);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -575,39 +589,39 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
         }
 
         .action-button {
-          background: rgba(255, 255, 255, 0.05);
-          border: 1px solid rgba(0, 245, 212, 0.3);
-          color: #fff;
+          background: #00f5d4;
+          border: none;
+          color: #000;
           padding: 0.75rem;
           border-radius: 10px;
           font-size: 0.9rem;
           font-family: 'Orbitron', monospace;
-          font-weight: 500;
+          font-weight: 600;
           text-transform: uppercase;
           letter-spacing: 0.5px;
           cursor: pointer;
-          transition: all 0.2s;
+          transition: all 0.3s;
           width: 100%;
         }
 
         .action-button:hover {
-          background: rgba(0, 245, 212, 0.1);
-          border-color: rgba(0, 245, 212, 0.5);
-          box-shadow: 0 0 20px rgba(0, 245, 212, 0.2);
+          opacity: 0.9;
+          transform: translateY(-2px);
+          box-shadow: 0 10px 30px rgba(0, 245, 212, 0.3);
         }
 
         .action-button.signout,
         .action-button.disconnect {
-          background: rgba(255, 255, 255, 0.05);
-          border-color: rgba(255, 59, 48, 0.3);
-          color: #ff6b6b;
+          background: #ff6b6b;
+          border: none;
+          color: #fff;
         }
 
         .action-button.signout:hover,
         .action-button.disconnect:hover {
-          background: rgba(255, 59, 48, 0.1);
-          border-color: rgba(255, 59, 48, 0.5);
-          box-shadow: 0 0 20px rgba(255, 59, 48, 0.2);
+          opacity: 0.9;
+          transform: translateY(-2px);
+          box-shadow: 0 10px 30px rgba(255, 107, 107, 0.3);
         }
 
         .wallet-info {
@@ -708,15 +722,15 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
         }
 
         .action-button.connect {
-          background: rgba(138, 43, 226, 0.1);
-          border: 1px solid rgba(138, 43, 226, 0.3);
-          color: #fff;
+          background: linear-gradient(135deg, #00f5d4, #00bbff);
+          border: none;
+          color: #000;
+          font-weight: 600;
         }
-        
+
         .action-button.connect:hover {
-          background: rgba(138, 43, 226, 0.2);
-          border-color: rgba(138, 43, 226, 0.5);
-          box-shadow: 0 0 20px rgba(138, 43, 226, 0.3);
+          transform: translateY(-2px);
+          box-shadow: 0 10px 30px rgba(0, 245, 212, 0.3);
         }
 
         @media (max-width: 480px) {

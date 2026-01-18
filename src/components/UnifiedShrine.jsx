@@ -1,7 +1,9 @@
 'use client'
 import React, { useRef, useState, useEffect, Suspense, useCallback, useMemo, forwardRef, useImperativeHandle, Component } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Stats, useGLTF, Html } from '@react-three/drei'
+import { Stats, useGLTF, Html, OrbitControls } from '@react-three/drei'
+import { EffectComposer, Bloom } from '@react-three/postprocessing'
+import { BlendFunction } from 'postprocessing'
 import * as THREE from 'three'
 import { HandsModel, CameraController } from './HandsGLTFScene'
 // IMPORTANT: Import from the optimized version!
@@ -67,6 +69,457 @@ class CanvasErrorBoundary extends Component {
 
     return this.props.children
   }
+}
+
+// Flickering flame shader material for tiny votive (non-instanced version)
+function createTinyFlameMaterial() {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+    },
+    vertexShader: `
+      uniform float uTime;
+      varying float vHeight;
+
+      void main() {
+        vec3 pos = position;
+
+        // Height normalized 0-1
+        vHeight = clamp((pos.y + 0.1) / 0.6, 0.0, 1.0);
+
+        // Flame flicker animation
+        float flameTime = uTime * 3.0;
+
+        // Sway side to side
+        float sway = sin(flameTime * 1.5) * 0.06 * vHeight * vHeight;
+        sway += sin(flameTime * 2.3) * 0.03 * vHeight;
+        pos.x += sway;
+
+        // Flicker height
+        float flicker = sin(flameTime * 2.0) * 0.04 * vHeight;
+        flicker += sin(flameTime * 3.7) * 0.02 * vHeight * vHeight;
+        pos.y += flicker;
+
+        // Z wobble
+        pos.z += cos(flameTime * 1.8) * 0.04 * vHeight * vHeight;
+
+        // Taper at top
+        float taper = 1.0 - vHeight * 0.5;
+        pos.x *= taper;
+        pos.z *= taper;
+
+        // Vertical stretch
+        float stretch = 1.0 + sin(flameTime * 2.5) * 0.1 * vHeight;
+        pos.y *= stretch;
+
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      varying float vHeight;
+
+      void main() {
+        float time = uTime * 3.0;
+
+        // Base flame colors
+        vec3 innerColor = vec3(1.0, 0.95, 0.8);
+        vec3 midColor = vec3(1.0, 0.5, 0.0);
+        vec3 outerColor = vec3(1.0, 0.2, 0.0);
+
+        vec3 color;
+        if (vHeight < 0.3) {
+          color = mix(innerColor, midColor, vHeight / 0.3);
+        } else if (vHeight < 0.7) {
+          color = mix(midColor, outerColor, (vHeight - 0.3) / 0.4);
+        } else {
+          color = mix(outerColor, vec3(1.0, 0.8, 0.0), (vHeight - 0.7) / 0.3);
+        }
+
+        float flicker = sin(time * 4.0) * 0.25 + sin(time * 9.0) * 0.15 + 1.0;
+        float intensity = 3.5 * flicker;
+        float alpha = (1.0 - vHeight * 0.5) * (0.8 + flicker * 0.2);
+
+        gl_FragColor = vec4(color * intensity, alpha);
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  })
+}
+
+// Tiny votive model for Illumin80 trophy display with custom avatar texture
+function TinyVotiveModel({ imageUrl }) {
+  const { scene } = useGLTF('/models/tinyVotiveIllumin80.glb')
+  const flameMaterialRef = useRef(null)
+  const senoraMeshRef = useRef(null)
+  const textureRef = useRef(null)
+  const prevImageUrlRef = useRef(null)
+
+  // Clone scene and set up materials (only once)
+  const clonedScene = useMemo(() => {
+    const clone = scene.clone(true)
+
+    // Clone materials so each instance is independent
+    clone.traverse((child) => {
+      if (child.isMesh) {
+        child.material = child.material.clone()
+      }
+    })
+
+    return clone
+  }, [scene])
+
+  // Set up flame material once
+  useEffect(() => {
+    if (!clonedScene) return
+
+    const flameMaterial = createTinyFlameMaterial()
+    flameMaterialRef.current = flameMaterial
+
+    clonedScene.traverse((child) => {
+      if (child.isMesh) {
+        if (child.name === 'Flame') {
+          child.material = flameMaterial
+        }
+        if (child.name === 'senora') {
+          senoraMeshRef.current = child
+          // Hide initially until texture loads
+          child.visible = false
+        }
+      }
+    })
+
+    return () => {
+      flameMaterial.dispose()
+    }
+  }, [clonedScene])
+
+  // Handle texture loading separately - only when imageUrl changes
+  useEffect(() => {
+    const senoraMesh = senoraMeshRef.current
+    if (!senoraMesh || !imageUrl) return
+
+    // Skip if same URL
+    if (imageUrl === prevImageUrlRef.current) return
+    prevImageUrlRef.current = imageUrl
+
+    const textureLoader = new THREE.TextureLoader()
+    textureLoader.crossOrigin = 'anonymous'
+    textureLoader.load(imageUrl, (texture) => {
+      texture.flipY = false
+      texture.colorSpace = THREE.SRGBColorSpace
+      texture.wrapS = THREE.ClampToEdgeWrapping
+      texture.wrapT = THREE.ClampToEdgeWrapping
+      texture.minFilter = THREE.LinearFilter
+      texture.magFilter = THREE.LinearFilter
+
+      // Dispose of old texture if it exists
+      if (textureRef.current) {
+        textureRef.current.dispose()
+      }
+
+      // Update or create material with new texture
+      if (senoraMesh.material.isMeshBasicMaterial) {
+        senoraMesh.material.map = texture
+        senoraMesh.material.needsUpdate = true
+      } else {
+        senoraMesh.material = new THREE.MeshBasicMaterial({
+          map: texture,
+          transparent: true,
+          alphaTest: 0.1,
+          side: THREE.FrontSide
+        })
+      }
+
+      // Show the mesh now that texture is ready
+      senoraMesh.visible = true
+      textureRef.current = texture
+    })
+
+    return () => {
+      if (textureRef.current) {
+        textureRef.current.dispose()
+      }
+    }
+  }, [imageUrl])
+
+  // Animate the flame
+  useFrame((state) => {
+    if (flameMaterialRef.current) {
+      flameMaterialRef.current.uniforms.uTime.value = state.clock.elapsedTime
+    }
+  })
+
+  return <primitive object={clonedScene} scale={1} position={[0, 0.3, 0]} />
+}
+
+// Spinning wrapper for votive model transitions
+function SpinningVotive({ imageUrl, spinTrigger }) {
+  const groupRef = useRef()
+  const spinProgress = useRef(0)
+  const isSpinning = useRef(false)
+  const lastTrigger = useRef(spinTrigger)
+
+  useFrame((state, delta) => {
+    if (!groupRef.current) return
+
+    // Detect trigger change to start spin
+    if (spinTrigger !== lastTrigger.current) {
+      lastTrigger.current = spinTrigger
+      isSpinning.current = true
+      spinProgress.current = 0
+    }
+
+    // Animate spin
+    if (isSpinning.current) {
+      spinProgress.current += delta * 4 // ~0.5 second for full rotation
+      const progress = Math.min(spinProgress.current, 1)
+
+      // Ease out cubic for smooth deceleration
+      const eased = 1 - Math.pow(1 - progress, 3)
+      groupRef.current.rotation.y = eased * Math.PI * 2
+
+      if (progress >= 1) {
+        isSpinning.current = false
+        groupRef.current.rotation.y = 0
+      }
+    }
+  })
+
+  return (
+    <group ref={groupRef}>
+      <TinyVotiveModel imageUrl={imageUrl} />
+    </group>
+  )
+}
+
+// Leaderboard Trophy Carousel
+function LeaderboardCarousel({ leaderboardData, isMobile }) {
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [spinTrigger, setSpinTrigger] = useState(0)
+  const [freshAvatars, setFreshAvatars] = useState({})
+
+  // Fetch fresh avatar URLs from Clerk via API
+  useEffect(() => {
+    const fetchAvatars = async () => {
+      const avatarPromises = leaderboardData.map(async (leader) => {
+        if (!leader.userId) return { id: leader.id, imageUrl: leader.userImageUrl }
+
+        try {
+          const res = await fetch(`/api/user-avatar/${leader.userId}`)
+          if (res.ok) {
+            const data = await res.json()
+            return { id: leader.id, imageUrl: data.imageUrl }
+          }
+        } catch (err) {
+          console.warn('Failed to fetch avatar for', leader.userId, err)
+        }
+        // Fallback to stored URL
+        return { id: leader.id, imageUrl: leader.userImageUrl }
+      })
+
+      const results = await Promise.all(avatarPromises)
+      const avatarMap = {}
+      results.forEach(r => { avatarMap[r.id] = r.imageUrl })
+      setFreshAvatars(avatarMap)
+    }
+
+    if (leaderboardData.length > 0) {
+      fetchAvatars()
+    }
+  }, [leaderboardData])
+
+  const currentLeader = leaderboardData[currentIndex]
+
+  // Use fresh avatar if available, fallback to stored
+  const currentAvatarUrl = currentLeader
+    ? (freshAvatars[currentLeader.id] || currentLeader.userImageUrl)
+    : null
+
+  const goNext = () => {
+    setSpinTrigger(prev => prev + 1)
+    setCurrentIndex((prev) => (prev + 1) % leaderboardData.length)
+  }
+
+  const goPrev = () => {
+    setSpinTrigger(prev => prev + 1)
+    setCurrentIndex((prev) => (prev - 1 + leaderboardData.length) % leaderboardData.length)
+  }
+
+  const formatBurned = (amount) => {
+    if (amount >= 1000000000) return `${(amount / 1000000000).toFixed(1)}B`
+    if (amount >= 1000000) return `${(amount / 1000000).toFixed(1)}M`
+    if (amount >= 1000) return `${(amount / 1000).toFixed(1)}K`
+    return amount?.toLocaleString() || '0'
+  }
+
+  const getRankDisplay = (index) => {
+    if (index === 0) return '👑'
+    if (index === 1) return '🥈'
+    if (index === 2) return '🥉'
+    return `#${index + 1}`
+  }
+
+  if (!currentLeader) return null
+
+  return (
+    <div style={{ position: 'relative', height: '100%' }}>
+      {/* 3D Canvas */}
+      <Canvas
+        camera={{ position: [0, 0, 4], fov: 35 }}
+        style={{ background: 'transparent' }}
+        gl={{ alpha: true, antialias: true }}
+      >
+        <ambientLight intensity={0.5} />
+        <pointLight position={[2, 2, 2]} intensity={1} color="#ff9500" />
+        <pointLight position={[-2, -1, 1]} intensity={0.5} color="#ff6600" />
+        <Suspense fallback={null}>
+          <SpinningVotive
+            imageUrl={currentAvatarUrl
+              ? `${currentAvatarUrl}?width=512&height=512`
+              : null
+            }
+            spinTrigger={spinTrigger}
+          />
+        </Suspense>
+        <OrbitControls enableZoom={false} enablePan={false} autoRotate={false} />
+        <EffectComposer>
+          <Bloom
+            intensity={1.5}
+            luminanceThreshold={0.4}
+            luminanceSmoothing={0.9}
+            blendFunction={BlendFunction.SCREEN}
+          />
+        </EffectComposer>
+      </Canvas>
+
+      {/* Navigation Arrows */}
+      {leaderboardData.length > 1 && (
+        <>
+          <button
+            onClick={goPrev}
+            style={{
+              position: 'absolute',
+              left: '4px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'rgba(255, 149, 0, 0.3)',
+              border: '1px solid rgba(255, 149, 0, 0.5)',
+              borderRadius: '50%',
+              width: isMobile ? '24px' : '28px',
+              height: isMobile ? '24px' : '28px',
+              color: '#fff',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: isMobile ? '12px' : '14px',
+              zIndex: 10
+            }}
+          >
+            ‹
+          </button>
+          <button
+            onClick={goNext}
+            style={{
+              position: 'absolute',
+              right: '4px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              background: 'rgba(255, 149, 0, 0.3)',
+              border: '1px solid rgba(255, 149, 0, 0.5)',
+              borderRadius: '50%',
+              width: isMobile ? '24px' : '28px',
+              height: isMobile ? '24px' : '28px',
+              color: '#fff',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: isMobile ? '12px' : '14px',
+              zIndex: 10
+            }}
+          >
+            ›
+          </button>
+        </>
+      )}
+
+      {/* User Info Overlay */}
+      <div style={{
+        position: 'absolute',
+        bottom: '8px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        background: 'rgba(0, 0, 0, 0.7)',
+        borderRadius: '8px',
+        padding: isMobile ? '4px 10px' : '6px 12px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        border: '1px solid rgba(255, 149, 0, 0.3)',
+        zIndex: 10
+      }}>
+        <span style={{
+          fontSize: isMobile ? '14px' : '16px',
+          fontWeight: 'bold',
+          color: currentIndex === 0 ? '#ffd700' : currentIndex === 1 ? '#c0c0c0' : currentIndex === 2 ? '#cd7f32' : '#fff'
+        }}>
+          {getRankDisplay(currentIndex)}
+        </span>
+        <span style={{
+          fontSize: isMobile ? '11px' : '13px',
+          color: '#fff',
+          fontWeight: 'bold',
+          maxWidth: '100px',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        }}>
+          {currentLeader.username || 'Anonymous'}
+        </span>
+        <span style={{
+          fontSize: isMobile ? '10px' : '12px',
+          color: '#ff9500',
+          fontFamily: 'monospace',
+          fontWeight: 'bold'
+        }}>
+          {formatBurned(currentLeader.totalBurned)}
+        </span>
+      </div>
+
+      {/* Dot Indicators */}
+      {leaderboardData.length > 1 && (
+        <div style={{
+          position: 'absolute',
+          top: '8px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          gap: '4px',
+          zIndex: 10
+        }}>
+          {leaderboardData.slice(0, 5).map((_, idx) => (
+            <div
+              key={idx}
+              onClick={() => setCurrentIndex(idx)}
+              style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: idx === currentIndex ? '#ff9500' : 'rgba(255, 255, 255, 0.3)',
+                cursor: 'pointer',
+                transition: 'background 0.2s'
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // Highlighted candle with attached label
@@ -762,7 +1215,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
         const leaderboardQuery = query(
           collection(db, 'userStats'),
           orderBy('totalBurned', 'desc'),
-          limit(10)
+          limit(20)
         )
         const snapshot = await getDocs(leaderboardQuery)
         const leaders = snapshot.docs.map((doc, index) => ({
@@ -1271,9 +1724,9 @@ useEffect(() => {
       } else {
         // Base candle (no owner data)
         setClickedCandleData({
-          username: 'Eternal Flame',
+          username: '',
           userImageUrl: null,
-          litAt: 'burns forever',
+          litAt: '',
           message: null,
           isCurrentUser: false
         })
@@ -2094,7 +2547,7 @@ useEffect(() => {
       {!targetCameraPosition && (
         <div style={{
           position: 'fixed',
-          top: isMobile ? '100px' : '105px',
+          top: isMobile ? '6rem' : '105px',
           right: isMobile ? '10px' : '20px',
           zIndex: 1000,
           display: 'flex',
@@ -2529,7 +2982,7 @@ useEffect(() => {
                     lineHeight: '1.3',
                     fontFamily: 'monospace',
                   }}>
-                    Daily analysis of community prayers & candle messages
+                    Daily analysis of prayers & candle messages
                   </div>
                 </div>
               </div>
@@ -2567,11 +3020,11 @@ useEffect(() => {
                   color: 'rgba(255, 255, 255, 0.6)',
                   marginTop: '2px'
                 }}>
-                  Top Burners (All Time)
+                  Top Burners
                 </div>
               </div>
 
-              {/* Leaderboard List */}
+              {/* Trophy Candle Carousel */}
               {leaderboardLoading ? (
                 <div style={{
                   textAlign: 'center',
@@ -2592,104 +3045,13 @@ useEffect(() => {
                 </div>
               ) : (
                 <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: isMobile ? '4px' : '6px',
-                  maxHeight: isMobile ? '200px' : '240px',
-                  overflowY: 'auto'
+                  height: isMobile ? '200px' : '240px',
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255, 149, 0, 0.2)',
+                  overflow: 'hidden'
                 }}>
-                  {leaderboardData.map((leader, index) => (
-                    <div
-                      key={leader.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        padding: isMobile ? '6px 8px' : '8px 10px',
-                        background: index === 0
-                          ? 'linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 149, 0, 0.1))'
-                          : index === 1
-                          ? 'linear-gradient(135deg, rgba(192, 192, 192, 0.15), rgba(150, 150, 150, 0.05))'
-                          : index === 2
-                          ? 'linear-gradient(135deg, rgba(205, 127, 50, 0.15), rgba(180, 100, 40, 0.05))'
-                          : 'rgba(255, 255, 255, 0.03)',
-                        borderRadius: '8px',
-                        border: index < 3
-                          ? `1px solid ${index === 0 ? 'rgba(255, 215, 0, 0.4)' : index === 1 ? 'rgba(192, 192, 192, 0.3)' : 'rgba(205, 127, 50, 0.3)'}`
-                          : '1px solid rgba(255, 255, 255, 0.05)'
-                      }}
-                    >
-                      {/* Rank */}
-                      <div style={{
-                        width: '20px',
-                        textAlign: 'center',
-                        fontSize: index < 3 ? '14px' : '11px',
-                        fontWeight: 'bold',
-                        color: index === 0 ? '#ffd700' : index === 1 ? '#c0c0c0' : index === 2 ? '#cd7f32' : 'rgba(255, 255, 255, 0.5)'
-                      }}>
-                        {index === 0 ? '👑' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`}
-                      </div>
-
-                      {/* Avatar */}
-                      {leader.userImageUrl ? (
-                        <img
-                          src={leader.userImageUrl}
-                          alt={leader.username}
-                          style={{
-                            width: '24px',
-                            height: '24px',
-                            borderRadius: '50%',
-                            objectFit: 'cover',
-                            border: index < 3 ? '2px solid rgba(255, 149, 0, 0.5)' : '1px solid rgba(255, 255, 255, 0.2)'
-                          }}
-                        />
-                      ) : (
-                        <div style={{
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '50%',
-                          background: 'linear-gradient(135deg, #ff9500, #ff6600)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '10px',
-                          fontWeight: 'bold',
-                          color: '#fff'
-                        }}>
-                          {leader.username?.charAt(0).toUpperCase() || '?'}
-                        </div>
-                      )}
-
-                      {/* Name */}
-                      <div style={{
-                        flex: 1,
-                        fontSize: isMobile ? '11px' : '12px',
-                        color: index < 3 ? '#fff' : 'rgba(255, 255, 255, 0.8)',
-                        fontWeight: index < 3 ? 'bold' : 'normal',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
-                      }}>
-                        {leader.username || 'Anonymous'}
-                      </div>
-
-                      {/* Burned Amount */}
-                      <div style={{
-                        fontSize: isMobile ? '10px' : '11px',
-                        color: '#ff9500',
-                        fontFamily: 'monospace',
-                        fontWeight: 'bold'
-                      }}>
-                        {leader.totalBurned >= 1000000000
-                          ? `${(leader.totalBurned / 1000000000).toFixed(1)}B`
-                          : leader.totalBurned >= 1000000
-                          ? `${(leader.totalBurned / 1000000).toFixed(1)}M`
-                          : leader.totalBurned >= 1000
-                          ? `${(leader.totalBurned / 1000).toFixed(1)}K`
-                          : leader.totalBurned?.toLocaleString() || '0'}
-                      </div>
-                    </div>
-                  ))}
+                  <LeaderboardCarousel leaderboardData={leaderboardData} isMobile={isMobile} />
                 </div>
               )}
             </div>
@@ -2698,7 +3060,7 @@ useEffect(() => {
         </div>
         
         {/* Find My Candle button for mobile - positioned below stats box */}
-        {isMobile && currentUserId && !targetCameraPosition && (
+        {isMobile && currentUserId && !targetCameraPosition && offeringCandles.some(c => c.userId === currentUserId) && (
           <button
             onClick={() => findUserCandle()}
             style={{

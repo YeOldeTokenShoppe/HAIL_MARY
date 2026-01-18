@@ -49,14 +49,14 @@ export default function RootLayout({ children }) {
             appearance={{
               baseTheme: dark,
               variables: {
-                colorPrimary: '#ff006e',  // Neon magenta for primary actions
+                colorPrimary: '#00f5d4',  // Cyan for primary actions
                 colorBackground: 'rgba(0, 0, 0, 0.95)',  // Dark background with transparency
                 colorInputBackground: 'rgba(26, 26, 46, 0.8)',  // Dark input backgrounds
                 colorInputText: '#ffffff',
                 colorText: '#ffffff',  // White text for readability
-                colorTextOnPrimaryBackground: '#ffffff',  // White text on neon backgrounds
+                colorTextOnPrimaryBackground: '#000000',  // Black text on cyan backgrounds
                 colorTextSecondary: '#00f5d4',  // Cyan for secondary text
-                colorDanger: '#ff006e',
+                colorDanger: '#ff6b6b',
                 colorSuccess: '#00ff88',
                 colorWarning: '#ffb700',
                 colorNeutral: 'rgba(255, 255, 255, 0.3)',
@@ -77,9 +77,12 @@ export default function RootLayout({ children }) {
                 card: {
                   backgroundColor: 'rgba(20, 20, 30, 0.98)',
                   backdropFilter: 'blur(20px)',
-                  boxShadow: '0 0 40px rgba(138, 43, 226, 0.3)',
-                  border: '2px solid rgba(138, 43, 226, 0.4)',
-                  borderRadius: '16px',
+                  boxShadow: '0 20px 60px rgba(0, 245, 212, 0.3)',
+                  border: '2px solid transparent',
+                  backgroundImage: 'linear-gradient(rgba(20, 20, 30, 0.98), rgba(20, 20, 30, 0.98)), linear-gradient(90deg, #00f5d4, #00bbff)',
+                  backgroundOrigin: 'border-box',
+                  backgroundClip: 'padding-box, border-box',
+                  borderRadius: '20px',
                   padding: '20px',
                   width: '400px !important',
                   maxWidth: '90vw',
@@ -113,54 +116,50 @@ export default function RootLayout({ children }) {
                   textAlign: 'left'
                 },
                 headerSubtitle: {
-                  color: 'rgba(0, 245, 212, 0.8)',
+                  color: '#FFD700',
                   fontSize: '11px !important',
                   letterSpacing: '0.5px',
                   marginBottom: '12px !important',
                   textAlign: 'left'
                 },
-                // Close button - compact yellow X
+                // Close button - cyan X
                 modalCloseButton: {
                   position: 'absolute !important',
                   top: '12px !important',
                   right: '12px !important',
-                  backgroundColor: '#ffee00 !important',
-                  color: '#000 !important',
-                  width: '28px !important',
-                  height: '28px !important',
-                  borderRadius: '4px !important',
+                  backgroundColor: 'transparent !important',
+                  color: '#00f5d4 !important',
+                  width: '32px !important',
+                  height: '32px !important',
+                  borderRadius: '6px !important',
                   padding: '0 !important',
                   display: 'flex !important',
                   alignItems: 'center !important',
                   justifyContent: 'center !important',
-                  fontSize: '18px !important',
+                  fontSize: '1.5rem !important',
                   fontWeight: 'bold !important',
                   border: 'none !important',
-                  boxShadow: '0 0 15px rgba(255, 238, 0, 0.5) !important',
-                  transform: 'rotate(45deg)',
+                  boxShadow: 'none !important',
                   '&:hover': {
-                    backgroundColor: '#fff !important',
-                    boxShadow: '0 0 20px rgba(255, 238, 0, 0.7) !important',
-                    transform: 'rotate(45deg) scale(1.05)'
+                    transform: 'scale(1.1)',
+                    color: '#00f5d4 !important'
                   }
                 },
                 formButtonPrimary: {
-                  background: '#ffffff',
+                  background: 'linear-gradient(135deg, #00f5d4, #00bbff)',
                   color: '#000000',
                   fontWeight: '600',
                   fontSize: '14px !important',
                   padding: '12px 24px !important',
-                  borderRadius: '40px !important',
+                  borderRadius: '50px !important',
                   textTransform: 'none',
                   letterSpacing: '0.5px',
                   border: 'none',
-                  boxShadow: '0 2px 15px rgba(255, 255, 255, 0.2)',
-                  transition: 'all 0.2s ease',
+                  boxShadow: '0 2px 15px rgba(0, 245, 212, 0.2)',
+                  transition: 'all 0.3s ease',
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #ff006e, #8338ec)',
-                    color: '#ffffff',
-                    transform: 'translateY(-1px)',
-                    boxShadow: '0 4px 20px rgba(255, 0, 110, 0.4)'
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 10px 30px rgba(0, 245, 212, 0.3)'
                   }
                 },
                 footerActionLink: {
@@ -168,24 +167,24 @@ export default function RootLayout({ children }) {
                   textDecoration: 'none',
                   textShadow: '0 0 5px rgba(0, 245, 212, 0.5)',
                   '&:hover': {
-                    color: '#ff006e',
-                    textShadow: '0 0 10px rgba(255, 0, 110, 0.8)'
+                    color: '#00bbff',
+                    textShadow: '0 0 10px rgba(0, 187, 255, 0.8)'
                   }
                 },
                 socialButtonsBlockButton: {
                   backgroundColor: 'rgba(0, 0, 0, 0.6) !important',
-                  border: '2px solid rgba(255, 0, 110, 0.4) !important',
+                  border: '1px solid rgba(0, 245, 212, 0.3) !important',
                   color: '#ffffff !important',
                   padding: '12px !important',
                   backdropFilter: 'blur(10px) !important',
-                  boxShadow: '0 0 15px rgba(255, 0, 110, 0.3) !important',
+                  boxShadow: 'none !important',
+                  borderRadius: '12px !important',
                   transition: 'all 0.2s ease',
                   '&:hover': {
-                    backgroundColor: 'rgba(255, 0, 110, 0.2) !important',
-                    borderColor: '#ff006e !important',
-                    color: '#ff006e !important',
-                    transform: 'scale(1.05)',
-                    boxShadow: '0 0 25px rgba(255, 0, 110, 0.5) !important'
+                    backgroundColor: 'rgba(0, 245, 212, 0.1) !important',
+                    borderColor: 'rgba(0, 245, 212, 0.5) !important',
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 0 20px rgba(0, 245, 212, 0.2) !important'
                   }
                 },
                 socialButtonsBlockButtonText: {
@@ -194,15 +193,15 @@ export default function RootLayout({ children }) {
                 },
                 socialButtonsIconButton: {
                   backgroundColor: 'rgba(0, 0, 0, 0.6) !important',
-                  border: '2px solid rgba(0, 245, 212, 0.4) !important',
+                  border: '2px solid rgba(255, 215, 0, 0.4) !important',
                   padding: '12px !important',
                   backdropFilter: 'blur(10px) !important',
-                  boxShadow: '0 0 15px rgba(0, 245, 212, 0.3) !important',
+                  boxShadow: '0 0 15px rgba(255, 215, 0, 0.3) !important',
                   '&:hover': {
-                    backgroundColor: 'rgba(0, 245, 212, 0.2) !important',
-                    borderColor: '#00f5d4 !important',
+                    backgroundColor: 'rgba(255, 215, 0, 0.2) !important',
+                    borderColor: '#FFD700 !important',
                     transform: 'scale(1.1)',
-                    boxShadow: '0 0 25px rgba(0, 245, 212, 0.5) !important'
+                    boxShadow: '0 0 25px rgba(255, 215, 0, 0.5) !important'
                   }
                 },
                 socialButtonsProviderIcon: {
@@ -210,6 +209,12 @@ export default function RootLayout({ children }) {
                 },
                 identityPreviewEditButtonIcon: {
                   color: '#FFD700'
+                },
+                identityPreviewEditButton: {
+                  color: '#FFD700 !important',
+                  '&:hover': {
+                    color: '#00f5d4 !important'
+                  }
                 },
                 formFieldInput: {
                   backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -236,7 +241,7 @@ export default function RootLayout({ children }) {
                   marginBottom: '6px !important'
                 },
                 dividerLine: {
-                  background: 'linear-gradient(90deg, transparent, rgba(255, 0, 110, 0.3), transparent)',
+                  background: 'linear-gradient(90deg, transparent, rgba(0, 245, 212, 0.3), transparent)',
                   margin: '16px 0 !important'
                 },
                 dividerText: {
@@ -250,16 +255,28 @@ export default function RootLayout({ children }) {
                   margin: '16px 0 !important'
                 },
                 formFieldLabel: {
-                  color: 'rgba(0, 245, 212, 0.7)',
+                  color: '#00f5d4 !important',
                   fontWeight: '600',
                   fontSize: '11px !important',
                   textTransform: 'uppercase',
                   letterSpacing: '0.5px'
                 },
+                formFieldLabelText: {
+                  color: '#00f5d4 !important'
+                },
+                formFieldSuccessText: {
+                  color: '#00f5d4 !important'
+                },
                 footer: {
                   '& a': {
                     color: '#FFD700'
                   }
+                },
+                formHeaderTitle: {
+                  color: '#ffffff !important'
+                },
+                formHeaderSubtitle: {
+                  color: '#FFD700 !important'
                 },
                 // User button and profile modal styles
                 userButtonBox: {
@@ -275,33 +292,19 @@ export default function RootLayout({ children }) {
                     transition: 'transform 0.2s ease'
                   }
                 },
-                // User profile modal - matching ThirdwebBuyModal style
+                // User profile modal - matching StakeModal style
                 userButtonPopoverCard: {
                   backgroundColor: 'rgba(20, 20, 30, 0.98) !important',
                   backdropFilter: 'blur(20px) !important',
-                  border: 'none !important',
+                  border: '2px solid transparent !important',
+                  backgroundImage: 'linear-gradient(rgba(20, 20, 30, 0.98), rgba(20, 20, 30, 0.98)), linear-gradient(90deg, #00f5d4, #00bbff) !important',
+                  backgroundOrigin: 'border-box !important',
+                  backgroundClip: 'padding-box, border-box !important',
                   borderRadius: '20px !important',
-                  boxShadow: `
-                    0 0 0 1px rgba(255, 238, 0, 0.1),
-                    0 0 60px rgba(138, 43, 226, 0.4),
-                    0 0 120px rgba(255, 0, 110, 0.3),
-                    inset 0 0 60px rgba(138, 43, 226, 0.05)
-                  `,
+                  boxShadow: '0 20px 60px rgba(0, 245, 212, 0.3) !important',
                   padding: '24px !important',
                   width: '360px !important',
-                  position: 'relative',
-                  '&::before': {
-                    content: '""',
-                    position: 'absolute',
-                    top: '-2px',
-                    left: '-2px',
-                    right: '-2px',
-                    bottom: '-2px',
-                    background: 'linear-gradient(135deg, #ff006e, #8338ec, #00f5d4, #ffee00)',
-                    borderRadius: '22px',
-                    zIndex: -1,
-                    opacity: 0.8
-                  }
+                  position: 'relative'
                 },
                 userButtonPopoverActions: {
                   backgroundColor: 'transparent !important',
@@ -314,14 +317,14 @@ export default function RootLayout({ children }) {
                   fontSize: '12px !important',
                   transition: 'all 0.2s ease',
                   '&:hover': {
-                    backgroundColor: 'rgba(255, 0, 110, 0.1) !important',
-                    color: '#ff006e !important',
-                    textShadow: '0 0 10px rgba(255, 0, 110, 0.8) !important'
+                    backgroundColor: 'rgba(0, 245, 212, 0.1) !important',
+                    color: '#00f5d4 !important',
+                    textShadow: '0 0 10px rgba(0, 245, 212, 0.8) !important'
                   },
                   // Specifically style the sign out button
                   '&[data-localization-key="userButton.action__signOut"]': {
-                    color: '#ff006e !important',
-                    borderTop: '1px solid rgba(255, 0, 110, 0.2) !important',
+                    color: '#ff6b6b !important',
+                    borderTop: '1px solid rgba(255, 107, 107, 0.2) !important',
                     marginTop: '8px !important',
                     paddingTop: '12px !important'
                   }
@@ -333,8 +336,8 @@ export default function RootLayout({ children }) {
                   color: '#00f5d4 !important'
                 },
                 userButtonPopoverFooter: {
-                  backgroundColor: 'rgba(255, 0, 110, 0.05) !important',
-                  borderTop: '1px solid rgba(255, 0, 110, 0.2) !important',
+                  backgroundColor: 'rgba(0, 245, 212, 0.05) !important',
+                  borderTop: '1px solid rgba(0, 245, 212, 0.2) !important',
                   padding: '8px 12px !important',
                   marginTop: '8px !important'
                 },
@@ -347,7 +350,7 @@ export default function RootLayout({ children }) {
                   color: '#ffffff !important',
                   fontWeight: '700 !important',
                   fontSize: '13px !important',
-                  textShadow: '0 0 10px rgba(255, 0, 110, 0.5) !important'
+                  textShadow: 'none !important'
                 },
                 userPreviewSecondaryIdentifier: {
                   color: '#00f5d4 !important',
@@ -355,7 +358,7 @@ export default function RootLayout({ children }) {
                 },
                 // Badge styles
                 badge: {
-                  background: 'linear-gradient(135deg, #ff006e, #8338ec) !important',
+                  background: 'linear-gradient(135deg, #ff69b4, #ff1493) !important',
                   color: '#ffffff !important',
                   borderRadius: '6px !important',
                   padding: '4px 10px !important',
@@ -363,7 +366,7 @@ export default function RootLayout({ children }) {
                   fontWeight: '700 !important',
                   textTransform: 'uppercase !important',
                   letterSpacing: '1px !important',
-                  boxShadow: '0 0 15px rgba(255, 0, 110, 0.5) !important'
+                  boxShadow: '0 0 15px rgba(255, 105, 180, 0.5) !important'
                 },
                 // Special Illumin80 member styling
                 userButtonAvatarBox: {
@@ -374,30 +377,33 @@ export default function RootLayout({ children }) {
                   }
                 },
                 profileSectionPrimaryButton: {
-                  background: 'linear-gradient(135deg, #ff006e, #8338ec) !important',
-                  color: '#ffffff !important',
-                  border: '2px solid #ff006e !important',
+                  background: 'linear-gradient(135deg, #00f5d4, #00bbff) !important',
+                  color: '#000000 !important',
+                  border: 'none !important',
                   fontWeight: '700 !important',
                   textTransform: 'uppercase !important',
                   letterSpacing: '1px !important',
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #8338ec, #ff006e) !important',
-                    boxShadow: '0 0 20px rgba(255, 0, 110, 0.5) !important'
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 10px 30px rgba(0, 245, 212, 0.3) !important'
                   }
                 },
                 // Profile modal specific styles for better visibility
                 profileSection: {
-                  color: '#00FFFF !important',
+                  color: '#ffffff !important',
                   padding: '8px !important',
                   marginBottom: '4px !important'
                 },
                 profileSectionTitle: {
-                  color: '#ff006e !important',
+                  color: '#00f5d4 !important',
                   fontWeight: '700 !important',
                   fontSize: '13px !important',
                   textTransform: 'uppercase !important',
                   letterSpacing: '0.5px !important',
                   marginBottom: '8px !important'
+                },
+                profileSectionTitleText: {
+                  color: '#00f5d4 !important'
                 },
                 profileSectionContent: {
                   color: '#ffffff !important'
@@ -415,10 +421,10 @@ export default function RootLayout({ children }) {
                   color: '#ffffff !important',
                   padding: '8px 12px !important',
                   fontSize: '12px !important',
-                  borderBottom: '1px solid rgba(255, 0, 110, 0.2) !important',
+                  borderBottom: '1px solid rgba(0, 245, 212, 0.2) !important',
                   '&:hover': {
-                    backgroundColor: 'rgba(255, 0, 110, 0.1) !important',
-                    color: '#ff006e !important'
+                    backgroundColor: 'rgba(0, 245, 212, 0.1) !important',
+                    color: '#00f5d4 !important'
                   }
                 },
                 accordionContent: {
@@ -429,16 +435,16 @@ export default function RootLayout({ children }) {
                   backdropFilter: 'blur(20px) !important'
                 },
                 modalCloseButton: {
-                  color: '#ff006e !important',
+                  color: '#00f5d4 !important',
                   '&:hover': {
-                    backgroundColor: 'rgba(255, 0, 110, 0.1) !important',
+                    backgroundColor: 'transparent !important',
                     transform: 'scale(1.1)'
                   }
                 },
                 navbarButton: {
                   color: 'rgba(255, 255, 255, 0.8) !important',
                   '&:hover': {
-                    color: '#ff006e !important'
+                    color: '#00f5d4 !important'
                   }
                 },
                 navbarButtonIcon: {
@@ -453,19 +459,19 @@ export default function RootLayout({ children }) {
                     backgroundColor: 'rgba(0, 0, 0, 0.2)'
                   },
                   '&::-webkit-scrollbar-thumb': {
-                    backgroundColor: 'rgba(255, 0, 110, 0.4)',
+                    backgroundColor: 'rgba(0, 245, 212, 0.4)',
                     borderRadius: '4px',
                     '&:hover': {
-                      backgroundColor: 'rgba(255, 0, 110, 0.6)'
+                      backgroundColor: 'rgba(0, 245, 212, 0.6)'
                     }
                   }
                 },
                 // Ensure sign out button is visible
                 userButtonPopoverActionButtonIcon__signOut: {
-                  color: '#ff006e !important'
+                  color: '#ff6b6b !important'
                 },
                 userButtonPopoverActionButtonText__signOut: {
-                  color: '#ff006e !important',
+                  color: '#ff6b6b !important',
                   fontWeight: '600 !important'
                 },
                 // Compact the user preview section
@@ -499,6 +505,9 @@ export default function RootLayout({ children }) {
                 navbar: {
                   padding: '8px 12px !important',
                   minHeight: 'auto !important'
+                },
+                navbarMobileMenuButton: {
+                  color: '#00f5d4 !important'
                 },
                 navbarMobileMenuRow: {
                   minHeight: 'auto !important',
@@ -560,9 +569,9 @@ export default function RootLayout({ children }) {
                 },
                 // Tighter button spacing
                 profileSectionPrimaryButton: {
-                  background: 'linear-gradient(135deg, #ff006e, #8338ec) !important',
-                  color: '#ffffff !important',
-                  border: '2px solid #ff006e !important',
+                  background: 'linear-gradient(135deg, #00f5d4, #00bbff) !important',
+                  color: '#000000 !important',
+                  border: 'none !important',
                   fontWeight: '700 !important',
                   fontSize: '10px !important',
                   padding: '6px 12px !important',
@@ -570,8 +579,8 @@ export default function RootLayout({ children }) {
                   letterSpacing: '0.5px !important',
                   marginTop: '8px !important',
                   '&:hover': {
-                    background: 'linear-gradient(135deg, #8338ec, #ff006e) !important',
-                    boxShadow: '0 0 20px rgba(255, 0, 110, 0.5) !important'
+                    transform: 'translateY(-2px)',
+                    boxShadow: '0 10px 30px rgba(0, 245, 212, 0.3) !important'
                   }
                 },
                 // Reduce footer padding
@@ -582,6 +591,22 @@ export default function RootLayout({ children }) {
                     color: '#FFD700',
                     fontSize: '10px !important'
                   }
+                },
+                // Additional overrides for any remaining pink elements
+                formFieldAction: {
+                  color: '#00f5d4 !important'
+                },
+                formFieldAction__password: {
+                  color: '#00f5d4 !important'
+                },
+                otpCodeFieldInput: {
+                  borderColor: 'rgba(0, 245, 212, 0.3) !important',
+                  '&:focus': {
+                    borderColor: '#00f5d4 !important'
+                  }
+                },
+                formFieldInputShowPasswordButton: {
+                  color: '#00f5d4 !important'
                 }
               }
             }}

@@ -1568,6 +1568,63 @@
 				isInitialLoad: true // Flag to prevent showing all existing donations on load
 			};
 
+			// Illumin80 badge system
+			const illumin80Cache = {
+				userIds: new Set(),
+				avatarUrls: {}, // Cache fresh avatar URLs by userId
+				loaded: false
+			};
+
+			// Fetch Illumin80 top 20 burners
+			async function loadIllumin80Users() {
+				try {
+					const { collection, query, orderBy, limit, getDocs } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+					const leaderboardQuery = query(
+						collection(window.db, 'userStats'),
+						orderBy('totalBurned', 'desc'),
+						limit(20)
+					);
+					const snapshot = await getDocs(leaderboardQuery);
+					snapshot.docs.forEach(doc => {
+						const data = doc.data();
+						if (data.userId) {
+							illumin80Cache.userIds.add(data.userId);
+						}
+					});
+					illumin80Cache.loaded = true;
+					console.log('Illumin80 users loaded:', illumin80Cache.userIds.size);
+				} catch (err) {
+					console.warn('Failed to load Illumin80 users:', err);
+				}
+			}
+
+			// Fetch fresh avatar URL from Clerk
+			async function getFreshAvatarUrl(userId) {
+				if (!userId) return null;
+
+				// Check cache first
+				if (illumin80Cache.avatarUrls[userId]) {
+					return illumin80Cache.avatarUrls[userId];
+				}
+
+				try {
+					const res = await fetch(`/api/user-avatar/${userId}`);
+					if (res.ok) {
+						const data = await res.json();
+						if (data.imageUrl) {
+							illumin80Cache.avatarUrls[userId] = data.imageUrl;
+							return data.imageUrl;
+						}
+					}
+				} catch (err) {
+					console.warn('Failed to fetch fresh avatar:', err);
+				}
+				return null;
+			}
+
+			// Load Illumin80 users on page load
+			loadIllumin80Users();
+
 			function getCharityIcon(charityKey) {
 				const icons = {
 					'ST_JUDES': '🏥',
@@ -1605,7 +1662,7 @@
 				return then.toLocaleDateString();
 			}
 
-			function createDonationToast(donation, isNew = false) {
+			async function createDonationToast(donation, isNew = false) {
 				const container = document.getElementById('donationToastContainer');
 				if (!container) return;
 
@@ -1624,11 +1681,22 @@
 				// Get user info with fallbacks
 				const userName = donation.userName ||
 					(donation.donor ? `${donation.donor.slice(0, 6)}...${donation.donor.slice(-4)}` : 'Anonymous');
-				const userAvatar = donation.userAvatar;
 				const charityIcon = getCharityIcon(donation.charity);
 				const charityName = getCharityShortName(donation.charity);
 				const amount = parseFloat(donation.amount) || 0;
 				const timeAgo = formatTimeAgo(donation.timestamp);
+
+				// Try to get fresh avatar from Clerk if userId is available
+				let userAvatar = donation.userAvatar;
+				if (donation.userId) {
+					const freshAvatar = await getFreshAvatarUrl(donation.userId);
+					if (freshAvatar) {
+						userAvatar = `${freshAvatar}?width=128&height=128`;
+					}
+				}
+
+				// Check if user has Illumin80 status
+				const hasIllumin80 = donation.userId && illumin80Cache.userIds.has(donation.userId);
 
 				// Generate avatar content
 				let avatarContent;
@@ -1640,10 +1708,15 @@
 					avatarContent = /[A-Z]/.test(initial) ? initial : '🪙';
 				}
 
+				// Generate Illumin80 badge if user qualifies
+				const illumin80Badge = hasIllumin80
+					? `<img src="/images/ILLUMIN80_TATTOO.webp" alt="Illumin80" class="illumin80-badge" style="width: 20px; height: 20px; margin-left: 4px; vertical-align: middle;">`
+					: '';
+
 				toast.innerHTML = `
 					<div class="donation-toast-avatar">${avatarContent}</div>
 					<div class="donation-toast-content">
-						<div class="donation-toast-name">${userName}</div>
+						<div class="donation-toast-name">${userName}${illumin80Badge}</div>
 						<div class="donation-toast-details">
 							<span class="donation-toast-amount">${amount.toLocaleString()} RL80</span>
 							<span>→</span>

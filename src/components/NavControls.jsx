@@ -212,19 +212,19 @@ export default function NavControls({
 
         /* Style Clerk's UserButton - Override 60x60 default */
         .user-button-container :global(.cl-userButtonBox) {
-          width: 40px !important;
-          height: 40px !important;
-          max-width: 40px !important;
-          max-height: 40px !important;
+          width: 2.5rem !important;
+          height: 2.5rem !important;
+          max-width: 2.5rem !important;
+          max-height: 2.5rem !important;
         }
 
         .user-button-container :global(.cl-userButtonTrigger) {
-          width: 40px !important;
-          height: 40px !important;
-          min-width: 40px !important;
-          min-height: 40px !important;
-          max-width: 40px !important;
-          max-height: 40px !important;
+          width: 2.5rem !important;
+          height: 2.5rem !important;
+          min-width: 2.5rem !important;
+          min-height: 2.5rem !important;
+          max-width: 2.5rem !important;
+          max-height: 2.5rem !important;
           border-radius: 10px !important;
           border: 2px solid #00f5d4;
           box-shadow: 
@@ -260,15 +260,15 @@ export default function NavControls({
         
         /* Force override any Clerk inline styles */
         .user-button-container :global(.cl-userButtonTrigger > button) {
-          width: 40px !important;
-          height: 40px !important;
+          width: 2.5rem !important;
+          height: 2.5rem !important;
           padding: 0 !important;
         }
 
         /* Sign In Button */
         .sign-in-btn {
-          width: 40px;
-          height: 40px;
+          width: 2.5rem;
+          height: 2.5rem;
           border-radius: 10px;
           background: linear-gradient(135deg, #1a1a2e, #0d0d1a);
           border: 2px solid #00f5d4;

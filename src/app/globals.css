@@ -6752,15 +6752,15 @@ body .cl-modalBackdrop {
 
 /* Style the purple container with subtle magenta neon glow */
 body .cl-internal-dsfs4w {
-  background: rgba(119, 42, 168, 0.95) !important;
+  /* background: rgba(119, 42, 168, 0.95) !important; */
   backdrop-filter: blur(20px) !important;
   border-radius: 20px !important;  /* Increased to match inner container */
   height: auto !important;
-  border: 1px solid rgba(255, 0, 110, 0.3) !important;
-  box-shadow: 
+  /* border: 1px solid rgba(255, 0, 110, 0.3) !important; */
+  /* box-shadow: 
     0 0 20px rgba(255, 0, 110, 0.3),
-    0 0 40px rgba(255, 0, 110, 0.15),
-    inset 0 0 20px rgba(255, 0, 110, 0.05) !important;
+    0 0 40px rgba(255, 0, 110, 0.15), */
+    /* inset 0 0 20px rgba(255, 0, 110, 0.05) !important; */
   animation: subtleMagentaPulse 4s ease-in-out infinite !important;
   position: relative !important;
   overflow: hidden !important;  /* Changed to hidden to clip inner content */
@@ -6872,6 +6872,11 @@ div[data-three] {
   min-height: 2.5rem !important;
   max-width: 2.5rem !important;
   max-height: 2.5rem !important;
+}
+
+.cl-internal-1uwt565 {
+
+  font-size: 0px;
 }
 
 .cl-userButtonTrigger button {

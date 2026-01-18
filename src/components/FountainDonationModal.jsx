@@ -171,6 +171,7 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
       try {
         await addDoc(collection(db, 'fountain_donations'), {
           donor: walletAddress,
+          userId: user?.id,
           userName: getUserDisplayName(),
           userAvatar: getUserAvatar(),
           charity: selectedCharity,

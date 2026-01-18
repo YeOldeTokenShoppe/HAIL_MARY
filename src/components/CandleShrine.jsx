@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useEffect, useState, useCallback } from 'react'
+import React, { useRef, useMemo, useEffect, useLayoutEffect, useState, useCallback } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
@@ -583,21 +583,22 @@ function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.9
   }, [positions, localMatrix, scale, capacity])
   
   // Set matrices ONCE on mount or when positions change
-  useEffect(() => {
+  // Use useLayoutEffect to set matrices synchronously before paint, preventing flash of clumped candles
+  useLayoutEffect(() => {
     if (!meshRef.current) return
-    
+
     // Set the actual count of instances to render
     meshRef.current.count = actualCount
-    
+
     for (let i = 0; i < capacity; i++) {
       meshRef.current.setMatrixAt(i, baseMatrices[i])
     }
     meshRef.current.instanceMatrix.needsUpdate = true
-    
+
     // Force compute bounding box and sphere for better raycasting
     meshRef.current.computeBoundingBox()
     meshRef.current.computeBoundingSphere()
-    
+
     // Expand bounding sphere to account for shader wobble
     if (meshRef.current.boundingSphere) {
       meshRef.current.boundingSphere.radius *= 1.5  // Account for movement

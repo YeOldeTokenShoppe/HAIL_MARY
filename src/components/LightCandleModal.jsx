@@ -957,7 +957,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
               fontSize: '0.9rem',
               marginBottom: '1rem'
             }}>
-              Burning {tokenAmount || '0'} RL80 token{parseInt(tokenAmount) !== 1 ? 's' : ''}...
+              Burning {parseInt(tokenAmount || '0').toLocaleString()} RL80 token{parseInt(tokenAmount) !== 1 ? 's' : ''}...
             </p>
             
             <p style={{
@@ -1111,8 +1111,12 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                 placeholder="Name"
                 value={prayerFor === 'self' ? (user?.username || user?.firstName || '') : recipientName}
                 onChange={(e) => {
-                  const sanitized = sanitizeText(e.target.value);
-                  setRecipientName(sanitized);
+                  // Don't sanitize on keystroke - only basic XSS prevention
+                  const value = e.target.value
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .slice(0, 50);
+                  setRecipientName(value);
                 }}
                 disabled={prayerFor === 'self'}
                 style={{
@@ -1139,7 +1143,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                 id="message"
                 className="message-textarea"
                 placeholder={
-                  offeringType === 'petition' 
+                  offeringType === 'petition'
                     ? "Write your prayer or select a template below"
                     : offeringType === 'confession'
                     ? "Share what's on your heart..."
@@ -1147,8 +1151,12 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                 }
                 value={message}
                 onChange={(e) => {
-                  const sanitized = sanitizeText(e.target.value);
-                  setMessage(sanitized);
+                  // Don't sanitize on keystroke - only basic XSS prevention
+                  const value = e.target.value
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .slice(0, 300);
+                  setMessage(value);
                 }}
                 maxLength={300}
               />
@@ -1232,12 +1240,15 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
               </label>
               <input
                 id="tokens"
-                type="number"
+                type="text"
+                inputMode="numeric"
                 className="token-input"
-                min="1"
-                max={parseInt(tokenBalance) > 0 ? parseInt(tokenBalance) : 10000}
-                value={tokenAmount}
-                onChange={(e) => setTokenAmount(e.target.value)}
+                value={tokenAmount ? parseInt(tokenAmount).toLocaleString() : ''}
+                onChange={(e) => {
+                  // Remove commas and non-numeric characters
+                  const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                  setTokenAmount(rawValue);
+                }}
                 placeholder="1 RL80 minimum"
                 required
               />
@@ -1372,7 +1383,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
               fontSize: '0.85rem',
               marginBottom: '1rem'
             }}>
-              Amount: <strong>{tokenAmount} RL80</strong>
+              Amount: <strong>{parseInt(tokenAmount || '0').toLocaleString()} RL80</strong>
             </p>
             
             {/* Status */}
@@ -1461,9 +1472,9 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                 fontSize: '1rem',
                 marginBottom: '1rem',
                 lineHeight: '1.2',
-       
+
               }}>
-                You're about to burn <strong style={{ fontSize: '1.2rem', color: '#ffc107' }}><br/>{pendingBurnAmount}<br/></strong> RL80 token{pendingBurnAmount !== 1 ? 's' : ''}
+                You're about to burn <strong style={{ fontSize: '1.2rem', color: '#ffc107' }}><br/>{pendingBurnAmount.toLocaleString()}<br/></strong> RL80 token{pendingBurnAmount !== 1 ? 's' : ''}
               </p>
               <p style={{
                 color: 'rgba(255, 193, 7, 0.9)',

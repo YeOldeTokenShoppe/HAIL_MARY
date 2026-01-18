@@ -131,7 +131,7 @@ const Footer = ({ isMobile = false }) => {
           opacity: 0.6,
           fontFamily: 'Cyber, monospace'
         }}>
-          © 2025 All rights reserved.
+          © 2026 All rights reserved.
         </p>
         
         {/* Decorative Elements */}
