@@ -7,7 +7,7 @@ import { HandsModel, CameraController } from './HandsGLTFScene'
 // IMPORTANT: Import from the optimized version!
 import { CandleCloud, GradientBackground, SceneSetup } from './CandleShrine'
 import { NewCandleEffectManager } from './NewCandleEffect'
-import { EffectComposer, Bloom } from '@react-three/postprocessing'
+import PostProcessingEffects from './PostProcessingEffects'
 import { useStaking } from '@/hooks/useStaking'
 import { useReadContract } from 'thirdweb/react'
 import { totalSupply } from 'thirdweb/extensions/erc20'
@@ -1887,17 +1887,7 @@ useEffect(() => {
      
 
   <Suspense fallback={null}>
-
-      <EffectComposer>
-        <Bloom 
-          intensity={1.0}
-          luminanceThreshold={0.1}
-          luminanceSmoothing={0.9}
-          mipmapBlur
-        radius={0.8}
-      />
-    </EffectComposer>
-
+      <PostProcessingEffects is80sMode={is80sMode} />
   </Suspense>
 
       </Canvas>
