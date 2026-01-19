@@ -6,7 +6,9 @@
  */
 
 // Enhanced personality and knowledge system
-import { buildEnhancedPrompt } from './configs/enhancedPromptBuilder.js';
+import { buildEnhancedPrompt, buildScoringPrompt } from './configs/enhancedPromptBuilder.js';
+import { parseScoreResponse, generateSentimentFallbackScores } from '../utils/scoreParser.js';
+import { createAnalystScoreOutput } from '../types/scoring.js';
 
 // ============================================================================
 // PERSONALITY CONFIGURATION
@@ -349,6 +351,10 @@ export async function callSentimentOracle(context, apiKey) {
   });
   
   try {
+    // Add 30 second timeout to prevent hanging
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     const response = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -363,8 +369,11 @@ export async function callSentimentOracle(context, apiKey) {
         model: 'grok-2-1212',
         temperature: enhancedPrompt.temperature,
         max_tokens: enhancedPrompt.maxTokens
-      })
+      }),
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
     
     if (!response.ok) {
       throw new Error(`API responded with status: ${response.status}`);
@@ -376,6 +385,93 @@ export async function callSentimentOracle(context, apiKey) {
     // Enhanced fallback with personality-aware response
     console.log('Grok API failed, using enhanced generated response:', error.message);
     return generateEnhancedSentimentResponse(context.marketData);
+  }
+}
+
+// ============================================================================
+// SCORING MODE FUNCTION
+// ============================================================================
+
+/**
+ * Call Sentiment Oracle with scoring output
+ * Returns structured scores for all assets along with text response
+ * @param {Object} context - Trading context with market data
+ * @param {string} apiKey - Grok API key
+ * @returns {AnalystScoreOutput}
+ */
+export async function callSentimentOracleWithScoring(context, apiKey) {
+  const scoringPrompt = await buildScoringPrompt('EMO', context, context.lastMessages || []);
+
+  console.log('EMO (Scoring Mode) analyzing:', {
+    fearGreed: context.marketData?.fearGreed,
+    funding: context.marketData?.fundingRate,
+    vix: context.marketData?.vix
+  });
+
+  try {
+    // Add 30 second timeout to prevent hanging
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    const response = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: scoringPrompt.systemPrompt },
+          { role: 'user', content: scoringPrompt.userPrompt }
+        ],
+        model: 'grok-2-1212',
+        temperature: scoringPrompt.temperature,
+        max_tokens: scoringPrompt.maxTokens
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`API responded with status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const rawResponse = data.choices[0].message.content;
+
+    // Parse the response to extract scores
+    const parseResult = parseScoreResponse(rawResponse, 'EMO', {
+      marketData: context.marketData,
+      timestamp: Date.now()
+    });
+
+    if (parseResult.success) {
+      console.log('EMO scoring parsed successfully:', parseResult.output.scores.length, 'scores');
+      return parseResult.output;
+    } else {
+      console.warn('EMO scoring parse failed, using fallback:', parseResult.error);
+      // Return the parse result which includes fallback scores
+      return parseResult.output;
+    }
+
+  } catch (error) {
+    // Enhanced fallback with sentiment-based scores
+    console.log('EMO API failed, generating fallback scores:', error.message);
+
+    const fallbackScores = generateSentimentFallbackScores(context.marketData);
+    const fallbackText = generateEnhancedSentimentResponse(context.marketData);
+
+    return createAnalystScoreOutput(
+      'EMO',
+      fallbackScores,
+      fallbackText,
+      {
+        fallback: true,
+        error: error.message,
+        marketData: context.marketData
+      }
+    );
   }
 }
 

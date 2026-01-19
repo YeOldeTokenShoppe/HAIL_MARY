@@ -293,6 +293,7 @@ export default function RootLayout({ children }) {
                   }
                 },
                 // User profile modal - matching StakeModal style
+                // Mobile styles are handled in globals.css with media queries
                 userButtonPopoverCard: {
                   backgroundColor: 'rgba(20, 20, 30, 0.98) !important',
                   backdropFilter: 'blur(20px) !important',
@@ -304,6 +305,8 @@ export default function RootLayout({ children }) {
                   boxShadow: '0 20px 60px rgba(0, 245, 212, 0.3) !important',
                   padding: '24px !important',
                   width: '360px !important',
+                  maxWidth: 'calc(100vw - 32px) !important',
+                  maxHeight: 'calc(100vh - 64px) !important',
                   position: 'relative'
                 },
                 userButtonPopoverActions: {

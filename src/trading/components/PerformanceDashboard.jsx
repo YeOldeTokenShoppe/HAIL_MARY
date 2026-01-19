@@ -22,11 +22,20 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
     recentTrades: [],
     equityCurve: [],
     agentScores: {
-      emo: { accuracy: 0, contribution: 0 },
-      tekno: { accuracy: 0, contribution: 0 },
-      macro: { accuracy: 0, contribution: 0 },
-      rl80: { accuracy: 0, decisiveness: 0 }
+      emo: { accuracy: 0, avgDirection: 0, avgConfidence: 0, totalCalls: 0 },
+      tekno: { accuracy: 0, avgDirection: 0, avgConfidence: 0, totalCalls: 0 },
+      macro: { accuracy: 0, avgDirection: 0, avgConfidence: 0, totalCalls: 0 },
+      rl80: { accuracy: 0, decisiveness: 0, avgAgreement: 0, totalDecisions: 0 }
     }
+  });
+
+  // Scoring system data
+  const [scoringData, setScoringData] = useState({
+    latestDecision: null,
+    recentDecisions: [],
+    shadowTestResults: null,
+    portfolioHeat: 0,
+    activeSignals: []
   });
 
   const [timeFrame, setTimeFrame] = useState('24h'); // 24h, 7d, 30d, all
@@ -100,6 +109,54 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
       unsubscribeAccount();
       unsubscribeTrading();
     };
+  }, [db, show]);
+
+  // Load scoring decisions from Firebase
+  useEffect(() => {
+    if (!db || !show) return;
+
+    // Listen to recent decisions from scoring system
+    const decisionsQuery = query(
+      collection(db, 'decisions'),
+      orderBy('timestamp', 'desc'),
+      limit(20)
+    );
+
+    const unsubscribeDecisions = onSnapshot(decisionsQuery, (snapshot) => {
+      const decisions = [];
+      let latestDecision = null;
+      const activeSignals = [];
+      let totalHeat = 0;
+
+      snapshot.forEach((doc, index) => {
+        const decision = { id: doc.id, ...doc.data() };
+        decisions.push(decision);
+
+        if (index === 0) {
+          latestDecision = decision;
+          // Extract active signals from latest decision
+          if (decision.recommendations) {
+            decision.recommendations.forEach(rec => {
+              if (rec.action !== 'HOLD' && rec.sizePercent > 0) {
+                activeSignals.push(rec);
+                totalHeat += rec.sizePercent * 100;
+              }
+            });
+          }
+        }
+      });
+
+      setScoringData(prev => ({
+        ...prev,
+        latestDecision,
+        recentDecisions: decisions,
+        activeSignals,
+        portfolioHeat: totalHeat,
+        shadowTestResults: latestDecision?.shadowComparison || null
+      }));
+    });
+
+    return () => unsubscribeDecisions();
   }, [db, show]);
 
   // Fetch and calculate metrics from Firestore
@@ -210,8 +267,8 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
           const avgLoss = losses > 0 ? lossSum / losses : 0;
           const profitFactor = lossSum > 0 ? winSum / lossSum : winSum > 0 ? 999 : 0;
 
-          // Calculate agent performance scores
-          const agentScores = calculateAgentScores(trades);
+          // Calculate agent performance scores (pass decisions from scoringData)
+          const agentScores = calculateAgentScores(trades, scoringData.recentDecisions);
 
           setMetrics({
             totalPnL: totalPnL,
@@ -243,7 +300,7 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
     };
 
     fetchMetrics();
-  }, [show, timeFrame]);
+  }, [show, timeFrame, scoringData.recentDecisions]);
 
   // Helper functions
   const calculateSharpe = (trades) => {
@@ -277,72 +334,122 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
     return maxDD;
   };
 
-  const calculateAgentScores = (trades) => {
+  const calculateAgentScores = (trades, decisions = []) => {
+    // New scoring system: uses direction scores (-10 to +10) and confidence (0-1)
     const scores = {
-      emo: { correct: 0, total: 0 },
-      tekno: { correct: 0, total: 0 },
-      macro: { correct: 0, total: 0 },
-      rl80: { correct: 0, total: 0 }
+      emo: { correct: 0, total: 0, directionSum: 0, confidenceSum: 0 },
+      tekno: { correct: 0, total: 0, directionSum: 0, confidenceSum: 0 },
+      macro: { correct: 0, total: 0, directionSum: 0, confidenceSum: 0 },
+      rl80: { correct: 0, total: 0, agreementSum: 0 }
     };
-    
-    trades.forEach(trade => {
-      if (trade.preAnalysis && trade.result) {
-        const success = trade.result.success;
-        
-        // Check EMO sentiment
-        if (trade.preAnalysis.emoScore !== undefined) {
-          scores.emo.total++;
-          if ((trade.preAnalysis.emoScore > 60 && success) || 
-              (trade.preAnalysis.emoScore < 40 && !success)) {
-            scores.emo.correct++;
+
+    // Process decisions from new scoring system
+    decisions.forEach(decision => {
+      if (decision.analysts && decision.outcome) {
+        const wasProfit = decision.outcome.pnl > 0;
+
+        // Check each analyst's scores
+        ['EMO', 'TEKNO', 'MACRO'].forEach(agentId => {
+          const agentKey = agentId.toLowerCase();
+          const analystData = decision.analysts[agentId];
+
+          if (analystData && analystData.score !== undefined) {
+            scores[agentKey].total++;
+            scores[agentKey].directionSum += analystData.score;
+            scores[agentKey].confidenceSum += analystData.confidence || 0;
+
+            // Direction accuracy: positive score + profit = correct, negative score + loss = correct
+            const predictedUp = analystData.score > 0;
+            if ((predictedUp && wasProfit) || (!predictedUp && !wasProfit)) {
+              scores[agentKey].correct++;
+            }
           }
-        }
-        
-        // Check TEKNO technical
-        if (trade.preAnalysis.teknoScore !== undefined) {
-          scores.tekno.total++;
-          if ((trade.preAnalysis.teknoScore > 60 && success) || 
-              (trade.preAnalysis.teknoScore < 40 && !success)) {
-            scores.tekno.correct++;
-          }
-        }
-        
-        // Check MACRO
-        if (trade.preAnalysis.macroScore !== undefined) {
-          scores.macro.total++;
-          if ((trade.preAnalysis.macroScore > 60 && success) || 
-              (trade.preAnalysis.macroScore < 40 && !success)) {
-            scores.macro.correct++;
-          }
-        }
-        
-        // RL80 decision accuracy
-        if (trade.preAnalysis.rl80Decision) {
+        });
+
+        // RL80 aggregated decision
+        if (decision.aggregated) {
           scores.rl80.total++;
-          const wasBullish = trade.preAnalysis.rl80Decision.includes('BUY');
-          if ((wasBullish && success) || (!wasBullish && !success)) {
+          const predictedUp = decision.aggregated.weightedScore > 0;
+          if ((predictedUp && wasProfit) || (!predictedUp && !wasProfit)) {
             scores.rl80.correct++;
+          }
+          // Track agreement (how aligned analysts were)
+          if (decision.aggregated.agreement) {
+            scores.rl80.agreementSum += decision.aggregated.agreement;
           }
         }
       }
     });
-    
+
+    // Fallback to legacy trade-based scoring if no decisions
+    if (decisions.length === 0) {
+      trades.forEach(trade => {
+        if (trade.preAnalysis && trade.result) {
+          const success = trade.result.success;
+
+          // Legacy: Check EMO sentiment (0-100 scale)
+          if (trade.preAnalysis.emoScore !== undefined) {
+            scores.emo.total++;
+            if ((trade.preAnalysis.emoScore > 60 && success) ||
+                (trade.preAnalysis.emoScore < 40 && !success)) {
+              scores.emo.correct++;
+            }
+          }
+
+          // Legacy: Check TEKNO technical
+          if (trade.preAnalysis.teknoScore !== undefined) {
+            scores.tekno.total++;
+            if ((trade.preAnalysis.teknoScore > 60 && success) ||
+                (trade.preAnalysis.teknoScore < 40 && !success)) {
+              scores.tekno.correct++;
+            }
+          }
+
+          // Legacy: Check MACRO
+          if (trade.preAnalysis.macroScore !== undefined) {
+            scores.macro.total++;
+            if ((trade.preAnalysis.macroScore > 60 && success) ||
+                (trade.preAnalysis.macroScore < 40 && !success)) {
+              scores.macro.correct++;
+            }
+          }
+
+          // Legacy: RL80 decision accuracy
+          if (trade.preAnalysis.rl80Decision) {
+            scores.rl80.total++;
+            const wasBullish = trade.preAnalysis.rl80Decision.includes('BUY');
+            if ((wasBullish && success) || (!wasBullish && !success)) {
+              scores.rl80.correct++;
+            }
+          }
+        }
+      });
+    }
+
     return {
-      emo: { 
+      emo: {
         accuracy: scores.emo.total > 0 ? (scores.emo.correct / scores.emo.total) * 100 : 0,
-        contribution: scores.emo.correct 
+        avgDirection: scores.emo.total > 0 ? scores.emo.directionSum / scores.emo.total : 0,
+        avgConfidence: scores.emo.total > 0 ? scores.emo.confidenceSum / scores.emo.total : 0,
+        totalCalls: scores.emo.total
       },
-      tekno: { 
+      tekno: {
         accuracy: scores.tekno.total > 0 ? (scores.tekno.correct / scores.tekno.total) * 100 : 0,
-        contribution: scores.tekno.correct 
+        avgDirection: scores.tekno.total > 0 ? scores.tekno.directionSum / scores.tekno.total : 0,
+        avgConfidence: scores.tekno.total > 0 ? scores.tekno.confidenceSum / scores.tekno.total : 0,
+        totalCalls: scores.tekno.total
       },
-      macro: { 
+      macro: {
         accuracy: scores.macro.total > 0 ? (scores.macro.correct / scores.macro.total) * 100 : 0,
-        contribution: scores.macro.correct 
+        avgDirection: scores.macro.total > 0 ? scores.macro.directionSum / scores.macro.total : 0,
+        avgConfidence: scores.macro.total > 0 ? scores.macro.confidenceSum / scores.macro.total : 0,
+        totalCalls: scores.macro.total
       },
-      rl80: { 
+      rl80: {
         accuracy: scores.rl80.total > 0 ? (scores.rl80.correct / scores.rl80.total) * 100 : 0,
-        decisiveness: scores.rl80.total 
+        decisiveness: scores.rl80.total,
+        avgAgreement: scores.rl80.total > 0 ? scores.rl80.agreementSum / scores.rl80.total : 0,
+        totalDecisions: scores.rl80.total
       }
     };
   };
@@ -744,6 +851,151 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
                   Live Testnet Data
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Scoring System Insights - NEW */}
+          {(scoringData.latestDecision || scoringData.activeSignals.length > 0) && (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.08) 0%, rgba(255, 165, 0, 0.03) 100%)',
+              backdropFilter: 'blur(15px)',
+              WebkitBackdropFilter: 'blur(15px)',
+              padding: isMobile ? '12px' : '15px',
+              borderRadius: '15px',
+              border: '1px solid rgba(255, 215, 0, 0.3)',
+              boxShadow: '0 4px 20px rgba(255, 215, 0, 0.15)',
+              marginBottom: '15px'
+            }}>
+              <div style={{
+                color: '#FFD700',
+                fontSize: isMobile ? '12px' : '13px',
+                marginBottom: '12px',
+                fontWeight: 'bold',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <span>🎯 LIVE SCORING SIGNALS</span>
+                <span style={{
+                  fontSize: '10px',
+                  color: 'rgba(255, 215, 0, 0.7)',
+                  fontWeight: 'normal'
+                }}>
+                  Heat: {scoringData.portfolioHeat.toFixed(1)}%
+                </span>
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(140px, 1fr))',
+                gap: '10px'
+              }}>
+                {scoringData.activeSignals.length > 0 ? (
+                  scoringData.activeSignals.map((signal, idx) => (
+                    <div key={idx} style={{
+                      background: 'rgba(0, 0, 0, 0.3)',
+                      padding: '10px',
+                      borderRadius: '10px',
+                      border: `1px solid ${signal.direction > 0 ? 'rgba(0, 255, 0, 0.3)' : 'rgba(255, 0, 0, 0.3)'}`,
+                      textAlign: 'center'
+                    }}>
+                      <div style={{
+                        fontSize: '14px',
+                        fontWeight: 'bold',
+                        color: '#fff',
+                        marginBottom: '4px'
+                      }}>
+                        {signal.asset}
+                      </div>
+                      <div style={{
+                        fontSize: '18px',
+                        fontWeight: 'bold',
+                        color: signal.direction > 0 ? '#00ff00' : '#ff3333',
+                        marginBottom: '4px'
+                      }}>
+                        {signal.direction > 0 ? '⬆️' : '⬇️'} {signal.action || (signal.direction > 0 ? 'LONG' : 'SHORT')}
+                      </div>
+                      <div style={{
+                        fontSize: '11px',
+                        color: 'rgba(255, 255, 255, 0.6)'
+                      }}>
+                        Size: {(signal.sizePercent * 100).toFixed(1)}%
+                      </div>
+                      {signal.confidence && (
+                        <div style={{
+                          fontSize: '10px',
+                          color: signal.confidence > 0.7 ? '#00ff00' : signal.confidence > 0.5 ? '#ffaa00' : '#ff6666',
+                          marginTop: '2px'
+                        }}>
+                          Conf: {(signal.confidence * 100).toFixed(0)}%
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div style={{
+                    gridColumn: '1 / -1',
+                    textAlign: 'center',
+                    color: 'rgba(255, 255, 255, 0.4)',
+                    padding: '15px',
+                    fontSize: '12px'
+                  }}>
+                    No active signals • Agents holding positions
+                  </div>
+                )}
+              </div>
+
+              {/* Shadow Test Comparison */}
+              {scoringData.shadowTestResults && (
+                <div style={{
+                  marginTop: '12px',
+                  padding: '10px',
+                  background: 'rgba(147, 51, 234, 0.1)',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(147, 51, 234, 0.2)'
+                }}>
+                  <div style={{
+                    fontSize: '10px',
+                    color: '#9333ea',
+                    marginBottom: '8px',
+                    textTransform: 'uppercase',
+                    fontWeight: '600'
+                  }}>
+                    📊 Shadow Test Results
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    gap: '8px',
+                    flexWrap: 'wrap'
+                  }}>
+                    {Object.entries(scoringData.shadowTestResults).map(([scheme, data]) => (
+                      <div key={scheme} style={{
+                        flex: '1',
+                        minWidth: '80px',
+                        padding: '6px',
+                        background: 'rgba(0, 0, 0, 0.2)',
+                        borderRadius: '6px',
+                        textAlign: 'center'
+                      }}>
+                        <div style={{
+                          fontSize: '9px',
+                          color: 'rgba(255, 255, 255, 0.5)',
+                          marginBottom: '2px'
+                        }}>
+                          {scheme.replace('_', ' ')}
+                        </div>
+                        <div style={{
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          color: data?.weightedScore > 0 ? '#00ff00' : data?.weightedScore < 0 ? '#ff3333' : '#888'
+                        }}>
+                          {data?.weightedScore?.toFixed(1) || '0'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1173,8 +1425,8 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
                   {metrics.agentScores.emo.accuracy.toFixed(0)}%
                 </div>
                 {/* Accuracy Bar */}
-                <div style={{ 
-                  height: '3px', 
+                <div style={{
+                  height: '3px',
                   background: 'rgba(147, 51, 234, 0.2)',
                   borderRadius: '2px',
                   overflow: 'hidden'
@@ -1187,7 +1439,9 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
                   }} />
                 </div>
                 <div style={{ color: '#666', fontSize: '8px', marginTop: '4px' }}>
-                  Sentiment Analysis
+                  {metrics.agentScores.emo.avgConfidence > 0 ?
+                    `Conf: ${(metrics.agentScores.emo.avgConfidence * 100).toFixed(0)}%` :
+                    'Sentiment Analysis'}
                 </div>
               </div>
 
@@ -1208,8 +1462,8 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
                 <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#fff', marginBottom: '4px' }}>
                   {metrics.agentScores.tekno.accuracy.toFixed(0)}%
                 </div>
-                <div style={{ 
-                  height: '4px', 
+                <div style={{
+                  height: '4px',
                   background: 'rgba(0, 255, 255, 0.2)',
                   borderRadius: '2px',
                   overflow: 'hidden'
@@ -1222,7 +1476,9 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
                   }} />
                 </div>
                 <div style={{ color: '#666', fontSize: '8px', marginTop: '4px' }}>
-                  Technical Analysis
+                  {metrics.agentScores.tekno.avgConfidence > 0 ?
+                    `Conf: ${(metrics.agentScores.tekno.avgConfidence * 100).toFixed(0)}%` :
+                    'Technical Analysis'}
                 </div>
               </div>
 
@@ -1243,8 +1499,8 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
                 <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#fff', marginBottom: '4px' }}>
                   {metrics.agentScores.macro.accuracy.toFixed(0)}%
                 </div>
-                <div style={{ 
-                  height: '4px', 
+                <div style={{
+                  height: '4px',
                   background: 'rgba(0, 255, 0, 0.2)',
                   borderRadius: '2px',
                   overflow: 'hidden'
@@ -1257,7 +1513,9 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
                   }} />
                 </div>
                 <div style={{ color: '#666', fontSize: '8px', marginTop: '4px' }}>
-                  Economic Analysis
+                  {metrics.agentScores.macro.avgConfidence > 0 ?
+                    `Conf: ${(metrics.agentScores.macro.avgConfidence * 100).toFixed(0)}%` :
+                    'Economic Analysis'}
                 </div>
               </div>
 
@@ -1278,8 +1536,8 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
                 <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#fff', marginBottom: '4px' }}>
                   {metrics.agentScores.rl80.accuracy.toFixed(0)}%
                 </div>
-                <div style={{ 
-                  height: '4px', 
+                <div style={{
+                  height: '4px',
                   background: 'rgba(255, 215, 0, 0.2)',
                   borderRadius: '2px',
                   overflow: 'hidden'
@@ -1292,7 +1550,9 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
                   }} />
                 </div>
                 <div style={{ color: '#666', fontSize: '8px', marginTop: '4px' }}>
-                  Master Coordinator
+                  {metrics.agentScores.rl80.avgAgreement > 0 ?
+                    `Agree: ${(metrics.agentScores.rl80.avgAgreement * 100).toFixed(0)}%` :
+                    `${metrics.agentScores.rl80.totalDecisions} decisions`}
                 </div>
               </div>
             </div>

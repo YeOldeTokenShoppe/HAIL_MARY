@@ -6,6 +6,7 @@
  */
 
 import { buildCharacterPrompt, getResponseTemplate, adaptPersonalityToMarket } from './personalitySystem.js';
+import { SCORING_PROMPT_TEMPLATE, ASSETS } from '../../config/scoring-config.js';
 
 // Import knowledge bases
 import EMO_KNOWLEDGE from './knowledge/emo-knowledge.json';
@@ -91,6 +92,126 @@ ${responseConstraints}
       isSequentialWorkflow
     }
   };
+}
+
+// ============================================================================
+// SCORING PROMPT BUILDER
+// ============================================================================
+
+/**
+ * Build prompt for scoring mode - includes instructions for JSON output
+ * @param {string} agentName - Agent identifier (EMO, TEKNO, MACRO)
+ * @param {Object} context - Trading context and market data
+ * @param {Array} teamMessages - Recent messages from other agents
+ * @param {Object} options - Additional options
+ * @returns {Object} - Complete prompt configuration with scoring instructions
+ */
+export async function buildScoringPrompt(agentName, context = {}, teamMessages = [], options = {}) {
+  const { marketData = {}, teamAnalysis = null, isSequentialWorkflow = false } = context;
+  const { includeKnowledge = true, adaptToMarket = true, includeWeeklyAnalysis = true } = options;
+
+  // Build base character prompt
+  const characterPrompt = buildCharacterPrompt(agentName, marketData, { teamMessages });
+
+  // Add knowledge base if requested
+  let knowledgeSection = '';
+  if (includeKnowledge) {
+    knowledgeSection = await buildKnowledgeSection(agentName, marketData, includeWeeklyAnalysis);
+  }
+
+  // Add market adaptations
+  let adaptationSection = '';
+  if (adaptToMarket) {
+    adaptationSection = buildAdaptationSection(agentName, marketData);
+  }
+
+  // Add team context for RL80
+  let teamContextSection = '';
+  if (agentName === 'RL80' && teamAnalysis) {
+    teamContextSection = buildTeamContextSection(teamAnalysis);
+  }
+
+  // Build scoring-specific system prompt
+  const fullPrompt = `${characterPrompt}
+
+${knowledgeSection}
+
+${adaptationSection}
+
+${teamContextSection}
+
+## RESPONSE REQUIREMENTS
+- Respond as ${agentName} would, staying completely in character
+- Use your specific vocabulary and communication style
+- Focus on your area of expertise
+- Consider current market conditions in your analysis
+- IMPORTANT: You MUST provide scores for all assets in your analysis
+
+${SCORING_PROMPT_TEMPLATE}`;
+
+  return {
+    systemPrompt: fullPrompt,
+    userPrompt: buildScoringUserPrompt(agentName, context, teamMessages),
+    temperature: getTemperatureForAgent(agentName, marketData),
+    maxTokens: getMaxTokensForScoringAgent(agentName),
+    metadata: {
+      agentName,
+      marketConditions: analyzeMarketConditions(marketData),
+      teamConsensus: analyzeTeamConsensus(teamMessages),
+      isSequentialWorkflow,
+      scoringMode: true
+    }
+  };
+}
+
+/**
+ * Build user prompt for scoring mode
+ * @param {string} agentName - Agent name
+ * @param {Object} context - Context with market data
+ * @param {Array} teamMessages - Team messages
+ * @returns {string}
+ */
+function buildScoringUserPrompt(agentName, context, teamMessages) {
+  const { marketData = {} } = context;
+
+  let prompt = `Analyze the current market and provide your ${agentName} assessment.\n\n`;
+
+  prompt += `**Current Market Data:**\n`;
+  if (marketData.btcPrice) prompt += `- BTC: $${marketData.btcPrice.toLocaleString()}\n`;
+  if (marketData.ethPrice) prompt += `- ETH: $${marketData.ethPrice.toLocaleString()}\n`;
+  if (marketData.fearGreed !== undefined) prompt += `- Fear & Greed Index: ${marketData.fearGreed}\n`;
+  if (marketData.vix !== undefined) prompt += `- VIX: ${marketData.vix.toFixed(1)}\n`;
+  if (marketData.dxy !== undefined) prompt += `- DXY: ${marketData.dxy.toFixed(2)}\n`;
+  if (marketData.fundingRate !== undefined) prompt += `- Funding Rate: ${(marketData.fundingRate * 100).toFixed(3)}%\n`;
+  if (marketData.openInterest !== undefined) prompt += `- Open Interest: $${marketData.openInterest}B\n`;
+
+  if (teamMessages?.length > 0) {
+    prompt += `\n**Recent Team Messages:**\n`;
+    teamMessages.slice(-3).forEach(msg => {
+      prompt += `- ${msg.agent}: ${msg.message}\n`;
+    });
+  }
+
+  prompt += `\n**Required Assets to Score:** ${ASSETS.join(', ')}\n`;
+  prompt += `\nProvide your analysis in character, then include your scores in <scores> tags as shown in the system prompt.`;
+  prompt += `\nYour text analysis will be shown to users, so make it engaging and insightful.`;
+
+  return prompt;
+}
+
+/**
+ * Get max tokens for scoring mode (larger to accommodate JSON)
+ * @param {string} agentName - Agent name
+ * @returns {number}
+ */
+function getMaxTokensForScoringAgent(agentName) {
+  // Scoring mode needs more tokens for JSON output
+  return {
+    EMO: 500,
+    TEKNO: 500,
+    MACRO: 500,
+    RL80: 600
+  }[agentName] || 500;
 }
 
 // ============================================================================
@@ -514,6 +635,7 @@ function getMaxTokensForAgent(agentName) {
 
 export default {
   buildEnhancedPrompt,
+  buildScoringPrompt,
   buildKnowledgeSection,
   buildUserPrompt,
   analyzeMarketConditions

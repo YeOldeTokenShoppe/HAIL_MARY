@@ -4,10 +4,11 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs, doc, getDoc } from 'firebase/firestore';
 
 // Import agent functions
-import { callSentimentOracle } from '../../../trading/agents/sentiment-oracle';
-import { callMarketAnalyst } from '../../../trading/agents/market-analyst';
-import { callMacroSpecialist } from '../../../trading/agents/macro-specialist';
-import { callRL80Trader } from '../../../trading/agents/rl80-trader';
+import { callSentimentOracle, callSentimentOracleWithScoring } from '../../../trading/agents/sentiment-oracle';
+import { callMarketAnalyst, callMarketAnalystWithScoring } from '../../../trading/agents/market-analyst';
+import { callMacroSpecialist, callMacroSpecialistWithScoring } from '../../../trading/agents/macro-specialist';
+import { callRL80Trader, generateRL80ScoringDecision } from '../../../trading/agents/rl80-trader';
+import { logAnalystScores } from '../../../trading/services/decisionLogger';
 
 // Firebase config - using environment variables
 const firebaseConfig = {
@@ -156,7 +157,16 @@ async function getLiveMarketData() {
 
 export async function POST(request) {
   try {
-    const { agent, force = false, context: clientContext, teamAnalysis, isSequentialWorkflow } = await request.json();
+    const {
+      agent,
+      force = false,
+      context: clientContext,
+      teamAnalysis,
+      isSequentialWorkflow,
+      scoringMode = false,
+      analystScores = null,
+      portfolioState = null
+    } = await request.json();
 
     if (!agent) {
       return NextResponse.json({
@@ -188,14 +198,15 @@ export async function POST(request) {
       ...clientContext // Merge any additional context from client
     };
 
-    console.log(`[Sequential Workflow] ${agent} triggered with context:`, {
+    console.log(`[${scoringMode ? 'Scoring' : 'Sequential'} Workflow] ${agent} triggered with context:`, {
       btcPrice: liveMarketData.btcPrice,
       fearGreed: liveMarketData.fearGreed,
       hasTeamAnalysis: !!teamAnalysis,
-      isSequentialWorkflow
+      isSequentialWorkflow,
+      scoringMode
     });
 
-    let response, messageType, sentiment;
+    let response, messageType, sentiment, scoreOutput = null, decisionOutput = null;
 
     // Get API keys
     const openaiKey = process.env.OPENAI_API_KEY;
@@ -205,39 +216,67 @@ export async function POST(request) {
     try {
       switch (agent) {
         case 'TEKNO':
-        case 'market': // Support both naming conventions
+        case 'market':
           if (!openaiKey) {
             throw new Error('OpenAI API key not configured');
           }
-          response = await callMarketAnalyst(context, openaiKey);
+          if (scoringMode) {
+            // Scoring mode: return structured scores
+            scoreOutput = await callMarketAnalystWithScoring(context, openaiKey);
+            response = scoreOutput.textResponse;
+            // Log scores to Firebase
+            await logAnalystScores(scoreOutput);
+          } else {
+            response = await callMarketAnalyst(context, openaiKey);
+          }
           messageType = 'market';
           sentiment = 'neutral';
           break;
 
         case 'EMO':
-        case 'sentiment': // Support both naming conventions
+        case 'sentiment':
           if (!grokKey) {
             throw new Error('Grok API key not configured');
           }
-          response = await callSentimentOracle(context, grokKey);
+          if (scoringMode) {
+            scoreOutput = await callSentimentOracleWithScoring(context, grokKey);
+            response = scoreOutput.textResponse;
+            await logAnalystScores(scoreOutput);
+          } else {
+            response = await callSentimentOracle(context, grokKey);
+          }
           messageType = 'sentiment';
           sentiment = 'neutral';
           break;
 
         case 'MACRO':
-        case 'macro': // Support both naming conventions
+        case 'macro':
           if (!anthropicKey) {
             throw new Error('Anthropic API key not configured');
           }
-          response = await callMacroSpecialist(context, anthropicKey);
+          if (scoringMode) {
+            scoreOutput = await callMacroSpecialistWithScoring(context, anthropicKey);
+            response = scoreOutput.textResponse;
+            await logAnalystScores(scoreOutput);
+          } else {
+            response = await callMacroSpecialist(context, anthropicKey);
+          }
           messageType = 'macro';
           sentiment = 'neutral';
           break;
 
         case 'RL80':
-        case 'rl80': // Support both naming conventions
-          // RL80 can process team analysis in sequential workflow
-          if (isSequentialWorkflow && teamAnalysis) {
+        case 'rl80':
+          if (scoringMode && analystScores) {
+            // Scoring mode: generate decision from analyst scores
+            console.log('🧠 RL80 processing scoring mode with analyst scores');
+            decisionOutput = await generateRL80ScoringDecision(
+              context,
+              analystScores,
+              portfolioState || {}
+            );
+            response = decisionOutput.textResponse;
+          } else if (isSequentialWorkflow && teamAnalysis) {
             console.log('🧠 RL80 processing team analysis from sequential workflow');
             response = await callRL80Trader(context, recentMessages, teamAnalysis);
           } else {
@@ -251,15 +290,18 @@ export async function POST(request) {
           throw new Error(`Unknown agent: ${agent}`);
       }
 
-      // Validate and save response to Firebase
-      if (response && typeof response === 'string' && response.trim().length > 0) {
-        const cleanResponse = response.trim();
+      // Validate response
+      const textResponse = response && typeof response === 'string' ? response.trim() : '';
+
+      if (textResponse.length > 0 || scoreOutput || decisionOutput) {
+        const cleanResponse = textResponse || `${agent} analysis complete.`;
         const messageId = await saveMessageToFirebase(agent, cleanResponse, messageType, sentiment);
-        
+
         // Update rate limiting
         lastCallTimes[agent] = now;
 
-        return NextResponse.json({
+        // Build response object
+        const responseData = {
           success: true,
           agent,
           message: cleanResponse,
@@ -267,8 +309,28 @@ export async function POST(request) {
           type: messageType,
           sentiment,
           timestamp: new Date().toISOString(),
-          isSequentialWorkflow
-        });
+          isSequentialWorkflow,
+          scoringMode
+        };
+
+        // Include scoring data if available
+        if (scoreOutput) {
+          responseData.scores = scoreOutput.scores;
+          responseData.scoreOutput = scoreOutput;
+        }
+
+        // Include decision data if available
+        if (decisionOutput) {
+          responseData.decision = {
+            recommendations: decisionOutput.tradeableRecommendations,
+            summary: decisionOutput.summary,
+            aggregatedScores: decisionOutput.aggregatedScores,
+            shadowComparison: decisionOutput.shadowComparison
+          };
+          responseData.decisionOutput = decisionOutput;
+        }
+
+        return NextResponse.json(responseData);
       } else {
         const errorMsg = `${agent} returned empty response. Response type: ${typeof response}, Value: ${JSON.stringify(response)}`;
         throw new Error(errorMsg);
@@ -276,17 +338,18 @@ export async function POST(request) {
 
     } catch (agentError) {
       console.error(`${agent} agent error:`, agentError);
-      
+
       // Save error message to Firebase for debugging
       const errorMessage = `⚠️ Agent temporarily unavailable: ${agentError.message}`;
       const messageId = await saveMessageToFirebase(agent, errorMessage, 'error', 'warning');
-      
+
       return NextResponse.json({
         success: false,
         agent,
         error: agentError.message,
         messageId,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        scoringMode
       });
     }
 

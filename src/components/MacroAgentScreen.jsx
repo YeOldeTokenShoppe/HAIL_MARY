@@ -1,73 +1,39 @@
 import { useEffect, useState } from 'react'
 
-// Data fetching hook with 15 minute refresh interval and price history
-const useMacroData = (refreshInterval = 900000) => { // 900000ms = 15 minutes
+// Data fetching hook with 30 minute refresh interval
+const useMacroData = (refreshInterval = 1800000) => { // 1800000ms = 30 minutes
   const [data, setData] = useState({
-    btc: { price: 0, change: 0, history: [] },
-    eth: { price: 0, change: 0, history: [] },
-    dominance: { btc: 0, eth: 0 },
-    totalMarketCap: 0,
-    volume24h: 0,
+    vix: { value: 18.5, change: 0, changePercent: 0 },
+    spx: { value: 585, change: 0, changePercent: 0 },
+    dxy: { value: 28.5, change: 0, changePercent: 0 },
+    treasury10y: { value: 4.5, change: 0 },
+    funding: { btc: 0.01, eth: 0.008 },
+    openInterest: { btc: 0, eth: 0, total: 0 },
   })
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Try to fetch from our cached API first
-        const response = await fetch('/api/ai/crypto')
-        
+        const response = await fetch('/api/ai/macro')
+
         if (response.ok) {
-          const cachedData = await response.json()
-          // console.log('[MacroAgentScreen] Using cached data from:', cachedData.source)
-          
-          // If data is stale, trigger an update in the background
-          if (cachedData.isStale) {
-            // console.log('[MacroAgentScreen] Data is stale, triggering background update')
-            fetch('/api/ai/update-crypto').catch(err => 
-              console.log('[MacroAgentScreen] Background update failed:', err)
-            )
-          }
-          
+          const macroData = await response.json()
           setData({
-            btc: cachedData.btc || { price: 95000, change: 2.5, history: [] },
-            eth: cachedData.eth || { price: 3200, change: 3.2, history: [] },
-            dominance: {
-              btc: cachedData.dominance?.btc || "52.3",
-              eth: cachedData.dominance?.eth || "16.8"
-            },
-            totalMarketCap: cachedData.totalMarketCap || 3400000000000,
-            volume24h: cachedData.volume24h || 145000000000
-          })
-        } else {
-          // console.log('[MacroAgentScreen] Failed to fetch cached data, using fallback')
-          // Use fallback values
-          setData({
-            btc: { price: 95000, change: 2.5, history: [] },
-            eth: { price: 3200, change: 3.2, history: [] },
-            dominance: { btc: "52.3", eth: "16.8" },
-            totalMarketCap: 3400000000000,
-            volume24h: 145000000000
+            vix: macroData.vix || { value: 18.5, change: 0, changePercent: 0 },
+            spx: macroData.spx || { value: 585, change: 0, changePercent: 0 },
+            dxy: macroData.dxy || { value: 28.5, change: 0, changePercent: 0 },
+            treasury10y: macroData.treasury10y || { value: 4.5, change: 0 },
+            funding: macroData.funding || { btc: 0.01, eth: 0.008 },
+            openInterest: macroData.openInterest || { btc: 0, eth: 0, total: 0 },
           })
         }
       } catch (err) {
         console.error('[MacroAgentScreen] Data fetch failed:', err)
-        // Use fallback values on error
-        setData({
-          btc: { price: 95000, change: 2.5, history: [] },
-          eth: { price: 3200, change: 3.2, history: [] },
-          dominance: { btc: "52.3", eth: "16.8" },
-          totalMarketCap: 3400000000000,
-          volume24h: 145000000000
-        })
       }
     }
 
-    // Initial fetch
     fetchData()
-    
-    // Set up interval for refreshing every 15 minutes
     const interval = setInterval(fetchData, refreshInterval)
-    
     return () => clearInterval(interval)
   }, [refreshInterval])
 
@@ -77,201 +43,211 @@ const useMacroData = (refreshInterval = 900000) => { // 900000ms = 15 minutes
 // The screen component
 const MacroAgentScreen = () => {
   const data = useMacroData()
-  
-  // Only log when data actually changes
-  // useEffect(() => {
-  //   if (data.btc.price > 0) {
-  //     console.log('[MacroAgentScreen] Data updated:', data)
-  //   }
-  // }, [data.btc.price, data.eth.price])
 
-  // Draw loop using useEffect with interval instead of useFrame
   useEffect(() => {
     const draw = () => {
       // Use the global canvas set up by VideoScreens
-      // @ts-ignore
       const canvas = window.__screen2Canvas
-      // @ts-ignore
       const texture = window.__screen2Texture
-      
-      if (!canvas || !texture) {
-        // console.log('[MacroAgentScreen] Waiting for canvas/texture...')
-        return
-      }
-      
+
+      if (!canvas || !texture) return
+
       const ctx = canvas.getContext('2d')
 
-    // Background - clean black
-    ctx.fillStyle = '#000000'
-    ctx.fillRect(0, 0, 512, 320)
+      // Background - clean black
+      ctx.fillStyle = '#000000'
+      ctx.fillRect(0, 0, 512, 320)
 
-    // Header
-    ctx.fillStyle = '#00ff66'
-    ctx.font = 'bold 18px monospace'
-    ctx.fillText('◆ MACRO OVERVIEW', 16, 28)
-    
-    // Divider line
-    ctx.strokeStyle = '#00ff66'
-    ctx.lineWidth = 1
-    ctx.beginPath()
-    ctx.moveTo(16, 40)
-    ctx.lineTo(496, 40)
-    ctx.stroke()
+      // Header
+      ctx.fillStyle = '#00ff66'
+      ctx.font = 'bold 18px monospace'
+      ctx.fillText('◆ MACRO INDICATORS', 16, 28)
 
-    // BTC Price
-    drawPriceRow(ctx, 'BTC', data.btc.price, data.btc.change, 70, data.btc.history)
-    
-    // ETH Price
-    drawPriceRow(ctx, 'ETH', data.eth.price, data.eth.change, 110, data.eth.history)
+      // Divider line
+      ctx.strokeStyle = '#00ff66'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(16, 40)
+      ctx.lineTo(496, 40)
+      ctx.stroke()
 
-    // Market Overview
-    drawMarketOverview(ctx, data, 160)
+      // Row 1: DXY and VIX
+      drawIndicatorBoxCompact(ctx, 'DXY', data.dxy.value, data.dxy.changePercent, 20, 50, 'USD (UUP)', false)
+      drawIndicatorBoxCompact(ctx, 'VIX', data.vix.value, data.vix.changePercent, 265, 50, 'Vol (VIXY)', true)
 
-    // Simple border
-    ctx.strokeStyle = 'rgba(0, 255, 100, 0.8)'
-    ctx.lineWidth = 1
-    ctx.strokeRect(2, 2, 508, 316)
+      // Row 2: 10Y Treasury and S&P 500
+      drawIndicatorBoxCompact(ctx, '10Y', data.treasury10y.value, data.treasury10y.change, 20, 100, 'Treasury', true, true)
+      drawIndicatorBoxCompact(ctx, 'SPX', data.spx.value, data.spx.changePercent, 265, 100, 'S&P 500', false)
 
-      // Update texture
+      // Divider before Funding Rates
+      ctx.strokeStyle = 'rgba(0, 255, 100, 0.3)'
+      ctx.beginPath()
+      ctx.moveTo(16, 150)
+      ctx.lineTo(496, 150)
+      ctx.stroke()
+
+      // Funding Rates Section
+      drawFundingRates(ctx, data.funding, 160)
+
+      // Divider before Open Interest
+      ctx.strokeStyle = 'rgba(0, 255, 100, 0.3)'
+      ctx.beginPath()
+      ctx.moveTo(16, 235)
+      ctx.lineTo(496, 235)
+      ctx.stroke()
+
+      // Open Interest Section
+      drawOpenInterest(ctx, data.openInterest, 245)
+
+      // Simple border
+      ctx.strokeStyle = 'rgba(0, 255, 100, 0.8)'
+      ctx.lineWidth = 1
+      ctx.strokeRect(2, 2, 508, 316)
+
       if (texture) {
         texture.needsUpdate = true
       }
     }
-    
-    // Set up interval for drawing
-    const intervalId = setInterval(draw, 100) // Draw every 100ms (~10fps)
-    
-    return () => {
-      clearInterval(intervalId)
-    }
-  }, [data]) // Redraw when data changes
 
-  // This component doesn't render anything in the 3D scene
-  // It just updates the canvas that VideoScreens already attached to Screen2
+    const intervalId = setInterval(draw, 100)
+    return () => clearInterval(intervalId)
+  }, [data])
+
   return null
 }
 
-// Helper functions
-const drawPriceRow = (ctx, symbol, price, change, y, history = []) => {
+// Draw a compact indicator box
+const drawIndicatorBoxCompact = (ctx, symbol, value, change, x, y, subtitle, invertColors = false, isPercent = false) => {
   const isPositive = change >= 0
-  
+  const showGreen = invertColors ? !isPositive : isPositive
+
+  // Box background
+  ctx.fillStyle = 'rgba(0, 255, 100, 0.05)'
+  ctx.fillRect(x, y, 225, 42)
+  ctx.strokeStyle = 'rgba(0, 255, 100, 0.3)'
+  ctx.strokeRect(x, y, 225, 42)
+
+  // Symbol (left side)
   ctx.fillStyle = '#00ff66'
-  ctx.font = 'bold 16px monospace'
-  ctx.fillText(symbol, 24, y)
-  
+  ctx.font = 'bold 14px monospace'
+  ctx.fillText(symbol, x + 10, y + 16)
+
+  // Subtitle (under symbol)
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'
+  ctx.font = '8px monospace'
+  ctx.fillText(subtitle, x + 10, y + 28)
+
+  // Value (center-right)
   ctx.fillStyle = '#ffffff'
-  ctx.font = '20px monospace'
-  ctx.fillText(`$${price.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, 80, y)
-  
-  ctx.fillStyle = isPositive ? '#00ff66' : '#ff4444'
-  ctx.font = '14px monospace'
+  ctx.font = 'bold 18px monospace'
+  const displayValue = isPercent ? `${value.toFixed(2)}%` : value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  ctx.fillText(displayValue, x + 70, y + 26)
+
+  // Change (far right)
+  ctx.fillStyle = showGreen ? '#00ff66' : '#ff4444'
+  ctx.font = 'bold 10px monospace'
   const arrow = isPositive ? '▲' : '▼'
-  ctx.fillText(`${arrow} ${Math.abs(change).toFixed(2)}%`, 220, y)
-  
-  // Draw real sparkline with historical data
-  drawMiniSparkline(ctx, 320, y - 12, history, isPositive)
+  const changeDisplay = isPercent ? `${arrow}${Math.abs(change).toFixed(2)}` : `${arrow}${Math.abs(change).toFixed(2)}%`
+  ctx.fillText(changeDisplay, x + 175, y + 26)
 }
 
-const drawMiniSparkline = (ctx, x, y, history, trending) => {
-  // Add "24H" label
+// Draw Funding Rates section
+const drawFundingRates = (ctx, funding, y) => {
+  // Title
+  ctx.fillStyle = '#00ff66'
+  ctx.font = 'bold 12px monospace'
+  ctx.fillText('PERP FUNDING RATES (LIGHTER)', 20, y + 15)
+
+  // BTC Funding
+  const btcRate = funding.btc || 0
+  const btcPositive = btcRate >= 0
+  drawFundingBar(ctx, 'BTC', btcRate, 20, y + 30, btcPositive)
+
+  // ETH Funding
+  const ethRate = funding.eth || 0
+  const ethPositive = ethRate >= 0
+  drawFundingBar(ctx, 'ETH', ethRate, 260, y + 30, ethPositive)
+}
+
+// Draw individual funding rate bar
+const drawFundingBar = (ctx, symbol, rate, x, y, isPositive) => {
+  // Background box
+  ctx.fillStyle = 'rgba(0, 255, 100, 0.05)'
+  ctx.fillRect(x, y, 220, 35)
+  ctx.strokeStyle = 'rgba(0, 255, 100, 0.3)'
+  ctx.strokeRect(x, y, 220, 35)
+
+  // Symbol
+  ctx.fillStyle = '#00ff66'
+  ctx.font = 'bold 12px monospace'
+  ctx.fillText(symbol, x + 10, y + 15)
+
+  // Rate value - format as percentage with 4 decimals
+  const ratePercent = (rate * 100).toFixed(4)
+  const sign = isPositive ? '+' : ''
+  ctx.fillStyle = isPositive ? '#00ff66' : '#ff4444'
+  ctx.font = 'bold 16px monospace'
+  ctx.fillText(`${sign}${ratePercent}%`, x + 50, y + 16)
+
+  // Label
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'
+  ctx.font = '9px monospace'
+  const label = isPositive ? 'LONGS PAY SHORTS' : 'SHORTS PAY LONGS'
+  ctx.fillText(label, x + 10, y + 28)
+}
+
+// Draw Open Interest section
+const drawOpenInterest = (ctx, openInterest, y) => {
+  // Title
+  ctx.fillStyle = '#00ff66'
+  ctx.font = 'bold 12px monospace'
+  ctx.fillText('OPEN INTEREST (LIGHTER)', 20, y + 15)
+
+  // BTC OI
+  const btcOI = openInterest.btc || 0
+  drawOIBar(ctx, 'BTC', btcOI, 20, y + 28)
+
+  // ETH OI
+  const ethOI = openInterest.eth || 0
+  drawOIBar(ctx, 'ETH', ethOI, 260, y + 28)
+
+  // Total OI
+  const totalOI = openInterest.total || (btcOI + ethOI)
   ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'
   ctx.font = '10px monospace'
-  ctx.fillText('24H', x - 5, y - 2)
-  
-  ctx.strokeStyle = trending ? '#00ff66' : '#ff4444'
-  ctx.lineWidth = 1.5
-  
-  if (history.length > 1) {
-    // Draw real historical data
-    const width = 140  // Width of sparkline area
-    const height = 20  // Height of sparkline area
-    const points = history.slice(-24) // Last 24 hours
-    
-    if (points.length > 0) {
-      // Calculate min and max for scaling
-      const min = Math.min(...points)
-      const max = Math.max(...points)
-      const range = max - min || 1
-      
-      ctx.beginPath()
-      points.forEach((price, i) => {
-        const xPos = x + (i / (points.length - 1)) * width
-        const yPos = y + height - ((price - min) / range) * height
-        
-        if (i === 0) {
-          ctx.moveTo(xPos, yPos)
-        } else {
-          ctx.lineTo(xPos, yPos)
-        }
-      })
-      ctx.stroke()
-      
-      // Add a subtle glow effect
-      ctx.strokeStyle = trending ? 'rgba(0, 255, 100, 0.3)' : 'rgba(255, 68, 68, 0.3)'
-      ctx.lineWidth = 3
-      ctx.stroke()
-      
-      // Add min/max price indicators
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'
-      ctx.font = '9px monospace'
-      ctx.fillText(`H:${Math.floor(max).toLocaleString()}`, x + width + 5, y + 5)
-      ctx.fillText(`L:${Math.floor(min).toLocaleString()}`, x + width + 5, y + height - 2)
-    }
-  } else {
-    // Fallback to simple line if no history
-    ctx.beginPath()
-    ctx.moveTo(x, y + 10)
-    ctx.lineTo(x + 140, y + 10 + (trending ? -5 : 5))
-    ctx.stroke()
-  }
+  ctx.fillText(`TOTAL: $${formatLargeNumber(totalOI)}`, 300, y + 15)
 }
 
-const drawMarketOverview = (ctx, data, y) => {
-  // Market Cap Header
+// Draw individual OI bar
+const drawOIBar = (ctx, symbol, value, x, y) => {
+  // Background box
+  ctx.fillStyle = 'rgba(0, 255, 100, 0.05)'
+  ctx.fillRect(x, y, 220, 30)
+  ctx.strokeStyle = 'rgba(0, 255, 100, 0.3)'
+  ctx.strokeRect(x, y, 220, 30)
+
+  // Symbol
   ctx.fillStyle = '#00ff66'
-  ctx.font = 'bold 14px monospace'
-  ctx.fillText('MARKET OVERVIEW', 24, y)
-  
-  // Total Market Cap
+  ctx.font = 'bold 12px monospace'
+  ctx.fillText(symbol, x + 10, y + 12)
+
+  // Value - format as dollar amount
   ctx.fillStyle = '#ffffff'
-  ctx.font = '12px monospace'
-  const marketCapFormatted = (data.totalMarketCap / 1e12).toFixed(2) // Convert to trillions
-  ctx.fillText(`Total Cap: $${marketCapFormatted}T`, 24, y + 25)
-  
-  // 24h Volume
-  const volumeFormatted = (data.volume24h / 1e9).toFixed(1) // Convert to billions
-  ctx.fillText(`24h Vol: $${volumeFormatted}B`, 24, y + 45)
-  
-  // Dominance Section
-  ctx.fillStyle = '#00ff66'
   ctx.font = 'bold 14px monospace'
-  ctx.fillText('DOMINANCE', 250, y)
-  
-  // BTC Dominance with visual bar
-  drawDominanceBar(ctx, 'BTC', data.dominance.btc, 250, y + 20, '#f7931a')
-  
-  // ETH Dominance with visual bar
-  drawDominanceBar(ctx, 'ETH', data.dominance.eth, 250, y + 45, '#627eea')
-}
+  ctx.fillText(`$${formatLargeNumber(value)}`, x + 50, y + 13)
 
-const drawDominanceBar = (ctx, symbol, percentage, x, y, color) => {
   // Label
-  ctx.fillStyle = '#ffffff'
-  ctx.font = '11px monospace'
-  ctx.fillText(`${symbol}:`, x, y)
-  
-  // Bar background
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'
-  ctx.fillRect(x + 35, y - 10, 100, 12)
-  
-  // Bar fill
-  ctx.fillStyle = color
-  ctx.fillRect(x + 35, y - 10, (percentage / 100) * 100, 12)
-  
-  // Percentage text
-  ctx.fillStyle = '#ffffff'
-  ctx.font = 'bold 11px monospace'
-  ctx.fillText(`${percentage}%`, x + 140, y)
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'
+  ctx.font = '8px monospace'
+  ctx.fillText('OPEN INTEREST', x + 10, y + 24)
+}
+
+// Format large numbers (e.g., 1500000 -> 1.5M)
+const formatLargeNumber = (num) => {
+  if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B'
+  if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M'
+  if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K'
+  return num.toFixed(0)
 }
 
 export default MacroAgentScreen

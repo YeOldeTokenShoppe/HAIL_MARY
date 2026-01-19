@@ -167,7 +167,7 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-        const modelToPreload = isMobile ? '/models/MOBILE.glb' : '/models/RL80_4anims.glb';
+      const modelToPreload = isMobile ? '/models/MOBILE.glb' : '/models/RL80_4anims.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
           const link = document.createElement('link');

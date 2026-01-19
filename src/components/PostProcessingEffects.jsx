@@ -141,7 +141,7 @@ const PostProcessingEffects = ({ is80sMode = false }) => {
       )} */}
       <Bloom
         intensity={bloomIntensity}           // Dynamically controlled intensity
-        luminanceThreshold={0.8}  // Lowered from 0.4 to catch more of the sunset colors
+        luminanceThreshold={0.3}  // Lowered to 0.3 to catch emissive cylinder rings
         luminanceSmoothing={0.7}  // Adjusted from 0.9 for sharper bloom edges
         height={400}              // Increased from 300 for more detail
         blendFunction={BlendFunction.SCREEN} // Use SCREEN blend mode for a more natural glow

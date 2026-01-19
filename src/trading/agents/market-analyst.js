@@ -7,6 +7,9 @@
 
 // Import external knowledge base
 import tradingKnowledge from './configs/knowledge/trading-knowledge.json';
+import { buildScoringPrompt } from './configs/enhancedPromptBuilder.js';
+import { parseScoreResponse, generateTechnicalFallbackScores } from '../utils/scoreParser.js';
+import { createAnalystScoreOutput } from '../types/scoring.js';
 
 // ============================================================================
 // PERSONALITY CONFIGURATION
@@ -322,6 +325,96 @@ export async function callMarketAnalyst(context, apiKey) {
   }
   
   return data.choices[0].message.content;
+}
+
+// ============================================================================
+// SCORING MODE FUNCTION
+// ============================================================================
+
+/**
+ * Call Market Analyst with scoring output
+ * Returns structured scores for all assets along with text response
+ * @param {Object} context - Trading context with market data
+ * @param {string} apiKey - OpenAI API key
+ * @returns {AnalystScoreOutput}
+ */
+export async function callMarketAnalystWithScoring(context, apiKey) {
+  const scoringPrompt = await buildScoringPrompt('TEKNO', context, context.lastMessages || []);
+
+  console.log('TEKNO (Scoring Mode) analyzing:', {
+    btcPrice: context.marketData?.btcPrice,
+    ethPrice: context.marketData?.ethPrice,
+    vix: context.marketData?.vix
+  });
+
+  try {
+    // Add 30 second timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: MARKET_ANALYST_CONFIG.model,
+        messages: [
+          { role: 'system', content: scoringPrompt.systemPrompt },
+          { role: 'user', content: scoringPrompt.userPrompt }
+        ],
+        temperature: scoringPrompt.temperature,
+        max_tokens: scoringPrompt.maxTokens
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`API responded with status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const rawResponse = data.choices[0]?.message?.content;
+
+    if (!rawResponse) {
+      throw new Error('Empty response from OpenAI');
+    }
+
+    // Parse the response to extract scores
+    const parseResult = parseScoreResponse(rawResponse, 'TEKNO', {
+      marketData: context.marketData,
+      timestamp: Date.now()
+    });
+
+    if (parseResult.success) {
+      console.log('TEKNO scoring parsed successfully:', parseResult.output.scores.length, 'scores');
+      return parseResult.output;
+    } else {
+      console.warn('TEKNO scoring parse failed, using fallback:', parseResult.error);
+      return parseResult.output;
+    }
+
+  } catch (error) {
+    // Fallback with technical-based scores
+    console.log('TEKNO API failed, generating fallback scores:', error.message);
+
+    const fallbackScores = generateTechnicalFallbackScores(context.marketData);
+    const fallbackText = generateMarketResponse(context.marketData) || 'Technical analysis pending.';
+
+    return createAnalystScoreOutput(
+      'TEKNO',
+      fallbackScores,
+      fallbackText,
+      {
+        fallback: true,
+        error: error.message,
+        marketData: context.marketData
+      }
+    );
+  }
 }
 
 export default MARKET_ANALYST_CONFIG;

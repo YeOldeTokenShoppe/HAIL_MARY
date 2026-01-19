@@ -4,7 +4,11 @@ import './RL80TraderCard.css';
 const RL80TraderCard = ({
   agentData,
   className = "",
-  onClose
+  onClose,
+  // Scoring system integration props
+  latestScores = null,      // { BTC: { direction, confidence }, ETH: {...}, ... }
+  latestDecision = null,    // { recommendations: [...], summary: {...} }
+  latestThesis = null       // Live text response from agent
 }) => {
   const cardRef = useRef(null);
   const [isVisible, setIsVisible] = useState(false);
@@ -21,16 +25,16 @@ const RL80TraderCard = ({
       rarity: 'legendary',
       level: 15,
       class: 'rl80',
-      image: '/images/Headshot_RL80.webp', // Update this path
+      image: '/images/Headshot_RL80.webp', 
       bio: 'Supreme commander of the trading council. Aggregates specialist insights to make final trading decisions.',
       thesis: 'Synthesizing macro data, sentiment indicators, and technical patterns. Strong confluence detected on ETH/USD. Executing calculated long position with 3x leverage. Risk-reward ratio: 1:4.2',
       stats: {
-        wins: 1085,
-        losses: 162,
-        winRate: 87,
-        totalTrades: 1247,
-        profit: '+324.5%',
-        level: 15
+        wins: 0,
+        losses: 0,
+        winRate: 0,
+        totalTrades: 0,
+        profit: '+0%',
+        level: 1
       },
       knowledgeSources: [
         'Real-time market data feeds',
@@ -49,16 +53,16 @@ const RL80TraderCard = ({
       rarity: 'epic',
       level: 11,
       class: 'sentiment',
-      image: '/images/Headshot_Emo.webp', // Update this path
+      image: '/images/Headshot_Emo.webp', 
       bio: 'Emotional intelligence expert. Analyzes social trends, news sentiment, and crowd psychology to detect market shifts.',
       thesis: 'Market sentiment shifting to extreme greed (F&G: 82). Social mentions up 450% in 24hrs. Whale accumulation detected. High volatility incoming - defensive positioning recommended.',
       stats: {
-        wins: 731,
-        losses: 161,
-        winRate: 82,
-        totalTrades: 892,
-        profit: '+267.3%',
-        level: 11
+        wins: 0,
+        losses: 0,
+        winRate: 0,
+        totalTrades: 0,
+        profit: '+0%',
+        level: 1
       },
       knowledgeSources: [
         'Twitter/X sentiment analysis',
@@ -77,16 +81,16 @@ const RL80TraderCard = ({
       rarity: 'epic',
       level: 9,
       class: 'macro',
-      image: '/images/Headshot_Macro.webp', // Update this path
+      image: '/images/Headshot_Macro.webp', 
       bio: 'Global strategist. Tracks central bank policies, inflation data, interest rates, and geopolitical events.',
       thesis: 'Fed pivot probability increasing - CME FedWatch showing 78% odds of rate cut in Q2. DXY breaking support at 103.5. Strong tailwinds for risk-on assets and crypto.',
       stats: {
-        wins: 429,
-        losses: 114,
-        winRate: 79,
-        totalTrades: 543,
-        profit: '+198.7%',
-        level: 9
+        wins: 0,
+        losses: 0,
+        winRate: 0,
+        totalTrades: 0,
+        profit: '+0%',
+        level: 1
       },
       knowledgeSources: [
         'Federal Reserve statements',
@@ -105,16 +109,16 @@ const RL80TraderCard = ({
       rarity: 'epic',
       level: 13,
       class: 'technical',
-      image: '/images/Headshot_Tekno.webp', // Update this path
+      image: '/images/Headshot_Tekno.webp', 
       bio: 'Chart wizard. Lives and breathes price action, candlestick patterns, indicators, and support/resistance.',
       thesis: 'BTC forming textbook ascending triangle on 4H. RSI bullish divergence on daily. Volume confirms accumulation. Target: $52k. Stop: $47.2k. Fib 0.618 holding support.',
       stats: {
-        wins: 1914,
-        losses: 189,
-        winRate: 91,
-        totalTrades: 2103,
-        profit: '+412.8%',
-        level: 13
+        wins: 0,
+        losses: 0,
+        winRate: 0,
+        totalTrades: 0,
+        profit: '+0%',
+        level: 1
       },
       knowledgeSources: [
         'Multi-timeframe price data',
@@ -124,6 +128,57 @@ const RL80TraderCard = ({
       ],
       status: 'Analyzing'
     }
+  };
+
+  // Helper to format direction score with visual indicator
+  const formatDirectionScore = (score) => {
+    if (score === null || score === undefined) return { text: '—', color: '#888', arrow: '' };
+    const absScore = Math.abs(score);
+    const isLong = score > 0;
+    const isBearish = score < 0;
+
+    let strength = 'Neutral';
+    let color = '#888';
+    let arrow = '';
+
+    if (absScore >= 7) {
+      strength = isLong ? 'Strong Long' : 'Strong Short';
+      color = isLong ? '#22c55e' : '#ef4444';
+      arrow = isLong ? '⬆️' : '⬇️';
+    } else if (absScore >= 4) {
+      strength = isLong ? 'Moderate Long' : 'Moderate Short';
+      color = isLong ? '#4ade80' : '#f87171';
+      arrow = isLong ? '↗️' : '↘️';
+    } else if (absScore >= 2) {
+      strength = isLong ? 'Weak Long' : 'Weak Short';
+      color = isLong ? '#86efac' : '#fca5a5';
+      arrow = isLong ? '↑' : '↓';
+    } else {
+      strength = 'Neutral';
+      color = '#fbbf24';
+      arrow = '➡️';
+    }
+
+    return { text: `${arrow} ${score > 0 ? '+' : ''}${score}`, strength, color };
+  };
+
+  // Helper to format confidence as percentage with color
+  const formatConfidence = (confidence) => {
+    if (confidence === null || confidence === undefined) return { text: '—', color: '#888' };
+    const pct = Math.round(confidence * 100);
+    let color = '#888';
+    if (pct >= 70) color = '#22c55e';
+    else if (pct >= 50) color = '#fbbf24';
+    else color = '#f87171';
+    return { text: `${pct}%`, color };
+  };
+
+  // Map agent names to scoring system agent IDs
+  const agentToScoringId = {
+    'Emo': 'EMO',
+    'Tekno': 'TEKNO',
+    'Macro': 'MACRO',
+    'RL80': 'RL80'
   };
 
   // Get agent info from database, fallback to passed agentData
@@ -272,13 +327,42 @@ const RL80TraderCard = ({
             <p className="bio-text">{agent.bio}</p>
           </div>
 
+          {/* Live Scoring Display - Only shown when latestScores available */}
+          {latestScores && (
+            <div className="card-section scoring-section">
+              <div className="section-header">
+                <span className="section-icon">📊</span>
+                <span className="section-title">LIVE CONVICTION</span>
+              </div>
+              <div className="scoring-grid">
+                {['BTC', 'ETH'].map(asset => {
+                  const scoringId = agentToScoringId[agent.name];
+                  const assetScore = latestScores[asset];
+                  const dirFormat = formatDirectionScore(assetScore?.direction);
+                  const confFormat = formatConfidence(assetScore?.confidence);
+                  return (
+                    <div key={asset} className="score-item">
+                      <span className="score-asset">{asset}</span>
+                      <span className="score-direction" style={{ color: dirFormat.color }}>
+                        {dirFormat.text}
+                      </span>
+                      <span className="score-confidence" style={{ color: confFormat.color }}>
+                        {confFormat.text}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Current Thesis */}
           <div className="card-section thesis-section">
             <div className="section-header">
               <span className="section-icon">💭</span>
               <span className="section-title">CURRENT THESIS</span>
             </div>
-            <p className="thesis-text">{agent.thesis}</p>
+            <p className="thesis-text">{latestThesis || agent.thesis}</p>
           </div>
 
           {/* Card Footer */}
@@ -332,6 +416,36 @@ const RL80TraderCard = ({
               <span className="level-value">{agent.level}</span>
             </div>
           </div>
+
+          {/* RL80 Trade Recommendations - Only for RL80 with decision data */}
+          {agent.name === 'RL80' && latestDecision?.recommendations && (
+            <div className="card-section recommendations-section">
+              <div className="section-header">
+                <span className="section-icon">🎯</span>
+                <span className="section-title">ACTIVE SIGNALS</span>
+              </div>
+              <div className="recommendations-list">
+                {latestDecision.recommendations.slice(0, 3).map((rec, idx) => {
+                  const dirFormat = formatDirectionScore(rec.direction);
+                  return (
+                    <div key={idx} className="recommendation-item">
+                      <span className="rec-asset">{rec.asset}</span>
+                      <span className="rec-action" style={{ color: dirFormat.color }}>
+                        {rec.action?.toUpperCase() || dirFormat.strength}
+                      </span>
+                      <span className="rec-size">{Math.round(rec.sizePercent * 100)}%</span>
+                    </div>
+                  );
+                })}
+                {latestDecision.summary && (
+                  <div className="decision-summary">
+                    <span>Heat: {latestDecision.summary.totalHeat || 0}%</span>
+                    <span>Positions: {latestDecision.summary.tradeable || 0}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Win/Loss Stats */}
           <div className="card-section stats-section">

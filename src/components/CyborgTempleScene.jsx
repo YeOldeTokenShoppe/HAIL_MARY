@@ -573,7 +573,22 @@ const CyborgTempleScene = ({
       
       // Find the specific meshes and add click handlers
       templeScene.traverse((child) => {
-        
+
+        // Target all cylinder meshes (the glowing rings around coins)
+        if (child.name && child.name.startsWith('Cylinder') && child.isMesh) {
+          // Enhance the emissive glow for cylinder rings
+          if (child.material) {
+            child.material.emissiveIntensity = 4.5; // Increase from 1.4 to 4.5
+            child.material.toneMapped = false; // CRITICAL - prevents tone mapping from dimming
+            child.material.needsUpdate = true;
+
+            // If emissive color isn't set, give it a cyan glow
+            if (!child.material.emissive || child.material.emissive.getHex() === 0x000000) {
+              child.material.emissive = new THREE.Color(0x00ffff);
+            }
+          }
+        }
+
         if (child.name === 'Cylinder043_0') {
           cylinderMeshRef.current = child;
         }

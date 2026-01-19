@@ -57,7 +57,7 @@ class FloatingGallery extends THREE.Group {
     this.imageData = [
       { 
         url: '/carousel_images/img1.jpg', 
-        year: '2200 BCE',
+        year: '67 CE',
         description: 'Driving back a bear market',
         curvePosition: 0.11,  // Position along curve (0-1)
         width: 1.2,
@@ -81,9 +81,9 @@ class FloatingGallery extends THREE.Group {
 
       // },
       { 
-        url: '/carousel_images/img3.jpg', 
-        year: '1350 CE',
-        description: 'Early clown encounter turns ugly',
+        url: '/carousel_images/img8.jpg', 
+        year: '380 CE',
+        description: 'Pre-meme era patronage of the arts',
         curvePosition: 0.27,
         width: 1,
         height: 1,
@@ -94,9 +94,9 @@ class FloatingGallery extends THREE.Group {
         verticalOffset: 0.5
       },
       { 
-        url: '/carousel_images/img4.jpg', 
-        year: '2010',
-        description: 'Featured in popular manga series',
+        url: '/carousel_images/img13.jpg', 
+        year: '1100 CE',
+      description: 'Early Carpathian staking protocol',
         curvePosition: 0.37,
         width: 1,
         height: 1,
@@ -108,9 +108,9 @@ class FloatingGallery extends THREE.Group {
 
       },
       { 
-        url: '/carousel_images/img5.jpg', 
-        year: '2031',
-        description: 'Laying down DeFi Beats',
+        url: '/carousel_images/img3.jpg', 
+        year: '1350 CE',
+        description: 'Early clown encounter turns ugly',
         curvePosition: 0.46,
         width: 1,
         height: 1,
@@ -122,9 +122,9 @@ class FloatingGallery extends THREE.Group {
 
       },
       { 
-        url: '/carousel_images/img6.jpg', 
-        year: '2077',
-        description: 'Autonomous artisans provide laser-inscripted devotions',
+        url: '/carousel_images/img9.jpg', 
+        year: '1680',
+        description: 'Monetary theory for a young privateer',
         curvePosition: 0.55,
         width: 1.3,
         height: 1.3,
@@ -135,9 +135,9 @@ class FloatingGallery extends THREE.Group {
 
       },
       { 
-        url: '/carousel_images/img13.jpg', 
-        year: '1100 CE',
-      description: 'Early Carpathian staking protocol',
+        url: '/carousel_images/img11.jpg', 
+        year: '1790',
+        description: 'Heroine of Mythology',
         curvePosition: 0.66,
         width: 1.4,
         height: 1.4,
@@ -148,9 +148,9 @@ class FloatingGallery extends THREE.Group {
 
       },
       { 
-        url: '/carousel_images/img8.jpg', 
-        year: '380 CE',
-        description: 'Pre-meme era patronage of the arts',
+     url: '/carousel_images/img4.jpg', 
+        year: '2010',
+        description: 'Featured in popular manga series',
         curvePosition: 0.74,
         width: 1.2,
         height: 1.2,
@@ -161,9 +161,9 @@ class FloatingGallery extends THREE.Group {
 
       },
       { 
-        url: '/carousel_images/img9.jpg', 
-        year: '1680',
-        description: 'Monetary theory for a young privateer',
+        url: '/carousel_images/img5.jpg', 
+        year: '2031',
+        description: 'Laying down DeFi Beats',
         curvePosition: 0.83,
         width: 1,
         height: 1,
@@ -174,9 +174,9 @@ class FloatingGallery extends THREE.Group {
         rotateZ: 0                      // No vertical flip needed
       },
       { 
-        url: '/carousel_images/img11.jpg', 
-        year: '1790',
-        description: 'Heroine of Mythology',
+       url: '/carousel_images/img6.jpg', 
+        year: '2077',
+        description: 'Autonomous artisans provide laser-inscripted devotions',
         curvePosition: 0.98,
         width: 1,
         height: 1,

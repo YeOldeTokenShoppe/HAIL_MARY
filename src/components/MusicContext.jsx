@@ -256,9 +256,8 @@ export const MusicProvider = ({ children }) => {
       const playlist = is80sMode ? eightyTracks : non80sTracks;
       if (playlist.length > 0) {
         let index = 0;
-        // For non-80s mode, always preload Utopia (index 0) as the first track
-        // For 80s mode, use shuffle if enabled
-        if (isShuffled && is80sMode) {
+        // Use random starting track if shuffle is enabled
+        if (isShuffled) {
           index = Math.floor(Math.random() * playlist.length);
         }
         
@@ -339,10 +338,9 @@ export const MusicProvider = ({ children }) => {
           // Fallback: Load from Firebase Storage
           const playlist = is80sMode ? eightyTracks : non80sTracks;
           let startIndex = 0;
-          
-          // For non-80s mode, always start with Utopia (index 0) as the first track
-          // For 80s mode, use shuffle if enabled
-          if (isShuffled && playlist.length > 0 && is80sMode) {
+
+          // Use random starting track if shuffle is enabled
+          if (isShuffled && playlist.length > 0) {
             startIndex = Math.floor(Math.random() * playlist.length);
           }
           

@@ -6,7 +6,8 @@ class AgentChatManager {
     this.isActive = false;
     this.intervals = {};
     this.lastTriggerTimes = {};
-    
+    this.scoringMode = false; // Enable scoring mode by default when ready
+
     // Sequential agent workflow configuration (EMO → TEKNO → MACRO → RL80)
     this.agentConfig = {
       'EMO': {
@@ -44,12 +45,28 @@ class AgentChatManager {
       lastWorkflowStart: null,
       agentResponses: {
         'EMO': null,
-        'TEKNO': null, 
+        'TEKNO': null,
         'MACRO': null,
         'RL80': null
       },
+      // Scoring mode outputs
+      agentScores: {
+        'EMO': null,
+        'TEKNO': null,
+        'MACRO': null
+      },
+      lastDecision: null,
       isWorkflowRunning: false
     };
+  }
+
+  /**
+   * Enable or disable scoring mode
+   * @param {boolean} enabled - Whether to enable scoring mode
+   */
+  setScoringMode(enabled) {
+    this.scoringMode = enabled;
+    console.log(`🎯 Scoring mode ${enabled ? 'enabled' : 'disabled'}`);
   }
 
   // Start the agent chat system with sequential workflow
@@ -111,60 +128,210 @@ class AgentChatManager {
       return;
     }
 
-    console.log('🔄 Starting agent analysis workflow...');
+    const workflowType = this.scoringMode ? 'Scoring' : 'Sequential';
+    console.log(`🔄 Starting ${workflowType} agent analysis workflow...`);
     this.workflowState.isWorkflowRunning = true;
     this.workflowState.lastWorkflowStart = Date.now();
-    
-    // Reset agent responses
+
+    // Reset agent responses and scores
     Object.keys(this.workflowState.agentResponses).forEach(agent => {
       this.workflowState.agentResponses[agent] = null;
     });
+    Object.keys(this.workflowState.agentScores).forEach(agent => {
+      this.workflowState.agentScores[agent] = null;
+    });
 
     try {
-      // Step 1: EMO (Sentiment Analysis)
-      console.log('📍 Step 1/4: EMO starting sentiment analysis...');
-      this.workflowState.currentAgent = 'EMO';
-      const emoResponse = await this.triggerAgent('EMO', true);
-      this.workflowState.agentResponses.EMO = emoResponse;
-      
-      // Wait 30 seconds for EMO to complete
-      await this.delay(30000);
-      
-      // Step 2: TEKNO (Technical Analysis)
-      console.log('📍 Step 2/4: TEKNO starting technical analysis...');
-      this.workflowState.currentAgent = 'TEKNO';
-      const teknoResponse = await this.triggerAgent('TEKNO', true);
-      this.workflowState.agentResponses.TEKNO = teknoResponse;
-      
-      // Wait 30 seconds for TEKNO to complete
-      await this.delay(30000);
-      
-      // Step 3: MACRO (Macroeconomic Analysis)
-      console.log('📍 Step 3/4: MACRO starting macro analysis...');
-      this.workflowState.currentAgent = 'MACRO';
-      const macroResponse = await this.triggerAgent('MACRO', true);
-      this.workflowState.agentResponses.MACRO = macroResponse;
-      
-      // Wait 30 seconds for MACRO to complete
-      await this.delay(30000);
-      
-      // Step 4: RL80 (Final Trading Decision)
-      console.log('📍 Step 4/4: RL80 making final trading decision...');
-      this.workflowState.currentAgent = 'RL80';
-      const rl80Response = await this.triggerAgentWithContext('RL80', {
-        emoAnalysis: this.workflowState.agentResponses.EMO,
-        teknoAnalysis: this.workflowState.agentResponses.TEKNO,
-        macroAnalysis: this.workflowState.agentResponses.MACRO
-      });
-      this.workflowState.agentResponses.RL80 = rl80Response;
-      
+      if (this.scoringMode) {
+        await this.runScoringWorkflow();
+      } else {
+        await this.runSequentialWorkflow();
+      }
+
       console.log('✅ Agent workflow completed successfully!');
-      
+
     } catch (error) {
       console.error('❌ Agent workflow failed:', error);
     } finally {
       this.workflowState.isWorkflowRunning = false;
       this.workflowState.currentAgent = null;
+    }
+  }
+
+  // Run scoring mode workflow
+  async runScoringWorkflow() {
+    // Step 1: EMO (Sentiment Analysis with Scoring)
+    console.log('📍 Step 1/4: EMO starting sentiment analysis (scoring mode)...');
+    this.workflowState.currentAgent = 'EMO';
+    const emoResult = await this.triggerAgentWithScoring('EMO');
+    this.workflowState.agentResponses.EMO = emoResult?.message;
+    this.workflowState.agentScores.EMO = emoResult?.scoreOutput;
+
+    await this.delay(30000);
+
+    // Step 2: TEKNO (Technical Analysis with Scoring)
+    console.log('📍 Step 2/4: TEKNO starting technical analysis (scoring mode)...');
+    this.workflowState.currentAgent = 'TEKNO';
+    const teknoResult = await this.triggerAgentWithScoring('TEKNO');
+    this.workflowState.agentResponses.TEKNO = teknoResult?.message;
+    this.workflowState.agentScores.TEKNO = teknoResult?.scoreOutput;
+
+    await this.delay(30000);
+
+    // Step 3: MACRO (Macroeconomic Analysis with Scoring)
+    console.log('📍 Step 3/4: MACRO starting macro analysis (scoring mode)...');
+    this.workflowState.currentAgent = 'MACRO';
+    const macroResult = await this.triggerAgentWithScoring('MACRO');
+    this.workflowState.agentResponses.MACRO = macroResult?.message;
+    this.workflowState.agentScores.MACRO = macroResult?.scoreOutput;
+
+    await this.delay(30000);
+
+    // Step 4: RL80 (Final Trading Decision using all scores)
+    console.log('📍 Step 4/4: RL80 making final trading decision (scoring mode)...');
+    this.workflowState.currentAgent = 'RL80';
+    const rl80Result = await this.triggerRL80WithScores();
+    this.workflowState.agentResponses.RL80 = rl80Result?.message;
+    this.workflowState.lastDecision = rl80Result?.decisionOutput;
+  }
+
+  // Run original sequential workflow (non-scoring)
+  async runSequentialWorkflow() {
+    // Step 1: EMO (Sentiment Analysis)
+    console.log('📍 Step 1/4: EMO starting sentiment analysis...');
+    this.workflowState.currentAgent = 'EMO';
+    const emoResponse = await this.triggerAgent('EMO', true);
+    this.workflowState.agentResponses.EMO = emoResponse;
+
+    await this.delay(30000);
+
+    // Step 2: TEKNO (Technical Analysis)
+    console.log('📍 Step 2/4: TEKNO starting technical analysis...');
+    this.workflowState.currentAgent = 'TEKNO';
+    const teknoResponse = await this.triggerAgent('TEKNO', true);
+    this.workflowState.agentResponses.TEKNO = teknoResponse;
+
+    await this.delay(30000);
+
+    // Step 3: MACRO (Macroeconomic Analysis)
+    console.log('📍 Step 3/4: MACRO starting macro analysis...');
+    this.workflowState.currentAgent = 'MACRO';
+    const macroResponse = await this.triggerAgent('MACRO', true);
+    this.workflowState.agentResponses.MACRO = macroResponse;
+
+    await this.delay(30000);
+
+    // Step 4: RL80 (Final Trading Decision)
+    console.log('📍 Step 4/4: RL80 making final trading decision...');
+    this.workflowState.currentAgent = 'RL80';
+    const rl80Response = await this.triggerAgentWithContext('RL80', {
+      emoAnalysis: this.workflowState.agentResponses.EMO,
+      teknoAnalysis: this.workflowState.agentResponses.TEKNO,
+      macroAnalysis: this.workflowState.agentResponses.MACRO
+    });
+    this.workflowState.agentResponses.RL80 = rl80Response;
+  }
+
+  // Trigger agent with scoring mode
+  async triggerAgentWithScoring(agent) {
+    try {
+      const now = Date.now();
+
+      console.log(`🎯 Triggering ${agent} agent (scoring mode)...`);
+
+      const response = await fetch('/api/agent-chat-service', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          agent,
+          force: true,
+          scoringMode: true
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log(`✅ ${agent} scored:`, result.scores?.length, 'assets');
+        this.lastTriggerTimes[agent] = now;
+
+        // Dispatch custom event for UI updates
+        window.dispatchEvent(new CustomEvent('agentChatUpdate', {
+          detail: {
+            agent,
+            message: result.message,
+            type: result.type,
+            sentiment: result.sentiment,
+            timestamp: result.timestamp,
+            scores: result.scores,
+            scoringMode: true
+          }
+        }));
+
+        return result;
+      } else {
+        console.warn(`⚠️ ${agent} scoring failed:`, result.error);
+        return null;
+      }
+
+    } catch (error) {
+      console.error(`❌ Error triggering ${agent} (scoring):`, error);
+      return null;
+    }
+  }
+
+  // Trigger RL80 with collected scores
+  async triggerRL80WithScores() {
+    try {
+      const now = Date.now();
+
+      console.log('🎯 Triggering RL80 with analyst scores...');
+
+      const response = await fetch('/api/agent-chat-service', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          agent: 'RL80',
+          force: true,
+          scoringMode: true,
+          analystScores: this.workflowState.agentScores,
+          portfolioState: {} // Could be populated with actual portfolio data
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log(`✅ RL80 decision:`, result.decision?.summary);
+        this.lastTriggerTimes['RL80'] = now;
+
+        // Dispatch custom event with trading decision
+        window.dispatchEvent(new CustomEvent('agentChatUpdate', {
+          detail: {
+            agent: 'RL80',
+            message: result.message,
+            type: result.type,
+            sentiment: result.sentiment,
+            timestamp: result.timestamp,
+            isTradingDecision: true,
+            decision: result.decision,
+            scoringMode: true
+          }
+        }));
+
+        return result;
+      } else {
+        console.warn('⚠️ RL80 decision failed:', result.error);
+        return null;
+      }
+
+    } catch (error) {
+      console.error('❌ Error triggering RL80 with scores:', error);
+      return null;
     }
   }
 
@@ -328,14 +495,51 @@ class AgentChatManager {
   updateAgentInterval(agent, newInterval) {
     if (this.agentConfig[agent]) {
       this.agentConfig[agent].interval = newInterval;
-      
+
       // Restart the agent with new interval
       if (this.isActive) {
         this.startAgent(agent);
       }
-      
+
       console.log(`🔄 Updated ${agent} interval to ${newInterval/1000}s`);
     }
+  }
+
+  // Get last decision (scoring mode)
+  getLastDecision() {
+    return this.workflowState.lastDecision;
+  }
+
+  // Get all agent scores from last workflow
+  getAgentScores() {
+    return this.workflowState.agentScores;
+  }
+
+  // Check if scoring mode is enabled
+  isScoringModeEnabled() {
+    return this.scoringMode;
+  }
+
+  // Get workflow state summary
+  getWorkflowStateSummary() {
+    return {
+      isRunning: this.workflowState.isWorkflowRunning,
+      currentAgent: this.workflowState.currentAgent,
+      lastStart: this.workflowState.lastWorkflowStart
+        ? new Date(this.workflowState.lastWorkflowStart).toISOString()
+        : null,
+      hasScores: Object.values(this.workflowState.agentScores).some(s => s !== null),
+      hasDecision: this.workflowState.lastDecision !== null,
+      scoringMode: this.scoringMode
+    };
+  }
+
+  // Manually trigger scoring workflow
+  async triggerScoringWorkflow() {
+    if (!this.scoringMode) {
+      this.setScoringMode(true);
+    }
+    return this.startWorkflow();
   }
 }
 

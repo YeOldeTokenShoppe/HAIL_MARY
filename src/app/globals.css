@@ -6899,3 +6899,267 @@ div[data-three] {
 
 }
 
+/* ============ CLERK BUTTON ALIGNMENT FIXES ============ */
+
+/* Ensure the button containers can use flexbox */
+body .cl-profileSection__profile,
+body .cl-profileSection__username,
+body .cl-profileSection__danger,
+body .cl-profileSection__security {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+}
+
+/* Profile section buttons (UPDATE PROFILE, UPDATE USERNAME) - align right */
+body .cl-profileSection__profile .cl-profileSectionPrimaryButton,
+body .cl-profileSection__username .cl-profileSectionPrimaryButton {
+  margin-left: auto !important;
+  margin-right: 0 !important;
+  display: block !important;
+  width: fit-content !important;
+  align-self: flex-end !important;
+}
+
+/* Security/Delete section button (DELETE ACCOUNT) - keep left aligned */
+body .cl-profileSection__danger .cl-profileSectionPrimaryButton,
+body .cl-profileSection__security .cl-profileSectionPrimaryButton {
+  margin-left: 0 !important;
+  margin-right: auto !important;
+  display: block !important;
+  width: fit-content !important;
+  align-self: flex-start !important;
+}
+
+
+/*THIRDWEB*/
+.css-1d0ku7v {
+  border-radius: 0px !important;
+}
+
+/* ============ MOBILE RESPONSIVE CLERK STYLES ============ */
+
+/* Mobile optimizations for Clerk UserButton dropdown/modal */
+@media (max-width: 640px) {
+  /* Make the userButton popover card responsive */
+  body .cl-userButtonPopoverCard {
+    width: calc(100vw - 32px) !important;
+    max-width: calc(100vw - 32px) !important;
+    min-width: unset !important;
+    padding: 16px !important;
+    margin: 16px !important;
+    border-radius: 16px !important;
+  }
+
+  /* Reduce padding in the main content area */
+  body .cl-userButtonPopoverMain {
+    padding: 8px !important;
+  }
+
+  /* Compact the user preview section */
+  body .cl-userPreview {
+    padding: 8px !important;
+    gap: 8px !important;
+  }
+
+  /* Make avatar smaller on mobile */
+  body .cl-userButtonPopoverCard .cl-avatarBox {
+    width: 48px !important;
+    height: 48px !important;
+  }
+
+  /* Reduce font sizes slightly */
+  body .cl-userPreviewMainIdentifier {
+    font-size: 12px !important;
+  }
+
+  body .cl-userPreviewSecondaryIdentifier {
+    font-size: 10px !important;
+  }
+
+  /* Compact action buttons */
+  body .cl-userButtonPopoverActions {
+    padding: 4px !important;
+    gap: 2px !important;
+  }
+
+  body .cl-userButtonPopoverActionButton {
+    padding: 6px 10px !important;
+    font-size: 11px !important;
+  }
+
+  /* Reduce footer padding */
+  body .cl-userButtonPopoverFooter {
+    padding: 6px 10px !important;
+    margin-top: 6px !important;
+  }
+
+  /* Make profile sections more compact */
+  body .cl-profileSection {
+    padding: 6px !important;
+    margin-bottom: 4px !important;
+  }
+
+  body .cl-profileSectionTitle {
+    font-size: 11px !important;
+    margin-bottom: 6px !important;
+  }
+
+  /* Compact form fields */
+  body .cl-formFieldRow {
+    gap: 4px !important;
+    margin-bottom: 8px !important;
+  }
+
+  body .cl-formFieldInput {
+    padding: 8px 10px !important;
+    font-size: 12px !important;
+  }
+
+  /* Reduce button sizes and align based on section */
+  body .cl-profileSectionPrimaryButton {
+    font-size: 9px !important;
+    padding: 5px 10px !important;
+  }
+
+  body .cl-profileSection__profile .cl-profileSectionPrimaryButton, body .cl-profileSection__username .cl-profileSectionPrimaryButton {
+    position: relative;
+    right: 15%;
+  }
+
+  body .cl-profileSection__danger .cl-profileSectionPrimaryButton, body .cl-profileSection__security .cl-profileSectionPrimaryButton {
+    position: relative;
+    left: 15%;
+  }
+
+  body .cl-profileSection__profile .cl-profileSectionPrimaryButton, body .cl-profileSection__username .cl-profileSectionPrimaryButton {
+    position: relative;
+    right: 15%;
+  }
+
+  /* Ensure the button containers can use flexbox on mobile */
+  body .cl-profileSection__profile,
+  body .cl-profileSection__username,
+  body .cl-profileSection__danger,
+  body .cl-profileSection__security {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  /* Profile section buttons (UPDATE PROFILE, UPDATE USERNAME) - align right */
+  body .cl-profileSection__profile .cl-profileSectionPrimaryButton,
+  body .cl-profileSection__username .cl-profileSectionPrimaryButton {
+    margin-left: auto !important;
+    margin-right: 0 !important;
+    display: block !important;
+    width: fit-content !important;
+    align-self: flex-end !important;
+  }
+
+  /* Security/Delete section button (DELETE ACCOUNT) - keep left aligned */
+  body .cl-profileSection__danger .cl-profileSectionPrimaryButton,
+  body .cl-profileSection__security .cl-profileSectionPrimaryButton {
+    margin-left: 0 !important;
+    margin-right: auto !important;
+    display: block !important;
+    width: fit-content !important;
+    align-self: flex-start !important;
+  }
+
+  /* Make the scroll box more compact */
+  body .cl-scrollBox {
+    padding: 0 !important;
+  }
+
+  body .cl-pageScrollBox {
+    padding: 8px !important;
+  }
+
+  /* Prevent horizontal overflow */
+  body .cl-userButtonPopoverCard,
+  body .cl-userButtonPopoverCard * {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Ensure text wraps properly */
+  body .cl-profileSectionContent {
+    overflow-x: hidden !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  /* Compact navbar */
+  /* body .cl-navbar {
+    padding: 6px 10px !important;
+    padding-bottom: 60px !important;
+  } */
+
+  /* Make sign in/up modals more mobile-friendly */
+  body .cl-signIn-root,
+  body .cl-signUp-root {
+    width: calc(100vw - 32px) !important;
+    max-width: calc(100vw - 32px) !important;
+  }
+
+  body .cl-card.cl-signIn-start,
+  body .cl-card.cl-signUp-start {
+    padding: 16px !important;
+  }
+
+  /* Adjust main card on mobile */
+  body .cl-card {
+    padding: 16px !important;
+    border-radius: 16px !important;
+  }
+
+  /* Make the root box fit mobile screens */
+  body .cl-rootBox,
+  body .cl-cardBox {
+    max-width: calc(100vw - 32px) !important;
+    margin: 16px auto !important;
+  }
+
+  /* User profile modal mobile adjustments */
+  body .cl-userProfile-root {
+    width: calc(100vw - 32px) !important;
+    max-width: calc(100vw - 32px) !important;
+    flex-direction: column !important;
+  }
+
+  body .cl-userProfile-root > div {
+    flex-direction: column !important;
+  }
+}
+
+/* Extra small mobile devices */
+@media (max-width: 375px) {
+  body .cl-userButtonPopoverCard {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    padding: 12px !important;
+    margin: 12px !important;
+  }
+
+  body .cl-userPreview {
+    flex-direction: column !important;
+    align-items: center !important;
+    text-align: center !important;
+  }
+
+  body .cl-userButtonPopoverCard .cl-avatarBox {
+    width: 40px !important;
+    height: 40px !important;
+  }
+
+  body .cl-userPreviewMainIdentifier {
+    font-size: 11px !important;
+  }
+
+  body .cl-userPreviewSecondaryIdentifier {
+    font-size: 9px !important;
+  }
+}
+

@@ -10,7 +10,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "scoring": "node src/trading/services/runScoringWorkflow.js",
+    "scoring:scheduled": "node src/trading/services/runScoringWorkflow.js --scheduled",
+    "scoring:health": "node src/trading/services/runScoringWorkflow.js --health"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.31.1",
@@ -22,7 +25,9 @@
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
     "ethers": "^5.8.0",
+    "dotenv": "^16.4.5",
     "firebase": "^12.1.0",
+    "firebase-admin": "^12.0.0",
     "framer-motion": "^12.23.22",
     "gsap": "^3.13.0",
     "html2canvas": "^1.4.1",

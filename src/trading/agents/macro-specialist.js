@@ -1,9 +1,13 @@
 /**
  * Macro Specialist - Global Economics Expert
- * 
+ *
  * This agent analyzes global economic factors, central bank policies,
  * and macro trends affecting crypto markets.
  */
+
+import { buildScoringPrompt } from './configs/enhancedPromptBuilder.js';
+import { parseScoreResponse, generateMacroFallbackScores } from '../utils/scoreParser.js';
+import { createAnalystScoreOutput } from '../types/scoring.js';
 
 // ============================================================================
 // PERSONALITY CONFIGURATION
@@ -352,6 +356,97 @@ export async function callMacroSpecialist(context, apiKey) {
   }
   
   return data.content[0].text;
+}
+
+// ============================================================================
+// SCORING MODE FUNCTION
+// ============================================================================
+
+/**
+ * Call Macro Specialist with scoring output
+ * Returns structured scores for all assets along with text response
+ * @param {Object} context - Trading context with market data
+ * @param {string} apiKey - Anthropic API key
+ * @returns {AnalystScoreOutput}
+ */
+export async function callMacroSpecialistWithScoring(context, apiKey) {
+  const scoringPrompt = await buildScoringPrompt('MACRO', context, context.lastMessages || []);
+
+  console.log('MACRO (Scoring Mode) analyzing:', {
+    dxy: context.marketData?.dxy,
+    vix: context.marketData?.vix,
+    treasury10Y: context.marketData?.treasury10Y
+  });
+
+  try {
+    // Add 30 second timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: MACRO_SPECIALIST_CONFIG.model,
+        system: scoringPrompt.systemPrompt,
+        messages: [
+          { role: 'user', content: scoringPrompt.userPrompt }
+        ],
+        max_tokens: scoringPrompt.maxTokens,
+        temperature: scoringPrompt.temperature
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`API responded with status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const rawResponse = data.content?.[0]?.text;
+
+    if (!rawResponse) {
+      throw new Error('Empty response from Anthropic');
+    }
+
+    // Parse the response to extract scores
+    const parseResult = parseScoreResponse(rawResponse, 'MACRO', {
+      marketData: context.marketData,
+      timestamp: Date.now()
+    });
+
+    if (parseResult.success) {
+      console.log('MACRO scoring parsed successfully:', parseResult.output.scores.length, 'scores');
+      return parseResult.output;
+    } else {
+      console.warn('MACRO scoring parse failed, using fallback:', parseResult.error);
+      return parseResult.output;
+    }
+
+  } catch (error) {
+    // Fallback with macro-based scores
+    console.log('MACRO API failed, generating fallback scores:', error.message);
+
+    const fallbackScores = generateMacroFallbackScores(context.marketData);
+    const fallbackText = generateMacroResponse(context.marketData) || 'Macro analysis pending.';
+
+    return createAnalystScoreOutput(
+      'MACRO',
+      fallbackScores,
+      fallbackText,
+      {
+        fallback: true,
+        error: error.message,
+        marketData: context.marketData
+      }
+    );
+  }
 }
 
 export default MACRO_SPECIALIST_CONFIG;

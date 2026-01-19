@@ -1,9 +1,16 @@
 /**
  * RL80 Trader - Lead Trading AI
- * 
+ *
  * The decision-making head trader that synthesizes input from all team members
  * and executes trading strategies with proper risk management.
  */
+
+import { ANALYST_WEIGHTS, TRADEABLE_ASSETS, isTradeableAsset, getPerpSymbol } from '../config/scoring-config.js';
+import { aggregateScores, runShadowTests, compareShadowResults } from '../services/scoreAggregator.js';
+import { calculatePositionRecommendations, summarizeRecommendations, getTradeableRecommendations } from '../services/positionSizer.js';
+import { enforceRiskLimits, formatRiskSummary, calculatePortfolioState } from '../services/riskManager.js';
+import { logDecision, logAnalystScores } from '../services/decisionLogger.js';
+import { getActionFromScore, interpretDirectionScore } from '../types/scoring.js';
 
 // ============================================================================
 // PERSONALITY CONFIGURATION
@@ -474,6 +481,202 @@ export function callRL80Trader(context, teamMessages, teamAnalysis = null) {
   });
   
   return generateRL80Response(context, teamMessages, teamAnalysis);
+}
+
+// ============================================================================
+// SCORING MODE DECISION ENGINE
+// ============================================================================
+
+/**
+ * Generate RL80 trading decision using scoring system
+ * Aggregates analyst scores, calculates positions, applies risk limits
+ * @param {Object} context - Trading context with market data
+ * @param {Object} analystScores - { EMO: AnalystScoreOutput, TEKNO: ..., MACRO: ... }
+ * @param {Object} portfolioState - Current portfolio state for risk checks
+ * @returns {Object} - Full decision object with recommendations and text summary
+ */
+export async function generateRL80ScoringDecision(context, analystScores, portfolioState = {}) {
+  const { marketData } = context;
+  const timestamp = Date.now();
+
+  console.log('RL80 (Scoring Mode) synthesizing team analysis...');
+
+  // Step 1: Aggregate scores from all analysts
+  const aggregatedScores = aggregateScores(analystScores, ANALYST_WEIGHTS);
+
+  console.log('Aggregated scores:', aggregatedScores.map(s => ({
+    asset: s.asset,
+    direction: s.weightedDirection.toFixed(2),
+    confidence: (s.weightedConfidence * 100).toFixed(0) + '%'
+  })));
+
+  // Step 2: Calculate position recommendations
+  const rawRecommendations = calculatePositionRecommendations(aggregatedScores);
+
+  // Step 3: Run shadow tests (for logging, not execution)
+  const shadowTestResults = runShadowTests(analystScores);
+
+  // Step 4: Apply risk limits
+  const portfolioForRisk = calculatePortfolioState(portfolioState.positions || []);
+  portfolioForRisk.dailyPnL = portfolioState.dailyPnL || 0;
+
+  const { adjustedRecommendations, riskSummary, anyAdjustments } = enforceRiskLimits(
+    rawRecommendations,
+    portfolioForRisk
+  );
+
+  if (anyAdjustments) {
+    console.log('Risk adjustments applied:', formatRiskSummary(riskSummary));
+  }
+
+  // Step 5: Get tradeable recommendations only
+  const tradeableRecommendations = getTradeableRecommendations(adjustedRecommendations);
+
+  // Step 6: Generate text summary for chat display
+  const textSummary = generateDecisionTextSummary(
+    aggregatedScores,
+    adjustedRecommendations,
+    tradeableRecommendations,
+    marketData,
+    anyAdjustments
+  );
+
+  // Step 7: Log decisions to Firebase
+  for (const rec of adjustedRecommendations) {
+    const aggregatedForAsset = aggregatedScores.find(s => s.asset === rec.asset);
+
+    try {
+      await logDecision({
+        asset: rec.asset,
+        analystOutputs: analystScores,
+        aggregatedScore: aggregatedForAsset,
+        recommendation: rec,
+        shadowTests: shadowTestResults,
+        marketData
+      });
+    } catch (error) {
+      console.error(`Failed to log decision for ${rec.asset}:`, error.message);
+    }
+  }
+
+  // Step 8: Compare shadow results
+  const shadowComparison = compareShadowResults(aggregatedScores, shadowTestResults);
+
+  // Return full decision structure
+  return {
+    timestamp,
+    textResponse: textSummary,
+    aggregatedScores,
+    recommendations: adjustedRecommendations,
+    tradeableRecommendations,
+    shadowTests: shadowTestResults,
+    shadowComparison,
+    riskSummary,
+    summary: summarizeRecommendations(adjustedRecommendations),
+    metadata: {
+      weights: ANALYST_WEIGHTS,
+      riskAdjusted: anyAdjustments,
+      marketData: {
+        btcPrice: marketData?.btcPrice,
+        fearGreed: marketData?.fearGreed,
+        vix: marketData?.vix
+      }
+    }
+  };
+}
+
+/**
+ * Generate text summary for chat display
+ */
+function generateDecisionTextSummary(aggregatedScores, recommendations, tradeableRecs, marketData, riskAdjusted) {
+  const config = RL80_TRADER_CONFIG;
+  let summary = '';
+
+  // Find the strongest conviction tradeable asset
+  const sortedTradeable = tradeableRecs.sort((a, b) =>
+    Math.abs(b.sizePercent) - Math.abs(a.sizePercent)
+  );
+
+  if (sortedTradeable.length === 0) {
+    // No positions to take
+    summary = config.responsePatterns.mixed_signals[
+      Math.floor(Math.random() * config.responsePatterns.mixed_signals.length)
+    ];
+
+    // Add specific reasoning
+    const topAggregated = aggregatedScores
+      .sort((a, b) => Math.abs(b.weightedDirection) - Math.abs(a.weightedDirection))[0];
+
+    if (topAggregated) {
+      const interpretation = interpretDirectionScore(topAggregated.weightedDirection);
+      summary += ` ${topAggregated.asset}: ${interpretation} signal but below threshold.`;
+    }
+
+    return summary;
+  }
+
+  // We have positions to take
+  const primaryRec = sortedTradeable[0];
+  const primaryAgg = aggregatedScores.find(s => s.asset === primaryRec.asset);
+
+  // Determine consensus direction
+  const bullishCount = aggregatedScores.filter(s => s.weightedDirection > 2).length;
+  const bearishCount = aggregatedScores.filter(s => s.weightedDirection < -2).length;
+
+  if (bullishCount > bearishCount && primaryRec.direction === 'LONG') {
+    summary = config.responsePatterns.bullish_consensus[
+      Math.floor(Math.random() * config.responsePatterns.bullish_consensus.length)
+    ];
+  } else if (bearishCount > bullishCount && primaryRec.direction === 'SHORT') {
+    summary = config.responsePatterns.bearish_consensus[
+      Math.floor(Math.random() * config.responsePatterns.bearish_consensus.length)
+    ];
+  } else {
+    summary = config.responsePatterns.opportunity[
+      Math.floor(Math.random() * config.responsePatterns.opportunity.length)
+    ];
+  }
+
+  // Add specific details
+  summary += ` ${primaryRec.asset}-PERP ${primaryRec.direction} at ${(primaryRec.sizePercent * 100).toFixed(1)}%`;
+
+  if (primaryAgg) {
+    summary += ` (team score: ${primaryRec.direction === 'LONG' ? '+' : ''}${primaryAgg.weightedDirection.toFixed(1)}, `;
+    summary += `confidence: ${(primaryAgg.weightedConfidence * 100).toFixed(0)}%)`;
+  }
+
+  // Add risk note if adjustments were made
+  if (riskAdjusted) {
+    summary += ' [Risk-adjusted]';
+  }
+
+  // Mention secondary positions if any
+  if (sortedTradeable.length > 1) {
+    const secondary = sortedTradeable[1];
+    summary += ` Also watching ${secondary.asset}.`;
+  }
+
+  return summary;
+}
+
+/**
+ * Helper to get analyst breakdown for a specific asset
+ */
+export function getAnalystBreakdownForAsset(analystScores, asset) {
+  const breakdown = {};
+
+  for (const [agentId, output] of Object.entries(analystScores || {})) {
+    const assetScore = output?.scores?.find(s => s.asset === asset);
+    if (assetScore) {
+      breakdown[agentId] = {
+        direction: assetScore.direction,
+        confidence: assetScore.confidence,
+        rationale: assetScore.rationale
+      };
+    }
+  }
+
+  return breakdown;
 }
 
 export default RL80_TRADER_CONFIG;

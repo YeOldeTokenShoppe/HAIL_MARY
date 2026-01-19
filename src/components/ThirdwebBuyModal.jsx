@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { BuyWidget } from "thirdweb/react";
+import { BuyWidget, darkTheme } from "thirdweb/react";
 import { createThirdwebClient } from "thirdweb";
 import { defineChain } from "thirdweb/chains";
 import { useLanguage } from './LanguageProvider';
@@ -30,8 +30,8 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
   useEffect(() => {
     if (isOpen) {
       const interval = setInterval(() => {
-        setGlitchActive(true);
-        setTimeout(() => setGlitchActive(false), 200);
+        setGlitchActive(false);
+        setTimeout(() => setGlitchActive(false), 100);
       }, 3000);
       return () => clearInterval(interval);
     }
@@ -174,7 +174,7 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
         
         {/* Modal Content */}
         <div 
-          className={glitchActive ? 'modal-glitch' : ''}
+          // className={glitchActive ? 'modal-glitch' : ''}
           style={{
             position: 'relative',
             background: 'linear-gradient(135deg, #93276a, #3434a7)',
@@ -308,18 +308,18 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
             flexDirection: 'column',
             justifyContent: 'center',
             alignItems: 'center',
-            minHeight: isMobile ? '300px' : '400px',
-            padding: isMobile ? '15px' : '20px',
-            background: 'rgba(15, 10, 20, 0.8)',
-            border: '1px solid rgba(255, 24, 76, 0.3)',
-            clipPath: 'polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px))',
+            // minHeight: isMobile ? '300px' : '400px',
+            padding: isMobile ? '2px' : '3px',
+            // background: 'rgba(15, 10, 20, 0.8)',
+            // border: '1px solid rgba(255, 24, 76, 0.3)',
+            // clipPath: 'polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px))',
             position: 'relative',
           }}>
             {/* Corner Accents */}
             <div style={{
               position: 'absolute',
               top: '0',
-              left: '0',
+              left: '-8px',
               width: '20px',
               height: '20px',
               borderTop: '2px solid #fded00',
@@ -328,7 +328,7 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
             <div style={{
               position: 'absolute',
               top: '0',
-              right: '0',
+              right: '-8px',
               width: '20px',
               height: '20px',
               borderTop: '2px solid #fded00',
@@ -337,7 +337,7 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
             <div style={{
               position: 'absolute',
               bottom: '0',
-              left: '0',
+              left: '-8px',
               width: '20px',
               height: '20px',
               borderBottom: '2px solid #00e572',
@@ -346,7 +346,7 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
             <div style={{
               position: 'absolute',
               bottom: '0',
-              right: '0',
+              right: '-8px',
               width: '20px',
               height: '20px',
               borderBottom: '2px solid #00e572',
@@ -354,13 +354,27 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
             }} />
             
             <div suppressHydrationWarning>
-              <BuyWidget
-                client={client}
-                chain={defineChain(42161)} // Arbitrum One
-                // Add your token contract address when ready
-                // tokenAddress="0x..."
-                theme="dark"
-              />
+<BuyWidget
+style={{borderRadius: '0px'}}
+      theme={darkTheme({
+        colors: {
+          // modalBg: "hsl(50, 61%, 22%)",
+          // tertiaryBg: "hsl(0, 1%, 17%)",
+          // skeletonBg: "hsl(99, 44%, 23%)",
+          // accentButtonBg: "hsl(221, 87%, 41%)",
+          // accentButtonText: "hsl(0, 0%, 100%)",
+          // connectedButtonBg: "hsl(0, 85%, 4%)",
+          // borderColor: "hsl(0, 0%, 15%)",
+          // accentText: "hsl(0, 0%, 0%)",
+        },
+      })}
+      client={client}
+      description={"𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙"}
+      currency={"USD"}
+      chain={defineChain(42161)}
+      amount={"0.002"}
+      tokenEditable={false}
+    />
             </div>
           </div>
 

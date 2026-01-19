@@ -1,6 +1,6 @@
-# Agent Personality & Character System
+# Agent Personality & Scoring System
 
-A comprehensive system for establishing distinct personalities, knowledge bases, and character-driven responses for your trading agents.
+A comprehensive system for establishing distinct personalities, knowledge bases, character-driven responses, and **quantitative scoring** for your trading agents.
 
 ## 🎭 System Overview
 
@@ -9,24 +9,43 @@ Your trading agents now have:
 - **Specialized knowledge bases** with domain-specific expertise
 - **Dynamic personality injection** that adapts to market conditions
 - **Character-consistent responses** that maintain authenticity
+- **Quantitative scoring outputs** with direction scores (-10 to +10) and confidence levels (0-1)
+- **Weighted aggregation** for synthesized trading decisions
+- **Shadow testing** of alternative weight schemes
 
 ## 📁 File Structure
 
 ```
-src/trading/agents/configs/
-├── personalities/
-│   ├── emo-character.js      # EMO's complete personality profile
-│   ├── tekno-character.js    # TEKNO's character definition
-│   ├── macro-character.js    # MACRO's personality traits
-│   └── rl80-character.js     # RL80's decision framework
-├── knowledge/
-│   ├── emo-knowledge.json    # Sentiment analysis expertise
-│   ├── tekno-knowledge.json  # Technical analysis knowledge
-│   ├── macro-knowledge.json  # Economic/policy knowledge
-│   └── rl80-knowledge.json   # Risk management systems
-├── personalitySystem.js      # Core personality engine
-├── enhancedPromptBuilder.js  # Dynamic prompt construction
-└── agentInteractionGuidelines.md # Team interaction rules
+src/trading/
+├── agents/configs/
+│   ├── personalities/
+│   │   ├── emo-character.js      # EMO's complete personality profile
+│   │   ├── tekno-character.js    # TEKNO's character definition
+│   │   ├── macro-character.js    # MACRO's personality traits
+│   │   └── rl80-character.js     # RL80's decision framework
+│   ├── knowledge/
+│   │   ├── emo-knowledge.json    # Sentiment analysis expertise
+│   │   ├── tekno-knowledge.json  # Technical analysis knowledge
+│   │   ├── macro-knowledge.json  # Economic/policy knowledge
+│   │   └── rl80-knowledge.json   # Risk management systems
+│   ├── personalitySystem.js      # Core personality engine
+│   ├── enhancedPromptBuilder.js  # Dynamic prompt construction + scoring prompts
+│   └── agentInteractionGuidelines.md
+├── config/
+│   └── scoring-config.js         # Scoring system configuration
+├── types/
+│   └── scoring.js                # Type definitions for scores
+├── utils/
+│   └── scoreParser.js            # Parse JSON scores from LLM responses
+├── services/
+│   ├── scoringOrchestrator.js    # Server-side workflow orchestrator (Railway)
+│   ├── runScoringWorkflow.js     # CLI entry point for Railway
+│   ├── scoreAggregator.js        # Weighted score aggregation
+│   ├── positionSizer.js          # Position sizing from scores
+│   ├── riskManager.js            # Risk limit enforcement
+│   └── decisionLogger.js         # Firebase decision logging
+└── components/
+    └── PerformanceDashboard.jsx  # Live scoring metrics display
 ```
 
 ## 🚀 How to Use
@@ -88,6 +107,139 @@ export async function callYourAgent(context, apiKey) {
   });
 }
 ```
+
+---
+
+## 📊 Scoring System
+
+### Overview
+
+The scoring system converts qualitative agent analysis into quantitative trading signals:
+
+| Component | Range | Description |
+|-----------|-------|-------------|
+| Direction Score | -10 to +10 | Bearish (-10) to Bullish (+10) |
+| Confidence | 0 to 1 | Low (0) to High (1) certainty |
+| Assets | BTC, ETH, SOL, XRP | All analyzed assets |
+| Tradeable | BTC-PERP, ETH-PERP | Lighter DEX positions |
+
+### Scoring Workflow
+
+```
+EMO (Grok) → TEKNO (OpenAI) → MACRO (Claude) → RL80 (Aggregator)
+     ↓              ↓              ↓                  ↓
+  Scores         Scores         Scores          Decision
+     └──────────────┴──────────────┘                 │
+                    ↓                                │
+           scoreAggregator.js ←──────────────────────┘
+                    ↓
+           positionSizer.js
+                    ↓
+            riskManager.js
+                    ↓
+           decisionLogger.js → Firebase
+```
+
+### Running on Railway
+
+```bash
+# Single run (Railway cron job)
+npm run scoring
+
+# Scheduled (keeps process alive)
+npm run scoring:scheduled
+
+# Health check
+npm run scoring:health
+```
+
+### Configuration
+
+Edit `src/trading/config/scoring-config.js`:
+
+```javascript
+// Assets to analyze
+ASSETS: ['BTC', 'ETH', 'SOL', 'XRP']
+TRADEABLE_ASSETS: ['BTC', 'ETH']  // Only these can be traded
+
+// Agent weights (must sum to 1.0)
+ANALYST_WEIGHTS: {
+  EMO: 0.333,    // Sentiment
+  TEKNO: 0.333,  // Technical
+  MACRO: 0.334   // Macro
+}
+
+// Risk limits
+RISK_LIMITS: {
+  MAX_POSITION: 0.05,      // 5% max per position
+  MAX_HEAT: 0.15,          // 15% total portfolio exposure
+  MAX_DAILY_LOSS: 0.02,    // 2% daily loss limit
+  MIN_CONFIDENCE: 0.4      // Minimum confidence to trade
+}
+```
+
+### Shadow Testing
+
+Alternative weight schemes are logged (not executed) for future optimization:
+
+```javascript
+SHADOW_WEIGHTS: {
+  momentum_focused: { EMO: 0.2, TEKNO: 0.5, MACRO: 0.3 },
+  sentiment_focused: { EMO: 0.5, TEKNO: 0.25, MACRO: 0.25 },
+  macro_focused: { EMO: 0.2, TEKNO: 0.3, MACRO: 0.5 }
+}
+```
+
+### Firebase Collections
+
+| Collection | Purpose |
+|------------|---------|
+| `agentScores/` | Individual analyst scores per run |
+| `decisions/` | Full decision logs with recommendations |
+| `decisionOutcomes/` | P&L outcomes (filled when positions close) |
+
+### Adding Scoring to Agents
+
+Each agent has a scoring function:
+
+```javascript
+import { callSentimentOracleWithScoring } from './agents/sentiment-oracle.js';
+import { callMarketAnalystWithScoring } from './agents/market-analyst.js';
+import { callMacroSpecialistWithScoring } from './agents/macro-specialist.js';
+
+// Returns: { scores: [...], textResponse: "...", agentId: "EMO" }
+const result = await callSentimentOracleWithScoring(context, apiKey);
+```
+
+### Score Output Format
+
+```javascript
+{
+  agentId: "EMO",
+  timestamp: 1705600000000,
+  scores: [
+    { asset: "BTC", direction: 6, confidence: 0.75, rationale: "..." },
+    { asset: "ETH", direction: 4, confidence: 0.65, rationale: "..." }
+  ],
+  textResponse: "Vibes are bullish...",
+  metadata: { fearGreed: 72, ... }
+}
+```
+
+### Decision Output Format
+
+```javascript
+{
+  timestamp: 1705600000000,
+  recommendations: [
+    { asset: "BTC", action: "LONG", direction: 5.2, sizePercent: 0.03, ... }
+  ],
+  summary: { tradeable: 2, totalHeat: 8.5 },
+  shadowComparison: { momentum_focused: {...}, ... }
+}
+```
+
+---
 
 ## 🎯 Character Profiles
 
@@ -262,12 +414,20 @@ const slangTerms = getCharacterVocabulary('EMO', 'slang');
 
 ## 🔮 Future Enhancements
 
-Potential additions to the system:
-- Real-time personality learning
-- Market regime detection
-- Dynamic knowledge updates
-- Cross-agent relationship evolution
-- Performance-based personality adaptation
+**Implemented:**
+- [x] Quantitative scoring system (-10 to +10)
+- [x] Weighted score aggregation
+- [x] Position sizing from conviction
+- [x] Risk management enforcement
+- [x] Shadow testing of weight schemes
+- [x] Firebase decision logging
+
+**Planned:**
+- [ ] Outcome tracking (fill P&L when positions close)
+- [ ] Weight optimization from shadow test results
+- [ ] Analyst accuracy tracking
+- [ ] Regime-based weight switching
+- [ ] ML-based score calibration
 
 ## 💡 Pro Tips
 

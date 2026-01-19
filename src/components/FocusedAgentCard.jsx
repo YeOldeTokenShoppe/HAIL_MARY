@@ -40,6 +40,10 @@ const FocusedAgentCard = ({ agentId, onClose }) => {
       agentData={agentData}
       onClose={onClose}
       className="focused-card"
+                                                
+    // latestScores={scoresFromFirebase}                                      
+    // latestDecision={decisionFromFirebase}                                  
+    // latestThesis={latestChatMessage}   
     />
   );
 };
