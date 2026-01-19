@@ -58,9 +58,14 @@ const hasRequiredEnvironmentVariables = () => {
 try {
   // Only initialize Firebase in the browser environment
   if (!isBrowser) {
-    console.log("🌍 Skipping Firebase initialization on server side");
-    throw new Error('Firebase initialization skipped on server');
-  }
+    console.log("🌍 Skipping Firebase client initialization on server side (use firebaseAdmin for API routes)");
+    // Don't throw - let services be null and let consuming code handle it
+    app = null;
+    db = null;
+    auth = null;
+    storage = null;
+    rtdb = null;
+  } else {
   
   // First check if we have the required environment variables
   if (!hasRequiredEnvironmentVariables()) {
@@ -105,7 +110,8 @@ try {
     testCollection: !!testCollection,
     projectId: app.options.projectId
   });
-  
+  } // Close the else block for isBrowser check
+
 } catch (error) {
   console.error("❌ CRITICAL: Error initializing Firebase:", error);
   console.error("❌ Firebase initialization details:", {
