@@ -91,3 +91,7 @@ env:
     availability:
       - BUILD
       - RUNTIME
+  - variable: GROK_API_KEY
+    secret: GROK_API_KEY
+  - variable: ANTHROPIC_API_KEY
+    secret: ANTHROPIC_API_KEY

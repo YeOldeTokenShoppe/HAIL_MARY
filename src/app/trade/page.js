@@ -595,7 +595,7 @@ export default function CyborgTemple() {
                 textAlign: "center",
                 fontStyle: "italic",
               }}>
-                Featuring 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙 and the 3 Wise Mechs
+                Featuring 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙 and the 3 Wise Cyborgs
               </p>
               
               {!isMobileView && (
@@ -606,7 +606,7 @@ export default function CyborgTemple() {
                   margin: 0,
                   marginBottom: "1rem",
                 }}>
-                  The Virtual Mary (more 'trade life' than trad wife) is learning to trade perpetuals. 
+                  The Virtual Mary is more ito 'trade life' than trad wife, and she's learning to trade perpetuals with her team. 
                   Once she hits 100+ trades with a 60%+ win rate and keeps drawdown under 
                   15% for 30 days, the team ascends to the mainnet.
                 </p>
