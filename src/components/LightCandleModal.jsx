@@ -378,21 +378,20 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
       
       let docRef = null;
       try {
-        // First, verify Firebase is properly initialized (not a dummy)
-        if (!db || db._isDummy) {
+        // First, verify Firebase is properly initialized
+        if (!db) {
           throw new Error('Firebase Firestore is not properly initialized. Please refresh the page and try again.');
         }
-        
+
         // Test Firestore connectivity by creating a collection reference
         const testCollection = collection(db, 'test');
         if (!testCollection) {
           throw new Error('Firebase Firestore collection function is not working properly.');
         }
-        
+
         // Test Firestore connectivity
         console.log('✅ Firebase DB status:', {
           db: !!db,
-          isDummy: !!db._isDummy,
           testCollection: !!testCollection,
           hasAddDoc: typeof addDoc === 'function'
         });

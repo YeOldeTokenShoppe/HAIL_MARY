@@ -115,116 +115,14 @@ try {
     isBrowser,
     configProjectId: firebaseConfig.projectId
   });
-  
+
   // Set services to null when initialization fails
+  // Components should check for null/undefined before using Firebase
   app = null;
   db = null;
   auth = null;
   storage = null;
   rtdb = null;
-}
-
-// Create dummy implementations for when Firebase is unavailable
-// This helps prevent errors when Firebase fails to initialize
-if (!db) {
-  if (isBrowser) {
-    console.warn("⚠️ CRITICAL: Creating dummy Firebase implementations - DATA WILL NOT BE SAVED!");
-    console.warn("⚠️ This means Firebase failed to initialize in the browser. Check the error above and your environment variables.");
-  }
-  
-  // Create a more comprehensive dummy implementation
-  const dummySnapshot = {
-    empty: true,
-    size: 0,
-    docs: [],
-    forEach: (callback) => {},
-    map: () => [],
-    exists: () => false,
-    data: () => ({}),
-    id: 'dummy-id'
-  };
-  
-  // Dummy promise resolution functions for Firestore
-  const dummyPromiseReturns = {
-    get: () => Promise.resolve(dummySnapshot),
-    set: () => Promise.resolve(),
-    update: () => Promise.resolve(),
-    delete: () => Promise.resolve(),
-    add: () => Promise.resolve({ id: 'dummy-id' }),
-    where: () => dummyPromiseReturns,
-    orderBy: () => dummyPromiseReturns,
-    limit: () => dummyPromiseReturns,
-    doc: () => dummyPromiseReturns,
-    collection: () => dummyPromiseReturns,
-    getDocs: () => Promise.resolve(dummySnapshot),
-    getDoc: () => Promise.resolve(dummySnapshot),
-    addDoc: () => Promise.resolve({ id: 'dummy-id' }),
-    setDoc: () => Promise.resolve(),
-    deleteDoc: () => Promise.resolve(),
-    updateDoc: () => Promise.resolve(),
-    writeBatch: () => ({
-      set: () => {},
-      update: () => {},
-      delete: () => {},
-      commit: () => Promise.resolve()
-    }),
-    onSnapshot: () => {
-      // Return a function that can be called to unsubscribe
-      return () => {};
-    },
-    withConverter: () => dummyPromiseReturns
-  };
-  
-  // Create comprehensive dummy implementations
-  db = {
-    collection: () => dummyPromiseReturns,
-    doc: () => dummyPromiseReturns,
-    batch: () => ({
-      set: () => {},
-      update: () => {},
-      delete: () => {},
-      commit: () => Promise.resolve()
-    }),
-    runTransaction: () => Promise.resolve()
-  };
-  
-  // Mark the db as a dummy for runtime detection
-  db._isDummy = true;
-  
-  // Extend the global Firebase namespace to include these functions
-  if (typeof window !== 'undefined') {
-    window.firebase = {
-      firestore: {
-        serverTimestamp: () => new Date()
-      }
-    };
-  }
-  
-  auth = {
-    onAuthStateChanged: (callback) => {
-      callback(null);
-      return () => {};
-    },
-    signInWithCustomToken: () => Promise.resolve({ user: null }),
-    currentUser: null
-  };
-  
-  storage = {
-    ref: () => ({
-      put: () => Promise.resolve({}),
-      getDownloadURL: () => Promise.resolve("")
-    })
-  };
-  
-  rtdb = {
-    ref: () => ({
-      set: () => Promise.resolve(),
-      on: () => {},
-      once: () => Promise.resolve({}),
-      push: () => Promise.resolve({ key: 'dummy-key' }),
-      onDisconnect: () => ({ remove: () => Promise.resolve() })
-    })
-  };
 }
 
 // Export the initialized Firebase services

@@ -1,112 +1,397 @@
-/* Simple Card Styles - No transforms or flips */
+/* Trading Card Styles - Pokemon/Baseball Card Inspired */
+@import url('https://fonts.googleapis.com/css2?family=Bangers&family=Rubik:wght@400;600;700&display=swap');
+
 .simple-card {
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, #ffd89b 0%, #ffcb6b 50%, #ffb347 100%);
-  border-radius: 12px;
-  border: 10px solid hsl(0 0% 25%);
-  padding: 15px;
+  border-radius: 16px;
+  border: 8px solid;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+  gap: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5),
+              0 0 0 2px rgba(255, 255, 255, 0.2) inset;
   position: relative;
   overflow: hidden;
+  font-family: 'Rubik', sans-serif;
+  transition: all 0.3s ease;
 }
 
+/* Rarity-based color schemes */
+.simple-card.common {
+  background: linear-gradient(135deg, #e0e0e0 0%, #bdbdbd 100%);
+  border-color: #757575;
+}
+
+.simple-card.rare {
+  background: linear-gradient(135deg, #ffd89b 0%, #ffcb6b 50%, #ffb347 100%);
+  border-color: #ff9800;
+}
+
+.simple-card.epic {
+  background: linear-gradient(135deg, #c084fc 0%, #a855f7 50%, #9333ea 100%);
+  border-color: #7c3aed;
+}
+
+.simple-card.legendary {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 25%, #ff6b6b 75%, #9333ea 100%);
+  border-color: #d97706;
+  animation: legendary-pulse 3s ease-in-out infinite;
+}
+
+/* Header section */
 .simple-card-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
+  align-items: flex-start;
+  margin-bottom: 4px;
+}
+
+.card-title-section {
+  flex: 1;
 }
 
 .simple-card-name {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: #333;
+  font-family: 'Bangers', cursive;
+  font-size: 1.8rem;
+  font-weight: normal;
+  color: #1a1a1a;
   margin: 0;
+  line-height: 1;
+  text-shadow: 2px 2px 0 rgba(255, 255, 255, 0.7),
+               -1px -1px 0 rgba(0, 0, 0, 0.2);
+  letter-spacing: 0.05em;
 }
 
-.simple-card-type {
-  background: linear-gradient(135deg, #ff6b6b, #ff3333);
+.simple-card-subtitle {
+  font-size: 0.7rem;
+  color: #444;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.card-level {
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 4px 10px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: bold;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.level-label {
+  font-size: 0.6rem;
+  opacity: 0.8;
+}
+
+.level-value {
+  font-size: 1rem;
+}
+
+/* Specialty badge */
+.specialty-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.6);
   color: white;
   padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: bold;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  width: fit-content;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
+.specialty-icon {
+  font-size: 1rem;
+}
+
+/* Character portrait */
 .simple-card-image {
   width: 100%;
-  height: 40%;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 8px;
-  margin-bottom: 10px;
+  height: 140px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) inset,
+              0 2px 8px rgba(0, 0, 0, 0.3);
+  border: 3px solid rgba(255, 255, 255, 0.5);
+}
+
+.image-frame {
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
 }
 
-.simple-card-image img {
+.image-frame img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.simple-card-description {
-  font-size: 0.75rem;
-  color: #444;
-  margin-bottom: 10px;
-  line-height: 1.3;
-  flex: 1;
+.image-caption {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
+  color: white;
+  padding: 6px 8px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.simple-card-stats {
-  display: flex;
-  justify-content: space-around;
-  gap: 10px;
-  margin-bottom: 10px;
+/* Card sections */
+.card-section {
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 8px;
   padding: 8px;
-  background: rgba(255, 255, 255, 0.7);
-  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 
-.simple-card-stats .stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-.simple-card-stats .stat-label {
-  font-size: 0.6rem;
+.section-label {
+  font-size: 0.65rem;
+  font-weight: 700;
   color: #666;
   text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 4px;
 }
 
-.simple-card-stats .stat-value {
-  font-size: 0.9rem;
-  font-weight: bold;
-  color: #222;
+/* Bio section */
+.bio-section {
+  min-height: 50px;
 }
 
-.simple-card-footer {
-  text-align: center;
+.bio-text {
   font-size: 0.7rem;
-  color: #666;
-  padding-top: 5px;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  line-height: 1.4;
+  color: #333;
+}
+
+/* Thesis section */
+.thesis-section {
+  background: rgba(255, 255, 255, 0.9);
+  border-left: 3px solid #4caf50;
+}
+
+.thesis-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.thesis-icon {
+  font-size: 0.9rem;
+}
+
+.thesis-text {
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: #222;
+  font-weight: 500;
+  font-style: italic;
+}
+
+/* Stats section */
+.stats-section {
+  background: rgba(0, 0, 0, 0.75);
+  color: white;
+}
+
+.stats-section .section-label {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.stat-box {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 6px;
+  border-radius: 6px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.stat-box.highlight {
+  background: rgba(76, 175, 80, 0.3);
+  border-color: #4caf50;
+}
+
+.stat-box .stat-label {
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  margin-bottom: 2px;
+  display: block;
+}
+
+.stat-box .stat-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: white;
+}
+
+/* Knowledge sources section */
+.sources-section {
+  background: rgba(255, 255, 255, 0.9);
+  max-height: 80px;
+  overflow-y: auto;
+}
+
+.sources-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.source-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.65rem;
+  color: #444;
+  padding: 3px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+}
+
+.source-icon {
+  font-size: 0.8rem;
+}
+
+.source-text {
+  flex: 1;
+  line-height: 1.3;
+}
+
+/* Custom scrollbar for sources */
+.sources-section::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sources-section::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+.sources-section::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+}
+
+/* Card footer */
+.simple-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.65rem;
+  color: #333;
+  padding-top: 6px;
+  border-top: 2px solid rgba(0, 0, 0, 0.2);
+  font-weight: 600;
 }
 
 .card-id {
-  font-weight: bold;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.card-rarity {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.6rem;
+}
+
+/* Holographic effect */
+.holo-effect {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.1) 75%,
+    transparent 100%
+  );
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.simple-card:hover .holo-effect {
+  opacity: 1;
+  animation: holo-shine 2s linear infinite;
+}
+
+@keyframes holo-shine {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
 
 /* Active state with glow */
 .simple-card.active {
-  box-shadow: 
-    0 10px 40px rgba(0, 0, 0, 0.4),
-    0 0 30px rgba(255, 215, 0, 0.4);
+  transform: scale(1.02);
+  box-shadow:
+    0 15px 50px rgba(0, 0, 0, 0.6),
+    0 0 40px rgba(255, 215, 0, 0.5),
+    0 0 0 3px rgba(255, 255, 255, 0.3) inset;
+}
+
+.simple-card.active .holo-effect {
+  opacity: 0.8;
+}
+
+/* Legendary pulse animation */
+@keyframes legendary-pulse {
+  0%, 100% {
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5),
+                0 0 20px rgba(255, 215, 0, 0.4),
+                0 0 0 2px rgba(255, 255, 255, 0.2) inset;
+  }
+  50% {
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5),
+                0 0 40px rgba(255, 215, 0, 0.8),
+                0 0 0 2px rgba(255, 255, 255, 0.4) inset;
+  }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 480px) {
+  .simple-card-name {
+    font-size: 1.4rem;
+  }
+
+  .simple-card-image {
+    height: 100px;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
 }

@@ -2457,7 +2457,7 @@ const PalmsScene = ({ onLoadingChange }) => {
             e.target.style.opacity = '0.8';
           }}
         >
-          Skip Animation
+          Skip Intro
         </button>
       )}
       

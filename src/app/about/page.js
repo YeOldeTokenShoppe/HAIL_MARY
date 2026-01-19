@@ -181,10 +181,11 @@ export default function CarouselPage() {
   }, []);
 
   return (
-    <div style={{ 
-      position: 'relative', 
-      width: '100%', 
-      height: '100vh',
+    <div style={{
+      position: 'relative',
+      width: '100%',
+      minHeight: '100vh',
+      overflowY: 'auto',
       ...(is80sMode && isMobileDevice ? {
         backgroundImage: 'url("/images/retro.webp")',
         backgroundSize: 'cover',

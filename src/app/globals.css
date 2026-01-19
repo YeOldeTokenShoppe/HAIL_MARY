@@ -98,8 +98,9 @@ html, body {
   margin: 0 !important;
   padding: 0 !important;
   width: 100%;
-  height: 100%;
+  min-height: 100%;
   overflow-x: hidden;
+  overflow-y: auto;
   background: #000000;
 }
 
@@ -549,7 +550,7 @@ body {
 
 html, body {
   /* Ensure proper height for iOS devices */
-  height: 100%;
+  min-height: 100%;
   position: relative;
 }
 

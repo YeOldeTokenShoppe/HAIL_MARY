@@ -353,13 +353,15 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
               borderRight: '2px solid #00e572',
             }} />
             
-            <BuyWidget
-              client={client}
-              chain={defineChain(42161)} // Arbitrum One
-              // Add your token contract address when ready
-              // tokenAddress="0x..." 
-              theme="dark"
-            />
+            <div suppressHydrationWarning>
+              <BuyWidget
+                client={client}
+                chain={defineChain(42161)} // Arbitrum One
+                // Add your token contract address when ready
+                // tokenAddress="0x..."
+                theme="dark"
+              />
+            </div>
           </div>
 
           {/* Info Text */}
