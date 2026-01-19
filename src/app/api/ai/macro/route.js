@@ -16,15 +16,14 @@ export async function GET() {
     }
 
     const finnhubKey = process.env.NEXT_PUBLIC_FINNHUB;
-    const alphaVantageKey = process.env.NEXT_PUBLIC_ALPHA_VANTAGE_API_KEY;
     const lighterBaseUrl = process.env.NEXT_PUBLIC_LIGHTER_BASE_URL;
 
     // Fetch all data in parallel (4 logical requests, batched where possible)
     const [finnhubData, treasuryData, fundingData, oiData] = await Promise.allSettled([
-      // Batch all Finnhub quotes (VIXY, SPY, UUP) - 3 API calls but grouped
+      // Yahoo Finance for VIX & DXY, Finnhub for SPY
       fetchFinnhubBatch(finnhubKey),
-      // 10Y Treasury from Alpha Vantage
-      fetchTreasuryYield(alphaVantageKey),
+      // 10Y Treasury from Yahoo Finance (^TNX)
+      fetchTreasuryYield(),
       // Funding rates from Lighter DEX
       fetchLighterFundingRates(lighterBaseUrl),
       // Open Interest from Lighter DEX
@@ -65,11 +64,11 @@ export async function GET() {
   }
 }
 
-// Fetch real VIX index from Yahoo Finance
-async function fetchRealVIX() {
+// Fetch index data from Yahoo Finance
+async function fetchYahooIndex(symbol, label) {
   try {
     const response = await fetch(
-      'https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1d&range=1d',
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=1d`,
       {
         headers: { 'User-Agent': 'Mozilla/5.0' },
         next: { revalidate: 300 } // Cache for 5 min
@@ -93,50 +92,51 @@ async function fetchRealVIX() {
       }
     }
   } catch (err) {
-    console.error('[Macro API] Yahoo VIX error:', err.message);
+    console.error(`[Macro API] Yahoo ${label} error:`, err.message);
   }
   return null;
 }
 
-// Batch fetch Finnhub quotes (SPY, UUP) + Yahoo for VIX
+// Fetch real VIX index from Yahoo Finance
+async function fetchRealVIX() {
+  return fetchYahooIndex('^VIX', 'VIX');
+}
+
+// Fetch real DXY (US Dollar Index) from Yahoo Finance
+async function fetchRealDXY() {
+  return fetchYahooIndex('DX-Y.NYB', 'DXY');
+}
+
+// Batch fetch: Yahoo for VIX & DXY, Finnhub for SPY
 async function fetchFinnhubBatch(apiKey) {
   const results = { vix: null, spx: null, dxy: null };
 
-  // Fetch real VIX from Yahoo Finance (free, actual index value)
-  results.vix = await fetchRealVIX();
+  // Fetch real VIX and DXY from Yahoo Finance (free, actual index values)
+  const [vixResult, dxyResult] = await Promise.all([
+    fetchRealVIX(),
+    fetchRealDXY()
+  ]);
+  results.vix = vixResult;
+  results.dxy = dxyResult;
 
-  if (!apiKey) {
-    console.warn('Finnhub API key not configured, using VIX only');
-    return {
-      vix: results.vix || { value: 18.5, change: 0, changePercent: 0 },
-      spx: { value: 585, change: 0, changePercent: 0 },
-      dxy: { value: 103, change: 0, changePercent: 0 }
-    };
-  }
-
-  // Fetch SPY and UUP from Finnhub
-  const symbols = ['SPY', 'UUP'];
-
-  for (const symbol of symbols) {
+  // Fetch SPY from Finnhub (if API key available)
+  if (apiKey) {
     try {
       const response = await fetch(
-        `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${apiKey}`,
+        `https://finnhub.io/api/v1/quote?symbol=SPY&token=${apiKey}`,
         { next: { revalidate: 1800 } } // Cache for 30 min
       );
 
       if (response.ok) {
         const data = await response.json();
-        const quote = {
+        results.spx = {
           value: data.c || 0,
           change: data.d || 0,
           changePercent: data.dp || 0
         };
-
-        if (symbol === 'SPY') results.spx = quote;
-        else if (symbol === 'UUP') results.dxy = quote;
       }
     } catch (err) {
-      console.error(`[Macro API] Finnhub ${symbol} error:`, err.message);
+      console.error('[Macro API] Finnhub SPY error:', err.message);
     }
   }
 
@@ -144,39 +144,41 @@ async function fetchFinnhubBatch(apiKey) {
   return {
     vix: results.vix || { value: 18.5, change: 0, changePercent: 0 },
     spx: results.spx || { value: 585, change: 0, changePercent: 0 },
-    dxy: results.dxy || { value: 103, change: 0, changePercent: 0 }
+    dxy: results.dxy || { value: 99, change: 0, changePercent: 0 }
   };
 }
 
-// Fetch 10Y Treasury yield from Alpha Vantage
-async function fetchTreasuryYield(apiKey) {
-  if (!apiKey) {
-    throw new Error('Alpha Vantage API key not configured');
+// Fetch 10Y Treasury yield from Yahoo Finance (^TNX)
+async function fetchTreasuryYield() {
+  try {
+    const response = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/%5ETNX?interval=1d&range=2d`,
+      {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        next: { revalidate: 300 } // Cache for 5 min
+      }
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      const quote = data.chart?.result?.[0]?.meta;
+      if (quote) {
+        const currentYield = quote.regularMarketPrice || 0;
+        const previousClose = quote.previousClose || currentYield;
+        const change = currentYield - previousClose;
+
+        return {
+          value: parseFloat(currentYield.toFixed(3)),
+          change: parseFloat(change.toFixed(3)),
+          previousValue: parseFloat(previousClose.toFixed(3))
+        };
+      }
+    }
+  } catch (err) {
+    console.error('[Macro API] Yahoo Treasury error:', err.message);
   }
 
-  const response = await fetch(
-    `https://www.alphavantage.co/query?function=TREASURY_YIELD&interval=daily&maturity=10year&apikey=${apiKey}`,
-    { next: { revalidate: 900 } }
-  );
-
-  if (!response.ok) {
-    throw new Error(`Alpha Vantage error: ${response.status}`);
-  }
-
-  const data = await response.json();
-
-  // Alpha Vantage returns data array with date and value
-  if (data.data && data.data.length >= 2) {
-    const latest = parseFloat(data.data[0].value);
-    const previous = parseFloat(data.data[1].value);
-    return {
-      value: latest,
-      change: (latest - previous).toFixed(2),
-      previousValue: previous
-    };
-  }
-
-  throw new Error('Invalid Treasury data format');
+  throw new Error('Failed to fetch Treasury yield from Yahoo Finance');
 }
 
 // Fetch funding rates from Lighter DEX
