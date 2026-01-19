@@ -1,192 +1,374 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
+import { createChart, ColorType, CrosshairMode, CandlestickSeries, LineSeries, HistogramSeries } from 'lightweight-charts'
+import { db, doc, onSnapshot } from '@/lib/firebaseClient'
 
-// Technical data fetching hook
-const useTechnicalData = (refreshInterval = 60000) => { // 1 minute to check for updates
+// Technical data hook - reads from Firestore (populated by Railway background service)
+const useTechnicalData = () => {
   const [currentTokenIndex, setCurrentTokenIndex] = useState(0)
-  const tokens = ['BTC', 'ETH', 'SOL']
+  const [autoRotate, setAutoRotate] = useState(true)
+  const tokens = ['BTC', 'ETH', 'SOL', 'XRP']
   const [allTokenData, setAllTokenData] = useState({})
   const [data, setData] = useState({
     symbol: 'BTC',
-    price: { current: 0, change24h: 0, high24h: 0, low24h: 0 },
-    candles: [], // OHLCV data
-    rsi: { value: 50, signal: 'neutral', overbought: false, oversold: false },
-    macd: { histogram: 0, signal: 0, macd: 0, trend: 'neutral' },
-    movingAverages: { sma20: 0, sma50: 0, sma200: 0, ema12: 0, ema26: 0 },
-    bollingerBands: { upper: 0, middle: 0, lower: 0, squeeze: false },
-    volume: { current: 0, average: 0, trend: 'normal' },
-    patterns: [], // Detected candle patterns
-    support: 0,
-    resistance: 0,
-    momentum: 50, // 0-100 scale
-    volatility: 'normal', // low, normal, high, extreme
-    trend: 'sideways', // bullish, bearish, sideways
+    candles: [],
+    indicators: {
+      ema12: [],
+      ema26: [],
+      sma20: [],
+      rsi: [],
+      macd: [],
+      macdSignal: [],
+      macdHistogram: [],
+      bollingerUpper: [],
+      bollingerMiddle: [],
+      bollingerLower: []
+    },
+    current: {
+      price: 0,
+      rsi: 50,
+      macd: 0,
+      macdSignal: 0,
+      trend: 'sideways',
+      support: 0,
+      resistance: 0
+    },
     isLive: false,
-    cacheAge: 0 // Age of cached data in seconds
+    updatedAt: null
   })
-  
-  // Rotate through tokens every 15 seconds
+
+  // Function to manually set token
+  const setToken = useCallback((index) => {
+    setCurrentTokenIndex(index)
+    setAutoRotate(false) // Stop auto-rotation when user manually selects
+    // Resume auto-rotation after 30 seconds of no interaction
+    setTimeout(() => setAutoRotate(true), 30000)
+  }, [tokens])
+
+  // Rotate through tokens every 15 seconds (only if autoRotate is enabled)
   useEffect(() => {
+    if (!autoRotate) return
+
     const rotationInterval = setInterval(() => {
       setCurrentTokenIndex(prev => (prev + 1) % tokens.length)
-    }, 15000) // 15 seconds per token
-    
-    return () => clearInterval(rotationInterval)
-  }, [])
+    }, 15000)
 
-  // Fetch technical data from cached API
+    return () => clearInterval(rotationInterval)
+  }, [autoRotate])
+
+  // Subscribe to Firestore for real-time technical data updates
   useEffect(() => {
-    const fetchTechnicalData = async () => {
-      try {
-        // Fetch from our cached technical API endpoint with real CoinGecko data
-        // Try real data first, fallback to simulated if it fails
-        let response = await fetch('/api/ai/technical-real')
-        if (!response.ok) {
-          response = await fetch('/api/ai/technical')
-        }
-        if (response.ok) {
-          const cachedData = await response.json()
-          
+    if (!db) {
+      console.warn('[TeknoScreen] Firebase not initialized')
+      return
+    }
+
+    const technicalRef = doc(db, 'technicalData', 'latest')
+
+    const unsubscribe = onSnapshot(
+      technicalRef,
+      (docSnapshot) => {
+        if (docSnapshot.exists()) {
+          const technicalData = docSnapshot.data()
+
           // Store all token data
-          const tokenData = {
-            BTC: cachedData.BTC || {},
-            ETH: cachedData.ETH || {},
-            SOL: cachedData.SOL || {}
-          }
-          
+          const tokenData = {}
+          tokens.forEach(symbol => {
+            if (technicalData[symbol]) {
+              tokenData[symbol] = technicalData[symbol]
+            }
+          })
+
           setAllTokenData(tokenData)
-          
-          // Also store cache age
-          const cacheAge = cachedData.cacheAge || 0
-          
-          // Update current display with the current token's data
+
+          // Update current display
           const currentToken = tokens[currentTokenIndex]
           if (tokenData[currentToken]) {
             setData({
               symbol: currentToken,
               ...tokenData[currentToken],
-              cacheAge: cacheAge
+              isLive: true,
+              updatedAt: technicalData.updatedAt
             })
           }
-          
-        } else {
-          console.error('[TeknoScreen] Failed to fetch technical data')
-        }
-      } catch (err) {
-        console.error('[TeknoScreen] Error fetching technical data:', err)
-      }
-    }
 
-    // Initial fetch
-    fetchTechnicalData()
-    
-    // Set up refresh interval
-    const interval = setInterval(fetchTechnicalData, refreshInterval)
-    
-    return () => clearInterval(interval)
-  }, [refreshInterval]) // Refresh periodically
-  
+        } else {
+          console.log('[TeknoScreen] No technical data in Firestore yet')
+        }
+      },
+      (error) => {
+        console.error('[TeknoScreen] Firestore subscription error:', error)
+      }
+    )
+
+    return () => unsubscribe()
+  }, [currentTokenIndex])
+
   // Update displayed data when token changes
   useEffect(() => {
     const currentToken = tokens[currentTokenIndex]
     if (allTokenData[currentToken]) {
-      setData({
+      setData(prev => ({
         symbol: currentToken,
         ...allTokenData[currentToken],
-        cacheAge: data.cacheAge // Preserve cache age
-      })
+        isLive: true,
+        updatedAt: prev.updatedAt
+      }))
     }
   }, [currentTokenIndex, allTokenData])
 
-  return data
+  return { data, tokens, currentTokenIndex, setToken }
 }
 
-// The technical analysis screen component
+// The technical analysis screen component with lightweight-charts
 const TeknoScreen = () => {
-  const data = useTechnicalData()
-  const [hasStartedDrawing, setHasStartedDrawing] = useState(false)
+  const { data, tokens, currentTokenIndex, setToken } = useTechnicalData()
+  const chartContainerRef = useRef(null)
+  const chartRef = useRef(null)
+  const candlestickSeriesRef = useRef(null)
+  const ema12SeriesRef = useRef(null)
+  const ema26SeriesRef = useRef(null)
+  const bollingerUpperRef = useRef(null)
+  const bollingerLowerRef = useRef(null)
+  const volumeSeriesRef = useRef(null)
+  const [chartInitialized, setChartInitialized] = useState(false)
 
-  // Draw loop using useEffect with interval
+  // Listen for click events on Screen3 to handle token button clicks
+  useEffect(() => {
+    const handleScreen3Click = (event) => {
+      const { uv } = event.detail || {}
+      if (!uv) return
+
+      // Convert UV coordinates to canvas coordinates (512x320)
+      const canvasX = uv.x * 512
+      const canvasY = uv.y * 320
+
+      // Token button positions (from drawHeader function):
+      // Buttons start at x=400, each is 28px wide, y is 8-22
+      // Expand hit area for easier clicking (y: 0-50 to catch header area)
+      if (canvasY <= 50) {
+        if (canvasX >= 380 && canvasX < 420) {
+          setToken(0) // BTC
+        } else if (canvasX >= 420 && canvasX < 455) {
+          setToken(1) // ETH
+        } else if (canvasX >= 455 && canvasX < 490) {
+          setToken(2) // SOL
+        } else if (canvasX >= 490) {
+          setToken(3) // XRP
+        }
+      }
+    }
+
+    window.addEventListener('screen3Click', handleScreen3Click)
+    return () => window.removeEventListener('screen3Click', handleScreen3Click)
+  }, [setToken])
+
+  // Create hidden container and initialize chart
+  useEffect(() => {
+    // Create hidden container for the chart
+    let container = document.getElementById('tekno-chart-container')
+    if (!container) {
+      container = document.createElement('div')
+      container.id = 'tekno-chart-container'
+      container.style.position = 'absolute'
+      container.style.left = '-9999px'
+      container.style.top = '-9999px'
+      container.style.width = '512px'
+      container.style.height = '320px'
+      container.style.overflow = 'hidden'
+      document.body.appendChild(container)
+    }
+    chartContainerRef.current = container
+
+    // Initialize the chart
+    const chart = createChart(container, {
+      width: 512,
+      height: 240, // Leave room for indicators header
+      layout: {
+        background: { type: ColorType.Solid, color: '#000000' },
+        textColor: '#00ffff',
+        fontSize: 10,
+      },
+      grid: {
+        vertLines: { color: 'rgba(0, 255, 255, 0.1)' },
+        horzLines: { color: 'rgba(0, 255, 255, 0.1)' },
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: { color: 'rgba(0, 255, 255, 0.4)', width: 1 },
+        horzLine: { color: 'rgba(0, 255, 255, 0.4)', width: 1 },
+      },
+      rightPriceScale: {
+        borderColor: 'rgba(0, 255, 255, 0.3)',
+        scaleMargins: { top: 0.1, bottom: 0.2 },
+      },
+      timeScale: {
+        borderColor: 'rgba(0, 255, 255, 0.3)',
+        timeVisible: false,
+        secondsVisible: false,
+      },
+      handleScroll: false,
+      handleScale: false,
+    })
+
+    // Add candlestick series (v4+ API)
+    const candlestickSeries = chart.addSeries(CandlestickSeries, {
+      upColor: '#26a69a',
+      downColor: '#ef5350',
+      borderUpColor: '#26a69a',
+      borderDownColor: '#ef5350',
+      wickUpColor: '#26a69a',
+      wickDownColor: '#ef5350',
+    })
+
+    // Add EMA 12 line (v4+ API)
+    const ema12Series = chart.addSeries(LineSeries, {
+      color: '#ffeb3b',
+      lineWidth: 1,
+      priceLineVisible: false,
+      lastValueVisible: false,
+    })
+
+    // Add EMA 26 line (v4+ API)
+    const ema26Series = chart.addSeries(LineSeries, {
+      color: '#ff9800',
+      lineWidth: 1,
+      priceLineVisible: false,
+      lastValueVisible: false,
+    })
+
+    // Add Bollinger Bands (v4+ API)
+    const bollingerUpper = chart.addSeries(LineSeries, {
+      color: 'rgba(33, 150, 243, 0.5)',
+      lineWidth: 1,
+      priceLineVisible: false,
+      lastValueVisible: false,
+    })
+
+    const bollingerLower = chart.addSeries(LineSeries, {
+      color: 'rgba(33, 150, 243, 0.5)',
+      lineWidth: 1,
+      priceLineVisible: false,
+      lastValueVisible: false,
+    })
+
+    // Add volume series (v4+ API)
+    const volumeSeries = chart.addSeries(HistogramSeries, {
+      color: '#26a69a',
+      priceFormat: { type: 'volume' },
+      priceScaleId: 'volume',
+    })
+
+    // Set volume price scale margins
+    chart.priceScale('volume').applyOptions({
+      scaleMargins: { top: 0.85, bottom: 0 },
+    })
+
+    chartRef.current = chart
+    candlestickSeriesRef.current = candlestickSeries
+    ema12SeriesRef.current = ema12Series
+    ema26SeriesRef.current = ema26Series
+    bollingerUpperRef.current = bollingerUpper
+    bollingerLowerRef.current = bollingerLower
+    volumeSeriesRef.current = volumeSeries
+
+    setChartInitialized(true)
+
+    return () => {
+      chart.remove()
+      if (container && container.parentNode) {
+        container.parentNode.removeChild(container)
+      }
+    }
+  }, [])
+
+  // Update chart data when data changes
+  useEffect(() => {
+    if (!chartInitialized || !data.candles || data.candles.length === 0) return
+
+    const chart = chartRef.current
+    const candlestickSeries = candlestickSeriesRef.current
+    const ema12Series = ema12SeriesRef.current
+    const ema26Series = ema26SeriesRef.current
+    const bollingerUpper = bollingerUpperRef.current
+    const bollingerLower = bollingerLowerRef.current
+    const volumeSeries = volumeSeriesRef.current
+
+    if (!chart || !candlestickSeries) return
+
+    // Update candlestick data
+    candlestickSeries.setData(data.candles)
+
+    // Update EMA lines
+    if (data.indicators?.ema12) {
+      const emaData = data.indicators.ema12.filter(d => d.value !== null)
+      ema12Series.setData(emaData)
+    }
+
+    if (data.indicators?.ema26) {
+      const emaData = data.indicators.ema26.filter(d => d.value !== null)
+      ema26Series.setData(emaData)
+    }
+
+    // Update Bollinger Bands
+    if (data.indicators?.bollingerUpper) {
+      const upperData = data.indicators.bollingerUpper.filter(d => d.value !== null)
+      bollingerUpper.setData(upperData)
+    }
+
+    if (data.indicators?.bollingerLower) {
+      const lowerData = data.indicators.bollingerLower.filter(d => d.value !== null)
+      bollingerLower.setData(lowerData)
+    }
+
+    // Update volume
+    const volumeData = data.candles.map(c => ({
+      time: c.time,
+      value: c.volume,
+      color: c.close >= c.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)'
+    }))
+    volumeSeries.setData(volumeData)
+
+    // Fit content
+    chart.timeScale().fitContent()
+  }, [data, chartInitialized])
+
+  // Draw to the texture canvas
   useEffect(() => {
     const draw = () => {
-      // Use the global canvas set up by VideoScreens for Screen3
-      // @ts-ignore
       const canvas = window['__screen3Canvas']
-      // @ts-ignore
       const texture = window['__screen3Texture']
-      
-      if (!canvas || !texture) {
-        return
-      }
-      
-      // Log once when we start drawing
-      if (!hasStartedDrawing) {
-        setHasStartedDrawing(true)
-      }
-      
-      const ctx = canvas.getContext('2d')
-      const t = performance.now() / 1000 // Time in seconds
 
-      // Background - clean black
+      if (!canvas || !texture) return
+
+      const ctx = canvas.getContext('2d')
+
+      // Clear canvas
       ctx.fillStyle = '#000000'
       ctx.fillRect(0, 0, 512, 320)
 
-      // Header with Tekno's color (cyan/tech blue)
-      ctx.fillStyle = '#00ffff' // Cyan for Tekno
-      ctx.font = 'bold 18px monospace'
-      ctx.fillText(`⚡ TECHNICAL ANALYSIS - ${data.symbol}`, 16, 28)
-      
-      // Status indicator
-      ctx.fillStyle = data.isLive ? '#44ff44' : '#ffff44'
-      ctx.font = '10px monospace'
-      ctx.fillText(data.isLive ? '●LIVE' : '●SIM', 460, 28)
-      
-      // Token rotation indicators (show dots for BTC, ETH, SOL)
-      const tokens = ['BTC', 'ETH', 'SOL']
-      const currentIndex = tokens.indexOf(data.symbol)
-      tokens.forEach((token, i) => {
-        ctx.fillStyle = i === currentIndex ? '#00ffff' : 'rgba(0, 255, 255, 0.3)'
-        ctx.fillRect(380 + i * 25, 24, 20, 8)
-        ctx.fillStyle = i === currentIndex ? '#000000' : 'rgba(255, 255, 255, 0.5)'
-        ctx.font = '7px monospace'
-        ctx.fillText(token.substring(0, 3), 382 + i * 25, 30)
-      })
-      
-      // Cache age indicator
-      if (data.cacheAge !== undefined) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'
-        ctx.font = '8px monospace'
-        const ageMinutes = Math.floor(data.cacheAge / 60)
-        const ageText = ageMinutes > 0 ? `${ageMinutes}m old` : `${data.cacheAge}s old`
-        ctx.fillText(`Cache: ${ageText}`, 380, 38)
-      }
-      
-      // Divider line
-      ctx.strokeStyle = '#00ffff'
-      ctx.lineWidth = 1
-      ctx.beginPath()
-      ctx.moveTo(16, 40)
-      ctx.lineTo(496, 40)
-      ctx.stroke()
+      // Draw header
+      drawHeader(ctx, data, tokens, currentTokenIndex)
 
-      // Main sections layout
-      // Top: Price & Trend
-      drawPriceSection(ctx, data, 50, t)
-      
-      // Left column: Indicators
-      drawRSIGauge(ctx, data.rsi, 110, t)
-      drawMACDHistogram(ctx, data.macd, 180, t)
-      
-      // Right column: Candle chart and patterns
-      drawMiniCandleChart(ctx, data.candles, data.movingAverages, 260, 110, t)
-      drawPatterns(ctx, data.patterns, 260, 220)
-      
-      // Bottom: Support/Resistance & Signals - moved up slightly
-      drawSupportResistance(ctx, data, 275)
-      
-      // Market summary bar - with more separation
-      drawMarketSummary(ctx, data, 298)
-      
-      // Simple border
+      // Get chart screenshot and draw it
+      if (chartRef.current && chartInitialized) {
+        try {
+          const chartCanvas = chartRef.current.takeScreenshot()
+          if (chartCanvas) {
+            // Draw chart below header (at y=45)
+            ctx.drawImage(chartCanvas, 0, 45, 512, 200)
+          }
+        } catch (e) {
+          // Chart not ready, draw placeholder
+          drawPlaceholderChart(ctx, data)
+        }
+      } else {
+        drawPlaceholderChart(ctx, data)
+      }
+
+      // Draw indicator panels at bottom
+      drawIndicatorPanels(ctx, data)
+
+      // Draw border
       ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)'
       ctx.lineWidth = 1
       ctx.strokeRect(2, 2, 508, 316)
@@ -196,319 +378,280 @@ const TeknoScreen = () => {
         texture.needsUpdate = true
       }
     }
-    
-    // Set up interval for drawing
-    const intervalId = setInterval(draw, 100) // Draw every 100ms (~10fps)
-    
-    return () => {
-      clearInterval(intervalId)
-    }
-  }, [data, hasStartedDrawing])
+
+    const intervalId = setInterval(draw, 100)
+    return () => clearInterval(intervalId)
+  }, [data, tokens, currentTokenIndex, chartInitialized])
 
   return null
 }
 
-// Helper drawing functions
-const drawPriceSection = (ctx, data, y) => {
-  // Current price with animation
-  ctx.fillStyle = '#ffffff'
-  ctx.font = 'bold 24px monospace'
-  const priceStr = `$${(data.price?.current || 0).toLocaleString('en-US', { 
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0 
-  })}`
-  ctx.fillText(priceStr, 24, y + 20)
-  
-  // 24h change - with more spacing
-  const change24h = data.price?.change24h || 0
-  const changeColor = change24h >= 0 ? '#44ff44' : '#ff4444'
-  ctx.fillStyle = changeColor
-  ctx.font = 'bold 14px monospace'
-  const changeStr = `${change24h >= 0 ? '↑' : '↓'} ${Math.abs(change24h).toFixed(2)}%`
-  ctx.fillText(changeStr, 150, y + 20)  // Fixed position instead of relative
-  
-  // Trend indicator
-  ctx.fillStyle = '#00ffff'
-  ctx.font = '12px monospace'
-  ctx.fillText('TREND:', 300, y + 10)
-  
-  const trendColors = {
-    'bullish': '#44ff44',
-    'bearish': '#ff4444',
-    'sideways': '#ffff44'
-  }
-  ctx.fillStyle = trendColors[data.trend] || '#ffff44'
-  ctx.font = 'bold 12px monospace'
-  ctx.fillText((data.trend || 'sideways').toUpperCase(), 350, y + 10)
-  
-  // Momentum bar
-  ctx.fillStyle = '#00ffff'
-  ctx.font = '12px monospace'
-  ctx.fillText('MOMENTUM:', 300, y + 25)
-  
-  // Draw momentum bar
-  const barX = 380
-  const barWidth = 100
-  const barHeight = 8
-  ctx.fillStyle = 'rgba(0, 255, 255, 0.2)'
-  ctx.fillRect(barX, y + 18, barWidth, barHeight)
-  
-  const momentum = data.momentum || 50
-  const momentumWidth = (momentum / 100) * barWidth
-  const momentumColor = momentum > 70 ? '#44ff44' : 
-                        momentum < 30 ? '#ff4444' : '#ffff44'
-  ctx.fillStyle = momentumColor
-  ctx.fillRect(barX, y + 18, momentumWidth, barHeight)
-}
+// Draw header section
+function drawHeader(ctx, data, tokens, currentIndex) {
+  // Header background
+  ctx.fillStyle = 'rgba(0, 255, 255, 0.1)'
+  ctx.fillRect(0, 0, 512, 42)
 
-const drawRSIGauge = (ctx, rsi, y) => {
-  if (!rsi) return
-  
+  // Title
   ctx.fillStyle = '#00ffff'
-  ctx.font = 'bold 12px monospace'
-  ctx.fillText('RSI (14)', 24, y)
-  
-  // RSI gauge bar
-  const gaugeX = 24
-  const gaugeY = y + 10
-  const gaugeWidth = 200
-  const gaugeHeight = 20
-  
-  // Background gradient
-  const gradient = ctx.createLinearGradient(gaugeX, 0, gaugeX + gaugeWidth, 0)
-  gradient.addColorStop(0, '#ff4444')
-  gradient.addColorStop(0.3, '#ff4444')
-  gradient.addColorStop(0.5, '#ffff44')
-  gradient.addColorStop(0.7, '#44ff44')
-  gradient.addColorStop(1, '#44ff44')
-  
-  ctx.fillStyle = gradient
-  ctx.globalAlpha = 0.3
-  ctx.fillRect(gaugeX, gaugeY, gaugeWidth, gaugeHeight)
-  ctx.globalAlpha = 1
-  
-  // Overbought/Oversold zones
-  ctx.fillStyle = 'rgba(255, 68, 68, 0.2)'
-  ctx.fillRect(gaugeX, gaugeY, gaugeWidth * 0.3, gaugeHeight) // Oversold zone
-  ctx.fillRect(gaugeX + gaugeWidth * 0.7, gaugeY, gaugeWidth * 0.3, gaugeHeight) // Overbought zone
-  
-  // RSI needle
-  const rsiValue = rsi.value || 50
-  const needleX = gaugeX + (rsiValue / 100) * gaugeWidth
-  
-  ctx.strokeStyle = '#ffffff'
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.moveTo(needleX, gaugeY - 2)
-  ctx.lineTo(needleX, gaugeY + gaugeHeight + 2)
-  ctx.stroke()
-  
-  // RSI value
-  ctx.fillStyle = '#ffffff'
   ctx.font = 'bold 16px monospace'
-  ctx.fillText(rsiValue.toFixed(1), gaugeX + gaugeWidth + 10, gaugeY + 15)
-  
-  // Signal
-  const signalColors = {
-    'overbought': '#ff4444',
-    'oversold': '#44ff44',
-    'neutral': '#ffff44'
-  }
-  ctx.fillStyle = signalColors[rsi.signal] || '#ffff44'
-  ctx.font = '10px monospace'
-  ctx.fillText((rsi.signal || 'neutral').toUpperCase(), gaugeX + gaugeWidth + 60, gaugeY + 15)
-}
+  ctx.fillText(`TECHNICAL ANALYSIS - ${data.symbol}`, 16, 24)
 
-const drawMACDHistogram = (ctx, macd, y) => {
-  if (!macd) return
-  
-  ctx.fillStyle = '#00ffff'
-  ctx.font = 'bold 12px monospace'
-  ctx.fillText('MACD', 24, y)
-  
-  // MACD histogram bars
-  const barX = 24
-  const barY = y + 30
-  const barWidth = 200
-  const maxHeight = 25
-  
-  // Zero line
-  ctx.strokeStyle = 'rgba(0, 255, 255, 0.5)'
+  // Price and change
+  const price = data.current?.price || 0
+  const priceStr = price > 1000 ? `$${price.toLocaleString('en-US', { maximumFractionDigits: 0 })}` :
+                   price > 1 ? `$${price.toFixed(2)}` : `$${price.toFixed(4)}`
+
+  ctx.fillStyle = '#ffffff'
+  ctx.font = 'bold 14px monospace'
+  ctx.fillText(priceStr, 300, 16)
+
+  // Trend indicator
+  const trend = data.current?.trend || 'sideways'
+  const trendColors = { bullish: '#26a69a', bearish: '#ef5350', sideways: '#ffeb3b' }
+  ctx.fillStyle = trendColors[trend]
+  ctx.font = 'bold 11px monospace'
+  ctx.fillText(trend.toUpperCase(), 300, 32)
+
+  // Token selector tabs
+  tokens.forEach((token, i) => {
+    const isActive = i === currentIndex
+    ctx.fillStyle = isActive ? '#00ffff' : 'rgba(0, 255, 255, 0.3)'
+    ctx.fillRect(400 + i * 28, 8, 24, 14)
+    ctx.fillStyle = isActive ? '#000000' : 'rgba(255, 255, 255, 0.5)'
+    ctx.font = 'bold 8px monospace'
+    ctx.fillText(token, 402 + i * 28, 18)
+  })
+
+  // Live indicator
+  ctx.fillStyle = data.isLive ? '#26a69a' : '#ffeb3b'
+  ctx.font = '9px monospace'
+  ctx.fillText(data.isLive ? 'LIVE' : 'SYNC', 400, 35)
+
+  // Last update time
+  if (data.updatedAt) {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'
+    ctx.font = '8px monospace'
+    const updatedDate = new Date(data.updatedAt)
+    const now = new Date()
+    const ageSeconds = Math.floor((now - updatedDate) / 1000)
+    const ageText = ageSeconds > 60 ? `${Math.floor(ageSeconds / 60)}m` : `${ageSeconds}s`
+    ctx.fillText(ageText, 440, 35)
+  }
+
+  // Divider
+  ctx.strokeStyle = '#00ffff'
   ctx.lineWidth = 1
   ctx.beginPath()
-  ctx.moveTo(barX, barY)
-  ctx.lineTo(barX + barWidth, barY)
+  ctx.moveTo(16, 42)
+  ctx.lineTo(496, 42)
   ctx.stroke()
-  
-  // Draw histogram bars (simplified - just show current value)
-  const histogramValue = macd.histogram || 0
-  const barHeight = Math.min(maxHeight, Math.abs(histogramValue) * 100)
-  
-  if (histogramValue > 0) {
-    ctx.fillStyle = '#44ff44'
-    ctx.fillRect(barX + barWidth/2 - 20, barY - barHeight, 40, barHeight)
-  } else {
-    ctx.fillStyle = '#ff4444'
-    ctx.fillRect(barX + barWidth/2 - 20, barY, 40, Math.abs(barHeight))
-  }
-  
-  // MACD values
-  ctx.fillStyle = '#ffffff'
-  ctx.font = '10px monospace'
-  ctx.fillText(`MACD: ${(macd.macd || 0).toFixed(3)}`, barX, y + 60)
-  ctx.fillText(`Signal: ${(macd.signal || 0).toFixed(3)}`, barX + 100, y + 60)
-  
-  // Trend indicator
-  const trendColor = macd.trend === 'bullish' ? '#44ff44' : '#ff4444'
-  ctx.fillStyle = trendColor
-  ctx.font = 'bold 10px monospace'
-  ctx.fillText((macd.trend || 'neutral').toUpperCase(), barX + 180, y + 60)
 }
 
-const drawMiniCandleChart = (ctx, candles, movingAverages, x, y) => {
-  if (!candles || candles.length === 0) return
-  
-  ctx.fillStyle = '#00ffff'
-  ctx.font = 'bold 12px monospace'
-  ctx.fillText('PRICE ACTION', x, y - 5)
-  
-  const chartWidth = 220
-  const chartHeight = 80
-  const candleWidth = chartWidth / candles.length
-  
-  // Find price range
+// Draw placeholder chart when lightweight-charts is not ready
+function drawPlaceholderChart(ctx, data) {
+  if (!data.candles || data.candles.length === 0) {
+    ctx.fillStyle = 'rgba(0, 255, 255, 0.3)'
+    ctx.font = '12px monospace'
+    ctx.fillText('Loading chart data...', 200, 140)
+    return
+  }
+
+  // Simple candlestick fallback
+  const candles = data.candles.slice(-50)
+  const chartX = 20
+  const chartY = 55
+  const chartWidth = 470
+  const chartHeight = 180
+
   const allPrices = candles.flatMap(c => [c.high, c.low])
   const maxPrice = Math.max(...allPrices)
   const minPrice = Math.min(...allPrices)
   const priceRange = maxPrice - minPrice || 1
-  
-  // Draw candles
+  const candleWidth = chartWidth / candles.length
+
   candles.forEach((candle, i) => {
-    const candleX = x + i * candleWidth
-    
-    // Calculate Y positions
-    const highY = y + (1 - (candle.high - minPrice) / priceRange) * chartHeight
-    const lowY = y + (1 - (candle.low - minPrice) / priceRange) * chartHeight
-    const openY = y + (1 - (candle.open - minPrice) / priceRange) * chartHeight
-    const closeY = y + (1 - (candle.close - minPrice) / priceRange) * chartHeight
-    
-    // Candle color
-    const isBullish = candle.close > candle.open
-    ctx.strokeStyle = isBullish ? '#44ff44' : '#ff4444'
-    ctx.fillStyle = isBullish ? 'rgba(68, 255, 68, 0.3)' : 'rgba(255, 68, 68, 0.3)'
-    
-    // Draw wick
+    const x = chartX + i * candleWidth
+    const highY = chartY + (1 - (candle.high - minPrice) / priceRange) * chartHeight
+    const lowY = chartY + (1 - (candle.low - minPrice) / priceRange) * chartHeight
+    const openY = chartY + (1 - (candle.open - minPrice) / priceRange) * chartHeight
+    const closeY = chartY + (1 - (candle.close - minPrice) / priceRange) * chartHeight
+
+    const isBullish = candle.close >= candle.open
+    ctx.strokeStyle = isBullish ? '#26a69a' : '#ef5350'
+    ctx.fillStyle = isBullish ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)'
+
+    // Wick
     ctx.lineWidth = 1
     ctx.beginPath()
-    ctx.moveTo(candleX + candleWidth/2, highY)
-    ctx.lineTo(candleX + candleWidth/2, lowY)
+    ctx.moveTo(x + candleWidth / 2, highY)
+    ctx.lineTo(x + candleWidth / 2, lowY)
     ctx.stroke()
-    
-    // Draw body
+
+    // Body
     const bodyTop = Math.min(openY, closeY)
-    const bodyHeight = Math.abs(closeY - openY)
-    ctx.fillRect(candleX + 2, bodyTop, candleWidth - 4, Math.max(1, bodyHeight))
+    const bodyHeight = Math.max(1, Math.abs(closeY - openY))
+    ctx.fillRect(x + 1, bodyTop, Math.max(1, candleWidth - 2), bodyHeight)
   })
-  
-  // Draw SMA20 line if available
-  if (movingAverages && movingAverages.sma20 > 0) {
-    const smaY = y + (1 - (movingAverages.sma20 - minPrice) / priceRange) * chartHeight
-    ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)'
+}
+
+// Draw indicator panels at bottom
+function drawIndicatorPanels(ctx, data) {
+  const panelY = 248
+
+  // Background
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.8)'
+  ctx.fillRect(0, panelY, 512, 70)
+
+  // RSI Section
+  ctx.fillStyle = '#00ffff'
+  ctx.font = 'bold 10px monospace'
+  ctx.fillText('RSI(14)', 16, panelY + 14)
+
+  const rsi = data.current?.rsi || 50
+  const rsiBarWidth = 120
+  const rsiBarX = 70
+
+  // RSI background
+  ctx.fillStyle = 'rgba(255, 68, 68, 0.2)'
+  ctx.fillRect(rsiBarX, panelY + 6, rsiBarWidth * 0.3, 12) // Oversold zone
+  ctx.fillRect(rsiBarX + rsiBarWidth * 0.7, panelY + 6, rsiBarWidth * 0.3, 12) // Overbought zone
+  ctx.fillStyle = 'rgba(255, 255, 68, 0.2)'
+  ctx.fillRect(rsiBarX + rsiBarWidth * 0.3, panelY + 6, rsiBarWidth * 0.4, 12) // Neutral zone
+
+  // RSI needle
+  const rsiX = rsiBarX + (rsi / 100) * rsiBarWidth
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(rsiX, panelY + 4)
+  ctx.lineTo(rsiX, panelY + 20)
+  ctx.stroke()
+
+  // RSI value
+  ctx.fillStyle = rsi > 70 ? '#ef5350' : rsi < 30 ? '#26a69a' : '#ffeb3b'
+  ctx.font = 'bold 11px monospace'
+  ctx.fillText(rsi.toFixed(1), rsiBarX + rsiBarWidth + 8, panelY + 16)
+
+  // MACD Section
+  ctx.fillStyle = '#00ffff'
+  ctx.font = 'bold 10px monospace'
+  ctx.fillText('MACD', 16, panelY + 36)
+
+  const macd = data.current?.macd || 0
+  const macdSignal = data.current?.macdSignal || 0
+  const histogram = data.current?.macdHistogram || (macd - macdSignal)
+
+  // MACD histogram bar
+  const histBarX = 70
+  const histBarWidth = 80
+  const maxHist = 100 // Scale factor
+  const histHeight = Math.min(20, Math.abs(histogram) * 2)
+
+  ctx.fillStyle = histogram >= 0 ? '#26a69a' : '#ef5350'
+  if (histogram >= 0) {
+    ctx.fillRect(histBarX + histBarWidth / 2, panelY + 42 - histHeight, histBarWidth / 4, histHeight)
+  } else {
+    ctx.fillRect(histBarX + histBarWidth / 2, panelY + 42, histBarWidth / 4, histHeight)
+  }
+
+  // MACD values
+  ctx.fillStyle = '#ffffff'
+  ctx.font = '9px monospace'
+  ctx.fillText(`M:${macd.toFixed(2)}`, histBarX + histBarWidth + 5, panelY + 35)
+  ctx.fillText(`S:${macdSignal.toFixed(2)}`, histBarX + histBarWidth + 5, panelY + 46)
+
+  // Support/Resistance Section
+  ctx.fillStyle = '#00ffff'
+  ctx.font = 'bold 10px monospace'
+  ctx.fillText('S/R', 250, panelY + 14)
+
+  const support = data.current?.support || 0
+  const resistance = data.current?.resistance || 0
+
+  ctx.fillStyle = '#26a69a'
+  ctx.font = '10px monospace'
+  const supportStr = support > 1000 ? `S:$${(support / 1000).toFixed(1)}k` : `S:$${support.toFixed(2)}`
+  ctx.fillText(supportStr, 280, panelY + 14)
+
+  ctx.fillStyle = '#ef5350'
+  const resistStr = resistance > 1000 ? `R:$${(resistance / 1000).toFixed(1)}k` : `R:$${resistance.toFixed(2)}`
+  ctx.fillText(resistStr, 350, panelY + 14)
+
+  // Bollinger Band indicator
+  ctx.fillStyle = '#00ffff'
+  ctx.font = 'bold 10px monospace'
+  ctx.fillText('BB', 250, panelY + 36)
+
+  // Draw mini BB representation
+  const bbY = panelY + 44
+  const bbWidth = 100
+
+  // Get last bollinger values
+  const lastUpper = data.indicators?.bollingerUpper?.slice(-1)[0]?.value
+  const lastMiddle = data.indicators?.bollingerMiddle?.slice(-1)[0]?.value
+  const lastLower = data.indicators?.bollingerLower?.slice(-1)[0]?.value
+  const currentPrice = data.current?.price
+
+  if (lastUpper && lastLower && lastMiddle && currentPrice) {
+    const range = lastUpper - lastLower
+    const pricePosition = range > 0 ? (currentPrice - lastLower) / range : 0.5
+
+    // Draw BB band
+    ctx.fillStyle = 'rgba(33, 150, 243, 0.3)'
+    ctx.fillRect(280, bbY - 8, bbWidth, 16)
+
+    // Draw middle line
+    ctx.strokeStyle = 'rgba(33, 150, 243, 0.8)'
     ctx.lineWidth = 1
     ctx.beginPath()
-    ctx.moveTo(x, smaY)
-    ctx.lineTo(x + chartWidth, smaY)
+    ctx.moveTo(280 + bbWidth / 2, bbY - 8)
+    ctx.lineTo(280 + bbWidth / 2, bbY + 8)
     ctx.stroke()
-    
-    ctx.fillStyle = 'rgba(255, 255, 0, 0.7)'
-    ctx.font = '8px monospace'
-    ctx.fillText('MA20', x + chartWidth + 2, smaY + 3)
-  }
-}
 
-const drawPatterns = (ctx, patterns, x, y) => {
-  ctx.fillStyle = '#00ffff'
-  ctx.font = 'bold 12px monospace'
-  ctx.fillText('PATTERNS', x, y)
-  
-  if (!patterns || patterns.length === 0) {
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'
-    ctx.font = '10px monospace'
-    ctx.fillText('No patterns detected', x, y + 20)
-    return
+    // Draw price position
+    const priceX = 280 + pricePosition * bbWidth
+    ctx.fillStyle = currentPrice > lastMiddle ? '#26a69a' : '#ef5350'
+    ctx.beginPath()
+    ctx.arc(priceX, bbY, 4, 0, Math.PI * 2)
+    ctx.fill()
   }
-  
-  patterns.slice(0, 3).forEach((pattern, i) => {
-    const yPos = y + 20 + (i * 15)
-    
-    // Pattern signal color
-    const signalColor = pattern.signal === 'bullish' ? '#44ff44' :
-                       pattern.signal === 'bearish' ? '#ff4444' : '#ffff44'
-    
-    ctx.fillStyle = signalColor
-    ctx.font = '10px monospace'
-    ctx.fillText('●', x, yPos)
-    
-    ctx.fillStyle = '#ffffff'
-    ctx.font = '10px monospace'
-    ctx.fillText(pattern.name, x + 12, yPos)
-  })
-}
 
-const drawSupportResistance = (ctx, data, y) => {
+  // Trading Signal
   ctx.fillStyle = '#00ffff'
-  ctx.font = 'bold 11px monospace'
-  ctx.fillText('S/R LEVELS', 24, y)
-  
-  // Support - moved up to avoid overlap
-  ctx.fillStyle = '#44ff44'
-  ctx.font = '10px monospace'
-  ctx.fillText(`Support: $${(data.support || 0).toFixed(0)}`, 24, y + 14)
-  
-  // Resistance - adjusted spacing
-  ctx.fillStyle = '#ff4444'
-  ctx.font = '10px monospace'
-  ctx.fillText(`Resistance: $${(data.resistance || 0).toFixed(0)}`, 150, y + 14)
-  
-  // Volatility - better positioned
-  ctx.fillStyle = '#00ffff'
-  ctx.font = '10px monospace'
-  ctx.fillText(`Volatility:`, 300, y + 14)
-  
-  const volColors = {
-    'low': '#44ff44',
-    'normal': '#ffff44',
-    'high': '#ff8844',
-    'extreme': '#ff4444'
-  }
-  ctx.fillStyle = volColors[data.volatility] || '#ffff44'
   ctx.font = 'bold 10px monospace'
-  ctx.fillText((data.volatility || 'normal').toUpperCase(), 370, y + 14)
-}
+  ctx.fillText('SIGNAL:', 400, panelY + 14)
 
-const drawMarketSummary = (ctx, data, y) => {
-  // Summary line
-  const summaryColor = data.trend === 'bullish' ? '#44ff44' :
-                       data.trend === 'bearish' ? '#ff4444' : '#ffff44'
-  
-  ctx.fillStyle = summaryColor
-  ctx.font = 'bold 10px monospace'
-  
-  let summary = 'SIGNAL: '
-  const rsiValue = data.rsi?.value || 50
-  if (data.trend === 'bullish' && rsiValue < 70) {
-    summary += 'BUY - Bullish trend, RSI room to grow'
-  } else if (data.trend === 'bearish' && rsiValue > 30) {
-    summary += 'SELL - Bearish trend, RSI room to fall'
-  } else if (rsiValue > 70) {
-    summary += 'WAIT - Overbought conditions'
-  } else if (rsiValue < 30) {
-    summary += 'ACCUMULATE - Oversold conditions'
-  } else {
-    summary += 'HOLD - Neutral conditions'
+  const trend = data.current?.trend || 'sideways'
+  let signal = 'HOLD'
+  let signalColor = '#ffeb3b'
+
+  if (trend === 'bullish' && rsi < 70) {
+    signal = 'BUY'
+    signalColor = '#26a69a'
+  } else if (trend === 'bearish' && rsi > 30) {
+    signal = 'SELL'
+    signalColor = '#ef5350'
+  } else if (rsi > 70) {
+    signal = 'OVERBOUGHT'
+    signalColor = '#ef5350'
+  } else if (rsi < 30) {
+    signal = 'OVERSOLD'
+    signalColor = '#26a69a'
   }
-  
-  ctx.fillText(summary, 24, y)
+
+  ctx.fillStyle = signalColor
+  ctx.font = 'bold 14px monospace'
+  ctx.fillText(signal, 400, panelY + 36)
+
+  // Legend for chart indicators
+  ctx.fillStyle = '#ffeb3b'
+  ctx.font = '8px monospace'
+  ctx.fillText('EMA12', 400, panelY + 52)
+  ctx.fillStyle = '#ff9800'
+  ctx.fillText('EMA26', 440, panelY + 52)
+  ctx.fillStyle = 'rgba(33, 150, 243, 0.8)'
+  ctx.fillText('BB', 480, panelY + 52)
 }
 
 export default TeknoScreen

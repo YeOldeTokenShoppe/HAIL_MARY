@@ -606,9 +606,8 @@ export default function CyborgTemple() {
                   margin: 0,
                   marginBottom: "1rem",
                 }}>
-                  The Virtual Mary is more ito 'trade life' than trad wife, and she's learning to trade perpetuals with her team. 
-                  Once she hits 100+ trades with a 60%+ win rate and keeps drawdown under 
-                  15% for 30 days, the team ascends to the mainnet.
+                  The Virtual Mary, more 'trade life' than trad wife, is learning to trade perpetuals with her team of investment specialists. 
+                  Click on any of the traders to see their trading cards. Click on 📊 or 💬 buttons to follow along!
                 </p>
               )}
                     

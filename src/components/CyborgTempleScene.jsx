@@ -1309,6 +1309,13 @@ const CyborgTempleScene = ({
             window.dispatchEvent(new CustomEvent('screenClicked', {
               detail: { screenName: object.userData.agentId }
             }));
+
+            // For Screen3 (TeknoScreen), also dispatch UV coordinates for button clicks
+            if (object.userData.agentId === 'Screen3' && intersects[i].uv) {
+              window.dispatchEvent(new CustomEvent('screen3Click', {
+                detail: { uv: intersects[i].uv }
+              }));
+            }
           }
           
           break; // Stop after first clickable object
