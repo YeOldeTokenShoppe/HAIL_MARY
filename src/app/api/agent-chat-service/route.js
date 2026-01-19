@@ -91,33 +91,25 @@ async function getRecentMessages() {
 
 async function getLiveMarketData() {
   if (!db) return null;
-  
+
   try {
-    // Get market data from Railway service
-    const marketDataRef = doc(db, 'marketData', 'latest');
-    const marketDataSnap = await getDoc(marketDataRef);
-    
-    // Get agent context data
-    const agentContextRef = doc(db, 'agentContext', 'market');
-    const agentContextSnap = await getDoc(agentContextRef);
-    
-    // Get Lighter trading data
-    const lighterAccountRef = doc(db, 'lighterData', 'account');
-    const lighterTradingRef = doc(db, 'lighterData', 'trading');
-    const lighterAccountSnap = await getDoc(lighterAccountRef);
-    const lighterTradingSnap = await getDoc(lighterTradingRef);
-    
-    const marketData = marketDataSnap.exists() ? marketDataSnap.data() : {};
-    const agentContext = agentContextSnap.exists() ? agentContextSnap.data() : {};
-    const lighterAccount = lighterAccountSnap.exists() ? lighterAccountSnap.data() : {};
-    const lighterTrading = lighterTradingSnap.exists() ? lighterTradingSnap.data() : {};
-    
+    // Fetch Firestore data and real macro data in parallel
+    const [firestoreData, macroData] = await Promise.all([
+      fetchFirestoreData(),
+      fetchRealMacroData()
+    ]);
+
+    const { marketData, agentContext, lighterAccount, lighterTrading } = firestoreData;
+
     return {
       btcPrice: marketData.btcPrice || 95000,
       ethPrice: marketData.ethPrice || 3500,
       fearGreed: agentContext.fearGreed || 50,
-      fundingRate: agentContext.fundingRate || 0.01,
-      vix: agentContext.vix || 22.5,
+      fundingRate: macroData.funding?.btc || agentContext.fundingRate || 0.01,
+      vix: macroData.vix?.value || agentContext.vix || 22.5,
+      dxy: macroData.dxy?.value || agentContext.dxy || 103,
+      spx: macroData.spx?.value || 585,
+      treasury10y: macroData.treasury10y?.value || 4.5,
       marketSentiment: agentContext.marketSentiment || 'neutral',
       trend: agentContext.trend || 'sideways',
       timestamp: new Date().toISOString(),
@@ -131,16 +123,19 @@ async function getLiveMarketData() {
         orderCount: lighterTrading.orderCount || 0
       }
     };
-    
+
   } catch (error) {
     console.error('Failed to get live market data:', error);
     // Return mock data as fallback
     return {
       btcPrice: 95000,
-      ethPrice: 3500, 
+      ethPrice: 3500,
       fearGreed: 50,
       fundingRate: 0.01,
       vix: 22.5,
+      dxy: 103,
+      spx: 585,
+      treasury10y: 4.5,
       marketSentiment: 'neutral',
       trend: 'sideways',
       timestamp: new Date().toISOString(),
@@ -153,6 +148,46 @@ async function getLiveMarketData() {
       }
     };
   }
+}
+
+async function fetchFirestoreData() {
+  const marketDataRef = doc(db, 'marketData', 'latest');
+  const agentContextRef = doc(db, 'agentContext', 'market');
+  const lighterAccountRef = doc(db, 'lighterData', 'account');
+  const lighterTradingRef = doc(db, 'lighterData', 'trading');
+
+  const [marketDataSnap, agentContextSnap, lighterAccountSnap, lighterTradingSnap] = await Promise.all([
+    getDoc(marketDataRef),
+    getDoc(agentContextRef),
+    getDoc(lighterAccountRef),
+    getDoc(lighterTradingRef)
+  ]);
+
+  return {
+    marketData: marketDataSnap.exists() ? marketDataSnap.data() : {},
+    agentContext: agentContextSnap.exists() ? agentContextSnap.data() : {},
+    lighterAccount: lighterAccountSnap.exists() ? lighterAccountSnap.data() : {},
+    lighterTrading: lighterTradingSnap.exists() ? lighterTradingSnap.data() : {}
+  };
+}
+
+async function fetchRealMacroData() {
+  try {
+    // Fetch from internal macro API to get real VIX, DXY, SPX
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL || 'http://localhost:3000';
+    const response = await fetch(`${baseUrl}/api/ai/macro`, {
+      next: { revalidate: 300 } // Cache for 5 minutes
+    });
+
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (error) {
+    console.error('Failed to fetch real macro data:', error.message);
+  }
+
+  // Return empty object if fetch fails - will use Firestore fallbacks
+  return {};
 }
 
 export async function POST(request) {

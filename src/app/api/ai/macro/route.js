@@ -65,16 +65,58 @@ export async function GET() {
   }
 }
 
-// Batch fetch all Finnhub quotes (VIXY, SPY, UUP)
-async function fetchFinnhubBatch(apiKey) {
-  if (!apiKey) {
-    throw new Error('Finnhub API key not configured');
-  }
+// Fetch real VIX index from Yahoo Finance
+async function fetchRealVIX() {
+  try {
+    const response = await fetch(
+      'https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1d&range=1d',
+      {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        next: { revalidate: 300 } // Cache for 5 min
+      }
+    );
 
-  const symbols = ['VIXY', 'SPY', 'UUP'];
+    if (response.ok) {
+      const data = await response.json();
+      const quote = data.chart?.result?.[0]?.meta;
+      if (quote) {
+        const currentPrice = quote.regularMarketPrice || 0;
+        const previousClose = quote.previousClose || currentPrice;
+        const change = currentPrice - previousClose;
+        const changePercent = previousClose ? (change / previousClose) * 100 : 0;
+
+        return {
+          value: parseFloat(currentPrice.toFixed(2)),
+          change: parseFloat(change.toFixed(2)),
+          changePercent: parseFloat(changePercent.toFixed(2))
+        };
+      }
+    }
+  } catch (err) {
+    console.error('[Macro API] Yahoo VIX error:', err.message);
+  }
+  return null;
+}
+
+// Batch fetch Finnhub quotes (SPY, UUP) + Yahoo for VIX
+async function fetchFinnhubBatch(apiKey) {
   const results = { vix: null, spx: null, dxy: null };
 
-  // Fetch sequentially to stay within rate limits
+  // Fetch real VIX from Yahoo Finance (free, actual index value)
+  results.vix = await fetchRealVIX();
+
+  if (!apiKey) {
+    console.warn('Finnhub API key not configured, using VIX only');
+    return {
+      vix: results.vix || { value: 18.5, change: 0, changePercent: 0 },
+      spx: { value: 585, change: 0, changePercent: 0 },
+      dxy: { value: 103, change: 0, changePercent: 0 }
+    };
+  }
+
+  // Fetch SPY and UUP from Finnhub
+  const symbols = ['SPY', 'UUP'];
+
   for (const symbol of symbols) {
     try {
       const response = await fetch(
@@ -90,8 +132,7 @@ async function fetchFinnhubBatch(apiKey) {
           changePercent: data.dp || 0
         };
 
-        if (symbol === 'VIXY') results.vix = quote;
-        else if (symbol === 'SPY') results.spx = quote;
+        if (symbol === 'SPY') results.spx = quote;
         else if (symbol === 'UUP') results.dxy = quote;
       }
     } catch (err) {
@@ -103,7 +144,7 @@ async function fetchFinnhubBatch(apiKey) {
   return {
     vix: results.vix || { value: 18.5, change: 0, changePercent: 0 },
     spx: results.spx || { value: 585, change: 0, changePercent: 0 },
-    dxy: results.dxy || { value: 28.5, change: 0, changePercent: 0 }
+    dxy: results.dxy || { value: 103, change: 0, changePercent: 0 }
   };
 }
 
