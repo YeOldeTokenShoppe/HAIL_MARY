@@ -490,10 +490,9 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
       zIndex: 1000,
       height: isMobile ? '100vh' : 'auto',
       maxHeight: isMobile ? '100vh' : '90vh',
-      overflowY: 'auto',
+      overflow: isMobile ? 'auto' : 'hidden',
       scrollbarWidth: 'thin',
       scrollbarColor: 'rgba(255, 215, 0, 0.3) transparent',
-      overflow: isMobile ? 'auto' : 'hidden',
       opacity: '0',
       animation: isMobile ? 'fadeInMobile 0.5s ease-out forwards' : 'fadeIn 0.4s ease-out forwards, float 6s ease-in-out infinite'
     }}
@@ -646,90 +645,73 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
             </div>
           )}
 
-          {/* Current Account Balance - Prominent Display */}
+          {/* Current Account Balance - Compact Display */}
           {(apiAccountData?.account || lighterAccount) && (
             <div style={{
               background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.15) 0%, rgba(147, 51, 234, 0.05) 100%)',
               backdropFilter: 'blur(15px)',
               WebkitBackdropFilter: 'blur(15px)',
-              padding: isMobile ? '20px' : '25px',
-              borderRadius: '20px',
-              border: '2px solid rgba(147, 51, 234, 0.4)',
-              boxShadow: '0 8px 40px rgba(147, 51, 234, 0.2), inset 0 0 20px rgba(147, 51, 234, 0.1)',
-              marginBottom: '20px',
-              textAlign: 'center',
-              position: 'relative',
-              overflow: 'hidden'
+              padding: isMobile ? '12px' : '12px 20px',
+              borderRadius: '12px',
+              border: '1px solid rgba(147, 51, 234, 0.3)',
+              boxShadow: '0 4px 20px rgba(147, 51, 234, 0.15)',
+              marginBottom: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '10px'
             }}>
-              {/* Animated background glow */}
-              <div style={{
-                position: 'absolute',
-                top: '-50%',
-                left: '-50%',
-                width: '200%',
-                height: '200%',
-                background: 'radial-gradient(circle, rgba(147, 51, 234, 0.1) 0%, transparent 70%)',
-                animation: 'pulse 4s ease-in-out infinite',
-                zIndex: 0
-              }} />
-              
-              <div style={{ position: 'relative', zIndex: 1 }}>
-                <div style={{ 
-                  color: 'rgba(255, 255, 255, 0.6)', 
-                  fontSize: isMobile ? '12px' : '14px', 
-                  marginBottom: '8px', 
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                  fontWeight: '600'
-                }}>
-                  💳 Current Account Balance
-                </div>
-                
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
-                  fontSize: isMobile ? '36px' : '48px',
-                  fontWeight: '900',
+                  color: 'rgba(255, 255, 255, 0.5)',
+                  fontSize: '10px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  💳 Balance
+                </div>
+                <div style={{
+                  fontSize: isMobile ? '24px' : '28px',
+                  fontWeight: '800',
                   color: '#fff',
-                  marginBottom: '8px',
-                  textShadow: '0 0 30px rgba(147, 51, 234, 0.8), 0 0 60px rgba(147, 51, 234, 0.4)',
+                  textShadow: '0 0 20px rgba(147, 51, 234, 0.6)',
                   fontFamily: 'monospace'
                 }}>
-                  ${((apiAccountData?.account?.balance || lighterAccount?.balance || 0)).toLocaleString(undefined, { 
-                    minimumFractionDigits: 2, 
-                    maximumFractionDigits: 2 
+                  ${((apiAccountData?.account?.balance || lighterAccount?.balance || 0)).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
                   })}
                 </div>
-                
-                <div style={{ 
-                  color: 'rgba(147, 51, 234, 0.8)', 
-                  fontSize: isMobile ? '11px' : '12px',
-                  fontWeight: '500',
-                  marginBottom: '15px'
-                }}>
-                  Lighter Testnet • Account #{(apiAccountData?.account?.accountIndex || lighterAccount?.accountIndex || 'N/A')}
-                </div>
+              </div>
 
-                {/* Balance status indicator */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <div style={{
-                  display: 'inline-flex',
+                  color: 'rgba(147, 51, 234, 0.7)',
+                  fontSize: '10px'
+                }}>
+                  Lighter Testnet • #{(apiAccountData?.account?.accountIndex || lighterAccount?.accountIndex || 'N/A')}
+                </div>
+                <div style={{
+                  display: 'flex',
                   alignItems: 'center',
-                  gap: '6px',
+                  gap: '4px',
                   background: 'rgba(0, 255, 0, 0.1)',
                   border: '1px solid rgba(0, 255, 0, 0.3)',
-                  borderRadius: '20px',
-                  padding: '4px 12px',
-                  fontSize: '10px',
+                  borderRadius: '10px',
+                  padding: '3px 8px',
+                  fontSize: '9px',
                   color: '#00ff00',
                   fontWeight: '600'
                 }}>
                   <div style={{
-                    width: '6px',
-                    height: '6px',
+                    width: '5px',
+                    height: '5px',
                     borderRadius: '50%',
                     background: '#00ff00',
-                    boxShadow: '0 0 8px rgba(0, 255, 0, 0.8)',
-                    animation: 'pulse 2s infinite'
+                    boxShadow: '0 0 6px rgba(0, 255, 0, 0.8)'
                   }} />
-                  {apiAccountData ? 'LIVE API' : 'FIREBASE DATA'}
+                  {apiAccountData ? 'LIVE API' : 'FIREBASE'}
                 </div>
               </div>
             </div>
@@ -999,100 +981,53 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
             </div>
           )}
 
-          {/* Main P&L Card - Full Width */}
+          {/* P&L and Equity Curve - 2 Column Layout */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+            gap: '10px',
+            marginBottom: '10px'
+          }}>
+          {/* Main P&L Card */}
           <div style={{
             background: 'rgba(0, 40, 30, 0.3)',
             backdropFilter: 'blur(15px)',
             WebkitBackdropFilter: 'blur(15px)',
-            padding: isMobile ? '12px' : '15px',
-            borderRadius: '15px',
+            padding: isMobile ? '10px' : '10px',
+            borderRadius: '12px',
             border: '1px solid rgba(0, 255, 184, 0.1)',
             boxShadow: '0 4px 20px rgba(0, 255, 184, 0.1), inset 0 0 20px rgba(0, 255, 184, 0.02)',
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr',
-            gap: isMobile ? '12px' : '15px'
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px'
           }}>
             {/* Total P&L */}
-            <div>
-              <div style={{ color: '#888', fontSize: isMobile ? '9px' : '10px', marginBottom: '6px', textTransform: 'uppercase' }}>
-                Total P&L
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ color: '#888', fontSize: '9px', textTransform: 'uppercase' }}>Total P&L</div>
+              <div style={{
+                fontSize: isMobile ? '18px' : '20px',
+                fontWeight: 'bold',
+                color: (apiAccountData?.combined?.pnlTotalPnl || metrics.totalPnL) >= 0 ? '#00ff00' : '#ff3333',
+                textShadow: (apiAccountData?.combined?.pnlTotalPnl || metrics.totalPnL) >= 0 ? '0 0 10px rgba(0, 255, 0, 0.5)' : '0 0 10px rgba(255, 51, 51, 0.5)'
+              }}>
+                {apiAccountData?.pnl?.hasNoHistory ? '$0.00' :
+                  apiAccountData?.combined?.pnlTotalPnl !== undefined
+                    ? `${apiAccountData.combined.pnlTotalPnl >= 0 ? '+' : ''}$${apiAccountData.combined.pnlTotalPnl.toFixed(2)}`
+                    : `${metrics.totalPnL >= 0 ? '+' : ''}${metrics.totalPnL.toFixed(2)}%`
+                }
               </div>
-              {apiAccountData?.pnl?.hasNoHistory ? (
-                <div>
-                  <div style={{
-                    fontSize: isMobile ? '24px' : '28px',
-                    fontWeight: 'bold',
-                    color: 'rgba(255, 255, 255, 0.3)',
-                    marginBottom: '4px'
-                  }}>
-                    $0.00
-                  </div>
-                  <div style={{ 
-                    color: 'rgba(255, 255, 255, 0.4)', 
-                    fontSize: '9px',
-                    fontStyle: 'italic'
-                  }}>
-                    No trading history yet
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <div style={{
-                    fontSize: isMobile ? '24px' : '28px',
-                    fontWeight: 'bold',
-                    color: (apiAccountData?.combined?.pnlTotalPnl || metrics.totalPnL) >= 0 ? '#00ff00' : '#ff3333',
-                    marginBottom: '4px',
-                    textShadow: (apiAccountData?.combined?.pnlTotalPnl || metrics.totalPnL) >= 0 ? '0 0 15px rgba(0, 255, 0, 0.6)' : '0 0 15px rgba(255, 51, 51, 0.6)'
-                  }}>
-                    {apiAccountData?.combined?.pnlTotalPnl !== undefined 
-                      ? `${apiAccountData.combined.pnlTotalPnl >= 0 ? '+' : ''}$${apiAccountData.combined.pnlTotalPnl.toFixed(2)}`
-                      : `${metrics.totalPnL >= 0 ? '+' : ''}${metrics.totalPnL.toFixed(2)}%`
-                    }
-                  </div>
-                  <div style={{ 
-                    display: 'flex', 
-                    gap: '8px', 
-                    color: 'rgba(255, 255, 255, 0.3)', 
-                    fontSize: '10px',
-                    alignItems: 'center'
-                  }}>
-                    <span>{apiAccountData?.combined?.tradeCount || metrics.totalTrades} trades</span>
-                    <span>•</span>
-                    <span>{apiAccountData ? 'LIVE API' : timeFrame.toUpperCase()}</span>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Win Rate with Visual Bar */}
             <div>
-              <div style={{ color: '#888', fontSize: isMobile ? '9px' : '10px', marginBottom: '6px', textTransform: 'uppercase' }}>
-                Win Rate
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <span style={{ color: '#888', fontSize: '9px', textTransform: 'uppercase' }}>Win Rate</span>
+                <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff' }}>{metrics.winRate.toFixed(0)}%</span>
               </div>
-              <div style={{ fontSize: isMobile ? '24px' : '28px', fontWeight: 'bold', color: '#fff', marginBottom: '6px' }}>
-                {metrics.winRate.toFixed(0)}%
+              <div style={{ display: 'flex', height: '4px', borderRadius: '2px', overflow: 'hidden', background: 'rgba(255, 51, 51, 0.3)' }}>
+                <div style={{ width: `${metrics.winRate}%`, background: '#00ff00', transition: 'width 0.5s ease' }} />
               </div>
-              {/* Win/Loss Bar */}
-              <div style={{ 
-                display: 'flex', 
-                height: '6px', 
-                borderRadius: '3px',
-                overflow: 'hidden',
-                background: 'rgba(255, 51, 51, 0.3)'
-              }}>
-                <div style={{
-                  width: `${metrics.winRate}%`,
-                  background: '#00ff00',
-                  transition: 'width 0.5s ease'
-                }} />
-              </div>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between',
-                marginTop: '5px',
-                fontSize: '10px',
-                color: '#666'
-              }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px', fontSize: '9px', color: '#666' }}>
                 <span>{metrics.wins}W</span>
                 <span>{metrics.losses}L</span>
               </div>
@@ -1101,32 +1036,19 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
             {/* Current Streak */}
             <div style={{
               background: metrics.currentStreak > 0 ? 'rgba(0, 255, 0, 0.05)' : 'rgba(255, 0, 0, 0.05)',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
-              padding: isMobile ? '10px' : '12px',
-              borderRadius: '10px',
+              padding: '6px 8px',
+              borderRadius: '8px',
               border: `1px solid ${metrics.currentStreak > 0 ? 'rgba(0, 255, 0, 0.2)' : 'rgba(255, 0, 0, 0.2)'}`,
-              boxShadow: metrics.currentStreak > 0 ? '0 0 20px rgba(0, 255, 0, 0.15)' : '0 0 20px rgba(255, 0, 0, 0.15)'
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
             }}>
-              <div style={{ color: '#888', fontSize: isMobile ? '9px' : '10px', marginBottom: '6px', textTransform: 'uppercase' }}>
-                Current Streak
-              </div>
-              <div style={{
-                fontSize: isMobile ? '24px' : '28px',
-                fontWeight: 'bold',
-                color: metrics.currentStreak > 0 ? '#00ff00' : '#ff3333',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                {Math.abs(metrics.currentStreak)}
-                <span style={{ fontSize: isMobile ? '16px' : '18px' }}>
-                  {metrics.currentStreak > 0 ? '🔥' : '❄️'}
+              <span style={{ color: '#888', fontSize: '9px', textTransform: 'uppercase' }}>Streak</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span style={{ fontSize: '16px', fontWeight: 'bold', color: metrics.currentStreak > 0 ? '#00ff00' : '#ff3333' }}>
+                  {Math.abs(metrics.currentStreak)}
                 </span>
-              </div>
-              <div style={{ color: '#666', fontSize: '9px', marginTop: '3px' }}>
-                {metrics.currentStreak > 0 ? 'Consecutive Wins' : 
-                 metrics.currentStreak < 0 ? 'Consecutive Losses' : 'No Streak'}
+                <span style={{ fontSize: '12px' }}>{metrics.currentStreak > 0 ? '🔥' : metrics.currentStreak < 0 ? '❄️' : '➖'}</span>
               </div>
             </div>
           </div>
@@ -1136,23 +1058,24 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
               background: 'rgba(0, 20, 40, 0.3)',
               backdropFilter: 'blur(15px)',
               WebkitBackdropFilter: 'blur(15px)',
-              padding: isMobile ? '10px' : '12px',
-              borderRadius: '15px',
+              padding: '8px 10px',
+              borderRadius: '12px',
               border: '1px solid rgba(0, 255, 184, 0.1)',
               boxShadow: '0 4px 20px rgba(0, 255, 184, 0.05), inset 0 0 20px rgba(0, 20, 40, 0.05)',
-              marginTop: isMobile ? '10px' : '12px'
+              display: 'flex',
+              flexDirection: 'column'
             }}>
-              <div style={{ 
-                color: '#888', 
-                fontSize: isMobile ? '9px' : '10px', 
-                marginBottom: '8px', 
+              <div style={{
+                color: '#888',
+                fontSize: '9px',
+                marginBottom: '4px',
                 textTransform: 'uppercase',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center'
               }}>
-                <span>📈 Equity Curve {apiAccountData?.pnl && !apiAccountData.pnl.hasNoHistory ? '(Live P&L)' : ''}</span>
-                <span style={{ color: '#00FFB8', fontSize: '12px' }}>
+                <span>📈 Equity Curve</span>
+                <span style={{ color: '#00FFB8', fontSize: '11px' }}>
                   {apiAccountData?.pnl?.hasNoHistory ? 
                     'Waiting for trades...' :
                     apiAccountData?.combined?.pnlHistory?.length > 0 ? 
@@ -1167,11 +1090,11 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
               {/* SVG Chart */}
               {(apiAccountData?.combined?.pnlHistory?.length > 0 || metrics.equityCurve.length > 0) && !apiAccountData?.pnl?.hasNoHistory ? (
               <>
-              <div style={{ position: 'relative', width: '100%', height: isMobile ? '100px' : '120px' }}>
-                <svg 
-                  width="100%" 
-                  height="100%" 
-                  viewBox={`0 0 ${isMobile ? 350 : 800} ${isMobile ? 100 : 120}`}
+              <div style={{ position: 'relative', width: '100%', height: isMobile ? '60px' : '70px', flex: 1 }}>
+                <svg
+                  width="100%"
+                  height="100%"
+                  viewBox={`0 0 ${isMobile ? 350 : 400} ${isMobile ? 60 : 70}`}
                   preserveAspectRatio="none"
                   style={{ overflow: 'visible' }}
                 >
@@ -1200,8 +1123,8 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
                   
                   {/* Create path for equity curve */}
                   {(() => {
-                    const width = isMobile ? 350 : 800;
-                    const height = isMobile ? 100 : 120;
+                    const width = isMobile ? 350 : 400;
+                    const height = isMobile ? 60 : 70;
                     const padding = 10;
                     
                     // Find min and max values for scaling
@@ -1292,94 +1215,37 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
                     );
                   })()}
                 </svg>
-                
-                {/* Y-axis labels */}
-                <div style={{
-                  position: 'absolute',
-                  left: '-30px',
-                  top: '0',
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  fontSize: '8px',
-                  color: '#666'
-                }}>
-                  {(() => {
-                    const values = metrics.equityCurve.map(d => d.value);
-                    const minValue = Math.min(...values, 0);
-                    const maxValue = Math.max(...values, 0);
-                    return (
-                      <>
-                        <span>{maxValue.toFixed(0)}%</span>
-                        <span>{((maxValue + minValue) / 2).toFixed(0)}%</span>
-                        <span>{minValue.toFixed(0)}%</span>
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
-              {/* Statistics below chart */}
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-around',
-                marginTop: '6px',
-                paddingTop: '6px',
-                borderTop: '1px solid rgba(255, 255, 255, 0.05)',
-                fontSize: '9px'
-              }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ color: '#666' }}>Start</div>
-                  <div style={{ color: '#fff', fontWeight: 'bold' }}>0%</div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ color: '#666' }}>Peak</div>
-                  <div style={{ color: '#00ff00', fontWeight: 'bold' }}>
-                    +{Math.max(...metrics.equityCurve.map(d => d.value), 0).toFixed(1)}%
-                  </div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ color: '#666' }}>Trough</div>
-                  <div style={{ color: '#ff3333', fontWeight: 'bold' }}>
-                    {Math.min(...metrics.equityCurve.map(d => d.value), 0).toFixed(1)}%
-                  </div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ color: '#666' }}>Current</div>
-                  <div style={{ 
-                    color: metrics.equityCurve[metrics.equityCurve.length - 1]?.value >= 0 ? '#00ff00' : '#ff3333', 
-                    fontWeight: 'bold' 
-                  }}>
-                    {metrics.equityCurve[metrics.equityCurve.length - 1]?.value >= 0 ? '+' : ''}
-                    {metrics.equityCurve[metrics.equityCurve.length - 1]?.value.toFixed(1)}%
-                  </div>
-                </div>
               </div>
               </>
             ) : (
               <div style={{
                 color: 'rgba(255, 255, 255, 0.3)',
                 textAlign: 'center',
-                padding: isMobile ? '20px 15px' : '25px 20px',
-                fontSize: '11px'
+                padding: '15px 10px',
+                fontSize: '10px',
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center'
               }}>
-                <div style={{ fontSize: '20px', marginBottom: '8px' }}>
+                <div style={{ fontSize: '16px', marginBottom: '6px' }}>
                   {apiAccountData?.pnl?.hasNoHistory ? '🤖' : '📊'}
                 </div>
-                {apiAccountData?.pnl?.hasNoHistory ? 
-                  'AI agents haven\'t started trading yet. Performance curve will appear when they make their first moves!' :
-                  'No equity curve data yet. Start trading to see your performance!'
+                {apiAccountData?.pnl?.hasNoHistory ?
+                  'Waiting for first trades...' :
+                  'No data yet'
                 }
               </div>
             )}
           </div>
+          </div>{/* Close 2-column wrapper */}
 
           {/* 2x2 Grid Section - Stacks on mobile */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
-            gap: isMobile ? '10px' : '12px',
-            marginTop: isMobile ? '10px' : '12px'
+            gap: isMobile ? '10px' : '10px'
           }}>
             {/* Council Performance */}
             <div style={{

@@ -180,7 +180,7 @@ class LighterAccountService {
     }
 
     try {
-      const url = `${LIGHTER_API_BASE}/accountActiveOrders?by=l1_address&value=${ACCOUNT_ADDRESS}`;
+      const url = `${LIGHTER_API_BASE}/accountActiveOrders?by=index&value=${LIGHTER_ACCOUNT_INDEX}`;
       console.log('Fetching active orders from:', url);
       
       const response = await fetch(url);

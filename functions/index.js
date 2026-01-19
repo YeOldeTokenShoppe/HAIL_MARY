@@ -154,15 +154,105 @@ exports.analyzePrayersManual = onRequest({
 }, async (req, res) => {
   try {
     logger.info("[Prayer Analysis] Manual trigger requested");
-    
+
     // You can call the same analysis logic here
     // For now, just trigger the scheduled function logic
     const event = { scheduleTime: new Date().toISOString() };
     await exports.analyzePrayersDaily.run(event);
-    
+
     res.json({ success: true, message: "Prayer analysis triggered manually" });
   } catch (error) {
     logger.error("[Prayer Analysis] Manual trigger failed:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// =============================================================================
+// AGENT SCORING WORKFLOW
+// =============================================================================
+
+// Scoring Workflow - Runs every hour
+// Triggers the Next.js API endpoint that runs EMO → TEKNO → MACRO → RL80
+exports.runScoringWorkflow = onSchedule({
+  schedule: "0 * * * *",  // Every hour at minute 0
+  timeZone: "UTC",
+  memory: "256MiB",
+  timeoutSeconds: 540,    // 9 minutes max
+  secrets: ["CRON_SECRET"]
+}, async (event) => {
+  try {
+    logger.info("[Scoring] Starting hourly scoring workflow...");
+
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret) {
+      logger.error("[Scoring] CRON_SECRET not configured");
+      return;
+    }
+
+    // Your Firebase Hosting URL (update if different)
+    const appUrl = process.env.APP_URL || "https://rl80.com";
+    const scoringEndpoint = `${appUrl}/api/cron/run-scoring`;
+
+    logger.info("[Scoring] Calling:", scoringEndpoint);
+
+    // Call the Next.js API endpoint
+    const response = await fetch(scoringEndpoint, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${cronSecret}`,
+        "Content-Type": "application/json"
+      },
+      // 5 minute timeout for the fetch
+      signal: AbortSignal.timeout(300000)
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      logger.info("[Scoring] Workflow completed successfully:", {
+        duration: result.duration,
+        agents: result.agentsCompleted,
+        tradeable: result.summary?.tradeable
+      });
+    } else {
+      logger.error("[Scoring] Workflow failed:", result.error);
+    }
+
+    // Log result to Firestore for monitoring
+    await db.collection('scoringRuns').add({
+      timestamp: new Date(),
+      success: result.success,
+      duration: result.duration,
+      agentsCompleted: result.agentsCompleted || [],
+      summary: result.summary || null,
+      error: result.error || null
+    });
+
+  } catch (error) {
+    logger.error("[Scoring] Fatal error:", error);
+
+    // Log failure to Firestore
+    await db.collection('scoringRuns').add({
+      timestamp: new Date(),
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Manual trigger for scoring (for testing)
+exports.runScoringManual = onRequest({
+  secrets: ["CRON_SECRET"]
+}, async (req, res) => {
+  try {
+    logger.info("[Scoring] Manual trigger requested");
+
+    const event = { scheduleTime: new Date().toISOString() };
+    await exports.runScoringWorkflow.run(event);
+
+    res.json({ success: true, message: "Scoring workflow triggered manually" });
+  } catch (error) {
+    logger.error("[Scoring] Manual trigger failed:", error);
     res.status(500).json({ error: error.message });
   }
 });
