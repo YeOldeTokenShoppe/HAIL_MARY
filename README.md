@@ -321,8 +321,9 @@ agentChatManager.stop()                     // Stop workflow
 |------------|----------|-------------|------------|
 | `marketData` | `latest` | BTC/ETH prices, 24h changes | Railway (60s) |
 | `agentContext` | `market` | Fear & Greed, funding rate, VIX, trend | Railway (120s) |
-| `sentimentData` | `latest` | Trending topics, Polymarket, whale activity | Railway (30m) |
+| `sentimentData` | `latest` | Trending topics, Polymarket, whale activity | Railway (12hr) |
 | `technicalData` | `latest` | OHLC candles, RSI, MACD, Bollinger Bands | Railway (60s) |
+| `macroData` | `latest` | VIX, DXY, SPX, 10Y Treasury, funding rates, OI | Railway (4hr) |
 | `lighterData` | `account` | Lighter account balance | Railway (20m) |
 | `lighterData` | `trading` | Positions and orders | Railway (20m) |
 | `agentChat` | (auto-id) | Agent chat messages | Firebase Functions (hourly) |
@@ -335,15 +336,33 @@ agentChatManager.stop()                     // Stop workflow
 
 ---
 
+## Railway Data Fetch Schedule
+
+The Railway background service fetches data from external APIs at varying intervals. All APIs used are **free**.
+
+| Data Type | Interval | APIs Used | Notes |
+|-----------|----------|-----------|-------|
+| Market prices (BTC/ETH) | 60s | CoinGecko | Crypto volatility needs frequent updates |
+| Technical OHLC | 60s | CoinGecko | Chart data for TeknoScreen |
+| Agent context (F&G) | 120s | Alternative.me | Fear & Greed index |
+| Lighter trading data | 20 min | Lighter DEX | Account balance, positions, orders |
+| Sentiment data | 12 hr | Reddit, CoinGecko, Polymarket, Binance | Twice daily social/news updates |
+| Macro data | 4 hr | Yahoo Finance, Lighter DEX | VIX, DXY, SPX, Treasury, funding, OI |
+| Service health | 5 min | Internal | Status heartbeat |
+
+**Rate Limiting:** CoinGecko calls use a built-in `RateLimiter` class (2s minimum between calls) to avoid hitting free tier limits.
+
+---
+
 ## Agent Display Screens
 
-The `/trade` page displays 4 animated agent screens. Most screens read data directly from Firestore using `onSnapshot` listeners for real-time updates. MacroAgentScreen is the exception, using an API endpoint.
+The `/trade` page displays 4 animated agent screens. All screens read data directly from Firestore using `onSnapshot` listeners for real-time updates (no API calls from the frontend).
 
 | Screen | Component | Data Source | What It Displays |
 |--------|-----------|-------------|------------------|
 | **EMO** | `SentimentScreen.jsx` | `sentimentData/latest` | Fear & Greed, trending topics, Polymarket, whale activity, Google Trends, app rankings |
 | **TEKNO** | `TeknoScreen.jsx` | `technicalData/latest` | Live candlestick chart, RSI, MACD, Bollinger Bands, support/resistance, trading signals |
-| **MACRO** | `MacroAgentScreen.jsx` | `/api/ai/macro` | VIX, DXY, 10Y Treasury, S&P 500, funding rates, open interest |
+| **MACRO** | `MacroAgentScreen.jsx` | `macroData/latest` | VIX, DXY, 10Y Treasury, S&P 500, funding rates, open interest |
 | **RL80** | `RL80Screen.jsx` | Multiple collections | Council scores, decision matrix, performance metrics, trade history |
 
 ### RL80Screen Data Sources
@@ -509,9 +528,9 @@ HAIL_MARY/
 │   │       ├── cron/          # Cron endpoints (run-scoring, update-sentiment)
 │   │       ├── agent-chat-service/  # Agent chat API
 │   │       └── market-data/   # Market data endpoints
-│   ├── components/            # React components (agent display screens)
+│   ├── components/            # React components (agent display screens, all use Firestore)
 │   │   ├── SentimentScreen.jsx    # EMO agent display (Firestore: sentimentData/latest)
-│   │   ├── MacroAgentScreen.jsx   # MACRO agent display (API: /api/ai/macro)
+│   │   ├── MacroAgentScreen.jsx   # MACRO agent display (Firestore: macroData/latest)
 │   │   ├── TeknoScreen.jsx        # TEKNO agent display (Firestore: technicalData/latest)
 │   │   └── RL80Screen.jsx         # RL80 agent display (Firestore: multiple collections)
 │   ├── trading/               # Trading system

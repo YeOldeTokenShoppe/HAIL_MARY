@@ -1,41 +1,47 @@
 import { useEffect, useState } from 'react'
+import { db, doc, onSnapshot } from '@/lib/firebaseClient'
 
-// Data fetching hook with 30 minute refresh interval
-const useMacroData = (refreshInterval = 1800000) => { // 1800000ms = 30 minutes
+// Macro data hook - reads from Firestore (populated by Railway background service)
+const useMacroData = () => {
   const [data, setData] = useState({
     vix: { value: 18.5, change: 0, changePercent: 0 },
     spx: { value: 585, change: 0, changePercent: 0 },
-    dxy: { value: 28.5, change: 0, changePercent: 0 },
+    dxy: { value: 99, change: 0, changePercent: 0 },
     treasury10y: { value: 4.5, change: 0 },
-    funding: { btc: 0.01, eth: 0.008 },
+    funding: { btc: 0, eth: 0 },
     openInterest: { btc: 0, eth: 0, total: 0 },
+    isLive: false,
+    lastUpdate: null
   })
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await fetch('/api/ai/macro')
-
-        if (response.ok) {
-          const macroData = await response.json()
-          setData({
-            vix: macroData.vix || { value: 18.5, change: 0, changePercent: 0 },
-            spx: macroData.spx || { value: 585, change: 0, changePercent: 0 },
-            dxy: macroData.dxy || { value: 28.5, change: 0, changePercent: 0 },
-            treasury10y: macroData.treasury10y || { value: 4.5, change: 0 },
-            funding: macroData.funding || { btc: 0.01, eth: 0.008 },
-            openInterest: macroData.openInterest || { btc: 0, eth: 0, total: 0 },
-          })
-        }
-      } catch (err) {
-        console.error('[MacroAgentScreen] Data fetch failed:', err)
-      }
+    if (!db) {
+      console.warn('[MacroAgentScreen] Firebase not initialized')
+      return
     }
 
-    fetchData()
-    const interval = setInterval(fetchData, refreshInterval)
-    return () => clearInterval(interval)
-  }, [refreshInterval])
+    // Subscribe to macroData/latest for real-time updates
+    const macroRef = doc(db, 'macroData', 'latest')
+    const unsubscribe = onSnapshot(macroRef, (docSnapshot) => {
+      if (docSnapshot.exists()) {
+        const macroData = docSnapshot.data()
+        setData({
+          vix: macroData.vix || { value: 18.5, change: 0, changePercent: 0 },
+          spx: macroData.spx || { value: 585, change: 0, changePercent: 0 },
+          dxy: macroData.dxy || { value: 99, change: 0, changePercent: 0 },
+          treasury10y: macroData.treasury10y || { value: 4.5, change: 0 },
+          funding: macroData.funding || { btc: 0, eth: 0 },
+          openInterest: macroData.openInterest || { btc: 0, eth: 0, total: 0 },
+          isLive: true,
+          lastUpdate: macroData.lastUpdate || null
+        })
+      }
+    }, (error) => {
+      console.error('[MacroAgentScreen] Firestore subscription error:', error)
+    })
+
+    return () => unsubscribe()
+  }, [])
 
   return data
 }
@@ -62,6 +68,11 @@ const MacroAgentScreen = () => {
       ctx.fillStyle = '#00ff66'
       ctx.font = 'bold 18px monospace'
       ctx.fillText('◆ MACRO INDICATORS', 16, 28)
+
+      // Live indicator
+      ctx.fillStyle = data.isLive ? '#44ff44' : '#ffff44'
+      ctx.font = '9px monospace'
+      ctx.fillText(data.isLive ? 'LIVE' : 'SYNC', 480, 28)
 
       // Divider line
       ctx.strokeStyle = '#00ff66'
