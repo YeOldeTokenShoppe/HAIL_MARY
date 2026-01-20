@@ -7,16 +7,16 @@ const useSentimentData = () => {
     fearGreed: { value: 0, label: 'Loading...' },
     trendingTopics: [],
     polymarket: null,
-    whaleActivity: { activity: 'Loading...', confidence: 0 },
     googleTrends: { btc: null, eth: null },
     appRankings: { coinbase: null, binance: null, metamask: null },
+    news: { headlines: [], sentiment: null, sentimentScore: 0 },
     isGrokLive: false,
     dataStatus: {
       fearGreed: 'loading',
       trending: 'loading',
-      whale: 'loading',
       googleTrends: 'loading',
-      appRankings: 'loading'
+      appRankings: 'loading',
+      news: 'loading'
     }
   })
 
@@ -27,13 +27,12 @@ const useSentimentData = () => {
       setData(prev => ({
         ...prev,
         fearGreed: { value: 0, label: 'Unavailable' },
-        whaleActivity: { activity: 'Unavailable', confidence: 0 },
         dataStatus: {
           fearGreed: 'unavailable',
           trending: 'unavailable',
-          whale: 'unavailable',
           googleTrends: 'unavailable',
-          appRankings: 'unavailable'
+          appRankings: 'unavailable',
+          news: 'unavailable'
         }
       }))
       return
@@ -41,63 +40,73 @@ const useSentimentData = () => {
 
     // Listen to Firestore for real-time updates from cron job
     const sentimentRef = doc(db, 'sentimentData', 'latest')
+    const newsRef = doc(db, 'newsData', 'latest')
 
-    const unsubscribe = onSnapshot(
+    const unsubscribeSentiment = onSnapshot(
       sentimentRef,
       (docSnapshot) => {
         if (docSnapshot.exists()) {
           const sentimentData = docSnapshot.data()
 
-          setData({
+          setData(prev => ({
+            ...prev,
             fearGreed: sentimentData.fearGreed || { value: 0, label: 'Unavailable' },
             trendingTopics: sentimentData.trendingTopics || [],
             polymarket: sentimentData.polymarket || null,
-            whaleActivity: sentimentData.whaleActivity || { activity: 'Unknown', confidence: 0 },
             googleTrends: sentimentData.googleTrends || { btc: null, eth: null },
             appRankings: sentimentData.appRankings || { coinbase: null, binance: null, metamask: null },
             isGrokLive: sentimentData.dataStatus?.trending === 'live',
-            dataStatus: sentimentData.dataStatus || {
-              fearGreed: 'unavailable',
-              trending: 'unavailable',
-              whale: 'unavailable',
-              googleTrends: 'unavailable',
-              appRankings: 'unavailable'
+            dataStatus: {
+              ...prev.dataStatus,
+              fearGreed: sentimentData.dataStatus?.fearGreed || 'unavailable',
+              trending: sentimentData.dataStatus?.trending || 'unavailable',
+              googleTrends: sentimentData.dataStatus?.googleTrends || 'unavailable',
+              appRankings: sentimentData.dataStatus?.appRankings || 'unavailable'
             }
-          })
+          }))
         } else {
-          // No data yet - cron job hasn't run
           console.log('[SentimentScreen] No sentiment data in Firestore yet')
           setData(prev => ({
             ...prev,
-            fearGreed: { value: 0, label: 'Awaiting data...' },
-            whaleActivity: { activity: 'Awaiting data...', confidence: 0 },
+            fearGreed: { value: 0, label: 'Awaiting data...' }
+          }))
+        }
+      },
+      (error) => {
+        console.error('[SentimentScreen] Error listening to sentiment:', error)
+      }
+    )
+
+    // Subscribe to news data
+    const unsubscribeNews = onSnapshot(
+      newsRef,
+      (docSnapshot) => {
+        if (docSnapshot.exists()) {
+          const newsData = docSnapshot.data()
+          setData(prev => ({
+            ...prev,
+            news: {
+              headlines: newsData.headlines || [],
+              sentiment: newsData.sentiment || null,
+              sentimentScore: newsData.sentimentScore || 0
+            },
             dataStatus: {
-              fearGreed: 'loading',
-              trending: 'loading',
-              whale: 'loading',
-              googleTrends: 'loading',
-              appRankings: 'loading'
+              ...prev.dataStatus,
+              news: 'live'
             }
           }))
         }
       },
       (error) => {
-        console.error('[SentimentScreen] Error listening to Firestore:', error)
-        setData(prev => ({
-          ...prev,
-          dataStatus: {
-            fearGreed: 'unavailable',
-            trending: 'unavailable',
-            whale: 'unavailable',
-            googleTrends: 'unavailable',
-            appRankings: 'unavailable'
-          }
-        }))
+        console.error('[SentimentScreen] Error listening to news:', error)
       }
     )
 
-    // Cleanup listener on unmount
-    return () => unsubscribe()
+    // Cleanup listeners on unmount
+    return () => {
+      unsubscribeSentiment()
+      unsubscribeNews()
+    }
   }, [])
 
   return data
@@ -160,43 +169,35 @@ const SentimentScreen = () => {
       ctx.lineTo(496, 40)
       ctx.stroke()
 
-      // Fear & Greed Index - Compact display (left side)
-      drawFearGreedCompact(ctx, data.fearGreed, 50, t)
+      // Fear & Greed Index - left side (y=55 to clear header line at y=40)
+      drawFearGreedLarge(ctx, data.fearGreed, 55, t)
 
-      // Google Trends (center)
-      drawGoogleTrends(ctx, data.googleTrends, data.dataStatus, 50)
+      // Google Trends (right side, expanded)
+      drawGoogleTrends(ctx, data.googleTrends, data.dataStatus, 55)
 
-      // App Rankings (right side)
-      drawAppRankings(ctx, data.appRankings, data.dataStatus, 50)
+      // Polymarket Bet Display (y=125 to clear Fear & Greed which extends to ~110)
+      drawPolymarketBet(ctx, data.polymarket, 125, t)
 
-      // Polymarket Bet Display (pass time for animation)
-      drawPolymarketBet(ctx, data.polymarket, 115, t)
+      // News Headlines - main content area
+      drawNewsHeadlines(ctx, data.news, 190, t)
 
-      // Trending Topics
-      drawTrendingTopics(ctx, data.trendingTopics, 195)
-
-      // Whale Activity
-      drawWhaleActivity(ctx, data.whaleActivity, data.dataStatus, 280)
-
-      // Data source indicator - show actual status
+      // Data source indicator - show actual status (at bottom)
       ctx.fillStyle = 'rgba(147, 51, 234, 0.4)'
       ctx.font = '8px monospace'
       const status = data.dataStatus || {}
       const statusParts = []
       if (status.fearGreed === 'live') statusParts.push('F&G')
-      if (status.trending === 'live') statusParts.push('SOCIAL')
-      if (status.whale === 'live') statusParts.push('WHALE')
+      if (status.news === 'live') statusParts.push('NEWS')
       if (status.googleTrends === 'live') statusParts.push('GTRENDS')
-      if (status.appRankings === 'live') statusParts.push('APPS')
       const dataStatusText = statusParts.length > 0
         ? `LIVE: ${statusParts.join(' | ')}`
         : 'CONNECTING...'
-      ctx.fillText(dataStatusText, 10, 298)
+      ctx.fillText(dataStatusText, 10, 300)
 
       // Data sources footer
       ctx.fillStyle = 'rgba(147, 51, 234, 0.3)'
       ctx.font = '7px monospace'
-      ctx.fillText('Sources: Alternative.me | Reddit | CoinGecko | Polymarket | Binance | Google Trends | App Store', 10, 310)
+      ctx.fillText('Sources: Alternative.me | CryptoPanic | CoinDesk | CoinTelegraph | Decrypt | Google Trends', 10, 312)
 
       // Simple border
       ctx.strokeStyle = 'rgba(147, 51, 234, 0.8)'
@@ -221,7 +222,9 @@ const SentimentScreen = () => {
 }
 
 // Helper functions
-const drawFearGreedCompact = (ctx, { value, label }, y, time) => {
+
+// Fear & Greed display - compact but prominent
+const drawFearGreedLarge = (ctx, { value, label }, y, time) => {
   const x = 16
 
   ctx.fillStyle = '#9333ea'
@@ -231,18 +234,18 @@ const drawFearGreedCompact = (ctx, { value, label }, y, time) => {
   // Handle loading/unavailable states
   if (label === 'Loading...' || label === 'Unavailable' || label === 'Awaiting data...') {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'
-    ctx.font = '10px monospace'
-    ctx.fillText('--', x + 10, y + 28)
+    ctx.font = '12px monospace'
+    ctx.fillText('--', x, y + 25)
     return
   }
 
-  // Compact gauge bar
+  // Gauge bar first (at top)
   const gaugeX = x
-  const gaugeY = y + 8
-  const gaugeWidth = 120
+  const gaugeY = y + 10
+  const gaugeWidth = 130
   const gaugeHeight = 12
 
-  // Gradient bar
+  // Gradient bar background
   const gradient = ctx.createLinearGradient(gaugeX, 0, gaugeX + gaugeWidth, 0)
   gradient.addColorStop(0, '#ff4444')
   gradient.addColorStop(0.25, '#ff8844')
@@ -253,9 +256,9 @@ const drawFearGreedCompact = (ctx, { value, label }, y, time) => {
   ctx.fillStyle = gradient
   ctx.fillRect(gaugeX, gaugeY, gaugeWidth, gaugeHeight)
 
-  // Indicator needle with subtle pulse
+  // Indicator needle
   const needleX = gaugeX + (value / 100) * gaugeWidth
-  const pulse = Math.sin(time * 4) * 1
+  const pulse = Math.sin(time * 3) * 1
 
   ctx.fillStyle = '#ffffff'
   ctx.beginPath()
@@ -266,13 +269,13 @@ const drawFearGreedCompact = (ctx, { value, label }, y, time) => {
   ctx.fill()
 
   // Value and label below gauge
-  ctx.fillStyle = '#ffffff'
-  ctx.font = 'bold 18px monospace'
-  ctx.fillText(value.toString(), gaugeX, gaugeY + 35)
+  ctx.fillStyle = getGreedColor(value)
+  ctx.font = 'bold 24px monospace'
+  ctx.fillText(value.toString(), x, y + 50)
 
   ctx.fillStyle = getGreedColor(value)
-  ctx.font = 'bold 10px monospace'
-  ctx.fillText(label.toUpperCase(), gaugeX + 40, gaugeY + 35)
+  ctx.font = 'bold 12px monospace'
+  ctx.fillText(label.toUpperCase(), x + 45, y + 50)
 }
 
 const drawPolymarketBet = (ctx, polymarket, y, time) => {
@@ -396,6 +399,126 @@ const drawPolymarketBet = (ctx, polymarket, y, time) => {
   ctx.fillText(`Volume: ${polymarket.volume}`, barWidth + 35, barY + 10)
 }
 
+const drawNewsHeadlines = (ctx, news, y, time) => {
+  // Section header with border
+  ctx.strokeStyle = 'rgba(147, 51, 234, 0.5)'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(16, y - 5)
+  ctx.lineTo(496, y - 5)
+  ctx.stroke()
+
+  ctx.fillStyle = '#9333ea'
+  ctx.font = 'bold 11px monospace'
+  ctx.fillText('CRYPTO NEWS', 24, y + 8)
+
+  if (!news?.headlines || news.headlines.length === 0) {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'
+    ctx.font = '10px monospace'
+    ctx.fillText('Awaiting news data from CryptoPanic...', 24, y + 28)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'
+    ctx.font = '9px monospace'
+    ctx.fillText('RSS feeds: CoinDesk | CoinTelegraph | Decrypt', 24, y + 44)
+    return
+  }
+
+  // Filter tabs - rotate through different filters every 8 seconds
+  const t = time || performance.now() / 1000
+  const filterIndex = Math.floor(t / 8) % 5
+  const filters = ['all', 'BTC', 'ETH', 'SOL', 'XRP']
+  const currentFilter = filters[filterIndex]
+
+  // Draw filter tabs
+  const filterLabels = ['ALL', 'BTC', 'ETH', 'SOL', 'XRP']
+  filterLabels.forEach((label, i) => {
+    const isActive = i === filterIndex
+    const tabX = 120 + (i * 40)
+
+    // Tab background
+    if (isActive) {
+      ctx.fillStyle = 'rgba(147, 51, 234, 0.3)'
+      ctx.fillRect(tabX - 2, y - 2, 35, 14)
+    }
+
+    ctx.fillStyle = isActive ? '#9333ea' : 'rgba(255, 255, 255, 0.4)'
+    ctx.font = isActive ? 'bold 9px monospace' : '9px monospace'
+    ctx.fillText(label, tabX, y + 8)
+  })
+
+  // Show sentiment summary on far right
+  if (news.sentiment) {
+    const total = news.sentiment.bullish + news.sentiment.bearish + news.sentiment.neutral
+    if (total > 0) {
+      ctx.fillStyle = '#44ff44'
+      ctx.font = '8px monospace'
+      ctx.fillText(`↑${news.sentiment.bullish}`, 400, y + 8)
+      ctx.fillStyle = '#ff4444'
+      ctx.fillText(`↓${news.sentiment.bearish}`, 430, y + 8)
+      ctx.fillStyle = '#888888'
+      ctx.fillText(`─${news.sentiment.neutral}`, 460, y + 8)
+    }
+  }
+
+  // Filter headlines based on current filter
+  let filteredHeadlines = news.headlines
+  if (currentFilter !== 'all') {
+    const assetKeywords = {
+      BTC: ['bitcoin', 'btc', 'satoshi'],
+      ETH: ['ethereum', 'eth', 'vitalik', 'layer 2', 'l2'],
+      SOL: ['solana', 'sol'],
+      XRP: ['ripple', 'xrp']
+    }
+    const keywords = assetKeywords[currentFilter] || []
+    filteredHeadlines = news.headlines.filter(h =>
+      keywords.some(kw => h.title.toLowerCase().includes(kw))
+    )
+    // If no specific headlines, show all
+    if (filteredHeadlines.length === 0) {
+      filteredHeadlines = news.headlines
+    }
+  }
+
+  // Draw up to 5 headlines (we have the space)
+  const headlinesToShow = filteredHeadlines.slice(0, 5)
+  headlinesToShow.forEach((headline, i) => {
+    const yPos = y + 24 + (i * 16)
+
+    // Sentiment indicator dot
+    const sentimentColor = headline.sentiment === 'bullish' ? '#44ff44' :
+                          headline.sentiment === 'bearish' ? '#ff4444' : '#666666'
+    ctx.fillStyle = sentimentColor
+    ctx.beginPath()
+    ctx.arc(28, yPos - 3, 3, 0, Math.PI * 2)
+    ctx.fill()
+
+    // Truncate headline text
+    let title = headline.title || 'Unknown headline'
+    const maxLength = 58
+    if (title.length > maxLength) {
+      title = title.substring(0, maxLength) + '..'
+    }
+
+    ctx.fillStyle = '#ffffff'
+    ctx.font = '9px monospace'
+    ctx.fillText(title, 38, yPos)
+
+    // Source on the right (abbreviated)
+    if (headline.source) {
+      ctx.fillStyle = 'rgba(147, 51, 234, 0.5)'
+      ctx.font = '7px monospace'
+      const shortSource = headline.source.substring(0, 10)
+      ctx.fillText(shortSource, 480 - ctx.measureText(shortSource).width, yPos)
+    }
+  })
+
+  // Fill empty slots with subtle lines
+  for (let i = headlinesToShow.length; i < 5; i++) {
+    const yPos = y + 24 + (i * 16)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'
+    ctx.fillRect(38, yPos - 5, 430, 1)
+  }
+}
+
 const drawTrendingTopics = (ctx, topics, y) => {
   ctx.fillStyle = '#9333ea'
   ctx.font = 'bold 14px monospace'
@@ -489,51 +612,6 @@ const drawGoogleTrends = (ctx, googleTrends, dataStatus, y) => {
   }
 }
 
-const drawAppRankings = (ctx, appRankings, dataStatus, y) => {
-  const x = 330
-
-  ctx.fillStyle = '#9333ea'
-  ctx.font = 'bold 11px monospace'
-  ctx.fillText('APP RANKINGS', x, y)
-
-  if (dataStatus.appRankings !== 'live' || !appRankings) {
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'
-    ctx.font = '10px monospace'
-    ctx.fillText('Unavailable', x, y + 20)
-    return
-  }
-
-  const apps = [
-    { name: 'CB', data: appRankings.coinbase },
-    { name: 'BIN', data: appRankings.binance },
-    { name: 'MM', data: appRankings.metamask }
-  ]
-
-  let offsetX = 0
-  apps.forEach((app, i) => {
-    if (!app.data) return
-
-    const appX = x + offsetX
-
-    // App name
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'
-    ctx.font = '9px monospace'
-    ctx.fillText(app.name, appX, y + 18)
-
-    // Star rating
-    const rating = app.data.score || app.data.rating || 0
-    ctx.fillStyle = rating >= 4.5 ? '#44ff44' : rating >= 4.0 ? '#ffff44' : '#ff8844'
-    ctx.font = 'bold 11px monospace'
-    ctx.fillText(rating.toFixed(1), appX, y + 32)
-
-    // Mini star
-    ctx.fillStyle = '#ffd700'
-    ctx.font = '8px monospace'
-    ctx.fillText('★', appX + 25, y + 32)
-
-    offsetX += 55
-  })
-}
 
 const drawWhaleActivity = (ctx, whaleActivity, dataStatus, y) => {
   ctx.fillStyle = '#9333ea'

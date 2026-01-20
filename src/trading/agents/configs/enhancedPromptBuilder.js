@@ -185,6 +185,25 @@ function buildScoringUserPrompt(agentName, context, teamMessages) {
   if (marketData.fundingRate !== undefined) prompt += `- Funding Rate: ${(marketData.fundingRate * 100).toFixed(3)}%\n`;
   if (marketData.openInterest !== undefined) prompt += `- Open Interest: $${marketData.openInterest}B\n`;
 
+  // Add news data for EMO agent
+  if (agentName === 'EMO' && marketData.news?.headlines?.length > 0) {
+    prompt += `\n**Latest Crypto News Headlines:**\n`;
+    const newsToShow = marketData.news.headlines.slice(0, 8);
+    newsToShow.forEach(h => {
+      const sentimentIcon = h.sentiment === 'bullish' ? '📈' : h.sentiment === 'bearish' ? '📉' : '➖';
+      prompt += `${sentimentIcon} ${h.title} (${h.source})\n`;
+    });
+
+    const sentiment = marketData.news.sentiment;
+    if (sentiment) {
+      prompt += `\n**News Sentiment Summary:** ${sentiment.bullish} bullish, ${sentiment.bearish} bearish, ${sentiment.neutral} neutral\n`;
+      const score = marketData.news.sentimentScore;
+      if (score !== undefined) {
+        prompt += `**News Sentiment Score:** ${score > 0 ? '+' : ''}${score.toFixed(2)} (-1 bearish to +1 bullish)\n`;
+      }
+    }
+  }
+
   if (teamMessages?.length > 0) {
     prompt += `\n**Recent Team Messages:**\n`;
     teamMessages.slice(-3).forEach(msg => {

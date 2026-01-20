@@ -82,11 +82,13 @@ async function fetchMarketData() {
     const agentContextDoc = await firestore.collection('agentContext').doc('market').get();
     const lighterAccountDoc = await firestore.collection('lighterData').doc('account').get();
     const lighterTradingDoc = await firestore.collection('lighterData').doc('trading').get();
+    const newsDataDoc = await firestore.collection('newsData').doc('latest').get();
 
     const marketData = marketDataDoc.exists ? marketDataDoc.data() : {};
     const agentContext = agentContextDoc.exists ? agentContextDoc.data() : {};
     const lighterAccount = lighterAccountDoc.exists ? lighterAccountDoc.data() : {};
     const lighterTrading = lighterTradingDoc.exists ? lighterTradingDoc.data() : {};
+    const newsData = newsDataDoc.exists ? newsDataDoc.data() : {};
 
     return {
       btcPrice: marketData.btcPrice || 95000,
@@ -106,6 +108,14 @@ async function fetchMarketData() {
         orders: lighterTrading.orders || [],
         positionCount: lighterTrading.positionCount || 0,
         orderCount: lighterTrading.orderCount || 0
+      },
+      // News data for EMO sentiment analysis
+      news: {
+        headlines: newsData.headlines || [],
+        sentiment: newsData.sentiment || { bullish: 0, bearish: 0, neutral: 0 },
+        sentimentScore: newsData.sentimentScore || 0,
+        topStories: newsData.topStories || [],
+        lastUpdate: newsData.lastUpdate || null
       }
     };
   } catch (error) {
@@ -122,7 +132,8 @@ async function fetchMarketData() {
       marketSentiment: 'neutral',
       trend: 'sideways',
       timestamp: new Date().toISOString(),
-      trading: { balance: 0, positions: [], orders: [] }
+      trading: { balance: 0, positions: [], orders: [] },
+      news: { headlines: [], sentiment: { bullish: 0, bearish: 0, neutral: 0 }, sentimentScore: 0, topStories: [] }
     };
   }
 }
