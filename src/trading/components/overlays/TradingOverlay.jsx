@@ -28,6 +28,7 @@ const SingleCandleDisplay = dynamic(() => import('../displays/SingleCandleDispla
 
 // Import PredictionMarketOverlay
 import PredictionMarketOverlay from './PredictionMarketOverlay';
+import DocumentationModal from './DocumentationModal';
 
 const TradingOverlay = ({ show = false, data = null, isConnected = false, onModalStateChange = null, onNavigationClick = null }) => {
   const [isMobile, setIsMobile] = useState(false);
@@ -44,6 +45,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
   const [showCompactCandleModal, setShowCompactCandleModal] = React.useState(false); // Modal for CompactCandleModal
   const [showSingleCandleDisplay, setShowSingleCandleDisplay] = useState(false); // For showing the petite SingleCandleDisplay
   const [showPredictionMarket, setShowPredictionMarket] = useState(false); // For showing prediction market overlay
+  const [showDocumentation, setShowDocumentation] = useState(false); // For showing documentation modal
   const [selectedAgent, setSelectedAgent] = useState('all'); // For filtering chat by agent: 'all', 'rl80', 'emo', 'tekno', 'macro'
   const [hoveredNavButton, setHoveredNavButton] = useState(null); // For navigation button hover labels
 
@@ -686,7 +688,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
             {/* Documentation Button */}
             <button
               onClick={() => {
-                // TODO: Add documentation link
+                setShowDocumentation(true);
                 if (onNavigationClick) onNavigationClick();
               }}
               onMouseEnter={() => setHoveredNavButton('docs')}
@@ -2089,7 +2091,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                 right: 0,
                 bottom: 0,
                 background: 'rgba(0, 0, 0, 0.8)',
-                zIndex: window.innerWidth <= 768 ? 99999 : 9999,
+                zIndex: window.innerWidth <= 768 ? 99999 : 99999,
                 backdropFilter: 'blur(5px)'
               }}
             />
@@ -2156,6 +2158,12 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
         <PredictionMarketOverlay
           show={showPredictionMarket}
           onClose={() => setShowPredictionMarket(false)}
+        />
+
+        {/* Documentation Modal */}
+        <DocumentationModal
+          show={showDocumentation}
+          onClose={() => setShowDocumentation(false)}
         />
 
         {/* Compact Candle Modal - Renders on top when opened */}
@@ -2229,7 +2237,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
         padding: leftPanelTab === 'performance' ? '0' : '12px',
         fontFamily: 'monospace',
         fontSize: '11px',
-        zIndex: 9999,
+        zIndex: 99999,
         width: 'min(320px, 25vw)',
         minWidth: '260px',
         maxWidth: '340px',
@@ -2744,7 +2752,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
         padding: '12px',
         fontFamily: 'monospace',
         fontSize: '11px',
-        zIndex: 9999,
+        zIndex: 99999,
         width: 'min(380px, 30vw)',
         minWidth: '320px',
         maxWidth: '400px',
@@ -2908,7 +2916,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
           padding: '12px',
           fontFamily: 'monospace',
           fontSize: '11px',
-          zIndex: 9999,
+          zIndex: 99999,
           width: 'min(320px, 25vw)',
           minWidth: '260px',
           maxWidth: '340px',
@@ -3286,7 +3294,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
           padding: '12px',
           fontFamily: 'monospace',
           fontSize: '11px',
-          zIndex: 9999,
+          zIndex: 99999,
           width: 'min(320px, 25vw)',
           minWidth: '260px',
           maxWidth: '340px',
@@ -3471,7 +3479,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
         padding: '12px',
         fontFamily: 'monospace',
         fontSize: '11px',
-        zIndex: 9999,
+        zIndex: 99999,
         width: 'min(320px, 25vw)',
         minWidth: '260px',
         maxWidth: '340px',

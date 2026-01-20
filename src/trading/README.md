@@ -118,9 +118,9 @@ curl http://localhost:3000/api/agent-status
 - **Metrics**: DXY, VIX, treasury yields
 
 ### RL80 Trader
-- **Type**: Logic-based (no API)
+- **Provider**: Anthropic Claude
 - **Role**: Lead trader, synthesizes team input
-- **Features**: Risk management, position sizing
+- **Features**: Aggregates EMO/TEKNO/MACRO scores, makes final trade decisions
 
 ## Lighter Integration
 
