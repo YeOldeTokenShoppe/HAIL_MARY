@@ -45,7 +45,8 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
   const [showSingleCandleDisplay, setShowSingleCandleDisplay] = useState(false); // For showing the petite SingleCandleDisplay
   const [showPredictionMarket, setShowPredictionMarket] = useState(false); // For showing prediction market overlay
   const [selectedAgent, setSelectedAgent] = useState('all'); // For filtering chat by agent: 'all', 'rl80', 'emo', 'tekno', 'macro'
-  
+  const [hoveredNavButton, setHoveredNavButton] = useState(null); // For navigation button hover labels
+
   // Notification states for all buttons
   const [notifications, setNotifications] = useState({
     trades: 0,      // For 📊 Trading Data & Positions
@@ -510,6 +511,8 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                 // Trigger panel collapse callback
                 if (onNavigationClick) onNavigationClick();
               }}
+              onMouseEnter={() => setHoveredNavButton('performance')}
+              onMouseLeave={() => setHoveredNavButton(null)}
               style={{
                 position: 'relative',
                 width: '60px',
@@ -523,21 +526,43 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                 cursor: 'pointer',
                 transition: 'all 0.3s ease',
                 backdropFilter: 'blur(10px)',
-                boxShadow: '0 0 25px rgba(0, 255, 0, 0.6)',
+                boxShadow: hoveredNavButton === 'performance'
+                  ? '0 0 35px rgba(0, 255, 0, 0.9)'
+                  : '0 0 25px rgba(0, 255, 0, 0.6)',
+                transform: hoveredNavButton === 'performance' ? 'scale(1.1)' : 'scale(1)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontFamily: 'monospace'
               }}
-              title="Trading Data & Positions"
+              title="Performance"
             >
               📊
-              <NotificationBadge 
+              <NotificationBadge
                 count={notifications.trades}
                 color="#ff0041"
                 pulse={true}
                 position="top-right"
               />
+              {hoveredNavButton === 'performance' && (
+                <span style={{
+                  position: 'absolute',
+                  top: '-32px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: 'rgba(0, 0, 0, 0.9)',
+                  color: '#00ff00',
+                  padding: '4px 10px',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  whiteSpace: 'nowrap',
+                  border: '1px solid #00ff00',
+                  pointerEvents: 'none'
+                }}>
+                  Performance
+                </span>
+              )}
             </button>
             
             {/* Chat Button */}
@@ -549,6 +574,8 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                 // Trigger panel collapse callback
                 if (onNavigationClick) onNavigationClick();
               }}
+              onMouseEnter={() => setHoveredNavButton('chat')}
+              onMouseLeave={() => setHoveredNavButton(null)}
               style={{
                 position: 'relative',
                 width: '60px',
@@ -562,21 +589,43 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                 cursor: 'pointer',
                 transition: 'all 0.3s ease',
                 backdropFilter: 'blur(10px)',
-                boxShadow: '0 0 25px rgba(255, 0, 255, 0.6)',
+                boxShadow: hoveredNavButton === 'chat'
+                  ? '0 0 35px rgba(255, 0, 255, 0.9)'
+                  : '0 0 25px rgba(255, 0, 255, 0.6)',
+                transform: hoveredNavButton === 'chat' ? 'scale(1.1)' : 'scale(1)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontFamily: 'monospace'
               }}
-              title="Team Chat"
+              title="Agent Chat"
             >
               💬
-              <NotificationBadge 
+              <NotificationBadge
                 count={notifications.messages}
                 color="#ff0041"
                 pulse={true}
                 position="top-right"
               />
+              {hoveredNavButton === 'chat' && (
+                <span style={{
+                  position: 'absolute',
+                  top: '-32px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: 'rgba(0, 0, 0, 0.9)',
+                  color: '#ff00ff',
+                  padding: '4px 10px',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  whiteSpace: 'nowrap',
+                  border: '1px solid #ff00ff',
+                  pointerEvents: 'none'
+                }}>
+                  Agent Chat
+                </span>
+              )}
             </button>
             
             {/* Prediction Market Button */}
@@ -586,6 +635,8 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                 // Trigger panel collapse callback
                 if (onNavigationClick) onNavigationClick();
               }}
+              onMouseEnter={() => setHoveredNavButton('bet')}
+              onMouseLeave={() => setHoveredNavButton(null)}
               style={{
                 position: 'relative',
                 width: '60px',
@@ -599,15 +650,91 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                 cursor: 'pointer',
                 transition: 'all 0.3s ease',
                 backdropFilter: 'blur(10px)',
-                boxShadow: '0 0 25px rgba(255, 136, 0, 0.6)',
+                boxShadow: hoveredNavButton === 'bet'
+                  ? '0 0 35px rgba(255, 136, 0, 0.9)'
+                  : '0 0 25px rgba(255, 136, 0, 0.6)',
+                transform: hoveredNavButton === 'bet' ? 'scale(1.1)' : 'scale(1)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontFamily: 'monospace'
               }}
-              title="Prediction Market"
+              title="Place Bet"
             >
               🎲
+              {hoveredNavButton === 'bet' && (
+                <span style={{
+                  position: 'absolute',
+                  top: '-32px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: 'rgba(0, 0, 0, 0.9)',
+                  color: '#ff8800',
+                  padding: '4px 10px',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  whiteSpace: 'nowrap',
+                  border: '1px solid #ff8800',
+                  pointerEvents: 'none'
+                }}>
+                  Place Bet
+                </span>
+              )}
+            </button>
+
+            {/* Documentation Button */}
+            <button
+              onClick={() => {
+                // TODO: Add documentation link
+                if (onNavigationClick) onNavigationClick();
+              }}
+              onMouseEnter={() => setHoveredNavButton('docs')}
+              onMouseLeave={() => setHoveredNavButton(null)}
+              style={{
+                position: 'relative',
+                width: '60px',
+                height: '60px',
+                background: 'linear-gradient(135deg, rgba(0, 200, 255, 0.9) 0%, rgba(0, 100, 200, 0.7) 100%)',
+                border: '2px solid #00c8ff',
+                borderRadius: '50%',
+                color: '#000',
+                fontSize: '24px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                backdropFilter: 'blur(10px)',
+                boxShadow: hoveredNavButton === 'docs'
+                  ? '0 0 35px rgba(0, 200, 255, 0.9)'
+                  : '0 0 25px rgba(0, 200, 255, 0.6)',
+                transform: hoveredNavButton === 'docs' ? 'scale(1.1)' : 'scale(1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontFamily: 'monospace'
+              }}
+              title="Documentation"
+            >
+              📜
+              {hoveredNavButton === 'docs' && (
+                <span style={{
+                  position: 'absolute',
+                  top: '-32px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: 'rgba(0, 0, 0, 0.9)',
+                  color: '#00c8ff',
+                  padding: '4px 10px',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  whiteSpace: 'nowrap',
+                  border: '1px solid #00c8ff',
+                  pointerEvents: 'none'
+                }}>
+                  Documentation
+                </span>
+              )}
             </button>
           </div>
         )}
