@@ -568,62 +568,6 @@ export default function CyborgTemple() {
           // Allow touch events to pass through when collapsed
           pointerEvents: "auto",
         }}>
-          {!userHasInteracted && !isMobileView &&(
-            <>
-              <p style={{
-                fontSize: isMobileView ? "1.8rem" : "1rem",
-                lineHeight: "1.2",
-                color: "rgba(255, 255, 255, 0.95)",
-                margin: 0,
-                marginBottom: isMobileView ? "0.75rem" : "1rem",
-                fontWeight: "700",
-                textAlign: "center",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                paddingBottom: isMobileView ? "0.75rem" : "1rem",
-                borderBottom: "1px solid rgba(255, 255, 255, 0.2)",
-              }}>
-                Multi-agent AI trading
-              </p>
-              
-              <p style={{
-                fontSize: isMobileView ? "1.1rem" : "0.9rem",
-                lineHeight: "1.2",
-                color: "rgba(255, 255, 255, 0.8)",
-                margin: 0,
-                marginBottom: isMobileView ? "0.5rem" : "0.75rem",
-                textAlign: "center",
-                fontStyle: "italic",
-              }}>
-                Featuring 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙 and the 3 Wise Cyborgs
-              </p>
-              
-              {!isMobileView && (
-                <p style={{
-                  fontSize: "0.85rem",
-                  lineHeight: "1.4",
-                  color: "rgba(255, 255, 255, 0.7)",
-                  margin: 0,
-                  marginBottom: "1rem",
-                }}>
-                  The Virtual Mary, more 'trade life' than trad wife, is learning to trade perpetuals with her team of investment specialists. 
-                  Click on any of the traders to see their trading cards. Click on 📊 or 💬 buttons to follow along, 🎲 to place bets on the Trading Agents, and 📜 for system documentation.
-                </p>
-              )}
-                    
-              {/* <p style={{
-                fontSize: isMobileView ? "0.8rem" : "0.9rem",
-                lineHeight: "1.1",
-                color: "rgba(255, 255, 255, 0.8)",
-                margin: 0,
-                marginBottom: isMobileView ? "0.75rem" : "1rem",
-                textAlign: isMobileView ? "center" : "left",
-              }}>
-                {isMobileView ? "Tap agents to view more stats" : "Click on any agent to view their individual performance and features/trading philosophy."}
-              </p> */}
-            </>
-          )}
-
           {/* Mainnet Readiness Stats - Only show when user hasn't interacted AND not on mobile */}
           {!userHasInteracted && !isMobileView && (
           <div style={{
@@ -635,6 +579,47 @@ export default function CyborgTemple() {
             padding: isMobileView ? "0" : (userHasInteracted ? "0.75rem" : "1rem"),
             marginTop: isMobileView ? "0" : "0.5rem",
           }}>
+            <p style={{
+              fontSize: isMobileView ? "1.8rem" : "1rem",
+              lineHeight: "1.2",
+              color: "rgba(255, 255, 255, 0.95)",
+              margin: 0,
+              marginBottom: isMobileView ? "0.75rem" : "1rem",
+              fontWeight: "700",
+              textAlign: "center",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              paddingBottom: isMobileView ? "0.75rem" : "1rem",
+              borderBottom: "1px solid rgba(255, 255, 255, 0.2)",
+            }}>
+              Multi-agent AI trading
+            </p>
+
+            <p style={{
+              fontSize: isMobileView ? "1.1rem" : "0.9rem",
+              lineHeight: "1.2",
+              color: "rgba(255, 255, 255, 0.8)",
+              margin: 0,
+              marginBottom: isMobileView ? "0.5rem" : "0.75rem",
+              textAlign: "center",
+              fontStyle: "italic",
+            }}>
+              Featuring 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙 and the 3 Wise Cyborgs
+            </p>
+
+            {!isMobileView && (
+              <p style={{
+                fontSize: "0.85rem",
+                lineHeight: "1.4",
+                color: "rgba(255, 255, 255, 0.7)",
+                margin: 0,
+                marginBottom: "1rem",
+              }}>
+                The Virtual Mary, more 'trade life' than trad wife, is learning to trade perpetuals with her team of investment specialists.
+                Click on any of the traders to see their trading cards. Click on 📊 or 💬 buttons to follow along, or 🎲 to place bets on the Trading Agents, and 📜 for system documentation.
+              </p>
+            )}
+
             <h3 
               className="mainnet-readiness-heading"
               style={{
