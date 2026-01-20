@@ -330,6 +330,45 @@ agentChatManager.stop()                     // Stop workflow
 | `tradeHistory` | (auto-id) | All trade execution logs | Railway |
 | `scoringRuns` | (auto-id) | Scoring workflow logs | Firebase Functions (hourly) |
 | `serviceStatus` | `lighterService` | Railway service health | Railway (5m) |
+| `decisions` | (auto-id) | Full decision logs with analyst scores | Scoring Workflow |
+| `agentScores` | (auto-id) | Individual analyst score outputs | Scoring Workflow |
+
+---
+
+## Agent Display Screens
+
+The `/trade` page displays 4 animated agent screens. Most screens read data directly from Firestore using `onSnapshot` listeners for real-time updates. MacroAgentScreen is the exception, using an API endpoint.
+
+| Screen | Component | Data Source | What It Displays |
+|--------|-----------|-------------|------------------|
+| **EMO** | `SentimentScreen.jsx` | `sentimentData/latest` | Fear & Greed, trending topics, Polymarket, whale activity, Google Trends, app rankings |
+| **TEKNO** | `TeknoScreen.jsx` | `technicalData/latest` | Live candlestick chart, RSI, MACD, Bollinger Bands, support/resistance, trading signals |
+| **MACRO** | `MacroAgentScreen.jsx` | `/api/ai/macro` | VIX, DXY, 10Y Treasury, S&P 500, funding rates, open interest |
+| **RL80** | `RL80Screen.jsx` | Multiple collections | Council scores, decision matrix, performance metrics, trade history |
+
+### RL80Screen Data Sources
+
+The RL80 Command Center aggregates data from multiple Firestore collections:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     RL80Screen Firestore Subscriptions               │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  agentDecisions/RL80 ──────► Latest trading decision                │
+│    └─ action, symbol, confidence, reasoning, size                   │
+│                                                                      │
+│  decisions (latest) ───────► Aggregated analyst scores              │
+│    └─ EMO/TEKNO/MACRO direction scores, consensus, agreement        │
+│                                                                      │
+│  agentScores (recent) ─────► Real-time analyst updates              │
+│    └─ Individual agent scoring outputs                              │
+│                                                                      │
+│  tradeHistory (recent 20) ─► Performance metrics                    │
+│    └─ Win rate, total P&L, trade count, recent trade outcomes       │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -470,11 +509,11 @@ HAIL_MARY/
 │   │       ├── cron/          # Cron endpoints (run-scoring, update-sentiment)
 │   │       ├── agent-chat-service/  # Agent chat API
 │   │       └── market-data/   # Market data endpoints
-│   ├── components/            # React components
-│   │   ├── SentimentScreen.jsx    # EMO agent display
-│   │   ├── MacroAgentScreen.jsx   # MACRO agent display
-│   │   ├── TeknoScreen.jsx        # TEKNO agent display
-│   │   └── RL80Screen.jsx         # RL80 agent display
+│   ├── components/            # React components (agent display screens)
+│   │   ├── SentimentScreen.jsx    # EMO agent display (Firestore: sentimentData/latest)
+│   │   ├── MacroAgentScreen.jsx   # MACRO agent display (API: /api/ai/macro)
+│   │   ├── TeknoScreen.jsx        # TEKNO agent display (Firestore: technicalData/latest)
+│   │   └── RL80Screen.jsx         # RL80 agent display (Firestore: multiple collections)
 │   ├── trading/               # Trading system
 │   │   ├── agents/            # AI agent configurations
 │   │   │   ├── sentiment-oracle.js   # EMO agent

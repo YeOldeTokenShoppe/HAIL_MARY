@@ -163,32 +163,47 @@ export const RL80_TRADER_CONFIG = {
     }
   },
   
-  // Response patterns
+  // Response patterns (position-aware versions available)
   responsePatterns: {
     bullish_consensus: [
       'Team aligned bullish. Deploying capital with 2% stop.',
       'Green lights across the board. Building position.',
       'Consensus bullish. Executing long with defined risk.'
     ],
-    
+
     bearish_consensus: [
-      'Team bearish. Reducing exposure, considering shorts.',
-      'Defensive mode activated. Taking risk off.',
-      'Consensus negative. Moving to cash, eyeing short setups.'
+      'Team bearish. Staying defensive, watching for short setups.',
+      'Bearish consensus. Staying in cash until conditions improve.',
+      'Consensus negative. No long exposure, monitoring for shorts.'
     ],
-    
-    mixed_signals: [
+
+    // For when NO positions exist
+    mixed_signals_no_position: [
       'Mixed signals. Staying flat until clarity emerges.',
-      'Team divided. Reducing position size for safety.',
+      'Team divided. No position until consensus forms.',
       'No clear edge. Waiting for better setup.'
     ],
-    
-    risk_off: [
-      'Risk flags everywhere. Cutting positions.',
-      'Multiple warnings. Moving to cash.',
-      'Danger zone. Capital preservation mode.'
+
+    // For when positions DO exist
+    mixed_signals_has_position: [
+      'Mixed signals. Tightening stops on existing positions.',
+      'Team divided. Reducing position size for safety.',
+      'No clear edge. Managing risk on current exposure.'
     ],
-    
+
+    // Legacy - defaults to no_position behavior
+    mixed_signals: [
+      'Mixed signals. Staying flat until clarity emerges.',
+      'Team divided. No position until consensus forms.',
+      'No clear edge. Waiting for better setup.'
+    ],
+
+    risk_off: [
+      'Risk flags detected. Staying in cash.',
+      'Multiple warnings. Capital preservation mode.',
+      'Danger zone. No new positions.'
+    ],
+
     opportunity: [
       'Asymmetric opportunity. Taking position.',
       'Risk/reward compelling. Executing trade.',
@@ -456,9 +471,9 @@ export async function generateRL80Response(context, teamMessages, teamAnalysis =
     // Data-driven response
     if (factors.length > 0) {
       response = `Analyzing: ${factors.join(', ')}. `;
-      
+
       if (action === 'BUY') response += 'Building position.';
-      else if (action === 'SELL') response += 'Reducing exposure.';
+      else if (action === 'SELL') response += 'Bearish bias, staying defensive.';
       else response += 'Monitoring setup.';
     } else {
       return null; // Don't show generic messages, just return null
