@@ -189,8 +189,8 @@ exports.runScoringWorkflow = onSchedule({
       return;
     }
 
-    // Your Firebase Hosting URL (update if different)
-    const appUrl = process.env.APP_URL || "https://rl80.com";
+    // Firebase App Hosting URL
+    const appUrl = process.env.APP_URL || "https://pumpkin--hailmary-3ff6c.us-central1.hosted.app";
     const scoringEndpoint = `${appUrl}/api/cron/run-scoring`;
 
     logger.info("[Scoring] Calling:", scoringEndpoint);
