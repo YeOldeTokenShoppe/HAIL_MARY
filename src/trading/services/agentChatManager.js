@@ -546,15 +546,12 @@ class AgentChatManager {
 // Export singleton instance
 export const agentChatManager = new AgentChatManager();
 
-// Auto-start in development mode (comment out for production)
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  // Auto-start after page load
-  setTimeout(() => {
-    if (!agentChatManager.isRunning()) {
-      console.log('🚀 Auto-starting Agent Chat Manager in development mode');
-      agentChatManager.start();
-    }
-  }, 5000);
-}
+// DISABLED: Auto-start removed to prevent duplicate triggers
+// Agent triggering is now handled ONLY by Firebase Cloud Functions (hourly cron)
+// The client-side manager can still be started manually via agentChatManager.start()
+// or used for UI updates and manual triggers via the trading interface.
+//
+// To manually start in browser console: agentChatManager.start()
+// To manually trigger a single agent: agentChatManager.manualTrigger('MACRO')
 
 export default agentChatManager;

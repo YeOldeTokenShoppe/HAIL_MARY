@@ -35,13 +35,12 @@ It uses transparent mechanics, community participation, and creative presentatio
           title: 'What can I do with RL80?',
           response: `LOADING UTILITY MODULE...
 
-You can simply hold RL80, or you can actively engage with its features.
+You can simply hold RL80, or you can actively engage with its features and micro-economy.
 Nothing is required, and no action is framed as an obligation. The system is designed so that meaning and utility emerge from how the community chooses to participate.
 Depending on how you choose to engage, RL80 allows you to:
 	•	Hold as a long-term signal of alignment
 	•	Stake to participate in rewards
-	•	Burn tokens for symbolic acts, recognition, or access to special features
-	•	Interact with creative, on-chain displays that reflect community activity
+	•	Burn tokens for symbolic acts of sacrifice and deflationary impact, or to earn Illumin80 status. 
 
 `,
           status: '[UTILITY.LOADED]'
@@ -70,7 +69,7 @@ Depending on how you choose to engage, RL80 allows you to:
 
       The act parallels traditional candle votives offered to the Virgin Mary: a small, personal gesture made visible within a shared space. In RL80, each burn adds light to the shrine.
 
-      Every burn permanently reduces the fixed token supply. In doing so, an offering becomes a universal goodwill gesture—one that strengthens the system for all participants rather than extracting value from others.
+      Every burn permanently reduces the fixed token supply, thus increasing token value. In doing so, an offering becomes a universal goodwill gesture—one that strengthens the system for all participants rather than extracting value from others.
 
       On the Illumin80 page, the total number of candles burning and tokens burned to date form a living display of collective engagement—a quiet, real-time signal of sentiment, conviction, and attention over time.
 `,
@@ -84,7 +83,9 @@ Depending on how you choose to engage, RL80 allows you to:
       title: 'What is The Illumin80?',
       response: ` LOADING LUMINARY MODULE...
 
-The Illumin80 refers to participants who have chosen to actively engage with RL80 by staking or burning tokens.
+The Illumin80 refers to token-holders who rank among the top 20% of tokens offered to burn to light a green candle. This status 
+unlocks the top-tier of staking rewards and provides the user with a personalized candle votive that doesn't 'burn out' or expire
+as long as they continue to qualify - i.e., they are not displaced from the top 20%. 
 
 `,
       status: '[REQUIREMENTS.LISTED]',
@@ -95,8 +96,8 @@ The Illumin80 refers to participants who have chosen to actively engage with RL8
           title: 'How do I burn a candle?',
           response: `RETRIEVING INSTRUCTIONS...
 
-To burn a candle, visit the /illumin80 page and follow the on-screen steps.
-Detailed burning instructions are available below.
+To burn a candle, visit the /illumin80 page and simply click the button, fill out a quick form, and sign your digital wallet transaction.
+Candles melt over the next 80 hours. When fully melted, they expire and are removed from the scene.
 `,
           status: '[INSTRUCTIONS.LISTED]'
         },
@@ -119,7 +120,7 @@ Detailed staking instructions are available in the next module.
       title: 'Staking & Rewards',
       response: ` ACCESSING STAKING PROTOCOL...
 
-Staking lets you deposit RL80 into the staking vault to participate in the system’s reward stream. While staked, your tokens remain yours, but they are locked in the staking contract until your unlock period ends.
+Staking lets you deposit RL80 into the staking vault to participate in the system’s reward stream. While staked, your tokens remain yours, but they are locked in the staking contract until your unlock period ends after 7 days from your last staking deposit.
 
 `,
       status: '[TERMS.LOADED]',
@@ -205,7 +206,7 @@ Because claiming requires an on-chain transaction, a minimum threshold is used t
 To burn a candle, visit the /illumin80 page and follow the on-screen steps.
 Burning RL80 is optional and accessible—any amount may be burned to participate. Each burn lights a candle and adds your message to the shrine.
 
-Each candle burns for 7 days.
+Each candle burns for 80 hours.
 
 Only one candle may be active per wallet at a time.
 If you burn again before your candle expires, your new candle replaces the existing one—renewing your light rather than stacking visibility.

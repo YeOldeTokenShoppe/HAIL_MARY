@@ -13,11 +13,11 @@ import { agentChatManager } from '../../services/agentChatManager';
 const SingleCandleDisplay = dynamic(() => import('../displays/SingleCandleDisplay'), {
   ssr: false,
   loading: () => (
-    <div style={{ 
-      width: '100%', 
-      height: '280px', 
-      display: 'flex', 
-      alignItems: 'center', 
+    <div style={{
+      width: '100%',
+      height: '280px',
+      display: 'flex',
+      alignItems: 'center',
       justifyContent: 'center',
       color: '#666'
     }}>
@@ -25,6 +25,9 @@ const SingleCandleDisplay = dynamic(() => import('../displays/SingleCandleDispla
     </div>
   )
 });
+
+// Import PredictionMarketOverlay
+import PredictionMarketOverlay from './PredictionMarketOverlay';
 
 const TradingOverlay = ({ show = false, data = null, isConnected = false, onModalStateChange = null, onNavigationClick = null }) => {
   const [isMobile, setIsMobile] = useState(false);
@@ -40,6 +43,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
   const [showAddCandleModal, setShowAddCandleModal] = useState(false); // Modal for adding user's candle
   const [showCompactCandleModal, setShowCompactCandleModal] = React.useState(false); // Modal for CompactCandleModal
   const [showSingleCandleDisplay, setShowSingleCandleDisplay] = useState(false); // For showing the petite SingleCandleDisplay
+  const [showPredictionMarket, setShowPredictionMarket] = useState(false); // For showing prediction market overlay
   const [selectedAgent, setSelectedAgent] = useState('all'); // For filtering chat by agent: 'all', 'rl80', 'emo', 'tekno', 'macro'
   
   // Notification states for all buttons
@@ -575,12 +579,10 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
               />
             </button>
             
-            {/* Candle Display Button - Opens SingleCandleDisplay */}
-            {/* <button
+            {/* Prediction Market Button */}
+            <button
               onClick={() => {
-                setShowSingleCandleDisplay(true);
-                // Clear candle notifications when viewing
-                setNotifications(prev => ({ ...prev, candles: 0 }));
+                setShowPredictionMarket(true);
                 // Trigger panel collapse callback
                 if (onNavigationClick) onNavigationClick();
               }}
@@ -592,7 +594,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                 border: '2px solid #ff8800',
                 borderRadius: '50%',
                 color: '#000',
-                fontSize: '24px',
+                fontSize: '32px',
                 fontWeight: 'bold',
                 cursor: 'pointer',
                 transition: 'all 0.3s ease',
@@ -603,16 +605,10 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                 justifyContent: 'center',
                 fontFamily: 'monospace'
               }}
-              title="Candlelaria"
+              title="Prediction Market"
             >
-              🙏
-              <NotificationBadge 
-                count={notifications.candles}
-                color="#ff0041"
-                pulse={true}
-                position="top-right"
-              />
-            </button> */}
+              🎲
+            </button>
           </div>
         )}
 
@@ -2028,7 +2024,13 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
             </div>
           </>
         )}
-        
+
+        {/* Prediction Market Overlay */}
+        <PredictionMarketOverlay
+          show={showPredictionMarket}
+          onClose={() => setShowPredictionMarket(false)}
+        />
+
         {/* Compact Candle Modal - Renders on top when opened */}
         {/* <CompactCandleModal
           isOpen={showCompactCandleModal}
