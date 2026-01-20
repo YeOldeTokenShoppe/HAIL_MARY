@@ -184,6 +184,10 @@ async function saveMessageToFirestore(agent, message, type = 'trading', sentimen
   const firestore = initFirebaseAdmin();
 
   try {
+    // Calculate expireAt for TTL (7 days from now)
+    const expireAt = new Date();
+    expireAt.setDate(expireAt.getDate() + 7);
+
     const docRef = await firestore.collection('agentChat').add({
       agent,
       message,
@@ -191,6 +195,7 @@ async function saveMessageToFirestore(agent, message, type = 'trading', sentimen
       sentiment,
       timestamp: FieldValue.serverTimestamp(),
       createdAt: new Date().toISOString(),
+      expireAt: expireAt,  // TTL field - document expires after 7 days
       ...additionalData
     });
 
@@ -211,10 +216,15 @@ async function saveAgentScoresToFirestore(scoreOutput) {
   try {
     const docId = `${scoreOutput.timestamp}_${scoreOutput.agentId}`;
 
+    // Calculate expireAt for TTL (7 days from now)
+    const expireAt = new Date();
+    expireAt.setDate(expireAt.getDate() + 7);
+
     await firestore.collection(FIREBASE_COLLECTIONS.AGENT_SCORES).doc(docId).set({
       ...scoreOutput,
       createdAt: FieldValue.serverTimestamp(),
-      createdAtISO: new Date().toISOString()
+      createdAtISO: new Date().toISOString(),
+      expireAt: expireAt  // TTL field - document expires after 7 days
     });
 
     console.log(`[ScoringOrchestrator] Saved ${scoreOutput.agentId} scores: ${docId}`);
@@ -232,8 +242,13 @@ async function saveWorkflowSummary(workflowResult) {
   const firestore = initFirebaseAdmin();
 
   try {
+    // Calculate expireAt for TTL (7 days from now)
+    const expireAt = new Date();
+    expireAt.setDate(expireAt.getDate() + 7);
+
     const docRef = await firestore.collection('workflowRuns').add({
       timestamp: FieldValue.serverTimestamp(),
+      expireAt: expireAt,  // TTL field - document expires after 7 days
       startedAt: workflowResult.startedAt,
       completedAt: workflowResult.completedAt,
       duration: workflowResult.duration,

@@ -1,86 +1,239 @@
 import { useEffect, useState } from 'react'
+import { db, doc, collection, onSnapshot, query, orderBy, limit, where } from '@/lib/firebaseClient'
 
-// RL80 command center data fetching
-const useRL80Data = (refreshInterval = 30000) => { // 30 seconds refresh
+// RL80 data hook - reads from Firestore (populated by scoring workflow)
+const useRL80Data = () => {
   const [data, setData] = useState({
-    signals: {
-      sentiment: { score: 50, signal: 'neutral', confidence: 0.5, factors: [] },
-      technical: { score: 50, signal: 'neutral', confidence: 0.5, factors: [] },
-      macro: { score: 50, signal: 'neutral', confidence: 0.5, factors: [] }
-    },
+    // Latest RL80 decision from agentDecisions/RL80
     decision: {
       action: 'HOLD',
-      size: 0,
+      symbol: 'ETH',
       confidence: 0.5,
-      reasoning: 'Initializing...',
-      consensusScore: 50
+      reasoning: 'Awaiting data...',
+      timestamp: null
     },
+    // Analyst scores from the latest workflow run
+    analystScores: {
+      EMO: { direction: 0, confidence: 0.5, signal: 'neutral' },
+      TEKNO: { direction: 0, confidence: 0.5, signal: 'neutral' },
+      MACRO: { direction: 0, confidence: 0.5, signal: 'neutral' }
+    },
+    // Aggregated consensus
+    consensus: {
+      score: 50,
+      agreement: 0.5,
+      direction: 'neutral'
+    },
+    // Performance from trade history
     performance: {
-      winRate: 50,
+      winRate: 0,
       totalPnL: 0,
+      tradeCount: 0,
       recentTrades: []
-    }
+    },
+    // Connection status
+    isLive: false,
+    lastUpdate: null
   })
 
   useEffect(() => {
-    const fetchRL80Analysis = async () => {
-      try {
-        const response = await fetch('/api/ai/rl80-analysis')
-        if (response.ok) {
-          const analysisData = await response.json()
-          setData(analysisData)
-        }
-      } catch (err) {
-        console.error('[RL80Screen] Error fetching analysis:', err)
-      }
+    if (!db) {
+      console.warn('[RL80Screen] Firebase not initialized')
+      return
     }
 
-    // Initial fetch
-    fetchRL80Analysis()
-    
-    // Set up refresh interval
-    const interval = setInterval(fetchRL80Analysis, refreshInterval)
-    
-    return () => clearInterval(interval)
-  }, [refreshInterval])
+    const unsubscribes = []
+
+    // Listen to agentDecisions/RL80 for latest decision
+    const decisionRef = doc(db, 'agentDecisions', 'RL80')
+    unsubscribes.push(
+      onSnapshot(decisionRef, (docSnapshot) => {
+        if (docSnapshot.exists()) {
+          const decisionData = docSnapshot.data()
+          setData(prev => ({
+            ...prev,
+            decision: {
+              action: decisionData.action || 'HOLD',
+              symbol: decisionData.symbol || 'ETH',
+              confidence: decisionData.confidence || 0.5,
+              reasoning: decisionData.reasoning || 'No reasoning provided',
+              timestamp: decisionData.timestamp?.toDate?.() || decisionData.timestamp || null,
+              size: decisionData.size || 0,
+              riskLevel: decisionData.riskLevel || 'normal'
+            },
+            isLive: true,
+            lastUpdate: new Date()
+          }))
+        }
+      }, (error) => {
+        console.error('[RL80Screen] Decision subscription error:', error)
+      })
+    )
+
+    // Listen to latest decisions collection for aggregated scores
+    const decisionsQuery = query(
+      collection(db, 'decisions'),
+      orderBy('timestamp', 'desc'),
+      limit(1)
+    )
+    unsubscribes.push(
+      onSnapshot(decisionsQuery, (snapshot) => {
+        if (!snapshot.empty) {
+          const latestDecision = snapshot.docs[0].data()
+
+          // Extract analyst scores
+          const analysts = latestDecision.analysts || {}
+          const analystScores = {
+            EMO: formatAnalystScore(analysts.EMO),
+            TEKNO: formatAnalystScore(analysts.TEKNO),
+            MACRO: formatAnalystScore(analysts.MACRO)
+          }
+
+          // Calculate consensus from aggregated score
+          const aggregated = latestDecision.aggregated || {}
+          const consensusScore = ((aggregated.weightedDirection || 0) + 10) * 5 // Convert -10..+10 to 0..100
+
+          setData(prev => ({
+            ...prev,
+            analystScores,
+            consensus: {
+              score: Math.round(consensusScore),
+              agreement: aggregated.agreement || 0.5,
+              direction: getDirectionFromScore(aggregated.weightedDirection || 0)
+            }
+          }))
+        }
+      }, (error) => {
+        console.error('[RL80Screen] Decisions subscription error:', error)
+      })
+    )
+
+    // Listen to recent trade history for performance metrics
+    const tradesQuery = query(
+      collection(db, 'tradeHistory'),
+      orderBy('timestamp', 'desc'),
+      limit(20)
+    )
+    unsubscribes.push(
+      onSnapshot(tradesQuery, (snapshot) => {
+        if (!snapshot.empty) {
+          const trades = snapshot.docs.map(doc => doc.data())
+          const performance = calculatePerformance(trades)
+          setData(prev => ({
+            ...prev,
+            performance
+          }))
+        }
+      }, (error) => {
+        console.error('[RL80Screen] TradeHistory subscription error:', error)
+      })
+    )
+
+    // Also listen to agentScores for real-time analyst updates
+    const scoresQuery = query(
+      collection(db, 'agentScores'),
+      orderBy('createdAt', 'desc'),
+      limit(4)
+    )
+    unsubscribes.push(
+      onSnapshot(scoresQuery, (snapshot) => {
+        if (!snapshot.empty) {
+          const recentScores = {}
+          snapshot.docs.forEach(doc => {
+            const data = doc.data()
+            const agentId = data.agentId
+            if (agentId && !recentScores[agentId]) {
+              // Get score for ETH (primary trading asset)
+              const ethScore = data.scores?.find(s => s.asset === 'ETH') || data.scores?.[0]
+              if (ethScore) {
+                recentScores[agentId] = formatAnalystScore({
+                  score: ethScore.direction,
+                  confidence: ethScore.confidence,
+                  rationale: ethScore.rationale
+                })
+              }
+            }
+          })
+
+          if (Object.keys(recentScores).length > 0) {
+            setData(prev => ({
+              ...prev,
+              analystScores: {
+                ...prev.analystScores,
+                ...recentScores
+              }
+            }))
+          }
+        }
+      }, (error) => {
+        console.error('[RL80Screen] AgentScores subscription error:', error)
+      })
+    )
+
+    return () => {
+      unsubscribes.forEach(unsub => unsub())
+    }
+  }, [])
 
   return data
+}
+
+// Helper: Format analyst score data
+function formatAnalystScore(data) {
+  if (!data) return { direction: 0, confidence: 0.5, signal: 'neutral' }
+
+  const direction = data.score || data.direction || 0
+  const confidence = data.confidence || 0.5
+
+  return {
+    direction,
+    confidence,
+    signal: getDirectionFromScore(direction),
+    rationale: data.rationale || ''
+  }
+}
+
+// Helper: Get signal direction from score
+function getDirectionFromScore(score) {
+  if (score >= 5) return 'bullish'
+  if (score >= 2) return 'lean_bullish'
+  if (score <= -5) return 'bearish'
+  if (score <= -2) return 'lean_bearish'
+  return 'neutral'
+}
+
+// Helper: Calculate performance metrics from trades
+function calculatePerformance(trades) {
+  if (!trades || trades.length === 0) {
+    return { winRate: 0, totalPnL: 0, tradeCount: 0, recentTrades: [] }
+  }
+
+  const completedTrades = trades.filter(t => t.status === 'filled' || t.pnl !== undefined)
+  const wins = completedTrades.filter(t => (t.pnl || 0) > 0).length
+  const totalPnL = completedTrades.reduce((sum, t) => sum + (t.pnl || 0), 0)
+
+  return {
+    winRate: completedTrades.length > 0 ? (wins / completedTrades.length) * 100 : 0,
+    totalPnL,
+    tradeCount: completedTrades.length,
+    recentTrades: trades.slice(0, 5).map(t => ({
+      action: t.action || t.side,
+      symbol: t.symbol,
+      success: (t.pnl || 0) >= 0,
+      pnl: t.pnl,
+      timestamp: t.timestamp
+    }))
+  }
 }
 
 // The RL80 command center screen
 const RL80Screen = () => {
   const data = useRL80Data()
-  const [hasStartedDrawing, setHasStartedDrawing] = useState(false)
   const [animationFrame, setAnimationFrame] = useState(0)
-  const [dataReceived, setDataReceived] = useState({
-    emo: false,
-    tekno: false,
-    macro: false
-  })
-  const [lastDataTime, setLastDataTime] = useState(null)
-  
-  // Track when new data arrives
-  useEffect(() => {
-    if (data && data.signals) {
-      const newDataReceived = {
-        emo: data.signals.sentiment && data.signals.sentiment.score !== 50,
-        tekno: data.signals.technical && data.signals.technical.score !== 50,
-        macro: data.signals.macro && data.signals.macro.score !== 50
-      }
-      setDataReceived(newDataReceived)
-      
-      // Update timestamp when any real data arrives
-      if (newDataReceived.emo || newDataReceived.tekno || newDataReceived.macro) {
-        setLastDataTime(Date.now())
-      }
-    }
-  }, [data])
 
-  // Animation loop
+  // Animation loop for pulsing effects
   useEffect(() => {
-    const animate = () => {
-      setAnimationFrame(prev => prev + 1)
-    }
+    const animate = () => setAnimationFrame(prev => prev + 1)
     const interval = setInterval(animate, 100)
     return () => clearInterval(interval)
   }, [])
@@ -88,30 +241,20 @@ const RL80Screen = () => {
   // Draw loop
   useEffect(() => {
     const draw = () => {
-      // Use the global canvas set up by VideoScreens for Screen4
-      // @ts-ignore
       const canvas = window['__screen4Canvas']
-      // @ts-ignore
       const texture = window['__screen4Texture']
-      
-      if (!canvas || !texture) {
-        return
-      }
-      
-      // Log once when we start drawing
-      if (!hasStartedDrawing) {
-        setHasStartedDrawing(true)
-      }
-      
+
+      if (!canvas || !texture) return
+
       const ctx = canvas.getContext('2d')
-      const t = performance.now() / 1000 // Time in seconds
+      const t = performance.now() / 1000
 
       // Background - dark with subtle grid
       ctx.fillStyle = '#0a0a0a'
       ctx.fillRect(0, 0, 512, 320)
-      
+
       // Draw subtle grid
-      ctx.strokeStyle = 'rgba(255, 215, 0, 0.05)' // Very faint gold
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.05)'
       ctx.lineWidth = 0.5
       for (let x = 0; x < 512; x += 32) {
         ctx.beginPath()
@@ -126,41 +269,30 @@ const RL80Screen = () => {
         ctx.stroke()
       }
 
-      // Header with RL80's golden color
-      ctx.fillStyle = '#FFD700' // Gold for the boss
+      // Header
+      ctx.fillStyle = '#FFD700'
       ctx.font = 'bold 18px monospace'
-      ctx.fillText('⚡ RL80 COMMAND CENTER', 16, 28)
-      
-      // Data flow indicators - show which agents are feeding data
-      const agentStatuses = [
-        { name: 'EMO', active: dataReceived.emo, x: 280, color: '#9333ea' },
-        { name: 'TEK', active: dataReceived.tekno, x: 320, color: '#00ffff' },
-        { name: 'MAC', active: dataReceived.macro, x: 360, color: '#00ff00' }
-      ]
-      
-      agentStatuses.forEach(agent => {
-        const pulseFactor = agent.active ? Math.sin(t * 4) * 0.3 + 0.7 : 0.3
-        ctx.fillStyle = agent.active ? agent.color : 'rgba(255, 255, 255, 0.2)'
-        ctx.globalAlpha = pulseFactor
-        ctx.font = 'bold 10px monospace'
-        ctx.fillText('▼', agent.x, 24)
-        ctx.font = '8px monospace'
-        ctx.fillText(agent.name, agent.x - 4, 36)
-        ctx.globalAlpha = 1.0
-      })
-      
-      // Status indicator - pulses when making decisions
+      ctx.fillText('\u26A1 RL80 COMMAND CENTER', 16, 28)
+
+      // Status indicator
       const pulse = Math.sin(t * 3) * 0.5 + 0.5
-      if (data.decision.action !== 'HOLD') {
-        ctx.fillStyle = `rgba(255, 215, 0, ${pulse})`
+      const isActive = data.decision.action !== 'HOLD'
+
+      if (isActive) {
+        ctx.fillStyle = `rgba(255, 215, 0, ${0.5 + pulse * 0.5})`
         ctx.font = 'bold 12px monospace'
-        ctx.fillText('●ACTIVE', 460, 28)
+        ctx.fillText('\u25CFACTIVE', 420, 28)
       } else {
         ctx.fillStyle = 'rgba(255, 215, 0, 0.5)'
         ctx.font = '10px monospace'
-        ctx.fillText('●STANDBY', 450, 28)
+        ctx.fillText('\u25CFSTANDBY', 420, 28)
       }
-      
+
+      // Live indicator
+      ctx.fillStyle = data.isLive ? '#44ff44' : '#ffff44'
+      ctx.font = '9px monospace'
+      ctx.fillText(data.isLive ? 'LIVE' : 'SYNC', 480, 28)
+
       // Divider line
       ctx.strokeStyle = '#FFD700'
       ctx.lineWidth = 1
@@ -168,38 +300,32 @@ const RL80Screen = () => {
       ctx.moveTo(16, 40)
       ctx.lineTo(496, 40)
       ctx.stroke()
-      
-      // Show data sync status
-      if (lastDataTime) {
-        const timeSinceUpdate = Math.floor((Date.now() - lastDataTime) / 1000)
-        const nextSyncIn = Math.max(0, 60 - (timeSinceUpdate % 60)) // API polls every 60s
-        const nextFreshDataIn = Math.max(0, 900 - (timeSinceUpdate % 900)) // Fresh data every 15 min
+
+      // Last update timestamp
+      if (data.lastUpdate) {
+        const timeSince = Math.floor((Date.now() - data.lastUpdate.getTime()) / 1000)
         ctx.fillStyle = 'rgba(255, 215, 0, 0.6)'
         ctx.font = '9px monospace'
-        ctx.fillText(`Last sync: ${timeSinceUpdate}s ago`, 16, 54)
-        // Show minutes:seconds for fresh data countdown
-        const minutes = Math.floor(nextFreshDataIn / 60)
-        const seconds = nextFreshDataIn % 60
-        ctx.fillText(`Next fresh data: ${minutes}:${seconds.toString().padStart(2, '0')}`, 140, 54)
+        ctx.fillText(`Last sync: ${timeSince}s ago`, 16, 54)
       }
 
-      // Council Analysis Section with connection indicators
-      drawCouncilSignals(ctx, data.signals, 70, t, dataReceived)
-      
+      // Council Analysis Section
+      drawCouncilAnalysis(ctx, data.analystScores, 68, t)
+
       // Decision Matrix
-      drawDecisionMatrix(ctx, data.decision, 155, t)
-      
+      drawDecisionMatrix(ctx, data.decision, data.consensus, 160, t)
+
       // Performance Metrics
-      drawPerformanceMetrics(ctx, data.performance, 235)
-      
+      drawPerformanceMetrics(ctx, data.performance, 240)
+
       // Trade Signal Bar
-      drawTradeSignal(ctx, data.decision, 290, t)
-      
+      drawTradeSignal(ctx, data.decision, 295, t)
+
       // Confidence meter on the right
-      drawConfidenceMeter(ctx, data.decision.confidence, 420, 60, t)
-      
+      drawConfidenceMeter(ctx, data.decision.confidence, 440, 65, t)
+
       // Border with glow effect when active
-      if (data.decision.action !== 'HOLD') {
+      if (isActive) {
         ctx.strokeStyle = `rgba(255, 215, 0, ${0.5 + pulse * 0.5})`
         ctx.lineWidth = 2
       } else {
@@ -208,217 +334,246 @@ const RL80Screen = () => {
       }
       ctx.strokeRect(2, 2, 508, 316)
 
-      // Update texture
       if (texture) {
         texture.needsUpdate = true
       }
     }
-    
-    // Set up interval for drawing
-    const intervalId = setInterval(draw, 100) // Draw every 100ms (~10fps)
-    
-    return () => {
-      clearInterval(intervalId)
-    }
-  }, [data, dataReceived, lastDataTime, hasStartedDrawing, animationFrame])
+
+    const intervalId = setInterval(draw, 100)
+    return () => clearInterval(intervalId)
+  }, [data, animationFrame])
 
   return null
 }
 
-// Helper drawing functions
-const drawCouncilSignals = (ctx, signals, y, time, dataReceived = {}) => {
+// Draw council analysis with real analyst scores
+function drawCouncilAnalysis(ctx, scores, y, time) {
   ctx.fillStyle = '#FFD700'
   ctx.font = 'bold 14px monospace'
   ctx.fillText('COUNCIL ANALYSIS', 24, y)
-  
+
   const agents = [
-    { name: 'EMO', data: signals.sentiment, color: '#9333ea', connected: dataReceived.emo },
-    { name: 'TEK', data: signals.technical, color: '#00ffff', connected: dataReceived.tekno },
-    { name: 'MAC', data: signals.macro, color: '#00ff00', connected: dataReceived.macro }
+    { name: 'EMO', data: scores.EMO, color: '#9333ea' },
+    { name: 'TEK', data: scores.TEKNO, color: '#00ffff' },
+    { name: 'MAC', data: scores.MACRO, color: '#00ff00' }
   ]
-  
+
   agents.forEach((agent, i) => {
-    const yPos = y + 20 + (i * 22)
-    
+    const yPos = y + 18 + (i * 22)
+    const hasData = agent.data && agent.data.direction !== 0
+
     // Connection indicator
-    if (agent.connected) {
-      const pulse = Math.sin(time * 3) * 0.3 + 0.7
-      ctx.fillStyle = agent.color
-      ctx.globalAlpha = pulse
-      ctx.font = '10px monospace'
-      ctx.fillText('◉', 12, yPos)
-      ctx.globalAlpha = 1.0
-    } else {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)'
-      ctx.font = '10px monospace'
-      ctx.fillText('○', 12, yPos)
-    }
-    
+    const pulse = hasData ? Math.sin(time * 3) * 0.3 + 0.7 : 0.3
+    ctx.fillStyle = hasData ? agent.color : 'rgba(255, 255, 255, 0.2)'
+    ctx.globalAlpha = pulse
+    ctx.font = '10px monospace'
+    ctx.fillText(hasData ? '\u25C9' : '\u25CB', 12, yPos)
+    ctx.globalAlpha = 1.0
+
     // Agent name
-    ctx.fillStyle = agent.connected ? agent.color : 'rgba(255, 255, 255, 0.5)'
+    ctx.fillStyle = hasData ? agent.color : 'rgba(255, 255, 255, 0.5)'
     ctx.font = 'bold 11px monospace'
     ctx.fillText(agent.name + ':', 24, yPos)
-    
-    // Score bar
+
+    // Direction score bar - convert -10..+10 to percentage
     const barX = 70
-    const barWidth = 150
+    const barWidth = 140
     const barHeight = 14
-    
+    const direction = agent.data?.direction || 0
+    const scorePercent = ((direction + 10) / 20) * 100 // -10 to +10 -> 0 to 100
+
     // Background bar
     ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'
     ctx.fillRect(barX, yPos - 12, barWidth, barHeight)
-    
-    // Filled bar based on score
-    const fillWidth = (agent.data.score / 100) * barWidth
-    const barColor = agent.data.score > 65 ? '#44ff44' : 
-                     agent.data.score < 35 ? '#ff4444' : '#ffff44'
+
+    // Center line (neutral)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(barX + barWidth / 2, yPos - 12)
+    ctx.lineTo(barX + barWidth / 2, yPos + 2)
+    ctx.stroke()
+
+    // Filled bar based on direction (from center)
+    const fillWidth = Math.abs(direction) / 10 * (barWidth / 2)
+    const barColor = direction > 2 ? '#44ff44' : direction < -2 ? '#ff4444' : '#ffff44'
     ctx.fillStyle = barColor
-    ctx.fillRect(barX, yPos - 12, fillWidth, barHeight)
-    
-    // Score text
+
+    if (direction >= 0) {
+      ctx.fillRect(barX + barWidth / 2, yPos - 12, fillWidth, barHeight)
+    } else {
+      ctx.fillRect(barX + barWidth / 2 - fillWidth, yPos - 12, fillWidth, barHeight)
+    }
+
+    // Direction score text
     ctx.fillStyle = '#ffffff'
     ctx.font = '10px monospace'
-    ctx.fillText(`${agent.data.score.toFixed(0)}%`, barX + barWidth + 5, yPos - 2)
-    
-    // Signal
+    const dirStr = direction >= 0 ? `+${direction.toFixed(1)}` : direction.toFixed(1)
+    ctx.fillText(dirStr, barX + barWidth + 5, yPos - 2)
+
+    // Signal label
+    const signalText = getSignalLabel(agent.data?.signal)
     ctx.fillStyle = agent.color
-    ctx.font = 'bold 10px monospace'
-    const signalText = agent.data.signal.toUpperCase()
+    ctx.font = 'bold 9px monospace'
     ctx.fillText(signalText, barX + barWidth + 40, yPos - 2)
-    
-    // Confidence indicator
-    const confSize = 4
-    const confX = barX + barWidth + 110
-    const confLevel = Math.floor(agent.data.confidence * 5)
+
+    // Confidence dots
+    const confLevel = Math.floor((agent.data?.confidence || 0.5) * 5)
+    const confX = barX + barWidth + 95
     for (let j = 0; j < 5; j++) {
       ctx.fillStyle = j < confLevel ? agent.color : 'rgba(255, 255, 255, 0.1)'
-      ctx.fillRect(confX + j * (confSize + 2), yPos - 8, confSize, confSize)
+      ctx.fillRect(confX + j * 6, yPos - 8, 4, 4)
     }
   })
 }
 
-const drawDecisionMatrix = (ctx, decision, y, time) => {
+// Get display label for signal
+function getSignalLabel(signal) {
+  switch (signal) {
+    case 'bullish': return 'BULLISH'
+    case 'lean_bullish': return 'LEAN BUY'
+    case 'bearish': return 'BEARISH'
+    case 'lean_bearish': return 'LEAN SELL'
+    default: return 'NEUTRAL'
+  }
+}
+
+// Draw decision matrix with real decision data
+function drawDecisionMatrix(ctx, decision, consensus, y, time) {
   // Decision box with golden border
   ctx.strokeStyle = '#FFD700'
   ctx.lineWidth = 2
-  ctx.strokeRect(24, y, 380, 60)
-  
-  // Decision background - changes color based on action
-  const bgColor = decision.action.includes('BUY') ? 'rgba(0, 255, 0, 0.1)' :
-                  decision.action.includes('SELL') ? 'rgba(255, 0, 0, 0.1)' :
+  ctx.strokeRect(24, y, 380, 65)
+
+  // Background color based on action
+  const bgColor = decision.action.includes('BUY') || decision.action === 'LONG' ? 'rgba(0, 255, 0, 0.1)' :
+                  decision.action.includes('SELL') || decision.action === 'SHORT' ? 'rgba(255, 0, 0, 0.1)' :
                   'rgba(255, 255, 255, 0.05)'
   ctx.fillStyle = bgColor
-  ctx.fillRect(24, y, 380, 60)
-  
-  // Decision header
+  ctx.fillRect(24, y, 380, 65)
+
+  // Header
   ctx.fillStyle = '#FFD700'
   ctx.font = 'bold 14px monospace'
   ctx.fillText('DECISION MATRIX', 34, y + 18)
-  
-  // Action with animation
+
+  // Action with pulsing effect
   const pulse = Math.sin(time * 4) * 0.5 + 0.5
-  const actionColor = decision.action.includes('BUY') ? '#44ff44' :
-                      decision.action.includes('SELL') ? '#ff4444' :
+  const actionColor = decision.action.includes('BUY') || decision.action === 'LONG' ? '#44ff44' :
+                      decision.action.includes('SELL') || decision.action === 'SHORT' ? '#ff4444' :
                       '#ffff44'
-  
-  ctx.fillStyle = decision.action !== 'HOLD' ? 
-    `rgba(${actionColor === '#44ff44' ? '68, 255, 68' : 
+
+  ctx.fillStyle = decision.action !== 'HOLD' ?
+    `rgba(${actionColor === '#44ff44' ? '68, 255, 68' :
            actionColor === '#ff4444' ? '255, 68, 68' : '255, 255, 68'}, ${0.5 + pulse * 0.5})` :
     actionColor
   ctx.font = 'bold 20px monospace'
   ctx.fillText(decision.action, 34, y + 44)
-  
-  // Size indicator
+
+  // Symbol
+  ctx.fillStyle = '#ffffff'
+  ctx.font = '12px monospace'
+  ctx.fillText(decision.symbol || 'ETH', 120, y + 44)
+
+  // Size indicator if available
   if (decision.size > 0) {
-    ctx.fillStyle = '#ffffff'
-    ctx.font = '12px monospace'
-    ctx.fillText(`Size: ${(decision.size * 100).toFixed(0)}%`, 150, y + 44)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'
+    ctx.font = '10px monospace'
+    ctx.fillText(`Size: ${(decision.size * 100).toFixed(0)}%`, 170, y + 44)
   }
-  
+
   // Consensus score
   ctx.fillStyle = '#FFD700'
   ctx.font = '11px monospace'
-  ctx.fillText(`Consensus: ${decision.consensusScore.toFixed(0)}/100`, 250, y + 44)
-  
-  // Reasoning
+  ctx.fillText(`Consensus: ${consensus.score}/100`, 250, y + 44)
+
+  // Reasoning (truncated)
   ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'
   ctx.font = '9px monospace'
-  const reasoning = decision.reasoning.length > 50 ? 
-    decision.reasoning.substring(0, 50) + '...' : decision.reasoning
-  ctx.fillText(reasoning, 34, y + 58)
+  const reasoning = decision.reasoning || 'Awaiting analysis...'
+  const truncatedReasoning = reasoning.length > 55 ? reasoning.substring(0, 55) + '...' : reasoning
+  ctx.fillText(truncatedReasoning, 34, y + 60)
 }
 
-const drawPerformanceMetrics = (ctx, performance, y) => {
+// Draw performance metrics from real trade data
+function drawPerformanceMetrics(ctx, performance, y) {
   ctx.fillStyle = '#FFD700'
   ctx.font = 'bold 12px monospace'
   ctx.fillText('PERFORMANCE METRICS', 24, y)
-  
+
   // Win rate gauge
   ctx.fillStyle = '#ffffff'
   ctx.font = '11px monospace'
   ctx.fillText('Win Rate:', 24, y + 20)
-  
+
   const winRateX = 90
   const winRateWidth = 100
   const winRateHeight = 10
-  
+
   // Background
   ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'
   ctx.fillRect(winRateX, y + 12, winRateWidth, winRateHeight)
-  
+
   // Fill based on win rate
   const winRateFill = (performance.winRate / 100) * winRateWidth
   const winRateColor = performance.winRate > 60 ? '#44ff44' :
                        performance.winRate < 40 ? '#ff4444' : '#ffff44'
   ctx.fillStyle = winRateColor
   ctx.fillRect(winRateX, y + 12, winRateFill, winRateHeight)
-  
+
   // Win rate text
   ctx.fillStyle = '#ffffff'
   ctx.font = 'bold 11px monospace'
   ctx.fillText(`${performance.winRate.toFixed(0)}%`, winRateX + winRateWidth + 5, y + 20)
-  
+
   // P&L
   const pnlColor = performance.totalPnL >= 0 ? '#44ff44' : '#ff4444'
   ctx.fillStyle = pnlColor
   ctx.font = '11px monospace'
-  ctx.fillText(`P&L: ${performance.totalPnL >= 0 ? '+' : ''}${performance.totalPnL.toFixed(2)}%`, 250, y + 20)
-  
+  const pnlDisplay = performance.totalPnL >= 0 ? `+$${performance.totalPnL.toFixed(2)}` : `-$${Math.abs(performance.totalPnL).toFixed(2)}`
+  ctx.fillText(`P&L: ${pnlDisplay}`, 230, y + 20)
+
+  // Trade count
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.6)'
+  ctx.font = '10px monospace'
+  ctx.fillText(`Trades: ${performance.tradeCount}`, 340, y + 20)
+
   // Recent trades visualization
   ctx.fillStyle = '#ffffff'
   ctx.font = '10px monospace'
-  ctx.fillText('Recent:', 24, y + 35)
-  
+  ctx.fillText('Recent:', 24, y + 38)
+
   if (performance.recentTrades && performance.recentTrades.length > 0) {
     performance.recentTrades.slice(0, 5).forEach((trade, i) => {
       const xPos = 75 + i * 25
       ctx.fillStyle = trade.success ? '#44ff44' : '#ff4444'
       ctx.font = 'bold 14px monospace'
-      ctx.fillText(trade.success ? '✓' : '✗', xPos, y + 35)
+      ctx.fillText(trade.success ? '\u2713' : '\u2717', xPos, y + 38)
     })
   } else {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'
     ctx.font = '10px monospace'
-    ctx.fillText('No trades yet', 75, y + 35)
+    ctx.fillText('No trades yet', 75, y + 38)
   }
 }
 
-const drawTradeSignal = (ctx, decision, y, time) => {
+// Draw trade signal bar
+function drawTradeSignal(ctx, decision, y, time) {
   if (decision.action === 'HOLD') {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.3)'
     ctx.font = '11px monospace'
-    ctx.fillText('⚡ AWAITING OPPORTUNITY - NO ACTIVE SIGNALS', 24, y)
+    ctx.fillText('\u26A1 AWAITING OPPORTUNITY - NO ACTIVE SIGNALS', 24, y)
   } else {
-    // Animated trade signal
     const pulse = Math.sin(time * 5) * 0.5 + 0.5
-    const signalColor = decision.action.includes('BUY') ? 
+    const signalColor = decision.action.includes('BUY') || decision.action === 'LONG' ?
       `rgba(68, 255, 68, ${0.5 + pulse * 0.5})` :
       `rgba(255, 68, 68, ${0.5 + pulse * 0.5})`
-    
+
     ctx.fillStyle = signalColor
     ctx.font = 'bold 12px monospace'
-    ctx.fillText(`⚡ SIGNAL: ${decision.action} ${decision.size > 0 ? `@ ${(decision.size * 100).toFixed(0)}% SIZE` : ''}`, 24, y)
-    
+    const sizeText = decision.size > 0 ? ` @ ${(decision.size * 100).toFixed(0)}% SIZE` : ''
+    ctx.fillText(`\u26A1 SIGNAL: ${decision.action} ${decision.symbol}${sizeText}`, 24, y)
+
     // Flash effect
     if (pulse > 0.8) {
       ctx.strokeStyle = signalColor
@@ -428,44 +583,55 @@ const drawTradeSignal = (ctx, decision, y, time) => {
   }
 }
 
-const drawConfidenceMeter = (ctx, confidence, x, y, time) => {
+// Draw vertical confidence meter
+function drawConfidenceMeter(ctx, confidence, x, y, time) {
   ctx.fillStyle = '#FFD700'
   ctx.font = '10px monospace'
   ctx.fillText('CONF', x, y - 5)
-  
-  // Vertical confidence meter
-  const meterHeight = 180
+
+  const meterHeight = 160
   const meterWidth = 20
-  
+
   // Background
   ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'
   ctx.fillRect(x, y, meterWidth, meterHeight)
-  
+
   // Gradient fill
   const gradient = ctx.createLinearGradient(0, y + meterHeight, 0, y)
   gradient.addColorStop(0, '#ff4444')
   gradient.addColorStop(0.5, '#ffff44')
   gradient.addColorStop(1, '#44ff44')
-  
+
   // Fill based on confidence
   const fillHeight = confidence * meterHeight
   ctx.fillStyle = gradient
   ctx.fillRect(x, y + meterHeight - fillHeight, meterWidth, fillHeight)
-  
+
   // Confidence percentage
   ctx.fillStyle = '#ffffff'
   ctx.font = 'bold 10px monospace'
   ctx.fillText(`${(confidence * 100).toFixed(0)}%`, x - 5, y + meterHeight + 15)
-  
-  // Animated indicator
+
+  // Animated indicator line
   const indicatorY = y + meterHeight - fillHeight
-  const pulse = Math.sin(time * 3)
   ctx.strokeStyle = '#FFD700'
   ctx.lineWidth = 2
   ctx.beginPath()
   ctx.moveTo(x - 5, indicatorY)
   ctx.lineTo(x + meterWidth + 5, indicatorY)
   ctx.stroke()
+
+  // Threshold markers
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'
+  ctx.lineWidth = 1
+  const thresholds = [0.4, 0.6, 0.8]
+  thresholds.forEach(thresh => {
+    const threshY = y + meterHeight - (thresh * meterHeight)
+    ctx.beginPath()
+    ctx.moveTo(x + meterWidth + 2, threshY)
+    ctx.lineTo(x + meterWidth + 8, threshY)
+    ctx.stroke()
+  })
 }
 
 export default RL80Screen

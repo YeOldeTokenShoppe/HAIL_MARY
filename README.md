@@ -567,6 +567,45 @@ All trades are logged to `tradeHistory` for audit purposes.
 
 ---
 
+## Firestore TTL (Auto-Purging Old Records)
+
+To prevent Firestore from accumulating thousands of records, use TTL policies to auto-delete old documents.
+
+### Collections with TTL Support
+
+All growing collections now include an `expireAt` field:
+
+| Collection | TTL Duration | Field | Max Docs (~) |
+|------------|--------------|-------|--------------|
+| `agentChat` | 7 days | `expireAt` | ~672 |
+| `tradeHistory` | 30 days | `expireAt` | ~720 |
+| `workflowRuns` | 7 days | `expireAt` | ~168 |
+| `agentScores` | 7 days | `expireAt` | ~672 |
+
+### Setting Up TTL in Firebase Console
+
+1. Go to **Firebase Console → Firestore → TTL Policies**
+2. Click **Create Policy**
+3. For each collection:
+   - **Collection group**: e.g., `agentChat`
+   - **Timestamp field**: `expireAt`
+4. Click **Create**
+
+Repeat for: `agentChat`, `tradeHistory`, `workflowRuns`, `agentScores`
+
+### How It Works
+
+- Documents include an `expireAt` timestamp set at creation time
+- Firestore automatically deletes documents when `now > expireAt`
+- Deletion happens within ~24 hours of expiration
+- No code or cron jobs needed - it's fully automatic
+
+### Note
+
+TTL policies only work with the `expireAt` field (not `timestamp` or `createdAt`). The `expireAt` field contains the **future deletion time**, not the creation time.
+
+---
+
 ## API Calls Reference
 
 ### External API Calls by Service
