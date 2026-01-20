@@ -450,20 +450,22 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
     }
   }, [db]);
 
-  // Auto-start agent chat system when component mounts
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      // Start agent system automatically after 3 seconds
-      const timer = setTimeout(() => {
-        if (!agentChatManager.isRunning()) {
-          console.log('🚀 Auto-starting agent chat system');
-          agentChatManager.start();
-        }
-      }, 3000);
-
-      return () => clearTimeout(timer);
-    }
-  }, []);
+  // DISABLED: Client-side auto-start causes duplicate agent runs
+  // Agent triggering is handled ONLY by Firebase Cloud Functions (hourly cron)
+  // To manually trigger agents for testing, use browser console:
+  //   agentChatManager.start() - runs full workflow
+  //   agentChatManager.manualTrigger('MACRO') - single agent
+  // useEffect(() => {
+  //   if (typeof window !== 'undefined') {
+  //     const timer = setTimeout(() => {
+  //       if (!agentChatManager.isRunning()) {
+  //         console.log('🚀 Auto-starting agent chat system');
+  //         agentChatManager.start();
+  //       }
+  //     }, 3000);
+  //     return () => clearTimeout(timer);
+  //   }
+  // }, []);
 
   // Auto-scroll chat to bottom when new messages arrive or chat tab is opened
   useEffect(() => {

@@ -4,12 +4,12 @@ import { db, doc, onSnapshot } from '@/lib/firebaseClient'
 // Macro data hook - reads from Firestore (populated by Railway background service)
 const useMacroData = () => {
   const [data, setData] = useState({
-    vix: { value: 18.5, change: 0, changePercent: 0 },
-    spx: { value: 585, change: 0, changePercent: 0 },
-    dxy: { value: 99, change: 0, changePercent: 0 },
-    treasury10y: { value: 4.5, change: 0 },
-    funding: { btc: 0, eth: 0 },
-    openInterest: { btc: 0, eth: 0, total: 0 },
+    vix: null,  // No fake defaults - show N/A until real data arrives
+    spx: null,
+    dxy: null,
+    treasury10y: null,
+    funding: { btc: null, eth: null },
+    openInterest: { btc: null, eth: null, total: null },
     isLive: false,
     lastUpdate: null
   })
@@ -26,12 +26,12 @@ const useMacroData = () => {
       if (docSnapshot.exists()) {
         const macroData = docSnapshot.data()
         setData({
-          vix: macroData.vix || { value: 18.5, change: 0, changePercent: 0 },
-          spx: macroData.spx || { value: 585, change: 0, changePercent: 0 },
-          dxy: macroData.dxy || { value: 99, change: 0, changePercent: 0 },
-          treasury10y: macroData.treasury10y || { value: 4.5, change: 0 },
-          funding: macroData.funding || { btc: 0, eth: 0 },
-          openInterest: macroData.openInterest || { btc: 0, eth: 0, total: 0 },
+          vix: macroData.vix || null,  // Keep null if no data - display will show N/A
+          spx: macroData.spx || null,
+          dxy: macroData.dxy || null,
+          treasury10y: macroData.treasury10y || null,
+          funding: macroData.funding || { btc: null, eth: null },
+          openInterest: macroData.openInterest || { btc: null, eth: null, total: null },
           isLive: true,
           lastUpdate: macroData.lastUpdate || null
         })
@@ -82,13 +82,13 @@ const MacroAgentScreen = () => {
       ctx.lineTo(496, 40)
       ctx.stroke()
 
-      // Row 1: DXY and VIX
-      drawIndicatorBoxCompact(ctx, 'DXY', data.dxy.value, data.dxy.changePercent, 20, 50, 'USD (UUP)', false)
-      drawIndicatorBoxCompact(ctx, 'VIX', data.vix.value, data.vix.changePercent, 265, 50, 'Vol (VIXY)', true)
+      // Row 1: DXY and VIX (handle null data with optional chaining)
+      drawIndicatorBoxCompact(ctx, 'DXY', data.dxy?.value, data.dxy?.changePercent, 20, 50, 'USD (UUP)', false)
+      drawIndicatorBoxCompact(ctx, 'VIX', data.vix?.value, data.vix?.changePercent, 265, 50, 'Vol (VIXY)', true)
 
       // Row 2: 10Y Treasury and S&P 500
-      drawIndicatorBoxCompact(ctx, '10Y', data.treasury10y.value, data.treasury10y.change, 20, 100, 'Treasury', true, true)
-      drawIndicatorBoxCompact(ctx, 'SPX', data.spx.value, data.spx.changePercent, 265, 100, 'S&P 500', false)
+      drawIndicatorBoxCompact(ctx, '10Y', data.treasury10y?.value, data.treasury10y?.change, 20, 100, 'Treasury', true, true)
+      drawIndicatorBoxCompact(ctx, 'SPX', data.spx?.value, data.spx?.changePercent, 265, 100, 'S&P 500', false)
 
       // Divider before Funding Rates
       ctx.strokeStyle = 'rgba(0, 255, 100, 0.3)'
@@ -129,7 +129,9 @@ const MacroAgentScreen = () => {
 
 // Draw a compact indicator box
 const drawIndicatorBoxCompact = (ctx, symbol, value, change, x, y, subtitle, invertColors = false, isPercent = false) => {
-  const isPositive = change >= 0
+  const hasData = value != null && !isNaN(value)
+  const hasChange = change != null && !isNaN(change)
+  const isPositive = hasChange ? change >= 0 : true
   const showGreen = invertColors ? !isPositive : isPositive
 
   // Box background
@@ -148,17 +150,20 @@ const drawIndicatorBoxCompact = (ctx, symbol, value, change, x, y, subtitle, inv
   ctx.font = '8px monospace'
   ctx.fillText(subtitle, x + 10, y + 28)
 
-  // Value (center-right)
-  ctx.fillStyle = '#ffffff'
+  // Value (center-right) - show N/A if no data
+  ctx.fillStyle = hasData ? '#ffffff' : '#666666'
   ctx.font = 'bold 18px monospace'
-  const displayValue = isPercent ? `${value.toFixed(2)}%` : value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const displayValue = hasData
+    ? (isPercent ? `${value.toFixed(2)}%` : value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
+    : 'N/A'
   ctx.fillText(displayValue, x + 70, y + 26)
 
-  // Change (far right)
-  ctx.fillStyle = showGreen ? '#00ff66' : '#ff4444'
+  // Change (far right) - show --- if no data
+  ctx.fillStyle = hasChange ? (showGreen ? '#00ff66' : '#ff4444') : '#666666'
   ctx.font = 'bold 10px monospace'
-  const arrow = isPositive ? '▲' : '▼'
-  const changeDisplay = isPercent ? `${arrow}${Math.abs(change).toFixed(2)}` : `${arrow}${Math.abs(change).toFixed(2)}%`
+  const changeDisplay = hasChange
+    ? `${isPositive ? '▲' : '▼'}${Math.abs(change).toFixed(2)}${isPercent ? '' : '%'}`
+    : '---'
   ctx.fillText(changeDisplay, x + 175, y + 26)
 }
 
@@ -169,19 +174,20 @@ const drawFundingRates = (ctx, funding, y) => {
   ctx.font = 'bold 12px monospace'
   ctx.fillText('PERP FUNDING RATES (LIGHTER)', 20, y + 15)
 
-  // BTC Funding
-  const btcRate = funding.btc || 0
-  const btcPositive = btcRate >= 0
-  drawFundingBar(ctx, 'BTC', btcRate, 20, y + 30, btcPositive)
+  // BTC Funding - pass null through to display N/A
+  const btcRate = funding?.btc
+  drawFundingBar(ctx, 'BTC', btcRate, 20, y + 30)
 
   // ETH Funding
-  const ethRate = funding.eth || 0
-  const ethPositive = ethRate >= 0
-  drawFundingBar(ctx, 'ETH', ethRate, 260, y + 30, ethPositive)
+  const ethRate = funding?.eth
+  drawFundingBar(ctx, 'ETH', ethRate, 260, y + 30)
 }
 
 // Draw individual funding rate bar
-const drawFundingBar = (ctx, symbol, rate, x, y, isPositive) => {
+const drawFundingBar = (ctx, symbol, rate, x, y) => {
+  const hasData = rate != null && !isNaN(rate)
+  const isPositive = hasData ? rate >= 0 : true
+
   // Background box
   ctx.fillStyle = 'rgba(0, 255, 100, 0.05)'
   ctx.fillRect(x, y, 220, 35)
@@ -193,18 +199,28 @@ const drawFundingBar = (ctx, symbol, rate, x, y, isPositive) => {
   ctx.font = 'bold 12px monospace'
   ctx.fillText(symbol, x + 10, y + 15)
 
-  // Rate value - format as percentage with 4 decimals
-  const ratePercent = (rate * 100).toFixed(4)
-  const sign = isPositive ? '+' : ''
-  ctx.fillStyle = isPositive ? '#00ff66' : '#ff4444'
-  ctx.font = 'bold 16px monospace'
-  ctx.fillText(`${sign}${ratePercent}%`, x + 50, y + 16)
+  // Rate value - format as percentage with 4 decimals, or N/A
+  if (hasData) {
+    const ratePercent = (rate * 100).toFixed(4)
+    const sign = isPositive ? '+' : ''
+    ctx.fillStyle = isPositive ? '#00ff66' : '#ff4444'
+    ctx.font = 'bold 16px monospace'
+    ctx.fillText(`${sign}${ratePercent}%`, x + 50, y + 16)
 
-  // Label
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'
-  ctx.font = '9px monospace'
-  const label = isPositive ? 'LONGS PAY SHORTS' : 'SHORTS PAY LONGS'
-  ctx.fillText(label, x + 10, y + 28)
+    // Label
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'
+    ctx.font = '9px monospace'
+    const label = isPositive ? 'LONGS PAY SHORTS' : 'SHORTS PAY LONGS'
+    ctx.fillText(label, x + 10, y + 28)
+  } else {
+    ctx.fillStyle = '#666666'
+    ctx.font = 'bold 16px monospace'
+    ctx.fillText('N/A', x + 50, y + 16)
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'
+    ctx.font = '9px monospace'
+    ctx.fillText('NO DATA', x + 10, y + 28)
+  }
 }
 
 // Draw Open Interest section
@@ -214,23 +230,26 @@ const drawOpenInterest = (ctx, openInterest, y) => {
   ctx.font = 'bold 12px monospace'
   ctx.fillText('OPEN INTEREST (LIGHTER)', 20, y + 15)
 
-  // BTC OI
-  const btcOI = openInterest.btc || 0
+  // BTC OI - pass null through
+  const btcOI = openInterest?.btc
   drawOIBar(ctx, 'BTC', btcOI, 20, y + 28)
 
   // ETH OI
-  const ethOI = openInterest.eth || 0
+  const ethOI = openInterest?.eth
   drawOIBar(ctx, 'ETH', ethOI, 260, y + 28)
 
   // Total OI
-  const totalOI = openInterest.total || (btcOI + ethOI)
+  const totalOI = openInterest?.total
+  const hasTotal = totalOI != null && !isNaN(totalOI)
   ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'
   ctx.font = '10px monospace'
-  ctx.fillText(`TOTAL: $${formatLargeNumber(totalOI)}`, 300, y + 15)
+  ctx.fillText(`TOTAL: ${hasTotal ? '$' + formatLargeNumber(totalOI) : 'N/A'}`, 300, y + 15)
 }
 
 // Draw individual OI bar
 const drawOIBar = (ctx, symbol, value, x, y) => {
+  const hasData = value != null && !isNaN(value)
+
   // Background box
   ctx.fillStyle = 'rgba(0, 255, 100, 0.05)'
   ctx.fillRect(x, y, 220, 30)
@@ -242,10 +261,10 @@ const drawOIBar = (ctx, symbol, value, x, y) => {
   ctx.font = 'bold 12px monospace'
   ctx.fillText(symbol, x + 10, y + 12)
 
-  // Value - format as dollar amount
-  ctx.fillStyle = '#ffffff'
+  // Value - format as dollar amount or N/A
+  ctx.fillStyle = hasData ? '#ffffff' : '#666666'
   ctx.font = 'bold 14px monospace'
-  ctx.fillText(`$${formatLargeNumber(value)}`, x + 50, y + 13)
+  ctx.fillText(hasData ? `$${formatLargeNumber(value)}` : 'N/A', x + 50, y + 13)
 
   // Label
   ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'
@@ -255,6 +274,7 @@ const drawOIBar = (ctx, symbol, value, x, y) => {
 
 // Format large numbers (e.g., 1500000 -> 1.5M)
 const formatLargeNumber = (num) => {
+  if (num == null || isNaN(num)) return 'N/A'
   if (num >= 1e9) return (num / 1e9).toFixed(2) + 'B'
   if (num >= 1e6) return (num / 1e6).toFixed(2) + 'M'
   if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K'

@@ -269,6 +269,79 @@ async function saveWorkflowSummary(workflowResult) {
   }
 }
 
+/**
+ * Post trading decision to agentDecisions/RL80 for Railway to execute
+ * THIS IS THE CRITICAL FUNCTION that triggers actual trade execution
+ */
+async function postDecisionForExecution(recommendation, decisionOutput, marketData) {
+  const firestore = initFirebaseAdmin();
+
+  try {
+    // Map direction to action
+    const action = recommendation.direction === 'LONG' ? 'BUY' :
+                   recommendation.direction === 'SHORT' ? 'SELL' : 'HOLD';
+
+    // Build the decision document that Railway service expects
+    const decision = {
+      action,
+      symbol: recommendation.asset || 'ETH',
+      confidence: recommendation.confidence || 0.6,
+      reasoning: decisionOutput.textResponse?.substring(0, 500) || 'Team consensus trade',
+      position_size: recommendation.sizePercent || null,
+      stop_loss: null,
+      take_profit: null,
+      timestamp: Date.now(),
+      created_at: FieldValue.serverTimestamp(),
+      agent_version: 'ScoringOrchestrator_v1',
+      // Additional context for logging
+      team_score: recommendation.teamScore || null,
+      tradeable_count: decisionOutput.summary?.tradeable || 0
+    };
+
+    // Post to agentDecisions/RL80 - this is what Railway listens to
+    await firestore.collection('agentDecisions').doc('RL80').set(decision);
+
+    console.log(`[ScoringOrchestrator] 🚀 Posted ${action} decision to agentDecisions/RL80:`, {
+      action,
+      symbol: decision.symbol,
+      confidence: (decision.confidence * 100).toFixed(0) + '%',
+      size: decision.position_size ? (decision.position_size * 100).toFixed(1) + '%' : 'default'
+    });
+
+    return true;
+  } catch (error) {
+    console.error('[ScoringOrchestrator] Failed to post decision for execution:', error);
+    return false;
+  }
+}
+
+/**
+ * Post a HOLD decision when there are no tradeable signals
+ */
+async function postHoldDecision(reasoning) {
+  const firestore = initFirebaseAdmin();
+
+  try {
+    const decision = {
+      action: 'HOLD',
+      symbol: 'ETH',
+      confidence: 0.3,
+      reasoning: reasoning || 'No clear edge - waiting for better setup',
+      timestamp: Date.now(),
+      created_at: FieldValue.serverTimestamp(),
+      agent_version: 'ScoringOrchestrator_v1'
+    };
+
+    await firestore.collection('agentDecisions').doc('RL80').set(decision);
+    console.log('[ScoringOrchestrator] Posted HOLD decision to agentDecisions/RL80');
+
+    return true;
+  } catch (error) {
+    console.error('[ScoringOrchestrator] Failed to post HOLD decision:', error);
+    return false;
+  }
+}
+
 // ============================================================================
 // MAIN WORKFLOW
 // ============================================================================
@@ -435,6 +508,16 @@ export async function runScoringWorkflow() {
           summary: decisionOutput.summary
         }
       });
+
+      // POST TO agentDecisions/RL80 for Railway service to execute
+      // This is the critical step that triggers actual trade execution
+      if (decisionOutput.tradeableRecommendations && decisionOutput.tradeableRecommendations.length > 0) {
+        const primaryRec = decisionOutput.tradeableRecommendations[0];
+        await postDecisionForExecution(primaryRec, decisionOutput, marketData);
+      } else {
+        // Post HOLD decision so Railway knows we're still active
+        await postHoldDecision('No tradeable signals above threshold');
+      }
 
       workflowResult.decision = decisionOutput;
       workflowResult.agentsCompleted.push('RL80');
