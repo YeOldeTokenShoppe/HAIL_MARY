@@ -95,3 +95,7 @@ env:
     secret: GROK_API_KEY
   - variable: ANTHROPIC_API_KEY
     secret: ANTHROPIC_API_KEY
+  - variable: OPENAI_API_KEY
+    secret: OPENAI_API_KEY
+  - variable: CRON_SECRET
+    secret: CRON_SECRET
