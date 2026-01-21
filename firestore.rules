@@ -60,6 +60,48 @@
         allow delete: if false;
       }
 
+      // =========================================================================
+      // PREDICTION MARKETS
+      // =========================================================================
+
+      // Prediction Markets - public read, server-only write
+      match /predictionMarkets/{marketId} {
+        allow read: if true;
+        allow write: if false; // Only Railway service account writes
+      }
+
+      // Prediction Bets - users can create with their userId, read their own
+      match /predictionBets/{betId} {
+        allow read: if true; // Allow public read for leaderboards
+        allow create: if request.auth != null
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.keys().hasAll(['marketId', 'optionId', 'amount', 'userId'])
+          && request.resource.data.amount > 0;
+        allow update, delete: if false;
+      }
+
+      // Prediction Payouts - public read, server-only write
+      match /predictionPayouts/{payoutId} {
+        allow read: if true;
+        allow write: if false; // Only Railway service resolves
+      }
+
+      // =========================================================================
+      // ORACLE ACCURACY TRACKING
+      // =========================================================================
+
+      // Oracle Accuracy Logs - public read, server-only write
+      match /oracleAccuracyLogs/{logId} {
+        allow read: if true;
+        allow write: if false; // Only Railway service writes
+      }
+
+      // Oracle Accuracy Stats - public read, server-only write
+      match /oracleAccuracyStats/{statsId} {
+        allow read: if true;
+        allow write: if false; // Only Railway service writes
+      }
+
       // Default rules for other documents
       match /{document=**} {
         allow read: if true;

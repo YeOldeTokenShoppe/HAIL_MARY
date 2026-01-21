@@ -321,7 +321,14 @@ export const FIREBASE_COLLECTIONS = {
   AGENT_SCORES: 'agentScores',
   DECISIONS: 'decisions',
   DECISION_OUTCOMES: 'decisionOutcomes',
-  SHADOW_TEST_ANALYSIS: 'shadowTestAnalysis'
+  SHADOW_TEST_ANALYSIS: 'shadowTestAnalysis',
+  // Oracle Accuracy Tracking
+  ORACLE_ACCURACY_LOGS: 'oracleAccuracyLogs',      // Individual call accuracy records
+  ORACLE_ACCURACY_STATS: 'oracleAccuracyStats',    // Aggregated weekly/daily stats
+  // Prediction Markets
+  PREDICTION_MARKETS: 'predictionMarkets',          // Active/resolved markets
+  PREDICTION_BETS: 'predictionBets',                // User bets on markets
+  PREDICTION_PAYOUTS: 'predictionPayouts'           // Resolved payouts
 };
 
 // ============================================================================

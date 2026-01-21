@@ -13,7 +13,8 @@
     "lint": "next lint",
     "scoring": "node src/trading/services/runScoringWorkflow.js",
     "scoring:scheduled": "node src/trading/services/runScoringWorkflow.js --scheduled",
-    "scoring:health": "node src/trading/services/runScoringWorkflow.js --health"
+    "scoring:health": "node src/trading/services/runScoringWorkflow.js --health",
+    "create-market": "node --experimental-detect-module scripts/createMarket.js"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.31.1",

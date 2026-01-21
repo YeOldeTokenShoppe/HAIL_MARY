@@ -1,9 +1,26 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { TransactionButton, useReadContract } from "thirdweb/react";
+import { toWei, toEther } from "thirdweb/utils";
+import {
+  predictionMarketFunctions,
+  predictionMarketContract,
+  approveForPredictionMarket,
+  getPredictionMarketAllowance,
+  PREDICTION_MARKET_ADDRESS
+} from '@/lib/contract';
+import { useWalletAuth } from '@/components/WalletAuthProvider';
+import {
+  getActiveMarkets,
+  getUserBets,
+  placeBet,
+  ensureCurrentWeekMarket,
+  getCurrentOracleMarket
+} from '../../services/predictionMarketService.js';
 
-// Mock prediction markets data - supports both binary and multi-option markets
-const MOCK_MARKETS = [
+// Fallback mock data when Firebase is loading or unavailable
+const FALLBACK_MARKETS = [
   // Multi-option: Agent markets
   {
     id: 1,
@@ -79,7 +96,7 @@ const MOCK_MARKETS = [
   }
 ];
 
-const MOCK_POSITIONS = [
+const FALLBACK_POSITIONS = [
   {
     marketId: 1,
     question: "Most profitable agent this week?",
@@ -155,6 +172,274 @@ const categoryConfig = {
   macro: { color: '#00c8ff', icon: '📊' }
 };
 
+// Oracle option colors (for oracle accuracy markets)
+const ORACLE_COLORS = {
+  'EMO': '#ff8800',
+  'TEKNO': '#aa44ff',
+  'MACRO': '#00c8ff',
+  'RL80': '#00ff88'
+};
+
+// Hook to read on-chain market data
+const useOnChainMarketData = (marketId, enabled = true) => {
+  // Read market info
+  const { data: marketInfo, isLoading: loadingInfo } = useReadContract({
+    contract: predictionMarketContract,
+    method: "function getMarketInfo(uint256 _marketId) view returns (string question, uint256 endTime, uint8 winningOption, uint8 optionCount, bool resolved)",
+    params: [BigInt(marketId || 0)],
+    enabled: enabled && marketId !== undefined && marketId !== null
+  });
+
+  // Read all options
+  const { data: options, isLoading: loadingOptions } = useReadContract({
+    contract: predictionMarketContract,
+    method: "function getAllOptions(uint256 _marketId) view returns (string[] options)",
+    params: [BigInt(marketId || 0)],
+    enabled: enabled && marketId !== undefined && marketId !== null
+  });
+
+  // Read all option shares (pool sizes)
+  const { data: shares, isLoading: loadingShares } = useReadContract({
+    contract: predictionMarketContract,
+    method: "function getAllOptionShares(uint256 _marketId) view returns (uint256[] shares)",
+    params: [BigInt(marketId || 0)],
+    enabled: enabled && marketId !== undefined && marketId !== null
+  });
+
+  const isLoading = loadingInfo || loadingOptions || loadingShares;
+
+  // Parse the data
+  const parsedData = marketInfo && options && shares ? {
+    question: marketInfo[0],
+    endTime: new Date(Number(marketInfo[1]) * 1000),
+    winningOption: marketInfo[2],
+    optionCount: marketInfo[3],
+    resolved: marketInfo[4],
+    options: options.map((name, idx) => ({
+      id: name,
+      name: name,
+      pool: Number(toEther(shares[idx] || BigInt(0))),
+      color: ORACLE_COLORS[name] || '#888888'
+    }))
+  } : null;
+
+  return { data: parsedData, isLoading };
+};
+
+// Hook to read user's shares for a market
+const useUserShares = (marketId, userAddress, optionCount, enabled = true) => {
+  const { data: userShares, isLoading } = useReadContract({
+    contract: predictionMarketContract,
+    method: "function getAllUserShares(uint256 _marketId, address _user) view returns (uint256[] shares)",
+    params: [BigInt(marketId || 0), userAddress || '0x0000000000000000000000000000000000000000'],
+    enabled: enabled && marketId !== undefined && userAddress && optionCount > 0
+  });
+
+  return {
+    shares: userShares ? userShares.map(s => Number(toEther(s))) : [],
+    isLoading
+  };
+};
+
+// Component to display user's shares and potential winnings
+const UserSharesDisplay = ({ marketId, options, userAddress }) => {
+  const optionCount = options?.length || 0;
+  const { shares, isLoading } = useUserShares(marketId, userAddress, optionCount, !!userAddress);
+
+  // Check if user has any shares
+  const totalUserShares = shares.reduce((sum, s) => sum + s, 0);
+
+  if (isLoading) {
+    return (
+      <div style={{
+        padding: '10px',
+        background: 'rgba(0, 0, 0, 0.2)',
+        borderRadius: '8px',
+        marginTop: '12px',
+        fontSize: '11px',
+        color: 'rgba(255,255,255,0.4)'
+      }}>
+        Loading your shares...
+      </div>
+    );
+  }
+
+  if (!userAddress || totalUserShares === 0) {
+    return null;
+  }
+
+  // Calculate total pool
+  const totalPool = options.reduce((sum, opt) => sum + opt.pool, 0);
+
+  return (
+    <div style={{
+      padding: '12px',
+      background: 'linear-gradient(135deg, rgba(0, 200, 255, 0.1) 0%, rgba(0, 100, 200, 0.05) 100%)',
+      border: '1px solid rgba(0, 200, 255, 0.3)',
+      borderRadius: '8px',
+      marginTop: '12px'
+    }}>
+      <div style={{
+        fontSize: '11px',
+        fontWeight: 'bold',
+        color: '#00c8ff',
+        marginBottom: '8px',
+        textTransform: 'uppercase',
+        letterSpacing: '0.5px'
+      }}>
+        Your Position
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '10px' }}>
+        {options.map((opt, idx) => {
+          const userSharesForOption = shares[idx] || 0;
+          if (userSharesForOption === 0) return null;
+
+          return (
+            <div
+              key={opt.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 8px',
+                borderRadius: '4px',
+                background: `${opt.color}22`,
+                border: `1px solid ${opt.color}44`
+              }}
+            >
+              <span style={{ color: opt.color, fontWeight: 'bold', fontSize: '11px' }}>
+                {opt.name}
+              </span>
+              <span style={{ color: '#fff', fontSize: '11px' }}>
+                {formatRL80(userSharesForOption)} shares
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Potential winnings for each option */}
+      <div style={{
+        fontSize: '10px',
+        color: 'rgba(255,255,255,0.5)',
+        borderTop: '1px solid rgba(255,255,255,0.1)',
+        paddingTop: '8px'
+      }}>
+        <div style={{ marginBottom: '4px', fontWeight: 'bold' }}>If wins:</div>
+        {options.map((opt, idx) => {
+          const userSharesForOption = shares[idx] || 0;
+          if (userSharesForOption === 0) return null;
+
+          // Calculate potential winnings
+          const optionPool = opt.pool;
+          const opposingPool = totalPool - optionPool;
+          const userShare = optionPool > 0 ? userSharesForOption / optionPool : 0;
+          const potentialWinnings = userSharesForOption + (userShare * opposingPool);
+
+          return (
+            <div key={opt.id} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+              <span style={{ color: opt.color }}>{opt.name}:</span>
+              <span style={{ color: '#00ff88', fontWeight: 'bold' }}>
+                {formatRL80(Math.round(potentialWinnings))} RL80
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// Live on-chain pool display component
+const LivePoolDisplay = ({ marketId, options: fallbackOptions }) => {
+  const { data: onChainData, isLoading } = useOnChainMarketData(marketId);
+
+  // Use on-chain data if available, otherwise fallback
+  const options = onChainData?.options || fallbackOptions;
+  const totalPool = options?.reduce((sum, opt) => sum + opt.pool, 0) || 0;
+
+  if (isLoading) {
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        fontSize: '10px',
+        color: 'rgba(255,255,255,0.4)'
+      }}>
+        <span style={{
+          display: 'inline-block',
+          width: '8px',
+          height: '8px',
+          borderRadius: '50%',
+          background: '#ff8800',
+          animation: 'pulse 1.5s infinite'
+        }} />
+        Loading live data...
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: '8px' }}>
+      {/* Live indicator */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        marginBottom: '6px',
+        fontSize: '9px',
+        color: 'rgba(255,255,255,0.5)'
+      }}>
+        <span style={{
+          display: 'inline-block',
+          width: '6px',
+          height: '6px',
+          borderRadius: '50%',
+          background: '#00ff88',
+          boxShadow: '0 0 6px #00ff88'
+        }} />
+        LIVE ON-CHAIN
+      </div>
+
+      {/* Pool breakdown */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+        {options?.map(opt => {
+          const percent = totalPool > 0 ? Math.round((opt.pool / totalPool) * 100) : 0;
+          return (
+            <div
+              key={opt.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '3px 6px',
+                borderRadius: '4px',
+                background: `${opt.color}15`,
+                border: `1px solid ${opt.color}30`,
+                fontSize: '10px'
+              }}
+            >
+              <span style={{ color: opt.color, fontWeight: 'bold' }}>{opt.name}</span>
+              <span style={{ color: 'rgba(255,255,255,0.6)' }}>{percent}%</span>
+              <span style={{ color: 'rgba(255,255,255,0.4)' }}>({formatRL80(opt.pool)})</span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{
+        fontSize: '10px',
+        color: 'rgba(255,255,255,0.4)',
+        marginTop: '6px'
+      }}>
+        Total Pool: {formatRL80(totalPool)} RL80
+      </div>
+    </div>
+  );
+};
+
 // Multi-option probability bar
 const MultiProbabilityBar = ({ options }) => {
   const total = options.reduce((sum, opt) => sum + opt.pool, 0);
@@ -216,9 +501,12 @@ const BinaryProbabilityBar = ({ yesPool, noPool }) => {
 };
 
 // Market card component - handles both binary and multi-option
-const MarketCard = ({ market, onSelect, isSelected }) => {
+const MarketCard = ({ market, onSelect, isSelected, walletAddress }) => {
   const totalPool = getTotalPool(market);
   const catConfig = categoryConfig[market.category] || { color: '#888', icon: '📈' };
+
+  // Check if market has on-chain ID for live data
+  const hasOnChainId = market.onChainId !== undefined && market.onChainId !== null;
 
   return (
     <div
@@ -347,35 +635,87 @@ const MarketCard = ({ market, onSelect, isSelected }) => {
         <span>Pool: {formatRL80(totalPool)} RL80</span>
         <span>Ends: {formatTimeRemaining(market.endTime)}</span>
       </div>
+
+      {/* Live on-chain data display */}
+      {hasOnChainId && market.type !== 'binary' && (
+        <LivePoolDisplay marketId={market.onChainId} options={market.options} />
+      )}
+
+      {/* User's shares display */}
+      {hasOnChainId && walletAddress && market.type !== 'binary' && (
+        <UserSharesDisplay
+          marketId={market.onChainId}
+          options={market.options}
+          userAddress={walletAddress}
+        />
+      )}
     </div>
   );
 };
 
 // Bet panel component - handles both binary and multi-option
-const BetPanel = ({ market, onClose }) => {
+const BetPanel = ({ market, onClose, userId = 'anonymous', onBetPlaced }) => {
+  const { walletAddress, isWalletConnected } = useWalletAuth();
   const [selectedOption, setSelectedOption] = useState(
     market.type === 'binary' ? 'YES' : market.options[0]?.id
   );
   const [amount, setAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [needsApproval, setNeedsApproval] = useState(true);
+  const [checkingAllowance, setCheckingAllowance] = useState(false);
+
+  // Get live on-chain data if market has onChainId
+  const hasOnChainId = market.onChainId !== undefined && market.onChainId !== null;
+  const { data: onChainData, isLoading: loadingOnChain } = useOnChainMarketData(
+    market.onChainId,
+    hasOnChainId
+  );
+
+  // Use on-chain data for pools if available, otherwise use firebase data
+  const liveOptions = onChainData?.options || market.options;
+  const liveMarket = { ...market, options: liveOptions };
 
   const betAmount = parseFloat(amount) || 0;
-  const totalPool = getTotalPool(market);
+  const betAmountWei = betAmount > 0 ? toWei(betAmount.toString()) : BigInt(0);
+  const totalPool = getTotalPool(liveMarket);
 
-  // Calculate potential winnings
+  // Check allowance when amount changes
+  useEffect(() => {
+    const checkAllowance = async () => {
+      if (!walletAddress || betAmount <= 0) {
+        setNeedsApproval(true);
+        return;
+      }
+
+      setCheckingAllowance(true);
+      try {
+        const currentAllowance = await getPredictionMarketAllowance(walletAddress);
+        setNeedsApproval(currentAllowance < betAmountWei);
+      } catch (err) {
+        console.error('[PredictionMarket] Error checking allowance:', err);
+        setNeedsApproval(true);
+      } finally {
+        setCheckingAllowance(false);
+      }
+    };
+
+    checkAllowance();
+  }, [walletAddress, betAmount, betAmountWei]);
+
+  // Calculate potential winnings using live data
   let yourPool, opposingPool, selectedName, selectedColor;
 
-  if (market.type === 'binary') {
-    yourPool = selectedOption === 'YES' ? market.yesPool : market.noPool;
-    opposingPool = selectedOption === 'YES' ? market.noPool : market.yesPool;
+  if (liveMarket.type === 'binary') {
+    yourPool = selectedOption === 'YES' ? liveMarket.yesPool : liveMarket.noPool;
+    opposingPool = selectedOption === 'YES' ? liveMarket.noPool : liveMarket.yesPool;
     selectedName = selectedOption;
     selectedColor = selectedOption === 'YES' ? '#00ff88' : '#ff4466';
   } else {
-    const selected = market.options.find(o => o.id === selectedOption);
+    const selected = liveOptions.find(o => o.id === selectedOption || o.name === selectedOption);
     yourPool = selected?.pool || 0;
     opposingPool = totalPool - yourPool;
-    selectedName = selected?.name || '';
-    selectedColor = selected?.color || '#888';
+    selectedName = selected?.name || selectedOption || '';
+    selectedColor = selected?.color || ORACLE_COLORS[selectedOption] || '#888';
   }
 
   const newYourPool = yourPool + betAmount;
@@ -383,25 +723,6 @@ const BetPanel = ({ market, onClose }) => {
   const potentialWinnings = newYourPool > 0 ? (betAmount / newYourPool) * opposingPool : 0;
   const totalReturn = betAmount + potentialWinnings;
   const multiplier = betAmount > 0 ? totalReturn / betAmount : 0;
-
-  const handleSubmit = async () => {
-    if (!amount || parseFloat(amount) <= 0) return;
-
-    setIsSubmitting(true);
-    console.log('Placing bet:', {
-      marketId: market.id,
-      marketType: market.type,
-      selectedOption,
-      selectedName,
-      amount: betAmount,
-      potentialWinnings,
-      multiplier: multiplier.toFixed(2)
-    });
-
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsSubmitting(false);
-    setAmount('');
-  };
 
   return (
     <div style={{
@@ -418,9 +739,33 @@ const BetPanel = ({ market, onClose }) => {
         alignItems: 'center',
         marginBottom: '16px'
       }}>
-        <span style={{ color: '#fff', fontWeight: 'bold', fontSize: '14px' }}>
-          Place Your Bet
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ color: '#fff', fontWeight: 'bold', fontSize: '14px' }}>
+            Place Your Bet
+          </span>
+          {hasOnChainId && !loadingOnChain && (
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              fontSize: '9px',
+              background: 'rgba(0, 255, 136, 0.15)',
+              color: '#00ff88',
+              border: '1px solid rgba(0, 255, 136, 0.3)'
+            }}>
+              <span style={{
+                width: '5px',
+                height: '5px',
+                borderRadius: '50%',
+                background: '#00ff88',
+                boxShadow: '0 0 4px #00ff88'
+              }} />
+              LIVE
+            </span>
+          )}
+        </div>
         <button
           onClick={onClose}
           style={{
@@ -491,24 +836,25 @@ const BetPanel = ({ market, onClose }) => {
       ) : (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: market.options.length <= 3 ? `repeat(${market.options.length}, 1fr)` : 'repeat(2, 1fr)',
+          gridTemplateColumns: liveOptions.length <= 3 ? `repeat(${liveOptions.length}, 1fr)` : 'repeat(2, 1fr)',
           gap: '8px',
           marginBottom: '16px'
         }}>
-          {market.options.map(option => {
-            const percent = Math.round((option.pool / totalPool) * 100);
-            const isActive = selectedOption === option.id;
+          {liveOptions.map(option => {
+            const percent = totalPool > 0 ? Math.round((option.pool / totalPool) * 100) : 0;
+            const isActive = selectedOption === option.id || selectedOption === option.name;
+            const optColor = option.color || ORACLE_COLORS[option.name] || '#888';
 
             return (
               <button
-                key={option.id}
-                onClick={() => setSelectedOption(option.id)}
+                key={option.id || option.name}
+                onClick={() => setSelectedOption(option.id || option.name)}
                 style={{
                   padding: '12px 8px',
                   borderRadius: '8px',
-                  border: isActive ? `2px solid ${option.color}` : '1px solid rgba(100,100,120,0.3)',
-                  background: isActive ? `${option.color}22` : 'rgba(30, 30, 40, 0.5)',
-                  color: isActive ? option.color : 'rgba(255,255,255,0.5)',
+                  border: isActive ? `2px solid ${optColor}` : '1px solid rgba(100,100,120,0.3)',
+                  background: isActive ? `${optColor}22` : 'rgba(30, 30, 40, 0.5)',
+                  color: isActive ? optColor : 'rgba(255,255,255,0.5)',
                   cursor: 'pointer',
                   fontWeight: 'bold',
                   fontSize: '12px',
@@ -627,33 +973,142 @@ const BetPanel = ({ market, onClose }) => {
         {market.type === 'multi' && ` With ${market.options.length} options, you win from all other pools combined.`}
       </div>
 
-      {/* Submit button */}
-      <button
-        onClick={handleSubmit}
-        disabled={!amount || parseFloat(amount) <= 0 || isSubmitting}
-        style={{
+      {/* Submit button - Wallet connection check */}
+      {!isWalletConnected ? (
+        <div style={{
           width: '100%',
           padding: '14px',
           borderRadius: '8px',
-          border: 'none',
-          background: `linear-gradient(135deg, ${selectedColor} 0%, ${selectedColor}aa 100%)`,
-          color: '#000',
+          border: '1px solid rgba(255, 136, 0, 0.5)',
+          background: 'rgba(255, 136, 0, 0.1)',
+          color: '#ff8800',
           fontWeight: 'bold',
           fontSize: '14px',
-          cursor: (!amount || parseFloat(amount) <= 0 || isSubmitting) ? 'not-allowed' : 'pointer',
-          opacity: (!amount || parseFloat(amount) <= 0 || isSubmitting) ? 0.5 : 1,
-          transition: 'all 0.2s ease',
-          boxShadow: `0 0 20px ${selectedColor}44`
-        }}
-      >
-        {isSubmitting ? 'Placing Bet...' : `Bet ${betAmount > 0 ? formatRL80(betAmount) + ' on ' : ''}${selectedName}`}
-      </button>
+          textAlign: 'center'
+        }}>
+          Connect wallet to place bets
+        </div>
+      ) : checkingAllowance ? (
+        <div style={{
+          width: '100%',
+          padding: '14px',
+          borderRadius: '8px',
+          border: '1px solid rgba(100, 100, 120, 0.4)',
+          background: 'rgba(30, 30, 40, 0.5)',
+          color: 'rgba(255,255,255,0.5)',
+          fontWeight: 'bold',
+          fontSize: '14px',
+          textAlign: 'center'
+        }}>
+          Checking allowance...
+        </div>
+      ) : needsApproval && betAmount > 0 ? (
+        /* Step 1: Approve RL80 tokens */
+        <TransactionButton
+          transaction={() => approveForPredictionMarket(betAmountWei)}
+          onTransactionSent={() => setIsSubmitting(true)}
+          onTransactionConfirmed={() => {
+            setIsSubmitting(false);
+            setNeedsApproval(false);
+            console.log('[PredictionMarket] Approval confirmed');
+          }}
+          onError={(err) => {
+            setIsSubmitting(false);
+            console.error('[PredictionMarket] Approval error:', err);
+          }}
+          style={{
+            width: '100%',
+            padding: '14px',
+            borderRadius: '8px',
+            border: 'none',
+            background: 'linear-gradient(135deg, #ff8800 0%, #cc6600 100%)',
+            color: '#000',
+            fontWeight: 'bold',
+            fontSize: '14px',
+            cursor: 'pointer',
+            boxShadow: '0 0 20px rgba(255, 136, 0, 0.3)'
+          }}
+        >
+          {isSubmitting ? 'Approving...' : `Approve ${formatRL80(betAmount)} RL80`}
+        </TransactionButton>
+      ) : (
+        /* Step 2: Buy shares on-chain */
+        <TransactionButton
+          transaction={() => {
+            // Get the option index for the contract
+            // For binary markets: YES=0, NO=1
+            // For multi-option: use the option index from the market
+            let optionIndex;
+            if (market.type === 'binary') {
+              optionIndex = selectedOption === 'YES' ? 0 : 1;
+            } else {
+              optionIndex = market.options.findIndex(o => o.id === selectedOption);
+            }
+            return predictionMarketFunctions.buyShares(
+              market.onChainId || market.id,
+              optionIndex,
+              betAmountWei
+            );
+          }}
+          disabled={!amount || parseFloat(amount) <= 0}
+          onTransactionSent={() => setIsSubmitting(true)}
+          onTransactionConfirmed={async (receipt) => {
+            setIsSubmitting(false);
+            console.log('[PredictionMarket] Bet confirmed:', receipt);
+
+            // Also record in Firebase for tracking
+            try {
+              await placeBet({
+                marketId: market.id,
+                optionId: selectedOption,
+                amount: betAmount,
+                userId: userId || walletAddress,
+                txHash: receipt.transactionHash
+              });
+            } catch (err) {
+              console.warn('[PredictionMarket] Firebase recording failed:', err);
+            }
+
+            setAmount('');
+            if (onBetPlaced) {
+              onBetPlaced({ success: true, txHash: receipt.transactionHash });
+            }
+            onClose();
+          }}
+          onError={(err) => {
+            setIsSubmitting(false);
+            console.error('[PredictionMarket] Transaction error:', err);
+          }}
+          style={{
+            width: '100%',
+            padding: '14px',
+            borderRadius: '8px',
+            border: 'none',
+            background: `linear-gradient(135deg, ${selectedColor} 0%, ${selectedColor}aa 100%)`,
+            color: '#000',
+            fontWeight: 'bold',
+            fontSize: '14px',
+            cursor: (!amount || parseFloat(amount) <= 0) ? 'not-allowed' : 'pointer',
+            opacity: (!amount || parseFloat(amount) <= 0) ? 0.5 : 1,
+            boxShadow: `0 0 20px ${selectedColor}44`
+          }}
+        >
+          {isSubmitting ? 'Placing Bet...' : `Bet ${betAmount > 0 ? formatRL80(betAmount) + ' on ' : ''}${selectedName}`}
+        </TransactionButton>
+      )}
     </div>
   );
 };
 
 // Position card component - handles both types
-const PositionCard = ({ position }) => {
+const PositionCard = ({ position, onClaim }) => {
+  const [isClaiming, setIsClaiming] = useState(false);
+
+  // Check if position is resolved and user won
+  const isResolved = position.resolved;
+  const didWin = position.won;
+  const hasClaimed = position.claimed;
+
   if (position.type === 'binary') {
     const totalPool = position.currentYesPool + position.currentNoPool;
     const yourPool = position.side === 'YES' ? position.currentYesPool : position.currentNoPool;
@@ -666,12 +1121,34 @@ const PositionCard = ({ position }) => {
 
     return (
       <div style={{
-        background: 'linear-gradient(135deg, rgba(20, 20, 30, 0.9) 0%, rgba(10, 10, 20, 0.95) 100%)',
-        border: '1px solid rgba(100, 100, 120, 0.3)',
+        background: isResolved
+          ? didWin
+            ? 'linear-gradient(135deg, rgba(0, 100, 50, 0.3) 0%, rgba(0, 50, 25, 0.4) 100%)'
+            : 'linear-gradient(135deg, rgba(100, 30, 30, 0.3) 0%, rgba(50, 15, 15, 0.4) 100%)'
+          : 'linear-gradient(135deg, rgba(20, 20, 30, 0.9) 0%, rgba(10, 10, 20, 0.95) 100%)',
+        border: isResolved
+          ? didWin ? '1px solid rgba(0, 255, 136, 0.4)' : '1px solid rgba(255, 68, 102, 0.4)'
+          : '1px solid rgba(100, 100, 120, 0.3)',
         borderRadius: '10px',
         padding: '12px',
         marginBottom: '8px'
       }}>
+        {/* Resolved badge */}
+        {isResolved && (
+          <div style={{
+            display: 'inline-block',
+            padding: '2px 8px',
+            borderRadius: '4px',
+            fontSize: '9px',
+            fontWeight: 'bold',
+            textTransform: 'uppercase',
+            marginBottom: '8px',
+            background: didWin ? 'rgba(0, 255, 136, 0.2)' : 'rgba(255, 68, 102, 0.2)',
+            color: didWin ? '#00ff88' : '#ff4466'
+          }}>
+            {didWin ? (hasClaimed ? 'CLAIMED' : 'WON') : 'LOST'}
+          </div>
+        )}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -701,39 +1178,110 @@ const PositionCard = ({ position }) => {
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ color, fontWeight: 'bold', fontSize: '12px' }}>
-              If wins:
-            </div>
-            <div style={{ color: '#fff', fontSize: '13px', fontWeight: 'bold' }}>
-              {formatRL80(Math.round(totalReturn))} RL80
-            </div>
-            <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px' }}>
-              +{formatRL80(Math.round(potentialWinnings))} profit
-            </div>
+            {isResolved ? (
+              didWin ? (
+                <>
+                  <div style={{ color: '#00ff88', fontWeight: 'bold', fontSize: '12px' }}>
+                    Won:
+                  </div>
+                  <div style={{ color: '#fff', fontSize: '13px', fontWeight: 'bold' }}>
+                    {formatRL80(Math.round(position.payout || totalReturn))} RL80
+                  </div>
+                </>
+              ) : (
+                <div style={{ color: '#ff4466', fontWeight: 'bold', fontSize: '12px' }}>
+                  Lost {formatRL80(position.amount)} RL80
+                </div>
+              )
+            ) : (
+              <>
+                <div style={{ color, fontWeight: 'bold', fontSize: '12px' }}>
+                  If wins:
+                </div>
+                <div style={{ color: '#fff', fontSize: '13px', fontWeight: 'bold' }}>
+                  {formatRL80(Math.round(totalReturn))} RL80
+                </div>
+                <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px' }}>
+                  +{formatRL80(Math.round(potentialWinnings))} profit
+                </div>
+              </>
+            )}
           </div>
         </div>
+        {/* Claim button for won positions */}
+        {isResolved && didWin && !hasClaimed && (
+          <TransactionButton
+            transaction={() => predictionMarketFunctions.claimWinnings(position.onChainMarketId || position.marketId)}
+            onTransactionSent={() => setIsClaiming(true)}
+            onTransactionConfirmed={() => {
+              setIsClaiming(false);
+              if (onClaim) onClaim(position.marketId);
+            }}
+            onError={(err) => {
+              setIsClaiming(false);
+              console.error('[PredictionMarket] Claim error:', err);
+            }}
+            style={{
+              width: '100%',
+              marginTop: '10px',
+              padding: '10px',
+              borderRadius: '6px',
+              border: 'none',
+              background: 'linear-gradient(135deg, #00ff88 0%, #00cc66 100%)',
+              color: '#000',
+              fontWeight: 'bold',
+              fontSize: '12px',
+              cursor: 'pointer'
+            }}
+          >
+            {isClaiming ? 'Claiming...' : 'Claim Winnings'}
+          </TransactionButton>
+        )}
       </div>
     );
   }
 
   // Multi-option position
-  const totalPool = position.currentOptions.reduce((sum, o) => sum + o.pool, 0);
-  const yourOption = position.currentOptions.find(o => o.id === position.selectedOption.id);
+  const totalPool = position.currentOptions?.reduce((sum, o) => sum + o.pool, 0) || 0;
+  const yourOption = position.currentOptions?.find(o => o.id === position.selectedOption?.id);
   const yourPool = yourOption?.pool || 0;
   const opposingPool = totalPool - yourPool;
   const yourShare = yourPool > 0 ? position.amount / yourPool : 0;
   const potentialWinnings = yourShare * opposingPool;
   const totalReturn = position.amount + potentialWinnings;
   const currentPercent = totalPool > 0 ? Math.round((yourPool / totalPool) * 100) : 0;
+  const optionColor = position.selectedOption?.color || '#888';
 
   return (
     <div style={{
-      background: 'linear-gradient(135deg, rgba(20, 20, 30, 0.9) 0%, rgba(10, 10, 20, 0.95) 100%)',
-      border: '1px solid rgba(100, 100, 120, 0.3)',
+      background: isResolved
+        ? didWin
+          ? 'linear-gradient(135deg, rgba(0, 100, 50, 0.3) 0%, rgba(0, 50, 25, 0.4) 100%)'
+          : 'linear-gradient(135deg, rgba(100, 30, 30, 0.3) 0%, rgba(50, 15, 15, 0.4) 100%)'
+        : 'linear-gradient(135deg, rgba(20, 20, 30, 0.9) 0%, rgba(10, 10, 20, 0.95) 100%)',
+      border: isResolved
+        ? didWin ? '1px solid rgba(0, 255, 136, 0.4)' : '1px solid rgba(255, 68, 102, 0.4)'
+        : '1px solid rgba(100, 100, 120, 0.3)',
       borderRadius: '10px',
       padding: '12px',
       marginBottom: '8px'
     }}>
+      {/* Resolved badge */}
+      {isResolved && (
+        <div style={{
+          display: 'inline-block',
+          padding: '2px 8px',
+          borderRadius: '4px',
+          fontSize: '9px',
+          fontWeight: 'bold',
+          textTransform: 'uppercase',
+          marginBottom: '8px',
+          background: didWin ? 'rgba(0, 255, 136, 0.2)' : 'rgba(255, 68, 102, 0.2)',
+          color: didWin ? '#00ff88' : '#ff4466'
+        }}>
+          {didWin ? (hasClaimed ? 'CLAIMED' : 'WON') : 'LOST'}
+        </div>
+      )}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -755,13 +1303,13 @@ const PositionCard = ({ position }) => {
             fontSize: '12px'
           }}>
             <span style={{
-              color: position.selectedOption.color,
+              color: optionColor,
               fontWeight: 'bold',
               padding: '2px 6px',
               borderRadius: '4px',
-              background: `${position.selectedOption.color}22`
+              background: `${optionColor}22`
             }}>
-              {position.selectedOption.name} ({currentPercent}%)
+              {position.selectedOption?.name || 'Unknown'} ({currentPercent}%)
             </span>
             <span style={{ color: 'rgba(255,255,255,0.4)' }}>
               {formatRL80(position.amount)} RL80
@@ -769,32 +1317,152 @@ const PositionCard = ({ position }) => {
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{
-            color: position.selectedOption.color,
-            fontWeight: 'bold',
-            fontSize: '12px'
-          }}>
-            If wins:
-          </div>
-          <div style={{ color: '#fff', fontSize: '13px', fontWeight: 'bold' }}>
-            {formatRL80(Math.round(totalReturn))} RL80
-          </div>
-          <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px' }}>
-            +{formatRL80(Math.round(potentialWinnings))} profit
-          </div>
+          {isResolved ? (
+            didWin ? (
+              <>
+                <div style={{ color: '#00ff88', fontWeight: 'bold', fontSize: '12px' }}>
+                  Won:
+                </div>
+                <div style={{ color: '#fff', fontSize: '13px', fontWeight: 'bold' }}>
+                  {formatRL80(Math.round(position.payout || totalReturn))} RL80
+                </div>
+              </>
+            ) : (
+              <div style={{ color: '#ff4466', fontWeight: 'bold', fontSize: '12px' }}>
+                Lost {formatRL80(position.amount)} RL80
+              </div>
+            )
+          ) : (
+            <>
+              <div style={{
+                color: optionColor,
+                fontWeight: 'bold',
+                fontSize: '12px'
+              }}>
+                If wins:
+              </div>
+              <div style={{ color: '#fff', fontSize: '13px', fontWeight: 'bold' }}>
+                {formatRL80(Math.round(totalReturn))} RL80
+              </div>
+              <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px' }}>
+                +{formatRL80(Math.round(potentialWinnings))} profit
+              </div>
+            </>
+          )}
         </div>
       </div>
+      {/* Claim button for won positions */}
+      {isResolved && didWin && !hasClaimed && (
+        <TransactionButton
+          transaction={() => predictionMarketFunctions.claimWinnings(position.onChainMarketId || position.marketId)}
+          onTransactionSent={() => setIsClaiming(true)}
+          onTransactionConfirmed={() => {
+            setIsClaiming(false);
+            if (onClaim) onClaim(position.marketId);
+          }}
+          onError={(err) => {
+            setIsClaiming(false);
+            console.error('[PredictionMarket] Claim error:', err);
+          }}
+          style={{
+            width: '100%',
+            marginTop: '10px',
+            padding: '10px',
+            borderRadius: '6px',
+            border: 'none',
+            background: 'linear-gradient(135deg, #00ff88 0%, #00cc66 100%)',
+            color: '#000',
+            fontWeight: 'bold',
+            fontSize: '12px',
+            cursor: 'pointer'
+          }}
+        >
+          {isClaiming ? 'Claiming...' : 'Claim Winnings'}
+        </TransactionButton>
+      )}
     </div>
   );
 };
 
 // Main overlay component
-export default function PredictionMarketOverlay({ show, onClose }) {
-  const [markets] = useState(MOCK_MARKETS);
-  const [positions] = useState(MOCK_POSITIONS);
+export default function PredictionMarketOverlay({ show, onClose, userId = 'anonymous' }) {
+  const { walletAddress } = useWalletAuth();
+  const [markets, setMarkets] = useState(FALLBACK_MARKETS);
+  const [positions, setPositions] = useState(FALLBACK_POSITIONS);
   const [selectedMarket, setSelectedMarket] = useState(null);
   const [activeTab, setActiveTab] = useState('markets');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Load real data from Firebase
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Ensure current week's oracle market exists
+      await ensureCurrentWeekMarket();
+
+      // Load active markets
+      const activeMarkets = await getActiveMarkets();
+      if (activeMarkets.length > 0) {
+        // Transform Firebase data to component format
+        const transformedMarkets = activeMarkets.map(m => ({
+          id: m.id,
+          question: m.question,
+          type: m.type === 'oracle_accuracy' ? 'multi' : m.type,
+          category: m.type === 'oracle_accuracy' ? 'agent' : (m.category || 'crypto'),
+          options: m.options?.map(opt => ({
+            id: opt.id,
+            name: opt.name,
+            pool: opt.pool || 0,
+            color: opt.color || '#888888'
+          })),
+          // Binary market support
+          yesPool: m.options?.find(o => o.id === 'YES')?.pool || 0,
+          noPool: m.options?.find(o => o.id === 'NO')?.pool || 0,
+          endTime: new Date(m.endTime),
+          resolved: m.resolved,
+          winner: m.winner
+        }));
+        setMarkets(transformedMarkets);
+      }
+
+      // Load user's bets
+      if (userId && userId !== 'anonymous') {
+        const userBets = await getUserBets(userId);
+        if (userBets.length > 0) {
+          const transformedBets = userBets.map(b => ({
+            marketId: b.marketId,
+            question: b.question || 'Market bet',
+            type: b.optionId === 'YES' || b.optionId === 'NO' ? 'binary' : 'multi',
+            selectedOption: { id: b.optionId, name: b.optionName, color: '#ff8800' },
+            side: b.optionId,
+            amount: b.amount,
+            poolAtEntry: b.poolAtBet,
+            resolved: b.resolved,
+            won: b.won,
+            payout: b.payout
+          }));
+          setPositions(transformedBets);
+        }
+      }
+    } catch (err) {
+      console.error('[PredictionMarket] Error loading data:', err);
+      setError('Failed to load markets');
+      // Keep fallback data on error
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
+  // Load data when overlay opens
+  useEffect(() => {
+    if (show) {
+      loadData();
+    }
+  }, [show, loadData]);
 
   // Filter markets by category
   const filteredMarkets = filterCategory === 'all'
@@ -869,7 +1537,7 @@ export default function PredictionMarketOverlay({ show, onClose }) {
             alignItems: 'center'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '24px' }}>🎲</span>
+              <span style={{ fontSize: '24px' }}>{loading ? '⏳' : '🎲'}</span>
               <div>
                 <div style={{
                   color: '#fff',
@@ -880,12 +1548,12 @@ export default function PredictionMarketOverlay({ show, onClose }) {
                   PREDICTION MARKET
                 </div>
                 <div style={{
-                  color: 'rgba(255, 255, 255, 0.5)',
+                  color: loading ? '#ff8800' : 'rgba(255, 255, 255, 0.5)',
                   fontSize: '10px',
                   fontFamily: 'monospace',
                   letterSpacing: '1px'
                 }}>
-                  BET RL80 • WINNERS TAKE ALL
+                  {loading ? 'LOADING...' : error ? 'USING CACHED DATA' : 'BET RL80 • WINNERS TAKE ALL'}
                 </div>
               </div>
             </div>
@@ -1020,6 +1688,7 @@ export default function PredictionMarketOverlay({ show, onClose }) {
                   market={market}
                   onSelect={setSelectedMarket}
                   isSelected={selectedMarket?.id === market.id}
+                  walletAddress={walletAddress}
                 />
               ))}
 
@@ -1028,6 +1697,8 @@ export default function PredictionMarketOverlay({ show, onClose }) {
                 <BetPanel
                   market={selectedMarket}
                   onClose={() => setSelectedMarket(null)}
+                  userId={userId}
+                  onBetPlaced={() => loadData()}
                 />
               )}
             </>
@@ -1103,7 +1774,7 @@ export default function PredictionMarketOverlay({ show, onClose }) {
               {/* Position cards */}
               {positions.length > 0 ? (
                 positions.map((position, idx) => (
-                  <PositionCard key={idx} position={position} />
+                  <PositionCard key={idx} position={position} onClaim={() => loadData()} />
                 ))
               ) : (
                 <div style={{

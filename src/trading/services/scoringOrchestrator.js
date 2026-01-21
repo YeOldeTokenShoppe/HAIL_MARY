@@ -23,6 +23,10 @@ import { generateRL80ScoringDecision } from '../agents/rl80-trader.js';
 import { ANALYST_WEIGHTS, FIREBASE_COLLECTIONS } from '../config/scoring-config.js';
 import { logAnalystScores } from './decisionLogger.js';
 
+// Import oracle accuracy tracking for prediction markets
+import { logAllOracleCalls, verifyPendingCalls } from './oracleAccuracyService.js';
+import { ensureCurrentWeekMarket, checkAndResolveMarkets } from './predictionMarketService.js';
+
 // ============================================================================
 // FIREBASE ADMIN INITIALIZATION
 // ============================================================================
@@ -497,6 +501,31 @@ export async function runScoringWorkflow() {
     await delay(5000);
 
     // =========================================================================
+    // Oracle Accuracy Tracking (for Prediction Markets)
+    // =========================================================================
+    try {
+      // Log all oracle calls for accuracy tracking
+      const prices = {
+        BTC: marketData.btcPrice,
+        ETH: marketData.ethPrice,
+        SOL: marketData.solPrice || null,
+        XRP: marketData.xrpPrice || null
+      };
+
+      await logAllOracleCalls(workflowResult.scores, prices);
+      console.log('📊 Oracle calls logged for accuracy tracking');
+
+      // Verify any pending calls from ~24 hours ago
+      const verification = await verifyPendingCalls(prices);
+      if (verification.verified?.length > 0) {
+        console.log(`📊 Verified ${verification.verified.length} oracle predictions from 24h ago`);
+      }
+    } catch (error) {
+      console.error('⚠️ Oracle accuracy tracking failed (non-blocking):', error.message);
+      // Non-blocking - don't fail the workflow for accuracy tracking
+    }
+
+    // =========================================================================
     // Step 4: RL80 (Final Trading Decision)
     // =========================================================================
     console.log('\n📍 Step 4/4: RL80 making final trading decision...');
@@ -552,6 +581,25 @@ export async function runScoringWorkflow() {
 
     // Save workflow summary
     await saveWorkflowSummary(workflowResult);
+
+    // =========================================================================
+    // Prediction Market Maintenance (runs after workflow)
+    // =========================================================================
+    try {
+      // Ensure current week's oracle accuracy market exists
+      const marketResult = await ensureCurrentWeekMarket();
+      if (marketResult.success && !marketResult.existed) {
+        console.log('🎲 Created new weekly oracle accuracy market');
+      }
+
+      // Check and resolve any ended markets
+      const resolveResult = await checkAndResolveMarkets();
+      if (resolveResult.resolved?.length > 0) {
+        console.log(`🎲 Resolved ${resolveResult.resolved.length} prediction market(s)`);
+      }
+    } catch (error) {
+      console.error('⚠️ Prediction market maintenance failed (non-blocking):', error.message);
+    }
 
     console.log('\n' + '='.repeat(60));
     console.log('[ScoringOrchestrator] Workflow completed!');

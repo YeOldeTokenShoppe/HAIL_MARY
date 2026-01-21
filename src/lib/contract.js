@@ -1,4 +1,4 @@
-import { createThirdwebClient, getContract } from "thirdweb";
+import { createThirdwebClient, getContract, prepareContractCall, readContract } from "thirdweb";
 import { defineChain } from "thirdweb/chains";
 import { balanceOf, transfer, approve, allowance, totalSupply, decimals } from "thirdweb/extensions/erc20";
 import { name, symbol } from "thirdweb/extensions/common";
@@ -92,6 +92,166 @@ export const tokenFunctions = {
     const BURN_ADDRESS = "0x000000000000000000000000000000000000dEaD";
     return transfer({ contract: erc20Contract, to: BURN_ADDRESS, amount });
   },
+};
+
+// ============================================================================
+// PREDICTION MARKET CONTRACT
+// ============================================================================
+
+export const PREDICTION_MARKET_ADDRESS = "0x31Cb381461b7A531FAB4aD03848b31A199f4B921";
+
+// Prediction Market contract instance
+export const predictionMarketContract = getContract({
+  client,
+  chain,
+  address: PREDICTION_MARKET_ADDRESS,
+});
+
+// Prediction Market functions
+export const predictionMarketFunctions = {
+  // ===== READ FUNCTIONS =====
+
+  getMarketInfo: async (marketId) => {
+    return readContract({
+      contract: predictionMarketContract,
+      method: "function getMarketInfo(uint256 _marketId) view returns (string question, uint256 endTime, uint8 winningOption, uint8 optionCount, bool resolved)",
+      params: [BigInt(marketId)],
+    });
+  },
+
+  getAllOptions: async (marketId) => {
+    return readContract({
+      contract: predictionMarketContract,
+      method: "function getAllOptions(uint256 _marketId) view returns (string[] options)",
+      params: [BigInt(marketId)],
+    });
+  },
+
+  getAllOptionShares: async (marketId) => {
+    return readContract({
+      contract: predictionMarketContract,
+      method: "function getAllOptionShares(uint256 _marketId) view returns (uint256[] shares)",
+      params: [BigInt(marketId)],
+    });
+  },
+
+  getUserShares: async (marketId, userAddress, optionId) => {
+    return readContract({
+      contract: predictionMarketContract,
+      method: "function getUserShares(uint256 _marketId, address _user, uint8 _optionId) view returns (uint256 userShares)",
+      params: [BigInt(marketId), userAddress, optionId],
+    });
+  },
+
+  getAllUserShares: async (marketId, userAddress) => {
+    return readContract({
+      contract: predictionMarketContract,
+      method: "function getAllUserShares(uint256 _marketId, address _user) view returns (uint256[] shares)",
+      params: [BigInt(marketId), userAddress],
+    });
+  },
+
+  hasUserClaimed: async (marketId, userAddress) => {
+    return readContract({
+      contract: predictionMarketContract,
+      method: "function hasUserClaimed(uint256 _marketId, address _user) view returns (bool claimed)",
+      params: [BigInt(marketId), userAddress],
+    });
+  },
+
+  calculatePotentialWinnings: async (marketId, userAddress, assumedWinner) => {
+    return readContract({
+      contract: predictionMarketContract,
+      method: "function calculatePotentialWinnings(uint256 _marketId, address _user, uint8 _assumedWinner) view returns (uint256 potentialWinnings)",
+      params: [BigInt(marketId), userAddress, assumedWinner],
+    });
+  },
+
+  getMarketCount: async () => {
+    return readContract({
+      contract: predictionMarketContract,
+      method: "function marketCount() view returns (uint256)",
+      params: [],
+    });
+  },
+
+  getMinimumBet: async () => {
+    return readContract({
+      contract: predictionMarketContract,
+      method: "function minimumBet() view returns (uint256)",
+      params: [],
+    });
+  },
+
+  // ===== WRITE FUNCTIONS (return prepared transaction) =====
+
+  buyShares: (marketId, optionId, amount) => {
+    return prepareContractCall({
+      contract: predictionMarketContract,
+      method: "function buyShares(uint256 _marketId, uint8 _optionId, uint256 _amount)",
+      params: [BigInt(marketId), optionId, BigInt(amount)],
+    });
+  },
+
+  claimWinnings: (marketId) => {
+    return prepareContractCall({
+      contract: predictionMarketContract,
+      method: "function claimWinnings(uint256 _marketId)",
+      params: [BigInt(marketId)],
+    });
+  },
+
+  claimRefund: (marketId) => {
+    return prepareContractCall({
+      contract: predictionMarketContract,
+      method: "function claimRefund(uint256 _marketId)",
+      params: [BigInt(marketId)],
+    });
+  },
+
+  // ===== ADMIN FUNCTIONS (onlyOwner) =====
+
+  createMarket: (question, options, durationSeconds) => {
+    return prepareContractCall({
+      contract: predictionMarketContract,
+      method: "function createMarket(string _question, string[] _options, uint256 _duration) returns (uint256)",
+      params: [question, options, BigInt(durationSeconds)],
+    });
+  },
+
+  resolveMarket: (marketId, winningOption) => {
+    return prepareContractCall({
+      contract: predictionMarketContract,
+      method: "function resolveMarket(uint256 _marketId, uint8 _winningOption)",
+      params: [BigInt(marketId), winningOption],
+    });
+  },
+
+  cancelMarket: (marketId) => {
+    return prepareContractCall({
+      contract: predictionMarketContract,
+      method: "function cancelMarket(uint256 _marketId)",
+      params: [BigInt(marketId)],
+    });
+  },
+};
+
+// Helper: Approve RL80 tokens for prediction market betting
+export const approveForPredictionMarket = (amount) => {
+  return approve({
+    contract: erc20Contract,
+    spender: PREDICTION_MARKET_ADDRESS,
+    amount: BigInt(amount),
+  });
+};
+
+// Helper: Check RL80 allowance for prediction market
+export const getPredictionMarketAllowance = async (ownerAddress) => {
+  return allowance({
+    contract: erc20Contract,
+    owner: ownerAddress,
+    spender: PREDICTION_MARKET_ADDRESS,
+  });
 };
 
 export { client, chain };
