@@ -346,6 +346,63 @@ function enhanceResponse(baseResponse, marketData) {
   return baseResponse;
 }
 
+// Response templates for varied fallback messages - avoids repetition
+const FALLBACK_RESPONSE_TEMPLATES = {
+  extremeFear: [
+    (fg) => `F&G at ${fg} = extreme fear. Historically, this is where bottoms form. The crowd's usually wrong here.`,
+    (fg) => `I'm reading extreme fear at ${fg} on F&G. Blood in the streets vibes - this is contrarian territory.`,
+    (fg) => `F&G showing ${fg} - deep fear zone. When everyone's panicking, that's often the setup. Stay sharp.`,
+    (fg) => `Sentiment tanked to ${fg}. Extreme fear = potential opportunity. The herd's usually wrong at these levels.`,
+    (fg) => `I'm seeing F&G at ${fg} - capitulation territory. Smart money tends to accumulate when retail pukes.`
+  ],
+  extremeGreed: [
+    (fg) => `F&G at ${fg} = euphoria zone. When everyone's bullish, that's your exit signal. Tops are built on confidence.`,
+    (fg) => `I'm reading ${fg} on F&G - extreme greed. This is where the crowd gets rekt. Stay cautious.`,
+    (fg) => `Sentiment at ${fg} screams euphoria. When your barber talks crypto, it's time to be careful.`,
+    (fg) => `F&G showing ${fg} - peak greed territory. The crowd's all-in, which historically means trouble ahead.`,
+    (fg) => `I'm seeing extreme greed at ${fg}. Everyone's a genius in a bull run - until they're not.`
+  ],
+  fear: [
+    (fg) => `F&G at ${fg} - fear building but not extreme yet. Watch for capitulation or reversal.`,
+    (fg) => `I'm reading ${fg} on F&G - crowd getting nervous. Not panic yet, but sentiment weakening.`,
+    (fg) => `Sentiment at ${fg} shows fear creeping in. The crowd's shaky but hasn't fully capitulated.`,
+    (fg) => `F&G showing ${fg} - bearish vibes spreading. Watch for either a flush or a sentiment reversal.`
+  ],
+  greed: [
+    (fg) => `F&G at ${fg} - greed building. Not extreme yet but getting toppy. Stay nimble.`,
+    (fg) => `I'm seeing ${fg} on F&G - optimism rising. Not euphoria yet, but crowd's getting confident.`,
+    (fg) => `Sentiment at ${fg} leans greedy. FOMO building but hasn't peaked. Eyes open for overextension.`,
+    (fg) => `F&G showing ${fg} - bullish vibes strong. Ride the wave but watch for the crowd getting too comfortable.`
+  ],
+  neutral: [
+    (fg) => `F&G at ${fg} - neutral zone, no clear sentiment edge. The crowd's as confused as the price action.`,
+    (fg) => `I'm reading ${fg} on F&G - sentiment flatlined. No clear edge either way, waiting for conviction.`,
+    (fg) => `Sentiment at ${fg} is meh - neither fear nor greed dominates. Crowd's indecisive, I am too.`,
+    (fg) => `F&G showing ${fg} - middle of the road. No contrarian signal here, market's in wait-and-see mode.`
+  ],
+  highFunding: [
+    (fr) => `Funding at ${fr.toFixed(3)}% - longs overleveraged. When funding's this high, shorts get paid to wait for the flush.`,
+    (fr) => `I'm seeing funding at ${fr.toFixed(3)}% - perps running hot. Longs paying up, squeeze potential building on the downside.`,
+    (fr) => `Funding rate ${fr.toFixed(3)}% shows crowded longs. This level of leverage tends to unwind violently.`
+  ],
+  negativeFunding: [
+    (fr) => `Funding at ${fr.toFixed(3)}% - shorts overleveraged. Negative funding = squeeze setup. Watch for the reversal.`,
+    (fr) => `I'm reading funding at ${fr.toFixed(3)}% - shorts paying longs. Contrarian long setup forming here.`,
+    (fr) => `Funding rate ${fr.toFixed(3)}% shows bearish crowding. These setups often flip hard when shorts get squeezed.`
+  ],
+  default: [
+    `Sentiment data inconclusive. No clear crowd positioning to fade. Waiting for extremes.`,
+    `I'm not seeing a clear sentiment edge right now. The crowd's mixed, no contrarian setup yet.`,
+    `Waiting for clearer sentiment signals. No extreme positioning to trade against currently.`,
+    `Sentiment's in no-man's land. I'll speak up when the crowd gives me something to fade.`
+  ]
+};
+
+// Helper to pick random template
+function pickRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
 // Enhanced fallback response generator using personality system
 function generateEnhancedSentimentResponse(marketData) {
   const { fearGreed, fundingRate } = marketData || {};
@@ -353,15 +410,15 @@ function generateEnhancedSentimentResponse(marketData) {
   // Use EMO character knowledge to generate response with teaching
   if (fearGreed !== undefined) {
     if (fearGreed < 25) {
-      return `F&G at ${fearGreed} = extreme fear. Historically, this is where bottoms form. The crowd's usually wrong here.`;
+      return pickRandom(FALLBACK_RESPONSE_TEMPLATES.extremeFear)(fearGreed);
     } else if (fearGreed > 75) {
-      return `F&G at ${fearGreed} = euphoria zone. When everyone's bullish, that's your exit signal. Tops are built on confidence.`;
+      return pickRandom(FALLBACK_RESPONSE_TEMPLATES.extremeGreed)(fearGreed);
     } else if (fearGreed < 40) {
-      return `F&G at ${fearGreed} - fear building but not extreme yet. Watch for capitulation or reversal.`;
+      return pickRandom(FALLBACK_RESPONSE_TEMPLATES.fear)(fearGreed);
     } else if (fearGreed > 60) {
-      return `F&G at ${fearGreed} - greed building. Not extreme yet but getting toppy. Stay nimble.`;
+      return pickRandom(FALLBACK_RESPONSE_TEMPLATES.greed)(fearGreed);
     } else {
-      return `F&G at ${fearGreed} - neutral zone, no clear sentiment edge. The crowd's as confused as the price action.`;
+      return pickRandom(FALLBACK_RESPONSE_TEMPLATES.neutral)(fearGreed);
     }
   }
 
@@ -369,14 +426,14 @@ function generateEnhancedSentimentResponse(marketData) {
   if (fundingRate !== undefined) {
     const fundingPercent = fundingRate * 100;
     if (fundingPercent > 0.05) {
-      return `Funding at ${fundingPercent.toFixed(3)}% - longs overleveraged. When funding's this high, shorts get paid to wait for the flush.`;
+      return pickRandom(FALLBACK_RESPONSE_TEMPLATES.highFunding)(fundingPercent);
     } else if (fundingPercent < -0.02) {
-      return `Funding at ${fundingPercent.toFixed(3)}% - shorts overleveraged. Negative funding = squeeze setup. Watch for the reversal.`;
+      return pickRandom(FALLBACK_RESPONSE_TEMPLATES.negativeFunding)(fundingPercent);
     }
   }
 
   // Default EMO-style response
-  return "Sentiment data inconclusive. No clear crowd positioning to fade. Waiting for extremes.";
+  return pickRandom(FALLBACK_RESPONSE_TEMPLATES.default);
 }
 
 // ============================================================================

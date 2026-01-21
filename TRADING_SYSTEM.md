@@ -349,6 +349,11 @@ agentChatManager.stop()                     // Stop workflow
 | `serviceStatus` | `lighterService` | Railway service health | Railway (5m) |
 | `decisions` | (auto-id) | Full decision logs with analyst scores | Scoring Workflow |
 | `agentScores` | (auto-id) | Individual analyst score outputs | Scoring Workflow |
+| `predictionMarkets` | (market-id) | Prediction market metadata | Admin |
+| `predictionBets` | (auto-id) | User prediction bets | Users |
+| `predictionPayouts` | (auto-id) | Payout records | Service |
+| `oracleAccuracyLogs` | (auto-id) | Oracle directional call logs | Scoring Workflow |
+| `oracleAccuracyStats` | (oracle-id) | Aggregated oracle accuracy | Scoring Workflow |
 
 ---
 
@@ -680,17 +685,119 @@ NEXT_PUBLIC_MOCK_SENTIMENT=true
 
 ### Adding Weekly Market Analysis
 
-Upload YouTube transcripts via the admin interface at `/admin`:
+Upload YouTube transcripts via the admin interface at `/admin` to keep agent knowledge current with the latest market analysis.
+
+#### Upload Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    WEEKLY ANALYSIS KNOWLEDGE FLOW                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  1. UPLOAD (Admin Page)                                                     │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  /admin → WeeklyAnalysisUploader.jsx                                │   │
+│  │  User pastes YouTube transcript with title, channel, date           │   │
+│  │  POST /api/weekly-analysis                                          │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│  2. PROCESSING (weeklyAnalysisSystem.js)                                    │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  processWeeklyAnalysis() extracts domain-specific insights:         │   │
+│  │                                                                      │   │
+│  │  extractSentimentInsights() ──► EMO insights                        │   │
+│  │    - fear/greed mentions, retail behavior, whale activity           │   │
+│  │                                                                      │   │
+│  │  extractTechnicalInsights() ──► TEKNO insights                      │   │
+│  │    - support/resistance levels, RSI/MACD mentions, patterns         │   │
+│  │                                                                      │   │
+│  │  extractMacroInsights() ──────► MACRO insights                      │   │
+│  │    - Fed policy, inflation, DXY, recession/growth mentions          │   │
+│  │                                                                      │   │
+│  │  extractTradingInsights() ────► RL80 insights                       │   │
+│  │    - position sizing, risk management, entry/exit strategies        │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│  3. STORAGE (Firebase)                                                      │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  Collection: weeklyAnalysis                                         │   │
+│  │  Documents: One per agent (EMO, TEKNO, MACRO, RL80)                 │   │
+│  │  Fields: agent, source, timestamp, insights[], keyQuotes[]          │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│  4. RETRIEVAL (During Agent Runs - Hourly)                                  │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  enhancedPromptBuilder.js: buildEnhancedPrompt()                    │   │
+│  │         │                                                            │   │
+│  │         ▼                                                            │   │
+│  │  buildKnowledgeSection(agentName, marketData, includeWeeklyAnalysis)│   │
+│  │         │                                                            │   │
+│  │         ▼                                                            │   │
+│  │  getRecentAnalysisForAgent(agentName, 7) // last 7 days             │   │
+│  │         │                                                            │   │
+│  │         ▼                                                            │   │
+│  │  Adds "## RECENT WEEKLY ANALYSIS" section to agent's system prompt  │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### How to Upload
 
 1. **Navigate to Admin Page**: Visit `/admin` and authenticate with admin password
 2. **Upload Tab**: Use the transcript uploader to submit weekly market analysis
-3. **Automatic Processing**: System extracts insights for each agent:
-   - EMO: Sentiment indicators, fear/greed levels, social psychology
-   - TEKNO: Support/resistance levels, technical patterns, indicators
-   - MACRO: Economic policy, Fed commentary, global trends
-   - RL80: Trading strategies, risk management, position sizing
+3. **Fill in Details**: Title, channel/source, publish date, and full transcript
+4. **Submit**: Click "Upload & Process" to extract insights
 
-### Adding Knowledge
+#### What Gets Extracted
+
+| Agent | Extracted Insights | Pattern Examples |
+|-------|-------------------|------------------|
+| **EMO** | Sentiment indicators, crowd psychology | "fear greed", "retail panic", "whale accumulation", "funding rates" |
+| **TEKNO** | Price levels, technical patterns | "support $95,000", "resistance", "RSI", "MACD", "breakout" |
+| **MACRO** | Economic policy, global trends | "Fed", "inflation", "CPI", "DXY", "rate cuts", "recession" |
+| **RL80** | Trading strategies, risk management | "position size", "stop loss", "risk management", "entry/exit" |
+
+#### Agent Knowledge Sources
+
+Each agent uses TWO types of knowledge:
+
+1. **Static JSON Knowledge** (foundational, rarely changes):
+   - `src/trading/agents/configs/knowledge/emo-knowledge.json`
+   - `src/trading/agents/configs/knowledge/tekno-knowledge.json`
+   - `src/trading/agents/configs/knowledge/macro-knowledge.json`
+   - `src/trading/agents/configs/knowledge/rl80-knowledge.json`
+
+2. **Dynamic Weekly Analysis** (current, uploaded via admin):
+   - Firebase `weeklyAnalysis` collection
+   - Automatically included in prompts (last 7 days)
+   - Refreshed each time you upload new transcripts
+
+#### Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/app/admin/page.js` | Admin interface with upload tab |
+| `src/components/WeeklyAnalysisUploader.jsx` | Upload form component |
+| `src/app/api/weekly-analysis/route.js` | API endpoint for processing |
+| `src/trading/agents/configs/knowledge/weeklyAnalysisSystem.js` | Extraction and storage logic |
+| `src/trading/agents/configs/enhancedPromptBuilder.js` | Includes weekly analysis in prompts |
+
+#### Verifying Integration
+
+To check if weekly analysis is being used:
+
+```bash
+# Check recent analysis for an agent
+curl "http://localhost:3000/api/weekly-analysis?agent=EMO&days=7"
+```
+
+The response shows how many insights are available for that agent from recent uploads.
+
+### Adding Static Knowledge
 
 Edit agent-specific knowledge files in `configs/knowledge/`:
 
@@ -781,6 +888,234 @@ The trading system includes multiple safety mechanisms:
 | **Emergency Stop** | Manual | RL80 can halt all trading |
 
 All trades are logged to `tradeHistory` for audit purposes.
+
+---
+
+## Prediction Market
+
+The trading system includes a prediction market where users can bet RL80 tokens on which oracle (EMO, TEKNO, MACRO) will be most accurate over a week.
+
+### Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         PREDICTION MARKET FLOW                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  1. MARKET CREATION (Admin)                                                 │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  npm run create-market                                               │   │
+│  │  Creates on-chain market: "Most accurate oracle this week?"          │   │
+│  │  Options: EMO, TEKNO, MACRO                                          │   │
+│  │  Duration: 7 days                                                    │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│  2. USERS PLACE BETS                                                        │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  User approves RL80 tokens → Buys shares on chosen oracle            │   │
+│  │  Shares represent proportional claim on the losing pools             │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│  3. ORACLE ACCURACY TRACKING (Automatic)                                    │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  Each hour: Log oracle directional calls                             │   │
+│  │  24 hours later: Compare to actual price movement                    │   │
+│  │  Aggregate weekly stats per oracle                                   │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                    │                                        │
+│                                    ▼                                        │
+│  4. MARKET RESOLUTION (Admin at week end)                                   │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │  Admin resolves market with winning oracle (highest accuracy)        │   │
+│  │  Winners claim: original stake + share of losing pools               │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Smart Contract
+
+| Property | Value |
+|----------|-------|
+| **Network** | Base Sepolia Testnet (Chain ID: 84532) |
+| **Contract Address** | `0x31Cb381461b7A531FAB4aD03848b31A199f4B921` |
+| **Betting Token** | RL80 (`0x3841c83409714e0BA0eA33444a0D4354Da19A084`) |
+| **Market Type** | Parimutuel (winners split loser pools) |
+
+### How Parimutuel Betting Works
+
+The prediction market uses **parimutuel betting** (also called "pool betting"), which differs from traditional fixed-odds betting:
+
+| Aspect | Fixed-Odds Betting | Parimutuel (This System) |
+|--------|-------------------|--------------------------|
+| **Odds** | Set when you bet | Change as more bets come in |
+| **Payout** | Known at bet time | Only known after betting closes |
+| **House edge** | Bookmaker sets odds | Can be zero (pure pool split) |
+| **Risk to house** | House can lose | House never loses (just facilitates) |
+
+**Why parimutuel works well here:**
+- No need to set odds manually (the market determines them)
+- No house risk (the contract just facilitates the pool)
+- Underdogs naturally have higher payouts
+- Simple, fair, transparent on-chain math
+
+It's the same system used by horse racing tracks, lottery games, and prediction markets like Polymarket.
+
+**How the math works:**
+
+```
+Example: Market with 3 options (EMO, TEKNO, MACRO)
+
+Pool Distribution:
+  EMO:    1000 RL80 (25%)
+  TEKNO:  2000 RL80 (50%)
+  MACRO:  1000 RL80 (25%)
+  TOTAL:  4000 RL80
+
+If EMO wins:
+  - EMO bettors split: 1000 (their pool) + 3000 (losing pools) = 4000 RL80
+  - A user with 100 RL80 in EMO (10% of EMO pool) receives:
+    100 + (10% × 3000) = 100 + 300 = 400 RL80 (4x return)
+
+If TEKNO wins:
+  - TEKNO bettors split: 2000 + 2000 = 4000 RL80
+  - A user with 100 RL80 in TEKNO (5% of TEKNO pool) receives:
+    100 + (5% × 2000) = 100 + 100 = 200 RL80 (2x return)
+```
+
+**Key insight:** Betting on underdogs yields higher returns if they win.
+
+### Contract Functions
+
+#### Read Functions (via `predictionMarketFunctions`)
+
+| Function | Description |
+|----------|-------------|
+| `getMarketInfo(marketId)` | Returns question, endTime, winningOption, optionCount, resolved |
+| `getAllOptions(marketId)` | Returns array of option names |
+| `getAllOptionShares(marketId)` | Returns array of pool sizes (wei) |
+| `getAllUserShares(marketId, userAddress)` | Returns user's shares per option |
+| `calculatePotentialWinnings(marketId, user, assumedWinner)` | Calculates payout if option wins |
+| `getMarketCount()` | Returns total number of markets |
+| `hasUserClaimed(marketId, user)` | Check if user claimed winnings |
+
+#### Write Functions
+
+| Function | Description | Access |
+|----------|-------------|--------|
+| `buyShares(marketId, optionId, amount)` | Buy shares on an option | Anyone |
+| `claimWinnings(marketId)` | Claim winnings after resolution | Winners |
+| `claimRefund(marketId)` | Claim refund if market cancelled | Anyone |
+| `createMarket(question, options, duration)` | Create new market | Owner only |
+| `resolveMarket(marketId, winningOption)` | Resolve with winner | Owner only |
+| `cancelMarket(marketId)` | Cancel and enable refunds | Owner only |
+
+### Creating a Market
+
+Use the provided script:
+
+```bash
+# 1. Add private key to .env
+OWNER_PRIVATE_KEY=your_deployer_wallet_private_key
+
+# 2. (Optional) Edit market config in scripts/createMarket.js
+const MARKET_CONFIG = {
+  question: "Most accurate oracle this week?",
+  options: ["EMO", "TEKNO", "MACRO"],
+  durationDays: 7
+};
+
+# 3. Run the script
+npm run create-market
+```
+
+The script outputs the market ID (starts at 0 for first market).
+
+### Oracle Accuracy Tracking
+
+The system automatically tracks oracle accuracy:
+
+1. **Logging calls** (`oracleAccuracyService.js`):
+   - After each scoring run, logs each oracle's directional call (LONG/SHORT/NEUTRAL)
+   - Records the BTC price at time of call
+   - Sets verification time to 24 hours later
+
+2. **Verifying calls**:
+   - Compares actual price movement to predicted direction
+   - Marks call as correct/incorrect
+   - Updates running accuracy stats
+
+3. **Weekly aggregation**:
+   - Calculates accuracy percentage per oracle
+   - Used to resolve weekly prediction markets
+
+### Firebase Collections
+
+| Collection | Purpose | Updated By |
+|------------|---------|------------|
+| `predictionMarkets` | Market metadata (synced from chain) | Admin/Service |
+| `predictionBets` | User bet records | Users (on bet) |
+| `predictionPayouts` | Payout records | Service (on claim) |
+| `oracleAccuracyLogs` | Individual oracle call logs | Scoring workflow |
+| `oracleAccuracyStats` | Aggregated accuracy stats | Scoring workflow |
+
+### UI Components
+
+**Location:** `src/trading/components/overlays/PredictionMarketOverlay.jsx`
+
+Features:
+- Market cards showing pool distribution
+- Live on-chain data via `useReadContract`
+- Two-step betting: Approve RL80 → Buy shares
+- User position display with potential winnings
+- Claim winnings button for resolved markets
+
+### Linking Firebase to On-Chain
+
+When loading markets from Firebase, include the `onChainId` to enable live data:
+
+```javascript
+const market = {
+  id: 'weekly-oracle-market',
+  onChainId: 0,  // <-- Links to contract market ID
+  question: "Most accurate oracle this week?",
+  options: [
+    { id: 'EMO', name: 'EMO', color: '#ff8800' },
+    { id: 'TEKNO', name: 'TEKNO', color: '#aa44ff' },
+    { id: 'MACRO', name: 'MACRO', color: '#00c8ff' }
+  ],
+  endTime: new Date('2026-01-27'),
+  // ...
+};
+```
+
+When `onChainId` is present, the UI:
+- Fetches live pool sizes from the contract
+- Shows "LIVE ON-CHAIN" indicator
+- Displays user's shares and potential winnings
+
+### Environment Variables
+
+```env
+# Required for market creation
+OWNER_PRIVATE_KEY=...              # Wallet that deployed the contract
+
+# Already configured (from Thirdweb setup)
+NEXT_PUBLIC_THIRDWEB_CLIENT_ID=... # Thirdweb client ID
+```
+
+### Resolving a Market
+
+At the end of the week, the admin resolves the market:
+
+1. Check oracle accuracy stats in Firebase (`oracleAccuracyStats`)
+2. Determine winning oracle (highest accuracy)
+3. Call `resolveMarket(marketId, winningOptionIndex)`:
+   - EMO = 0, TEKNO = 1, MACRO = 2
+
+This can be done via Thirdweb dashboard or a resolution script.
 
 ---
 

@@ -290,61 +290,148 @@ function buildUserPrompt(marketData, lastMessages, config) {
 // RESPONSE GENERATOR (Fallback)
 // ============================================================================
 
+// Response templates for varied fallback messages - avoids repetition
+const MACRO_FALLBACK_TEMPLATES = {
+  dxyStrong: [
+    (dxy) => `DXY at ${dxy.toFixed(1)} crushing risk assets`,
+    (dxy) => `I'm seeing DXY at ${dxy.toFixed(1)} - strong dollar headwind for crypto`,
+    (dxy) => `Dollar strength at ${dxy.toFixed(1)} pressuring risk. Macro headwinds evident.`,
+    (dxy) => `DXY reading ${dxy.toFixed(1)} - tight financial conditions, risk assets under pressure.`
+  ],
+  dxyWeak: [
+    (dxy) => `DXY at ${dxy.toFixed(1)} supporting crypto`,
+    (dxy) => `I'm reading DXY at ${dxy.toFixed(1)} - weak dollar tailwind for risk assets`,
+    (dxy) => `Dollar weakness at ${dxy.toFixed(1)} providing macro support. Liquidity conditions favorable.`,
+    (dxy) => `DXY at ${dxy.toFixed(1)} - softer dollar historically positive for crypto flows.`
+  ],
+  dxyNeutral: [
+    (dxy) => `DXY ${dxy.toFixed(1)} neutral`,
+    (dxy) => `I'm seeing DXY at ${dxy.toFixed(1)} - no strong directional bias from the dollar`,
+    (dxy) => `Dollar index at ${dxy.toFixed(1)} - in the middle range, watching for breakout.`,
+    (dxy) => `DXY reading ${dxy.toFixed(1)} - macro neither helping nor hurting here.`
+  ],
+  vixSpike: [
+    () => `VIX spiking - macro stress evident`,
+    () => `I'm reading elevated VIX - fear across markets, risk-off conditions`,
+    () => `VIX in danger zone - institutional hedging heavy, caution mode.`,
+    () => `Volatility index spiking - tradfi stress often bleeds into crypto.`
+  ],
+  vixElevated: [
+    () => `VIX elevated - caution warranted`,
+    () => `I'm seeing VIX above comfort zone - some stress in the system`,
+    () => `VIX showing nerves - not crisis but not complacent either.`,
+    () => `Elevated volatility expectations - position sizing should reflect uncertainty.`
+  ],
+  vixLow: [
+    () => `VIX complacent - volatility coming`,
+    () => `I'm reading VIX low - calm before the storm, historically`,
+    () => `VIX in complacency territory - these levels rarely last.`,
+    () => `Low VIX readings often precede vol expansion. Stay nimble.`
+  ],
+  yieldsHigh: [
+    () => `Yields pressuring risk assets`,
+    () => `I'm seeing treasury yields elevated - real rates matter for crypto`,
+    () => `High yields competing with risk assets for capital allocation.`,
+    () => `Treasury yields at these levels historically pressure speculative assets.`
+  ],
+  yieldsLow: [
+    () => `Yields supportive for growth`,
+    () => `I'm reading supportive yield environment - TINA vibes for risk`,
+    () => `Lower yields pushing capital toward growth and risk assets.`,
+    () => `Yield backdrop favorable - less competition from safe haven rates.`
+  ],
+  regimeRiskOff: [
+    () => `Risk-off regime`,
+    () => `I'm reading risk-off conditions across the board`,
+    () => `Macro regime clearly defensive - flight to safety underway.`,
+    () => `Risk-off environment - capital preservation mode warranted.`
+  ],
+  regimeRiskOn: [
+    () => `Risk-on regime`,
+    () => `I'm seeing risk-on conditions - macro supportive for crypto`,
+    () => `Macro regime constructive - liquidity conditions favorable.`,
+    () => `Risk-on environment - capital flows toward growth assets.`
+  ],
+  regimeCrisis: [
+    () => `Crisis mode - capital preservation priority`,
+    () => `I'm reading crisis-level stress - defensive positioning`,
+    () => `Macro in crisis territory - protect capital first.`,
+    () => `Stress levels elevated - this is not the time for aggression.`
+  ],
+  regimeTightening: [
+    () => `Tightening cycle - headwinds for risk`,
+    () => `I'm seeing tightening conditions - policy not friendly`,
+    () => `Monetary tightening environment - liquidity being drained.`,
+    () => `Fed policy tightening backdrop - historically challenging for crypto.`
+  ],
+  regimeNeutral: [
+    () => `Neutral regime - watching for inflection`,
+    () => `I'm reading neutral macro conditions - no strong directional bias`,
+    () => `Macro in transition - watching for regime shift signals.`,
+    () => `Neither risk-on nor risk-off - the setup will clarify.`
+  ]
+};
+
+// Helper to pick random template
+function pickRandomMacro(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
 export function generateMacroResponse(marketData) {
   const { dxy, vix, treasury10Y, btcPrice } = marketData || {};
   const config = MACRO_SPECIALIST_CONFIG;
-  
+
   let response = [];
-  
+
   // DXY analysis
   if (dxy) {
     if (dxy > 105) {
-      response.push(`DXY at ${dxy.toFixed(1)} crushing risk`);
+      response.push(pickRandomMacro(MACRO_FALLBACK_TEMPLATES.dxyStrong)(dxy));
     } else if (dxy < 100) {
-      response.push(`DXY at ${dxy.toFixed(1)} supporting crypto`);
+      response.push(pickRandomMacro(MACRO_FALLBACK_TEMPLATES.dxyWeak)(dxy));
     } else {
-      response.push(`DXY ${dxy.toFixed(1)} neutral`);
+      response.push(pickRandomMacro(MACRO_FALLBACK_TEMPLATES.dxyNeutral)(dxy));
     }
   }
-  
+
   // VIX analysis
   if (vix) {
     if (vix > 30) {
-      response.push("VIX spiking - macro stress");
+      response.push(pickRandomMacro(MACRO_FALLBACK_TEMPLATES.vixSpike)());
     } else if (vix > 20) {
-      response.push("VIX elevated - caution warranted");
+      response.push(pickRandomMacro(MACRO_FALLBACK_TEMPLATES.vixElevated)());
     } else if (vix < 15) {
-      response.push("VIX complacent - volatility coming");
+      response.push(pickRandomMacro(MACRO_FALLBACK_TEMPLATES.vixLow)());
     }
   }
-  
+
   // Yields
   if (treasury10Y) {
     if (treasury10Y > 4.5) {
-      response.push("Yields pressuring risk assets");
+      response.push(pickRandomMacro(MACRO_FALLBACK_TEMPLATES.yieldsHigh)());
     } else if (treasury10Y < 3.5) {
-      response.push("Yields supportive for growth");
+      response.push(pickRandomMacro(MACRO_FALLBACK_TEMPLATES.yieldsLow)());
     }
   }
-  
+
   // Determine regime
   const regime = determineRegime(marketData);
   if (regime) {
     response.push(regime);
   }
-  
+
   return response.join('. ') + '.';
 }
 
 function determineRegime(marketData) {
   const { dxy, vix, treasury10Y } = marketData || {};
-  
-  if (dxy > 105 && vix > 25) return "Risk-off regime";
-  if (dxy < 100 && vix < 20) return "Risk-on regime";
-  if (vix > 30) return "Crisis mode";
-  if (treasury10Y && treasury10Y > 5) return "Tightening cycle";
 
-  return "Neutral regime"; // Always return something
+  if (dxy > 105 && vix > 25) return pickRandomMacro(MACRO_FALLBACK_TEMPLATES.regimeRiskOff)();
+  if (dxy < 100 && vix < 20) return pickRandomMacro(MACRO_FALLBACK_TEMPLATES.regimeRiskOn)();
+  if (vix > 30) return pickRandomMacro(MACRO_FALLBACK_TEMPLATES.regimeCrisis)();
+  if (treasury10Y && treasury10Y > 5) return pickRandomMacro(MACRO_FALLBACK_TEMPLATES.regimeTightening)();
+
+  return pickRandomMacro(MACRO_FALLBACK_TEMPLATES.regimeNeutral)();
 }
 
 // ============================================================================
