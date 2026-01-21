@@ -940,7 +940,7 @@ The trading system includes a prediction market where users can bet RL80 tokens 
 | Property | Value |
 |----------|-------|
 | **Network** | Base Sepolia Testnet (Chain ID: 84532) |
-| **Contract Address** | `0x31Cb381461b7A531FAB4aD03848b31A199f4B921` |
+| **Contract Address** | `0x3e34244D9F9c6CD1Ad970Cf02247d74e5451818c` |
 | **Betting Token** | RL80 (`0x3841c83409714e0BA0eA33444a0D4354Da19A084`) |
 | **Market Type** | Parimutuel (winners split loser pools) |
 

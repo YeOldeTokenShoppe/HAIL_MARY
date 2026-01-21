@@ -643,13 +643,20 @@ function generateDecisionTextSummary(aggregatedScores, recommendations, tradeabl
       Math.floor(Math.random() * config.responsePatterns.mixed_signals.length)
     ];
 
-    // Add specific reasoning in her voice
+    // Add specific reasoning in her voice with varied phrasing
     const topAggregated = aggregatedScores
       .sort((a, b) => Math.abs(b.weightedDirection) - Math.abs(a.weightedDirection))[0];
 
     if (topAggregated) {
       const interpretation = interpretDirectionScore(topAggregated.weightedDirection);
-      summary += ` ${topAggregated.asset} shows ${interpretation} signals but not strong enough for action.`;
+      const noActionSuffixes = [
+        `${topAggregated.asset} reads ${interpretation} - watching but not acting.`,
+        `Seeing ${interpretation} on ${topAggregated.asset}, conviction too low to deploy.`,
+        `${topAggregated.asset} at ${interpretation} strength - need more confirmation.`,
+        `The math on ${topAggregated.asset} says ${interpretation}, but the setup isn't there yet.`,
+        `${interpretation} vibes on ${topAggregated.asset} - waiting for cleaner entry.`
+      ];
+      summary += ' ' + noActionSuffixes[Math.floor(Math.random() * noActionSuffixes.length)];
     }
 
     return summary;

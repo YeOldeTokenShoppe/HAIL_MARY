@@ -1,27 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, collection, query, where, orderBy, limit, onSnapshot, doc } from 'firebase/firestore';
+import { db, collection, query, where, orderBy, limit, onSnapshot, doc } from '../lib/firebaseClient';
 import RL80TraderCard from './RL80TraderCard';
 import './FocusedAgentCard.css';
-
-// Firebase config
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
-};
-
-// Initialize Firebase
-let db;
-try {
-  const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
-  db = getFirestore(app);
-} catch (error) {
-  console.error('Firebase initialization failed:', error);
-}
 
 const FocusedAgentCard = ({ agentId, onClose }) => {
   const [agentData, setAgentData] = useState(null);

@@ -407,30 +407,78 @@ function checkDirectionMatch(predicted, actual) {
 }
 
 /**
- * Get current week identifier
+ * Get current week identifier (ISO week: Monday-Sunday)
  */
 export function getCurrentWeekId() {
   const now = new Date();
-  const year = now.getFullYear();
-  const oneJan = new Date(year, 0, 1);
-  const weekNum = Math.ceil(((now - oneJan) / 86400000 + oneJan.getDay() + 1) / 7);
+  // Get the Monday of the current week
+  const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - daysFromMonday);
+  monday.setHours(0, 0, 0, 0);
+
+  // Calculate ISO week number
+  const year = monday.getFullYear();
+  const jan1 = new Date(year, 0, 1);
+  const jan1Day = jan1.getDay() || 7; // Convert Sunday from 0 to 7
+
+  // First Thursday determines week 1
+  const firstThursday = new Date(jan1);
+  firstThursday.setDate(jan1.getDate() + (4 - jan1Day + 7) % 7);
+
+  // Calculate week number
+  const weekNum = Math.ceil(((monday - new Date(year, 0, 1)) / 86400000 + 1) / 7);
+
   return `${year}-W${weekNum.toString().padStart(2, '0')}`;
 }
 
 /**
- * Get week start and end dates
+ * Get week start (Monday) and end (Sunday 23:59:59.999) dates
+ * Can accept weekId or calculate for current week
  */
 export function getWeekBounds(weekId = null) {
-  const id = weekId || getCurrentWeekId();
-  const [year, weekPart] = id.split('-W');
+  // If no weekId provided, calculate bounds for current week directly
+  if (!weekId) {
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+
+    // Monday 00:00:00.000
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - daysFromMonday);
+    weekStart.setHours(0, 0, 0, 0);
+
+    // Sunday 23:59:59.999
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+
+    return { start: weekStart, end: weekEnd };
+  }
+
+  // Parse weekId and calculate bounds
+  const [year, weekPart] = weekId.split('-W');
   const weekNum = parseInt(weekPart);
 
+  // Find Jan 1 of that year
   const jan1 = new Date(parseInt(year), 0, 1);
-  const daysToMonday = (8 - jan1.getDay()) % 7;
-  const firstMonday = new Date(jan1.getTime() + daysToMonday * 86400000);
+  const jan1Day = jan1.getDay() || 7; // Convert Sunday from 0 to 7
 
-  const weekStart = new Date(firstMonday.getTime() + (weekNum - 1) * 7 * 86400000);
-  const weekEnd = new Date(weekStart.getTime() + 7 * 86400000 - 1);
+  // Find first Monday of the year (could be in previous year)
+  const firstMonday = new Date(jan1);
+  const daysToMonday = jan1Day === 1 ? 0 : (8 - jan1Day);
+  firstMonday.setDate(jan1.getDate() + daysToMonday);
+
+  // Calculate week start (Monday)
+  const weekStart = new Date(firstMonday);
+  weekStart.setDate(firstMonday.getDate() + (weekNum - 1) * 7);
+  weekStart.setHours(0, 0, 0, 0);
+
+  // Calculate week end (Sunday 23:59:59.999)
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  weekEnd.setHours(23, 59, 59, 999);
 
   return { start: weekStart, end: weekEnd };
 }

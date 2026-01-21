@@ -12,14 +12,26 @@ import { privateKeyToAccount } from "thirdweb/wallets";
 import { defineChain } from "thirdweb/chains";
 
 // Configuration
-const PREDICTION_MARKET_ADDRESS = "0x31Cb381461b7A531FAB4aD03848b31A199f4B921";
+const PREDICTION_MARKET_ADDRESS = "0x3e34244D9F9c6CD1Ad970Cf02247d74e5451818c";
 const THIRDWEB_CLIENT_ID = process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || "cbae42251fe95b7e26a19a326b96ce5c";
 
-// Market configuration - EDIT THESE
+// Market configuration
 const MARKET_CONFIG = {
-  question: "Most accurate oracle this week?",
   options: ["EMO", "TEKNO", "MACRO"],
-  durationDays: 7  // Market runs for 7 days
+  // Duration: ends Sunday 23:59:59 of current week
+  getEndDate: () => {
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
+    const sunday = new Date(now);
+    sunday.setDate(now.getDate() + daysUntilSunday);
+    sunday.setHours(23, 59, 59, 999);
+    return sunday;
+  },
+  getQuestion: (endDate) => {
+    const endDateStr = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `Most accurate oracle for week ending ${endDateStr}?`;
+  }
 };
 
 async function createMarket() {
@@ -49,13 +61,16 @@ async function createMarket() {
     address: PREDICTION_MARKET_ADDRESS,
   });
 
-  // Calculate duration in seconds
-  const durationSeconds = MARKET_CONFIG.durationDays * 24 * 60 * 60;
+  // Calculate end date and duration
+  const endDate = MARKET_CONFIG.getEndDate();
+  const question = MARKET_CONFIG.getQuestion(endDate);
+  const durationSeconds = Math.floor((endDate - new Date()) / 1000);
 
   console.log(`\n📋 Market Details:`);
-  console.log(`   Question: ${MARKET_CONFIG.question}`);
+  console.log(`   Question: ${question}`);
   console.log(`   Options: ${MARKET_CONFIG.options.join(", ")}`);
-  console.log(`   Duration: ${MARKET_CONFIG.durationDays} days (${durationSeconds} seconds)`);
+  console.log(`   Ends: ${endDate.toLocaleString()}`);
+  console.log(`   Duration: ${Math.round(durationSeconds / 3600)} hours (${durationSeconds} seconds)`);
 
   try {
     // Prepare the transaction
@@ -63,7 +78,7 @@ async function createMarket() {
       contract,
       method: "function createMarket(string _question, string[] _options, uint256 _duration) returns (uint256)",
       params: [
-        MARKET_CONFIG.question,
+        question,
         MARKET_CONFIG.options,
         BigInt(durationSeconds)
       ],

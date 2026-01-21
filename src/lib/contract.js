@@ -98,7 +98,7 @@ export const tokenFunctions = {
 // PREDICTION MARKET CONTRACT
 // ============================================================================
 
-export const PREDICTION_MARKET_ADDRESS = "0x31Cb381461b7A531FAB4aD03848b31A199f4B921";
+export const PREDICTION_MARKET_ADDRESS = "0x3e34244D9F9c6CD1Ad970Cf02247d74e5451818c";
 
 // Prediction Market contract instance
 export const predictionMarketContract = getContract({

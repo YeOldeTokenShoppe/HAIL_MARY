@@ -1,136 +1,62 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { TransactionButton, useReadContract } from "thirdweb/react";
+import { TransactionButton, useReadContract, ConnectButton, useWalletBalance, useActiveAccount } from "thirdweb/react";
+import { sendAndConfirmTransaction } from "thirdweb";
 import { toWei, toEther } from "thirdweb/utils";
+import { darkTheme } from "thirdweb/react";
+import { defineChain } from "thirdweb/chains";
+import { createWallet } from "thirdweb/wallets";
+import { inAppWallet } from "thirdweb/wallets/in-app";
 import {
   predictionMarketFunctions,
   predictionMarketContract,
   approveForPredictionMarket,
   getPredictionMarketAllowance,
-  PREDICTION_MARKET_ADDRESS
+  PREDICTION_MARKET_ADDRESS,
+  tokenFunctions,
+  client
 } from '@/lib/contract';
+
+// Chain config for wallet connection
+const chain = defineChain(84532); // Base Sepolia
+
+// Wallet options for prediction market
+const predictionWallets = [
+  createWallet("io.metamask"),
+  createWallet("com.coinbase.wallet"),
+  createWallet("walletConnect"),
+  inAppWallet({
+    auth: {
+      options: ["google", "discord", "email", "passkey"],
+    },
+  }),
+];
+
+// Custom theme for connect button
+const predictionWalletTheme = darkTheme({
+  colors: {
+    primaryButtonBg: "linear-gradient(135deg, #ff8800, #cc6600)",
+    primaryButtonText: "#000",
+    modalBg: "rgba(20, 20, 30, 0.98)",
+    borderColor: "rgba(255, 136, 0, 0.3)",
+    accentText: "#ff8800",
+    primaryText: "#ffffff",
+    secondaryText: "rgba(255, 255, 255, 0.6)",
+  },
+});
 import { useWalletAuth } from '@/components/WalletAuthProvider';
+import { validateTransaction } from '@/utils/security';
 import {
   getActiveMarkets,
   getUserBets,
   placeBet,
-  ensureCurrentWeekMarket,
   getCurrentOracleMarket
 } from '../../services/predictionMarketService.js';
 
-// Fallback mock data when Firebase is loading or unavailable
-const FALLBACK_MARKETS = [
-  // Multi-option: Agent markets
-  {
-    id: 1,
-    question: "Most profitable agent this week?",
-    type: 'multi',
-    category: 'agent',
-    options: [
-      { id: 'macro', name: 'Macro Specialist', pool: 3200, color: '#00c8ff' },
-      { id: 'sentiment', name: 'Sentiment (Grok)', pool: 4100, color: '#ff8800' },
-      { id: 'technical', name: 'Technical Specialist', pool: 2700, color: '#aa44ff' }
-    ],
-    endTime: new Date('2026-01-26'),
-    resolved: false
-  },
-  {
-    id: 2,
-    question: "Coordinator's next trade direction?",
-    type: 'multi',
-    category: 'agent',
-    options: [
-      { id: 'long', name: 'LONG', pool: 8500, color: '#00ff88' },
-      { id: 'short', name: 'SHORT', pool: 6200, color: '#ff4466' },
-      { id: 'hold', name: 'HOLD', pool: 2300, color: '#888888' }
-    ],
-    endTime: new Date('2026-01-20'),
-    resolved: false
-  },
-  // Binary markets
-  {
-    id: 3,
-    question: "BTC > $150k by March 2026?",
-    type: 'binary',
-    category: 'crypto',
-    yesPool: 12500,
-    noPool: 7500,
-    endTime: new Date('2026-03-01'),
-    resolved: false
-  },
-  {
-    id: 4,
-    question: "Fed cuts rates before June 2026?",
-    type: 'binary',
-    category: 'macro',
-    yesPool: 31200,
-    noPool: 12800,
-    endTime: new Date('2026-06-01'),
-    resolved: false
-  },
-  {
-    id: 5,
-    question: "VIX > 30 this month?",
-    type: 'binary',
-    category: 'macro',
-    yesPool: 4200,
-    noPool: 8800,
-    endTime: new Date('2026-02-28'),
-    resolved: false
-  },
-  // Multi-option: More agent markets
-  {
-    id: 6,
-    question: "Which agent calls the next big move?",
-    type: 'multi',
-    category: 'agent',
-    options: [
-      { id: 'macro', name: 'Macro', pool: 1800, color: '#00c8ff' },
-      { id: 'sentiment', name: 'Sentiment', pool: 2400, color: '#ff8800' },
-      { id: 'technical', name: 'Technical', pool: 3100, color: '#aa44ff' },
-      { id: 'coordinator', name: 'Coordinator', pool: 1200, color: '#00ff88' }
-    ],
-    endTime: new Date('2026-01-25'),
-    resolved: false
-  }
-];
-
-const FALLBACK_POSITIONS = [
-  {
-    marketId: 1,
-    question: "Most profitable agent this week?",
-    type: 'multi',
-    selectedOption: { id: 'sentiment', name: 'Sentiment (Grok)', color: '#ff8800' },
-    amount: 250,
-    poolAtEntry: 3500,
-    currentOptions: [
-      { id: 'macro', pool: 3200 },
-      { id: 'sentiment', pool: 4100 },
-      { id: 'technical', pool: 2700 }
-    ]
-  },
-  {
-    marketId: 3,
-    question: "BTC > $150k by March 2026?",
-    type: 'binary',
-    side: 'YES',
-    amount: 500,
-    poolAtEntry: 10000,
-    currentYesPool: 12500,
-    currentNoPool: 7500
-  },
-  {
-    marketId: 4,
-    question: "Fed cuts rates before June 2026?",
-    type: 'binary',
-    side: 'NO',
-    amount: 200,
-    poolAtEntry: 10000,
-    currentYesPool: 31200,
-    currentNoPool: 12800
-  }
-];
+// Empty fallbacks - real data comes from Firebase/on-chain
+const FALLBACK_MARKETS = [];
+const FALLBACK_POSITIONS = [];
 
 // Format time remaining
 const formatTimeRemaining = (endTime) => {
@@ -178,6 +104,51 @@ const ORACLE_COLORS = {
   'TEKNO': '#aa44ff',
   'MACRO': '#00c8ff',
   'RL80': '#00ff88'
+};
+
+// Market status helper - determines state based on contract data
+// winningOption: 0 = cancelled/not resolved, 1-N = winning option index (1-based)
+const getMarketStatus = (resolved, winningOption, endTime) => {
+  const now = new Date();
+  const ended = endTime && endTime < now;
+
+  if (resolved && winningOption === 0) {
+    return {
+      status: 'CANCELLED',
+      message: 'Market cancelled - claim your refund',
+      action: 'CLAIM_REFUND',
+      color: '#ff8800',
+      icon: '🚫'
+    };
+  }
+
+  if (resolved && winningOption > 0) {
+    return {
+      status: 'RESOLVED',
+      message: `Resolved - Option ${winningOption} won`,
+      action: 'CLAIM_WINNINGS',
+      color: '#00ff88',
+      icon: '✓'
+    };
+  }
+
+  if (ended) {
+    return {
+      status: 'ENDED',
+      message: 'Waiting for resolution',
+      action: null,
+      color: '#ffcc00',
+      icon: '⏳'
+    };
+  }
+
+  return {
+    status: 'ACTIVE',
+    message: 'Market is live',
+    action: 'PLACE_BET',
+    color: '#00c8ff',
+    icon: '🔴'
+  };
 };
 
 // Hook to read on-chain market data
@@ -506,28 +477,67 @@ const MarketCard = ({ market, onSelect, isSelected, walletAddress }) => {
   const catConfig = categoryConfig[market.category] || { color: '#888', icon: '📈' };
 
   // Check if market has on-chain ID for live data
-  const hasOnChainId = market.onChainId !== undefined && market.onChainId !== null;
+  // Support both onChainId and onChainMarketId field names
+  const effectiveOnChainId = market.onChainId ?? market.onChainMarketId;
+  const hasOnChainId = effectiveOnChainId !== undefined && effectiveOnChainId !== null;
+
+  // Get market status (ACTIVE, ENDED, CANCELLED, RESOLVED)
+  const marketStatus = getMarketStatus(
+    market.resolved,
+    market.winningOption || 0,
+    market.endTime
+  );
+  const isCancelled = marketStatus.status === 'CANCELLED';
+  const isEnded = marketStatus.status === 'ENDED' || marketStatus.status === 'RESOLVED';
 
   return (
     <div
-      onClick={() => onSelect(market)}
+      onClick={() => !isCancelled && onSelect(market)}
       style={{
-        background: isSelected
-          ? 'linear-gradient(135deg, rgba(0, 255, 136, 0.15) 0%, rgba(0, 100, 50, 0.2) 100%)'
-          : 'linear-gradient(135deg, rgba(20, 20, 30, 0.9) 0%, rgba(10, 10, 20, 0.95) 100%)',
-        border: isSelected
-          ? '1px solid rgba(0, 255, 136, 0.6)'
-          : '1px solid rgba(100, 100, 120, 0.3)',
+        background: isCancelled
+          ? 'linear-gradient(135deg, rgba(100, 80, 50, 0.3) 0%, rgba(50, 40, 25, 0.4) 100%)'
+          : isSelected
+            ? 'linear-gradient(135deg, rgba(0, 255, 136, 0.15) 0%, rgba(0, 100, 50, 0.2) 100%)'
+            : 'linear-gradient(135deg, rgba(20, 20, 30, 0.9) 0%, rgba(10, 10, 20, 0.95) 100%)',
+        border: isCancelled
+          ? '1px solid rgba(255, 136, 0, 0.4)'
+          : isSelected
+            ? '1px solid rgba(0, 255, 136, 0.6)'
+            : '1px solid rgba(100, 100, 120, 0.3)',
         borderRadius: '12px',
         padding: '16px',
-        cursor: 'pointer',
+        cursor: isCancelled ? 'default' : 'pointer',
         transition: 'all 0.2s ease',
         marginBottom: '12px',
         boxShadow: isSelected
           ? '0 0 20px rgba(0, 255, 136, 0.2)'
-          : '0 4px 12px rgba(0, 0, 0, 0.3)'
+          : '0 4px 12px rgba(0, 0, 0, 0.3)',
+        opacity: isCancelled ? 0.7 : 1
       }}
     >
+      {/* Market status badge for cancelled/resolved markets */}
+      {(isCancelled || marketStatus.status === 'RESOLVED') && (
+        <div style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          padding: '3px 8px',
+          borderRadius: '4px',
+          fontSize: '9px',
+          fontWeight: 'bold',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+          marginBottom: '8px',
+          marginRight: '8px',
+          background: `${marketStatus.color}22`,
+          color: marketStatus.color,
+          border: `1px solid ${marketStatus.color}44`
+        }}>
+          <span>{marketStatus.icon}</span>
+          {marketStatus.status}
+        </div>
+      )}
+
       {/* Category tag */}
       <div style={{
         display: 'inline-flex',
@@ -638,13 +648,13 @@ const MarketCard = ({ market, onSelect, isSelected, walletAddress }) => {
 
       {/* Live on-chain data display */}
       {hasOnChainId && market.type !== 'binary' && (
-        <LivePoolDisplay marketId={market.onChainId} options={market.options} />
+        <LivePoolDisplay marketId={effectiveOnChainId} options={market.options} />
       )}
 
       {/* User's shares display */}
       {hasOnChainId && walletAddress && market.type !== 'binary' && (
         <UserSharesDisplay
-          marketId={market.onChainId}
+          marketId={effectiveOnChainId}
           options={market.options}
           userAddress={walletAddress}
         />
@@ -653,21 +663,44 @@ const MarketCard = ({ market, onSelect, isSelected, walletAddress }) => {
   );
 };
 
+// RL80 Token address on Base Sepolia
+const RL80_TOKEN_ADDRESS = "0x3841c83409714e0ba0ea33444a0d4354da19a084";
+
 // Bet panel component - handles both binary and multi-option
 const BetPanel = ({ market, onClose, userId = 'anonymous', onBetPlaced }) => {
+  // Use activeAccount from Thirdweb directly - this is the actually connected wallet
+  const thirdwebAccount = useActiveAccount();
+  // Get wallet context for additional info
   const { walletAddress, isWalletConnected } = useWalletAuth();
+
+  // Use the Thirdweb account or fallback to walletAddress from useWalletAuth
+  const activeAccount = thirdwebAccount;
+  const effectiveWalletAddress = thirdwebAccount?.address || walletAddress;
+
+  // Use Thirdweb's useWalletBalance hook to get token balance for the connected account
+  const { data: balanceData, isLoading: isLoadingBalance } = useWalletBalance({
+    chain,
+    address: effectiveWalletAddress,
+    tokenAddress: RL80_TOKEN_ADDRESS, // RL80 token address
+    client,
+  });
   const [selectedOption, setSelectedOption] = useState(
     market.type === 'binary' ? 'YES' : market.options[0]?.id
   );
   const [amount, setAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [transactionStatus, setTransactionStatus] = useState(''); // 'approving', 'betting', 'confirming', 'success'
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [needsApproval, setNeedsApproval] = useState(true);
-  const [checkingAllowance, setCheckingAllowance] = useState(false);
+  const [checkingAllowance, setCheckingAllowance] = useState(true); // Start true to show loading
 
   // Get live on-chain data if market has onChainId
-  const hasOnChainId = market.onChainId !== undefined && market.onChainId !== null;
+  // Support both onChainId and onChainMarketId field names
+  const effectiveOnChainId = market.onChainId ?? market.onChainMarketId;
+  const hasOnChainId = effectiveOnChainId !== undefined && effectiveOnChainId !== null;
   const { data: onChainData, isLoading: loadingOnChain } = useOnChainMarketData(
-    market.onChainId,
+    effectiveOnChainId,
     hasOnChainId
   );
 
@@ -679,18 +712,64 @@ const BetPanel = ({ market, onClose, userId = 'anonymous', onBetPlaced }) => {
   const betAmountWei = betAmount > 0 ? toWei(betAmount.toString()) : BigInt(0);
   const totalPool = getTotalPool(liveMarket);
 
+  // Human-readable balance from useWalletBalance hook
+  // balanceData.displayValue is the human-readable format (e.g., "1000.0")
+  // balanceData.value is the raw BigInt in wei
+  const userBalanceNum = balanceData?.displayValue ? parseFloat(balanceData.displayValue) : 0;
+  const insufficientBalance = betAmount > 0 && betAmount > userBalanceNum;
+
+  // Check if wallet is actually connected (either via Thirdweb or WalletAuth)
+  const isActuallyConnected = !!thirdwebAccount || isWalletConnected;
+
+  // Sync selectedOption with liveOptions when they load
+  useEffect(() => {
+    if (liveOptions && liveOptions.length > 0 && !liveMarket.type?.includes('binary')) {
+      // Check if current selection exists in liveOptions
+      const selectedLower = selectedOption?.toLowerCase();
+      const exists = liveOptions.some(o =>
+        o.id?.toLowerCase() === selectedLower ||
+        o.name?.toLowerCase() === selectedLower
+      );
+      if (!exists) {
+        // Default to first option
+        const firstOption = liveOptions[0];
+        console.log('[PredictionMarket] Syncing selectedOption to first liveOption:', firstOption?.id || firstOption?.name);
+        setSelectedOption(firstOption?.id || firstOption?.name);
+      }
+    }
+  }, [liveOptions, selectedOption, liveMarket.type]);
+
+  // Debug logging for balance
+  useEffect(() => {
+    console.log('[PredictionMarket] Balance check:', {
+      effectiveWalletAddress,
+      thirdwebAccountAddress: thirdwebAccount?.address,
+      walletAuthAddress: walletAddress,
+      balanceData,
+      userBalanceNum,
+      isLoadingBalance
+    });
+  }, [effectiveWalletAddress, thirdwebAccount, walletAddress, balanceData, userBalanceNum, isLoadingBalance]);
+
   // Check allowance when amount changes
   useEffect(() => {
     const checkAllowance = async () => {
-      if (!walletAddress || betAmount <= 0) {
+      if (!effectiveWalletAddress || betAmount <= 0) {
         setNeedsApproval(true);
+        setCheckingAllowance(false);
         return;
       }
 
       setCheckingAllowance(true);
       try {
-        const currentAllowance = await getPredictionMarketAllowance(walletAddress);
+        // Check allowance
+        const currentAllowance = await getPredictionMarketAllowance(effectiveWalletAddress);
         setNeedsApproval(currentAllowance < betAmountWei);
+        console.log('[PredictionMarket] Allowance check:', {
+          currentAllowance: currentAllowance.toString(),
+          betAmountWei: betAmountWei.toString(),
+          needsApproval: currentAllowance < betAmountWei
+        });
       } catch (err) {
         console.error('[PredictionMarket] Error checking allowance:', err);
         setNeedsApproval(true);
@@ -973,22 +1052,57 @@ const BetPanel = ({ market, onClose, userId = 'anonymous', onBetPlaced }) => {
         {market.type === 'multi' && ` With ${market.options.length} options, you win from all other pools combined.`}
       </div>
 
-      {/* Submit button - Wallet connection check */}
-      {!isWalletConnected ? (
+      {/* User's RL80 balance display */}
+      {isActuallyConnected && balanceData && (
         <div style={{
-          width: '100%',
-          padding: '14px',
-          borderRadius: '8px',
-          border: '1px solid rgba(255, 136, 0, 0.5)',
-          background: 'rgba(255, 136, 0, 0.1)',
-          color: '#ff8800',
-          fontWeight: 'bold',
-          fontSize: '14px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '8px 12px',
+          marginBottom: '12px',
+          background: 'rgba(0, 0, 0, 0.2)',
+          borderRadius: '6px',
+          fontSize: '11px'
+        }}>
+          <span style={{ color: 'rgba(255,255,255,0.5)' }}>Your RL80 Balance:</span>
+          <span style={{ color: '#ff8800', fontWeight: 'bold', fontFamily: 'monospace' }}>
+            {formatRL80(Math.floor(userBalanceNum))} RL80
+          </span>
+        </div>
+      )}
+
+      {/* Insufficient balance warning */}
+      {insufficientBalance && betAmount > 0 && (
+        <div style={{
+          padding: '10px 12px',
+          marginBottom: '12px',
+          background: 'rgba(255, 68, 102, 0.15)',
+          border: '1px solid rgba(255, 68, 102, 0.4)',
+          borderRadius: '6px',
+          fontSize: '11px',
+          color: '#ff4466',
           textAlign: 'center'
         }}>
-          Connect wallet to place bets
+          Insufficient RL80 balance. You need {formatRL80(betAmount)} RL80 but have {formatRL80(Math.floor(userBalanceNum))} RL80.
         </div>
-      ) : checkingAllowance ? (
+      )}
+
+      {/* Submit button - Wallet connection check */}
+      {!isWalletConnected ? (
+        <div style={{ width: '100%' }}>
+          <ConnectButton
+            client={client}
+            chain={chain}
+            wallets={predictionWallets}
+            theme={predictionWalletTheme}
+            connectModal={{
+              size: "compact",
+              title: "Connect to Place Bets",
+              showThirdwebBranding: false
+            }}
+          />
+        </div>
+      ) : (checkingAllowance || isLoadingBalance) ? (
         <div style={{
           width: '100%',
           padding: '14px',
@@ -1000,114 +1114,393 @@ const BetPanel = ({ market, onClose, userId = 'anonymous', onBetPlaced }) => {
           fontSize: '14px',
           textAlign: 'center'
         }}>
-          Checking allowance...
+          {isLoadingBalance ? 'Loading balance...' : 'Checking allowance...'}
         </div>
-      ) : needsApproval && betAmount > 0 ? (
-        /* Step 1: Approve RL80 tokens */
-        <TransactionButton
-          transaction={() => approveForPredictionMarket(betAmountWei)}
-          onTransactionSent={() => setIsSubmitting(true)}
-          onTransactionConfirmed={() => {
-            setIsSubmitting(false);
-            setNeedsApproval(false);
-            console.log('[PredictionMarket] Approval confirmed');
-          }}
-          onError={(err) => {
-            setIsSubmitting(false);
-            console.error('[PredictionMarket] Approval error:', err);
-          }}
-          style={{
-            width: '100%',
-            padding: '14px',
-            borderRadius: '8px',
-            border: 'none',
-            background: 'linear-gradient(135deg, #ff8800 0%, #cc6600 100%)',
-            color: '#000',
-            fontWeight: 'bold',
-            fontSize: '14px',
-            cursor: 'pointer',
-            boxShadow: '0 0 20px rgba(255, 136, 0, 0.3)'
-          }}
-        >
-          {isSubmitting ? 'Approving...' : `Approve ${formatRL80(betAmount)} RL80`}
-        </TransactionButton>
+      ) : insufficientBalance && betAmount > 0 ? (
+        /* Insufficient balance - disabled button */
+        <div style={{
+          width: '100%',
+          padding: '14px',
+          borderRadius: '8px',
+          border: '1px solid rgba(255, 68, 102, 0.4)',
+          background: 'rgba(255, 68, 102, 0.1)',
+          color: '#ff4466',
+          fontWeight: 'bold',
+          fontSize: '14px',
+          textAlign: 'center',
+          cursor: 'not-allowed',
+          opacity: 0.7
+        }}>
+          Insufficient RL80 Balance
+        </div>
       ) : (
-        /* Step 2: Buy shares on-chain */
-        <TransactionButton
-          transaction={() => {
-            // Get the option index for the contract
-            // For binary markets: YES=0, NO=1
-            // For multi-option: use the option index from the market
-            let optionIndex;
-            if (market.type === 'binary') {
-              optionIndex = selectedOption === 'YES' ? 0 : 1;
-            } else {
-              optionIndex = market.options.findIndex(o => o.id === selectedOption);
-            }
-            return predictionMarketFunctions.buyShares(
-              market.onChainId || market.id,
-              optionIndex,
-              betAmountWei
-            );
-          }}
-          disabled={!amount || parseFloat(amount) <= 0}
-          onTransactionSent={() => setIsSubmitting(true)}
-          onTransactionConfirmed={async (receipt) => {
-            setIsSubmitting(false);
-            console.log('[PredictionMarket] Bet confirmed:', receipt);
+        /* Single button that handles approve + bet in one flow */
+        <button
+          onClick={async () => {
+            if (isSubmitting) return;
 
-            // Also record in Firebase for tracking
+            // Check for active account first
+            if (!activeAccount) {
+              setErrorMessage('Please connect your wallet to place a bet.');
+              return;
+            }
+
             try {
-              await placeBet({
-                marketId: market.id,
-                optionId: selectedOption,
-                amount: betAmount,
-                userId: userId || walletAddress,
-                txHash: receipt.transactionHash
-              });
-            } catch (err) {
-              console.warn('[PredictionMarket] Firebase recording failed:', err);
-            }
+              setIsSubmitting(true);
+              setErrorMessage('');
+              setTransactionStatus('checking');
 
-            setAmount('');
-            if (onBetPlaced) {
-              onBetPlaced({ success: true, txHash: receipt.transactionHash });
+              // Validate transaction using security utils (human-readable values)
+              // This follows the same pattern as StakeModal and LightCandleModal
+              const balanceInt = Math.floor(userBalanceNum);
+              const validation = validateTransaction(betAmount, balanceInt, effectiveWalletAddress);
+
+              console.log('[PredictionMarket] Transaction validation:', {
+                betAmount,
+                userBalance: balanceInt,
+                rawBalanceData: balanceData,
+                walletAddress: effectiveWalletAddress,
+                isValid: validation.isValid,
+                error: validation.error
+              });
+
+              if (!validation.isValid) {
+                setErrorMessage(validation.error);
+                setIsSubmitting(false);
+                setTransactionStatus('');
+                return;
+              }
+
+              // FRESH allowance check
+              console.log('[PredictionMarket] Checking allowance...');
+              const freshAllowance = await getPredictionMarketAllowance(effectiveWalletAddress);
+              const needsApprovalNow = freshAllowance < betAmountWei;
+              console.log('[PredictionMarket] Allowance:', {
+                allowance: freshAllowance.toString(),
+                needsApproval: needsApprovalNow
+              });
+
+              // Get the option index for the contract
+              // Options are EMO (0), TEKNO (1), MACRO (2)
+              let optionIndex;
+              if (liveMarket.type === 'binary') {
+                optionIndex = selectedOption === 'YES' ? 0 : 1;
+              } else {
+                // Try matching by id first, then by name (case-insensitive)
+                const selectedLower = selectedOption?.toLowerCase();
+                optionIndex = liveOptions.findIndex(o =>
+                  o.id?.toLowerCase() === selectedLower ||
+                  o.name?.toLowerCase() === selectedLower
+                );
+              }
+
+              console.log('[PredictionMarket] Option calculation:', {
+                marketType: liveMarket.type,
+                selectedOption,
+                selectedLower: selectedOption?.toLowerCase(),
+                optionIndex,
+                liveOptions: liveOptions.map((o, i) => ({ index: i, id: o.id, name: o.name })),
+                onChainMarketId: market.onChainId,
+                optionCountOnContract: liveOptions.length
+              });
+
+              // Validate option index (0-indexed from findIndex, will be converted to 1-indexed for contract)
+              if (optionIndex < 0 || optionIndex >= liveOptions.length) {
+                console.error('[PredictionMarket] Invalid optionIndex from findIndex:', optionIndex);
+                setErrorMessage(`Invalid option selected. Please select a valid option.`);
+                setIsSubmitting(false);
+                setTransactionStatus('');
+                return;
+              }
+
+              // Check if we need to approve first
+              if (needsApprovalNow) {
+                setTransactionStatus('approving');
+                console.log('[PredictionMarket] Starting approval...');
+
+                const approveTx = approveForPredictionMarket(betAmountWei);
+                // Use direct sendAndConfirmTransaction with activeAccount (same as StakeModal)
+                await sendAndConfirmTransaction({
+                  transaction: approveTx,
+                  account: activeAccount
+                });
+                console.log('[PredictionMarket] Approval confirmed');
+
+                // Wait a bit for approval to propagate
+                await new Promise(r => setTimeout(r, 1000));
+                setNeedsApproval(false);
+              }
+
+              // Now place the bet
+              setTransactionStatus('betting');
+
+              // Support both onChainId and onChainMarketId field names
+              const marketIdForContract = Number(market.onChainId ?? market.onChainMarketId ?? 0);
+              // Contract uses 1-indexed options: optionId 1 = first option, 2 = second, etc.
+              const optionIdForContract = Number(optionIndex) + 1; // Convert 0-indexed to 1-indexed
+
+              console.log('[PredictionMarket] Placing bet with params:', {
+                marketId: marketIdForContract,
+                marketIdType: typeof marketIdForContract,
+                optionIndex: optionIdForContract,
+                optionIndexType: typeof optionIdForContract,
+                betAmountWei: betAmountWei.toString(),
+                betAmountTokens: betAmount,
+                rawMarketOnChainId: market.onChainId,
+                rawOptionIndex: optionIndex
+              });
+
+              // Additional validation (contract uses 1-indexed: 1, 2, or 3)
+              if (isNaN(optionIdForContract) || optionIdForContract < 1 || optionIdForContract > 3) {
+                console.error('[PredictionMarket] Invalid option ID:', optionIdForContract);
+                setErrorMessage(`Invalid option: ${optionIdForContract}. Expected 1, 2, or 3.`);
+                setIsSubmitting(false);
+                setTransactionStatus('');
+                return;
+              }
+
+              if (isNaN(marketIdForContract) || marketIdForContract < 0) {
+                console.error('[PredictionMarket] Invalid market ID:', marketIdForContract);
+                setErrorMessage(`Invalid market ID: ${marketIdForContract}`);
+                setIsSubmitting(false);
+                setTransactionStatus('');
+                return;
+              }
+
+              const betTx = predictionMarketFunctions.buyShares(
+                marketIdForContract,
+                optionIdForContract,
+                betAmountWei
+              );
+
+              // Use direct sendAndConfirmTransaction with activeAccount (same as StakeModal)
+              const result = await sendAndConfirmTransaction({
+                transaction: betTx,
+                account: activeAccount
+              });
+              const txHash = result?.transactionHash;
+
+              console.log('[PredictionMarket] Bet confirmed:', txHash);
+
+              // Record in Firebase first (wait for it to complete)
+              // Use wallet address as userId if userId is 'anonymous' or not set
+              const betUserId = (userId && userId !== 'anonymous') ? userId : effectiveWalletAddress;
+              try {
+                await placeBet({
+                  marketId: market.id,
+                  optionId: selectedOption,
+                  amount: betAmount,
+                  userId: betUserId,
+                  txHash
+                });
+                console.log('[PredictionMarket] Bet recorded in Firebase with userId:', betUserId);
+              } catch (err) {
+                console.warn('[PredictionMarket] Firebase recording failed:', err);
+              }
+
+              // Show success message
+              setTransactionStatus('success');
+              setSuccessMessage(`Bet placed! ${betAmount} RL80 on ${selectedOption}`);
+              setIsSubmitting(false);
+              setAmount('');
+
+              // Refresh data to update "My Bets" tab (with small delay for Firebase propagation)
+              setTimeout(() => {
+                if (onBetPlaced) {
+                  onBetPlaced({ success: true, txHash });
+                }
+              }, 500);
+
+              // Close after a longer delay so user sees the confirmation
+              setTimeout(() => {
+                onClose();
+              }, 2500);
+
+            } catch (error) {
+              console.error('[PredictionMarket] Transaction error:', error);
+              setTransactionStatus('');
+              setIsSubmitting(false);
+
+              const errMsg = error?.message || String(error);
+
+              // Don't show error for user rejection
+              if (errMsg.toLowerCase().includes('user rejected') || errMsg.toLowerCase().includes('denied')) {
+                return;
+              }
+
+              // Convert any wei amounts in error to human-readable format
+              const weiMatch = errMsg.match(/(\d{15,})/);
+              if (weiMatch && (errMsg.toLowerCase().includes('insufficient') || errMsg.toLowerCase().includes('funds'))) {
+                const tokenAmount = Number(BigInt(weiMatch[1])) / 1e18;
+                setErrorMessage(`Insufficient balance. You need ${formatRL80(Math.ceil(tokenAmount))} RL80 but have ${formatRL80(Math.floor(userBalanceNum))} RL80.`);
+              } else if (errMsg.toLowerCase().includes('allowance')) {
+                setErrorMessage('Token approval failed. Please try again.');
+                setNeedsApproval(true);
+              } else {
+                // Generic error - keep it short and user-friendly
+                setErrorMessage('Transaction failed. Please try again.');
+              }
             }
-            onClose();
           }}
-          onError={(err) => {
-            setIsSubmitting(false);
-            console.error('[PredictionMarket] Transaction error:', err);
-          }}
+          disabled={!amount || parseFloat(amount) <= 0 || isSubmitting}
           style={{
             width: '100%',
             padding: '14px',
             borderRadius: '8px',
             border: 'none',
-            background: `linear-gradient(135deg, ${selectedColor} 0%, ${selectedColor}aa 100%)`,
+            background: isSubmitting
+              ? 'rgba(100, 100, 100, 0.5)'
+              : `linear-gradient(135deg, ${selectedColor} 0%, ${selectedColor}aa 100%)`,
             color: '#000',
             fontWeight: 'bold',
             fontSize: '14px',
-            cursor: (!amount || parseFloat(amount) <= 0) ? 'not-allowed' : 'pointer',
+            cursor: (!amount || parseFloat(amount) <= 0 || isSubmitting) ? 'not-allowed' : 'pointer',
             opacity: (!amount || parseFloat(amount) <= 0) ? 0.5 : 1,
-            boxShadow: `0 0 20px ${selectedColor}44`
+            boxShadow: `0 0 20px ${selectedColor}44`,
+            transition: 'all 0.2s'
           }}
         >
-          {isSubmitting ? 'Placing Bet...' : `Bet ${betAmount > 0 ? formatRL80(betAmount) + ' on ' : ''}${selectedName}`}
-        </TransactionButton>
+          {transactionStatus === 'approving' ? 'Approving RL80...' :
+           transactionStatus === 'betting' ? 'Placing Bet...' :
+           needsApproval && betAmount > 0 ? `Approve & Bet ${formatRL80(betAmount)} on ${selectedName}` :
+           `Bet ${betAmount > 0 ? formatRL80(betAmount) + ' on ' : ''}${selectedName}`}
+        </button>
+      )}
+
+      {/* Error message display */}
+      {errorMessage && (
+        <div style={{
+          marginTop: '12px',
+          padding: '10px 12px',
+          background: 'rgba(255, 68, 102, 0.15)',
+          border: '1px solid rgba(255, 68, 102, 0.4)',
+          borderRadius: '6px',
+          fontSize: '12px',
+          color: '#ff4466',
+          textAlign: 'center'
+        }}>
+          {errorMessage}
+        </div>
+      )}
+
+      {/* Success message display */}
+      {successMessage && transactionStatus === 'success' && (
+        <div style={{
+          marginTop: '12px',
+          padding: '14px 16px',
+          background: 'rgba(0, 255, 136, 0.15)',
+          border: '1px solid rgba(0, 255, 136, 0.4)',
+          borderRadius: '8px',
+          fontSize: '14px',
+          color: '#00ff88',
+          textAlign: 'center',
+          fontWeight: 'bold'
+        }}>
+          ✓ {successMessage}
+        </div>
       )}
     </div>
   );
 };
 
-// Position card component - handles both types
+// Position card component - handles both types and cancelled markets
 const PositionCard = ({ position, onClaim }) => {
   const [isClaiming, setIsClaiming] = useState(false);
 
-  // Check if position is resolved and user won
+  // Check market status
+  // cancelled = resolved but winningOption is 0
   const isResolved = position.resolved;
-  const didWin = position.won;
+  const isCancelled = position.cancelled || (isResolved && position.winningOption === 0);
+  const didWin = !isCancelled && position.won;
   const hasClaimed = position.claimed;
+
+  // Handle cancelled market - show refund UI
+  if (isCancelled) {
+    return (
+      <div style={{
+        background: 'linear-gradient(135deg, rgba(255, 136, 0, 0.15) 0%, rgba(200, 100, 0, 0.1) 100%)',
+        border: '1px solid rgba(255, 136, 0, 0.4)',
+        borderRadius: '10px',
+        padding: '12px',
+        marginBottom: '8px'
+      }}>
+        {/* Cancelled badge */}
+        <div style={{
+          display: 'inline-block',
+          padding: '2px 8px',
+          borderRadius: '4px',
+          fontSize: '9px',
+          fontWeight: 'bold',
+          textTransform: 'uppercase',
+          marginBottom: '8px',
+          background: hasClaimed ? 'rgba(100, 100, 100, 0.3)' : 'rgba(255, 136, 0, 0.2)',
+          color: hasClaimed ? '#888' : '#ff8800'
+        }}>
+          {hasClaimed ? 'REFUNDED' : 'CANCELLED'}
+        </div>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start'
+        }}>
+          <div style={{ flex: 1 }}>
+            <div style={{
+              color: 'rgba(255,255,255,0.7)',
+              fontSize: '11px',
+              marginBottom: '4px',
+              lineHeight: '1.3'
+            }}>
+              {position.question}
+            </div>
+            <div style={{
+              fontSize: '11px',
+              color: 'rgba(255,255,255,0.5)',
+              marginTop: '4px'
+            }}>
+              Market was cancelled - all bets refunded
+            </div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ color: '#ff8800', fontWeight: 'bold', fontSize: '12px' }}>
+              Refund:
+            </div>
+            <div style={{ color: '#fff', fontSize: '13px', fontWeight: 'bold' }}>
+              {formatRL80(position.amount)} RL80
+            </div>
+          </div>
+        </div>
+        {/* Claim Refund button */}
+        {!hasClaimed && (
+          <TransactionButton
+            transaction={() => predictionMarketFunctions.claimRefund(position.onChainMarketId || position.marketId)}
+            onTransactionSent={() => setIsClaiming(true)}
+            onTransactionConfirmed={() => {
+              setIsClaiming(false);
+              if (onClaim) onClaim(position.marketId);
+            }}
+            onError={(err) => {
+              setIsClaiming(false);
+              console.error('[PredictionMarket] Refund claim error:', err);
+            }}
+            style={{
+              width: '100%',
+              marginTop: '10px',
+              padding: '10px',
+              borderRadius: '6px',
+              border: 'none',
+              background: 'linear-gradient(135deg, #ff8800 0%, #cc6600 100%)',
+              color: '#000',
+              fontWeight: 'bold',
+              fontSize: '12px',
+              cursor: 'pointer'
+            }}
+          >
+            {isClaiming ? 'Claiming Refund...' : 'Claim Refund'}
+          </TransactionButton>
+        )}
+      </div>
+    );
+  }
 
   if (position.type === 'binary') {
     const totalPool = position.currentYesPool + position.currentNoPool;
@@ -1395,21 +1788,25 @@ export default function PredictionMarketOverlay({ show, onClose, userId = 'anony
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Load real data from Firebase
+  // Load real data from Firebase or directly from chain
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Ensure current week's oracle market exists
-      await ensureCurrentWeekMarket();
+      // Load markets from Firebase (creation is handled by scheduled Firebase function)
+      let activeMarkets = [];
+      try {
+        activeMarkets = await getActiveMarkets();
+      } catch (firebaseErr) {
+        console.warn('[PredictionMarket] Firebase error, falling back to on-chain:', firebaseErr.message);
+      }
 
-      // Load active markets
-      const activeMarkets = await getActiveMarkets();
+      // If Firebase has markets, use them
       if (activeMarkets.length > 0) {
-        // Transform Firebase data to component format
         const transformedMarkets = activeMarkets.map(m => ({
           id: m.id,
+          onChainId: m.onChainMarketId ?? m.onChainId,
           question: m.question,
           type: m.type === 'oracle_accuracy' ? 'multi' : m.type,
           category: m.type === 'oracle_accuracy' ? 'agent' : (m.category || 'crypto'),
@@ -1419,34 +1816,103 @@ export default function PredictionMarketOverlay({ show, onClose, userId = 'anony
             pool: opt.pool || 0,
             color: opt.color || '#888888'
           })),
-          // Binary market support
           yesPool: m.options?.find(o => o.id === 'YES')?.pool || 0,
           noPool: m.options?.find(o => o.id === 'NO')?.pool || 0,
           endTime: new Date(m.endTime),
           resolved: m.resolved,
+          winningOption: m.winningOption || 0, // 0 = not resolved or cancelled, 1-N = winner
           winner: m.winner
         }));
         setMarkets(transformedMarkets);
+      } else {
+        // Fallback: Read directly from on-chain contract
+        console.log('[PredictionMarket] No Firebase markets, reading from chain...');
+        try {
+          const marketCount = await predictionMarketFunctions.getMarketCount();
+          const onChainMarkets = [];
+
+          for (let i = 0; i < Number(marketCount); i++) {
+            const [marketInfo, options, shares] = await Promise.all([
+              predictionMarketFunctions.getMarketInfo(i),
+              predictionMarketFunctions.getAllOptions(i),
+              predictionMarketFunctions.getAllOptionShares(i)
+            ]);
+
+            const [question, endTime, winningOption, optionCount, resolved] = marketInfo;
+
+            // Only show unresolved markets that haven't ended
+            if (!resolved) {
+              onChainMarkets.push({
+                id: `onchain-${i}`,
+                onChainId: i,
+                question: question,
+                type: 'multi',
+                category: 'agent',
+                options: options.map((name, idx) => ({
+                  id: name,
+                  name: name,
+                  pool: Number(toEther(shares[idx] || BigInt(0))),
+                  color: ORACLE_COLORS[name] || '#888888'
+                })),
+                endTime: new Date(Number(endTime) * 1000),
+                resolved: resolved,
+                winningOption: winningOption
+              });
+            }
+          }
+
+          if (onChainMarkets.length > 0) {
+            setMarkets(onChainMarkets);
+            console.log('[PredictionMarket] Loaded', onChainMarkets.length, 'markets from chain');
+          }
+        } catch (chainErr) {
+          console.error('[PredictionMarket] Error reading from chain:', chainErr);
+        }
       }
 
-      // Load user's bets
-      if (userId && userId !== 'anonymous') {
-        const userBets = await getUserBets(userId);
-        if (userBets.length > 0) {
-          const transformedBets = userBets.map(b => ({
-            marketId: b.marketId,
-            question: b.question || 'Market bet',
-            type: b.optionId === 'YES' || b.optionId === 'NO' ? 'binary' : 'multi',
-            selectedOption: { id: b.optionId, name: b.optionName, color: '#ff8800' },
-            side: b.optionId,
-            amount: b.amount,
-            poolAtEntry: b.poolAtBet,
-            resolved: b.resolved,
-            won: b.won,
-            payout: b.payout
-          }));
-          setPositions(transformedBets);
+      // Load user's bets - check wallet address, userId, and 'anonymous' (for backwards compatibility)
+      const effectiveUserId = walletAddress || (userId && userId !== 'anonymous' ? userId : null);
+      console.log('[PredictionMarket] Loading bets for:', { userId, walletAddress, effectiveUserId });
+
+      let userBets = [];
+      if (effectiveUserId) {
+        userBets = await getUserBets(effectiveUserId);
+        console.log('[PredictionMarket] Bets found for effectiveUserId:', userBets.length);
+      }
+
+      // Also check for 'anonymous' bets (backwards compatibility - old bets stored without wallet address)
+      // This is a temporary measure until all bets are migrated
+      const anonymousBets = await getUserBets('anonymous');
+      console.log('[PredictionMarket] Anonymous bets found:', anonymousBets.length);
+
+      // Combine and dedupe by bet id
+      const existingIds = new Set(userBets.map(b => b.id));
+      for (const bet of anonymousBets) {
+        if (!existingIds.has(bet.id)) {
+          userBets.push(bet);
         }
+      }
+
+      console.log('[PredictionMarket] Total bets after combining:', userBets.length);
+
+      if (userBets.length > 0) {
+        const transformedBets = userBets.map(b => ({
+          marketId: b.marketId,
+          onChainMarketId: b.onChainMarketId,
+          question: b.question || 'Market bet',
+          type: b.optionId === 'YES' || b.optionId === 'NO' ? 'binary' : 'multi',
+          selectedOption: { id: b.optionId, name: b.optionName, color: '#ff8800' },
+          side: b.optionId,
+          amount: b.amount,
+          poolAtEntry: b.poolAtBet,
+          resolved: b.resolved,
+          won: b.won,
+          payout: b.payout,
+          claimed: b.claimed || false,
+          cancelled: b.cancelled || false,
+          winningOption: b.winningOption // 0 = cancelled, 1-N = winner
+        }));
+        setPositions(transformedBets);
       }
     } catch (err) {
       console.error('[PredictionMarket] Error loading data:', err);
@@ -1455,7 +1921,7 @@ export default function PredictionMarketOverlay({ show, onClose, userId = 'anony
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, walletAddress]);
 
   // Load data when overlay opens
   useEffect(() => {
@@ -1470,16 +1936,18 @@ export default function PredictionMarketOverlay({ show, onClose, userId = 'anony
     : markets.filter(m => m.category === filterCategory);
 
   // Calculate totals
-  const totalStaked = positions.reduce((acc, pos) => acc + pos.amount, 0);
+  const totalStaked = positions.reduce((acc, pos) => acc + (pos.amount || 0), 0);
   const totalPotentialWinnings = positions.reduce((acc, pos) => {
     if (pos.type === 'binary') {
-      const yourPool = pos.side === 'YES' ? pos.currentYesPool : pos.currentNoPool;
-      const opposingPool = pos.side === 'YES' ? pos.currentNoPool : pos.currentYesPool;
+      const yourPool = pos.side === 'YES' ? (pos.currentYesPool || 0) : (pos.currentNoPool || 0);
+      const opposingPool = pos.side === 'YES' ? (pos.currentNoPool || 0) : (pos.currentYesPool || 0);
       const yourShare = yourPool > 0 ? pos.amount / yourPool : 0;
       return acc + (yourShare * opposingPool);
     } else {
-      const totalPool = pos.currentOptions.reduce((sum, o) => sum + o.pool, 0);
-      const yourOption = pos.currentOptions.find(o => o.id === pos.selectedOption.id);
+      // Safety check for currentOptions
+      const options = pos.currentOptions || [];
+      const totalPool = options.reduce((sum, o) => sum + (o.pool || 0), 0);
+      const yourOption = options.find(o => o.id === pos.selectedOption?.id);
       const yourPool = yourOption?.pool || 0;
       const opposingPool = totalPool - yourPool;
       const yourShare = yourPool > 0 ? pos.amount / yourPool : 0;
