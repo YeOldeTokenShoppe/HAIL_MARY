@@ -26,8 +26,8 @@ const RL80TraderCard = ({
       level: 15,
       class: 'rl80',
       image: '/images/Headshot_RL80.webp',
-      bio: 'Trade Life. Evolved AI consciousness who synthesizes oracle insights into trading decisions. Sharp, empowered, and maternalistic in a protective mama bear way.',
-      thesis: 'Synthesizing macro regime, sentiment flow, and price structure. Strong confluence detected. Deploying with defined risk for the mission.',
+      bio: 'Trade Life. Synthesizes oracle insights into action. Sharp, empowered, protective mama bear energy.',
+      thesis: 'Oracle confluence detected. Deploying with defined risk.',
       stats: {
         wins: 0,
         losses: 0,
@@ -54,8 +54,8 @@ const RL80TraderCard = ({
       level: 11,
       class: 'sentiment',
       image: '/images/Headshot_Emo.webp',
-      bio: 'Reads the room before the room knows what it\'s feeling. Surfs chaos, spots sentiment shifts, and knows when the crowd is about to flip.',
-      thesis: 'Sentiment shifting - crowd getting greedy but smart money quiet. Whale wallets accumulating while retail chases. The vibe is off. Stay sharp.',
+      bio: 'Reads the room before the room knows. Surfs chaos, spots sentiment shifts early.',
+      thesis: 'Crowd vibes shifting. Smart money quiet while retail chases.',
       stats: {
         wins: 0,
         losses: 0,
@@ -82,8 +82,8 @@ const RL80TraderCard = ({
       level: 9,
       class: 'macro',
       image: '/images/Headshot_Macro.webp',
-      bio: 'Seen every cycle, read every Fed minute. Knows when the macro regime supports risk-on and when to hide. Grumpy because he\'s usually right.',
-      thesis: 'Fed pivot probability increasing. DXY breaking support. Yield curve dynamics favor risk assets. The macro setup is constructive - for now.',
+      bio: 'Seen every cycle, read every Fed minute. Grumpy because he\'s usually right.',
+      thesis: 'Fed pivot rising. DXY weakening. Macro setup constructive.',
       stats: {
         wins: 0,
         losses: 0,
@@ -110,8 +110,8 @@ const RL80TraderCard = ({
       level: 13,
       class: 'technical',
       image: '/images/Headshot_Tekno.webp',
-      bio: 'Cool kid who secretly loves spreadsheets. Obsessed with patterns, levels, and confluence. Price is truth - everything else is just stories.',
-      thesis: 'Textbook setup forming on the 4H. RSI divergence at key level. Volume confirms. Entry defined, stop defined. This is why we wait for structure.',
+      bio: 'Cool kid who secretly loves spreadsheets. Obsessed with patterns and levels.',
+      thesis: 'Textbook setup on 4H. RSI divergence confirmed. Levels defined.',
       stats: {
         wins: 0,
         losses: 0,

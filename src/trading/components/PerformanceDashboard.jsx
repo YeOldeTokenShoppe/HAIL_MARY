@@ -1613,179 +1613,229 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
           </div>
 
           {/* Mainnet Readiness Card */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.02)',
-            backdropFilter: 'blur(15px)',
-            WebkitBackdropFilter: 'blur(15px)',
-            padding: isMobile ? '12px' : '15px',
-            borderRadius: '15px',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            boxShadow: '0 4px 20px rgba(0, 255, 255, 0.05), inset 0 0 20px rgba(255, 255, 255, 0.02)'
-          }}>
-            <div style={{ 
-              color: '#888', 
-              fontSize: '12px', 
-              marginBottom: '15px', 
-              fontWeight: 'bold',
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em'
-            }}>
-              🚀 Mainnet Readiness
-            </div>
-            
-            {/* Benchmarks Grid */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(2, 1fr)',
-              gap: '10px'
-            }}>
-              {/* Total Trades */}
+          {(() => {
+            // Benchmark targets
+            const BENCHMARKS = {
+              totalTrades: 100,
+              winRate: 60,
+              maxDrawdown: 15, // Max acceptable
+              daysLive: 30
+            };
+
+            // Calculate days live from earliest trade or decision
+            const getEarliestTimestamp = () => {
+              const tradeTimestamps = metrics.recentTrades
+                .map(t => t.timestamp)
+                .filter(Boolean);
+              const decisionTimestamps = scoringData.recentDecisions
+                .map(d => d.timestamp)
+                .filter(Boolean);
+              const allTimestamps = [...tradeTimestamps, ...decisionTimestamps];
+              return allTimestamps.length > 0 ? Math.min(...allTimestamps) : Date.now();
+            };
+
+            const earliestTimestamp = getEarliestTimestamp();
+            const daysLive = Math.floor((Date.now() - earliestTimestamp) / (1000 * 60 * 60 * 24));
+
+            // Check if benchmarks are met
+            const tradesMet = metrics.totalTrades >= BENCHMARKS.totalTrades;
+            const winRateMet = metrics.winRate >= BENCHMARKS.winRate;
+            const drawdownMet = metrics.maxDrawdown <= BENCHMARKS.maxDrawdown;
+            const daysMet = daysLive >= BENCHMARKS.daysLive;
+
+            // Overall readiness
+            const benchmarksMet = [tradesMet, winRateMet, drawdownMet, daysMet].filter(Boolean).length;
+            const readinessPercent = (benchmarksMet / 4) * 100;
+
+            return (
               <div style={{
-                textAlign: 'center',
-                padding: '10px',
-                borderRadius: '8px',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                background: 'rgba(255, 255, 255, 0.03)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)'
+                background: 'rgba(255, 255, 255, 0.02)',
+                backdropFilter: 'blur(15px)',
+                WebkitBackdropFilter: 'blur(15px)',
+                padding: isMobile ? '12px' : '15px',
+                borderRadius: '15px',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                boxShadow: '0 4px 20px rgba(0, 255, 255, 0.05), inset 0 0 20px rgba(255, 255, 255, 0.02)'
               }}>
                 <div style={{
+                  color: '#888',
+                  fontSize: '12px',
+                  marginBottom: '15px',
                   fontWeight: 'bold',
-                  marginBottom: '4px'
-                }}>
-                  <span style={{
-                    fontSize: '20px',
-                    color: '#ffffff'
-                  }}>47</span>
-                  <span style={{
-                    fontSize: '12px',
-                    color: 'rgba(255, 255, 255, 0.5)'
-                  }}> / 100</span>
-                </div>
-                <div style={{
-                  fontSize: '10px',
-                  color: 'rgba(255, 255, 255, 0.6)',
                   textTransform: 'uppercase',
-                  letterSpacing: '0.05em'
+                  letterSpacing: '0.1em',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
                 }}>
-                  Total Trades
+                  <span>🚀 Mainnet Readiness</span>
+                  <span style={{
+                    fontSize: '11px',
+                    color: readinessPercent === 100 ? '#00ff00' : '#FFD700',
+                    fontWeight: 'bold'
+                  }}>
+                    {benchmarksMet}/4 ✓
+                  </span>
+                </div>
+
+                {/* Benchmarks Grid */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gap: '10px'
+                }}>
+                  {/* Total Trades */}
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '10px',
+                    borderRadius: '8px',
+                    border: `1px solid ${tradesMet ? 'rgba(0, 255, 0, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                    background: tradesMet ? 'rgba(0, 255, 0, 0.05)' : 'rgba(255, 255, 255, 0.03)',
+                    backdropFilter: 'blur(10px)',
+                    WebkitBackdropFilter: 'blur(10px)'
+                  }}>
+                    <div style={{
+                      fontWeight: 'bold',
+                      marginBottom: '4px'
+                    }}>
+                      <span style={{
+                        fontSize: '20px',
+                        color: tradesMet ? '#00ff00' : '#ffffff'
+                      }}>{metrics.totalTrades}</span>
+                      <span style={{
+                        fontSize: '12px',
+                        color: 'rgba(255, 255, 255, 0.5)'
+                      }}> / {BENCHMARKS.totalTrades}</span>
+                    </div>
+                    <div style={{
+                      fontSize: '10px',
+                      color: 'rgba(255, 255, 255, 0.6)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      Total Trades {tradesMet && '✓'}
+                    </div>
+                  </div>
+
+                  {/* Win Rate */}
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '10px',
+                    borderRadius: '8px',
+                    border: `1px solid ${winRateMet ? 'rgba(0, 255, 0, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                    background: winRateMet ? 'rgba(0, 255, 0, 0.05)' : 'rgba(255, 255, 255, 0.03)',
+                    backdropFilter: 'blur(10px)',
+                    WebkitBackdropFilter: 'blur(10px)'
+                  }}>
+                    <div style={{
+                      fontWeight: 'bold',
+                      marginBottom: '4px'
+                    }}>
+                      <span style={{
+                        fontSize: '20px',
+                        color: winRateMet ? '#00ff00' : '#ffffff'
+                      }}>{metrics.winRate.toFixed(0)}%</span>
+                      <span style={{
+                        fontSize: '12px',
+                        color: 'rgba(255, 255, 255, 0.5)'
+                      }}> / {BENCHMARKS.winRate}%</span>
+                    </div>
+                    <div style={{
+                      fontSize: '10px',
+                      color: 'rgba(255, 255, 255, 0.6)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      Win Rate {winRateMet && '✓'}
+                    </div>
+                  </div>
+
+                  {/* Max Drawdown */}
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '10px',
+                    borderRadius: '8px',
+                    border: `1px solid ${drawdownMet ? 'rgba(0, 255, 0, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                    background: drawdownMet ? 'rgba(0, 255, 0, 0.05)' : 'rgba(255, 255, 255, 0.03)',
+                    backdropFilter: 'blur(10px)',
+                    WebkitBackdropFilter: 'blur(10px)'
+                  }}>
+                    <div style={{
+                      fontWeight: 'bold',
+                      marginBottom: '4px'
+                    }}>
+                      <span style={{
+                        fontSize: '20px',
+                        color: drawdownMet ? '#00ff00' : '#ffffff'
+                      }}>{metrics.maxDrawdown.toFixed(1)}%</span>
+                      <span style={{
+                        fontSize: '12px',
+                        color: 'rgba(255, 255, 255, 0.5)'
+                      }}> / {BENCHMARKS.maxDrawdown}%</span>
+                    </div>
+                    <div style={{
+                      fontSize: '10px',
+                      color: 'rgba(255, 255, 255, 0.6)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      Max Drawdown {drawdownMet && '✓'}
+                    </div>
+                  </div>
+
+                  {/* Days Live */}
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '10px',
+                    borderRadius: '8px',
+                    border: `1px solid ${daysMet ? 'rgba(0, 255, 0, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
+                    background: daysMet ? 'rgba(0, 255, 0, 0.05)' : 'rgba(255, 255, 255, 0.03)',
+                    backdropFilter: 'blur(10px)',
+                    WebkitBackdropFilter: 'blur(10px)'
+                  }}>
+                    <div style={{
+                      fontWeight: 'bold',
+                      marginBottom: '4px'
+                    }}>
+                      <span style={{
+                        fontSize: '20px',
+                        color: daysMet ? '#00ff00' : '#ffffff'
+                      }}>{daysLive}</span>
+                      <span style={{
+                        fontSize: '12px',
+                        color: 'rgba(255, 255, 255, 0.5)'
+                      }}> / {BENCHMARKS.daysLive}</span>
+                    </div>
+                    <div style={{
+                      fontSize: '10px',
+                      color: 'rgba(255, 255, 255, 0.6)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      Days Live {daysMet && '✓'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Progress note */}
+                <div style={{
+                  marginTop: '12px',
+                  padding: '8px',
+                  background: readinessPercent === 100 ? 'rgba(0, 255, 0, 0.1)' : 'rgba(0, 255, 184, 0.05)',
+                  borderRadius: '6px',
+                  border: `1px solid ${readinessPercent === 100 ? 'rgba(0, 255, 0, 0.3)' : 'rgba(0, 255, 184, 0.1)'}`,
+                  fontSize: '10px',
+                  color: readinessPercent === 100 ? '#00ff00' : 'rgba(0, 255, 184, 0.8)',
+                  textAlign: 'center'
+                }}>
+                  {readinessPercent === 100
+                    ? '✅ All benchmarks met - Ready for mainnet!'
+                    : `Testing benchmarks before mainnet deployment (${readinessPercent.toFixed(0)}% ready)`
+                  }
                 </div>
               </div>
-              
-              {/* Win Rate */}
-              <div style={{
-                textAlign: 'center',
-                padding: '10px',
-                borderRadius: '8px',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                background: 'rgba(255, 255, 255, 0.03)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)'
-              }}>
-                <div style={{
-                  fontWeight: 'bold',
-                  marginBottom: '4px'
-                }}>
-                  <span style={{
-                    fontSize: '20px',
-                    color: '#ffffff'
-                  }}>52%</span>
-                  <span style={{
-                    fontSize: '12px',
-                    color: 'rgba(255, 255, 255, 0.5)'
-                  }}> / 60%</span>
-                </div>
-                <div style={{
-                  fontSize: '10px',
-                  color: 'rgba(255, 255, 255, 0.6)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em'
-                }}>
-                  Win Rate
-                </div>
-              </div>
-              
-              {/* Max Drawdown */}
-              <div style={{
-                textAlign: 'center',
-                padding: '10px',
-                borderRadius: '8px',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                background: 'rgba(255, 255, 255, 0.03)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)'
-              }}>
-                <div style={{
-                  fontWeight: 'bold',
-                  marginBottom: '4px'
-                }}>
-                  <span style={{
-                    fontSize: '20px',
-                    color: '#ffffff'
-                  }}>8.2%</span>
-                  <span style={{
-                    fontSize: '12px',
-                    color: 'rgba(255, 255, 255, 0.5)'
-                  }}> / 15%</span>
-                </div>
-                <div style={{
-                  fontSize: '10px',
-                  color: 'rgba(255, 255, 255, 0.6)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em'
-                }}>
-                  Max Drawdown
-                </div>
-              </div>
-              
-              {/* Days Live */}
-              <div style={{
-                textAlign: 'center',
-                padding: '10px',
-                borderRadius: '8px',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                background: 'rgba(255, 255, 255, 0.03)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)'
-              }}>
-                <div style={{
-                  fontWeight: 'bold',
-                  marginBottom: '4px'
-                }}>
-                  <span style={{
-                    fontSize: '20px',
-                    color: '#ffffff'
-                  }}>7</span>
-                  <span style={{
-                    fontSize: '12px',
-                    color: 'rgba(255, 255, 255, 0.5)'
-                  }}> / 30</span>
-                </div>
-                <div style={{
-                  fontSize: '10px',
-                  color: 'rgba(255, 255, 255, 0.6)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em'
-                }}>
-                  Days Live
-                </div>
-              </div>
-            </div>
-            
-            {/* Progress note */}
-            <div style={{
-              marginTop: '12px',
-              padding: '8px',
-              background: 'rgba(0, 255, 184, 0.05)',
-              borderRadius: '6px',
-              border: '1px solid rgba(0, 255, 184, 0.1)',
-              fontSize: '10px',
-              color: 'rgba(0, 255, 184, 0.8)',
-              textAlign: 'center'
-            }}>
-              Testing benchmarks before mainnet deployment
-            </div>
-          </div>
+            );
+          })()}
         </div>
       </div>
       )}

@@ -278,7 +278,8 @@ export function generateMarketResponse(marketData) {
   const config = MARKET_ANALYST_CONFIG;
 
   if (!btcPrice || btcPrice === 0) {
-    return null; // Don't show loading messages
+    // Always return something - work with whatever data we have
+    return 'Waiting on price feed. Structure analysis pending.';
   }
 
   // Determine market condition based on available data

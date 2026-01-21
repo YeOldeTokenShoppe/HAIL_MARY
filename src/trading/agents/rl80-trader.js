@@ -371,9 +371,10 @@ export async function generateRL80Response(context, teamMessages, teamAnalysis =
   const { marketData } = context;
   const { btcPrice, fearGreed, fundingRate, openInterest, vix } = marketData || {};
   
-  // If no market data, return null to avoid showing loading messages
+  // If no market data, return a waiting message instead of null
   if (!btcPrice || btcPrice === 0) {
-    return null;
+    console.warn('RL80: Missing BTC price data, returning waiting message');
+    return 'Waiting for market data from the oracles. Stand by.';
   }
   
   // Analyze team consensus from either messages or structured analysis
@@ -498,7 +499,8 @@ export async function generateRL80Response(context, teamMessages, teamAnalysis =
       else if (action === 'SELL') response += 'Bearish bias, staying defensive.';
       else response += 'Monitoring setup.';
     } else {
-      return null; // Don't show generic messages, just return null
+      // Always return something - work with whatever data we have
+      response = 'Synthesizing oracle inputs. No strong signals yet - holding pattern.';
     }
   }
   

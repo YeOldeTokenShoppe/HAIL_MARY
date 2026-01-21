@@ -343,8 +343,8 @@ function determineRegime(marketData) {
   if (dxy < 100 && vix < 20) return "Risk-on regime";
   if (vix > 30) return "Crisis mode";
   if (treasury10Y && treasury10Y > 5) return "Tightening cycle";
-  
-  return null;
+
+  return "Neutral regime"; // Always return something
 }
 
 // ============================================================================
