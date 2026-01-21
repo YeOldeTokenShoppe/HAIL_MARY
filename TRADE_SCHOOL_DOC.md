@@ -19,6 +19,8 @@ Three specialist agents analyze the market from different perspectives—
 macro conditions, market sentiment, and technical price action—
 and report to an executive agent (RL80) that decides whether a trade is justified.
 
+The system currently evaluates four assets: BTC, ETH, SOL, and XRP.
+
 The system:
 	•	collects market, sentiment, and macro data continuously
 	•	evaluates conditions on a scheduled cadence (currently hourly)
@@ -279,13 +281,13 @@ Self-doubt is healthy.
 
 ⸻
 
-What we’re still learning
+What we're still learning
 
 This is an evolving system. Areas of active learning include:
 	•	better weighting based on recent agent performance
-	•	clearer regime gating (“don’t trade” conditions)
+	•	clearer regime gating ("don't trade" conditions)
 	•	improved belief decay handling
-	•	expanded—but cautious—asset support
+	•	refining multi-asset analysis across BTC, ETH, SOL, and XRP
 
 Trade School exists so these lessons are visible.
 
