@@ -101,44 +101,46 @@ async function getLiveMarketData() {
 
     const { marketData, agentContext, lighterAccount, lighterTrading } = firestoreData;
 
+    // No fallback values - agents work with real data only
     return {
-      btcPrice: marketData.btcPrice || 95000,
-      ethPrice: marketData.ethPrice || 3500,
-      fearGreed: agentContext.fearGreed || 50,
-      fundingRate: macroData.funding?.btc || agentContext.fundingRate || 0.01,
-      vix: macroData.vix?.value || agentContext.vix || 22.5,
-      dxy: macroData.dxy?.value || agentContext.dxy || 103,
-      spx: macroData.spx?.value || 585,
-      treasury10y: macroData.treasury10y?.value || 4.5,
-      marketSentiment: agentContext.marketSentiment || 'neutral',
-      trend: agentContext.trend || 'sideways',
+      btcPrice: marketData.btcPrice || null,
+      ethPrice: marketData.ethPrice || null,
+      fearGreed: agentContext.fearGreed ?? null,
+      fundingRate: macroData.funding?.btc ?? agentContext.fundingRate ?? null,
+      vix: macroData.vix?.value ?? agentContext.vix ?? null,
+      dxy: macroData.dxy?.value ?? agentContext.dxy ?? null,
+      spx: macroData.spx?.value ?? null,
+      treasury10y: macroData.treasury10y?.value ?? null,
+      marketSentiment: agentContext.marketSentiment || null,
+      trend: agentContext.trend || null,
       timestamp: new Date().toISOString(),
-      lastUpdate: marketData.lastUpdate || agentContext.lastUpdate,
+      lastUpdate: marketData.lastUpdate || agentContext.lastUpdate || null,
       // Add Lighter trading data for agents
       trading: {
-        balance: lighterAccount.balance || 0,
+        balance: lighterAccount.balance ?? 0,
         positions: lighterTrading.positions || [],
         orders: lighterTrading.orders || [],
-        positionCount: lighterTrading.positionCount || 0,
-        orderCount: lighterTrading.orderCount || 0
+        positionCount: lighterTrading.positionCount ?? 0,
+        orderCount: lighterTrading.orderCount ?? 0
       }
     };
 
   } catch (error) {
     console.error('Failed to get live market data:', error);
-    // Return mock data as fallback
+    // Return null values - no fake data
     return {
-      btcPrice: 95000,
-      ethPrice: 3500,
-      fearGreed: 50,
-      fundingRate: 0.01,
-      vix: 22.5,
-      dxy: 103,
-      spx: 585,
-      treasury10y: 4.5,
-      marketSentiment: 'neutral',
-      trend: 'sideways',
+      btcPrice: null,
+      ethPrice: null,
+      fearGreed: null,
+      fundingRate: null,
+      vix: null,
+      dxy: null,
+      spx: null,
+      treasury10y: null,
+      marketSentiment: null,
+      trend: null,
       timestamp: new Date().toISOString(),
+      error: error.message,
       trading: {
         balance: 0,
         positions: [],

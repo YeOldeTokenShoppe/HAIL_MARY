@@ -90,50 +90,53 @@ async function fetchMarketData() {
     const lighterTrading = lighterTradingDoc.exists ? lighterTradingDoc.data() : {};
     const newsData = newsDataDoc.exists ? newsDataDoc.data() : {};
 
+    // No fallback values - agents work with whatever data is available
+    // Missing data = null, agents should handle gracefully
     return {
-      btcPrice: marketData.btcPrice || 95000,
-      ethPrice: marketData.ethPrice || 3500,
-      fearGreed: agentContext.fearGreed || 50,
-      fundingRate: agentContext.fundingRate || 0.01,
-      vix: agentContext.vix || 22.5,
-      dxy: agentContext.dxy || 103,
-      openInterest: agentContext.openInterest || 25,
-      marketSentiment: agentContext.marketSentiment || 'neutral',
-      trend: agentContext.trend || 'sideways',
+      btcPrice: marketData.btcPrice || null,
+      ethPrice: marketData.ethPrice || null,
+      fearGreed: agentContext.fearGreed ?? null,
+      fundingRate: agentContext.fundingRate ?? null,
+      vix: agentContext.vix ?? null,
+      dxy: agentContext.dxy ?? null,
+      openInterest: agentContext.openInterest ?? null,
+      marketSentiment: agentContext.marketSentiment || null,
+      trend: agentContext.trend || null,
       timestamp: new Date().toISOString(),
-      lastUpdate: marketData.lastUpdate || agentContext.lastUpdate,
+      lastUpdate: marketData.lastUpdate || agentContext.lastUpdate || null,
       trading: {
-        balance: lighterAccount.balance || 0,
+        balance: lighterAccount.balance ?? 0,
         positions: lighterTrading.positions || [],
         orders: lighterTrading.orders || [],
-        positionCount: lighterTrading.positionCount || 0,
-        orderCount: lighterTrading.orderCount || 0
+        positionCount: lighterTrading.positionCount ?? 0,
+        orderCount: lighterTrading.orderCount ?? 0
       },
       // News data for EMO sentiment analysis
       news: {
         headlines: newsData.headlines || [],
-        sentiment: newsData.sentiment || { bullish: 0, bearish: 0, neutral: 0 },
-        sentimentScore: newsData.sentimentScore || 0,
+        sentiment: newsData.sentiment || null,
+        sentimentScore: newsData.sentimentScore ?? null,
         topStories: newsData.topStories || [],
         lastUpdate: newsData.lastUpdate || null
       }
     };
   } catch (error) {
     console.error('[ScoringOrchestrator] Failed to fetch market data:', error);
-    // Return fallback data
+    // Return empty data - no fake values, agents handle missing data
     return {
-      btcPrice: 95000,
-      ethPrice: 3500,
-      fearGreed: 50,
-      fundingRate: 0.01,
-      vix: 22.5,
-      dxy: 103,
-      openInterest: 25,
-      marketSentiment: 'neutral',
-      trend: 'sideways',
+      btcPrice: null,
+      ethPrice: null,
+      fearGreed: null,
+      fundingRate: null,
+      vix: null,
+      dxy: null,
+      openInterest: null,
+      marketSentiment: null,
+      trend: null,
       timestamp: new Date().toISOString(),
+      error: error.message,
       trading: { balance: 0, positions: [], orders: [] },
-      news: { headlines: [], sentiment: { bullish: 0, bearish: 0, neutral: 0 }, sentimentScore: 0, topStories: [] }
+      news: { headlines: [], sentiment: null, sentimentScore: null, topStories: [] }
     };
   }
 }
