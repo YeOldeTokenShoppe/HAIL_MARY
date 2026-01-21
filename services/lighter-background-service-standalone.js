@@ -21,7 +21,7 @@ const appStore = require('app-store-scraper');
 class RateLimiter {
   constructor() {
     this.lastCall = 0;
-    this.minInterval = 6000; // 6 seconds between API calls (CoinGecko free tier: 10-50/min)
+    this.minInterval = 8000; // 8 seconds between API calls (CoinGecko free tier is very strict)
   }
   
   async throttle() {
@@ -928,36 +928,122 @@ class LighterStandaloneService {
   }
 
   startMarketDataUpdates() {
-    // Fetch real market data every 3 minutes (reduced to avoid CoinGecko rate limits)
-    setInterval(async () => {
+    // Single batched CoinGecko call every 5 minutes
+    // Uses /coins/markets which returns prices, changes, and sparkline for multiple coins
+    const updateMarketData = async () => {
       if (!this.isRunning) return;
 
       try {
-        // Fetch real BTC price from CoinGecko
-        const response = await axios.get('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true', {
-          timeout: 10000
-        });
+        // Batched call: gets price, 24h change, high/low, volume, and 7-day sparkline for all coins
+        const response = await axios.get(
+          'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum,solana,ripple&order=market_cap_desc&sparkline=true&price_change_percentage=24h',
+          { timeout: 15000 }
+        );
 
-        if (response.data) {
+        if (response.data && response.data.length > 0) {
+          const coins = {};
+          response.data.forEach(coin => {
+            coins[coin.symbol.toUpperCase()] = {
+              price: coin.current_price,
+              change24h: coin.price_change_percentage_24h || 0,
+              high24h: coin.high_24h,
+              low24h: coin.low_24h,
+              volume: coin.total_volume,
+              marketCap: coin.market_cap,
+              sparkline: coin.sparkline_in_7d?.price || [] // 7-day price history for charts
+            };
+          });
+
           const marketData = {
-            btcPrice: response.data.bitcoin.usd,
-            ethPrice: response.data.ethereum.usd,
-            btcChange24h: response.data.bitcoin.usd_24h_change || 0,
-            ethChange24h: response.data.ethereum.usd_24h_change || 0,
+            btcPrice: coins.BTC?.price || 0,
+            ethPrice: coins.ETH?.price || 0,
+            solPrice: coins.SOL?.price || 0,
+            xrpPrice: coins.XRP?.price || 0,
+            btcChange24h: coins.BTC?.change24h || 0,
+            ethChange24h: coins.ETH?.change24h || 0,
+            coins, // Full data for all coins
             timestamp: admin.firestore.FieldValue.serverTimestamp(),
             lastUpdate: new Date().toISOString()
           };
 
           await this.saveMarketData(marketData);
-          console.log(`📊 Market updated: BTC $${marketData.btcPrice.toFixed(0)}, ETH $${marketData.ethPrice.toFixed(0)}`);
+
+          // Also save sparkline data for TeknoScreen charts
+          await this.saveSparklineData(coins);
+
+          console.log(`📊 Market updated: BTC $${marketData.btcPrice.toFixed(0)}, ETH $${marketData.ethPrice.toFixed(0)}, SOL $${(marketData.solPrice || 0).toFixed(0)}`);
         }
 
       } catch (error) {
         console.error('❌ Error fetching market data:', error.message);
       }
-    }, 180000);
+    };
 
-    console.log('📈 Started market data updates (3min interval)');
+    // Run immediately, then every 5 minutes
+    updateMarketData();
+    setInterval(updateMarketData, 300000);
+
+    console.log('📈 Started market data updates (5min interval, single batched call)');
+  }
+
+  async saveSparklineData(coins) {
+    if (!this.db) return;
+
+    try {
+      // Convert sparkline to OHLC-like format for TeknoScreen compatibility
+      const technicalData = {};
+      const now = Date.now();
+
+      for (const [symbol, data] of Object.entries(coins)) {
+        if (data.sparkline && data.sparkline.length > 0) {
+          // Sparkline is hourly prices for 7 days (~168 points)
+          // Convert to candle format with proper timestamps for charts
+          const candles = [];
+          const prices = data.sparkline;
+          const interval = Math.floor(prices.length / 42); // ~42 candles like OHLC
+          const hoursPerCandle = interval; // Each candle represents this many hours
+
+          // Calculate start time (7 days ago)
+          const startTime = now - (7 * 24 * 60 * 60 * 1000);
+
+          let candleIndex = 0;
+          for (let i = 0; i < prices.length; i += interval) {
+            const slice = prices.slice(i, i + interval);
+            if (slice.length > 0) {
+              // Calculate timestamp for this candle (Unix timestamp in seconds)
+              const candleTime = Math.floor((startTime + (candleIndex * hoursPerCandle * 60 * 60 * 1000)) / 1000);
+
+              candles.push({
+                time: candleTime,
+                open: slice[0],
+                high: Math.max(...slice),
+                low: Math.min(...slice),
+                close: slice[slice.length - 1],
+                volume: Math.random() * 1000000 // Placeholder volume since sparkline doesn't include it
+              });
+              candleIndex++;
+            }
+          }
+
+          technicalData[symbol] = {
+            candles: candles.slice(-42), // Last 42 candles
+            currentPrice: data.price,
+            high24h: data.high24h,
+            low24h: data.low24h,
+            change24h: data.change24h
+          };
+        }
+      }
+
+      await this.db.collection('technicalData').doc('latest').set({
+        ...technicalData,
+        timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        lastUpdate: new Date().toISOString()
+      });
+
+    } catch (error) {
+      console.error('❌ Error saving sparkline data:', error.message);
+    }
   }
 
   startAgentContextUpdates() {
@@ -1168,52 +1254,8 @@ class LighterStandaloneService {
       console.log('⚠️ Polymarket fetch failed:', error.message);
     }
 
-    // Fetch whale activity from Binance large trades (free)
-    try {
-      console.log('🐋 Fetching whale activity...');
-      await this.rateLimiter.throttle();
-      const response = await axios.get(
-        'https://fapi.binance.com/fapi/v1/aggTrades?symbol=BTCUSDT&limit=100',
-        { timeout: 10000 }
-      );
-
-      if (Array.isArray(response.data)) {
-        let buyVolume = 0;
-        let sellVolume = 0;
-
-        response.data.forEach(trade => {
-          const value = parseFloat(trade.p) * parseFloat(trade.q);
-          if (value > 100000) { // Only count large trades > $100k
-            if (trade.m) {
-              sellVolume += value;
-            } else {
-              buyVolume += value;
-            }
-          }
-        });
-
-        const ratio = buyVolume / (sellVolume || 1);
-
-        if (ratio > 1.3) {
-          results.whaleActivity = {
-            activity: 'Accumulating',
-            confidence: Math.min(100, Math.round((ratio - 1) * 50))
-          };
-        } else if (ratio < 0.7) {
-          results.whaleActivity = {
-            activity: 'Distributing',
-            confidence: Math.min(100, Math.round((1 - ratio) * 50))
-          };
-        } else {
-          results.whaleActivity = { activity: 'Normal', confidence: 50 };
-        }
-
-        results.dataStatus.whale = 'live';
-        console.log(`✅ Whale activity: ${results.whaleActivity.activity} (${results.whaleActivity.confidence}%)`);
-      }
-    } catch (error) {
-      console.log('⚠️ Whale activity fetch failed:', error.message);
-    }
+    // REMOVED: Whale activity from Binance - returns 451 (geo-blocked from Railway servers)
+    // Whale data already removed from UI
 
     // Fetch Google Trends for Bitcoin (free)
     try {
@@ -1411,17 +1453,18 @@ class LighterStandaloneService {
       }
     };
 
-    // Run immediately on start
-    updateTechnicalData();
+    // DISABLED: OHLC fetching uses too many CoinGecko API calls
+    // Market data updates provide sufficient price data
+    // Uncomment below to re-enable if you upgrade to CoinGecko paid tier
+    // setTimeout(updateTechnicalData, 60000);
+    // setInterval(updateTechnicalData, 300000);
 
-    // Then every 5 minutes (300s) to reduce CoinGecko rate limit hits
-    setInterval(updateTechnicalData, 300000);
-
-    console.log('📊 Started technical data updates (5min interval)');
+    console.log('📊 Technical data updates DISABLED (CoinGecko rate limits)');
   }
 
   async fetchOHLCData() {
-    const symbols = ['BTC', 'ETH', 'SOL', 'XRP'];
+    // Reduced to BTC/ETH only to minimize CoinGecko API calls (free tier is strict)
+    const symbols = ['BTC', 'ETH'];
     const symbolMap = {
       'BTC': 'bitcoin',
       'ETH': 'ethereum',
@@ -1691,29 +1734,29 @@ class LighterStandaloneService {
       try {
         console.log('🌍 Fetching macro data (VIX, DXY, SPX, Treasury, Funding, OI)...');
 
-        // Fetch all data in parallel
-        const [yahooData, treasuryData, fundingData, oiData] = await Promise.allSettled([
-          this.fetchYahooMacroData(),
+        // Fetch all data in parallel (FRED for VIX/DXY/Treasury, Alpha Vantage for SPY)
+        const [macroData, treasuryData, fundingData, oiData] = await Promise.allSettled([
+          this.fetchMacroData(),
           this.fetchTreasuryYield(),
           this.fetchLighterFundingRates(),
           this.fetchLighterOpenInterest()
         ]);
 
-        const yahooResults = this.extractResult(yahooData, {});
-        const macroData = {
-          vix: yahooResults.vix || null,  // No fallback - show N/A if fetch fails
-          dxy: yahooResults.dxy || null,  // No fallback - show N/A if fetch fails
-          spx: yahooResults.spx || null,  // No fallback - show N/A if fetch fails
-          treasury10y: this.extractResult(treasuryData, null),
+        const macroResults = this.extractResult(macroData, {});
+        const macroDataToSave = {
+          vix: macroResults.vix || null,  // From FRED
+          dxy: macroResults.dxy || null,  // From FRED
+          spx: macroResults.spx || null,  // From Alpha Vantage
+          treasury10y: this.extractResult(treasuryData, null),  // From FRED
           funding: this.extractResult(fundingData, { btc: null, eth: null }),
           openInterest: this.extractResult(oiData, { btc: null, eth: null, total: null }),
           timestamp: admin.firestore.FieldValue.serverTimestamp(),
           lastUpdate: new Date().toISOString(),
-          source: 'yahoo/lighter'
+          source: 'fred/alphavantage/lighter'
         };
 
-        await this.saveMacroData(macroData);
-        console.log(`🌍 Macro data updated: VIX=${macroData.vix?.value ?? 'N/A'}, DXY=${macroData.dxy?.value ?? 'N/A'}, SPX=${macroData.spx?.value ?? 'N/A'}`);
+        await this.saveMacroData(macroDataToSave);
+        console.log(`🌍 Macro data updated: VIX=${macroDataToSave.vix?.value ?? 'N/A'}, DXY=${macroDataToSave.dxy?.value ?? 'N/A'}, SPX=${macroDataToSave.spx?.value ?? 'N/A'}`);
 
       } catch (error) {
         console.error('❌ Error fetching macro data:', error.message);
@@ -1729,129 +1772,126 @@ class LighterStandaloneService {
     console.log('🌍 Started macro data updates (1hr interval)');
   }
 
-  // Fetch VIX, DXY, SPX from Yahoo Finance
-  async fetchYahooMacroData() {
+  // Fetch VIX, DXY from FRED API and SPY from Alpha Vantage
+  async fetchMacroData() {
     const results = { vix: null, dxy: null, spx: null };
+    const fredKey = process.env.FRED_API_KEY;
+    const alphaKey = process.env.ALPHAVANTAGE_API_KEY;
 
-    // Fetch VIX (^VIX)
-    try {
-      const vixResponse = await axios.get(
-        'https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1d&range=1d',
-        {
-          headers: { 'User-Agent': 'Mozilla/5.0' },
-          timeout: 10000
+    // Fetch VIX from FRED (VIXCLS series)
+    if (fredKey) {
+      try {
+        const vixResponse = await axios.get(
+          `https://api.stlouisfed.org/fred/series/observations?series_id=VIXCLS&api_key=${fredKey}&file_type=json&limit=2&sort_order=desc`,
+          { timeout: 10000 }
+        );
+        const observations = vixResponse.data?.observations;
+        if (observations && observations.length >= 1) {
+          const current = parseFloat(observations[0].value);
+          const previous = observations.length > 1 ? parseFloat(observations[1].value) : current;
+          const change = current - previous;
+          results.vix = {
+            value: parseFloat(current.toFixed(2)),
+            change: parseFloat(change.toFixed(2)),
+            changePercent: previous ? parseFloat(((change / previous) * 100).toFixed(2)) : 0
+          };
+          console.log(`✅ FRED VIX: ${results.vix.value}`);
         }
-      );
-      const vixQuote = vixResponse.data?.chart?.result?.[0]?.meta;
-      if (vixQuote) {
-        const currentPrice = vixQuote.regularMarketPrice || 0;
-        const previousClose = vixQuote.previousClose || currentPrice;
-        const change = currentPrice - previousClose;
-        results.vix = {
-          value: parseFloat(currentPrice.toFixed(2)),
-          change: parseFloat(change.toFixed(2)),
-          changePercent: previousClose ? parseFloat(((change / previousClose) * 100).toFixed(2)) : 0
-        };
+      } catch (err) {
+        console.log('⚠️ FRED VIX fetch error:', err.message);
       }
-    } catch (err) {
-      console.log('⚠️ Yahoo VIX fetch error:', err.message || err.code || 'Unknown error');
-      if (err.response) {
-        console.log('   Status:', err.response.status, '| Code:', err.response.data?.chart?.error?.code);
+
+      // Fetch DXY from FRED (DTWEXBGS - Trade Weighted Dollar Index)
+      try {
+        const dxyResponse = await axios.get(
+          `https://api.stlouisfed.org/fred/series/observations?series_id=DTWEXBGS&api_key=${fredKey}&file_type=json&limit=2&sort_order=desc`,
+          { timeout: 10000 }
+        );
+        const observations = dxyResponse.data?.observations;
+        if (observations && observations.length >= 1) {
+          const current = parseFloat(observations[0].value);
+          const previous = observations.length > 1 ? parseFloat(observations[1].value) : current;
+          const change = current - previous;
+          results.dxy = {
+            value: parseFloat(current.toFixed(2)),
+            change: parseFloat(change.toFixed(2)),
+            changePercent: previous ? parseFloat(((change / previous) * 100).toFixed(2)) : 0
+          };
+          console.log(`✅ FRED DXY: ${results.dxy.value}`);
+        }
+      } catch (err) {
+        console.log('⚠️ FRED DXY fetch error:', err.message);
       }
+    } else {
+      console.log('⚠️ FRED_API_KEY not configured - skipping VIX/DXY');
     }
 
-    // Fetch DXY (DX-Y.NYB) - US Dollar Index
-    try {
-      const dxyResponse = await axios.get(
-        'https://query1.finance.yahoo.com/v8/finance/chart/DX-Y.NYB?interval=1d&range=1d',
-        {
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-          timeout: 10000
+    // Fetch SPY from Alpha Vantage
+    if (alphaKey) {
+      try {
+        const spyResponse = await axios.get(
+          `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=SPY&apikey=${alphaKey}`,
+          { timeout: 10000 }
+        );
+        const quote = spyResponse.data?.['Global Quote'];
+        if (quote && quote['05. price']) {
+          const currentPrice = parseFloat(quote['05. price']);
+          const previousClose = parseFloat(quote['08. previous close'] || currentPrice);
+          const change = parseFloat(quote['09. change'] || 0);
+          const changePercent = parseFloat((quote['10. change percent'] || '0').replace('%', ''));
+          results.spx = {
+            value: parseFloat(currentPrice.toFixed(2)),
+            change: parseFloat(change.toFixed(2)),
+            changePercent: parseFloat(changePercent.toFixed(2))
+          };
+          console.log(`✅ Alpha Vantage SPY: ${results.spx.value}`);
         }
-      );
-
-      // Check for Yahoo Finance API errors
-      const chartError = dxyResponse.data?.chart?.error;
-      if (chartError) {
-        console.log('⚠️ Yahoo DXY API error:', chartError.code, chartError.description);
+      } catch (err) {
+        console.log('⚠️ Alpha Vantage SPY fetch error:', err.message);
       }
-
-      const dxyQuote = dxyResponse.data?.chart?.result?.[0]?.meta;
-      if (dxyQuote) {
-        const currentPrice = dxyQuote.regularMarketPrice || 0;
-        const previousClose = dxyQuote.previousClose || currentPrice;
-        const change = currentPrice - previousClose;
-        results.dxy = {
-          value: parseFloat(currentPrice.toFixed(2)),
-          change: parseFloat(change.toFixed(2)),
-          changePercent: previousClose ? parseFloat(((change / previousClose) * 100).toFixed(2)) : 0
-        };
-        console.log(`✅ DXY fetched: ${results.dxy.value}`);
-      } else {
-        console.log('⚠️ Yahoo DXY: No quote data in response. Response keys:', Object.keys(dxyResponse.data || {}));
-      }
-    } catch (err) {
-      console.log('⚠️ Yahoo DXY fetch error:', err.message);
-      if (err.response) {
-        console.log('   Status:', err.response.status, '| Data:', JSON.stringify(err.response.data).slice(0, 200));
-      }
-    }
-
-    // Fetch SPY (for SPX proxy)
-    try {
-      const spyResponse = await axios.get(
-        'https://query1.finance.yahoo.com/v8/finance/chart/SPY?interval=1d&range=1d',
-        {
-          headers: { 'User-Agent': 'Mozilla/5.0' },
-          timeout: 10000
-        }
-      );
-      const spyQuote = spyResponse.data?.chart?.result?.[0]?.meta;
-      if (spyQuote) {
-        const currentPrice = spyQuote.regularMarketPrice || 0;
-        const previousClose = spyQuote.previousClose || currentPrice;
-        const change = currentPrice - previousClose;
-        results.spx = {
-          value: parseFloat(currentPrice.toFixed(2)),
-          change: parseFloat(change.toFixed(2)),
-          changePercent: previousClose ? parseFloat(((change / previousClose) * 100).toFixed(2)) : 0
-        };
-      }
-    } catch (err) {
-      console.log('⚠️ Yahoo SPY fetch error:', err.message || err.code || 'Unknown error');
-      if (err.response) {
-        console.log('   Status:', err.response.status);
-      }
+    } else {
+      console.log('⚠️ ALPHAVANTAGE_API_KEY not configured - skipping SPY');
     }
 
     return results;
   }
 
-  // Fetch 10Y Treasury yield from Yahoo Finance (^TNX)
+  // Fetch 10Y Treasury yield from FRED (DGS10 series)
   async fetchTreasuryYield() {
+    const fredKey = process.env.FRED_API_KEY;
+
+    if (!fredKey) {
+      console.log('⚠️ FRED_API_KEY not configured - skipping Treasury');
+      return null;
+    }
+
     try {
       const response = await axios.get(
-        'https://query1.finance.yahoo.com/v8/finance/chart/%5ETNX?interval=1d&range=2d',
-        {
-          headers: { 'User-Agent': 'Mozilla/5.0' },
-          timeout: 10000
-        }
+        `https://api.stlouisfed.org/fred/series/observations?series_id=DGS10&api_key=${fredKey}&file_type=json&limit=2&sort_order=desc`,
+        { timeout: 10000 }
       );
-      const quote = response.data?.chart?.result?.[0]?.meta;
-      if (quote) {
-        const currentYield = quote.regularMarketPrice || 0;
-        const previousClose = quote.previousClose || currentYield;
-        const change = currentYield - previousClose;
-        return {
-          value: parseFloat(currentYield.toFixed(3)),
-          change: parseFloat(change.toFixed(3)),
-          previousValue: parseFloat(previousClose.toFixed(3))
-        };
+      const observations = response.data?.observations;
+      if (observations && observations.length >= 1) {
+        // FRED may return "." for missing data
+        const currentValue = observations[0].value;
+        if (currentValue && currentValue !== '.') {
+          const current = parseFloat(currentValue);
+          const previous = observations.length > 1 && observations[1].value !== '.'
+            ? parseFloat(observations[1].value)
+            : current;
+          const change = current - previous;
+          console.log(`✅ FRED Treasury 10Y: ${current.toFixed(3)}%`);
+          return {
+            value: parseFloat(current.toFixed(3)),
+            change: parseFloat(change.toFixed(3)),
+            previousValue: parseFloat(previous.toFixed(3))
+          };
+        }
       }
     } catch (err) {
-      console.log('⚠️ Yahoo Treasury fetch error:', err.message);
+      console.log('⚠️ FRED Treasury fetch error:', err.message);
     }
-    return { value: 4.5, change: 0 };
+    return null;
   }
 
   // Fetch funding rates from Lighter DEX
