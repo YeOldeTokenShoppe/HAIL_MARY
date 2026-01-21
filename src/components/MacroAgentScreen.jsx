@@ -83,7 +83,7 @@ const MacroAgentScreen = () => {
       ctx.stroke()
 
       // Row 1: DXY and VIX (handle null data with optional chaining)
-      drawIndicatorBoxCompact(ctx, 'DXY', data.dxy?.value, data.dxy?.changePercent, 20, 50, 'USD (UUP)', false)
+      drawIndicatorBoxCompact(ctx, 'DXY', data.dxy?.value, data.dxy?.changePercent, 20, 50, 'USD Index', false)
       drawIndicatorBoxCompact(ctx, 'VIX', data.vix?.value, data.vix?.changePercent, 265, 50, 'Vol (VIXY)', true)
 
       // Row 2: 10Y Treasury and S&P 500
@@ -131,8 +131,10 @@ const MacroAgentScreen = () => {
 const drawIndicatorBoxCompact = (ctx, symbol, value, change, x, y, subtitle, invertColors = false, isPercent = false) => {
   const hasData = value != null && !isNaN(value)
   const hasChange = change != null && !isNaN(change)
-  const isPositive = hasChange ? change >= 0 : true
-  const showGreen = invertColors ? !isPositive : isPositive
+  const isPositive = hasChange ? change > 0 : false
+  const isNegative = hasChange ? change < 0 : false
+  // Arrow color matches direction: up=green, down=red, zero=gray
+  const arrowColor = isPositive ? '#00ff66' : (isNegative ? '#ff4444' : '#888888')
 
   // Box background
   ctx.fillStyle = 'rgba(0, 255, 100, 0.05)'
@@ -159,10 +161,12 @@ const drawIndicatorBoxCompact = (ctx, symbol, value, change, x, y, subtitle, inv
   ctx.fillText(displayValue, x + 70, y + 26)
 
   // Change (far right) - show --- if no data
-  ctx.fillStyle = hasChange ? (showGreen ? '#00ff66' : '#ff4444') : '#666666'
+  // Arrow color matches direction: up=green, down=red, zero=gray
+  ctx.fillStyle = hasChange ? arrowColor : '#666666'
   ctx.font = 'bold 10px monospace'
+  const arrow = isPositive ? '▲' : (isNegative ? '▼' : '●')
   const changeDisplay = hasChange
-    ? `${isPositive ? '▲' : '▼'}${Math.abs(change).toFixed(2)}${isPercent ? '' : '%'}`
+    ? `${arrow}${Math.abs(change).toFixed(2)}${isPercent ? '' : '%'}`
     : '---'
   ctx.fillText(changeDisplay, x + 175, y + 26)
 }
