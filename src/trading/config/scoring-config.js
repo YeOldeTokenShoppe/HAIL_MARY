@@ -17,14 +17,16 @@ export const ASSETS = ['BTC', 'ETH', 'SOL', 'XRP'];
 /**
  * Assets that are tradeable on Lighter DEX (perps)
  */
-export const TRADEABLE_ASSETS = ['BTC', 'ETH'];
+export const TRADEABLE_ASSETS = ['BTC', 'ETH', 'SOL', 'XRP'];
 
 /**
  * Mapping from asset to perp symbol
  */
 export const PERP_SYMBOLS = {
   BTC: 'BTC-PERP',
-  ETH: 'ETH-PERP'
+  ETH: 'ETH-PERP',
+  SOL: 'SOL-PERP',
+  XRP: 'XRP-PERP'
 };
 
 /**

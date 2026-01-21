@@ -226,7 +226,7 @@ The Railway service listens to `agentDecisions/RL80` in Firestore using `onSnaps
 
 1. **Validates the decision:**
    - Confidence meets minimum threshold (default: 60%)
-   - Symbol is allowed (BTC, ETH)
+   - Symbol is allowed (BTC, ETH, SOL, XRP)
    - Daily trade limit not reached
    - Daily loss limit not exceeded
    - Cooldown period elapsed (default: 5 minutes)
@@ -884,7 +884,7 @@ The trading system includes multiple safety mechanisms:
 | **Daily Loss Limit** | $50 | Halts trading if exceeded |
 | **Minimum Confidence** | 60% | Rejects low-confidence decisions |
 | **Trade Cooldown** | 5 min | Prevents rapid-fire trading |
-| **Allowed Symbols** | ETH, BTC | Only trades approved assets |
+| **Allowed Symbols** | BTC, ETH, SOL, XRP | Only trades approved assets |
 | **Emergency Stop** | Manual | RL80 can halt all trading |
 
 All trades are logged to `tradeHistory` for audit purposes.

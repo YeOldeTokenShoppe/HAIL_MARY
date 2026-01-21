@@ -1,28 +1,43 @@
 import { useEffect, useState } from 'react'
 import { db, doc, collection, onSnapshot, query, orderBy, limit, where } from '@/lib/firebaseClient'
 
+// Tradeable assets
+const TRADEABLE_ASSETS = ['BTC', 'ETH', 'SOL', 'XRP']
+
+// Default analyst score
+const defaultAnalystScore = { direction: 0, confidence: 0.5 }
+
 // RL80 data hook - reads from Firestore (populated by scoring workflow)
 const useRL80Data = () => {
   const [data, setData] = useState({
-    // Latest RL80 decision from agentDecisions/RL80
-    decision: {
-      action: 'HOLD',
-      symbol: 'ETH',
-      confidence: 0.5,
-      reasoning: 'Awaiting data...',
-      timestamp: null
+    // Decisions for each tradeable asset
+    decisions: {
+      BTC: { action: 'HOLD', confidence: 0.5, reasoning: 'Awaiting data...', size: 0 },
+      ETH: { action: 'HOLD', confidence: 0.5, reasoning: 'Awaiting data...', size: 0 },
+      SOL: { action: 'HOLD', confidence: 0.5, reasoning: 'Awaiting data...', size: 0 },
+      XRP: { action: 'HOLD', confidence: 0.5, reasoning: 'Awaiting data...', size: 0 }
     },
-    // Analyst scores from the latest workflow run
+    // Primary decision (strongest signal)
+    primaryAsset: 'BTC',
+    // Analyst scores per asset
+    assetScores: {
+      BTC: { EMO: defaultAnalystScore, TEKNO: defaultAnalystScore, MACRO: defaultAnalystScore },
+      ETH: { EMO: defaultAnalystScore, TEKNO: defaultAnalystScore, MACRO: defaultAnalystScore },
+      SOL: { EMO: defaultAnalystScore, TEKNO: defaultAnalystScore, MACRO: defaultAnalystScore },
+      XRP: { EMO: defaultAnalystScore, TEKNO: defaultAnalystScore, MACRO: defaultAnalystScore }
+    },
+    // Aggregated consensus per asset
+    consensus: {
+      BTC: { score: 50, direction: 'neutral' },
+      ETH: { score: 50, direction: 'neutral' },
+      SOL: { score: 50, direction: 'neutral' },
+      XRP: { score: 50, direction: 'neutral' }
+    },
+    // Legacy format for backward compatibility
     analystScores: {
       EMO: { direction: 0, confidence: 0.5, signal: 'neutral' },
       TEKNO: { direction: 0, confidence: 0.5, signal: 'neutral' },
       MACRO: { direction: 0, confidence: 0.5, signal: 'neutral' }
-    },
-    // Aggregated consensus
-    consensus: {
-      score: 50,
-      agreement: 0.5,
-      direction: 'neutral'
     },
     // Performance from trade history
     performance: {
@@ -70,37 +85,82 @@ const useRL80Data = () => {
       })
     )
 
-    // Listen to latest decisions collection for aggregated scores
+    // Listen to latest decisions collection for aggregated scores - fetch for each tradeable asset
     const decisionsQuery = query(
       collection(db, 'decisions'),
       orderBy('timestamp', 'desc'),
-      limit(1)
+      limit(10) // Get recent decisions to cover both assets
     )
     unsubscribes.push(
       onSnapshot(decisionsQuery, (snapshot) => {
         if (!snapshot.empty) {
-          const latestDecision = snapshot.docs[0].data()
+          const assetDecisions = {}
+          const assetScoresData = {}
+          const consensusData = {}
+          let latestAnalystScores = null
 
-          // Extract analyst scores
-          const analysts = latestDecision.analysts || {}
-          const analystScores = {
-            EMO: formatAnalystScore(analysts.EMO),
-            TEKNO: formatAnalystScore(analysts.TEKNO),
-            MACRO: formatAnalystScore(analysts.MACRO)
-          }
+          // Process decisions for each asset
+          snapshot.docs.forEach(doc => {
+            const decision = doc.data()
+            const asset = decision.asset || 'ETH'
 
-          // Calculate consensus from aggregated score
-          const aggregated = latestDecision.aggregated || {}
-          const consensusScore = ((aggregated.weightedDirection || 0) + 10) * 5 // Convert -10..+10 to 0..100
+            // Only process if we haven't seen this asset yet (get most recent)
+            if (!assetDecisions[asset] && TRADEABLE_ASSETS.includes(asset)) {
+              assetDecisions[asset] = {
+                action: decision.recommendation?.action || 'HOLD',
+                confidence: decision.aggregated?.weightedConfidence || 0.5,
+                reasoning: decision.recommendation?.rationale || 'No data',
+                size: decision.recommendation?.sizePercent || 0
+              }
+
+              // Extract per-asset analyst scores
+              const analysts = decision.analysts || {}
+              assetScoresData[asset] = {
+                EMO: { direction: analysts.EMO?.score || 0, confidence: analysts.EMO?.confidence || 0.5 },
+                TEKNO: { direction: analysts.TEKNO?.score || 0, confidence: analysts.TEKNO?.confidence || 0.5 },
+                MACRO: { direction: analysts.MACRO?.score || 0, confidence: analysts.MACRO?.confidence || 0.5 }
+              }
+
+              // Calculate consensus for this asset
+              const aggregated = decision.aggregated || {}
+              const consensusScore = ((aggregated.weightedDirection || 0) + 10) * 5
+              consensusData[asset] = {
+                score: Math.round(consensusScore),
+                direction: getDirectionFromScore(aggregated.weightedDirection || 0)
+              }
+
+              // Use first decision's analysts for legacy format
+              if (!latestAnalystScores) {
+                latestAnalystScores = {
+                  EMO: formatAnalystScore(analysts.EMO),
+                  TEKNO: formatAnalystScore(analysts.TEKNO),
+                  MACRO: formatAnalystScore(analysts.MACRO)
+                }
+              }
+            }
+          })
+
+          // Determine primary asset (strongest signal)
+          let primaryAsset = 'ETH'
+          let strongestSignal = 0
+          TRADEABLE_ASSETS.forEach(asset => {
+            const decision = assetDecisions[asset]
+            if (decision && decision.action !== 'HOLD') {
+              const signalStrength = Math.abs(consensusData[asset]?.score - 50 || 0)
+              if (signalStrength > strongestSignal) {
+                strongestSignal = signalStrength
+                primaryAsset = asset
+              }
+            }
+          })
 
           setData(prev => ({
             ...prev,
-            analystScores,
-            consensus: {
-              score: Math.round(consensusScore),
-              agreement: aggregated.agreement || 0.5,
-              direction: getDirectionFromScore(aggregated.weightedDirection || 0)
-            }
+            decisions: { ...prev.decisions, ...assetDecisions },
+            assetScores: { ...prev.assetScores, ...assetScoresData },
+            consensus: { ...prev.consensus, ...consensusData },
+            primaryAsset,
+            analystScores: latestAnalystScores || prev.analystScores
           }))
         }
       }, (error) => {
@@ -139,17 +199,30 @@ const useRL80Data = () => {
       onSnapshot(scoresQuery, (snapshot) => {
         if (!snapshot.empty) {
           const recentScores = {}
+          const assetScoresUpdate = { BTC: {}, ETH: {}, SOL: {}, XRP: {} }
+
           snapshot.docs.forEach(doc => {
-            const data = doc.data()
-            const agentId = data.agentId
+            const docData = doc.data()
+            const agentId = docData.agentId
             if (agentId && !recentScores[agentId]) {
-              // Get score for ETH (primary trading asset)
-              const ethScore = data.scores?.find(s => s.asset === 'ETH') || data.scores?.[0]
-              if (ethScore) {
+              // Get scores for all tradeable assets
+              TRADEABLE_ASSETS.forEach(asset => {
+                const assetScore = docData.scores?.find(s => s.asset === asset)
+                if (assetScore) {
+                  assetScoresUpdate[asset][agentId] = {
+                    direction: assetScore.direction || 0,
+                    confidence: assetScore.confidence || 0.5
+                  }
+                }
+              })
+
+              // Use BTC for legacy format (backward compatibility)
+              const btcScore = docData.scores?.find(s => s.asset === 'BTC') || docData.scores?.[0]
+              if (btcScore) {
                 recentScores[agentId] = formatAnalystScore({
-                  score: ethScore.direction,
-                  confidence: ethScore.confidence,
-                  rationale: ethScore.rationale
+                  score: btcScore.direction,
+                  confidence: btcScore.confidence,
+                  rationale: btcScore.rationale
                 })
               }
             }
@@ -161,6 +234,12 @@ const useRL80Data = () => {
               analystScores: {
                 ...prev.analystScores,
                 ...recentScores
+              },
+              assetScores: {
+                BTC: { ...prev.assetScores.BTC, ...assetScoresUpdate.BTC },
+                ETH: { ...prev.assetScores.ETH, ...assetScoresUpdate.ETH },
+                SOL: { ...prev.assetScores.SOL, ...assetScoresUpdate.SOL },
+                XRP: { ...prev.assetScores.XRP, ...assetScoresUpdate.XRP }
               }
             }))
           }
@@ -274,11 +353,13 @@ const RL80Screen = () => {
       ctx.font = 'bold 18px monospace'
       ctx.fillText('\u26A1 RL80 COMMAND CENTER', 16, 28)
 
-      // Status indicator
+      // Status indicator - check if any asset has an active signal
       const pulse = Math.sin(t * 3) * 0.5 + 0.5
-      const isActive = data.decision.action !== 'HOLD'
+      const hasActiveSignal = TRADEABLE_ASSETS.some(asset =>
+        data.decisions[asset]?.action && data.decisions[asset].action !== 'HOLD'
+      )
 
-      if (isActive) {
+      if (hasActiveSignal) {
         ctx.fillStyle = `rgba(255, 215, 0, ${0.5 + pulse * 0.5})`
         ctx.font = 'bold 12px monospace'
         ctx.fillText('\u25CFACTIVE', 420, 28)
@@ -312,20 +393,23 @@ const RL80Screen = () => {
       // Council Analysis Section
       drawCouncilAnalysis(ctx, data.analystScores, 68, t)
 
-      // Decision Matrix
-      drawDecisionMatrix(ctx, data.decision, data.consensus, 160, t)
+      // Multi-Asset Decision Matrix - shows all 4 tradeable assets
+      drawMultiAssetDecisionMatrix(ctx, data.decisions, data.consensus, 160, t)
 
       // Performance Metrics
-      drawPerformanceMetrics(ctx, data.performance, 240)
+      drawPerformanceMetrics(ctx, data.performance, 250)
 
-      // Trade Signal Bar
-      drawTradeSignal(ctx, data.decision, 295, t)
+      // Trade Signal Bar - shows primary active signal
+      const primaryDecision = data.decisions[data.primaryAsset] || { action: 'HOLD', symbol: data.primaryAsset }
+      drawTradeSignal(ctx, { ...primaryDecision, symbol: data.primaryAsset }, 300, t)
 
-      // Confidence meter on the right
-      drawConfidenceMeter(ctx, data.decision.confidence, 440, 65, t)
+      // Confidence meter on the right - average confidence across assets
+      const avgConfidence = TRADEABLE_ASSETS.reduce((sum, asset) =>
+        sum + (data.decisions[asset]?.confidence || 0.5), 0) / TRADEABLE_ASSETS.length
+      drawConfidenceMeter(ctx, avgConfidence, 470, 65, t)
 
       // Border with glow effect when active
-      if (isActive) {
+      if (hasActiveSignal) {
         ctx.strokeStyle = `rgba(255, 215, 0, ${0.5 + pulse * 0.5})`
         ctx.lineWidth = 2
       } else {
@@ -438,61 +522,107 @@ function getSignalLabel(signal) {
   }
 }
 
-// Draw decision matrix with real decision data
-function drawDecisionMatrix(ctx, decision, consensus, y, time) {
-  // Decision box with golden border
-  ctx.strokeStyle = '#FFD700'
-  ctx.lineWidth = 2
-  ctx.strokeRect(24, y, 380, 65)
-
-  // Background color based on action
-  const bgColor = decision.action.includes('BUY') || decision.action === 'LONG' ? 'rgba(0, 255, 0, 0.1)' :
-                  decision.action.includes('SELL') || decision.action === 'SHORT' ? 'rgba(255, 0, 0, 0.1)' :
-                  'rgba(255, 255, 255, 0.05)'
-  ctx.fillStyle = bgColor
-  ctx.fillRect(24, y, 380, 65)
-
+// Draw multi-asset decision matrix - shows all 4 tradeable assets
+function drawMultiAssetDecisionMatrix(ctx, decisions, consensus, y, time) {
   // Header
   ctx.fillStyle = '#FFD700'
-  ctx.font = 'bold 14px monospace'
-  ctx.fillText('DECISION MATRIX', 34, y + 18)
+  ctx.font = 'bold 12px monospace'
+  ctx.fillText('ASSET SIGNALS', 24, y)
 
-  // Action with pulsing effect
+  const assets = TRADEABLE_ASSETS
+  const boxWidth = 105
+  const boxHeight = 70
+  const startX = 24
+  const boxY = y + 8
   const pulse = Math.sin(time * 4) * 0.5 + 0.5
-  const actionColor = decision.action.includes('BUY') || decision.action === 'LONG' ? '#44ff44' :
-                      decision.action.includes('SELL') || decision.action === 'SHORT' ? '#ff4444' :
-                      '#ffff44'
 
-  ctx.fillStyle = decision.action !== 'HOLD' ?
-    `rgba(${actionColor === '#44ff44' ? '68, 255, 68' :
-           actionColor === '#ff4444' ? '255, 68, 68' : '255, 255, 68'}, ${0.5 + pulse * 0.5})` :
-    actionColor
-  ctx.font = 'bold 20px monospace'
-  ctx.fillText(decision.action, 34, y + 44)
+  assets.forEach((asset, i) => {
+    const decision = decisions[asset] || { action: 'HOLD', confidence: 0.5 }
+    const assetConsensus = consensus[asset] || { score: 50, direction: 'neutral' }
+    const x = startX + (i * (boxWidth + 4))
 
-  // Symbol
-  ctx.fillStyle = '#ffffff'
-  ctx.font = '12px monospace'
-  ctx.fillText(decision.symbol || 'ETH', 120, y + 44)
+    // Background color based on action
+    const isActive = decision.action && decision.action !== 'HOLD'
+    const isBuy = decision.action?.includes('BUY') || decision.action === 'LONG'
+    const isSell = decision.action?.includes('SELL') || decision.action === 'SHORT'
 
-  // Size indicator if available
-  if (decision.size > 0) {
+    const bgColor = isBuy ? 'rgba(0, 255, 0, 0.15)' :
+                    isSell ? 'rgba(255, 0, 0, 0.15)' :
+                    'rgba(255, 255, 255, 0.05)'
+
+    // Draw box
+    ctx.fillStyle = bgColor
+    ctx.fillRect(x, boxY, boxWidth, boxHeight)
+
+    // Border - highlight if active
+    if (isActive) {
+      ctx.strokeStyle = isBuy ? `rgba(68, 255, 68, ${0.5 + pulse * 0.5})` :
+                        `rgba(255, 68, 68, ${0.5 + pulse * 0.5})`
+      ctx.lineWidth = 2
+    } else {
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.3)'
+      ctx.lineWidth = 1
+    }
+    ctx.strokeRect(x, boxY, boxWidth, boxHeight)
+
+    // Asset symbol
+    ctx.fillStyle = '#FFD700'
+    ctx.font = 'bold 14px monospace'
+    ctx.fillText(asset, x + 5, boxY + 18)
+
+    // Action
+    const actionColor = isBuy ? '#44ff44' : isSell ? '#ff4444' : '#888888'
+    ctx.fillStyle = isActive ?
+      `rgba(${isBuy ? '68, 255, 68' : isSell ? '255, 68, 68' : '136, 136, 136'}, ${0.6 + pulse * 0.4})` :
+      actionColor
+    ctx.font = 'bold 11px monospace'
+    const actionText = decision.action || 'HOLD'
+    ctx.fillText(actionText, x + 5, boxY + 35)
+
+    // Consensus score bar
+    const barX = x + 5
+    const barY = boxY + 42
+    const barWidth = boxWidth - 10
+    const barHeight = 8
+
+    // Bar background
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'
+    ctx.fillRect(barX, barY, barWidth, barHeight)
+
+    // Bar fill based on consensus (0-100, 50 is neutral)
+    const score = assetConsensus.score || 50
+    const fillWidth = (score / 100) * barWidth
+    const barColor = score > 60 ? '#44ff44' : score < 40 ? '#ff4444' : '#ffff44'
+    ctx.fillStyle = barColor
+    ctx.fillRect(barX, barY, fillWidth, barHeight)
+
+    // Center line at 50
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(barX + barWidth / 2, barY)
+    ctx.lineTo(barX + barWidth / 2, barY + barHeight)
+    ctx.stroke()
+
+    // Score text
     ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'
-    ctx.font = '10px monospace'
-    ctx.fillText(`Size: ${(decision.size * 100).toFixed(0)}%`, 170, y + 44)
-  }
+    ctx.font = '9px monospace'
+    ctx.fillText(`${score}`, x + 5, boxY + 62)
 
-  // Consensus score
-  ctx.fillStyle = '#FFD700'
-  ctx.font = '11px monospace'
-  ctx.fillText(`Consensus: ${consensus.score}/100`, 250, y + 44)
+    // Confidence indicator (small dots)
+    const confLevel = Math.floor((decision.confidence || 0.5) * 5)
+    for (let j = 0; j < 5; j++) {
+      ctx.fillStyle = j < confLevel ? '#FFD700' : 'rgba(255, 255, 255, 0.15)'
+      ctx.fillRect(x + 35 + j * 8, boxY + 56, 5, 5)
+    }
 
-  // Reasoning (truncated)
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.7)'
-  ctx.font = '9px monospace'
-  const reasoning = decision.reasoning || 'Awaiting analysis...'
-  const truncatedReasoning = reasoning.length > 55 ? reasoning.substring(0, 55) + '...' : reasoning
-  ctx.fillText(truncatedReasoning, 34, y + 60)
+    // Size if trading
+    if (decision.size > 0) {
+      ctx.fillStyle = '#FFD700'
+      ctx.font = '8px monospace'
+      ctx.fillText(`${(decision.size * 100).toFixed(0)}%`, x + boxWidth - 25, boxY + 18)
+    }
+  })
 }
 
 // Draw performance metrics from real trade data

@@ -220,32 +220,40 @@ async function fetchYahooFinance() {
   }
 }
 
-// Fetch crypto market metrics
+// Fetch crypto market metrics - batched for all tradeable assets
 async function fetchCryptoMetrics() {
   try {
     // Use CoinGecko for market dominance and total market cap
     const coinGeckoKey = process.env.COINGECKO_API_KEY;
-    const baseUrl = coinGeckoKey 
+    const baseUrl = coinGeckoKey
       ? 'https://pro-api.coingecko.com/api/v3'
       : 'https://api.coingecko.com/api/v3';
-    
+
     const headers = coinGeckoKey ? { 'x-cg-pro-api-key': coinGeckoKey } : {};
-    
-    // Fetch global data for dominance and market caps
-    const globalResponse = await fetch(`${baseUrl}/global`, { headers });
+
+    // Fetch global data and all 4 tradeable assets in parallel (batched)
+    const [globalResponse, coinsResponse] = await Promise.all([
+      fetch(`${baseUrl}/global`, { headers }),
+      // Fetch all 4 tradeable assets in a single batched call
+      fetch(
+        `${baseUrl}/coins/markets?vs_currency=usd&ids=bitcoin,ethereum,solana,ripple&order=market_cap_desc`,
+        { headers }
+      )
+    ]);
+
     const globalData = await globalResponse.json();
-    
+    const coinsData = await coinsResponse.json();
+
     const btcDominance = globalData.data?.market_cap_percentage?.btc || 50;
     const totalMarketCap = globalData.data?.total_market_cap?.usd || 2e12;
     const totalVolume = globalData.data?.total_volume?.usd || 100e9;
-    
-    // Fetch top coins for individual market caps
-    const coinsResponse = await fetch(
-      `${baseUrl}/coins/markets?vs_currency=usd&ids=bitcoin,ethereum&order=market_cap_desc`,
-      { headers }
-    );
-    const coinsData = await coinsResponse.json();
-    
+
+    // Extract data for each asset from the batched response
+    const btcCoin = coinsData.find(c => c.id === 'bitcoin') || {};
+    const ethCoin = coinsData.find(c => c.id === 'ethereum') || {};
+    const solCoin = coinsData.find(c => c.id === 'solana') || {};
+    const xrpCoin = coinsData.find(c => c.id === 'ripple') || {};
+
     return {
       btcDominance: {
         value: btcDominance,
@@ -253,44 +261,75 @@ async function fetchCryptoMetrics() {
       },
       totalCryptoMcap: totalMarketCap / 1e12, // Convert to trillions
       totalVolume24h: totalVolume / 1e9, // Convert to billions
-      btcPrice: coinsData[0]?.current_price || 0,
-      btcChange24h: coinsData[0]?.price_change_percentage_24h || 0,
-      ethPrice: coinsData[1]?.current_price || 0,
-      ethChange24h: coinsData[1]?.price_change_percentage_24h || 0
+      // All 4 tradeable asset prices
+      btcPrice: btcCoin.current_price || 0,
+      btcChange24h: btcCoin.price_change_percentage_24h || 0,
+      ethPrice: ethCoin.current_price || 0,
+      ethChange24h: ethCoin.price_change_percentage_24h || 0,
+      solPrice: solCoin.current_price || 0,
+      solChange24h: solCoin.price_change_percentage_24h || 0,
+      xrpPrice: xrpCoin.current_price || 0,
+      xrpChange24h: xrpCoin.price_change_percentage_24h || 0,
+      // Aggregated prices object for easy access
+      prices: {
+        BTC: btcCoin.current_price || 0,
+        ETH: ethCoin.current_price || 0,
+        SOL: solCoin.current_price || 0,
+        XRP: xrpCoin.current_price || 0
+      },
+      changes: {
+        BTC: btcCoin.price_change_percentage_24h || 0,
+        ETH: ethCoin.price_change_percentage_24h || 0,
+        SOL: solCoin.price_change_percentage_24h || 0,
+        XRP: xrpCoin.price_change_percentage_24h || 0
+      }
     };
   } catch (error) {
     console.error('Crypto metrics fetch error:', error);
     return {
       btcDominance: { value: 50, change: 0 },
       totalCryptoMcap: 2.5,
-      totalVolume24h: 100
+      totalVolume24h: 100,
+      prices: { BTC: 0, ETH: 0, SOL: 0, XRP: 0 },
+      changes: { BTC: 0, ETH: 0, SOL: 0, XRP: 0 }
     };
   }
 }
 
-// Fetch funding rates from exchanges
+// Fetch funding rates from exchanges - batched for all tradeable assets
 async function fetchFundingRates() {
   try {
-    // Binance perpetual funding rates
-    const response = await fetch('https://fapi.binance.com/fapi/v1/premiumIndex?symbol=BTCUSDT');
-    const data = await response.json();
-    
-    const fundingRate = parseFloat(data.lastFundingRate || 0.0001);
-    const markPrice = parseFloat(data.markPrice || 0);
-    
-    // Also fetch ETH funding
-    const ethResponse = await fetch('https://fapi.binance.com/fapi/v1/premiumIndex?symbol=ETHUSDT');
-    const ethData = await ethResponse.json();
-    const ethFunding = parseFloat(ethData.lastFundingRate || 0.0001);
-    
-    // Average the major pairs
-    const avgFunding = (fundingRate + ethFunding) / 2;
-    
+    // Binance perpetual funding rates - fetch all 4 assets in parallel
+    const symbols = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT'];
+
+    const responses = await Promise.all(
+      symbols.map(symbol =>
+        fetch(`https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${symbol}`)
+          .then(r => r.json())
+          .catch(() => ({ lastFundingRate: '0.0001' }))
+      )
+    );
+
+    const [btcData, ethData, solData, xrpData] = responses;
+
+    const fundingRates = {
+      BTC: parseFloat(btcData.lastFundingRate || 0.0001),
+      ETH: parseFloat(ethData.lastFundingRate || 0.0001),
+      SOL: parseFloat(solData.lastFundingRate || 0.0001),
+      XRP: parseFloat(xrpData.lastFundingRate || 0.0001)
+    };
+
+    // Average of all 4 assets
+    const avgFunding = Object.values(fundingRates).reduce((a, b) => a + b, 0) / 4;
+
     return {
       fundingRate: {
         value: avgFunding,
-        btc: fundingRate,
-        eth: ethFunding,
+        btc: fundingRates.BTC,
+        eth: fundingRates.ETH,
+        sol: fundingRates.SOL,
+        xrp: fundingRates.XRP,
+        byAsset: fundingRates,
         // Convert to percentage (funding rates are typically 8-hour)
         percentageAnnualized: avgFunding * 3 * 365 * 100 // 3 times per day * 365 days
       }
@@ -302,6 +341,9 @@ async function fetchFundingRates() {
         value: 0.01,
         btc: 0.01,
         eth: 0.01,
+        sol: 0.01,
+        xrp: 0.01,
+        byAsset: { BTC: 0.01, ETH: 0.01, SOL: 0.01, XRP: 0.01 },
         percentageAnnualized: 10.95
       }
     };
