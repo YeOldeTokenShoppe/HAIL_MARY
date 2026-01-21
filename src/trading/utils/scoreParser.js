@@ -195,8 +195,8 @@ function createFallbackOutput(agentId, response, metadata = {}) {
     createAssetScore(asset, 0, 0.3, 'Fallback neutral score - parsing failed')
   );
 
-  // Use the response as text if no scores were parsed
-  const textResponse = response?.trim() || `${agentId} analysis pending.`;
+  // Strip <scores> tags even in fallback mode - don't show raw JSON to users
+  const textResponse = extractTextResponse(response) || `${agentId} analysis pending.`;
 
   return createAnalystScoreOutput(
     agentId,

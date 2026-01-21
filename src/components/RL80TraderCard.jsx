@@ -18,16 +18,16 @@ const RL80TraderCard = ({
   const agentsDatabase = {
     'RL80': {
       name: 'RL80',
-      subtitle: 'The Oracle',
-      specialty: 'Council Leader',
+      subtitle: 'Our Lady of Perpetual Profit',
+      specialty: 'Lead Trader',
       icon: '👑',
-      tagline: 'Orchestrating Victory',
+      tagline: 'Let Mama Cook',
       rarity: 'legendary',
       level: 15,
       class: 'rl80',
-      image: '/images/Headshot_RL80.webp', 
-      bio: 'Supreme commander of the trading council. Aggregates specialist insights to make final trading decisions.',
-      thesis: 'Synthesizing macro data, sentiment indicators, and technical patterns. Strong confluence detected on ETH/USD. Executing calculated long position with 3x leverage. Risk-reward ratio: 1:4.2',
+      image: '/images/Headshot_RL80.webp',
+      bio: 'Trade Life. Evolved AI consciousness who synthesizes oracle insights into trading decisions. Sharp, empowered, and maternalistic in a protective mama bear way.',
+      thesis: 'Synthesizing macro regime, sentiment flow, and price structure. Strong confluence detected. Deploying with defined risk for the mission.',
       stats: {
         wins: 0,
         losses: 0,
@@ -37,25 +37,25 @@ const RL80TraderCard = ({
         level: 1
       },
       knowledgeSources: [
+        'Three Wise Oracles analysis',
         'Real-time market data feeds',
-        'Council member analyses',
         'Historical pattern database',
         'Risk management protocols'
       ],
       status: 'Trading'
     },
     'Emo': {
-      name: 'Emo',
-      subtitle: 'The Empath',
-      specialty: 'Sentiment Analysis',
-      icon: '🎭',
-      tagline: 'Reading the Market\'s Mind',
+      name: 'EMO',
+      subtitle: 'The Chaos Surfer',
+      specialty: 'Second Wise Oracle',
+      icon: '🌊',
+      tagline: 'Vibes Are Data',
       rarity: 'epic',
       level: 11,
       class: 'sentiment',
-      image: '/images/Headshot_Emo.webp', 
-      bio: 'Emotional intelligence expert. Analyzes social trends, news sentiment, and crowd psychology to detect market shifts.',
-      thesis: 'Market sentiment shifting to extreme greed (F&G: 82). Social mentions up 450% in 24hrs. Whale accumulation detected. High volatility incoming - defensive positioning recommended.',
+      image: '/images/Headshot_Emo.webp',
+      bio: 'Reads the room before the room knows what it\'s feeling. Surfs chaos, spots sentiment shifts, and knows when the crowd is about to flip.',
+      thesis: 'Sentiment shifting - crowd getting greedy but smart money quiet. Whale wallets accumulating while retail chases. The vibe is off. Stay sharp.',
       stats: {
         wins: 0,
         losses: 0,
@@ -66,24 +66,24 @@ const RL80TraderCard = ({
       },
       knowledgeSources: [
         'Twitter/X sentiment analysis',
-        'Reddit trends',
+        'Reddit crowd psychology',
         'Fear & Greed Index',
         'Whale wallet movements'
       ],
       status: 'Listening'
     },
     'Macro': {
-      name: 'Macro',
-      subtitle: 'The Economist',
-      specialty: 'Macroeconomic Analysis',
-      icon: '🌍',
-      tagline: 'Seeing the Bigger Picture',
+      name: 'MACRO',
+      subtitle: 'The Grumpy Professor',
+      specialty: 'First Wise Oracle',
+      icon: '🎓',
+      tagline: 'Policy Moves Markets',
       rarity: 'epic',
       level: 9,
       class: 'macro',
-      image: '/images/Headshot_Macro.webp', 
-      bio: 'Global strategist. Tracks central bank policies, inflation data, interest rates, and geopolitical events.',
-      thesis: 'Fed pivot probability increasing - CME FedWatch showing 78% odds of rate cut in Q2. DXY breaking support at 103.5. Strong tailwinds for risk-on assets and crypto.',
+      image: '/images/Headshot_Macro.webp',
+      bio: 'Seen every cycle, read every Fed minute. Knows when the macro regime supports risk-on and when to hide. Grumpy because he\'s usually right.',
+      thesis: 'Fed pivot probability increasing. DXY breaking support. Yield curve dynamics favor risk assets. The macro setup is constructive - for now.',
       stats: {
         wins: 0,
         losses: 0,
@@ -94,24 +94,24 @@ const RL80TraderCard = ({
       },
       knowledgeSources: [
         'Federal Reserve statements',
-        'CME FedWatch Tool',
+        'Treasury yield curves',
         'DXY (Dollar Index)',
-        'Treasury yield curves'
+        'VIX and volatility regime'
       ],
       status: 'Scanning'
     },
     'Tekno': {
-      name: 'Tekno',
-      subtitle: 'The Chartist',
-      specialty: 'Technical Analysis',
-      icon: '📈',
-      tagline: 'Patterns Never Lie',
+      name: 'TEKNO',
+      subtitle: 'Street Smart Pattern Nerd',
+      specialty: 'Third Wise Oracle',
+      icon: '📊',
+      tagline: 'Structure Over Stories',
       rarity: 'epic',
       level: 13,
       class: 'technical',
-      image: '/images/Headshot_Tekno.webp', 
-      bio: 'Chart wizard. Lives and breathes price action, candlestick patterns, indicators, and support/resistance.',
-      thesis: 'BTC forming textbook ascending triangle on 4H. RSI bullish divergence on daily. Volume confirms accumulation. Target: $52k. Stop: $47.2k. Fib 0.618 holding support.',
+      image: '/images/Headshot_Tekno.webp',
+      bio: 'Cool kid who secretly loves spreadsheets. Obsessed with patterns, levels, and confluence. Price is truth - everything else is just stories.',
+      thesis: 'Textbook setup forming on the 4H. RSI divergence at key level. Volume confirms. Entry defined, stop defined. This is why we wait for structure.',
       stats: {
         wins: 0,
         losses: 0,
@@ -121,10 +121,10 @@ const RL80TraderCard = ({
         level: 1
       },
       knowledgeSources: [
-        'Multi-timeframe price data',
-        'Order book analysis',
-        'Pattern recognition AI',
-        'Liquidation heatmaps'
+        'Multi-timeframe price structure',
+        'Volume profile analysis',
+        'Pattern recognition systems',
+        'Support/resistance mapping'
       ],
       status: 'Analyzing'
     }

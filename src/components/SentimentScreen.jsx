@@ -459,8 +459,24 @@ const drawNewsHeadlines = (ctx, news, y, time) => {
     }
   }
 
+  // Filter out generic/low-value headlines
+  const lowValuePatterns = [
+    /here'?s what happened/i,
+    /this week in crypto/i,
+    /daily (roundup|recap|digest)/i,
+    /what you need to know/i,
+    /^crypto news:/i,
+    /weekly (roundup|recap|wrap)/i,
+    /morning (brief|update)/i,
+    /evening (brief|update)/i,
+    /^today in crypto/i,
+    /newsletter/i
+  ]
+
   // Filter headlines based on current filter
-  let filteredHeadlines = news.headlines
+  let filteredHeadlines = news.headlines.filter(h =>
+    !lowValuePatterns.some(pattern => pattern.test(h.title))
+  )
   if (currentFilter !== 'all') {
     const assetKeywords = {
       BTC: ['bitcoin', 'btc', 'satoshi'],

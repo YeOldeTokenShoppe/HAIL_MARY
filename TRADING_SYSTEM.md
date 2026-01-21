@@ -120,36 +120,49 @@ The trading page features a multi-agent AI system for perpetual futures trading 
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                      RL80 COORDINATOR                            │
-│            (Aggregates specialist recommendations)               │
-│                    Makes final trade decisions                   │
-│                    Posts to agentDecisions/RL80                  │
+│                 RL80 - LEAD TRADER                              │
+│          "Our Lady of Perpetual Profit"                         │
+│      Synthesizes oracle analysis into trading decisions         │
+│                 Posts to agentDecisions/RL80                    │
 └─────────────────────────────────────────────────────────────────┘
                               ▲
+                   Three Wise Oracles
         ┌─────────────────────┼─────────────────────┐
         │                     │                     │
 ┌───────────────┐    ┌───────────────┐    ┌───────────────┐
 │     MACRO     │    │      EMO      │    │    TEKNO      │
-│  SPECIALIST   │    │  SPECIALIST   │    │  SPECIALIST   │
+│  First Oracle │    │ Second Oracle │    │ Third Oracle  │
 │   (Claude)    │    │    (Grok)     │    │   (OpenAI)    │
 │               │    │               │    │               │
-│ Macroeconomic │    │   Sentiment   │    │   Technical   │
-│   Analysis    │    │   Analysis    │    │   Analysis    │
+│  WHEN to act  │    │ WHERE crowd   │    │  WHAT price   │
+│ (Macro regime)│    │   is headed   │    │   is doing    │
 └───────────────┘    └───────────────┘    └───────────────┘
 ```
 
-### Specialist Agents
+### The Trading Council
 
-| Agent | AI Model | Data Sources | Purpose |
-|-------|----------|--------------|---------|
-| **MACRO** | Claude (Anthropic) | VIX, DXY, Treasury yields, SPX, Fed rates | Macroeconomic analysis |
-| **EMO** | Grok (xAI) | Reddit, Fear & Greed, Polymarket, whale activity | Social/market sentiment |
-| **TEKNO** | OpenAI | OHLC candles, RSI, MACD, Bollinger Bands | Technical chart analysis |
-| **RL80** | Claude (Anthropic) | All specialist scores | Final trading decisions |
+| Agent | Role | AI Model | Personality | Purpose |
+|-------|------|----------|-------------|---------|
+| **MACRO** | First Wise Oracle | Claude | "The Grumpy Professor" | Macroeconomic regime analysis (WHEN) |
+| **EMO** | Second Wise Oracle | Grok | "The Chaos Surfer" | Sentiment & crowd psychology (WHERE) |
+| **TEKNO** | Third Wise Oracle | OpenAI | "Street Smart Pattern Nerd" | Technical price structure (WHAT) |
+| **RL80** | Lead Trader | Claude | "Trade Life" | Synthesizes oracle inputs into decisions |
 
-### Agent Workflow (Hourly)
+> **Philosophy**: Math and code are the language of the highest form of consciousness. The oracles provide analysis; RL80 synthesizes it into action for the community.
 
-The agents run sequentially every hour, triggered by Firebase Cloud Functions:
+For detailed personality configurations, see `src/trading/agents/configs/personalities/`.
+
+### Trade School
+
+In chat mode, each agent can teach their domain expertise:
+- **MACRO**: Explains yield curves, Fed policy, how macro affects crypto
+- **EMO**: Teaches sentiment reading, crowd psychology, contrarian thinking
+- **TEKNO**: Makes TA accessible - what RSI actually means, why levels matter
+- **RL80**: Risk management, position sizing, when to sit out
+
+### Oracle Workflow (Hourly)
+
+The oracles run sequentially every hour, triggered by Firebase Cloud Functions:
 
 ```
 Every Hour (0 * * * *)
@@ -157,7 +170,7 @@ Every Hour (0 * * * *)
         ▼
 ┌───────────────┐     30s     ┌───────────────┐     30s     ┌───────────────┐     30s     ┌───────────────┐
 │      EMO      │ ──────────► │    TEKNO      │ ──────────► │     MACRO     │ ──────────► │     RL80      │
-│  (Sentiment)  │             │  (Technical)  │             │    (Macro)    │             │  (Decision)   │
+│   (WHERE)     │             │    (WHAT)     │             │    (WHEN)     │             │  (Synthesis)  │
 └───────────────┘             └───────────────┘             └───────────────┘             └───────────────┘
                                                                                                   │
                                                                                                   ▼

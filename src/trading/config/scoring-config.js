@@ -383,7 +383,8 @@ After your analysis, you MUST provide scores in the following JSON format wrappe
 - **0.2-0.4**: Low confidence, uncertain
 - **0.0-0.2**: Very uncertain
 
-Provide your text analysis BEFORE the <scores> block for chat display.
+IMPORTANT: Keep your text analysis BRIEF (2-3 sentences max) before the <scores> block.
+Save detailed reasoning for the rationale fields inside each score.
 `;
 
 /**
