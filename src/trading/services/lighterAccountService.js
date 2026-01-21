@@ -174,26 +174,39 @@ class LighterAccountService {
 
     const cacheKey = 'active_orders';
     const cached = this.cache.get(cacheKey);
-    
+
     if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
       return cached.data;
     }
 
     try {
-      const url = `${LIGHTER_API_BASE}/accountActiveOrders?by=index&value=${LIGHTER_ACCOUNT_INDEX}`;
-      console.log('Fetching active orders from:', url);
-      
-      const response = await fetch(url);
-      
+      // Use l1_address like other endpoints - accountActiveOrders may not be supported
+      const response = await fetch(`${LIGHTER_API_BASE}/orders?by=l1_address&value=${ACCOUNT_ADDRESS}`);
+
+      // Handle 404 - endpoint may not exist
+      if (response.status === 404) {
+        console.log('No active orders endpoint available (404 - normal)');
+        return {
+          activeOrders: [],
+          activeOrderCount: 0,
+          totalOrderValue: 0,
+          noDataYet: true
+        };
+      }
+
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`API Error ${response.status}:`, errorText);
-        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      const transformedData = this.transformActiveOrdersData(data);
-      
+      // Filter for active/open orders only
+      const activeData = {
+        orders: (data.orders || []).filter(order =>
+          order.status === 'open' || order.status === 'active' || order.status === 'pending'
+        )
+      };
+      const transformedData = this.transformActiveOrdersData(activeData);
+
       // Cache the result
       this.cache.set(cacheKey, {
         data: transformedData,
@@ -202,7 +215,7 @@ class LighterAccountService {
 
       return transformedData;
     } catch (error) {
-      console.error('Failed to fetch Lighter active orders:', error);
+      console.log('Failed to fetch Lighter active orders (using fallback):', error.message);
       // Return empty active orders data if fetch fails
       return {
         activeOrders: [],

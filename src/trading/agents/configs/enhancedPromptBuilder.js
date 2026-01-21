@@ -73,12 +73,15 @@ ${teamContextSection}
 
 ${responseConstraints}
 
+## RESPONSE FORMAT (CRITICAL)
+${getResponseFormatGuidance(agentName)}
+
 ## RESPONSE REQUIREMENTS
 - Respond as ${agentName} would, staying completely in character
 - Use your specific vocabulary and communication style
-- Keep response length appropriate for your character
+- Keep response to 35-55 words (approximately 200-280 characters)
 - Focus on your area of expertise
-- Consider current market conditions in your analysis`;
+- Include specific numbers (prices, percentages, levels) when available`;
 
   return {
     systemPrompt: fullPrompt,
@@ -140,11 +143,14 @@ ${adaptationSection}
 
 ${teamContextSection}
 
+## RESPONSE FORMAT (CRITICAL)
+${getResponseFormatGuidance(agentName)}
+
 ## RESPONSE REQUIREMENTS
 - Respond as ${agentName} would, staying completely in character
 - Use your specific vocabulary and communication style
-- Focus on your area of expertise
-- Consider current market conditions in your analysis
+- Keep your text analysis to 35-55 words (~200-280 characters)
+- Include specific numbers (prices, percentages, levels)
 - IMPORTANT: You MUST provide scores for all assets in your analysis
 
 ${SCORING_PROMPT_TEMPLATE}`;
@@ -212,8 +218,8 @@ function buildScoringUserPrompt(agentName, context, teamMessages) {
   }
 
   prompt += `\n**Required Assets to Score:** ${ASSETS.join(', ')}\n`;
-  prompt += `\nProvide your analysis in character, then include your scores in <scores> tags as shown in the system prompt.`;
-  prompt += `\nYour text analysis will be shown to users, so make it engaging and insightful.`;
+  prompt += `\nProvide your analysis in character (35-55 words), then include your scores in <scores> tags.`;
+  prompt += `\nYour text will be shown to users - be specific with numbers, start with "I'm seeing/watching/reading..."`;
 
   return prompt;
 }
@@ -639,14 +645,49 @@ function getTemperatureForAgent(agentName, marketData) {
 }
 
 function getMaxTokensForAgent(agentName) {
-  // Token limits for chat mode - keeps responses to ~2-3 sentences
+  // Token limits for chat mode - targets 35-55 words (~200-280 chars)
   // Scoring mode uses getMaxTokensForScoringAgent() which allows more for JSON
   return {
-    EMO: 100,
-    TEKNO: 100,
-    MACRO: 120,
-    RL80: 100
-  }[agentName] || 100;
+    EMO: 85,
+    TEKNO: 85,
+    MACRO: 90,
+    RL80: 95
+  }[agentName] || 85;
+}
+
+/**
+ * Get role-aware response format guidance
+ * Oracles (EMO, TEKNO, MACRO) report analysis to RL80
+ * RL80 is the trader who synthesizes and executes
+ */
+function getResponseFormatGuidance(agentName) {
+  if (agentName === 'RL80') {
+    // RL80 is the trader - she executes trades
+    return `You ARE the trader. You execute trades based on oracle analysis.
+START with action: "I'm [holding/adding/closing/watching] [asset]..."
+INCLUDE: Your position, oracle synthesis, specific risk levels (stops, targets)
+EXAMPLE: "I'm holding my ETH-PERP long as the oracles lean bullish - TEKNO confirms support at $3,400, EMO sees squeeze potential. Stops at $3,200, targeting $3,800."`;
+  }
+
+  // Oracles report their domain analysis to RL80
+  const oracleGuidance = {
+    EMO: `You are an ORACLE reporting sentiment analysis to RL80 (the trader).
+START with observation: "I'm seeing..." or "I'm reading..." or "Sentiment shows..."
+INCLUDE: Specific F&G number, funding rates, crowd positioning, your directional read
+EXAMPLE: "I'm seeing fear at F&G 32 with negative funding suggesting shorts are stacking - not extreme yet, but squeeze potential is building if we dip to sub-25 territory."`,
+
+    TEKNO: `You are an ORACLE reporting technical analysis to RL80 (the trader).
+START with observation: "I'm watching..." or "Structure shows..." or "I'm seeing..."
+INCLUDE: Specific price levels, support/resistance, indicators (RSI, etc.), your directional read
+EXAMPLE: "I'm watching BTC hold $95k support with RSI neutral at 48 - need a break above $98k to confirm continuation, range-bound until then favors patience."`,
+
+    MACRO: `You are an ORACLE reporting macro analysis to RL80 (the trader).
+START with observation: "I'm reading..." or "Macro shows..." or "I'm seeing..."
+INCLUDE: Specific DXY, VIX, yields, policy context, your regime assessment
+EXAMPLE: "I'm reading the macro as cautious risk-off with DXY at 104.5 and VIX elevated at 23 - yields still pressuring risk assets, patience favored until Fed signals clearly."`
+  };
+
+  return oracleGuidance[agentName] || 'Provide clear, specific analysis with data points.';
 }
 
 // ============================================================================

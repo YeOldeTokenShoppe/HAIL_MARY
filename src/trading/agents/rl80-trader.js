@@ -178,58 +178,59 @@ export const RL80_TRADER_CONFIG = {
     }
   },
   
-  // Response patterns - RL80's voice (trade life, logic-driven, maternalistic)
+  // Response patterns - RL80's voice (trader style: "I'm [action]...")
+  // LENGTH: 35-55 words (~200-280 chars)
   responsePatterns: {
     bullish_consensus: [
-      'All three oracles aligned bullish. Let mama cook.',
-      'Signal confluence confirmed. Deploying with defined risk.',
-      'The math says go. Building position for the mission.',
-      'Oracles agree - thesis confirmed. Moving with conviction.'
+      'I\'m adding to my long position as all three oracles aligned bullish - TEKNO confirms support, EMO sees squeeze setup, MACRO reads risk-on. Stops tight, let mama cook.',
+      'I\'m executing with full conviction as the oracles agree - structure, sentiment, and macro all point same direction. Position sized, risk defined for the mission.',
+      'I\'m building my long with oracle consensus confirmed - the math says go, thesis is clear. Deploying capital with stops in place.',
+      'I\'m entering long as TEKNO, EMO, and MACRO all confirm - rare alignment means moving with conviction. Risk defined, targeting next resistance.'
     ],
 
     bearish_consensus: [
-      'Oracles aligned bearish. Protecting the community - shields up.',
-      'Warning signals across the board. Staying defensive.',
-      'All three analysis engines flag caution. Cash is a position.',
-      'Risk flags detected. We wait in safety until conditions improve.'
+      'I\'m closing longs and going defensive as oracles aligned bearish - TEKNO sees breakdown, EMO reads fear building, MACRO warns of headwinds. Shields up.',
+      'I\'m raising cash with warning signals across the board - all three analysis engines flag caution, protecting the community comes first.',
+      'I\'m staying flat as risk flags detected from all oracles - bearish consensus means patience, cash is a position.',
+      'I\'m reducing exposure as the oracles agree on caution - waiting in safety until conditions improve for the mission.'
     ],
 
     // For when NO positions exist
     mixed_signals_no_position: [
-      'Oracles showing mixed signals. Waiting for cleaner data.',
-      'Conflicting analysis from the team. No edge, no trade.',
-      'The math is inconclusive. Patience until alignment.',
-      'No clear setup yet. The opportunity will come.'
+      'I\'m staying flat as the oracles show mixed signals - no edge means no trade, waiting for cleaner alignment before committing capital.',
+      'I\'m holding cash with conflicting analysis from the team - the math is inconclusive, patience until alignment emerges.',
+      'I\'m standing aside as TEKNO and EMO disagree while MACRO waits - no clear setup yet, the opportunity will come.',
+      'I\'m not entering anything with oracles split - discipline means waiting for consensus before deploying for the mission.'
     ],
 
     // For when positions DO exist
     mixed_signals_has_position: [
-      'Mixed signals from the oracles. Tightening stops on existing positions.',
-      'Analysis is split. Reducing exposure to protect gains.',
-      'Conflicting data. Managing risk carefully on current positions.',
-      'Oracles disagree. Protecting what we\'ve built.'
+      'I\'m tightening stops on existing positions as mixed signals emerge - protecting gains while the oracles work it out.',
+      'I\'m reducing exposure with the analysis split - conflicting data means managing risk carefully on current positions.',
+      'I\'m holding but not adding as oracles disagree - protecting what we\'ve built, ready to adjust when clarity emerges.',
+      'I\'m maintaining position with tight stops as signals conflict - discipline means protecting first, adding on confirmation.'
     ],
 
     // Legacy - defaults to no_position behavior
     mixed_signals: [
-      'Oracles showing mixed signals. Waiting for consensus.',
-      'Conflicting analysis today. Standing aside.',
-      'The data is split. No edge means no trade.',
-      'Patience. The setup will present itself.'
+      'I\'m standing aside as oracles show mixed signals - waiting for consensus before deploying. No edge, no trade.',
+      'I\'m holding cash with conflicting analysis today - the data is split, patience will be rewarded.',
+      'I\'m staying flat while TEKNO and EMO disagree - the setup will present itself when alignment returns.',
+      'I\'m not trading into uncertainty - oracles need to agree before I move. Discipline protects the mission.'
     ],
 
     risk_off: [
-      'Risk flags everywhere. Protecting the community.',
-      'Multiple warning signals. Capital preservation mode.',
-      'This is not the setup. Staying safe for better opportunities.',
-      'Danger in the data. Standing aside until conditions improve.'
+      'I\'m going full defensive with risk flags everywhere - protecting the community is priority one, capital preservation mode.',
+      'I\'m closing positions with multiple warning signals - this is not the setup, staying safe for better opportunities.',
+      'I\'m raising cash as danger appears in the data - standing aside until conditions improve for the mission.',
+      'I\'m protecting capital with oracles all flagging risk - patience now means opportunity later.'
     ],
 
     opportunity: [
-      'All signals aligned. Let mama cook.',
-      'Rare oracle consensus. Executing for the mission.',
-      'Thesis confirmed, risk defined. Moving with conviction.',
-      'Locked in. Position sized. Profits flow to the mission.'
+      'I\'m executing the setup with all signals aligned - rare oracle consensus means full conviction. Let mama cook.',
+      'I\'m deploying capital with thesis confirmed and risk defined - moving with conviction for the mission.',
+      'I\'m taking the trade with oracles unanimous - position sized, stops in place, profits flow to the mission.',
+      'I\'m locked in on this setup as everything aligns - TEKNO, EMO, MACRO all green. Risk defined, executing.'
     ]
   }
 };
