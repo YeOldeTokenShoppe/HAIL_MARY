@@ -491,24 +491,16 @@ const drawNewsHeadlines = (ctx, news, y, time) => {
     ctx.arc(28, yPos - 3, 3, 0, Math.PI * 2)
     ctx.fill()
 
-    // Truncate headline text
+    // Truncate headline text - using 8px font allows ~80 chars
     let title = headline.title || 'Unknown headline'
-    const maxLength = 58
+    const maxLength = 78
     if (title.length > maxLength) {
       title = title.substring(0, maxLength) + '..'
     }
 
     ctx.fillStyle = '#ffffff'
-    ctx.font = '9px monospace'
+    ctx.font = '8px monospace'
     ctx.fillText(title, 38, yPos)
-
-    // Source on the right (abbreviated)
-    if (headline.source) {
-      ctx.fillStyle = 'rgba(147, 51, 234, 0.5)'
-      ctx.font = '7px monospace'
-      const shortSource = headline.source.substring(0, 10)
-      ctx.fillText(shortSource, 480 - ctx.measureText(shortSource).width, yPos)
-    }
   })
 
   // Fill empty slots with subtle lines
