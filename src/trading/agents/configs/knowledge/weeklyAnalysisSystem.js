@@ -8,6 +8,16 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, collection, addDoc, query, orderBy, limit, getDocs, where } from 'firebase/firestore';
 
+// Firebase configuration
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+};
+
 // ============================================================================
 // TRANSCRIPT PROCESSING SYSTEM
 // ============================================================================
@@ -262,8 +272,8 @@ async function storeAnalysisInFirebase(agentInsights, source) {
       const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
       db = getFirestore(app);
     } catch (error) {
-      console.error('Firebase not available for storing analysis');
-      return;
+      console.error('Firebase not available for storing analysis:', error);
+      throw new Error('Firebase initialization failed: ' + error.message);
     }
 
     // Store each agent's insights

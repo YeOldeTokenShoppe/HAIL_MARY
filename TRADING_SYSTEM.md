@@ -65,9 +65,10 @@ Here's how a trade flows through the entire system:
 │                                                                             │
 │  STEP 1: DATA COLLECTION (Railway Service - Continuous)                     │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │  CoinGecko ──► Market Prices ──► Firestore (marketData/latest)      │   │
-│  │  Binance ────► Whale Activity ─► Firestore (sentimentData/latest)   │   │
-│  │  Alternative ► Fear & Greed ──► Firestore (agentContext/market)     │   │
+│  │  CoinGecko ──► Market Prices + Technical ──► marketData/latest      │   │
+│  │  FRED ───────► VIX, DXY, Treasury ────────► macroData/latest        │   │
+│  │  AlphaVantage► SPY ───────────────────────► macroData/latest        │   │
+│  │  Alternative ► Fear & Greed ──────────────► agentContext/market     │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                    │                                        │
 │                                    ▼                                        │
@@ -211,11 +212,12 @@ Every Hour (0 * * * *)
 
 | Data Type | Interval | Firestore Location | Source |
 |-----------|----------|-------------------|--------|
-| Market Prices (BTC/ETH) | 60 seconds | `marketData/latest` | CoinGecko |
+| Market Prices (BTC/ETH/SOL/XRP) | 5 minutes | `marketData/latest` | CoinGecko (batched) |
+| Technical Data (Charts + Indicators) | 5 minutes | `technicalData/latest` | CoinGecko sparkline |
 | Agent Context (Fear & Greed) | 120 seconds | `agentContext/market` | Alternative.me |
 | Lighter Trading Data | 20 minutes | `lighterData/*` | Lighter DEX API |
-| Sentiment Data | 30 minutes | `sentimentData/latest` | Reddit, Polymarket, Binance |
-| Technical OHLC Data | 60 seconds | `technicalData/latest` | CoinGecko |
+| Sentiment Data | 12 hours | `sentimentData/latest` | Reddit, Polymarket, CryptoPanic |
+| Macro Data (VIX, DXY, SPY, Treasury) | 4 hours | `macroData/latest` | FRED, Alpha Vantage |
 | Service Health | 5 minutes | `serviceStatus/lighterService` | Internal |
 
 #### Trade Execution (Real-time)
@@ -287,11 +289,12 @@ agentChatManager.stop()                     // Stop workflow
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  DATA COLLECTION:                                                           │
-│  CoinGecko ──────► Market Data      ──► every 60s  ──► marketData/latest   │
+│  CoinGecko ──────► Market + Technical ► every 5min ──► marketData/latest   │
+│              └───► Sparkline Charts ──► every 5min ──► technicalData/latest│
 │  Alternative.me ─► Agent Context    ──► every 120s ──► agentContext/market │
 │  Lighter DEX ────► Trading Data     ──► every 20m  ──► lighterData/*       │
-│  Reddit/Binance ─► Sentiment Data   ──► every 30m  ──► sentimentData/latest│
-│  CoinGecko ──────► Technical OHLC   ──► every 60s  ──► technicalData/latest│
+│  Reddit/Polymarket► Sentiment Data  ──► every 12hr ──► sentimentData/latest│
+│  FRED/AlphaVantage► Macro Data      ──► every 4hr  ──► macroData/latest    │
 │                                                                             │
 │  TRADE EXECUTION:                                                           │
 │  agentDecisions/RL80 ◄── onSnapshot ◄── Validates ──► Lighter DEX          │
@@ -332,10 +335,10 @@ agentChatManager.stop()                     // Stop workflow
 
 | Collection | Document | Description | Updated By |
 |------------|----------|-------------|------------|
-| `marketData` | `latest` | BTC/ETH prices, 24h changes | Railway (60s) |
+| `marketData` | `latest` | BTC/ETH/SOL/XRP prices, 24h changes, volume | Railway (5min) |
 | `agentContext` | `market` | Fear & Greed, funding rate, VIX, trend | Railway (120s) |
-| `sentimentData` | `latest` | Trending topics, Polymarket, whale activity | Railway (12hr) |
-| `technicalData` | `latest` | OHLC candles, RSI, MACD, Bollinger Bands | Railway (60s) |
+| `sentimentData` | `latest` | Trending topics, Polymarket, news headlines | Railway (12hr) |
+| `technicalData` | `latest` | Sparkline candles, RSI, MACD, EMA, Bollinger Bands | Railway (5min) |
 | `macroData` | `latest` | VIX, DXY, SPX, 10Y Treasury, funding rates, OI | Railway (4hr) |
 | `lighterData` | `account` | Lighter account balance | Railway (20m) |
 | `lighterData` | `trading` | Positions and orders | Railway (20m) |
@@ -355,15 +358,14 @@ The Railway background service fetches data from external APIs at varying interv
 
 | Data Type | Interval | APIs Used | Notes |
 |-----------|----------|-----------|-------|
-| Market prices (BTC/ETH) | 60s | CoinGecko | Crypto volatility needs frequent updates |
-| Technical OHLC | 60s | CoinGecko | Chart data for TeknoScreen |
+| Market prices + Technical data | 5 min | CoinGecko `/coins/markets` | Single batched call with 7-day sparkline |
 | Agent context (F&G) | 120s | Alternative.me | Fear & Greed index |
 | Lighter trading data | 20 min | Lighter DEX | Account balance, positions, orders |
-| Sentiment data | 12 hr | Reddit, CoinGecko, Polymarket, Binance | Twice daily social/news updates |
-| Macro data | 4 hr | Yahoo Finance, Lighter DEX | VIX, DXY, SPX, Treasury, funding, OI |
+| Sentiment data | 12 hr | Reddit, Polymarket, CryptoPanic | Twice daily social/news updates |
+| Macro data | 4 hr | FRED, Alpha Vantage | VIX, DXY, SPY, 10Y Treasury |
 | Service health | 5 min | Internal | Status heartbeat |
 
-**Rate Limiting:** CoinGecko calls use a built-in `RateLimiter` class (2s minimum between calls) to avoid hitting free tier limits.
+**Rate Limiting:** API calls use a built-in `RateLimiter` class (8s minimum between calls) to avoid hitting free tier limits. Market data is batched into a single call per interval.
 
 ---
 
@@ -373,7 +375,7 @@ The `/trade` page displays 4 animated agent screens. All screens read data direc
 
 | Screen | Component | Data Source | What It Displays |
 |--------|-----------|-------------|------------------|
-| **EMO** | `SentimentScreen.jsx` | `sentimentData/latest` | Fear & Greed, trending topics, Polymarket, whale activity, Google Trends, app rankings |
+| **EMO** | `SentimentScreen.jsx` | `sentimentData/latest` | Fear & Greed, trending topics, Polymarket, news headlines, Google Trends |
 | **TEKNO** | `TeknoScreen.jsx` | `technicalData/latest` | Live candlestick chart, RSI, MACD, Bollinger Bands, support/resistance, trading signals |
 | **MACRO** | `MacroAgentScreen.jsx` | `macroData/latest` | VIX, DXY, 10Y Treasury, S&P 500, funding rates, open interest |
 | **RL80** | `RL80Screen.jsx` | Multiple collections | Council scores, decision matrix, performance metrics, trade history |
@@ -428,6 +430,10 @@ ANTHROPIC_API_KEY=          # For Claude (Macro, RL80)
 OPENAI_API_KEY=             # For OpenAI (Tekno)
 GROK_API_KEY=               # For Grok (Emo) - via api.x.ai
 
+# Macro Data APIs (free tiers)
+FRED_API_KEY=               # Free from fred.stlouisfed.org
+ALPHAVANTAGE_API_KEY=       # Free from alphavantage.co
+
 # Lighter DEX (testnet)
 LIGHTER_API_KEY=
 LIGHTER_WALLET_PRIVATE_KEY=
@@ -464,6 +470,10 @@ FIREBASE_PRIVATE_KEY_BASE64=  # Base64 encoded private key
 FIREBASE_CLIENT_EMAIL=
 FIREBASE_PRIVATE_KEY_ID=
 FIREBASE_CLIENT_ID=
+
+# Macro Data APIs (free tiers)
+FRED_API_KEY=                 # Get free key at fred.stlouisfed.org
+ALPHAVANTAGE_API_KEY=         # Get free key at alphavantage.co
 
 # Lighter DEX
 LIGHTER_API_KEY=              # 80-character API key
@@ -825,31 +835,30 @@ TTL policies only work with the `expireAt` field (not `timestamp` or `createdAt`
 │  RAILWAY SERVICE (services/lighter-background-service-standalone.js)        │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │                                                                      │   │
-│  │  MARKET DATA:                                                        │   │
-│  │  ├─ CoinGecko API ────────────────── every 60s                      │   │
-│  │  │  └─ /api/v3/simple/price (BTC, ETH prices)                       │   │
-│  │  │  └─ /api/v3/coins/{id}/ohlc (OHLC candles)                       │   │
+│  │  MARKET DATA (Single batched call every 5 min):                      │   │
+│  │  ├─ CoinGecko API ────────────────── every 5min                     │   │
+│  │  │  └─ /api/v3/coins/markets (BTC, ETH, SOL, XRP)                   │   │
+│  │  │     - prices, 24h change, high/low, volume, market cap           │   │
+│  │  │     - 7-day sparkline (converted to OHLC-like candles)           │   │
+│  │  │     - Technical indicators calculated: RSI, EMA, MACD, Bollinger │   │
 │  │  │                                                                   │   │
 │  │  SENTIMENT DATA:                                                     │   │
 │  │  ├─ Alternative.me ───────────────── every 120s                     │   │
 │  │  │  └─ /fng/ (Fear & Greed Index)                                   │   │
 │  │  │                                                                   │   │
-│  │  ├─ Reddit API ───────────────────── every 30min                    │   │
+│  │  ├─ Reddit API ───────────────────── every 12hr                     │   │
 │  │  │  └─ /r/bitcoin/hot.json                                          │   │
 │  │  │  └─ /r/ethereum/hot.json                                         │   │
 │  │  │  └─ /r/cryptocurrency/hot.json                                   │   │
 │  │  │                                                                   │   │
-│  │  ├─ Polymarket API ───────────────── every 30min                    │   │
+│  │  ├─ Polymarket API ───────────────── every 12hr                     │   │
 │  │  │  └─ /markets (crypto prediction markets)                         │   │
 │  │  │                                                                   │   │
-│  │  ├─ Binance Futures API ──────────── every 30min                    │   │
-│  │  │  └─ /fapi/v1/trades (whale activity detection)                   │   │
+│  │  ├─ CryptoPanic API ──────────────── every 12hr                     │   │
+│  │  │  └─ /posts/ (crypto news headlines via RSS)                      │   │
 │  │  │                                                                   │   │
-│  │  ├─ Google Trends ────────────────── every 30min                    │   │
+│  │  ├─ Google Trends ────────────────── every 12hr                     │   │
 │  │  │  └─ interestOverTime (Bitcoin search interest)                   │   │
-│  │  │                                                                   │   │
-│  │  ├─ App Store Scraper ────────────── every 30min                    │   │
-│  │  │  └─ Coinbase, Binance, MetaMask ratings                          │   │
 │  │  │                                                                   │   │
 │  │  LIGHTER DEX:                                                        │   │
 │  │  ├─ Lighter Testnet API ──────────── every 20min + on trade         │   │
@@ -857,9 +866,13 @@ TTL policies only work with the `expireAt` field (not `timestamp` or `createdAt`
 │  │  │  └─ /api/v1/transaction/send_tx (order execution)                │   │
 │  │  │                                                                   │   │
 │  │  MACRO DATA:                                                         │   │
-│  │  └─ Yahoo Finance ────────────────── every 120s                     │   │
-│  │     └─ ^TNX (Treasury yields)                                        │   │
-│  │     └─ ^VIX (Volatility index)                                       │   │
+│  │  ├─ FRED API ─────────────────────── every 4hr                      │   │
+│  │  │  └─ VIXCLS (VIX volatility index)                                │   │
+│  │  │  └─ DTWEXBGS (DXY dollar index)                                  │   │
+│  │  │  └─ DGS10 (10-Year Treasury yield)                               │   │
+│  │  │                                                                   │   │
+│  │  └─ Alpha Vantage API ────────────── every 4hr                      │   │
+│  │     └─ GLOBAL_QUOTE (SPY stock price)                               │   │
 │  │                                                                      │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                             │
@@ -895,16 +908,15 @@ TTL policies only work with the `expireAt` field (not `timestamp` or `createdAt`
 
 | Service | API | Endpoint | Frequency | Purpose | Auth Required |
 |---------|-----|----------|-----------|---------|---------------|
-| **Railway** | CoinGecko | `/api/v3/simple/price` | 60s | BTC/ETH prices | No |
-| **Railway** | CoinGecko | `/api/v3/coins/{id}/ohlc` | 60s | OHLC candles | No |
+| **Railway** | CoinGecko | `/api/v3/coins/markets` | 5min | Prices + sparkline (batched) | No |
 | **Railway** | Alternative.me | `/fng/` | 120s | Fear & Greed Index | No |
-| **Railway** | Reddit | `/r/{sub}/hot.json` | 30min | Trending posts | No |
-| **Railway** | Polymarket | `/markets` | 30min | Prediction markets | No |
-| **Railway** | Binance Futures | `/fapi/v1/trades` | 30min | Whale detection | No |
-| **Railway** | Google Trends | `interestOverTime` | 30min | Search interest | No |
-| **Railway** | App Store | Scraper | 30min | App ratings | No |
-| **Railway** | Yahoo Finance | `^TNX`, `^VIX` | 120s | Treasury, VIX | No |
-| **Railway** | Lighter DEX | `/api/v1/account` | 20min | Account data | Yes |
+| **Railway** | FRED | `/series/observations` | 4hr | VIX, DXY, 10Y Treasury | Yes (free) |
+| **Railway** | Alpha Vantage | `/query?function=GLOBAL_QUOTE` | 4hr | SPY stock price | Yes (free) |
+| **Railway** | Reddit | `/r/{sub}/hot.json` | 12hr | Trending posts | No |
+| **Railway** | Polymarket | `/markets` | 12hr | Prediction markets | No |
+| **Railway** | CryptoPanic | RSS feed | 12hr | Crypto news headlines | No |
+| **Railway** | Google Trends | `interestOverTime` | 12hr | Search interest | No |
+| **Railway** | Lighter DEX | `/api/v1/account` | 20min | Account data | Optional |
 | **Railway** | Lighter DEX | `/api/v1/transaction/send_tx` | On trade | Order execution | Yes |
 | **Firebase** | Next.js App | `/api/cron/run-scoring` | Hourly | Trigger agents | Yes (CRON_SECRET) |
 | **Next.js** | Anthropic | Messages API | Hourly ×2 | MACRO, RL80 | Yes |
@@ -915,14 +927,14 @@ TTL policies only work with the `expireAt` field (not `timestamp` or `createdAt`
 
 | API | Calls/Hour | Calls/Day | Rate Limit | Notes |
 |-----|------------|-----------|------------|-------|
-| CoinGecko (prices) | 60 | 1,440 | 10-50/min (free) | May need Pro for reliability |
-| CoinGecko (OHLC) | 60 | 1,440 | Combined with above | |
+| CoinGecko (batched) | 12 | 288 | 10-50/min (free) | Single call every 5 min |
 | Alternative.me | 30 | 720 | Generous | Very stable |
-| Reddit | 6 | 144 | 60/min | No auth needed |
-| Polymarket | 2 | 48 | Unknown | Monitor for limits |
-| Binance Futures | 2 | 48 | 1200/min | Very generous |
-| Google Trends | 2 | 48 | ~100/day | May need rotation |
-| Yahoo Finance | 30 | 720 | Generous | Very stable |
+| FRED | 0.25 | 6 | 120/min | Very generous (free with key) |
+| Alpha Vantage | 0.25 | 6 | 25/day (free) | Well within limits |
+| Reddit | 0.08 | 2 | 60/min | Twice daily |
+| Polymarket | 0.08 | 2 | Unknown | Twice daily |
+| CryptoPanic | 0.08 | 2 | 200/hr | RSS feed, twice daily |
+| Google Trends | 0.08 | 2 | ~100/day | Twice daily |
 | Lighter DEX | 3 + trades | ~72 + trades | Unknown | Testnet is lenient |
 | **Anthropic** | 2 | 48 | Tier-based | ~$0.60/day |
 | **xAI (Grok)** | 1 | 24 | Tier-based | ~$0.50/day |
@@ -936,6 +948,10 @@ ANTHROPIC_API_KEY=sk-ant-...      # Claude for MACRO + RL80
 OPENAI_API_KEY=sk-...              # GPT for TEKNO
 GROK_API_KEY=xai-...               # Grok for EMO
 
+# Macro Data APIs (Free tiers)
+FRED_API_KEY=...                   # FRED API for VIX, DXY, Treasury
+ALPHAVANTAGE_API_KEY=...           # Alpha Vantage for SPY
+
 # Trading (Required for trade execution)
 LIGHTER_API_KEY=...                # 80-char Lighter API key
 LIGHTER_WALLET_PRIVATE_KEY=...     # 64-char wallet key
@@ -946,11 +962,15 @@ CRON_SECRET=...                    # Firebase → Next.js auth
 
 ### Free APIs (No Key Required)
 
-- CoinGecko (rate-limited)
+- CoinGecko (rate-limited, batched calls)
 - Alternative.me Fear & Greed
 - Reddit (public endpoints)
 - Polymarket (public endpoints)
-- Binance Futures (public endpoints)
+- CryptoPanic (RSS feed, no auth required)
 - Google Trends (via library)
-- Yahoo Finance (via library)
-- App Store/Play Store (via scrapers)
+
+### Free APIs (Key Required)
+
+- FRED API (free key from fred.stlouisfed.org - 120 calls/min)
+- Alpha Vantage (free key from alphavantage.co - 25 calls/day)
+
