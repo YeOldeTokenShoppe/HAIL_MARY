@@ -639,11 +639,12 @@ function getTemperatureForAgent(agentName, marketData) {
 }
 
 function getMaxTokensForAgent(agentName) {
-  // Token limits based on expected response length
+  // Token limits for chat mode - keeps responses to ~2-3 sentences
+  // Scoring mode uses getMaxTokensForScoringAgent() which allows more for JSON
   return {
     EMO: 100,
-    TEKNO: 120,
-    MACRO: 150,
+    TEKNO: 100,
+    MACRO: 120,
     RL80: 100
   }[agentName] || 100;
 }

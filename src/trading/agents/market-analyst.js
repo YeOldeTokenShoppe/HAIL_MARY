@@ -16,34 +16,52 @@ import { createAnalystScoreOutput } from '../types/scoring.js';
 // ============================================================================
 
 export const MARKET_ANALYST_CONFIG = {
-  name: 'Market Analyst',
+  name: 'TEKNO',
   model: 'gpt-4-turbo-preview',
-  temperature: 0.7,
-  maxTokens: 100,
-  
+  temperature: 0.75,
+  maxTokens: 100,  // ~2-3 sentences, keeps responses punchy
+
   // Core personality traits
   personality: {
-    archetype: 'Technical Analysis Expert & Chart Wizard',
-    
+    archetype: 'The Chart Whisperer - Street Smart Pattern Nerd',
+
     traits: [
-      'Data-driven and analytical',
-      'Obsessed with chart patterns and indicators',
-      'Skeptical of pure sentiment plays',
-      'Respects price action above all else',
-      'Spots divergences and hidden signals',
-      'Thinks in support/resistance levels'
+      'Street smart and cool but nerds out HARD over patterns',
+      'Obsessed with structure in a weirdly endearing way',
+      'Skeptical of vibes until they show up on the chart',
+      'Gets genuinely excited when a textbook setup appears',
+      'Spots divergences others miss because he\'s always watching',
+      'Makes TA accessible - no mystical guru nonsense'
     ],
-    
+
     communicationStyle: {
-      tone: 'Sharp, precise, technical',
-      length: '1-2 sentences with specific levels',
-      vocabulary: 'Technical indicators, price levels, chart patterns'
+      tone: 'Cool and precise with nerdy enthusiasm for good setups',
+      length: '1-3 sentences with specific levels',
+      vocabulary: 'Technical terms but explained, not gatekept'
     },
-    
+
     relationships: {
-      sentiment: 'Friendly rivalry - they trust feelings, I trust charts',
-      macro: 'Respect their fundamentals but focus on technicals',
-      rl80: 'Provide clear entry/exit levels and risk parameters'
+      EMO: 'Friendly rivalry - "cool vibes, now let me show you the structure"',
+      MACRO: 'Mutual respect - "love the thesis, here\'s where it matters on chart"',
+      RL80: 'Trusted advisor - "here\'s the level, the invalidation, your call on size"'
+    },
+
+    banterTriggers: {
+      toEMO: [
+        'EMO\'s vibes are valid but price is at resistance. Facts > feelings.',
+        'Cool sentiment read. Here\'s what the structure actually says.',
+        'The crowd can feel however they want. Chart says support is here.'
+      ],
+      toMACRO: [
+        'Policy implications noted. The 200 EMA doesn\'t read Fed minutes though.',
+        'MACRO sees the forest. I see the exact tree we\'re about to hit.',
+        'Love the macro context. Here\'s where it shows up on the chart.'
+      ],
+      toRL80: [
+        'Structure supports your thesis. Level and invalidation defined.',
+        'Clean setup, boss. Entry, target, stop - all here.',
+        'Textbook pattern. I\'d take it but you see the full picture.'
+      ]
     }
   },
   
@@ -178,8 +196,11 @@ export function generateMarketPrompt(context) {
 }
 
 function buildSystemPrompt(config) {
-  return `You are ${config.name}, a technical analysis expert advisor for a crypto trading AI named RL80.
-You're in a live trading room chat with RL80 (the lead trader), Sentiment (crowd psychology), and Macro (global economics).
+  return `You are ${config.name}, the technical analyst on RL80's crypto trading team.
+
+This is TRADE SCHOOL - you're here to help people learn while you call the charts. Explain TA concepts naturally, not like a textbook. Make technical analysis accessible and cool, not mystical.
+
+You're street smart and cool but you nerd out HARD over patterns. You get genuinely excited when a textbook setup appears. You're obsessed with structure in a weirdly endearing way.
 
 Your personality:
 ${config.personality.traits.map(t => `- ${t}`).join('\n')}
@@ -187,47 +208,64 @@ ${config.personality.traits.map(t => `- ${t}`).join('\n')}
 Communication style:
 - ${config.personality.communicationStyle.tone}
 - ${config.personality.communicationStyle.length}
-- Focus on: ${Object.keys(config.expertise.indicators).join(', ')}
+- Always cite specific levels, not vague "support" or "resistance"
 
-Your expertise:
-${config.expertise.primary.slice(0, 3).map(e => `- ${e}`).join('\n')}
+Team dynamics (you are the Third Wise Oracle - Technical Analysis Engine):
+- EMO (Second Wise Oracle): Friendly rivalry - "vibes are cool, here's what structure says"
+- MACRO (First Wise Oracle): Mutual respect - "policy thesis is solid, here's the chart level that matters"
+- RL80 (Lead Trader & Synthesis Engine): Professional respect - you provide technical precision for her synthesis. She combines all oracle inputs into decisions. Support her with: "RL80, structure confirms..."
 
-Team dynamics:
-- With Sentiment: ${config.personality.relationships.sentiment}
-- With Macro: ${config.personality.relationships.macro}
-- With RL80: ${config.personality.relationships.rl80}
+TEACHING MOMENTS (weave naturally):
+- Explain what indicators actually measure when you cite them
+- Note why levels matter (liquidity, psychology, prior reactions)
+- Teach pattern recognition without making it mystical
+- Help viewers understand structure > noise
 
-Always mention specific price levels, indicator readings, or patterns when available.
-Keep responses to 1-2 sentences max. Be precise with numbers.`;
+IMPORTANT: Reference ACTUAL levels - specific prices, not "near support". Be precise.
+Keep it punchy. You're the cool chart nerd, not a boring lecturer. Max 2-3 sentences.`;
 }
 
 function buildUserPrompt(marketData, lastMessages, config) {
   const { btcPrice, ethPrice, fearGreed, vix, dxy, openInterest, fundingRate } = marketData || {};
-  
-  let prompt = `Current market snapshot:\n`;
-  
+
+  let prompt = `PRICE DATA:\n`;
+
   if (btcPrice > 0) {
-    prompt += `BTC: $${Math.floor(btcPrice)}`;
     // Find nearest support/resistance
     const supports = config.priceLevels.bitcoin.major_support.filter(s => s < btcPrice);
     const resistances = config.priceLevels.bitcoin.major_resistance.filter(r => r > btcPrice);
-    if (supports.length > 0) prompt += ` (support: $${supports[supports.length - 1]})`;
-    if (resistances.length > 0) prompt += ` (resistance: $${resistances[0]})`;
+    const nearestSupport = supports.length > 0 ? supports[supports.length - 1] : null;
+    const nearestResistance = resistances.length > 0 ? resistances[0] : null;
+
+    prompt += `• BTC: $${btcPrice.toLocaleString()}`;
+    if (nearestSupport) {
+      const supportDist = ((btcPrice - nearestSupport) / btcPrice * 100).toFixed(1);
+      prompt += ` | Support: $${nearestSupport.toLocaleString()} (${supportDist}% below)`;
+    }
+    if (nearestResistance) {
+      const resistDist = ((nearestResistance - btcPrice) / btcPrice * 100).toFixed(1);
+      prompt += ` | Resistance: $${nearestResistance.toLocaleString()} (${resistDist}% above)`;
+    }
     prompt += '\n';
   }
-  
-  if (ethPrice > 0) prompt += `ETH: $${Math.floor(ethPrice)}\n`;
-  if (fearGreed) prompt += `Fear & Greed: ${fearGreed}\n`;
-  if (vix) prompt += `VIX: ${vix.toFixed(1)}\n`;
-  if (dxy) prompt += `DXY: ${dxy.toFixed(2)}\n`;
-  if (openInterest) prompt += `Open Interest: $${openInterest}B\n`;
-  if (fundingRate) prompt += `Funding Rate: ${(fundingRate * 100).toFixed(3)}%\n`;
-  
-  prompt += '\nRecent team chat:\n';
-  prompt += lastMessages?.map(m => `${m.agent}: ${m.message}`).join('\n') || 'No recent messages';
-  
-  prompt += '\n\nWhat\'s your technical take on this setup? Be specific and reference actual levels.';
-  
+
+  if (ethPrice > 0) prompt += `• ETH: $${ethPrice.toLocaleString()}\n`;
+
+  prompt += `\nMARKET CONTEXT:\n`;
+  if (fearGreed !== undefined) prompt += `• Fear & Greed: ${fearGreed}/100\n`;
+  if (fundingRate !== undefined) prompt += `• Funding: ${(fundingRate * 100).toFixed(3)}%\n`;
+  if (openInterest) prompt += `• Open Interest: $${openInterest}B\n`;
+  if (vix) prompt += `• VIX: ${vix.toFixed(1)}\n`;
+  if (dxy) prompt += `• DXY: ${dxy.toFixed(2)}\n`;
+
+  // Team context with banter opportunity
+  if (lastMessages?.length > 0) {
+    prompt += `\nTEAM CHAT (feel free to add your technical perspective to their takes):\n`;
+    prompt += lastMessages.map(m => `${m.agent}: "${m.message}"`).join('\n');
+  }
+
+  prompt += `\n\nGive your technical read. Be specific with levels. If EMO or MACRO said something, add the chart perspective. Teach something about TA if it fits naturally. Keep it punchy and precise.`;
+
   return prompt;
 }
 
@@ -238,48 +276,52 @@ function buildUserPrompt(marketData, lastMessages, config) {
 export function generateMarketResponse(marketData) {
   const { btcPrice, fearGreed, fundingRate, openInterest } = marketData || {};
   const config = MARKET_ANALYST_CONFIG;
-  
+
   if (!btcPrice || btcPrice === 0) {
     return null; // Don't show loading messages
   }
-  
+
   // Determine market condition based on available data
   let response = [];
-  
-  // Price level analysis
+
+  // Price level analysis with teaching
   const priceK = Math.floor(btcPrice / 1000);
   const supports = config.priceLevels.bitcoin.major_support.filter(s => s < btcPrice);
   const resistances = config.priceLevels.bitcoin.major_resistance.filter(r => r > btcPrice);
-  
+
   if (supports.length > 0 && resistances.length > 0) {
     const nearestSupport = supports[supports.length - 1];
     const nearestResistance = resistances[0];
     const supportDistance = ((btcPrice - nearestSupport) / btcPrice * 100).toFixed(1);
     const resistanceDistance = ((nearestResistance - btcPrice) / btcPrice * 100).toFixed(1);
-    
-    if (Math.abs(supportDistance) < 2) {
-      response.push(`Testing support at $${nearestSupport/1000}k`);
-    } else if (Math.abs(resistanceDistance) < 2) {
-      response.push(`Approaching resistance at $${nearestResistance/1000}k`);
+
+    if (parseFloat(supportDistance) < 2) {
+      response.push(`BTC testing $${(nearestSupport/1000).toFixed(0)}k support - this level held before, watching for reaction`);
+    } else if (parseFloat(resistanceDistance) < 2) {
+      response.push(`BTC approaching $${(nearestResistance/1000).toFixed(0)}k resistance - previous rejection zone, needs volume to break`);
     } else {
-      response.push(`BTC at $${priceK}k between $${nearestSupport/1000}k-$${nearestResistance/1000}k`);
+      response.push(`BTC at $${priceK}k, ranging between $${(nearestSupport/1000).toFixed(0)}k support and $${(nearestResistance/1000).toFixed(0)}k resistance`);
     }
   }
-  
-  // RSI proxy based on Fear & Greed
-  if (fearGreed) {
-    if (fearGreed < 30) {
-      response.push("RSI oversold, bounce likely");
-    } else if (fearGreed > 70) {
-      response.push("RSI overbought, correction due");
+
+  // RSI proxy with teaching
+  if (fearGreed !== undefined) {
+    if (fearGreed < 25) {
+      response.push("Momentum stretched to downside - oversold doesn't mean 'buy now' but sellers are exhausted");
+    } else if (fearGreed > 75) {
+      response.push("Momentum extended - overbought means strong trend, not automatic reversal. Watch for divergence");
     }
   }
-  
-  // Funding analysis
+
+  // Funding analysis with teaching
   if (fundingRate && Math.abs(fundingRate) > 0.03) {
-    response.push(`Funding ${fundingRate > 0 ? 'overheated' : 'inverted'}`);
+    if (fundingRate > 0) {
+      response.push(`Funding at ${(fundingRate * 100).toFixed(2)}% - longs paying shorts, positioning getting crowded`);
+    } else {
+      response.push(`Funding at ${(fundingRate * 100).toFixed(2)}% - shorts paying longs, contrarian long setup building`);
+    }
   }
-  
+
   return response.join('. ') + '.';
 }
 
