@@ -214,9 +214,9 @@ Every Hour (0 * * * *)
 |-----------|----------|-------------------|--------|
 | Market Prices (BTC/ETH/SOL/XRP) | 5 minutes | `marketData/latest` | CoinGecko (batched) |
 | Technical Data (Charts + Indicators) | 5 minutes | `technicalData/latest` | CoinGecko sparkline |
-| Agent Context (Fear & Greed) | 120 seconds | `agentContext/market` | Alternative.me |
+| Agent Context (Fear & Greed) | 120 seconds | `agentContext/market` | CoinMarketCap (primary), Alternative.me (fallback) |
 | Lighter Trading Data | 20 minutes | `lighterData/*` | Lighter DEX API |
-| Sentiment Data | 12 hours | `sentimentData/latest` | Reddit, Polymarket, CryptoPanic |
+| Sentiment Data | 6 hours | `sentimentData/latest` | Reddit, Polymarket, CryptoPanic RSS |
 | Macro Data (VIX, DXY, SPY, Treasury) | 4 hours | `macroData/latest` | FRED, Alpha Vantage |
 | Service Health | 5 minutes | `serviceStatus/lighterService` | Internal |
 
@@ -291,9 +291,10 @@ agentChatManager.stop()                     // Stop workflow
 │  DATA COLLECTION:                                                           │
 │  CoinGecko ──────► Market + Technical ► every 5min ──► marketData/latest   │
 │              └───► Sparkline Charts ──► every 5min ──► technicalData/latest│
-│  Alternative.me ─► Agent Context    ──► every 120s ──► agentContext/market │
+│  CoinMarketCap ──► Fear & Greed     ──► every 120s ──► agentContext/market │
+│   (Alt.me fallback)                                                         │
 │  Lighter DEX ────► Trading Data     ──► every 20m  ──► lighterData/*       │
-│  Reddit/Polymarket► Sentiment Data  ──► every 12hr ──► sentimentData/latest│
+│  Reddit/Polymarket► Sentiment Data  ──► every 6hr  ──► sentimentData/latest│
 │  FRED/AlphaVantage► Macro Data      ──► every 4hr  ──► macroData/latest    │
 │                                                                             │
 │  TRADE EXECUTION:                                                           │
@@ -359,18 +360,20 @@ agentChatManager.stop()                     // Stop workflow
 
 ## Railway Data Fetch Schedule
 
-The Railway background service fetches data from external APIs at varying intervals. All APIs used are **free**.
+The Railway background service fetches data from external APIs at varying intervals. All APIs used are **free** (some require free API keys).
 
 | Data Type | Interval | APIs Used | Notes |
 |-----------|----------|-----------|-------|
 | Market prices + Technical data | 5 min | CoinGecko `/coins/markets` | Single batched call with 7-day sparkline |
-| Agent context (F&G) | 120s | Alternative.me | Fear & Greed index |
+| Agent context (F&G) | 120s | CoinMarketCap (primary), Alternative.me (fallback) | Fear & Greed index with real-time updates |
 | Lighter trading data | 20 min | Lighter DEX | Account balance, positions, orders |
-| Sentiment data | 12 hr | Reddit, Polymarket, CryptoPanic | Twice daily social/news updates |
+| Sentiment data | 6 hr | Reddit, Polymarket, CryptoPanic RSS | 4× daily social/news updates |
 | Macro data | 4 hr | FRED, Alpha Vantage | VIX, DXY, SPY, 10Y Treasury |
 | Service health | 5 min | Internal | Status heartbeat |
 
 **Rate Limiting:** API calls use a built-in `RateLimiter` class (8s minimum between calls) to avoid hitting free tier limits. Market data is batched into a single call per interval.
+
+**CryptoPanic Conservation:** To conserve API quota, CryptoPanic uses RSS feeds instead of the API. Set `CRYPTOPANIC_DISABLED=true` to completely disable CryptoPanic calls if needed.
 
 ---
 
@@ -1177,22 +1180,26 @@ TTL policies only work with the `expireAt` field (not `timestamp` or `createdAt`
 │  │  │     - 7-day sparkline (converted to OHLC-like candles)           │   │
 │  │  │     - Technical indicators calculated: RSI, EMA, MACD, Bollinger │   │
 │  │  │                                                                   │   │
-│  │  SENTIMENT DATA:                                                     │   │
-│  │  ├─ Alternative.me ───────────────── every 120s                     │   │
+│  │  FEAR & GREED DATA:                                                  │   │
+│  │  ├─ CoinMarketCap API ────────────── every 120s (primary)           │   │
+│  │  │  └─ /v3/fear-and-greed/latest (Fear & Greed Index)               │   │
+│  │  │                                                                   │   │
+│  │  ├─ Alternative.me ───────────────── every 120s (fallback)          │   │
 │  │  │  └─ /fng/ (Fear & Greed Index)                                   │   │
 │  │  │                                                                   │   │
-│  │  ├─ Reddit API ───────────────────── every 12hr                     │   │
+│  │  SENTIMENT DATA:                                                     │   │
+│  │  ├─ Reddit API ───────────────────── every 6hr                      │   │
 │  │  │  └─ /r/bitcoin/hot.json                                          │   │
 │  │  │  └─ /r/ethereum/hot.json                                         │   │
 │  │  │  └─ /r/cryptocurrency/hot.json                                   │   │
 │  │  │                                                                   │   │
-│  │  ├─ Polymarket API ───────────────── every 12hr                     │   │
-│  │  │  └─ /markets (crypto prediction markets)                         │   │
+│  │  ├─ Polymarket API ───────────────── every 6hr                      │   │
+│  │  │  └─ /markets (crypto/finance prediction markets only)            │   │
 │  │  │                                                                   │   │
-│  │  ├─ CryptoPanic API ──────────────── every 12hr                     │   │
-│  │  │  └─ /posts/ (crypto news headlines via RSS)                      │   │
+│  │  ├─ CryptoPanic RSS ──────────────── every 6hr                      │   │
+│  │  │  └─ /news/rss/ (crypto news headlines - no API quota used)       │   │
 │  │  │                                                                   │   │
-│  │  ├─ Google Trends ────────────────── every 12hr                     │   │
+│  │  ├─ Google Trends ────────────────── every 6hr                      │   │
 │  │  │  └─ interestOverTime (Bitcoin search interest)                   │   │
 │  │  │                                                                   │   │
 │  │  LIGHTER DEX:                                                        │   │
@@ -1244,13 +1251,14 @@ TTL policies only work with the `expireAt` field (not `timestamp` or `createdAt`
 | Service | API | Endpoint | Frequency | Purpose | Auth Required |
 |---------|-----|----------|-----------|---------|---------------|
 | **Railway** | CoinGecko | `/api/v3/coins/markets` | 5min | Prices + sparkline (batched) | No |
-| **Railway** | Alternative.me | `/fng/` | 120s | Fear & Greed Index | No |
+| **Railway** | CoinMarketCap | `/v3/fear-and-greed/latest` | 120s | Fear & Greed Index (primary) | Yes (free) |
+| **Railway** | Alternative.me | `/fng/` | 120s | Fear & Greed Index (fallback) | No |
 | **Railway** | FRED | `/series/observations` | 4hr | VIX, DXY, 10Y Treasury | Yes (free) |
 | **Railway** | Alpha Vantage | `/query?function=GLOBAL_QUOTE` | 4hr | SPY stock price | Yes (free) |
-| **Railway** | Reddit | `/r/{sub}/hot.json` | 12hr | Trending posts | No |
-| **Railway** | Polymarket | `/markets` | 12hr | Prediction markets | No |
-| **Railway** | CryptoPanic | RSS feed | 12hr | Crypto news headlines | No |
-| **Railway** | Google Trends | `interestOverTime` | 12hr | Search interest | No |
+| **Railway** | Reddit | `/r/{sub}/hot.json` | 6hr | Trending posts | No |
+| **Railway** | Polymarket | `/markets` | 6hr | Crypto/finance prediction markets | No |
+| **Railway** | CryptoPanic | RSS feed (`/news/rss/`) | 6hr | Crypto news headlines (no API quota) | No |
+| **Railway** | Google Trends | `interestOverTime` | 6hr | Search interest | No |
 | **Railway** | Lighter DEX | `/api/v1/account` | 20min | Account data | Optional |
 | **Railway** | Lighter DEX | `/api/v1/transaction/send_tx` | On trade | Order execution | Yes |
 | **Firebase** | Next.js App | `/api/cron/run-scoring` | Hourly | Trigger agents | Yes (CRON_SECRET) |
@@ -1263,13 +1271,14 @@ TTL policies only work with the `expireAt` field (not `timestamp` or `createdAt`
 | API | Calls/Hour | Calls/Day | Rate Limit | Notes |
 |-----|------------|-----------|------------|-------|
 | CoinGecko (batched) | 12 | 288 | 10-50/min (free) | Single call every 5 min |
-| Alternative.me | 30 | 720 | Generous | Very stable |
+| CoinMarketCap | 30 | 720 | 10,000/month (free) | Primary F&G source, ~2% of quota |
+| Alternative.me | 30 | 720 | Generous | Fallback F&G source |
 | FRED | 0.25 | 6 | 120/min | Very generous (free with key) |
 | Alpha Vantage | 0.25 | 6 | 25/day (free) | Well within limits |
-| Reddit | 0.08 | 2 | 60/min | Twice daily |
-| Polymarket | 0.08 | 2 | Unknown | Twice daily |
-| CryptoPanic | 0.08 | 2 | 200/hr | RSS feed, twice daily |
-| Google Trends | 0.08 | 2 | ~100/day | Twice daily |
+| Reddit | 0.17 | 4 | 60/min | 4× daily (every 6hr) |
+| Polymarket | 0.17 | 4 | Unknown | 4× daily (every 6hr) |
+| CryptoPanic RSS | 0.17 | 4 | Unlimited | RSS feed - no API quota used |
+| Google Trends | 0.17 | 4 | ~100/day | 4× daily (every 6hr) |
 | Lighter DEX | 3 + trades | ~72 + trades | Unknown | Testnet is lenient |
 | **Anthropic** | 2 | 48 | Tier-based | ~$0.60/day |
 | **xAI (Grok)** | 1 | 24 | Tier-based | ~$0.50/day |
@@ -1283,7 +1292,8 @@ ANTHROPIC_API_KEY=sk-ant-...      # Claude for MACRO + RL80
 OPENAI_API_KEY=sk-...              # GPT for TEKNO
 GROK_API_KEY=xai-...               # Grok for EMO
 
-# Macro Data APIs (Free tiers)
+# Market Data APIs (Free tiers)
+COINMARKETCAP_API_KEY=...          # CoinMarketCap for Fear & Greed (primary)
 FRED_API_KEY=...                   # FRED API for VIX, DXY, Treasury
 ALPHAVANTAGE_API_KEY=...           # Alpha Vantage for SPY
 
@@ -1293,19 +1303,29 @@ LIGHTER_WALLET_PRIVATE_KEY=...     # 64-char wallet key
 
 # Internal Security
 CRON_SECRET=...                    # Firebase → Next.js auth
+
+# Optional Feature Flags
+CRYPTOPANIC_DISABLED=true          # Set to disable CryptoPanic entirely
 ```
 
 ### Free APIs (No Key Required)
 
 - CoinGecko (rate-limited, batched calls)
-- Alternative.me Fear & Greed
+- Alternative.me Fear & Greed (fallback source)
 - Reddit (public endpoints)
-- Polymarket (public endpoints)
-- CryptoPanic (RSS feed, no auth required)
+- Polymarket (public endpoints, filtered to crypto/finance)
+- CryptoPanic RSS (no API quota, unlimited)
 - Google Trends (via library)
 
 ### Free APIs (Key Required)
 
+- CoinMarketCap (free key from coinmarketcap.com - 10,000 calls/month, primary F&G source)
 - FRED API (free key from fred.stlouisfed.org - 120 calls/min)
 - Alpha Vantage (free key from alphavantage.co - 25 calls/day)
+
+### API Conservation Notes
+
+**CryptoPanic:** The system uses RSS feeds (`/news/rss/`) instead of the paid API to conserve quota. This provides unlimited news headlines without using API credits. Set `CRYPTOPANIC_DISABLED=true` to completely disable if needed.
+
+**Fear & Greed Index:** CoinMarketCap is the primary source (updates more frequently than Alternative.me). Alternative.me serves as an automatic fallback if CoinMarketCap fails or no API key is configured.
 

@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 
-// Cache for trending data (30 minute TTL for free APIs)
+// Cache for trending data (6 hour TTL to conserve API quotas)
 let cache = {
   data: null,
   timestamp: 0,
-  TTL: 30 * 60 * 1000 // 30 minutes
+  TTL: 6 * 60 * 60 * 1000 // 6 hours - drastically reduced to save CryptoPanic API calls
 };
 
 export async function GET() {
@@ -184,35 +184,10 @@ async function fetchCoinGeckoTrending() {
   }
 }
 
-// Fetch crypto news from CryptoPanic (free tier)
+// Fetch crypto news from CryptoPanic RSS (no API quota usage)
 async function fetchCryptoPanicNews() {
-  try {
-    // CryptoPanic public feed (no auth needed for basic access)
-    const response = await fetch(
-      'https://cryptopanic.com/api/v1/posts/?auth_token=FREE&currencies=BTC,ETH&filter=hot&public=true',
-      { next: { revalidate: 1800 } }
-    );
-
-    // If the free endpoint doesn't work, try RSS
-    if (!response.ok) {
-      return await fetchCryptoPanicRSS();
-    }
-
-    const data = await response.json();
-    const posts = data.results || [];
-
-    return posts.slice(0, 2).map(post => ({
-      topic: truncateTitle(post.title, 40),
-      sentiment: post.votes?.positive > post.votes?.negative ? 'bullish' :
-                 post.votes?.negative > post.votes?.positive ? 'bearish' : 'neutral',
-      mentions: (post.votes?.positive || 0) + (post.votes?.negative || 0),
-      source: 'cryptopanic'
-    }));
-
-  } catch (error) {
-    console.log('[Trending] CryptoPanic API failed, trying RSS:', error.message);
-    return await fetchCryptoPanicRSS();
-  }
+  // Always use RSS to conserve API quota - RSS is free and unlimited
+  return await fetchCryptoPanicRSS();
 }
 
 // Fallback: Parse CryptoPanic RSS feed
