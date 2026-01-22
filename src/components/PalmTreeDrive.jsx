@@ -13,7 +13,8 @@ import { useRouter } from 'next/navigation';
 import MorphingWebGLText from './MorphingWebGLText';
 import WebGLStandaloneText from '@/components/WebGLStandaloneText';
 import ThirdwebBuyModal from './ThirdwebBuyModal';
-import NavButtons from './NavButtons';
+import CyberNav from './CyberNav';
+import HorizontalRoadmap from './HorizontalRoadmap';
 
 
 
@@ -106,6 +107,7 @@ const PalmsScene = ({ onLoadingChange }) => {
   const [hideLastText, setHideLastText] = useState(false); // Hide the last text block after delay
   const [shouldMorph, setShouldMorph] = useState(false); // Trigger morph animation
   const [showBuyModal, setShowBuyModal] = useState(false); // Control ThirdwebBuyModal visibility
+  const [isCyberNavOpen, setIsCyberNavOpen] = useState(false); // Control CyberNav menu visibility
   const [hasScrolled, setHasScrolled] = useState(false); // Track if user has started scrolling
   // Music player states
   const [isMobile, setIsMobile] = useState(false);
@@ -2305,7 +2307,7 @@ const PalmsScene = ({ onLoadingChange }) => {
           style={{
             position: 'fixed',
             right: isMobile ? '20px' : '15%',
-            top: isMobile ? '40%' : '50%',
+            top: isMobile ? '50%' : '50%',
             transform: 'translateY(-50%)',
             width: isMobile ? '85%' : '50%',
             maxWidth: '600px',
@@ -2480,7 +2482,7 @@ const PalmsScene = ({ onLoadingChange }) => {
         <div style={{
           position: 'fixed',
           right: isMobile ? '20px' : '15%',
-          top: '70%',
+          top: isMobile ? '78%' : '70%',
           transform: 'translateY(-50%)', // Center vertically at new position
           width: isMobile ? '85%' : '50%',
           maxWidth: '600px',
@@ -2492,20 +2494,24 @@ const PalmsScene = ({ onLoadingChange }) => {
           pointerEvents: 'auto',
           animation: 'simpleFadeIn 1s ease-in',
         }}>
-          {/* All navigation items on same level */}
+          {/* Horizontal Roadmap Timeline */}
+          <HorizontalRoadmap
+            isVisible={true}
+            isMobile={isMobile}
+          />
+
+          {/* Action buttons row - Buy + More */}
           <div style={{
             display: 'flex',
-            gap: '2rem',
+            gap: '1.5rem',
             justifyContent: 'center',
             alignItems: 'center',
-            flexWrap: 'wrap',
-            marginTop: '3rem',
+            marginTop: '1.5rem',
           }}>
             <button
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                // Open the ThirdwebBuyModal instead of navigating
                 setShowBuyModal(true);
               }}
               style={{
@@ -2533,16 +2539,58 @@ const PalmsScene = ({ onLoadingChange }) => {
             >
               {t('palmTreeDrive.buyButton')}
             </button>
-            
-            <NavButtons/>
+
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // Disable ScrollTriggers temporarily when opening menu
+                const triggers = ScrollTrigger.getAll();
+                triggers.forEach(trigger => trigger.disable());
+                setIsCyberNavOpen(true);
+              }}
+              style={{
+                padding: isMobile ? '10px 25px' : '15px 40px',
+                fontSize: isMobile ? "1.3rem" : "1.8rem",
+                fontFamily: "'Permanent Marker', serif",
+                background: 'transparent',
+                color: "#000000",
+                border: "none",
+                cursor: "pointer",
+                transition: "all 0.3s ease",
+                textShadow: '0 0 20px rgba(255, 0, 238, 0.9), 0 0 40px rgba(255, 0, 238, 0.6)',
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.transform = "scale(1.1)";
+                e.target.style.textShadow = '0 0 25px rgba(255, 0, 238, 1), 0 0 50px rgba(255, 0, 238, 0.8)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = "scale(1)";
+                e.target.style.textShadow = '0 0 20px rgba(255, 0, 238, 0.9), 0 0 40px rgba(255, 0, 238, 0.6)';
+              }}
+            >
+              {t('palmTreeDrive.more')}
+            </button>
           </div>
         </div>
       )}
-      
+
       {/* Thirdweb Buy Modal */}
-      <ThirdwebBuyModal 
-        isOpen={showBuyModal} 
+      <ThirdwebBuyModal
+        isOpen={showBuyModal}
         onClose={() => setShowBuyModal(false)}
+      />
+
+      {/* CyberNav Menu */}
+      <CyberNav
+        isOpen={isCyberNavOpen}
+        onClose={() => {
+          setIsCyberNavOpen(false);
+          // Re-enable ScrollTriggers when closing
+          const triggers = ScrollTrigger.getAll();
+          triggers.forEach(trigger => trigger.enable());
+        }}
+        showButton={false}
       />
     </div>
   );

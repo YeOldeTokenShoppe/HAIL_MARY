@@ -903,7 +903,7 @@ useEffect(() => {
                   fontWeight: 300,
                   textAlign: 'center',
                 }}>
-                  Strike match to Light a Green Candle!
+                  Light a Green Candle!
                 </div>
                 <div style={{ 
                   fontSize: '0.65rem',
@@ -1039,7 +1039,7 @@ useEffect(() => {
                 ) : (
                   // Unlit state - matchstick SVG
                   <img 
-                    src="/images/matchstick.svg"
+                    src="/images/torchIcon.webp"
                     alt="Matchstick"
                     style={{
                       width: '28px',
@@ -1549,6 +1549,7 @@ useEffect(() => {
       <StakeModal
         isOpen={showStakeModal}
         onClose={() => setShowStakeModal(false)}
+        currentPhase={1} // Phase 1: Pre-rewards. Change to 2, 3, or 4 as protocol evolves
         onStake={async (stakeData) => {
           console.log('Stake submitted:', stakeData);
           // TODO: Implement actual staking logic here

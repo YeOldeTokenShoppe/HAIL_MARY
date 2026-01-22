@@ -98,7 +98,25 @@ export default function TokenomicsPage() {
     
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(to bottom, #0a0e27, #000000)',
+      background: `
+        radial-gradient(ellipse at 50% 0%, rgba(0, 60, 40, 0.4) 0%, transparent 50%),
+        radial-gradient(ellipse at 90% 25%, rgba(0, 50, 35, 0.2) 0%, transparent 35%),
+        radial-gradient(ellipse at 10% 50%, rgba(0, 45, 30, 0.15) 0%, transparent 30%),
+        radial-gradient(ellipse at 80% 85%, rgba(90, 50, 120, 0.2) 0%, transparent 35%),
+        radial-gradient(ellipse at 20% 95%, rgba(120, 80, 40, 0.15) 0%, transparent 30%),
+        radial-gradient(ellipse at 50% 100%, rgba(80, 50, 100, 0.25) 0%, transparent 45%),
+        linear-gradient(180deg,
+          #040a07 0%,
+          #050c09 8%,
+          #060e0a 20%,
+          #07100b 35%,
+          #080f0c 50%,
+          #0a0d10 65%,
+          #0c0a12 78%,
+          #100a14 88%,
+          #120a16 100%
+        )
+      `,
       padding: '80px 20px 40px',
     }}>
      
@@ -426,9 +444,9 @@ export default function TokenomicsPage() {
               </div>
 
               {/* Stats Cards - Cyber Style */}
-              <div style={{ marginBottom: '50px' }}>
+              {/* <div style={{ marginBottom: '50px' }}>
                 <CyberStatsSection isMobile={isMobile} />
-              </div>
+              </div> */}
 
               {/* Tokenomics Content - Cyber Style */}
               <div style={{ marginBottom: '50px' }}>
@@ -844,9 +862,8 @@ export default function TokenomicsPage() {
         }
       `}</style>
 
-
+      <Footer is80sMode={is80sMode} />
     </div>
-          <Footer is80sMode={is80sMode} />
     </>
   );
 }

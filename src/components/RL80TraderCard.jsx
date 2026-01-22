@@ -21,12 +21,12 @@ const RL80TraderCard = ({
       subtitle: 'Our Lady of Perpetual Profit',
       specialty: 'Lead Trader',
       icon: '👑',
-      tagline: 'Let Mama Cook',
+      tagline: 'Patron Saint of Day Traders',
       rarity: 'legendary',
       level: 15,
       class: 'rl80',
       image: '/images/Headshot_RL80.webp',
-      bio: 'Trade Life. Synthesizes oracle insights into action. Sharp, empowered, protective mama bear energy.',
+      bio: 'Synthesizes oracle insights into action. Motivated by belief in prosperity for all humanity.',
       thesis: 'Oracle confluence detected. Deploying with defined risk.',
       stats: {
         wins: 0,
@@ -74,7 +74,7 @@ const RL80TraderCard = ({
     },
     'Macro': {
       name: 'MACRO',
-      subtitle: 'The Grumpy Professor',
+      subtitle: 'The Economist',
       specialty: 'First Wise Oracle',
       icon: '🎓',
       tagline: 'Policy Moves Markets',
@@ -102,7 +102,7 @@ const RL80TraderCard = ({
     },
     'Tekno': {
       name: 'TEKNO',
-      subtitle: 'Street Smart Pattern Nerd',
+      subtitle: 'Savvy Pattern Finder',
       specialty: 'Third Wise Oracle',
       icon: '📊',
       tagline: 'Structure Over Stories',
@@ -110,7 +110,7 @@ const RL80TraderCard = ({
       level: 13,
       class: 'technical',
       image: '/images/Headshot_Tekno.webp',
-      bio: 'Cool kid who secretly loves spreadsheets. Obsessed with patterns and levels.',
+      bio: 'A cypherpunk technician who treats markets as ciphertext and charts as decryption tools.',
       thesis: 'Textbook setup on 4H. RSI divergence confirmed. Levels defined.',
       stats: {
         wins: 0,
@@ -327,15 +327,45 @@ const RL80TraderCard = ({
             <p className="bio-text">{agent.bio}</p>
           </div>
 
-          {/* Live Scoring Display - Only shown when latestScores available */}
-          {latestScores && (
+          {/* Live Scoring Display - Oracles show conviction, RL80 shows active signals */}
+          {agent.name === 'RL80' ? (
+            // RL80 shows ACTIVE SIGNALS - the final decisions
+            <div className="card-section scoring-section">
+              <div className="section-header">
+                <span className="section-icon">⚡</span>
+                <span className="section-title">ACTIVE SIGNALS</span>
+              </div>
+              <div className="scoring-grid">
+                {['BTC', 'ETH', 'SOL', 'XRP'].map(asset => {
+                  const rec = latestDecision?.recommendations?.find(r => r.asset === asset);
+                  const action = rec?.direction === 'LONG' ? 'BUY' :
+                                 rec?.direction === 'SHORT' ? 'SELL' : 'HOLD';
+                  const actionColor = action === 'BUY' ? '#44ff44' :
+                                      action === 'SELL' ? '#ff4444' : '#888888';
+                  const size = rec?.sizePercent ? `${(rec.sizePercent * 100).toFixed(0)}%` : '-';
+                  return (
+                    <div key={asset} className="score-item">
+                      <span className="score-asset">{asset}</span>
+                      <span className="score-direction" style={{ color: actionColor, fontWeight: 'bold' }}>
+                        {action}
+                      </span>
+                      <span className="score-confidence" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                        {action !== 'HOLD' ? size : '—'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : latestScores && (
+            // Oracles show LIVE CONVICTION - their per-asset scores
             <div className="card-section scoring-section">
               <div className="section-header">
                 <span className="section-icon">📊</span>
                 <span className="section-title">LIVE CONVICTION</span>
               </div>
               <div className="scoring-grid">
-                {['BTC', 'ETH'].map(asset => {
+                {['BTC', 'ETH', 'SOL', 'XRP'].map(asset => {
                   const scoringId = agentToScoringId[agent.name];
                   const assetScore = latestScores[asset];
                   const dirFormat = formatDirectionScore(assetScore?.direction);
@@ -439,7 +469,15 @@ const RL80TraderCard = ({
                 })}
                 {latestDecision.summary && (
                   <div className="decision-summary">
-                    <span>Heat: {latestDecision.summary.totalHeat || 0}%</span>
+                    <span
+                      className="heat-tooltip-wrapper"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Heat: {latestDecision.summary.totalHeat || 0}%
+                      <span className="heat-tooltip">
+                        Portfolio exposure — sum of all active position sizes. Max 15%.
+                      </span>
+                    </span>
                     <span>Positions: {latestDecision.summary.tradeable || 0}</span>
                   </div>
                 )}

@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react'
 import { db, doc, onSnapshot } from '@/lib/firebaseClient'
 
+// Helper to get F&G label from value
+function getFearGreedLabel(value) {
+  if (value >= 75) return 'Extreme Greed'
+  if (value >= 55) return 'Greed'
+  if (value >= 45) return 'Neutral'
+  if (value >= 25) return 'Fear'
+  return 'Extreme Fear'
+}
+
 // Sentiment data hook - reads from Firestore (populated by cron job)
 const useSentimentData = () => {
   const [data, setData] = useState({
@@ -41,6 +50,38 @@ const useSentimentData = () => {
     // Listen to Firestore for real-time updates from cron job
     const sentimentRef = doc(db, 'sentimentData', 'latest')
     const newsRef = doc(db, 'newsData', 'latest')
+    // Also listen to agentContext/market for fresh F&G (updated every 2 min by Railway)
+    const agentContextRef = doc(db, 'agentContext', 'market')
+
+    // Track F&G from agentContext separately (primary source for freshness)
+    let agentContextFearGreed = null
+
+    const unsubscribeAgentContext = onSnapshot(
+      agentContextRef,
+      (docSnapshot) => {
+        if (docSnapshot.exists()) {
+          const contextData = docSnapshot.data()
+          if (contextData.fearGreed !== undefined) {
+            agentContextFearGreed = contextData.fearGreed
+            // Update F&G with fresh value from agentContext
+            setData(prev => ({
+              ...prev,
+              fearGreed: {
+                value: contextData.fearGreed,
+                label: getFearGreedLabel(contextData.fearGreed)
+              },
+              dataStatus: {
+                ...prev.dataStatus,
+                fearGreed: 'live'
+              }
+            }))
+          }
+        }
+      },
+      (error) => {
+        console.error('[SentimentScreen] Error listening to agentContext:', error)
+      }
+    )
 
     const unsubscribeSentiment = onSnapshot(
       sentimentRef,
@@ -50,7 +91,10 @@ const useSentimentData = () => {
 
           setData(prev => ({
             ...prev,
-            fearGreed: sentimentData.fearGreed || { value: 0, label: 'Unavailable' },
+            // Use agentContext F&G if available (fresher), otherwise use sentimentData F&G
+            fearGreed: agentContextFearGreed !== null
+              ? { value: agentContextFearGreed, label: getFearGreedLabel(agentContextFearGreed) }
+              : (sentimentData.fearGreed || { value: 0, label: 'Unavailable' }),
             trendingTopics: sentimentData.trendingTopics || [],
             polymarket: sentimentData.polymarket || null,
             googleTrends: sentimentData.googleTrends || { btc: null, eth: null },
@@ -58,7 +102,7 @@ const useSentimentData = () => {
             isGrokLive: sentimentData.dataStatus?.trending === 'live',
             dataStatus: {
               ...prev.dataStatus,
-              fearGreed: sentimentData.dataStatus?.fearGreed || 'unavailable',
+              fearGreed: agentContextFearGreed !== null ? 'live' : (sentimentData.dataStatus?.fearGreed || 'unavailable'),
               trending: sentimentData.dataStatus?.trending || 'unavailable',
               googleTrends: sentimentData.dataStatus?.googleTrends || 'unavailable',
               appRankings: sentimentData.dataStatus?.appRankings || 'unavailable'
@@ -68,7 +112,9 @@ const useSentimentData = () => {
           console.log('[SentimentScreen] No sentiment data in Firestore yet')
           setData(prev => ({
             ...prev,
-            fearGreed: { value: 0, label: 'Awaiting data...' }
+            fearGreed: agentContextFearGreed !== null
+              ? { value: agentContextFearGreed, label: getFearGreedLabel(agentContextFearGreed) }
+              : { value: 0, label: 'Awaiting data...' }
           }))
         }
       },
@@ -104,6 +150,7 @@ const useSentimentData = () => {
 
     // Cleanup listeners on unmount
     return () => {
+      unsubscribeAgentContext()
       unsubscribeSentiment()
       unsubscribeNews()
     }

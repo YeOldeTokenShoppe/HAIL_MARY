@@ -199,7 +199,11 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
   const { user } = useUser();
   const { walletAddress, tokenBalance, activeAccount } = useWalletAuth();
   const { mutate: sendTransaction } = useSendTransaction();
-  
+
+  // Multi-step wizard state
+  const [currentStep, setCurrentStep] = useState(1);
+  const TOTAL_STEPS = 3;
+
   const [offeringType, setOfferingType] = useState('petition');
   const [message, setMessage] = useState('');
   const [tokenAmount, setTokenAmount] = useState('');
@@ -282,6 +286,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
       }
 
       console.log('[LightCandleModal] Resetting modal state on open');
+      setCurrentStep(1); // Reset to step 1
       setOfferingType('petition');
       setMessage('');
       setTokenAmount('');
@@ -296,6 +301,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
       setShowConfirmation(false); // Reset confirmation modal
       setShowWalletLoading(false); // Reset wallet loading
       setPendingBurnAmount(0); // Reset pending amount
+      setSelectedPrayer(''); // Reset selected prayer template
       // Check token balance immediately when modal opens
       // tokenBalance is a string from the provider, so convert to number
       const balance = parseInt(tokenBalance) || 0;
@@ -869,6 +875,102 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           cursor: not-allowed;
         }
 
+        .step-indicator {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          gap: 0.5rem;
+          margin-bottom: 1rem;
+        }
+
+        .step-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          background: rgba(255, 255, 255, 0.2);
+          transition: all 0.3s ease;
+        }
+
+        .step-dot.active {
+          background: #8b5cf6;
+          box-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
+        }
+
+        .step-dot.completed {
+          background: #00f5d4;
+        }
+
+        .step-connector {
+          width: 30px;
+          height: 2px;
+          background: rgba(255, 255, 255, 0.2);
+          transition: all 0.3s ease;
+        }
+
+        .step-connector.active {
+          background: linear-gradient(90deg, #00f5d4, #8b5cf6);
+        }
+
+        .step-title {
+          font-size: 0.75rem;
+          color: rgba(255, 255, 255, 0.6);
+          text-align: center;
+          margin-bottom: 1rem;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+        }
+
+        .step-content {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+        }
+
+        .step-navigation {
+          display: flex;
+          gap: 0.75rem;
+          margin-top: auto;
+          padding-top: 1rem;
+        }
+
+        .nav-button {
+          flex: 1;
+          padding: 0.7rem;
+          border-radius: 50px;
+          font-size: 0.85rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s;
+        }
+
+        .nav-button.back {
+          background: transparent;
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          color: rgba(255, 255, 255, 0.7);
+        }
+
+        .nav-button.back:hover {
+          border-color: rgba(255, 255, 255, 0.4);
+          color: #fff;
+        }
+
+        .nav-button.next {
+          background: #8b5cf6;
+          border: none;
+          color: #fff;
+        }
+
+        .nav-button.next:hover:not(:disabled) {
+          background: #9f75f8;
+          transform: translateY(-2px);
+          box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
+        }
+
+        .nav-button.next:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
       `}</style>
 
       {/* Separate overlay for transaction progress with Blue Guidance Box */}
@@ -989,7 +1091,28 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <button className="close-button" onClick={onClose}>✕</button>
             <h2 className="modal-title">Light a Candle</h2>
-            
+
+            {/* Step Indicator */}
+            <div className="step-indicator">
+              {[1, 2, 3].map((step, index) => (
+                <React.Fragment key={step}>
+                  <div
+                    className={`step-dot ${currentStep === step ? 'active' : ''} ${currentStep > step ? 'completed' : ''}`}
+                  />
+                  {index < 2 && (
+                    <div className={`step-connector ${currentStep > step ? 'active' : ''}`} />
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+
+            {/* Step Title */}
+            <div className="step-title">
+              {currentStep === 1 && 'Choose Your Intent'}
+              {currentStep === 2 && 'Write Your Message'}
+              {currentStep === 3 && 'Make Your Offering'}
+            </div>
+
             {/* Validation Error Display */}
             {validationError && (
               <div style={{
@@ -1006,295 +1129,355 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
               </div>
             )}
 
-            {/* Compact Info Section - Always visible */}
-            <div style={{
-              background: 'rgba(139, 92, 246, 0.05)',
-              border: '1px solid rgba(139, 92, 246, 0.2)',
-              borderRadius: '8px',
-              padding: '0.5rem',
-              marginBottom: '0.5rem',
-              fontSize: '0.6rem',
-              color: 'rgba(255, 255, 255, 0.7)',
-              lineHeight: '1.3',
-              display: 'flex',
-              gap: '0.75rem',
-              flexWrap: 'wrap',
-              justifyContent: 'center'
-            }}>
-              <span>💎 1 token min</span>
-              <span>⏱️ 80hr expiry</span>
-              <span>🕯️ 1 per wallet</span>
-            </div>
-            
-            <form onSubmit={handleSubmit} style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              flex: 1
-            }}>
-            
-            {/* Offering Type Selection */}
-            <label className="form-label" style={{ textAlign: 'left', marginBottom: '0.3rem' }}>
-              Prayer Protocol:
-            </label>
-            <div className="offering-types">
-              {Object.entries(offeringTypes).map(([type, config]) => (
-                <button
-                  key={type}
-                  type="button"
-                  className={`offering-type-button ${offeringType === type ? 'selected' : ''}`}
-                  style={{
-                    borderColor: offeringType === type ? config.color : 'transparent',
-                    color: offeringType === type ? config.color : '#fff'
-                  }}
-                  onClick={() => {
-                    setOfferingType(type);
-                    setSelectedPrayer(''); // Clear selected template when type changes
-                  }}
-                >
-                  <span className="type-icon">{config.icon}</span>
-                  <span className="type-label">{config.label}</span>
-                  <div className="type-description">{config.description}</div>
-                </button>
-              ))}
-            </div>
-
-            {/* Prayer Recipient Toggle */}
-            <div style={{ marginBottom: '0.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.4rem', gap: '0.5rem' }}>
-                <label className="form-label" style={{ margin: 0, fontSize: '0.65rem' }}>
-                  For:
-                </label>
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="prayerFor"
-                      value="self"
-                      checked={prayerFor === 'self'}
-                      onChange={() => {
-                        setPrayerFor('self');
-                        setRecipientName(user?.username || user?.firstName || '');
-                      }}
-                      style={{
-                        marginRight: '0.3rem',
-                        cursor: 'pointer',
-                        accentColor: '#8b5cf6'
-                      }}
-                    />
-                    <span style={{ fontSize: '0.7rem', color: 'rgba(255, 255, 255, 0.7)' }}>Me</span>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                    <input
-                      type="radio"
-                      name="prayerFor"
-                      value="other"
-                      checked={prayerFor === 'other'}
-                      onChange={() => {
-                        setPrayerFor('other');
-                        setRecipientName('');
-                      }}
-                      style={{
-                        marginRight: '0.3rem',
-                        cursor: 'pointer',
-                        accentColor: '#8b5cf6'
-                      }}
-                    />
-                    <span style={{ fontSize: '0.7rem', color: 'rgba(255, 255, 255, 0.7)' }}>Someone Else</span>
-                  </label>
-                </div>
-              </div>
-              
-              {/* Name Input */}
-              <input
-                type="text"
-                placeholder="Name"
-                value={prayerFor === 'self' ? (user?.username || user?.firstName || '') : recipientName}
-                onChange={(e) => {
-                  // Don't sanitize on keystroke - only basic XSS prevention
-                  const value = e.target.value
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;')
-                    .slice(0, 50);
-                  setRecipientName(value);
-                }}
-                disabled={prayerFor === 'self'}
-                style={{
-                  width: '100%',
-                  padding: '0.4rem',
-                  background: prayerFor === 'self' ? 'rgba(139, 92, 246, 0.05)' : 'rgba(255, 255, 255, 0.03)',
-                  border: '1px solid rgba(139, 92, 246, 0.3)',
-                  borderRadius: '8px',
-                  color: '#fff',
-                  fontSize: '0.75rem',
-                  opacity: prayerFor === 'self' ? 0.7 : 1,
-                  cursor: prayerFor === 'self' ? 'not-allowed' : 'text',
-                  boxSizing: 'border-box'
-                }}
-              />
-            </div>
-
-            {/* Message Input */}
-            <div className="form-group" style={{ marginBottom: '0.5rem' }}>
-              <label className="form-label" htmlFor="message">
-                Your Message to 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙
-              </label>
-              <textarea
-                id="message"
-                className="message-textarea"
-                placeholder={
-                  offeringType === 'petition'
-                    ? "Write your prayer or select a template below"
-                    : offeringType === 'confession'
-                    ? "Share what's on your heart..."
-                    : "Express your gratitude..."
-                }
-                value={message}
-                onChange={(e) => {
-                  // Don't sanitize on keystroke - only basic XSS prevention
-                  const value = e.target.value
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;')
-                    .slice(0, 300);
-                  setMessage(value);
-                }}
-                maxLength={300}
-              />
-              <div style={{ textAlign: 'right', fontSize: '0.6rem', color: '#666', marginTop: '0.1rem' }}>
-                {message.length}/300
-              </div>
-              
-              {/* Prayer Templates Section - Only for Petitions */}
-              {offeringType === 'petition' && (
+            <div className="step-content">
+              {/* STEP 1: Protocol + Recipient */}
+              {currentStep === 1 && (
                 <>
-                  {/* Language Selector */}
-                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.3rem' }}>
-                    <select 
-                      value={selectedLanguage}
+                  {/* Offering Type Selection */}
+                  <label className="form-label" style={{ textAlign: 'left', marginBottom: '0.5rem' }}>
+                    Prayer Protocol:
+                  </label>
+                  <div className="offering-types" style={{ marginBottom: '1.5rem' }}>
+                    {Object.entries(offeringTypes).map(([type, config]) => (
+                      <button
+                        key={type}
+                        type="button"
+                        className={`offering-type-button ${offeringType === type ? 'selected' : ''}`}
+                        style={{
+                          borderColor: offeringType === type ? config.color : 'transparent',
+                          color: offeringType === type ? config.color : '#fff'
+                        }}
+                        onClick={() => {
+                          setOfferingType(type);
+                          setSelectedPrayer(''); // Clear selected template when type changes
+                          setMessage(''); // Clear message when type changes
+                        }}
+                      >
+                        <span className="type-icon">{config.icon}</span>
+                        <span className="type-label">{config.label}</span>
+                        <div className="type-description">{config.description}</div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Prayer Recipient Toggle */}
+                  <div style={{ marginBottom: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.6rem', gap: '0.5rem' }}>
+                      <label className="form-label" style={{ margin: 0, fontSize: '0.7rem' }}>
+                        Light this candle for:
+                      </label>
+                    </div>
+                    <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.75rem' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="prayerFor"
+                          value="self"
+                          checked={prayerFor === 'self'}
+                          onChange={() => {
+                            setPrayerFor('self');
+                            setRecipientName(user?.username || user?.firstName || '');
+                          }}
+                          style={{
+                            marginRight: '0.4rem',
+                            cursor: 'pointer',
+                            accentColor: '#8b5cf6'
+                          }}
+                        />
+                        <span style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.8)' }}>Myself</span>
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="prayerFor"
+                          value="other"
+                          checked={prayerFor === 'other'}
+                          onChange={() => {
+                            setPrayerFor('other');
+                            setRecipientName('');
+                          }}
+                          style={{
+                            marginRight: '0.4rem',
+                            cursor: 'pointer',
+                            accentColor: '#8b5cf6'
+                          }}
+                        />
+                        <span style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.8)' }}>Someone Else</span>
+                      </label>
+                    </div>
+
+                    {/* Name Input */}
+                    <input
+                      type="text"
+                      placeholder={prayerFor === 'self' ? 'Your name' : "Enter their name"}
+                      value={prayerFor === 'self' ? (user?.username || user?.firstName || '') : recipientName}
                       onChange={(e) => {
-                        setSelectedLanguage(e.target.value);
-                        setSelectedPrayer(''); // Clear selected prayer when language changes
-                        setMessage(''); // Clear message to let user pick a new prayer
+                        const value = e.target.value
+                          .replace(/</g, '&lt;')
+                          .replace(/>/g, '&gt;')
+                          .slice(0, 50);
+                        setRecipientName(value);
                       }}
+                      disabled={prayerFor === 'self'}
                       style={{
-                        flex: '0 0 auto',
-                        padding: '0.4rem',
-                        background: 'rgba(139, 92, 246, 0.1)',
+                        width: '100%',
+                        padding: '0.6rem',
+                        background: prayerFor === 'self' ? 'rgba(139, 92, 246, 0.05)' : 'rgba(255, 255, 255, 0.03)',
                         border: '1px solid rgba(139, 92, 246, 0.3)',
-                        borderRadius: '8px',
-                        color: '#8b5cf6',
+                        borderRadius: '10px',
+                        color: '#fff',
                         fontSize: '0.85rem',
-                        cursor: 'pointer'
+                        opacity: prayerFor === 'self' ? 0.7 : 1,
+                        cursor: prayerFor === 'self' ? 'not-allowed' : 'text',
+                        boxSizing: 'border-box'
                       }}
-                    >
-                      <option value="en">English</option>
-                      <option value="es">Español</option>
-                      <option value="pt">Português</option>
-                      <option value="fr">Français</option>
-                      <option value="zh">中文</option>
-                      <option value="hi">हिंदी</option>
-                      <option value="it">Italiano</option>
-                    </select>
-                    
-                    {/* Prayer Template Selector */}
-                    <select 
-                      value={selectedPrayer}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* STEP 2: Message */}
+              {currentStep === 2 && (
+                <>
+                  <div className="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                    <label className="form-label" htmlFor="message" style={{ marginBottom: '0.5rem' }}>
+                      Your Message to 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙
+                    </label>
+                    <textarea
+                      id="message"
+                      className="message-textarea"
+                      style={{ flex: 1, minHeight: '120px' }}
+                      placeholder={
+                        offeringType === 'petition'
+                          ? "Write your prayer or select a template below"
+                          : offeringType === 'confession'
+                          ? "Share what's on your heart..."
+                          : "Express your gratitude..."
+                      }
+                      value={message}
                       onChange={(e) => {
-                        const value = e.target.value;
-                        setSelectedPrayer(value);
-                        if (value) {
-                          const prayer = prayerTemplates.find(p => p.id === value);
-                          if (prayer) {
-                            setMessage(prayer.text);
-                          }
-                        }
+                        const value = e.target.value
+                          .replace(/</g, '&lt;')
+                          .replace(/>/g, '&gt;')
+                          .slice(0, 300);
+                        setMessage(value);
                       }}
-                      style={{
-                        flex: 1,
-                        padding: '0.4rem',
-                        background: 'rgba(139, 92, 246, 0.1)',
-                        border: '1px solid rgba(139, 92, 246, 0.3)',
-                        borderRadius: '8px',
-                        color: '#8b5cf6',
-                        fontSize: '0.85rem',
-                        cursor: 'pointer'
+                      maxLength={300}
+                    />
+                    <div style={{ textAlign: 'right', fontSize: '0.65rem', color: '#666', marginTop: '0.25rem' }}>
+                      {message.length}/300
+                    </div>
+
+                    {/* Prayer Templates Section - Only for Petitions */}
+                    {offeringType === 'petition' && (
+                      <div style={{ marginTop: '0.75rem' }}>
+                        <label className="form-label" style={{ marginBottom: '0.4rem', fontSize: '0.65rem' }}>
+                          Or choose a template:
+                        </label>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <select
+                            value={selectedLanguage}
+                            onChange={(e) => {
+                              setSelectedLanguage(e.target.value);
+                              setSelectedPrayer('');
+                              setMessage('');
+                            }}
+                            style={{
+                              flex: '0 0 auto',
+                              padding: '0.5rem',
+                              background: 'rgba(139, 92, 246, 0.1)',
+                              border: '1px solid rgba(139, 92, 246, 0.3)',
+                              borderRadius: '8px',
+                              color: '#8b5cf6',
+                              fontSize: '0.85rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <option value="en">English</option>
+                            <option value="es">Español</option>
+                            <option value="pt">Português</option>
+                            <option value="fr">Français</option>
+                            <option value="zh">中文</option>
+                            <option value="hi">हिंदी</option>
+                            <option value="it">Italiano</option>
+                          </select>
+
+                          <select
+                            value={selectedPrayer}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setSelectedPrayer(value);
+                              if (value) {
+                                const prayer = prayerTemplates.find(p => p.id === value);
+                                if (prayer) {
+                                  setMessage(prayer.text);
+                                }
+                              }
+                            }}
+                            style={{
+                              flex: 1,
+                              padding: '0.5rem',
+                              background: 'rgba(139, 92, 246, 0.1)',
+                              border: '1px solid rgba(139, 92, 246, 0.3)',
+                              borderRadius: '8px',
+                              color: '#8b5cf6',
+                              fontSize: '0.85rem',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <option value="">Select a prayer...</option>
+                            {prayerTemplates.map(prayer => (
+                              <option key={prayer.id} value={prayer.id}>
+                                {prayer.title}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* STEP 3: Token Amount + Confirm */}
+              {currentStep === 3 && (
+                <>
+                  {/* Summary of choices */}
+                  <div style={{
+                    background: 'rgba(139, 92, 246, 0.05)',
+                    border: '1px solid rgba(139, 92, 246, 0.2)',
+                    borderRadius: '10px',
+                    padding: '0.75rem',
+                    marginBottom: '1rem',
+                    fontSize: '0.75rem'
+                  }}>
+                    <div style={{ color: 'rgba(255, 255, 255, 0.6)', marginBottom: '0.25rem' }}>
+                      {offeringTypes[offeringType]?.label} for {prayerFor === 'self' ? (user?.username || user?.firstName || 'yourself') : (recipientName || 'someone')}
+                    </div>
+                    {message && (
+                      <div style={{
+                        color: 'rgba(255, 255, 255, 0.4)',
+                        fontStyle: 'italic',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        "{message.slice(0, 50)}{message.length > 50 ? '...' : ''}"
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Info Section */}
+                  <div style={{
+                    background: 'rgba(0, 245, 212, 0.05)',
+                    border: '1px solid rgba(0, 245, 212, 0.2)',
+                    borderRadius: '10px',
+                    padding: '0.6rem',
+                    marginBottom: '1rem',
+                    fontSize: '0.65rem',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    display: 'flex',
+                    gap: '1rem',
+                    justifyContent: 'center'
+                  }}>
+                    <span>💎 1 token min</span>
+                    <span>⏱️ 80hr expiry</span>
+                    <span>🕯️ 1 per wallet</span>
+                  </div>
+
+                  {/* Token Amount */}
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="tokens">
+                      RL80 Tokens to Burn
+                    </label>
+                    <input
+                      id="tokens"
+                      type="text"
+                      inputMode="numeric"
+                      className="token-input"
+                      value={tokenAmount ? parseInt(tokenAmount).toLocaleString() : ''}
+                      onChange={(e) => {
+                        const rawValue = e.target.value.replace(/[^0-9]/g, '');
+                        setTokenAmount(rawValue);
                       }}
-                    >
-                      <option value="">Select a prayer template...</option>
-                      {prayerTemplates.map(prayer => (
-                        <option key={prayer.id} value={prayer.id}>
-                          {prayer.title}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder="1 RL80 minimum"
+                      required
+                      style={{ fontSize: '1rem', padding: '0.75rem' }}
+                    />
+                    {tokenBalance !== null && tokenBalance !== undefined ? (
+                      <div className="token-balance" style={{ marginTop: '0.5rem' }}>
+                        Balance: {tokenBalance.toLocaleString()} RL80
+                      </div>
+                    ) : walletAddress ? (
+                      <div className="token-balance">
+                        Loading balance...
+                      </div>
+                    ) : (
+                      <div className="token-balance" style={{ color: '#ff6b35' }}>
+                        Connect wallet to see balance
+                      </div>
+                    )}
                   </div>
                 </>
               )}
             </div>
 
+            {/* Step Navigation */}
+            <div className="step-navigation">
+              {currentStep > 1 && (
+                <button
+                  type="button"
+                  className="nav-button back"
+                  onClick={() => setCurrentStep(currentStep - 1)}
+                >
+                  Back
+                </button>
+              )}
 
-            {/* Token Amount */}
-            <div className="form-group" style={{ marginBottom: '0.5rem' }}>
-              <label className="form-label" htmlFor="tokens">
-                RL80 Tokens to Burn
-              </label>
-              <input
-                id="tokens"
-                type="text"
-                inputMode="numeric"
-                className="token-input"
-                value={tokenAmount ? parseInt(tokenAmount).toLocaleString() : ''}
-                onChange={(e) => {
-                  // Remove commas and non-numeric characters
-                  const rawValue = e.target.value.replace(/[^0-9]/g, '');
-                  setTokenAmount(rawValue);
-                }}
-                placeholder="1 RL80 minimum"
-                required
-              />
-              {tokenBalance !== null && tokenBalance !== undefined ? (
-                <div className="token-balance">
-                  Balance: {tokenBalance.toLocaleString()} RL80
-                </div>
-              ) : walletAddress ? (
-                <div className="token-balance">
-                  Loading balance...
-                </div>
+              {currentStep < TOTAL_STEPS ? (
+                <button
+                  type="button"
+                  className="nav-button next"
+                  onClick={() => {
+                    // Validation for step 1
+                    if (currentStep === 1 && prayerFor === 'other' && !recipientName.trim()) {
+                      showError('Please enter a name for the recipient');
+                      return;
+                    }
+                    setCurrentStep(currentStep + 1);
+                    setValidationError('');
+                  }}
+                  style={currentStep === 1 ? { flex: 1 } : {}}
+                >
+                  Continue
+                </button>
               ) : (
-                <div className="token-balance" style={{ color: '#ff6b35' }}>
-                  Connect wallet to see balance
-                </div>
+                <button
+                  type="button"
+                  className="submit-button"
+                  onClick={async () => {
+                    if (!validateCandleForm()) {
+                      return;
+                    }
+
+                    const validation = validateAmount(tokenAmount, parseInt(tokenBalance));
+                    if (!validation.isValid) {
+                      showError(validation.error);
+                      return;
+                    }
+
+                    setPendingBurnAmount(validation.value);
+                    setShowConfirmation(true);
+                    setValidationError('');
+                  }}
+                  disabled={isSubmitting || !tokenAmount || parseInt(tokenAmount) < 1}
+                  style={{ flex: 1 }}
+                >
+                  {isSubmitting ? 'Processing...' : 'Light Candle'}
+                </button>
               )}
             </div>
-            
-            {/* Submit Button - Light Candle with token burn */}
-            <button
-              onClick={async () => {
-                // Validate before proceeding
-                if (!validateCandleForm()) {
-                  return;
-                }
-                
-                const validation = validateAmount(tokenAmount, parseInt(tokenBalance));
-                if (!validation.isValid) {
-                  showError(validation.error);
-                  return;
-                }
-                
-                // Show custom confirmation modal
-                setPendingBurnAmount(validation.value);
-                setShowConfirmation(true);
-                setValidationError(''); // Clear any existing errors
-              }}
-              disabled={isSubmitting || !tokenAmount || parseInt(tokenAmount) < 1}
-              className="submit-button"
-              style={{
-                marginTop: '0.5rem'
-              }}
-            >
-              {isSubmitting ? 'Processing...' : 'Light Candle'}
-            </button>
-            </form>
-            
+
           </div>
         ) : null}
       </div>

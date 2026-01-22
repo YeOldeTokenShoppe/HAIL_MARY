@@ -12,9 +12,9 @@ const Footer = ({ isMobile = false }) => {
 
   return (
     <footer style={{
-      marginTop: '8rem',
-      padding: '8rem 2rem 2rem 2rem',
-      background: 'linear-gradient(to bottom, rgba(234, 124, 14, 0.0), rgba(14, 84, 234, 0.6))',
+      // marginTop: '8rem',
+      padding: '2rem 2rem 2rem 2rem',
+      background: 'transparent',
       color: '#ffffff',
       textAlign: 'center',
       position: 'relative',
@@ -86,9 +86,14 @@ const Footer = ({ isMobile = false }) => {
           margin: '1.5rem auto'
         }} />
         
-        {/* Contact Link */}
+        {/* Contact & Social Links */}
         <div style={{
-          marginBottom: '2rem'
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '1.5rem',
+          marginBottom: '2rem',
+          flexWrap: 'wrap',
         }}>
           <Link href="mailto:411@rl80.com" style={{
             color: '#d4af37',
@@ -112,8 +117,45 @@ const Footer = ({ isMobile = false }) => {
           }}>
             Contact
           </Link>
+
+          <a
+            href="https://x.com/rlaborare"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0.5rem',
+              borderRadius: '50%',
+              border: '1px solid rgba(212, 175, 55, 0.5)',
+              transition: 'all 0.3s ease',
+              width: '44px',
+              height: '44px',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(212, 175, 55, 0.1)';
+              e.currentTarget.style.boxShadow = '0 0 15px rgba(212, 175, 55, 0.4)';
+              e.currentTarget.style.transform = 'scale(1.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.boxShadow = 'none';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            <img
+              src="/images/x_logo.svg"
+              alt="X (Twitter)"
+              style={{
+                width: '20px',
+                height: '20px',
+                filter: 'brightness(0) invert(1)',
+              }}
+            />
+          </a>
         </div>
-        
+
         {/* Blessing Text */}
         <p style={{
           fontSize: '1rem',

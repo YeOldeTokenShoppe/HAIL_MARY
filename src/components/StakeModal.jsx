@@ -18,9 +18,10 @@ import { toWei } from "thirdweb/utils";
 import { useStaking } from '@/hooks/useStaking';
 import { validateAmount, validateTransaction, checkRateLimit, formatSafeErrorMessage } from '@/utils/security';
 
-const StakeModal = ({ isOpen, onClose, onStake }) => {
+const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
   const { user } = useUser();
   const { walletAddress, tokenBalance, refreshBalance, activeAccount } = useWalletAuth();
+  const [showPhaseTooltip, setShowPhaseTooltip] = useState(false);
   const { 
     stakedBalance, 
     earnedRewards, 
@@ -392,6 +393,69 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
               )}
             </div>
             
+            {/* Phase Status Banner for Dashboard */}
+            {currentPhase === 1 && (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.12), rgba(255, 193, 7, 0.08))',
+                border: '1px solid rgba(212, 175, 55, 0.3)',
+                borderRadius: '10px',
+                padding: '0.75rem 1rem',
+                marginBottom: '1.25rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+              }}>
+                <span style={{ fontSize: '1.1rem' }}>⏳</span>
+                <div>
+                  <span style={{
+                    fontSize: '0.8rem',
+                    fontWeight: '600',
+                    color: '#d4af37',
+                  }}>
+                    Phase 1: Pre-Rewards
+                  </span>
+                  <p style={{
+                    fontSize: '0.7rem',
+                    color: 'rgba(255, 255, 255, 0.6)',
+                    margin: '0.2rem 0 0 0',
+                  }}>
+                    Your position is secured. Rewards activate in Phase 2.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {(currentPhase === 2 || currentPhase === 3) && (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(0, 245, 212, 0.12), rgba(0, 187, 255, 0.08))',
+                border: '1px solid rgba(0, 245, 212, 0.3)',
+                borderRadius: '10px',
+                padding: '0.75rem 1rem',
+                marginBottom: '1.25rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+              }}>
+                <span style={{ fontSize: '1.1rem' }}>💰</span>
+                <div>
+                  <span style={{
+                    fontSize: '0.8rem',
+                    fontWeight: '600',
+                    color: '#00f5d4',
+                  }}>
+                    Phase {currentPhase}: Rewards Active
+                  </span>
+                  <p style={{
+                    fontSize: '0.7rem',
+                    color: 'rgba(255, 255, 255, 0.6)',
+                    margin: '0.2rem 0 0 0',
+                  }}>
+                    {currentPhase === 2 ? '1%' : '2%'} of transaction tax flowing to stakers
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Staking Activity Section */}
             <div style={{
               marginBottom: '1.5rem'
@@ -733,9 +797,185 @@ const StakeModal = ({ isOpen, onClose, onStake }) => {
             </div>
             
             
+            {/* Phase Status Banner */}
+            {currentPhase === 1 && (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.15), rgba(255, 193, 7, 0.1))',
+                border: '1px solid rgba(212, 175, 55, 0.4)',
+                borderRadius: '12px',
+                padding: '1rem',
+                marginBottom: '1rem',
+                position: 'relative',
+              }}>
+                {/* Main Status */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  marginBottom: '0.5rem',
+                }}>
+                  <span style={{ fontSize: '1.2rem' }}>🔓</span>
+                  <span style={{
+                    fontSize: '0.9rem',
+                    fontWeight: '600',
+                    color: '#d4af37',
+                    fontFamily: "'Orbitron', monospace",
+                    letterSpacing: '0.5px',
+                  }}>
+                    Staking is Open
+                  </span>
+                  <span style={{
+                    fontSize: '0.75rem',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    fontStyle: 'italic',
+                  }}>
+                    (Rewards Activate in Phase 2)
+                  </span>
+                </div>
+
+                {/* Subtext */}
+                <p style={{
+                  fontSize: '0.8rem',
+                  color: 'rgba(255, 255, 255, 0.8)',
+                  margin: '0 0 0.25rem 0',
+                  lineHeight: '1.4',
+                }}>
+                  Stake early to secure your position.
+                </p>
+                <p style={{
+                  fontSize: '0.75rem',
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  margin: 0,
+                  lineHeight: '1.4',
+                }}>
+                  Rewards begin once liquidity and volume thresholds are met.
+                </p>
+
+                {/* Tooltip Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setShowPhaseTooltip(!showPhaseTooltip)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#d4af37',
+                    fontSize: '0.7rem',
+                    cursor: 'pointer',
+                    padding: '0.5rem 0 0 0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.3rem',
+                    opacity: 0.9,
+                    transition: 'opacity 0.2s',
+                  }}
+                  onMouseEnter={(e) => e.target.style.opacity = '1'}
+                  onMouseLeave={(e) => e.target.style.opacity = '0.9'}
+                >
+                  <span>{showPhaseTooltip ? '▼' : '▶'}</span>
+                  What does this mean?
+                </button>
+
+                {/* Expanded Tooltip */}
+                {showPhaseTooltip && (
+                  <div style={{
+                    marginTop: '0.75rem',
+                    paddingTop: '0.75rem',
+                    borderTop: '1px solid rgba(212, 175, 55, 0.2)',
+                  }}>
+                    <ul style={{
+                      margin: 0,
+                      paddingLeft: '1.25rem',
+                      fontSize: '0.75rem',
+                      color: 'rgba(255, 255, 255, 0.75)',
+                      lineHeight: '1.6',
+                    }}>
+                      <li style={{ marginBottom: '0.3rem' }}>
+                        <span style={{ color: '#d4af37' }}>•</span> Tokens are locked per staking rules
+                      </li>
+                      <li style={{ marginBottom: '0.3rem' }}>
+                        <span style={{ color: '#d4af37' }}>•</span> No rewards are distributed during Phase 1
+                      </li>
+                      <li style={{ marginBottom: '0.3rem' }}>
+                        <span style={{ color: '#d4af37' }}>•</span> All rewards accrued before Phase 2 are queued
+                      </li>
+                      <li>
+                        <span style={{ color: '#d4af37' }}>•</span> Early stakers are first in line when rewards activate
+                      </li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Phase 2+ Active Rewards Banner */}
+            {(currentPhase === 2 || currentPhase === 3) && (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(0, 245, 212, 0.15), rgba(0, 187, 255, 0.1))',
+                border: '1px solid rgba(0, 245, 212, 0.4)',
+                borderRadius: '12px',
+                padding: '0.75rem 1rem',
+                marginBottom: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}>
+                <span style={{ fontSize: '1.2rem' }}>💰</span>
+                <div>
+                  <span style={{
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    color: '#00f5d4',
+                    fontFamily: "'Orbitron', monospace",
+                  }}>
+                    Rewards Active
+                  </span>
+                  <span style={{
+                    fontSize: '0.75rem',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    marginLeft: '0.5rem',
+                  }}>
+                    Phase {currentPhase}: {currentPhase === 2 ? '1%' : '2%'} of tax → staking rewards
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Phase 4 Zero Tax Banner */}
+            {currentPhase === 4 && (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(138, 43, 226, 0.15), rgba(75, 0, 130, 0.1))',
+                border: '1px solid rgba(138, 43, 226, 0.4)',
+                borderRadius: '12px',
+                padding: '0.75rem 1rem',
+                marginBottom: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}>
+                <span style={{ fontSize: '1.2rem' }}>✨</span>
+                <div>
+                  <span style={{
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    color: '#9b59b6',
+                    fontFamily: "'Orbitron', monospace",
+                  }}>
+                    Zero Tax Mode
+                  </span>
+                  <span style={{
+                    fontSize: '0.75rem',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    marginLeft: '0.5rem',
+                  }}>
+                    Protocol is self-sustaining. Withdraw anytime.
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Compact Info Toggle Button */}
-            <div style={{ 
-              textAlign: 'right', 
+            <div style={{
+              textAlign: 'right',
               marginBottom: '0.25rem',
               marginTop: '-0.75rem'
             }}>

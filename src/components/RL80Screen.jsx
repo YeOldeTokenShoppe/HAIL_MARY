@@ -101,32 +101,37 @@ const useRL80Data = () => {
 
           // Process decisions for each asset
           snapshot.docs.forEach(doc => {
-            const decision = doc.data()
-            const asset = decision.asset || 'ETH'
+            const decisionDoc = doc.data()
+            const asset = decisionDoc.asset || 'ETH'
 
             // Only process if we haven't seen this asset yet (get most recent)
             if (!assetDecisions[asset] && TRADEABLE_ASSETS.includes(asset)) {
+              // Map the decision action (LONG/SHORT/FLAT) to display action (BUY/SELL/HOLD)
+              const rawAction = decisionDoc.decision?.action || 'FLAT'
+              const displayAction = rawAction === 'LONG' ? 'BUY' : rawAction === 'SHORT' ? 'SELL' : 'HOLD'
+
               assetDecisions[asset] = {
-                action: decision.recommendation?.action || 'HOLD',
-                confidence: decision.aggregated?.weightedConfidence || 0.5,
-                reasoning: decision.recommendation?.rationale || 'No data',
-                size: decision.recommendation?.sizePercent || 0
+                action: displayAction,
+                confidence: decisionDoc.aggregated?.weightedConfidence || 0.5,
+                reasoning: decisionDoc.decision?.rationale || 'No data',
+                size: decisionDoc.decision?.positionSize || 0
               }
 
               // Extract per-asset analyst scores
-              const analysts = decision.analysts || {}
+              const analysts = decisionDoc.analysts || {}
               assetScoresData[asset] = {
                 EMO: { direction: analysts.EMO?.score || 0, confidence: analysts.EMO?.confidence || 0.5 },
                 TEKNO: { direction: analysts.TEKNO?.score || 0, confidence: analysts.TEKNO?.confidence || 0.5 },
                 MACRO: { direction: analysts.MACRO?.score || 0, confidence: analysts.MACRO?.confidence || 0.5 }
               }
 
-              // Calculate consensus for this asset
-              const aggregated = decision.aggregated || {}
-              const consensusScore = ((aggregated.weightedDirection || 0) + 10) * 5
+              // Calculate consensus for this asset - weightedScore is stored as weightedScore, not weightedDirection
+              const aggregated = decisionDoc.aggregated || {}
+              const weightedScore = aggregated.weightedScore || 0
+              const consensusScore = ((weightedScore) + 10) * 5 // Convert -10..+10 to 0..100
               consensusData[asset] = {
                 score: Math.round(consensusScore),
-                direction: getDirectionFromScore(aggregated.weightedDirection || 0)
+                direction: getDirectionFromScore(weightedScore)
               }
 
               // Use first decision's analysts for legacy format
@@ -190,6 +195,7 @@ const useRL80Data = () => {
     )
 
     // Also listen to agentScores for real-time analyst updates
+    // This is the PRIMARY source for asset signals since it's reliably populated
     const scoresQuery = query(
       collection(db, 'agentScores'),
       orderBy('createdAt', 'desc'),
@@ -229,6 +235,71 @@ const useRL80Data = () => {
           })
 
           if (Object.keys(recentScores).length > 0) {
+            // Calculate per-asset consensus from analyst scores
+            // Weights: EMO: 0.25, TEKNO: 0.35, MACRO: 0.40
+            const weights = { EMO: 0.25, TEKNO: 0.35, MACRO: 0.40 }
+            const calculatedConsensus = {}
+            const calculatedDecisions = {}
+
+            TRADEABLE_ASSETS.forEach(asset => {
+              const assetAgentScores = assetScoresUpdate[asset]
+              let weightedSum = 0
+              let weightedConfidence = 0
+              let totalWeight = 0
+
+              Object.entries(assetAgentScores).forEach(([agentId, scoreData]) => {
+                const weight = weights[agentId] || 0.33
+                if (scoreData.direction !== undefined) {
+                  weightedSum += scoreData.direction * weight
+                  weightedConfidence += (scoreData.confidence || 0.5) * weight
+                  totalWeight += weight
+                }
+              })
+
+              // Normalize if we have weights
+              if (totalWeight > 0) {
+                const normalizedDirection = weightedSum / totalWeight
+                const normalizedConfidence = weightedConfidence / totalWeight
+                // Convert -10..+10 to 0..100
+                const consensusScore = Math.round((normalizedDirection + 10) * 5)
+
+                calculatedConsensus[asset] = {
+                  score: consensusScore,
+                  direction: getDirectionFromScore(normalizedDirection)
+                }
+
+                // Determine action and hold reason based on thresholds
+                // MIN_SCORE_MAGNITUDE = 2, MIN_CONFIDENCE = 0.4
+                const directionMagnitude = Math.abs(normalizedDirection)
+                const meetsDirectionThreshold = directionMagnitude >= 2
+                const meetsConfidenceThreshold = normalizedConfidence >= 0.4
+
+                let action = 'HOLD'
+                let holdReason = null
+
+                if (meetsDirectionThreshold && meetsConfidenceThreshold) {
+                  action = normalizedDirection >= 2 ? 'BUY' : 'SELL'
+                } else {
+                  // Determine why we're not trading
+                  if (!meetsDirectionThreshold && !meetsConfidenceThreshold) {
+                    holdReason = 'Weak signal & low confidence'
+                  } else if (!meetsDirectionThreshold) {
+                    holdReason = `Signal too weak (${directionMagnitude.toFixed(1)}/2.0)`
+                  } else {
+                    holdReason = `Low confidence (${(normalizedConfidence * 100).toFixed(0)}%/40%)`
+                  }
+                }
+
+                calculatedDecisions[asset] = {
+                  action,
+                  confidence: normalizedConfidence,
+                  reasoning: holdReason || `Consensus: ${consensusScore}/100`,
+                  holdReason,
+                  size: 0
+                }
+              }
+            })
+
             setData(prev => ({
               ...prev,
               analystScores: {
@@ -240,6 +311,15 @@ const useRL80Data = () => {
                 ETH: { ...prev.assetScores.ETH, ...assetScoresUpdate.ETH },
                 SOL: { ...prev.assetScores.SOL, ...assetScoresUpdate.SOL },
                 XRP: { ...prev.assetScores.XRP, ...assetScoresUpdate.XRP }
+              },
+              // Update consensus and decisions from agentScores (primary source)
+              consensus: {
+                ...prev.consensus,
+                ...calculatedConsensus
+              },
+              decisions: {
+                ...prev.decisions,
+                ...calculatedDecisions
               }
             }))
           }
@@ -609,11 +689,22 @@ function drawMultiAssetDecisionMatrix(ctx, decisions, consensus, y, time) {
     ctx.font = '9px monospace'
     ctx.fillText(`${score}`, x + 5, boxY + 62)
 
-    // Confidence indicator (small dots)
-    const confLevel = Math.floor((decision.confidence || 0.5) * 5)
-    for (let j = 0; j < 5; j++) {
-      ctx.fillStyle = j < confLevel ? '#FFD700' : 'rgba(255, 255, 255, 0.15)'
-      ctx.fillRect(x + 35 + j * 8, boxY + 56, 5, 5)
+    // Show hold reason if not trading, otherwise show confidence dots
+    if (decision.holdReason && !isActive) {
+      // Hold reason text (truncated to fit)
+      ctx.fillStyle = 'rgba(255, 165, 0, 0.8)' // Orange for warning
+      ctx.font = '7px monospace'
+      const reason = decision.holdReason.length > 18
+        ? decision.holdReason.substring(0, 18) + '..'
+        : decision.holdReason
+      ctx.fillText(reason, x + 25, boxY + 62)
+    } else {
+      // Confidence indicator (small dots)
+      const confLevel = Math.floor((decision.confidence || 0.5) * 5)
+      for (let j = 0; j < 5; j++) {
+        ctx.fillStyle = j < confLevel ? '#FFD700' : 'rgba(255, 255, 255, 0.15)'
+        ctx.fillRect(x + 35 + j * 8, boxY + 56, 5, 5)
+      }
     }
 
     // Size if trading

@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, useInView } from 'framer-motion';
 import SkewedHeading from '@/components/SkewedHeading';
 
@@ -15,6 +15,46 @@ export default function CyberFAQSection({ isMobile = false }) {
   const [scanlinePos, setScanlinePos] = useState(0);
   const [sessionId, setSessionId] = useState('LOADING');
 
+  // Track which sections have already been animated (show instantly on re-open)
+  const [animatedQueries, setAnimatedQueries] = useState({});
+  const [animatedSubQueries, setAnimatedSubQueries] = useState({});
+
+  // Refs to store interval IDs for proper cleanup
+  const typewriterIntervalRef = useRef(null);
+  const subTypewriterIntervalsRef = useRef({});
+
+  // Helper function to render text with clickable links
+  const renderTextWithLinks = (text) => {
+    if (!text) return null;
+
+    // URL regex pattern
+    const urlPattern = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlPattern);
+
+    return parts.map((part, index) => {
+      if (part.match(urlPattern)) {
+        return (
+          <a
+            key={index}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              color: '#00ffff',
+              textDecoration: 'underline',
+              wordBreak: 'break-all',
+              cursor: 'pointer'
+            }}
+          >
+            {part}
+          </a>
+        );
+      }
+      return <span key={index}>{part}</span>;
+    });
+  };
+
   // FAQ data with terminal-style queries
   const faqData = [
     {
@@ -23,7 +63,7 @@ export default function CyberFAQSection({ isMobile = false }) {
       title: 'What is RL80"?',
       response: ` ACCESSING DATABASE... 
       
-RL80 is the on-chain expression of Our Lady of Perpetual Profit—a watcher of markets across centuries, now instantiated in code.
+RL80 is the on-chain expression of Our Lady of Perpetual Profit — a watcher of markets and protector of portfolios across centuries, now instantiated in code.
 It uses transparent mechanics, community participation, and creative presentation to explore how trust, incentives, and belief systems shape financial behavior.
 
 `,
@@ -35,7 +75,7 @@ It uses transparent mechanics, community participation, and creative presentatio
           title: 'What can I do with RL80?',
           response: `LOADING UTILITY MODULE...
 
-You can simply hold RL80, or you can actively engage with its features and micro-economy.
+You can simply hold RL80, or you can actively engage with its features.
 Nothing is required, and no action is framed as an obligation. The system is designed so that meaning and utility emerge from how the community chooses to participate.
 Depending on how you choose to engage, RL80 allows you to:
 	•	Hold as a long-term signal of alignment
@@ -61,7 +101,7 @@ Depending on how you choose to engage, RL80 allows you to:
           id: 'SUB_001_C',
           command: '>> SUB.QUERY: BURN.Mechanism',
           title: 'Why would I burn RL80 tokens?',
-          response: `ANALYZING IGNITION MECHANISM...
+          response: `ANALYZING BURN MECHANISM...
 
       Burning is the primary utility of RL80.
 
@@ -74,44 +114,115 @@ Depending on how you choose to engage, RL80 allows you to:
       On the Illumin80 page, the total number of candles burning and tokens burned to date form a living display of collective engagement—a quiet, real-time signal of sentiment, conviction, and attention over time.
 `,
           status: '[MECHANISM.ANALYZED]'
+        },
+        {
+          id: 'SUB_001_D',
+          command: '>> SUB.QUERY: Purchase.Protocol',
+          title: 'How do I buy RL80?',
+          response: `LOADING ACQUISITION PROTOCOLS...
+
+RL80 is available on the Base network. There are several ways to acquire it:
+
+OPTION 1: BUY WITH CREDIT/DEBIT CARD (Easiest)
+• Use our built-in purchase widget on the site
+• Pay with credit card, debit card, or bank transfer
+• No existing crypto or wallet required
+• A non-custodial wallet is automatically created for you
+• Tokens are delivered directly to your new wallet
+• You'll receive instructions to access and secure your wallet
+
+OPTION 2: SWAP ETH FOR RL80
+• If you already have ETH, use our swap feature
+• Connect your existing wallet (MetaMask, Coinbase, etc.)
+• Swap ETH for RL80 directly on the site
+
+OPTION 3: BUY VIA UNISWAP
+• For experienced users with existing wallets
+• Go to Uniswap and connect to Base network
+• Search for RL80 or paste the contract address
+• Swap ETH or other tokens for RL80
+
+CONTRACT ADDRESS (Base):
+[Contract address will be displayed here - verify before transacting]
+
+IMPORTANT: Always verify you have the correct token contract to avoid scams.
+`,
+          status: '[ACQUISITION.READY]'
         }
       ]
     },
     {
-      id: 'QUERY_002', 
+      id: 'QUERY_002',
       command: '> QUERY: Special.Status',
       title: 'What is The Illumin80?',
       response: ` LOADING LUMINARY MODULE...
 
-The Illumin80 refers to token-holders who rank among the top 20% of tokens offered to burn to light a green candle. This status 
-unlocks the top-tier of staking rewards and provides the user with a personalized candle votive that doesn't 'burn out' or expire
-as long as they continue to qualify - i.e., they are not displaced from the top 20%. 
+The Illumin80 is an elite status for RL80's most dedicated participants. Members who qualify receive a 1.2x multiplier on staking rewards.
+
+QUALIFICATION:
+• Top 20% of cumulative token burners
+• Evaluated monthly
+• Status applies for the following month
+• Rankings may change as participation grows
 
 `,
       status: '[REQUIREMENTS.LISTED]',
       subQuestions: [
         {
           id: 'SUB_002_A',
+          command: '>> SUB.QUERY: Staking.Multiplier',
+          title: 'What is the 1.2x staking multiplier?',
+          response: `LOADING MULTIPLIER DETAILS...
+
+Illumin80 members receive a 1.2x multiplier on all staking rewards.
+
+EXAMPLE:
+• Standard staker earns 100 ETH in rewards
+• Illumin80 staker earns 120 ETH for the same stake
+
+HOW IT WORKS:
+• Multiplier applies automatically when you have Illumin80 status
+• Status is evaluated monthly based on cumulative burn rankings
+• If you qualify this month, multiplier applies next month
+• Multiplier stacks with your proportional stake — bigger stake + Illumin80 = maximum rewards
+
+This rewards long-term believers who demonstrate commitment through burning.
+`,
+          status: '[MULTIPLIER.ACTIVE]'
+        },
+        {
+          id: 'SUB_002_B',
+          command: '>> SUB.QUERY: Qualification',
+          title: 'How do I qualify for Illumin80?',
+          response: `LOADING QUALIFICATION CRITERIA...
+
+ILLUMIN80 QUALIFICATION:
+• Rank in the top 20% of cumulative token burners
+• Rankings are evaluated monthly
+• Status applies for the following month
+
+IMPORTANT NOTES:
+• It's cumulative — all your burns count toward your total
+• Rankings may shift as more participants join
+• You don't lose past burns, but others may catch up
+• Check your ranking on the /illumin80 leaderboard
+
+The threshold adjusts dynamically. As the community grows, you may need to burn more to maintain top 20% status.
+`,
+          status: '[QUALIFICATION.LOADED]'
+        },
+        {
+          id: 'SUB_002_C',
           command: '>> SUB.QUERY: Burn.Protocol',
           title: 'How do I burn a candle?',
           response: `RETRIEVING INSTRUCTIONS...
 
 To burn a candle, visit the /illumin80 page and simply click the button, fill out a quick form, and sign your digital wallet transaction.
-Candles melt over the next 80 hours. When fully melted, they expire and are removed from the scene.
+
+Candles melt over 80 hours. When fully melted, they expire and are removed from the scene. Burn again to maintain your presence on the shrine and build toward Illumin80 status.
 `,
           status: '[INSTRUCTIONS.LISTED]'
-        },
-        {
-          id: 'SUB_002_B',
-          command: '>> SUB.QUERY: Staking.Protocol',
-          title: 'How do I stake RL80?',
-          response: `CREATING SUMMARY...
-Staking RL80 allows you to participate in longer-term system mechanics.
-Detailed staking instructions are available in the next module.
-`,
-          status: '[INSTRUCTIONS.SUMMARIZED]'
-        },
-
+        }
       ]
     },
     {
@@ -120,81 +231,150 @@ Detailed staking instructions are available in the next module.
       title: 'Staking & Rewards',
       response: ` ACCESSING STAKING PROTOCOL...
 
-Staking lets you deposit RL80 into the staking vault to participate in the system’s reward stream. While staked, your tokens remain yours, but they are locked in the staking contract until your unlock period ends after 7 days from your last staking deposit.
+Staking lets you deposit RL80 into the staking vault to participate in the system's reward stream. While staked, your tokens remain yours, but they are locked in the staking contract until your unlock period ends after 7 days from your last staking deposit.
+
+RL80 uses a phased rollout for staking rewards. Staking is open from day one, but rewards activate progressively as the protocol matures.
 
 `,
       status: '[TERMS.LOADED]',
       subQuestions: [
         {
           id: 'SUB_003_A',
-          command: '>> SUB.QUERY: APY.Current',
-          title: 'What are the current staking returns?',
-          response: `CALCULATING ...
-          
-RL80 staking does not offer a fixed or guaranteed rate of return.
+          command: '>> SUB.QUERY: Phased.Rollout',
+          title: 'How does the phased rewards system work?',
+          response: `LOADING PHASE CONFIGURATION...
 
-Rewards are paid in ETH and depend on how much ETH is routed into the staking contract from the RL80 tax and rewards infrastructure. The amount you earn is proportional to your share of the total staked supply and the timing of distributions—but it is not a set yield like a bank interest rate.
+RL80 staking rewards are distributed according to a 4-phase rollout:
 
-Because rewards come from real on-chain activity (e.g., taxes converted to ETH via the rewards splitter), the effective return can vary over time and is influenced by market conditions and token flow.
+PHASE 1: LIQUIDITY BUILD (Current)
+• Staking is OPEN — stake early to secure your position
+• No rewards distributed yet
+• All rewards accrued are queued for Phase 2
+• Early stakers are first in line when rewards activate
 
-You can view your pending rewards in the staking interface before claiming.
+PHASE 2: PILOT DIVIDENDS
+• 1% of transaction tax flows to staking rewards
+• Rewards paid in ETH
+• Protocol begins testing reward distribution at scale
 
- `,
-          status: '[REWARDS.CALCULATED]'
+PHASE 3: STAKING DOMINANT
+• 2% of transaction tax flows to staking rewards
+• Full staking rewards activated
+• Mature protocol stage
+
+PHASE 4: ZERO TAX MODE (Optional)
+• 0% transaction tax
+• Protocol becomes self-sustaining
+• Staking rewards cease; withdraw anytime
+
+This phased approach ensures liquidity is established before rewards begin flowing, creating a more stable foundation for long-term stakers.
+`,
+          status: '[PHASES.LOADED]'
         },
         {
           id: 'SUB_003_B',
+          command: '>> SUB.QUERY: APY.Current',
+          title: 'What are the current staking returns?',
+          response: `CALCULATING ...
+
+RL80 staking does not offer a fixed or guaranteed rate of return.
+
+CURRENT STATUS: Phase 1 (Pre-Rewards)
+• Staking is open, but rewards have not yet activated
+• Stake now to secure your position for Phase 2
+
+WHEN REWARDS ACTIVATE (Phase 2+):
+Rewards are paid in ETH and depend on how much ETH is routed into the staking contract from the RL80 tax infrastructure. The amount you earn is proportional to your share of the total staked supply.
+
+Because rewards come from real on-chain activity (taxes converted to ETH via the rewards splitter), the effective return varies over time and is influenced by market conditions and token flow.
+
+You can view your pending rewards in the staking interface before claiming.
+`,
+          status: '[REWARDS.CALCULATED]'
+        },
+        {
+          id: 'SUB_003_C',
           command: '>> SUB.QUERY: Rewards.Distribution',
           title: 'Where do staking rewards come from?',
           response: `LOADING DISTRIBUTION LOGIC...
 
-Staking rewards are paid in ETH. ETH is routed into the staking contract from RL80’s tax flow via a distributor module that swaps collected RL80 for ETH and forwards a share to stakers.
+Staking rewards are paid in ETH. When rewards are active (Phase 2+), ETH is routed into the staking contract from RL80's transaction tax via a distributor module.
+
+TAX ALLOCATION BY PHASE:
+• Phase 1: 0% to staking (liquidity focus)
+• Phase 2: 1% to staking (pilot rewards)
+• Phase 3: 2% to staking (full rewards)
+• Phase 4: 0% to staking (zero tax mode)
+
+The distributor swaps collected RL80 for ETH and forwards the staking allocation to the rewards contract for distribution to stakers.
 `,
-          status: '[DISTRIBUTION.ACTIVE]'
+          status: '[DISTRIBUTION.CONFIGURED]'
         },
         {
-          id: 'SUB_003_C',
+          id: 'SUB_003_D',
           command: '>> SUB.QUERY: Reward.Mechanism',
           title: 'How are rewards calculated?',
           response: `ANALYZING ...
 
 Rewards are distributed proportionally based on how much RL80 you have staked and for how long. The contract uses a cumulative per-token accounting model so rewards remain fair across deposits and withdrawals.
 
- `,
+STANDARD CALCULATION:
+Your share = (Your Staked Amount / Total Staked) × Rewards Distributed
+
+ILLUMIN80 BONUS:
+Members with Illumin80 status receive a 1.2x multiplier on all staking rewards. Qualify by ranking in the top 20% of cumulative token burners (evaluated monthly).
+
+Early stakers who position themselves in Phase 1 will be included in the first reward distributions when Phase 2 activates.
+`,
           status: '[REWARDS.CALCULATED]'
         },
-                {
-          id: 'SUB_003_D',
+        {
+          id: 'SUB_003_E',
           command: '>> SUB.QUERY: LOCK.Mechanism',
           title: 'Is there a lockup?',
           response: `ANALYZING ...
 
-Yes. Staked RL80 has a 7-day lock. Staking again extends your unlock time forward.
- `,
-          status: '[LOCKUP.CLARIFIED]'
-        }
-        ,
-                {
-          id: 'SUB_003_E',
-          command: '>> SUB.QUERY: CLAIM.Mechanism',
-          title: 'When can I claim?',
-          response: `ANALYZING ...
+Yes. Staked RL80 has a 7-day lock period. Each new staking deposit resets your unlock timer.
 
-You can claim at any time while the contract is active, as long as your claim meets the minimum claim threshold (to reduce gas-inefficient micro-claims).
- `,
-          status: '[REWARDS.CALCULATED]'
-        }
-        ,
-                {
+This applies in all phases — even in Phase 1 when rewards haven't activated yet. Your tokens are locked per standard staking rules regardless of reward status.
+`,
+          status: '[LOCKUP.CLARIFIED]'
+        },
+        {
           id: 'SUB_003_F',
           command: '>> SUB.QUERY: CLAIM.Mechanism',
-          title: 'What happens if rewards arrive when TVL is low?',
+          title: 'When can I claim rewards?',
           response: `ANALYZING ...
 
-Yes. You can claim your staking rewards whenever you choose, as long as your accrued rewards meet the minimum claim amount.
+You can claim rewards at any time once they are available (Phase 2+), as long as your accrued rewards meet the minimum claim threshold.
 
-Because claiming requires an on-chain transaction, a minimum threshold is used to help prevent gas-inefficient micro-claims. You remain in full control of when to claim. `,
-          status: '[REWARDS.CALCULATED]'
+IMPORTANT: During Phase 1, there are no rewards to claim yet. The staking interface will show your staked position, but claimable rewards will be zero until Phase 2 activates.
+
+Because claiming requires an on-chain transaction, a minimum threshold is used to help prevent gas-inefficient micro-claims. You remain in full control of when to claim.
+`,
+          status: '[CLAIM.READY]'
+        },
+        {
+          id: 'SUB_003_G',
+          command: '>> SUB.QUERY: Early.Staking',
+          title: 'Why stake early in Phase 1?',
+          response: `ANALYZING EARLY STAKER BENEFITS...
+
+Staking during Phase 1 offers several advantages:
+
+• SECURE YOUR POSITION: Be first in line when rewards activate
+• NO RUSH: Stake at your own pace before Phase 2 competition
+• SAME LOCK RULES: 7-day lock applies — your commitment is real
+• QUEUED REWARDS: Early stakers are included from the first distribution
+• BUILD ILLUMIN80 STATUS: Burn tokens now to qualify for 1.2x multiplier
+
+Think of Phase 1 staking like getting in line before the doors open. When Phase 2 activates, you're already positioned to receive your proportional share of the first reward distribution.
+
+PRO TIP: Use Phase 1 to both stake AND burn. Qualify for Illumin80 status now, and when rewards activate in Phase 2, you'll receive the 1.2x multiplier on your staking rewards.
+
+This is intentional design, not a delay. Building liquidity first creates a stronger foundation for sustainable rewards.
+`,
+          status: '[BENEFITS.LOADED]'
         }
       ]
     },
@@ -266,51 +446,241 @@ INITIAL SUPPLY: 80B RL80`,
       id: 'QUERY_005',
       command: '> QUERY: Legal.Compliance',
       title: 'Legal and Tax Info',
-      response: ` CONNECTING TO LEGAL ADVISOR..
+      response: ` CONNECTING TO LEGAL ADVISOR...
 
 Legal framework and compliance:
 
-
-• Terms of service enforced
-
+• Platform registered in Oregon, United States
+• Terms of Service and Privacy Policy enforced
+• 18+ age requirement for all users
+• AI-generated content and financial disclaimers in effect
 
  `,
-      status: '[SUPPORT.ONLINE]',
+      status: '[LEGAL.ONLINE]',
       subQuestions: [
         {
-          id: 'SUB_007_A',
-          command: '>> SUB.QUERY: Regulatory.Status',
-          title: 'What is the regulatory compliance?',
-          response: `CHECKING COMPLIANCE STATUS...
+          id: 'SUB_005_A',
+          command: '>> SUB.QUERY: Disclaimers',
+          title: 'What are the key disclaimers?',
+          response: `LOADING DISCLAIMERS...
 
+FINANCIAL DISCLAIMER:
+• RL80 does NOT provide financial, investment, or trading advice
+• All AI-generated analysis is for informational purposes only
+• Cryptocurrency trading involves substantial risk of loss
+• Past performance is not indicative of future results
+• You are solely responsible for your own trading decisions
+
+AI CONTENT DISCLAIMER:
+• AI agent outputs may contain errors or inaccuracies
+• AI analysis should not be the sole basis for financial decisions
+• AI agents are experimental tools for educational purposes
+
+BLOCKCHAIN DISCLAIMER:
+• Wallet security is your responsibility
+• All blockchain transactions are irreversible
+• We do not have custody of your funds or assets
 `,
-          status: '[COMPLIANCE.VERIFIED]'
+          status: '[DISCLAIMERS.LOADED]'
         },
         {
-          id: 'SUB_007_B',
+          id: 'SUB_005_B',
           command: '>> SUB.QUERY: Terms.Service',
           title: 'What are the terms of service?',
-          response: `LOADING LEGAL DOCUMENTS...
+          response: `LOADING TERMS OF SERVICE...
 
 Key Terms:
-• 18+ years required
-• No financial advice provided
-• User assumes all risks
+• 18+ years of age required
+• No financial advice provided - informational only
+• User assumes all risks related to cryptocurrency
+• All sales and donations are final
+• We reserve the right to terminate accounts
+• Oregon state law governs all disputes
+• Binding arbitration for dispute resolution
+
+View full Terms of Service:
+https://app.termly.io/policy-viewer/policy.html?policyUUID=350b7b1c-556c-490e-b0ee-a07f5b52be86
 `,
           status: '[TERMS.DISPLAYED]'
         },
         {
-          id: 'SUB_007_C',
+          id: 'SUB_005_C',
           command: '>> SUB.QUERY: Privacy.Policy',
           title: 'How is my data protected?',
           response: `ACCESSING PRIVACY PROTOCOLS...
 
 Data Protection:
-• No personal data stored on-chain
-• No data sold to third parties
-• Right to deletion honored
+• Wallet addresses collected when connected
+• User-generated content stored in Firebase
+• AI providers (OpenAI, Anthropic, xAI) process interactions
+• Authentication handled by Clerk
+• No personal data sold to third parties
+• Right to data deletion honored upon request
+• Contact: 411@rl80.com
+
+View full Privacy Policy:
+https://app.termly.io/policy-viewer/policy.html?policyUUID=c79eb066-d5de-4656-b606-9802510fa0eb
 `,
           status: '[PRIVACY.SECURED]'
+        },
+        {
+          id: 'SUB_005_D',
+          command: '>> SUB.QUERY: Tax.Info',
+          title: 'What about taxes?',
+          response: `LOADING TAX INFORMATION...
+
+TAX NOTICE:
+• You are responsible for reporting crypto transactions
+• Token burns, trades, and rewards may be taxable events
+• Consult a qualified tax professional in your jurisdiction
+• We do not provide tax advice
+• Keep records of all transactions for tax purposes
+
+This is not tax advice. Tax treatment varies by jurisdiction.
+`,
+          status: '[TAX.INFO.LOADED]'
+        }
+      ]
+    },
+    {
+      id: 'QUERY_006',
+      command: '> QUERY: Safety.Protocol',
+      title: 'Anti-Scam & Safety',
+      response: ` LOADING SECURITY PROTOCOLS...
+
+RL80 takes community safety seriously. This project is built on transparency, not hype. Please read the following guidelines to protect yourself from scams and impersonation.
+
+REMEMBER: When in doubt, verify everything through our official channels.
+`,
+      status: '[SECURITY.ACTIVE]',
+      subQuestions: [
+        {
+          id: 'SUB_006_A',
+          command: '>> SUB.QUERY: Official.Channels',
+          title: 'What are the official channels?',
+          response: `VERIFYING OFFICIAL SOURCES...
+
+OFFICIAL CHANNELS:
+• Website: https://rl80.com
+• X (Twitter): @rlaborare
+• Email: 411@rl80.com
+
+IMPORTANT: We do NOT have a Discord or Telegram.
+Any Discord or Telegram claiming to be RL80 is a scam.
+
+If you see anyone promoting an RL80 Discord, Telegram, or alternative website, report them immediately and do not engage.
+`,
+          status: '[CHANNELS.VERIFIED]'
+        },
+        {
+          id: 'SUB_006_B',
+          command: '>> SUB.QUERY: DM.Policy',
+          title: 'Will RL80 ever DM me?',
+          response: `LOADING CONTACT POLICY...
+
+NO. We will NEVER contact you privately.
+
+• No DMs on X (Twitter)
+• No private messages on any platform
+• No "special offers" or "exclusive access" via private chat
+• No requests for wallet info, seed phrases, or private keys
+
+Anyone claiming to represent RL80 in your DMs is a scammer.
+Do not engage. Block and report immediately.
+`,
+          status: '[POLICY.CLEAR]'
+        },
+        {
+          id: 'SUB_006_C',
+          command: '>> SUB.QUERY: Wallet.Safety',
+          title: 'How do I protect my wallet?',
+          response: `LOADING WALLET SECURITY PROTOCOLS...
+
+WALLET SAFETY GUIDELINES:
+• NEVER share your seed phrase or private keys with anyone
+• NEVER enter your seed phrase on any website or form
+• NEVER approve wallet transactions you don't understand
+• ALWAYS verify contract addresses before interacting
+• ALWAYS use hardware wallets for large holdings if possible
+
+If someone asks for your seed phrase for ANY reason—even to "verify" your wallet or "fix" an issue—it is a scam.
+
+Your seed phrase = your funds. Share it with no one.
+`,
+          status: '[WALLET.SECURED]'
+        },
+        {
+          id: 'SUB_006_D',
+          command: '>> SUB.QUERY: Community.Guidelines',
+          title: 'How should I interact with the community?',
+          response: `LOADING COMMUNITY PROTOCOLS...
+
+COMMUNITY GUIDELINES:
+• Be skeptical of unsolicited offers, "alpha," or airdrops
+• Verify links before clicking—scammers use lookalike URLs
+• Don't trust screenshots of wallets, transactions, or profits
+• Question anyone promising guaranteed returns
+• Report suspicious accounts to @rlaborare on X
+
+REMEMBER: Real community members help each other stay safe.
+If something feels off, trust your instincts.
+`,
+          status: '[COMMUNITY.GUIDELINES]'
+        },
+        {
+          id: 'SUB_006_E',
+          command: '>> SUB.QUERY: No.Guarantees',
+          title: 'Are profits guaranteed?',
+          response: `LOADING FINANCIAL REALITY CHECK...
+
+NO. There are NO guaranteed profits.
+
+• Cryptocurrency is volatile and speculative
+• Past performance does not predict future results
+• You can lose some or all of your investment
+• Anyone promising guaranteed returns is lying
+
+RL80 does not promise financial returns. It offers a transparent system with observable mechanics. How you engage is your choice, and so are the risks.
+
+INVEST ONLY WHAT YOU CAN AFFORD TO LOSE.
+`,
+          status: '[REALITY.CHECK]'
+        },
+        {
+          id: 'SUB_006_F',
+          command: '>> SUB.QUERY: Report.Scam',
+          title: 'How do I report a scam or impersonation?',
+          response: `LOADING REPORT PROTOCOL...
+
+TO REPORT SCAMS OR IMPERSONATION:
+• Tweet or DM @rlaborare on X with details
+• Email 411@rl80.com with screenshots if possible
+• Block and report the scammer on the platform
+
+We actively monitor for impersonation and will issue warnings through our official X account when scams are detected.
+
+Help us protect the community by reporting suspicious activity.
+`,
+          status: '[REPORT.READY]'
+        },
+        {
+          id: 'SUB_006_G',
+          command: '>> SUB.QUERY: Design.Philosophy',
+          title: 'Why no Discord or Telegram?',
+          response: `LOADING DESIGN PHILOSOPHY...
+
+We intentionally avoid Discord and Telegram because:
+
+• These platforms are common vectors for scams
+• Private groups enable impersonation and manipulation
+• "Alpha" channels create information asymmetry
+• Moderation is difficult at scale
+
+RL80 is designed for transparency. Everything you need is public: the website, the contract, the tokenomics, and official announcements on X.
+
+This is a feature, not a limitation.
+`,
+          status: '[PHILOSOPHY.LOADED]'
         }
       ]
     }
@@ -327,69 +697,143 @@ Data Protection:
     return () => clearInterval(interval);
   }, []);
 
+  // Cleanup all typewriter intervals on unmount
+  useEffect(() => {
+    return () => {
+      if (typewriterIntervalRef.current) {
+        clearInterval(typewriterIntervalRef.current);
+      }
+      Object.values(subTypewriterIntervalsRef.current).forEach(intervalId => {
+        if (intervalId) clearInterval(intervalId);
+      });
+    };
+  }, []);
+
   // Typewriter effect for responses
-  const typewriterEffect = (text, index) => {
+  // Typewriter effect for main query responses
+  const typewriterEffect = useCallback((text, queryIndex) => {
+    // Clear any existing interval first
+    if (typewriterIntervalRef.current) {
+      clearInterval(typewriterIntervalRef.current);
+      typewriterIntervalRef.current = null;
+    }
+
     setIsTyping(true);
     setTypedText('');
     let charIndex = 0;
-    
-    const typeInterval = setInterval(() => {
+
+    typewriterIntervalRef.current = setInterval(() => {
       if (charIndex < text.length) {
         setTypedText(text.substring(0, charIndex + 1));
         charIndex++;
       } else {
-        clearInterval(typeInterval);
+        clearInterval(typewriterIntervalRef.current);
+        typewriterIntervalRef.current = null;
         setIsTyping(false);
+        // Mark this query as animated
+        setAnimatedQueries(prev => ({ ...prev, [queryIndex]: true }));
       }
-    }, 20); // Slightly slower for better reliability
-
-    return () => clearInterval(typeInterval);
-  };
+    }, 15);
+  }, []);
 
   // Typewriter effect for sub-question responses
-  const subTypewriterEffect = (text, parentIndex, subIndex) => {
+  const subTypewriterEffect = useCallback((text, parentIndex, subIndex) => {
     const key = `${parentIndex}-${subIndex}`;
+
+    // Clear any existing interval for this key first
+    if (subTypewriterIntervalsRef.current[key]) {
+      clearInterval(subTypewriterIntervalsRef.current[key]);
+      subTypewriterIntervalsRef.current[key] = null;
+    }
+
     setIsSubTyping(prev => ({ ...prev, [key]: true }));
     setSubTypedText(prev => ({ ...prev, [key]: '' }));
     let charIndex = 0;
-    
-    const typeInterval = setInterval(() => {
+
+    subTypewriterIntervalsRef.current[key] = setInterval(() => {
       if (charIndex < text.length) {
         setSubTypedText(prev => ({ ...prev, [key]: text.substring(0, charIndex + 1) }));
         charIndex++;
       } else {
-        clearInterval(typeInterval);
+        clearInterval(subTypewriterIntervalsRef.current[key]);
+        subTypewriterIntervalsRef.current[key] = null;
         setIsSubTyping(prev => ({ ...prev, [key]: false }));
+        // Mark this sub-query as animated
+        setAnimatedSubQueries(prev => ({ ...prev, [key]: true }));
       }
-    }, 20);
-
-    return () => clearInterval(typeInterval);
-  };
+    }, 15);
+  }, []);
 
   const handleQueryClick = (index) => {
     if (activeQuery === index) {
+      // Closing - clear all intervals
+      if (typewriterIntervalRef.current) {
+        clearInterval(typewriterIntervalRef.current);
+        typewriterIntervalRef.current = null;
+      }
+      // Clear all sub-intervals
+      Object.keys(subTypewriterIntervalsRef.current).forEach(key => {
+        if (subTypewriterIntervalsRef.current[key]) {
+          clearInterval(subTypewriterIntervalsRef.current[key]);
+          subTypewriterIntervalsRef.current[key] = null;
+        }
+      });
       setActiveQuery(null);
       setTypedText('');
+      setIsTyping(false);
       setActiveSubQuery({});
       setSubTypedText({});
+      setIsSubTyping({});
     } else {
+      // Opening new section - clear any existing intervals first
+      if (typewriterIntervalRef.current) {
+        clearInterval(typewriterIntervalRef.current);
+        typewriterIntervalRef.current = null;
+      }
+      Object.keys(subTypewriterIntervalsRef.current).forEach(key => {
+        if (subTypewriterIntervalsRef.current[key]) {
+          clearInterval(subTypewriterIntervalsRef.current[key]);
+          subTypewriterIntervalsRef.current[key] = null;
+        }
+      });
       setActiveQuery(index);
-      typewriterEffect(faqData[index].response, index);
       setActiveSubQuery({});
       setSubTypedText({});
+      setIsSubTyping({});
+
+      // Check if already animated - show instantly, otherwise animate
+      if (animatedQueries[index]) {
+        setTypedText(faqData[index].response);
+        setIsTyping(false);
+      } else {
+        typewriterEffect(faqData[index].response, index);
+      }
     }
   };
 
   const handleSubQueryClick = (e, parentIndex, subIndex) => {
-    e.stopPropagation(); // Prevent event bubbling to parent
+    e.stopPropagation();
     const key = `${parentIndex}-${subIndex}`;
     if (activeSubQuery[key]) {
+      // Closing - clear this sub-interval
+      if (subTypewriterIntervalsRef.current[key]) {
+        clearInterval(subTypewriterIntervalsRef.current[key]);
+        subTypewriterIntervalsRef.current[key] = null;
+      }
       setActiveSubQuery(prev => ({ ...prev, [key]: false }));
       setSubTypedText(prev => ({ ...prev, [key]: '' }));
+      setIsSubTyping(prev => ({ ...prev, [key]: false }));
     } else {
       setActiveSubQuery(prev => ({ ...prev, [key]: true }));
       const subQuestion = faqData[parentIndex].subQuestions[subIndex];
-      subTypewriterEffect(subQuestion.response, parentIndex, subIndex);
+
+      // Check if already animated - show instantly, otherwise animate
+      if (animatedSubQueries[key]) {
+        setSubTypedText(prev => ({ ...prev, [key]: subQuestion.response }));
+        setIsSubTyping(prev => ({ ...prev, [key]: false }));
+      } else {
+        subTypewriterEffect(subQuestion.response, parentIndex, subIndex);
+      }
     }
   };
 
@@ -810,7 +1254,7 @@ Data Protection:
                         position: 'relative',
                         zIndex: 1
                       }}>
-                        {typedText}
+                        {renderTextWithLinks(typedText)}
                         {isTyping && <span style={{ 
                           animation: 'blink 0.5s infinite',
                           marginLeft: '2px'
@@ -929,7 +1373,7 @@ Data Protection:
                                         whiteSpace: 'pre-line',
                                         opacity: 0.9
                                       }}>
-                                        {subTypedText[subKey] || ''}
+                                        {renderTextWithLinks(subTypedText[subKey] || '')}
                                         {isSubTyping[subKey] && <span style={{
                                           animation: 'blink 0.5s infinite',
                                           marginLeft: '2px'

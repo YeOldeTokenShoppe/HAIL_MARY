@@ -1067,7 +1067,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                   borderRadius: '2px'
                 }}>
                   <div style={{ color: '#00ff00', fontSize: '8px', fontWeight: 'bold', marginBottom: '2px' }}>
-                    ⚡ STRATEGY (RL80 Main)
+                    ⚡️ STRATEGY (RL80 Main)
                   </div>
                   <div style={{ color: '#ddd', fontSize: '9px', lineHeight: '1.3', fontWeight: 'bold' }}>
                     {features/tradingData.assistantInsights?.strategy || 'Long bias maintained. Adding on dips to $95K support. Target $105K by month end.'}
