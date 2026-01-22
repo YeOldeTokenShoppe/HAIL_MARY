@@ -225,11 +225,11 @@ const SentimentScreen = () => {
       // Google Trends (right side, expanded)
       drawGoogleTrends(ctx, data.googleTrends, data.dataStatus, 55)
 
-      // Polymarket Bet Display (y=125 to clear Fear & Greed which extends to ~110)
-      drawPolymarketBet(ctx, data.polymarket, 125, t)
+      // Polymarket Bet Display (y=140 to clear Fear & Greed which extends to ~117)
+      drawPolymarketBet(ctx, data.polymarket, 140, t)
 
       // News Headlines - main content area
-      drawNewsHeadlines(ctx, data.news, 190, t)
+      drawNewsHeadlines(ctx, data.news, 205, t)
 
       // Data source indicator - show actual status (at bottom)
       ctx.fillStyle = 'rgba(147, 51, 234, 0.4)'
@@ -247,7 +247,7 @@ const SentimentScreen = () => {
       // Data sources footer
       ctx.fillStyle = 'rgba(147, 51, 234, 0.3)'
       ctx.font = '7px monospace'
-      ctx.fillText('Sources: Alternative.me | CryptoPanic | CoinDesk | CoinTelegraph | Decrypt | Google Trends', 10, 312)
+      ctx.fillText('Sources: CoinMarketCap | CryptoPanic | CoinDesk | CoinTelegraph | Decrypt | Google Trends', 10, 312)
 
       // Simple border
       ctx.strokeStyle = 'rgba(147, 51, 234, 0.8)'
@@ -554,8 +554,8 @@ const drawNewsHeadlines = (ctx, news, y, time) => {
     }
   }
 
-  // Draw up to 5 headlines (we have the space)
-  const headlinesToShow = filteredHeadlines.slice(0, 5)
+  // Draw up to 3 headlines (compact layout)
+  const headlinesToShow = filteredHeadlines.slice(0, 3)
   headlinesToShow.forEach((headline, i) => {
     const yPos = y + 24 + (i * 16)
 
@@ -580,7 +580,7 @@ const drawNewsHeadlines = (ctx, news, y, time) => {
   })
 
   // Fill empty slots with subtle lines
-  for (let i = headlinesToShow.length; i < 5; i++) {
+  for (let i = headlinesToShow.length; i < 3; i++) {
     const yPos = y + 24 + (i * 16)
     ctx.fillStyle = 'rgba(255, 255, 255, 0.1)'
     ctx.fillRect(38, yPos - 5, 430, 1)

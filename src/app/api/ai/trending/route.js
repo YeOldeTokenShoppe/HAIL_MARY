@@ -261,8 +261,19 @@ async function fetchPolymarketData() {
       return null;
     }
 
-    // Filter for crypto-related markets (BTC, ETH, crypto keywords)
+    // Current date for filtering out expired markets
+    const now = new Date();
+
+    // Filter for crypto-related markets (BTC, ETH, crypto keywords) and exclude expired
     const cryptoMarkets = markets.filter(market => {
+      // Filter out markets with past end dates
+      if (market.endDate) {
+        const endDate = new Date(market.endDate);
+        if (endDate < now) {
+          return false; // Skip expired markets
+        }
+      }
+
       const q = (market.question || '').toLowerCase();
       return q.includes('bitcoin') || q.includes('btc') ||
              q.includes('ethereum') || q.includes('eth') ||
@@ -271,8 +282,14 @@ async function fetchPolymarketData() {
     });
 
     if (cryptoMarkets.length === 0) {
-      // If no crypto markets, return top markets
-      return formatPolymarkets(markets.slice(0, 5));
+      // If no crypto markets, filter non-expired general markets only
+      const activeMarkets = markets.filter(m => {
+        if (m.endDate) {
+          return new Date(m.endDate) >= now;
+        }
+        return true;
+      });
+      return formatPolymarkets(activeMarkets.slice(0, 5));
     }
 
     return formatPolymarkets(cryptoMarkets.slice(0, 5));
