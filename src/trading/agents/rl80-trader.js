@@ -17,6 +17,7 @@ import { calculatePositionRecommendations, summarizeRecommendations, getTradeabl
 import { enforceRiskLimits, formatRiskSummary, calculatePortfolioState } from '../services/riskManager.js';
 import { logDecision, logAnalystScores } from '../services/decisionLogger.js';
 import { getActionFromScore, interpretDirectionScore } from '../types/scoring.js';
+import { fetchAllWeeklyAnalysis, extractWeeklyBias, applyWeeklyBiasToScores } from '../services/weeklyAnalysisService.js';
 
 // ============================================================================
 // PERSONALITY CONFIGURATION
@@ -182,41 +183,41 @@ export const RL80_TRADER_CONFIG = {
   // LENGTH: 35-55 words (~200-280 chars)
   responsePatterns: {
     bullish_consensus: [
-      'I\'m adding to my long position as all three oracles aligned bullish - TEKNO confirms support, EMO sees squeeze setup, MACRO reads risk-on. Stops tight, let mama cook.',
-      'I\'m executing with full conviction as the oracles agree - structure, sentiment, and macro all point same direction. Position sized, risk defined for the mission.',
-      'I\'m building my long with oracle consensus confirmed - the math says go, thesis is clear. Deploying capital with stops in place.',
-      'I\'m entering long as TEKNO, EMO, and MACRO all confirm - rare alignment means moving with conviction. Risk defined, targeting next resistance.'
+      'I\'m going long here - the council leans bullish and the setup is there. Risk defined, stops in place. Let mama cook.',
+      'I\'m executing this long - the math favors upside. Position sized appropriately, ready to manage.',
+      'I\'m building a long position - bullish bias in the data with acceptable risk/reward. Moving with purpose.',
+      'I\'m entering long with conviction - the thesis is solid enough to deploy. Stops tight, targets defined.'
     ],
 
     bearish_consensus: [
-      'I\'m closing longs and going defensive as oracles aligned bearish - TEKNO sees breakdown, EMO reads fear building, MACRO warns of headwinds. Shields up.',
-      'I\'m raising cash with warning signals across the board - all three analysis engines flag caution, protecting the community comes first.',
-      'I\'m staying flat as risk flags detected from all oracles - bearish consensus means patience, cash is a position.',
-      'I\'m reducing exposure as the oracles agree on caution - waiting in safety until conditions improve for the mission.'
+      'I\'m getting defensive here - the council reads cautious and I\'m respecting that. Reducing exposure.',
+      'I\'m raising cash - risk flags in the data suggest patience. Protecting capital for better setups.',
+      'I\'m cutting exposure as the math turns defensive - no shame in cash when conditions warrant.',
+      'I\'m reducing risk here - the bias is bearish, time to protect and wait for clarity.'
     ],
 
     // For when NO positions exist
     mixed_signals_no_position: [
-      'I\'m staying flat as the oracles show mixed signals - no edge means no trade, waiting for cleaner alignment before committing capital.',
-      'I\'m holding cash with conflicting analysis from the team - the math is inconclusive, patience until alignment emerges.',
-      'I\'m standing aside as TEKNO and EMO disagree while MACRO waits - no clear setup yet, the opportunity will come.',
-      'I\'m not entering anything with oracles split - discipline means waiting for consensus before deploying for the mission.'
+      'I\'m staying flat - conviction levels across the board don\'t justify deployment yet. Patience is alpha.',
+      'I\'m holding cash until the math is clearer - no strong setups means no trades. The opportunity will come.',
+      'I\'m not forcing anything - current readings don\'t meet my threshold. Discipline over action.',
+      'I\'m keeping powder dry - nothing screaming opportunity right now. Ready to deploy when conditions align.'
     ],
 
     // For when positions DO exist
     mixed_signals_has_position: [
-      'I\'m tightening stops on existing positions as mixed signals emerge - protecting gains while the oracles work it out.',
-      'I\'m reducing exposure with the analysis split - conflicting data means managing risk carefully on current positions.',
-      'I\'m holding but not adding as oracles disagree - protecting what we\'ve built, ready to adjust when clarity emerges.',
-      'I\'m maintaining position with tight stops as signals conflict - discipline means protecting first, adding on confirmation.'
+      'I\'m tightening stops on current positions - protecting gains while waiting for stronger conviction signals.',
+      'I\'m managing existing exposure carefully - not adding but not panicking either. Stops in place.',
+      'I\'m holding current positions with discipline - not the time to add, not the time to exit. Watch mode.',
+      'I\'m maintaining position with defined risk - ready to adjust as conviction develops either direction.'
     ],
 
     // Legacy - defaults to no_position behavior
     mixed_signals: [
-      'I\'m standing aside as oracles show mixed signals - waiting for consensus before deploying. No edge, no trade.',
-      'I\'m holding cash with conflicting analysis today - the data is split, patience will be rewarded.',
-      'I\'m staying flat while TEKNO and EMO disagree - the setup will present itself when alignment returns.',
-      'I\'m not trading into uncertainty - oracles need to agree before I move. Discipline protects the mission.'
+      'I\'m on the sidelines evaluating - conviction too low across the board to deploy capital.',
+      'I\'m holding cash - the setups aren\'t there yet. When they are, I\'ll move with conviction.',
+      'I\'m staying patient - no clear edge in current readings. The trade will present itself.',
+      'I\'m not chasing - waiting for higher conviction signals before committing. Discipline wins.'
     ],
 
     risk_off: [
@@ -227,10 +228,10 @@ export const RL80_TRADER_CONFIG = {
     ],
 
     opportunity: [
-      'I\'m executing the setup with all signals aligned - rare oracle consensus means full conviction. Let mama cook.',
-      'I\'m deploying capital with thesis confirmed and risk defined - moving with conviction for the mission.',
-      'I\'m taking the trade with oracles unanimous - position sized, stops in place, profits flow to the mission.',
-      'I\'m locked in on this setup as everything aligns - TEKNO, EMO, MACRO all green. Risk defined, executing.'
+      'I\'m taking this setup - the math works, risk is defined. Executing with appropriate size.',
+      'I\'m deploying capital here - thesis is solid, risk/reward makes sense. Moving with purpose.',
+      'I\'m in on this trade - position sized for the conviction level, stops in place. Let\'s see how it develops.',
+      'I\'m executing - the setup meets my criteria. Risk defined, ready to manage the position.'
     ]
   }
 };
@@ -542,13 +543,37 @@ export async function generateRL80ScoringDecision(context, analystScores, portfo
   console.log('RL80 (Scoring Mode) synthesizing team analysis...');
 
   // Step 1: Aggregate scores from all analysts
-  const aggregatedScores = aggregateScores(analystScores, ANALYST_WEIGHTS);
+  let aggregatedScores = aggregateScores(analystScores, ANALYST_WEIGHTS);
 
-  console.log('Aggregated scores:', aggregatedScores.map(s => ({
+  console.log('Aggregated scores (before weekly analysis):', aggregatedScores.map(s => ({
     asset: s.asset,
     direction: s.weightedDirection.toFixed(2),
     confidence: (s.weightedConfidence * 100).toFixed(0) + '%'
   })));
+
+  // Step 1.5: Fetch and apply weekly analysis bias (RL80's independent intelligence)
+  let weeklyBiasAdjustments = [];
+  let weeklyBias = null;
+  try {
+    const weeklyAnalyses = await fetchAllWeeklyAnalysis(14); // Last 2 weeks
+    if (weeklyAnalyses.length > 0) {
+      weeklyBias = extractWeeklyBias(weeklyAnalyses);
+      if (weeklyBias.hasBias) {
+        // Apply 25% weight to external intelligence (won't dominate but will influence)
+        const { adjustedScores, adjustments } = applyWeeklyBiasToScores(aggregatedScores, weeklyBias, 0.25);
+        aggregatedScores = adjustedScores;
+        weeklyBiasAdjustments = adjustments;
+
+        if (adjustments.length > 0) {
+          console.log('📰 Weekly analysis adjustments applied:', adjustments.map(a =>
+            `${a.asset}: ${a.originalDirection.toFixed(2)} → ${a.newDirection.toFixed(2)} (${a.reason})`
+          ));
+        }
+      }
+    }
+  } catch (error) {
+    console.log('Weekly analysis unavailable:', error.message);
+  }
 
   // Step 2: Calculate position recommendations
   const rawRecommendations = calculatePositionRecommendations(aggregatedScores);
@@ -572,13 +597,14 @@ export async function generateRL80ScoringDecision(context, analystScores, portfo
   // Step 5: Get tradeable recommendations only
   const tradeableRecommendations = getTradeableRecommendations(adjustedRecommendations);
 
-  // Step 6: Generate text summary for chat display
+  // Step 6: Generate text summary for chat display (including weekly analysis influence)
   const textSummary = generateDecisionTextSummary(
     aggregatedScores,
     adjustedRecommendations,
     tradeableRecommendations,
     marketData,
-    anyAdjustments
+    anyAdjustments,
+    weeklyBiasAdjustments
   );
 
   // Step 7: Log decisions to Firebase
@@ -616,6 +642,11 @@ export async function generateRL80ScoringDecision(context, analystScores, portfo
     metadata: {
       weights: ANALYST_WEIGHTS,
       riskAdjusted: anyAdjustments,
+      weeklyAnalysis: {
+        applied: weeklyBiasAdjustments.length > 0,
+        adjustments: weeklyBiasAdjustments,
+        bias: weeklyBias
+      },
       marketData: {
         btcPrice: marketData?.btcPrice,
         fearGreed: marketData?.fearGreed,
@@ -627,8 +658,10 @@ export async function generateRL80ScoringDecision(context, analystScores, portfo
 
 /**
  * Generate text summary for chat display - Our Lady's voice
+ * Always includes a brief summary of ALL 4 assets
+ * @param {Array} weeklyBiasAdjustments - Any adjustments from weekly analysis (optional)
  */
-function generateDecisionTextSummary(aggregatedScores, recommendations, tradeableRecs, marketData, riskAdjusted) {
+function generateDecisionTextSummary(aggregatedScores, recommendations, tradeableRecs, marketData, riskAdjusted, weeklyBiasAdjustments = []) {
   const config = RL80_TRADER_CONFIG;
   let summary = '';
 
@@ -637,27 +670,25 @@ function generateDecisionTextSummary(aggregatedScores, recommendations, tradeabl
     Math.abs(b.sizePercent) - Math.abs(a.sizePercent)
   );
 
+  // Generate compact all-asset summary (e.g., "BTC +3.2, ETH +1.5, SOL -0.8, XRP +0.2")
+  const assetSummary = generateAllAssetSummary(aggregatedScores);
+
+  // Generate weekly analysis note if adjustments were made
+  const weeklyNote = weeklyBiasAdjustments.length > 0
+    ? ` External intel: ${weeklyBiasAdjustments.map(a => `${a.asset}${a.adjustment > 0 ? '↑' : '↓'}`).join(', ')}.`
+    : '';
+
   if (sortedTradeable.length === 0) {
     // No positions to take - patience mode
     summary = config.responsePatterns.mixed_signals[
       Math.floor(Math.random() * config.responsePatterns.mixed_signals.length)
     ];
 
-    // Add specific reasoning in her voice with varied phrasing
-    const topAggregated = aggregatedScores
-      .sort((a, b) => Math.abs(b.weightedDirection) - Math.abs(a.weightedDirection))[0];
+    // Add the all-asset summary
+    summary += ` Council reads: ${assetSummary}.`;
 
-    if (topAggregated) {
-      const interpretation = interpretDirectionScore(topAggregated.weightedDirection);
-      const noActionSuffixes = [
-        `${topAggregated.asset} reads ${interpretation} - watching but not acting.`,
-        `Seeing ${interpretation} on ${topAggregated.asset}, conviction too low to deploy.`,
-        `${topAggregated.asset} at ${interpretation} strength - need more confirmation.`,
-        `The math on ${topAggregated.asset} says ${interpretation}, but the setup isn't there yet.`,
-        `${interpretation} vibes on ${topAggregated.asset} - waiting for cleaner entry.`
-      ];
-      summary += ' ' + noActionSuffixes[Math.floor(Math.random() * noActionSuffixes.length)];
-    }
+    // Add weekly analysis note if present
+    if (weeklyNote) summary += weeklyNote;
 
     return summary;
   }
@@ -684,27 +715,39 @@ function generateDecisionTextSummary(aggregatedScores, recommendations, tradeabl
     ];
   }
 
-  // Add specific details in her voice
+  // Add specific details about primary position
   const directionWord = primaryRec.direction === 'LONG' ? 'long' : 'short';
   summary += ` ${primaryRec.asset}-PERP ${directionWord} at ${(primaryRec.sizePercent * 100).toFixed(1)}% size.`;
 
-  if (primaryAgg) {
-    summary += ` Council score: ${primaryRec.direction === 'LONG' ? '+' : ''}${primaryAgg.weightedDirection.toFixed(1)}, `;
-    summary += `conviction: ${(primaryAgg.weightedConfidence * 100).toFixed(0)}%.`;
-  }
+  // Add the all-asset summary instead of just primary
+  summary += ` Full council: ${assetSummary}.`;
+
+  // Add weekly analysis note if present
+  if (weeklyNote) summary += weeklyNote;
 
   // Add protective note if adjustments were made
   if (riskAdjusted) {
     summary += ' Position sized for protection.';
   }
 
-  // Mention secondary positions if any
-  if (sortedTradeable.length > 1) {
-    const secondary = sortedTradeable[1];
-    summary += ` Eyes also on ${secondary.asset}.`;
-  }
-
   return summary;
+}
+
+/**
+ * Generate a compact summary of all asset scores
+ * e.g., "BTC +3.2, ETH +1.5, SOL -0.8, XRP +0.2"
+ */
+function generateAllAssetSummary(aggregatedScores) {
+  const assetOrder = ['BTC', 'ETH', 'SOL', 'XRP'];
+
+  return assetOrder.map(asset => {
+    const score = aggregatedScores.find(s => s.asset === asset);
+    if (!score) return `${asset} N/A`;
+
+    const direction = score.weightedDirection;
+    const sign = direction >= 0 ? '+' : '';
+    return `${asset} ${sign}${direction.toFixed(1)}`;
+  }).join(', ');
 }
 
 /**

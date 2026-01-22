@@ -25,7 +25,7 @@ import { logAnalystScores } from './decisionLogger.js';
 
 // Import oracle accuracy tracking for prediction markets
 import { logAllOracleCalls, verifyPendingCalls } from './oracleAccuracyService.js';
-import { ensureCurrentWeekMarket, checkAndResolveMarkets } from './predictionMarketService.js';
+import { checkAndResolveMarkets } from './predictionMarketService.js';
 
 // ============================================================================
 // FIREBASE ADMIN INITIALIZATION
@@ -585,13 +585,12 @@ export async function runScoringWorkflow() {
     // =========================================================================
     // Prediction Market Maintenance (runs after workflow)
     // =========================================================================
+    // NOTE: Market creation is now handled by Firebase scheduled function
+    // (createWeeklyPredictionMarket in functions/index.js) which runs every
+    // Monday at 00:05 UTC and creates on-chain + Firebase markets.
+    // Removed ensureCurrentWeekMarket() call to prevent duplicate markets.
+    // =========================================================================
     try {
-      // Ensure current week's oracle accuracy market exists
-      const marketResult = await ensureCurrentWeekMarket();
-      if (marketResult.success && !marketResult.existed) {
-        console.log('🎲 Created new weekly oracle accuracy market');
-      }
-
       // Check and resolve any ended markets
       const resolveResult = await checkAndResolveMarkets();
       if (resolveResult.resolved?.length > 0) {

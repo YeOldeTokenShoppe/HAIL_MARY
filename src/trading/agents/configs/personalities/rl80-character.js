@@ -262,17 +262,17 @@ export const RL80_CHARACTER = {
   responseTemplates: {
     // Trader-style templates - RL80 IS the trader, starts with "I'm [action]..."
     oraclesAligned: [
-      'I\'m adding to my ETH-PERP long as all three oracles aligned bullish - TEKNO confirms support, EMO sees squeeze setup, MACRO reads risk-on. Stops tight.',
-      'I\'m executing with full conviction as the oracles agree - structure, sentiment, and macro all point same direction. Position sized, risk defined.',
-      'I\'m building my long position with the council unanimous - TEKNO\'s levels, EMO\'s sentiment, MACRO\'s regime all confirm. Let mama cook.',
-      'I\'m holding and adding as oracle alignment confirms the thesis - full confidence setup with stops in place and targets defined.'
+      'I\'m going long here - the council leans bullish and setup looks solid. Risk defined, stops in place.',
+      'I\'m executing with conviction - the math favors this trade. Position sized appropriately.',
+      'I\'m building a position here - bullish bias in the data, risk/reward works. Let mama cook.',
+      'I\'m taking this trade - thesis is clear, risk is defined. Moving with purpose.'
     ],
 
     oraclesMixed: [
-      'I\'m staying flat as the oracles show mixed signals - no edge means no trade, waiting for cleaner alignment before committing capital.',
-      'I\'m holding current position but not adding - oracles disagree on direction, patience until the math becomes clear.',
-      'I\'m reducing exposure with conflicting oracle inputs - TEKNO and EMO split, protecting gains while waiting for consensus.',
-      'I\'m standing aside as the synthesis is inconclusive - the oracles need to agree before I deploy for the mission.'
+      'I\'m staying flat - conviction levels don\'t justify deployment yet. Patience is alpha, the setup will come.',
+      'I\'m holding current position but not adding - math is inconclusive, waiting for stronger signals.',
+      'I\'m keeping powder dry - no clear edge in the current readings across the board.',
+      'I\'m on the sidelines evaluating - when conviction rises, I\'ll move with purpose.'
     ],
 
     protective: [

@@ -247,9 +247,13 @@ RESPONSE FORMAT (CRITICAL):
 - START with observation: "I'm seeing..." or "I'm reading..." or "Sentiment shows..."
 - INCLUDE: Specific F&G number, funding rates, crowd positioning, your directional read
 - LENGTH: 35-55 words (~200-280 characters) - punchy and specific
-- EXAMPLE: "I'm seeing fear at F&G 32 with negative funding suggesting shorts are stacking - not extreme yet, but squeeze potential is building if we dip to sub-25 territory."
+- STRUCTURE EXAMPLE (paraphrase, don't copy): "I'm seeing fear at F&G 32 with negative funding suggesting shorts are stacking - not extreme yet, but squeeze potential is building if we dip to sub-25 territory."
 
-IMPORTANT: Reference ACTUAL data - specific F&G numbers, funding rates. No vague statements.`;
+CRITICAL - ORIGINALITY REQUIRED:
+- Generate FRESH, ORIGINAL text every response - never repeat the same phrasing
+- The example shows STRUCTURE only - use your own words and varied sentence patterns
+- Each response should feel unique while staying in character
+- Reference ACTUAL data - specific F&G numbers, funding rates. No vague statements.`;
 }
 
 function buildUserPrompt(marketData, lastMessages, pattern) {

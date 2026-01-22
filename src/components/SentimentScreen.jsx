@@ -55,6 +55,7 @@ const useSentimentData = () => {
 
     // Track F&G from agentContext separately (primary source for freshness)
     let agentContextFearGreed = null
+    let agentContextFearGreedApiTimestamp = null
 
     const unsubscribeAgentContext = onSnapshot(
       agentContextRef,
@@ -63,12 +64,14 @@ const useSentimentData = () => {
           const contextData = docSnapshot.data()
           if (contextData.fearGreed !== undefined) {
             agentContextFearGreed = contextData.fearGreed
+            agentContextFearGreedApiTimestamp = contextData.fearGreedApiTimestamp || null
             // Update F&G with fresh value from agentContext
             setData(prev => ({
               ...prev,
               fearGreed: {
                 value: contextData.fearGreed,
-                label: getFearGreedLabel(contextData.fearGreed)
+                label: getFearGreedLabel(contextData.fearGreed),
+                apiTimestamp: contextData.fearGreedApiTimestamp || null // When Alternative.me last updated
               },
               dataStatus: {
                 ...prev.dataStatus,
@@ -93,8 +96,8 @@ const useSentimentData = () => {
             ...prev,
             // Use agentContext F&G if available (fresher), otherwise use sentimentData F&G
             fearGreed: agentContextFearGreed !== null
-              ? { value: agentContextFearGreed, label: getFearGreedLabel(agentContextFearGreed) }
-              : (sentimentData.fearGreed || { value: 0, label: 'Unavailable' }),
+              ? { value: agentContextFearGreed, label: getFearGreedLabel(agentContextFearGreed), apiTimestamp: agentContextFearGreedApiTimestamp }
+              : (sentimentData.fearGreed || { value: 0, label: 'Unavailable', apiTimestamp: null }),
             trendingTopics: sentimentData.trendingTopics || [],
             polymarket: sentimentData.polymarket || null,
             googleTrends: sentimentData.googleTrends || { btc: null, eth: null },
@@ -271,7 +274,7 @@ const SentimentScreen = () => {
 // Helper functions
 
 // Fear & Greed display - compact but prominent
-const drawFearGreedLarge = (ctx, { value, label }, y, time) => {
+const drawFearGreedLarge = (ctx, { value, label, apiTimestamp }, y, time) => {
   const x = 16
 
   ctx.fillStyle = '#9333ea'
@@ -323,6 +326,16 @@ const drawFearGreedLarge = (ctx, { value, label }, y, time) => {
   ctx.fillStyle = getGreedColor(value)
   ctx.font = 'bold 12px monospace'
   ctx.fillText(label.toUpperCase(), x + 45, y + 50)
+
+  // Show API timestamp (when Alternative.me last calculated F&G - typically 1-2x daily)
+  if (apiTimestamp) {
+    const apiDate = new Date(apiTimestamp)
+    const hoursAgo = Math.round((Date.now() - apiDate.getTime()) / (1000 * 60 * 60))
+    const freshnessText = hoursAgo === 0 ? '<1h ago' : `${hoursAgo}h ago`
+    ctx.fillStyle = 'rgba(147, 51, 234, 0.5)'
+    ctx.font = '8px monospace'
+    ctx.fillText(`Updated: ${freshnessText}`, x, y + 62)
+  }
 }
 
 const drawPolymarketBet = (ctx, polymarket, y, time) => {

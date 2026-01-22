@@ -244,9 +244,13 @@ RESPONSE FORMAT (CRITICAL):
 - START with observation: "I'm reading..." or "Macro shows..." or "I'm seeing..."
 - INCLUDE: Specific DXY, VIX, yields, policy context, your regime assessment
 - LENGTH: 35-55 words (~200-280 characters) - authoritative and specific
-- EXAMPLE: "I'm reading the macro as cautious risk-off with DXY at 104.5 and VIX elevated at 23 - yields still pressuring risk assets, patience favored until Fed signals clearly."
+- STRUCTURE EXAMPLE (paraphrase, don't copy): "I'm reading the macro as cautious risk-off with DXY at 104.5 and VIX elevated at 23 - yields still pressuring risk assets, patience favored until Fed signals clearly."
 
-IMPORTANT: Reference ACTUAL data - specific DXY levels, VIX readings. No vague "macro headwinds".`;
+CRITICAL - ORIGINALITY REQUIRED:
+- Generate FRESH, ORIGINAL text every response - never repeat the same phrasing
+- The example shows STRUCTURE only - use your own words and varied sentence patterns
+- Each response should feel unique while staying in character
+- Reference ACTUAL data - specific DXY levels, VIX readings. No vague "macro headwinds".`;
 }
 
 function buildUserPrompt(marketData, lastMessages, config) {

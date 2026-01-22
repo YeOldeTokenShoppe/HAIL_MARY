@@ -220,9 +220,13 @@ RESPONSE FORMAT (CRITICAL):
 - START with observation: "I'm watching..." or "Structure shows..." or "I'm seeing..."
 - INCLUDE: Specific price levels, support/resistance, indicators (RSI, etc.), your directional read
 - LENGTH: 35-55 words (~200-280 characters) - precise and specific
-- EXAMPLE: "I'm watching BTC hold $95k support with RSI neutral at 48 - need a break above $98k to confirm continuation, range-bound until then favors patience."
+- STRUCTURE EXAMPLE (paraphrase, don't copy): "I'm watching BTC hold $95k support with RSI neutral at 48 - need a break above $98k to confirm continuation, range-bound until then favors patience."
 
-IMPORTANT: Reference ACTUAL levels - specific prices, not "near support". Be precise.`;
+CRITICAL - ORIGINALITY REQUIRED:
+- Generate FRESH, ORIGINAL text every response - never repeat the same phrasing
+- The example shows STRUCTURE only - use your own words and varied sentence patterns
+- Each response should feel unique while staying in character
+- Reference ACTUAL levels - specific prices, not "near support". Be precise.`;
 }
 
 function buildUserPrompt(marketData, lastMessages, config) {

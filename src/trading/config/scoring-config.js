@@ -120,10 +120,12 @@ export const RISK_LIMITS = {
   MAX_DAILY_LOSS: 0.02,   // 2%
 
   // Minimum confidence to take a position
-  MIN_CONFIDENCE: 0.4,    // 40%
+  MIN_CONFIDENCE: 0.35,   // 35% (lowered from 40% to allow more trades)
 
   // Minimum score magnitude to take a position
-  MIN_SCORE_MAGNITUDE: 2, // Must be >= 2 or <= -2
+  // Lowered from 2 to 1.0 - even slight directional bias can trigger small positions
+  // This allows trades when 2/3 agents agree but one is neutral/slightly opposite
+  MIN_SCORE_MAGNITUDE: 1.0,
 
   // Maximum number of simultaneous positions
   MAX_POSITIONS: 3
@@ -144,6 +146,10 @@ export const SL_TP_DEFAULTS = {
   WEAK: {
     stopLoss: 0.02,     // 2% stop loss
     takeProfit: 0.04    // 4% take profit (2:1 R:R)
+  },
+  EXPLORATORY: {
+    stopLoss: 0.015,    // 1.5% stop loss (tighter for lower conviction)
+    takeProfit: 0.03    // 3% take profit (2:1 R:R)
   }
 };
 
@@ -156,25 +162,32 @@ export const SL_TP_DEFAULTS = {
  * Maps absolute score value to conviction level
  */
 export const POSITION_SIZING = {
-  // Strong conviction: |score| >= 7
+  // Strong conviction: |score| >= 6
   STRONG: {
-    minScore: 7,
+    minScore: 6,
     baseSize: 0.04,      // 4% base position
     maxSize: 0.05        // 5% max after confidence adjustment
   },
-  // Moderate conviction: |score| >= 4 && < 7
+  // Moderate conviction: |score| >= 3.5 && < 6
   MODERATE: {
-    minScore: 4,
+    minScore: 3.5,
     baseSize: 0.025,     // 2.5% base position
     maxSize: 0.035       // 3.5% max
   },
-  // Weak conviction: |score| >= 2 && < 4
+  // Weak conviction: |score| >= 2 && < 3.5
   WEAK: {
     minScore: 2,
     baseSize: 0.015,     // 1.5% base position
     maxSize: 0.02        // 2% max
   },
-  // No position: |score| < 2
+  // Exploratory: |score| >= 1 && < 2 (new tier for lower conviction)
+  // Small positions when there's a slight directional bias
+  EXPLORATORY: {
+    minScore: 1,
+    baseSize: 0.01,      // 1% base position
+    maxSize: 0.015       // 1.5% max
+  },
+  // No position: |score| < 1
   NONE: {
     minScore: 0,
     baseSize: 0,
@@ -185,7 +198,7 @@ export const POSITION_SIZING = {
 /**
  * Get conviction level from score magnitude
  * @param {number} score - Direction score (-10 to +10)
- * @returns {'STRONG'|'MODERATE'|'WEAK'|'NONE'}
+ * @returns {'STRONG'|'MODERATE'|'WEAK'|'EXPLORATORY'|'NONE'}
  */
 export function getConvictionLevel(score) {
   const magnitude = Math.abs(score);
@@ -193,6 +206,7 @@ export function getConvictionLevel(score) {
   if (magnitude >= POSITION_SIZING.STRONG.minScore) return 'STRONG';
   if (magnitude >= POSITION_SIZING.MODERATE.minScore) return 'MODERATE';
   if (magnitude >= POSITION_SIZING.WEAK.minScore) return 'WEAK';
+  if (magnitude >= POSITION_SIZING.EXPLORATORY.minScore) return 'EXPLORATORY';
   return 'NONE';
 }
 
