@@ -1,0 +1,808 @@
+@import url("https://fonts.cdnfonts.com/css/poppins");
+
+/* Reset default margins and padding */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.carousel-container {
+  font-family: "Poppins", sans-serif;
+  color: #333;
+  height: 100vh;
+  width: 100%;
+  transform: scale(1);
+  /* background: radial-gradient(
+      circle at 60% 50%,
+      #ff4a4a 0 4vmin,
+      #fff0 50vmin 100%
+    ),
+    repeating-conic-gradient(
+      from 0deg at 60% 50%,
+      #ff4a4a 0 6deg,
+      #e6282a 0 12deg
+    ); */
+  display: flex;
+  justify-content: center;
+  position: relative;
+  align-items: center;
+  overflow: visible;
+  margin-top: 20rem;
+  z-index: 1;
+}
+
+#carousel {
+  width: 150px;
+  height: 250px;
+  transform: perspective(1000px);
+  margin-top: 0px;
+  transform-style: preserve-3d;
+  animation: var(--rotation-time) carousel linear reverse infinite;
+  rotate: x 0deg;
+  transition: margin-top 1s ease-in-out;
+  transform: scale(0.5);
+}
+
+#carousel:hover {
+  /* margin-top: -150px; */
+  /* rotate: x -15deg; */
+}
+
+#carousel::after,
+#carousel::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 900px;
+  height: 900px;
+  border-radius: 50%;
+  transform: translate(-50%, 50%) rotateX(90deg);
+  background: radial-gradient(
+      circle at 50% 50%,
+      /* Same position */ #f7d774 0 4vmin,
+      /* Light gold */ /* Gold color for the inner circle */ #fff0 50vmin 100%
+        /* Transparent for the outer area */
+    ),
+    repeating-conic-gradient(
+      from 0deg at 50% 50%,
+      /* Same position and angle */ #f7d774 0 6deg,
+      /* Light gold for the first segment */ #d4a017 0 12deg
+        /* Deeper gold for the second segment */
+    ),
+    conic-gradient(
+      from 180deg,
+      /* Starting angle for a different rotation */ #f7d774,
+      /* Light gold */ #d4a017 /* Deeper gold */
+    );
+  z-index: -1;
+}
+/* Add the mirrored structure on top of the circle */
+#carousel::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0; /* Position it at the top */
+  transform: translate(-50%, -50%) rotateX(90deg);
+  width: 900px; /* Same width as the bottom */
+  height: 900px; /* Same height as the bottom */
+  border-radius: 50%; /* Keep it circular */
+  z-index: -1; /* Send it behind the carousel */
+
+  background: radial-gradient(
+      circle at center,
+      transparent 40 350px,
+      /* Adjust as needed */ #d00 350px,
+      #900 400px,
+      #d00 450px
+    ),
+    conic-gradient(
+      from 180deg,
+      /* Use the same gradient or colors as the bottom */ #ff4a4a,
+      #e6282a
+    );
+}
+
+.element {
+  position: absolute;
+  inset: 0;
+
+  transform: rotateY(calc((var(--item) - 1) * 360deg / var(--elements)))
+    translateZ(400px);
+  transform-style: preserve-3d;
+}
+
+.element::after,
+.element::before {
+  position: absolute;
+  top: -52px;
+  border: 1px solid #9097a0;
+  background-color: #1b1724;
+  height: 50px;
+}
+
+.element::after {
+  content: attr(data-item); /* Default to showing the number */
+
+  background-image: url("/arrows.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  font-size: 2rem;
+  font-weight: bold;
+  line-height: 50px;
+
+  transform: translateZ(35px);
+}
+/* For odd elements: Apply circusStars.jpg background */
+/* Odd elements get the circusStars background */
+.element:nth-child(odd)::after {
+  content: "";
+  display: block;
+  background-image: url("/marquee2.jpg");
+  background-color: #1b1724;
+  background-size: contain;
+  background-repeat: repeat;
+  background-position: center;
+
+  width: 100%;
+  height: 50px;
+  top: -52px;
+  position: absolute;
+
+  left: 0;
+  z-index: 1; /* Adjust the z-index if needed */
+}
+
+/* Even elements get specific logo backgrounds */
+.element:nth-child(2)::after {
+  content: "";
+  display: block;
+  background-image: url("/marquee2.jpg");
+  background-size: stretch;
+  background-repeat: no-repeat;
+  background-position: center;
+  width: 100%;
+  background-color: black;
+  border: 2px solid #8e662b;
+  position: absolute;
+  top: -52px;
+  left: 0;
+  z-index: 1;
+}
+
+.element:nth-child(4)::after {
+  content: "";
+  display: block;
+  background-image: url("/marquee2.jpg");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: #1b1724;
+  border: 2px solid #8e662b;
+  position: absolute;
+  top: -52px;
+  left: 0;
+  z-index: 1;
+}
+.element:nth-child(6)::after {
+  content: "";
+  display: block;
+  background-image: url("/marquee2.jpg");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: black;
+  border: 2px solid #8e662b;
+  position: absolute;
+  top: -52px;
+  left: 0;
+  z-index: 1;
+}
+.element:nth-child(8)::after {
+  content: "";
+  display: block;
+  background-image: url("/marquee2.jpg");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: #8e662b;
+  border: 2px solid #8e662b;
+  position: absolute;
+  top: -52px;
+  left: 0;
+  z-index: 1;
+}
+.element:nth-child(10)::after {
+  content: "";
+  display: block;
+  background-image: url("/marquee2.jpg");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: #8e662b;
+  border: 2px solid #8e662b;
+  position: absolute;
+  top: -52px;
+  left: 0;
+  z-index: 1;
+}
+.element:nth-child(12)::after {
+  content: "";
+  display: block;
+  background-image: url("/marquee2.jpg");
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+  /* background-color: #8e662b; */
+  border: 2px solid #8e662b;
+  position: absolute;
+  top: -52px;
+  left: 0;
+  z-index: 1;
+}
+/* Make the logo elements clickable */
+.element:nth-child(even) {
+  cursor: pointer; /* Add a pointer cursor to even elements (with logos) */
+}
+
+/* Hover effect for clickable logo elements */
+.element:nth-child(even):hover::after {
+  background-color: #ffcc00; /* Change to desired hover background color */
+
+  opacity: 0.9; /* Slightly fade the logo on hover */
+  transition: background-color 0.3s ease-in-out, transform 0.3s ease-in-out,
+    opacity 0.3s ease-in-out; /* Smooth hover transition */
+}
+
+/* For even elements (with 'logo'), replace the content with the logo */
+
+.element::before {
+  content: ""; /* Reset the content property */
+  background-image: url("/arrows.png"); /* Set the background image */
+  background-size: cover; /* Ensures the image covers the container */
+  background-position: center; /* Centers the image */
+  background-repeat: repeat; /* Prevent repeating */
+  border: 2px solid #8e662b;
+  left: 150px;
+  width: 82px;
+  transform-origin: left center;
+
+  object-fit: contain;
+  transform: translateZ(35px) rotateY(16deg);
+}
+
+.beast {
+  position: absolute;
+  width: 130px;
+  height: 130px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  animation: beast-move calc(var(--rotation-time) / var(--elements)) ease-in-out
+    infinite;
+  animation-delay: calc(var(--item) * -0.5s);
+}
+@keyframes carousel {
+  0% {
+    transform: perspective(1000px) rotateY(0deg);
+  }
+  100% {
+    transform: perspective(1000px) rotateY(360deg);
+  }
+}
+
+@keyframes beast-move {
+  0%,
+  100% {
+    transform: translate(-50%, -30%);
+  }
+  50% {
+    transform: translate(-50%, -70%);
+  }
+}
+
+/* Media Queries for Different Screen Sizes */
+@media (min-width: 1200px) {
+  .carousel-container {
+    height: 5rem;
+    transform: scale(1.2); /* Full size */
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) and (orientation: portrait) {
+  .carousel-container {
+    height: 5rem; /* Adjust height */
+    transform: scale(0.8); /* Scaled down */
+  }
+  .chat-box-container {
+    margin-top: 5rem;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1199px) and (orientation: landscape) {
+  .carousel-container {
+    height: 5rem; /* Adjust height */
+    transform: scale(0.8); /* Scaled down */
+  }
+  .chat-box-container {
+    margin-top: 3rem;
+  }
+}
+
+@media (min-width: 576px) and (max-width: 767px) {
+  .carousel-container {
+    height: 25rem; /* Adjust height */
+    transform: scale(0.7); /* Scaled down further */
+  }
+}
+
+@media (max-width: 575px) {
+  .carousel-container {
+    height: 10rem; /* Adjust height */
+    transform: scale(0.7); /* Smallest scale */
+  }
+}
+@media (min-width: 400px) and (max-width: 767px) {
+  .chat-box-container {
+    margin-top: 15rem;
+  }
+}
+@media (max-width: 400px) {
+  .carousel-container {
+    height: 7rem;
+    transform: scale(0.7);
+  }
+  .chat-box-container {
+    margin-top: 5rem;
+  }
+}
+
+.pageBackground {
+  /* background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+  background-size: 400% 400%;
+  animation: gradient 15s ease infinite; */
+  height: 100vh;
+  width: 100vw;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: -1;
+}
+
+@keyframes gradient {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.rider-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+}
+
+.rider-name {
+  margin-bottom: 5px;
+  font-size: 1rem;
+  font-weight: bold;
+  color: #8e662b;
+}
+
+.rider-beast-group {
+  position: absolute;
+  top: 65%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  transform-style: preserve-3d;
+  animation: beast-move calc(var(--rotation-time) / var(--elements)) ease-in-out
+    infinite;
+  animation-delay: calc(var(--item) * -0.5s); /* Ensures the same delay */
+}
+
+.rider-container {
+  position: absolute;
+  top: 30px; /* Adjust as necessary to position avatar above beast */
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  z-index: 1;
+  animation: inherit;
+}
+
+.element2 {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, #b8860b, #ffd700, #b8860b) 70px / 10px
+    no-repeat;
+
+  transform-style: preserve-3d;
+}
+
+.element2::after,
+.element2::before {
+  position: absolute;
+  bottom: -52px;
+  border: 1px solid #9097a0;
+  background: linear-gradient(to bottom, #c0c7d0 0%, #606770 100%);
+  height: 50px;
+}
+
+.element2::after {
+  content: "" !important; /* Reset the content property */
+  background-image: url("/candles.png"); /* Set the background image */
+  background-size: contain;
+  background-repeat: repeat-x;
+  background-color: #1b1724;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  font-size: 2rem;
+  font-weight: bold;
+  line-height: 50px;
+  transform: translateZ(35px);
+}
+
+/* Alternate backgrounds for element2::after */
+.element:nth-child(odd) .element2::after {
+  content: "" !important;
+  background-image: url("/circusStripes.webp") !important;
+  background-repeat: repeat-x;
+}
+
+.element:nth-child(even) .element2::after {
+  content: "" !important;
+  background-image: url("/circusStripes.webp") !important;
+  background-repeat: repeat-x;
+}
+
+.element2::before {
+  content: ""; /* Required for pseudo-element to render */
+  background-image: url("/circusStars.jpg"); /* Set the background image */
+  background-size: cover; /* Ensures the image covers the container */
+  background-position: center; /* Centers the image */
+  background-repeat: repeat; /* Prevent repeating */
+  background-color: #1b1724;
+  left: 150px;
+  width: 82px;
+  transform-origin: left center;
+  transform: translateZ(35px) rotateY(16deg);
+}
+
+.message-bubble {
+  padding: 5px 5px;
+  border-radius: 12px;
+  background-color: #f5f5f5; /* Match color with the arrow */
+  max-width: 350px;
+  min-width: 80px;
+  word-wrap: break-word; /* Break long words */
+  word-break: break-word;
+  font-size: 10px; /* Slightly larger font for better legibility */
+  line-height: 1.4;
+  position: absolute; /* Position the bubble relative to the rider */
+  top: -120px; /* Adjust this to move the bubble above */
+  left: 40px; /* Adjust this to move the bubble to the right */
+  transform: translateX(-50%);
+
+  max-height: 150px;
+  margin-bottom: 15px;
+  z-index: 1;
+  display: inline-block;
+  overflow: hidden;
+}
+@keyframes message-move {
+  0%,
+  100% {
+    transform: translate(-30%, -50%) scale(1);
+  }
+  50% {
+    transform: translate(-50%, -120%) scale(1.05); /* Slight zoom effect for more dynamism */
+  }
+}
+
+.message-bubble.right {
+  background-color: #d4e2ff; /* Same as the right-aligned bubble */
+  margin-left: auto;
+  text-align: right;
+}
+
+/* Comic-book style speech bubble arrow for left-aligned bubbles */
+.message-bubble:before {
+  border: solid 5px transparent;
+  border-left: solid 5px #f5f5f5; /* Same color as bubble */
+  border-top: solid 5px #f5f5f5;
+  bottom: -20px;
+  content: "";
+  height: 0;
+  /* left: 24px; */
+  position: absolute;
+
+  transform: skew(-15deg);
+  width: 0;
+}
+
+.message-bubble:after {
+  border: solid 5px transparent;
+  border-left: solid 5px white; /* Inner white border to match the bubble */
+  border-top: solid 5px white;
+  bottom: -10px;
+  content: "";
+  height: 0;
+  /* left: 27px; */
+  position: absolute;
+  transform: skew(-15deg);
+  width: 0;
+}
+
+/* Comic-book style speech bubble arrow for right-aligned bubbles */
+.message-bubble.right:before {
+  border-left: none;
+  border-right: solid 12px #d4e2ff; /* Same color as right-aligned bubble */
+  border-top: solid 12px #d4e2ff;
+  right: 24px;
+  left: auto;
+  bottom: -24px;
+  transform: skew(15deg);
+}
+
+.message-bubble.right:after {
+  border-left: none;
+  border-right: solid 10px white; /* Inner white border for the right bubble */
+  border-top: solid 10px white;
+  right: 27px;
+  left: auto;
+  bottom: -19px;
+  transform: skew(15deg);
+}
+
+.message-bubble p {
+  margin: 0;
+  font-size: 8px;
+  word-break: break-word;
+  white-space: normal;
+}
+
+.chat-box-container {
+  background-color: #8e662b;
+  color: #e1b67e;
+  border: 1px solid #e1b67e;
+  padding: 10px;
+  /* margin-top: 20px; */
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* Centers content horizontally */
+  justify-content: center; /* Centers content vertically */
+  position: fixed;
+  top: 10rem;
+  right: 0;
+  z-index: 9999 !important;
+  transform: translateX(-50%);
+  min-width: 25rem;
+  max-width: 30rem;
+  font-size: 10px;
+}
+.overlay {
+  position: fixed;
+  top: -20rem;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent black */
+}
+
+.logo-title-container {
+  text-align: center;
+  margin-top: 20px; /* Adjust as needed */
+}
+
+.logo-title-container img {
+  display: block;
+  margin: 0 auto;
+}
+
+.logo-title-container h3 {
+  font-size: 1.2rem;
+  color: white; /* Adjust color */
+}
+/* Default: invisible and covers the logo area */
+.clickable-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 20rem;
+  height: 20rem;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 10; /* Make sure it's above other content */
+  cursor: pointer; /* Show pointer cursor */
+  visibility: hidden; /* Hidden initially */
+}
+
+/* Show the overlay on hover */
+.element:hover .clickable-overlay {
+  position: absolute;
+  top: 0;
+  width: 20rem;
+  height: 20rem;
+  visibility: visible;
+
+  z-index: 100;
+  font-family: Verdana, Geneva, Tahoma, sans-serif;
+  color: white;
+}
+#carouselBackground {
+  text-align: center;
+  background: radial-gradient(circle, #593a41, #1b1724);
+  margin-top: 2rem !important;
+}
+.waitlist-container {
+  display: block;
+  padding: 1rem;
+  /* background-color: #f9f9f9; */
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  position: relative;
+  margin-top: 6rem;
+}
+.waitlist-container ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.waitlist-container li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.waitlist-container img {
+  border-radius: 50%;
+}
+.bubble {
+  color: black;
+  background-color: #ffffff;
+  font-family: sans-serif;
+  letter-spacing: 0.03em;
+
+  /* Use relative units for the box */
+  max-width: 380px;
+  min-width: 80px;
+  word-wrap: break-word; /* Break long words */
+  word-break: break-word;
+  border-radius: 1em;
+  padding: 1em;
+  margin-bottom: 2em;
+
+  /* Give relative position so we can position the ::after pseudoelement */
+  position: relative;
+}
+
+.bubble::after {
+  content: "";
+
+  /* Make triangle shape.
+     This can use relative units or px,    
+     depending on how you want it to resize
+  */
+
+  width: 0;
+  height: 0;
+  border-left: 1em solid transparent;
+  border-right: 1em solid transparent;
+  border-top: 1em solid #ffffff;
+
+  /* Position on the bottom right */
+  position: absolute;
+  bottom: -1em;
+  right: 2.5em;
+}
+
+.bubble p {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+.comic {
+  display: flex;
+  flex-wrap: wrap;
+  font-family: "Comic Sans", cursive;
+  padding: 1vmin;
+}
+
+.text {
+  background-color: #fff;
+  border: solid 2px #000;
+  margin: 0;
+  padding: 3px 10px;
+}
+
+.top-left {
+  left: -6px;
+  position: absolute;
+  top: -2px;
+  transform: skew(-15deg);
+}
+
+.bottom-right {
+  bottom: -2px;
+  position: absolute;
+  right: -6px;
+  transform: skew(-15deg);
+}
+.speech-container {
+  --bubble-padding: 0.3em 0.6em;
+  --bubble-margin: 0.3em;
+  --bubble-border: 1.5px;
+  --bubble-radius: 8px;
+  --arrow-size: 7px;
+  --arrow-border: 5px;
+  position: relative;
+  right: -2rem;
+  top: -4rem;
+}
+
+.speech-container .speech {
+  background-color: #fff;
+  border: solid var(--bubble-border) #000;
+  border-radius: var(--bubble-radius);
+  display: inline-block;
+  margin: var(--bubble-margin);
+  padding: var(--bubble-padding);
+  position: relative;
+  font-size: 0.5em; /* Adjust text size */
+  min-width: 50px;
+  max-width: 150px;
+}
+
+.speech-container .speech:before {
+  border: solid var(--arrow-border) transparent;
+  border-left: solid var(--arrow-border) #000;
+  border-top: solid var(--arrow-border) #000;
+  bottom: calc(-2.3 * var(--arrow-border));
+  content: "";
+  height: 0;
+  left: calc(3.5 * var(--arrow-border));
+  position: absolute;
+  transform: skew(-15deg);
+  width: 0;
+}
+
+.speech-container .speech:after {
+  border: solid var(--arrow-size) transparent;
+  border-left: solid var(--arrow-size) #fff;
+  border-top: solid var(--arrow-size) #fff;
+  bottom: calc(-1.4 * var(--arrow-size));
+  content: "";
+  height: 0;
+  left: calc(2.7 * var(--arrow-size));
+  position: absolute;
+  transform: skew(-15deg);
+  width: 0;
+}
+
+/* Add this new rule */
+.carousel-sign {
+  position: fixed;
+  z-index: 9999;
+  transform: translateX(-50%) scale(0.5);
+  top: -6rem;
+  left: 50%;
+  width: auto;
+  max-width: none;
+  max-height: none;
+  pointer-events: none;
+  isolation: isolate;
+  will-change: transform;
+}

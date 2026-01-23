@@ -12,7 +12,7 @@ const Footer = ({ isMobile = false }) => {
 
   return (
     <footer style={{
-      // marginTop: '8rem',
+      marginTop: '6rem',
       padding: '2rem 2rem 2rem 2rem',
       background: 'transparent',
       color: '#ffffff',
@@ -42,6 +42,7 @@ const Footer = ({ isMobile = false }) => {
             <h1 className='custom-title footer-title'
               id="main-title"
               style={{ 
+                fontFamily: "UnifrakturCook",
               position: "relative",
               // left: isMobile ? "5%" : "10%",
               color: "#d4af37",
@@ -95,27 +96,54 @@ const Footer = ({ isMobile = false }) => {
           marginBottom: '2rem',
           flexWrap: 'wrap',
         }}>
-          <Link href="mailto:411@rl80.com" style={{
-            color: '#d4af37',
-            textDecoration: 'none',
-            fontSize: '1.2rem',
-            fontFamily: 'Cyber, monospace',
-            transition: 'all 0.3s ease',
-            textShadow: '0 0 5px rgba(212, 175, 55, 0.3)',
-            display: 'inline-block',
-            padding: '0.5rem 1.5rem',
-            border: '1px solid rgba(212, 175, 55, 0.5)',
-            borderRadius: '20px'
-          }}
+          <a
+            href="/test"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0.5rem',
+              borderRadius: '50%',
+              border: '1px solid rgba(212, 175, 55, 0.5)',
+              transition: 'all 0.3s ease',
+              width: '44px',
+              height: '44px',
+            }}>
+            <svg style={{
+                width: '20px',
+                height: '20px',
+                filter: 'brightness(0) invert(1)',
+              }} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-circle-icon lucide-message-circle"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg>
+          </a>
+          <Link href="mailto:411@rl80.com" 
+           style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0.5rem',
+              borderRadius: '50%',
+              border: '1px solid rgba(212, 175, 55, 0.5)',
+              transition: 'all 0.3s ease',
+              width: '44px',
+              height: '44px',
+            }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(212, 175, 55, 0.1)';
-            e.currentTarget.style.textShadow = '0 0 10px rgba(212, 175, 55, 0.7)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.textShadow = '0 0 5px rgba(212, 175, 55, 0.3)';
-          }}>
-            Contact
+              e.currentTarget.style.backgroundColor = 'rgba(212, 175, 55, 0.1)';
+              e.currentTarget.style.boxShadow = '0 0 15px rgba(212, 175, 55, 0.4)';
+              e.currentTarget.style.transform = 'scale(1.1)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent';
+              e.currentTarget.style.boxShadow = 'none';
+              e.currentTarget.style.transform = 'scale(1)';
+            }}>
+            <svg style={{
+                width: '20px',
+                height: '20px',
+                filter: 'brightness(0) invert(1)',
+              }} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-mail-icon lucide-mail"><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"/><rect x="2" y="4" width="20" height="16" rx="2"/></svg>
           </Link>
 
           <a
@@ -148,8 +176,8 @@ const Footer = ({ isMobile = false }) => {
               src="/images/x_logo.svg"
               alt="X (Twitter)"
               style={{
-                width: '20px',
-                height: '20px',
+                width: '18px',
+                height: '18px',
                 filter: 'brightness(0) invert(1)',
               }}
             />

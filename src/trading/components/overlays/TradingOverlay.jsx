@@ -633,7 +633,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
             </button>
             
             {/* Prediction Market Button */}
-            <button
+            {/* <button
               onClick={() => {
                 setShowPredictionMarket(true);
                 // Trigger panel collapse callback
@@ -685,7 +685,7 @@ const TradingOverlay = ({ show = false, data = null, isConnected = false, onModa
                   Place Bet
                 </span>
               )}
-            </button>
+            </button> */}
 
             {/* Documentation Button */}
             <button

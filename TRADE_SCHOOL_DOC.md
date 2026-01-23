@@ -294,57 +294,6 @@ Trade School exists so these lessons are visible.
 ⸻
 
 
-A note on prediction markets (parimutuel pools)
-
-You may notice a button on the Trade page for simple parimutuel prediction markets.
-
-These pools are separate from the AI trading system.
-
-They are included as a learning tool: a way to observe how collective belief, probability, and incentives interact in a market-like setting.
-
-What they are
-	•	Small, parimutuel-style pools
-	•	Outcomes are determined by participation, not an order book
-	•	Odds emerge from how participants allocate belief
-	•	No leverage, no liquidations, no execution engine
-
-What they are not
-	•	They are not used directly by the trading agents
-	•	They are not signals or recommendations
-	•	They do not influence RL80 decisions
-	•	They are not financial advice or forecasts
-
-Think of them as a belief laboratory, not a trading venue.
-
-⸻
-
-Why include them at all?
-
-Prediction markets are useful for learning because they:
-	•	expose how narratives compete
-	•	reveal confidence vs conviction
-	•	show how probabilities shift as information arrives
-
-They complement Trade School’s core idea:
-
-markets are as much about belief and coordination as they are about price.
-
-In the future, aggregated signals from prediction markets may be studied as contextual data—but for now, they exist purely as an educational side experiment.
-
-⸻
-
-Relationship to the trading system
-
-To be explicit:
-	•	AI agents do not trade these pools
-	•	Trades on Lighter DEX do not depend on pool outcomes
-	•	Pool participation does not affect agent confidence or sizing
-
-The separation is intentional.
-Learning works best when experiments don’t contaminate each other.
-
-
-⸻
 
 Final thought
 

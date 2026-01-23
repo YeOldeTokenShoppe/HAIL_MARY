@@ -418,65 +418,69 @@ async function createWeeklyMarket(privateKey) {
 /**
  * Scheduled function - runs every Monday at 00:05 UTC
  * Creates the weekly oracle accuracy market
+ *
+ * DISABLED 2026-01-23: Automated prediction market creation turned off per user request
  */
-exports.createWeeklyPredictionMarket = onSchedule({
-  schedule: "5 0 * * 1", // Every Monday at 00:05 UTC
-  timeZone: "UTC",
-  memory: "256MiB",
-  timeoutSeconds: 120,
-  secrets: [ownerPrivateKey],
-}, async (event) => {
-  logger.info("[PredictionMarket] Running scheduled weekly market creation...");
-
-  try {
-    const result = await createWeeklyMarket(ownerPrivateKey.value());
-    logger.info("[PredictionMarket] Weekly market creation result:", result);
-
-    // Log to Firestore for monitoring
-    await db.collection('predictionMarketRuns').add({
-      timestamp: new Date(),
-      success: true,
-      ...result
-    });
-
-    return result;
-  } catch (error) {
-    logger.error("[PredictionMarket] Error creating weekly market:", error);
-
-    await db.collection('predictionMarketRuns').add({
-      timestamp: new Date(),
-      success: false,
-      error: error.message
-    });
-
-    throw error;
-  }
-});
+// exports.createWeeklyPredictionMarket = onSchedule({
+//   schedule: "5 0 * * 1", // Every Monday at 00:05 UTC
+//   timeZone: "UTC",
+//   memory: "256MiB",
+//   timeoutSeconds: 120,
+//   secrets: [ownerPrivateKey],
+// }, async (event) => {
+//   logger.info("[PredictionMarket] Running scheduled weekly market creation...");
+//
+//   try {
+//     const result = await createWeeklyMarket(ownerPrivateKey.value());
+//     logger.info("[PredictionMarket] Weekly market creation result:", result);
+//
+//     // Log to Firestore for monitoring
+//     await db.collection('predictionMarketRuns').add({
+//       timestamp: new Date(),
+//       success: true,
+//       ...result
+//     });
+//
+//     return result;
+//   } catch (error) {
+//     logger.error("[PredictionMarket] Error creating weekly market:", error);
+//
+//     await db.collection('predictionMarketRuns').add({
+//       timestamp: new Date(),
+//       success: false,
+//       error: error.message
+//     });
+//
+//     throw error;
+//   }
+// });
 
 /**
  * Manual trigger to create weekly market
+ *
+ * DISABLED 2026-01-23: Automated prediction market creation turned off per user request
  */
-exports.createWeeklyPredictionMarketManual = onRequest({
-  secrets: [ownerPrivateKey, "CRON_SECRET"],
-}, async (req, res) => {
-  // Verify authorization
-  const authHeader = req.headers.authorization;
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (!authHeader || authHeader !== "Bearer " + cronSecret) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-
-  try {
-    logger.info("[PredictionMarket] Manual trigger requested");
-    const result = await createWeeklyMarket(ownerPrivateKey.value());
-    res.json(result);
-  } catch (error) {
-    logger.error("[PredictionMarket] Manual trigger failed:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
+// exports.createWeeklyPredictionMarketManual = onRequest({
+//   secrets: [ownerPrivateKey, "CRON_SECRET"],
+// }, async (req, res) => {
+//   // Verify authorization
+//   const authHeader = req.headers.authorization;
+//   const cronSecret = process.env.CRON_SECRET;
+//
+//   if (!authHeader || authHeader !== "Bearer " + cronSecret) {
+//     res.status(401).json({ error: "Unauthorized" });
+//     return;
+//   }
+//
+//   try {
+//     logger.info("[PredictionMarket] Manual trigger requested");
+//     const result = await createWeeklyMarket(ownerPrivateKey.value());
+//     res.json(result);
+//   } catch (error) {
+//     logger.error("[PredictionMarket] Manual trigger failed:", error);
+//     res.status(500).json({ error: error.message });
+//   }
+// });
 
 // =============================================================================
 // WEEKLY PREDICTION MARKET RESOLUTION
@@ -740,72 +744,76 @@ async function resolveWeeklyMarket(privateKey, marketId = null) {
 /**
  * Scheduled function - runs every Sunday at 23:55 UTC
  * Resolves the current week's market based on oracle accuracy
+ *
+ * DISABLED 2026-01-23: Automated prediction market resolution turned off per user request
  */
-exports.resolveWeeklyPredictionMarket = onSchedule({
-  schedule: "55 23 * * 0", // Every Sunday at 23:55 UTC
-  timeZone: "UTC",
-  memory: "256MiB",
-  timeoutSeconds: 120,
-  secrets: [ownerPrivateKey],
-}, async (event) => {
-  logger.info("[PredictionMarket] Running scheduled weekly market resolution...");
-
-  try {
-    // For Sunday resolution, we resolve the CURRENT week's market
-    const { weekId } = getWeekInfo();
-    const marketId = "oracle-accuracy-" + weekId;
-
-    const result = await resolveWeeklyMarket(ownerPrivateKey.value(), marketId);
-    logger.info("[PredictionMarket] Weekly market resolution result:", result);
-
-    // Log to Firestore for monitoring
-    await db.collection('predictionMarketRuns').add({
-      timestamp: new Date(),
-      action: 'resolve',
-      success: result.success,
-      ...result
-    });
-
-    return result;
-  } catch (error) {
-    logger.error("[PredictionMarket] Error resolving weekly market:", error);
-
-    await db.collection('predictionMarketRuns').add({
-      timestamp: new Date(),
-      action: 'resolve',
-      success: false,
-      error: error.message
-    });
-
-    throw error;
-  }
-});
+// exports.resolveWeeklyPredictionMarket = onSchedule({
+//   schedule: "55 23 * * 0", // Every Sunday at 23:55 UTC
+//   timeZone: "UTC",
+//   memory: "256MiB",
+//   timeoutSeconds: 120,
+//   secrets: [ownerPrivateKey],
+// }, async (event) => {
+//   logger.info("[PredictionMarket] Running scheduled weekly market resolution...");
+//
+//   try {
+//     // For Sunday resolution, we resolve the CURRENT week's market
+//     const { weekId } = getWeekInfo();
+//     const marketId = "oracle-accuracy-" + weekId;
+//
+//     const result = await resolveWeeklyMarket(ownerPrivateKey.value(), marketId);
+//     logger.info("[PredictionMarket] Weekly market resolution result:", result);
+//
+//     // Log to Firestore for monitoring
+//     await db.collection('predictionMarketRuns').add({
+//       timestamp: new Date(),
+//       action: 'resolve',
+//       success: result.success,
+//       ...result
+//     });
+//
+//     return result;
+//   } catch (error) {
+//     logger.error("[PredictionMarket] Error resolving weekly market:", error);
+//
+//     await db.collection('predictionMarketRuns').add({
+//       timestamp: new Date(),
+//       action: 'resolve',
+//       success: false,
+//       error: error.message
+//     });
+//
+//     throw error;
+//   }
+// });
 
 /**
  * Manual trigger to resolve a market
+ *
+ * DISABLED 2026-01-23: Automated prediction market resolution turned off per user request
  */
-exports.resolveWeeklyPredictionMarketManual = onRequest({
-  secrets: [ownerPrivateKey, "CRON_SECRET"],
-}, async (req, res) => {
-  // Verify authorization
-  const authHeader = req.headers.authorization;
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (!authHeader || authHeader !== "Bearer " + cronSecret) {
-    res.status(401).json({ error: "Unauthorized" });
-    return;
-  }
-
-  try {
-    logger.info("[PredictionMarket] Manual resolution trigger requested");
-
-    // Allow specifying a specific market ID in query params
-    const marketId = req.query.marketId || null;
-
-    const result = await resolveWeeklyMarket(ownerPrivateKey.value(), marketId);
-    res.json(result);
-  } catch (error) {
-    logger.error("[PredictionMarket] Manual resolution failed:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
+// exports.resolveWeeklyPredictionMarketManual = onRequest({
+//   secrets: [ownerPrivateKey, "CRON_SECRET"],
+// }, async (req, res) => {
+//   // Verify authorization
+//   const authHeader = req.headers.authorization;
+//   const cronSecret = process.env.CRON_SECRET;
+//
+//   if (!authHeader || authHeader !== "Bearer " + cronSecret) {
+//     res.status(401).json({ error: "Unauthorized" });
+//     return;
+//   }
+//
+//   try {
+//     logger.info("[PredictionMarket] Manual resolution trigger requested");
+//
+//     // Allow specifying a specific market ID in query params
+//     const marketId = req.query.marketId || null;
+//
+//     const result = await resolveWeeklyMarket(ownerPrivateKey.value(), marketId);
+//     res.json(result);
+//   } catch (error) {
+//     logger.error("[PredictionMarket] Manual resolution failed:", error);
+//     res.status(500).json({ error: error.message });
+//   }
+// });

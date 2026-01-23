@@ -3,14 +3,14 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 const EnhancedVolumetricLight = ({ 
-  position = [-5, 100, 0], 
+  position = [-5, 50, 0], 
   target = [3, -10, -45],
   color = '#0af9dd',
   intensity = 1,
   rayCount = 20,
   spread = 12,
   opacity = 0.015,
-  scrollY = 0
+
 }) => {
   const groupRef = useRef();
   const time = useRef(0);

@@ -25,7 +25,8 @@ import { logAnalystScores } from './decisionLogger.js';
 
 // Import oracle accuracy tracking for prediction markets
 import { logAllOracleCalls, verifyPendingCalls } from './oracleAccuracyService.js';
-import { checkAndResolveMarkets } from './predictionMarketService.js';
+// DISABLED 2026-01-23: Automated prediction market maintenance turned off per user request
+// import { checkAndResolveMarkets } from './predictionMarketService.js';
 
 // ============================================================================
 // FIREBASE ADMIN INITIALIZATION
@@ -589,16 +590,18 @@ export async function runScoringWorkflow() {
     // (createWeeklyPredictionMarket in functions/index.js) which runs every
     // Monday at 00:05 UTC and creates on-chain + Firebase markets.
     // Removed ensureCurrentWeekMarket() call to prevent duplicate markets.
+    //
+    // DISABLED 2026-01-23: Automated prediction market maintenance turned off per user request
     // =========================================================================
-    try {
-      // Check and resolve any ended markets
-      const resolveResult = await checkAndResolveMarkets();
-      if (resolveResult.resolved?.length > 0) {
-        console.log(`🎲 Resolved ${resolveResult.resolved.length} prediction market(s)`);
-      }
-    } catch (error) {
-      console.error('⚠️ Prediction market maintenance failed (non-blocking):', error.message);
-    }
+    // try {
+    //   // Check and resolve any ended markets
+    //   const resolveResult = await checkAndResolveMarkets();
+    //   if (resolveResult.resolved?.length > 0) {
+    //     console.log(`🎲 Resolved ${resolveResult.resolved.length} prediction market(s)`);
+    //   }
+    // } catch (error) {
+    //   console.error('⚠️ Prediction market maintenance failed (non-blocking):', error.message);
+    // }
 
     console.log('\n' + '='.repeat(60));
     console.log('[ScoringOrchestrator] Workflow completed!');

@@ -11,6 +11,9 @@ import CyberGlitchButton from '@/components/carousel/CyberGlitchButton'
 import CoinLoader from '@/components/CoinLoader'
 import { useRouter, usePathname } from 'next/navigation'
 import { useLanguage } from '@/components/LanguageProvider'
+import RetroFuturisticButton from '@/components/RetroFuturisticButton'
+import Footer from '@/components/Footer'
+// import HolyGrail from '@/components/HolyGrail'
 
 // Dynamic imports with no SSR for consistent loading
 const CarouselComponent = dynamic(() => import('@/components/carousel/Carousel'), {
@@ -234,12 +237,13 @@ export default function CarouselPage() {
   
           .cyber-candle-btn {
             position: relative;
+
           }
           
           .cyber-candle-btn::before {
             content: '';
             position: absolute;
-            top: 50%;
+            top: 60%;
             left: 50%;
             transform: translate(-50%, -50%);
             width: 150%;
@@ -313,62 +317,30 @@ export default function CarouselPage() {
       `}} />
       
       {/* Main carousel */}
-      <CarouselComponent 
+      <CarouselComponent
         disableScrollControls={false}
-        buyButton={!isMobileDevice && deviceDetected ? (
+        buyButton={deviceDetected ? (
           <div style={{
             display: 'flex',
             justifyContent: 'center',
             width: '100%',
- 
-            // marginTop: '2rem'
           }}>
-            <div className="cyber-candle-btn" style={{ 
-              opacity: mounted ? 1 : 0, 
+            <div className="cyber-candle-btn" style={{
+              opacity: mounted ? 1 : 0,
               transition: 'opacity 0.3s',
               display: 'inline-block',
-        
             }}>
-              <CyberGlitchButton
-                key={`button-desktop`}
-                text={t('buttons.buy') || 'Buy'}
-                text2="RL80"
+              <RetroFuturisticButton
                 onClick={() => setShowBuyModal(true)}
-                label="RL80"
-                mobile={false}
-              />
+                disabled={isLoading}
+                className="my-custom-class"
+              >
+                BUY RL80
+              </RetroFuturisticButton>
             </div>
           </div>
         ) : null}
       />
-      
-      {/* Buy RL80 Button - Only show absolutely positioned version on Mobile */}
-      {deviceDetected && isMobileDevice && (
-        <div style={{
-          position: "absolute",
-          top: "80%",
-          right: "62%",
-          marginTop: '0rem',
-          zIndex: 298,
-          overflow: 'visible',
-        }}>
-          <div className="cyber-candle-btn" style={{ 
-            opacity: mounted ? 1 : 0, 
-            transition: 'opacity 0.3s',
-            position: 'relative',
-            display: 'inline-block'
-          }}>
-            <CyberGlitchButton
-              key={`button-${isMobileDevice}`}
-              text={t('buttons.buy') || 'Buy'}
-              text2="RL80"
-              onClick={() => setShowBuyModal(true)}
-              label="RL80"
-              mobile={isMobileDevice}
-            />
-          </div>
-        </div>
-      )}
       
       
       {/* Navigation Toggle */}

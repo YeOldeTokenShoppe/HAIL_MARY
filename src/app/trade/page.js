@@ -616,7 +616,7 @@ export default function CyborgTemple() {
                 marginBottom: "1rem",
               }}>
                 The Virtual Mary, more 'trade life' than trad wife, is learning to trade perpetuals with her team of investment specialists.
-                Click on any of the traders to see their trading cards. Click on 📊 or 💬 buttons to follow along, or 🎲 to place bets on the Trading Agents, and 📜 for system documentation.
+                Click on any of the traders to see their trading cards. Click on 📊 or 💬 buttons to follow along, or 🎲 to place bets on the Trading Agents, and 📜 for system documentation. The trading system will be continuously improved.
               </p>
             )}
 
