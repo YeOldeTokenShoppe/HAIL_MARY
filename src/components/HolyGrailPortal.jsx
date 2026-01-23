@@ -4,48 +4,47 @@ import React, { useRef, useState, useEffect, Suspense } from "react";
 import * as THREE from 'three';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useGLTF, MeshPortalMaterial, Environment, useTexture, CameraControls } from '@react-three/drei';
+import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import { easing } from 'maath';
 import DarkClouds from "./Clouds";
 
 // Clipping planes for the model coming through the portal
-// zPlane: normal (0,0,1) with constant 0 means plane at z=0
-// This KEEPS z > 0 (toward camera) and CLIPS z < 0 (behind portal)
-const zPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
-// yPlane: clips the bottom to keep it above the frame edge
-const yPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 1.2);
+// These will be set dynamically based on the screen angle
+// screenPlane: angled to match the laptop screen tilt (-0.35 rad on x-axis)
+const screenAngle = 0.32;
+const screenPlane = new THREE.Plane(
+  new THREE.Vector3(0, Math.sin(screenAngle), Math.cos(screenAngle)).normalize(),
+  -0.09 // More negative = more of the model pokes through
+);
+// yPlane: clips the bottom to keep it above the keyboard
+const yPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0.2);
 
 // Holy Grail Model component
 function GrailModel({ clip = false, ...props }) {
   const { scene } = useGLTF('/models/ourlady_rider7.glb');
   const meshRef = useRef();
 
-  // Gentle floating animation - preserve base rotation
-  const baseRotationY = props.rotation?.[1] ?? 0;
-  const basePositionY = props.position?.[1] ?? 0;
-
-  // useFrame((state) => {
-  //   if (meshRef.current) {
-  //     // Add subtle wobble to base rotation
-  //     meshRef.current.rotation.y = baseRotationY + Math.sin(state.clock.elapsedTime * 0.3) * 0.05;
-  //     // Gentle float up and down
-  //     meshRef.current.position.y = basePositionY + Math.sin(state.clock.elapsedTime * 0.5) * 0.03;
-  //   }
-  // });
-
-  // Clone scene once and apply clipping if needed
+  // Clone scene once and apply clipping/glow hiding as needed
   const clonedScene = React.useMemo(() => {
     const clone = scene.clone();
 
-    if (clip) {
-      clone.traverse((child) => {
-        if (child.isMesh && child.material) {
+    clone.traverse((child) => {
+      if (child.isMesh) {
+        // Log mesh names to help identify glow meshes
+ 
+
+       
+        // Apply clipping planes
+        if (clip && child.material) {
           child.material = child.material.clone();
-          child.material.clippingPlanes = [zPlane, yPlane];
+          child.material.clippingPlanes = [screenPlane, yPlane];
           child.material.clipShadows = true;
           child.material.side = THREE.DoubleSide;
+          // Render clipped model after portal
+          child.renderOrder = 10;
         }
-      });
-    }
+      }
+    });
 
     return clone;
   }, [scene, clip]);
@@ -74,7 +73,7 @@ function PortalFrame({ children, width = 1.8, height = 2.2, ...props }) {
           {/* <spotLight position={[0, 5, 5]} angle={0.5} penumbra={1} intensity={2} /> */}
          <hemisphereLight 
       skyColor={'#0000ff'} 
-      groundColor={'#e100ffff'} 
+      groundColor={'#e100ff'} 
       intensity={1} 
     />
           {/* <pointLight position={[-2, 0, 2]} color="#ffd700" intensity={1.5} />
@@ -92,69 +91,110 @@ function PortalFrame({ children, width = 1.8, height = 2.2, ...props }) {
       </mesh>
 
       {/* Glowing border effect */}
-      <mesh position={[0, 0, -0.01]}>
+      {/* <mesh position={[0, 0, -0.01]}>
         <planeGeometry args={[width + 0.15, height + 0.15]} />
         <meshBasicMaterial color="#ffd700" transparent opacity={0.3} />
-      </mesh>
+      </mesh> */}
 
       {/* Outer glow */}
-      <mesh position={[0, 0, -0.02]}>
+      {/* <mesh position={[0, 0, -0.02]}>
         <planeGeometry args={[width + 0.3, height + 0.3]} />
         <meshBasicMaterial color="#ffd700" transparent opacity={0.1} />
+      </mesh> */}
+    </group>
+  );
+}
+
+
+
+// Cyberpunk Laptop Frame component
+function LaptopFrame({ children, ...props }) {
+  const { scene } = useGLTF('/models/laptop.glb');
+  const portalRef = useRef();
+
+  // Clone and hide the original screen mesh
+  const clonedScene = React.useMemo(() => {
+    const clone = scene.clone();
+    clone.traverse((child) => {
+      if (child.isMesh && child.name === 'Cube_Screen_0') {
+        child.visible = false;
+      }
+    });
+    return clone;
+  }, [scene]);
+
+  return (
+    <group {...props}>
+      {/* The laptop model */}
+      <primitive object={clonedScene} scale={0.06} />
+
+      {/* Portal positioned where the screen is - ADJUST THESE VALUES */}
+      <mesh position={[0, 0.65, -0.15]} rotation={[-0.35, 0, 0]}>
+        <planeGeometry args={[1.45, 1.0]} />
+        <MeshPortalMaterial ref={portalRef} side={THREE.DoubleSide} blend={0}>
+          {children}
+        </MeshPortalMaterial>
       </mesh>
     </group>
   );
 }
 
-// Gold Frame overlay component (rendered in 3D space)
-function GoldFrameOverlay({ width = 2, height = 2.4 }) {
-  const texture = useTexture('/images/goldFrame.webp');
-
-  return (
-    <mesh position={[0, 0, 0.01]}>
-      <planeGeometry args={[width, height]} />
-      <meshBasicMaterial
-        map={texture}
-        transparent
-        side={THREE.DoubleSide}
-        depthWrite={false}
-      />
-    </mesh>
-  );
-}
-
 // Main Portal Scene
 function PortalScene({ isMobile = false }) {
-  const grailScale = isMobile ? 1.1 : 1.1;
-  // Model AT the portal plane (z=0) - only parts extending toward camera will poke through
-  const grailPosition = [0, -1.2, -1.67];
-  const grailRotation = isMobile ? [0, -3.3, 0] : [0.1, -3.25, 0];
+  const grailScale = isMobile ? 0.7 : 0.7;
+  const grailRotation = isMobile ? [0, -3.25, 0] : [0.1, -3.25, 0];
 
-  // Rotate the entire scene slightly for a more dynamic initial view
-  const sceneRotation = [0, 0.25, 0];
+  // Inner model position (inside portal world) - closer to portal plane
+  const innerGrailPosition = [0, -0.8, -1.1];
+  // Clipped model position - needs to match where inner model appears at portal plane
+  const clippedGrailPosition = [0, -0.8, -1.1];
+
+  // Position for clipped model (accounting for LaptopFrame transforms)
+  const laptopPos = [0, -0.4, 0];
+  const laptopScale = 1.15;
+  const portalPos = [0, 0.65, -0.15];
+
+  // Overall rotation to accentuate 3D dimensionality
+  const sceneRotation = [0, 0.6, 0]; // Tilt up slightly, rotate to the side
 
   return (
     <group rotation={sceneRotation}>
-      {/* The portal frame with grail inside (full model visible in portal world) */}
-      <PortalFrame position={[0, 0, 0]}>
-        {/* Move clouds up to immerse the model */}
+      {/* The laptop frame with portal screen */}
+      <LaptopFrame position={laptopPos} scale={laptopScale}>
+        {/* Lighting inside the portal */}
+        <hemisphereLight
+          skyColor={'#0000ff'}
+          groundColor={'#e100ff'}
+          intensity={1}
+        />
+        {/* Clouds in the portal world */}
         <group position={[0, 5.3, -1.3]}>
           <DarkClouds />
         </group>
+        {/* The grail model inside the portal (no glow) */}
         <GrailModel
           scale={grailScale}
-          position={grailPosition}
+          position={innerGrailPosition}
           rotation={grailRotation}
+          hideGlow={true}
         />
-      </PortalFrame>
+      </LaptopFrame>
 
-      {/* The clipped grail - SAME position, clipping shows only what extends toward viewer */}
-      <GrailModel
-        clip
-        scale={grailScale}
-        position={grailPosition}
-        rotation={grailRotation}
-      />
+      {/* Clipped grail that pokes through the screen (with glow) */}
+      <group position={laptopPos} scale={laptopScale}>
+        <group position={portalPos} rotation={[-0.35, 0, 0]}>
+          <GrailModel
+            clip
+            scale={grailScale}
+            position={clippedGrailPosition}
+            rotation={grailRotation}
+          />
+        </group>
+      </group>
+
+      {/* Ambient light to see the laptop model */}
+      <ambientLight intensity={0.5} />
+      <directionalLight position={[2, 2, 2]} intensity={1} />
     </group>
   );
 }
@@ -167,20 +207,20 @@ export default function HolyGrailPortal({ isMobile = false }) {
     setClientReady(true);
   }, []);
 
-  if (!clientReady) {
-    return (
-      <div style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'radial-gradient(ellipse at center, #1a1a2e 0%, #000 100%)',
-      }}>
-        <div style={{ color: '#ffd700', fontFamily: 'monospace' }}>Loading...</div>
-      </div>
-    );
-  }
+  // if (!clientReady) {
+  //   return (
+  //     <div style={{
+  //       width: '100%',
+  //       height: '100%',
+  //       display: 'flex',
+  //       alignItems: 'center',
+  //       justifyContent: 'center',
+  //       background: 'radial-gradient(ellipse at center, #1a1a2e 0%, #000 100%)',
+  //     }}>
+  //       <div style={{ color: '#ffd700', fontFamily: 'monospace' }}>Loading...</div>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -192,7 +232,7 @@ export default function HolyGrailPortal({ isMobile = false }) {
         }}
         camera={{
           fov: 50,
-          position: [0, 0, 3],
+          position: [0, 0.8, 3],
           near: 0.1,
           far: 100
         }}
@@ -222,11 +262,20 @@ export default function HolyGrailPortal({ isMobile = false }) {
               wheel: 0,   // NONE - allow page scroll
             }}
           />
+          <EffectComposer>
+            <Bloom
+              intensity={0.4}
+              luminanceThreshold={0.9}
+              luminanceSmoothing={0.9}
+              mipmapBlur
+            />
+          </EffectComposer>
         </Suspense>
       </Canvas>
     </div>
   );
 }
 
-// Preload the model
+// Preload the models
 useGLTF.preload('/models/ourlady_rider7.glb');
+useGLTF.preload('/models/laptop.glb');
