@@ -1,0 +1,5 @@
+# Force Railway to use Dockerfile instead of Nixpacks/Railpack
+[phases.build]
+cmds = ["echo 'Use Dockerfile builder in Railway settings'"]
+
+# This file exists as a fallback - configure Railway to use Dockerfile builder

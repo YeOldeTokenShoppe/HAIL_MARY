@@ -1,20 +1,15 @@
 # Railway Configuration for RL80 - Our Lady of Perpetual Profit
-# ElizaOS Agent Service
 
 [build]
 builder = "dockerfile"
-dockerfilePath = "Dockerfile"
+dockerfilePath = "./Dockerfile"
 
 [deploy]
-# Health check endpoint
 healthcheckPath = "/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
-
-# Start command (optional, Dockerfile CMD is used by default)
-# startCommand = "elizaos start"
+startCommand = "elizaos start"
 
 [service]
-# Internal port ElizaOS listens on
 internalPort = 3000
