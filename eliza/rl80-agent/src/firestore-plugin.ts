@@ -513,10 +513,10 @@ const marketDataProvider: Provider = {
       // Macro
       if (macroData) {
         contextParts.push('\n🌍 MACRO:');
-        if (macroData.vix) contextParts.push(`  VIX: ${macroData.vix.toFixed(2)}`);
-        if (macroData.dxy) contextParts.push(`  DXY: ${macroData.dxy.toFixed(2)}`);
-        if (macroData.treasury10y)
-          contextParts.push(`  10Y Treasury: ${macroData.treasury10y.toFixed(2)}%`);
+        if (macroData.vix != null) contextParts.push(`  VIX: ${Number(macroData.vix).toFixed(2)}`);
+        if (macroData.dxy != null) contextParts.push(`  DXY: ${Number(macroData.dxy).toFixed(2)}`);
+        if (macroData.treasury10y != null)
+          contextParts.push(`  10Y Treasury: ${Number(macroData.treasury10y).toFixed(2)}%`);
       }
 
       // Latest decision
