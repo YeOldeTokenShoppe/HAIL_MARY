@@ -193,8 +193,8 @@ function PortalScene({ isMobile = false }) {
       </group>
 
       {/* Ambient light to see the laptop model */}
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[2, 2, 2]} intensity={1} />
+      <ambientLight intensity={0.9} />
+      {/* <directionalLight position={[2, 2, 2]} intensity={1} /> */}
     </group>
   );
 }

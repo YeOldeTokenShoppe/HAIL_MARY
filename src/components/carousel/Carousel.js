@@ -441,56 +441,8 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
       {/* Experience Controls - positioned top-right */}
       {!isMobilePhone && <ExperienceControls isMobile={isMobile} />}
       
-      {/* Desktop Intro Section - bottom-left overlay */}
-      {/* {!isMobilePhone && (
-        <div style={{
-          position: 'fixed',
-          bottom: '8%',
-          left: '3%',
-          zIndex: 20,
-          maxWidth: '380px',
-          padding: '10px',
-          background: 'rgba(20, 15, 25, 0.85)',
-          backdropFilter: 'blur(12px)',
-          borderRadius: '8px',
-          border: '1px solid rgba(255, 215, 0, 0.2)',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-          animation: 'fadeInUp 0.8s ease-out',
-        }}>
-          <h2 style={{
-            fontSize: '26px',
-            fontFamily: 'UnifrakturCook, serif',
-            color: '#ffd700',
-            marginBottom: '10px',
-            marginTop: '10px',
-            letterSpacing: '0.5px',
-            textShadow: '0 2px 4px rgba(0, 0, 0, 0.5)',
-          }}>
-            {t('carousel.title') || 'Iconography'}
-          </h2>
-          <p style={{
-            fontSize: '14px',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-            color: 'rgba(255, 255, 255, 0.85)',
-            lineHeight: '1.5',
-            margin: 0,
-          }}>
-            {t('carousel.subtitle') || 'A visual canon of Our Lady of Perpetual Profit, from antiquity to the future.'}
-          </p>
-          <p style={{
-            fontSize: '14px',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-            color: 'rgba(255, 255, 255, 0.85)',
-            lineHeight: '1.5',
-            marginTop: '10px',
-          }}>
-            Or read the Techno-Mythic Whitepaper <a href="/philosophy" style={{
-              color: '#ffd700',
-              textDecoration: 'underline',
-            }}>here ↗</a>
-          </p>
-        </div>
-      )} */}
+   
+     
       
       {/* Mobile and Portrait Portal View */}
       {(isMobilePhone || isPortraitOrientation) && !isFullscreen ? (
@@ -567,7 +519,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           </>
 
           {/* Our Lady of Perpetual Profit Logo - Fixed position (Portrait/Tablet view) */}
-          {/* {!isMobilePhone && (
+          {!isMobilePhone && (
             <h1 className='custom-title'
               id="main-title-portrait"
               style={{
@@ -598,7 +550,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                     rgba(255, 192, 203, 0.4) -1px -1px 5px,
                     rgba(0, 0, 0, 0.8) 10px 10px 15px
                   `,
-                fontSize: isTabletPortrait ? "2rem" : "2.5rem",
+                fontSize: isTabletPortrait ? "2rem" : "1.5rem",
                 fontWeight: 900,
                 lineHeight: 0.8,
                 transform: "rotate(-8deg) skew(-15deg)",
@@ -614,7 +566,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               </span>
               <span className="title-line" style={{ display: 'block', marginLeft: isTabletPortrait ? "3rem" : "3.5rem", position: 'relative' }}>Profit</span>
             </h1>
-          )} */}
+          )}
 
           {/* Mobile Sections Container */}
           <div
@@ -1118,7 +1070,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           )}
 
           {/* Our Lady of Perpetual Profit Logo - Fixed position (Desktop) */}
-          {/* <h1 className='custom-title'
+          <h1 className='custom-title'
             id="main-title"
             style={{
               position: 'absolute',
@@ -1163,7 +1115,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               Perpetual
             </span>
             <span className="title-line" style={{ display: 'block', marginLeft: "4rem", position: 'relative' }}>Profit</span>
-          </h1> */}
+          </h1>
 
           {/* Navigation Group - Fixed bottom right */}
           {!isMobilePhone && (
@@ -1640,14 +1592,14 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                   maxWidth: isTabletLandscape ? '550px' : isTabletPortrait ? '500px' : '700px',
                   height: isTabletLandscape ? '600px' : isTabletPortrait ? '550px' : '750px',
                   transition: 'all 0.3s ease',
-                  filter: 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.5))',
+                  // filter: 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.5))',
                   overflow: 'visible',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.filter = 'drop-shadow(0 0 70px rgba(255, 215, 0, 0.9)) brightness(1.1)'
+                  e.currentTarget.style.filter = 'drop-shadow(0 0 70px rgba(9, 99, 244, 0.6)) brightness(1.1)'
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.filter = 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.5)) brightness(1)'
+                  e.currentTarget.style.filter = 'drop-shadow(0 0 40px rgba(0, 149, 255, 0.4)) brightness(1)'
                 }}
               >
                 {/* HolyGrail Portal Canvas */}
