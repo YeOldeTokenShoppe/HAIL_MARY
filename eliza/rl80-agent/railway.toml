@@ -5,11 +5,10 @@ builder = "dockerfile"
 dockerfilePath = "./Dockerfile"
 
 [deploy]
-healthcheckPath = "/health"
-healthcheckTimeout = 300
+# Disable health checks - ElizaOS doesn't have /health by default
+# healthcheckPath = "/health"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
-startCommand = "elizaos start"
 
 [service]
 internalPort = 3000

@@ -50,8 +50,7 @@ RUN chown -R node:node /app && \
 # Switch to non-root user
 USER node
 
-# Railway uses PORT env var, ElizaOS uses SERVER_PORT
-# Default to 3000 if not set
+# Railway uses PORT env var
 ENV PORT=3000
 ENV SERVER_PORT=3000
 ENV NODE_ENV=production
@@ -59,10 +58,6 @@ ENV LOG_LEVEL=info
 
 # Expose the port
 EXPOSE 3000
-
-# Health check for Railway
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:${PORT:-3000}/health || exit 1
 
 # Start RL80
 CMD ["elizaos", "start"]
