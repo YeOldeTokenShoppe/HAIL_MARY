@@ -283,8 +283,16 @@ class LighterStandaloneService {
     // =========================================================================
     // TRADE EXECUTION CONFIGURATION
     // =========================================================================
+    // Debug: Log raw env var value
+    const rawTradingEnabled = process.env.TRADING_ENABLED;
+    console.log(`🔧 DEBUG: TRADING_ENABLED raw value: "${rawTradingEnabled}" (type: ${typeof rawTradingEnabled})`);
+
+    // More lenient check - accept 'true', 'TRUE', '1', 'yes'
+    const tradingEnabled = ['true', 'TRUE', '1', 'yes', 'YES'].includes(String(rawTradingEnabled).trim());
+    console.log(`🔧 DEBUG: Trading enabled resolved to: ${tradingEnabled}`);
+
     this.tradingConfig = {
-      enabled: process.env.TRADING_ENABLED === 'true',  // Must explicitly enable
+      enabled: tradingEnabled,  // Now more lenient
       maxPositionSizeUSD: parseFloat(process.env.MAX_POSITION_SIZE_USD || '100'),  // Max $100 per trade
       maxDailyTrades: parseInt(process.env.MAX_DAILY_TRADES || '10'),
       maxDailyLossUSD: parseFloat(process.env.MAX_DAILY_LOSS_USD || '50'),  // Stop trading if down $50
