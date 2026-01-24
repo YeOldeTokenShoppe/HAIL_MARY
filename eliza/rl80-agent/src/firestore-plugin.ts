@@ -192,7 +192,10 @@ export class FirestoreService extends Service {
       }
 
       this.db = getFirestore(this.app);
-      logger.info('Firestore connection established');
+
+      // Force REST API instead of gRPC - fixes Railway/container networking issues
+      this.db.settings({ preferRest: true });
+      logger.info('Firestore connection established (REST mode enabled)');
 
       // Test connection with a simple read
       try {
