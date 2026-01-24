@@ -2102,7 +2102,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
           {/* Description */}
           <p style={{
             color: '#d4af37',
-            fontFamily: 'Georgia, serif',
+            fontFamily: '"Georgia", "Times New Roman", serif',
             fontSize: '1.1rem',
             maxWidth: '600px',
             textAlign: 'center',
