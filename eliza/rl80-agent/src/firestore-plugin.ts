@@ -159,8 +159,19 @@ export class FirestoreService extends Service {
 
       this.db = getFirestore(this.app);
       logger.info('Firestore connection established');
-    } catch (error) {
-      logger.error({ error }, 'Failed to initialize Firestore:');
+
+      // Test connection with a simple read
+      try {
+        const testDoc = await this.db.collection('agentDecisions').doc('RL80').get();
+        logger.info(`Firestore connection verified - RL80 doc exists: ${testDoc.exists}`);
+      } catch (testError: any) {
+        logger.warn(`Firestore test read failed: ${testError?.message || testError?.code || String(testError)}`);
+      }
+    } catch (error: any) {
+      logger.error(`Failed to initialize Firestore: ${error?.message || error?.code || String(error)}`);
+      if (error?.stack) {
+        logger.error(`Stack trace: ${error.stack}`);
+      }
       this.db = null;
     }
   }
@@ -183,8 +194,8 @@ export class FirestoreService extends Service {
     try {
       const doc = await this.db.collection('marketData').doc('latest').get();
       return doc.exists ? (doc.data() as MarketData) : null;
-    } catch (error) {
-      logger.error({ error }, 'Error fetching market data:');
+    } catch (error: any) {
+      logger.error(`Error fetching market data: ${error?.message || error?.code || String(error)}`);
       return null;
     }
   }
@@ -194,8 +205,8 @@ export class FirestoreService extends Service {
     try {
       const doc = await this.db.collection('technicalData').doc('latest').get();
       return doc.exists ? (doc.data() as TechnicalData) : null;
-    } catch (error) {
-      logger.error({ error }, 'Error fetching technical data:');
+    } catch (error: any) {
+      logger.error(`Error fetching technical data: ${error?.message || error?.code || String(error)}`);
       return null;
     }
   }
@@ -205,8 +216,8 @@ export class FirestoreService extends Service {
     try {
       const doc = await this.db.collection('agentContext').doc('market').get();
       return doc.exists ? (doc.data() as SentimentData) : null;
-    } catch (error) {
-      logger.error({ error }, 'Error fetching sentiment data:');
+    } catch (error: any) {
+      logger.error(`Error fetching sentiment data: ${error?.message || error?.code || String(error)}`);
       return null;
     }
   }
@@ -216,8 +227,8 @@ export class FirestoreService extends Service {
     try {
       const doc = await this.db.collection('macroData').doc('latest').get();
       return doc.exists ? (doc.data() as MacroData) : null;
-    } catch (error) {
-      logger.error({ error }, 'Error fetching macro data:');
+    } catch (error: any) {
+      logger.error(`Error fetching macro data: ${error?.message || error?.code || String(error)}`);
       return null;
     }
   }
@@ -227,8 +238,8 @@ export class FirestoreService extends Service {
     try {
       const doc = await this.db.collection('agentDecisions').doc('RL80').get();
       return doc.exists ? (doc.data() as AgentDecision) : null;
-    } catch (error) {
-      logger.error({ error }, 'Error fetching latest decision:');
+    } catch (error: any) {
+      logger.error(`Error fetching latest decision: ${error?.message || error?.code || String(error)}`);
       return null;
     }
   }
@@ -242,8 +253,8 @@ export class FirestoreService extends Service {
         .limit(limit)
         .get();
       return snapshot.docs.map((doc) => doc.data() as TradeHistoryEntry);
-    } catch (error) {
-      logger.error({ error }, 'Error fetching trade history:');
+    } catch (error: any) {
+      logger.error(`Error fetching trade history: ${error?.message || error?.code || String(error)}`);
       return [];
     }
   }
@@ -265,8 +276,8 @@ export class FirestoreService extends Service {
         }
       });
       return scores;
-    } catch (error) {
-      logger.error({ error }, 'Error fetching analyst scores:');
+    } catch (error: any) {
+      logger.error(`Error fetching analyst scores: ${error?.message || error?.code || String(error)}`);
       return null;
     }
   }
@@ -314,16 +325,15 @@ export class FirestoreService extends Service {
       // Also log to decision history for audit trail
       await this.db.collection('agentDecisions').doc(`RL80_${Date.now()}`).set(decisionDoc);
 
-      logger.info({
-        action: normalizedAction,
-        symbol: decision.symbol,
-        confidence: `${(decision.confidence * 100).toFixed(0)}%`,
-      }, '📤 RL80 decision posted to Firestore');
+      logger.info(`📤 RL80 decision posted: ${normalizedAction} ${decision.symbol} @ ${(decision.confidence * 100).toFixed(0)}%`);
 
       this.lastDecision = decision;
       return true;
-    } catch (error) {
-      logger.error({ error }, 'Failed to post trading decision:');
+    } catch (error: any) {
+      logger.error(`Failed to post trading decision: ${error?.message || error?.code || String(error)}`);
+      if (error?.stack) {
+        logger.error(`Stack trace: ${error.stack}`);
+      }
       return false;
     }
   }
@@ -487,8 +497,8 @@ const marketDataProvider: Provider = {
           recentTrades,
         },
       };
-    } catch (error) {
-      logger.error({ error }, 'Error in market data provider:');
+    } catch (error: any) {
+      logger.error(`Error in market data provider: ${error?.message || error?.code || String(error)}`);
       return {
         text: '[Error fetching market data]',
         values: { connected: false, error: true },
@@ -552,8 +562,8 @@ const oracleScoresProvider: Provider = {
         values: { hasScores: true },
         data: { scores },
       };
-    } catch (error) {
-      logger.error({ error }, 'Error in oracle scores provider:');
+    } catch (error: any) {
+      logger.error(`Error in oracle scores provider: ${error?.message || error?.code || String(error)}`);
       return {
         text: '',
         values: {},
@@ -693,8 +703,8 @@ const makeTradeAction: Action = {
           error: new Error('Firestore write failed'),
         };
       }
-    } catch (error) {
-      logger.error({ error }, 'Error in MAKE_TRADE action:');
+    } catch (error: any) {
+      logger.error(`Error in MAKE_TRADE action: ${error?.message || error?.code || String(error)}`);
 
       await callback({
         text: 'Error posting trade decision. Protecting capital - staying flat.',
