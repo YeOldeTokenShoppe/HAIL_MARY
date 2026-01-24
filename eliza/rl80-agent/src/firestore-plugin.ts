@@ -128,9 +128,17 @@ export class FirestoreService extends Service {
       const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
       let privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
+      // Log credential status (not the actual values)
+      logger.info(`Firebase config check - projectId: ${projectId ? 'SET' : 'MISSING'}`);
+      logger.info(`Firebase config check - clientEmail: ${clientEmail ? clientEmail.substring(0, 20) + '...' : 'MISSING'}`);
+      logger.info(`Firebase config check - privateKey length: ${privateKey?.length || 0}`);
+      logger.info(`Firebase config check - privateKey starts with: ${privateKey?.substring(0, 30) || 'N/A'}`);
+
       // Handle base64 encoded private key (common in Railway/Heroku)
       if (process.env.FIREBASE_PRIVATE_KEY_BASE64) {
+        logger.info('Using base64 encoded private key');
         privateKey = Buffer.from(process.env.FIREBASE_PRIVATE_KEY_BASE64, 'base64').toString('utf8');
+        logger.info(`Decoded privateKey length: ${privateKey?.length || 0}`);
       }
 
       if (!projectId || !clientEmail || !privateKey) {
@@ -139,7 +147,12 @@ export class FirestoreService extends Service {
       }
 
       // Fix escaped newlines in private key
+      const hadEscapedNewlines = privateKey.includes('\\n');
       privateKey = privateKey.replace(/\\n/g, '\n');
+      logger.info(`Private key newline fix applied: ${hadEscapedNewlines}`);
+      logger.info(`Private key has BEGIN marker: ${privateKey.includes('-----BEGIN')}`);
+      logger.info(`Private key has END marker: ${privateKey.includes('-----END')}`);
+      logger.info(`Private key newline count: ${(privateKey.match(/\n/g) || []).length}`);
 
       // Check if Firebase is already initialized
       const existingApps = getApps();
@@ -165,7 +178,14 @@ export class FirestoreService extends Service {
         const testDoc = await this.db.collection('agentDecisions').doc('RL80').get();
         logger.info(`Firestore connection verified - RL80 doc exists: ${testDoc.exists}`);
       } catch (testError: any) {
-        logger.warn(`Firestore test read failed: ${testError?.message || testError?.code || String(testError)}`);
+        // Log everything we can about the error
+        logger.warn(`Firestore test read failed`);
+        logger.warn(`Error type: ${typeof testError}`);
+        logger.warn(`Error constructor: ${testError?.constructor?.name}`);
+        logger.warn(`Error JSON: ${JSON.stringify(testError, Object.getOwnPropertyNames(testError || {}), 2)}`);
+        logger.warn(`Error keys: ${Object.keys(testError || {}).join(', ')}`);
+        if (testError?.details) logger.warn(`Error details: ${testError.details}`);
+        if (testError?.metadata) logger.warn(`Error metadata: ${JSON.stringify(testError.metadata)}`);
       }
     } catch (error: any) {
       logger.error(`Failed to initialize Firestore: ${error?.message || error?.code || String(error)}`);
