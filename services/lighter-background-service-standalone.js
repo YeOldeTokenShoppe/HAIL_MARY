@@ -2148,6 +2148,12 @@ class LighterStandaloneService {
   // ============================================================================
 
   startNewsDataUpdates() {
+    // Check if all news fetching is disabled
+    if (process.env.NEWS_DISABLED === 'true') {
+      console.log('📰 News fetching DISABLED (NEWS_DISABLED=true)');
+      return;
+    }
+
     const updateNewsData = async () => {
       if (!this.isRunning) return;
 
