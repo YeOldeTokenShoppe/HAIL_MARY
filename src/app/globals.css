@@ -7112,8 +7112,19 @@ body .cl-profileSection__security .cl-profileSectionPrimaryButton {
   /* Adjust main card on mobile */
   body .cl-card {
     padding: 16px !important;
-    border-radius: 16px !important;
+    border-radius: 30px !important;
   }
+
+
+.cl-internal-1oollo {
+  display: block !important;
+}
+
+.cl-internal-w3zdjl {
+  position: absolute;
+  right: 2px !important;
+  top: 3px !important;
+}
 
   /* Make the root box fit mobile screens */
   body .cl-rootBox,

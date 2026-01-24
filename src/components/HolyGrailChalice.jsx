@@ -91,8 +91,9 @@ function createTinyFlameMaterial() {
 }
 
 // Holy Grail Chalice Model component
-function ChaliceModel({ scale = 1, position = [0, 0, 0], rotation = [0, 0, 0] }) {
-  const { scene } = useGLTF('/models/holyGrail.glb');
+function ChaliceModel({ scale = 1, position = [0, 0, 0], rotation = [0, 0, 0], isMobile = false }) {
+  const modelPath = isMobile ? '/models/holyGrail_MOBILE.glb' : '/models/holyGrail.glb';
+  const { scene } = useGLTF(modelPath);
   const meshRef = useRef();
   const flameMaterialRef = useRef(null);
   const coinsRef = useRef([]);
@@ -178,12 +179,24 @@ function ChaliceModel({ scale = 1, position = [0, 0, 0], rotation = [0, 0, 0] })
 }
 
 // Main exported component
-export default function HolyGrailChalice({ isMobile = false }) {
+export default function HolyGrailChalice({ isMobile: isMobileProp }) {
   const [clientReady, setClientReady] = useState(false);
+  const [isMobileDetected, setIsMobileDetected] = useState(false);
 
   useEffect(() => {
+    // Detect mobile on client
+    const checkMobile = () => {
+      setIsMobileDetected(window.innerWidth <= 480);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
     setClientReady(true);
+
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Use prop if provided, otherwise use detected value
+  const isMobile = isMobileProp !== undefined ? isMobileProp : isMobileDetected;
 
   if (!clientReady) {
     return (
@@ -200,8 +213,10 @@ export default function HolyGrailChalice({ isMobile = false }) {
     );
   }
 
-  const chaliceScale = isMobile ? 0.4 : 0.4;
-  const chalicePosition = [0, -1.5, -2];
+  const chaliceScale = isMobile ? 0.7 : 0.4;
+  const chalicePosition = isMobile ? [0, -6.9, -2] : [0, -1.5, -2];
+    console.log('isMobile:', isMobile, 'modelPath:', isMobile ? '/models/holyGrail_MOBILE.glb' 
+  : '/models/holyGrail.glb'); 
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -229,8 +244,10 @@ export default function HolyGrailChalice({ isMobile = false }) {
           <pointLight position={[2, 2, 2]} color="#ffd700" intensity={1} /> */}
 
           <ChaliceModel
+            key={isMobile ? 'mobile' : 'desktop'}
             scale={chaliceScale}
             position={chalicePosition}
+            isMobile={isMobile}
           />
 
           {/* <OrbitControls
@@ -260,5 +277,6 @@ export default function HolyGrailChalice({ isMobile = false }) {
   );
 }
 
-// Preload the model
+// Preload the models
 useGLTF.preload('/models/holyGrail.glb');
+useGLTF.preload('/models/holyGrail_MOBILE.glb');

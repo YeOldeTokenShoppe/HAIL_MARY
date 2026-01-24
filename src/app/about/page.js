@@ -458,7 +458,7 @@ export default function CarouselPage() {
       
       
       {/* RL80 Logo - Mobile Only */}
-      {deviceDetected && isMobileDevice && (
+      {/* {deviceDetected && isMobileDevice && ( */}
         <div style={{
           position: "absolute",
           top: "20px", 
@@ -507,7 +507,7 @@ export default function CarouselPage() {
             })}
           </div>
         </div>
-      )}
+      {/* )} */}
     </div>
   )
 }

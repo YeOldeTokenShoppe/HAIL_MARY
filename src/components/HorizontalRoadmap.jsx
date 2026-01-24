@@ -32,9 +32,9 @@ const HorizontalRoadmap = ({ isVisible = true, isMobile = false }) => {
   }, []);
 
   const milestones = [
-    { id: 1, title: 'Launch', titleShort: 'Launch', date: 'Q1 2025', icon: '🚀', badge: 'Q1' },
-    { id: 2, title: 'Build up LP', titleShort: 'Liquidity', date: '', icon: '💧', badge: null },
-    { id: 3, title: 'Staking Rewards', titleShort: 'Staking', date: 'Q2', icon: '💎', badge: 'Q2' },
+    { id: 1, title: 'Launch', titleShort: 'Launch', date: 'Q1 2026', icon: '🚀', badge: 'Q1' },
+    { id: 2, title: 'Build Liquiditys', titleShort: 'Liquidity', date: '', icon: '💧', badge: null },
+    { id: 3, title: 'Staking Rewards', titleShort: 'Staking', date: 'Q2 2026', icon: '💎', badge: 'Q2' },
     { id: 4, title: 'More Rewards', titleShort: 'Rewards', date: '', icon: '🎁', badge: null },
     { id: 5, title: '0% Taxes', titleShort: '0% Tax', date: '', icon: '✨', badge: 'Q?' },
   ];

@@ -316,14 +316,24 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           }
 
           .carousel-nav-dots {
-            bottom: 15px;
-            padding: 6px 12px;
-            gap: 10px;
+            bottom: 12px;
+            padding: 4px 10px;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.3);
+            border: none;
+            backdrop-filter: none;
           }
 
           .carousel-dot {
-            width: 8px;
-            height: 8px;
+            width: 6px;
+            height: 6px;
+            border: none;
+            background: rgba(255, 255, 255, 0.4);
+          }
+
+          .carousel-dot.active {
+            background: #ffd700;
+            box-shadow: none;
           }
 
           .carousel-progress {
@@ -335,7 +345,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           }
 
           .carousel-section-label {
-            font-size: 7px !important;
+            display: none;
           }
         }
 
@@ -557,7 +567,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           </>
 
           {/* Our Lady of Perpetual Profit Logo - Fixed position (Portrait/Tablet view) */}
-          {!isMobilePhone && (
+          {/* {!isMobilePhone && (
             <h1 className='custom-title'
               id="main-title-portrait"
               style={{
@@ -604,7 +614,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               </span>
               <span className="title-line" style={{ display: 'block', marginLeft: isTabletPortrait ? "3rem" : "3.5rem", position: 'relative' }}>Profit</span>
             </h1>
-          )}
+          )} */}
 
           {/* Mobile Sections Container */}
           <div
@@ -628,8 +638,8 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'flex-start',
-            paddingTop: isMobilePhone ? '120px' : '120px',
-            paddingBottom: isMobilePhone ? '80px' : '100px',
+            paddingTop: isMobilePhone ? '30%' : '120px',
+            paddingBottom: isMobilePhone ? '1rem' : '100px',
             paddingLeft: isMobilePhone ? '1rem' : '2rem',
             paddingRight: isMobilePhone ? '1rem' : '2rem',
             position: 'relative',
@@ -662,7 +672,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           {/* </div> */}
           
           {/* Sub-heading */}
-          <p style={{
+          {/* <p style={{
             fontFamily: "'Courier New', monospace",
             fontSize: isSmallPhone ? '0.7rem' : isMobilePhone ? '0.9rem' : isLargeTablet ? '1.2rem' : isTabletPortrait ? '1rem' : '1.2rem',
             color: '#ffd700',
@@ -675,10 +685,10 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
           }}>
             Journey Through Her Illustrious History
-          </p>
+          </p> */}
 
           {/* Description text */}
-          <p style={{
+          {/* <p style={{
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
             fontSize: isSmallPhone ? '0.8rem' : isMobilePhone ? '0.9rem' : '1rem',
             color: 'rgba(255, 255, 255, 0.85)',
@@ -688,16 +698,19 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             textAlign: 'center',
             padding: '0 1rem',
           }}>
-            Take a roller coaster ride through time and see a collection of Our Lady of Perpetual Profit's most iconic moments, from antiquity to the future.
-          </p>
+            Take a roller coaster ride through time to see Our Lady of Perpetual Profit's most iconic moments.
+          </p> */}
 
           {/* Portal Preview Container with Frame Image */}
-          <div 
+          <div
             onClick={() => setIsFullscreen(true)}
             style={{
               position: 'relative',
               width: '90%',
-              maxWidth: isSmallPhone ? '280px' : isMobilePhone ? '380px' : isLargeTablet ? '550px' : isTabletPortrait ? '450px' : '450px',
+              marginTop: '5%',
+              // marginBottom: '5%',
+              maxWidth: isSmallPhone ? 'min(280px, 95vw)' : isMobilePhone ? 'min(380px, 95vw)' : isLargeTablet ? '550px' : isTabletPortrait ? '450px' : '450px',
+              maxHeight: isMobilePhone ? '80vh' : 'none',
               aspectRatio: '4/3',
               cursor: 'pointer',
               transition: 'all 0.3s ease',
@@ -800,7 +813,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             marginTop: '1.5rem',
             marginBottom: '1rem',
             fontFamily: "'Courier New', monospace",
-            fontSize: isMobilePhone ? '0.75rem' : '0.9rem',
+            fontSize: isMobilePhone ? '1rem' : '0.9rem',
             color: '#888',
             textAlign: 'center',
             lineHeight: '1.4',
@@ -811,9 +824,22 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             animation: 'pulse 2s ease-in-out infinite',
 }}>Tap to enter</span> • <a href="/philosophy" style={{ color: '#ffff00', textDecoration: 'underline' }}>Read whitepaper</a>
           </p>
+ {/* Description */}
+            <p style={{
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              fontSize: isMobilePhone ? '1rem' : '1rem',
+              color: 'rgba(255, 255, 255, 0.85)',
+              lineHeight: '1.6',
+              marginTop: '-0.5rem',
+              maxWidth: isMobilePhone ? '320px' : '450px',
+              textAlign: 'center',
+              padding: '0 1rem',
+            }}>
+       Trysail Sail ho Corsair red ensign hulk smartly boom jib rum gangway. 
+            </p>
 
           {/* Buy Button for Mobile - at the bottom of Section 1 */}
-          <div style={{ marginTop: '1rem', marginBottom: '2rem' }}>
+          <div style={{ marginTop: '1.5rem', marginBottom: '1rem' }}>
             {buyButton}
           </div>
 
@@ -841,7 +867,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             <SkewedHeading
               lines={["PROSPER80", "FOR ALL", "HUMAN80!"]}
               colors={["#00ff00", "#f4e4c1", "#ffd700"]}
-              fontSize={{ mobile: isSmallPhone ? "1.6rem" : "2rem", desktop: "2.5rem" }}
+              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "2.5rem" : "3rem"}
               isMobile={true}
               language={locale}
             />
@@ -849,18 +875,18 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             {/* HolyGrailPortal Canvas */}
             <div style={{
               width: '100%',
-              maxWidth: isMobilePhone ? '350px' : '500px',
-              height: isMobilePhone ? '400px' : '550px',
+              maxWidth: isMobilePhone ? 'min(350px, 80vw)' : '500px',
+              height: isMobilePhone ? 'min(400px, 40vh)' : '550px',
               marginTop: '0.5rem',
               filter: 'drop-shadow(0 0 30px rgba(0, 221, 255, 0.4))',
             }}>
-              <HolyGrailPortal isMobile={true} />
+              <HolyGrailPortal isMobile={isMobilePhone} />
             </div>
 
             {/* Description */}
             <p style={{
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-              fontSize: isMobilePhone ? '0.9rem' : '1rem',
+              fontSize: isMobilePhone ? '1rem' : '1rem',
               color: 'rgba(255, 255, 255, 0.85)',
               lineHeight: '1.6',
               marginTop: '-0.5rem',
@@ -868,7 +894,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               textAlign: 'center',
               padding: '0 1rem',
             }}>
-       Trysail Sail ho Corsair red ensign hulk smartly boom jib rum gangway. Case shot Shiver me timbers gangplank crack Jennys tea cup ballast Blimey lee snow crow's nest rutters. Fluke jib scourge of the seven seas boatswain schooner gaff booty Jack Tar transom spirits.
+       Trysail Sail ho Corsair red ensign hulk smartly boom jib rum gangway. 
             </p>
 
             {/* Tokenomics Button */}
@@ -912,26 +938,27 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             {/* HolyGrailChalice Canvas */}
             <div style={{
               width: '100%',
-              maxWidth: isMobilePhone ? '350px' : '500px',
-              height: isMobilePhone ? '350px' : '450px',
-              marginTop: '1.5rem',
+              maxWidth: isMobilePhone ? 'min(450px, 80vw)' : '500px',
+              height: isMobilePhone ? 'min(550px, 30vh)' : '450px',
+              marginTop: '0',
             }}>
-              <HolyGrailChalice isMobile={true} />
+              <HolyGrailChalice isMobile={isMobilePhone} />
             </div>
 
             {/* Description */}
             <p style={{
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-              fontSize: isMobilePhone ? '0.9rem' : '1rem',
+              fontSize: isMobilePhone ? '1rem' : '1rem',
               color: 'rgba(255, 255, 255, 0.85)',
               lineHeight: '1.6',
-              marginTop: '-0.5rem',
+              // marginTop: '-3.5rem',
               maxWidth: isMobilePhone ? '320px' : '450px',
               textAlign: 'center',
               padding: '0 1rem',
             }}>
-                Devote a green candle to the charts by burning 1 or more RL80 tokens. Top 20% of burners are
-                automatically qualified for The Illumin80 - part mystery cult, part trading guild. Illumin80 qualify for special perks, like a custom candle that never melts, plus a 1.25x multiplier for staking rewards.
+                {/* Devote a green candle to the charts by burning 1 or more RL80 tokens. Top 20% of burners are
+                automatically qualified  */}
+                Join The Illumin80 - part mystery cult, part trading guild - and get special perks, like a 1.25x multiplier for staking rewards.
             </p>
 
             {/* Illumin80 Button */}
@@ -1091,7 +1118,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           )}
 
           {/* Our Lady of Perpetual Profit Logo - Fixed position (Desktop) */}
-          <h1 className='custom-title'
+          {/* <h1 className='custom-title'
             id="main-title"
             style={{
               position: 'absolute',
@@ -1136,7 +1163,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               Perpetual
             </span>
             <span className="title-line" style={{ display: 'block', marginLeft: "4rem", position: 'relative' }}>Profit</span>
-          </h1>
+          </h1> */}
 
           {/* Navigation Group - Fixed bottom right */}
           {!isMobilePhone && (
@@ -1774,7 +1801,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                 //   e.currentTarget.style.filter = 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.5)) brightness(1)'
                 // }}
               >
-                <HolyGrailChalice isMobile={false} />
+                <HolyGrailChalice isMobile={isMobilePhone} />
               </div>
 
             </div>

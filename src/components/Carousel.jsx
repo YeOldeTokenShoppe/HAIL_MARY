@@ -192,6 +192,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
 
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const emojiPickerRef = useRef(null);
+  const wasSignedInRef = useRef(false);
 
   // Notify parent when riding state changes
   useEffect(() => {
@@ -323,6 +324,42 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
       });
     }
   }, [isLoaded, isSignedIn, user, firebaseUser]);
+
+  // Clean up ride when user signs out
+  useEffect(() => {
+    if (isLoaded) {
+      if (isSignedIn) {
+        wasSignedInRef.current = true;
+      } else if (wasSignedInRef.current && activeBeastId) {
+        // User was signed in but now isn't, and they have an active ride
+        wasSignedInRef.current = false;
+
+        const cleanupRideOnSignOut = async () => {
+          try {
+            const beastIdToCleanup = activeBeastId;
+            const beastRef = doc(db, "carouselBeasts", beastIdToCleanup);
+            await deleteDoc(beastRef);
+            await deleteMessagesForBeast(beastIdToCleanup);
+            await assignBeastFromWaitlist(beastIdToCleanup);
+
+            // Reset local state
+            setActiveBeastId(null);
+            setIsRiding(false);
+            setMessages((prevMessages) => {
+              const updatedMessages = { ...prevMessages };
+              delete updatedMessages[beastIdToCleanup];
+              return updatedMessages;
+            });
+            setNewMessage("");
+          } catch (error) {
+            console.error("Failed to cleanup ride on sign out:", error);
+          }
+        };
+
+        cleanupRideOnSignOut();
+      }
+    }
+  }, [isLoaded, isSignedIn, activeBeastId]);
 
   const fetchUserProfile = async (userId) => {
     try {

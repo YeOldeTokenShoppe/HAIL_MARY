@@ -584,91 +584,9 @@ const DocumentationModal = ({ show, onClose }) => {
               Trade School exists so these lessons are visible.
             </p>
 
-            <hr style={{ border: 'none', borderTop: '1px solid #00c8ff', margin: '40px 0' }} />
+  
 
-            {/* Prediction markets */}
-            <h2 style={{ color: '#00c8ff', fontSize: '24px', marginTop: '40px', marginBottom: '20px' }}>
-              A note on prediction markets (parimutuel pools)
-            </h2>
-
-            <p style={{ color: '#cccccc' }}>
-              You may notice a button on the Trade page for simple parimutuel prediction markets.
-            </p>
-
-            <p style={{ color: '#cccccc' }}>
-              These pools are separate from the AI trading system.
-            </p>
-
-            <p style={{ color: '#cccccc' }}>
-              They are included as a learning tool: a way to observe how collective belief, probability, and incentives interact in a market-like setting.
-            </p>
-
-            <h3 style={{ color: '#00ff88', fontSize: '18px', marginTop: '25px', marginBottom: '15px' }}>
-              What they are
-            </h3>
-            <ul style={{ color: '#cccccc', paddingLeft: '20px' }}>
-              <li>Small, parimutuel-style pools</li>
-              <li>Outcomes are determined by participation, not an order book</li>
-              <li>Odds emerge from how participants allocate belief</li>
-              <li>No leverage, no liquidations, no execution engine</li>
-            </ul>
-
-            <h3 style={{ color: '#00ff88', fontSize: '18px', marginTop: '25px', marginBottom: '15px' }}>
-              What they are not
-            </h3>
-            <ul style={{ color: '#cccccc', paddingLeft: '20px' }}>
-              <li>They are not used directly by the trading agents</li>
-              <li>They are not signals or recommendations</li>
-              <li>They do not influence RL80 decisions</li>
-              <li>They are not financial advice or forecasts</li>
-            </ul>
-
-            <p style={{ color: '#cccccc', fontStyle: 'italic' }}>
-              Think of them as a belief laboratory, not a trading venue.
-            </p>
-
-            <h3 style={{ color: '#00ff88', fontSize: '18px', marginTop: '25px', marginBottom: '15px' }}>
-              Why include them at all?
-            </h3>
-
-            <p style={{ color: '#cccccc' }}>
-              Prediction markets are useful for learning because they:
-            </p>
-            <ul style={{ color: '#cccccc', paddingLeft: '20px' }}>
-              <li>expose how narratives compete</li>
-              <li>reveal confidence vs conviction</li>
-              <li>show how probabilities shift as information arrives</li>
-            </ul>
-
-            <p style={{ color: '#cccccc' }}>
-              They complement Trade School's core idea:
-            </p>
-
-            <p style={{ color: '#cccccc', fontStyle: 'italic' }}>
-              markets are as much about belief and coordination as they are about price.
-            </p>
-
-            <p style={{ color: '#cccccc' }}>
-              In the future, aggregated signals from prediction markets may be studied as contextual data—but for now, they exist purely as an educational side experiment.
-            </p>
-
-            <h3 style={{ color: '#00ff88', fontSize: '18px', marginTop: '25px', marginBottom: '15px' }}>
-              Relationship to the trading system
-            </h3>
-
-            <p style={{ color: '#cccccc' }}>
-              To be explicit:
-            </p>
-            <ul style={{ color: '#cccccc', paddingLeft: '20px' }}>
-              <li>AI agents do not trade these pools</li>
-              <li>Trades on Lighter DEX do not depend on pool outcomes</li>
-              <li>Pool participation does not affect agent confidence or sizing</li>
-            </ul>
-
-            <p style={{ color: '#cccccc' }}>
-              The separation is intentional.<br />
-              Learning works best when experiments don't contaminate each other.
-            </p>
+            
 
             <hr style={{ border: 'none', borderTop: '1px solid #00c8ff', margin: '40px 0' }} />
 

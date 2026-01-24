@@ -1,5 +1,6 @@
 'use client'
 import React, { useRef, useState, useEffect, Suspense, useCallback, useMemo, forwardRef, useImperativeHandle, Component } from 'react'
+import { createPortal } from 'react-dom'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Stats, useGLTF, Html, OrbitControls } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
@@ -2057,11 +2058,11 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Fixed screen-space panel for user's candle info */}
-      {targetCameraPosition && userCandleData && (
+      {/* Fixed screen-space panel for user's candle info - rendered via portal to escape stacking context */}
+      {targetCameraPosition && userCandleData && typeof document !== 'undefined' && createPortal(
         <div
           style={{
-            position: 'absolute',
+            position: 'fixed',
             top: isMobile ? '120px' : '80px',
             right: isMobile ? '16px' : '24px',
             background: 'rgba(20, 20, 30, 0.98)',
@@ -2073,113 +2074,127 @@ useEffect(() => {
             boxShadow: '0 0 60px rgba(138, 43, 226, 0.3)',
             backdropFilter: 'blur(10px)',
             WebkitBackdropFilter: 'blur(10px)',
-            zIndex: 101,
-            animation: 'slideInRight 0.4s ease-out',
+            zIndex: 500,
             pointerEvents: 'none',
             textAlign: 'center',
           }}
         >
-          {/* Icon/Avatar */}
-          <div style={{ marginBottom: '1rem' }}>
-            {userCandleData.userImageUrl ? (
-              <img
-                src={userCandleData.userImageUrl}
-                alt={userCandleData.username}
-                style={{
+          <style>{`
+            @keyframes portalSlideIn {
+              from {
+                opacity: 0;
+                transform: translateX(30px);
+              }
+              to {
+                opacity: 1;
+                transform: translateX(0);
+              }
+            }
+          `}</style>
+          <div style={{ animation: 'portalSlideIn 0.4s ease-out' }}>
+            {/* Icon/Avatar */}
+            <div style={{ marginBottom: '1rem' }}>
+              {userCandleData.userImageUrl ? (
+                <img
+                  src={userCandleData.userImageUrl}
+                  alt={userCandleData.username}
+                  style={{
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                    filter: 'drop-shadow(0 0 20px rgba(138, 43, 226, 0.8)) drop-shadow(0 0 40px rgba(138, 43, 226, 0.5))',
+                    border: '2px solid rgba(138, 43, 226, 0.6)'
+                  }}
+                />
+              ) : (
+                <div style={{
                   width: '60px',
                   height: '60px',
                   borderRadius: '50%',
-                  objectFit: 'cover',
+                  background: 'linear-gradient(135deg, #8a2be2, #ff006e)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '24px',
+                  fontWeight: 'bold',
+                  color: '#fff',
+                  margin: '0 auto',
                   filter: 'drop-shadow(0 0 20px rgba(138, 43, 226, 0.8)) drop-shadow(0 0 40px rgba(138, 43, 226, 0.5))',
                   border: '2px solid rgba(138, 43, 226, 0.6)'
-                }}
-              />
-            ) : (
+                }}>
+                  {userCandleData.username?.charAt(0).toUpperCase() || '?'}
+                </div>
+              )}
+            </div>
+
+            {/* Title */}
+            <h2 style={{
+              fontSize: isMobile ? '1rem' : '1.2rem',
+              marginBottom: '0.5rem',
+              fontWeight: 'bold',
+              textTransform: 'uppercase',
+              letterSpacing: '2px',
+              fontFamily: "'Orbitron', monospace",
+              color: '#fff'
+            }}>
+              Your Candle
+            </h2>
+
+            {/* Username */}
+            <p style={{
+              marginBottom: '1rem',
+              color: '#00f5d4',
+              fontSize: isMobile ? '1rem' : '1.1rem',
+              fontWeight: '600',
+              lineHeight: '1.5'
+            }}>
+              {userCandleData.username}
+            </p>
+
+            {/* Candle stats */}
+            <div style={{
+              padding: '0.75rem 1rem',
+              background: 'rgba(138, 43, 226, 0.15)',
+              borderRadius: '12px',
+              border: '1px solid rgba(138, 43, 226, 0.3)',
+              marginBottom: userCandleData.message ? '1rem' : '0'
+            }}>
               <div style={{
-                width: '60px',
-                height: '60px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #8a2be2, #ff006e)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '24px',
-                fontWeight: 'bold',
-                color: '#fff',
-                margin: '0 auto',
-                filter: 'drop-shadow(0 0 20px rgba(138, 43, 226, 0.8)) drop-shadow(0 0 40px rgba(138, 43, 226, 0.5))',
-                border: '2px solid rgba(138, 43, 226, 0.6)'
+                gap: '8px',
               }}>
-                {userCandleData.username?.charAt(0).toUpperCase() || '?'}
+                <span style={{ fontSize: '18px' }}>🕯️</span>
+                <span style={{
+                  fontSize: isMobile ? '0.85rem' : '0.9rem',
+                  color: '#fff',
+                  fontFamily: "'Orbitron', monospace",
+                  letterSpacing: '0.5px'
+                }}>
+                  {userCandleData.litAt}
+                </span>
+              </div>
+            </div>
+
+            {/* Message if present */}
+            {userCandleData.message && (
+              <div style={{
+                padding: '0.75rem 1rem',
+                background: 'rgba(255, 255, 255, 0.05)',
+                borderRadius: '12px',
+                fontSize: isMobile ? '0.85rem' : '0.9rem',
+                color: 'rgba(255, 255, 255, 0.8)',
+                fontStyle: 'italic',
+                lineHeight: '1.5',
+              }}>
+                "{userCandleData.message}"
               </div>
             )}
           </div>
-
-          {/* Title */}
-          <h2 style={{
-            fontSize: isMobile ? '1rem' : '1.2rem',
-            marginBottom: '0.5rem',
-            fontWeight: 'bold',
-            textTransform: 'uppercase',
-            letterSpacing: '2px',
-            fontFamily: "'Orbitron', monospace",
-            color: '#fff'
-          }}>
-            Your Candle
-          </h2>
-
-          {/* Username */}
-          <p style={{
-            marginBottom: '1rem',
-            color: '#00f5d4',
-            fontSize: isMobile ? '1rem' : '1.1rem',
-            fontWeight: '600',
-            lineHeight: '1.5'
-          }}>
-            {userCandleData.username}
-          </p>
-
-          {/* Candle stats */}
-          <div style={{
-            padding: '0.75rem 1rem',
-            background: 'rgba(138, 43, 226, 0.15)',
-            borderRadius: '12px',
-            border: '1px solid rgba(138, 43, 226, 0.3)',
-            marginBottom: userCandleData.message ? '1rem' : '0'
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-            }}>
-              <span style={{ fontSize: '18px' }}>🕯️</span>
-              <span style={{
-                fontSize: isMobile ? '0.85rem' : '0.9rem',
-                color: '#fff',
-                fontFamily: "'Orbitron', monospace",
-                letterSpacing: '0.5px'
-              }}>
-                {userCandleData.litAt}
-              </span>
-            </div>
-          </div>
-
-          {/* Message if present */}
-          {userCandleData.message && (
-            <div style={{
-              padding: '0.75rem 1rem',
-              background: 'rgba(255, 255, 255, 0.05)',
-              borderRadius: '12px',
-              fontSize: isMobile ? '0.85rem' : '0.9rem',
-              color: 'rgba(255, 255, 255, 0.8)',
-              fontStyle: 'italic',
-              lineHeight: '1.5',
-            }}>
-              "{userCandleData.message}"
-            </div>
-          )}
-        </div>
+        </div>,
+        document.body
       )}
       
       {mounted && typeof window !== 'undefined' && (
@@ -2393,6 +2408,17 @@ useEffect(() => {
           to {
             opacity: 1;
             transform: translateX(0);
+          }
+        }
+
+        @keyframes slideInLeft {
+          from {
+            opacity: 0;
+            transform: translateY(-50%) translateX(-30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(-50%) translateX(0);
           }
         }
 

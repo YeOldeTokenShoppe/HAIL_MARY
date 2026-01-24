@@ -39,7 +39,7 @@ const Footer = ({ isMobile = false }) => {
             justifyContent: 'center',
           }}>
           </div>
-            <h1 className='custom-title footer-title'
+            {/* <h1 className='custom-title footer-title'
               id="main-title"
               style={{ 
                 fontFamily: "UnifrakturCook",
@@ -76,7 +76,7 @@ const Footer = ({ isMobile = false }) => {
                 Perpetual
               </span>
               <span  style={{ display: 'block', marginLeft: isMobile ? "0rem" : "0rem", position: 'relative' }}>Profit</span>
-            </h1>
+            </h1> */}
         </div>
         
         {/* Divider */}

@@ -151,7 +151,7 @@ function PortalScene({ isMobile = false }) {
 
   // Position for clipped model (accounting for LaptopFrame transforms)
   const laptopPos = [0, -0.4, 0];
-  const laptopScale = 1.15;
+  const laptopScale = isMobile ? 1.3 : 1.15;
   const portalPos = [0, 0.65, -0.15];
 
   // Overall rotation to accentuate 3D dimensionality
