@@ -124,54 +124,65 @@ export class FirestoreService extends Service {
 
   async initialize(): Promise<void> {
     try {
-      const projectId = process.env.FIREBASE_PROJECT_ID;
-      const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-      let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+      let projectId: string | undefined;
+      let clientEmail: string | undefined;
+      let privateKey: string | undefined;
 
-      // Log credential status (not the actual values)
-      logger.info(`Firebase config check - projectId: ${projectId ? 'SET' : 'MISSING'}`);
-      logger.info(`Firebase config check - clientEmail: ${clientEmail ? clientEmail.substring(0, 20) + '...' : 'MISSING'}`);
-      logger.info(`Firebase config check - privateKey length: ${privateKey?.length || 0}`);
-      logger.info(`Firebase config check - privateKey starts with: ${privateKey?.substring(0, 30) || 'N/A'}`);
+      // Method 1: Full JSON credentials (recommended for Railway)
+      const jsonCreds = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+      if (jsonCreds) {
+        logger.info('Using GOOGLE_APPLICATION_CREDENTIALS_JSON (full JSON method)');
+        try {
+          const creds = JSON.parse(jsonCreds);
+          projectId = creds.project_id;
+          clientEmail = creds.client_email;
+          privateKey = creds.private_key;
+          logger.info(`Parsed JSON credentials for project: ${projectId}`);
+        } catch (parseError: any) {
+          logger.error(`Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON: ${parseError?.message}`);
+          return;
+        }
+      } else {
+        // Method 2: Separate env vars
+        projectId = process.env.FIREBASE_PROJECT_ID;
+        clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+        privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
-      // Handle base64 encoded private key (common in Railway/Heroku)
-      if (process.env.FIREBASE_PRIVATE_KEY_BASE64) {
-        logger.info('Using base64 encoded private key');
-        privateKey = Buffer.from(process.env.FIREBASE_PRIVATE_KEY_BASE64, 'base64').toString('utf8');
-        logger.info(`Decoded privateKey length: ${privateKey?.length || 0}`);
+        // Log credential status (not the actual values)
+        logger.info(`Firebase config check - projectId: ${projectId ? 'SET' : 'MISSING'}`);
+        logger.info(`Firebase config check - clientEmail: ${clientEmail ? clientEmail.substring(0, 20) + '...' : 'MISSING'}`);
+        logger.info(`Firebase config check - privateKey length: ${privateKey?.length || 0}`);
+
+        // Handle base64 encoded private key (common in Railway/Heroku)
+        if (process.env.FIREBASE_PRIVATE_KEY_BASE64) {
+          logger.info('Using base64 encoded private key');
+          privateKey = Buffer.from(process.env.FIREBASE_PRIVATE_KEY_BASE64, 'base64').toString('utf8');
+          logger.info(`Decoded privateKey length: ${privateKey?.length || 0}`);
+        }
+
+        if (privateKey) {
+          // Fix escaped newlines in private key
+          const hadEscapedNewlines = privateKey.includes('\\n');
+          privateKey = privateKey.replace(/\\n/g, '\n');
+          logger.info(`Private key newline fix applied: ${hadEscapedNewlines}`);
+        }
       }
 
       if (!projectId || !clientEmail || !privateKey) {
         logger.warn('Firebase credentials not configured - Firestore service disabled');
+        logger.warn('Set GOOGLE_APPLICATION_CREDENTIALS_JSON with full service account JSON');
         return;
       }
-
-      // Fix escaped newlines in private key
-      const hadEscapedNewlines = privateKey.includes('\\n');
-      privateKey = privateKey.replace(/\\n/g, '\n');
-      logger.info(`Private key newline fix applied: ${hadEscapedNewlines}`);
 
       // Validate private key format
       const hasBegin = privateKey.includes('-----BEGIN PRIVATE KEY-----');
       const hasEnd = privateKey.includes('-----END PRIVATE KEY-----');
       const newlineCount = (privateKey.match(/\n/g) || []).length;
 
-      logger.info(`Private key validation:`);
-      logger.info(`  - Has BEGIN marker: ${hasBegin}`);
-      logger.info(`  - Has END marker: ${hasEnd}`);
-      logger.info(`  - Newline count: ${newlineCount}`);
-      logger.info(`  - Total length: ${privateKey.length} chars`);
+      logger.info(`Private key validation: BEGIN=${hasBegin}, END=${hasEnd}, newlines=${newlineCount}, length=${privateKey.length}`);
 
       if (!hasBegin || !hasEnd) {
         logger.error('INVALID PRIVATE KEY FORMAT - missing BEGIN or END markers');
-        logger.error(`First 50 chars: ${privateKey.substring(0, 50)}`);
-        logger.error(`Last 50 chars: ${privateKey.substring(privateKey.length - 50)}`);
-        return;
-      }
-
-      if (newlineCount < 20) {
-        logger.error(`INVALID PRIVATE KEY - too few newlines (${newlineCount}), expected ~26-28`);
-        logger.error('Key may have escaped newlines not being converted');
         return;
       }
 
