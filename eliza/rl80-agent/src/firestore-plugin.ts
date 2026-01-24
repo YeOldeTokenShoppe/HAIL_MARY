@@ -150,9 +150,30 @@ export class FirestoreService extends Service {
       const hadEscapedNewlines = privateKey.includes('\\n');
       privateKey = privateKey.replace(/\\n/g, '\n');
       logger.info(`Private key newline fix applied: ${hadEscapedNewlines}`);
-      logger.info(`Private key has BEGIN marker: ${privateKey.includes('-----BEGIN')}`);
-      logger.info(`Private key has END marker: ${privateKey.includes('-----END')}`);
-      logger.info(`Private key newline count: ${(privateKey.match(/\n/g) || []).length}`);
+
+      // Validate private key format
+      const hasBegin = privateKey.includes('-----BEGIN PRIVATE KEY-----');
+      const hasEnd = privateKey.includes('-----END PRIVATE KEY-----');
+      const newlineCount = (privateKey.match(/\n/g) || []).length;
+
+      logger.info(`Private key validation:`);
+      logger.info(`  - Has BEGIN marker: ${hasBegin}`);
+      logger.info(`  - Has END marker: ${hasEnd}`);
+      logger.info(`  - Newline count: ${newlineCount}`);
+      logger.info(`  - Total length: ${privateKey.length} chars`);
+
+      if (!hasBegin || !hasEnd) {
+        logger.error('INVALID PRIVATE KEY FORMAT - missing BEGIN or END markers');
+        logger.error(`First 50 chars: ${privateKey.substring(0, 50)}`);
+        logger.error(`Last 50 chars: ${privateKey.substring(privateKey.length - 50)}`);
+        return;
+      }
+
+      if (newlineCount < 20) {
+        logger.error(`INVALID PRIVATE KEY - too few newlines (${newlineCount}), expected ~26-28`);
+        logger.error('Key may have escaped newlines not being converted');
+        return;
+      }
 
       // Check if Firebase is already initialized
       const existingApps = getApps();
@@ -178,14 +199,21 @@ export class FirestoreService extends Service {
         const testDoc = await this.db.collection('agentDecisions').doc('RL80').get();
         logger.info(`Firestore connection verified - RL80 doc exists: ${testDoc.exists}`);
       } catch (testError: any) {
-        // Log everything we can about the error
-        logger.warn(`Firestore test read failed`);
-        logger.warn(`Error type: ${typeof testError}`);
-        logger.warn(`Error constructor: ${testError?.constructor?.name}`);
-        logger.warn(`Error JSON: ${JSON.stringify(testError, Object.getOwnPropertyNames(testError || {}), 2)}`);
-        logger.warn(`Error keys: ${Object.keys(testError || {}).join(', ')}`);
-        if (testError?.details) logger.warn(`Error details: ${testError.details}`);
-        if (testError?.metadata) logger.warn(`Error metadata: ${JSON.stringify(testError.metadata)}`);
+        // Log everything we can about the error - gRPC errors have code/details
+        logger.error(`Firestore test read failed`);
+        logger.error(`gRPC error code: ${testError?.code}`);
+        logger.error(`gRPC error details: ${testError?.details}`);
+        logger.error(`Error message: ${testError?.message}`);
+        // Try to get the actual values
+        const code = testError?.code;
+        const details = testError?.details;
+        logger.error(`Code value: ${JSON.stringify(code)}, type: ${typeof code}`);
+        logger.error(`Details value: ${JSON.stringify(details)}, type: ${typeof details}`);
+        // gRPC status codes: 7 = PERMISSION_DENIED, 16 = UNAUTHENTICATED
+        if (code === 7) logger.error('PERMISSION_DENIED - Check Firestore security rules');
+        if (code === 16) logger.error('UNAUTHENTICATED - Check Firebase credentials');
+        if (code === 5) logger.error('NOT_FOUND - Collection or document does not exist');
+        if (code === 14) logger.error('UNAVAILABLE - Firestore service unavailable');
       }
     } catch (error: any) {
       logger.error(`Failed to initialize Firestore: ${error?.message || error?.code || String(error)}`);
