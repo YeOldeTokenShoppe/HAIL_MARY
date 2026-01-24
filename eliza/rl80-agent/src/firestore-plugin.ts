@@ -650,6 +650,7 @@ const makeTradeAction: Action = {
 
   validate: async (runtime: IAgentRuntime, message: Memory, _state: State): Promise<boolean> => {
     const text = message.content?.text?.toLowerCase() || '';
+    logger.info(`[MAKE_TRADE] Validating message: "${text.substring(0, 100)}"`);
 
     // Validate if message contains trading intent
     const tradingKeywords = [
@@ -667,6 +668,7 @@ const makeTradeAction: Action = {
     const assets = ['btc', 'eth', 'sol', 'xrp', 'bitcoin', 'ethereum', 'solana'];
     const hasAsset = assets.some(asset => text.includes(asset));
 
+    logger.info(`[MAKE_TRADE] Validation result: hasTradeIntent=${hasTradeIntent}, hasAsset=${hasAsset}`);
     return hasTradeIntent && hasAsset;
   },
 
@@ -677,9 +679,13 @@ const makeTradeAction: Action = {
     _options: any,
     callback: HandlerCallback
   ): Promise<ActionResult> => {
+    logger.info(`[MAKE_TRADE] Handler invoked for message: "${message.content?.text?.substring(0, 100)}"`);
+
     const service = runtime.getService(FirestoreService.serviceType) as FirestoreService;
+    logger.info(`[MAKE_TRADE] Service found: ${!!service}, Connected: ${service?.isConnected()}`);
 
     if (!service || !service.isConnected()) {
+      logger.error('[MAKE_TRADE] Firestore not connected - cannot post decision');
       await callback({
         text: "I can't post this decision - Firestore connection is down. The trade won't execute until reconnected.",
         action: 'MAKE_TRADE',
@@ -730,6 +736,7 @@ const makeTradeAction: Action = {
       });
 
       if (success) {
+        logger.info(`[MAKE_TRADE] ✅ SUCCESS - Posted ${action} ${symbol} @ ${(confidence * 100).toFixed(0)}%`);
         const responseContent: Content = {
           text: `Decision posted: ${action} ${symbol}-PERP @ ${(confidence * 100).toFixed(0)}% conviction. Railway will execute. Risk defined, thesis confirmed.`,
           action: 'MAKE_TRADE',
