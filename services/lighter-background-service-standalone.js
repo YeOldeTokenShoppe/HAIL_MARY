@@ -646,26 +646,50 @@ class LighterStandaloneService {
         return { success: false, error: 'Failed to fetch nonce from Lighter API - cannot execute trade' };
       }
 
-      console.log('📦 SDK order params:', JSON.stringify({
+      // Use LIMIT orders instead of market orders to avoid bad fills on illiquid testnet
+      // Apply small slippage to ensure fill: 0.5% for buys (higher), 0.5% for sells (lower)
+      const slippagePercent = 0.005; // 0.5%
+      const limitPrice = isAsk
+        ? marketData.price * (1 - slippagePercent)  // Sell slightly below market
+        : marketData.price * (1 + slippagePercent); // Buy slightly above market
+
+      // Price scaling: SDK uses price * 100
+      const priceScaled = Math.floor(limitPrice * 100);
+
+      // Order type constants (from zklighter-sdk)
+      const ORDER_TYPE_LIMIT = 0;
+      const ORDER_TIME_IN_FORCE_GTC = 0; // Good Till Cancel
+      const triggerPrice = 0; // No trigger (not a stop order)
+      const orderExpiry = Math.floor(Date.now() / 1000) + (24 * 60 * 60); // Expires in 24 hours
+
+      console.log('📦 SDK LIMIT order params:', JSON.stringify({
         marketIndex,
         clientOrderIndex,
         baseAmount,
-        avgExecutionPrice,
+        price: priceScaled,
+        limitPrice: limitPrice.toFixed(2),
         isAsk,
+        orderType: 'LIMIT',
+        timeInForce: 'GTC',
         reduceOnly,
+        orderExpiry,
         nonce,
         apiKeyIndex: apiKeyIdx
       }));
 
-      // Create market order using SDK
+      // Create LIMIT order using SDK (not market order)
       await this.rateLimiter.throttle();
-      const [order, tx, err] = await client.create_market_order(
+      const [order, tx, err] = await client.create_order(
         marketIndex,
         clientOrderIndex,
         baseAmount,
-        avgExecutionPrice,
+        priceScaled,
         isAsk,
+        ORDER_TYPE_LIMIT,
+        ORDER_TIME_IN_FORCE_GTC,
         reduceOnly,
+        triggerPrice,
+        orderExpiry,
         nonce,
         apiKeyIdx
       );
@@ -675,16 +699,17 @@ class LighterStandaloneService {
         return { success: false, error: err };
       }
 
-      console.log('✅ Order created via SDK:', JSON.stringify(order));
+      console.log('✅ LIMIT order created via SDK:', JSON.stringify(order));
       console.log('📤 Transaction:', JSON.stringify(tx));
 
       return {
         success: true,
         orderId: order?.order_id || clientOrderIndex,
         size: tokenAmount,
-        price: marketData.price,
+        price: limitPrice,
         side,
         market,
+        orderType: 'LIMIT',
         response: { order, tx }
       };
 

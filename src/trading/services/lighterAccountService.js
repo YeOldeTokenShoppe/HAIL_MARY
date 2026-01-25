@@ -68,42 +68,35 @@ class LighterAccountService {
 
     const cacheKey = 'positions';
     const cached = this.cache.get(cacheKey);
-    
+
     if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
       return cached.data;
     }
 
+    // Positions are included in the account response
+    // This avoids redundant API calls
     try {
-      const response = await fetch(`${LIGHTER_API_BASE}/positions?by=l1_address&value=${ACCOUNT_ADDRESS}`);
-      
-      // Handle 404 - likely no positions data yet
-      if (response.status === 404) {
-        console.log('No positions data available yet (404 - normal for new accounts)');
-        return {
-          positions: [],
-          positionCount: 0,
-          totalValue: 0,
-          noDataYet: true
-        };
-      }
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      const accountData = await this.fetchAccountData();
+      const positions = accountData.positions || [];
 
-      const data = await response.json();
-      const transformedData = this.transformPositionsData(data);
-      
+      const result = {
+        positions,
+        positionCount: positions.length,
+        totalValue: positions.reduce((sum, pos) => sum + (pos.positionValue || 0), 0),
+        totalUnrealizedPnl: accountData.unrealizedPnl || 0,
+        totalRealizedPnl: accountData.realizedPnl || 0,
+        noDataYet: positions.length === 0
+      };
+
       // Cache the result
       this.cache.set(cacheKey, {
-        data: transformedData,
+        data: result,
         timestamp: Date.now()
       });
 
-      return transformedData;
+      return result;
     } catch (error) {
       console.log('Failed to fetch Lighter positions (using fallback):', error.message);
-      // Return empty positions data if fetch fails
       return {
         positions: [],
         positionCount: 0,
@@ -232,43 +225,39 @@ class LighterAccountService {
 
     const cacheKey = 'trade_history';
     const cached = this.cache.get(cacheKey);
-    
+
     if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
       return cached.data;
     }
 
+    // Note: The Lighter API /accountTxs endpoint requires authentication
+    // For now, we derive trade info from the account positions
+    // The positions show realized_pnl which indicates closed trades
     try {
-      const response = await fetch(`${LIGHTER_API_BASE}/trades?by=l1_address&value=${ACCOUNT_ADDRESS}`);
-      
-      // Handle 404 - likely no trade history data yet
-      if (response.status === 404) {
-        console.log('No trade history data available yet (404 - normal for new accounts)');
-        return {
-          trades: [],
-          tradeCount: 0,
-          totalVolume: 0,
-          realizedPnl: 0,
-          noDataYet: true
-        };
-      }
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      const accountData = await this.fetchAccountData();
+      const positions = accountData.positions || [];
 
-      const data = await response.json();
-      const transformedData = this.transformTradeHistoryData(data);
-      
+      // Calculate realized P&L from positions (indicates past trades)
+      const realizedPnl = positions.reduce((sum, pos) => sum + (pos.realizedPnl || 0), 0);
+
+      const result = {
+        trades: [], // No individual trade data without auth
+        tradeCount: positions.length > 0 ? 1 : 0, // At least 1 trade if we have positions
+        totalVolume: positions.reduce((sum, pos) => sum + (pos.positionValue || 0), 0),
+        realizedPnl,
+        noDataYet: positions.length === 0,
+        note: 'Trade history requires API authentication - showing position summary'
+      };
+
       // Cache the result
       this.cache.set(cacheKey, {
-        data: transformedData,
+        data: result,
         timestamp: Date.now()
       });
 
-      return transformedData;
+      return result;
     } catch (error) {
       console.log('Failed to fetch Lighter trade history (using fallback):', error.message);
-      // Return empty trade history data if fetch fails
       return {
         trades: [],
         tradeCount: 0,
@@ -286,43 +275,38 @@ class LighterAccountService {
 
     const cacheKey = `pnl_${accountIndex}_${resolution}_${startTs}_${endTs}`;
     const cached = this.cache.get(cacheKey);
-    
+
     if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
       return cached.data;
     }
 
+    // On testnet, the /pnl endpoint often returns errors (account not found, time range issues)
+    // Fall back to getting P&L from account data which already includes position P&L
     try {
-      // Default to last 30 days if no timestamps provided
-      if (!endTs) endTs = Math.floor(Date.now() / 1000);
-      if (!startTs) startTs = endTs - (30 * 24 * 60 * 60); // 30 days ago
+      const accountData = await this.fetchAccountData();
 
-      const response = await fetch(
-        `${LIGHTER_API_BASE}/pnl?by=index&value=${accountIndex}&resolution=${resolution}&start_timestamp=${startTs}&end_timestamp=${endTs}&count_back=100`
-      );
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      // P&L is calculated from positions in the account response
+      const result = {
+        data: [],
+        pnlHistory: [{
+          timestamp: Date.now(),
+          totalPnl: accountData.totalPnl || 0,
+          unrealizedPnl: accountData.unrealizedPnl || 0,
+          realizedPnl: accountData.realizedPnl || 0,
+          date: new Date().toISOString()
+        }],
+        totalPnl: accountData.totalPnl || 0,
+        unrealizedPnl: accountData.unrealizedPnl || 0,
+        realizedPnl: accountData.realizedPnl || 0,
+        isEmpty: false,
+        hasNoHistory: false,
+        // Additional context
+        positions: accountData.positions || [],
+        totalAssetValue: accountData.totalAssetValue || 0,
+        collateral: accountData.collateral || 0,
+        availableBalance: accountData.availableBalance || 0
+      };
 
-      const data = await response.json();
-      
-      // No trading history yet
-      if (data.code === 21100) {
-        const emptyResult = { data: [], isEmpty: true, hasNoHistory: true };
-        this.cache.set(cacheKey, {
-          data: emptyResult,
-          timestamp: Date.now()
-        });
-        return emptyResult;
-      }
-      
-      if (data.code !== 200) {
-        throw new Error(data.message || 'Failed to fetch P&L data');
-      }
-      
-      const transformedData = this.transformPnLData(data.pnl);
-      const result = { ...transformedData, isEmpty: false, hasNoHistory: false };
-      
       // Cache the result
       this.cache.set(cacheKey, {
         data: result,
@@ -331,7 +315,7 @@ class LighterAccountService {
 
       return result;
     } catch (error) {
-      console.error('Failed to fetch Lighter P&L:', error);
+      console.error('Failed to fetch Lighter P&L from account data:', error);
       // Return empty P&L data if fetch fails
       return {
         data: [],
@@ -352,12 +336,29 @@ class LighterAccountService {
         collateral: 0,
         availableBalance: 0,
         assets: [],
+        positions: [],
+        unrealizedPnl: 0,
+        realizedPnl: 0,
+        totalPnl: 0,
+        totalAssetValue: 0,
         lastUpdate: Date.now()
       };
     }
 
     const account = apiData.accounts[0];
-    
+
+    // Extract P&L from positions (embedded in account response)
+    const positions = account.positions || [];
+    let unrealizedPnl = 0;
+    let realizedPnl = 0;
+
+    positions.forEach(pos => {
+      unrealizedPnl += parseFloat(pos.unrealized_pnl) || 0;
+      realizedPnl += parseFloat(pos.realized_pnl) || 0;
+    });
+
+    const totalPnl = unrealizedPnl + realizedPnl;
+
     return {
       balance: parseFloat(account.available_balance) || 0,
       accountIndex: account.index || 'N/A',
@@ -365,7 +366,25 @@ class LighterAccountService {
       accountType: account.account_type,
       collateral: parseFloat(account.collateral) || 0,
       availableBalance: parseFloat(account.available_balance) || 0,
+      totalAssetValue: parseFloat(account.total_asset_value) || 0,
+      crossAssetValue: parseFloat(account.cross_asset_value) || 0,
       assets: account.assets || [],
+      positions: positions.map(pos => ({
+        marketId: pos.market_id,
+        symbol: pos.symbol,
+        sign: pos.sign, // 1 for Long, -1 for Short
+        position: parseFloat(pos.position) || 0,
+        avgEntryPrice: parseFloat(pos.avg_entry_price) || 0,
+        positionValue: parseFloat(pos.position_value) || 0,
+        unrealizedPnl: parseFloat(pos.unrealized_pnl) || 0,
+        realizedPnl: parseFloat(pos.realized_pnl) || 0,
+        liquidationPrice: parseFloat(pos.liquidation_price) || 0,
+        marginMode: pos.margin_mode
+      })),
+      // P&L calculated from positions
+      unrealizedPnl,
+      realizedPnl,
+      totalPnl,
       status: account.status,
       lastUpdate: Date.now()
     };
@@ -525,15 +544,41 @@ class LighterAccountService {
   // Get all data at once
   async fetchAllData() {
     try {
-      // Fetch all data in parallel, using the known account index for P&L
-      const [accountData, positionsData, ordersData, activeOrdersData, tradeHistoryData, pnlData] = await Promise.all([
-        this.fetchAccountData(),
-        this.fetchPositions(),
+      // Fetch account data first (contains positions and P&L)
+      const accountData = await this.fetchAccountData();
+
+      // Then fetch orders in parallel
+      const [ordersData, activeOrdersData] = await Promise.all([
         this.fetchOrders(),
-        this.fetchActiveOrders(),
-        this.fetchTradeHistory(),
-        this.fetchPnL(LIGHTER_ACCOUNT_INDEX)
+        this.fetchActiveOrders()
       ]);
+
+      // Trade history and P&L are derived from account data
+      const tradeHistoryData = await this.fetchTradeHistory();
+
+      // P&L is now extracted from account positions
+      const pnlData = {
+        totalPnl: accountData.totalPnl || 0,
+        unrealizedPnl: accountData.unrealizedPnl || 0,
+        realizedPnl: accountData.realizedPnl || 0,
+        positions: accountData.positions || [],
+        pnlHistory: [{
+          timestamp: Date.now(),
+          totalPnl: accountData.totalPnl || 0,
+          unrealizedPnl: accountData.unrealizedPnl || 0,
+          realizedPnl: accountData.realizedPnl || 0,
+          date: new Date().toISOString()
+        }],
+        isEmpty: accountData.positions?.length === 0,
+        hasNoHistory: false
+      };
+
+      // Positions from account data (already transformed)
+      const positionsData = {
+        positions: accountData.positions || [],
+        positionCount: accountData.positions?.length || 0,
+        totalValue: accountData.positions?.reduce((sum, pos) => sum + (pos.positionValue || 0), 0) || 0
+      };
 
       return {
         account: accountData,
@@ -541,7 +586,7 @@ class LighterAccountService {
         orders: ordersData,
         activeOrders: activeOrdersData,
         tradeHistory: tradeHistoryData,
-        pnl: pnlData || { isEmpty: true, hasNoHistory: true, totalPnl: 0, unrealizedPnl: 0, realizedPnl: 0 },
+        pnl: pnlData,
         combined: {
           ...accountData,
           positionCount: positionsData.positionCount,
@@ -554,13 +599,12 @@ class LighterAccountService {
           tradeCount: tradeHistoryData.tradeCount,
           trades: tradeHistoryData.trades,
           totalVolume: tradeHistoryData.totalVolume,
-          realizedPnl: tradeHistoryData.realizedPnl,
-          // P&L data
-          pnlTotalPnl: pnlData?.totalPnl || 0,
-          pnlUnrealizedPnl: pnlData?.unrealizedPnl || 0,
-          pnlRealizedPnl: pnlData?.realizedPnl || 0,
-          pnlHistory: pnlData?.pnlHistory || [],
-          hasNoHistory: pnlData?.hasNoHistory || false,
+          // P&L from account positions
+          pnlTotalPnl: pnlData.totalPnl,
+          pnlUnrealizedPnl: pnlData.unrealizedPnl,
+          pnlRealizedPnl: pnlData.realizedPnl,
+          pnlHistory: pnlData.pnlHistory,
+          hasNoHistory: pnlData.isEmpty,
           lastUpdate: Date.now()
         }
       };
