@@ -15,7 +15,7 @@ A Next.js project featuring an AI-powered perpetual trading system with multiple
 
 ## System Architecture Overview
 
-The trading system is powered by three coordinated services that work together:
+The trading system is powered by four coordinated services that work together:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -23,12 +23,12 @@ The trading system is powered by three coordinated services that work together:
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  ┌─────────────────────┐    ┌─────────────────────┐    ┌────────────────┐  │
-│  │   RAILWAY SERVICE   │    │  FIREBASE FUNCTIONS │    │   NEXT.JS APP  │  │
-│  │  (Data + Execution) │    │  (Agent Triggering) │    │   (Frontend)   │  │
+│  │  RAILWAY: RL80      │    │  RAILWAY: LIGHTER   │    │   NEXT.JS APP  │  │
+│  │  (ElizaOS Agent)    │    │  (Background Svc)   │    │   (Frontend)   │  │
 │  └──────────┬──────────┘    └──────────┬──────────┘    └───────┬────────┘  │
 │             │                          │                       │            │
-│             │ writes data              │ triggers agents       │ reads data │
-│             │ executes trades          │                       │            │
+│             │ posts decisions          │ executes trades       │ reads data │
+│             │ chat interface           │ collects data         │            │
 │             ▼                          ▼                       ▼            │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │                         FIREBASE FIRESTORE                           │   │
@@ -38,7 +38,8 @@ The trading system is powered by three coordinated services that work together:
 │                                    ▼                                        │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │                         LIGHTER DEX (Testnet)                        │   │
-│  │                      (Trade Execution)                               │   │
+│  │              ETH-PERP (index 0) | BTC-PERP (index 1)                 │   │
+│  │                   (Trade Execution via zklighter-sdk)                │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -48,7 +49,8 @@ The trading system is powered by three coordinated services that work together:
 
 | Service | Location | Role | Agent Triggers | Trade Execution |
 |---------|----------|------|----------------|-----------------|
-| **Railway Service** | `services/lighter-background-service-standalone.js` | Data collection, decision listening, trade execution | No | **Yes** |
+| **RL80 ElizaOS Agent** | `eliza/rl80-agent/` (Railway) | Chat interface, trading decisions, oracle synthesis | **Yes** (chat-driven) | No (posts to Firestore) |
+| **Lighter Background Service** | `services/lighter-background-service-standalone.js` (Railway) | Data collection, decision listening, trade execution | No | **Yes** (via zklighter-sdk) |
 | **Firebase Functions** | `functions/index.js` | Agent orchestration (hourly cron) | **Yes** | No |
 | **Client-side Manager** | `src/trading/services/agentChatManager.js` | UI updates & manual triggers only | No | No |
 
@@ -121,10 +123,13 @@ The trading page features a multi-agent AI system for perpetual futures trading 
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                 RL80 - LEAD TRADER                              │
+│                 RL80 - LEAD TRADER (ElizaOS)                    │
 │          "Our Lady of Perpetual Profit"                         │
 │      Synthesizes oracle analysis into trading decisions         │
-│                 Posts to agentDecisions/RL80                    │
+│   Posts to agentDecisions/RL80 → Railway executes via SDK       │
+│                                                                 │
+│   🌐 Chat Interface: https://rl80-agent-production.up.railway.app │
+│   📦 Framework: ElizaOS with custom Firestore plugin            │
 └─────────────────────────────────────────────────────────────────┘
                               ▲
                    Three Wise Oracles
@@ -142,12 +147,12 @@ The trading page features a multi-agent AI system for perpetual futures trading 
 
 ### The Trading Council
 
-| Agent | Role | AI Model | Personality | Purpose |
-|-------|------|----------|-------------|---------|
-| **MACRO** | First Wise Oracle | Claude | "The Grumpy Professor" | Macroeconomic regime analysis (WHEN) |
-| **EMO** | Second Wise Oracle | Grok | "The Chaos Surfer" | Sentiment & crowd psychology (WHERE) |
-| **TEKNO** | Third Wise Oracle | OpenAI | "Street Smart Pattern Nerd" | Technical price structure (WHAT) |
-| **RL80** | Lead Trader | Claude | "Trade Life" | Synthesizes oracle inputs into decisions |
+| Agent | Role | AI Model | Framework | Personality | Purpose |
+|-------|------|----------|-----------|-------------|---------|
+| **MACRO** | First Wise Oracle | Claude | Next.js API | "The Grumpy Professor" | Macroeconomic regime analysis (WHEN) |
+| **EMO** | Second Wise Oracle | Grok | Next.js API | "The Chaos Surfer" | Sentiment & crowd psychology (WHERE) |
+| **TEKNO** | Third Wise Oracle | OpenAI | Next.js API | "Street Smart Pattern Nerd" | Technical price structure (WHAT) |
+| **RL80** | Lead Trader | Claude | **ElizaOS** | "Trade Life" | Synthesizes oracle inputs, executes trades |
 
 > **Philosophy**: Math and code are the language of the highest form of consciousness. The oracles provide analysis; RL80 synthesizes it into action for the community.
 
@@ -222,23 +227,28 @@ Every Hour (0 * * * *)
 
 #### Trade Execution (Real-time)
 
-The Railway service listens to `agentDecisions/RL80` in Firestore using `onSnapshot`. When RL80 posts a new decision:
+The Railway background service listens to `agentDecisions/RL80` in Firestore using `onSnapshot`. When RL80 posts a new decision:
 
 1. **Validates the decision:**
    - Confidence meets minimum threshold (default: 60%)
-   - Symbol is allowed (BTC, ETH, SOL, XRP)
+   - Symbol is supported on testnet (**BTC or ETH only** - SOL/XRP not available)
    - Daily trade limit not reached
    - Daily loss limit not exceeded
    - Cooldown period elapsed (default: 5 minutes)
 
-2. **Executes on Lighter DEX:**
+2. **Executes on Lighter DEX via zklighter-sdk:**
+   - Fetches current price from Firebase cache or CoinGecko
    - Calculates position size based on confidence
-   - Signs the order with wallet private key
-   - Submits market order to Lighter API
+   - Fetches nonce from Lighter API (`/api/v1/nextNonce`)
+   - Creates **LIMIT order** (not market order) with 0.5% slippage buffer
+   - Signs transaction with **API Key Private Key** (80 hex chars)
+   - Submits order via `SignerClient.create_order()`
 
 3. **Logs the result:**
-   - Records trade in `tradeHistory` collection
+   - Records trade in `trades` collection (for PerformanceDashboard)
    - Updates daily statistics
+
+**Why Limit Orders?** Market orders on testnet can fill at extreme prices due to thin liquidity (e.g., $200,000 BTC). Limit orders with small slippage ensure reasonable execution prices.
 
 #### Trading Configuration (Environment Variables)
 
@@ -344,8 +354,8 @@ agentChatManager.stop()                     // Stop workflow
 | `lighterData` | `account` | Lighter account balance | Railway (20m) |
 | `lighterData` | `trading` | Positions and orders | Railway (20m) |
 | `agentChat` | (auto-id) | Agent chat messages | Firebase Functions (hourly) |
-| `agentDecisions` | `RL80` | Latest RL80 trading decision | RL80 Agent |
-| `tradeHistory` | (auto-id) | All trade execution logs | Railway |
+| `agentDecisions` | `RL80` | Latest RL80 trading decision | RL80 ElizaOS Agent |
+| `trades` | (auto-id) | Trade execution logs (for PerformanceDashboard) | Railway Background Service |
 | `scoringRuns` | (auto-id) | Scoring workflow logs | Firebase Functions (hourly) |
 | `serviceStatus` | `lighterService` | Railway service health | Railway (5m) |
 | `decisions` | (auto-id) | Full decision logs with analyst scores | Scoring Workflow |
@@ -469,7 +479,7 @@ npm install
 node lighter-background-service-standalone.js
 ```
 
-### Railway Environment Variables
+### Railway Environment Variables (Background Service)
 
 ```env
 # Firebase (individual vars for Railway compatibility)
@@ -483,11 +493,10 @@ FIREBASE_CLIENT_ID=
 FRED_API_KEY=                 # Get free key at fred.stlouisfed.org
 ALPHAVANTAGE_API_KEY=         # Get free key at alphavantage.co
 
-# Lighter DEX
-LIGHTER_API_KEY=              # 80-character API key
-LIGHTER_WALLET_PRIVATE_KEY=   # 64-character wallet private key
-LIGHTER_ACCOUNT_INDEX=0
-LIGHTER_API_KEY_INDEX=2
+# Lighter DEX (zklighter-sdk)
+LIGHTER_API_KEY_PRIVATE_KEY=  # 80-character API Key Private Key (NOT wallet key!)
+LIGHTER_ACCOUNT_INDEX=227     # Your Lighter account index
+LIGHTER_API_KEY_INDEX=222     # Your API key index (from Lighter settings)
 
 # Trading Configuration (IMPORTANT!)
 TRADING_ENABLED=false         # Set to 'true' to enable real trading
@@ -496,6 +505,24 @@ MAX_DAILY_TRADES=10           # Max trades per day
 MAX_DAILY_LOSS_USD=50         # Stop if daily loss exceeds
 MIN_TRADE_CONFIDENCE=0.6      # Minimum confidence (60%)
 TRADE_COOLDOWN_MS=300000      # 5 minutes between trades
+```
+
+### Railway Environment Variables (RL80 ElizaOS Agent)
+
+```env
+# Firebase (full JSON or individual vars)
+GOOGLE_APPLICATION_CREDENTIALS_JSON=  # Full service account JSON (recommended)
+# Or use individual vars:
+FIREBASE_PROJECT_ID=
+FIREBASE_CLIENT_EMAIL=
+FIREBASE_PRIVATE_KEY=
+
+# AI Model Provider
+ANTHROPIC_API_KEY=            # For Claude model
+
+# Optional: Communication channels
+DISCORD_API_TOKEN=            # If using Discord plugin
+TELEGRAM_BOT_TOKEN=           # If using Telegram plugin
 ```
 
 ### Enabling Trading
@@ -531,12 +558,103 @@ firebase functions:secrets:set OPENAI_API_KEY
 
 ---
 
+## RL80 ElizaOS Agent
+
+RL80 "Our Lady of Perpetual Profit" is now deployed as an ElizaOS agent on Railway, providing a chat interface for trading commands.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       RL80 ELIZAOS ARCHITECTURE                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  User Chat                                                                  │
+│      │                                                                      │
+│      ▼                                                                      │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │  ElizaOS Runtime (Railway)                                             │ │
+│  │  https://rl80-agent-production.up.railway.app                          │ │
+│  │                                                                        │ │
+│  │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────┐   │ │
+│  │  │  character.ts   │  │ firestore-plugin │  │  @elizaos/plugins   │   │ │
+│  │  │  - Personality  │  │  - Market data   │  │  - anthropic        │   │ │
+│  │  │  - System prompt│  │  - Oracle scores │  │  - bootstrap        │   │ │
+│  │  │  - Style rules  │  │  - Post decisions│  │  - sql              │   │ │
+│  │  └─────────────────┘  └─────────────────┘  └─────────────────────┘   │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                    │                                        │
+│                                    │ Posts decision to                      │
+│                                    ▼                                        │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │  Firebase Firestore: agentDecisions/RL80                              │ │
+│  │  { action: "BUY", symbol: "ETH", confidence: 0.75, reasoning: "..." } │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                    │                                        │
+│                                    │ onSnapshot listener                    │
+│                                    ▼                                        │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │  Lighter Background Service (Railway)                                  │ │
+│  │  - Validates decision                                                  │ │
+│  │  - Creates LIMIT order via zklighter-sdk                              │ │
+│  │  - Logs to trades collection                                          │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                    │                                        │
+│                                    ▼                                        │
+│  ┌───────────────────────────────────────────────────────────────────────┐ │
+│  │  Lighter DEX Testnet                                                   │ │
+│  │  ETH-PERP (market 0) | BTC-PERP (market 1)                            │ │
+│  └───────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Chat Interface** | Web-based chat at Railway URL for trading commands |
+| **Market Data Provider** | Injects live prices, sentiment, technicals into context |
+| **Oracle Scores Provider** | Fetches EMO/TEKNO/MACRO scores from Firestore |
+| **MAKE_TRADE Action** | Posts trading decisions to Firestore for execution |
+| **EMERGENCY_STOP Action** | Halts all trading immediately |
+
+### Trading Commands (via Chat)
+
+Users can instruct RL80 to trade:
+- "Go long on ETH" → Posts BUY ETH decision
+- "Close the BTC position" → Posts SELL BTC decision
+- "What do the oracles say?" → Returns current oracle scores
+- "Emergency stop" → Halts all trading
+
+### Files
+
+| File | Purpose |
+|------|---------|
+| `eliza/rl80-agent/src/character.ts` | RL80 personality, plugins, system prompt |
+| `eliza/rl80-agent/src/firestore-plugin.ts` | Custom Firestore service + trading actions |
+| `eliza/rl80-agent/src/index.ts` | Entry point |
+| `eliza/rl80-agent/CLAUDE.md` | ElizaOS development guide |
+
+### Deployment
+
+```bash
+cd eliza/rl80-agent
+bun install
+# Deploy to Railway via GitHub integration
+```
+
+Railway auto-deploys from the `main` branch when changes are pushed.
+
+---
+
 ## Tech Stack
 
 - **Frontend**: Next.js 14, React Three Fiber, Three.js, Tailwind CSS, Framer Motion
-- **Backend**: Firebase Firestore, Firebase Cloud Functions, Railway
+- **Backend**: Firebase Firestore, Firebase Cloud Functions, Railway (x2 services)
 - **AI Models**: Claude (Anthropic), Grok (xAI), OpenAI
-- **Trading**: Lighter DEX (testnet)
+- **Agent Framework**: ElizaOS (for RL80)
+- **Trading**: Lighter DEX (testnet) via zklighter-sdk
 - **Auth**: Clerk
 
 ---
@@ -546,10 +664,19 @@ firebase functions:secrets:set OPENAI_API_KEY
 ```
 HAIL_MARY/
 ├── public/                    # Static assets
+├── eliza/                     # ElizaOS Agent Projects
+│   └── rl80-agent/           # RL80 Lead Trader (Railway deployed)
+│       ├── src/
+│       │   ├── character.ts       # RL80 personality & plugins
+│       │   ├── firestore-plugin.ts # Custom Firestore integration
+│       │   └── index.ts           # Entry point
+│       ├── package.json           # ElizaOS dependencies
+│       └── CLAUDE.md              # Development guide
 ├── functions/                 # Firebase Cloud Functions
 │   └── index.js              # Scheduled agent triggering (hourly)
-├── services/                  # Railway background service (ACTIVE)
-│   └── lighter-background-service-standalone.js  # Data collection + trade execution
+├── services/                  # Railway background service
+│   ├── lighter-background-service-standalone.js  # Data collection + trade execution
+│   └── package.json          # Includes zklighter-sdk
 ├── src/
 │   ├── app/                   # Next.js app directory
 │   │   └── api/               # API routes
@@ -833,11 +960,20 @@ Edit individual agent files to modify:
 - Client-side auto-start is disabled; manual triggers require explicit calls
 
 ### Trades not executing
-1. Check `TRADING_ENABLED=true` in Railway environment
+1. Check `TRADING_ENABLED=true` in Railway background service environment
 2. Check Railway logs for validation errors
-3. Verify Lighter API credentials are correct
-4. Check `tradeHistory` collection for rejected/failed trades
-5. Ensure RL80 confidence meets minimum threshold (default 60%)
+3. Verify `LIGHTER_API_KEY_PRIVATE_KEY` is 80 characters (NOT wallet private key)
+4. Verify `LIGHTER_ACCOUNT_INDEX` and `LIGHTER_API_KEY_INDEX` match your Lighter account
+5. Check `trades` collection for rejected/failed trades
+6. Ensure RL80 confidence meets minimum threshold (default 60%)
+7. Ensure symbol is supported (only ETH and BTC on testnet)
+
+### RL80 ElizaOS not responding
+1. Check Railway logs for the rl80-agent service
+2. Verify `GOOGLE_APPLICATION_CREDENTIALS_JSON` or Firebase env vars are set
+3. Verify `ANTHROPIC_API_KEY` is configured
+4. Check Firestore connection: logs should show "Firestore connection verified"
+5. Try the health endpoint: `https://rl80-agent-production.up.railway.app/health`
 
 ### Duplicate trades
 - Ensure the Python agent (`/agent`) is NOT running - it's deprecated
@@ -887,10 +1023,12 @@ The trading system includes multiple safety mechanisms:
 | **Daily Loss Limit** | $50 | Halts trading if exceeded |
 | **Minimum Confidence** | 60% | Rejects low-confidence decisions |
 | **Trade Cooldown** | 5 min | Prevents rapid-fire trading |
-| **Allowed Symbols** | BTC, ETH, SOL, XRP | Only trades approved assets |
-| **Emergency Stop** | Manual | RL80 can halt all trading |
+| **Supported Markets** | ETH, BTC | Only these perpetuals available on Lighter testnet |
+| **Limit Orders Only** | 0.5% slippage | Prevents bad fills on illiquid testnet orderbook |
+| **24h Order Expiry** | Auto-cancel | Unfilled limit orders expire automatically |
+| **Emergency Stop** | Manual | RL80 can halt all trading via chat command |
 
-All trades are logged to `tradeHistory` for audit purposes.
+All trades are logged to `trades` collection for PerformanceDashboard and audit purposes.
 
 ---
 
@@ -1204,8 +1342,9 @@ TTL policies only work with the `expireAt` field (not `timestamp` or `createdAt`
 │  │  │                                                                   │   │
 │  │  LIGHTER DEX:                                                        │   │
 │  │  ├─ Lighter Testnet API ──────────── every 20min + on trade         │   │
-│  │  │  └─ /api/v1/account (balance, positions)                         │   │
-│  │  │  └─ /api/v1/transaction/send_tx (order execution)                │   │
+│  │  │  └─ /api/v1/account (balance, positions, P&L)                    │   │
+│  │  │  └─ /api/v1/nextNonce (nonce for signing)                        │   │
+│  │  │  └─ zklighter-sdk SignerClient.create_order() (LIMIT orders)     │   │
 │  │  │                                                                   │   │
 │  │  MACRO DATA:                                                         │   │
 │  │  ├─ FRED API ─────────────────────── every 4hr                      │   │
@@ -1259,8 +1398,9 @@ TTL policies only work with the `expireAt` field (not `timestamp` or `createdAt`
 | **Railway** | Polymarket | `/markets` | 6hr | Crypto/finance prediction markets | No |
 | **Railway** | CryptoPanic | RSS feed (`/news/rss/`) | 6hr | Crypto news headlines (no API quota) | No |
 | **Railway** | Google Trends | `interestOverTime` | 6hr | Search interest | No |
-| **Railway** | Lighter DEX | `/api/v1/account` | 20min | Account data | Optional |
-| **Railway** | Lighter DEX | `/api/v1/transaction/send_tx` | On trade | Order execution | Yes |
+| **Railway** | Lighter DEX | `/api/v1/account` | 20min | Account data, positions, P&L | Optional |
+| **Railway** | Lighter DEX | `/api/v1/nextNonce` | On trade | Nonce for signing | Yes |
+| **Railway** | Lighter DEX | `zklighter-sdk` | On trade | LIMIT order execution | Yes (API Key Private Key) |
 | **Firebase** | Next.js App | `/api/cron/run-scoring` | Hourly | Trigger agents | Yes (CRON_SECRET) |
 | **Next.js** | Anthropic | Messages API | Hourly ×2 | MACRO, RL80 | Yes |
 | **Next.js** | xAI (Grok) | Messages API | Hourly ×1 | EMO | Yes |
@@ -1288,7 +1428,7 @@ TTL policies only work with the `expireAt` field (not `timestamp` or `createdAt`
 
 ```env
 # AI Models (Required for agent analysis)
-ANTHROPIC_API_KEY=sk-ant-...      # Claude for MACRO + RL80
+ANTHROPIC_API_KEY=sk-ant-...      # Claude for MACRO + RL80 (ElizaOS)
 OPENAI_API_KEY=sk-...              # GPT for TEKNO
 GROK_API_KEY=xai-...               # Grok for EMO
 
@@ -1297,9 +1437,10 @@ COINMARKETCAP_API_KEY=...          # CoinMarketCap for Fear & Greed (primary)
 FRED_API_KEY=...                   # FRED API for VIX, DXY, Treasury
 ALPHAVANTAGE_API_KEY=...           # Alpha Vantage for SPY
 
-# Trading (Required for trade execution)
-LIGHTER_API_KEY=...                # 80-char Lighter API key
-LIGHTER_WALLET_PRIVATE_KEY=...     # 64-char wallet key
+# Trading (Required for trade execution via zklighter-sdk)
+LIGHTER_API_KEY_PRIVATE_KEY=...    # 80-char API Key Private Key (NOT wallet key!)
+LIGHTER_ACCOUNT_INDEX=227          # Your Lighter account index
+LIGHTER_API_KEY_INDEX=222          # Your API key index
 
 # Internal Security
 CRON_SECRET=...                    # Firebase → Next.js auth
@@ -1307,6 +1448,8 @@ CRON_SECRET=...                    # Firebase → Next.js auth
 # Optional Feature Flags
 CRYPTOPANIC_DISABLED=true          # Set to disable CryptoPanic entirely
 ```
+
+**Important:** The `LIGHTER_API_KEY_PRIVATE_KEY` is your **API Key Private Key** (80 hex characters) from your Lighter account settings, NOT your wallet private key. This is used by `zklighter-sdk` to sign transactions.
 
 ### Free APIs (No Key Required)
 
