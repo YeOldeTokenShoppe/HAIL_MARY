@@ -15,6 +15,16 @@ const fs = require('fs');
 const path = require('path');
 const googleTrends = require('google-trends-api');
 
+// Lighter SDK for proper transaction signing
+let SignerClient;
+try {
+  SignerClient = require('zklighter-sdk').SignerClient;
+  console.log('✅ zklighter-sdk loaded successfully');
+} catch (e) {
+  console.warn('⚠️ zklighter-sdk not available, will use fallback:', e.message);
+  SignerClient = null;
+}
+
 // Rate limiting helper
 class RateLimiter {
   constructor() {
@@ -535,7 +545,7 @@ class LighterStandaloneService {
   }
 
   // =========================================================================
-  // TRADE EXECUTION - Sends orders to Lighter DEX
+  // TRADE EXECUTION - Sends orders to Lighter DEX using zklighter-sdk
   // =========================================================================
   async executeTrade(decision) {
     const { action, symbol, confidence, position_size } = decision;
@@ -559,79 +569,89 @@ class LighterStandaloneService {
       // Determine order side
       const side = action === 'BUY' ? 'buy' : 'sell';
       const market = `${symbol}-USD`;
+      const isAsk = side === 'sell';
 
       console.log(`📝 Order details:`);
       console.log(`   Market: ${market}`);
-      console.log(`   Side: ${side}`);
+      console.log(`   Side: ${side} (isAsk: ${isAsk})`);
       console.log(`   Size: ${tokenAmount.toFixed(6)} ${symbol} (~$${finalSizeUSD.toFixed(2)})`);
       console.log(`   Price: $${marketData.price.toFixed(2)}`);
 
-      // Create auth token
-      const auth = await this.createLighterAuthToken();
-
-      // Build order payload - format matches lighter-python SDK
-      // See: https://github.com/elliottech/lighter-python/blob/main/examples/create_market_order_eth_buy.py
-      const orderPayload = {
-        market_index: this.getMarketIndex(symbol),  // 0=ETH perp, 1=BTC perp, etc
-        client_order_index: Date.now() % 1000000,   // Sequence number
-        base_amount: Math.floor(tokenAmount * 10000),  // 10000 = 1 token (1000 = 0.1)
-        avg_execution_price: Math.floor(marketData.price * 100),  // Price * 100 ($3000 = 300000)
-        is_ask: side === 'sell',  // false = buy, true = sell
-      };
-
-      console.log('📦 Order payload:', JSON.stringify(orderPayload));
-
-      // Sign the order
-      const walletKey = this.lighterConfig.walletPrivateKey.startsWith('0x')
-        ? this.lighterConfig.walletPrivateKey
-        : `0x${this.lighterConfig.walletPrivateKey}`;
-      const wallet = new Wallet(walletKey);
-      const message = JSON.stringify(orderPayload);
-      const signature = await wallet.signMessage(message);
-
-      // Send order to Lighter
-      await this.rateLimiter.throttle();
-      const response = await axios.post(
-        `${this.lighterConfig.baseUrl}/api/v1/sendTx`,
-        {
-          ...orderPayload,
-          signature
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${auth.authToken}`,
-            'X-API-Key': auth.apiKey,
-            'X-Signature': auth.signature,
-            'X-Account-Index': this.lighterConfig.accountIndex,
-            'X-API-Key-Index': this.lighterConfig.apiKeyIndex
-          },
-          timeout: 30000
-        }
-      );
-
-      if (response.data && response.data.success !== false) {
-        return {
-          success: true,
-          orderId: response.data.order_id || orderPayload.client_order_index,
-          size: tokenAmount,
-          price: marketData.price,
-          side,
-          market,
-          response: response.data
-        };
-      } else {
-        return {
-          success: false,
-          error: response.data?.error || 'Unknown error from Lighter'
-        };
+      // Use zklighter-sdk for proper transaction signing
+      if (!SignerClient) {
+        return { success: false, error: 'zklighter-sdk not available - cannot sign transactions' };
       }
 
+      // Initialize SignerClient
+      const apiKeyPrivateKey = this.lighterConfig.walletPrivateKey.startsWith('0x')
+        ? this.lighterConfig.walletPrivateKey
+        : `0x${this.lighterConfig.walletPrivateKey}`;
+
+      const client = new SignerClient(
+        this.lighterConfig.baseUrl,
+        apiKeyPrivateKey,
+        parseInt(this.lighterConfig.apiKeyIndex) || 0,
+        parseInt(this.lighterConfig.accountIndex) || 0
+      );
+
+      // Order parameters for zklighter-sdk
+      const marketIndex = this.getMarketIndex(symbol);
+      const clientOrderIndex = Date.now() % 1000000;
+      // baseAmount: 10000 = 1 token (SDK uses this scaling)
+      const baseAmount = Math.floor(tokenAmount * 10000);
+      // avgExecutionPrice: price * 100 (SDK uses this scaling)
+      const avgExecutionPrice = Math.floor(marketData.price * 100);
+      const reduceOnly = false;
+      // Get current nonce (timestamp-based for simplicity)
+      const nonce = Math.floor(Date.now() / 1000);
+
+      console.log('📦 SDK order params:', JSON.stringify({
+        marketIndex,
+        clientOrderIndex,
+        baseAmount,
+        avgExecutionPrice,
+        isAsk,
+        reduceOnly,
+        nonce,
+        apiKeyIndex: parseInt(this.lighterConfig.apiKeyIndex) || 0
+      }));
+
+      // Create market order using SDK
+      await this.rateLimiter.throttle();
+      const [order, tx, err] = await client.create_market_order(
+        marketIndex,
+        clientOrderIndex,
+        baseAmount,
+        avgExecutionPrice,
+        isAsk,
+        reduceOnly,
+        nonce,
+        parseInt(this.lighterConfig.apiKeyIndex) || 0
+      );
+
+      if (err) {
+        console.error('SDK order creation error:', err);
+        return { success: false, error: err };
+      }
+
+      console.log('✅ Order created via SDK:', JSON.stringify(order));
+      console.log('📤 Transaction:', JSON.stringify(tx));
+
+      return {
+        success: true,
+        orderId: order?.order_id || clientOrderIndex,
+        size: tokenAmount,
+        price: marketData.price,
+        side,
+        market,
+        response: { order, tx }
+      };
+
     } catch (error) {
-      console.error('Trade execution error:', error.response?.data || error.message);
+      console.error('Trade execution error:', error.response?.data || error.message || error);
       return {
         success: false,
-        error: error.response?.data?.message || error.message
+        error: error.response?.data?.message || error.message || String(error)
       };
     }
   }
