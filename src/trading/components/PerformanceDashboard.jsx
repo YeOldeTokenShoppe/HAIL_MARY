@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { db, collection, onSnapshot, query, orderBy, limit, doc, getDoc } from '@/lib/firebaseClient';
-import { lighterAccountService } from '../services/lighterAccountService';
+import { paperTradingService } from '../services/paperTradingService';
 
 const PerformanceDashboard = ({ show = true, onClose }) => {
   const [isMobile, setIsMobile] = useState(false);
@@ -44,6 +44,30 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
   const [lighterTradingData, setLighterTradingData] = useState(null);
   const [apiAccountData, setApiAccountData] = useState(null);
   const [apiLoadingError, setApiLoadingError] = useState(null);
+  const [isResetting, setIsResetting] = useState(false);
+
+  // Reset paper trading account
+  const handleResetAccount = async () => {
+    if (!confirm('Reset paper trading account to $10,000? All positions and history will be cleared.')) {
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      const result = await paperTradingService.resetAccount();
+      if (result.success) {
+        // Refresh data
+        const data = await paperTradingService.fetchAllData();
+        setApiAccountData(data);
+        alert('Account reset to $10,000!');
+      } else {
+        alert('Reset failed: ' + result.error);
+      }
+    } catch (error) {
+      alert('Reset failed: ' + error.message);
+    }
+    setIsResetting(false);
+  };
 
   // Check for mobile viewport
   useEffect(() => {
@@ -56,18 +80,19 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Fetch Lighter API data
+  // Fetch Paper Trading data (or Lighter API data)
   useEffect(() => {
     if (!show) return;
 
     const fetchApiData = async () => {
       try {
         setApiLoadingError(null);
-        const data = await lighterAccountService.fetchAllData();
+        // Use paper trading service instead of Lighter
+        const data = await paperTradingService.fetchAllData();
         setApiAccountData(data);
-        console.log('Lighter API data loaded:', data);
+        console.log('Paper trading data loaded:', data);
       } catch (error) {
-        console.error('Failed to load Lighter API data:', error);
+        console.error('Failed to load paper trading data:', error);
         setApiLoadingError(error.message);
       }
     };
@@ -75,8 +100,8 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
     // Initial fetch
     fetchApiData();
 
-    // Set up periodic refresh (every 30 seconds)
-    const interval = setInterval(fetchApiData, 30000);
+    // Set up periodic refresh (every 15 seconds for paper trading)
+    const interval = setInterval(fetchApiData, 15000);
 
     return () => {
       clearInterval(interval);
@@ -130,9 +155,11 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
 
       snapshot.forEach((doc, index) => {
         const decision = { id: doc.id, ...doc.data() };
+        // Skip deleted decisions
+        if (decision.deleted) return;
         decisions.push(decision);
 
-        if (index === 0) {
+        if (decisions.length === 1) {
           latestDecision = decision;
           // Extract active signals from latest decision
           if (decision.recommendations) {
@@ -198,7 +225,8 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
           const allTrades = [];
           snapshot.forEach(doc => {
             const trade = { id: doc.id, ...doc.data() };
-            if (trade.timestamp && trade.timestamp >= timeAgo) {
+            // Skip deleted trades and filter by timeframe
+            if (!trade.deleted && trade.timestamp && trade.timestamp >= timeAgo) {
               allTrades.push(trade);
             }
           });
@@ -270,6 +298,12 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
           // Calculate agent performance scores (pass decisions from scoringData)
           const agentScores = calculateAgentScores(trades, scoringData.recentDecisions);
 
+          // Filter for only completed/executed trades (exclude failed/unfilled)
+          const completedTrades = trades.filter(trade =>
+            trade.result?.success === true ||
+            (trade.result?.orderId && trade.result?.price > 0)
+          );
+
           setMetrics({
             totalPnL: totalPnL,
             winRate: winRate,
@@ -284,7 +318,7 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
             currentStreak: currentStreak,
             bestTrade: bestTrade,
             worstTrade: worstTrade,
-            recentTrades: trades.slice(0, 5),
+            recentTrades: completedTrades.slice(0, 5),
             equityCurve: equityCurve,
             agentScores: agentScores
           });
@@ -468,19 +502,19 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
   }, []);
 
   return (
-    <div 
+    <div
       ref={dashboardRef}
       style={{
       width: isMobile ? '100vw' : 'auto',
-      maxWidth: isMobile ? '100vw' : '1200px',
+      maxWidth: isMobile ? '100vw' : '1100px',
       margin: '0 auto',
-      padding: isMobile ? '15px' : '15px',
+      padding: isMobile ? '10px' : '12px',
       background: 'rgba(0, 20, 15, 0.1)',
       backdropFilter: 'blur(20px)',
       WebkitBackdropFilter: 'blur(20px)',
-      borderRadius: isMobile ? '0' : '20px',
+      borderRadius: isMobile ? '0' : '16px',
       border: '1px solid rgba(255, 255, 255, 0.1)',
-      boxShadow: isMobile ? '0 8px 32px rgba(0, 255, 255, 0.1)' : '0 8px 32px rgba(0, 255, 255, 0.1), inset 0 0 32px rgba(255, 215, 0, 0.03)',
+      boxShadow: '0 8px 32px rgba(0, 255, 255, 0.1)',
       color: '#fff',
       fontFamily: 'monospace',
       position: 'fixed',
@@ -489,7 +523,7 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
       transform: isMobile ? 'none' : 'translate(-50%, -50%)',
       zIndex: 1000,
       height: isMobile ? '100vh' : 'auto',
-      maxHeight: isMobile ? '100vh' : '90vh',
+      maxHeight: isMobile ? '100vh' : '88vh',
       overflow: isMobile ? 'auto' : 'hidden',
       scrollbarWidth: 'thin',
       scrollbarColor: 'rgba(255, 215, 0, 0.3) transparent',
@@ -526,17 +560,12 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
         flexDirection: isMobile ? 'column' : 'row',
         justifyContent: 'space-between',
         alignItems: isMobile ? 'stretch' : 'center',
-        marginBottom: isMobile ? '10px' : '15px',
+        marginBottom: '8px',
         borderBottom: '1px solid rgba(0, 255, 200, 0.1)',
         background: 'linear-gradient(90deg, rgba(0, 255, 200, 0.03) 0%, transparent 100%)',
-        backdropFilter: 'blur(10px)',
-        WebkitBackdropFilter: 'blur(10px)',
-        borderRadius: '10px',
-        paddingTop: '10px',
-        paddingRight: '10px',
-        paddingBottom: isMobile ? '8px' : '10px',
-        paddingLeft: '10px',
-        gap: isMobile ? '10px' : '0',
+        borderRadius: '8px',
+        padding: '8px 10px',
+        gap: isMobile ? '8px' : '0',
         position: 'relative'
       }}>
         {/* Close Button - Mobile Only */}
@@ -567,45 +596,35 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
         )}
         
         <div>
-          <h2 style={{ 
-            color: '#00FFB8', 
-            margin: 0, 
-            fontSize: isMobile ? '16px' : '20px',
+          <h2 style={{
+            color: '#00FFB8',
+            margin: 0,
+            fontSize: isMobile ? '14px' : '16px',
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
-            textShadow: '0 0 20px rgba(0, 255, 184, 0.5)',
-            letterSpacing: '1px'
+            gap: '6px',
+            textShadow: '0 0 15px rgba(0, 255, 184, 0.5)',
+            letterSpacing: '0.5px'
           }}>
-            ⚡ {isMobile ? 'RL80 Dashboard' : 'RL80 Dashboard'}
+            ⚡ RL80 Dashboard
           </h2>
-          {!isMobile && (
-            <div style={{ color: '#888', fontSize: '11px', marginTop: '2px' }}>
-              Multi-Agent Trading System Analytics
-            </div>
-          )}
         </div>
         
         {/* Timeframe Selector */}
-        <div style={{ display: 'flex', gap: isMobile ? '4px' : '8px', justifyContent: isMobile ? 'space-between' : 'flex-end', paddingRight: isMobile ? '40px' : '0' }}>
+        <div style={{ display: 'flex', gap: '4px', paddingRight: isMobile ? '35px' : '0' }}>
           {['24h', '7d', '30d', 'all'].map(tf => (
             <button
               key={tf}
               onClick={() => setTimeFrame(tf)}
               style={{
-                padding: isMobile ? '5px 10px' : '6px 12px',
+                padding: '4px 8px',
                 background: timeFrame === tf ? 'rgba(0, 255, 184, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
                 color: timeFrame === tf ? '#00FFB8' : 'rgba(255, 255, 255, 0.7)',
                 border: `1px solid ${timeFrame === tf ? 'rgba(0, 255, 184, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
-                boxShadow: timeFrame === tf ? '0 0 15px rgba(0, 255, 184, 0.3)' : 'none',
-                borderRadius: '5px',
+                borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: isMobile ? '11px' : '12px',
+                fontSize: '10px',
                 fontWeight: 'bold',
-                transition: 'all 0.2s',
-                flex: isMobile ? '1' : 'none'
               }}
             >
               {tf.toUpperCase()}
@@ -649,40 +668,29 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
           {(apiAccountData?.account || lighterAccount) && (
             <div style={{
               background: 'linear-gradient(135deg, rgba(147, 51, 234, 0.15) 0%, rgba(147, 51, 234, 0.05) 100%)',
-              backdropFilter: 'blur(15px)',
-              WebkitBackdropFilter: 'blur(15px)',
-              padding: isMobile ? '12px' : '12px 20px',
-              borderRadius: '12px',
+              padding: '8px 12px',
+              borderRadius: '10px',
               border: '1px solid rgba(147, 51, 234, 0.3)',
-              boxShadow: '0 4px 20px rgba(147, 51, 234, 0.15)',
-              marginBottom: '12px',
+              marginBottom: '10px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               flexWrap: 'wrap',
-              gap: '10px'
+              gap: '8px'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{
-                  color: 'rgba(255, 255, 255, 0.5)',
-                  fontSize: '10px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
-                }}>
-                  💳 Balance
-                </div>
-                <div style={{
-                  fontSize: isMobile ? '24px' : '28px',
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '9px' }}>💳</span>
+                <span style={{
+                  fontSize: isMobile ? '20px' : '22px',
                   fontWeight: '800',
                   color: '#fff',
-                  textShadow: '0 0 20px rgba(147, 51, 234, 0.6)',
                   fontFamily: 'monospace'
                 }}>
                   ${((apiAccountData?.account?.balance || lighterAccount?.balance || 0)).toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2
                   })}
-                </div>
+                </span>
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -690,28 +698,28 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
                   color: 'rgba(147, 51, 234, 0.7)',
                   fontSize: '10px'
                 }}>
-                  Lighter Testnet • #{(apiAccountData?.account?.accountIndex || lighterAccount?.accountIndex || 'N/A')}
+                  {apiAccountData?.combined?.isPaperTrading ? 'Paper Trading' : 'Lighter Testnet'} • {apiAccountData?.combined?.isPaperTrading ? 'SIMULATED' : `#${(apiAccountData?.account?.accountIndex || lighterAccount?.accountIndex || 'N/A')}`}
                 </div>
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '4px',
-                  background: 'rgba(0, 255, 0, 0.1)',
-                  border: '1px solid rgba(0, 255, 0, 0.3)',
+                  background: apiAccountData?.combined?.isPaperTrading ? 'rgba(255, 170, 0, 0.1)' : 'rgba(0, 255, 0, 0.1)',
+                  border: apiAccountData?.combined?.isPaperTrading ? '1px solid rgba(255, 170, 0, 0.3)' : '1px solid rgba(0, 255, 0, 0.3)',
                   borderRadius: '10px',
                   padding: '3px 8px',
                   fontSize: '9px',
-                  color: '#00ff00',
+                  color: apiAccountData?.combined?.isPaperTrading ? '#ffaa00' : '#00ff00',
                   fontWeight: '600'
                 }}>
                   <div style={{
                     width: '5px',
                     height: '5px',
                     borderRadius: '50%',
-                    background: '#00ff00',
-                    boxShadow: '0 0 6px rgba(0, 255, 0, 0.8)'
+                    background: apiAccountData?.combined?.isPaperTrading ? '#ffaa00' : '#00ff00',
+                    boxShadow: apiAccountData?.combined?.isPaperTrading ? '0 0 6px rgba(255, 170, 0, 0.8)' : '0 0 6px rgba(0, 255, 0, 0.8)'
                   }} />
-                  {apiAccountData ? 'LIVE API' : 'FIREBASE'}
+                  {apiAccountData?.combined?.isPaperTrading ? '📝 PAPER' : (apiAccountData ? 'LIVE API' : 'FIREBASE')}
                 </div>
               </div>
             </div>
@@ -721,38 +729,48 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
           {(apiAccountData?.combined || lighterTradingData) && (
             <div style={{
               background: 'rgba(0, 255, 255, 0.05)',
-              backdropFilter: 'blur(15px)',
-              WebkitBackdropFilter: 'blur(15px)',
-              padding: isMobile ? '12px' : '15px',
-              borderRadius: '15px',
+              padding: isMobile ? '10px' : '10px',
+              borderRadius: '12px',
               border: '1px solid rgba(0, 255, 255, 0.2)',
-              boxShadow: '0 4px 20px rgba(0, 255, 255, 0.1)',
-              marginBottom: '15px',
+              marginBottom: '10px',
               display: 'grid',
-              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(160px, 1fr))',
-              gap: '15px'
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(140px, 1fr))',
+              gap: '10px'
             }}>
-              <div>
-                <div style={{ color: '#888', fontSize: '10px', marginBottom: '6px', textTransform: 'uppercase' }}>
-                  📊 Open Positions
+              <div style={{ gridColumn: isMobile ? '1' : 'span 2' }}>
+                <div style={{ color: '#888', fontSize: '9px', marginBottom: '4px', textTransform: 'uppercase' }}>
+                  📊 Positions ({apiAccountData?.combined?.positionCount || lighterTradingData?.positionCount || 0})
                 </div>
-                <div style={{
-                  fontSize: isMobile ? '20px' : '24px',
-                  fontWeight: 'bold',
-                  color: '#00ffff',
-                  marginBottom: '4px'
-                }}>
-                  {apiAccountData?.combined?.positionCount || lighterTradingData?.positionCount || 0}
-                </div>
-                <div style={{ 
-                  color: 'rgba(255, 255, 255, 0.3)', 
-                  fontSize: '9px'
-                }}>
-                  {(apiAccountData?.combined?.positions || lighterTradingData?.positions)?.length > 0 ? 
-                    (apiAccountData?.combined?.positions || lighterTradingData?.positions).map(p => p.symbol).join(', ') : 
-                    'No positions'
-                  }
-                </div>
+                {(apiAccountData?.combined?.positions || lighterTradingData?.positions)?.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '80px', overflowY: 'auto' }}>
+                    {(apiAccountData?.combined?.positions || lighterTradingData?.positions).map((pos, idx) => (
+                      <div key={idx} style={{
+                        background: 'rgba(0, 255, 255, 0.05)',
+                        borderRadius: '4px',
+                        padding: '4px 6px',
+                        border: '1px solid rgba(0, 255, 255, 0.1)',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        fontSize: '10px'
+                      }}>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          <span style={{ color: '#00ffff', fontWeight: 'bold' }}>{pos.symbol}</span>
+                          <span style={{ color: pos.sign === 1 ? '#00ff00' : '#ff3333', fontSize: '9px' }}>
+                            {pos.sign === 1 ? 'L' : 'S'} {pos.position}
+                          </span>
+                        </div>
+                        <span style={{ color: pos.unrealizedPnl >= 0 ? '#00ff00' : '#ff3333', fontWeight: 'bold' }}>
+                          {pos.unrealizedPnl >= 0 ? '+' : ''}${pos.unrealizedPnl?.toFixed(2)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ color: 'rgba(255, 255, 255, 0.3)', fontSize: '10px', textAlign: 'center' }}>
+                    No open positions
+                  </div>
+                )}
               </div>
 
               <div>
@@ -767,16 +785,41 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
                 }}>
                   {apiAccountData?.combined?.activeOrderCount || lighterTradingData?.orderCount || 0}
                 </div>
-                <div style={{ 
-                  color: 'rgba(255, 255, 255, 0.3)', 
+                <div style={{
+                  color: 'rgba(255, 255, 255, 0.3)',
                   fontSize: '9px'
                 }}>
-                  {(apiAccountData?.combined?.activeOrders || lighterTradingData?.orders)?.length > 0 ? 
+                  {(apiAccountData?.combined?.activeOrders || lighterTradingData?.orders)?.length > 0 ?
                     `${(apiAccountData?.combined?.activeOrders || lighterTradingData?.orders).filter(o => o.side === 'buy').length} buy, ${(apiAccountData?.combined?.activeOrders || lighterTradingData?.orders).filter(o => o.side === 'sell').length} sell` :
-                    'No orders'
+                    'No active orders'
                   }
                 </div>
               </div>
+
+              {/* Assets Holdings */}
+              {apiAccountData?.combined?.assets?.length > 0 && (
+                <div>
+                  <div style={{ color: '#888', fontSize: '10px', marginBottom: '6px', textTransform: 'uppercase' }}>
+                    🪙 Asset Holdings
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {apiAccountData.combined.assets.map((asset, idx) => (
+                      <div key={idx} style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        fontSize: '11px',
+                        padding: '4px 0',
+                        borderBottom: idx < apiAccountData.combined.assets.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none'
+                      }}>
+                        <span style={{ color: '#00ffff' }}>{asset.symbol}</span>
+                        <span style={{ color: '#fff' }}>
+                          {parseFloat(asset.balance).toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* P&L Breakdown */}
               {apiAccountData && !apiAccountData.pnl?.hasNoHistory && (
@@ -811,6 +854,46 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
                 </div>
               )}
 
+              {/* Paper Trading Stats */}
+              {apiAccountData?.combined?.isPaperTrading && (
+                <div>
+                  <div style={{ color: '#888', fontSize: '10px', marginBottom: '6px', textTransform: 'uppercase' }}>
+                    📊 Trade Stats
+                  </div>
+                  <div style={{ fontSize: '11px', marginBottom: '4px' }}>
+                    <span style={{ color: '#00ff00' }}>{apiAccountData.combined.wins || 0}W</span>
+                    <span style={{ color: '#666' }}> / </span>
+                    <span style={{ color: '#ff3333' }}>{apiAccountData.combined.losses || 0}L</span>
+                  </div>
+                  <div style={{
+                    color: (apiAccountData.combined.winRate || 0) >= 0.5 ? '#00ff00' : '#ff3333',
+                    fontSize: '10px'
+                  }}>
+                    {((apiAccountData.combined.winRate || 0) * 100).toFixed(1)}% Win Rate
+                  </div>
+                  <div style={{ color: '#666', fontSize: '9px', marginTop: '2px' }}>
+                    Max DD: {(apiAccountData.combined.maxDrawdown || 0).toFixed(1)}%
+                  </div>
+                  <button
+                    onClick={handleResetAccount}
+                    disabled={isResetting}
+                    style={{
+                      marginTop: '8px',
+                      padding: '4px 10px',
+                      fontSize: '9px',
+                      background: 'rgba(255, 100, 100, 0.1)',
+                      border: '1px solid rgba(255, 100, 100, 0.3)',
+                      borderRadius: '6px',
+                      color: '#ff6666',
+                      cursor: isResetting ? 'not-allowed' : 'pointer',
+                      opacity: isResetting ? 0.5 : 1,
+                    }}
+                  >
+                    {isResetting ? 'Resetting...' : '🔄 Reset Account'}
+                  </button>
+                </div>
+              )}
+
               <div>
                 <div style={{ color: '#888', fontSize: '10px', marginBottom: '6px', textTransform: 'uppercase' }}>
                   🔄 Last Update
@@ -821,163 +904,70 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
                   color: '#00ff00',
                   marginBottom: '4px'
                 }}>
-                  {(apiAccountData?.combined?.lastUpdate || lighterTradingData?.lastUpdate) ? 
-                    new Date(apiAccountData?.combined?.lastUpdate || lighterTradingData?.lastUpdate).toLocaleTimeString() : 
+                  {(apiAccountData?.combined?.lastUpdate || lighterTradingData?.lastUpdate) ?
+                    new Date(apiAccountData?.combined?.lastUpdate || lighterTradingData?.lastUpdate).toLocaleTimeString() :
                     'Never'
                   }
                 </div>
-                <div style={{ 
-                  color: 'rgba(255, 255, 255, 0.3)', 
+                <div style={{
+                  color: 'rgba(255, 255, 255, 0.3)',
                   fontSize: '9px'
                 }}>
-                  Live Testnet Data
+                  {apiAccountData?.combined?.isPaperTrading ? 'Paper Trading' : 'Live Testnet Data'}
                 </div>
               </div>
             </div>
           )}
 
-          {/* Scoring System Insights - NEW */}
+          {/* Scoring System Insights - Compact */}
           {(scoringData.latestDecision || scoringData.activeSignals.length > 0) && (
             <div style={{
               background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.08) 0%, rgba(255, 165, 0, 0.03) 100%)',
-              backdropFilter: 'blur(15px)',
-              WebkitBackdropFilter: 'blur(15px)',
-              padding: isMobile ? '12px' : '15px',
-              borderRadius: '15px',
+              padding: '8px 10px',
+              borderRadius: '12px',
               border: '1px solid rgba(255, 215, 0, 0.3)',
-              boxShadow: '0 4px 20px rgba(255, 215, 0, 0.15)',
-              marginBottom: '15px'
+              marginBottom: '10px'
             }}>
               <div style={{
                 color: '#FFD700',
-                fontSize: isMobile ? '12px' : '13px',
-                marginBottom: '12px',
+                fontSize: '10px',
+                marginBottom: '6px',
                 fontWeight: 'bold',
                 display: 'flex',
-                alignItems: 'center',
                 justifyContent: 'space-between'
               }}>
-                <span>🎯 LIVE SCORING SIGNALS</span>
-                <span style={{
-                  fontSize: '10px',
-                  color: 'rgba(255, 215, 0, 0.7)',
-                  fontWeight: 'normal'
-                }}>
+                <span>🎯 LIVE SIGNALS</span>
+                <span style={{ fontSize: '9px', color: 'rgba(255, 215, 0, 0.7)', fontWeight: 'normal' }}>
                   Heat: {scoringData.portfolioHeat.toFixed(1)}%
                 </span>
               </div>
 
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(140px, 1fr))',
-                gap: '10px'
-              }}>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 {scoringData.activeSignals.length > 0 ? (
                   scoringData.activeSignals.map((signal, idx) => (
                     <div key={idx} style={{
                       background: 'rgba(0, 0, 0, 0.3)',
-                      padding: '10px',
-                      borderRadius: '10px',
+                      padding: '4px 8px',
+                      borderRadius: '6px',
                       border: `1px solid ${signal.direction > 0 ? 'rgba(0, 255, 0, 0.3)' : 'rgba(255, 0, 0, 0.3)'}`,
-                      textAlign: 'center'
+                      display: 'flex',
+                      gap: '6px',
+                      alignItems: 'center',
+                      fontSize: '10px'
                     }}>
-                      <div style={{
-                        fontSize: '14px',
-                        fontWeight: 'bold',
-                        color: '#fff',
-                        marginBottom: '4px'
-                      }}>
-                        {signal.asset}
-                      </div>
-                      <div style={{
-                        fontSize: '18px',
-                        fontWeight: 'bold',
-                        color: signal.direction > 0 ? '#00ff00' : '#ff3333',
-                        marginBottom: '4px'
-                      }}>
-                        {signal.direction > 0 ? '⬆️' : '⬇️'} {signal.action || (signal.direction > 0 ? 'LONG' : 'SHORT')}
-                      </div>
-                      <div style={{
-                        fontSize: '11px',
-                        color: 'rgba(255, 255, 255, 0.6)'
-                      }}>
-                        Size: {(signal.sizePercent * 100).toFixed(1)}%
-                      </div>
-                      {signal.confidence && (
-                        <div style={{
-                          fontSize: '10px',
-                          color: signal.confidence > 0.7 ? '#00ff00' : signal.confidence > 0.5 ? '#ffaa00' : '#ff6666',
-                          marginTop: '2px'
-                        }}>
-                          Conf: {(signal.confidence * 100).toFixed(0)}%
-                        </div>
-                      )}
+                      <span style={{ fontWeight: 'bold', color: '#fff' }}>{signal.asset}</span>
+                      <span style={{ color: signal.direction > 0 ? '#00ff00' : '#ff3333', fontWeight: 'bold' }}>
+                        {signal.direction > 0 ? '↑L' : '↓S'}
+                      </span>
+                      <span style={{ color: '#666' }}>{(signal.sizePercent * 100).toFixed(0)}%</span>
                     </div>
                   ))
                 ) : (
-                  <div style={{
-                    gridColumn: '1 / -1',
-                    textAlign: 'center',
-                    color: 'rgba(255, 255, 255, 0.4)',
-                    padding: '15px',
-                    fontSize: '12px'
-                  }}>
-                    No active signals • Agents holding positions
+                  <div style={{ color: 'rgba(255, 255, 255, 0.4)', fontSize: '10px' }}>
+                    No active signals
                   </div>
                 )}
               </div>
-
-              {/* Shadow Test Comparison */}
-              {scoringData.shadowTestResults && (
-                <div style={{
-                  marginTop: '12px',
-                  padding: '10px',
-                  background: 'rgba(147, 51, 234, 0.1)',
-                  borderRadius: '8px',
-                  border: '1px solid rgba(147, 51, 234, 0.2)'
-                }}>
-                  <div style={{
-                    fontSize: '10px',
-                    color: '#9333ea',
-                    marginBottom: '8px',
-                    textTransform: 'uppercase',
-                    fontWeight: '600'
-                  }}>
-                    📊 Shadow Test Results
-                  </div>
-                  <div style={{
-                    display: 'flex',
-                    gap: '8px',
-                    flexWrap: 'wrap'
-                  }}>
-                    {Object.entries(scoringData.shadowTestResults).map(([scheme, data]) => (
-                      <div key={scheme} style={{
-                        flex: '1',
-                        minWidth: '80px',
-                        padding: '6px',
-                        background: 'rgba(0, 0, 0, 0.2)',
-                        borderRadius: '6px',
-                        textAlign: 'center'
-                      }}>
-                        <div style={{
-                          fontSize: '9px',
-                          color: 'rgba(255, 255, 255, 0.5)',
-                          marginBottom: '2px'
-                        }}>
-                          {scheme.replace('_', ' ')}
-                        </div>
-                        <div style={{
-                          fontSize: '12px',
-                          fontWeight: 'bold',
-                          color: data?.weightedScore > 0 ? '#00ff00' : data?.weightedScore < 0 ? '#ff3333' : '#888'
-                        }}>
-                          {data?.weightedScore?.toFixed(1) || '0'}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
@@ -985,49 +975,45 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
           <div style={{
             display: 'grid',
             gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-            gap: '10px',
-            marginBottom: '10px'
+            gap: '8px',
+            marginBottom: '8px'
           }}>
           {/* Main P&L Card */}
           <div style={{
             background: 'rgba(0, 40, 30, 0.3)',
-            backdropFilter: 'blur(15px)',
-            WebkitBackdropFilter: 'blur(15px)',
-            padding: isMobile ? '10px' : '10px',
-            borderRadius: '12px',
+            padding: '8px',
+            borderRadius: '10px',
             border: '1px solid rgba(0, 255, 184, 0.1)',
-            boxShadow: '0 4px 20px rgba(0, 255, 184, 0.1), inset 0 0 20px rgba(0, 255, 184, 0.02)',
             display: 'flex',
             flexDirection: 'column',
-            gap: '6px'
+            gap: '4px'
           }}>
             {/* Total P&L */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ color: '#888', fontSize: '9px', textTransform: 'uppercase' }}>Total P&L</div>
-              <div style={{
-                fontSize: isMobile ? '18px' : '20px',
+              <span style={{ color: '#888', fontSize: '8px', textTransform: 'uppercase' }}>P&L</span>
+              <span style={{
+                fontSize: '16px',
                 fontWeight: 'bold',
                 color: (apiAccountData?.combined?.pnlTotalPnl || metrics.totalPnL) >= 0 ? '#00ff00' : '#ff3333',
-                textShadow: (apiAccountData?.combined?.pnlTotalPnl || metrics.totalPnL) >= 0 ? '0 0 10px rgba(0, 255, 0, 0.5)' : '0 0 10px rgba(255, 51, 51, 0.5)'
               }}>
                 {apiAccountData?.pnl?.hasNoHistory ? '$0.00' :
                   apiAccountData?.combined?.pnlTotalPnl !== undefined
                     ? `${apiAccountData.combined.pnlTotalPnl >= 0 ? '+' : ''}$${apiAccountData.combined.pnlTotalPnl.toFixed(2)}`
                     : `${metrics.totalPnL >= 0 ? '+' : ''}${metrics.totalPnL.toFixed(2)}%`
                 }
-              </div>
+              </span>
             </div>
 
             {/* Win Rate with Visual Bar */}
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <span style={{ color: '#888', fontSize: '9px', textTransform: 'uppercase' }}>Win Rate</span>
-                <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#fff' }}>{metrics.winRate.toFixed(0)}%</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2px' }}>
+                <span style={{ color: '#888', fontSize: '8px', textTransform: 'uppercase' }}>Win Rate</span>
+                <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#fff' }}>{metrics.winRate.toFixed(0)}%</span>
               </div>
-              <div style={{ display: 'flex', height: '4px', borderRadius: '2px', overflow: 'hidden', background: 'rgba(255, 51, 51, 0.3)' }}>
-                <div style={{ width: `${metrics.winRate}%`, background: '#00ff00', transition: 'width 0.5s ease' }} />
+              <div style={{ display: 'flex', height: '3px', borderRadius: '2px', overflow: 'hidden', background: 'rgba(255, 51, 51, 0.3)' }}>
+                <div style={{ width: `${metrics.winRate}%`, background: '#00ff00' }} />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px', fontSize: '9px', color: '#666' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1px', fontSize: '8px', color: '#666' }}>
                 <span>{metrics.wins}W</span>
                 <span>{metrics.losses}L</span>
               </div>
@@ -1036,19 +1022,19 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
             {/* Current Streak */}
             <div style={{
               background: metrics.currentStreak > 0 ? 'rgba(0, 255, 0, 0.05)' : 'rgba(255, 0, 0, 0.05)',
-              padding: '6px 8px',
-              borderRadius: '8px',
+              padding: '3px 6px',
+              borderRadius: '6px',
               border: `1px solid ${metrics.currentStreak > 0 ? 'rgba(0, 255, 0, 0.2)' : 'rgba(255, 0, 0, 0.2)'}`,
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center'
             }}>
-              <span style={{ color: '#888', fontSize: '9px', textTransform: 'uppercase' }}>Streak</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <span style={{ fontSize: '16px', fontWeight: 'bold', color: metrics.currentStreak > 0 ? '#00ff00' : '#ff3333' }}>
+              <span style={{ color: '#888', fontSize: '8px', textTransform: 'uppercase' }}>Streak</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                <span style={{ fontSize: '13px', fontWeight: 'bold', color: metrics.currentStreak > 0 ? '#00ff00' : '#ff3333' }}>
                   {Math.abs(metrics.currentStreak)}
                 </span>
-                <span style={{ fontSize: '12px' }}>{metrics.currentStreak > 0 ? '🔥' : metrics.currentStreak < 0 ? '❄️' : '➖'}</span>
+                <span style={{ fontSize: '10px' }}>{metrics.currentStreak > 0 ? '🔥' : metrics.currentStreak < 0 ? '❄️' : '➖'}</span>
               </div>
             </div>
           </div>
@@ -1056,33 +1042,30 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
           {/* Equity Curve Chart - Compact */}
           <div style={{
               background: 'rgba(0, 20, 40, 0.3)',
-              backdropFilter: 'blur(15px)',
-              WebkitBackdropFilter: 'blur(15px)',
-              padding: '8px 10px',
-              borderRadius: '12px',
+              padding: '6px 8px',
+              borderRadius: '10px',
               border: '1px solid rgba(0, 255, 184, 0.1)',
-              boxShadow: '0 4px 20px rgba(0, 255, 184, 0.05), inset 0 0 20px rgba(0, 20, 40, 0.05)',
               display: 'flex',
               flexDirection: 'column'
             }}>
               <div style={{
                 color: '#888',
-                fontSize: '9px',
-                marginBottom: '4px',
+                fontSize: '8px',
+                marginBottom: '3px',
                 textTransform: 'uppercase',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center'
               }}>
-                <span>📈 Equity Curve</span>
-                <span style={{ color: '#00FFB8', fontSize: '11px' }}>
-                  {apiAccountData?.pnl?.hasNoHistory ? 
-                    'Waiting for trades...' :
-                    apiAccountData?.combined?.pnlHistory?.length > 0 ? 
+                <span>📈 Equity</span>
+                <span style={{ color: '#00FFB8', fontSize: '10px' }}>
+                  {apiAccountData?.pnl?.hasNoHistory ?
+                    'Waiting...' :
+                    apiAccountData?.combined?.pnlHistory?.length > 0 ?
                       `$${apiAccountData.combined.pnlTotalPnl?.toFixed(2) || '0.00'}` :
-                      metrics.equityCurve.length > 0 ? 
+                      metrics.equityCurve.length > 0 ?
                         `${metrics.equityCurve[metrics.equityCurve.length - 1].value >= 0 ? '+' : ''}${metrics.equityCurve[metrics.equityCurve.length - 1].value.toFixed(2)}%` :
-                        'No data yet'
+                        'No data'
                   }
                 </span>
               </div>
@@ -1090,11 +1073,11 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
               {/* SVG Chart */}
               {(apiAccountData?.combined?.pnlHistory?.length > 0 || metrics.equityCurve.length > 0) && !apiAccountData?.pnl?.hasNoHistory ? (
               <>
-              <div style={{ position: 'relative', width: '100%', height: isMobile ? '60px' : '70px', flex: 1 }}>
+              <div style={{ position: 'relative', width: '100%', height: isMobile ? '50px' : '55px', flex: 1 }}>
                 <svg
                   width="100%"
                   height="100%"
-                  viewBox={`0 0 ${isMobile ? 350 : 400} ${isMobile ? 60 : 70}`}
+                  viewBox={`0 0 ${isMobile ? 350 : 400} ${isMobile ? 50 : 55}`}
                   preserveAspectRatio="none"
                   style={{ overflow: 'visible' }}
                 >
@@ -1124,8 +1107,8 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
                   {/* Create path for equity curve */}
                   {(() => {
                     const width = isMobile ? 350 : 400;
-                    const height = isMobile ? 60 : 70;
-                    const padding = 10;
+                    const height = isMobile ? 50 : 55;
+                    const padding = 8;
                     
                     // Find min and max values for scaling
                     const values = metrics.equityCurve.map(d => d.value);
@@ -1221,21 +1204,15 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
               <div style={{
                 color: 'rgba(255, 255, 255, 0.3)',
                 textAlign: 'center',
-                padding: '15px 10px',
-                fontSize: '10px',
-                flex: 1,
+                padding: '10px',
+                fontSize: '9px',
                 display: 'flex',
-                flexDirection: 'column',
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                gap: '4px'
               }}>
-                <div style={{ fontSize: '16px', marginBottom: '6px' }}>
-                  {apiAccountData?.pnl?.hasNoHistory ? '🤖' : '📊'}
-                </div>
-                {apiAccountData?.pnl?.hasNoHistory ?
-                  'Waiting for first trades...' :
-                  'No data yet'
-                }
+                <span>{apiAccountData?.pnl?.hasNoHistory ? '🤖' : '📊'}</span>
+                <span>{apiAccountData?.pnl?.hasNoHistory ? 'Waiting for trades...' : 'No data'}</span>
               </div>
             )}
           </div>
@@ -1245,291 +1222,152 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
           <div style={{
             display: 'grid',
             gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
-            gap: isMobile ? '10px' : '10px'
+            gap: '6px'
           }}>
-            {/* Council Performance */}
+            {/* Council Performance - Compact */}
             <div style={{
             background: 'rgba(147, 51, 234, 0.05)',
             backdropFilter: 'blur(15px)',
             WebkitBackdropFilter: 'blur(15px)',
-            padding: isMobile ? '10px' : '12px',
-            borderRadius: '15px',
+            padding: '8px',
+            borderRadius: '12px',
             border: '1px solid rgba(147, 51, 234, 0.2)',
-            boxShadow: '0 4px 20px rgba(147, 51, 234, 0.15), inset 0 0 20px rgba(147, 51, 234, 0.05)'
           }}>
-            <div style={{ 
-              color: '#9333ea', 
-              fontSize: isMobile ? '12px' : '13px', 
-              marginBottom: isMobile ? '10px' : '12px', 
+            <div style={{
+              color: '#9333ea',
+              fontSize: '10px',
+              marginBottom: '6px',
               fontWeight: 'bold',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px'
+              gap: '4px'
             }}>
-              <span>🤝</span> COUNCIL PERFORMANCE
+              🤝 COUNCIL
             </div>
-            <div style={{ 
-              display: 'grid', 
-              gridTemplateColumns: 'repeat(2, 1fr)', 
-              gap: '12px' 
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: '6px'
             }}>
               {/* EMO */}
               <div style={{
                 background: 'rgba(147, 51, 234, 0.03)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
-                padding: '10px',
-                borderRadius: '12px',
+                padding: '6px',
+                borderRadius: '8px',
                 textAlign: 'center',
                 border: '1px solid rgba(147, 51, 234, 0.15)',
-                boxShadow: '0 0 15px rgba(147, 51, 234, 0.1)'
               }}>
-                <div style={{ color: '#9333ea', fontSize: '10px', marginBottom: '6px' }}>
-                  EMO
-                </div>
-                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#fff', marginBottom: '4px' }}>
+                <div style={{ color: '#9333ea', fontSize: '8px', marginBottom: '2px' }}>EMO</div>
+                <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff' }}>
                   {metrics.agentScores.emo.accuracy.toFixed(0)}%
-                </div>
-                {/* Accuracy Bar */}
-                <div style={{
-                  height: '3px',
-                  background: 'rgba(147, 51, 234, 0.2)',
-                  borderRadius: '2px',
-                  overflow: 'hidden'
-                }}>
-                  <div style={{
-                    width: `${metrics.agentScores.emo.accuracy}%`,
-                    height: '100%',
-                    background: '#9333ea',
-                    transition: 'width 0.5s ease'
-                  }} />
-                </div>
-                <div style={{ color: '#666', fontSize: '8px', marginTop: '4px' }}>
-                  {metrics.agentScores.emo.avgConfidence > 0 ?
-                    `Conf: ${(metrics.agentScores.emo.avgConfidence * 100).toFixed(0)}%` :
-                    'Sentiment Analysis'}
                 </div>
               </div>
 
               {/* TEKNO */}
               <div style={{
                 background: 'rgba(0, 255, 255, 0.03)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
-                padding: '10px',
-                borderRadius: '12px',
+                padding: '6px',
+                borderRadius: '8px',
                 textAlign: 'center',
                 border: '1px solid rgba(0, 255, 255, 0.15)',
-                boxShadow: '0 0 15px rgba(0, 255, 255, 0.1)'
               }}>
-                <div style={{ color: '#00ffff', fontSize: '10px', marginBottom: '6px' }}>
-                  TEKNO
-                </div>
-                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#fff', marginBottom: '4px' }}>
+                <div style={{ color: '#00ffff', fontSize: '8px', marginBottom: '2px' }}>TEKNO</div>
+                <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff' }}>
                   {metrics.agentScores.tekno.accuracy.toFixed(0)}%
-                </div>
-                <div style={{
-                  height: '4px',
-                  background: 'rgba(0, 255, 255, 0.2)',
-                  borderRadius: '2px',
-                  overflow: 'hidden'
-                }}>
-                  <div style={{
-                    width: `${metrics.agentScores.tekno.accuracy}%`,
-                    height: '100%',
-                    background: '#00ffff',
-                    transition: 'width 0.5s ease'
-                  }} />
-                </div>
-                <div style={{ color: '#666', fontSize: '8px', marginTop: '4px' }}>
-                  {metrics.agentScores.tekno.avgConfidence > 0 ?
-                    `Conf: ${(metrics.agentScores.tekno.avgConfidence * 100).toFixed(0)}%` :
-                    'Technical Analysis'}
                 </div>
               </div>
 
               {/* MACRO */}
               <div style={{
                 background: 'rgba(0, 255, 0, 0.03)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
-                padding: '10px',
-                borderRadius: '12px',
+                padding: '6px',
+                borderRadius: '8px',
                 textAlign: 'center',
                 border: '1px solid rgba(0, 255, 0, 0.15)',
-                boxShadow: '0 0 15px rgba(0, 255, 0, 0.1)'
               }}>
-                <div style={{ color: '#00ff00', fontSize: '10px', marginBottom: '6px' }}>
-                  MACRO
-                </div>
-                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#fff', marginBottom: '4px' }}>
+                <div style={{ color: '#00ff00', fontSize: '8px', marginBottom: '2px' }}>MACRO</div>
+                <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff' }}>
                   {metrics.agentScores.macro.accuracy.toFixed(0)}%
-                </div>
-                <div style={{
-                  height: '4px',
-                  background: 'rgba(0, 255, 0, 0.2)',
-                  borderRadius: '2px',
-                  overflow: 'hidden'
-                }}>
-                  <div style={{
-                    width: `${metrics.agentScores.macro.accuracy}%`,
-                    height: '100%',
-                    background: '#00ff00',
-                    transition: 'width 0.5s ease'
-                  }} />
-                </div>
-                <div style={{ color: '#666', fontSize: '8px', marginTop: '4px' }}>
-                  {metrics.agentScores.macro.avgConfidence > 0 ?
-                    `Conf: ${(metrics.agentScores.macro.avgConfidence * 100).toFixed(0)}%` :
-                    'Economic Analysis'}
                 </div>
               </div>
 
               {/* RL80 */}
               <div style={{
                 background: 'rgba(255, 215, 0, 0.05)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
-                padding: '10px',
-                borderRadius: '12px',
+                padding: '6px',
+                borderRadius: '8px',
                 textAlign: 'center',
                 border: '1px solid rgba(255, 215, 0, 0.2)',
-                boxShadow: isMobile ? '0 0 10px rgba(255, 215, 0, 0.1)' : '0 0 20px rgba(255, 215, 0, 0.15)'
               }}>
-                <div style={{ color: '#FFD700', fontSize: '10px', marginBottom: '6px' }}>
-                  RL80 ⚡
-                </div>
-                <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#fff', marginBottom: '4px' }}>
+                <div style={{ color: '#FFD700', fontSize: '8px', marginBottom: '2px' }}>RL80 ⚡</div>
+                <div style={{ fontSize: '14px', fontWeight: 'bold', color: '#fff' }}>
                   {metrics.agentScores.rl80.accuracy.toFixed(0)}%
-                </div>
-                <div style={{
-                  height: '4px',
-                  background: 'rgba(255, 215, 0, 0.2)',
-                  borderRadius: '2px',
-                  overflow: 'hidden'
-                }}>
-                  <div style={{
-                    width: `${metrics.agentScores.rl80.accuracy}%`,
-                    height: '100%',
-                    background: '#FFD700',
-                    transition: 'width 0.5s ease'
-                  }} />
-                </div>
-                <div style={{ color: '#666', fontSize: '8px', marginTop: '4px' }}>
-                  {metrics.agentScores.rl80.avgAgreement > 0 ?
-                    `Agree: ${(metrics.agentScores.rl80.avgAgreement * 100).toFixed(0)}%` :
-                    `${metrics.agentScores.rl80.totalDecisions} decisions`}
                 </div>
               </div>
             </div>
           </div>
 
-            {/* Risk Metrics Card */}
+            {/* Risk Metrics Card - Compact */}
             <div style={{
             background: 'rgba(255, 255, 255, 0.02)',
             backdropFilter: 'blur(15px)',
             WebkitBackdropFilter: 'blur(15px)',
-            padding: isMobile ? '12px' : '15px',
-            borderRadius: '15px',
+            padding: '8px',
+            borderRadius: '12px',
             border: '1px solid rgba(255, 255, 255, 0.08)',
-            boxShadow: '0 4px 20px rgba(0, 255, 255, 0.05), inset 0 0 20px rgba(255, 255, 255, 0.02)'
           }}>
-            <div style={{ 
-              color: '#888', 
-              fontSize: '12px', 
-              marginBottom: '15px', 
+            <div style={{
+              color: '#888',
+              fontSize: '10px',
+              marginBottom: '8px',
               fontWeight: 'bold',
               textTransform: 'uppercase'
             }}>
               📊 Risk Metrics
             </div>
-            
-            {/* Profit Factor */}
-            <div style={{ marginBottom: '15px' }}>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between',
-                marginBottom: '5px'
-              }}>
-                <span style={{ color: '#666', fontSize: '11px' }}>Profit Factor</span>
-                <span style={{ color: '#0096ff', fontSize: '14px', fontWeight: 'bold' }}>
+
+            {/* Compact metrics grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', fontSize: '9px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                <span style={{ color: '#666' }}>Profit Factor</span>
+                <span style={{ color: '#0096ff', fontWeight: 'bold' }}>
                   {metrics.profitFactor > 100 ? '∞' : metrics.profitFactor.toFixed(2)}
                 </span>
               </div>
-            </div>
-
-            {/* Sharpe Ratio */}
-            <div style={{ marginBottom: '15px' }}>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between',
-                marginBottom: '5px'
-              }}>
-                <span style={{ color: '#666', fontSize: '11px' }}>Sharpe Ratio</span>
-                <span style={{ color: '#FFD700', fontSize: '14px', fontWeight: 'bold' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                <span style={{ color: '#666' }}>Sharpe</span>
+                <span style={{ color: '#FFD700', fontWeight: 'bold' }}>
                   {metrics.sharpeRatio.toFixed(2)}
                 </span>
               </div>
-            </div>
-
-            {/* Max Drawdown */}
-            <div style={{ marginBottom: '15px' }}>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between',
-                marginBottom: '5px'
-              }}>
-                <span style={{ color: '#666', fontSize: '11px' }}>Max Drawdown</span>
-                <span style={{ color: '#ff3333', fontSize: '14px', fontWeight: 'bold' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                <span style={{ color: '#666' }}>Max DD</span>
+                <span style={{ color: '#ff3333', fontWeight: 'bold' }}>
                   -{metrics.maxDrawdown.toFixed(1)}%
                 </span>
               </div>
-              {/* Drawdown visualization */}
-              <div style={{ 
-                height: '4px', 
-                background: 'rgba(255, 51, 51, 0.2)',
-                borderRadius: '2px',
-                overflow: 'hidden'
-              }}>
-                <div style={{
-                  width: `${Math.min(metrics.maxDrawdown, 100)}%`,
-                  height: '100%',
-                  background: '#ff3333'
-                }} />
-              </div>
-            </div>
-
-            {/* Win/Loss Ratio */}
-            <div>
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'space-between',
-                marginBottom: '5px'
-              }}>
-                <span style={{ color: '#666', fontSize: '11px' }}>Avg Win/Loss</span>
-                <span style={{ color: '#00ff00', fontSize: '14px', fontWeight: 'bold' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                <span style={{ color: '#666' }}>Win/Loss</span>
+                <span style={{ color: '#00ff00', fontWeight: 'bold' }}>
                   {metrics.avgLoss > 0 ? (metrics.avgWin / metrics.avgLoss).toFixed(2) : '∞'}
                 </span>
               </div>
             </div>
           </div>
 
-            {/* Recent Trades Card */}
+            {/* Recent Trades Card - Compact */}
             <div style={{
             background: 'rgba(255, 255, 255, 0.02)',
-            backdropFilter: 'blur(15px)',
-            WebkitBackdropFilter: 'blur(15px)',
-            padding: isMobile ? '12px' : '15px',
-            borderRadius: '15px',
+            padding: '8px',
+            borderRadius: '12px',
             border: '1px solid rgba(255, 255, 255, 0.08)',
-            boxShadow: '0 4px 20px rgba(0, 255, 255, 0.05), inset 0 0 20px rgba(255, 255, 255, 0.02)',
-            maxHeight: isMobile ? '150px' : '160px',
+            maxHeight: '90px',
             overflowY: 'auto'
           }}>
-            <div style={{ 
-              color: '#888', 
-              fontSize: '12px', 
-              marginBottom: '15px', 
+            <div style={{
+              color: '#888',
+              fontSize: '10px',
+              marginBottom: '6px',
               fontWeight: 'bold',
               textTransform: 'uppercase',
               display: 'flex',
@@ -1537,301 +1375,129 @@ const PerformanceDashboard = ({ show = true, onClose }) => {
               alignItems: 'center'
             }}>
               <span>📈 Recent Trades</span>
-              <span style={{ color: '#666', fontSize: '10px', fontWeight: 'normal' }}>
-                Last 5
-              </span>
+              <span style={{ color: '#666', fontSize: '8px', fontWeight: 'normal' }}>Last 5</span>
             </div>
-            
+
             {metrics.recentTrades.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                 {metrics.recentTrades.map((trade, i) => (
                   <div key={trade.id || i} style={{
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    padding: '10px',
+                    padding: '3px 5px',
                     background: 'rgba(255, 255, 255, 0.01)',
-                    backdropFilter: 'blur(5px)',
-                    WebkitBackdropFilter: 'blur(5px)',
-                    borderRadius: '10px',
-                    borderLeft: `3px solid ${trade.result?.success ? '#00ff00' : '#ff3333'}`,
-                    transition: 'all 0.3s',
-                    cursor: 'pointer',
-                    boxShadow: trade.result?.success ? '0 0 10px rgba(0, 255, 0, 0.1)' : '0 0 10px rgba(255, 51, 51, 0.1)'
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isMobile) {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)';
-                      e.currentTarget.style.transform = 'translateX(5px)';
-                      e.currentTarget.style.boxShadow = trade.result?.success ? '0 0 20px rgba(0, 255, 0, 0.2)' : '0 0 20px rgba(255, 51, 51, 0.2)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isMobile) {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.01)';
-                      e.currentTarget.style.transform = 'translateX(0)';
-                      e.currentTarget.style.boxShadow = trade.result?.success ? '0 0 10px rgba(0, 255, 0, 0.1)' : '0 0 10px rgba(255, 51, 51, 0.1)';
-                    }
-                  }}
-                  >
-                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                      <div style={{ 
-                        color: trade.result?.success ? '#00ff00' : '#ff3333',
-                        fontSize: '16px'
-                      }}>
+                    borderRadius: '4px',
+                    borderLeft: `2px solid ${trade.result?.success ? '#00ff00' : '#ff3333'}`,
+                  }}>
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                      <span style={{ color: trade.result?.success ? '#00ff00' : '#ff3333', fontSize: '9px' }}>
                         {trade.result?.success ? '✓' : '✗'}
-                      </div>
-                      <div>
-                        <div style={{ color: '#ddd', fontSize: '12px', marginBottom: '2px' }}>
-                          {trade.plannedTrade?.asset || 'BTC'} {trade.plannedTrade?.direction || 'N/A'}
-                        </div>
-                        <div style={{ color: '#666', fontSize: '10px' }}>
-                          {new Date(trade.timestamp).toLocaleTimeString()}
-                        </div>
-                      </div>
+                      </span>
+                      <span style={{ color: '#ddd', fontSize: '9px' }}>
+                        {trade.plannedTrade?.asset || 'BTC'} {trade.plannedTrade?.direction || 'N/A'}
+                      </span>
                     </div>
-                    <div style={{
+                    <span style={{
                       color: trade.result?.pnl >= 0 ? '#00ff00' : '#ff3333',
                       fontWeight: 'bold',
-                      fontSize: '13px'
+                      fontSize: '11px'
                     }}>
                       {trade.result?.pnl >= 0 ? '+' : ''}{trade.result?.pnl?.toFixed(2) || '0.00'}%
-                    </div>
+                    </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <div style={{ 
-                color: 'rgba(255, 255, 255, 0.3)', 
-                textAlign: 'center', 
-                padding: '40px 20px',
-                fontSize: '12px'
+              <div style={{
+                color: 'rgba(255, 255, 255, 0.3)',
+                textAlign: 'center',
+                padding: '10px',
+                fontSize: '10px'
               }}>
-                No trades in selected timeframe
+                No trades yet
               </div>
             )}
           </div>
 
-          {/* Mainnet Readiness Card */}
+          {/* Mainnet Readiness Card - Compact */}
           {(() => {
-            // Benchmark targets
-            const BENCHMARKS = {
-              totalTrades: 100,
-              winRate: 60,
-              maxDrawdown: 15, // Max acceptable
-              daysLive: 30
-            };
-
-            // Calculate days live from earliest trade or decision
+            const BENCHMARKS = { totalTrades: 100, winRate: 60, maxDrawdown: 15, daysLive: 30 };
             const getEarliestTimestamp = () => {
-              const tradeTimestamps = metrics.recentTrades
-                .map(t => t.timestamp)
-                .filter(Boolean);
-              const decisionTimestamps = scoringData.recentDecisions
-                .map(d => d.timestamp)
-                .filter(Boolean);
-              const allTimestamps = [...tradeTimestamps, ...decisionTimestamps];
+              const allTimestamps = [...metrics.recentTrades.map(t => t.timestamp), ...scoringData.recentDecisions.map(d => d.timestamp)].filter(Boolean);
               return allTimestamps.length > 0 ? Math.min(...allTimestamps) : Date.now();
             };
-
-            const earliestTimestamp = getEarliestTimestamp();
-            const daysLive = Math.floor((Date.now() - earliestTimestamp) / (1000 * 60 * 60 * 24));
-
-            // Check if benchmarks are met
+            const daysLive = Math.floor((Date.now() - getEarliestTimestamp()) / (1000 * 60 * 60 * 24));
             const tradesMet = metrics.totalTrades >= BENCHMARKS.totalTrades;
             const winRateMet = metrics.winRate >= BENCHMARKS.winRate;
             const drawdownMet = metrics.maxDrawdown <= BENCHMARKS.maxDrawdown;
             const daysMet = daysLive >= BENCHMARKS.daysLive;
-
-            // Overall readiness
             const benchmarksMet = [tradesMet, winRateMet, drawdownMet, daysMet].filter(Boolean).length;
-            const readinessPercent = (benchmarksMet / 4) * 100;
 
             return (
               <div style={{
                 background: 'rgba(255, 255, 255, 0.02)',
-                backdropFilter: 'blur(15px)',
-                WebkitBackdropFilter: 'blur(15px)',
-                padding: isMobile ? '12px' : '15px',
-                borderRadius: '15px',
+                padding: '8px',
+                borderRadius: '12px',
                 border: '1px solid rgba(255, 255, 255, 0.08)',
-                boxShadow: '0 4px 20px rgba(0, 255, 255, 0.05), inset 0 0 20px rgba(255, 255, 255, 0.02)'
               }}>
                 <div style={{
                   color: '#888',
-                  fontSize: '12px',
-                  marginBottom: '15px',
+                  fontSize: '10px',
+                  marginBottom: '6px',
                   fontWeight: 'bold',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.1em',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center'
                 }}>
-                  <span>🚀 Mainnet Readiness</span>
-                  <span style={{
-                    fontSize: '11px',
-                    color: readinessPercent === 100 ? '#00ff00' : '#FFD700',
-                    fontWeight: 'bold'
-                  }}>
-                    {benchmarksMet}/4 ✓
+                  <span>🚀 MAINNET READY</span>
+                  <span style={{ color: benchmarksMet === 4 ? '#00ff00' : '#FFD700', fontWeight: 'bold' }}>
+                    {benchmarksMet}/4
                   </span>
                 </div>
 
-                {/* Benchmarks Grid */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(2, 1fr)',
-                  gap: '10px'
-                }}>
-                  {/* Total Trades */}
+                {/* Compact 2x2 benchmarks */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', fontSize: '9px' }}>
                   <div style={{
-                    textAlign: 'center',
-                    padding: '10px',
-                    borderRadius: '8px',
-                    border: `1px solid ${tradesMet ? 'rgba(0, 255, 0, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
-                    background: tradesMet ? 'rgba(0, 255, 0, 0.05)' : 'rgba(255, 255, 255, 0.03)',
-                    backdropFilter: 'blur(10px)',
-                    WebkitBackdropFilter: 'blur(10px)'
+                    display: 'flex', justifyContent: 'space-between', padding: '3px 4px',
+                    background: tradesMet ? 'rgba(0, 255, 0, 0.05)' : 'transparent',
+                    borderRadius: '4px', border: `1px solid ${tradesMet ? 'rgba(0, 255, 0, 0.2)' : 'rgba(255,255,255,0.05)'}`
                   }}>
-                    <div style={{
-                      fontWeight: 'bold',
-                      marginBottom: '4px'
-                    }}>
-                      <span style={{
-                        fontSize: '20px',
-                        color: tradesMet ? '#00ff00' : '#ffffff'
-                      }}>{metrics.totalTrades}</span>
-                      <span style={{
-                        fontSize: '12px',
-                        color: 'rgba(255, 255, 255, 0.5)'
-                      }}> / {BENCHMARKS.totalTrades}</span>
-                    </div>
-                    <div style={{
-                      fontSize: '10px',
-                      color: 'rgba(255, 255, 255, 0.6)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      Total Trades {tradesMet && '✓'}
-                    </div>
+                    <span style={{ color: '#666' }}>Trades</span>
+                    <span style={{ color: tradesMet ? '#00ff00' : '#fff', fontWeight: 'bold' }}>
+                      {metrics.totalTrades}/{BENCHMARKS.totalTrades} {tradesMet && '✓'}
+                    </span>
                   </div>
-
-                  {/* Win Rate */}
                   <div style={{
-                    textAlign: 'center',
-                    padding: '10px',
-                    borderRadius: '8px',
-                    border: `1px solid ${winRateMet ? 'rgba(0, 255, 0, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
-                    background: winRateMet ? 'rgba(0, 255, 0, 0.05)' : 'rgba(255, 255, 255, 0.03)',
-                    backdropFilter: 'blur(10px)',
-                    WebkitBackdropFilter: 'blur(10px)'
+                    display: 'flex', justifyContent: 'space-between', padding: '3px 4px',
+                    background: winRateMet ? 'rgba(0, 255, 0, 0.05)' : 'transparent',
+                    borderRadius: '4px', border: `1px solid ${winRateMet ? 'rgba(0, 255, 0, 0.2)' : 'rgba(255,255,255,0.05)'}`
                   }}>
-                    <div style={{
-                      fontWeight: 'bold',
-                      marginBottom: '4px'
-                    }}>
-                      <span style={{
-                        fontSize: '20px',
-                        color: winRateMet ? '#00ff00' : '#ffffff'
-                      }}>{metrics.winRate.toFixed(0)}%</span>
-                      <span style={{
-                        fontSize: '12px',
-                        color: 'rgba(255, 255, 255, 0.5)'
-                      }}> / {BENCHMARKS.winRate}%</span>
-                    </div>
-                    <div style={{
-                      fontSize: '10px',
-                      color: 'rgba(255, 255, 255, 0.6)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      Win Rate {winRateMet && '✓'}
-                    </div>
+                    <span style={{ color: '#666' }}>Win Rate</span>
+                    <span style={{ color: winRateMet ? '#00ff00' : '#fff', fontWeight: 'bold' }}>
+                      {metrics.winRate.toFixed(0)}%/{BENCHMARKS.winRate}% {winRateMet && '✓'}
+                    </span>
                   </div>
-
-                  {/* Max Drawdown */}
                   <div style={{
-                    textAlign: 'center',
-                    padding: '10px',
-                    borderRadius: '8px',
-                    border: `1px solid ${drawdownMet ? 'rgba(0, 255, 0, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
-                    background: drawdownMet ? 'rgba(0, 255, 0, 0.05)' : 'rgba(255, 255, 255, 0.03)',
-                    backdropFilter: 'blur(10px)',
-                    WebkitBackdropFilter: 'blur(10px)'
+                    display: 'flex', justifyContent: 'space-between', padding: '3px 4px',
+                    background: drawdownMet ? 'rgba(0, 255, 0, 0.05)' : 'transparent',
+                    borderRadius: '4px', border: `1px solid ${drawdownMet ? 'rgba(0, 255, 0, 0.2)' : 'rgba(255,255,255,0.05)'}`
                   }}>
-                    <div style={{
-                      fontWeight: 'bold',
-                      marginBottom: '4px'
-                    }}>
-                      <span style={{
-                        fontSize: '20px',
-                        color: drawdownMet ? '#00ff00' : '#ffffff'
-                      }}>{metrics.maxDrawdown.toFixed(1)}%</span>
-                      <span style={{
-                        fontSize: '12px',
-                        color: 'rgba(255, 255, 255, 0.5)'
-                      }}> / {BENCHMARKS.maxDrawdown}%</span>
-                    </div>
-                    <div style={{
-                      fontSize: '10px',
-                      color: 'rgba(255, 255, 255, 0.6)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      Max Drawdown {drawdownMet && '✓'}
-                    </div>
+                    <span style={{ color: '#666' }}>Max DD</span>
+                    <span style={{ color: drawdownMet ? '#00ff00' : '#fff', fontWeight: 'bold' }}>
+                      {metrics.maxDrawdown.toFixed(1)}%/{BENCHMARKS.maxDrawdown}% {drawdownMet && '✓'}
+                    </span>
                   </div>
-
-                  {/* Days Live */}
                   <div style={{
-                    textAlign: 'center',
-                    padding: '10px',
-                    borderRadius: '8px',
-                    border: `1px solid ${daysMet ? 'rgba(0, 255, 0, 0.3)' : 'rgba(255, 255, 255, 0.1)'}`,
-                    background: daysMet ? 'rgba(0, 255, 0, 0.05)' : 'rgba(255, 255, 255, 0.03)',
-                    backdropFilter: 'blur(10px)',
-                    WebkitBackdropFilter: 'blur(10px)'
+                    display: 'flex', justifyContent: 'space-between', padding: '3px 4px',
+                    background: daysMet ? 'rgba(0, 255, 0, 0.05)' : 'transparent',
+                    borderRadius: '4px', border: `1px solid ${daysMet ? 'rgba(0, 255, 0, 0.2)' : 'rgba(255,255,255,0.05)'}`
                   }}>
-                    <div style={{
-                      fontWeight: 'bold',
-                      marginBottom: '4px'
-                    }}>
-                      <span style={{
-                        fontSize: '20px',
-                        color: daysMet ? '#00ff00' : '#ffffff'
-                      }}>{daysLive}</span>
-                      <span style={{
-                        fontSize: '12px',
-                        color: 'rgba(255, 255, 255, 0.5)'
-                      }}> / {BENCHMARKS.daysLive}</span>
-                    </div>
-                    <div style={{
-                      fontSize: '10px',
-                      color: 'rgba(255, 255, 255, 0.6)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      Days Live {daysMet && '✓'}
-                    </div>
+                    <span style={{ color: '#666' }}>Days</span>
+                    <span style={{ color: daysMet ? '#00ff00' : '#fff', fontWeight: 'bold' }}>
+                      {daysLive}/{BENCHMARKS.daysLive} {daysMet && '✓'}
+                    </span>
                   </div>
-                </div>
-
-                {/* Progress note */}
-                <div style={{
-                  marginTop: '12px',
-                  padding: '8px',
-                  background: readinessPercent === 100 ? 'rgba(0, 255, 0, 0.1)' : 'rgba(0, 255, 184, 0.05)',
-                  borderRadius: '6px',
-                  border: `1px solid ${readinessPercent === 100 ? 'rgba(0, 255, 0, 0.3)' : 'rgba(0, 255, 184, 0.1)'}`,
-                  fontSize: '10px',
-                  color: readinessPercent === 100 ? '#00ff00' : 'rgba(0, 255, 184, 0.8)',
-                  textAlign: 'center'
-                }}>
-                  {readinessPercent === 100
-                    ? '✅ All benchmarks met - Ready for mainnet!'
-                    : `Testing benchmarks before mainnet deployment (${readinessPercent.toFixed(0)}% ready)`
-                  }
                 </div>
               </div>
             );

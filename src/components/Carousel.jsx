@@ -38,6 +38,57 @@ import { useAuth } from "@clerk/nextjs"; // Add this line if it's missing
 import EmojiPicker from "emoji-picker-react";
 import "./Carousel.css";
 
+// Sanitize user input to prevent any injection attempts
+const sanitizeMessage = (input, blockUrls = false) => {
+  if (typeof input !== 'string') return '';
+  let sanitized = input
+    .trim()
+    .slice(0, 200) // Hard limit
+    .replace(/[<>]/g, '') // Remove angle brackets
+    .replace(/javascript:/gi, '') // Remove javascript: protocol
+    .replace(/on\w+=/gi, ''); // Remove event handlers
+
+  if (blockUrls) {
+    // Remove URLs (http, https, www, and common TLDs)
+    sanitized = sanitized
+      .replace(/https?:\/\/[^\s]+/gi, '[link removed]')
+      .replace(/www\.[^\s]+/gi, '[link removed]')
+      .replace(/[^\s]+\.(com|org|net|io|co|gg|xyz|me|info|dev|app)[^\s]*/gi, '[link removed]')
+      .replace(/discord\.(gg|com)[^\s]*/gi, '[link removed]')
+      .replace(/t\.me[^\s]*/gi, '[link removed]');
+  }
+
+  return sanitized;
+};
+
+// Validate image URLs to only allow safe sources
+const sanitizeImageUrl = (url, fallback = '/defaultAvatar.png') => {
+  if (typeof url !== 'string' || !url) return fallback;
+  try {
+    const parsed = new URL(url);
+    // Only allow https and specific trusted domains
+    const trustedDomains = [
+      'clerk.com',
+      'img.clerk.com',
+      'images.clerk.dev',
+      'gravatar.com',
+      'githubusercontent.com',
+      'googleusercontent.com',
+      'lh3.googleusercontent.com',
+      'platform-lookaside.fbsbx.com',
+      'pbs.twimg.com',
+      'api.dicebear.com' // For debug mock avatars
+    ];
+    if (parsed.protocol !== 'https:') return fallback;
+    const isTrusted = trustedDomains.some(domain =>
+      parsed.hostname === domain || parsed.hostname.endsWith('.' + domain)
+    );
+    return isTrusted ? url : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
 // Styled popup component
 const StyledPopup = ({ message, onClose, onConfirm }) => {
   return (
@@ -583,9 +634,9 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
 
       const riderData = {
         userId: user.id,
-        username: user.username || "Anonymous",
-        imageUrl: user.imageUrl || "/defaultAvatar.png",
-        timestamp: serverTimestamp() || new Date(), // Add fallback
+        username: sanitizeMessage(user.username || "Anonymous").slice(0, 50),
+        imageUrl: sanitizeImageUrl(user.imageUrl),
+        timestamp: serverTimestamp(),
       };
 
       // Save the rider to Firestore
@@ -659,7 +710,8 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
   const RATE_LIMIT_MS = 2000; // 2 seconds between messages
 
   const handleSendMessage = async (beastId) => {
-    if (!newMessage.trim() || !user) {
+    const sanitizedMessage = sanitizeMessage(newMessage, true); // Block URLs
+    if (!sanitizedMessage || sanitizedMessage === '[link removed]' || !user) {
       showPopupMessage("Please enter a message and ensure you are logged in.");
       return;
     }
@@ -675,10 +727,10 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
     try {
       const messageData = {
         beastId,
-        message: newMessage,
+        message: sanitizedMessage.slice(0, MAX_MESSAGE_LENGTH),
         userId: user.id,
-        username: user.username || "Anonymous",
-        imageUrl: user.imageUrl || "/defaultAvatar.png",
+        username: sanitizeMessage(user.username || "Anonymous").slice(0, 50),
+        imageUrl: sanitizeImageUrl(user.imageUrl),
         timestamp: serverTimestamp(),
       };
 
@@ -1048,6 +1100,34 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const globalChatRef = useRef(null);
 
+  // DEBUG MODE - Uncomment to test Spectator Lounge when beasts aren't full
+  // Press Ctrl+Shift+F to toggle
+  // const [debugForceFullCarousel, setDebugForceFullCarousel] = useState(false);
+  // const debugMockMessages = [
+  //   { id: 'mock1', username: 'CryptoKing', message: 'Waiting for my turn! 🎠', imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=CryptoKing' },
+  //   { id: 'mock2', username: 'MoonRider', message: 'This carousel is wild!', imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=MoonRider' },
+  //   { id: 'mock3', username: 'HODLer99', message: 'When lambo? 😂', imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=HODLer99' },
+  //   { id: 'mock4', username: 'DiamondHands', message: 'Love watching the beasts go round', imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=DiamondHands' },
+  // ];
+  // useEffect(() => {
+  //   const handleDebugKey = (e) => {
+  //     if (e.ctrlKey && e.shiftKey && e.key === 'F') {
+  //       setDebugForceFullCarousel(prev => {
+  //         const newState = !prev;
+  //         console.log(`[DEBUG] Full carousel mode: ${newState ? 'ON' : 'OFF'}`);
+  //         if (newState) {
+  //           setGlobalChatMessages(debugMockMessages);
+  //         } else {
+  //           setGlobalChatMessages([]);
+  //         }
+  //         return newState;
+  //       });
+  //     }
+  //   };
+  //   window.addEventListener('keydown', handleDebugKey);
+  //   return () => window.removeEventListener('keydown', handleDebugKey);
+  // }, []);
+
   const calculateWaitTime = (position) => {
     if (position === 1) {
       const rideDuration = 10 * 60 * 1000; // 10 minutes in milliseconds
@@ -1152,7 +1232,8 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
 
   // Send message to global chat
   const handleSendGlobalMessage = async () => {
-    if (!globalChatMessage.trim() || !user) return;
+    const sanitizedMessage = sanitizeMessage(globalChatMessage, true); // Block URLs
+    if (!sanitizedMessage || sanitizedMessage === '[link removed]' || !user) return;
 
     // Rate limiting
     const now = Date.now();
@@ -1163,10 +1244,10 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
 
     try {
       await addDoc(collection(db, "globalChat"), {
-        message: globalChatMessage,
+        message: sanitizedMessage.slice(0, 200),
         userId: user.id,
-        username: user.username || "Anonymous",
-        imageUrl: user.imageUrl || "/defaultAvatar.png",
+        username: sanitizeMessage(user.username || "Anonymous").slice(0, 50),
+        imageUrl: sanitizeImageUrl(user.imageUrl),
         timestamp: serverTimestamp(),
       });
       setGlobalChatMessage("");
@@ -1175,18 +1256,114 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
     }
   };
 
+  // Track user's position in waitlist
+  const [userQueuePosition, setUserQueuePosition] = useState(null);
+  const [notificationPermission, setNotificationPermission] = useState('default');
+  const prevQueuePositionRef = useRef(null);
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if ('Notification' in window) {
+      setNotificationPermission(Notification.permission);
+    }
+  }, []);
+
+  const requestNotificationPermission = async () => {
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission();
+      setNotificationPermission(permission);
+      return permission === 'granted';
+    }
+    return false;
+  };
+
+  const sendNotification = (title, body) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, {
+        body,
+        icon: '/horse-shoe-transparent.png',
+        tag: 'carousel-notification',
+      });
+    }
+  };
+
+  // Leave the waitlist
+  const leaveWaitlist = async () => {
+    if (!user) return;
+    try {
+      const waitlistRef = collection(db, "carouselWaitlist");
+      const waitlistQuery = query(waitlistRef, where("userId", "==", user.id));
+      const snapshot = await getDocs(waitlistQuery);
+
+      if (!snapshot.empty) {
+        await deleteDoc(snapshot.docs[0].ref);
+        console.log("User left the waitlist");
+      }
+    } catch (error) {
+      console.error("Failed to leave waitlist:", error);
+    }
+  };
+
+  // Report a message
+  const [reportedMessages, setReportedMessages] = useState(new Set());
+
+  const reportMessage = async (message, chatType) => {
+    if (!user || !message) return;
+
+    // Check if already reported by this user
+    if (reportedMessages.has(message.id)) {
+      showPopupMessage("You've already reported this message.");
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, "chatReports"), {
+        reporterId: user.id,
+        reporterUsername: user.username || "Anonymous",
+        reportedUserId: message.userId,
+        reportedUsername: message.username,
+        messageContent: message.message,
+        messageId: message.id || null,
+        chatType: chatType, // 'beast' or 'global'
+        timestamp: serverTimestamp(),
+        status: 'pending', // pending, reviewed, dismissed
+      });
+
+      setReportedMessages(prev => new Set([...prev, message.id]));
+      showPopupMessage("Report submitted. Thank you for keeping the community safe.");
+    } catch (error) {
+      console.error("Failed to submit report:", error);
+      showPopupMessage("Failed to submit report. Please try again.");
+    }
+  };
+
   useEffect(() => {
     const waitlistRef = collection(db, "carouselWaitlist");
-    const unsubscribe = onSnapshot(waitlistRef, (snapshot) => {
+    const waitlistQuery = query(waitlistRef, orderBy("timestamp", "asc"));
+    const unsubscribe = onSnapshot(waitlistQuery, (snapshot) => {
       const queue = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
       setWaitlist(queue);
+
+      // Find user's position in queue
+      if (user) {
+        const position = queue.findIndex(item => item.userId === user.id);
+        const newPosition = position >= 0 ? position + 1 : null;
+
+        // Check if user just got assigned (was in queue, now riding)
+        if (prevQueuePositionRef.current === 1 && newPosition === null && isRiding) {
+          sendNotification("Your beast is ready!", "Enjoy your 10-minute ride on the carousel!");
+        }
+
+        setUserQueuePosition(newPosition);
+        prevQueuePositionRef.current = newPosition;
+      }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [user, isRiding]);
   const [waitTimes, setWaitTimes] = useState([]);
 
   useEffect(() => {
@@ -1206,9 +1383,8 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
           const rideStartTime = rideData.timestamp?.toMillis();
 
           if (!rideStartTime) {
-            console.error(
-              `Invalid rideStartTime for beast ${doc.id}. Skipping.`
-            );
+            // Skip silently - this happens briefly after ride creation
+            // while serverTimestamp() is still being resolved by Firestore
             continue;
           }
 
@@ -1295,14 +1471,34 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
         if (snapshot.empty) {
           console.log("No beasts found in Firestore.");
           setRiders({});
+          // If no beasts exist and user was riding, end their ride
+          if (isRiding) {
+            setIsRiding(false);
+            setActiveBeastId(null);
+          }
           return;
         }
 
         const updatedRiders = {};
+        let userStillRiding = false;
+
         snapshot.forEach((doc) => {
           const data = doc.data();
           updatedRiders[doc.id] = data;
+
+          // Check if current user is still riding
+          if (user && data.userId === user.id) {
+            userStillRiding = true;
+          }
         });
+
+        // If user was riding but their beast is no longer in the list, end their ride
+        if (isRiding && !userStillRiding) {
+          console.log("User's ride ended - beast no longer exists");
+          setIsRiding(false);
+          setActiveBeastId(null);
+          setMessages({});
+        }
 
         console.log("Updated riders from Firestore:", updatedRiders);
         setRiders(updatedRiders);
@@ -1310,7 +1506,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
     );
 
     return () => unsubscribe();
-  }, []);
+  }, [user, isRiding]);
   const handleCloseChatBox = () => {
     if (rideActive) {
       // Show a confirmation popup only if the ride is still active
@@ -1393,8 +1589,8 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                           <div className="rider-container">
                             <p className="rider-name">{rider.username}</p>
                             <img
-                              src={rider.imageUrl}
-                              alt={rider.username}
+                              src={sanitizeImageUrl(rider.imageUrl)}
+                              alt={rider.username || "Rider"}
                               className="rider-avatar"
                             />
                           </div>
@@ -1770,6 +1966,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
       </div>
 
       {/* Global Chat Sidebar - appears when all 12 beasts are occupied */}
+      {/* Debug: Press Ctrl+Shift+F to toggle visibility for testing */}
       {allBeastsOccupied && (
         <div
           className="global-chat-sidebar"
@@ -1786,7 +1983,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
             borderRadius: "12px 0 0 12px",
             display: "flex",
             flexDirection: "column",
-            zIndex: 1000,
+            zIndex: 10001,
             transition: "right 0.3s ease-in-out",
             boxShadow: "-4px 0 15px rgba(0, 0, 0, 0.3)",
           }}
@@ -1849,6 +2046,105 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
             </span>
           </div>
 
+          {/* Queue Section */}
+          {waitlist.length > 0 && (
+            <div
+              style={{
+                padding: "10px",
+                borderBottom: "1px solid rgba(212, 175, 55, 0.3)",
+                backgroundColor: "rgba(0, 0, 0, 0.2)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                <span style={{ color: "#d4af37", fontSize: "12px", fontWeight: "bold" }}>
+                  Queue ({waitlist.length})
+                </span>
+                {notificationPermission !== 'granted' && (
+                  <button
+                    onClick={requestNotificationPermission}
+                    style={{
+                      fontSize: "10px",
+                      padding: "2px 6px",
+                      borderRadius: "8px",
+                      border: "1px solid rgba(212, 175, 55, 0.5)",
+                      backgroundColor: "transparent",
+                      color: "#d4af37",
+                      cursor: "pointer",
+                    }}
+                  >
+                    🔔 Enable alerts
+                  </button>
+                )}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "80px", overflowY: "auto" }}>
+                {waitlist.slice(0, 5).map((person, index) => (
+                  <div
+                    key={person.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "4px",
+                      borderRadius: "6px",
+                      backgroundColor: person.userId === user?.id ? "rgba(212, 175, 55, 0.2)" : "transparent",
+                    }}
+                  >
+                    <span style={{ color: "#d4af37", fontSize: "10px", fontWeight: "bold", minWidth: "16px" }}>
+                      #{index + 1}
+                    </span>
+                    <img
+                      src={sanitizeImageUrl(person.imageUrl)}
+                      alt={person.username}
+                      style={{ width: "20px", height: "20px", borderRadius: "50%", border: "1px solid #d4af37" }}
+                    />
+                    <span style={{ color: "white", fontSize: "11px", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {person.username}
+                      {person.userId === user?.id && " (you)"}
+                    </span>
+                    {person.userId === user?.id && (
+                      <button
+                        onClick={leaveWaitlist}
+                        style={{
+                          fontSize: "9px",
+                          padding: "2px 5px",
+                          borderRadius: "6px",
+                          border: "1px solid rgba(255, 100, 100, 0.5)",
+                          backgroundColor: "rgba(255, 100, 100, 0.2)",
+                          color: "#ff6b6b",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Leave
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {waitlist.length > 5 && (
+                  <span style={{ color: "rgba(255, 255, 255, 0.5)", fontSize: "10px", textAlign: "center" }}>
+                    +{waitlist.length - 5} more waiting...
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* User's queue position alert */}
+          {userQueuePosition && !isRiding && (
+            <div
+              style={{
+                padding: "8px 10px",
+                backgroundColor: "rgba(212, 175, 55, 0.15)",
+                borderBottom: "1px solid rgba(212, 175, 55, 0.3)",
+                textAlign: "center",
+              }}
+            >
+              <span style={{ color: "#d4af37", fontSize: "12px" }}>
+                You're <strong>#{userQueuePosition}</strong> in line
+                {userQueuePosition === 1 && " — You're next!"}
+              </span>
+            </div>
+          )}
+
           {/* Messages area */}
           <div
             ref={globalChatRef}
@@ -1880,11 +2176,13 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                     display: "flex",
                     alignItems: "flex-start",
                     gap: "8px",
+                    position: "relative",
                   }}
+                  className="chat-message-row"
                 >
                   <img
-                    src={msg.imageUrl || "/defaultAvatar.png"}
-                    alt={msg.username}
+                    src={sanitizeImageUrl(msg.imageUrl)}
+                    alt={msg.username || "User"}
                     style={{
                       width: "28px",
                       height: "28px",
@@ -1893,15 +2191,38 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                     }}
                   />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <span
-                      style={{
-                        color: "#d4af37",
-                        fontSize: "11px",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {msg.username}
-                    </span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span
+                        style={{
+                          color: "#d4af37",
+                          fontSize: "11px",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {msg.username}
+                      </span>
+                      {isSignedIn && msg.userId !== user?.id && (
+                        <button
+                          onClick={() => reportMessage(msg, 'global')}
+                          disabled={reportedMessages.has(msg.id)}
+                          title={reportedMessages.has(msg.id) ? "Reported" : "Report message"}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            padding: "0",
+                            cursor: reportedMessages.has(msg.id) ? "default" : "pointer",
+                            fontSize: "10px",
+                            color: reportedMessages.has(msg.id) ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.4)",
+                            opacity: 0.6,
+                            transition: "opacity 0.2s",
+                          }}
+                          onMouseEnter={(e) => { if (!reportedMessages.has(msg.id)) e.target.style.opacity = 1; }}
+                          onMouseLeave={(e) => { e.target.style.opacity = 0.6; }}
+                        >
+                          {reportedMessages.has(msg.id) ? "✓" : "⚑"}
+                        </button>
+                      )}
+                    </div>
                     <p
                       style={{
                         margin: "2px 0 0 0",
@@ -1919,7 +2240,19 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
           </div>
 
           {/* Input area */}
-          {isSignedIn ? (
+          {isSignedIn && isRiding ? (
+            <div
+              style={{
+                padding: "12px",
+                borderTop: "1px solid rgba(212, 175, 55, 0.3)",
+                textAlign: "center",
+                color: "rgba(255, 255, 255, 0.6)",
+                fontSize: "11px",
+              }}
+            >
+              You're riding! Use your beast chat.
+            </div>
+          ) : isSignedIn ? (
             <div
               style={{
                 padding: "10px",

@@ -759,7 +759,7 @@ useEffect(() => {
       </div>
       
       {/* Title - positioned at top left, desktop/tablet only */}
-      {!isMobileView && (
+      {/* {!isMobileView && (
       <h1 className='custom-title'
           id="main-title"
           style={{ 
@@ -807,7 +807,7 @@ useEffect(() => {
           </span>
           <span className="title-line" style={{ display: 'block', marginLeft: isMobileView ? "2rem" : "3rem", position: 'relative' }}>Profit</span>
         </h1>
-      )}
+      )} */}
       
       {/* Only render ShrineLeftPanel on desktop/tablet after we know device type */}
       {mounted && !isMobileView && (
@@ -1151,8 +1151,7 @@ useEffect(() => {
       {/* Tiny Candle Button with Glowing Arrow - Bottom Right - Desktop Only */}
       {!isMobileView && (
         <>
-          {/* Bottom-Right Corner Vignette - layered for smooth blending */}
-          {/* Outer soft layer */}
+   
           <div style={{
             position: "fixed",
             bottom: "-50px",
@@ -1172,7 +1171,7 @@ useEffect(() => {
             filter: "blur(20px)",
           }} />
           
-          {/* Middle layer */}
+
           <div style={{
             position: "fixed",
             bottom: "-20px",
@@ -1192,7 +1191,7 @@ useEffect(() => {
             filter: "blur(8px)",
           }} />
           
-          {/* Inner focused layer */}
+
           <div style={{
             position: "fixed",
             bottom: 0,
@@ -1227,7 +1226,7 @@ useEffect(() => {
               cursor: "pointer",
               transition: "transform 0.3s ease, filter 0.3s ease",
             }}
-            onClick={() => router.push('/trade')}
+            onClick={() => router.push('/ride')}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = "scale(1.15) rotate(-5deg)";
               e.currentTarget.style.filter = "drop-shadow(0 0 20px #ff9500)";
@@ -1238,7 +1237,7 @@ useEffect(() => {
             }}
           >
             <img 
-              src="/images/3ACES_TATTOO.webp"
+              src="/images/tiger.webp"
               alt="Tiny Candle Button"
               style={{
                 width: "100%",
@@ -1248,7 +1247,7 @@ useEffect(() => {
             />
           </div>
           
-          {/* Glowing Arrow with Text */}
+
           <svg
             className="luminarium-arrow"
             style={{
@@ -1262,7 +1261,7 @@ useEffect(() => {
               cursor: "pointer",
             }}
             viewBox="0 0 300 150"
-            onClick={() => router.push('/trade')}
+            onClick={() => router.push('/ride')}
         onMouseEnter={(e) => {
           const text = e.currentTarget.querySelector('text');
           const arrow = e.currentTarget.querySelector('#arrowPath');
@@ -1298,7 +1297,7 @@ useEffect(() => {
           }
         }}
       >
-        {/* Define gradients and filters */}
+
         <defs>
           <linearGradient id="arrowGradient" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
@@ -1323,7 +1322,7 @@ useEffect(() => {
           </filter>
         </defs>
         
-        {/* Curved arrow path */}
+  
         <path
           id="arrowPath"
           d="M 20 100 Q 100 40, 200 60"
@@ -1342,7 +1341,7 @@ useEffect(() => {
           />
         </path>
         
-        {/* Invisible path for text (offset above the arrow) */}
+
         <path
           id="textPath"
           d="M 20 85 Q 100 25, 200 45"
@@ -1350,7 +1349,7 @@ useEffect(() => {
           stroke="none"
         />
         
-        {/* Arrow head */}
+
         <path
           className="arrow-head"
           d="M 195 55 L 205 60 L 195 65"
@@ -1377,7 +1376,7 @@ useEffect(() => {
           style={{ transition: "all 0.3s ease" }}
         >
           <textPath href="#textPath" startOffset="5%">
-            Trade School
+            Hi Soci80
           </textPath>
           <animate
             attributeName="fill-opacity"
@@ -1387,7 +1386,7 @@ useEffect(() => {
           />
         </text>
         
-        {/* Floating particles */}
+     
         {[...Array(6)].map((_, i) => (
           <circle
             key={i}

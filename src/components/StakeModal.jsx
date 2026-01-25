@@ -715,9 +715,9 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
             {/* Decorative Image with Title Overlay */}
             <div style={{
               width: '100%',
-              height: '240px',
+              height: '300px',
               marginBottom: '0.75rem',
-              borderRadius: '12px',
+              // borderRadius: '12px',
               overflow: 'hidden',
               position: 'relative',
               background: 'linear-gradient(180deg, rgba(20,20,30,0) 0%, rgba(20,20,30,0.9) 100%)',
@@ -730,7 +730,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                 style={{
                   width: '100%',
                   height: '100%',
-                  objectFit: 'cover',
+                  objectFit: 'fill',
                   opacity: 0.7,
                 }}
               />

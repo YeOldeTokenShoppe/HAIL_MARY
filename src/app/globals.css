@@ -7126,6 +7126,17 @@ body .cl-profileSection__security .cl-profileSectionPrimaryButton {
   top: 3px !important;
 }
 
+.cl-internal-539ehg {
+  text-align: center !important;
+}
+
+/* Force Clerk cardBox to have rounded corners */
+.cl-cardBox,
+[class*="cl-cardBox"] {
+  border-radius: 20px !important;
+  overflow: hidden !important;
+}
+
   /* Make the root box fit mobile screens */
   body .cl-rootBox,
   body .cl-cardBox {

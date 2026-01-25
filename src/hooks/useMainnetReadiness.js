@@ -92,7 +92,10 @@ export const useMainnetReadiness = () => {
 
             snapshot.forEach(doc => {
               const trade = { id: doc.id, source: 'general', ...doc.data() };
-              trades.push(trade);
+              // Skip deleted trades
+              if (!trade.deleted) {
+                trades.push(trade);
+              }
             });
 
             processAllTrades();
@@ -125,9 +128,10 @@ export const useMainnetReadiness = () => {
 
             snapshot.forEach(doc => {
               const execution = doc.data();
-              if (execution.success && execution.result) {
-                const trade = { 
-                  id: doc.id, 
+              // Skip deleted and include only successful trades
+              if (!execution.deleted && execution.success && execution.result) {
+                const trade = {
+                  id: doc.id,
                   source: 'rl80',
                   timestamp: execution.timestamp || doc.data().timestamp,
                   result: execution.result,

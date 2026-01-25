@@ -122,14 +122,60 @@ const ShrineLeftPanel = forwardRef(({
         pointerEvents: 'none',
         zIndex: 3,
       }} />
-   
+   <h1 className='custom-title'
+          id="main-title"
+          style={{ 
+            position: 'fixed',
+            left:  '40px',
+            top:  '40px',
+            pointerEvents: 'auto',
+            color: is80sMode ? "#ffffff" : "#d4af37",
+            fontFamily: 'UnifrakturCook, serif',
+            textShadow: is80sMode 
+              ? `
+                0 0 20px rgba(201, 55, 255, 0.9),
+                0 0 40px rgba(201, 55, 255, 0.8),
+                0 0 60px rgba(201, 55, 255, 0.7),
+                4px 4px 12px rgba(201, 55, 255, 1),
+                -2px -2px 8px rgba(255, 0, 255, 0.8),
+                0 0 100px rgba(201, 55, 255, 0.5)
+              `
+              : `
+                rgba(83, 61, 74, 0.9) 1px 1px,
+                rgba(83, 61, 74, 0.9) 2px 2px,
+                rgba(83, 61, 74, 0.8) 3px 3px,
+                rgba(83, 61, 74, 0.8) 4px 4px,
+                rgba(83, 61, 74, 0.7) 5px 5px,
+                rgba(83, 61, 74, 0.7) 6px 6px,
+                rgba(83, 61, 74, 0.6) 7px 7px,
+                rgba(83, 61, 74, 0.6) 8px 8px,
+                rgba(255, 192, 203, 0.4) -1px -1px 5px,
+                rgba(0, 0, 0, 0.8) 10px 10px 15px
+              `,
+            fontSize: "3rem",
+            fontWeight: 900,
+            lineHeight: 0.75,
+            transform: "rotate(-8deg) skew(-15deg)",
+            cursor: 'pointer',
+            margin: 0,
+            zIndex: 100,
+          }}
+          onClick={() => router?.push('/about')}
+        >
+          <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
+          <span className="title-line" style={{ display: 'block', position: 'relative' }}>
+            <span style={{ fontSize: "1.6rem" }}>of    </span>
+            Perpetual
+          </span>
+          <span className="title-line" style={{ display: 'block', marginLeft: "3rem", position: 'relative' }}>Profit</span>
+        </h1>
      
 
       {/* Main content container - centered elements */}
       <div style={{
         position: 'fixed',
         left: '40px',
-        top: '55%',
+        top: '60%',
         transform: 'translateY(-50%)',  // Center vertically
         display: 'flex',
         flexDirection: 'column',

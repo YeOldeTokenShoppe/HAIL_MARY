@@ -1,4 +1,5 @@
 import { type Character } from '@elizaos/core';
+import { simulatedTradingPlugin } from './simulated-trading-plugin';
 
 /**
  * RL80 - Our Lady of Perpetual Profit
@@ -31,6 +32,9 @@ export const character: Character = {
 
     // Bootstrap plugin
     ...(!process.env.IGNORE_BOOTSTRAP ? ['@elizaos/plugin-bootstrap'] : []),
+
+    // Paper trading simulation (uses CoinGecko prices, no real execution)
+    simulatedTradingPlugin,
   ],
   settings: {
     secrets: {},

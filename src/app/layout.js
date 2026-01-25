@@ -82,12 +82,12 @@ export default function RootLayout({ children }) {
                   backgroundImage: 'linear-gradient(rgba(20, 20, 30, 0.98), rgba(20, 20, 30, 0.98)), linear-gradient(90deg, #00f5d4, #00bbff)',
                   backgroundOrigin: 'border-box',
                   backgroundClip: 'padding-box, border-box',
-                  borderRadius: '20px',
+                  borderRadius: '20px !important',
                   padding: '20px',
                   width: '400px !important',
                   maxWidth: '90vw',
                   maxHeight: '85vh !important',
-                  overflow: 'auto !important',
+                  overflow: 'hidden !important',
                   position: 'relative'
                 },
                 rootBox: {
@@ -120,7 +120,7 @@ export default function RootLayout({ children }) {
                   fontSize: '11px !important',
                   letterSpacing: '0.5px',
                   marginBottom: '12px !important',
-                  textAlign: 'left'
+                  textAlign: 'center'
                 },
                 // Close button - cyan X
                 modalCloseButton: {
@@ -171,6 +171,12 @@ export default function RootLayout({ children }) {
                     textShadow: '0 0 10px rgba(0, 187, 255, 0.8)'
                   }
                 },
+                // Social buttons container - give room for "Last used" badge
+                socialButtonsRoot: {
+                  paddingTop: '12px !important',
+                  paddingRight: '12px !important',
+                  overflow: 'visible !important'
+                },
                 socialButtonsBlockButton: {
                   backgroundColor: 'rgba(0, 0, 0, 0.6) !important',
                   border: '1px solid rgba(0, 245, 212, 0.3) !important',
@@ -180,6 +186,9 @@ export default function RootLayout({ children }) {
                   boxShadow: 'none !important',
                   borderRadius: '12px !important',
                   transition: 'all 0.2s ease',
+                  position: 'relative !important',
+                  overflow: 'visible !important',
+                  marginTop: '4px !important',
                   '&:hover': {
                     backgroundColor: 'rgba(0, 245, 212, 0.1) !important',
                     borderColor: 'rgba(0, 245, 212, 0.5) !important',
@@ -276,7 +285,8 @@ export default function RootLayout({ children }) {
                   color: '#ffffff !important'
                 },
                 formHeaderSubtitle: {
-                  color: '#FFD700 !important'
+                  color: '#FFD700 !important',
+                  textAlign: 'center'
                 },
                 // User button and profile modal styles
                 userButtonBox: {
@@ -364,12 +374,13 @@ export default function RootLayout({ children }) {
                   background: 'linear-gradient(135deg, #ff69b4, #ff1493) !important',
                   color: '#ffffff !important',
                   borderRadius: '6px !important',
-                  padding: '4px 10px !important',
-                  fontSize: '10px !important',
+                  padding: '4px 8px !important',
+                  fontSize: '9px !important',
                   fontWeight: '700 !important',
                   textTransform: 'uppercase !important',
-                  letterSpacing: '1px !important',
-                  boxShadow: '0 0 15px rgba(255, 105, 180, 0.5) !important'
+                  letterSpacing: '0.5px !important',
+                  boxShadow: '0 0 15px rgba(255, 105, 180, 0.5) !important',
+                  marginRight: '4px !important'
                 },
                 // Special Illumin80 member styling
                 userButtonAvatarBox: {
@@ -502,6 +513,14 @@ export default function RootLayout({ children }) {
                   left: 'auto !important',
                   right: 'auto !important',
                   transform: 'none !important',
+                  overflow: 'hidden !important',
+                  borderRadius: '20px !important'
+                },
+                // Footer container
+                footerRoot: {
+                  backgroundColor: 'rgba(15, 15, 25, 0.95) !important',
+                  borderBottomLeftRadius: '20px !important',
+                  borderBottomRightRadius: '20px !important',
                   overflow: 'hidden !important'
                 },
                 // More compact navbar
@@ -586,14 +605,30 @@ export default function RootLayout({ children }) {
                     boxShadow: '0 10px 30px rgba(0, 245, 212, 0.3) !important'
                   }
                 },
-                // Reduce footer padding
+                // Footer styling - match card's rounded corners
                 footer: {
-                  padding: '8px !important',
-                  marginTop: '8px !important',
+                  padding: '16px 20px !important',
+                  marginTop: '12px !important',
+                  backgroundColor: 'rgba(15, 15, 25, 0.9) !important',
+                  borderBottomLeftRadius: '18px !important',
+                  borderBottomRightRadius: '18px !important',
+                  marginLeft: '-20px !important',
+                  marginRight: '-20px !important',
+                  marginBottom: '-20px !important',
+                  width: 'calc(100% + 40px) !important',
+                  borderTop: '1px solid rgba(0, 245, 212, 0.2) !important',
                   '& a': {
                     color: '#FFD700',
-                    fontSize: '10px !important'
+                    fontSize: '11px !important'
                   }
+                },
+                footerActionText: {
+                  color: 'rgba(255, 255, 255, 0.7) !important',
+                  fontSize: '11px !important'
+                },
+                footerActionLink: {
+                  color: '#00f5d4 !important',
+                  fontWeight: '600 !important'
                 },
                 // Additional overrides for any remaining pink elements
                 formFieldAction: {

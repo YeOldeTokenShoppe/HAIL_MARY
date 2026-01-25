@@ -592,7 +592,7 @@ export default function CyborgTemple() {
               paddingBottom: isMobileView ? "0.75rem" : "1rem",
               borderBottom: "1px solid rgba(255, 255, 255, 0.2)",
             }}>
-              Multi-agent AI trading
+              Multi-agent AI trading system <br/>V1.0 (Paper Trading)
             </p>
 
             <p style={{
@@ -616,7 +616,7 @@ export default function CyborgTemple() {
                 marginBottom: "1rem",
               }}>
                 The Virtual Mary, more 'trade life' than trad wife, is learning to trade perpetuals with her team of investment specialists.
-                Click on any of the traders to see their trading cards. Click on 📊 or 💬 buttons to follow along, or 🎲 to place bets on the Trading Agents, and 📜 for system documentation. The trading system will be continuously improved.
+                Click on any of the traders to see their trading cards. Click on 📊 or 💬 buttons to follow along, or 📜 for system documentation. The trading system will be continuously improved.
               </p>
             )}
 
@@ -791,7 +791,7 @@ export default function CyborgTemple() {
                 color: "rgba(255, 255, 255, 0.7)",
                 fontStyle: "italic",
               }}>
-                Testnet Training Mode
+                Paper Trading Mode
               </span>
             </div>
           )}

@@ -1,7 +1,7 @@
 /**
  * Trading Module - Central Export File
- * 
- * This file provides a clean API for importing all features/trading-related functionality
+ *
+ * This file provides a clean API for importing all trading-related functionality
  * from a single location.
  */
 
@@ -16,7 +16,7 @@ export { callMacroSpecialist, MACRO_SPECIALIST_CONFIG } from './agents/macro-spe
 export { callRL80Trader, RL80_TRADER_CONFIG } from './agents/rl80-trader';
 
 // Agent Configuration
-export { 
+export {
   AGENT_CONFIG,
   isAgentEnabled,
   getMockResponse,
@@ -28,33 +28,15 @@ export {
 } from './agents/configs/agent-config';
 
 // Knowledge Base
-export { default as tradingKnowledge } from './agents/configs/knowledge/features/trading-knowledge.json';
-
-// ============================================================================
-// LIGHTER TRADING
-// ============================================================================
-
-// Clients
-export { LighterClient } from './lighter/clients/client';
-export { SimpleClient } from './lighter/clients/simple-client';
-export { AuthenticatedClient } from './lighter/clients/authenticated-client';
-
-// Lighter Agents
-export { AIAgent } from './lighter/agents/ai-agent';
-export { AIAgentLLM } from './lighter/agents/ai-agent-llm';
-
-// Lighter Trading
-export {trading } from './lighter/features/trading';
-export { setupApiKey } from './lighter/setup-api-key';
-export { websocket } from './lighter/websocket';
+export { default as tradingKnowledge } from './agents/configs/knowledge/trading-knowledge.json';
 
 // ============================================================================
 // SERVICES
 // ============================================================================
 
-export { tradingBotService } from './services/features/tradingBotService';
-export { lighterConnectionManager } from './services/lighterConnectionManager';
+export { tradingBotService } from './services/tradingBotService';
 export { calculateRiskAppetite } from './services/risk-appetite-calculator';
+export { paperTradingService } from './services/paperTradingService';
 
 // ============================================================================
 // HOOKS
@@ -83,12 +65,8 @@ export { MarketEmojis } from './components/MarketEmojis';
 // API HANDLERS
 // ============================================================================
 
-// Note: API route handlers are typically not imported directly,
-// but we export them here for reference and potential server-side use
-
 export { default as aiChatHandler } from './api/agents/ai-chat';
 export { default as agentStatusHandler } from './api/agents/agent-status';
 export { default as fearGreedHandler } from './api/fear-greed';
 export { default as marketDataHandler } from './api/market-data';
 export { default as marketAdvisorHandler } from './api/market-advisor';
-export { default as lighterDataHandler } from './api/lighter-data';

@@ -1,17 +1,23 @@
 // Firebase configuration for server-side usage (API routes)
 import { initializeApp, getApps } from "firebase/app";
-import { 
-  getFirestore, 
-  collection, 
+import {
+  getFirestore,
+  collection,
   query,
+  where,
   orderBy,
   limit,
   getDocs,
+  getDoc,
   doc,
   setDoc,
   addDoc,
+  updateDoc,
+  deleteDoc,
   serverTimestamp,
-  writeBatch
+  writeBatch,
+  increment,
+  Timestamp
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -48,4 +54,22 @@ try {
   db = null;
 }
 
-export { db, collection, query, orderBy, limit, getDocs, doc, setDoc, addDoc, serverTimestamp, writeBatch };
+export {
+  db,
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  getDocs,
+  getDoc,
+  doc,
+  setDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  serverTimestamp,
+  writeBatch,
+  increment,
+  Timestamp
+};
