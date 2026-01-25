@@ -613,8 +613,8 @@ class LighterStandaloneService {
       const client = new SignerClient(
         this.lighterConfig.baseUrl,
         apiKeyPrivateKey,
-        parseInt(this.lighterConfig.apiKeyIndex) || 0,
-        parseInt(this.lighterConfig.accountIndex) || 0
+        apiKeyIdx,
+        accountIdx
       );
 
       // Order parameters for zklighter-sdk
@@ -627,8 +627,6 @@ class LighterStandaloneService {
       const reduceOnly = false;
 
       // Fetch the next nonce from Lighter API (required for valid signatures)
-      const apiKeyIdx = parseInt(this.lighterConfig.apiKeyIndex) || 0;
-      const accountIdx = parseInt(this.lighterConfig.accountIndex) || 0;
       let nonce;
       try {
         const nonceResponse = await axios.get(
@@ -650,7 +648,7 @@ class LighterStandaloneService {
         isAsk,
         reduceOnly,
         nonce,
-        apiKeyIndex: parseInt(this.lighterConfig.apiKeyIndex) || 0
+        apiKeyIndex: apiKeyIdx
       }));
 
       // Create market order using SDK
@@ -663,7 +661,7 @@ class LighterStandaloneService {
         isAsk,
         reduceOnly,
         nonce,
-        parseInt(this.lighterConfig.apiKeyIndex) || 0
+        apiKeyIdx
       );
 
       if (err) {
