@@ -569,18 +569,17 @@ class LighterStandaloneService {
       // Create auth token
       const auth = await this.createLighterAuthToken();
 
-      // Build order payload
+      // Build order payload - format matches lighter-python SDK
+      // See: https://github.com/elliottech/lighter-python/blob/main/examples/create_market_order_eth_buy.py
       const orderPayload = {
-        market: this.getMarketIndex(symbol),
-        side: side === 'buy' ? 0 : 1,  // 0 = buy, 1 = sell
-        order_type: 1,  // Market order
-        base_amount: Math.floor(tokenAmount * 1e8),  // Convert to base units
-        price: 0,  // Market order doesn't need price
-        client_order_index: Date.now(),
-        time_in_force: 0,  // Immediate or cancel
-        account_index: this.lighterConfig.accountIndex,
-        api_key_index: this.lighterConfig.apiKeyIndex
+        market_index: this.getMarketIndex(symbol),  // 0=ETH perp, 1=BTC perp, etc
+        client_order_index: Date.now() % 1000000,   // Sequence number
+        base_amount: Math.floor(tokenAmount * 10000),  // 10000 = 1 token (1000 = 0.1)
+        avg_execution_price: Math.floor(marketData.price * 100),  // Price * 100 ($3000 = 300000)
+        is_ask: side === 'sell',  // false = buy, true = sell
       };
+
+      console.log('📦 Order payload:', JSON.stringify(orderPayload));
 
       // Sign the order
       const walletKey = this.lighterConfig.walletPrivateKey.startsWith('0x')
@@ -639,12 +638,15 @@ class LighterStandaloneService {
 
   // Get market index for Lighter API
   getMarketIndex(symbol) {
+    // Lighter perpetual market indices (from lighter-python SDK)
+    // ETH perp = 0, BTC perp = 1 (verify these with Lighter docs)
     const markets = {
-      'BTC': 0,
-      'ETH': 1,
-      'SOL': 2
+      'ETH': 0,   // ETH perpetual
+      'BTC': 1,   // BTC perpetual
+      'SOL': 2,   // SOL perpetual (if available)
+      'XRP': 3    // XRP perpetual (if available)
     };
-    return markets[symbol] ?? 1;  // Default to ETH
+    return markets[symbol] ?? 0;  // Default to ETH perp
   }
 
   // Get current market price
