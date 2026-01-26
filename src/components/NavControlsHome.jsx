@@ -22,6 +22,7 @@ export default function NavControlsHome({
   const [emoji, setEmoji] = useState("😇");
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [showMenuHint, setShowMenuHint] = useState(false);
   const pathname = usePathname(); // Get current path
   const { user: clerkUser } = useUser();
   
@@ -45,6 +46,26 @@ export default function NavControlsHome({
     }, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  // First-visit pulse hint for the hamburger menu
+  useEffect(() => {
+    // TODO: restore localStorage gate after testing
+    // try {
+    //   const seen = localStorage.getItem('hasSeenMenuHint');
+    //   if (!seen) {
+    const timer = setTimeout(() => setShowMenuHint(true), 2000);
+    return () => clearTimeout(timer);
+    //   }
+    // } catch {}
+  }, []);
+
+  // Dismiss hint when menu is opened
+  useEffect(() => {
+    if (isMenuOpen && showMenuHint) {
+      setShowMenuHint(false);
+      try { localStorage.setItem('hasSeenMenuHint', '1'); } catch {}
+    }
+  }, [isMenuOpen, showMenuHint]);
 
   const handlePlayClick = () => {
     if (onPlayMusic) {
@@ -559,6 +580,34 @@ export default function NavControlsHome({
             animation: neonFlicker 2s infinite;
           }
         ` : ''}
+
+        @keyframes menuHintPulse {
+          0% {
+            transform: scale(1);
+            opacity: 0.8;
+          }
+          70% {
+            transform: scale(1.9);
+            opacity: 0;
+          }
+          100% {
+            transform: scale(1.9);
+            opacity: 0;
+          }
+        }
+
+        .menu-hint-ring {
+          position: absolute;
+          inset: -2px;
+          border-radius: 10px;
+          border: 3px solid ${is80sMode ? 'rgba(255, 0, 255, 0.9)' : 'rgba(212, 175, 55, 0.9)'};
+          box-shadow: ${is80sMode
+            ? '0 0 14px rgba(255, 0, 255, 0.7), inset 0 0 14px rgba(255, 0, 255, 0.3)'
+            : '0 0 14px rgba(212, 175, 55, 0.7), inset 0 0 14px rgba(212, 175, 55, 0.3)'};
+          animation: menuHintPulse 1.2s ease-out infinite;
+          pointer-events: none;
+          z-index: 1;
+        }
       `}</style>
 
       <div className={`nav-mobile-home ${is80sMode ? 'mode-80s' : ''}`}>
@@ -660,10 +709,13 @@ export default function NavControlsHome({
         </div>
 
         {/* Menu */}
-        <button 
+        <button
           className={`menu-button-mobile ${isMenuOpen ? 'open' : ''}`}
           onClick={handleMenuClick}
         >
+          {showMenuHint && (
+            <span className="menu-hint-ring" />
+          )}
           <span className="menu-line-mobile" />
           <span className="menu-line-mobile" />
           <span className="menu-line-mobile" />

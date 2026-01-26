@@ -2433,7 +2433,7 @@ const PalmsScene = ({ onLoadingChange }) => {
           onClick={skipAnimation}
           style={{
             position: 'fixed',
-            bottom: '30px',
+            bottom: isMobile ? '60px' : '30px',
             right: '30px',
             backgroundColor: 'transparent',
             border: '1px solid rgba(255, 255, 255, 0.5)',
@@ -2459,7 +2459,7 @@ const PalmsScene = ({ onLoadingChange }) => {
             e.target.style.opacity = '0.8';
           }}
         >
-          Skip Intro
+          {isMobile ? 'Skip' : 'Skip Intro'}
         </button>
       )}
       
@@ -2495,10 +2495,10 @@ const PalmsScene = ({ onLoadingChange }) => {
           animation: 'simpleFadeIn 1s ease-in',
         }}>
           {/* Horizontal Roadmap Timeline */}
-          <HorizontalRoadmap
+          {/* <HorizontalRoadmap
             isVisible={true}
             isMobile={isMobile}
-          />
+          /> */}
 
           {/* Action buttons row - Buy + More */}
           <div style={{

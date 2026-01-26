@@ -43,6 +43,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
   const [isCarouselMode, setIsCarouselMode] = useState(true) // Carousel mode is always on
   const [activeSection, setActiveSection] = useState(0)
   const [isAutoPaused, setIsAutoPaused] = useState(false)
+  const [isManuallyPaused, setIsManuallyPaused] = useState(false)
   const autoRotateInterval = useRef(null)
   const touchStartX = useRef(0)
   const touchEndX = useRef(0)
@@ -123,12 +124,19 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
         goToPrevSection() // Swipe right = prev
       }
     }
-    setIsAutoPaused(false)
-  }, [goToNextSection, goToPrevSection])
+    // Only unpause touch-hold if not manually paused
+    if (!isManuallyPaused) {
+      setIsAutoPaused(false)
+    }
+  }, [goToNextSection, goToPrevSection, isManuallyPaused])
+
+  const toggleManualPause = useCallback(() => {
+    setIsManuallyPaused((prev) => !prev)
+  }, [])
 
   // Auto-rotation for carousel mode
   useEffect(() => {
-    if (isCarouselMode && !isAutoPaused && !isFullscreen) {
+    if (isCarouselMode && !isAutoPaused && !isManuallyPaused && !isFullscreen) {
       autoRotateInterval.current = setInterval(() => {
         goToNextSection()
       }, AUTO_ROTATE_DELAY)
@@ -139,7 +147,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
         clearInterval(autoRotateInterval.current)
       }
     }
-  }, [isCarouselMode, isAutoPaused, isFullscreen, goToNextSection])
+  }, [isCarouselMode, isAutoPaused, isManuallyPaused, isFullscreen, goToNextSection])
 
   // Keyboard navigation for carousel
   useEffect(() => {
@@ -318,7 +326,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
 
           .carousel-nav-dots {
             bottom: auto;
-            top: 66%;
+            top: 63%;
             padding: 4px 10px;
             gap: 8px;
             background: rgba(0, 0, 0, 0.3);
@@ -341,7 +349,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           .carousel-progress {
             display: block;
             bottom: auto;
-            top: 68%;
+            top: 69%;
             width: 120px;
           }
 
@@ -476,7 +484,8 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           background: is80sMode ? 'transparent' : 'radial-gradient(ellipse at center, #1a1a2e 0%, #000 100%)',
           zIndex: 2,
         }}>
-          {/* Mobile Carousel Navigation */}
+          {/* Mobile Carousel Navigation - hidden on mobile phones (single section) */}
+          {!isMobilePhone && (
           <>
             {/* Left Arrow */}
             <button
@@ -531,14 +540,53 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               ))}
             </div>
 
-            {/* Progress Bar */}
-            <div className="carousel-progress">
-              <div
-                key={activeSection}
-                className={`carousel-progress-bar ${isAutoPaused ? 'paused' : ''}`}
-              />
+            {/* Progress Bar + Pause Button */}
+            <div style={{
+              position: 'fixed',
+              ...(isTabletPortrait
+                ? { bottom: '70px', top: 'auto' }
+                : { top: '66%' }
+              ),
+              left: '50%',
+              transform: 'translateX(-50%)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              zIndex: 100,
+            }}>
+              <div className="carousel-progress" style={{
+                position: 'static',
+                transform: 'none',
+              }}>
+                <div
+                  key={activeSection}
+                  className={`carousel-progress-bar ${(isAutoPaused || isManuallyPaused) ? 'paused' : ''}`}
+                />
+              </div>
+              <button
+                onClick={toggleManualPause}
+                aria-label={isManuallyPaused ? 'Resume auto-advance' : 'Pause auto-advance'}
+                style={{
+                  background: 'none',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  borderRadius: '50%',
+                  width: '28px',
+                  height: '28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  fontSize: '12px',
+                  padding: 0,
+                  flexShrink: 0,
+                }}
+              >
+                {isManuallyPaused ? '▶' : '❚❚'}
+              </button>
             </div>
           </>
+          )}
 
           {/* Our Lady of Perpetual Profit Logo - Fixed position (Portrait/Tablet view) */}
           {!isMobilePhone && (
@@ -595,7 +643,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             style={{
               display: 'flex',
               flexDirection: 'row',
-              transform: `translateX(-${activeSection * 100}vw)`,
+              transform: isMobilePhone ? 'none' : `translateX(-${activeSection * 100}vw)`,
               transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
               height: '100%',
             }}
@@ -603,7 +651,8 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
           >
-          {/* ===== SECTION 1: OldsCoolTunnel Portal ===== */}
+          {/* ===== SECTION 1: OldsCoolTunnel Portal (hidden on mobile phones) ===== */}
+          {!isMobilePhone && (
           <div style={{
             width: '100vw',
             minWidth: '100vw',
@@ -611,11 +660,11 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: isMobilePhone ? 'flex-start' : 'center',
-            paddingTop: isMobilePhone ? '7rem' : '2rem',
-            paddingBottom: isMobilePhone ? '1rem' : '2rem',
-            paddingLeft: isMobilePhone ? '1rem' : '2rem',
-            paddingRight: isMobilePhone ? '1rem' : '2rem',
+            justifyContent: 'center',
+            paddingTop: '2rem',
+            paddingBottom: '2rem',
+            paddingLeft: '2rem',
+            paddingRight: '2rem',
             position: 'relative',
             flexShrink: 0,
             overflowY: 'auto',
@@ -828,7 +877,8 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               textAlign: 'center',
               padding: '0 1rem',
             }}>
-       {/* Trysail Sail ho Corsair red ensign hulk smartly boom jib rum gangway. */}
+              Take a roller coaster ride through a time gallery and re-live some of Our Lady's most glorious moments,
+              from antiquity to infinity.
             </p>
 
           {/* Buy Button for Mobile - at the bottom of Section 1 */}
@@ -841,6 +891,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           {/* End of scale wrapper */}
 
           </div>
+          )}
           {/* End of Section 1 */}
 
           {/* ===== SECTION 2: HolyGrailPortal ===== */}
@@ -852,7 +903,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: isMobilePhone ? 'flex-start' : 'center',
-            paddingTop: isMobilePhone ? '7rem' : '2rem',
+            paddingTop: isMobilePhone ? '6rem' : '2rem',
             paddingBottom: isMobilePhone ? '1rem' : '2rem',
             paddingLeft: isMobilePhone ? '1rem' : '2rem',
             paddingRight: isMobilePhone ? '1rem' : '2rem',
@@ -910,8 +961,9 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               textAlign: 'center',
               padding: '0 1rem',
             }}>
-All monetary systems are belief systems. This is the founding ethos of RL80 &mdash; a return to first principles: minimize trust, distribute power, and enable access without hierarchy.
-            </p>
+             All monetary systems are belief systems.<br/>
+Cryptocurrency was designed to be a less corruptible, technologically superior form of money—yet, ironically, it has earned a poor reputation, and not without reason.<br/><br/> It doesn’t have to be that way. <br/><br/>RL80 is a return to first principles: minimized trust, constant vigilance, distributed power, universal access.</p>
+    
 
             {/* Tokenomics Navigation - tablet portrait only */}
             {isTabletPortrait && (
@@ -1007,7 +1059,8 @@ All monetary systems are belief systems. This is the founding ethos of RL80 &mda
           </div>
           {/* End of Section 2 */}
 
-          {/* ===== SECTION 3: HolyGrailChalice ===== */}
+          {/* ===== SECTION 3: HolyGrailChalice (hidden on mobile phones) ===== */}
+          {!isMobilePhone && (
           <div style={{
             width: '100vw',
             minWidth: '100vw',
@@ -1015,11 +1068,11 @@ All monetary systems are belief systems. This is the founding ethos of RL80 &mda
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: isMobilePhone ? 'flex-start' : 'center',
-            paddingTop: isMobilePhone ? '7rem' : '2rem',
-            paddingBottom: isMobilePhone ? '1rem' : '2rem',
-            paddingLeft: isMobilePhone ? '1rem' : '2rem',
-            paddingRight: isMobilePhone ? '1rem' : '2rem',
+            justifyContent: 'center',
+            paddingTop: '2rem',
+            paddingBottom: '2rem',
+            paddingLeft: '2rem',
+            paddingRight: '2rem',
             position: 'relative',
             flexShrink: 0,
             overflowY: 'auto',
@@ -1077,7 +1130,9 @@ All monetary systems are belief systems. This is the founding ethos of RL80 &mda
               textAlign: 'center',
               padding: '0 1rem',
             }}>
-                Join <i>The Illumin80</i> &mdash; an investor sect that believes fervently in having no faith, at least in money. Light metaphorical green candles as beacons of hope. Give more, get more &mdash; top 20% unlock extra staking rewards.
+              Experience the new enigma machine. The icon of intercession is now online and on-chain.
+              <br/><br/>
+              Light a virtual green candle and join the Illumin80 — a circle of investors who paradoxically place their faith in having none at all, at least when it comes to money.
             </p>
 
             {/* Illumin80 Navigation - tablet portrait only */}
@@ -1171,6 +1226,7 @@ All monetary systems are belief systems. This is the founding ethos of RL80 &mda
             </div>
             {/* End of scale wrapper */}
           </div>
+          )}
           {/* End of Section 3 */}
 
           </div>
@@ -1248,7 +1304,7 @@ All monetary systems are belief systems. This is the founding ethos of RL80 &mda
                 className="carousel-arrow left"
                 onClick={goToPrevSection}
                 onMouseEnter={() => setIsAutoPaused(true)}
-                onMouseLeave={() => setIsAutoPaused(false)}
+                onMouseLeave={() => !isManuallyPaused && setIsAutoPaused(false)}
               >
                 &#8249;
               </button>
@@ -1258,7 +1314,7 @@ All monetary systems are belief systems. This is the founding ethos of RL80 &mda
                 className="carousel-arrow right"
                 onClick={goToNextSection}
                 onMouseEnter={() => setIsAutoPaused(true)}
-                onMouseLeave={() => setIsAutoPaused(false)}
+                onMouseLeave={() => !isManuallyPaused && setIsAutoPaused(false)}
               >
                 &#8250;
               </button>
@@ -1267,7 +1323,7 @@ All monetary systems are belief systems. This is the founding ethos of RL80 &mda
               <div
                 className="carousel-nav-dots"
                 onMouseEnter={() => setIsAutoPaused(true)}
-                onMouseLeave={() => setIsAutoPaused(false)}
+                onMouseLeave={() => !isManuallyPaused && setIsAutoPaused(false)}
               >
                 {[
                   { index: 0, label: 'Time Portal' },
@@ -1307,13 +1363,17 @@ All monetary systems are belief systems. This is the founding ethos of RL80 &mda
               <div className="carousel-progress">
                 <div
                   key={activeSection}
-                  className={`carousel-progress-bar ${isAutoPaused ? 'paused' : ''}`}
+                  className={`carousel-progress-bar ${(isAutoPaused || isManuallyPaused) ? 'paused' : ''}`}
                 />
               </div>
 
               {/* Pause Hint */}
-              <div className="carousel-pause-hint">
-                {isAutoPaused ? 'Paused' : 'Auto-advancing'}
+              <div
+                className="carousel-pause-hint"
+                onClick={toggleManualPause}
+                style={{ cursor: 'pointer' }}
+              >
+                {(isAutoPaused || isManuallyPaused) ? 'Paused' : 'Auto-advancing'}
               </div>
             </>
           )}
@@ -1379,7 +1439,7 @@ All monetary systems are belief systems. This is the founding ethos of RL80 &mda
               transition: isCarouselMode ? 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
             }}
             onMouseEnter={() => isCarouselMode && setIsAutoPaused(true)}
-            onMouseLeave={() => isCarouselMode && setIsAutoPaused(false)}
+            onMouseLeave={() => isCarouselMode && !isManuallyPaused && setIsAutoPaused(false)}
           >
           {/* Row 1: Portal on Left, Text on Right */}
           <div
@@ -1536,7 +1596,7 @@ All monetary systems are belief systems. This is the founding ethos of RL80 &mda
             alignItems: 'center',
             maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : '550px',
             paddingLeft: isTabletLandscape ? '1rem' : '2rem',
-            paddingTop: '10%',
+            // paddingTop: '10%',
 
           }}>
             {/* Heading for desktop */}
@@ -1574,8 +1634,8 @@ All monetary systems are belief systems. This is the founding ethos of RL80 &mda
               maxWidth: '450px',
               textAlign: 'center'
             }}>
-              Take a roller coaster ride through time and see a collection of Our Lady of Perpetual Profit's most iconic moments,
-              from antiquity to the future.
+              Take a roller coaster ride through a time gallery and re-live some of Our Lady's most glorious moments,
+              from antiquity to infinity.
             </p>
 
             {/* Click instruction */}
@@ -1674,11 +1734,10 @@ All monetary systems are belief systems. This is the founding ethos of RL80 &mda
                 lineHeight: '1.6',
                 marginTop: '2rem',
                 marginBottom: isTablet ? '1.5rem' : '2rem',
-                maxWidth: '450px',
+                maxWidth: '500px',
                 textAlign: 'center'
-              }}>
-All monetary systems are belief systems. Cryptocurrency was designed to be a less corruptible system of money and yet, ironically, it is commonly regarded as exactly the opposite. <br/> But it doesn’t have to be that way. This is the founding ethos of RL80 -- as a return to first principles: minimize trust, maintain vigilance, distribute power, and enable access without hierarchy or bureaucracy.              </p>
-  {/* {!isMobilePhone && ( */}
+              }}>All monetary systems are belief systems.<br/>
+Cryptocurrency was designed to be a less corruptible, technologically superior form of money—yet, ironically, it has earned a poor reputation, and not without reason.<br/><br/> It doesn’t have to be that way. <br/><br/>RL80 is a return to first principles: minimized trust, constant vigilance, distributed power, universal access.</p>
             <div
               className="navigation-group"
               style={{
@@ -1997,7 +2056,9 @@ All monetary systems are belief systems. Cryptocurrency was designed to be a les
                 maxWidth: '450px',
                 textAlign: 'center'
               }}>
-                Join <i>The Illumin80</i> - A generous and self-sacrificing investor sect that paradoxically believes fervently in having no faith at all, at least in the realm of money and finance. Enjoy the symbolism of lighting metaphorical green candles as a means of signaling hope in the midst of market uncertainty, like tiny beacons of light. Give more, get more - top 20% unlock extra staking rewards and perks. 
+              Experience the new enigma machine. The icon of intercession is now online and on-chain.
+              <br/><br/>
+              Light a virtual green candle and join the Illumin80 — a circle of investors who paradoxically place their faith in having none at all, at least when it comes to money.
               </p>
  {/* {!isMobilePhone && ( */}
             <div
