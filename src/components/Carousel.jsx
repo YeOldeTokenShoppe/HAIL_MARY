@@ -38,6 +38,22 @@ import { useAuth } from "@clerk/nextjs"; // Add this line if it's missing
 import EmojiPicker from "emoji-picker-react";
 import "./Carousel.css";
 
+// Scramble text for signed-out users to tease chat content
+const scrambleText = (text) => {
+  if (typeof text !== 'string' || !text) return '';
+  return text.split('').map(char => {
+    if (char === ' ' || char === '!' || char === '?' || char === '.' || char === ',') return char;
+    // Keep emojis intact
+    if (char.charCodeAt(0) > 127) return char;
+    const isUpper = char >= 'A' && char <= 'Z';
+    const isLower = char >= 'a' && char <= 'z';
+    if (isUpper) return String.fromCharCode(65 + Math.floor(Math.random() * 26));
+    if (isLower) return String.fromCharCode(97 + Math.floor(Math.random() * 26));
+    if (char >= '0' && char <= '9') return String.fromCharCode(48 + Math.floor(Math.random() * 10));
+    return char;
+  }).join('');
+};
+
 // Sanitize user input to prevent any injection attempts
 const sanitizeMessage = (input, blockUrls = false) => {
   if (typeof input !== 'string') return '';
@@ -742,6 +758,24 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
     } catch (error) {
       console.error("Failed to send message:", error);
       showPopupMessage("Failed to send the message. Please try again.");
+    }
+  };
+
+  // Clear the current user's displayed message from their beast
+  const clearBeastMessage = async (beastId) => {
+    if (!beastId || !user) return;
+    try {
+      const messageRef = doc(db, "carouselChat", beastId);
+      await deleteDoc(messageRef);
+
+      setMessages((prevMessages) => {
+        const updated = { ...prevMessages };
+        delete updated[beastId];
+        return updated;
+      });
+      setNewMessage("");
+    } catch (error) {
+      console.error("Failed to clear message:", error);
     }
   };
 
@@ -1587,7 +1621,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                       >
                         {rider && (
                           <div className="rider-container">
-                            <p className="rider-name">{rider.username}</p>
+                            <p className="rider-name">{isSignedIn ? rider.username : scrambleText(rider.username)}</p>
                             <img
                               src={sanitizeImageUrl(rider.imageUrl)}
                               alt={rider.username || "Rider"}
@@ -1601,7 +1635,9 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                         <div className="speech-container">
                           <div className="speech">
                             <p>
-                              {beastMessages[beastMessages.length - 1].message}
+                              {isSignedIn
+                                ? beastMessages[beastMessages.length - 1].message
+                                : scrambleText(beastMessages[beastMessages.length - 1].message)}
                             </p>
                           </div>
                         </div>
@@ -1827,7 +1863,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
               Chat Box
             </h1>
 
-            {/* Time remaining */}
+            {/* Time remaining and controls */}
             <div
               style={{
                 display: "flex",
@@ -1844,6 +1880,32 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
               >
                 {newMessage.length}/{MAX_MESSAGE_LENGTH}
               </span>
+              {messages[activeBeastId]?.length > 0 && (
+                <button
+                  onClick={() => clearBeastMessage(activeBeastId)}
+                  title="Clear displayed message"
+                  style={{
+                    fontSize: "10px",
+                    padding: "2px 8px",
+                    borderRadius: "8px",
+                    border: "1px solid rgba(255, 100, 100, 0.4)",
+                    backgroundColor: "rgba(255, 100, 100, 0.1)",
+                    color: "#ff6b6b",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.target.style.backgroundColor = "rgba(255, 100, 100, 0.25)";
+                    e.target.style.borderColor = "rgba(255, 100, 100, 0.6)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.target.style.backgroundColor = "rgba(255, 100, 100, 0.1)";
+                    e.target.style.borderColor = "rgba(255, 100, 100, 0.4)";
+                  }}
+                >
+                  Clear bubble
+                </button>
+              )}
               <span
                 style={{
                   fontSize: "11px",
@@ -2199,7 +2261,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                           fontWeight: "bold",
                         }}
                       >
-                        {msg.username}
+                        {isSignedIn ? msg.username : scrambleText(msg.username)}
                       </span>
                       {isSignedIn && msg.userId !== user?.id && (
                         <button
@@ -2226,12 +2288,13 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                     <p
                       style={{
                         margin: "2px 0 0 0",
-                        color: "white",
+                        color: isSignedIn ? "white" : "rgba(255, 255, 255, 0.5)",
                         fontSize: "12px",
                         wordBreak: "break-word",
+                        fontStyle: isSignedIn ? "normal" : "italic",
                       }}
                     >
-                      {msg.message}
+                      {isSignedIn ? msg.message : scrambleText(msg.message)}
                     </p>
                   </div>
                 </div>

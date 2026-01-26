@@ -337,6 +337,7 @@ export default function CommunionPage() {
           is80sMode={is80sMode}
           onToggle80sMode={() => setIs80sMode(!is80sMode)}
           userImage={user?.imageUrl}
+          show80sButton={false}
         />
       </div>
 

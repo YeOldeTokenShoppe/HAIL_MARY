@@ -59,8 +59,15 @@ function StarfieldStatueScene({
       style={{
         width: '100%',
         height: '100%',
-        background: 'transparent',
+        background: '#000',
         position: 'relative',
+        overflow: 'hidden',
+        borderRadius: '10px',
+        border: '1.5px solid rgba(0, 255, 136, 0.15)',
+        boxShadow:
+          'inset 0 0 30px rgba(0, 0, 0, 0.6), ' +
+          '0 0 20px rgba(0, 255, 136, 0.07), ' +
+          '0 0 60px rgba(0, 0, 0, 0.5)',
 
         // CRT screen curvature
 
@@ -84,6 +91,7 @@ function StarfieldStatueScene({
       transform: 'rotateX(1deg) rotateY(5deg) scaleX(1.2)',
       borderRadius: '8px',
       overflow: 'hidden',
+      background: '#000',
     }}>
       {/* Monitor bezel frame */}
       <div style={{

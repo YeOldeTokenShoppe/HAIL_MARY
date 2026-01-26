@@ -5,7 +5,7 @@ import ScheduledRace from '@/components/ScheduledRace';
 
 // Sample horses
 const RACE_HORSES = [
-  { name: 'Thunder', color: '#ff6b6b', number: 1 },
+  { name: 'Aquinas', color: '#ff6b6b', number: 1 },
   { name: 'Lightning', color: '#4ecdc4', number: 2 },
   { name: 'Shadow', color: '#2c3e50', number: 3 },
   { name: 'Blaze', color: '#f39c12', number: 4 },
@@ -162,7 +162,7 @@ export default function ScheduledRaceDemo() {
           chainId={8453} // Base
           onRequestSeed={handleRequestSeed}
           onRaceComplete={handleRaceComplete}
-          fanfareDuration={3000}
+          fanfareDuration={10000}
           raceLength={600}
           maxRaceTime={8000}
           maxRaceDiff={2500}

@@ -1,32 +1,3 @@
-// Hack to detect device scrollbar width.
-// When a mouse is plugged in, the contents of an element will shift over to accomodate the scrollbar.
-// We will detect this and shift the .panel-content's to the left via padding-right, else the panels and the main content view become out of sync.
-(function () {
-  var div = document.createElement("div");
-  div.style.width = "100px";
-  div.style.height = "100px";
-  div.style.overflow = "scroll";
-  div.style.position = "absolute";
-  div.style.top = "-9999px";
-  document.body.appendChild(div);
-
-  var scrollBarWidth = div.offsetWidth - div.clientWidth;
-
-  document.body.removeChild(div);
-
-  var style = document.createElement("style");
-  document.querySelector("head").appendChild(style);
-
-  var selector = ".panel-content";
-  var rule = `padding-right: ${scrollBarWidth}px`;
-
-  if (style.sheet) {
-    if (style.sheet.insertRule)
-      style.sheet.insertRule(`${selector} {${rule}}`, 0);
-    else style.sheet.addRule(selector, rule);
-  } else if (style.styleSheet) style.styleSheet.addRule(selector, rule);
-})();
-
 // Each articulation panel consists of three DOM elements
 //  - a grandparent for 3d positioning
 //  - a parent for clipping
@@ -62,18 +33,19 @@ function syncPanelContent(
     var b = bottoms[i];
     var tTop = (i + 1) * panelHeight - scrollTop;
     var bTop = -i * panelHeight - scrollTop - containerHeight;
-    t.style.transform = `translate3d(0,${tTop}px,0)`;
-    b.style.transform = `translate3d(0,${bTop}px,0)`;
+    t.style.transform = "translate3d(0," + tTop + "px,0)";
+    b.style.transform = "translate3d(0," + bTop + "px,0)";
   }
 }
 
 function transYrotX(y, x) {
-  return `translate3d(0,${y}px,0) rotateX(${x}rad)`;
+  return "translate3d(0," + y + "px,0) rotateX(" + x + "rad)";
 }
 
 // Create num top and bottom panels based off the innerHTML of el with articulation angle.
 // We nest panels and use `transform-style: preserve-3d` to get the tentacle curl effect.
-// Should probably only use this on relatively simple el's, because we are going to need to create 2 * num deep copies of el and attach them to the DOM. Needless to say, this will scale poorly.
+// Content and panels are both driven by JS transforms so they always update in the same
+// frame — no desync between native compositor scrolling and JS panel updates.
 function createScrollOverlay(el, panelHeight, num, angle) {
   var tops = [];
   var bottoms = [];
@@ -85,12 +57,26 @@ function createScrollOverlay(el, panelHeight, num, angle) {
 
   var totalTheta = 0;
 
+  // Wrap content children in a transform-driven container.
+  // This replaces native scrolling so content and panels always move together.
+  var wrapper = document.createElement("div");
+  wrapper.style.position = "relative";
+  wrapper.style.transformStyle = "flat";
+  wrapper.style.willChange = "transform";
+  while (el.firstChild) wrapper.appendChild(el.firstChild);
+  el.appendChild(wrapper);
+  el.style.overflow = "hidden";
+
+  var scrollPos = 110;
+  var cachedHeight = container.clientHeight;
+  var maxScroll = Math.max(0, wrapper.scrollHeight - cachedHeight);
+
   for (var i = 0; i < num; i++) {
     var topPanel = panel(html);
     var bottomPanel = panel(html);
 
-    topPanel.style.height = `${panelHeight}px`;
-    bottomPanel.style.height = `${panelHeight}px`;
+    topPanel.style.height = panelHeight + "px";
+    bottomPanel.style.height = panelHeight + "px";
     topPanel.style.transformOrigin = "50% 100% 0";
     bottomPanel.style.transformOrigin = "50% 0% 0";
 
@@ -98,9 +84,9 @@ function createScrollOverlay(el, panelHeight, num, angle) {
     var bottomPanelContent = bottomPanel.querySelector(".panel-content");
 
     if (i === 0) {
-      topPanel.style.transform = transYrotX(-panelHeight, 0);
+      topPanel.style.transform = transYrotX(-panelHeight + 0.25, 0);
       bottomPanel.style.top = "100%";
-      bottomPanel.style.transform = transYrotX(0, 0);
+      bottomPanel.style.transform = transYrotX(-0.25, 0);
     } else {
       topPanel.style.transform = transYrotX(-panelHeight + 0.25, angle);
       bottomPanel.style.transform = transYrotX(panelHeight - 0.25, angle);
@@ -125,45 +111,99 @@ function createScrollOverlay(el, panelHeight, num, angle) {
     bottomParent = bottomPanel;
   }
 
-  syncPanelContent(tops, bottoms, 0, container.clientHeight, panelHeight);
+  function sync() {
+    wrapper.style.transform = "translate3d(0," + (-scrollPos) + "px,0)";
+    syncPanelContent(tops, bottoms, scrollPos, cachedHeight, panelHeight);
+  }
 
-  function update() {
-    var scrollTop = el.scrollTop;
-    var containerHeight = container.clientHeight;
+  var ticking = false;
+  function scheduleSync() {
+    if (ticking) return;
+    ticking = true;
     requestAnimationFrame(function () {
-      syncPanelContent(tops, bottoms, scrollTop, containerHeight, panelHeight);
+      sync();
+      ticking = false;
     });
   }
 
-  el.onscroll = update;
-  window.onresize = update;
+  // Wheel events — normalize deltaMode for mouse wheels vs trackpads
+  el.addEventListener("wheel", function (e) {
+    var delta = e.deltaY;
+    if (e.deltaMode === 1) delta *= 20;
+    else if (e.deltaMode === 2) delta *= cachedHeight;
+    scrollPos = Math.max(0, Math.min(maxScroll, scrollPos + delta));
+    scheduleSync();
+  }, { passive: true });
 
-  // setInterval(function() {el.scrollTop++}, 32)
+  // Touch events with momentum
+  var touchStartY = 0;
+  var velocity = 0;
+  var momentumId = null;
+
+  el.addEventListener("touchstart", function (e) {
+    touchStartY = e.touches[0].clientY;
+    velocity = 0;
+    if (momentumId) {
+      cancelAnimationFrame(momentumId);
+      momentumId = null;
+    }
+  }, { passive: true });
+
+  el.addEventListener("touchmove", function (e) {
+    var y = e.touches[0].clientY;
+    var delta = touchStartY - y;
+    touchStartY = y;
+    velocity = delta;
+    scrollPos = Math.max(0, Math.min(maxScroll, scrollPos + delta));
+    scheduleSync();
+  }, { passive: true });
+
+  el.addEventListener("touchend", function () {
+    function momentum() {
+      velocity *= 0.95;
+      if (Math.abs(velocity) < 0.5) {
+        momentumId = null;
+        return;
+      }
+      scrollPos = Math.max(0, Math.min(maxScroll, scrollPos + velocity));
+      sync();
+      momentumId = requestAnimationFrame(momentum);
+    }
+    momentumId = requestAnimationFrame(momentum);
+  }, { passive: true });
+
+  window.addEventListener("resize", function () {
+    cachedHeight = container.clientHeight;
+    maxScroll = Math.max(0, wrapper.scrollHeight - cachedHeight);
+    scheduleSync();
+  });
+
+  // Initial sync — content and panels start at the same position, together
+  sync();
 }
 
 var theta = 0.3;
 var num = 20;
-if (/iPhone|Android/.test(navigator.userAgent)) {
-  theta = 0.45;
-  num = 10;
-}
 
 var $ = document.querySelector.bind(document);
 
-// Get device type from URL parameter
-function getDeviceFromURL() {
-  var urlParams = new URLSearchParams(window.location.search);
-  return urlParams.get('device') || 'unknown';
-}
-
-// Apply device-specific class to container
-var deviceType = getDeviceFromURL();
 var container = $("#container");
-if (container && deviceType) {
-  container.className += ' device-' + deviceType;
+var isFlat = new URLSearchParams(window.location.search).get("flat") === "true";
+
+if (isFlat) {
+  container.style.transform = "translate(-50%, -50%)";
+  container.style.perspective = "none";
+  container.style.webkitPerspective = "none";
+  container.style.width = "92%";
+  container.style.height = "90%";
+  container.style.maxHeight = "none";
+  container.style.top = "50%";
+  var el = $("#content");
+  el.style.overflowY = "auto";
+  el.style.webkitOverflowScrolling = "touch";
+} else {
+  if (/iPhone|Android/.test(navigator.userAgent)) {
+    container.style.width = "clamp(70%, 65vmin, 90%)";
+  }
+  createScrollOverlay($("#content"), 20, num, theta);
 }
-
-createScrollOverlay($("#content"), 20, num, theta);
-
-var el = $("#content");
-el.scrollTop = 110; // initial scroll position

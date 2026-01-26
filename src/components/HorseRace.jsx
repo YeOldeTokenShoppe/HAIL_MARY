@@ -151,6 +151,9 @@ const HorseRace = forwardRef(({
 
     finishOrderRef.current.push(result);
 
+    // Update results after each finish (enables incremental medal throw animations)
+    setRaceResults([...finishOrderRef.current]);
+
     if (onHorseFinish) {
       onHorseFinish(result);
     }
@@ -158,8 +161,6 @@ const HorseRace = forwardRef(({
     // Check if race is complete
     if (finishOrderRef.current.length === horsesRef.current.length) {
       setIsRacing(false);
-      setRaceResults([...finishOrderRef.current]);
-
       if (onRaceComplete) {
         onRaceComplete([...finishOrderRef.current]);
       }
@@ -279,62 +280,55 @@ const HorseRace = forwardRef(({
           filter="url(#hr-mud)"
         />
 
-        {/* Finish Line */}
-        <g className="finish-line">
-          <path d={`M${finishLinePos} -10v${viewBoxHeight}`} stroke="rgb(72,44,22)" strokeWidth="12" />
-          <path d={`M${finishLinePos} -2.5v${(horses.length * 20) + 5}`} stroke="#000" strokeDasharray="5" strokeWidth="10" />
-          <path d={`M${finishLinePos} -2.5v${(horses.length * 20) + 5}`} stroke="#fff" strokeDasharray="5" strokeDashoffset="5" strokeWidth="10" />
-        </g>
-
-        {/* Medals */}
+        {/* Medals - always rendered, thrown into position as horses finish */}
         {showMedals && (
-          <g className="medals" transform={`translate(${raceLength - 95} 0)`}>
-            {raceResults.slice(0, 3).map((result, idx) => {
-              const colors = ['gold', 'silver', 'rgb(185, 107, 30)'];
-              const labels = ['1st', '2nd', '3rd'];
+          <g transform={`translate(${raceLength - 95} 0)`}>
+            {[
+              { color: 'gold', label: '1st', shineTextFill: 'rgba(255,230,15,0.1)' },
+              { color: 'silver', label: '2nd', shineTextFill: '#000', shineTextOpacity: '0.1' },
+              { color: 'rgb(185,107,30)', label: '3rd', shineTextFill: '#000', shineTextOpacity: '0.1' },
+            ].map((medal, idx) => {
+              const result = raceResults[idx];
+              const medalTransform = result
+                ? `scale(0.2 0.2) translate(0 ${100 * result.lane - 24})`
+                : `scale(0.2 0.2) translate(${1170 + raceLength} -200)`;
               return (
-                <g
-                  key={idx}
-                  transform={`scale(0.2 0.2) translate(0 ${100 * result.lane - 24})`}
-                  style={{ transition: 'transform 500ms' }}
-                >
-                  <circle clipPath="url(#hr-medalMask)" cx="50" cy="50" r="35" fill={colors[idx]} filter="brightness(90%)" />
-                  <path clipPath="url(#hr-medalMask)" d="M 0 0 V 100 L 100 0 Z" fill={colors[idx]} filter="brightness(120%)" />
-                  <circle cx="50" cy="50" r="30" fill={colors[idx]} />
-                  <text x="50" y="50" dominantBaseline="middle" textAnchor="middle" fill={colors[idx]} filter="brightness(80%)" fontFamily="Arial, Helvetica, sans-serif" fontSize="25">{labels[idx]}</text>
+                <g key={`medal-${idx}`} transform={medalTransform} style={{ transition: '500ms' }}>
+                  <circle clipPath="url(#hr-medalMask)" cx="50" cy="50" r="35" fill={medal.color} filter="brightness(90%)" />
+                  <path clipPath="url(#hr-medalMask)" d="M -10 90 L 0 100 L 100 0 L 90 -10" fill="#fff">
+                    <animate
+                      attributeName="d"
+                      values="M -10 90 L 0 100 L 100 0 L 90 -10; M 50 150 L 60 160 L 160 60 L 150 50; M 50 150 L 60 160 L 160 60 L 150 50"
+                      keyTimes="0; 0.167; 1"
+                      dur="6s"
+                      repeatCount="indefinite"
+                    />
+                  </path>
+                  <path clipPath="url(#hr-medalMask)" d="M 0 0 V 100 L 100 0 Z" fill={medal.color} filter="brightness(120%)" />
+                  <circle cx="50" cy="50" r="30" fill={medal.color} />
+                  <text x="50" y="50" dominantBaseline="middle" textAnchor="middle" fill={medal.color} filter="brightness(80%)" fontFamily="Arial, Helvetica, sans-serif" fontSize="25">{medal.label}</text>
+                  <path clipPath="url(#hr-medalMask)" d="M 40 140 L 50 150 L 150 50 L 140 40" fill="#fff">
+                    <animate
+                      attributeName="d"
+                      values="M 40 140 L 50 150 L 150 50 L 140 40; M -60 40 L -50 50 L 50 -50 L 40 -60; M -60 40 L -50 50 L 50 -50 L 40 -60"
+                      keyTimes="0; 0.167; 1"
+                      dur="6s"
+                      begin="0.5s"
+                      repeatCount="indefinite"
+                    />
+                  </path>
+                  <text x="50" y="50" dominantBaseline="middle" textAnchor="middle" fill={medal.shineTextFill} opacity={medal.shineTextOpacity} fontFamily="Arial, Helvetica, sans-serif" fontSize="25">{medal.label}</text>
                 </g>
               );
             })}
           </g>
         )}
 
-        {/* Starting Building */}
-        <g className="start-building">
-          <path d={`M -10 -2 h 50 v ${buildingH} h-50`} fill="url(#hr-grad)" stroke="#000" strokeWidth="0.5"/>
-          <path d={`M -10 -2 l 25 ${buildingH/8} v ${buildingH - (buildingH/3)} l-25 ${buildingH/5} M 40 -2 l-25 ${buildingH/8}v ${buildingH - (buildingH/3)} l25 ${buildingH/5}`} fill="none" stroke="rgba(0,0,0,0.3)" strokeWidth="0.5" />
-        </g>
-
-        {/* Gates */}
-        <g className="gates">
-          {horses.map((horse, i) => (
-            <path
-              key={`gate-${i}`}
-              d={`M40 ${i * 20}v20`}
-              stroke="#fff"
-              strokeWidth="1"
-            >
-              <animateTransform
-                className="gate-anim"
-                attributeName="transform"
-                attributeType="XML"
-                type="rotate"
-                values={`0 40 ${(i * 20) + 20}; 90 40 ${(i * 20) + 20}`}
-                dur="200ms"
-                begin="indefinite"
-                fill="freeze"
-              />
-            </path>
-          ))}
+        {/* Finish Line */}
+        <g className="finish-line">
+          <path d={`M${finishLinePos} -10v${viewBoxHeight}`} stroke="rgb(72,44,22)" strokeWidth="12" />
+          <path d={`M${finishLinePos} -2.5v${(horses.length * 20) + 5}`} stroke="#000" strokeDasharray="5" strokeWidth="10" />
+          <path d={`M${finishLinePos} -2.5v${(horses.length * 20) + 5}`} stroke="#fff" strokeDasharray="5" strokeDashoffset="5" strokeWidth="10" />
         </g>
 
         {/* Horses/Racers - only render when race has started */}
@@ -466,6 +460,35 @@ const HorseRace = forwardRef(({
               </g>
             );
           })}
+        </g>
+
+        {/* Starting Blocks - rendered after horses so the building covers them */}
+        <g className="starting-blocks">
+          <g className="start-building">
+            <path d={`M -10 -2 h 50 v ${buildingH} h-50`} fill="url(#hr-grad)" stroke="#000" strokeWidth="0.5"/>
+            <path d={`M -10 -2 l 25 ${buildingH/8} v ${buildingH - (buildingH/3)} l-25 ${buildingH/5} M 40 -2 l-25 ${buildingH/8}v ${buildingH - (buildingH/3)} l25 ${buildingH/5}`} fill="none" stroke="rgba(0,0,0,0.3)" strokeWidth="0.5" />
+          </g>
+          <g className="gates">
+            {horses.map((horse, i) => (
+              <path
+                key={`gate-${i}`}
+                d={`M40 ${i * 20}v20`}
+                stroke="#fff"
+                strokeWidth="1"
+              >
+                <animateTransform
+                  className="gate-anim"
+                  attributeName="transform"
+                  attributeType="XML"
+                  type="rotate"
+                  values={`0 40 ${(i * 20) + 20}; 90 40 ${(i * 20) + 20}`}
+                  dur="200ms"
+                  begin="indefinite"
+                  fill="freeze"
+                />
+              </path>
+            ))}
+          </g>
         </g>
       </svg>
 

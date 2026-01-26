@@ -16,7 +16,8 @@ export default function NavControlsHome({
   isMenuOpen = false,
   is80sMode = false,
   onToggle80sMode,
-  userImage = null
+  userImage = null,
+  show80sButton = true
 }) {
   const [emoji, setEmoji] = useState("😇");
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
@@ -562,19 +563,21 @@ export default function NavControlsHome({
 
       <div className={`nav-mobile-home ${is80sMode ? 'mode-80s' : ''}`}>
         {/* 80s Mode Button */}
-        <button 
-          className="eighties-btn-mobile"
-          onClick={onToggle80sMode}
-          title={is80sMode ? "Disable 80s Mode" : "Enable 80s Mode"}
-        >
-          <span className="eighties-btn-emoji">{is80sMode ? '🎸' : ''}</span>
-          <span className="eighties-btn-text">
-            80s
-          </span>
-          <span className="eighties-btn-text-small">
-            MODE
-          </span>
-        </button>
+        {show80sButton && (
+          <button
+            className="eighties-btn-mobile"
+            onClick={onToggle80sMode}
+            title={is80sMode ? "Disable 80s Mode" : "Enable 80s Mode"}
+          >
+            <span className="eighties-btn-emoji">{is80sMode ? '🎸' : ''}</span>
+            <span className="eighties-btn-text">
+              80s
+            </span>
+            <span className="eighties-btn-text-small">
+              MODE
+            </span>
+          </button>
+        )}
 
         {/* Music - Splits when active */}
         <div className="music-stack-mobile">

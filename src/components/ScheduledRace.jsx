@@ -134,6 +134,10 @@ const ScheduledRace = ({
     } else if (seed && phase === PHASE.WAITING) {
       // Seed provided directly without request phase
       setPhase(PHASE.READY);
+    } else if (seedStatus === 'waiting' && !seed && phase !== PHASE.WAITING) {
+      // Reset back to waiting (e.g., when demo is reset)
+      setPhase(PHASE.WAITING);
+      setRaceResults(null);
     }
   }, [seedStatus, seed, phase]);
 

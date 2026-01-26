@@ -8,6 +8,56 @@ import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import { easing } from 'maath';
 import DarkClouds from "./Clouds";
 
+// Sky gradient shader for portal background
+const SkyGradientMaterial = {
+  uniforms: {
+    zenithColor: { value: new THREE.Color('#0b0b2a') },
+    upperColor: { value: new THREE.Color('#1a1145') },
+    midColor: { value: new THREE.Color('#4a1854') },
+    warmColor: { value: new THREE.Color('#b83a5a') },
+    horizonColor: { value: new THREE.Color('#ff7b3a') },
+    horizonGlow: { value: new THREE.Color('#ffad5e') },
+  },
+  vertexShader: `
+    varying vec3 vWorldPosition;
+    void main() {
+      vec4 worldPos = modelMatrix * vec4(position, 1.0);
+      vWorldPosition = worldPos.xyz;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform vec3 zenithColor;
+    uniform vec3 upperColor;
+    uniform vec3 midColor;
+    uniform vec3 warmColor;
+    uniform vec3 horizonColor;
+    uniform vec3 horizonGlow;
+    varying vec3 vWorldPosition;
+    void main() {
+      float h = normalize(vWorldPosition).y;
+      vec3 color;
+      if (h > 0.4) {
+        // Zenith
+        color = mix(upperColor, zenithColor, smoothstep(0.4, 0.9, h));
+      } else if (h > 0.1) {
+        // Upper to mid sky
+        color = mix(midColor, upperColor, smoothstep(0.1, 0.4, h));
+      } else if (h > -0.05) {
+        // Mid to warm band
+        color = mix(warmColor, midColor, smoothstep(-0.05, 0.1, h));
+      } else if (h > -0.15) {
+        // Warm to horizon
+        color = mix(horizonColor, warmColor, smoothstep(-0.15, -0.05, h));
+      } else {
+        // Below horizon glow
+        color = mix(horizonGlow, horizonColor, smoothstep(-0.3, -0.15, h));
+      }
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `,
+};
+
 // Clipping planes for the model coming through the portal
 // These will be set dynamically based on the screen angle
 // screenPlane: angled to match the laptop screen tilt (-0.35 rad on x-axis)
@@ -177,6 +227,16 @@ function PortalScene({ isMobile = false }) {
     <group rotation={sceneRotation}>
       {/* The laptop frame with portal screen */}
       <LaptopFrame position={laptopPos} scale={laptopScale}>
+        {/* Sky gradient background inside the portal */}
+        <mesh scale={20}>
+          <sphereGeometry args={[1, 64, 64]} />
+          <shaderMaterial
+            attach="material"
+            args={[SkyGradientMaterial]}
+            side={THREE.BackSide}
+            toneMapped={false}
+          />
+        </mesh>
         {/* Lighting inside the portal */}
         <hemisphereLight
           skyColor={'#0000ff'}
@@ -184,7 +244,7 @@ function PortalScene({ isMobile = false }) {
           intensity={1}
         />
         {/* Clouds in the portal world */}
-        <group position={[0, 5.3, -1.3]}>
+        <group position={[0, 6.8, -1.7]}>
           <DarkClouds />
         </group>
         {/* The grail model inside the portal (no glow) */}

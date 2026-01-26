@@ -742,9 +742,8 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                 position: 'absolute',
                 top: '50%',
                 left: '50%',
-                width: '300%',  // Wider to show more of the tunnel
-                height: 'auto',  // Taller to show more of the tunnel
-                // Combine all transforms in the correct order
+                width: '300%',
+                height: 'auto',
                 transform: `
                   translate(-50%, -50%)
                   rotateX(-5deg)
@@ -911,8 +910,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               textAlign: 'center',
               padding: '0 1rem',
             }}>
-       Trysail Sail ho Corsair red ensign hulk smartly boom jib rum gangway.
-            </p>
+All monetary systems are belief systems. Cryptocurrency was designed to be a less corruptible system of money and yet, ironically, it is commonly regarded as exactly the opposite. <br/> But it doesn’t have to be that way. This is the founding ethos of RL80 -- as a return to first principles: minimize trust, maintain vigilance, distribute power, and enable access without hierarchy or bureaucracy.              </p>
 
             {/* Tokenomics Navigation - tablet portrait only */}
             {isTabletPortrait && (
@@ -1076,7 +1074,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             }}>
                 {/* Devote a green candle to the charts by burning 1 or more RL80 tokens. Top 20% of burners are
                 automatically qualified  */}
-                Join The Illumin80 - part mystery cult, part trading guild - and get special perks, like a 1.25x multiplier for staking rewards.
+                Join <i>The Illumin80</i> - A generous and self-sacrificing investor sect that paradoxically believes fervently in having no faith at all, at least in the realm of money and finance. Enjoy the symbolism of lighting metaphorical green candles as a means of signaling hope in the midst of market uncertainty, like tiny beacons of light. Give more, get more - top 20% unlock extra staking rewards and perks. 
             </p>
 
             {/* Illumin80 Navigation - tablet portrait only */}
@@ -1676,8 +1674,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                 maxWidth: '450px',
                 textAlign: 'center'
               }}>
-                Deadlights jack lad schooner scallywag dance the hempen jig carouser broadside cable strike colors. Bring a spring upon her cable holystone blow the man down spanker Shiver me timbers to go on account lookout wherry doubloon chase. Belay yo-ho-ho keelhaul squiffy black spot yardarm spyglass sheet transom heave to.
-              </p>
+All monetary systems are belief systems. Cryptocurrency was designed to be a less corruptible system of money and yet, ironically, it is commonly regarded as exactly the opposite. <br/> But it doesn’t have to be that way. This is the founding ethos of RL80 -- as a return to first principles: minimize trust, maintain vigilance, distribute power, and enable access without hierarchy or bureaucracy.              </p>
   {/* {!isMobilePhone && ( */}
             <div
               className="navigation-group"
@@ -1997,8 +1994,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                 maxWidth: '450px',
                 textAlign: 'center'
               }}>
-                Devote a green candle to the charts by burning 1 or more RL80 tokens. Top 20% of burners are
-                automatically qualified for The Illumin80 - part mystery cult, part trading guild. Illumin80 qualify for special perks, like a custom candle that never melts, plus a 1.25x multiplier for staking rewards.
+                Join <i>The Illumin80</i> - A generous and self-sacrificing investor sect that paradoxically believes fervently in having no faith at all, at least in the realm of money and finance. Enjoy the symbolism of lighting metaphorical green candles as a means of signaling hope in the midst of market uncertainty, like tiny beacons of light. Give more, get more - top 20% unlock extra staking rewards and perks. 
               </p>
  {/* {!isMobilePhone && ( */}
             <div

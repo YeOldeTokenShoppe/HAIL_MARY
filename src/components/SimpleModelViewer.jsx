@@ -2205,9 +2205,9 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
               })()}
             </div>
             
-            {/* Magnified iframe with zoom controls */}
+            {/* Magnified iframe with zoom controls (hidden on mobile flat view) */}
             <div style={{
-              display: 'flex',
+              display: isMobile ? 'none' : 'flex',
               justifyContent: 'center',
               marginBottom: '0.5rem',
               gap: '1rem',
@@ -2219,7 +2219,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  const newZoom = Math.max(0.5, magnifiedZoom - 0.25);
+                  const newZoom = Math.max(1.0, magnifiedZoom - 0.25);
                   console.log('Zoom Out clicked, new zoom:', newZoom);
                   setMagnifiedZoom(newZoom);
                 }}
@@ -2253,7 +2253,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  const newZoom = Math.min(1.5, magnifiedZoom + 0.25);
+                  const newZoom = Math.min(2.0, magnifiedZoom + 0.25);
                   console.log('Zoom In clicked, new zoom:', newZoom);
                   setMagnifiedZoom(newZoom);
                 }}
@@ -2281,7 +2281,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
             {/* Iframe container with overflow for zooming */}
             <div style={{
               width: '100%',
-              height: isMobile ? 'calc(100% - 5rem)' : 'calc(100% - 6rem)',
+              height: isMobile ? 'calc(100% - 3rem)' : 'calc(100% - 6rem)',
               overflow: 'auto',
               position: 'relative',
               top: '-3rem',
@@ -2291,8 +2291,14 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
               <iframe
                 ref={magnifiedIframeRef}
                 id="magnified-iframe"
-                src={currentScrollSrc}
-                style={{
+                src={isMobile ? `${currentScrollSrc}&flat=true` : currentScrollSrc}
+                style={isMobile ? {
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                  background: '#fefee0',
+                  borderRadius: '0.5rem',
+                } : {
                   width: `${100 / magnifiedZoom}%`,
                   height: `${100 / magnifiedZoom}%`,
                   border: 'none',
