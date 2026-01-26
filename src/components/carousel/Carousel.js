@@ -828,7 +828,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               textAlign: 'center',
               padding: '0 1rem',
             }}>
-       Trysail Sail ho Corsair red ensign hulk smartly boom jib rum gangway.
+       {/* Trysail Sail ho Corsair red ensign hulk smartly boom jib rum gangway. */}
             </p>
 
           {/* Buy Button for Mobile - at the bottom of Section 1 */}
@@ -902,15 +902,16 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             }}>
             <p style={{
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-              fontSize: isMobilePhone ? '1rem' : '1rem',
+              fontSize: isSmallPhone ? '0.9rem' : '1rem',
               color: 'rgba(255, 255, 255, 0.85)',
-              lineHeight: '1.6',
+              lineHeight: isSmallPhone ? '1.3' : '1.5',
               marginTop: '-0.5rem',
               maxWidth: isMobilePhone ? '320px' : '450px',
               textAlign: 'center',
               padding: '0 1rem',
             }}>
-All monetary systems are belief systems. Cryptocurrency was designed to be a less corruptible system of money and yet, ironically, it is commonly regarded as exactly the opposite. <br/> But it doesn’t have to be that way. This is the founding ethos of RL80 -- as a return to first principles: minimize trust, maintain vigilance, distribute power, and enable access without hierarchy or bureaucracy.              </p>
+All monetary systems are belief systems. This is the founding ethos of RL80 &mdash; a return to first principles: minimize trust, distribute power, and enable access without hierarchy.
+            </p>
 
             {/* Tokenomics Navigation - tablet portrait only */}
             {isTabletPortrait && (
@@ -1041,12 +1042,16 @@ All monetary systems are belief systems. Cryptocurrency was designed to be a les
             />
 
             {/* HolyGrailChalice Canvas */}
-            <div style={{
-              width: '100%',
-              maxWidth: isMobilePhone ? 'min(450px, 80vw)' : '500px',
-              height: isMobilePhone ? 'min(550px, 30vh)' : '450px',
-              marginTop: '0',
-            }}>
+            <div
+              onClick={() => router.push('/illumin80')}
+              style={{
+                width: '100%',
+                maxWidth: isMobilePhone ? 'min(450px, 80vw)' : '500px',
+                height: isMobilePhone ? 'min(550px, 30vh)' : '450px',
+                marginTop: '0',
+                cursor: 'pointer',
+              }}
+            >
               <StarfieldStatueScene isMobile={isMobilePhone} cameraRadius={isMobilePhone ? 3.2 : isTabletPortrait ? 3.0 : 2.0} />
             </div>
 
@@ -1054,7 +1059,7 @@ All monetary systems are belief systems. Cryptocurrency was designed to be a les
             <div style={{
               ...(isMobilePhone ? {
                 position: 'absolute',
-                bottom: '5rem',
+                bottom: '6rem',
                 left: 0,
                 right: 0,
               } : {}),
@@ -1064,17 +1069,15 @@ All monetary systems are belief systems. Cryptocurrency was designed to be a les
             }}>
             <p style={{
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-              fontSize: isMobilePhone ? '1rem' : '1rem',
+              fontSize: isSmallPhone ? '0.9rem' : '1rem',
               color: 'rgba(255, 255, 255, 0.85)',
-              lineHeight: '1.2',
+              lineHeight: isSmallPhone ? '1.3' : '1.35',
               // marginTop: '-3.5rem',
               maxWidth: isMobilePhone ? '320px' : '450px',
               textAlign: 'center',
               padding: '0 1rem',
             }}>
-                {/* Devote a green candle to the charts by burning 1 or more RL80 tokens. Top 20% of burners are
-                automatically qualified  */}
-                Join <i>The Illumin80</i> - A generous and self-sacrificing investor sect that paradoxically believes fervently in having no faith at all, at least in the realm of money and finance. Enjoy the symbolism of lighting metaphorical green candles as a means of signaling hope in the midst of market uncertainty, like tiny beacons of light. Give more, get more - top 20% unlock extra staking rewards and perks. 
+                Join <i>The Illumin80</i> &mdash; an investor sect that believes fervently in having no faith, at least in money. Light metaphorical green candles as beacons of hope. Give more, get more &mdash; top 20% unlock extra staking rewards.
             </p>
 
             {/* Illumin80 Navigation - tablet portrait only */}
