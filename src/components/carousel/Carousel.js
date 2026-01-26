@@ -16,7 +16,7 @@ import DropInTitle from '../DropInTitle'
 import RetroFuturisticButton from '@/components/RetroFuturisticButton'
 import MobilePolaroidGallerySimple from './MobilePolaroidGallerySimple'
 import OldsCoolTunnel from '../OldsCoolTunnel'
-
+import StarfieldStatueScene from '../StarfieldStatueScene'
 import HolyGrail from '@/components/HolyGrail'
 import HolyGrailPortal from '@/components/HolyGrailPortal'
 import HolyGrailChalice from '@/components/HolyGrailChalice'
@@ -305,6 +305,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             width: 40px;
             height: 40px;
             font-size: 18px;
+            top: 65% !important;
           }
 
           .carousel-arrow.left {
@@ -316,7 +317,8 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           }
 
           .carousel-nav-dots {
-            bottom: 12px;
+            bottom: auto;
+            top: 66%;
             padding: 4px 10px;
             gap: 8px;
             background: rgba(0, 0, 0, 0.3);
@@ -337,7 +339,10 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           }
 
           .carousel-progress {
-            display: none;
+            display: block;
+            bottom: auto;
+            top: 68%;
+            width: 120px;
           }
 
           .carousel-pause-hint {
@@ -346,6 +351,23 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
 
           .carousel-section-label {
             display: none;
+          }
+        }
+
+        /* Tablet portrait - push indicators lower */
+        @media (min-width: 481px) and (max-width: 1024px) and (orientation: portrait) {
+          .carousel-nav-dots {
+            top: auto !important;
+            bottom: 40px;
+          }
+
+          .carousel-progress {
+            top: auto !important;
+            bottom: 70px;
+          }
+
+          .carousel-arrow {
+            top: 55% !important;
           }
         }
 
@@ -460,7 +482,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             <button
               className="carousel-arrow left"
               onClick={goToPrevSection}
-              style={{ top: '50%' }}
+              style={{ top: '60%' }}
             >
               &#8249;
             </button>
@@ -469,7 +491,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             <button
               className="carousel-arrow right"
               onClick={goToNextSection}
-              style={{ top: '50%' }}
+              style={{ top: '60%' }}
             >
               &#8250;
             </button>
@@ -589,14 +611,21 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'flex-start',
-            paddingTop: isMobilePhone ? '7rem' : '120px',
-            paddingBottom: isMobilePhone ? '1rem' : '100px',
+            justifyContent: isMobilePhone ? 'flex-start' : 'center',
+            paddingTop: isMobilePhone ? '7rem' : '2rem',
+            paddingBottom: isMobilePhone ? '1rem' : '2rem',
             paddingLeft: isMobilePhone ? '1rem' : '2rem',
             paddingRight: isMobilePhone ? '1rem' : '2rem',
             position: 'relative',
             flexShrink: 0,
             overflowY: 'auto',
+          }}>
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            transform: (!isMobilePhone && isPortraitOrientation) ? 'scale(1.2)' : 'none',
+            transformOrigin: 'center center',
           }}>
           {/* Heading */}
           {/* <h2 style={{
@@ -661,6 +690,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               width: '90%',
               marginTop: '5%',
               // marginBottom: '5%',
+              minWidth: '18rem',
               maxWidth: isSmallPhone ? 'min(280px, 95vw)' : isMobilePhone ? 'min(380px, 95vw)' : isLargeTablet ? '550px' : isTabletPortrait ? '450px' : '450px',
               maxHeight: isMobilePhone ? '80vh' : 'none',
               aspectRatio: '4/3',
@@ -760,6 +790,18 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             </div>
           </div>
 
+          {/* Content below arrows on mobile */}
+          <div style={{
+            ...(isMobilePhone ? {
+              position: 'absolute',
+              bottom: '10%',
+              left: 0,
+              right: 0,
+            } : {}),
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+          }}>
           {/* Additional info below portal */}
           <p style={{
             marginTop: '1.5rem',
@@ -781,19 +823,23 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
               fontSize: isMobilePhone ? '1rem' : '1rem',
               color: 'rgba(255, 255, 255, 0.85)',
-              lineHeight: '1.6',
-              marginTop: '-0.5rem',
+              lineHeight: '1.3',
+              marginTop: '-.5rem',
               maxWidth: isMobilePhone ? '320px' : '450px',
               textAlign: 'center',
               padding: '0 1rem',
             }}>
-       Trysail Sail ho Corsair red ensign hulk smartly boom jib rum gangway. 
+       Trysail Sail ho Corsair red ensign hulk smartly boom jib rum gangway.
             </p>
 
           {/* Buy Button for Mobile - at the bottom of Section 1 */}
           <div style={{ marginTop: '1.5rem', marginBottom: '1rem' }}>
             {buyButton}
           </div>
+          </div>
+
+          </div>
+          {/* End of scale wrapper */}
 
           </div>
           {/* End of Section 1 */}
@@ -806,15 +852,23 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'flex-start',
-            paddingTop: isMobilePhone ? '7rem' : '80px',
-            paddingBottom: isMobilePhone ? '1rem' : '100px',
+            justifyContent: isMobilePhone ? 'flex-start' : 'center',
+            paddingTop: isMobilePhone ? '7rem' : '2rem',
+            paddingBottom: isMobilePhone ? '1rem' : '2rem',
             paddingLeft: isMobilePhone ? '1rem' : '2rem',
             paddingRight: isMobilePhone ? '1rem' : '2rem',
             position: 'relative',
             flexShrink: 0,
             overflowY: 'auto',
           }}>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              transform: (!isMobilePhone && isPortraitOrientation) ? 'scale(1)' : 'none',
+              minWidth: '25rem',
+              transformOrigin: 'center center',
+            }}>
             {/* Heading */}
             <SkewedHeading
               lines={["PROSPER80", "FOR ALL", "HUMAN80!"]}
@@ -827,7 +881,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             {/* HolyGrailPortal Canvas */}
             <div style={{
               width: '100%',
-              maxWidth: isMobilePhone ? 'min(350px, 80vw)' : '500px',
+              // maxWidth: isMobilePhone ? 'min(350px, 80vw)' : '500px',
               height: isMobilePhone ? 'min(400px, 40vh)' : '550px',
               marginTop: '0.5rem',
               filter: 'drop-shadow(0 0 30px rgba(0, 221, 255, 0.4))',
@@ -835,7 +889,18 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               <HolyGrailPortal isMobile={isMobilePhone} />
             </div>
 
-            {/* Description */}
+            {/* Description - below arrows on mobile */}
+            <div style={{
+              ...(isMobilePhone ? {
+                position: 'absolute',
+                bottom: '15%',
+                left: 0,
+                right: 0,
+              } : {}),
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+            }}>
             <p style={{
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
               fontSize: isMobilePhone ? '1rem' : '1rem',
@@ -846,17 +911,99 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               textAlign: 'center',
               padding: '0 1rem',
             }}>
-       Trysail Sail ho Corsair red ensign hulk smartly boom jib rum gangway. 
+       Trysail Sail ho Corsair red ensign hulk smartly boom jib rum gangway.
             </p>
 
-            {/* Tokenomics Button */}
-            <div style={{ marginTop: '1.5rem' }}>
-              <Link href="/tokenomics" style={{ textDecoration: 'none' }}>
-                <RetroFuturisticButton>
-                  TOKENOMICS
-                </RetroFuturisticButton>
-              </Link>
+            {/* Tokenomics Navigation - tablet portrait only */}
+            {isTabletPortrait && (
+              <div
+                className="navigation-group"
+                style={{
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0',
+                  transform: 'scale(1)',
+                  transformOrigin: 'center center',
+                  zIndex: 50,
+                }}
+              >
+                <svg
+                  style={{
+                    width: '220px',
+                    height: '100px',
+                    marginRight: '-20%',
+                    pointerEvents: 'auto',
+                    cursor: 'pointer',
+                  }}
+                  viewBox="0 0 300 150"
+                  onClick={() => router.push('/tokenomics')}
+                  onMouseEnter={(e) => {
+                    const text = e.currentTarget.querySelector('text');
+                    const arrow = e.currentTarget.querySelector('#arrowPathS2');
+                    const arrowHead = e.currentTarget.querySelector('.arrow-head-s2');
+                    if (text) { text.style.fontSize = '32'; text.style.fill = '#ffffff'; text.style.filter = 'url(#glowS2) drop-shadow(0 0 10px #ffcc00)'; }
+                    if (arrow) { arrow.style.strokeWidth = '3.5'; arrow.style.filter = 'url(#glowS2) drop-shadow(0 0 15px #ff9500)'; }
+                    if (arrowHead) { arrowHead.style.strokeWidth = '3.5'; }
+                  }}
+                  onMouseLeave={(e) => {
+                    const text = e.currentTarget.querySelector('text');
+                    const arrow = e.currentTarget.querySelector('#arrowPathS2');
+                    const arrowHead = e.currentTarget.querySelector('.arrow-head-s2');
+                    if (text) { text.style.fontSize = '28'; text.style.fill = '#ffcc00'; text.style.filter = 'url(#candleGlowS2)'; }
+                    if (arrow) { arrow.style.strokeWidth = '2.5'; arrow.style.filter = 'url(#glowS2)'; }
+                    if (arrowHead) { arrowHead.style.strokeWidth = '2.5'; }
+                  }}
+                >
+                  <defs>
+                    <linearGradient id="arrowGradientS2" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
+                      <stop offset="50%" stopColor="#ffcc00" stopOpacity="0.8" />
+                      <stop offset="100%" stopColor="#ff9500" stopOpacity="1" />
+                    </linearGradient>
+                    <filter id="glowS2">
+                      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+                      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                    </filter>
+                    <filter id="candleGlowS2">
+                      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                      <feFlood floodColor="#ff9500" floodOpacity="0.4"/>
+                      <feComposite in2="coloredBlur" operator="in"/>
+                      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+                    </filter>
+                  </defs>
+                  <path id="arrowPathS2" d="M 20 100 Q 100 40, 200 60" stroke="url(#arrowGradientS2)" strokeWidth="2.5" fill="none" filter="url(#glowS2)" strokeLinecap="round" opacity="0.9">
+                    <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="2.5s" repeatCount="indefinite" />
+                  </path>
+                  <path id="textPathS2" d="M 20 85 Q 100 25, 200 45" fill="none" stroke="none" />
+                  <path className="arrow-head-s2" d="M 195 55 L 205 60 L 195 65" stroke="url(#arrowGradientS2)" strokeWidth="2.5" fill="none" filter="url(#glowS2)" strokeLinecap="round">
+                    <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="2.5s" repeatCount="indefinite" />
+                  </path>
+                  <text fill="#ffcc00" fontSize="28" fontFamily="'UnifrakturMaguntia', cursive" filter="url(#candleGlowS2)" style={{ transition: 'all 0.3s ease' }}>
+                    <textPath href="#textPathS2" startOffset="0">Tokenomics</textPath>
+                    <animate attributeName="fill-opacity" values="0.7;1;0.7" dur="3s" repeatCount="indefinite" />
+                  </text>
+                  {[...Array(6)].map((_, i) => (
+                    <circle key={i} r="1.5" fill="#ffcc00" filter="url(#glowS2)">
+                      <animateMotion dur={`${4 + i}s`} repeatCount="indefinite" path="M 20 100 Q 100 40, 200 60"><mpath href="#arrowPathS2" /></animateMotion>
+                      <animate attributeName="opacity" values="0;1;0" dur={`${4 + i}s`} repeatCount="indefinite" />
+                      <animate attributeName="r" values="0.5;2;0.5" dur={`${4 + i}s`} repeatCount="indefinite" />
+                    </circle>
+                  ))}
+                </svg>
+                <div
+                  style={{ width: '60px', height: '60px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'transform 0.3s ease, filter 0.3s ease' }}
+                  onClick={() => router.push('/tokenomics')}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.15) rotate(-5deg)'; e.currentTarget.style.filter = 'drop-shadow(0 0 20px #ff9500)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1) rotate(0deg)'; e.currentTarget.style.filter = 'none'; }}
+                >
+                  <img src="/images/COIN_TATTOO.webp" alt="Navigate to Tokenomics" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                </div>
+              </div>
+            )}
             </div>
+            </div>
+            {/* End of scale wrapper */}
 
           </div>
           {/* End of Section 2 */}
@@ -869,20 +1016,28 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'flex-start',
-            paddingTop: isMobilePhone ? '7rem' : '80px',
-            paddingBottom: isMobilePhone ? '1rem' : '100px',
+            justifyContent: isMobilePhone ? 'flex-start' : 'center',
+            paddingTop: isMobilePhone ? '7rem' : '2rem',
+            paddingBottom: isMobilePhone ? '1rem' : '2rem',
             paddingLeft: isMobilePhone ? '1rem' : '2rem',
             paddingRight: isMobilePhone ? '1rem' : '2rem',
             position: 'relative',
             flexShrink: 0,
             overflowY: 'auto',
           }}>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              transform: (!isMobilePhone && isPortraitOrientation) ? 'scale(1.05)' : 'none',
+              transformOrigin: 'center center',
+              paddingBottom: '2rem'
+            }}>
             {/* Heading */}
             <SkewedHeading
-              lines={["JOIN THE", "ENLIGHTENMENT", "TODAY"]}
+              lines={["ENTER THE", "LIMINAL", "TERMINAL"]}
              // colors={["#d4af37", "#f4e4c1", "#ffd700"]}
-              fontSize={{ mobile: isSmallPhone ? "1.6rem" : "2rem", desktop: "2.5rem" }}
+              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "2.5rem" : "3rem"}
               isMobile={true}
               language={locale}
             />
@@ -894,15 +1049,26 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               height: isMobilePhone ? 'min(550px, 30vh)' : '450px',
               marginTop: '0',
             }}>
-              <HolyGrailChalice isMobile={isMobilePhone} />
+              <StarfieldStatueScene isMobile={isMobilePhone} cameraRadius={isMobilePhone ? 3.2 : isTabletPortrait ? 3.0 : 2.0} />
             </div>
 
-            {/* Description */}
+            {/* Description - below arrows on mobile */}
+            <div style={{
+              ...(isMobilePhone ? {
+                position: 'absolute',
+                bottom: '5rem',
+                left: 0,
+                right: 0,
+              } : {}),
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+            }}>
             <p style={{
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
               fontSize: isMobilePhone ? '1rem' : '1rem',
               color: 'rgba(255, 255, 255, 0.85)',
-              lineHeight: '1.6',
+              lineHeight: '1.2',
               // marginTop: '-3.5rem',
               maxWidth: isMobilePhone ? '320px' : '450px',
               textAlign: 'center',
@@ -913,14 +1079,96 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                 Join The Illumin80 - part mystery cult, part trading guild - and get special perks, like a 1.25x multiplier for staking rewards.
             </p>
 
-            {/* Illumin80 Button */}
-            <div style={{ marginTop: '1.5rem' }}>
-              <Link href="/illumin80" style={{ textDecoration: 'none' }}>
-                <RetroFuturisticButton>
-                  THE ILLUMIN80
-                </RetroFuturisticButton>
-              </Link>
+            {/* Illumin80 Navigation - tablet portrait only */}
+            {isTabletPortrait && (
+              <div
+                className="navigation-group"
+                style={{
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0',
+                  transform: 'scale(1)',
+                  transformOrigin: 'center center',
+                  zIndex: 50,
+                }}
+              >
+                <svg
+                  style={{
+                    width: '220px',
+                    height: '100px',
+                    marginRight: '-20%',
+                    pointerEvents: 'auto',
+                    cursor: 'pointer',
+                  }}
+                  viewBox="0 0 300 150"
+                  onClick={() => router.push('/illumin80')}
+                  onMouseEnter={(e) => {
+                    const text = e.currentTarget.querySelector('text');
+                    const arrow = e.currentTarget.querySelector('#arrowPathS3');
+                    const arrowHead = e.currentTarget.querySelector('.arrow-head-s3');
+                    if (text) { text.style.fontSize = '32'; text.style.fill = '#ffffff'; text.style.filter = 'url(#glowS3) drop-shadow(0 0 10px #ffcc00)'; }
+                    if (arrow) { arrow.style.strokeWidth = '3.5'; arrow.style.filter = 'url(#glowS3) drop-shadow(0 0 15px #ff9500)'; }
+                    if (arrowHead) { arrowHead.style.strokeWidth = '3.5'; }
+                  }}
+                  onMouseLeave={(e) => {
+                    const text = e.currentTarget.querySelector('text');
+                    const arrow = e.currentTarget.querySelector('#arrowPathS3');
+                    const arrowHead = e.currentTarget.querySelector('.arrow-head-s3');
+                    if (text) { text.style.fontSize = '28'; text.style.fill = '#ffcc00'; text.style.filter = 'url(#candleGlowS3)'; }
+                    if (arrow) { arrow.style.strokeWidth = '2.5'; arrow.style.filter = 'url(#glowS3)'; }
+                    if (arrowHead) { arrowHead.style.strokeWidth = '2.5'; }
+                  }}
+                >
+                  <defs>
+                    <linearGradient id="arrowGradientS3" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
+                      <stop offset="50%" stopColor="#ffcc00" stopOpacity="0.8" />
+                      <stop offset="100%" stopColor="#ff9500" stopOpacity="1" />
+                    </linearGradient>
+                    <filter id="glowS3">
+                      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+                      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                    </filter>
+                    <filter id="candleGlowS3">
+                      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                      <feFlood floodColor="#ff9500" floodOpacity="0.4"/>
+                      <feComposite in2="coloredBlur" operator="in"/>
+                      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+                    </filter>
+                  </defs>
+                  <path id="arrowPathS3" d="M 20 100 Q 100 40, 200 60" stroke="url(#arrowGradientS3)" strokeWidth="2.5" fill="none" filter="url(#glowS3)" strokeLinecap="round" opacity="0.9">
+                    <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="2.5s" repeatCount="indefinite" />
+                  </path>
+                  <path id="textPathS3" d="M 20 85 Q 100 25, 200 45" fill="none" stroke="none" />
+                  <path className="arrow-head-s3" d="M 195 55 L 205 60 L 195 65" stroke="url(#arrowGradientS3)" strokeWidth="2.5" fill="none" filter="url(#glowS3)" strokeLinecap="round">
+                    <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="2.5s" repeatCount="indefinite" />
+                  </path>
+                  <text fill="#ffcc00" fontSize="28" fontFamily="'UnifrakturMaguntia', cursive" filter="url(#candleGlowS3)" style={{ transition: 'all 0.3s ease' }}>
+                    <textPath href="#textPathS3" startOffset="0">The Illumin80</textPath>
+                    <animate attributeName="fill-opacity" values="0.7;1;0.7" dur="3s" repeatCount="indefinite" />
+                  </text>
+                  {[...Array(6)].map((_, i) => (
+                    <circle key={i} r="1.5" fill="#ffcc00" filter="url(#glowS3)">
+                      <animateMotion dur={`${4 + i}s`} repeatCount="indefinite" path="M 20 100 Q 100 40, 200 60"><mpath href="#arrowPathS3" /></animateMotion>
+                      <animate attributeName="opacity" values="0;1;0" dur={`${4 + i}s`} repeatCount="indefinite" />
+                      <animate attributeName="r" values="0.5;2;0.5" dur={`${4 + i}s`} repeatCount="indefinite" />
+                    </circle>
+                  ))}
+                </svg>
+                <div
+                  style={{ width: '60px', height: '60px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'transform 0.3s ease, filter 0.3s ease' }}
+                  onClick={() => router.push('/illumin80')}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.15) rotate(-5deg)'; e.currentTarget.style.filter = 'drop-shadow(0 0 20px #ff9500)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1) rotate(0deg)'; e.currentTarget.style.filter = 'none'; }}
+                >
+                  <img src="/images/SKULL_TATTOO.webp" alt="Navigate to Illumin80" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                </div>
+              </div>
+            )}
             </div>
+            </div>
+            {/* End of scale wrapper */}
           </div>
           {/* End of Section 3 */}
 
@@ -1118,13 +1366,647 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           </h1>
 
           {/* Navigation Group - Fixed bottom right */}
-          {!isMobilePhone && (
+        
+
+          {/* Sections Container - Carousel or Stacked */}
+          <div
+            className={isCarouselMode ? 'carousel-container' : ''}
+            style={{
+              display: 'flex',
+              flexDirection: isCarouselMode ? 'row' : 'column',
+              transform: isCarouselMode ? `translateX(-${activeSection * 100}vw)` : 'none',
+              transition: isCarouselMode ? 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+            }}
+            onMouseEnter={() => isCarouselMode && setIsAutoPaused(true)}
+            onMouseLeave={() => isCarouselMode && setIsAutoPaused(false)}
+          >
+          {/* Row 1: Portal on Left, Text on Right */}
+          <div
+            className={isCarouselMode ? 'carousel-section' : ''}
+            style={{
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: isTabletLandscape ? '2rem' : isTabletPortrait ? '1.5rem' : '1rem',
+              padding: isTabletLandscape ? '0 3%' : isTabletPortrait ? '0 2%' : '0 5%',
+              minHeight: '100vh',
+              minWidth: isCarouselMode ? '100vw' : 'auto',
+              position: 'relative',
+              flexShrink: 0,
+            }}>
+          {/* Left Column - Portal and Whitepaper Link */}
+          <div style={{
+            flex: isTabletPortrait ? '0 0 45%' : '1 1 50%',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'flex-end',
+            gap: isTablet ? '1rem' : '2rem',
+            top: '3rem',
+            left: '-2rem',
+            position: 'relative',
+            maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : '650px'
+          }}>
+            {/* Portal Preview Container with Frame Image */}
+            <div
+              onClick={() => setIsFullscreen(true)}
+              style={{
+                position: 'relative',
+                width: '100%',
+                maxWidth: isTabletLandscape ? '400px' : isTabletPortrait ? '300px' : '600px',
+                aspectRatio: '4/3',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                transform: `perspective(1000px) rotateX(5deg) scale(${isTabletLandscape ? 0.9 : isTabletPortrait ? 0.85 : 1})`,
+                filter: 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.6))'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'perspective(1000px) rotateX(2deg) scale(1.05)'
+                e.currentTarget.style.filter = 'drop-shadow(0 0 80px rgba(255, 215, 0, 1)) brightness(1.2)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'perspective(1000px) rotateX(5deg) scale(1)'
+                e.currentTarget.style.filter = 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.6)) brightness(1)'
+              }}
+            >
+              {/* Portal frame image */}
+              <img
+                src="/images/timePortal.webp"
+                alt="Time Portal"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'contain',
+                  zIndex: 2,
+                  pointerEvents: 'none',
+                }}
+              />
+
+              {/* OldsCoolTunnel animation inside the frame */}
+              <div style={{
+                position: 'absolute',
+                top: '9%',
+                left: '13%',
+                width: '75%',
+                height: '73%',
+                overflow: 'hidden',
+                background: is80sMode ? 'rgba(0, 0, 0, 0.7)' : '#000',
+                borderRadius: '2px',
+                boxShadow: 'inset 0 0 50px rgba(0, 0, 0, 0.8)',
+                transformStyle: 'preserve-3d',
+                perspective: '800px'
+              }}>
+                <div style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  width: '300%',
+                  height: 'auto',
+                  // Combine all transforms in the correct order (reversed skew)
+                  transform: `
+                    translate(-50%, -50%)
+                    rotateX(5deg)
+                    rotateY(12deg)
+                    rotateZ(-8deg)
+                    scale(0.3)
+                  `,
+                  transformOrigin: 'center center'
+                }}>
+                  <OldsCoolTunnel isFullscreen={false} />
+                </div>
+              </div>
+            </div>
+             <div style={{
+              transform: 'rotate(-11deg)',
+              display: 'inline-block',
+                  position: 'relative',
+                top: '-3rem',
+                left: '-2rem',
+                alignContent: 'center'
+            }}>
+              <p style={{
+
+                fontFamily: "'Courier New', monospace",
+                fontSize: '1rem',
+                color: '#01ff00',
+                animation: 'pulse 2s ease-in-out infinite',
+              }}>
+                Click the portal to enter
+              </p>
+            {/* </div> */}
+            {/* Link to whitepaper - Under the portal */}
+            <p style={{
+              fontFamily: "'Courier New', monospace",
+              fontSize: isTablet ? '0.85rem' : '1rem',
+              color: '#888',
+              textAlign: 'center',
+              width: '100%',
+              maxWidth: isTabletLandscape ? '400px' : isTabletPortrait ? '300px' : '600px'
+            }}>
+              📜 Read the <a href="/philosophy" style={{
+                color: '#ffff00',
+                textDecoration: 'none',
+                borderBottom: '1px solid #ffff00',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = '#fff'
+                e.currentTarget.style.borderBottomColor = '#fff'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = '#ffff00'
+                e.currentTarget.style.borderBottomColor = '#ffff00'
+              }}
+              >Techno-Mythic Whitepaper</a>
+            </p>
+          </div>
+          </div>
+
+          {/* Right Column - Text Content */}
+          <div style={{
+            flex: isTabletPortrait ? '1 1 50%' : '1 1 50%',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : '550px',
+            paddingLeft: isTabletLandscape ? '1rem' : '2rem',
+            paddingTop: '10%',
+
+          }}>
+            {/* Heading for desktop */}
+            <SkewedHeading
+              lines={["A TIMELESS", "ICON FOR THE", "DIGITAL AGE"]}
+              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : isLargeTablet ? "3rem" : isTabletPortrait ? "2.5rem" : "3.5rem"}
+              color="#00ff9d"
+              skewAngle={0}
+              shadowColor="#000"
+            />
+
+            {/* Sub-heading */}
+            <p style={{
+              fontFamily: "'Courier New', monospace",
+              fontSize: isTabletLandscape ? '1rem' : isTabletPortrait ? '0.9rem' : '1.2rem',
+              color: '#ffd700',
+              textAlign: 'center',
+              // marginTop: isTablet ? '1rem' : '1.5rem',
+              // marginBottom: isTablet ? '1.5rem' : '2rem',
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+              opacity: 0.9,
+              textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
+            }}>
+              Journey Through Her Illustrious History
+            </p>
+
+            {/* Description text */}
+            <p style={{
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              fontSize: isTabletLandscape ? '0.95rem' : isTabletPortrait ? '0.9rem' : '1.1rem',
+              color: 'rgba(255, 255, 255, 0.85)',
+              lineHeight: '1.6',
+              marginBottom: isTablet ? '1.5rem' : '2rem',
+              maxWidth: '450px',
+              textAlign: 'center'
+            }}>
+              Take a roller coaster ride through time and see a collection of Our Lady of Perpetual Profit's most iconic moments,
+              from antiquity to the future.
+            </p>
+
+            {/* Click instruction */}
+
+            {/* Buy Button for Desktop */}
+            {buyButton}
+
+          </div>
+          </div>
+          {/* End of Row 1 */}
+
+          {/* Row 2: DropInTitle on Left, HolyGrail on Right (alternated layout) */}
+          <div
+            className={isCarouselMode ? 'carousel-section' : ''}
+            style={{
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: isTabletLandscape ? '2rem' : isTabletPortrait ? '1.5rem' : '1rem',
+              padding: isTabletLandscape ? '3% 3%' : isTabletPortrait ? '3% 2%' : '3% 5%',
+              minHeight: isCarouselMode ? '100vh' : '90vh',
+              minWidth: isCarouselMode ? '100vw' : 'auto',
+              position: 'relative',
+              overflow: 'visible',
+              flexShrink: 0,
+            }}>
+            {/* Left Column - HolyGrail Portal (3D pass-through effect) */}
+            <div style={{
+              flex: isTabletPortrait ? '1 1 65%' : '1 1 65%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              maxWidth: isTabletLandscape ? '800px' : isTabletPortrait ? '650px' : '800px',
+              position: 'relative',
+              overflow: 'visible',
+            }}>
+              {/* Portal Container */}
+              <div
+                style={{
+                  position: 'relative',
+                  width: '100%',
+                  maxWidth: isTabletLandscape ? '550px' : isTabletPortrait ? '500px' : '700px',
+                  height: isTabletLandscape ? '600px' : isTabletPortrait ? '550px' : '750px',
+                  transition: 'all 0.3s ease',
+                  // filter: 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.5))',
+                  overflow: 'visible',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.filter = 'drop-shadow(0 0 70px rgba(9, 99, 244, 0.6)) brightness(1.1)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.filter = 'drop-shadow(0 0 40px rgba(0, 149, 255, 0.4)) brightness(1)'
+                }}
+              >
+                {/* HolyGrail Portal Canvas */}
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%',
+                  overflow: 'visible',
+                  pointerEvents: 'auto',
+                }}>
+                  <HolyGrailPortal isMobile={false} />
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column - Title and Text */}
+            <div style={{
+              flex: isTabletPortrait ? '0 0 45%' : '1 1 50%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : '550px',
+              paddingLeft: isTabletLandscape ? '1rem' : '2rem',
+            }}>
+              {/* TranslatableDropInTitle */}
+              <SkewedHeading
+                lines={["PROSPER80", "FOR ALL", "HUMAN80!"]}
+              colors={["#00ff00", "#f4e4c1", "#ffd700"]}
+                fontSize={{ mobile: "2rem", desktop: isTabletLandscape ? "2.5rem" : "3.5rem" }}
+                isMobile={false}
+                language={locale}
+              />
+
+              {/* Description text */}
+              <p style={{
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                fontSize: isTabletLandscape ? '0.95rem' : isTabletPortrait ? '0.9rem' : '1.1rem',
+                color: 'rgba(255, 255, 255, 0.85)',
+                lineHeight: '1.6',
+                marginTop: '2rem',
+                marginBottom: isTablet ? '1.5rem' : '2rem',
+                maxWidth: '450px',
+                textAlign: 'center'
+              }}>
+                Deadlights jack lad schooner scallywag dance the hempen jig carouser broadside cable strike colors. Bring a spring upon her cable holystone blow the man down spanker Shiver me timbers to go on account lookout wherry doubloon chase. Belay yo-ho-ho keelhaul squiffy black spot yardarm spyglass sheet transom heave to.
+              </p>
+  {/* {!isMobilePhone && ( */}
             <div
               className="navigation-group"
               style={{
-                position: 'fixed',
-                bottom: '30px',
-                right: '30px',
+                position: 'relative',
+                // bottom: '30px',
+                // right: '30px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0',
+                transform: 'scale(1)',
+                transformOrigin: 'bottom right',
+                zIndex: 50,
+              }}
+            >
+              {/* Arrow with text */}
+              <svg
+                style={{
+                  width: '220px',
+                  height: '100px',
+                  marginRight: '-20%',
+                  pointerEvents: 'auto',
+                  cursor: 'pointer',
+                }}
+                viewBox="0 0 300 150"
+                onClick={() => router.push('/tokenomics')}
+                onMouseEnter={(e) => {
+                  const text = e.currentTarget.querySelector('text');
+                  const arrow = e.currentTarget.querySelector('#arrowPath');
+                  const arrowHead = e.currentTarget.querySelector('.arrow-head');
+                  if (text) {
+                    text.style.fontSize = '32';
+                    text.style.fill = '#ffffff';
+                    text.style.filter = 'url(#glow) drop-shadow(0 0 10px #ffcc00)';
+                  }
+                  if (arrow) {
+                    arrow.style.strokeWidth = '3.5';
+                    arrow.style.filter = 'url(#glow) drop-shadow(0 0 15px #ff9500)';
+                  }
+                  if (arrowHead) {
+                    arrowHead.style.strokeWidth = '3.5';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  const text = e.currentTarget.querySelector('text');
+                  const arrow = e.currentTarget.querySelector('#arrowPath');
+                  const arrowHead = e.currentTarget.querySelector('.arrow-head');
+                  if (text) {
+                    text.style.fontSize = '28';
+                    text.style.fill = '#ffcc00';
+                    text.style.filter = 'url(#candleGlow)';
+                  }
+                  if (arrow) {
+                    arrow.style.strokeWidth = '2.5';
+                    arrow.style.filter = 'url(#glow)';
+                  }
+                  if (arrowHead) {
+                    arrowHead.style.strokeWidth = '2.5';
+                  }
+                }}
+              >
+                {/* Define gradients and filters */}
+                <defs>
+                  <linearGradient id="arrowGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
+                    <stop offset="50%" stopColor="#ffcc00" stopOpacity="0.8" />
+                    <stop offset="100%" stopColor="#ff9500" stopOpacity="1" />
+                  </linearGradient>
+                  <filter id="glow">
+                    <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+                    <feMerge>
+                      <feMergeNode in="coloredBlur"/>
+                      <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
+                  <filter id="candleGlow">
+                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                    <feFlood floodColor="#ff9500" floodOpacity="0.4"/>
+                    <feComposite in2="coloredBlur" operator="in"/>
+                    <feMerge>
+                      <feMergeNode/>
+                      <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
+                </defs>
+
+                {/* Curved arrow path */}
+                <path
+                  id="arrowPath"
+                  d="M 20 100 Q 100 40, 200 60"
+                  stroke="url(#arrowGradient)"
+                  strokeWidth="2.5"
+                  fill="none"
+                  filter="url(#glow)"
+                  strokeLinecap="round"
+                  opacity="0.9"
+                >
+                  <animate
+                    attributeName="stroke-opacity"
+                    values="0.6;1;0.6"
+                    dur="2.5s"
+                    repeatCount="indefinite"
+                  />
+                </path>
+
+                {/* Invisible path for text (offset above the arrow) */}
+                <path
+                  id="textPath"
+                  d="M 20 85 Q 100 25, 200 45"
+                  fill="none"
+                  stroke="none"
+                />
+
+                {/* Arrow head */}
+                <path
+                  className="arrow-head"
+                  d="M 195 55 L 205 60 L 195 65"
+                  stroke="url(#arrowGradient)"
+                  strokeWidth="2.5"
+                  fill="none"
+                  filter="url(#glow)"
+                  strokeLinecap="round"
+                >
+                  <animate
+                    attributeName="stroke-opacity"
+                    values="0.6;1;0.6"
+                    dur="2.5s"
+                    repeatCount="indefinite"
+                  />
+                </path>
+
+                {/* Text along path */}
+                <text
+                  fill="#ffcc00"
+                  fontSize="28"
+                  fontFamily="'UnifrakturMaguntia', cursive"
+                  filter="url(#candleGlow)"
+                  style={{
+                    transition: "all 0.3s ease",
+                    textShadow: "2px 2px 8px rgba(0, 0, 0, 0.9), 4px 4px 12px rgba(0, 0, 0, 0.7)",
+                    filter: "url(#candleGlow) drop-shadow(3px 3px 6px rgba(0, 0, 0, 0.8))"
+                  }}
+                >
+                  <textPath href="#textPath" startOffset="0">
+                    Tokenomics
+                  </textPath>
+                  <animate
+                    attributeName="fill-opacity"
+                    values="0.7;1;0.7"
+                    dur="3s"
+                    repeatCount="indefinite"
+                  />
+                </text>
+
+                {/* Floating particles */}
+                {[...Array(6)].map((_, i) => (
+                  <circle
+                    key={i}
+                    r="1.5"
+                    fill="#ffcc00"
+                    filter="url(#glow)"
+                  >
+                    <animateMotion
+                      dur={`${4 + i}s`}
+                      repeatCount="indefinite"
+                      path="M 20 100 Q 100 40, 200 60"
+                    >
+                      <mpath href="#arrowPath" />
+                    </animateMotion>
+                    <animate
+                      attributeName="opacity"
+                      values="0;1;0"
+                      dur={`${4 + i}s`}
+                      repeatCount="indefinite"
+                    />
+                    <animate
+                      attributeName="r"
+                      values="0.5;2;0.5"
+                      dur={`${4 + i}s`}
+                      repeatCount="indefinite"
+                    />
+                  </circle>
+                ))}
+              </svg>
+
+              {/* Skull button */}
+              <div
+                style={{
+                  width: '60px',
+                  height: '60px',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'transform 0.3s ease, filter 0.3s ease',
+                }}
+                onClick={() => router.push('/tokenomics')}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.15) rotate(-5deg)';
+                  e.currentTarget.style.filter = 'drop-shadow(0 0 20px #ff9500)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1) rotate(0deg)';
+                  e.currentTarget.style.filter = 'none';
+                }}
+              >
+                <img
+                  src="/images/COIN_TATTOO.webp"
+                  alt="Navigate to Tokenomics"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                  }}
+                />
+              </div>
+            </div>
+          {/* )} */}
+              {/* Tokenomics Button */}
+              {/* <Link href="/tokenomics" style={{ textDecoration: 'none' }}>
+                <RetroFuturisticButton>
+                  TOKENOMICS
+                </RetroFuturisticButton>
+              </Link> */}
+            </div>
+
+          </div>
+          {/* End of Row 2 */}
+
+          
+          {/* Row 3: HolyGrailChalice on Left, Text on Right */}
+          <div
+            className={isCarouselMode ? 'carousel-section' : ''}
+            style={{
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: isTabletLandscape ? '2rem' : isTabletPortrait ? '1.5rem' : '1rem',
+              padding: isTabletLandscape ? '3% 3%' : isTabletPortrait ? '3% 2%' : '3% 5%',
+              minHeight: isCarouselMode ? '100vh' : '90vh',
+              minWidth: isCarouselMode ? '100vw' : 'auto',
+              position: 'relative',
+              overflow: 'visible',
+              flexShrink: 0,
+            }}>
+            {/* Left Column - HolyGrail Chalice */}
+            <div style={{
+              flex: isTabletPortrait ? '1 1 55%' : '1 1 55%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              maxWidth: isTabletLandscape ? '600px' : isTabletPortrait ? '550px' : '800px',
+              position: 'relative',
+              overflow: 'visible',
+            }}>
+              {/* StarfieldStatueScene Canvas */}
+              <div
+                style={{
+                  position: 'relative',
+                  width: '100%',
+                  maxWidth: isTabletLandscape ? '550px' : isTabletPortrait ? '500px' : '600px',
+                  height: isTabletLandscape ? '500px' : isTabletPortrait ? '450px' : '600px',
+                  transition: 'all 0.3s ease',
+                  // filter: 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.5))',
+                }}
+                // onMouseEnter={(e) => {
+                //   e.currentTarget.style.filter = 'drop-shadow(0 0 70px rgba(255, 215, 0, 0.9)) brightness(1.1)'
+                // }}
+                // onMouseLeave={(e) => {
+                //   e.currentTarget.style.filter = 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.5)) brightness(1)'
+                // }}
+              >
+                <StarfieldStatueScene
+                  style={{ width: '100%', height: '100%' }}
+                  statueProps={{ scale: [3, 3, 3] }}
+                  href="/illumin80"
+                />
+              </div>
+
+            </div>
+
+            {/* Right Column - Text Content */}
+            <div style={{
+              flex: isTabletPortrait ? '0 0 45%' : '1 1 50%',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : '550px',
+              paddingLeft: isTabletLandscape ? '1rem' : '2rem',
+              paddingBottom: isTabletLandscape ? '1rem' : isTabletPortrait ? '2rem' : '1rem',
+            }}>
+              <SkewedHeading
+                 lines={["ENTER THE", "LIMINAL", "TERMINAL"]}
+                colors={["#00ff00", "#f4e4c1", "#ffd700"]}
+              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "2.5rem" : "3rem"}
+                isMobile={false}
+                language={locale}
+                  //  scramble={true}
+              />
+              {/* <SkewedHeading
+    lines={['WELCOME', 'TO CIRCUS']}
+    scramble={true}
+  />                                                                                  */}
+
+
+              <p style={{
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                fontSize: isTabletLandscape ? '0.95rem' : isTabletPortrait ? '0.9rem' : '1.1rem',
+                color: 'rgba(255, 255, 255, 0.85)',
+                lineHeight: '1.6',
+                marginTop: '2rem',
+                marginBottom: isTablet ? '1.5rem' : '2rem',
+                maxWidth: '450px',
+                textAlign: 'center'
+              }}>
+                Devote a green candle to the charts by burning 1 or more RL80 tokens. Top 20% of burners are
+                automatically qualified for The Illumin80 - part mystery cult, part trading guild. Illumin80 qualify for special perks, like a custom candle that never melts, plus a 1.25x multiplier for staking rewards.
+              </p>
+ {/* {!isMobilePhone && ( */}
+            <div
+              className="navigation-group"
+              style={{
+                position: 'relative',
+                // bottom: '30px',
+                // right: '30px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0',
@@ -1336,428 +2218,16 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                 />
               </div>
             </div>
-          )}
-
-          {/* Sections Container - Carousel or Stacked */}
-          <div
-            className={isCarouselMode ? 'carousel-container' : ''}
-            style={{
-              display: 'flex',
-              flexDirection: isCarouselMode ? 'row' : 'column',
-              transform: isCarouselMode ? `translateX(-${activeSection * 100}vw)` : 'none',
-              transition: isCarouselMode ? 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
-            }}
-            onMouseEnter={() => isCarouselMode && setIsAutoPaused(true)}
-            onMouseLeave={() => isCarouselMode && setIsAutoPaused(false)}
-          >
-          {/* Row 1: Portal and Text */}
-          <div
-            className={isCarouselMode ? 'carousel-section' : ''}
-            style={{
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: isTabletLandscape ? '2rem' : isTabletPortrait ? '1.5rem' : '1rem',
-              padding: isTabletLandscape ? '0 3%' : isTabletPortrait ? '0 2%' : '0 5%',
-              minHeight: '100vh',
-              minWidth: isCarouselMode ? '100vw' : 'auto',
-              position: 'relative',
-              flexShrink: 0,
-            }}>
-          {/* Left Column - Text Content */}
-          <div style={{
-            flex: isTabletPortrait ? '1 1 50%' : '1 1 50%',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : '550px',
-            paddingRight: isTabletLandscape ? '1rem' : '2rem',
-            paddingTop: '10%',
-
-          }}>
-            {/* Heading for desktop */}
-            <SkewedHeading
-              lines={["A TIMELESS", "ICON FOR THE", "DIGITAL AGE"]}
-              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : isLargeTablet ? "3rem" : isTabletPortrait ? "2.5rem" : "3.5rem"}
-              color="#00ff9d"
-              skewAngle={0}
-              shadowColor="#000"
-            />
-
-            {/* Sub-heading */}
-            <p style={{
-              fontFamily: "'Courier New', monospace",
-              fontSize: isTabletLandscape ? '1rem' : isTabletPortrait ? '0.9rem' : '1.2rem',
-              color: '#ffd700',
-              textAlign: 'center',
-              // marginTop: isTablet ? '1rem' : '1.5rem',
-              // marginBottom: isTablet ? '1.5rem' : '2rem',
-              letterSpacing: '0.05em',
-              textTransform: 'uppercase',
-              opacity: 0.9,
-              textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
-            }}>
-              Journey Through Her Illustrious History
-            </p>
-
-            {/* Description text */}
-            <p style={{
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-              fontSize: isTabletLandscape ? '0.95rem' : isTabletPortrait ? '0.9rem' : '1.1rem',
-              color: 'rgba(255, 255, 255, 0.85)',
-              lineHeight: '1.6',
-              marginBottom: isTablet ? '1.5rem' : '2rem',
-              maxWidth: '450px',
-              textAlign: 'center'
-            }}>
-              Take a roller coaster ride through time and see a collection of Our Lady of Perpetual Profit's most iconic moments,
-              from antiquity to the future.
-            </p>
-
-            {/* Click instruction */}
-
-            {/* Buy Button for Desktop */}
-            {buyButton}
-
-          </div>
-
-          {/* Right Column - Portal and Whitepaper Link */}
-          <div style={{
-            flex: isTabletPortrait ? '0 0 45%' : '1 1 50%',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'flex-start',
-            gap: isTablet ? '1rem' : '2rem',
-            top: '3rem',
-            right: '-2rem',
-            position: 'relative',
-            maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : '650px'
-          }}>
-            {/* Portal Preview Container with Frame Image */}
-            <div
-              onClick={() => setIsFullscreen(true)}
-              style={{
-                position: 'relative',
-                width: '100%',
-                maxWidth: isTabletLandscape ? '400px' : isTabletPortrait ? '300px' : '600px',
-                aspectRatio: '4/3',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                transform: `perspective(1000px) rotateX(5deg) scale(${isTabletLandscape ? 0.9 : isTabletPortrait ? 0.85 : 1})`,
-                filter: 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.6))'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'perspective(1000px) rotateX(2deg) scale(1.05)'
-                e.currentTarget.style.filter = 'drop-shadow(0 0 80px rgba(255, 215, 0, 1)) brightness(1.2)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'perspective(1000px) rotateX(5deg) scale(1)'
-                e.currentTarget.style.filter = 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.6)) brightness(1)'
-              }}
-            >
-              {/* Portal frame image */}
-              <img
-                src="/images/timePortal.webp"
-                alt="Time Portal"
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain',
-                  zIndex: 2,
-                  pointerEvents: 'none',
-                  transform: 'scaleX(-1)'
-                }}
-              />
-
-              {/* OldsCoolTunnel animation inside the frame */}
-              <div style={{
-                position: 'absolute',
-                top: '9%',
-                left: '13%',
-                width: '75%',
-                height: '73%',
-                overflow: 'hidden',
-                background: is80sMode ? 'rgba(0, 0, 0, 0.7)' : '#000',
-                borderRadius: '2px',
-                boxShadow: 'inset 0 0 50px rgba(0, 0, 0, 0.8)',
-                transformStyle: 'preserve-3d',
-                perspective: '800px'
-              }}>
-                <div style={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  width: '300%',
-                  height: 'auto',
-                  // Combine all transforms in the correct order
-                  transform: `
-                    translate(-50%, -50%)
-                    rotateX(5deg)
-                    rotateY(-12deg)
-                    rotateZ(8deg)
-                    scale(0.3)
-                  `,
-                  transformOrigin: 'center center'
-                }}>
-                  <OldsCoolTunnel isFullscreen={false} />
-                </div>
-              </div>
-            </div>
-             <div style={{
-              transform: 'rotate(11deg)',
-              display: 'inline-block',
-                  position: 'relative',
-                top: '-3rem',
-                right: '-2rem',
-                alignContent: 'center'
-            }}>
-              <p style={{
-
-                fontFamily: "'Courier New', monospace",
-                fontSize: '1rem',
-                color: '#01ff00',
-                animation: 'pulse 2s ease-in-out infinite',
-              }}>
-                Click the portal to enter
-              </p>
-            {/* </div> */}
-            {/* Link to whitepaper - Under the portal */}
-            <p style={{
-              fontFamily: "'Courier New', monospace",
-              fontSize: isTablet ? '0.85rem' : '1rem',
-              color: '#888',
-              textAlign: 'center',
-              width: '100%',
-              maxWidth: isTabletLandscape ? '400px' : isTabletPortrait ? '300px' : '600px'
-            }}>
-              📜 Read the <a href="/philosophy" style={{
-                color: '#ffff00',
-                textDecoration: 'none',
-                borderBottom: '1px solid #ffff00',
-                transition: 'all 0.3s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = '#fff'
-                e.currentTarget.style.borderBottomColor = '#fff'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = '#ffff00'
-                e.currentTarget.style.borderBottomColor = '#ffff00'
-              }}
-              >Techno-Mythic Whitepaper</a>
-            </p>
-          </div>
-          </div>
-          </div>
-          {/* End of Row 1 */}
-
-          {/* Row 2: DropInTitle on Left, HolyGrail on Right (alternated layout) */}
-          <div
-            className={isCarouselMode ? 'carousel-section' : ''}
-            style={{
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: isTabletLandscape ? '2rem' : isTabletPortrait ? '1.5rem' : '1rem',
-              padding: isTabletLandscape ? '3% 3%' : isTabletPortrait ? '3% 2%' : '3% 5%',
-              minHeight: isCarouselMode ? '100vh' : '90vh',
-              minWidth: isCarouselMode ? '100vw' : 'auto',
-              position: 'relative',
-              overflow: 'visible',
-              flexShrink: 0,
-            }}>
-            {/* Left Column - HolyGrail Portal (3D pass-through effect) */}
-            <div style={{
-              flex: isTabletPortrait ? '1 1 65%' : '1 1 65%',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              maxWidth: isTabletLandscape ? '800px' : isTabletPortrait ? '650px' : '800px',
-              position: 'relative',
-              overflow: 'visible',
-            }}>
-              {/* Portal Container */}
-              <div
-                style={{
-                  position: 'relative',
-                  width: '100%',
-                  maxWidth: isTabletLandscape ? '550px' : isTabletPortrait ? '500px' : '700px',
-                  height: isTabletLandscape ? '600px' : isTabletPortrait ? '550px' : '750px',
-                  transition: 'all 0.3s ease',
-                  // filter: 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.5))',
-                  overflow: 'visible',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.filter = 'drop-shadow(0 0 70px rgba(9, 99, 244, 0.6)) brightness(1.1)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.filter = 'drop-shadow(0 0 40px rgba(0, 149, 255, 0.4)) brightness(1)'
-                }}
-              >
-                {/* HolyGrail Portal Canvas */}
-                <div style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  overflow: 'visible',
-                  pointerEvents: 'auto',
-                }}>
-                  <HolyGrailPortal isMobile={false} />
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column - Title and Text */}
-            <div style={{
-              flex: isTabletPortrait ? '0 0 45%' : '1 1 50%',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : '550px',
-              paddingLeft: isTabletLandscape ? '1rem' : '2rem',
-            }}>
-              {/* TranslatableDropInTitle */}
-              <SkewedHeading
-                lines={["PROSPER80", "FOR ALL", "HUMAN80!"]}
-              colors={["#00ff00", "#f4e4c1", "#ffd700"]}
-                fontSize={{ mobile: "2rem", desktop: isTabletLandscape ? "2.5rem" : "3.5rem" }}
-                isMobile={false}
-                language={locale}
-              />
-
-              {/* Description text */}
-              <p style={{
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-                fontSize: isTabletLandscape ? '0.95rem' : isTabletPortrait ? '0.9rem' : '1.1rem',
-                color: 'rgba(255, 255, 255, 0.85)',
-                lineHeight: '1.6',
-                marginTop: '2rem',
-                marginBottom: isTablet ? '1.5rem' : '2rem',
-                maxWidth: '450px',
-                textAlign: 'center'
-              }}>
-                Deadlights jack lad schooner scallywag dance the hempen jig carouser broadside cable strike colors. Bring a spring upon her cable holystone blow the man down spanker Shiver me timbers to go on account lookout wherry doubloon chase. Belay yo-ho-ho keelhaul squiffy black spot yardarm spyglass sheet transom heave to.
-              </p>
-
-              {/* Tokenomics Button */}
-              <Link href="/tokenomics" style={{ textDecoration: 'none' }}>
-                <RetroFuturisticButton>
-                  TOKENOMICS
-                </RetroFuturisticButton>
-              </Link>
-            </div>
-
-          </div>
-          {/* End of Row 2 */}
-
-          
-          {/* Row 3: Text on Left, Placeholder Component on Right */}
-          <div
-            className={isCarouselMode ? 'carousel-section' : ''}
-            style={{
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: isTabletLandscape ? '2rem' : isTabletPortrait ? '1.5rem' : '1rem',
-              padding: isTabletLandscape ? '3% 3%' : isTabletPortrait ? '3% 2%' : '3% 5%',
-              minHeight: isCarouselMode ? '100vh' : '90vh',
-              minWidth: isCarouselMode ? '100vw' : 'auto',
-              position: 'relative',
-              overflow: 'visible',
-              flexShrink: 0,
-            }}>
-            {/* Left Column - Text Content */}
-            <div style={{
-              flex: isTabletPortrait ? '0 0 45%' : '1 1 50%',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : '550px',
-              paddingRight: isTabletLandscape ? '1rem' : '2rem',
-            }}>
-              <SkewedHeading
-                lines={["JOIN THE", "ENLIGHTENMENT", "TODAY"]}
-                colors={["#00ff00", "#f4e4c1", "#ffd700"]}
-                fontSize={{ mobile: "2rem", desktop: isTabletLandscape ? "2.5rem" : "3.5rem" }}
-                isMobile={false}
-                language={locale}
-                  //  scramble={true}  
-              />
-              {/* <SkewedHeading                                                                     
-    lines={['WELCOME', 'TO CIRCUS']}                                                 
-    scramble={true}                                                                  
-  />                                                                                  */}
-     
-
-              <p style={{
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-                fontSize: isTabletLandscape ? '0.95rem' : isTabletPortrait ? '0.9rem' : '1.1rem',
-                color: 'rgba(255, 255, 255, 0.85)',
-                lineHeight: '1.6',
-                marginTop: '2rem',
-                marginBottom: isTablet ? '1.5rem' : '2rem',
-                maxWidth: '450px',
-                textAlign: 'center'
-              }}>
-                Devote a green candle to the charts by burning 1 or more RL80 tokens. Top 20% of burners are
-                automatically qualified for The Illumin80 - part mystery cult, part trading guild. Illumin80 qualify for special perks, like a custom candle that never melts, plus a 1.25x multiplier for staking rewards.
-              </p>
-
+          {/* )} */}
               {/* Illumin80 Button */}
-              <Link href="/illumin80" style={{ textDecoration: 'none' }}>
+              {/* <Link href="/illumin80" style={{ textDecoration: 'none' }}>
                 <RetroFuturisticButton>
                   THE ILLUMIN80
                 </RetroFuturisticButton>
-              </Link>
+              </Link> */}
 
             </div>
 
-            {/* Right Column - Placeholder Component */}
-            <div style={{
-              flex: isTabletPortrait ? '1 1 55%' : '1 1 55%',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              maxWidth: isTabletLandscape ? '600px' : isTabletPortrait ? '550px' : '800px',
-              position: 'relative',
-              overflow: 'visible',
-            }}>
-              {/* HolyGrail Chalice Canvas */}
-              <div
-                style={{
-                  position: 'relative',
-                  width: '100%',
-                  maxWidth: isTabletLandscape ? '550px' : isTabletPortrait ? '500px' : '700px',
-                  height: isTabletLandscape ? '500px' : isTabletPortrait ? '450px' : '600px',
-                  transition: 'all 0.3s ease',
-                  // filter: 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.5))',
-                }}
-                // onMouseEnter={(e) => {
-                //   e.currentTarget.style.filter = 'drop-shadow(0 0 70px rgba(255, 215, 0, 0.9)) brightness(1.1)'
-                // }}
-                // onMouseLeave={(e) => {
-                //   e.currentTarget.style.filter = 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.5)) brightness(1)'
-                // }}
-              >
-                <HolyGrailChalice isMobile={isMobilePhone} />
-              </div>
-
-            </div>
-            
           </div>
           {/* End of Row 3 */}
 

@@ -139,6 +139,21 @@ function LaptopFrame({ children, ...props }) {
   );
 }
 
+// Floating hover wrapper
+function FloatingGroup({ children, amplitude = 0.06, speed = 1.2, rotationAmplitude = 0.08, rotationSpeed = 0.8 }) {
+  const groupRef = useRef();
+
+  useFrame(({ clock }) => {
+    if (groupRef.current) {
+      const t = clock.getElapsedTime();
+      groupRef.current.position.y = Math.sin(t * speed) * amplitude;
+      groupRef.current.rotation.y = Math.sin(t * rotationSpeed) * rotationAmplitude;
+    }
+  });
+
+  return <group ref={groupRef}>{children}</group>;
+}
+
 // Main Portal Scene
 function PortalScene({ isMobile = false }) {
   const grailScale = isMobile ? 0.7 : 0.7;
@@ -158,6 +173,7 @@ function PortalScene({ isMobile = false }) {
   const sceneRotation = [0, 0.6, 0]; // Tilt up slightly, rotate to the side
 
   return (
+    <FloatingGroup>
     <group rotation={sceneRotation}>
       {/* The laptop frame with portal screen */}
       <LaptopFrame position={laptopPos} scale={laptopScale}>
@@ -196,6 +212,7 @@ function PortalScene({ isMobile = false }) {
       <ambientLight intensity={0.9} />
       {/* <directionalLight position={[2, 2, 2]} intensity={1} /> */}
     </group>
+    </FloatingGroup>
   );
 }
 

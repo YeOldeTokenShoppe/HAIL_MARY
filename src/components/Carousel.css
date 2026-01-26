@@ -57,8 +57,8 @@ body {
   position: absolute;
   left: 50%;
   bottom: 0;
-  width: 900px;
-  height: 900px;
+  width: 880px;
+  height: 880px;
   border-radius: 50%;
   transform: translate(-50%, 50%) rotateX(90deg);
   background: radial-gradient(
@@ -87,8 +87,8 @@ body {
   left: 50%;
   top: 0; /* Position it at the top */
   transform: translate(-50%, -50%) rotateX(90deg);
-  width: 900px; /* Same width as the bottom */
-  height: 900px; /* Same height as the bottom */
+  width: 880px; /* Same width as the bottom */
+  height: 880px; /* Same height as the bottom */
   border-radius: 50%; /* Keep it circular */
   z-index: -1; /* Send it behind the carousel */
 

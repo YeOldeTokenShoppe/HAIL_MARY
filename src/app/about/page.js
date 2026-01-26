@@ -319,27 +319,6 @@ export default function CarouselPage() {
       {/* Main carousel */}
       <CarouselComponent
         disableScrollControls={false}
-        buyButton={deviceDetected ? (
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            width: '100%',
-          }}>
-            <div className="cyber-candle-btn" style={{
-              opacity: mounted ? 1 : 0,
-              transition: 'opacity 0.3s',
-              display: 'inline-block',
-            }}>
-              <RetroFuturisticButton
-                onClick={() => setShowBuyModal(true)}
-                disabled={isLoading}
-                className="my-custom-class"
-              >
-                BUY RL80
-              </RetroFuturisticButton>
-            </div>
-          </div>
-        ) : null}
       />
       
       
@@ -425,6 +404,21 @@ export default function CarouselPage() {
         alignItems: "center",
         gap: "1rem"
       }}>
+        {/* Buy RL80 Button - top right on non-mobile */}
+        {deviceDetected && !isMobileDevice && (
+          <div className="cyber-candle-btn" style={{
+            opacity: mounted ? 1 : 0,
+            transition: 'opacity 0.3s',
+          }}>
+            <RetroFuturisticButton
+              onClick={() => setShowBuyModal(true)}
+              disabled={isLoading}
+              className="my-custom-class"
+            >
+              BUY RL80
+            </RetroFuturisticButton>
+          </div>
+        )}
         {/* Nav Controls */}
         <NavControlsHome 
           isPlaying={contextIsPlaying}
@@ -457,6 +451,27 @@ export default function CarouselPage() {
       />
       
       
+      {/* Buy RL80 Button - bottom right on mobile */}
+      {deviceDetected && isMobileDevice && (
+        <div className="cyber-candle-btn" style={{
+          position: 'absolute',
+          bottom: '2rem',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 300,
+          opacity: mounted ? 1 : 0,
+          transition: 'opacity 0.3s',
+        }}>
+          <RetroFuturisticButton
+            onClick={() => setShowBuyModal(true)}
+            disabled={isLoading}
+            className="my-custom-class"
+          >
+            BUY RL80
+          </RetroFuturisticButton>
+        </div>
+      )}
+
       {/* RL80 Logo - Mobile Only */}
       {deviceDetected && isMobileDevice && (
         <div style={{

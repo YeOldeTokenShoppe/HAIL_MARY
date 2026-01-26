@@ -1,0 +1,826 @@
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { useFrame } from '@react-three/fiber';
+import { useGLTF } from '@react-three/drei';
+import { EffectComposer, Bloom } from '@react-three/postprocessing';
+import * as THREE from 'three';
+
+// Preload the candle model
+useGLTF.preload('/models/tinyJapCanOnly.glb');
+
+// Shared time uniform for flame animation
+const flameUniforms = {
+  uTime: { value: 0 }
+};
+
+// Create flame material with flicker animation (from CandleShrine)
+function createFlameMaterial(phase = 0) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: flameUniforms.uTime,
+      uPhase: { value: phase }
+    },
+    vertexShader: `
+      uniform float uTime;
+      uniform float uPhase;
+
+      varying float vHeight;
+      varying float vPhase;
+
+      void main() {
+        vec3 pos = position;
+
+        // Height normalized 0-1
+        vHeight = clamp((pos.y + 0.1) / 0.6, 0.0, 1.0);
+        vPhase = uPhase;
+
+        // Flame flicker animation
+        float flameTime = uTime * 3.0 + uPhase;
+
+        // Strong sway side to side
+        float sway = sin(flameTime * 1.5) * 0.06 * vHeight * vHeight;
+        sway += sin(flameTime * 2.3) * 0.03 * vHeight;
+        pos.x += sway;
+
+        // Flicker height
+        float flicker = sin(flameTime * 2.0) * 0.04 * vHeight;
+        flicker += sin(flameTime * 3.7) * 0.02 * vHeight * vHeight;
+        pos.y += flicker;
+
+        // Z wobble
+        pos.z += cos(flameTime * 1.8) * 0.04 * vHeight * vHeight;
+
+        // Taper at top
+        float taper = 1.0 - vHeight * 0.5;
+        pos.x *= taper;
+        pos.z *= taper;
+
+        // Vertical stretch
+        float stretch = 1.0 + sin(flameTime * 2.5) * 0.1 * vHeight;
+        pos.y *= stretch;
+
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float uTime;
+      uniform float uPhase;
+      varying float vHeight;
+      varying float vPhase;
+
+      void main() {
+        float time = uTime * 3.0 + vPhase;
+
+        // Base flame colors
+        vec3 innerColor = vec3(1.0, 0.95, 0.8);
+        vec3 midColor = vec3(1.0, 0.5, 0.0);
+        vec3 outerColor = vec3(1.0, 0.2, 0.0);
+
+        vec3 color;
+        if (vHeight < 0.3) {
+          color = mix(innerColor, midColor, vHeight / 0.3);
+        } else if (vHeight < 0.7) {
+          color = mix(midColor, outerColor, (vHeight - 0.3) / 0.4);
+        } else {
+          color = mix(outerColor, vec3(1.0, 0.8, 0.0), (vHeight - 0.7) / 0.3);
+        }
+
+        float flicker = sin(time * 4.0) * 0.25 + sin(time * 9.0) * 0.15 + 1.0;
+        float intensity = 3.5 * flicker;
+        float alpha = (1.0 - vHeight * 0.5) * (0.8 + flicker * 0.2);
+
+        gl_FragColor = vec4(color * intensity, alpha);
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    toneMapped: false,
+  });
+}
+
+// Postprocessing component to be used alongside MobileCandleOrbital
+export function CandleOrbitalEffects() {
+  return (
+    <EffectComposer>
+      <Bloom
+        intensity={1}
+        luminanceThreshold={0.2}
+        luminanceSmoothing={0.9}
+        mipmapBlur
+        radius={0.4}
+      />
+    </EffectComposer>
+  );
+}
+
+// Global cache to prevent duplicate candle extraction across remounts
+const globalCandleCache = {
+  candles: null,
+  modelId: null
+};
+
+// Orbital candle component that receives a cloned VCANDLE
+function OrbitalCandle({ angle, radius, candleObject, userData, index, onClick, isLeader, transitionState, isViewerOpen }) {
+  const groupRef = useRef();
+  const candleRef = useRef();
+  const frozenTimeRef = useRef(null);
+  const frozenRotationRef = useRef(null);
+  const createdTexturesRef = useRef([]);
+  const createdMaterialsRef = useRef([]);
+  
+  // Setup candle on mount
+  useEffect(() => {
+    if (!candleObject || !groupRef.current) return;
+    
+    // Scale the candle appropriately for mobile
+    // VCANDLEs might be very small in the original scene
+    candleObject.scale.set(0.3, 0.3, 0.3); // Much larger scale for visibility
+    
+    // Ensure the candle is centered in its group
+    const box = new THREE.Box3().setFromObject(candleObject);
+    const center = box.getCenter(new THREE.Vector3());
+    candleObject.position.sub(center);
+    candleObject.position.y = 0; // Reset Y to baseline
+    
+    // Apply user data to the cloned candle
+    if (userData) {
+      // Update userData on the candle object
+      candleObject.userData = {
+        ...candleObject.userData,
+        ...userData,
+        hasUser: true
+      };
+      
+      // Apply user image with username to labels if available
+      if (userData.image || userData.username || userData.userName) {
+        // Create canvas for combined image and username
+        // Use smaller texture on mobile to save memory
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;  // Reduced from 1024 for mobile memory
+        canvas.height = 256;  // Reduced from 1024 for mobile memory
+        const ctx = canvas.getContext('2d');
+        
+        // Fill background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Get username (check multiple possible fields)
+        const username = userData.username || userData.userName || userData.name || '';
+        
+        // Function to create texture with image and name
+        const createCombinedTexture = (img) => {
+          // Clear canvas
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          
+          // Draw the image (leave space at bottom for name if username exists)
+          const imageHeight = username ? canvas.height * 0.9 : canvas.height;
+          ctx.drawImage(img, 0, 0, canvas.width, imageHeight);
+          
+          // Draw username if provided
+          if (username && username.trim()) {
+            // Create gradient background for text
+            const gradient = ctx.createLinearGradient(0, imageHeight, 0, canvas.height);
+            gradient.addColorStop(0, 'rgba(0, 0, 0, 0.7)');
+            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.9)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, imageHeight, canvas.width, canvas.height - imageHeight);
+            
+            // Draw the username
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            const textY = imageHeight + (canvas.height - imageHeight) / 2;
+            
+            // Add text shadow for better readability
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+            
+            ctx.fillText(username, canvas.width / 2, textY);
+          }
+          
+          // Create texture from canvas
+          const texture = new THREE.CanvasTexture(canvas);
+          texture.wrapS = THREE.ClampToEdgeWrapping;
+          texture.wrapT = THREE.ClampToEdgeWrapping;
+          texture.minFilter = THREE.LinearMipMapLinearFilter;
+          texture.magFilter = THREE.LinearFilter;
+          texture.anisotropy = 16;
+          texture.generateMipmaps = true;
+          texture.needsUpdate = true;
+          createdTexturesRef.current.push(texture); // Track for disposal
+          
+          // Apply texture to both labels
+          candleObject.traverse((child) => {
+            // Apply to Label1 objects (flipped)
+            if (child.name?.includes('Label1')) {
+              if (child.material) {
+                child.material = child.material.clone();
+                
+                // Clone and flip texture for Label1
+                const flippedTexture = texture.clone();
+                flippedTexture.center.set(0.5, 0.5);
+                flippedTexture.repeat.set(1, -1);
+                flippedTexture.needsUpdate = true;
+                
+                child.material.map = flippedTexture;
+                child.material.needsUpdate = true;
+              }
+            }
+            // Apply to Label2 objects (normal)
+            else if (child.name?.includes('Label2')) {
+              if (child.material) {
+                child.material = child.material.clone();
+                
+                // Use the texture directly (not flipped) for Label2
+                child.material.map = texture.clone();
+                child.material.needsUpdate = true;
+                
+                // Add subtle emissive glow to Label2
+                child.material.emissive = new THREE.Color(0xffffff);
+                child.material.emissiveMap = child.material.map;
+                child.material.emissiveIntensity = 0.2; // Subtle glow
+              }
+            }
+          });
+        };
+        
+        // Load and apply the image
+        if (userData.image) {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => createCombinedTexture(img);
+          img.onerror = () => {
+            // If image fails to load, create texture with just the name
+            const defaultImg = new Image();
+            defaultImg.onload = () => createCombinedTexture(defaultImg);
+            defaultImg.src = '/defaultAvatar.png';
+          };
+          img.src = userData.image;
+        } else {
+          // No image provided, use default
+          const defaultImg = new Image();
+          defaultImg.onload = () => createCombinedTexture(defaultImg);
+          defaultImg.src = '/defaultAvatar.png';
+        }
+      }
+    }
+    
+    // Apply flame flicker shader to flame meshes
+    const flamePhase = Math.random() * Math.PI * 2; // Random phase for each candle
+    candleObject.traverse((child) => {
+      if (child.isMesh && child.name?.toLowerCase().includes('flame')) {
+        const flameMaterial = createFlameMaterial(flamePhase);
+        createdMaterialsRef.current.push(flameMaterial);
+        child.material = flameMaterial;
+        child.renderOrder = 10; // Render flames on top
+      }
+    });
+
+    // Alternate wax colors between red and green
+    candleObject.traverse((child) => {
+      if (child.isMesh && child.name?.toLowerCase() === 'wax') {
+        const waxMaterial = child.material.clone();
+        createdMaterialsRef.current.push(waxMaterial);
+        // Alternate based on index: even = red, odd = green
+        if (index % 2 === 0) {
+          waxMaterial.color = new THREE.Color(0xcc2222); // Red
+        } else {
+          waxMaterial.color = new THREE.Color(0x22cc22); // Green
+        }
+        child.material = waxMaterial;
+      }
+    });
+
+    // Enhance flame effects for the leader (brighter intensity)
+    if (isLeader) {
+      candleObject.traverse((child) => {
+        if (child.isMesh && child.name?.toLowerCase().includes('flame')) {
+          // Leader flames are already using custom shader, just make them brighter
+          if (child.material.uniforms) {
+            // The shader handles intensity via the flicker calculation
+          }
+        }
+      });
+    }
+
+    // Add candle to group
+    candleRef.current = candleObject;
+    groupRef.current.add(candleObject);
+    
+    // Cleanup on unmount
+    return () => {
+      if (candleRef.current && groupRef.current) {
+        groupRef.current.remove(candleRef.current);
+      }
+      // Dispose created textures
+      createdTexturesRef.current.forEach(texture => {
+        if (texture && texture.dispose) texture.dispose();
+      });
+      createdTexturesRef.current = [];
+      // Dispose created materials (including flame shaders)
+      createdMaterialsRef.current.forEach(material => {
+        if (material && material.dispose) material.dispose();
+      });
+      createdMaterialsRef.current = [];
+    };
+  }, [candleObject, userData, isLeader, index]);
+  
+  useFrame((state) => {
+    if (groupRef.current) {
+      // Check if viewer is open
+      const viewerOpen = isViewerOpen;
+      
+      // Manage frozen time
+      if (viewerOpen && frozenTimeRef.current === null) {
+        // Just opened - freeze the time
+        frozenTimeRef.current = state.clock.elapsedTime;
+        if (candleRef.current) {
+          frozenRotationRef.current = candleRef.current.rotation.y;
+        }
+      } else if (!viewerOpen && frozenTimeRef.current !== null) {
+        // Just closed - unfreeze
+        frozenTimeRef.current = null;
+        frozenRotationRef.current = null;
+      }
+      
+      // Use frozen time if viewer is open
+      const currentTime = frozenTimeRef.current !== null ? frozenTimeRef.current : state.clock.elapsedTime;
+      
+      // Check if we're in a transition
+      if (transitionState && transitionState.isTransitioning && transitionState.progress !== undefined) {
+        const { progress, isFadingOut } = transitionState;
+        
+        // Debug log transition in candle
+        if (index === 0 && Math.random() < 0.05) {
+         
+        }
+        
+        if (isFadingOut) {
+          // Fade out phase - spiral outward
+          const spiralOffset = progress * Math.PI * 2;
+          const spiralRadius = radius + (progress * 8);
+          const fadeOut = Math.max(0, 1 - progress * 2);
+          const scaleEffect = Math.max(0.1, 1 - progress);
+          
+          groupRef.current.position.x = Math.cos(angle + spiralOffset) * spiralRadius;
+          groupRef.current.position.z = Math.sin(angle + spiralOffset) * spiralRadius;
+          groupRef.current.position.y = progress * 3;
+          groupRef.current.scale.setScalar(scaleEffect);
+          
+          // Fade materials
+          if (candleRef.current) {
+            candleRef.current.traverse((child) => {
+              if (child.material) {
+                if (!child.material.transparent) {
+                  child.material.transparent = true;
+                }
+                child.material.opacity = fadeOut;
+              }
+            });
+          }
+        } else {
+          // Fade in phase - spiral inward
+          const time = currentTime * 0.25;
+          const targetOrbitAngle = angle + time;
+          
+          // Calculate where the candle should be in its normal orbit
+          const targetRadiusVariation = Math.sin(targetOrbitAngle * 3) * 0.3;
+          const targetEffectiveRadius = radius + targetRadiusVariation;
+          const targetX = Math.cos(targetOrbitAngle) * targetEffectiveRadius * 1.3;
+          const targetZ = Math.sin(targetOrbitAngle) * targetEffectiveRadius * 0.7;
+          const targetY = Math.sin(targetOrbitAngle * 2) * 0.3 + Math.sin(currentTime * 2 + index) * 0.1;
+          
+          // Start from far out and spiral in to the target position
+          const spiralOffset = (1 - progress) * Math.PI * 2;
+          const spiralRadius = radius + ((1 - progress) * 8);
+          const fadeIn = progress;
+          const scaleEffect = 0.1 + (progress * 0.9);
+          
+          // Interpolate from spiral position to target orbit position
+          const spiralX = Math.cos(angle + spiralOffset) * spiralRadius;
+          const spiralZ = Math.sin(angle + spiralOffset) * spiralRadius;
+          const spiralY = (1 - progress) * 3;
+          
+          // Smooth interpolation to target position
+          groupRef.current.position.x = spiralX * (1 - progress) + targetX * progress;
+          groupRef.current.position.z = spiralZ * (1 - progress) + targetZ * progress;
+          groupRef.current.position.y = spiralY * (1 - progress) + targetY * progress;
+          
+          // Scale interpolation
+          const targetFrontness = (targetZ + radius * 0.7) / (radius * 1.4);
+          const targetScale = 0.4 + targetFrontness * 0.3;
+          groupRef.current.scale.setScalar(scaleEffect * (1 - progress) + targetScale * progress);
+          
+          // Fade materials
+          if (candleRef.current) {
+            candleRef.current.traverse((child) => {
+              if (child.material) {
+                if (!child.material.transparent) {
+                  child.material.transparent = true;
+                }
+                child.material.opacity = fadeIn;
+              }
+            });
+          }
+        }
+      } else {
+        // Normal orbital animation
+        const time = currentTime * 0.25;
+        const orbitAngle = angle + time;
+        
+        const radiusVariation = Math.sin(orbitAngle * 3) * 0.3;
+        const effectiveRadius = radius + radiusVariation;
+        
+        const x = Math.cos(orbitAngle) * effectiveRadius * 1.3;
+        const z = Math.sin(orbitAngle) * effectiveRadius * 0.7;
+        const y = Math.sin(orbitAngle * 2) * 0.9 + Math.sin(currentTime * 2 + index) * 0.1;
+        
+        groupRef.current.position.set(x, y, z);
+        
+        if (candleRef.current) {
+          candleRef.current.rotation.y = frozenRotationRef.current !== null ? frozenRotationRef.current : currentTime * 0.5;
+        }
+        
+        const frontness = (z + radius * 0.7) / (radius * 1.4);
+        const scale = 0.4 + frontness * 0.3;
+        groupRef.current.scale.setScalar(scale);
+        
+        if (candleRef.current) {
+          candleRef.current.traverse((child) => {
+            if (child.material) {
+              // Reset opacity to full for non-transition state
+              if (child.material.transparent && child.material.opacity < 1) {
+                child.material.opacity = 1;
+              }
+            }
+          });
+        }
+      }
+    }
+  });
+  
+  const handleClick = (e) => {
+    e.stopPropagation();
+    onClick({
+      ...userData,
+      candleId: `mobile-candle-${index}`,
+      candleTimestamp: Date.now(),
+    });
+  };
+  
+  return (
+    <group ref={groupRef} onClick={handleClick}>
+      {/* No badges or text - just the pure candle objects */}
+    </group>
+  );
+}
+
+// Main orbital system to be added to existing scene
+function MobileCandleOrbital({ candleData = [], onCandleClick, modelRef, onPaginationChange, isViewerOpen = false, sortBy }) {
+  const groupRef = useRef();
+  const [vcandleObjects, setVcandleObjects] = useState([]);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // Load the candle model directly
+  const { scene: candleModel } = useGLTF('/models/tinyJapCanOnly.glb');
+
+  // Debug log
+  useEffect(() => {
+
+  }, [isViewerOpen]);
+  const [transitionStartTime, setTransitionStartTime] = useState(0);
+  const [nextPage, setNextPage] = useState(0); // Store the page we're transitioning to
+
+  // Configuration for the Illumin80
+  const VISIBLE_CANDLES = 8;
+  const ROTATION_INTERVAL = 15000; // 15 seconds between rotations
+  const TRANSITION_DURATION = 2000; // 2 second fade transition
+
+  // Extract and clone candle objects from the loaded model
+  useEffect(() => {
+    if (!candleModel) return;
+
+    // Check global cache first to prevent duplicate extractions across remounts
+    const modelId = 'tinyJapCanOnly';
+    if (globalCandleCache.modelId === modelId && globalCandleCache.candles) {
+      console.log('[MobileCandleOrbital] Using cached candles from global cache');
+      setVcandleObjects(globalCandleCache.candles);
+      return;
+    }
+
+    console.log('[MobileCandleOrbital] Extracting candles from tinyJapCanOnly.glb...');
+    const extractedCandles = [];
+
+    // Clone the entire model as our base candle
+    const clonedCandle = candleModel.clone(true);
+
+    // Make sure the cloned candle and all its children are visible
+    clonedCandle.visible = true;
+    clonedCandle.traverse((descendant) => {
+      descendant.visible = true;
+    });
+
+    // Create multiple candle instances for the orbital display
+    for (let i = 0; i < 8; i++) {
+      const candleInstance = clonedCandle.clone(true);
+      candleInstance.visible = true;
+      candleInstance.traverse((descendant) => {
+        descendant.visible = true;
+      });
+
+      extractedCandles.push({
+        object: candleInstance,
+        name: `CANDLE${i}`,
+        userData: {}
+      });
+    }
+
+    // Debug: Log details about extracted candles
+    console.log(`[MobileCandleOrbital] Created ${extractedCandles.length} candle instances`);
+
+    // Cache the extracted candles globally
+    globalCandleCache.modelId = modelId;
+    globalCandleCache.candles = extractedCandles;
+
+    setVcandleObjects(extractedCandles);
+  }, [candleModel]);
+  
+  // Get all sorted user data (up to 80 for Illumin80/LAI80)
+  const allSortedData = React.useMemo(() => {
+    if (candleData.length > 0) {
+      // Data is already sorted by the hook based on sortBy prop
+      // No need to re-sort here since useFirestoreResults handles it
+      const realData = [...candleData];
+      
+      // For testing: Add mock data to make pagination visible
+      const mockData = Array(20).fill(null).map((_, i) => ({
+        id: `mock-${i}`,
+        userName: `TestUser${i + 1}`,
+        username: `TestUser${i + 1}`,
+        burnedAmount: Math.floor(Math.random() * 100),
+        image: i % 2 === 0 ? '/vvv.jpg' : '/vsClown.jpg'
+      }));
+      
+      return [...realData, ...mockData].slice(0, 80); // Combine real and mock data
+    }
+    // Fallback mock data
+    return Array(80).fill(null).map((_, i) => ({
+      id: `mock-${i}`,
+      userName: `Player${i + 1}`,
+      username: `Player${i + 1}`,
+      burnedAmount: Math.floor(Math.random() * 1000),
+      image: i % 2 === 0 ? '/vvv.jpg' : '/vsClown.jpg'
+    }));
+  }, [candleData, sortBy]);
+
+  // Calculate total pages
+  const totalPages = Math.ceil(allSortedData.length / VISIBLE_CANDLES);
+
+  // Get current page of users
+  const currentPageData = React.useMemo(() => {
+    const startIdx = currentPage * VISIBLE_CANDLES;
+    const endIdx = startIdx + VISIBLE_CANDLES;
+  
+    return allSortedData.slice(startIdx, endIdx);
+  }, [allSortedData, currentPage]);
+
+  // Combine current page data with VCANDLE objects
+  const combinedData = React.useMemo(() => {
+    if (vcandleObjects.length === 0) return [];
+    
+    return currentPageData.map((userData, index) => {
+      const vcandleIndex = index < vcandleObjects.length ? index : index % vcandleObjects.length;
+      
+      // Deep clone the candle object
+      const clonedCandle = vcandleObjects[vcandleIndex].object.clone(true);
+      
+      // Only clone materials if we're going to modify them (for labels with userData)
+      // This saves significant memory by reusing materials when possible
+      if (userData && (userData.image || userData.username || userData.userName)) {
+        clonedCandle.traverse((child) => {
+          if (child.material && child.name && child.name.toLowerCase().includes('label')) {
+            // Only clone materials for label meshes that will be modified
+            if (Array.isArray(child.material)) {
+              child.material = child.material.map(mat => mat.clone());
+            } else {
+              child.material = child.material.clone();
+            }
+          }
+        });
+      }
+      
+      return {
+        userData: {
+          ...userData,
+          // Ensure we have all the expected fields
+          userName: userData.userName || userData.username || `Player ${index + 1}`,
+          image: userData.image || userData.profileImage || null,
+          burnedAmount: userData.burnedAmount || 0,
+          message: userData.message || '',
+          createdAt: userData.createdAt || new Date()
+        },
+        candleObject: clonedCandle,
+        originalName: `${vcandleObjects[vcandleIndex].name}-page${currentPage}-idx${index}`,
+        globalIndex: currentPage * VISIBLE_CANDLES + index // Track position in Illumin80
+      };
+    });
+  }, [currentPageData, vcandleObjects, currentPage]);
+  
+  // Create a stable setCurrentPage function (moved here to avoid circular dependency)
+  const handleSetCurrentPage = useCallback((page) => {
+   
+    
+    // If viewer is open, just change page without transition animation
+    if (isViewerOpen) {
+  
+      setCurrentPage(page);
+      return;
+    }
+    
+    // Start transition with current candles
+    setIsTransitioning(true);
+    const startTime = Date.now();
+    setTransitionStartTime(startTime);
+    setNextPage(page); // Store where we're going
+    
+    // Immediately set initial transition state
+    setTransitionState({
+      isTransitioning: true,
+      progress: 0,
+      isFadingOut: true
+    });
+    
+
+    
+    // Wait for candles to spiral out before changing
+    setTimeout(() => {
+      setCurrentPage(page);
+    
+      
+      // Continue transition for fade-in
+      setTimeout(() => {
+        setIsTransitioning(false);
+        setTransitionStartTime(0);
+      }, TRANSITION_DURATION / 2);
+    }, TRANSITION_DURATION / 2); // Change page halfway through transition
+  }, [TRANSITION_DURATION, isViewerOpen]);
+  
+  // Create transition state to pass to children
+  const [transitionState, setTransitionState] = useState(null);
+  
+  // Track if we've done the initial spin effect
+  const [hasInitialSpinCompleted, setHasInitialSpinCompleted] = useState(false);
+  
+  // Auto spin effect after initial load (without pagination)
+  useEffect(() => {
+    if (!hasInitialSpinCompleted && vcandleObjects.length > 0) {
+      // Wait for the initial load time before doing the spin effect
+      const timer = setTimeout(() => {
+
+        
+        // Start the transition animation
+        setIsTransitioning(true);
+        const startTime = Date.now();
+        setTransitionStartTime(startTime);
+        
+        // Set initial transition state for spin effect
+        setTransitionState({
+          isTransitioning: true,
+          progress: 0,
+          isFadingOut: true // Start with fade-out for the spin
+        });
+        
+        // After half duration, switch to fade-in (but don't change page)
+        setTimeout(() => {
+          setTransitionState({
+            isTransitioning: true,
+            progress: 0,
+            isFadingOut: false
+          });
+        }, TRANSITION_DURATION / 2);
+        
+        // End the transition after full duration
+        setTimeout(() => {
+          setIsTransitioning(false);
+          setTransitionStartTime(0);
+          setHasInitialSpinCompleted(true);
+    
+        }, TRANSITION_DURATION);
+      }, ROTATION_INTERVAL); // Use same delay as before
+      
+      return () => clearTimeout(timer);
+    }
+  }, [hasInitialSpinCompleted, vcandleObjects.length, ROTATION_INTERVAL, TRANSITION_DURATION]);
+  
+  
+  // Add a slow overall rotation to the entire group and update flame animation
+  useFrame((state) => {
+    // Update flame animation time uniform
+    flameUniforms.uTime.value = state.clock.elapsedTime;
+
+    if (groupRef.current) {
+      if (isViewerOpen) {
+        // Don't update rotation when viewer is open
+      } else {
+        // Only rotate when viewer is closed
+        groupRef.current.rotation.y = state.clock.elapsedTime * 0.05;
+      }
+    }
+    
+    // Update transition state
+    if (groupRef.current && isTransitioning && transitionStartTime > 0) {
+        const elapsed = Date.now() - transitionStartTime;
+        const halfDuration = TRANSITION_DURATION / 2;
+        
+        // Determine which phase we're in
+        const isFadingOut = elapsed < halfDuration;
+        const phaseProgress = isFadingOut 
+          ? elapsed / halfDuration // 0 to 1 during fade out
+          : (elapsed - halfDuration) / halfDuration; // 0 to 1 during fade in
+        
+        // Update transition state for children
+        setTransitionState({
+          isTransitioning: true,
+          progress: phaseProgress,
+          isFadingOut
+        });
+        
+        // Debug logging - only log every 10th frame or so
+        if (Math.random() < 0.05) {
+         
+        }
+    } else if (transitionState) {
+      // Clear transition state when not transitioning
+      setTransitionState(null);
+    }
+  });
+  
+
+  // Pass pagination state up to parent
+  useEffect(() => {
+    if (onPaginationChange) {
+      onPaginationChange({
+        currentPage,
+        totalPages,
+        setCurrentPage: handleSetCurrentPage,
+        visibleRange: {
+          start: currentPage * VISIBLE_CANDLES + 1,
+          end: Math.min((currentPage + 1) * VISIBLE_CANDLES, allSortedData.length)
+        },
+        total: allSortedData.length
+      });
+    }
+  }, [currentPage, totalPages, allSortedData.length, onPaginationChange, handleSetCurrentPage]);
+
+  return (
+    <group ref={groupRef} position={[0, -0.3, 0]}>
+      {/* The candles */}
+      {combinedData.map((item, index) => {
+        const angle = (index / Math.min(combinedData.length, 8)) * Math.PI * 2;
+        return (
+          <OrbitalCandle
+            key={item.originalName || index}
+            angle={angle}
+            radius={1} // Distance from center - increased for better spacing
+            candleObject={item.candleObject}
+            userData={item.userData}
+            index={index}
+            onClick={onCandleClick}
+            isLeader={index === 0}
+            transitionState={transitionState}
+            isViewerOpen={isViewerOpen}
+          />
+        );
+      })}
+      
+      {/* Central glow effect */}
+      <pointLight
+        position={[0, 0, 0]}
+        color="#8b7dd8"
+        intensity={0.5}
+        distance={6}
+        decay={2}
+      />
+    </group>
+  );
+}
+
+// Wrap with React.memo to prevent unnecessary re-renders and re-extractions
+export default React.memo(MobileCandleOrbital, (prevProps, nextProps) => {
+  // Only re-render if these critical props change
+  return (
+    prevProps.candleData === nextProps.candleData &&
+    prevProps.modelRef === nextProps.modelRef &&
+    prevProps.isViewerOpen === nextProps.isViewerOpen &&
+    prevProps.sortBy === nextProps.sortBy &&
+    prevProps.onCandleClick === nextProps.onCandleClick &&
+    prevProps.onPaginationChange === nextProps.onPaginationChange
+  );
+});
