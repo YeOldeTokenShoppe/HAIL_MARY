@@ -961,8 +961,13 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               textAlign: 'center',
               padding: '0 1rem',
             }}>
-             All monetary systems are belief systems.<br/>
-Cryptocurrency was designed to be a less corruptible, technologically superior form of money—yet, ironically, it has earned a poor reputation, and not without reason.<br/><br/> It doesn’t have to be that way. <br/><br/>RL80 is a return to first principles: minimized trust, constant vigilance, distributed power, universal access.</p>
+              {isMobilePhone ? (
+                <>RL80 is a return to first principles: minimized trust, constant vigilance, distributed power, universal access.</>
+              ) : (
+                <>All monetary systems are belief systems.<br/>
+Cryptocurrency was designed to be a less corruptible, technologically superior form of money—yet, ironically, it has earned a poor reputation, and not without reason.<br/><br/> It doesn&apos;t have to be that way. <br/><br/>RL80 is a return to first principles: minimized trust, constant vigilance, distributed power, universal access.</>
+              )}
+            </p>
     
 
             {/* Tokenomics Navigation - tablet portrait only */}
