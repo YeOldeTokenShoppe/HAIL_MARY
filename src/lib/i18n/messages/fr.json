@@ -97,6 +97,26 @@
       }
     ]
   },
+  "illumin80": {
+    "watchlistLine1": "Entrez sur sa",
+    "watchlistLine2": "liste de surveillance",
+    "watchlistTitle": "Entrez Sur Sa Liste De Surveillance"
+  },
+  "cyberNav": {
+    "nav00": { "date": "ICÔNE SUR LA I-80", "title": "FEUILLE DE ROUTE" },
+    "nav01": { "date": "GRAVITÉ DEFI", "title": "À PROPOS DE RL80" },
+    "nav02": { "date": "GALERIE INFINIE", "title": "VISITE DE LA GALERIE" },
+    "nav03": { "date": "QUANTITÉ ET QUALITÉ", "title": "TOKENOMICS ET FAQ" },
+    "nav04": { "date": "UTILITÉ LUMINEUSE", "title": "LES ILLUMINATI" },
+    "nav05": { "date": "SOCIÉTÉ POLIE", "title": "SALON DE DISCUSSION" },
+    "nav06": { "date": "ÉTHIQUE ET MORALITÉ", "title": "PARCHEMINS DE ST. GR80" },
+    "nav07": { "date": "ESPOIR ET CHARITÉ", "title": "FONTAINE À PIÈCES" }
+  },
+  "about": {
+    "skewedHeading1": { "line1": "PROSPÉRITÉ", "line2": "POUR TOUTE", "line3": "L'HUMANITÉ!" },
+    "skewedHeading2": { "line1": "UNE ICÔNE", "line2": "INTEMPORELLE POUR", "line3": "L'ÈRE NUMÉRIQUE" },
+    "skewedHeading3": { "line1": "ENTREZ DANS", "line2": "LE TERMINAL", "line3": "LIMINAL" }
+  },
   "buyModal": {
     "title": "ACHETER_RL80_",
     "secureTransaction": "<PROTOCOLE_TRANSACTION_SÉCURISÉE_ACTIF>"

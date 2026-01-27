@@ -11,6 +11,7 @@ import LightCandleModal from '@/components/LightCandleModal'
 import StakeModal from '@/components/StakeModal'
 import { WalletConnectionModal } from '@/components/WalletConnectionModal'
 import { useRouter, usePathname } from 'next/navigation'
+import { useLanguage } from '@/components/LanguageProvider'
 import ShrineLeftPanel from '@/components/ShrineLeftPanel'
 import { db, collection, getDocs, query, orderBy, limit, onSnapshot, updateDoc, doc } from '@/lib/firebaseClient'
 import UnifiedShrine from '@/components/UnifiedShrine'
@@ -23,6 +24,7 @@ import CoinLoader from '@/components/CoinLoader'
 
 export default function ShrinePage() {
   const router = useRouter()
+  const { t } = useLanguage()
   const pathname = usePathname()
   const { user, isLoaded: userLoaded, isSignedIn } = useUser()
   const { isWalletConnected, walletAddress, connectWallet } = useWalletAuth()
@@ -895,7 +897,7 @@ useEffect(() => {
                   color: 'rgba(212, 175, 55, 0.9)',
                   textAlign: 'center',
                 }}>
-                  Get On Her Watchlist
+                  {t('illumin80.watchlistTitle')}
                 </div>
                 <div style={{ 
                   fontSize: '1rem',

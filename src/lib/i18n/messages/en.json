@@ -102,6 +102,26 @@
       }
     ]
   },
+  "illumin80": {
+    "watchlistLine1": "Get on her",
+    "watchlistLine2": "watchlist",
+    "watchlistTitle": "Get On Her Watchlist"
+  },
+  "cyberNav": {
+    "nav00": { "date": "ICON ON I-80", "title": "ROADMAP" },
+    "nav01": { "date": "DEFI GRAV80", "title": "SOMETHING ABOUT RL80" },
+    "nav02": { "date": "INFIN80 GALLERY", "title": "GALLERY RIDE" },
+    "nav03": { "date": "QUANT80 & QUAL80", "title": "TOKENOMICS & FAQ" },
+    "nav04": { "date": "LIGHT UTIL80", "title": "THE ILLUMIN80" },
+    "nav05": { "date": "POLITE SOCI80", "title": "CHAT ROOM" },
+    "nav06": { "date": "ETHICS & MORAL80", "title": "SCROLLS OF ST. GR80" },
+    "nav07": { "date": "HOPE & CHAR80", "title": "COIN FOUNTAIN" }
+  },
+  "about": {
+    "skewedHeading1": { "line1": "PROSPER80", "line2": "FOR ALL", "line3": "HUMAN80!" },
+    "skewedHeading2": { "line1": "A TIMELESS", "line2": "ICON FOR THE", "line3": "DIGITAL AGE" },
+    "skewedHeading3": { "line1": "ENTER THE", "line2": "LIMINAL", "line3": "TERMINAL" }
+  },
   "buyModal": {
     "title": "BUY_RL80_",
     "secureTransaction": "<SECURE_TRANSACTION_PROTOCOL_ACTIVE>"

@@ -111,6 +111,7 @@ export default function SkewedHeading({
     <div
       ref={containerRef}
       onMouseEnter={handleMouseEnter}
+      translate="no"
       style={{
         position: 'relative',
         display: 'inline-block',
@@ -183,8 +184,6 @@ export default function SkewedHeading({
               style={{
                 display: 'flex',
                 justifyContent: 'center',
-                margin: '0 auto',
-                width: 'fit-content',
                 overflow: 'visible',
               }}
             >

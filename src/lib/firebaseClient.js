@@ -58,7 +58,6 @@ const hasRequiredEnvironmentVariables = () => {
 try {
   // Only initialize Firebase in the browser environment
   if (!isBrowser) {
-    console.log("🌍 Skipping Firebase client initialization on server side (use firebaseAdmin for API routes)");
     // Don't throw - let services be null and let consuming code handle it
     app = null;
     db = null;
@@ -69,14 +68,6 @@ try {
   
   // First check if we have the required environment variables
   if (!hasRequiredEnvironmentVariables()) {
-    console.warn('⚠️ Firebase environment variables are missing!');
-    console.warn('Please add the following to your .env file:');
-    console.warn('NEXT_PUBLIC_FIREBASE_API_KEY=...');
-    console.warn('NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=...');
-    console.warn('NEXT_PUBLIC_FIREBASE_PROJECT_ID=...');
-    console.warn('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=...');
-    console.warn('NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...');
-    console.warn('NEXT_PUBLIC_FIREBASE_APP_ID=...');
     throw new Error('Missing required Firebase environment variables');
   }
   
@@ -85,7 +76,6 @@ try {
   const missingKeys = requiredKeys.filter(key => !firebaseConfig[key]);
   
   if (missingKeys.length > 0) {
-    console.error("❌ Missing required Firebase config keys:", missingKeys);
     throw new Error(`Missing required Firebase config: ${missingKeys.join(', ')}`);
   }
   
@@ -101,19 +91,10 @@ try {
   // Verify Firestore is working by attempting to create a collection reference
   const testCollection = collection(db, 'test');
   
-  console.log("✅ Firebase services initialized successfully:", {
-    app: !!app,
-    db: !!db,
-    auth: !!auth,
-    storage: !!storage,
-    rtdb: !!rtdb,
-    testCollection: !!testCollection,
-    projectId: app.options.projectId
-  });
+
   } // Close the else block for isBrowser check
 
 } catch (error) {
-  console.error("❌ CRITICAL: Error initializing Firebase:", error);
   console.error("❌ Firebase initialization details:", {
     error: error.message,
     stack: error.stack?.substring(0, 500),

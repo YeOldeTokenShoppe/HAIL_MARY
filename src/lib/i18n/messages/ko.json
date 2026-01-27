@@ -98,6 +98,26 @@
     ]
   
   },
+  "illumin80": {
+    "watchlistLine1": "그녀의",
+    "watchlistLine2": "감시 목록에 오르다",
+    "watchlistTitle": "그녀의 감시 목록에 오르다"
+  },
+  "cyberNav": {
+    "nav00": { "date": "I-80의 아이콘", "title": "로드맵" },
+    "nav01": { "date": "DEFI 중력", "title": "RL80에 대해" },
+    "nav02": { "date": "무한 갤러리", "title": "갤러리 라이드" },
+    "nav03": { "date": "양과 질", "title": "토크노믹스 & FAQ" },
+    "nav04": { "date": "빛의 효용", "title": "일루미나티" },
+    "nav05": { "date": "예의 바른 사회", "title": "채팅방" },
+    "nav06": { "date": "윤리와 도덕", "title": "성 GR80의 두루마리" },
+    "nav07": { "date": "희망과 자선", "title": "코인 분수" }
+  },
+  "about": {
+    "skewedHeading1": { "line1": "번영을", "line2": "모든", "line3": "인류에게!" },
+    "skewedHeading2": { "line1": "디지털 시대의", "line2": "영원한", "line3": "아이콘" },
+    "skewedHeading3": { "line1": "들어서라", "line2": "리미널", "line3": "터미널" }
+  },
   "buyModal": {
     "title": "구매_RL80_",
     "secureTransaction": "<보안_거래_프로토콜_활성>"

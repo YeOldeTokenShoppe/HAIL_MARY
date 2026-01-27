@@ -98,6 +98,26 @@
     ]
   
   },
+  "illumin80": {
+    "watchlistLine1": "彼女の",
+    "watchlistLine2": "監視リストに入れ",
+    "watchlistTitle": "彼女の監視リストに入れ"
+  },
+  "cyberNav": {
+    "nav00": { "date": "I-80のアイコン", "title": "ロードマップ" },
+    "nav01": { "date": "DEFI重力", "title": "RL80について" },
+    "nav02": { "date": "無限ギャラリー", "title": "ギャラリーライド" },
+    "nav03": { "date": "量と質", "title": "トケノミクスとFAQ" },
+    "nav04": { "date": "光の効用", "title": "イルミナティ" },
+    "nav05": { "date": "上品な社会", "title": "チャットルーム" },
+    "nav06": { "date": "倫理と道徳", "title": "聖GR80の巻物" },
+    "nav07": { "date": "希望と慈善", "title": "コイン噴水" }
+  },
+  "about": {
+    "skewedHeading1": { "line1": "繁栄を", "line2": "すべての", "line3": "人類に!" },
+    "skewedHeading2": { "line1": "デジタル時代の", "line2": "不朽の", "line3": "アイコン" },
+    "skewedHeading3": { "line1": "入れ", "line2": "リミナル", "line3": "ターミナル" }
+  },
   "buyModal": {
     "title": "購入_RL80_",
     "secureTransaction": "<安全な取引プロトコル有効>"

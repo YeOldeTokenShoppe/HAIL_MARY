@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="google" content="translate" />
     <link
       rel="stylesheet"
       type="text/css"
@@ -42,6 +43,12 @@ This, dear disciples of decentralization, is the true miracle of our age. We hav
 Praise be to the protocol. May your gas fees be low and your transactions forever confirmed.        </p>
       </div>
     </div>
+    <script>
+      (function() {
+        var lang = new URLSearchParams(window.location.search).get('lang');
+        if (lang) document.documentElement.lang = lang;
+      })();
+    </script>
     <script src="./scroll.js"></script>
   </body>
 </html>

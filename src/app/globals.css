@@ -6570,6 +6570,13 @@ body .cl-internal-1uc9s2c:hover {
   z-index: 10 !important;
 }
 
+/* Invert X/Twitter icon so it's visible on dark backgrounds */
+body .cl-socialButtonsProviderIcon__x,
+body .cl-socialButtonsBlockButton__x .cl-socialButtonsProviderIcon,
+body .cl-socialButtonsIconButton__x .cl-socialButtonsProviderIcon {
+  filter: brightness(0) invert(1) !important;
+}
+
 /* Close button styling - pink X */
 body .cl-modalCloseButton {
   position: absolute !important;

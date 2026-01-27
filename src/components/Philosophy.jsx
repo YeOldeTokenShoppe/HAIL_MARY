@@ -19,6 +19,7 @@ import CoinLoader from '@/components/CoinLoader';
 import Numerology from '@/components/Numerology';
 import ScrollTransition from '@/components/ScrollTransition';
 import CleanCanvas from '@/components/CleanCanvas';
+import { useLanguage } from './LanguageProvider';
 function createChartTexture(data, chartType = 'line', label = '') {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
@@ -1206,6 +1207,7 @@ function PyramidModel() {
 useGLTF.preload('/models/pyramid.glb');
 
 export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onLoadingChange, is80sMode = false }) {
+  const { locale } = useLanguage();
   const [selectedChart, setSelectedChart] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
@@ -1339,7 +1341,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
   };
   
   const iframePos = getIframePositioning(deviceType);
-  const [currentScrollSrc, setCurrentScrollSrc] = useState(`/scroll5.html?device=${deviceType}`); // Default scroll with device info
+  const [currentScrollSrc, setCurrentScrollSrc] = useState(`/scroll5.html?device=${deviceType}&lang=${locale}`); // Default scroll with device info
   const [showNumerology, setShowNumerology] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [nextScrollSrc, setNextScrollSrc] = useState(null);
@@ -1823,7 +1825,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
               if (isTransitioning) return;
               
               // Store next scroll with device parameter
-              setNextScrollSrc(`${scrollPath}?device=${deviceType}`);
+              setNextScrollSrc(`${scrollPath}?device=${deviceType}&lang=${locale}`);
               setIsTransitioning(true);
               
               // Hide iframe during transition

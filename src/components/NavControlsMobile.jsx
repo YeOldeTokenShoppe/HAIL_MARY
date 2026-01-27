@@ -1,10 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useLanguage } from './LanguageProvider';
 
 // Cyberpunk Nav Controls - Mobile
-// Ultra compact: music, avatar, menu only
+// Ultra compact: music, avatar, language, menu
 
-export default function NavControlsMobile({ 
-  isPlaying, 
+const LANGUAGES = [
+  { code: 'en', label: 'EN' },
+  { code: 'es', label: 'ES' },
+  { code: 'zh', label: '中文' },
+  { code: 'fr', label: 'FR' },
+  { code: 'de', label: 'DE' },
+  { code: 'it', label: 'IT' },
+  { code: 'pt', label: 'PT' },
+  { code: 'ru', label: 'РУ' },
+  { code: 'ja', label: '日本' },
+  { code: 'ko', label: '한국' },
+  { code: 'hi', label: 'हिं' },
+  { code: 'vi', label: 'VI' },
+  { code: 'ar', label: 'عر' },
+  { code: 'la', label: 'LA' },
+];
+
+export default function NavControlsMobile({
+  isPlaying,
   onPlayMusic,
   onStopMusic,
   onSkipTrack,
@@ -16,6 +34,9 @@ export default function NavControlsMobile({
   userImage = null  // Accept user image from parent
 }) {
   const [emoji, setEmoji] = useState("😇");
+  const [langOpen, setLangOpen] = useState(false);
+  const langRef = useRef(null);
+  const { locale, setLocale } = useLanguage();
   
   // Alternate emoji
   useEffect(() => {
@@ -24,6 +45,19 @@ export default function NavControlsMobile({
     }, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  // Close language dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (langRef.current && !langRef.current.contains(e.target)) {
+        setLangOpen(false);
+      }
+    };
+    if (langOpen) {
+      document.addEventListener('pointerdown', handleClickOutside);
+      return () => document.removeEventListener('pointerdown', handleClickOutside);
+    }
+  }, [langOpen]);
   const handlePlayClick = () => {
     if (onPlayMusic) {
       onPlayMusic();
@@ -208,6 +242,77 @@ export default function NavControlsMobile({
           transform: rotate(-45deg) translate(4px, -4px);
         }
 
+        /* Language button */
+        .lang-btn-mobile {
+          width: 2.5rem;
+          height: 2.5rem;
+          border-radius: 10px;
+          background: rgba(0, 0, 0, 0.6);
+          border: 1px solid rgba(0, 245, 212, 0.4);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          color: #00f5d4;
+          font-size: 10px;
+          font-family: 'Orbitron', monospace;
+          font-weight: 700;
+          letter-spacing: 0.5px;
+          position: relative;
+          padding: 0;
+        }
+
+        .lang-btn-mobile:hover,
+        .lang-btn-mobile:active {
+          background: rgba(0, 245, 212, 0.15);
+          border-color: #00f5d4;
+          box-shadow: 0 0 8px rgba(0, 245, 212, 0.3);
+        }
+
+        .lang-dropdown-mobile {
+          position: absolute;
+          bottom: calc(100% + 8px);
+          right: 0;
+          background: rgba(10, 10, 20, 0.95);
+          backdrop-filter: blur(16px);
+          border: 1px solid rgba(0, 245, 212, 0.3);
+          border-radius: 10px;
+          padding: 6px;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 4px;
+          z-index: 10000;
+          min-width: 140px;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 245, 212, 0.1);
+        }
+
+        .lang-option-mobile {
+          padding: 6px 8px;
+          border-radius: 6px;
+          background: transparent;
+          border: 1px solid transparent;
+          color: rgba(255, 255, 255, 0.7);
+          font-family: 'Orbitron', monospace;
+          font-size: 10px;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          text-align: center;
+        }
+
+        .lang-option-mobile:hover {
+          background: rgba(0, 245, 212, 0.1);
+          color: #00f5d4;
+          border-color: rgba(0, 245, 212, 0.3);
+        }
+
+        .lang-option-mobile.active {
+          background: rgba(0, 245, 212, 0.15);
+          color: #00f5d4;
+          border-color: #00f5d4;
+          box-shadow: 0 0 6px rgba(0, 245, 212, 0.2);
+        }
+
         /* 80s Mode styling */
         .nav-mobile.mode-80s {
           background: rgba(20, 0, 40, 0.6);
@@ -241,6 +346,18 @@ export default function NavControlsMobile({
           border-color: #ff00ff;
           color: #ff00ff;
           box-shadow: 0 0 8px rgba(255, 0, 255, 0.3);
+        }
+
+        .mode-80s .lang-btn-mobile {
+          border-color: rgba(0, 255, 255, 0.4);
+          color: #00ffff;
+        }
+
+        .mode-80s .lang-btn-mobile:hover,
+        .mode-80s .lang-btn-mobile:active {
+          border-color: #00ffff;
+          background: rgba(0, 255, 255, 0.15);
+          box-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
         }
       `}</style>
 
@@ -296,8 +413,35 @@ export default function NavControlsMobile({
           <div className={`avatar-status-mobile ${isUserSignedIn ? '' : 'offline'}`} />
         </div>
 
+        {/* Language */}
+        <div ref={langRef} style={{ position: 'relative' }}>
+          <button
+            className="lang-btn-mobile"
+            onClick={() => setLangOpen(prev => !prev)}
+            title="Language"
+          >
+            {locale.toUpperCase()}
+          </button>
+          {langOpen && (
+            <div className="lang-dropdown-mobile">
+              {LANGUAGES.map(lang => (
+                <button
+                  key={lang.code}
+                  className={`lang-option-mobile ${locale === lang.code ? 'active' : ''}`}
+                  onClick={() => {
+                    setLocale(lang.code);
+                    setLangOpen(false);
+                  }}
+                >
+                  {lang.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Menu */}
-        <button 
+        <button
           className={`menu-button-mobile ${isMenuOpen ? 'open' : ''}`}
           onClick={handleMenuClick}
         >

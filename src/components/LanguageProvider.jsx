@@ -36,39 +36,42 @@ export function LanguageProvider({ children }) {
     const detectLanguage = () => {
       // Store the browser's detected language
       const browserLang = navigator.language || navigator.userLanguage;
-      const langCode = browserLang.split('-')[0].toLowerCase();
       setDetectedLanguage(browserLang);
-      
-      // Check localStorage first (user's saved preference)
+
+      // URL params first (explicit override, highest priority)
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlLang = urlParams.get('lang');
+
+      if (urlLang && translations[urlLang]) {
+        setLocale(urlLang);
+        localStorage.setItem('preferredLanguage', urlLang);
+        setIsAutoDetected(false);
+        return;
+      }
+
+      // Then check localStorage (user's saved preference)
       const savedLang = localStorage.getItem('preferredLanguage');
       if (savedLang && translations[savedLang]) {
         setLocale(savedLang);
         setIsAutoDetected(false);
         return;
       }
-      
-      // Check URL params second (manual override)
-      const urlParams = new URLSearchParams(window.location.search);
-      const urlLang = urlParams.get('lang');
-      
-      if (urlLang && translations[urlLang]) {
-        // console.log('Language set from URL param:', urlLang);
-        setLocale(urlLang);
-        localStorage.setItem('preferredLanguage', urlLang);
-        setIsAutoDetected(false);
-        return;
+
+      // Finally, try browser languages (ordered by user preference)
+      const browserLangs = navigator.languages || [browserLang];
+      for (const lang of browserLangs) {
+        const langCode = lang.split('-')[0].toLowerCase();
+        if (translations[langCode]) {
+          setLocale(langCode);
+          localStorage.setItem('preferredLanguage', langCode);
+          setIsAutoDetected(true);
+          return;
+        }
       }
-      
-      // Finally, try to use browser language
-      if (translations[langCode]) {
-        // console.log('Auto-setting locale to browser language:', langCode);
-        setLocale(langCode);
-        setIsAutoDetected(true);
-      } else {
-        console.log('Language not supported, defaulting to English');
-        setLocale('en');
-        setIsAutoDetected(true);
-      }
+
+      // No supported language found, default to English
+      setLocale('en');
+      setIsAutoDetected(true);
     };
     
     detectLanguage();

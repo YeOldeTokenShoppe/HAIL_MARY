@@ -98,6 +98,26 @@
     ]
   
   },
+  "illumin80": {
+    "watchlistLine1": "Komm auf ihre",
+    "watchlistLine2": "Beobachtungsliste",
+    "watchlistTitle": "Komm Auf Ihre Beobachtungsliste"
+  },
+  "cyberNav": {
+    "nav00": { "date": "IKONE AUF DER I-80", "title": "FAHRPLAN" },
+    "nav01": { "date": "DEFI-SCHWERKRAFT", "title": "ÜBER RL80" },
+    "nav02": { "date": "UNENDLICHE GALERIE", "title": "GALERIERUNDGANG" },
+    "nav03": { "date": "QUANTITÄT & QUALITÄT", "title": "TOKENOMICS & FAQ" },
+    "nav04": { "date": "LICHT-NUTZEN", "title": "DIE ILLUMINATEN" },
+    "nav05": { "date": "FEINE GESELLSCHAFT", "title": "CHATRAUM" },
+    "nav06": { "date": "ETHIK & MORAL", "title": "SCHRIFTROLLEN VON ST. GR80" },
+    "nav07": { "date": "HOFFNUNG & NÄCHSTENLIEBE", "title": "MÜNZBRUNNEN" }
+  },
+  "about": {
+    "skewedHeading1": { "line1": "WOHLSTAND", "line2": "FÜR DIE GANZE", "line3": "MENSCHHEIT!" },
+    "skewedHeading2": { "line1": "EINE ZEITLOSE", "line2": "IKONE FÜR DAS", "line3": "DIGITALE ZEITALTER" },
+    "skewedHeading3": { "line1": "BETRETET DAS", "line2": "LIMINALE", "line3": "TERMINAL" }
+  },
   "buyModal": {
     "title": "KAUFEN_RL80_",
     "secureTransaction": "<SICHERES_TRANSAKTIONSPROTOKOLL_AKTIV>"

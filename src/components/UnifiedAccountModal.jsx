@@ -182,8 +182,13 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
   }; */
 
   const handleSignOut = async () => {
-    await signOut({ redirectUrl: pathname || '/' });
     onClose();
+    // Sign out without redirectUrl to avoid a race condition where
+    // Clerk's redirect fires while React is still reconciling the
+    // auth state change — which causes a removeChild error when
+    // non-default languages are active (extra re-render cycles).
+    await signOut();
+    window.location.href = pathname || '/';
   };
 
   return (

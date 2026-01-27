@@ -98,6 +98,26 @@
     ]
   
   },
+  "illumin80": {
+    "watchlistLine1": "Vào danh sách",
+    "watchlistLine2": "theo dõi của cô ấy",
+    "watchlistTitle": "Vào Danh Sách Theo Dõi Của Cô Ấy"
+  },
+  "cyberNav": {
+    "nav00": { "date": "BIỂU TƯỢNG TRÊN I-80", "title": "LỘ TRÌNH" },
+    "nav01": { "date": "TRỌNG LỰC DEFI", "title": "VỀ RL80" },
+    "nav02": { "date": "PHÒNG TRANH VÔ TẬN", "title": "THAM QUAN PHÒNG TRANH" },
+    "nav03": { "date": "SỐ LƯỢNG VÀ CHẤT LƯỢNG", "title": "TOKENOMICS VÀ FAQ" },
+    "nav04": { "date": "TIỆN ÍCH ÁNH SÁNG", "title": "HỘI ILLUMINATI" },
+    "nav05": { "date": "XÃ HỘI LỊCH SỰ", "title": "PHÒNG TRÒ CHUYỆN" },
+    "nav06": { "date": "ĐẠO ĐỨC VÀ LUÂN LÝ", "title": "CUỘN GIẤY THÁNH GR80" },
+    "nav07": { "date": "HY VỌNG VÀ TỪ THIỆN", "title": "ĐÀI PHUN TIỀN XU" }
+  },
+  "about": {
+    "skewedHeading1": { "line1": "THỊNH VƯỢNG", "line2": "CHO TẤT CẢ", "line3": "NHÂN LOẠI!" },
+    "skewedHeading2": { "line1": "BIỂU TƯỢNG", "line2": "VƯỢT THỜI GIAN", "line3": "CHO KỶ NGUYÊN SỐ" },
+    "skewedHeading3": { "line1": "BƯỚC VÀO", "line2": "THIẾT BỊ ĐẦU CUỐI", "line3": "NGƯỠNG" }
+  },
   "buyModal": {
     "title": "MUA_RL80_",
     "secureTransaction": "<GIAO_THỨC_BẢO_MẬT_ĐANG_HOẠT_ĐỘNG>"

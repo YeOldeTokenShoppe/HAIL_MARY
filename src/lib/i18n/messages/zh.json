@@ -98,6 +98,26 @@
     ]
 
   },
+  "illumin80": {
+    "watchlistLine1": "进入她的",
+    "watchlistLine2": "观察名单",
+    "watchlistTitle": "进入她的观察名单"
+  },
+  "cyberNav": {
+    "nav00": { "date": "I-80上的图标", "title": "路线图" },
+    "nav01": { "date": "DEFI引力", "title": "关于RL80" },
+    "nav02": { "date": "无限画廊", "title": "画廊之旅" },
+    "nav03": { "date": "数量与质量", "title": "代币经济与FAQ" },
+    "nav04": { "date": "光之效用", "title": "光明会" },
+    "nav05": { "date": "文明社会", "title": "聊天室" },
+    "nav06": { "date": "伦理与道德", "title": "圣GR80卷轴" },
+    "nav07": { "date": "希望与慈善", "title": "许愿池" }
+  },
+  "about": {
+    "skewedHeading1": { "line1": "繁荣", "line2": "属于全", "line3": "人类!" },
+    "skewedHeading2": { "line1": "数字时代", "line2": "永恒的", "line3": "偶像" },
+    "skewedHeading3": { "line1": "进入", "line2": "阈限", "line3": "终端" }
+  },
   "buyModal": {
     "title": "购买_RL80_",
     "secureTransaction": "<安全交易协议激活>"

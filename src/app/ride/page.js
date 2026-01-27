@@ -318,7 +318,7 @@ export default function CommunionPage() {
           position: "fixed",
           top: "1rem",
           right: "1rem",
-          zIndex: 9999,
+          zIndex: 9,
           display: "flex",
           alignItems: "center",
           gap: "1rem",

@@ -1804,8 +1804,6 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
             }}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            onTouchStart={() => setIsHovered(true)}
-            onTouchEnd={() => setIsHovered(false)}
           >
             {images.map((image, index) => {
               const beastId = `beast${index + 1}`;
@@ -1838,12 +1836,8 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                     <div className="rider-beast-group">
                       <div
                         className="beast"
-                        style={{ backgroundImage: `url(${image.src})`, touchAction: 'manipulation' }}
+                        style={{ backgroundImage: `url(${image.src})` }}
                         onClick={() => handleRideBeastClick(image, beastId)}
-                        onTouchEnd={(e) => {
-                          e.preventDefault();
-                          handleRideBeastClick(image, beastId);
-                        }}
                       >
                         {rider && (
                           <div className="rider-container">
@@ -1853,6 +1847,36 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                               alt={rider.username || "Rider"}
                               className="rider-avatar"
                             />
+                            {rider.djTrackName && (
+                              <div style={{
+                                position: "absolute",
+                                bottom: "-18px",
+                                left: "50%",
+                                transform: "translateX(-50%)",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "3px",
+                                background: "rgba(0, 0, 0, 0.85)",
+                                border: "1px solid rgba(212, 175, 55, 0.5)",
+                                borderRadius: "8px",
+                                padding: "1px 6px",
+                                whiteSpace: "nowrap",
+                                maxWidth: "120px",
+                              }}>
+                                <span style={{ fontSize: "10px" }}>♪</span>
+                                <span style={{
+                                  fontSize: "8px",
+                                  color: "#d4af37",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}>
+                                  {rider.djTrackName.length > 16
+                                    ? rider.djTrackName.slice(0, 16) + "…"
+                                    : rider.djTrackName}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1876,59 +1900,26 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                         style={{ display: "none" }} // Hidden from view
                       />
                     </div>
-                    {rider?.djTrackName && (
-                      <div style={{
-                        position: "absolute",
-                        bottom: "2px",
-                        left: "50%",
-                        transform: "translateX(-50%)",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "3px",
-                        background: "rgba(0, 0, 0, 0.85)",
-                        border: "1px solid rgba(212, 175, 55, 0.5)",
-                        borderRadius: "8px",
-                        padding: "1px 6px",
-                        whiteSpace: "nowrap",
-                        maxWidth: "120px",
-                        zIndex: 3,
-                        pointerEvents: "none",
-                      }}>
-                        <span style={{ fontSize: "10px" }}>♪</span>
-                        <span style={{
-                          fontSize: "8px",
-                          color: "#d4af37",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}>
-                          {rider.djTrackName.length > 16
-                            ? rider.djTrackName.slice(0, 16) + "…"
-                            : rider.djTrackName}
-                        </span>
-                      </div>
-                    )}
                   </div>
                 </div>
               );
             })}
           </div>
 
-          {selectedImage && isRideConfirmationOpen && typeof document !== 'undefined' && createPortal(
+          {selectedImage && isRideConfirmationOpen && (
             <div>
               {/* Overlay div */}
               <div
-                onClick={() => setIsRideConfirmationOpen(false)}
-                onTouchEnd={(e) => { e.preventDefault(); setIsRideConfirmationOpen(false); }}
+                className="clickable-overlay"
+                onClick={() => setIsRideConfirmationOpen(false)} // Close pop-up when clicking outside
                 style={{
                   position: "fixed",
-                  top: 0,
+                  top: "-25rem",
                   left: 0,
                   width: "100vw",
                   height: "100vh",
                   backgroundColor: "rgba(0, 0, 0, 0.5)",
-                  zIndex: 9998,
-                  backdropFilter: "blur(4px)",
+                  zIndex: 999,
                 }}
               ></div>
 
@@ -1937,7 +1928,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                 style={{
                   background: "linear-gradient(145deg, rgba(27, 23, 36, 0.98), rgba(45, 35, 55, 0.98))",
                   border: "2px solid #d4af37",
-                  position: "fixed",
+                  position: "absolute",
                   padding: "1.5rem 2rem",
                   display: "flex",
                   flexDirection: "column",
@@ -1947,7 +1938,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                   top: "50%",
                   left: "50%",
                   transform: "translate(-50%, -50%)",
-                  zIndex: 9999,
+                  zIndex: 1000,
                   textAlign: "center",
                   borderRadius: "16px",
                   boxShadow: "0 0 30px rgba(212, 175, 55, 0.3), 0 10px 40px rgba(0, 0, 0, 0.5)",
@@ -2054,8 +2045,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                   </button>
                 </div>
               </div>
-            </div>,
-            document.body
+            </div>
           )}
         </main>
 

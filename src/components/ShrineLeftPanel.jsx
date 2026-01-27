@@ -5,6 +5,7 @@ import Link from 'next/link'
 import styles from './Matchstick.module.css'
 import { useStaking } from '@/hooks/useStaking'
 import SkewedHeading from './SkewedHeading'
+import { useLanguage } from './LanguageProvider'
 
 /**
  * Consolidated left-side panel for the shrine page
@@ -21,6 +22,7 @@ const ShrineLeftPanel = forwardRef(({
   isHighlighting = false,
   hasActiveCandle = false
 }, ref) => {
+  const { t } = useLanguage()
   const [isLit, setIsLit] = useState(false)
   const [hasLitCandleThisSession, setHasLitCandleThisSession] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -188,7 +190,7 @@ const ShrineLeftPanel = forwardRef(({
       }}>
                {mounted && (
               <SkewedHeading 
-                lines={["Get on her", "watchlist"]}
+                lines={[t('illumin80.watchlistLine1'), t('illumin80.watchlistLine2')]}
                 // colors={["#d4af37", "#f4e4c1", "#ffd700"]}
                 colors={["#f0f4f0ff"]}
                 fontSize="1.5rem" 

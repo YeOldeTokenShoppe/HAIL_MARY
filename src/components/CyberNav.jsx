@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useLanguage } from './LanguageProvider';
 
 const CyberNav = ({ 
   is80sMode = false, 
@@ -17,7 +18,24 @@ const CyberNav = ({
   const [isMobile, setIsMobile] = useState(false);
   const [canHover, setCanHover] = useState(false);
   const pathname = usePathname();
-  
+  const { t } = useLanguage();
+  const portalContainerRef = useRef(null);
+
+  // Create a dedicated portal container so the menu overlay is isolated
+  // from other portals on document.body (e.g. Clerk modals), preventing
+  // removeChild errors during concurrent DOM operations like sign-out.
+  useEffect(() => {
+    const el = document.createElement('div');
+    el.id = 'cybernav-portal';
+    document.body.appendChild(el);
+    portalContainerRef.current = el;
+    return () => {
+      if (el.parentNode) {
+        el.parentNode.removeChild(el);
+      }
+    };
+  }, []);
+
   // Helper function to handle closing the menu
   const handleClose = () => {
     if (isOpen !== null && onClose) {
@@ -91,15 +109,15 @@ const CyberNav = ({
   }, [isMenuOpen]);
 
   const navItems = [
-    { id: '00', date: 'ICON ON I-80', title: "ROADMAP", path: '/', thumbnail: '/images/I80.png' },
-    { id: '01', date: 'DEFI GRAV80', title: 'SOMETHING ABOUT RL80', path: '/about', thumbnail: '/images/ROSE_TATTOO.webp' },
-    ...(isMobile ? [{ id: '02', date: 'INFIN80 GALLERY', title: 'GALLERY RIDE', path: '/portal', thumbnail: '/images/timePortal.webp' }] : []),
-    { id: '03', date: 'QUANT80 & QUAL80', title: 'TOKENOMICS & FAQ', path: '/tokenomics', thumbnail: '/images/DIAMOND_TATTOO.webp' },
-    { id: '04', date: 'LIGHT UTIL80', title: 'THE ILLUMIN80', path: '/illumin80', thumbnail: '/images/SKULL_TATTOO.webp' },
-    { id: '05', date: 'POLITE SOCI80', title: 'CHAT ROOM', path: '/ride', thumbnail: '/images/blackPuma.webp' },
+    { id: '00', date: t('cyberNav.nav00.date'), title: t('cyberNav.nav00.title'), path: '/', thumbnail: '/images/I80.png' },
+    { id: '01', date: t('cyberNav.nav01.date'), title: t('cyberNav.nav01.title'), path: '/about', thumbnail: '/images/ROSE_TATTOO.webp' },
+    ...(isMobile ? [{ id: '02', date: t('cyberNav.nav02.date'), title: t('cyberNav.nav02.title'), path: '/portal', thumbnail: '/images/timePortal.webp' }] : []),
+    { id: '03', date: t('cyberNav.nav03.date'), title: t('cyberNav.nav03.title'), path: '/tokenomics', thumbnail: '/images/DIAMOND_TATTOO.webp' },
+    { id: '04', date: t('cyberNav.nav04.date'), title: t('cyberNav.nav04.title'), path: '/illumin80', thumbnail: '/images/SKULL_TATTOO.webp' },
+    { id: '05', date: t('cyberNav.nav05.date'), title: t('cyberNav.nav05.title'), path: '/ride', thumbnail: '/images/blackPuma.webp' },
     // { id: '03', date: 'PRAYER & PROBABIL80', title: 'TRADE SCHOOL', path: '/trade', thumbnail: '/images/3ACES_TATTOO.webp' },
-    { id: '06', date: 'ETHICS & MORAL80', title: 'SCROLLS OF ST. GR80', path: '/philosophy', thumbnail: '/images/ILLUMIN80_TATTOO.webp' },
-    { id: '07', date: 'HOPE & CHAR80', title: 'COIN FOUNTAIN', path: '/fountain', thumbnail: '/images/HEART_TATTOO.webp' },
+    { id: '06', date: t('cyberNav.nav06.date'), title: t('cyberNav.nav06.title'), path: '/philosophy', thumbnail: '/images/ILLUMIN80_TATTOO.webp' },
+    { id: '07', date: t('cyberNav.nav07.date'), title: t('cyberNav.nav07.title'), path: '/fountain', thumbnail: '/images/HEART_TATTOO.webp' },
     // { id: '07', date: 'COMING SOON', title: 'LIGHT CLUB', path: '#', thumbnail: '/images/RL80_KNUCKLES.webp' },
   ];
 
@@ -159,7 +177,7 @@ const CyberNav = ({
         </button>
         )}
         
-        {isMenuOpen && typeof document !== 'undefined' && ReactDOM.createPortal(
+        {isMenuOpen && portalContainerRef.current && ReactDOM.createPortal(
           <div
             style={{
               position: "fixed",
@@ -300,7 +318,7 @@ const CyberNav = ({
               );
             })}
           </div>,
-          document.body
+          portalContainerRef.current
         )}
       </>
     );

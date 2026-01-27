@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="google" content="translate" />
     <link
       rel="stylesheet"
       type="text/css"
@@ -45,6 +46,12 @@ When first the bear market descends, the soul experiences what the ancient mysti
 Hold fast, dear pilgrims. Your future selves are watching from the mountaintop, smiling.</p>
       </div>
     </div>
+    <script>
+      (function() {
+        var lang = new URLSearchParams(window.location.search).get('lang');
+        if (lang) document.documentElement.lang = lang;
+      })();
+    </script>
     <script src="./scroll.js"></script>
   </body>
 </html>

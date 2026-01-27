@@ -331,7 +331,7 @@ function HolographicStatue3({
         const action = mixer.clipAction(haloAnimation);
         action.play();
       } else {
-        console.warn("HaloRotation animation not found in the model");
+        // console.warn("HaloRotation animation not found in the model");
       }
 
       // Create an anchor group with initial position
@@ -364,20 +364,6 @@ function HolographicStatue3({
       const center = box.getCenter(new THREE.Vector3());
       statue.position.set(-center.x, -center.y, -center.z);
 
-      // Apply materials
-      const goldHolographicMaterial = new THREE.ShaderMaterial({
-        uniforms: {
-          uTime: { value: 0 },
-          uColor: { value: new THREE.Color(0xffd700) },
-        },
-        vertexShader: holographicMaterial.vertexShader,
-        fragmentShader: holographicMaterial.fragmentShader,
-        transparent: true,
-        blending: THREE.NormalBlending,
-        depthWrite: true,
-        depthTest: true,
-        side: THREE.DoubleSide,
-      });
 
       // Clear previous animated materials
       animatedMaterialsRef.current = [];
@@ -385,27 +371,24 @@ function HolographicStatue3({
       // Find and store reference to HaloMaster object
       statue.traverse((child) => {
         if (child.name === 'HaloMaster' || child.name.toLowerCase() === 'halomaster') {
-          console.log("Found HaloMaster object:", child.name);
-          console.log("HaloMaster position:", child.position);
-          console.log("HaloMaster rotation:", child.rotation);
-          console.log("HaloMaster children count:", child.children.length);
+
           
           // Store direct reference to the HaloMaster object
           // We'll just rotate it as-is and let it rotate around its pivot
           haloMasterRef.current = child;
           
           // Log children names for debugging
-          child.traverse((subChild) => {
-            if (subChild !== child) {
-              console.log("HaloMaster child found:", subChild.name, "type:", subChild.type);
-            }
-          });
+          // child.traverse((subChild) => {
+          //   if (subChild !== child) {
+          //     // console.log("HaloMaster child found:", subChild.name, "type:", subChild.type);
+          //   }
+          // });
         }
       });
       
       statue.traverse((child) => {
         if (child.isMesh) {
-          console.log("Mesh name:", child.name); // Enable debug logging
+          // console.log("Mesh name:", child.name); // Enable debug logging
           const meshName = child.name.toLowerCase();
       
           if (

@@ -710,7 +710,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           </h2> */}
           {/* <div style={{ marginBottom: (isMobilePhone || isTabletPortrait) ? '1.5rem' : '0' }}> */}
             <SkewedHeading
-              lines={["A TIMELESS", "ICON FOR THE", "DIGITAL AGE"]}
+              lines={[t('about.skewedHeading2.line1'), t('about.skewedHeading2.line2'), t('about.skewedHeading2.line3')]}
               fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "2.5rem" : "3rem"}
               color="#00ff9d"
               skewAngle={0}
@@ -894,7 +894,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               textAlign: 'center',
               padding: '0 1rem',
             }}>
-              Take a roller coaster ride through time and re-live some of Our Lady's most glorious moments,
+              Take a roller coaster ride through time and witness some of Our Lady's most glorious moments,
               from antiquity to infinity.
             </p>
  <div style={{
@@ -978,7 +978,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             }}>
             {/* Heading */}
             <SkewedHeading
-              lines={["PROSPER80", "FOR ALL", "HUMAN80!"]}
+              lines={[t('about.skewedHeading1.line1'), t('about.skewedHeading1.line2'), t('about.skewedHeading1.line3')]}
               colors={["#00ff00", "#f4e4c1", "#ffd700"]}
               fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "2.5rem" : "2.5rem"}
               isMobile={true}
@@ -1186,7 +1186,7 @@ RL80 is designed on first principles: decentralized trust, fair distribution, di
             }}>
             {/* Heading */}
             <SkewedHeading
-              lines={["ENTER THE", "LIMINAL", "TERMINAL"]}
+              lines={[t('about.skewedHeading3.line1'), t('about.skewedHeading3.line2'), t('about.skewedHeading3.line3')]}
              // colors={["#d4af37", "#f4e4c1", "#ffd700"]}
               fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "2.5rem" : "3rem"}
               isMobile={true}
@@ -1645,7 +1645,7 @@ RL80 is designed on first principles: decentralized trust, fair distribution, di
               display: 'inline-block',
                   position: 'relative',
                 top: '-3rem',
-                left: '-2rem',
+                left: '-15%',
                 alignContent: 'center'
             }}>
               <p style={{
@@ -1677,7 +1677,7 @@ RL80 is designed on first principles: decentralized trust, fair distribution, di
           }}>
             {/* Heading for desktop */}
             <SkewedHeading
-              lines={["A TIMELESS", "ICON FOR THE", "DIGITAL AGE"]}
+              lines={[t('about.skewedHeading2.line1'), t('about.skewedHeading2.line2'), t('about.skewedHeading2.line3')]}
               fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : isLargeTablet ? "3rem" : isTabletPortrait ? "2.5rem" : "3.5rem"}
               color="#00ff9d"
               skewAngle={0}
@@ -1711,7 +1711,7 @@ RL80 is designed on first principles: decentralized trust, fair distribution, di
               maxWidth: '450px',
               textAlign: 'center'
             }}>
-              Take a roller coaster ride through time and re-live some of Our Lady's most glorious moments,
+              Take a roller coaster ride through time and witness some of Our Lady's most glorious moments,
               from antiquity to infinity.
             </p>
  <div style={{
@@ -1848,9 +1848,9 @@ RL80 is designed on first principles: decentralized trust, fair distribution, di
             }}>
               {/* TranslatableDropInTitle */}
               <SkewedHeading
-                lines={["PROSPER80", "FOR ALL", "HUMAN80!"]}
+                lines={[t('about.skewedHeading1.line1'), t('about.skewedHeading1.line2'), t('about.skewedHeading1.line3')]}
               colors={["#00ff00", "#f4e4c1", "#ffd700"]}
-                fontSize={{ mobile: "2rem", desktop: isTabletLandscape ? "2.0rem" : "2.5rem" }}
+                fontSize={{ mobile: "2rem", desktop: isTabletLandscape ? "2.0rem" : "3rem" }}
                 isMobile={false}
                 language={locale}
               />
@@ -2181,7 +2181,7 @@ The RL80 token is designed on first principles: decentralized trust, fair distri
               zIndex: 5,
             }}>
               <SkewedHeading
-                 lines={["ENTER THE", "LIMINAL", "TERMINAL"]}
+                 lines={[t('about.skewedHeading3.line1'), t('about.skewedHeading3.line2'), t('about.skewedHeading3.line3')]}
                 colors={["#00ff00", "#f4e4c1", "#ffd700"]}
               fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "2.5rem" : "3rem"}
                 isMobile={false}

@@ -98,6 +98,26 @@
     ]
   
   },
+  "illumin80": {
+    "watchlistLine1": "In eius indicem",
+    "watchlistLine2": "vigilantiae inscribe",
+    "watchlistTitle": "In Eius Indicem Vigilantiae Inscribe"
+  },
+  "cyberNav": {
+    "nav00": { "date": "ICON IN VIA I-80", "title": "ITER" },
+    "nav01": { "date": "GRAVITAS DEFI", "title": "DE RL80" },
+    "nav02": { "date": "INFINITA PINACOTHECA", "title": "ITER PINACOTHECAE" },
+    "nav03": { "date": "QUANTITAS ET QUALITAS", "title": "OECONOMIA ET FAQ" },
+    "nav04": { "date": "UTILITAS LUCIS", "title": "ILLUMINATI" },
+    "nav05": { "date": "SOCIETAS URBANA", "title": "CONCLAVE COLLOQUII" },
+    "nav06": { "date": "ETHICA ET MORALITAS", "title": "VOLUMINA S. GR80" },
+    "nav07": { "date": "SPES ET CARITAS", "title": "FONS NUMMORUM" }
+  },
+  "about": {
+    "skewedHeading1": { "line1": "PROSPERITAS", "line2": "PRO OMNI", "line3": "HUMANITATE!" },
+    "skewedHeading2": { "line1": "IMAGO", "line2": "AETERNA PRO", "line3": "AETATE DIGITALI" },
+    "skewedHeading3": { "line1": "INTRA IN", "line2": "TERMINALEM", "line3": "LIMINALEM" }
+  },
   "buyModal": {
     "title": "EMERE_RL80_",
     "secureTransaction": "<PROTOCOLLVM_TRANSACTIONIS_SECVRAE_ACTIVVM>"
