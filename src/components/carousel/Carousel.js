@@ -692,13 +692,13 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             paddingRight: '2rem',
             position: 'relative',
             flexShrink: 0,
-            overflowY: 'auto',
+            overflow: 'hidden',
           }}>
           <div style={{
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            transform: (!isMobilePhone && isPortraitOrientation) ? 'scale(1.2)' : 'none',
+            transform: (!isMobilePhone && isPortraitOrientation) ? 'scale(1.05)' : 'none',
             transformOrigin: 'center center',
           }}>
           {/* Heading */}
@@ -934,7 +934,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             paddingRight: isMobilePhone ? '1rem' : '2rem',
             position: 'relative',
             flexShrink: 0,
-            overflowY: 'auto',
+            overflow: 'hidden',
           }}>
             <div style={{
               display: 'flex',
@@ -957,7 +957,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             <div style={{
               width: '100%',
               // maxWidth: isMobilePhone ? 'min(350px, 80vw)' : '500px',
-              height: isMobilePhone ? 'min(400px, 40vh)' : '550px',
+              height: isMobilePhone ? 'min(400px, 40vh)' : isTabletPortrait ? '400px' : '550px',
               marginTop: '0.5rem',
               filter: 'drop-shadow(0 0 30px rgba(0, 221, 255, 0.4))',
               paddingTop: isMobilePhone ? '1rem' : '3rem'
@@ -1142,7 +1142,7 @@ Cryptocurrency was designed to be a less corruptible, technologically superior f
             paddingRight: '2rem',
             position: 'relative',
             flexShrink: 0,
-            overflowY: 'auto',
+            overflow: 'hidden',
           }}>
             <div style={{
               display: 'flex',
