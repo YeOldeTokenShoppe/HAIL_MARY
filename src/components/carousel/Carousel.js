@@ -467,32 +467,17 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
         width: '100%',
         height: isPortraitOrientation ? '100dvh' : 'auto',
         minHeight: isPortraitOrientation ? 'unset' : '100vh',
-        backgroundColor: (is80sMode && isMobilePhone) ? 'transparent' : '#000',
+        ...(is80sMode ? {
+          backgroundImage: 'url("/images/retro.webp")',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat'
+        } : {
+          backgroundColor: '#000'
+        }),
         position: 'relative',
         overflow: isPortraitOrientation ? 'hidden' : 'auto hidden',
       }}>
-        {/* Video background for 80s mode - desktop only */}
-        {is80sMode && !isMobilePhone && (
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              opacity: 0.8,
-              zIndex: 1,
-              pointerEvents: 'none',
-            }}
-          >
-            <source src="/videos/84.mp4" type="video/mp4" />
-          </video>
-        )}
       
       
       {/* Experience Controls - positioned top-right */}
@@ -508,7 +493,14 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           width: '100%',
           height: '100dvh',
           overflow: 'hidden',
-          background: is80sMode ? 'transparent' : 'radial-gradient(ellipse at center, #1a1a2e 0%, #000 100%)',
+          ...(is80sMode ? {
+            backgroundImage: 'url("/images/retro.webp")',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat'
+          } : {
+            background: 'radial-gradient(ellipse at center, #1a1a2e 0%, #000 100%)'
+          }),
           zIndex: 2,
         }}>
           {/* Mobile Carousel Navigation - hidden on mobile phones (single section) */}
@@ -877,8 +869,8 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           }}>
           {/* Additional info below portal */}
           <p style={{
-            marginTop: '1.5rem',
-            marginBottom: '1rem',
+            marginTop: '0.5rem',
+            marginBottom: '2rem',
             fontFamily: "'Courier New', monospace",
             fontSize: isMobilePhone ? '1rem' : '0.9rem',
             color: '#888',
@@ -889,7 +881,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             color: '#01ff00',
             textAlign: 'center',
             animation: 'pulse 2s ease-in-out infinite',
-}}>Tap to enter</span> • <a href="/philosophy" style={{ color: '#ffff00', textDecoration: 'underline' }}>Read whitepaper</a>
+}}>Tap to enter</span>
           </p>
  {/* Description */}
             <p style={{
@@ -902,10 +894,50 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               textAlign: 'center',
               padding: '0 1rem',
             }}>
-              Take a roller coaster ride through a time gallery and re-live some of Our Lady's most glorious moments,
+              Take a roller coaster ride through time and re-live some of Our Lady's most glorious moments,
               from antiquity to infinity.
             </p>
-
+ <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '12px',
+          margin: '0.75rem 0',
+          width: '100%',
+          maxWidth: '120px',
+        }}>
+          <div style={{
+            flex: 1,
+            height: '1px',
+            background: 'linear-gradient(to right, transparent, rgba(212, 175, 55, 0.4))',
+          }} />
+          <span style={{
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: '0.85rem',
+            color: 'rgba(212, 175, 55, 0.7)',
+            textTransform: 'lowercase',
+            letterSpacing: '0.1em',
+            fontStyle: 'italic',
+          }}>
+            or
+          </span>
+          <div style={{
+            flex: 1,
+            height: '1px',
+            background: 'linear-gradient(to left, transparent, rgba(212, 175, 55, 0.4))',
+          }} />
+        </div>
+         <p style={{
+            marginTop: '1.5rem',
+            marginBottom: '1rem',
+            fontFamily: "'Courier New', monospace",
+            fontSize: isMobilePhone ? '1rem' : '0.9rem',
+            color: '#888',
+            textAlign: 'center',
+            lineHeight: '1.4',
+          }}>
+    <a href="/philosophy" style={{ color: '#ffff00', textDecoration: 'underline' }}> 📜 Read the whitepaper</a>
+          </p>
           {/* Buy Button for Mobile - at the bottom of Section 1 */}
           <div style={{ marginTop: '1.5rem', marginBottom: '1rem' }}>
             {buyButton}
@@ -1006,7 +1038,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               All monetary systems are belief systems
             </span>
                 
-                RL80 is a return to first principles: minimized trust, constant vigilance, distributed power, universal access - the very qualities associated with the beloved icon, <i>𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙</i>.</>
+                RL80 is a return to first principles: decentralized trust, fair distribution, direct access, immutable and incorruptible - the very qualities associated with the RL80 token's namesake and patron saint</>
               ) : (
                 <>
                 
@@ -1020,12 +1052,13 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               fontWeight: 'bold',
               letterSpacing: '0.05em',
               textTransform: 'uppercase',
+              marginBottom: '1rem',
               opacity: 0.9,
               textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
             }}>
-              Experience the new enigma machine
+              ALL MONETARY SYSTEMS ARE BELIEF SYSTEMS
             </span>
-Cryptocurrency was designed to be a less corruptible, technologically superior form of money—yet, ironically, it has earned a poor reputation, and not without reason.<br/><br/> It doesn&apos;t have to be that way. <br/><br/>RL80 is a return to first principles: minimized trust, constant vigilance, distributed power, universal access - the very qualities associated with the beloved icon, <i>𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙</i>.</>
+Cryptocurrency was designed to be a less corruptible, technologically superior form of money—yet, ironically, it has earned a poor reputation, and not without reason.<br/><br/> It doesn&apos;t have to be that way. <br/><br/>RL80 is a return to first principles: decentralized trust, fair distribution, direct access, immutable and incorruptible - the very qualities associated with the RL80 token's namesake and patron saint</>
               )}
             </p>
     
@@ -1625,30 +1658,7 @@ Cryptocurrency was designed to be a less corruptible, technologically superior f
               </p>
             {/* </div> */}
             {/* Link to whitepaper - Under the portal */}
-            <p style={{
-              fontFamily: "'Courier New', monospace",
-              fontSize: isTablet ? '0.85rem' : '1rem',
-              color: '#888',
-              textAlign: 'center',
-              width: '100%',
-              maxWidth: isTabletLandscape ? '400px' : isTabletPortrait ? '300px' : '600px'
-            }}>
-              📜 Read the <a href="/philosophy" style={{
-                color: '#ffff00',
-                textDecoration: 'none',
-                borderBottom: '1px solid #ffff00',
-                transition: 'all 0.3s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = '#fff'
-                e.currentTarget.style.borderBottomColor = '#fff'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = '#ffff00'
-                e.currentTarget.style.borderBottomColor = '#ffff00'
-              }}
-              >Techno-Mythic Whitepaper</a>
-            </p>
+            
           </div>
           </div>
 
@@ -1700,12 +1710,64 @@ Cryptocurrency was designed to be a less corruptible, technologically superior f
               maxWidth: '450px',
               textAlign: 'center'
             }}>
-              Take a roller coaster ride through a time gallery and re-live some of Our Lady's most glorious moments,
+              Take a roller coaster ride through time and re-live some of Our Lady's most glorious moments,
               from antiquity to infinity.
             </p>
-
+ <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '12px',
+          margin: '0.75rem 0',
+          width: '100%',
+          maxWidth: '120px',
+        }}>
+          <div style={{
+            flex: 1,
+            height: '1px',
+            background: 'linear-gradient(to right, transparent, rgba(212, 175, 55, 0.4))',
+          }} />
+          <span style={{
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: '0.85rem',
+            color: 'rgba(212, 175, 55, 0.7)',
+            textTransform: 'lowercase',
+            letterSpacing: '0.1em',
+            fontStyle: 'italic',
+          }}>
+            or
+          </span>
+          <div style={{
+            flex: 1,
+            height: '1px',
+            background: 'linear-gradient(to left, transparent, rgba(212, 175, 55, 0.4))',
+          }} />
+        </div>
             {/* Click instruction */}
-
+<p style={{
+              fontFamily: "'Courier New', monospace",
+              fontSize: isTablet ? '0.85rem' : '1rem',
+              color: '#888',
+              textAlign: 'center',
+              width: '100%',
+              maxWidth: isTabletLandscape ? '400px' : isTabletPortrait ? '300px' : '600px'
+            }}>
+              📜 Read the <a href="/philosophy" style={{
+                color: '#ffff00',
+                textDecoration: 'none',
+                borderBottom: '1px solid #ffff00',
+                transition: 'all 0.3s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = '#fff'
+                e.currentTarget.style.borderBottomColor = '#fff'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = '#ffff00'
+                e.currentTarget.style.borderBottomColor = '#ffff00'
+              }}
+              >Techno-Mythic Whitepaper</a>
+            </p>
             {/* Buy Button for Desktop */}
             {buyButton}
 
@@ -1819,7 +1881,7 @@ Cryptocurrency was designed to be a less corruptible, technologically superior f
                 maxWidth: '500px',
                 textAlign: 'center'
               }}>
-Cryptocurrency was designed to be a less corruptible, technologically superior form of money—yet, ironically, it has earned a poor reputation, and not without reason.<br/><br/> It doesn’t have to be that way. <br/><br/>RL80 is a return to first principles: minimized trust, constant vigilance, distributed power, universal access - the very qualities associated with the beloved icon, <i>𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙</i>.</p>
+Cryptocurrency was designed to be a less corruptible, technologically superior form of money—yet, ironically, popular opinion takes a dim view on the topic, and not without reason.<br/><br/> It doesn’t have to be that way. <br/><br/>RL80 is a return to first principles: decentralized trust, fair distribution, direct access, immutable and incorruptible - the very qualities associated with the RL80 token's namesake and patron saint.</p>
             <div
               className="navigation-group"
               style={{
