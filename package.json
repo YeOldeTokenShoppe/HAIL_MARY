@@ -10,11 +10,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "scoring": "node src/trading/services/runScoringWorkflow.js",
-    "scoring:scheduled": "node src/trading/services/runScoringWorkflow.js --scheduled",
-    "scoring:health": "node src/trading/services/runScoringWorkflow.js --health",
-    "create-market": "node --experimental-detect-module scripts/createMarket.js"
+    "lint": "next lint"
+
   },
   "dependencies": {
     "@clerk/nextjs": "^6.31.1",
@@ -33,6 +30,7 @@
     "framer-motion": "^12.23.22",
     "gsap": "^3.13.0",
     "html2canvas": "^1.4.1",
+    "leva": "^0.10.1",
     "lightweight-charts": "^5.1.0",
     "maath": "^0.10.8",
     "next": "^16.0.7",

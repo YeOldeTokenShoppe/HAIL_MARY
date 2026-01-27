@@ -8,6 +8,7 @@ import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import { easing } from 'maath';
 import DarkClouds from "./Clouds";
 import BreathSmoke from "./BreathSmoke";
+// import { useControls, folder } from 'leva';
 
 // Sky gradient shader for portal background
 const SkyGradientMaterial = {
@@ -71,7 +72,7 @@ const screenPlane = new THREE.Plane(
 const yPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0.2);
 
 // Holy Grail Model component
-function GrailModel({ clip = false, ...props }) {
+function GrailModel({ clip = false, onBullFound = null, ...props }) {
   const { scene } = useGLTF('/models/ourlady_rider7.glb');
   const meshRef = useRef();
 
@@ -81,10 +82,6 @@ function GrailModel({ clip = false, ...props }) {
 
     clone.traverse((child) => {
       if (child.isMesh) {
-        // Log mesh names to help identify glow meshes
- 
-
-       
         // Apply clipping planes
         if (clip && child.material) {
           child.material = child.material.clone();
@@ -95,10 +92,15 @@ function GrailModel({ clip = false, ...props }) {
           child.renderOrder = 10;
         }
       }
+
+      // Find the bull mesh for breath smoke parenting
+      if (onBullFound && child.name === 'Bull') {
+        onBullFound(child);
+      }
     });
 
     return clone;
-  }, [scene, clip]);
+  }, [scene, clip, onBullFound]);
 
   return (
     <primitive
@@ -159,7 +161,7 @@ function PortalFrame({ children, width = 1.8, height = 2.2, ...props }) {
 
 
 // Cyberpunk Laptop Frame component
-function LaptopFrame({ children, ...props }) {
+function LaptopFrame({ children, portalBlend = 0, ...props }) {
   const { scene } = useGLTF('/models/laptop.glb');
   const portalRef = useRef();
 
@@ -182,7 +184,7 @@ function LaptopFrame({ children, ...props }) {
       {/* Portal positioned where the screen is - ADJUST THESE VALUES */}
       <mesh position={[0, 0.65, -0.15]} rotation={[-0.35, 0, 0]}>
         <planeGeometry args={[1.45, 1.0]} />
-        <MeshPortalMaterial ref={portalRef} side={THREE.DoubleSide} blend={0}>
+        <MeshPortalMaterial ref={portalRef} side={THREE.DoubleSide} blend={portalBlend}>
           {children}
         </MeshPortalMaterial>
       </mesh>
@@ -205,8 +207,85 @@ function FloatingGroup({ children, amplitude = 0.06, speed = 1.2, rotationAmplit
   return <group ref={groupRef}>{children}</group>;
 }
 
+// Breath smoke that follows the bull mesh
+function BullBreathSmoke({ bullObject, offset = [-0.05, -0.3, 1.3] }) {
+  const groupRef = useRef();
+
+  useFrame(() => {
+    if (bullObject && groupRef.current) {
+      const worldPos = new THREE.Vector3();
+      bullObject.getWorldPosition(worldPos);
+      groupRef.current.position.set(
+        worldPos.x + offset[0],
+        worldPos.y + offset[1],
+        worldPos.z + offset[2]
+      );
+    }
+  });
+
+  return (
+    <group ref={groupRef} scale={0.1}>
+      <BreathSmoke
+        name="Left Nostril"
+        position={[0, 0, 0]}
+        direction={[0.1, -0.3, 2]}
+        rotation={[2.6, 2.4, -0.3]}
+      />
+      <BreathSmoke
+        name="Right Nostril"
+        position={[0, 0, 0]}
+        direction={[-0.1, -0.3, 2]}
+        rotation={[2.1, 2.3, 0.7]}
+      />
+    </group>
+  );
+}
+
+/* --- Leva debug version (uncomment to re-enable) ---
+import { useControls, folder } from 'leva';
+function BreathSmokeDebug({ isMobile, bullObject }) {
+  const groupRef = useRef();
+  const { gx, gy, gz, gScale } = useControls('Nostril Group', {
+    gx: { value: 0, min: -20, max: 20, step: 0.1 },
+    gy: { value: -0.4, min: -20, max: 20, step: 0.1 },
+    gz: { value: 1.4, min: -20, max: 20, step: 0.1 },
+    gScale: { value: 0.1, min: 0.01, max: 3, step: 0.01 },
+  });
+  const left = useControls('Left Nostril', {
+    position: folder({ lx: { value: 0, min: -5, max: 5, step: 0.1 }, ly: { value: 0, min: -5, max: 5, step: 0.1 }, lz: { value: 0, min: -5, max: 5, step: 0.1 } }),
+    direction: folder({ ldx: { value: 0.1, min: -3, max: 3, step: 0.1 }, ldy: { value: -0.3, min: -3, max: 3, step: 0.1 }, ldz: { value: 2, min: -3, max: 3, step: 0.1 } }),
+    rotation: folder({ lrx: { value: 2.6, min: -Math.PI, max: Math.PI, step: 0.1 }, lry: { value: 2.4, min: -Math.PI, max: Math.PI, step: 0.1 }, lrz: { value: -0.3, min: -Math.PI, max: Math.PI, step: 0.1 } }),
+  });
+  const right = useControls('Right Nostril', {
+    position: folder({ rx: { value: 0, min: -5, max: 5, step: 0.1 }, ry: { value: 0, min: -5, max: 5, step: 0.1 }, rz: { value: 0, min: -5, max: 5, step: 0.1 } }),
+    direction: folder({ rdx: { value: -0.1, min: -3, max: 3, step: 0.1 }, rdy: { value: -0.3, min: -3, max: 3, step: 0.1 }, rdz: { value: 2, min: -3, max: 3, step: 0.1 } }),
+    rotation: folder({ rrx: { value: 2.1, min: -Math.PI, max: Math.PI, step: 0.1 }, rry: { value: 2.3, min: -Math.PI, max: Math.PI, step: 0.1 }, rrz: { value: 0.7, min: -Math.PI, max: Math.PI, step: 0.1 } }),
+  });
+  useFrame(() => {
+    if (bullObject && groupRef.current) {
+      const worldPos = new THREE.Vector3();
+      bullObject.getWorldPosition(worldPos);
+      groupRef.current.position.set(worldPos.x + gx, worldPos.y + gy, worldPos.z + gz);
+    }
+  });
+  useEffect(() => {
+    if (bullObject) { const wp = new THREE.Vector3(); bullObject.getWorldPosition(wp); console.log(`Bull world position: [${wp.x.toFixed(2)}, ${wp.y.toFixed(2)}, ${wp.z.toFixed(2)}]`); }
+    console.log(`Group offset: [${gx}, ${gy}, ${gz}], scale: ${gScale}`);
+  }, [gx, gy, gz, gScale, left, right, bullObject]);
+  return (
+    <group ref={groupRef} scale={gScale}>
+      <mesh><sphereGeometry args={[5, 16, 16]} /><meshBasicMaterial color="magenta" wireframe /></mesh>
+      <BreathSmoke name="Left Nostril" position={[left.lx, left.ly, left.lz]} direction={[left.ldx, left.ldy, left.ldz]} rotation={[left.lrx, left.lry, left.lrz]} />
+      <BreathSmoke name="Right Nostril" position={[right.rx, right.ry, right.rz]} direction={[right.rdx, right.rdy, right.rdz]} rotation={[right.rrx, right.rry, right.rrz]} />
+    </group>
+  );
+}
+--- end leva debug version */
+
 // Main Portal Scene
 function PortalScene({ isMobile = false }) {
+  const [bullObject, setBullObject] = useState(null);
+  const [clippedBullObject, setClippedBullObject] = useState(null);
   const grailScale = isMobile ? 0.65 : 0.65;
   const grailRotation = isMobile ? [0, -3.25, 0] : [0.1, -3.25, 0];
 
@@ -254,22 +333,9 @@ function PortalScene({ isMobile = false }) {
           position={innerGrailPosition}
           rotation={grailRotation}
           hideGlow={true}
+          onBullFound={setBullObject}
         />
-         <group position={isMobile ? [2, -8, -10] : [2, 8, -11]}>
-      {/* Right nostril (from bull's perspective) */}
-           <BreathSmoke 
-        name="Left Nostril"
-        position={[0, 0, 0]}
-        direction={[0.1, -0.3, 2]}
-        rotation={[2.6, 2.4, -0.3]}
-      />
-      <BreathSmoke 
-        name="Right Nostril"
-        position={[0, 0, 0]}
-        direction={[-0.1, -0.3, 2]}
-        rotation={[2.1, 2.3, 0.7]}
-      />
-    </group>
+        <BullBreathSmoke bullObject={bullObject} />
       </LaptopFrame>
 
       {/* Clipped grail that pokes through the screen (with glow) */}
@@ -280,9 +346,11 @@ function PortalScene({ isMobile = false }) {
             scale={grailScale}
             position={clippedGrailPosition}
             rotation={grailRotation}
+            onBullFound={setClippedBullObject}
           />
         </group>
       </group>
+      <BullBreathSmoke bullObject={clippedBullObject} offset={[-0.1, 0.25, 1.1]} />
 
       {/* Ambient light to see the laptop model */}
       <ambientLight intensity={0.7} />
