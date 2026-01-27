@@ -122,7 +122,7 @@ const StyledPopup = ({ message, onClose, onConfirm }) => {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: "rgba(0, 0, 0, 0.6)",
+          // backgroundColor: "rgba(0, 0, 0, 0.6)",
           zIndex: 9998,
           backdropFilter: "blur(4px)",
         }}
@@ -918,13 +918,13 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
 
   // Handle real-time message updates
   useEffect(() => {
-    images.forEach((_, index) => {
+    const unsubscribes = images.map((_, index) => {
       const beastId = `beast${index + 1}`;
       const q = query(
         collection(db, "carouselChat"),
         where("beastId", "==", beastId)
       );
-      onSnapshot(q, (snapshot) => {
+      return onSnapshot(q, (snapshot) => {
         const chatMessages = snapshot.docs.map((doc) => doc.data());
         setMessages((prevMessages) => ({
           ...prevMessages,
@@ -932,6 +932,8 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
         }));
       });
     });
+
+    return () => unsubscribes.forEach((unsub) => unsub());
   }, [images]);
 
   const quitRide = async () => {
@@ -950,10 +952,11 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
       // Reset local state
       setActiveBeastId(null);
       setIsRiding(false); // Ensure this is set to false
-      setMessages((prevMessages) => ({
-        ...prevMessages,
-        [activeBeastId]: [],
-      }));
+      setMessages((prevMessages) => {
+        const updated = { ...prevMessages };
+        delete updated[activeBeastId];
+        return updated;
+      });
     } catch (error) {
       console.error("Failed to quit the ride:", error);
       showPopupMessage("Error quitting the ride. Please try again.");
@@ -1176,31 +1179,31 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
 
   // DEBUG MODE - Uncomment to test Spectator Lounge when beasts aren't full
   // Press Ctrl+Shift+F to toggle
-  const [debugForceFullCarousel, setDebugForceFullCarousel] = useState(false);
-  const debugMockMessages = [
-    { id: 'mock1', username: 'CryptoKing', message: 'Waiting for my turn! 🎠', imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=CryptoKing' },
-    { id: 'mock2', username: 'MoonRider', message: 'This carousel is wild!', imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=MoonRider' },
-    { id: 'mock3', username: 'HODLer99', message: 'When lambo? 😂', imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=HODLer99' },
-    { id: 'mock4', username: 'DiamondHands', message: 'Love watching the beasts go round', imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=DiamondHands' },
-  ];
-  useEffect(() => {
-    const handleDebugKey = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'F' || e.key === 'f')) {
-        setDebugForceFullCarousel(prev => {
-          const newState = !prev;
-          console.log(`[DEBUG] Full carousel mode: ${newState ? 'ON' : 'OFF'}`);
-          if (newState) {
-            setGlobalChatMessages(debugMockMessages);
-          } else {
-            setGlobalChatMessages([]);
-          }
-          return newState;
-        });
-      }
-    };
-    window.addEventListener('keydown', handleDebugKey);
-    return () => window.removeEventListener('keydown', handleDebugKey);
-  }, []);
+  // const [debugForceFullCarousel, setDebugForceFullCarousel] = useState(false);
+  // const debugMockMessages = [
+  //   { id: 'mock1', username: 'CryptoKing', message: 'Waiting for my turn! 🎠', imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=CryptoKing' },
+  //   { id: 'mock2', username: 'MoonRider', message: 'This carousel is wild!', imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=MoonRider' },
+  //   { id: 'mock3', username: 'HODLer99', message: 'When lambo? 😂', imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=HODLer99' },
+  //   { id: 'mock4', username: 'DiamondHands', message: 'Love watching the beasts go round', imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=DiamondHands' },
+  // ];
+  // useEffect(() => {
+  //   const handleDebugKey = (e) => {
+  //     if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'F' || e.key === 'f')) {
+  //       setDebugForceFullCarousel(prev => {
+  //         const newState = !prev;
+  //         console.log(`[DEBUG] Full carousel mode: ${newState ? 'ON' : 'OFF'}`);
+  //         if (newState) {
+  //           setGlobalChatMessages(debugMockMessages);
+  //         } else {
+  //           setGlobalChatMessages([]);
+  //         }
+  //         return newState;
+  //       });
+  //     }
+  //   };
+  //   window.addEventListener('keydown', handleDebugKey);
+  //   return () => window.removeEventListener('keydown', handleDebugKey);
+  // }, []);
 
   const calculateWaitTime = (position) => {
     if (position === 1) {
@@ -1811,7 +1814,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
               return (
                 <div
                   key={beastId}
-                  className="element"
+                  className={`element${rider ? " has-rider" : ""}`}
                   data-item={isEven ? "logo" : ""}
                   style={{ position: "absolute", "--item": index + 1 }}
                 >
@@ -1820,6 +1823,13 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                       <span>{Math.floor(index / 2) % 2 === 0
                         ? "CLICK ANY AVAILABLE BEAST TO CHAT WHILE RIDING"
                         : "MUST BE LOGGED IN TO RIDE AND DECRYPT MESSAGES"}</span>
+                    </div>
+                  )}
+                  {rider && (
+                    <div className="marquee-overlay">
+                      <span>
+                        {isSignedIn ? rider.username : scrambleText(rider.username)}
+                      </span>
                     </div>
                   )}
                   <div className="element2">
@@ -1831,42 +1841,12 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                       >
                         {rider && (
                           <div className="rider-container">
-                            <p className="rider-name">{isSignedIn ? rider.username : scrambleText(rider.username)}</p>
+                            <p className="rider-name rider-name-hidden">{isSignedIn ? rider.username : scrambleText(rider.username)}</p>
                             <img
                               src={sanitizeImageUrl(rider.imageUrl)}
                               alt={rider.username || "Rider"}
                               className="rider-avatar"
                             />
-                            {rider.djTrackName && (
-                              <div style={{
-                                position: "absolute",
-                                bottom: "-18px",
-                                left: "50%",
-                                transform: "translateX(-50%)",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "3px",
-                                background: "rgba(0, 0, 0, 0.85)",
-                                border: "1px solid rgba(212, 175, 55, 0.5)",
-                                borderRadius: "8px",
-                                padding: "1px 6px",
-                                whiteSpace: "nowrap",
-                                maxWidth: "120px",
-                              }}>
-                                <span style={{ fontSize: "10px" }}>♪</span>
-                                <span style={{
-                                  fontSize: "8px",
-                                  color: "#d4af37",
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                }}>
-                                  {rider.djTrackName.length > 16
-                                    ? rider.djTrackName.slice(0, 16) + "…"
-                                    : rider.djTrackName}
-                                </span>
-                              </div>
-                            )}
                           </div>
                         )}
                       </div>
@@ -1890,6 +1870,38 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                         style={{ display: "none" }} // Hidden from view
                       />
                     </div>
+                    {rider?.djTrackName && (
+                      <div style={{
+                        position: "absolute",
+                        bottom: "2px",
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "3px",
+                        background: "rgba(0, 0, 0, 0.85)",
+                        border: "1px solid rgba(212, 175, 55, 0.5)",
+                        borderRadius: "8px",
+                        padding: "1px 6px",
+                        whiteSpace: "nowrap",
+                        maxWidth: "120px",
+                        zIndex: 3,
+                        pointerEvents: "none",
+                      }}>
+                        <span style={{ fontSize: "10px" }}>♪</span>
+                        <span style={{
+                          fontSize: "8px",
+                          color: "#d4af37",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}>
+                          {rider.djTrackName.length > 16
+                            ? rider.djTrackName.slice(0, 16) + "…"
+                            : rider.djTrackName}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

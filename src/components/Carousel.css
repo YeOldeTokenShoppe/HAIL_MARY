@@ -147,7 +147,15 @@ body {
   position: absolute;
 
   left: 0;
-  z-index: 1; /* Adjust the z-index if needed */
+  z-index: 1;
+}
+
+.element:nth-child(odd).has-rider::after {
+  background-image: url("/marquee2.jpg");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  border: 2px solid #8e662b;
 }
 
 /* Even elements get specific logo backgrounds */
@@ -421,7 +429,14 @@ body {
   margin-bottom: 5px;
   font-size: 1rem;
   font-weight: bold;
-  color: #8e662b;
+  color: #db9732;
+  border: 2px solid #db9732;
+  border-radius: 10px;
+  background-color: #000;
+}
+
+.rider-name-hidden {
+  display: none;
 }
 
 .rider-beast-group {

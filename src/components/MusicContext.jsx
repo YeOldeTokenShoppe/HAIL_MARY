@@ -25,7 +25,8 @@ const non80sTracks = [
   { name: "Lifetimes", path: "audio/07 Lifetimes.m4a", bpm: 105 },
   { name: "Magnetic - Tunde Adebimpe", path: "audio/01 Magnetic.m4a", bpm: 130 },
   { name: "Rocket Man - Steven Drozd", path: "audio/rocketMan.m4a", bpm: 45 },
-    { name: "Ox Out The Cage - Cannibal Ox", path: "audio/Ox.mp3", bpm: 100 }
+    { name: "Ox Out The Cage - Cannibal Ox", path: "audio/Ox.mp3", bpm: 100 },
+        { name: "Corner of My Eye - Future Islands", path: "/audio/Future Islands - Corner of My Eye.mp3", bpm: 100 }
 ];
 const eightyTracks = [
   { name: "Girls on Film - Duran Duran", path: "audio/Girls On Film.mp3", bpm: 100 },
