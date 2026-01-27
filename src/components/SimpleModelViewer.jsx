@@ -442,7 +442,7 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
   // Add glow effects to scroll objects and make them clickable
   useEffect(() => {
     if (scene) {
-      const scrollObjects = ['Scroll1', 'Scroll2', 'Scroll3', 'SM_Prop_Shelf_Scroll'];
+      const scrollObjects = ['Scroll1', 'Scroll2', 'Scroll3', 'Scroll4'];
       scrollMaterialsRef.current = []; // Reset materials array
       scrollMeshesRef.current = {}; // Reset meshes object
       
@@ -464,13 +464,8 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
             event.stopPropagation();
             // console.log(`${scrollName} clicked!`);
             if (onScrollClick) {
-              // Special handling for SM_Prop_Shelf_Scroll
-              if (scrollName === 'SM_Prop_Shelf_Scroll') {
-                onScrollClick('scroll.html');
-              } else {
-                const scrollNumber = scrollName.toLowerCase().replace('scroll', '');
-                onScrollClick(`scroll${scrollNumber}.html`);
-              }
+              const scrollNumber = scrollName.toLowerCase().replace('scroll', '');
+              onScrollClick(`scroll${scrollNumber}.html`);
             }
           };
           
@@ -2196,18 +2191,23 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
               fontFamily: '"UnifrakturCook", serif'
             }}>
               {(() => {
-                const cleanTitle = currentScrollSrc
-                  .split('?')[0] // Remove query parameters
+                const romanNumerals = { '1': 'I', '2': 'II', '3': 'III', '4': 'IV', '5': 'V' };
+                let numeral = null;
+                const base = currentScrollSrc
+                  .split('?')[0]
                   .replace('.html', '')
                   .replace('/', '')
-                  .replace(/scroll(\d+)?/i, (match, num) => num ? `Scroll ${num}` : 'Scroll');
-                return `${cleanTitle} - Magnified View`;
+                  .replace(/scroll(\d+)?/i, (_, num) => {
+                    if (num) numeral = romanNumerals[num] || num;
+                    return 'Scroll';
+                  });
+                return <>{base}{numeral && <span style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}> {numeral}</span>} - Magnified View</>;
               })()}
             </div>
             
-            {/* Magnified iframe with zoom controls (hidden on mobile flat view) */}
+            {/* Magnified iframe with zoom controls */}
             <div style={{
-              display: isMobile ? 'none' : 'flex',
+              display: 'flex',
               justifyContent: 'center',
               marginBottom: '0.5rem',
               gap: '1rem',
@@ -2281,10 +2281,10 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
             {/* Iframe container with overflow for zooming */}
             <div style={{
               width: '100%',
-              height: isMobile ? 'calc(100% - 3rem)' : 'calc(100% - 6rem)',
+              height: isMobile ? 'calc(100% - 5rem)' : 'calc(100% - 6rem)',
               overflow: 'auto',
               position: 'relative',
-              top: '-3rem',
+              top: isMobile ? '0' : '-3rem',
               borderRadius: isMobile ? '0' : '0.5rem',
             }}>
               {/* Magnified iframe */}
@@ -2292,17 +2292,12 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
                 ref={magnifiedIframeRef}
                 id="magnified-iframe"
                 src={isMobile ? `${currentScrollSrc}&flat=true` : currentScrollSrc}
-                style={isMobile ? {
-                  width: '100%',
-                  height: '100%',
-                  border: 'none',
-                  background: '#fefee0',
-                  borderRadius: '0.5rem',
-                } : {
+                style={{
                   width: `${100 / magnifiedZoom}%`,
                   height: `${100 / magnifiedZoom}%`,
                   border: 'none',
-                  background: 'transparent',
+                  background: isMobile ? '#fefee0' : 'transparent',
+                  borderRadius: isMobile ? '0.5rem' : '0',
                   transform: `scale(${magnifiedZoom})`,
                   transformOrigin: 'top left',
                 }}

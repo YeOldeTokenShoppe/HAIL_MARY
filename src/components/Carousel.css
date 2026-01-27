@@ -9,29 +9,20 @@ body {
   overflow-x: hidden;
 }
 
-.carousel-container {
+.beast-carousel-container {
   font-family: "Poppins", sans-serif;
   color: #333;
-  height: 100vh;
+  height: 100%;
   width: 100%;
-  transform: scale(1);
-  /* background: radial-gradient(
-      circle at 60% 50%,
-      #ff4a4a 0 4vmin,
-      #fff0 50vmin 100%
-    ),
-    repeating-conic-gradient(
-      from 0deg at 60% 50%,
-      #ff4a4a 0 6deg,
-      #e6282a 0 12deg
-    ); */
+  transform: scale(0.85);
   display: flex;
   justify-content: center;
   position: relative;
   align-items: center;
   overflow: visible;
-  margin-top: 20rem;
+  margin-top: 4vh;
   z-index: 1;
+  flex: 1;
 }
 
 #carousel {
@@ -144,9 +135,9 @@ body {
 .element:nth-child(odd)::after {
   content: "";
   display: block;
-  background-image: url("/marquee2.jpg");
+  background-image: url("/images/CIRCUS_SIGN2.webp");
   background-color: #1b1724;
-  background-size: contain;
+  background-size: cover;
   background-repeat: repeat;
   background-position: center;
 
@@ -246,6 +237,30 @@ body {
   left: 0;
   z-index: 1;
 }
+/* Text overlay on even element marquee images */
+.marquee-overlay {
+  position: absolute;
+  top: -52px;
+  left: 0;
+  width: 100%;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  pointer-events: none;
+  transform: translateZ(35px);
+}
+
+.marquee-overlay span {
+  color: #fff;
+  font-size: 0.5rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
 /* Make the logo elements clickable */
 .element:nth-child(even) {
   cursor: pointer; /* Add a pointer cursor to even elements (with logos) */
@@ -311,26 +326,29 @@ body {
 
 /* Media Queries for Different Screen Sizes */
 @media (min-width: 1200px) {
-  .carousel-container {
-    height: 5rem;
-    transform: scale(1.2); /* Full size */
+  .beast-carousel-container {
+    height: 100%;
+    margin-top: 3vh;
+    transform: scale(0.9);
   }
 }
 
 @media (min-width: 768px) and (max-width: 1199px) and (orientation: portrait) {
-  .carousel-container {
-    height: 5rem; /* Adjust height */
-    transform: scale(0.8); /* Scaled down */
+  .beast-carousel-container {
+    height: 100%;
+    margin-top: 2vh;
+    transform: scale(0.7); /* Scaled down */
   }
   .chat-box-container {
-    margin-top: 5rem;
+    margin-top: 5%;
   }
 }
 
 @media (min-width: 768px) and (max-width: 1199px) and (orientation: landscape) {
-  .carousel-container {
-    height: 5rem; /* Adjust height */
-    transform: scale(0.8); /* Scaled down */
+  .beast-carousel-container {
+    height: 100%;
+    margin-top: 1vh;
+    transform: scale(0.65); /* Scaled down */
   }
   .chat-box-container {
     margin-top: 3rem;
@@ -338,16 +356,18 @@ body {
 }
 
 @media (min-width: 576px) and (max-width: 767px) {
-  .carousel-container {
-    height: 25rem; /* Adjust height */
-    transform: scale(0.7); /* Scaled down further */
+  .beast-carousel-container {
+    height: 100%;
+    margin-top: 1vh;
+    transform: scale(0.8);
   }
 }
 
 @media (max-width: 575px) {
-  .carousel-container {
-    height: 10rem; /* Adjust height */
-    transform: scale(0.7); /* Smallest scale */
+  .beast-carousel-container {
+    height: 100%;
+    margin-top: 0.5vh;
+    transform: scale(0.75);
   }
 }
 @media (min-width: 400px) and (max-width: 767px) {
@@ -356,12 +376,13 @@ body {
   }
 }
 @media (max-width: 400px) {
-  .carousel-container {
-    height: 7rem;
+  .beast-carousel-container {
+    height: 100%;
+    margin-top: 0;
     transform: scale(0.7);
   }
   .chat-box-container {
-    margin-top: 5rem;
+    margin-top: 5%;
   }
 }
 

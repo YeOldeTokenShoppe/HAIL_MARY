@@ -441,7 +441,26 @@ INITIAL SUPPLY: 80B RL80`,
         }
       ]
     },
-    
+    {
+      id: 'QUERY_CHAT',
+      command: '> QUERY: Chat.Room',
+      title: 'Chat Room',
+      response: ` LOADING COMMUNICATION PROTOCOLS...
+
+RL80 uses a built-in chat room on the site rather than Discord or Telegram.
+
+This is a deliberate safety decision. Discord and Telegram are the most common platforms where crypto scammers operate — impersonating admins, sending phishing links in DMs, and running fake "support" channels.
+
+By keeping community chat on-site, we eliminate those attack vectors entirely. There are no DMs to exploit, no fake mod accounts, and no third-party servers to impersonate. What you see is what you get — one chat room, on the official site, in plain view.
+
+Chat messages are not saved — when you leave the page, they're gone. This is intentional. No chat logs means no data to mine, leak, or weaponize.
+
+Your safety matters more than platform convenience.
+`,
+      status: '[CHAT.SECURED]',
+      subQuestions: []
+    },
+
     {
       id: 'QUERY_005',
       command: '> QUERY: Legal.Compliance',

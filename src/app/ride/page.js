@@ -4,7 +4,6 @@ import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import Carousel from "@/components/Carousel";
-import Footer from "@/components/Footer";
 import CoinLoader from "@/components/CoinLoader";
 import { useUser } from "@clerk/nextjs";
 import { useMusic } from "@/components/MusicContext";
@@ -381,7 +380,7 @@ export default function CommunionPage() {
             opacity: contentOpacity,
             transition: "opacity 0.8s ease-in",
             width: "100vw",
-            minHeight: "100vh",
+            height: "100vh",
             overflow: "visible",
             position: "relative",
             zIndex: 1,
@@ -389,8 +388,9 @@ export default function CommunionPage() {
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            paddingTop: '5rem',
-            paddingBottom: '2rem',
+            paddingTop: '12vh',
+            paddingBottom: '0',
+            boxSizing: 'border-box',
           }}
         >
           {/* Title and Intro */}
@@ -429,13 +429,15 @@ export default function CommunionPage() {
           <div
             style={{
               position: "relative",
-              marginBottom: "2rem",
+              marginBottom: "0",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
               justifyContent: "center",
               zIndex: 2,
               width: "100%",
+              flex: 1,
+              minHeight: 0,
             }}
           >
             {/* Container wrapping the Carousel and the sign */}
@@ -472,9 +474,9 @@ export default function CommunionPage() {
             <div
               style={{
                 position: "absolute",
-                top: "-6rem",
+                top: "-4rem",
                 left: "50%",
-                transform: "translateX(-50%) scale(0.5)",
+                transform: "translateX(-50%) scale(0.35)",
                 width: "auto",
                 maxWidth: "none",
                 maxHeight: "none",
@@ -485,8 +487,8 @@ export default function CommunionPage() {
                 translate: "no",
               }}
             >
-              <img
-                src="/carouselSign.png"
+              {/* <img
+                src="/images/CIRCUS_SIGN2.webp"
                 alt=""
                 translate="no" 
                 style={{
@@ -495,24 +497,11 @@ export default function CommunionPage() {
                   maxHeight: "none",
                 }}
                 onLoad={() => console.log("Carousel sign loaded")}
-              />
+              /> */}
             </div>
           </div>
 
 
-          {!isRiding && (
-            <div style={{
-              width: '100%',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              marginTop: '2rem',
-              zIndex: 100,
-              position: 'relative'
-            }}>
-              <Footer />
-            </div>
-          )}
         </div>
       )}
     </>

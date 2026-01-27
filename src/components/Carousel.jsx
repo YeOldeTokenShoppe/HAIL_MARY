@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 
 import {
   collection,
@@ -250,6 +251,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
   const [newMessage, setNewMessage] = useState("");
   const [activeBeastId, setActiveBeastId] = useState(null);
   const [isRiding, setIsRiding] = useState(false);
+  const [hasRidden, setHasRidden] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(null);
   const [rideActive, setRideActive] = useState(true);
   const [popupMessage, setPopupMessage] = useState("");
@@ -265,6 +267,9 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
   useEffect(() => {
     if (onRidingChange) {
       onRidingChange(isRiding);
+    }
+    if (isRiding) {
+      setHasRidden(true);
     }
   }, [isRiding, onRidingChange]);
 
@@ -1136,31 +1141,31 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
 
   // DEBUG MODE - Uncomment to test Spectator Lounge when beasts aren't full
   // Press Ctrl+Shift+F to toggle
-  // const [debugForceFullCarousel, setDebugForceFullCarousel] = useState(false);
-  // const debugMockMessages = [
-  //   { id: 'mock1', username: 'CryptoKing', message: 'Waiting for my turn! 🎠', imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=CryptoKing' },
-  //   { id: 'mock2', username: 'MoonRider', message: 'This carousel is wild!', imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=MoonRider' },
-  //   { id: 'mock3', username: 'HODLer99', message: 'When lambo? 😂', imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=HODLer99' },
-  //   { id: 'mock4', username: 'DiamondHands', message: 'Love watching the beasts go round', imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=DiamondHands' },
-  // ];
-  // useEffect(() => {
-  //   const handleDebugKey = (e) => {
-  //     if (e.ctrlKey && e.shiftKey && e.key === 'F') {
-  //       setDebugForceFullCarousel(prev => {
-  //         const newState = !prev;
-  //         console.log(`[DEBUG] Full carousel mode: ${newState ? 'ON' : 'OFF'}`);
-  //         if (newState) {
-  //           setGlobalChatMessages(debugMockMessages);
-  //         } else {
-  //           setGlobalChatMessages([]);
-  //         }
-  //         return newState;
-  //       });
-  //     }
-  //   };
-  //   window.addEventListener('keydown', handleDebugKey);
-  //   return () => window.removeEventListener('keydown', handleDebugKey);
-  // }, []);
+  const [debugForceFullCarousel, setDebugForceFullCarousel] = useState(false);
+  const debugMockMessages = [
+    { id: 'mock1', username: 'CryptoKing', message: 'Waiting for my turn! 🎠', imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=CryptoKing' },
+    { id: 'mock2', username: 'MoonRider', message: 'This carousel is wild!', imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=MoonRider' },
+    { id: 'mock3', username: 'HODLer99', message: 'When lambo? 😂', imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=HODLer99' },
+    { id: 'mock4', username: 'DiamondHands', message: 'Love watching the beasts go round', imageUrl: 'https://api.dicebear.com/7.x/avataaars/svg?seed=DiamondHands' },
+  ];
+  useEffect(() => {
+    const handleDebugKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'F' || e.key === 'f')) {
+        setDebugForceFullCarousel(prev => {
+          const newState = !prev;
+          console.log(`[DEBUG] Full carousel mode: ${newState ? 'ON' : 'OFF'}`);
+          if (newState) {
+            setGlobalChatMessages(debugMockMessages);
+          } else {
+            setGlobalChatMessages([]);
+          }
+          return newState;
+        });
+      }
+    };
+    window.addEventListener('keydown', handleDebugKey);
+    return () => window.removeEventListener('keydown', handleDebugKey);
+  }, []);
 
   const calculateWaitTime = (position) => {
     if (position === 1) {
@@ -1585,9 +1590,12 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
         justifyContent: "center",
         textAlign: "center",
         position: "relative",
+        flex: 1,
+        minHeight: 0,
+        width: "100%",
       }}
     >
-      <div className="carousel-container">
+      <div className="beast-carousel-container">
         <main>
           <div
             id="carousel"
@@ -1612,6 +1620,13 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                   data-item={isEven ? "logo" : ""}
                   style={{ position: "absolute", "--item": index + 1 }}
                 >
+                  {isEven && ((Math.floor(index / 2) % 2 === 0 && !hasRidden) || (Math.floor(index / 2) % 2 === 1 && !isSignedIn)) && (
+                    <div className="marquee-overlay">
+                      <span>{Math.floor(index / 2) % 2 === 0
+                        ? "CLICK ANY BEAST TO RIDE AND CHAT FOR 10 MIN"
+                        : "MUST BE LOGGED IN TO RIDE AND DECRYPT MESSAGES"}</span>
+                    </div>
+                  )}
                   <div className="element2">
                     <div className="rider-beast-group">
                       <div
@@ -1799,20 +1814,23 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
           )}
         </main>
 
-        {isRiding && activeBeastId && (
+        {isRiding && activeBeastId && typeof document !== 'undefined' && createPortal(
           <div
             className="chat-box-container"
             style={{
               background: "linear-gradient(145deg, rgba(27, 23, 36, 0.98), rgba(45, 35, 55, 0.98))",
               border: "2px solid #d4af37",
-              padding: "1.25rem",
+              padding: "0.75rem 1rem",
               position: "fixed",
               zIndex: 9999,
               fontSize: "12px",
-              width: "320px",
+              width: "min(320px, calc(100vw - 2rem))",
               left: "50%",
               transform: "translateX(-50%)",
-              top: "18rem",
+              top: "auto",
+              bottom: "1rem",
+              maxHeight: "45vh",
+              overflowY: "auto",
               borderRadius: "16px",
               boxShadow: "0 0 30px rgba(212, 175, 55, 0.3), 0 10px 40px rgba(0, 0, 0, 0.5)",
               backdropFilter: "blur(10px)",
@@ -1850,74 +1868,74 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
               ×
             </button>
 
-            {/* Header */}
-            <h1
-              style={{
-                fontFamily: "Oleo Script, cursive",
-                fontSize: "1.4rem",
-                color: "#d4af37",
-                margin: "0 0 0.25rem 0",
-                textShadow: "0 0 10px rgba(212, 175, 55, 0.4)",
-              }}
-            >
-              Chat Box
-            </h1>
-
-            {/* Time remaining and controls */}
+            {/* Header row */}
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                marginBottom: "0.75rem",
+                marginBottom: "0.5rem",
               }}
             >
-              <span
+              <h1
                 style={{
-                  fontSize: "11px",
-                  color: "rgba(255, 255, 255, 0.6)",
+                  fontFamily: "Oleo Script, cursive",
+                  fontSize: "1rem",
+                  color: "#d4af37",
+                  margin: 0,
+                  textShadow: "0 0 10px rgba(212, 175, 55, 0.4)",
                 }}
               >
-                {newMessage.length}/{MAX_MESSAGE_LENGTH}
-              </span>
-              {messages[activeBeastId]?.length > 0 && (
-                <button
-                  onClick={() => clearBeastMessage(activeBeastId)}
-                  title="Clear displayed message"
+                Chat Box
+              </h1>
+              <div style={{ display: "flex", alignItems: "center", gap: "20px", paddingLeft: '10px' }}>
+                <span
                   style={{
                     fontSize: "10px",
-                    padding: "2px 8px",
-                    borderRadius: "8px",
-                    border: "1px solid rgba(255, 100, 100, 0.4)",
-                    backgroundColor: "rgba(255, 100, 100, 0.1)",
-                    color: "#ff6b6b",
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = "rgba(255, 100, 100, 0.25)";
-                    e.target.style.borderColor = "rgba(255, 100, 100, 0.6)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = "rgba(255, 100, 100, 0.1)";
-                    e.target.style.borderColor = "rgba(255, 100, 100, 0.4)";
+                    color: "rgba(255, 255, 255, 0.45)",
                   }}
                 >
-                  Clear bubble
-                </button>
-              )}
-              <span
-                style={{
-                  fontSize: "11px",
-                  color: "#d4af37",
-                  background: "rgba(212, 175, 55, 0.1)",
-                  padding: "2px 8px",
-                  borderRadius: "10px",
-                  border: "1px solid rgba(212, 175, 55, 0.3)",
-                }}
-              >
-                ⏱ {timeRemaining}
-              </span>
+                  {newMessage.length}/{MAX_MESSAGE_LENGTH}
+                </span>
+                {messages[activeBeastId]?.length > 0 && (
+                  <button
+                    onClick={() => clearBeastMessage(activeBeastId)}
+                    title="Clear displayed message"
+                    style={{
+                      fontSize: "9px",
+                      padding: "4px 10px",
+                      borderRadius: "6px",
+                      border: "1px solid rgba(255, 100, 100, 0.4)",
+                      backgroundColor: "rgba(255, 100, 100, 0.1)",
+                      color: "#ff6b6b",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.backgroundColor = "rgba(255, 100, 100, 0.25)";
+                      e.target.style.borderColor = "rgba(255, 100, 100, 0.6)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.backgroundColor = "rgba(255, 100, 100, 0.1)";
+                      e.target.style.borderColor = "rgba(255, 100, 100, 0.4)";
+                    }}
+                  >
+                    Clear
+                  </button>
+                )}
+                <span
+                  style={{
+                    fontSize: "10px",
+                    color: "#d4af37",
+                    background: "rgba(212, 175, 55, 0.1)",
+                    padding: "1px 6px",
+                    borderRadius: "8px",
+                    border: "1px solid rgba(212, 175, 55, 0.3)",
+                  }}
+                >
+                  ⏱ {timeRemaining}
+                </span>
+              </div>
             </div>
 
             {/* Input area */}
@@ -2016,7 +2034,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
               </div>
             )}
           </div>
-        )}
+        , document.body)}
 
         {popupMessage && (
           <StyledPopup
@@ -2029,7 +2047,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
 
       {/* Global Chat Sidebar - appears when all 12 beasts are occupied */}
       {/* Debug: Press Ctrl+Shift+F to toggle visibility for testing */}
-      {allBeastsOccupied && (
+      {allBeastsOccupied && typeof document !== 'undefined' && createPortal(
         <div
           className="global-chat-sidebar"
           style={{
@@ -2389,7 +2407,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
             </div>
           )}
         </div>
-      )}
+      , document.body)}
       {/* Ride or Die content box
       <div style={{ 
           backgroundColor: "#1b1724", 

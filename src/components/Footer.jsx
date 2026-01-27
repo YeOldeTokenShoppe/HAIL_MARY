@@ -2,8 +2,10 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
-const Footer = ({ isMobile = false }) => {
+const Footer = ({ isMobile = false, compact = false }) => {
+  const pathname = usePathname();
   // Helper function to get responsive values
   const getResponsiveValue = (mobile, tablet, tabletLandscape, desktop) => {
     if (isMobile) return mobile;
@@ -12,7 +14,7 @@ const Footer = ({ isMobile = false }) => {
 
   return (
     <footer style={{
-      marginTop: '6rem',
+      marginTop: compact ? '1vh' : '6rem',
       padding: '2rem 2rem 2rem 2rem',
       background: 'transparent',
       color: '#ffffff',
@@ -32,7 +34,7 @@ const Footer = ({ isMobile = false }) => {
           justifyContent: 'center',
              fontFamily: 'Cyber, monospace',
           gap: '2rem',
-          marginTop: isMobile ? '1rem' : '3rem',
+          marginTop: compact ? '0' : (isMobile ? '1rem' : '3rem'),
         }}>
           <div style={{
             display: 'flex',
@@ -96,8 +98,9 @@ const Footer = ({ isMobile = false }) => {
           marginBottom: '2rem',
           flexWrap: 'wrap',
         }}>
+          {pathname !== '/ride' && (
           <a
-            href="/test"
+            href="/ride"
             target="_blank"
             rel="noopener noreferrer"
             style={{
@@ -117,6 +120,7 @@ const Footer = ({ isMobile = false }) => {
                 filter: 'brightness(0) invert(1)',
               }} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-circle-icon lucide-message-circle"><path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719"/></svg>
           </a>
+          )}
           <Link href="mailto:411@rl80.com" 
            style={{
               display: 'flex',

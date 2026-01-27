@@ -48,7 +48,7 @@ export default function ModelViewerPage() {
   return (
     <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
       <SimpleModelViewer 
-        modelPath="/models/saint_robot.glb" 
+        modelPath="/models/saint_robot2.glb"
         onLoadingChange={setIsPageLoading}
         is80sMode={is80sMode}
       />

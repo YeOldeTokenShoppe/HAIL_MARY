@@ -47,6 +47,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
   const autoRotateInterval = useRef(null)
   const touchStartX = useRef(0)
   const touchEndX = useRef(0)
+  const isWrapping = useRef(false)
   const SECTION_COUNT = 3
   const AUTO_ROTATE_DELAY = 8000 // 8 seconds per section
   const SWIPE_THRESHOLD = 50 // minimum swipe distance in pixels
@@ -94,15 +95,32 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
 
   // Carousel navigation functions
   const goToSection = useCallback((index) => {
-    setActiveSection(index)
+    setActiveSection((prev) => {
+      if (Math.abs(index - prev) > 1) {
+        isWrapping.current = true
+      }
+      return index
+    })
   }, [])
 
   const goToNextSection = useCallback(() => {
-    setActiveSection((prev) => (prev + 1) % SECTION_COUNT)
+    setActiveSection((prev) => {
+      const next = (prev + 1) % SECTION_COUNT
+      if (prev === SECTION_COUNT - 1 && next === 0) {
+        isWrapping.current = true
+      }
+      return next
+    })
   }, [])
 
   const goToPrevSection = useCallback(() => {
-    setActiveSection((prev) => (prev - 1 + SECTION_COUNT) % SECTION_COUNT)
+    setActiveSection((prev) => {
+      const next = (prev - 1 + SECTION_COUNT) % SECTION_COUNT
+      if (prev === 0 && next === SECTION_COUNT - 1) {
+        isWrapping.current = true
+      }
+      return next
+    })
   }, [])
 
   // Touch handlers for swipe navigation
@@ -164,6 +182,16 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [isCarouselMode, isFullscreen, goToNextSection, goToPrevSection])
+
+  // Reset wrapping flag after the instant jump is painted
+  useEffect(() => {
+    if (isWrapping.current) {
+      const id = requestAnimationFrame(() => {
+        isWrapping.current = false
+      })
+      return () => cancelAnimationFrame(id)
+    }
+  }, [activeSection])
   
   // Cleanup on unmount
   useEffect(() => {
@@ -313,7 +341,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             width: 40px;
             height: 40px;
             font-size: 18px;
-            top: 65% !important;
+            bottom: 28px;
           }
 
           .carousel-arrow.left {
@@ -375,14 +403,13 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           }
 
           .carousel-arrow {
-            top: 55% !important;
+            bottom: 36px;
           }
         }
 
         .carousel-arrow {
           position: fixed;
-          top: 50%;
-          transform: translateY(-50%);
+          bottom: 36px;
           width: 60px;
           height: 60px;
           border-radius: 50%;
@@ -402,7 +429,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
         .carousel-arrow:hover {
           background: rgba(255, 215, 0, 0.2);
           border-color: #ffd700;
-          transform: translateY(-50%) scale(1.1);
+          transform: scale(1.1);
           box-shadow: 0 0 25px rgba(255, 215, 0, 0.6);
         }
 
@@ -491,7 +518,6 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             <button
               className="carousel-arrow left"
               onClick={goToPrevSection}
-              style={{ top: '60%' }}
             >
               &#8249;
             </button>
@@ -500,7 +526,6 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             <button
               className="carousel-arrow right"
               onClick={goToNextSection}
-              style={{ top: '60%' }}
             >
               &#8250;
             </button>
@@ -644,7 +669,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               display: 'flex',
               flexDirection: 'row',
               transform: isMobilePhone ? 'none' : `translateX(-${activeSection * 100}vw)`,
-              transition: 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
+              transition: isWrapping.current ? 'none' : 'transform 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
               height: '100%',
             }}
             onTouchStart={handleTouchStart}
@@ -923,7 +948,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             <SkewedHeading
               lines={["PROSPER80", "FOR ALL", "HUMAN80!"]}
               colors={["#00ff00", "#f4e4c1", "#ffd700"]}
-              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "2.5rem" : "3rem"}
+              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : isLargeTablet ? "2rem" : isTabletPortrait ? "2.5rem" : "2rem"}
               isMobile={true}
               language={locale}
             />
@@ -935,6 +960,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               height: isMobilePhone ? 'min(400px, 40vh)' : '550px',
               marginTop: '0.5rem',
               filter: 'drop-shadow(0 0 30px rgba(0, 221, 255, 0.4))',
+              paddingTop: isMobilePhone ? '1rem' : '3rem'
             }}>
               <HolyGrailPortal isMobile={isMobilePhone} />
             </div>
@@ -955,17 +981,53 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
               fontSize: isSmallPhone ? '0.9rem' : '1rem',
               color: 'rgba(255, 255, 255, 0.85)',
-              lineHeight: isSmallPhone ? '1.3' : '1.5',
+              lineHeight: isSmallPhone ? '1.3' : '1.3',
               marginTop: '-0.5rem',
               maxWidth: isMobilePhone ? '320px' : '450px',
               textAlign: 'center',
               padding: '0 1rem',
             }}>
               {isMobilePhone ? (
-                <>RL80 is a return to first principles: minimized trust, constant vigilance, distributed power, universal access.</>
+                
+                <>
+                 <p style={{
+              fontFamily: "'Courier New', monospace",
+              fontSize: isTabletLandscape ? '1rem' : isTabletPortrait ? '0.9rem' : '1.2rem',
+              fontWeight: 'bold',
+              color: '#ffd700',
+              textAlign: 'center',
+              // marginTop: isTablet ? '1rem' : '1.5rem',
+              // marginBottom: isTablet ? '1.5rem' : '2rem',
+              marginBottom: '1rem',
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+              opacity: 0.9,
+              textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
+            }}>
+              All monetary systems are belief systems
+            </p>
+                
+                RL80 is a return to first principles: minimized trust, constant vigilance, distributed power, universal access - the very qualities associated with <i>𝓞𝖚𝖗 𝕷𝖆𝖉𝖞</i>.</>
               ) : (
-                <>All monetary systems are belief systems.<br/>
-Cryptocurrency was designed to be a less corruptible, technologically superior form of money—yet, ironically, it has earned a poor reputation, and not without reason.<br/><br/> It doesn&apos;t have to be that way. <br/><br/>RL80 is a return to first principles: minimized trust, constant vigilance, distributed power, universal access.</>
+                <>
+                
+                
+             <p style={{
+              fontFamily: "'Courier New', monospace",
+              fontSize: isTabletLandscape ? '1rem' : isTabletPortrait ? '0.9rem' : '1.2rem',
+              color: '#ffd700',
+              textAlign: 'center',
+               fontWeight: 'bold',
+              // marginTop: isTablet ? '1rem' : '1.5rem',
+              // marginBottom: isTablet ? '1.5rem' : '2rem',
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+              opacity: 0.9,
+              textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
+            }}>
+              Experience the new enigma machine
+            </p>
+Cryptocurrency was designed to be a less corruptible, technologically superior form of money—yet, ironically, it has earned a poor reputation, and not without reason.<br/><br/> It doesn&apos;t have to be that way. <br/><br/>RL80 is a return to first principles: minimized trust, constant vigilance, distributed power, universal access - the very qualities associated with <i>𝓞𝖚𝖗 𝕷𝖆𝖉𝖞</i>.</>
               )}
             </p>
     
@@ -1104,8 +1166,8 @@ Cryptocurrency was designed to be a less corruptible, technologically superior f
               onClick={() => router.push('/illumin80')}
               style={{
                 width: '100%',
-                maxWidth: isMobilePhone ? 'min(450px, 80vw)' : '500px',
-                height: isMobilePhone ? 'min(550px, 30vh)' : '450px',
+                maxWidth: isMobilePhone ? 'min(450px, 80vw)' : '650px',
+                height: isMobilePhone ? 'min(550px, 30vh)' : '380px',
                 marginTop: '0',
                 cursor: 'pointer',
               }}
@@ -1135,7 +1197,7 @@ Cryptocurrency was designed to be a less corruptible, technologically superior f
               textAlign: 'center',
               padding: '0 1rem',
             }}>
-              Experience the new enigma machine. The icon of intercession is now online and on-chain.
+              <b>Experience the new enigma machine.</b><br /> The icon of intercession is now online and on-chain.
               <br/><br/>
               Light a virtual green candle and join the Illumin80 — a circle of investors who paradoxically place their faith in having none at all, at least when it comes to money.
             </p>
@@ -1441,7 +1503,7 @@ Cryptocurrency was designed to be a less corruptible, technologically superior f
               display: 'flex',
               flexDirection: isCarouselMode ? 'row' : 'column',
               transform: isCarouselMode ? `translateX(-${activeSection * 100}vw)` : 'none',
-              transition: isCarouselMode ? 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+              transition: (isCarouselMode && !isWrapping.current) ? 'transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
             }}
             onMouseEnter={() => isCarouselMode && setIsAutoPaused(true)}
             onMouseLeave={() => isCarouselMode && !isManuallyPaused && setIsAutoPaused(false)}
@@ -1619,6 +1681,7 @@ Cryptocurrency was designed to be a less corruptible, technologically superior f
               fontSize: isTabletLandscape ? '1rem' : isTabletPortrait ? '0.9rem' : '1.2rem',
               color: '#ffd700',
               textAlign: 'center',
+               fontWeight: 'bold',
               // marginTop: isTablet ? '1rem' : '1.5rem',
               // marginBottom: isTablet ? '1.5rem' : '2rem',
               letterSpacing: '0.05em',
@@ -1634,7 +1697,7 @@ Cryptocurrency was designed to be a less corruptible, technologically superior f
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
               fontSize: isTabletLandscape ? '0.95rem' : isTabletPortrait ? '0.9rem' : '1.1rem',
               color: 'rgba(255, 255, 255, 0.85)',
-              lineHeight: '1.6',
+              lineHeight: '1.4',
               marginBottom: isTablet ? '1.5rem' : '2rem',
               maxWidth: '450px',
               textAlign: 'center'
@@ -1726,23 +1789,39 @@ Cryptocurrency was designed to be a less corruptible, technologically superior f
               <SkewedHeading
                 lines={["PROSPER80", "FOR ALL", "HUMAN80!"]}
               colors={["#00ff00", "#f4e4c1", "#ffd700"]}
-                fontSize={{ mobile: "2rem", desktop: isTabletLandscape ? "2.5rem" : "3.5rem" }}
+                fontSize={{ mobile: "2rem", desktop: isTabletLandscape ? "2.5rem" : "3rem" }}
                 isMobile={false}
                 language={locale}
               />
-
+           
+             <p style={{
+              fontFamily: "'Courier New', monospace",
+              fontSize: isTabletLandscape ? '1rem' : isTabletPortrait ? '0.9rem' : '1.2rem',
+              color: '#ffd700',
+              textAlign: 'center',
+               fontWeight: 'bold',
+              // marginTop: isTablet ? '1rem' : '1.5rem',
+              // marginBottom: isTablet ? '1.5rem' : '2rem',
+              marginBottom: '-1rem',
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+              opacity: 0.9,
+              textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
+            }}>
+              All monetary systems are belief systems
+            </p>
               {/* Description text */}
               <p style={{
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
                 fontSize: isTabletLandscape ? '0.95rem' : isTabletPortrait ? '0.9rem' : '1.1rem',
                 color: 'rgba(255, 255, 255, 0.85)',
-                lineHeight: '1.6',
+                lineHeight: '1.3',
                 marginTop: '2rem',
                 marginBottom: isTablet ? '1.5rem' : '2rem',
                 maxWidth: '500px',
                 textAlign: 'center'
-              }}>All monetary systems are belief systems.<br/>
-Cryptocurrency was designed to be a less corruptible, technologically superior form of money—yet, ironically, it has earned a poor reputation, and not without reason.<br/><br/> It doesn’t have to be that way. <br/><br/>RL80 is a return to first principles: minimized trust, constant vigilance, distributed power, universal access.</p>
+              }}>
+Cryptocurrency was designed to be a less corruptible, technologically superior form of money—yet, ironically, it has earned a poor reputation, and not without reason.<br/><br/> It doesn’t have to be that way. <br/><br/>RL80 is a return to first principles: minimized trust, constant vigilance, distributed power, universal access - the very qualities associated with <i>𝓞𝖚𝖗 𝕷𝖆𝖉𝖞</i>.</p>
             <div
               className="navigation-group"
               style={{
@@ -2005,8 +2084,8 @@ Cryptocurrency was designed to be a less corruptible, technologically superior f
                 style={{
                   position: 'relative',
                   width: '100%',
-                  maxWidth: isTabletLandscape ? '550px' : isTabletPortrait ? '500px' : '600px',
-                  height: isTabletLandscape ? '500px' : isTabletPortrait ? '450px' : '600px',
+                  maxWidth: isTabletLandscape ? '600px' : isTabletPortrait ? '550px' : '700px',
+                  height: isTabletLandscape ? '420px' : isTabletPortrait ? '380px' : '500px',
                   transition: 'all 0.3s ease',
                   // filter: 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.5))',
                 }}
@@ -2034,8 +2113,11 @@ Cryptocurrency was designed to be a less corruptible, technologically superior f
               justifyContent: 'center',
               alignItems: 'center',
               maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : '550px',
+              marginLeft: isTabletLandscape ? '-2rem' : isTabletPortrait ? '-1rem' : '-6thatrem',
               paddingLeft: isTabletLandscape ? '1rem' : '2rem',
               paddingBottom: isTabletLandscape ? '1rem' : isTabletPortrait ? '2rem' : '1rem',
+              position: 'relative',
+              zIndex: 5,
             }}>
               <SkewedHeading
                  lines={["ENTER THE", "LIMINAL", "TERMINAL"]}
@@ -2049,19 +2131,33 @@ Cryptocurrency was designed to be a less corruptible, technologically superior f
     lines={['WELCOME', 'TO CIRCUS']}
     scramble={true}
   />                                                                                  */}
-
+ <p style={{
+              fontFamily: "'Courier New', monospace",
+              fontSize: isTabletLandscape ? '1rem' : isTabletPortrait ? '0.9rem' : '1.2rem',
+              color: '#ffd700',
+              textAlign: 'center',
+               fontWeight: 'bold',
+              // marginTop: isTablet ? '1rem' : '1.5rem',
+              // marginBottom: isTablet ? '1.5rem' : '2rem',
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+              opacity: 0.9,
+              textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
+            }}>
+              Experience the new enigma machine
+            </p>
 
               <p style={{
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
                 fontSize: isTabletLandscape ? '0.95rem' : isTabletPortrait ? '0.9rem' : '1.1rem',
                 color: 'rgba(255, 255, 255, 0.85)',
-                lineHeight: '1.6',
-                marginTop: '2rem',
-                marginBottom: isTablet ? '1.5rem' : '2rem',
+                lineHeight: '1.4',
+                // marginTop: '2rem',
+                // marginBottom: isTablet ? '1.5rem' : '2rem',
                 maxWidth: '450px',
                 textAlign: 'center'
               }}>
-              Experience the new enigma machine. The icon of intercession is now online and on-chain.
+          <b>The icon of intercession is now online and on-chain.</b>
               <br/><br/>
               Light a virtual green candle and join the Illumin80 — a circle of investors who paradoxically place their faith in having none at all, at least when it comes to money.
               </p>
