@@ -465,11 +465,11 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
       `}</style>
       <div style={{
         width: '100%',
-        minHeight: '100vh',
+        height: isPortraitOrientation ? '100dvh' : 'auto',
+        minHeight: isPortraitOrientation ? 'unset' : '100vh',
         backgroundColor: (is80sMode && isMobilePhone) ? 'transparent' : '#000',
         position: 'relative',
-        overflowX: 'hidden',
-        overflowY: 'auto'
+        overflow: isPortraitOrientation ? 'hidden' : 'auto hidden',
       }}>
         {/* Video background for 80s mode - desktop only */}
         {is80sMode && !isMobilePhone && (
@@ -506,7 +506,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
         <div style={{
           position: 'relative',
           width: '100%',
-          height: '100vh',
+          height: '100dvh',
           overflow: 'hidden',
           background: is80sMode ? 'transparent' : 'radial-gradient(ellipse at center, #1a1a2e 0%, #000 100%)',
           zIndex: 2,
@@ -948,7 +948,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             <SkewedHeading
               lines={["PROSPER80", "FOR ALL", "HUMAN80!"]}
               colors={["#00ff00", "#f4e4c1", "#ffd700"]}
-              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : isLargeTablet ? "2rem" : isTabletPortrait ? "2.5rem" : "2rem"}
+              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "2.5rem" : "2.5rem"}
               isMobile={true}
               language={locale}
             />
@@ -990,14 +990,13 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               {isMobilePhone ? (
                 
                 <>
-                 <p style={{
+                 <span style={{
+              display: 'block',
               fontFamily: "'Courier New', monospace",
               fontSize: isTabletLandscape ? '1rem' : isTabletPortrait ? '0.9rem' : '1.2rem',
               fontWeight: 'bold',
               color: '#ffd700',
               textAlign: 'center',
-              // marginTop: isTablet ? '1rem' : '1.5rem',
-              // marginBottom: isTablet ? '1.5rem' : '2rem',
               marginBottom: '1rem',
               letterSpacing: '0.05em',
               textTransform: 'uppercase',
@@ -1005,28 +1004,27 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
             }}>
               All monetary systems are belief systems
-            </p>
+            </span>
                 
                 RL80 is a return to first principles: minimized trust, constant vigilance, distributed power, universal access - the very qualities associated with the beloved icon, <i>𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙</i>.</>
               ) : (
                 <>
                 
                 
-             <p style={{
+             <span style={{
+              display: 'block',
               fontFamily: "'Courier New', monospace",
               fontSize: isTabletLandscape ? '1rem' : isTabletPortrait ? '0.9rem' : '1.2rem',
               color: '#ffd700',
               textAlign: 'center',
-               fontWeight: 'bold',
-              // marginTop: isTablet ? '1rem' : '1.5rem',
-              // marginBottom: isTablet ? '1.5rem' : '2rem',
+              fontWeight: 'bold',
               letterSpacing: '0.05em',
               textTransform: 'uppercase',
               opacity: 0.9,
               textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
             }}>
               Experience the new enigma machine
-            </p>
+            </span>
 Cryptocurrency was designed to be a less corruptible, technologically superior form of money—yet, ironically, it has earned a poor reputation, and not without reason.<br/><br/> It doesn&apos;t have to be that way. <br/><br/>RL80 is a return to first principles: minimized trust, constant vigilance, distributed power, universal access - the very qualities associated with the beloved icon, <i>𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙</i>.</>
               )}
             </p>
@@ -1789,7 +1787,7 @@ Cryptocurrency was designed to be a less corruptible, technologically superior f
               <SkewedHeading
                 lines={["PROSPER80", "FOR ALL", "HUMAN80!"]}
               colors={["#00ff00", "#f4e4c1", "#ffd700"]}
-                fontSize={{ mobile: "2rem", desktop: isTabletLandscape ? "2.5rem" : "3rem" }}
+                fontSize={{ mobile: "2rem", desktop: isTabletLandscape ? "2.0rem" : "2.5rem" }}
                 isMobile={false}
                 language={locale}
               />
@@ -2060,7 +2058,7 @@ Cryptocurrency was designed to be a less corruptible, technologically superior f
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: isTabletLandscape ? '2rem' : isTabletPortrait ? '1.5rem' : '1rem',
+              gap: isTabletLandscape ? '0' : isTabletPortrait ? '1.5rem' : '1rem',
               padding: isTabletLandscape ? '3% 3%' : isTabletPortrait ? '3% 2%' : '3% 5%',
               minHeight: isCarouselMode ? '100vh' : '90vh',
               minWidth: isCarouselMode ? '100vw' : 'auto',
@@ -2113,7 +2111,7 @@ Cryptocurrency was designed to be a less corruptible, technologically superior f
               justifyContent: 'center',
               alignItems: 'center',
               maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : '550px',
-              marginLeft: isTabletLandscape ? '-2rem' : isTabletPortrait ? '-1rem' : '-6thatrem',
+              marginLeft: isTabletLandscape ? '-5rem' : isTabletPortrait ? '0' : '-5rem',
               paddingLeft: isTabletLandscape ? '1rem' : '2rem',
               paddingBottom: isTabletLandscape ? '1rem' : isTabletPortrait ? '2rem' : '1rem',
               position: 'relative',
