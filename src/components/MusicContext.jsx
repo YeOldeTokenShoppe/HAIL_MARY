@@ -216,6 +216,72 @@ export const MusicProvider = ({ children }) => {
     }
   }, [is80sMode, setCurrentTrackBPM]);
   
+  // Load a track by its Firebase Storage path (for DJ listener mode)
+  const loadTrackByPath = useCallback(async (path, trackName, bpm = 100, seekSeconds = 0) => {
+    if (!path || !storage || !storage.app) return false;
+
+    setIsLoadingTrack(true);
+    try {
+      const trackRef = storageRefUtil(storage, path);
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Firebase Storage timeout')), 10000);
+      });
+      const url = await Promise.race([getDownloadURL(trackRef), timeoutPromise]);
+      if (!url) throw new Error('Empty URL from Firebase Storage');
+
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = url;
+        audioRef.current.load();
+
+        await new Promise((resolve) => {
+          const handleCanPlay = () => {
+            audioRef.current.removeEventListener('canplaythrough', handleCanPlay);
+            audioRef.current.removeEventListener('error', handleErr);
+            resolve();
+          };
+          const handleErr = () => {
+            audioRef.current.removeEventListener('canplaythrough', handleCanPlay);
+            audioRef.current.removeEventListener('error', handleErr);
+            resolve();
+          };
+          audioRef.current.addEventListener('canplaythrough', handleCanPlay);
+          audioRef.current.addEventListener('error', handleErr);
+          setTimeout(() => {
+            audioRef.current.removeEventListener('canplaythrough', handleCanPlay);
+            audioRef.current.removeEventListener('error', handleErr);
+            resolve();
+          }, 10000);
+        });
+
+        if (seekSeconds > 0 && isFinite(seekSeconds) && audioRef.current.duration) {
+          audioRef.current.currentTime = Math.min(seekSeconds, audioRef.current.duration);
+        }
+
+        const trackObj = { name: trackName, path, bpm };
+        setCurrentTrack(trackObj);
+        setCurrentTrackBPM(bpm);
+        setIsLoadingTrack(false);
+
+        if (globalAudioManager) {
+          globalAudioManager.setState({ currentTrack: trackObj });
+        }
+
+        try {
+          await audioRef.current.play();
+          setIsPlaying(true);
+        } catch (e) {
+          setIsPlaying(false);
+        }
+        return true;
+      }
+    } catch (error) {
+      console.error('[MusicContext] Error loading track by path:', error);
+      setIsLoadingTrack(false);
+      return false;
+    }
+  }, []);
+
   // Update loadTrackRef when loadTrack changes
   React.useEffect(() => {
     loadTrackRef.current = loadTrack;
@@ -595,6 +661,7 @@ export const MusicProvider = ({ children }) => {
     isLoadingTrack,
     non80sTracks,
     eightyTracks,
+    loadTrackByPath,
     isShuffled,
     setIsShuffled: (shuffled) => {
       setIsShuffled(shuffled);

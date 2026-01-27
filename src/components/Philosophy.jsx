@@ -1205,7 +1205,7 @@ function PyramidModel() {
 // Preload the pyramid model
 useGLTF.preload('/models/pyramid.glb');
 
-export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.glb', onLoadingChange, is80sMode = false }) {
+export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onLoadingChange, is80sMode = false }) {
   const [selectedChart, setSelectedChart] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
@@ -1441,7 +1441,7 @@ export default function SimpleModelViewer({ modelPath = '/models/saint_robot2.gl
   
   // Hide loader only when everything is loaded
   useEffect(() => {
-    // console.log('SimpleModelViewer loading status:', { modelLoaded, fontLoaded, iframeLoaded, isDesktop });
+    // console.log('Philosophy loading status:', { modelLoaded, fontLoaded, iframeLoaded, isDesktop });
     if (modelLoaded && fontLoaded && (iframeLoaded || !isDesktop)) {
       // console.log('All conditions met, hiding loader');
       // Add a small delay for smooth transition

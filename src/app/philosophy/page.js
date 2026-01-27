@@ -9,7 +9,7 @@ import CyberNav from '@/components/CyberNav';
 import CompactCandleModal from '@/components/CompactCandleModal';
 import NavControlsHome from '@/components/NavControlsHome';
 
-const SimpleModelViewer = dynamic(() => import('@/components/SimpleModelViewer'), {
+const Philosophy = dynamic(() => import('@/components/Philosophy'), {
   ssr: false,
   loading: () => <CoinLoader loading={true} />
 });
@@ -47,7 +47,7 @@ export default function ModelViewerPage() {
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
-      <SimpleModelViewer 
+      <Philosophy
         modelPath="/models/saint_robot2.glb"
         onLoadingChange={setIsPageLoading}
         is80sMode={is80sMode}

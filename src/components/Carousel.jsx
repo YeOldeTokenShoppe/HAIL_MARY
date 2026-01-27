@@ -19,6 +19,8 @@ import {
   getDoc,
   writeBatch,
   setDoc,
+  updateDoc,
+  deleteField,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebaseClient.js"; // Ensure Firestore and Firebase Auth are initialized correctly
 import {
@@ -38,6 +40,7 @@ import { signInWithCustomToken } from "firebase/auth";
 import { useAuth } from "@clerk/nextjs"; // Add this line if it's missing
 import EmojiPicker from "emoji-picker-react";
 import "./Carousel.css";
+import { useMusic } from "./MusicContext";
 
 // Scramble text for signed-out users to tease chat content
 const scrambleText = (text) => {
@@ -263,6 +266,13 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
   const emojiPickerRef = useRef(null);
   const wasSignedInRef = useRef(false);
 
+  // DJ Mode state
+  const { currentTrack, isPlaying, is80sMode, loadTrackByPath, audioRef: musicAudioRef } = useMusic();
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const [listeningToBeast, setListeningToBeast] = useState(null);
+  const [listeningToName, setListeningToName] = useState(null);
+  const djListenerUnsubRef = useRef(null);
+
   // Notify parent when riding state changes
   useEffect(() => {
     if (onRidingChange) {
@@ -417,6 +427,8 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
             // Reset local state
             setActiveBeastId(null);
             setIsRiding(false);
+            setIsBroadcasting(false);
+            stopListening();
             setMessages((prevMessages) => {
               const updatedMessages = { ...prevMessages };
               delete updatedMessages[beastIdToCleanup];
@@ -518,6 +530,57 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
     }
 
     try {
+      // Check if the selected beast is occupied
+      const beastRef = doc(db, "carouselBeasts", beastId);
+      const beastDoc = await getDoc(beastRef);
+
+      if (beastDoc.exists() && beastDoc.data().userId) {
+        const beastData = beastDoc.data();
+
+        // If this beast is broadcasting, offer listen-along
+        if (beastData.djTrackName) {
+          showPopupMessage(
+            `Listen along to ${beastData.username}'s music? Now playing: ${beastData.djTrackName}`,
+            () => startListening(beastId, beastData.username)
+          );
+          return;
+        }
+
+        // Check if the user is already riding a beast
+        const existingRidesQuery = query(
+          collection(db, "carouselBeasts"),
+          where("userId", "==", user.id)
+        );
+        const existingRidesSnapshot = await getDocs(existingRidesQuery);
+
+        if (!existingRidesSnapshot.empty) {
+          showPopupMessage("You are already riding another beast.");
+          return;
+        }
+
+        // Fetch all beasts to check if any are available
+        const beastsSnapshot = await getDocs(collection(db, "carouselBeasts"));
+        if (beastsSnapshot.empty) {
+          setRiders({});
+          setActiveBeastId(null);
+          setMessages({});
+          return;
+        }
+
+        const availableBeast = beastsSnapshot.docs.find(
+          (doc) => !doc.data().userId
+        );
+
+        if (!availableBeast) {
+          promptWaitlistAddition();
+        } else {
+          showPopupMessage(
+            "This beast is occupied. Please select an available beast."
+          );
+        }
+        return;
+      }
+
       // Check if the user is already riding a beast
       const existingRidesQuery = query(
         collection(db, "carouselBeasts"),
@@ -527,37 +590,6 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
 
       if (!existingRidesSnapshot.empty) {
         showPopupMessage("You are already riding another beast.");
-        return; // Exit early to avoid further checks
-      }
-
-      // Check if the selected beast is occupied
-      const beastRef = doc(db, "carouselBeasts", beastId);
-      const beastDoc = await getDoc(beastRef);
-
-      if (beastDoc.exists() && beastDoc.data().userId) {
-        // Fetch all beasts to check if any are available
-        const beastsSnapshot = await getDocs(collection(db, "carouselBeasts"));
-        if (beastsSnapshot.empty) {
-          setRiders({});
-          setActiveBeastId(null);
-          setMessages({});
-
-          return;
-        }
-
-        const availableBeast = beastsSnapshot.docs.find(
-          (doc) => !doc.data().userId // Find the first unoccupied beast
-        );
-
-        if (!availableBeast) {
-          // If no available beasts, prompt for the waitlist
-          promptWaitlistAddition();
-        } else {
-          // Notify the user that the current beast is occupied
-          showPopupMessage(
-            "This beast is occupied. Please select an available beast."
-          );
-        }
         return;
       }
 
@@ -906,6 +938,9 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
     if (!activeBeastId || !user) return;
 
     try {
+      // Clear DJ state
+      setIsBroadcasting(false);
+
       const beastRef = doc(db, "carouselBeasts", activeBeastId);
 
       await deleteDoc(beastRef); // Remove rider from Firestore
@@ -1581,6 +1616,166 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
 
     return () => unsubscribeSnapshots.forEach((unsub) => unsub());
   }, [images]);
+
+  // === DJ MODE: Broadcast effects ===
+
+  // Auto-update Firestore when DJ's track changes
+  useEffect(() => {
+    if (!isBroadcasting || !activeBeastId || !currentTrack) return;
+    const beastRef = doc(db, "carouselBeasts", activeBeastId);
+    updateDoc(beastRef, {
+      djTrackPath: currentTrack.path,
+      djTrackName: currentTrack.name,
+      djTrackBPM: currentTrack.bpm || 100,
+      djIs80sMode: is80sMode,
+      djStartedAt: serverTimestamp(),
+      djIsPlaying: isPlaying,
+    }).catch((err) => console.error("[DJ] Failed to update track:", err));
+  }, [currentTrack?.path, isBroadcasting, activeBeastId]);
+
+  // Separate effect for play/pause only (avoids resetting djStartedAt)
+  useEffect(() => {
+    if (!isBroadcasting || !activeBeastId || !currentTrack) return;
+    const beastRef = doc(db, "carouselBeasts", activeBeastId);
+    if (isPlaying) {
+      updateDoc(beastRef, {
+        djIsPlaying: true,
+        djStartedAt: serverTimestamp(),
+      }).catch((err) => console.error("[DJ] Failed to update play state:", err));
+    } else {
+      updateDoc(beastRef, { djIsPlaying: false }).catch((err) =>
+        console.error("[DJ] Failed to update pause state:", err)
+      );
+    }
+  }, [isPlaying, isBroadcasting, activeBeastId]);
+
+  // Toggle broadcasting on/off
+  const toggleBroadcast = async () => {
+    if (!activeBeastId) return;
+    const beastRef = doc(db, "carouselBeasts", activeBeastId);
+
+    if (isBroadcasting) {
+      // Turn OFF broadcasting — remove DJ fields
+      try {
+        await updateDoc(beastRef, {
+          djTrackPath: deleteField(),
+          djTrackName: deleteField(),
+          djTrackBPM: deleteField(),
+          djIs80sMode: deleteField(),
+          djStartedAt: deleteField(),
+          djIsPlaying: deleteField(),
+        });
+      } catch (err) {
+        console.error("[DJ] Failed to clear DJ fields:", err);
+      }
+      setIsBroadcasting(false);
+    } else {
+      // Turn ON broadcasting
+      if (!currentTrack || !isPlaying) {
+        showPopupMessage("Start playing music first, then share it!");
+        return;
+      }
+      try {
+        await updateDoc(beastRef, {
+          djTrackPath: currentTrack.path,
+          djTrackName: currentTrack.name,
+          djTrackBPM: currentTrack.bpm || 100,
+          djIs80sMode: is80sMode,
+          djStartedAt: serverTimestamp(),
+          djIsPlaying: true,
+        });
+        setIsBroadcasting(true);
+      } catch (err) {
+        console.error("[DJ] Failed to start broadcasting:", err);
+      }
+    }
+  };
+
+  // Clear DJ fields when ride ends (quitRide already clears the doc, but handle other cases)
+  useEffect(() => {
+    if (!isRiding && isBroadcasting) {
+      setIsBroadcasting(false);
+    }
+  }, [isRiding]);
+
+  // === DJ MODE: Listen-along functions ===
+
+  const stopListening = () => {
+    if (djListenerUnsubRef.current) {
+      djListenerUnsubRef.current();
+      djListenerUnsubRef.current = null;
+    }
+    setListeningToBeast(null);
+    setListeningToName(null);
+  };
+
+  const startListening = (beastId, riderName) => {
+    // Clean up any existing listener
+    stopListening();
+
+    const beastRef = doc(db, "carouselBeasts", beastId);
+    let lastTrackPath = null;
+
+    const unsub = onSnapshot(beastRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        // Beast doc deleted — DJ's ride ended
+        showPopupMessage(`${riderName}'s DJ session ended`);
+        stopListening();
+        return;
+      }
+
+      const data = snapshot.data();
+      if (!data.djTrackPath) {
+        // DJ stopped broadcasting
+        showPopupMessage(`${riderName}'s DJ session ended`);
+        stopListening();
+        return;
+      }
+
+      // Track changed — load new track
+      if (data.djTrackPath !== lastTrackPath) {
+        lastTrackPath = data.djTrackPath;
+        let seekSeconds = 0;
+        if (data.djStartedAt && typeof data.djStartedAt.toMillis === "function") {
+          seekSeconds = (Date.now() - data.djStartedAt.toMillis()) / 1000;
+          if (seekSeconds < 0) seekSeconds = 0;
+        }
+        loadTrackByPath(data.djTrackPath, data.djTrackName, data.djTrackBPM || 100, seekSeconds);
+      } else {
+        // Same track — handle play/pause
+        if (musicAudioRef?.current) {
+          if (data.djIsPlaying && musicAudioRef.current.paused) {
+            // Re-seek on resume
+            let seekSeconds = 0;
+            if (data.djStartedAt && typeof data.djStartedAt.toMillis === "function") {
+              seekSeconds = (Date.now() - data.djStartedAt.toMillis()) / 1000;
+              if (seekSeconds < 0) seekSeconds = 0;
+            }
+            if (seekSeconds > 0 && isFinite(seekSeconds) && musicAudioRef.current.duration) {
+              musicAudioRef.current.currentTime = Math.min(seekSeconds, musicAudioRef.current.duration);
+            }
+            musicAudioRef.current.play().catch(() => {});
+          } else if (!data.djIsPlaying && !musicAudioRef.current.paused) {
+            musicAudioRef.current.pause();
+          }
+        }
+      }
+    });
+
+    djListenerUnsubRef.current = unsub;
+    setListeningToBeast(beastId);
+    setListeningToName(riderName);
+  };
+
+  // Cleanup listener on unmount
+  useEffect(() => {
+    return () => {
+      if (djListenerUnsubRef.current) {
+        djListenerUnsubRef.current();
+      }
+    };
+  }, []);
+
   return (
     <div
       style={{
@@ -1623,7 +1818,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                   {isEven && ((Math.floor(index / 2) % 2 === 0 && !hasRidden) || (Math.floor(index / 2) % 2 === 1 && !isSignedIn)) && (
                     <div className="marquee-overlay">
                       <span>{Math.floor(index / 2) % 2 === 0
-                        ? "CLICK ANY BEAST TO RIDE AND CHAT FOR 10 MIN"
+                        ? "CLICK ANY AVAILABLE BEAST TO CHAT WHILE RIDING"
                         : "MUST BE LOGGED IN TO RIDE AND DECRYPT MESSAGES"}</span>
                     </div>
                   )}
@@ -1642,6 +1837,36 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                               alt={rider.username || "Rider"}
                               className="rider-avatar"
                             />
+                            {rider.djTrackName && (
+                              <div style={{
+                                position: "absolute",
+                                bottom: "-18px",
+                                left: "50%",
+                                transform: "translateX(-50%)",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "3px",
+                                background: "rgba(0, 0, 0, 0.85)",
+                                border: "1px solid rgba(212, 175, 55, 0.5)",
+                                borderRadius: "8px",
+                                padding: "1px 6px",
+                                whiteSpace: "nowrap",
+                                maxWidth: "120px",
+                              }}>
+                                <span style={{ fontSize: "10px" }}>♪</span>
+                                <span style={{
+                                  fontSize: "8px",
+                                  color: "#d4af37",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}>
+                                  {rider.djTrackName.length > 16
+                                    ? rider.djTrackName.slice(0, 16) + "…"
+                                    : rider.djTrackName}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1923,6 +2148,27 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                     Clear
                   </button>
                 )}
+                <button
+                  onClick={toggleBroadcast}
+                  title={isBroadcasting ? "Stop sharing music" : "Share your music"}
+                  style={{
+                    fontSize: "12px",
+                    padding: "2px 8px",
+                    borderRadius: "8px",
+                    border: isBroadcasting
+                      ? "1px solid #d4af37"
+                      : "1px solid rgba(255, 255, 255, 0.3)",
+                    backgroundColor: isBroadcasting
+                      ? "rgba(212, 175, 55, 0.3)"
+                      : "transparent",
+                    color: isBroadcasting ? "#d4af37" : "rgba(255, 255, 255, 0.6)",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    boxShadow: isBroadcasting ? "0 0 8px rgba(212, 175, 55, 0.4)" : "none",
+                  }}
+                >
+                  {isBroadcasting ? "♪ DJ ON" : "♪ DJ"}
+                </button>
                 <span
                   style={{
                     fontSize: "10px",
@@ -1937,6 +2183,41 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                 </span>
               </div>
             </div>
+
+            {/* Listening along indicator */}
+            {listeningToBeast && listeningToName && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  background: "rgba(212, 175, 55, 0.15)",
+                  border: "1px solid rgba(212, 175, 55, 0.3)",
+                  borderRadius: "8px",
+                  padding: "4px 8px",
+                  marginBottom: "6px",
+                  fontSize: "11px",
+                }}
+              >
+                <span style={{ color: "#d4af37" }}>
+                  ♪ Listening to {listeningToName}
+                </span>
+                <button
+                  onClick={stopListening}
+                  style={{
+                    fontSize: "9px",
+                    padding: "2px 8px",
+                    borderRadius: "6px",
+                    border: "1px solid rgba(255, 100, 100, 0.4)",
+                    backgroundColor: "rgba(255, 100, 100, 0.1)",
+                    color: "#ff6b6b",
+                    cursor: "pointer",
+                  }}
+                >
+                  Stop
+                </button>
+              </div>
+            )}
 
             {/* Input area */}
             <div
