@@ -1804,6 +1804,8 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
             }}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
+            onTouchStart={() => setIsHovered(true)}
+            onTouchEnd={() => setIsHovered(false)}
           >
             {images.map((image, index) => {
               const beastId = `beast${index + 1}`;
@@ -1836,8 +1838,12 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                     <div className="rider-beast-group">
                       <div
                         className="beast"
-                        style={{ backgroundImage: `url(${image.src})` }}
+                        style={{ backgroundImage: `url(${image.src})`, touchAction: 'manipulation' }}
                         onClick={() => handleRideBeastClick(image, beastId)}
+                        onTouchEnd={(e) => {
+                          e.preventDefault();
+                          handleRideBeastClick(image, beastId);
+                        }}
                       >
                         {rider && (
                           <div className="rider-container">

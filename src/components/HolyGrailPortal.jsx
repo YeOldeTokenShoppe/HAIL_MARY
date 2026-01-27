@@ -206,13 +206,13 @@ function FloatingGroup({ children, amplitude = 0.06, speed = 1.2, rotationAmplit
 
 // Main Portal Scene
 function PortalScene({ isMobile = false }) {
-  const grailScale = isMobile ? 0.7 : 0.7;
+  const grailScale = isMobile ? 0.65 : 0.65;
   const grailRotation = isMobile ? [0, -3.25, 0] : [0.1, -3.25, 0];
 
   // Inner model position (inside portal world) - closer to portal plane
-  const innerGrailPosition = [0, -0.8, -1.1];
+  const innerGrailPosition = [0, -0.7, -1.1];
   // Clipped model position - needs to match where inner model appears at portal plane
-  const clippedGrailPosition = [0, -0.8, -1.1];
+  const clippedGrailPosition = [0, -0.7, -1.1];
 
   // Position for clipped model (accounting for LaptopFrame transforms)
   const laptopPos = [0, -0.4, 0];
@@ -244,7 +244,7 @@ function PortalScene({ isMobile = false }) {
           intensity={1}
         />
         {/* Clouds in the portal world */}
-        <group position={[0, 6.8, -1.7]}>
+        <group position={[1.5, 6.3, -1.7]}>
           <DarkClouds />
         </group>
         {/* The grail model inside the portal (no glow) */}
@@ -269,7 +269,7 @@ function PortalScene({ isMobile = false }) {
       </group>
 
       {/* Ambient light to see the laptop model */}
-      <ambientLight intensity={0.9} />
+      <ambientLight intensity={0.7} />
       {/* <directionalLight position={[2, 2, 2]} intensity={1} /> */}
     </group>
     </FloatingGroup>
@@ -342,6 +342,7 @@ export default function HolyGrailPortal({ isMobile = false }) {
           <EffectComposer>
             <Bloom
               intensity={0.4}
+                 radius={0.4}
               luminanceThreshold={0.9}
               luminanceSmoothing={0.9}
               mipmapBlur

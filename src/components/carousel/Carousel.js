@@ -1017,7 +1017,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               marginTop: '-0.5rem',
               maxWidth: isMobilePhone ? '320px' : '450px',
               textAlign: 'center',
-              padding: '0 1rem',
+              // padding: '0 1rem',
             }}>
               {isMobilePhone ? (
                 
@@ -1025,7 +1025,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                  <span style={{
               display: 'block',
               fontFamily: "'Courier New', monospace",
-              fontSize: isTabletLandscape ? '1rem' : isTabletPortrait ? '0.9rem' : '1.2rem',
+              fontSize: isTabletLandscape ? '1rem' : isTabletPortrait ? '0.9rem' : '0.8rem',
               fontWeight: 'bold',
               color: '#ffd700',
               textAlign: 'center',
@@ -1035,10 +1035,11 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               opacity: 0.9,
               textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
             }}>
-              All monetary systems are belief systems
+              {"\u201C"}Any sufficiently advanced technology is indistinguishable from magic{"\u201D"} <span style={{fontSize: '0.5rem'}}>{"\u2014"}Clarke, Hazards of Prophecy</span>
             </span>
                 
-                RL80 is a return to first principles: decentralized trust, fair distribution, direct access, immutable and incorruptible - the very qualities associated with the RL80 token's namesake and patron saint</>
+                The RL80 token is designed on first principles: decentralized trust, fair distribution, direct access, immutable and incorruptible - the very same qualities associated with the beloved icon and patron saint of portfolios, 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙.
+</>
               ) : (
                 <>
                 
@@ -1056,9 +1057,9 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               opacity: 0.9,
               textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
             }}>
-              ALL MONETARY SYSTEMS ARE BELIEF SYSTEMS
+              {"\u201C"}Any sufficiently advanced technology is indistinguishable from magic{"\u201D"} <span style={{fontSize: '0.5rem'}}>{"\u2014"}Clarke, Hazards of Prophecy</span>
             </span>
-Cryptocurrency was designed to be a less corruptible, technologically superior form of money—yet, ironically, it has earned a poor reputation, and not without reason.<br/><br/> It doesn&apos;t have to be that way. <br/><br/>RL80 is a return to first principles: decentralized trust, fair distribution, direct access, immutable and incorruptible - the very qualities associated with the RL80 token's namesake and patron saint</>
+RL80 is designed on first principles: decentralized trust, fair distribution, direct access, immutable and incorruptible - the very same qualities associated with the RL80 token's namesake and patron saint</>
               )}
             </p>
     
@@ -1868,7 +1869,7 @@ Cryptocurrency was designed to be a less corruptible, technologically superior f
               opacity: 0.9,
               textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
             }}>
-              All monetary systems are belief systems
+              {"\u201C"}Any sufficiently advanced technology is indistinguishable from magic{"\u201D"} <span style={{fontSize: '0.5rem'}}>{"\u2014"}Clarke, Hazards of Prophecy</span>
             </p>
               {/* Description text */}
               <p style={{
@@ -1881,7 +1882,7 @@ Cryptocurrency was designed to be a less corruptible, technologically superior f
                 maxWidth: '500px',
                 textAlign: 'center'
               }}>
-Cryptocurrency was designed to be a less corruptible, technologically superior form of money—yet, ironically, popular opinion takes a dim view on the topic, and not without reason.<br/><br/> It doesn’t have to be that way. <br/><br/>RL80 is a return to first principles: decentralized trust, fair distribution, direct access, immutable and incorruptible - the very qualities associated with the RL80 token's namesake and patron saint.</p>
+The RL80 token is designed on first principles: decentralized trust, fair distribution, direct access, immutable and incorruptible - the very same qualities associated with the beloved icon and patron saint of portfolios, 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙.</p>
             <div
               className="navigation-group"
               style={{
