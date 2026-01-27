@@ -3,6 +3,8 @@
   },
   "palmTreeDrive": {
     "reality": "ваша\nреальность",
+    "skip": "Пропустить",
+    "skipIntro": "Пропустить вступление",
     "buyButton": "Купить",
     "about": "О нас",
     "tokenomics": "Токеномика",

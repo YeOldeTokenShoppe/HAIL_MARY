@@ -3,6 +3,8 @@
   },
   "palmTreeDrive": {
     "reality": "あなたの\n現実",
+    "skip": "スキップ",
+    "skipIntro": "イントロをスキップ",
     "buyButton": "購入",
     "about": "概要",
     "tokenomics": "トークノミクス",

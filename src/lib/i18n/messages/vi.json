@@ -3,6 +3,8 @@
   },
   "palmTreeDrive": {
     "reality": "của bạn\nthực tế",
+    "skip": "Bỏ qua",
+    "skipIntro": "Bỏ qua phần giới thiệu",
     "buyButton": "Mua",
     "about": "Về chúng tôi",
     "tokenomics": "Tokenomics",

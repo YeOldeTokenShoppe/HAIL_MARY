@@ -3,6 +3,8 @@
   },
   "palmTreeDrive": {
     "reality": "واقعك\nالخاص",
+    "skip": "تخطي",
+    "skipIntro": "تخطي المقدمة",
     "buyButton": "شراء",
     "about": "حول",
     "tokenomics": "اقتصاديات الرمز",

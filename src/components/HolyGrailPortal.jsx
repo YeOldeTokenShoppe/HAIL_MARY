@@ -7,6 +7,7 @@ import { useGLTF, MeshPortalMaterial, Environment, useTexture, CameraControls } 
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import { easing } from 'maath';
 import DarkClouds from "./Clouds";
+import BreathSmoke from "./BreathSmoke";
 
 // Sky gradient shader for portal background
 const SkyGradientMaterial = {
@@ -254,6 +255,21 @@ function PortalScene({ isMobile = false }) {
           rotation={grailRotation}
           hideGlow={true}
         />
+         <group position={isMobile ? [2, -8, -10] : [2, 8, -11]}>
+      {/* Right nostril (from bull's perspective) */}
+           <BreathSmoke 
+        name="Left Nostril"
+        position={[0, 0, 0]}
+        direction={[0.1, -0.3, 2]}
+        rotation={[2.6, 2.4, -0.3]}
+      />
+      <BreathSmoke 
+        name="Right Nostril"
+        position={[0, 0, 0]}
+        direction={[-0.1, -0.3, 2]}
+        rotation={[2.1, 2.3, 0.7]}
+      />
+    </group>
       </LaptopFrame>
 
       {/* Clipped grail that pokes through the screen (with glow) */}

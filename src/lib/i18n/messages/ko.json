@@ -3,6 +3,8 @@
   },
   "palmTreeDrive": {
     "reality": "당신의\n현실",
+    "skip": "건너뛰기",
+    "skipIntro": "인트로 건너뛰기",
     "buyButton": "구매",
     "about": "소개",
     "tokenomics": "토크노믹스",

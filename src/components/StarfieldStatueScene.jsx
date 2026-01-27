@@ -247,7 +247,7 @@ function StarfieldStatueScene({
             scrollSpeed={0.5}
             verticalLines={48}
           />
-
+<Suspense fallback={null}>
           {/* Holographic Statue */}
           <HolographicStatue3
             position={[0, 0, 0]}
@@ -258,7 +258,7 @@ function StarfieldStatueScene({
             onLoad={onStatueLoad}
             {...statueProps}
           />
-
+</Suspense>
           <MobileCandleOrbital />
 
           {/* OrbitControls removed in favor of Figure8Camera */}

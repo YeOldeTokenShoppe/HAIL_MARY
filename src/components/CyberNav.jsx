@@ -4,7 +4,24 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useLanguage } from './LanguageProvider';
 
-const CyberNav = ({ 
+const LANGUAGES = [
+  { code: 'en', label: 'EN' },
+  { code: 'es', label: 'ES' },
+  { code: 'zh', label: '中文' },
+  { code: 'fr', label: 'FR' },
+  { code: 'de', label: 'DE' },
+  { code: 'it', label: 'IT' },
+  { code: 'pt', label: 'PT' },
+  { code: 'ru', label: 'РУ' },
+  { code: 'ja', label: '日本' },
+  { code: 'ko', label: '한국' },
+  { code: 'hi', label: 'हिं' },
+  { code: 'vi', label: 'VI' },
+  { code: 'ar', label: 'عر' },
+  { code: 'la', label: 'LA' },
+];
+
+const CyberNav = ({
   is80sMode = false, 
   position = "fixed",
   isOpen = null,  // External control of menu state
@@ -16,9 +33,10 @@ const CyberNav = ({
   const isMenuOpen = isOpen !== null ? isOpen : internalIsMenuOpen;
   const [hoveredItemPath, setHoveredItemPath] = useState('');
   const [isMobile, setIsMobile] = useState(false);
+  const [isSmallTabletLandscape, setIsSmallTabletLandscape] = useState(false);
   const [canHover, setCanHover] = useState(false);
   const pathname = usePathname();
-  const { t } = useLanguage();
+  const { t, locale, setLocale } = useLanguage();
   const portalContainerRef = useRef(null);
 
   // Create a dedicated portal container so the menu overlay is isolated
@@ -65,7 +83,10 @@ const CyberNav = ({
   // Check for mobile device
   React.useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768);
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      setIsMobile(w <= 768);
+      setIsSmallTabletLandscape(w > 768 && w <= 1100 && h <= 768 && w > h);
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
@@ -111,13 +132,14 @@ const CyberNav = ({
   const navItems = [
     { id: '00', date: t('cyberNav.nav00.date'), title: t('cyberNav.nav00.title'), path: '/', thumbnail: '/images/I80.png' },
     { id: '01', date: t('cyberNav.nav01.date'), title: t('cyberNav.nav01.title'), path: '/about', thumbnail: '/images/ROSE_TATTOO.webp' },
-    ...(isMobile ? [{ id: '02', date: t('cyberNav.nav02.date'), title: t('cyberNav.nav02.title'), path: '/portal', thumbnail: '/images/timePortal.webp' }] : []),
-    { id: '03', date: t('cyberNav.nav03.date'), title: t('cyberNav.nav03.title'), path: '/tokenomics', thumbnail: '/images/DIAMOND_TATTOO.webp' },
-    { id: '04', date: t('cyberNav.nav04.date'), title: t('cyberNav.nav04.title'), path: '/illumin80', thumbnail: '/images/SKULL_TATTOO.webp' },
-    { id: '05', date: t('cyberNav.nav05.date'), title: t('cyberNav.nav05.title'), path: '/ride', thumbnail: '/images/blackPuma.webp' },
+    { id: '02', date: t('cyberNav.nav03.date'), title: t('cyberNav.nav03.title'), path: '/tokenomics', thumbnail: '/images/DIAMOND_TATTOO.webp' },
+    { id: '03', date: t('cyberNav.nav04.date'), title: t('cyberNav.nav04.title'), path: '/illumin80', thumbnail: '/images/SKULL_TATTOO.webp' },
+    { id: '04', date: t('cyberNav.nav05.date'), title: t('cyberNav.nav05.title'), path: '/ride', thumbnail: '/images/blackPuma.webp' },
     // { id: '03', date: 'PRAYER & PROBABIL80', title: 'TRADE SCHOOL', path: '/trade', thumbnail: '/images/3ACES_TATTOO.webp' },
-    { id: '06', date: t('cyberNav.nav06.date'), title: t('cyberNav.nav06.title'), path: '/philosophy', thumbnail: '/images/ILLUMIN80_TATTOO.webp' },
-    { id: '07', date: t('cyberNav.nav07.date'), title: t('cyberNav.nav07.title'), path: '/fountain', thumbnail: '/images/HEART_TATTOO.webp' },
+    { id: '05', date: t('cyberNav.nav06.date'), title: t('cyberNav.nav06.title'), path: '/philosophy', thumbnail: '/images/ILLUMIN80_TATTOO.webp' },
+        ...(isMobile ? [{ id: '02', date: t('cyberNav.nav02.date'), title: t('cyberNav.nav02.title'), path: '/portal', thumbnail: '/images/timePortal.webp' }] : []),
+
+    { id: '06', date: t('cyberNav.nav07.date'), title: t('cyberNav.nav07.title'), path: '/fountain', thumbnail: '/images/HEART_TATTOO.webp' },
     // { id: '07', date: 'COMING SOON', title: 'LIGHT CLUB', path: '#', thumbnail: '/images/RL80_KNUCKLES.webp' },
   ];
 
@@ -194,9 +216,11 @@ const CyberNav = ({
               display: "flex",
               flexDirection: "column",
               justifyContent: "center",
+              paddingTop: isSmallTabletLandscape ? '0' : '25%',
               alignItems: "center",
-              gap: isMobile ? "2px" : "10px",
-              padding: isMobile ? "20px" : "40px 20px",
+              overflowY: isSmallTabletLandscape ? "auto" : "hidden",
+              gap: isMobile ? "2px" : isSmallTabletLandscape ? "2px" : "10px",
+              padding: isMobile ? "20px" : isSmallTabletLandscape ? "15px 20px" : "40px 20px",
               isolation: "isolate",
               transform: "translateZ(0)"
             }}
@@ -228,6 +252,41 @@ const CyberNav = ({
                 <line x1="6" y1="6" x2="18" y2="18"/>
               </svg>
             </button>
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'center',
+              gap: isMobile ? '4px' : isSmallTabletLandscape ? '4px' : '6px',
+              padding: isMobile ? '0 10px 8px' : isSmallTabletLandscape ? '0 10px 6px' : '0 20px 12px',
+              maxWidth: '400px'
+            }}>
+              {LANGUAGES.map(lang => (
+                <button
+                  key={lang.code}
+                  onClick={() => setLocale(lang.code)}
+                  style={{
+                    padding: isMobile ? '4px 8px' : isSmallTabletLandscape ? '3px 7px' : '5px 10px',
+                    borderRadius: '6px',
+                    border: locale === lang.code
+                      ? `1px solid ${is80sMode ? '#00ffff' : '#c896ff'}`
+                      : '1px solid rgba(255,255,255,0.15)',
+                    background: locale === lang.code
+                      ? (is80sMode ? 'rgba(0,255,255,0.15)' : 'rgba(200,150,255,0.15)')
+                      : 'transparent',
+                    color: locale === lang.code
+                      ? (is80sMode ? '#00ffff' : '#c896ff')
+                      : 'rgba(255,255,255,0.5)',
+                    fontSize: isMobile ? '10px' : isSmallTabletLandscape ? '10px' : '11px',
+                    fontFamily: "'Rajdhani', sans-serif",
+                    fontWeight: locale === lang.code ? '700' : '500',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {lang.label}
+                </button>
+              ))}
+            </div>
             {navItems.map((item) => {
               // Handle route matching - ensure exact match only
               const currentPath = pathname || '';
@@ -258,7 +317,7 @@ const CyberNav = ({
                       flexDirection: "row",
                       alignItems: "center",
                       gap: "12px",
-                      padding: isMobile ? "8px 12px" : (isActive ? "14px" : "16px"),
+                      padding: isMobile ? "8px 12px" : isSmallTabletLandscape ? "6px 10px" : (isActive ? "14px" : "16px"),
                       borderRadius: "10px",
                       backgroundColor: isActive 
                         ? (is80sMode ? "#67e8f9" : "#c896ff")
@@ -277,7 +336,7 @@ const CyberNav = ({
                       setHoveredItemPath('');
                     }}
                   >
-                    <div style={{ width: isMobile ? "40px" : "60px", height: isMobile ? "40px" : "60px", overflow: "hidden", borderRadius: "5px", flexShrink: "0" }}>
+                    <div style={{ width: isMobile ? "40px" : isSmallTabletLandscape ? "40px" : "60px", height: isMobile ? "40px" : isSmallTabletLandscape ? "40px" : "60px", overflow: "hidden", borderRadius: "5px", flexShrink: "0" }}>
                       <img
                         src={item.thumbnail}
                         alt={item.title}
@@ -295,7 +354,7 @@ const CyberNav = ({
                         style={{
                           color: isActive ? '#000000' : (is80sMode ? "#D946EF" : '#ffffff'),
                           fontWeight: "700",
-                          fontSize: isMobile ? "0.65rem" : "0.875rem",
+                          fontSize: isMobile ? "0.65rem" : isSmallTabletLandscape ? "0.6rem" : "0.875rem",
                           fontFamily: "'Rajdhani', sans-serif",
                           textAlign: "left"
                         }}
@@ -305,7 +364,7 @@ const CyberNav = ({
                       <span
                         style={{
                           color: isActive ? '#000000' : (is80sMode ? "#D946EF" : '#ffff00'),
-                          fontSize: isMobile ? "1rem" : "1.5rem",
+                          fontSize: isMobile ? "1rem" : isSmallTabletLandscape ? "0.95rem" : "1.5rem",
                           fontWeight: "700",
                           fontFamily: "'Rajdhani', sans-serif"
                         }}

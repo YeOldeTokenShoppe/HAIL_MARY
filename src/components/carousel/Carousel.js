@@ -1003,7 +1003,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             <div style={{
               ...(isMobilePhone ? {
                 position: 'absolute',
-                bottom: '15%',
+                bottom: '13%',
                 left: 0,
                 right: 0,
               } : {}),
@@ -1037,10 +1037,10 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               opacity: 0.9,
               textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
             }}>
-              {"\u201C"}Any sufficiently advanced technology is indistinguishable from magic{"\u201D"} <span style={{fontSize: '0.4rem'}}>{"\u2014"}<br/>Arthur C. Clarke, Hazards of Prophecy</span>
+              {"\u201C"}Any sufficiently advanced technology is indistinguishable from magic{"\u201D"} 
             </span>
                 
-                The RL80 token is designed on first principles: decentralized trust, fair distribution, direct access, immutable and incorruptible - the very same qualities associated with the beloved icon and patron saint of portfolios, 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙.
+                The RL80 token is designed on first principles: decentralized trust, fair distribution, direct access, immutable and incorruptible - the very same qualities associated with the beloved icon and patron saint of portfolios.
 </>
               ) : (
                 <>
@@ -1206,7 +1206,7 @@ RL80 is designed on first principles: decentralized trust, fair distribution, di
                 cursor: 'pointer',
               }}
             >
-              <StarfieldStatueScene isMobile={isMobilePhone} cameraRadius={isMobilePhone ? 3.2 : isTabletPortrait ? 3.0 : 2.0} />
+              <StarfieldStatueScene isMobile={isMobilePhone} cameraRadius={isMobilePhone ? 3.2 : isTabletPortrait ? 3.0 : isTabletLandscape ? 3.0 : 2.0} />
             </div>
 
             {/* Description - below arrows on mobile */}
@@ -1233,7 +1233,7 @@ RL80 is designed on first principles: decentralized trust, fair distribution, di
             }}>
               <b>Experience the new enigma machine.</b><br /> The icon of intercession is now online and on-chain.
               <br/><br/>
-              Light a virtual green candle and join the Illumin80 — a circle of investors who paradoxically place their faith in having none at all, at least when it comes to money.
+              Light a virtual green candle and join the Illumin80 — a circle of investors who paradoxically place their faith in having none at all, lest it can be verified first.
             </p>
 
             {/* Illumin80 Navigation - tablet portrait only */}
@@ -2133,12 +2133,12 @@ The RL80 token is designed on first principles: decentralized trust, fair distri
             }}>
             {/* Left Column - HolyGrail Chalice */}
             <div style={{
-              flex: isTabletPortrait ? '1 1 55%' : '1 1 55%',
+              // flex: isTabletPortrait ? '1 1 55%' : '1 1 55%',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
               alignItems: 'center',
-              maxWidth: isTabletLandscape ? '600px' : isTabletPortrait ? '550px' : '800px',
+              maxWidth: isTabletLandscape ? '500px' : isTabletPortrait ? '550px' : '800px',
               position: 'relative',
               overflow: 'visible',
             }}>
@@ -2147,8 +2147,8 @@ The RL80 token is designed on first principles: decentralized trust, fair distri
                 style={{
                   position: 'relative',
                   width: '100%',
-                  maxWidth: isTabletLandscape ? '600px' : isTabletPortrait ? '550px' : '700px',
-                  height: isTabletLandscape ? '420px' : isTabletPortrait ? '380px' : '500px',
+                  maxWidth: isTabletLandscape ? '500px' : isTabletPortrait ? '550px' : '700px',
+                  height: isTabletLandscape ? '380px' : isTabletPortrait ? '380px' : '500px',
                   transition: 'all 0.3s ease',
                   // filter: 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.5))',
                 }}
@@ -2177,7 +2177,7 @@ The RL80 token is designed on first principles: decentralized trust, fair distri
               alignItems: 'center',
               maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : '550px',
               marginLeft: isIpadMiniLandscape ? '-5rem' : isTabletLandscape ? '-5rem' : isTabletPortrait ? '0' : '-5rem',
-              paddingLeft: isIpadMiniLandscape ? '1rem' : isTabletLandscape ? '1rem' : '2rem',
+              // paddingLeft: isIpadMiniLandscape ? '1rem' : isTabletLandscape ? '1rem' : '2rem',
               paddingBottom: isIpadMiniLandscape ? '1rem' : isTabletLandscape ? '1rem' : isTabletPortrait ? '2rem' : '1rem',
               position: 'relative',
               zIndex: 5,
@@ -2222,7 +2222,7 @@ The RL80 token is designed on first principles: decentralized trust, fair distri
               }}>
           <b>The icon of intercession is now online and on-chain.</b>
               <br/><br/>
-              Light a virtual green candle and join the Illumin80 — a circle of investors who paradoxically place their faith in having none at all, at least when it comes to money.
+              Light a virtual green candle and join the Illumin80 — a circle of investors who paradoxically place their faith in having none at all, lest it can be verified first.
               </p>
  {/* {!isMobilePhone && ( */}
             <div

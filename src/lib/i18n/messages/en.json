@@ -6,6 +6,8 @@
   },
   "palmTreeDrive": {
     "reality": "your\nREAL80",
+    "skip": "Skip",
+    "skipIntro": "Skip Intro",
     "buyButton": "Buy",
     "about": "About",
     "tokenomics": "Tokenomics",

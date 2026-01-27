@@ -26,11 +26,27 @@ const LanguageContext = createContext({
   isAutoDetected: false,
 });
 
+// Read the saved manual preference synchronously so useState starts
+// with the correct locale — avoids a flash of English and survives
+// component remounts during Next.js navigation.
+function getInitialLocale() {
+  if (typeof window === 'undefined') return 'en';
+  try {
+    const manual = localStorage.getItem('manualLanguage');
+    if (manual && translations[manual]) return manual;
+    const saved = localStorage.getItem('preferredLanguage');
+    if (saved && translations[saved]) return saved;
+  } catch (_) {
+    // localStorage unavailable (private browsing, etc.)
+  }
+  return 'en';
+}
+
 export function LanguageProvider({ children }) {
-  const [locale, setLocale] = useState('en');
+  const [locale, setLocale] = useState(getInitialLocale);
   const [detectedLanguage, setDetectedLanguage] = useState(null);
   const [isAutoDetected, setIsAutoDetected] = useState(false);
-  
+
   // Detect browser language on mount
   useEffect(() => {
     const detectLanguage = () => {
@@ -49,7 +65,15 @@ export function LanguageProvider({ children }) {
         return;
       }
 
-      // Then check localStorage (user's saved preference)
+      // If the user has manually chosen a language, always respect it.
+      const manualLang = localStorage.getItem('manualLanguage');
+      if (manualLang && translations[manualLang]) {
+        setLocale(manualLang);
+        setIsAutoDetected(false);
+        return;
+      }
+
+      // Then check localStorage (auto-detected preference from a prior visit)
       const savedLang = localStorage.getItem('preferredLanguage');
       if (savedLang && translations[savedLang]) {
         setLocale(savedLang);
@@ -73,36 +97,39 @@ export function LanguageProvider({ children }) {
       setLocale('en');
       setIsAutoDetected(true);
     };
-    
+
     detectLanguage();
   }, []);
-  
+
   // When manually changing locale, mark as not auto-detected and save to localStorage
   const handleSetLocale = (newLocale) => {
     setLocale(newLocale);
     setIsAutoDetected(false);
+    // Save under both keys: 'manualLanguage' is a sticky override that
+    // browser auto-detection can never overwrite.
     localStorage.setItem('preferredLanguage', newLocale);
+    localStorage.setItem('manualLanguage', newLocale);
   };
-  
+
   // Translation function
   const t = (key) => {
     const keys = key.split('.');
     let value = translations[locale];
-    
+
     for (const k of keys) {
       value = value?.[k];
     }
-    
+
     return value || key; // Return key if translation not found
   };
-  
+
   return (
-    <LanguageContext.Provider value={{ 
-      locale, 
-      setLocale: handleSetLocale, 
-      t, 
-      detectedLanguage, 
-      isAutoDetected 
+    <LanguageContext.Provider value={{
+      locale,
+      setLocale: handleSetLocale,
+      t,
+      detectedLanguage,
+      isAutoDetected
     }}>
       {children}
     </LanguageContext.Provider>

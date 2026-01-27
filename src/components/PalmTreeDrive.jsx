@@ -2459,7 +2459,7 @@ const PalmsScene = ({ onLoadingChange }) => {
             e.target.style.opacity = '0.8';
           }}
         >
-          {isMobile ? 'Skip' : 'Skip Intro'}
+          {isMobile ? t('palmTreeDrive.skip') : t('palmTreeDrive.skipIntro')}
         </button>
       )}
       

@@ -3,6 +3,8 @@
   },
   "palmTreeDrive": {
     "reality": "你的\n现实",
+    "skip": "跳过",
+    "skipIntro": "跳过简介",
     "buyButton": "购买",
     "about": "关于",
     "tokenomics": "代币经济",

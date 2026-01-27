@@ -3,6 +3,8 @@
   },
   "palmTreeDrive": {
     "reality": "tua\nrealitas",
+    "skip": "Omitte",
+    "skipIntro": "Omitte Prooemium",
     "buyButton": "Eme",
     "about": "De Nobis",
     "tokenomics": "Oeconomia Signi",

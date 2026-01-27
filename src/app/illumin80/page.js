@@ -839,16 +839,18 @@ useEffect(() => {
             // Don't expand if user has already lit a candle
             if (hasLitCandleThisSession) return;
             
-            // If collapsed, just expand. If already expanded, do nothing (let the button handle the click)
+            // If collapsed, expand. If already expanded, collapse it.
+            // (The icon button uses stopPropagation, so this only fires on the body area)
             if (!isExpanded) {
               setIsExpanded(true);
+            } else {
+              setIsExpanded(false);
             }
           }}
           style={{
             position: 'fixed',
             bottom: '16px',
-            left: '50%',
-            transform: 'translateX(-50%)',
+            right: '16px',
             width: (isExpanded && !hasLitCandleThisSession) ? 'calc(100% - 32px)' : '80px',
             maxWidth: (isExpanded && !hasLitCandleThisSession) ? '340px' : '80px',
             background: 'rgba(10, 10, 20, 0.4)',
@@ -865,6 +867,7 @@ useEffect(() => {
             WebkitBackdropFilter: 'blur(20px)',
             zIndex: 100,
             display: 'flex',
+            flexDirection: 'row-reverse',
             alignItems: 'center',
             justifyContent: isExpanded ? 'space-between' : 'center',
             gap: isExpanded ? '16px' : '0',
@@ -880,7 +883,7 @@ useEffect(() => {
               color: 'rgba(246, 245, 241, 0.9)',
               textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)',
               opacity: isExpanded ? 1 : 0,
-              transform: isExpanded ? 'translateX(0)' : 'translateX(-20px)',
+              transform: isExpanded ? 'translateX(0)' : 'translateX(20px)',
               transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
               width: isExpanded ? 'auto' : '0',
               overflow: 'hidden',

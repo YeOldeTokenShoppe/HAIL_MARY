@@ -3,6 +3,8 @@
   },
   "palmTreeDrive": {
     "reality": "आपकी\nवास्तविकता",
+    "skip": "छोड़ें",
+    "skipIntro": "परिचय छोड़ें",
     "buyButton": "खरीदें",
     "about": "के बारे में",
     "tokenomics": "टोकनोमिक्स",

@@ -3,6 +3,8 @@
   },
   "palmTreeDrive": {
     "reality": "sua\nrealidade",
+    "skip": "Pular",
+    "skipIntro": "Pular Intro",
     "buyButton": "Comprar",
     "about": "Sobre",
     "tokenomics": "Tokenomics",
