@@ -1037,7 +1037,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               opacity: 0.9,
               textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
             }}>
-              {"\u201C"}Any sufficiently advanced technology is indistinguishable from magic{"\u201D"} <span style={{fontSize: '0.5rem'}}>{"\u2014"}Clarke, Hazards of Prophecy</span>
+              {"\u201C"}Any sufficiently advanced technology is indistinguishable from magic{"\u201D"} <span style={{fontSize: '0.4rem'}}>{"\u2014"}<br/>Arthur C. Clarke, Hazards of Prophecy</span>
             </span>
                 
                 The RL80 token is designed on first principles: decentralized trust, fair distribution, direct access, immutable and incorruptible - the very same qualities associated with the beloved icon and patron saint of portfolios, 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙.
@@ -1059,7 +1059,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               opacity: 0.9,
               textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
             }}>
-              {"\u201C"}Any sufficiently advanced technology is indistinguishable from magic{"\u201D"} <span style={{fontSize: '0.5rem'}}>{"\u2014"}Clarke, Hazards of Prophecy</span>
+              {"\u201C"}Any sufficiently advanced technology is indistinguishable from magic{"\u201D"} <span style={{fontSize: '0.4rem'}}>{"\u2014"}<br/>Arthur C. Clarke, Hazards of Prophecy</span>
             </span>
 RL80 is designed on first principles: decentralized trust, fair distribution, direct access, immutable and incorruptible - the very same qualities associated with the RL80 token's namesake and patron saint</>
               )}
@@ -1871,7 +1871,7 @@ RL80 is designed on first principles: decentralized trust, fair distribution, di
               opacity: 0.9,
               textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
             }}>
-              {"\u201C"}Any sufficiently advanced technology is indistinguishable from magic{"\u201D"} <span style={{fontSize: '0.5rem'}}>{"\u2014"}Clarke, Hazards of Prophecy</span>
+              {"\u201C"}Any sufficiently advanced technology is indistinguishable from magic{"\u201D"} <span style={{fontSize: '0.4rem'}}>{"\u2014"}<br/>Arthur C. Clarke, Hazards of Prophecy</span>
             </p>
               {/* Description text */}
               <p style={{
