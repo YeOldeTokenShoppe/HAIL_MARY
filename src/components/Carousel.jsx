@@ -1804,6 +1804,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
             }}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
+            onTouchStart={() => setIsHovered(true)}
           >
             {images.map((image, index) => {
               const beastId = `beast${index + 1}`;
@@ -1836,8 +1837,12 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                     <div className="rider-beast-group">
                       <div
                         className="beast"
-                        style={{ backgroundImage: `url(${image.src})` }}
+                        style={{ backgroundImage: `url(${image.src})`, cursor: 'pointer', touchAction: 'manipulation' }}
                         onClick={() => handleRideBeastClick(image, beastId)}
+                        onTouchEnd={(e) => {
+                          e.preventDefault();
+                          handleRideBeastClick(image, beastId);
+                        }}
                       >
                         {rider && (
                           <div className="rider-container">
@@ -1906,20 +1911,20 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
             })}
           </div>
 
-          {selectedImage && isRideConfirmationOpen && (
+          {selectedImage && isRideConfirmationOpen && typeof document !== 'undefined' && createPortal(
             <div>
               {/* Overlay div */}
               <div
-                className="clickable-overlay"
-                onClick={() => setIsRideConfirmationOpen(false)} // Close pop-up when clicking outside
+                onClick={() => setIsRideConfirmationOpen(false)}
                 style={{
                   position: "fixed",
-                  top: "-25rem",
+                  top: 0,
                   left: 0,
                   width: "100vw",
                   height: "100vh",
                   backgroundColor: "rgba(0, 0, 0, 0.5)",
-                  zIndex: 999,
+                  zIndex: 9998,
+                  backdropFilter: "blur(4px)",
                 }}
               ></div>
 
@@ -1928,7 +1933,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                 style={{
                   background: "linear-gradient(145deg, rgba(27, 23, 36, 0.98), rgba(45, 35, 55, 0.98))",
                   border: "2px solid #d4af37",
-                  position: "absolute",
+                  position: "fixed",
                   padding: "1.5rem 2rem",
                   display: "flex",
                   flexDirection: "column",
@@ -1938,7 +1943,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                   top: "50%",
                   left: "50%",
                   transform: "translate(-50%, -50%)",
-                  zIndex: 1000,
+                  zIndex: 9999,
                   textAlign: "center",
                   borderRadius: "16px",
                   boxShadow: "0 0 30px rgba(212, 175, 55, 0.3), 0 10px 40px rgba(0, 0, 0, 0.5)",
@@ -2045,7 +2050,8 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                   </button>
                 </div>
               </div>
-            </div>
+            </div>,
+            document.body
           )}
         </main>
 

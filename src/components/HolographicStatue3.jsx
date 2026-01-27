@@ -101,7 +101,7 @@ function HolographicStatue3({
         transparent: true,
         blending: THREE.AdditiveBlending,
         depthWrite: true,
-        depthTest: true, 
+        depthTest: true,
         side: THREE.FrontSide,
       }),
     []
@@ -190,7 +190,7 @@ function HolographicStatue3({
     `,
         transparent: true,
         blending: THREE.AdditiveBlending,
-        depthWrite: true, // Allow transparency layering
+        depthWrite: true,
         depthTest: false,
         side: THREE.DoubleSide,
       }),
@@ -559,4 +559,13 @@ function HolographicStatue3({
   return null;
 }
 
-export default HolographicStatue3;
+export default React.memo(HolographicStatue3, (prev, next) => {
+  return (
+    prev.hover === next.hover &&
+    prev.rotate === next.rotate &&
+    prev.onLoad === next.onLoad &&
+    prev.position?.toString() === next.position?.toString() &&
+    prev.scale?.toString() === next.scale?.toString() &&
+    prev.rotation?.toString() === next.rotation?.toString()
+  );
+});

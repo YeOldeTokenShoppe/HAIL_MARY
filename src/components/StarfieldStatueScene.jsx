@@ -272,4 +272,17 @@ function StarfieldStatueScene({
   )
 }
 
-export default StarfieldStatueScene
+export default React.memo(StarfieldStatueScene, (prev, next) => {
+  return (
+    prev.href === next.href &&
+    prev.className === next.className &&
+    prev.enableControls === next.enableControls &&
+    prev.onStatueLoad === next.onStatueLoad &&
+    prev.cameraRadius === next.cameraRadius &&
+    JSON.stringify(prev.style) === JSON.stringify(next.style) &&
+    JSON.stringify(prev.statueProps) === JSON.stringify(next.statueProps) &&
+    JSON.stringify(prev.starfieldProps) === JSON.stringify(next.starfieldProps) &&
+    prev.cameraPosition?.toString() === next.cameraPosition?.toString() &&
+    prev.cameraTarget?.toString() === next.cameraTarget?.toString()
+  );
+})

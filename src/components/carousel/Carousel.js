@@ -35,6 +35,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
   const [isTabletLandscape, setIsTabletLandscape] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 768 && window.innerWidth <= 1024 : false)
   const [isPortraitOrientation, setIsPortraitOrientation] = useState(() => typeof window !== 'undefined' ? window.innerHeight > window.innerWidth : false)
   const [isLargeTablet, setIsLargeTablet] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 820 && window.innerWidth <= 1024 : false)
+  const [isIpadMiniLandscape, setIsIpadMiniLandscape] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 1024 && window.innerWidth <= 1180 && window.innerHeight <= 850 : false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const { is80sMode } = useMusic()
   const { t, locale } = useLanguage()
@@ -63,6 +64,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
       setIsTabletPortrait(width > 480 && width <= 1024 && window.innerHeight > width)
       setIsTabletLandscape(width > 768 && width <= 1024)
       setIsLargeTablet(width >= 820 && width <= 1024)
+      setIsIpadMiniLandscape(width > 1024 && width <= 1180 && window.innerHeight <= 850)
       setIsPortraitOrientation(window.innerHeight > width)
       // Check for small phones like iPhone SE
       setIsSmallPhone(window.innerHeight <= 700)
@@ -2174,9 +2176,9 @@ The RL80 token is designed on first principles: decentralized trust, fair distri
               justifyContent: 'center',
               alignItems: 'center',
               maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : '550px',
-              marginLeft: isTabletLandscape ? '-5rem' : isTabletPortrait ? '0' : '-5rem',
-              paddingLeft: isTabletLandscape ? '1rem' : '2rem',
-              paddingBottom: isTabletLandscape ? '1rem' : isTabletPortrait ? '2rem' : '1rem',
+              marginLeft: isIpadMiniLandscape ? '-5rem' : isTabletLandscape ? '-5rem' : isTabletPortrait ? '0' : '-5rem',
+              paddingLeft: isIpadMiniLandscape ? '1rem' : isTabletLandscape ? '1rem' : '2rem',
+              paddingBottom: isIpadMiniLandscape ? '1rem' : isTabletLandscape ? '1rem' : isTabletPortrait ? '2rem' : '1rem',
               position: 'relative',
               zIndex: 5,
             }}>
