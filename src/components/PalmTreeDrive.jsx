@@ -2506,7 +2506,7 @@ const PalmsScene = ({ onLoadingChange }) => {
             gap: '1.5rem',
             justifyContent: 'center',
             alignItems: 'center',
-            marginTop: '1.5rem',
+            marginTop: '50%',
           }}>
             <button
               onClick={(e) => {

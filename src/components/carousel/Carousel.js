@@ -1007,7 +1007,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               All monetary systems are belief systems
             </p>
                 
-                RL80 is a return to first principles: minimized trust, constant vigilance, distributed power, universal access - the very qualities associated with <i>𝓞𝖚𝖗 𝕷𝖆𝖉𝖞</i>.</>
+                RL80 is a return to first principles: minimized trust, constant vigilance, distributed power, universal access - the very qualities associated with the beloved icon, <i>𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙</i>.</>
               ) : (
                 <>
                 
@@ -1027,7 +1027,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             }}>
               Experience the new enigma machine
             </p>
-Cryptocurrency was designed to be a less corruptible, technologically superior form of money—yet, ironically, it has earned a poor reputation, and not without reason.<br/><br/> It doesn&apos;t have to be that way. <br/><br/>RL80 is a return to first principles: minimized trust, constant vigilance, distributed power, universal access - the very qualities associated with <i>𝓞𝖚𝖗 𝕷𝖆𝖉𝖞</i>.</>
+Cryptocurrency was designed to be a less corruptible, technologically superior form of money—yet, ironically, it has earned a poor reputation, and not without reason.<br/><br/> It doesn&apos;t have to be that way. <br/><br/>RL80 is a return to first principles: minimized trust, constant vigilance, distributed power, universal access - the very qualities associated with the beloved icon, <i>𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙</i>.</>
               )}
             </p>
     
@@ -1821,7 +1821,7 @@ Cryptocurrency was designed to be a less corruptible, technologically superior f
                 maxWidth: '500px',
                 textAlign: 'center'
               }}>
-Cryptocurrency was designed to be a less corruptible, technologically superior form of money—yet, ironically, it has earned a poor reputation, and not without reason.<br/><br/> It doesn’t have to be that way. <br/><br/>RL80 is a return to first principles: minimized trust, constant vigilance, distributed power, universal access - the very qualities associated with <i>𝓞𝖚𝖗 𝕷𝖆𝖉𝖞</i>.</p>
+Cryptocurrency was designed to be a less corruptible, technologically superior form of money—yet, ironically, it has earned a poor reputation, and not without reason.<br/><br/> It doesn’t have to be that way. <br/><br/>RL80 is a return to first principles: minimized trust, constant vigilance, distributed power, universal access - the very qualities associated with the beloved icon, <i>𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙</i>.</p>
             <div
               className="navigation-group"
               style={{
