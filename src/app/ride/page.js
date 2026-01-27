@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import ReactDOM from "react-dom";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import Carousel from "@/components/Carousel";
@@ -86,6 +87,7 @@ export default function CommunionPage() {
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [deviceDetected, setDeviceDetected] = useState(false);
   const [fontLoaded, setFontLoaded] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
     const [isTabletPortrait, setIsTabletPortrait] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 480 && window.innerWidth <= 1024 && window.innerHeight > window.innerWidth : false)
 
 
@@ -183,6 +185,16 @@ export default function CommunionPage() {
     };
     checkFont();
   }, []);
+
+  // Escape key closes help modal
+  useEffect(() => {
+    if (!showHelp) return;
+    const handleKey = (e) => {
+      if (e.key === "Escape") setShowHelp(false);
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [showHelp]);
 
   return (
     <>
@@ -504,6 +516,154 @@ export default function CommunionPage() {
 
         </div>
       )}
+
+      {/* Help Button - bottom left */}
+      <button
+        onClick={() => setShowHelp(true)}
+        aria-label="Help"
+        style={{
+          position: "fixed",
+          bottom: "30px",
+          left: "30px",
+          zIndex: 50,
+          width: "44px",
+          height: "44px",
+          borderRadius: "50%",
+          border: "2px solid #d4af37",
+          background: "rgba(13, 10, 20, 0.85)",
+          color: "#d4af37",
+          fontSize: "1.4rem",
+          fontWeight: "bold",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: "0 0 12px rgba(212, 175, 55, 0.3)",
+          transition: "box-shadow 0.2s, transform 0.2s",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.boxShadow = "0 0 20px rgba(212, 175, 55, 0.6)";
+          e.currentTarget.style.transform = "scale(1.1)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.boxShadow = "0 0 12px rgba(212, 175, 55, 0.3)";
+          e.currentTarget.style.transform = "scale(1)";
+        }}
+      >
+        ?
+      </button>
+
+      {/* Help Modal */}
+      {showHelp &&
+        ReactDOM.createPortal(
+          <div
+            onClick={() => setShowHelp(false)}
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100vw",
+              height: "100vh",
+              background: "rgba(0, 0, 0, 0.7)",
+              backdropFilter: "blur(4px)",
+              WebkitBackdropFilter: "blur(4px)",
+              zIndex: 9998,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: "relative",
+                zIndex: 9999,
+                maxWidth: "420px",
+                width: "90%",
+                background: "linear-gradient(135deg, #1b1724 0%, #2a1f3d 100%)",
+                border: "1px solid #d4af37",
+                borderRadius: "12px",
+                padding: "2rem 1.75rem",
+                color: "#fff",
+                fontFamily: "Roboto, sans-serif",
+                boxShadow: "0 0 30px rgba(212, 175, 55, 0.2), 0 8px 32px rgba(0,0,0,0.6)",
+              }}
+            >
+              {/* Close button */}
+              <button
+                onClick={() => setShowHelp(false)}
+                aria-label="Close"
+                style={{
+                  position: "absolute",
+                  top: "12px",
+                  right: "14px",
+                  background: "none",
+                  border: "none",
+                  color: "rgba(255,255,255,0.6)",
+                  fontSize: "1.4rem",
+                  cursor: "pointer",
+                  lineHeight: 1,
+                  padding: "4px",
+                }}
+              >
+                ✕
+              </button>
+
+              <h3
+                style={{
+                  fontFamily: "UnifrakturCook, serif",
+                  color: "#d4af37",
+                  fontSize: "1.5rem",
+                  margin: "0 0 1rem 0",
+                  textShadow: "0 0 8px rgba(212, 175, 55, 0.4)",
+                }}
+              >
+                Instructions
+              </h3>
+
+              <ul
+                style={{
+                  listStyle: "none",
+                  padding: 0,
+                  margin: 0,
+                  fontSize: "0.9rem",
+                  lineHeight: 1.7,
+                  color: "rgba(255,255,255,0.85)",
+                }}
+              >
+                <li style={{ marginBottom: "0.6rem" }}>
+                  <span style={{ color: "#d4af37", marginRight: "8px" }}>&#9733;</span>
+                  Click any available beast to start a <strong>10-minute ride</strong>. When 
+                  10 minutes are up, you can keep the conversation going by choosing another beast or chatting in the spectator chat box.
+                </li>
+                <li style={{ marginBottom: "0.6rem" }}>
+                  <span style={{ color: "#d4af37", marginRight: "8px" }}>&#9733;</span>
+                  You must be <strong>signed in</strong> to ride
+                </li>
+                <li style={{ marginBottom: "0.6rem" }}>
+                  <span style={{ color: "#d4af37", marginRight: "8px" }}>&#9733;</span>
+                  While riding, type messages that appear on your beast for <strong>signed-in users to see.</strong>
+                  { } Visitors that are not signed in will see encrypted text.
+                </li>
+                <li style={{ marginBottom: "0.6rem" }}>
+                  <span style={{ color: "#d4af37", marginRight: "8px" }}>&#9733;</span>
+                  Messages are limited to <strong>80 characters</strong>
+                </li>
+                
+                <li style={{ marginBottom: "0.6rem" }}>
+                  <span style={{ color: "#d4af37", marginRight: "8px" }}>&#9733;</span>
+                  Toggle <strong>DJ mode</strong> to let users see what song track you're listening to. Users can opt to 
+                  synch up with the song.
+                </li>
+                <li>
+                  <span style={{ color: "#d4af37", marginRight: "8px" }}>&#9733;</span>
+                  If all beasts are occupied, a <strong>global chat sidebar</strong> becomes available
+                </li>
+              </ul>
+            </div>
+          </div>,
+          document.body
+        )}
     </>
   );
 }

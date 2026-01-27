@@ -625,7 +625,7 @@ body {
   position: fixed;
   top: 10rem;
   right: 0;
-  z-index: 9999 !important;
+  z-index: 999 !important;
   transform: translateX(-50%);
   min-width: 25rem;
   max-width: 30rem;

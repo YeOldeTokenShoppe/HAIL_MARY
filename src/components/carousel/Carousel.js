@@ -35,7 +35,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
   const [isTabletLandscape, setIsTabletLandscape] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 768 && window.innerWidth <= 1024 : false)
   const [isPortraitOrientation, setIsPortraitOrientation] = useState(() => typeof window !== 'undefined' ? window.innerHeight > window.innerWidth : false)
   const [isLargeTablet, setIsLargeTablet] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 820 && window.innerWidth <= 1024 : false)
-  const [isIpadMiniLandscape, setIsIpadMiniLandscape] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 1024 && window.innerWidth <= 1180 && window.innerHeight <= 850 : false)
+  const [isSmallLandscape, setIsSmallLandscape] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 1024 && window.innerWidth <= 1500 : false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const { is80sMode } = useMusic()
   const { t, locale } = useLanguage()
@@ -64,7 +64,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
       setIsTabletPortrait(width > 480 && width <= 1024 && window.innerHeight > width)
       setIsTabletLandscape(width > 768 && width <= 1024)
       setIsLargeTablet(width >= 820 && width <= 1024)
-      setIsIpadMiniLandscape(width > 1024 && width <= 1180 && window.innerHeight <= 850)
+      setIsSmallLandscape(width > 1024 && width <= 1500)
       setIsPortraitOrientation(window.innerHeight > width)
       // Check for small phones like iPhone SE
       setIsSmallPhone(window.innerHeight <= 700)
@@ -1551,7 +1551,7 @@ RL80 is designed on first principles: decentralized trust, fair distribution, di
               alignItems: 'center',
               justifyContent: 'center',
               gap: isTabletLandscape ? '2rem' : isTabletPortrait ? '1.5rem' : '1rem',
-              padding: isTabletLandscape ? '0 3%' : isTabletPortrait ? '0 2%' : '0 5%',
+              padding: isTabletLandscape ? '0 3%' : isTabletPortrait ? '0 2%' : isSmallLandscape ? '0 3%' : '0 5%',
               minHeight: '100vh',
               minWidth: isCarouselMode ? '100vw' : 'auto',
               position: 'relative',
@@ -1568,7 +1568,7 @@ RL80 is designed on first principles: decentralized trust, fair distribution, di
             top: '3rem',
             left: '-2rem',
             position: 'relative',
-            maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : '650px'
+            maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : isSmallLandscape ? '500px' : '650px'
           }}>
             {/* Portal Preview Container with Frame Image */}
             <div
@@ -1576,11 +1576,11 @@ RL80 is designed on first principles: decentralized trust, fair distribution, di
               style={{
                 position: 'relative',
                 width: '100%',
-                maxWidth: isTabletLandscape ? '400px' : isTabletPortrait ? '300px' : '600px',
+                maxWidth: isTabletLandscape ? '400px' : isTabletPortrait ? '300px' : isSmallLandscape ? '430px' : '600px',
                 aspectRatio: '4/3',
                 cursor: 'pointer',
                 transition: 'all 0.3s ease',
-                transform: `perspective(1000px) rotateX(5deg) scale(${isTabletLandscape ? 0.9 : isTabletPortrait ? 0.85 : 1})`,
+                transform: `perspective(1000px) rotateX(5deg) scale(${isTabletLandscape ? 0.9 : isTabletPortrait ? 0.85 : isSmallLandscape ? 0.95 : 1})`,
                 filter: 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.6))'
               }}
               onMouseEnter={(e) => {
@@ -1672,8 +1672,8 @@ RL80 is designed on first principles: decentralized trust, fair distribution, di
             flexDirection: 'column',
             justifyContent: 'center',
             alignItems: 'center',
-            maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : '550px',
-            paddingLeft: isTabletLandscape ? '1rem' : '2rem',
+            maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : isSmallLandscape ? '450px' : '550px',
+            paddingLeft: isTabletLandscape ? '1rem' : isSmallLandscape ? '1rem' : '2rem',
             // paddingTop: '10%',
 
           }}>
@@ -1787,7 +1787,7 @@ RL80 is designed on first principles: decentralized trust, fair distribution, di
               alignItems: 'center',
               justifyContent: 'center',
               gap: isTabletLandscape ? '2rem' : isTabletPortrait ? '1.5rem' : '1rem',
-              padding: isTabletLandscape ? '3% 3%' : isTabletPortrait ? '3% 2%' : '3% 5%',
+              padding: isTabletLandscape ? '3% 3%' : isTabletPortrait ? '3% 2%' : isSmallLandscape ? '3% 3%' : '3% 5%',
               minHeight: isCarouselMode ? '100vh' : '90vh',
               minWidth: isCarouselMode ? '100vw' : 'auto',
               position: 'relative',
@@ -1796,12 +1796,12 @@ RL80 is designed on first principles: decentralized trust, fair distribution, di
             }}>
             {/* Left Column - HolyGrail Portal (3D pass-through effect) */}
             <div style={{
-              flex: isTabletPortrait ? '1 1 65%' : '1 1 65%',
+              flex: isTabletPortrait ? '1 1 65%' : isSmallLandscape ? '1 1 55%' : '1 1 65%',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'center',
               alignItems: 'center',
-              maxWidth: isTabletLandscape ? '800px' : isTabletPortrait ? '650px' : '800px',
+              maxWidth: isTabletLandscape ? '800px' : isTabletPortrait ? '650px' : isSmallLandscape ? '550px' : '800px',
               position: 'relative',
               overflow: 'visible',
             }}>
@@ -1810,8 +1810,8 @@ RL80 is designed on first principles: decentralized trust, fair distribution, di
                 style={{
                   position: 'relative',
                   width: '100%',
-                  maxWidth: isTabletLandscape ? '550px' : isTabletPortrait ? '500px' : '700px',
-                  height: isTabletLandscape ? '600px' : isTabletPortrait ? '550px' : '750px',
+                  maxWidth: isTabletLandscape ? '550px' : isTabletPortrait ? '500px' : isSmallLandscape ? '480px' : '700px',
+                  height: isTabletLandscape ? '600px' : isTabletPortrait ? '550px' : isSmallLandscape ? '530px' : '750px',
                   transition: 'all 0.3s ease',
                   // filter: 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.5))',
                   overflow: 'visible',
@@ -1845,14 +1845,14 @@ RL80 is designed on first principles: decentralized trust, fair distribution, di
               flexDirection: 'column',
               justifyContent: 'center',
               alignItems: 'center',
-              maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : '550px',
-              paddingLeft: isTabletLandscape ? '1rem' : '2rem',
+              maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : isSmallLandscape ? '450px' : '550px',
+              paddingLeft: isTabletLandscape ? '1rem' : isSmallLandscape ? '1rem' : '2rem',
             }}>
               {/* TranslatableDropInTitle */}
               <SkewedHeading
                 lines={[t('about.skewedHeading1.line1'), t('about.skewedHeading1.line2'), t('about.skewedHeading1.line3')]}
               colors={["#00ff00", "#f4e4c1", "#ffd700"]}
-                fontSize={{ mobile: "2rem", desktop: isTabletLandscape ? "2.0rem" : "3rem" }}
+                fontSize={{ mobile: "2rem", desktop: isTabletLandscape ? "2.0rem" : isSmallLandscape ? "2.2rem" : "3rem" }}
                 isMobile={false}
                 language={locale}
               />
@@ -2124,7 +2124,7 @@ The RL80 token is designed on first principles: decentralized trust, fair distri
               alignItems: 'center',
               justifyContent: 'center',
               gap: isTabletLandscape ? '0' : isTabletPortrait ? '1.5rem' : '1rem',
-              padding: isTabletLandscape ? '3% 3%' : isTabletPortrait ? '3% 2%' : '3% 5%',
+              padding: isTabletLandscape ? '3% 3%' : isTabletPortrait ? '3% 2%' : isSmallLandscape ? '3% 3%' : '3% 5%',
               minHeight: isCarouselMode ? '100vh' : '90vh',
               minWidth: isCarouselMode ? '100vw' : 'auto',
               position: 'relative',
@@ -2138,7 +2138,7 @@ The RL80 token is designed on first principles: decentralized trust, fair distri
               flexDirection: 'column',
               justifyContent: 'center',
               alignItems: 'center',
-              maxWidth: isTabletLandscape ? '500px' : isTabletPortrait ? '550px' : '800px',
+              maxWidth: isTabletLandscape ? '500px' : isTabletPortrait ? '550px' : isSmallLandscape ? '500px' : '800px',
               position: 'relative',
               overflow: 'visible',
             }}>
@@ -2147,8 +2147,8 @@ The RL80 token is designed on first principles: decentralized trust, fair distri
                 style={{
                   position: 'relative',
                   width: '100%',
-                  maxWidth: isTabletLandscape ? '500px' : isTabletPortrait ? '550px' : '700px',
-                  height: isTabletLandscape ? '380px' : isTabletPortrait ? '380px' : '500px',
+                  maxWidth: isTabletLandscape ? '500px' : isTabletPortrait ? '550px' : isSmallLandscape ? '500px' : '700px',
+                  height: isTabletLandscape ? '380px' : isTabletPortrait ? '380px' : isSmallLandscape ? '400px' : '500px',
                   transition: 'all 0.3s ease',
                   // filter: 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.5))',
                 }}
@@ -2175,17 +2175,16 @@ The RL80 token is designed on first principles: decentralized trust, fair distri
               flexDirection: 'column',
               justifyContent: 'center',
               alignItems: 'center',
-              maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : '550px',
-              marginLeft: isIpadMiniLandscape ? '-5rem' : isTabletLandscape ? '-5rem' : isTabletPortrait ? '0' : '-5rem',
-              // paddingLeft: isIpadMiniLandscape ? '1rem' : isTabletLandscape ? '1rem' : '2rem',
-              paddingBottom: isIpadMiniLandscape ? '1rem' : isTabletLandscape ? '1rem' : isTabletPortrait ? '2rem' : '1rem',
+              maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : isSmallLandscape ? '450px' : '550px',
+              marginLeft: isTabletLandscape ? '-5rem' : isTabletPortrait ? '0' : isSmallLandscape ? '-2rem' : '-5rem',
+              paddingBottom: isTabletLandscape ? '1rem' : isTabletPortrait ? '2rem' : isSmallLandscape ? '1rem' : '1rem',
               position: 'relative',
               zIndex: 5,
             }}>
               <SkewedHeading
                  lines={[t('about.skewedHeading3.line1'), t('about.skewedHeading3.line2'), t('about.skewedHeading3.line3')]}
                 colors={["#00ff00", "#f4e4c1", "#ffd700"]}
-              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "2.5rem" : "3rem"}
+              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "2.5rem" : isSmallLandscape ? "2.5rem" : "3rem"}
                 isMobile={false}
                 language={locale}
                   //  scramble={true}

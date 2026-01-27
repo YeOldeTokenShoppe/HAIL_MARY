@@ -207,24 +207,27 @@ function FloatingGroup({ children, amplitude = 0.06, speed = 1.2, rotationAmplit
   return <group ref={groupRef}>{children}</group>;
 }
 
-// Breath smoke that follows the bull mesh
-function BullBreathSmoke({ bullObject, offset = [-0.05, -0.3, 1.3] }) {
+// Breath smoke that follows the bull mesh in its local space
+function BullBreathSmoke({ bullObject, offset = [0, -0.4, 1.4], localScale = 0.1 }) {
   const groupRef = useRef();
+  const _worldPos = useRef(new THREE.Vector3());
+  const _worldScale = useRef(new THREE.Vector3());
 
   useFrame(() => {
     if (bullObject && groupRef.current) {
-      const worldPos = new THREE.Vector3();
-      bullObject.getWorldPosition(worldPos);
-      groupRef.current.position.set(
-        worldPos.x + offset[0],
-        worldPos.y + offset[1],
-        worldPos.z + offset[2]
-      );
+      // Transform offset from bull's local space to world space
+      bullObject.localToWorld(_worldPos.current.set(...offset));
+      groupRef.current.position.copy(_worldPos.current);
+
+      // Match the bull's world scale so smoke stays proportional
+      bullObject.getWorldScale(_worldScale.current);
+      const avgScale = (_worldScale.current.x + _worldScale.current.y + _worldScale.current.z) / 3;
+      groupRef.current.scale.setScalar(avgScale * localScale);
     }
   });
 
   return (
-    <group ref={groupRef} scale={0.1}>
+    <group ref={groupRef}>
       <BreathSmoke
         name="Left Nostril"
         position={[0, 0, 0]}
@@ -335,7 +338,7 @@ function PortalScene({ isMobile = false }) {
           hideGlow={true}
           onBullFound={setBullObject}
         />
-        <BullBreathSmoke bullObject={bullObject} />
+        <BullBreathSmoke bullObject={bullObject} offset={isMobile ? [0, -0.2, 1.4] : [0, -0.4, 1.4]} />
       </LaptopFrame>
 
       {/* Clipped grail that pokes through the screen (with glow) */}
@@ -350,7 +353,7 @@ function PortalScene({ isMobile = false }) {
           />
         </group>
       </group>
-      <BullBreathSmoke bullObject={clippedBullObject} offset={[-0.1, 0.25, 1.1]} />
+      <BullBreathSmoke bullObject={clippedBullObject} offset={isMobile ? [0.57, 0.65, -0.95] : [0.63, 0.41, -1.1]} />
 
       {/* Ambient light to see the laptop model */}
       <ambientLight intensity={0.7} />

@@ -137,9 +137,9 @@ const CyberNav = ({
     { id: '04', date: t('cyberNav.nav05.date'), title: t('cyberNav.nav05.title'), path: '/ride', thumbnail: '/images/blackPuma.webp' },
     // { id: '03', date: 'PRAYER & PROBABIL80', title: 'TRADE SCHOOL', path: '/trade', thumbnail: '/images/3ACES_TATTOO.webp' },
     { id: '05', date: t('cyberNav.nav06.date'), title: t('cyberNav.nav06.title'), path: '/philosophy', thumbnail: '/images/ILLUMIN80_TATTOO.webp' },
-        ...(isMobile ? [{ id: '02', date: t('cyberNav.nav02.date'), title: t('cyberNav.nav02.title'), path: '/portal', thumbnail: '/images/timePortal.webp' }] : []),
+        ...(isMobile ? [{ id: '06', date: t('cyberNav.nav02.date'), title: t('cyberNav.nav02.title'), path: '/portal', thumbnail: '/images/timePortal.webp' }] : []),
 
-    { id: '06', date: t('cyberNav.nav07.date'), title: t('cyberNav.nav07.title'), path: '/fountain', thumbnail: '/images/HEART_TATTOO.webp' },
+  { id: '07', date: t('cyberNav.nav07.date'), title: t('cyberNav.nav07.title'), path: '/fountain', thumbnail: '/images/HEART_TATTOO.webp' },
     // { id: '07', date: 'COMING SOON', title: 'LIGHT CLUB', path: '#', thumbnail: '/images/RL80_KNUCKLES.webp' },
   ];
 
@@ -215,16 +215,19 @@ const CyberNav = ({
               zIndex: 9999,
               display: "flex",
               flexDirection: "column",
-              justifyContent: "center",
-              paddingTop: isSmallTabletLandscape ? '0' : '25%',
+              justifyContent: "safe center",
               alignItems: "center",
-              overflowY: isSmallTabletLandscape ? "auto" : "hidden",
+              overflowY: "auto",
               gap: isMobile ? "2px" : isSmallTabletLandscape ? "2px" : "10px",
               padding: isMobile ? "20px" : isSmallTabletLandscape ? "15px 20px" : "40px 20px",
               isolation: "isolate",
               transform: "translateZ(0)"
             }}
             onClick={(e) => {
+              // Stop propagation so clicks on the overlay don't reach
+              // window-level handlers (e.g. PalmTreeDrive's 3D raycaster)
+              e.stopPropagation();
+              e.nativeEvent.stopImmediatePropagation();
               if (e.target === e.currentTarget) {
                 handleClose();
                 setHoveredItemPath('');

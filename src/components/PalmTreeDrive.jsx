@@ -142,6 +142,7 @@ const PalmsScene = ({ onLoadingChange }) => {
   const scrollProgressRef = useRef(0); // Start at 0 for aerial view
   const animationFrameRef = useRef(null); // Track animation frame ID for cleanup
   const hasScrolledRef = useRef(false); // Track if user has started scrolling
+  const animationSkippedRef = useRef(false); // Track if user clicked Skip
 
   // Force initial scroll position on mount and page load
   useEffect(() => {
@@ -331,8 +332,12 @@ const PalmsScene = ({ onLoadingChange }) => {
     // Mark as scrolled to hide the button
     setHasScrolled(true);
     hasScrolledRef.current = true;
-    
-    // Get all ScrollTriggers and update their progress
+
+    // Mark animation as skipped so ScrollTrigger callbacks won't reset the stage
+    animationSkippedRef.current = true;
+
+    // Get all ScrollTriggers, jump to end, then kill them so scroll events
+    // can no longer drag the animation back to the start
     const triggers = ScrollTrigger.getAll();
     triggers.forEach(trigger => {
       if (trigger.animation) {
@@ -340,10 +345,7 @@ const PalmsScene = ({ onLoadingChange }) => {
         trigger.animation.progress(1);
         trigger.animation.pause();
       }
-      // Update ScrollTrigger progress using the correct API
-      if (typeof trigger.progress === 'function') {
-        trigger.progress(1);
-      }
+      trigger.kill();
     });
     
     // Detect if mobile for scroll distance
@@ -377,9 +379,6 @@ const PalmsScene = ({ onLoadingChange }) => {
     document.documentElement.scrollTop = targetScroll;
     document.body.scrollTop = targetScroll;
     
-    // Update ScrollTrigger to recognize the new scroll position
-    ScrollTrigger.refresh();
-    ScrollTrigger.update();
   }, [setShouldMorph]);
   
   // Detect if device is mobile for routing
@@ -1816,6 +1815,9 @@ const PalmsScene = ({ onLoadingChange }) => {
         fastScrollEnd: false, // Disable for better touch response
         ignoreMobileResize: true, // Ignore resize events on mobile
         onUpdate: (self) => {
+          // If user already skipped, don't let scroll events reset the animation
+          if (animationSkippedRef.current) return;
+
           // Debug logging to track scroll progress and timeline
           if (self.progress > 0.9 || self.progress === 0 || Math.abs(self.progress - 0.5) < 0.01 || Math.abs(self.progress - 0.25) < 0.01 || Math.abs(self.progress - 0.75) < 0.01) {
             const tlProg = tl.progress();
@@ -2482,7 +2484,7 @@ const PalmsScene = ({ onLoadingChange }) => {
         <div style={{
           position: 'fixed',
           right: isMobile ? '20px' : '15%',
-          top: isMobile ? '78%' : '70%',
+          top: isMobile ? '78%' : '65%',
           transform: 'translateY(-50%)', // Center vertically at new position
           width: isMobile ? '85%' : '50%',
           maxWidth: '600px',
