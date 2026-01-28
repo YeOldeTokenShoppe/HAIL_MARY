@@ -13,12 +13,12 @@ import BreathSmoke from "./BreathSmoke";
 // Sky gradient shader for portal background
 const SkyGradientMaterial = {
   uniforms: {
-    zenithColor: { value: new THREE.Color('#0b0b2a') },
-    upperColor: { value: new THREE.Color('#1a1145') },
-    midColor: { value: new THREE.Color('#4a1854') },
-    warmColor: { value: new THREE.Color('#b83a5a') },
-    horizonColor: { value: new THREE.Color('#ff7b3a') },
-    horizonGlow: { value: new THREE.Color('#ffad5e') },
+    zenithColor: { value: new THREE.Color('#000014') },
+    upperColor: { value: new THREE.Color('#0a0040') },
+    midColor: { value: new THREE.Color('#2200aa') },
+    warmColor: { value: new THREE.Color('#8800cc') },
+    horizonColor: { value: new THREE.Color('#ff0066') },
+    horizonGlow: { value: new THREE.Color('#ff88aa') },
   },
   vertexShader: `
     varying vec3 vWorldPosition;
@@ -76,31 +76,34 @@ function GrailModel({ clip = false, onBullFound = null, ...props }) {
   const { scene } = useGLTF('/models/ourlady_rider7.glb');
   const meshRef = useRef();
 
-  // Clone scene once and apply clipping/glow hiding as needed
+  // Clone scene once and apply clipping as needed
   const clonedScene = React.useMemo(() => {
     const clone = scene.clone();
 
     clone.traverse((child) => {
       if (child.isMesh) {
-        // Apply clipping planes
         if (clip && child.material) {
           child.material = child.material.clone();
           child.material.clippingPlanes = [screenPlane, yPlane];
           child.material.clipShadows = true;
           child.material.side = THREE.DoubleSide;
-          // Render clipped model after portal
           child.renderOrder = 10;
         }
-      }
-
-      // Find the bull mesh for breath smoke parenting
-      if (onBullFound && child.name === 'Bull') {
-        onBullFound(child);
       }
     });
 
     return clone;
-  }, [scene, clip, onBullFound]);
+  }, [scene, clip]);
+
+  // Find the bull mesh after the scene is mounted and world matrices are ready
+  useEffect(() => {
+    if (!onBullFound || !clonedScene) return;
+    clonedScene.traverse((child) => {
+      if (child.name === 'Bull') {
+        onBullFound(child);
+      }
+    });
+  }, [clonedScene, onBullFound]);
 
   return (
     <primitive
@@ -111,52 +114,7 @@ function GrailModel({ clip = false, onBullFound = null, ...props }) {
   );
 }
 
-// Portal Frame component
-function PortalFrame({ children, width = 1.8, height = 2.2, ...props }) {
-  const portalRef = useRef();
 
-  return (
-    <group {...props}>
-      {/* Portal mesh with MeshPortalMaterial */}
-      <mesh>
-        <planeGeometry args={[width, height]} />
-        <MeshPortalMaterial ref={portalRef} side={THREE.DoubleSide} blend={0}>
-          {/* Environment inside the portal */}
-          {/* <ambientLight intensity={0.5} /> */}
-          {/* <spotLight position={[0, 5, 5]} angle={0.5} penumbra={1} intensity={2} /> */}
-         <hemisphereLight 
-      skyColor={'#0000ff'} 
-      groundColor={'#e100ff'} 
-      intensity={1} 
-    />
-          {/* <pointLight position={[-2, 0, 2]} color="#ffd700" intensity={1.5} />
-          <pointLight position={[2, 0, 2]} color="#ffd700" intensity={1.5} />  */}
-
-          {/* Background gradient sphere */}
-          {/* <mesh scale={10}>
-            <sphereGeometry args={[1, 32, 32]} />
-            <meshBasicMaterial side={THREE.BackSide} color="#0a0a1a" />
-          </mesh> */}
-
-          {/* Children (the grail model inside portal) */}
-          {children}
-        </MeshPortalMaterial>
-      </mesh>
-
-      {/* Glowing border effect */}
-      {/* <mesh position={[0, 0, -0.01]}>
-        <planeGeometry args={[width + 0.15, height + 0.15]} />
-        <meshBasicMaterial color="#ffd700" transparent opacity={0.3} />
-      </mesh> */}
-
-      {/* Outer glow */}
-      {/* <mesh position={[0, 0, -0.02]}>
-        <planeGeometry args={[width + 0.3, height + 0.3]} />
-        <meshBasicMaterial color="#ffd700" transparent opacity={0.1} />
-      </mesh> */}
-    </group>
-  );
-}
 
 
 
@@ -208,7 +166,7 @@ function FloatingGroup({ children, amplitude = 0.06, speed = 1.2, rotationAmplit
 }
 
 // Breath smoke that follows the bull mesh in its local space
-function BullBreathSmoke({ bullObject, offset = [0, -0.4, 1.4], localScale = 0.1 }) {
+function BullBreathSmoke({ bullObject, offset = [0, -0.4, 1.4], localScale = 0.1, rotation = [0, 0, 0] }) {
   const groupRef = useRef();
   const _worldPos = useRef(new THREE.Vector3());
   const _worldScale = useRef(new THREE.Vector3());
@@ -227,7 +185,7 @@ function BullBreathSmoke({ bullObject, offset = [0, -0.4, 1.4], localScale = 0.1
   });
 
   return (
-    <group ref={groupRef}>
+    <group ref={groupRef} rotation={rotation}>
       <BreathSmoke
         name="Left Nostril"
         position={[0, 0, 0]}
@@ -306,6 +264,7 @@ function PortalScene({ isMobile = false }) {
   const sceneRotation = [0, 0.6, 0]; // Tilt up slightly, rotate to the side
 
   return (
+    <group>
     <FloatingGroup>
     <group rotation={sceneRotation}>
       {/* The laptop frame with portal screen */}
@@ -338,7 +297,7 @@ function PortalScene({ isMobile = false }) {
           hideGlow={true}
           onBullFound={setBullObject}
         />
-        <BullBreathSmoke bullObject={bullObject} offset={isMobile ? [0, -0.2, 1.4] : [0, -0.4, 1.4]} />
+        <BullBreathSmoke bullObject={bullObject} offset={isMobile ? [-0.05, -0.2, 0.4] : [0, -0.4, 0.4]} />
       </LaptopFrame>
 
       {/* Clipped grail that pokes through the screen (with glow) */}
@@ -353,13 +312,15 @@ function PortalScene({ isMobile = false }) {
           />
         </group>
       </group>
-      <BullBreathSmoke bullObject={clippedBullObject} offset={isMobile ? [0.57, 0.65, -0.95] : [0.63, 0.41, -1.1]} />
 
       {/* Ambient light to see the laptop model */}
       <ambientLight intensity={0.7} />
       {/* <directionalLight position={[2, 2, 2]} intensity={1} /> */}
     </group>
     </FloatingGroup>
+    {/* Clipped breath smoke — outside FloatingGroup to avoid double hover */}
+    <BullBreathSmoke bullObject={clippedBullObject} offset={isMobile ? [0.0, 0.82, 1.38] : [-0.01, 0.77, 1.4] }  rotation={[0, 0.45, 0]}/>
+    </group>
   );
 }
 

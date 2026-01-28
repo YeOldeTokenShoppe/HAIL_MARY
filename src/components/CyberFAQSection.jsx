@@ -1167,7 +1167,7 @@ This is a feature, not a limitation.
             width: '100%'
           }}>
             {faqData.map((faq, index) => (
-              <div key={faq.id} style={{ marginBottom: '15px' }}>
+              <div key={faq.id} id={faq.id} style={{ marginBottom: '15px' }}>
                 <motion.div
                   onClick={() => handleQueryClick(index)}
                   whileHover={{ scale: 1.02 }}

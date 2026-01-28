@@ -247,7 +247,7 @@ function StarfieldStatueScene({
             scrollSpeed={0.5}
             verticalLines={48}
           />
-<Suspense fallback={null}>
+
           {/* Holographic Statue */}
           <HolographicStatue3
             position={[0, 0, 0]}
@@ -258,7 +258,7 @@ function StarfieldStatueScene({
             onLoad={onStatueLoad}
             {...statueProps}
           />
-</Suspense>
+
           <MobileCandleOrbital />
 
           {/* OrbitControls removed in favor of Figure8Camera */}
@@ -272,17 +272,4 @@ function StarfieldStatueScene({
   )
 }
 
-export default React.memo(StarfieldStatueScene, (prev, next) => {
-  return (
-    prev.href === next.href &&
-    prev.className === next.className &&
-    prev.enableControls === next.enableControls &&
-    prev.onStatueLoad === next.onStatueLoad &&
-    prev.cameraRadius === next.cameraRadius &&
-    JSON.stringify(prev.style) === JSON.stringify(next.style) &&
-    JSON.stringify(prev.statueProps) === JSON.stringify(next.statueProps) &&
-    JSON.stringify(prev.starfieldProps) === JSON.stringify(next.starfieldProps) &&
-    prev.cameraPosition?.toString() === next.cameraPosition?.toString() &&
-    prev.cameraTarget?.toString() === next.cameraTarget?.toString()
-  );
-})
+export default StarfieldStatueScene

@@ -525,7 +525,7 @@ export default function CommunionPage() {
           position: "fixed",
           bottom: "30px",
           left: "30px",
-          zIndex: 50,
+          // zIndex: 0,
           width: "44px",
           height: "44px",
           borderRadius: "50%",

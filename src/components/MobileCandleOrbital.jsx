@@ -510,10 +510,12 @@ function MobileCandleOrbital({ candleData = [], onCandleClick, modelRef, onPagin
     // Check global cache first to prevent duplicate extractions across remounts
     const modelId = 'tinyJapCanOnly';
     if (globalCandleCache.modelId === modelId && globalCandleCache.candles) {
+      console.log('[MobileCandleOrbital] Using cached candles from global cache');
       setVcandleObjects(globalCandleCache.candles);
       return;
     }
 
+    console.log('[MobileCandleOrbital] Extracting candles from tinyJapCanOnly.glb...');
     const extractedCandles = [];
 
     // Clone the entire model as our base candle
@@ -541,6 +543,7 @@ function MobileCandleOrbital({ candleData = [], onCandleClick, modelRef, onPagin
     }
 
     // Debug: Log details about extracted candles
+    console.log(`[MobileCandleOrbital] Created ${extractedCandles.length} candle instances`);
 
     // Cache the extracted candles globally
     globalCandleCache.modelId = modelId;
@@ -549,86 +552,86 @@ function MobileCandleOrbital({ candleData = [], onCandleClick, modelRef, onPagin
     setVcandleObjects(extractedCandles);
   }, [candleModel]);
   
-  // // Get all sorted user data (up to 80 for Illumin80/LAI80)
-  // const allSortedData = React.useMemo(() => {
-  //   if (candleData.length > 0) {
-  //     // Data is already sorted by the hook based on sortBy prop
-  //     // No need to re-sort here since useFirestoreResults handles it
-  //     const realData = [...candleData];
+  // Get all sorted user data (up to 80 for Illumin80/LAI80)
+  const allSortedData = React.useMemo(() => {
+    if (candleData.length > 0) {
+      // Data is already sorted by the hook based on sortBy prop
+      // No need to re-sort here since useFirestoreResults handles it
+      const realData = [...candleData];
       
-  //     // For testing: Add mock data to make pagination visible
-  //     const mockData = Array(20).fill(null).map((_, i) => ({
-  //       id: `mock-${i}`,
-  //       userName: `TestUser${i + 1}`,
-  //       username: `TestUser${i + 1}`,
-  //       burnedAmount: Math.floor(Math.random() * 100),
-  //       image: i % 2 === 0 ? '/vvv.jpg' : '/vsClown.jpg'
-  //     }));
+      // For testing: Add mock data to make pagination visible
+      const mockData = Array(20).fill(null).map((_, i) => ({
+        id: `mock-${i}`,
+        userName: `TestUser${i + 1}`,
+        username: `TestUser${i + 1}`,
+        burnedAmount: Math.floor(Math.random() * 100),
+        image: i % 2 === 0 ? '/vvv.jpg' : '/vsClown.jpg'
+      }));
       
-  //     return [...realData, ...mockData].slice(0, 80); // Combine real and mock data
-  //   }
-  //   // Fallback mock data
-  //   return Array(80).fill(null).map((_, i) => ({
-  //     id: `mock-${i}`,
-  //     userName: `Player${i + 1}`,
-  //     username: `Player${i + 1}`,
-  //     burnedAmount: Math.floor(Math.random() * 1000),
-  //     image: i % 2 === 0 ? '/vvv.jpg' : '/vsClown.jpg'
-  //   }));
-  // }, [candleData, sortBy]);
+      return [...realData, ...mockData].slice(0, 80); // Combine real and mock data
+    }
+    // Fallback mock data
+    return Array(80).fill(null).map((_, i) => ({
+      id: `mock-${i}`,
+      userName: `Player${i + 1}`,
+      username: `Player${i + 1}`,
+      burnedAmount: Math.floor(Math.random() * 1000),
+      image: i % 2 === 0 ? '/vvv.jpg' : '/vsClown.jpg'
+    }));
+  }, [candleData, sortBy]);
 
   // Calculate total pages
-  // const totalPages = Math.ceil(allSortedData.length / VISIBLE_CANDLES);
+  const totalPages = Math.ceil(allSortedData.length / VISIBLE_CANDLES);
 
   // Get current page of users
-  // const currentPageData = React.useMemo(() => {
-  //   const startIdx = currentPage * VISIBLE_CANDLES;
-  //   const endIdx = startIdx + VISIBLE_CANDLES;
+  const currentPageData = React.useMemo(() => {
+    const startIdx = currentPage * VISIBLE_CANDLES;
+    const endIdx = startIdx + VISIBLE_CANDLES;
   
-  //   return allSortedData.slice(startIdx, endIdx);
-  // }, [allSortedData, currentPage]);
+    return allSortedData.slice(startIdx, endIdx);
+  }, [allSortedData, currentPage]);
 
   // Combine current page data with VCANDLE objects
-  // const combinedData = React.useMemo(() => {
-  //   if (vcandleObjects.length === 0) return [];
+  const combinedData = React.useMemo(() => {
+    if (vcandleObjects.length === 0) return [];
     
-  //   return currentPageData.map((userData, index) => {
-  //     const vcandleIndex = index < vcandleObjects.length ? index : index % vcandleObjects.length;
+    return currentPageData.map((userData, index) => {
+      const vcandleIndex = index < vcandleObjects.length ? index : index % vcandleObjects.length;
       
-  //     // Deep clone the candle object
-  //     const clonedCandle = vcandleObjects[vcandleIndex].object.clone(true);
+      // Deep clone the candle object
+      const clonedCandle = vcandleObjects[vcandleIndex].object.clone(true);
       
-  //     // Only clone materials if we're going to modify them (for labels with userData)
-  //     // This saves significant memory by reusing materials when possible
-  //     if (userData && (userData.image || userData.username || userData.userName)) {
-  //       clonedCandle.traverse((child) => {
-  //         if (child.material && child.name && child.name.toLowerCase().includes('label')) {
-  //           // Only clone materials for label meshes that will be modified
-  //           if (Array.isArray(child.material)) {
-  //             child.material = child.material.map(mat => mat.clone());
-  //           } else {
-  //             child.material = child.material.clone();
-  //           }
-  //         }
-  //       });
-  //     }
+      // Only clone materials if we're going to modify them (for labels with userData)
+      // This saves significant memory by reusing materials when possible
+      if (userData && (userData.image || userData.username || userData.userName)) {
+        clonedCandle.traverse((child) => {
+          if (child.material && child.name && child.name.toLowerCase().includes('label')) {
+            // Only clone materials for label meshes that will be modified
+            if (Array.isArray(child.material)) {
+              child.material = child.material.map(mat => mat.clone());
+            } else {
+              child.material = child.material.clone();
+            }
+          }
+        });
+      }
       
-  //     return {
-  //       userData: {
-  //         ...userData,
-  //         // Ensure we have all the expected fields
-  //         userName: userData.userName || userData.username || `Player ${index + 1}`,
-  //         image: userData.image || userData.profileImage || null,
-  //         burnedAmount: userData.burnedAmount || 0,
-  //         message: userData.message || '',
-  //         createdAt: userData.createdAt || new Date()
-  //       },
-  //       candleObject: clonedCandle,
-  //       originalName: `${vcandleObjects[vcandleIndex].name}-page${currentPage}-idx${index}`,
-  //       globalIndex: currentPage * VISIBLE_CANDLES + index // Track position in Illumin80
-  //     };
-  //   });
-  // }, [currentPageData, vcandleObjects, currentPage]);
+      return {
+        userData: {
+          ...userData,
+          // Ensure we have all the expected fields
+          userName: userData.userName || userData.username || `Player ${index + 1}`,
+          image: userData.image || userData.profileImage || null,
+          burnedAmount: userData.burnedAmount || 0,
+          message: userData.message || '',
+          createdAt: userData.createdAt || new Date()
+        },
+        candleObject: clonedCandle,
+        originalName: `${vcandleObjects[vcandleIndex].name}-page${currentPage}-idx${index}`,
+        globalIndex: currentPage * VISIBLE_CANDLES + index // Track position in Illumin80
+      };
+    });
+  }, [currentPageData, vcandleObjects, currentPage]);
   
   // Create a stable setCurrentPage function (moved here to avoid circular dependency)
   const handleSetCurrentPage = useCallback((page) => {
@@ -761,25 +764,25 @@ function MobileCandleOrbital({ candleData = [], onCandleClick, modelRef, onPagin
   
 
   // Pass pagination state up to parent
-  // useEffect(() => {
-  //   if (onPaginationChange) {
-  //     onPaginationChange({
-  //       currentPage,
-  //       totalPages,
-  //       setCurrentPage: handleSetCurrentPage,
-  //       visibleRange: {
-  //         start: currentPage * VISIBLE_CANDLES + 1,
-  //         end: Math.min((currentPage + 1) * VISIBLE_CANDLES, allSortedData.length)
-  //       },
-  //       total: allSortedData.length
-  //     });
-  //   }
-  // }, [currentPage, totalPages, allSortedData.length, onPaginationChange, handleSetCurrentPage]);
+  useEffect(() => {
+    if (onPaginationChange) {
+      onPaginationChange({
+        currentPage,
+        totalPages,
+        setCurrentPage: handleSetCurrentPage,
+        visibleRange: {
+          start: currentPage * VISIBLE_CANDLES + 1,
+          end: Math.min((currentPage + 1) * VISIBLE_CANDLES, allSortedData.length)
+        },
+        total: allSortedData.length
+      });
+    }
+  }, [currentPage, totalPages, allSortedData.length, onPaginationChange, handleSetCurrentPage]);
 
   return (
     <group ref={groupRef} position={[0, -0.3, 0]}>
       {/* The candles */}
-      {/* {combinedData.map((item, index) => {
+      {combinedData.map((item, index) => {
         const angle = (index / Math.min(combinedData.length, 8)) * Math.PI * 2;
         return (
           <OrbitalCandle
@@ -787,15 +790,15 @@ function MobileCandleOrbital({ candleData = [], onCandleClick, modelRef, onPagin
             angle={angle}
             radius={1} // Distance from center - increased for better spacing
             candleObject={item.candleObject}
-            // userData={item.userData}
+            userData={item.userData}
             index={index}
             onClick={onCandleClick}
-            // isLeader={index === 0}
+            isLeader={index === 0}
             transitionState={transitionState}
             isViewerOpen={isViewerOpen}
           />
         );
-      })} */}
+      })}
       
       {/* Central glow effect */}
       <pointLight
