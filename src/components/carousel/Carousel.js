@@ -711,10 +711,11 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           }}>
             An Icon for the Ages
           </h2> */}
+          
           {/* <div style={{ marginBottom: (isMobilePhone || isTabletPortrait) ? '1.5rem' : '0' }}> */}
             <SkewedHeading
               lines={[t('about.skewedHeading2.line1'), t('about.skewedHeading2.line2'), t('about.skewedHeading2.line3')]}
-              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "2.5rem" : "3rem"}
+              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "3rem" : isTabletPortrait ? "3rem" : "3rem"}
               color="#00ff9d"
               skewAngle={0}
               shadowColor="#000"
@@ -980,11 +981,12 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               marginTop: '5%',
               transformOrigin: 'center center',
             }}>
+              
             {/* Heading */}
             <SkewedHeading
               lines={[t('about.skewedHeading1.line1'), t('about.skewedHeading1.line2'), t('about.skewedHeading1.line3')]}
               colors={["#00ff00", "#f4e4c1", "#ffd700"]}
-              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "2.5rem" : "2.5rem"}
+              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "3rem" : isTabletPortrait ? "3rem" : "3rem"}
               isMobile={true}
               language={locale}
             />
@@ -993,14 +995,32 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             <div style={{
               width: '100%',
               // maxWidth: isMobilePhone ? 'min(350px, 80vw)' : '500px',
-              height: isMobilePhone ? 'min(400px, 50vh)' : isTabletPortrait ? '400px' : '550px',
+              height: isMobilePhone ? 'min(400px, 45vh)' : isTabletPortrait ? 'min(400px, 55vh)' : 'min(400px, 45vh)',
               marginBottom: '1rem',
               filter: 'drop-shadow(0 0 30px rgba(0, 221, 255, 0.4))',
               paddingTop: isMobilePhone ? '1rem' : '3rem'
             }}>
-              <HolyGrailPortal isMobile={isMobilePhone} />
+              <HolyGrailPortal isMobile={isMobilePhone} isTabletPortrait={isTabletPortrait} />
             </div>
-
+ <p style={{
+              fontFamily: "'Courier New', monospace",
+              fontSize: isTabletLandscape ? '1rem' : isTabletPortrait ? '0.9rem' : '1.2rem',
+              color: '#ffd700',
+              textAlign: 'center',
+               fontWeight: 'bold',
+              // marginTop: isTablet ? '1rem' : '1.5rem',
+              // marginBottom: isTablet ? '1.5rem' : '2rem',
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+              opacity: 0.9,
+              textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
+            }}>
+              {/* {"\u201C"}Uro, ergo lucreor.{"\u201D"}
+              <br/>
+              <span style={{fontSize: '0.7em', fontStyle: 'italic', textTransform: 'none', opacity: 0.8}}>(I burn, therefore I earn.)</span>
+              <br/>
+              <span style={{fontSize: '0.6em', fontStyle: 'normal', textTransform: 'none', opacity: 0.7, letterSpacing: '0.1em'}}>{"\u2014"} St. Gr80</span> */}
+            </p>
             {/* Interactive Scroll */}
             <div style={{
               ...(isMobilePhone ? {
@@ -1140,7 +1160,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             <SkewedHeading
               lines={[t('about.skewedHeading3.line1'), t('about.skewedHeading3.line2'), t('about.skewedHeading3.line3')]}
              // colors={["#d4af37", "#f4e4c1", "#ffd700"]}
-              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "2.5rem" : "3rem"}
+              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "3rem" : isTabletPortrait ? "3rem" : "3rem"}
               isMobile={true}
               language={locale}
             />
@@ -1544,7 +1564,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               style={{
                 position: 'relative',
                 width: '100%',
-                maxWidth: isTabletLandscape ? '400px' : isTabletPortrait ? '300px' : isSmallLandscape ? '430px' : '600px',
+                // maxWidth: isTabletLandscape ? '400px' : isTabletPortrait ? '300px' : isSmallLandscape ? '430px' : '600px',
                 aspectRatio: '4/3',
                 cursor: 'pointer',
                 transition: 'all 0.3s ease',
@@ -1648,7 +1668,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             {/* Heading for desktop */}
             <SkewedHeading
               lines={[t('about.skewedHeading2.line1'), t('about.skewedHeading2.line2'), t('about.skewedHeading2.line3')]}
-              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : isLargeTablet ? "3rem" : isTabletPortrait ? "2.5rem" : "3.5rem"}
+              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "3rem" : isTabletPortrait ? "3rem" : "3rem"}
               color="#00ff9d"
               skewAngle={0}
               shadowColor="#000"
@@ -1755,7 +1775,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               alignItems: 'center',
               justifyContent: 'center',
               gap: isTabletLandscape ? '2rem' : isTabletPortrait ? '1.5rem' : '1rem',
-              padding: isTabletLandscape ? '3% 3%' : isTabletPortrait ? '3% 2%' : isSmallLandscape ? '3% 3%' : '3% 5%',
+              padding: isTabletLandscape ? '3% 10%' : isTabletPortrait ? '3% 2%' : isSmallLandscape ? '3% 10%' : '3% 10%',
               minHeight: isCarouselMode ? '100vh' : '90vh',
               minWidth: isCarouselMode ? '100vw' : 'auto',
               position: 'relative',
@@ -1769,7 +1789,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               flexDirection: 'column',
               justifyContent: 'center',
               alignItems: 'center',
-              maxWidth: isTabletLandscape ? '800px' : isTabletPortrait ? '650px' : isSmallLandscape ? '550px' : '800px',
+              // maxWidth: isTabletLandscape ? '800px' : isTabletPortrait ? '650px' : isSmallLandscape ? '550px' : '800px',
               position: 'relative',
               overflow: 'visible',
             }}>
@@ -1778,8 +1798,8 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                 style={{
                   position: 'relative',
                   width: '100%',
-                  maxWidth: isTabletLandscape ? '550px' : isTabletPortrait ? '500px' : isSmallLandscape ? '480px' : '700px',
-                  height: isTabletLandscape ? '600px' : isTabletPortrait ? '550px' : isSmallLandscape ? '530px' : '750px',
+                  // maxWidth: isTabletLandscape ? '550px' : isTabletPortrait ? '500px' : isSmallLandscape ? '480px' : '700px',
+                  height: isTabletLandscape ? '30rem' : isTabletPortrait ? '35rem' : isSmallLandscape ? '35rem' : '35rem',
                   transition: 'all 0.3s ease',
                   // filter: 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.5))',
                   overflow: 'visible',
@@ -1801,7 +1821,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                   overflow: 'visible',
                   pointerEvents: 'auto',
                 }}>
-                  <HolyGrailPortal isMobile={false} />
+                  <HolyGrailPortal isMobile={false} isTabletPortrait={isTabletPortrait} />
                 </div>
               </div>
             </div>
@@ -1814,17 +1834,36 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               justifyContent: 'center',
               alignItems: 'center',
               maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : isSmallLandscape ? '450px' : '550px',
-              paddingLeft: isTabletLandscape ? '1rem' : isSmallLandscape ? '1rem' : '2rem',
+              paddingLeft: isTabletLandscape ? '1rem' : isSmallLandscape ? '1rem' : '0',
+              marginLeft: isTabletPortrait ? '-5rem' : '-10rem'
             }}>
               {/* TranslatableDropInTitle */}
               <SkewedHeading
                 lines={[t('about.skewedHeading1.line1'), t('about.skewedHeading1.line2'), t('about.skewedHeading1.line3')]}
               colors={["#00ff00", "#f4e4c1", "#ffd700"]}
-                fontSize={{ mobile: "2rem", desktop: isTabletLandscape ? "2.0rem" : isSmallLandscape ? "2.2rem" : "3rem" }}
+                fontSize={{ mobile: "1.6rem", desktop: isTabletLandscape ? "2.5rem" : isSmallLandscape ? "3rem" : "3rem" }}
                 isMobile={false}
                 language={locale}
               />
-           
+            <p style={{
+              fontFamily: "'Courier New', monospace",
+              fontSize: isTabletLandscape ? '1rem' : isTabletPortrait ? '0.9rem' : '1.2rem',
+              color: '#ffd700',
+              textAlign: 'center',
+               fontWeight: 'bold',
+              // marginTop: isTablet ? '1rem' : '1.5rem',
+              // marginBottom: isTablet ? '1.5rem' : '2rem',
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+              opacity: 0.9,
+              textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
+            }}>
+              {"\u201C"}Prosperitas vera non nascitur ex dolo, sed ex aequitate et benevolentia.{"\u201D"}
+              <br/>
+              <span style={{fontSize: '0.7em', fontStyle: 'italic', textTransform: 'none', opacity: 0.8}}>(True prosperity is not born of deceit, but of fairness and goodwill.)</span>
+
+              <span style={{fontSize: '0.6em', fontStyle: 'normal', textTransform: 'none', opacity: 0.7, letterSpacing: '0.1em'}}>{"\u2014"} St. Gr80</span>
+            </p>
               {/* Interactive Scroll */}
               <div style={{
                 display: 'flex',
@@ -2134,7 +2173,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               <SkewedHeading
                  lines={[t('about.skewedHeading3.line1'), t('about.skewedHeading3.line2'), t('about.skewedHeading3.line3')]}
                 colors={["#00ff00", "#f4e4c1", "#ffd700"]}
-              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "2.5rem" : isSmallLandscape ? "2.5rem" : "3rem"}
+              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "3rem" : isTabletPortrait ? "3rem" : isSmallLandscape ? "3rem" : "3rem"}
                 isMobile={false}
                 language={locale}
                   //  scramble={true}

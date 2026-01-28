@@ -14,13 +14,15 @@ const client = createThirdwebClient({
 const ThirdwebBuyModal = ({ isOpen, onClose }) => {
   const [glitchActive, setGlitchActive] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isSmallPhone, setIsSmallPhone] = useState(false);
   const { t } = useLanguage();
-  
 
-  
+
+
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 640);
+      setIsSmallPhone(window.innerWidth < 400 || window.innerHeight < 700);
     };
     checkMobile();
     window.addEventListener('resize', checkMobile);
@@ -173,18 +175,18 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
         }} />
         
         {/* Modal Content */}
-        <div 
+        <div
           // className={glitchActive ? 'modal-glitch' : ''}
           style={{
             position: 'relative',
             background: 'linear-gradient(135deg, #93276a, #3434a7)',
-            clipPath: 'polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))',
-            padding: isMobile ? '3.5rem 1.5rem 2rem' : '3rem',
+            clipPath: isSmallPhone ? 'none' : 'polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))',
+            padding: isSmallPhone ? '2.5rem 1rem 1rem' : isMobile ? '3.5rem 1.5rem 2rem' : '3rem',
             maxWidth: '500px',
-            width: '90%',
-            maxHeight: isMobile ? '85vh' : '90vh',
+            width: isSmallPhone ? '95%' : '90%',
+            maxHeight: isSmallPhone ? '95vh' : isMobile ? '85vh' : '90vh',
             overflowY: 'auto',
-            boxShadow: glitchActive 
+            boxShadow: glitchActive
               ? '5px 5px 0 #ff184c, -5px -5px 0 #00e572, 0 0 50px rgba(139, 0, 255, 0.5)'
               : '3px 3px 0 #fded00, -3px -3px 0 #00e572, 0 0 30px rgba(255, 24, 76, 0.5)',
             transition: 'box-shadow 0.3s',
@@ -200,14 +202,14 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
             }}
             style={{
               position: 'absolute',
-              top: isMobile ? '15px' : '10px',
-              right: isMobile ? '15px' : '10px',
+              top: isSmallPhone ? '8px' : isMobile ? '15px' : '10px',
+              right: isSmallPhone ? '8px' : isMobile ? '15px' : '10px',
               background: '#000',
               border: 'none',
               color: '#000',
-              fontSize: isMobile ? '28px' : '24px',
-              width: isMobile ? '50px' : '40px',
-              height: isMobile ? '50px' : '40px',
+              fontSize: isSmallPhone ? '20px' : isMobile ? '28px' : '24px',
+              width: isSmallPhone ? '36px' : isMobile ? '50px' : '40px',
+              height: isSmallPhone ? '36px' : isMobile ? '50px' : '40px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -263,11 +265,11 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
           <h2 className="title-glitch" style={{
             color: '#fff',
             textAlign: 'center',
-            marginBottom: isMobile ? '1.5rem' : '2rem',
-            fontSize: isMobile ? '1.5rem' : '2rem',
+            marginBottom: isSmallPhone ? '0.75rem' : isMobile ? '1.5rem' : '2rem',
+            fontSize: isSmallPhone ? '1.2rem' : isMobile ? '1.5rem' : '2rem',
             fontFamily: 'monospace',
             textTransform: 'uppercase',
-            letterSpacing: '4px',
+            letterSpacing: isSmallPhone ? '2px' : '4px',
             fontWeight: '900',
             position: 'relative',
           }}>
@@ -382,10 +384,10 @@ style={{borderRadius: '0px'}}
           <p style={{
             color: '#00e572',
             textAlign: 'center',
-            marginTop: '1.5rem',
-            fontSize: '10px',
+            marginTop: isSmallPhone ? '0.75rem' : '1.5rem',
+            fontSize: isSmallPhone ? '8px' : '10px',
             fontFamily: 'monospace',
-            letterSpacing: '2px',
+            letterSpacing: isSmallPhone ? '1px' : '2px',
             textTransform: 'uppercase',
             textShadow: '0 0 10px rgba(0, 229, 114, 0.5)',
           }}>

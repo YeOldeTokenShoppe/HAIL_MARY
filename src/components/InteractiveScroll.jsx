@@ -55,7 +55,7 @@ function createTextCanvas() {
   // Attribution
   ctx.font = 'bold 160px "Courier New", monospace';
   ctx.fillStyle = "rgba(50, 35, 10, 0.7)";
-  ctx.fillText("\u2014 St. Gr80", cx, y);
+  ctx.fillText("\u2014 St. GR80", cx, y);
   y += 216;
 
   // Gold divider
@@ -77,19 +77,19 @@ function createTextCanvas() {
   const lines = [
     { text: "We are trustless\u2014",        font: 'bold 190px Georgia, serif',   color: "#3a2a0a" },
     { text: "But we believe",               font: 'bold italic 162px Georgia, serif', color: "rgba(30, 18, 5, 0.92)" },
-    { text: "In code and cryptography.",     font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
-    { text: "In purity of circuitry.",       font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
-    { text: "In virtue over villainy.",      font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
-    { text: "In the virtual machine.",       font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
+    { text: "In code and cryptography",     font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
+    { text: "In the purity of circuitry",       font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
+    { text: "In virtue over villainy",      font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
+    { text: "In the virtual machine",       font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
     { text: "",                              font: '180px Georgia, serif',        color: "transparent", gap: 72 },
-    { text: "Mater ex machina.",             font: 'bold italic 199px Georgia, serif', color: "#916e29ff" },
+    { text: "Mater ex machina",             font: 'bold italic 210px Georgia, serif', color: "#916e29ff" },
     { text: "",                              font: '180px Georgia, serif',        color: "transparent", gap: 72 },
     { text: "Incorruptible integrity",       font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
     { text: "An avatar of resistance",       font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
-    { text: "in a market built to break you.", font: 'bold 180px Georgia, serif', color: "rgba(30, 18, 5, 0.9)" },
+    { text: "in a market built to break you", font: 'bold 180px Georgia, serif', color: "rgba(30, 18, 5, 0.9)" },
     { text: "",                              font: '180px Georgia, serif',        color: "transparent", gap: 72 },
     { text: "Hold RL80 in your wallet as",   font: 'bold italic 180px Georgia, serif', color: "rgba(30, 18, 5, 0.9)" },
-    { text: "a rosary for prosperity.",      font: 'bold italic 180px Georgia, serif', color: "rgba(30, 18, 5, 0.9)" },
+    { text: "a rosary for prosperity",      font: 'bold italic 180px Georgia, serif', color: "rgba(30, 18, 5, 0.9)" },
   ];
 
   for (const line of lines) {
@@ -211,12 +211,122 @@ export default function InteractiveScroll({ isMobile, isSmallPhone }) {
   const openHeight = isMobile ? "75vh" : "80vh";
   const modelScale = isSmallPhone ? 5.0 : isMobile ? 4.8 : 5.1;
 
+  const containerWidth = isSmallPhone ? 150 : isMobile ? 175 : 220;
+  const containerHeight = isSmallPhone ? 100 : isMobile ? 115 : 140;
+
+  // Generate particles outside conditional render to avoid hooks violation
+  const particles = useMemo(() => {
+    const positions = [
+      // Edges
+      { x: 0.15, y: 0.1 }, { x: 0.5, y: 0.05 }, { x: 0.85, y: 0.12 },
+      { x: 0.08, y: 0.5 }, { x: 0.92, y: 0.5 },
+      { x: 0.15, y: 0.9 }, { x: 0.5, y: 0.95 }, { x: 0.85, y: 0.88 },
+      // Inner ring
+      { x: 0.25, y: 0.25 }, { x: 0.5, y: 0.2 }, { x: 0.75, y: 0.25 },
+      { x: 0.2, y: 0.5 }, { x: 0.8, y: 0.5 },
+      { x: 0.25, y: 0.75 }, { x: 0.5, y: 0.8 }, { x: 0.75, y: 0.75 },
+      // Center area
+      { x: 0.35, y: 0.35 }, { x: 0.65, y: 0.35 },
+      { x: 0.3, y: 0.5 }, { x: 0.5, y: 0.5 }, { x: 0.7, y: 0.5 },
+      { x: 0.35, y: 0.65 }, { x: 0.65, y: 0.65 },
+      { x: 0.4, y: 0.42 }, { x: 0.6, y: 0.58 },
+      { x: 0.45, y: 0.3 }, { x: 0.55, y: 0.7 },
+    ];
+
+    const colors = [
+      "rgba(255, 215, 0, 0.85)",
+      "rgba(255, 190, 60, 0.75)",
+      "rgba(255, 240, 180, 0.9)",
+      "rgba(218, 165, 32, 0.7)",
+      "rgba(255, 223, 128, 0.8)",
+    ];
+
+    return positions.map((pos, i) => {
+      const size = 1 + (i % 3) * 0.5;
+      const delay = (i * 0.3) % 6;
+      const duration = 2 + (i % 4) * 0.8;
+      const color = colors[i % colors.length];
+
+      return (
+        <div
+          key={i}
+          style={{
+            position: "absolute",
+            left: pos.x * containerWidth,
+            top: pos.y * containerHeight,
+            width: size,
+            height: size,
+            borderRadius: "50%",
+            backgroundColor: color,
+            color: color,
+            animation: `particleTwinkle ${duration}s ease-in-out ${delay}s infinite, particleGlow ${duration}s ease-in-out ${delay}s infinite`,
+            pointerEvents: "none",
+          }}
+        />
+      );
+    });
+  }, [isSmallPhone, isMobile, containerWidth, containerHeight]);
+
+  const sparkles = useMemo(() => {
+    const sparklePositions = [
+      // Outer
+      { x: 0.15, y: 0.3 }, { x: 0.85, y: 0.7 },
+      { x: 0.3, y: 0.1 }, { x: 0.7, y: 0.9 },
+      // Middle
+      { x: 0.35, y: 0.45 }, { x: 0.65, y: 0.55 },
+      { x: 0.4, y: 0.7 }, { x: 0.6, y: 0.3 },
+      // Center
+      { x: 0.5, y: 0.45 }, { x: 0.45, y: 0.55 },
+    ];
+
+    return sparklePositions.map((pos, i) => {
+      const delay = i * 0.4 + 0.2;
+      const duration = 1.5 + (i % 3) * 0.5;
+
+      return (
+        <div
+          key={`sparkle-${i}`}
+          style={{
+            position: "absolute",
+            left: pos.x * containerWidth,
+            top: pos.y * containerHeight,
+            width: 1.5,
+            height: 1.5,
+            borderRadius: "50%",
+            backgroundColor: "rgba(255, 255, 255, 0.9)",
+            boxShadow: "0 0 3px 1px rgba(255, 255, 255, 0.4)",
+            animation: `sparkle ${duration}s ease-in-out ${delay}s infinite`,
+            pointerEvents: "none",
+          }}
+        />
+      );
+    });
+  }, [isSmallPhone, isMobile, containerWidth, containerHeight]);
+
   return (
     <>
     <style>{`
       @keyframes scrollPulse {
         0%, 100% { filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.15)); }
         50% { filter: drop-shadow(0 0 18px rgba(255, 215, 0, 0.5)); }
+      }
+      @keyframes particleTwinkle {
+        0%, 100% {
+          opacity: 0;
+          transform: scale(0.5);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+      @keyframes particleGlow {
+        0%, 100% { box-shadow: 0 0 2px 1px currentColor; }
+        50% { box-shadow: 0 0 4px 2px currentColor; }
+      }
+      @keyframes sparkle {
+        0%, 100% { opacity: 0; transform: scale(0.6); }
+        50% { opacity: 0.9; transform: scale(1.1); }
       }
     `}</style>
 
@@ -235,25 +345,50 @@ export default function InteractiveScroll({ isMobile, isSmallPhone }) {
           animation: "scrollPulse 3s ease-in-out infinite",
         }}
       >
-        <img
-          src="/images/scroll.webp"
-          alt="Tap to read scroll"
-          style={{
-            width: isSmallPhone ? 120 : isMobile ? 140 : 180,
-            height: "auto",
-            objectFit: "contain",
-          }}
-        />
-        <span style={{
-          fontFamily: "Georgia, serif",
-          fontSize: isSmallPhone ? "0.65rem" : isMobile ? "0.7rem" : "0.8rem",
-          color: "rgba(255, 255, 255, 0.35)",
-          fontStyle: "italic",
-          letterSpacing: "0.05em",
-          marginTop: "0.3rem",
-          marginBottom: '1rem'
+        {/* Particle container - sized to hold particles close to scroll */}
+        <div style={{
+          position: "relative",
+          width: containerWidth,
+          height: containerHeight,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}>
-          tap to read
+          {/* Magical particles scattered all around */}
+          {particles}
+
+          {/* Sparkle particles scattered around */}
+          {sparkles}
+
+          {/* Scroll image centered in particle field */}
+          <img
+            src="/images/scroll.webp"
+            alt="Tap to read scroll"
+            style={{
+              // width: isSmallPhone ? '15rem' : isMobile ? 140 : 180,
+              width: '14rem',
+              height: "auto",
+              objectFit: "contain",
+              position: "relative",
+              zIndex: 1,
+            }}
+          />
+        </div>
+
+        <span style={{
+          fontFamily: "Fjalla One",
+          fontSize: isSmallPhone ? "0.7rem" : isMobile ? "0.75rem" : "0.85rem",
+          color: "white",
+          fontStyle: "italic",
+          letterSpacing: "0.08em",
+          marginTop: "0.4rem",
+          marginBottom: '1rem',
+          textShadow: "0 0 10px rgba(255, 215, 0, 0.3)",
+          position: 'relative',
+          bottom: '7.5rem',
+          right: '-3.5rem'
+        }}>
+          Read the Credo
         </span>
       </div>
     )}

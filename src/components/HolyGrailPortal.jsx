@@ -244,7 +244,7 @@ function BreathSmokeDebug({ isMobile, bullObject }) {
 --- end leva debug version */
 
 // Main Portal Scene
-function PortalScene({ isMobile = false }) {
+function PortalScene({ isMobile = false, isTabletPortrait = false }) {
   const [bullObject, setBullObject] = useState(null);
   const [clippedBullObject, setClippedBullObject] = useState(null);
   const grailScale = isMobile ? 0.65 : 0.65;
@@ -257,7 +257,7 @@ function PortalScene({ isMobile = false }) {
 
   // Position for clipped model (accounting for LaptopFrame transforms)
   const laptopPos = [0, -0.4, 0];
-  const laptopScale = isMobile ? 1.3 : 1.15;
+  const laptopScale = isMobile ? 1.3 : isTabletPortrait ? 1.5 : 1.15;
   const portalPos = [0, 0.65, -0.15];
 
   // Overall rotation to accentuate 3D dimensionality
@@ -325,7 +325,7 @@ function PortalScene({ isMobile = false }) {
 }
 
 // Main exported component
-export default function HolyGrailPortal({ isMobile = false }) {
+export default function HolyGrailPortal({ isMobile = false, isTabletPortrait = false }) {
   const [clientReady, setClientReady] = useState(false);
 
   useEffect(() => {
@@ -369,7 +369,7 @@ export default function HolyGrailPortal({ isMobile = false }) {
       >
         <Suspense fallback={null}>
           {/* <ambientLight intensity={0.3} /> */}
-          <PortalScene isMobile={isMobile} />
+          <PortalScene isMobile={isMobile} isTabletPortrait={isTabletPortrait} />
           <CameraControls
             makeDefault
             minAzimuthAngle={-Math.PI / 2.5}
