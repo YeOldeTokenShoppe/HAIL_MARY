@@ -517,41 +517,113 @@ export default function CommunionPage() {
         </div>
       )}
 
-      {/* Help Button - bottom left */}
-      <button
-        onClick={() => setShowHelp(true)}
-        aria-label="Help"
+      {/* Social Links + Help Button - right side */}
+      <div
         style={{
           position: "fixed",
           bottom: "30px",
-          left: "30px",
-          // zIndex: 0,
-          width: "44px",
-          height: "44px",
-          borderRadius: "50%",
-          border: "2px solid #d4af37",
-          background: "rgba(13, 10, 20, 0.85)",
-          color: "#d4af37",
-          fontSize: "1.4rem",
-          fontWeight: "bold",
-          cursor: "pointer",
+          right: "30px",
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
-          justifyContent: "center",
-          boxShadow: "0 0 12px rgba(212, 175, 55, 0.3)",
-          transition: "box-shadow 0.2s, transform 0.2s",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.boxShadow = "0 0 20px rgba(212, 175, 55, 0.6)";
-          e.currentTarget.style.transform = "scale(1.1)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.boxShadow = "0 0 12px rgba(212, 175, 55, 0.3)";
-          e.currentTarget.style.transform = "scale(1)";
+          gap: "12px",
+          zIndex: 10,
         }}
       >
-        ?
-      </button>
+        {/* Email */}
+        <a
+          href="mailto:411@rl80.com"
+          aria-label="Email"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "44px",
+            height: "44px",
+            borderRadius: "50%",
+            border: "1px solid rgba(212, 175, 55, 0.5)",
+            background: "rgba(13, 10, 20, 0.85)",
+            transition: "all 0.3s ease",
+            cursor: "pointer",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.1)";
+            e.currentTarget.style.boxShadow = "0 0 15px rgba(212, 175, 55, 0.4)";
+            e.currentTarget.style.transform = "scale(1.1)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "rgba(13, 10, 20, 0.85)";
+            e.currentTarget.style.boxShadow = "none";
+            e.currentTarget.style.transform = "scale(1)";
+          }}
+        >
+          <svg style={{ width: "20px", height: "20px", filter: "brightness(0) invert(1)" }} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"/><rect x="2" y="4" width="20" height="16" rx="2"/></svg>
+        </a>
+
+        {/* X (Twitter) */}
+        <a
+          href="https://x.com/rlaborare"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="X (Twitter)"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "44px",
+            height: "44px",
+            borderRadius: "50%",
+            border: "1px solid rgba(212, 175, 55, 0.5)",
+            background: "rgba(13, 10, 20, 0.85)",
+            transition: "all 0.3s ease",
+            cursor: "pointer",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.1)";
+            e.currentTarget.style.boxShadow = "0 0 15px rgba(212, 175, 55, 0.4)";
+            e.currentTarget.style.transform = "scale(1.1)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "rgba(13, 10, 20, 0.85)";
+            e.currentTarget.style.boxShadow = "none";
+            e.currentTarget.style.transform = "scale(1)";
+          }}
+        >
+          <img src="/images/x_logo.svg" alt="X (Twitter)" style={{ width: "18px", height: "18px", filter: "brightness(0) invert(1)" }} />
+        </a>
+
+        {/* Help Button */}
+        <button
+          onClick={() => setShowHelp(true)}
+          aria-label="Help"
+          style={{
+            width: "44px",
+            height: "44px",
+            borderRadius: "50%",
+            border: "2px solid #d4af37",
+            background: "rgba(13, 10, 20, 0.85)",
+            color: "#d4af37",
+            fontSize: "1.4rem",
+            fontWeight: "bold",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 0 12px rgba(212, 175, 55, 0.3)",
+            transition: "box-shadow 0.2s, transform 0.2s",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.boxShadow = "0 0 20px rgba(212, 175, 55, 0.6)";
+            e.currentTarget.style.transform = "scale(1.1)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.boxShadow = "0 0 12px rgba(212, 175, 55, 0.3)";
+            e.currentTarget.style.transform = "scale(1)";
+          }}
+        >
+          ?
+        </button>
+      </div>
 
       {/* Help Modal */}
       {showHelp &&

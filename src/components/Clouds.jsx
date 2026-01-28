@@ -271,6 +271,23 @@ const DarkCloudsComponent = React.forwardRef(({ onLoad, is80sMode, ...props }, r
                 texture={cloudTexture}
                 frustumCulled={false}
               />
+              {/* <Cloud 
+                ref={cloud0}
+                receiveShadow={false}
+                castShadow={false}
+                seed={1}
+                segments={10}
+                volume={15}
+                opacity={0.95}
+                fade={1}
+                growth={0}
+                speed={0.00}
+                bounds={[2.5, 2, 3]}
+                color={is80sMode ? pinkCloudColor : whiteCloudColor}
+                position={[-1, 0, -4]}
+                texture={cloudTexture}
+                frustumCulled={false}
+              /> */}
   {/* <Cloud
     seed={99}  // Different seed for different shape
     segments={20}  // More segments for visibility

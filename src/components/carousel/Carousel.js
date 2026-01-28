@@ -20,6 +20,7 @@ import StarfieldStatueScene from '../StarfieldStatueScene'
 import HolyGrail from '@/components/HolyGrail'
 import HolyGrailPortal from '@/components/HolyGrailPortal'
 import HolyGrailChalice from '@/components/HolyGrailChalice'
+import InteractiveScroll from '@/components/InteractiveScroll'
 import TranslatableDropInTitle from '@/components/TranslatableDropInTitle'
 import Footer from '@/components/Footer'
 
@@ -999,7 +1000,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               <HolyGrailPortal isMobile={isMobilePhone} />
             </div>
 
-            {/* Description - below arrows on mobile */}
+            {/* Interactive Scroll */}
             <div style={{
               ...(isMobilePhone ? {
                 position: 'absolute',
@@ -1011,67 +1012,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               flexDirection: 'column',
               alignItems: 'center',
             }}>
-            <p style={{
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-              fontSize: isSmallPhone ? '0.9rem' : '1rem',
-              color: 'rgba(255, 255, 255, 0.85)',
-              lineHeight: isSmallPhone ? '1.3' : '1.3',
-              marginTop: '-0.5rem',
-              maxWidth: isMobilePhone ? '320px' : '450px',
-              textAlign: 'center',
-              // padding: '0 1rem',
-            }}>
-              {isMobilePhone ? (
-                
-                <>
-                 <span style={{
-              display: 'block',
-              fontFamily: "'Courier New', monospace",
-              fontSize: isTabletLandscape ? '1rem' : isTabletPortrait ? '0.9rem' : '0.8rem',
-              fontWeight: 'bold',
-              color: '#ffd700',
-              textAlign: 'center',
-              marginBottom: '1rem',
-              letterSpacing: '0.05em',
-              textTransform: 'uppercase',
-              opacity: 0.9,
-              textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
-            }}>
-              {"\u201C"}Bene agere est vere lucrari.{"\u201D"}
-              <br/>
-              <span style={{fontSize: '0.7em', fontStyle: 'italic', textTransform: 'none', opacity: 0.8}}>(To act well is to profit truly.)</span>
-              <br/>
-              <span style={{fontSize: '0.6em', fontStyle: 'normal', textTransform: 'none', opacity: 0.7, letterSpacing: '0.1em', textAlign: 'right'}}>{"\u2014"} St. Gr80</span>
-            </span>
-                
-                The RL80 token is designed on first principles: decentralized trust, fair distribution, direct access, immutable and incorruptible - the very same qualities associated with the beloved icon and patron saint of portfolios.
-</>
-              ) : (
-                <>
-                
-                
-             <span style={{
-              display: 'block',
-              fontFamily: "'Courier New', monospace",
-              fontSize: isTabletLandscape ? '1rem' : isTabletPortrait ? '0.9rem' : '1.2rem',
-              color: '#ffd700',
-              textAlign: 'center',
-              fontWeight: 'bold',
-              letterSpacing: '0.05em',
-              textTransform: 'uppercase',
-              marginBottom: '1rem',
-              opacity: 0.9,
-              textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
-            }}>
-              {"\u201C"}Bene agere est vere lucrari.{"\u201D"}
-              <br/>
-              <span style={{fontSize: '0.7em', fontStyle: 'italic', textTransform: 'none', opacity: 0.8}}>(To act well is to profit truly.)</span>
-              <br/>
-              <span style={{fontSize: '0.6em', fontStyle: 'normal', textTransform: 'none', opacity: 0.7, letterSpacing: '0.1em', textAlign: 'right'}}>{"\u2014"} St. Gr80</span>
-            </span>
-RL80 is designed on first principles: decentralized trust, fair distribution, direct access, immutable and incorruptible - the very same qualities associated with the RL80 token's namesake and patron saint</>
-              )}
-            </p>
+              <InteractiveScroll isMobile={isMobilePhone} isSmallPhone={isSmallPhone} />
     
 
             {/* Tokenomics Navigation - tablet portrait only */}
@@ -1883,39 +1824,16 @@ RL80 is designed on first principles: decentralized trust, fair distribution, di
                 language={locale}
               />
            
-             <p style={{
-              fontFamily: "'Courier New', monospace",
-              fontSize: isTabletLandscape ? '1rem' : isTabletPortrait ? '0.9rem' : '1.2rem',
-              color: '#ffd700',
-              textAlign: 'center',
-               fontWeight: 'bold',
-              // marginTop: isTablet ? '1rem' : '1.5rem',
-              // marginBottom: isTablet ? '1.5rem' : '2rem',
-              marginBottom: '-1rem',
-              letterSpacing: '0.05em',
-              textTransform: 'uppercase',
-              opacity: 0.9,
-              textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
-            }}>
-              {"\u201C"}Bene agere est vere lucrari.{"\u201D"}
-              <br/>
-              <span style={{fontSize: '0.7em', fontStyle: 'italic', textTransform: 'none', opacity: 0.8}}>(To act well is to profit truly.)</span>
-              <br/>
-              <span style={{fontSize: '0.6em', fontStyle: 'normal', textTransform: 'none', opacity: 0.7, letterSpacing: '0.1em', textAlign: 'right'}}>{"\u2014"} St. Gr80</span>
-            </p>
-            
-              {/* Description text */}
-              <p style={{
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-                fontSize: isTabletLandscape ? '0.95rem' : isTabletPortrait ? '0.9rem' : '1.1rem',
-                color: 'rgba(255, 255, 255, 0.85)',
-                lineHeight: '1.4',
-                marginTop: '2rem',
+              {/* Interactive Scroll */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                marginTop: '1rem',
                 marginBottom: isTablet ? '1.5rem' : '2rem',
-                maxWidth: '500px',
-                textAlign: 'center'
               }}>
-The RL80 token was created on these principles: decentralized trust, fair distribution, direct access, and systems that are immutable and incorruptible—the very same qualities associated with the beloved icon and patron saint of portfolios, 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙.</p>
+                <InteractiveScroll isMobile={false} isSmallPhone={false} />
+              </div>
             <div
               className="navigation-group"
               style={{

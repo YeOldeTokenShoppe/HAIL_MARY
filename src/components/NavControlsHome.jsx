@@ -47,17 +47,15 @@ export default function NavControlsHome({
     return () => clearInterval(interval);
   }, []);
 
-  // First-visit pulse hint for the hamburger menu
+  // First-visit pulse hint for the hamburger menu (only on /about)
   useEffect(() => {
-    // TODO: restore localStorage gate after testing
-    // try {
-    //   const seen = localStorage.getItem('hasSeenMenuHint');
-    //   if (!seen) {
+    if (pathname !== '/about') {
+      setShowMenuHint(false);
+      return;
+    }
     const timer = setTimeout(() => setShowMenuHint(true), 2000);
     return () => clearTimeout(timer);
-    //   }
-    // } catch {}
-  }, []);
+  }, [pathname]);
 
   // Dismiss hint when menu is opened
   useEffect(() => {
