@@ -977,6 +977,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               alignItems: 'center',
               transform: (!isMobilePhone && isPortraitOrientation) ? 'scale(1)' : 'none',
               minWidth: '25rem',
+              marginTop: '5%',
               transformOrigin: 'center center',
             }}>
             {/* Heading */}
@@ -992,8 +993,8 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             <div style={{
               width: '100%',
               // maxWidth: isMobilePhone ? 'min(350px, 80vw)' : '500px',
-              height: isMobilePhone ? 'min(400px, 40vh)' : isTabletPortrait ? '400px' : '550px',
-              marginTop: '0.5rem',
+              height: isMobilePhone ? 'min(400px, 50vh)' : isTabletPortrait ? '400px' : '550px',
+              marginBottom: '1rem',
               filter: 'drop-shadow(0 0 30px rgba(0, 221, 255, 0.4))',
               paddingTop: isMobilePhone ? '1rem' : '3rem'
             }}>

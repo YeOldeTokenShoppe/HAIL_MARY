@@ -35,7 +35,7 @@ function createTextCanvas() {
   ctx.scale(-1, -1);
 
   const cx = w * 0.49;
-  let y = h * 0.11;
+  let y = h * 0.09;
 
   // Latin quote
   ctx.textAlign = "center";
@@ -53,7 +53,7 @@ function createTextCanvas() {
   y += 198;
 
   // Attribution
-  ctx.font = 'bold 117px "Courier New", monospace';
+  ctx.font = 'bold 160px "Courier New", monospace';
   ctx.fillStyle = "rgba(50, 35, 10, 0.7)";
   ctx.fillText("\u2014 St. Gr80", cx, y);
   y += 216;
@@ -75,21 +75,21 @@ function createTextCanvas() {
 
   // Poem
   const lines = [
-    { text: "We are trustless\u2014",        font: 'bold 171px Georgia, serif',   color: "#3a2a0a" },
+    { text: "We are trustless\u2014",        font: 'bold 190px Georgia, serif',   color: "#3a2a0a" },
     { text: "But we believe",               font: 'bold italic 162px Georgia, serif', color: "rgba(30, 18, 5, 0.92)" },
-    { text: "In code and cryptography.",     font: 'bold 153px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
-    { text: "In purity of circuitry.",       font: 'bold 153px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
-    { text: "In virtue over villainy.",      font: 'bold 153px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
-    { text: "In the virtual machine.",       font: 'bold 153px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
-    { text: "",                              font: '153px Georgia, serif',        color: "transparent", gap: 72 },
-    { text: "Mater ex machina.",             font: 'bold italic 189px Georgia, serif', color: "#3a2a0a" },
-    { text: "",                              font: '153px Georgia, serif',        color: "transparent", gap: 72 },
-    { text: "Incorruptible integrity",       font: 'bold 153px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
-    { text: "An avatar of resistance",       font: 'bold 153px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
-    { text: "in a market built to break you.", font: 'bold 153px Georgia, serif', color: "rgba(30, 18, 5, 0.9)" },
-    { text: "",                              font: '153px Georgia, serif',        color: "transparent", gap: 72 },
-    { text: "Hold RL80 in your wallet as",   font: 'bold italic 153px Georgia, serif', color: "rgba(30, 18, 5, 0.9)" },
-    { text: "a rosary for prosperity.",      font: 'bold italic 153px Georgia, serif', color: "rgba(30, 18, 5, 0.9)" },
+    { text: "In code and cryptography.",     font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
+    { text: "In purity of circuitry.",       font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
+    { text: "In virtue over villainy.",      font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
+    { text: "In the virtual machine.",       font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
+    { text: "",                              font: '180px Georgia, serif',        color: "transparent", gap: 72 },
+    { text: "Mater ex machina.",             font: 'bold italic 199px Georgia, serif', color: "#916e29ff" },
+    { text: "",                              font: '180px Georgia, serif',        color: "transparent", gap: 72 },
+    { text: "Incorruptible integrity",       font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
+    { text: "An avatar of resistance",       font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
+    { text: "in a market built to break you.", font: 'bold 180px Georgia, serif', color: "rgba(30, 18, 5, 0.9)" },
+    { text: "",                              font: '180px Georgia, serif',        color: "transparent", gap: 72 },
+    { text: "Hold RL80 in your wallet as",   font: 'bold italic 180px Georgia, serif', color: "rgba(30, 18, 5, 0.9)" },
+    { text: "a rosary for prosperity.",      font: 'bold italic 180px Georgia, serif', color: "rgba(30, 18, 5, 0.9)" },
   ];
 
   for (const line of lines) {
@@ -208,8 +208,8 @@ export default function InteractiveScroll({ isMobile, isSmallPhone }) {
   const open = useCallback(() => setIsOpen(true), []);
   const close = useCallback(() => setIsOpen(false), []);
 
-  const openHeight = isMobile ? "70vh" : "80vh";
-  const modelScale = isSmallPhone ? 4.7 : isMobile ? 4.8 : 4.8;
+  const openHeight = isMobile ? "75vh" : "80vh";
+  const modelScale = isSmallPhone ? 5.0 : isMobile ? 4.8 : 5.1;
 
   return (
     <>
@@ -246,11 +246,12 @@ export default function InteractiveScroll({ isMobile, isSmallPhone }) {
         />
         <span style={{
           fontFamily: "Georgia, serif",
-          fontSize: isSmallPhone ? "0.55rem" : isMobile ? "0.6rem" : "0.7rem",
+          fontSize: isSmallPhone ? "0.65rem" : isMobile ? "0.7rem" : "0.8rem",
           color: "rgba(255, 255, 255, 0.35)",
           fontStyle: "italic",
           letterSpacing: "0.05em",
           marginTop: "0.3rem",
+          marginBottom: '1rem'
         }}>
           tap to read
         </span>
@@ -302,7 +303,7 @@ export default function InteractiveScroll({ isMobile, isSmallPhone }) {
           onClick={close}
           style={{
             textAlign: "center",
-            fontSize: "0.7rem",
+            fontSize: "0.8rem",
             color: "rgba(255, 255, 255, 0.4)",
             margin: "0.4rem 0 0",
             letterSpacing: "0.08em",
