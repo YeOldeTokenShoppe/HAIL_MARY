@@ -35,6 +35,10 @@
       "line2": "THỰC TẾ",
       "line3": " "
     },
+    "morphing": {
+      "line1": "của bạn",
+      "line2": "thực tế"
+    },
     "scrollPrompt": "cuộn lên để tiếp tục"
   },
   "navigation": {
@@ -123,5 +127,94 @@
   "buyModal": {
     "title": "MUA_RL80_",
     "secureTransaction": "<GIAO_THỨC_BẢO_MẬT_ĐANG_HOẠT_ĐỘNG>"
+  },
+  "chatRoom": {
+    "placeholders": {
+      "typeMessage": "Nhập tin nhắn của bạn...",
+      "typeMessageShort": "Nhập tin nhắn..."
+    },
+    "buttons": {
+      "send": "Gửi",
+      "signInToChat": "Đăng nhập để trò chuyện",
+      "enableAlerts": "Bật thông báo",
+      "leave": "Rời đi"
+    },
+    "headers": {
+      "spectatorLounge": "Phòng Khán Giả",
+      "queue": "Hàng đợi"
+    },
+    "status": {
+      "allRidesFull": "Tất cả chuyến đi đã đầy",
+      "you": "(bạn)",
+      "moreWaiting": "+{count} người đang đợi..."
+    },
+    "messages": {
+      "waitlistPrompt": "Tất cả thú cưỡi đều bận. Bạn có muốn vào danh sách chờ không?",
+      "waitlistAdded": "Bạn đã được thêm vào danh sách chờ. Chúng tôi sẽ thông báo khi có thú cưỡi. Hãy tận hưởng Phòng Trăng trong lúc chờ đợi.",
+      "waitlistError": "Có lỗi khi thêm vào danh sách chờ. Vui lòng thử lại.",
+      "alreadyRiding": "Bạn đang cưỡi một thú khác rồi.",
+      "beastOccupied": "Thú cưỡi này đang bận. Vui lòng chọn thú khác.",
+      "beastOccupiedChoose": "Thú cưỡi đã bận. Vui lòng chọn con khác.",
+      "signInToRide": "Vui lòng đăng nhập để cưỡi thú.",
+      "genericError": "Đã xảy ra lỗi. Vui lòng thử lại.",
+      "enterMessage": "Vui lòng nhập tin nhắn và đảm bảo bạn đã đăng nhập.",
+      "rateLimited": "Vui lòng đợi một chút trước khi gửi tin nhắn tiếp.",
+      "sendFailed": "Gửi tin nhắn thất bại. Vui lòng thử lại.",
+      "quitError": "Lỗi khi thoát chuyến đi. Vui lòng thử lại.",
+      "confirmEndRide": "Bạn có chắc muốn kết thúc chuyến đi?",
+      "alreadyReported": "Bạn đã báo cáo tin nhắn này rồi.",
+      "reportSubmitted": "Đã gửi báo cáo. Cảm ơn bạn đã giữ cộng đồng an toàn.",
+      "reportFailed": "Gửi báo cáo thất bại. Vui lòng thử lại.",
+      "playMusicFirst": "Phát nhạc trước, rồi chia sẻ!",
+      "djSessionEnded": "Phiên DJ của {name} đã kết thúc",
+      "listenAlong": "Nghe nhạc của {name}? Đang phát: {track}"
+    },
+    "notifications": {
+      "beastReady": "Thú cưỡi của bạn đã sẵn sàng!",
+      "enjoyRide": "Hãy tận hưởng 10 phút trên vòng quay!"
+    },
+    "accessibility": {
+      "rider": "Người cưỡi"
+    },
+    "marquee": {
+      "clickToChat": "NHẤN VÀO THÚ CƯỠI BẤT KỲ ĐỂ TRÒ CHUYỆN",
+      "mustLogin": "ĐĂNG NHẬP ĐỂ CƯỠI VÀ GIẢI MÃ TIN NHẮN"
+    },
+    "rideConfirm": {
+      "question": "Cưỡi thú này?",
+      "yes": "Có",
+      "no": "Không"
+    },
+    "instructions": {
+      "title": "Hướng dẫn",
+      "clickBeast": "Nhấn vào bất kỳ thú cưỡi nào để bắt đầu <strong>chuyến đi 10 phút</strong>. Sau 10 phút, bạn có thể tiếp tục trò chuyện bằng cách chọn thú khác hoặc chat trong phòng khán giả.",
+      "signedIn": "Bạn phải <strong>đăng nhập</strong> để cưỡi",
+      "messages": "Trong khi cưỡi, nhập tin nhắn hiển thị trên thú của bạn cho <strong>người dùng đã đăng nhập xem.</strong> Khách chưa đăng nhập sẽ thấy văn bản mã hóa.",
+      "charLimit": "Tin nhắn giới hạn <strong>80 ký tự</strong>",
+      "djMode": "Bật <strong>chế độ DJ</strong> để hiển thị bài hát bạn đang nghe. Người dùng có thể đồng bộ với bài hát.",
+      "globalChat": "Nếu tất cả thú cưỡi đều bận, <strong>thanh chat toàn cục</strong> sẽ khả dụng"
+    }
+  },
+  "scroll": {
+    "readCredo": "Đọc Tín Điều",
+    "tapToClose": "chạm để đóng",
+    "altText": "Chạm để đọc cuộn giấy",
+    "latinQuote": "\"Bene agere est vere lucrari.\"",
+    "latinTranslation": "(Hành động tốt là lợi nhuận thực sự.)",
+    "attribution": "— Thánh GR80",
+    "credo": {
+      "line1": "Chúng tôi vô tín—",
+      "line2": "Nhưng chúng tôi tin",
+      "line3": "Vào mã và mật mã học",
+      "line4": "Vào sự thuần khiết mạch điện",
+      "line5": "Vào đức hạnh hơn gian ác",
+      "line6": "Vào máy ảo",
+      "line7": "Mater ex machina",
+      "line8": "Chính trực bất hoại",
+      "line9": "Hiện thân của kháng cự",
+      "line10": "trong thị trường muốn phá bạn",
+      "line11": "Giữ RL80 trong ví như",
+      "line12": "tràng hạt cho thịnh vượng"
+    }
   }
 }

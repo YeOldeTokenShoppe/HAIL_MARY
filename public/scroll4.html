@@ -60,5 +60,12 @@ Remember: The blockchain forgives not, but neither does it judge. It simply exec
       })();
     </script>
     <script src="./scroll.js"></script>
+    <script>
+      // Check for plaintext mode
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('plaintext') === 'true') {
+        document.getElementById('container').classList.add('plaintext');
+      }
+    </script>
   </body>
 </html>

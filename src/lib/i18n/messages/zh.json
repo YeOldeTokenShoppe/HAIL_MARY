@@ -35,6 +35,10 @@
       "line2": "现实",
       "line3": " "
     },
+    "morphing": {
+      "line1": "你的",
+      "line2": "现实"
+    },
     "scrollPrompt": "向上滚动继续"
   },
   "navigation": {
@@ -123,5 +127,94 @@
   "buyModal": {
     "title": "购买_RL80_",
     "secureTransaction": "<安全交易协议激活>"
+  },
+  "chatRoom": {
+    "placeholders": {
+      "typeMessage": "输入消息...",
+      "typeMessageShort": "输入消息..."
+    },
+    "buttons": {
+      "send": "发送",
+      "signInToChat": "登录聊天",
+      "enableAlerts": "启用通知",
+      "leave": "离开"
+    },
+    "headers": {
+      "spectatorLounge": "观众休息室",
+      "queue": "队列"
+    },
+    "status": {
+      "allRidesFull": "所有骑乘已满",
+      "you": "(你)",
+      "moreWaiting": "还有{count}人等待..."
+    },
+    "messages": {
+      "waitlistPrompt": "所有神兽都已被占用。你想加入等待名单吗？",
+      "waitlistAdded": "你已加入等待名单。神兽可用时我们会通知你。请在月亮房间等待。",
+      "waitlistError": "加入等待名单时出错。请重试。",
+      "alreadyRiding": "你已经在骑另一只神兽了。",
+      "beastOccupied": "这只神兽已被占用。请选择其他神兽。",
+      "beastOccupiedChoose": "神兽已被占用。请选择另一只。",
+      "signInToRide": "请登录以骑乘神兽。",
+      "genericError": "发生错误。请重试。",
+      "enterMessage": "请输入消息并确保已登录。",
+      "rateLimited": "请稍等再发送消息。",
+      "sendFailed": "消息发送失败。请重试。",
+      "quitError": "退出骑乘时出错。请重试。",
+      "confirmEndRide": "确定要结束骑乘吗？",
+      "alreadyReported": "你已举报过此消息。",
+      "reportSubmitted": "举报已提交。感谢你维护社区安全。",
+      "reportFailed": "举报失败。请重试。",
+      "playMusicFirst": "先播放音乐，然后分享！",
+      "djSessionEnded": "{name}的DJ播放已结束",
+      "listenAlong": "收听{name}的音乐？正在播放：{track}"
+    },
+    "notifications": {
+      "beastReady": "你的神兽准备好了！",
+      "enjoyRide": "享受你10分钟的旋转木马之旅！"
+    },
+    "accessibility": {
+      "rider": "骑手"
+    },
+    "marquee": {
+      "clickToChat": "点击任意可用神兽开始聊天",
+      "mustLogin": "请登录以骑乘和解密消息"
+    },
+    "rideConfirm": {
+      "question": "骑这只神兽？",
+      "yes": "是",
+      "no": "否"
+    },
+    "instructions": {
+      "title": "说明",
+      "clickBeast": "点击任何可用的神兽开始<strong>10分钟骑乘</strong>。10分钟后，你可以选择另一只神兽或在观众聊天室继续对话。",
+      "signedIn": "你必须<strong>登录</strong>才能骑乘",
+      "messages": "骑乘时，输入的消息会显示在你的神兽上供<strong>已登录用户查看。</strong>未登录的访客将看到加密文字。",
+      "charLimit": "消息限制为<strong>80个字符</strong>",
+      "djMode": "开启<strong>DJ模式</strong>让用户看到你正在听的歌曲。用户可以选择同步播放。",
+      "globalChat": "如果所有神兽都被占用，<strong>全局聊天侧边栏</strong>将可用"
+    }
+  },
+  "scroll": {
+    "readCredo": "阅读信条",
+    "tapToClose": "点击关闭",
+    "altText": "点击阅读卷轴",
+    "latinQuote": "\"Bene agere est vere lucrari.\"",
+    "latinTranslation": "(善行即真正获利。)",
+    "attribution": "— 圣GR80",
+    "credo": {
+      "line1": "我们不需信任—",
+      "line2": "但我们相信",
+      "line3": "代码与密码学",
+      "line4": "电路的纯净",
+      "line5": "美德胜于邪恶",
+      "line6": "虚拟机器",
+      "line7": "Mater ex machina",
+      "line8": "不可腐蚀的诚信",
+      "line9": "抵抗的化身",
+      "line10": "在想击垮你的市场中",
+      "line11": "在钱包中持有RL80",
+      "line12": "作为繁荣的念珠"
+    }
   }
 }

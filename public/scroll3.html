@@ -53,5 +53,12 @@ Hold fast, dear pilgrims. Your future selves are watching from the mountaintop, 
       })();
     </script>
     <script src="./scroll.js"></script>
+    <script>
+      // Check for plaintext mode
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('plaintext') === 'true') {
+        document.getElementById('container').classList.add('plaintext');
+      }
+    </script>
   </body>
 </html>

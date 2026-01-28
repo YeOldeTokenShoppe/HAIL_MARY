@@ -1019,7 +1019,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               <br/>
               <span style={{fontSize: '0.7em', fontStyle: 'italic', textTransform: 'none', opacity: 0.8}}>(I burn, therefore I earn.)</span>
               <br/>
-              <span style={{fontSize: '0.6em', fontStyle: 'normal', textTransform: 'none', opacity: 0.7, letterSpacing: '0.1em'}}>{"\u2014"} St. Gr80</span> */}
+              <span style={{fontSize: '0.6em', fontStyle: 'normal', textTransform: 'none', opacity: 0.7, letterSpacing: '0.1em'}}>{"\u2014"} St. GR80</span> */}
             </p>
             {/* Interactive Scroll */}
             <div style={{
@@ -1208,7 +1208,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               <br/>
               <span style={{fontSize: '0.7em', fontStyle: 'italic', textTransform: 'none', opacity: 0.8}}>(I burn, therefore I earn.)</span>
               <br/>
-              <span style={{fontSize: '0.6em', fontStyle: 'normal', textTransform: 'none', opacity: 0.7, letterSpacing: '0.1em'}}>{"\u2014"} St. Gr80</span>
+              <span style={{fontSize: '0.6em', fontStyle: 'normal', textTransform: 'none', opacity: 0.7, letterSpacing: '0.1em'}}>{"\u2014"} St. GR80</span>
             </p>
             <p style={{
               fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -1862,7 +1862,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               <br/>
               <span style={{fontSize: '0.7em', fontStyle: 'italic', textTransform: 'none', opacity: 0.8}}>(True prosperity is not born of deceit, but of fairness and goodwill.)</span>
 
-              <span style={{fontSize: '0.6em', fontStyle: 'normal', textTransform: 'none', opacity: 0.7, letterSpacing: '0.1em'}}>{"\u2014"} St. Gr80</span>
+              <span style={{fontSize: '0.6em', fontStyle: 'normal', textTransform: 'none', opacity: 0.7, letterSpacing: '0.1em'}}>{"\u2014"} St. GR80</span>
             </p>
               {/* Interactive Scroll */}
               <div style={{
@@ -2199,7 +2199,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               <br/>
               <span style={{fontSize: '0.7em', fontStyle: 'italic', textTransform: 'none', opacity: 0.8}}>(I burn, therefore I earn.)</span>
               <br/>
-              <span style={{fontSize: '0.6em', fontStyle: 'normal', textTransform: 'none', opacity: 0.7, letterSpacing: '0.1em'}}>{"\u2014"} St. Gr80</span>
+              <span style={{fontSize: '0.6em', fontStyle: 'normal', textTransform: 'none', opacity: 0.7, letterSpacing: '0.1em'}}>{"\u2014"} St. GR80</span>
             </p>
 
               <p style={{

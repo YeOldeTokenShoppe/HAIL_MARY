@@ -35,6 +35,10 @@
       "line2": "現実",
       "line3": " "
     },
+    "morphing": {
+      "line1": "あなたの",
+      "line2": "現実"
+    },
     "scrollPrompt": "上にスクロールして続ける"
   },
   "navigation": {
@@ -123,5 +127,94 @@
   "buyModal": {
     "title": "購入_RL80_",
     "secureTransaction": "<安全な取引プロトコル有効>"
+  },
+  "chatRoom": {
+    "placeholders": {
+      "typeMessage": "メッセージを入力...",
+      "typeMessageShort": "メッセージを入力..."
+    },
+    "buttons": {
+      "send": "送信",
+      "signInToChat": "ログインしてチャット",
+      "enableAlerts": "通知を有効にする",
+      "leave": "退出"
+    },
+    "headers": {
+      "spectatorLounge": "観客ラウンジ",
+      "queue": "待ち行列"
+    },
+    "status": {
+      "allRidesFull": "全ての乗り物が満席",
+      "you": "(あなた)",
+      "moreWaiting": "他{count}人が待機中..."
+    },
+    "messages": {
+      "waitlistPrompt": "全てのビーストは使用中です。順番待ちリストに追加しますか？",
+      "waitlistAdded": "順番待ちリストに追加されました。ビーストが利用可能になったら通知します。ムーンルームでお待ちください。",
+      "waitlistError": "順番待ちリストへの追加中にエラーが発生しました。再試行してください。",
+      "alreadyRiding": "既に別のビーストに乗っています。",
+      "beastOccupied": "このビーストは使用中です。他のビーストを選んでください。",
+      "beastOccupiedChoose": "ビーストは既に使用中です。他を選んでください。",
+      "signInToRide": "ビーストに乗るにはログインしてください。",
+      "genericError": "エラーが発生しました。再試行してください。",
+      "enterMessage": "メッセージを入力し、ログインしていることを確認してください。",
+      "rateLimited": "次のメッセージを送る前に少々お待ちください。",
+      "sendFailed": "メッセージの送信に失敗しました。再試行してください。",
+      "quitError": "乗り物を終了中にエラーが発生しました。再試行してください。",
+      "confirmEndRide": "乗り物を終了してもよろしいですか？",
+      "alreadyReported": "既にこのメッセージを報告しています。",
+      "reportSubmitted": "報告が送信されました。コミュニティの安全を守っていただきありがとうございます。",
+      "reportFailed": "報告の送信に失敗しました。再試行してください。",
+      "playMusicFirst": "まず音楽を再生してから共有してください！",
+      "djSessionEnded": "{name}のDJセッションが終了しました",
+      "listenAlong": "{name}の音楽を聴きますか？再生中：{track}"
+    },
+    "notifications": {
+      "beastReady": "あなたのビーストの準備ができました！",
+      "enjoyRide": "10分間のカルーセルをお楽しみください！"
+    },
+    "accessibility": {
+      "rider": "ライダー"
+    },
+    "marquee": {
+      "clickToChat": "利用可能なビーストをクリックしてチャット",
+      "mustLogin": "ログインして乗車・メッセージを解読"
+    },
+    "rideConfirm": {
+      "question": "このビーストに乗りますか？",
+      "yes": "はい",
+      "no": "いいえ"
+    },
+    "instructions": {
+      "title": "使い方",
+      "clickBeast": "利用可能なビーストをクリックして<strong>10分間の乗車</strong>を開始します。10分後、別のビーストを選ぶか観客チャットで会話を続けられます。",
+      "signedIn": "乗車するには<strong>ログイン</strong>が必要です",
+      "messages": "乗車中、ビーストに表示されるメッセージを入力して<strong>ログインユーザーに見せましょう。</strong>ログインしていない訪問者には暗号化されたテキストが表示されます。",
+      "charLimit": "メッセージは<strong>80文字</strong>に制限されています",
+      "djMode": "<strong>DJモード</strong>を切り替えて、聴いている曲をユーザーに表示します。ユーザーは曲に同期できます。",
+      "globalChat": "すべてのビーストが使用中の場合、<strong>グローバルチャットサイドバー</strong>が利用可能になります"
+    }
+  },
+  "scroll": {
+    "readCredo": "信条を読む",
+    "tapToClose": "タップして閉じる",
+    "altText": "タップして巻物を読む",
+    "latinQuote": "\"Bene agere est vere lucrari.\"",
+    "latinTranslation": "(善行は真の利益なり。)",
+    "attribution": "— 聖GR80",
+    "credo": {
+      "line1": "私たちはトラストレス—",
+      "line2": "しかし私たちは信じる",
+      "line3": "コードと暗号学を",
+      "line4": "回路の純粋さを",
+      "line5": "悪徳に対する美徳を",
+      "line6": "仮想マシンを",
+      "line7": "Mater ex machina",
+      "line8": "腐敗なき誠実さ",
+      "line9": "抵抗のアバター",
+      "line10": "君を壊す市場の中で",
+      "line11": "RL80をウォレットに持て",
+      "line12": "繁栄のロザリオとして"
+    }
   }
 }

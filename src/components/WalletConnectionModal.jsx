@@ -60,7 +60,7 @@ export function WalletConnectionModal({ onClose }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 10000,
+        zIndex: 1000000,
       }}
       onClick={onClose}
     >

@@ -40,6 +40,10 @@
       "line2": " ",
       "line3": " "
     },
+    "morphing": {
+      "line1": "your",
+      "line2": "REAL80"
+    },
     "scrollPrompt": "scroll up to continue"
   },
   "navigation": {
@@ -127,5 +131,94 @@
   "buyModal": {
     "title": "BUY_RL80_",
     "secureTransaction": "<SECURE_TRANSACTION_PROTOCOL_ACTIVE>"
+  },
+  "chatRoom": {
+    "placeholders": {
+      "typeMessage": "Type your message...",
+      "typeMessageShort": "Type a message..."
+    },
+    "buttons": {
+      "send": "Send",
+      "signInToChat": "Sign in to chat",
+      "enableAlerts": "Enable alerts",
+      "leave": "Leave"
+    },
+    "headers": {
+      "spectatorLounge": "Spectator Lounge",
+      "queue": "Queue"
+    },
+    "status": {
+      "allRidesFull": "All rides full",
+      "you": "(you)",
+      "moreWaiting": "+{count} more waiting..."
+    },
+    "messages": {
+      "waitlistPrompt": "All beasts are occupied. Would you like to be added to the waitlist?",
+      "waitlistAdded": "You have been added to the waitlist. We will notify you when a beast is available. Please enjoy the Moon Room in the meantime.",
+      "waitlistError": "An error occurred while adding you to the waitlist. Please try again.",
+      "alreadyRiding": "You are already riding another beast.",
+      "beastOccupied": "This beast is occupied. Please select an available beast.",
+      "beastOccupiedChoose": "Beast is already occupied. Please choose another beast.",
+      "signInToRide": "Please sign in to ride the beast.",
+      "genericError": "An error occurred. Please try again.",
+      "enterMessage": "Please enter a message and ensure you are logged in.",
+      "rateLimited": "Please wait a moment before sending another message.",
+      "sendFailed": "Failed to send the message. Please try again.",
+      "quitError": "Error quitting the ride. Please try again.",
+      "confirmEndRide": "Are you sure you want to end the ride?",
+      "alreadyReported": "You've already reported this message.",
+      "reportSubmitted": "Report submitted. Thank you for keeping the community safe.",
+      "reportFailed": "Failed to submit report. Please try again.",
+      "playMusicFirst": "Start playing music first, then share it!",
+      "djSessionEnded": "{name}'s DJ session ended",
+      "listenAlong": "Listen along to {name}'s music? Now playing: {track}"
+    },
+    "notifications": {
+      "beastReady": "Your beast is ready!",
+      "enjoyRide": "Enjoy your 10-minute ride on the carousel!"
+    },
+    "accessibility": {
+      "rider": "Rider"
+    },
+    "marquee": {
+      "clickToChat": "CLICK ANY AVAILABLE BEAST TO CHAT WHILE RIDING",
+      "mustLogin": "MUST BE LOGGED IN TO RIDE AND DECRYPT MESSAGES"
+    },
+    "rideConfirm": {
+      "question": "Ride this beast?",
+      "yes": "Yes",
+      "no": "No"
+    },
+    "instructions": {
+      "title": "Instructions",
+      "clickBeast": "Click any available beast to start a <strong>10-minute ride</strong>. When 10 minutes are up, you can keep the conversation going by choosing another beast or chatting in the spectator chat box.",
+      "signedIn": "You must be <strong>signed in</strong> to ride",
+      "messages": "While riding, type messages that appear on your beast for <strong>signed-in users to see.</strong> Visitors that are not signed in will see encrypted text.",
+      "charLimit": "Messages are limited to <strong>80 characters</strong>",
+      "djMode": "Toggle <strong>DJ mode</strong> to let users see what song track you're listening to. Users can opt to synch up with the song.",
+      "globalChat": "If all beasts are occupied, a <strong>global chat sidebar</strong> becomes available"
+    }
+  },
+  "scroll": {
+    "readCredo": "Read the Credo",
+    "tapToClose": "tap to close",
+    "altText": "Tap to read scroll",
+    "latinQuote": "\"Bene agere est vere lucrari.\"",
+    "latinTranslation": "(To act well is to profit truly.)",
+    "attribution": "— St. GR80",
+    "credo": {
+      "line1": "We are trustless—",
+      "line2": "But we believe",
+      "line3": "In code and cryptography",
+      "line4": "In the purity of circuitry",
+      "line5": "In virtue over villainy",
+      "line6": "In the virtual machine",
+      "line7": "Mater ex machina",
+      "line8": "Incorruptible integrity",
+      "line9": "An avatar of resistance",
+      "line10": "in a market built to break you",
+      "line11": "Hold RL80 in your wallet as",
+      "line12": "a rosary for prosperity"
+    }
   }
 }

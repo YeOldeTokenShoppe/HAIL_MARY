@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SignInButton, useUser } from "@clerk/nextjs";
+import { useUser, useClerk } from "@clerk/nextjs";
 import { usePathname } from 'next/navigation';
 import { useWalletAuth } from './WalletAuthProvider';
 import { UnifiedAccountModal } from './UnifiedAccountModal';
@@ -25,6 +25,7 @@ export default function NavControlsHome({
   const [showMenuHint, setShowMenuHint] = useState(false);
   const pathname = usePathname(); // Get current path
   const { user: clerkUser } = useUser();
+  const clerk = useClerk();
   
   // Fix hydration mismatch by ensuring client and server render the same initially
   useEffect(() => {
@@ -694,15 +695,14 @@ export default function NavControlsHome({
               )}
             </button>
           ) : (
-            <SignInButton 
-              mode="modal" 
-              forceRedirectUrl={pathname || "/"}
+            <button
+              className="avatar-mobile"
+              style={{ cursor: 'pointer' }}
+              onClick={() => clerk.openSignIn()}
             >
-              <button className="avatar-mobile" style={{ cursor: 'pointer', background: 'transparent', border: 'none' }}>
-                <span style={{ fontSize: '2rem' }}>{emoji}</span>
-                <div className="avatar-status-mobile offline" />
-              </button>
-            </SignInButton>
+              <span style={{ fontSize: '2rem' }}>{emoji}</span>
+              <div className="avatar-status-mobile offline" />
+            </button>
           )}
         </div>
 

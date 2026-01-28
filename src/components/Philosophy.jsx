@@ -1349,6 +1349,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
   const [examinedObject, setExaminedObject] = useState(null); // For examining the pyramid
   const [showIntroText, setShowIntroText] = useState(true); // Control intro text visibility
   const [magnifiedZoom, setMagnifiedZoom] = useState(1.25); // Track zoom level for magnified view
+  const [showPlainText, setShowPlainText] = useState(false); // Toggle plain text view
   const scrollIframeRef = useRef(null);
   const mobileScrollIframeRef = useRef(null);
   const magnifiedIframeRef = useRef(null); // Add ref for magnified iframe
@@ -2132,11 +2133,12 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
             backdropFilter: 'blur(5px)'
           }}
         >
-          <div 
+          <div
             onClick={(e) => e.stopPropagation()}
             style={{
               position: 'relative',
               width: '95vw',
+              maxWidth: isMobile ? 'none' : '50vw',
               height: '95vh',
               background: 'rgba(20, 20, 20, 0.95)',
               borderRadius: '1rem',
@@ -2278,28 +2280,52 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
               >
                 Zoom In
               </button>
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowPlainText(!showPlainText);
+                }}
+                style={{
+                  background: showPlainText ? 'rgba(212, 175, 55, 0.5)' : 'rgba(212, 175, 55, 0.2)',
+                  border: '1px solid #d4af37',
+                  color: '#d4af37',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '0.25rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  zIndex: 10002,
+                  marginLeft: '1rem'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = 'rgba(212, 175, 55, 0.4)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = showPlainText ? 'rgba(212, 175, 55, 0.5)' : 'rgba(212, 175, 55, 0.2)';
+                }}
+              >
+                {showPlainText ? 'Original Font' : 'Plain Text'}
+              </button>
             </div>
-            
+
             {/* Iframe container with overflow for zooming */}
             <div style={{
               width: '100%',
-              height: isMobile ? 'calc(100% - 5rem)' : 'calc(100% - 6rem)',
+              height: 'calc(100% - 6rem)',
               overflow: 'auto',
-              position: 'relative',
-              top: isMobile ? '0' : '-3rem',
-              borderRadius: isMobile ? '0' : '0.5rem',
+              borderRadius: '0.5rem',
             }}>
               {/* Magnified iframe */}
               <iframe
                 ref={magnifiedIframeRef}
                 id="magnified-iframe"
-                src={isMobile ? `${currentScrollSrc}&flat=true` : currentScrollSrc}
+                src={`${currentScrollSrc}&flat=true${showPlainText ? '&plaintext=true' : ''}`}
                 style={{
                   width: `${100 / magnifiedZoom}%`,
                   height: `${100 / magnifiedZoom}%`,
                   border: 'none',
-                  background: isMobile ? '#fefee0' : 'transparent',
-                  borderRadius: isMobile ? '0.5rem' : '0',
+                  background: '#fefee0',
+                  borderRadius: '0.5rem',
                   transform: `scale(${magnifiedZoom})`,
                   transformOrigin: 'top left',
                 }}

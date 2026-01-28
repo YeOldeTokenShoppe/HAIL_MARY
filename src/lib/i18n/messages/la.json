@@ -35,6 +35,10 @@
       "line2": "REALITAS",
       "line3": " "
     },
+    "morphing": {
+      "line1": "tua",
+      "line2": "realitas"
+    },
     "scrollPrompt": "sursum volve ut pergas"
   },
   "navigation": {
@@ -123,5 +127,94 @@
   "buyModal": {
     "title": "EMERE_RL80_",
     "secureTransaction": "<PROTOCOLLVM_TRANSACTIONIS_SECVRAE_ACTIVVM>"
+  },
+  "chatRoom": {
+    "placeholders": {
+      "typeMessage": "Scribe nuntium tuum...",
+      "typeMessageShort": "Scribe nuntium..."
+    },
+    "buttons": {
+      "send": "Mitte",
+      "signInToChat": "Intra ut colloquaris",
+      "enableAlerts": "Activa nuntios",
+      "leave": "Discede"
+    },
+    "headers": {
+      "spectatorLounge": "Atrium Spectatorum",
+      "queue": "Ordo"
+    },
+    "status": {
+      "allRidesFull": "Omnes vecturae plenae",
+      "you": "(tu)",
+      "moreWaiting": "+{count} alii exspectant..."
+    },
+    "messages": {
+      "waitlistPrompt": "Omnes bestiae occupatae sunt. Visne in indicem exspectantium addi?",
+      "waitlistAdded": "In indicem exspectantium additus es. Te certiorem faciemus cum bestia praesto sit. Interim Cubiculo Lunae fruere.",
+      "waitlistError": "Error in addendo ad indicem. Iterum conare.",
+      "alreadyRiding": "Iam aliam bestiam equitas.",
+      "beastOccupied": "Haec bestia occupata est. Aliam bestiam elige.",
+      "beastOccupiedChoose": "Bestia iam occupata. Aliam elige.",
+      "signInToRide": "Intra ut bestiam equites.",
+      "genericError": "Error accidit. Iterum conare.",
+      "enterMessage": "Nuntium scribe et cura ut intraveris.",
+      "rateLimited": "Paulum exspecta antequam alium nuntium mittas.",
+      "sendFailed": "Nuntium mittere non potuit. Iterum conare.",
+      "quitError": "Error in finiendo vecturam. Iterum conare.",
+      "confirmEndRide": "Certusne es te vecturam finire velle?",
+      "alreadyReported": "Hunc nuntium iam nuntiavisti.",
+      "reportSubmitted": "Nuntiatio missa. Gratias pro communitate tuta servanda.",
+      "reportFailed": "Nuntiatio mitti non potuit. Iterum conare.",
+      "playMusicFirst": "Primum musicam cane, deinde communica!",
+      "djSessionEnded": "Sessio DJ {name} finita est",
+      "listenAlong": "Musicam {name} audire? Nunc canit: {track}"
+    },
+    "notifications": {
+      "beastReady": "Bestia tua parata est!",
+      "enjoyRide": "Fruere vectura X minutarum in carrousello!"
+    },
+    "accessibility": {
+      "rider": "Eques"
+    },
+    "marquee": {
+      "clickToChat": "PREME BESTIAM PRAESTO UT COLLOQUARIS",
+      "mustLogin": "INTRA UT EQUITES ET NUNTIOS DECRYPTES"
+    },
+    "rideConfirm": {
+      "question": "Hanc bestiam equitare?",
+      "yes": "Ita",
+      "no": "Non"
+    },
+    "instructions": {
+      "title": "Instructiones",
+      "clickBeast": "Preme quamlibet bestiam praesto ut <strong>vecturam X minutarum</strong> incipias. Post X minuta, colloquium continuare potes alia bestia eligendo aut in colloquio spectatorum.",
+      "signedIn": "Debes <strong>intrare</strong> ut equites",
+      "messages": "Dum equitas, scribe nuntios qui in bestia tua apparent ut <strong>utentes intrati videant.</strong> Visitatores non intrati textum crypticum videbunt.",
+      "charLimit": "Nuntii ad <strong>LXXX characteres</strong> limitantur",
+      "djMode": "Muta <strong>modum DJ</strong> ut utentibus ostendas quod carmen audis. Utentes possunt carmen synchronizare.",
+      "globalChat": "Si omnes bestiae occupatae sunt, <strong>barra colloquii globalis</strong> praesto erit"
+    }
+  },
+  "scroll": {
+    "readCredo": "Lege Credo",
+    "tapToClose": "tange ad claudendum",
+    "altText": "Tange ad legendum volumen",
+    "latinQuote": "\"Bene agere est vere lucrari.\"",
+    "latinTranslation": "(Bene agere est vere lucrari.)",
+    "attribution": "— S. GR80",
+    "credo": {
+      "line1": "Sine fide sumus—",
+      "line2": "Sed credimus",
+      "line3": "In codicem et cryptographiam",
+      "line4": "In puritatem circuitus",
+      "line5": "In virtutem super nequitiam",
+      "line6": "In machinam virtualem",
+      "line7": "Mater ex machina",
+      "line8": "Integritas incorruptibilis",
+      "line9": "Avatar resistentiae",
+      "line10": "in mercatu facto ad te frangendum",
+      "line11": "Tene RL80 in sacco tuo ut",
+      "line12": "rosarium pro prosperitate"
+    }
   }
 }

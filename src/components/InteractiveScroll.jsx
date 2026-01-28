@@ -5,14 +5,18 @@ import { createPortal } from "react-dom";
 import * as THREE from "three";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF, useAnimations } from "@react-three/drei";
+import { useLanguage } from "./LanguageProvider";
 
-function createTextCanvas() {
+function createTextCanvas(translations, locale) {
   const canvas = document.createElement("canvas");
   const w = 4096;
   const h = 4096;
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d");
+
+  // Check if RTL language (Arabic, Hebrew, etc.)
+  const isRTL = locale === "ar";
 
   // Parchment background — warm tone that blends with scroll material
   ctx.fillStyle = "#f5e6c8";
@@ -37,25 +41,31 @@ function createTextCanvas() {
   const cx = w * 0.49;
   let y = h * 0.09;
 
-  // Latin quote
+  // Latin quote (always in Latin, from translation file)
   ctx.textAlign = "center";
-  ctx.font = 'bold 207px "Courier New", monospace';
+  ctx.direction = "ltr"; // Latin quote is always LTR
+  ctx.font = 'bold 207px "UnifrakturMaguntia", monospace';
   ctx.fillStyle = "#3a2a0a";
   ctx.fillText("\u201CBene agere est vere", cx, y);
   y += 252;
   ctx.fillText("lucrari.\u201D", cx, y);
   y += 270;
 
-  // Translation
+  // Set direction for localized text
+  if (isRTL) {
+    ctx.direction = "rtl";
+  }
+
+  // Translation (localized)
   ctx.font = "bold italic 153px Georgia, serif";
   ctx.fillStyle = "rgba(50, 35, 10, 0.85)";
-  ctx.fillText("(To act well is to profit truly.)", cx, y);
+  ctx.fillText(translations.latinTranslation, cx, y);
   y += 198;
 
-  // Attribution
+  // Attribution (localized)
   ctx.font = 'bold 160px "Courier New", monospace';
   ctx.fillStyle = "rgba(50, 35, 10, 0.7)";
-  ctx.fillText("\u2014 St. GR80", cx, y);
+  ctx.fillText(translations.attribution, cx, y);
   y += 216;
 
   // Gold divider
@@ -73,23 +83,24 @@ function createTextCanvas() {
   ctx.stroke();
   y += 198;
 
-  // Poem
+  // Poem/Credo (localized)
+  const credo = translations.credo;
   const lines = [
-    { text: "We are trustless\u2014",        font: 'bold 190px Georgia, serif',   color: "#3a2a0a" },
-    { text: "But we believe",               font: 'bold italic 162px Georgia, serif', color: "rgba(30, 18, 5, 0.92)" },
-    { text: "In code and cryptography",     font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
-    { text: "In the purity of circuitry",       font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
-    { text: "In virtue over villainy",      font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
-    { text: "In the virtual machine",       font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
-    { text: "",                              font: '180px Georgia, serif',        color: "transparent", gap: 72 },
-    { text: "Mater ex machina",             font: 'bold italic 210px Georgia, serif', color: "#916e29ff" },
-    { text: "",                              font: '180px Georgia, serif',        color: "transparent", gap: 72 },
-    { text: "Incorruptible integrity",       font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
-    { text: "An avatar of resistance",       font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
-    { text: "in a market built to break you", font: 'bold 180px Georgia, serif', color: "rgba(30, 18, 5, 0.9)" },
-    { text: "",                              font: '180px Georgia, serif',        color: "transparent", gap: 72 },
-    { text: "Hold RL80 in your wallet as",   font: 'bold italic 180px Georgia, serif', color: "rgba(30, 18, 5, 0.9)" },
-    { text: "a rosary for prosperity",      font: 'bold italic 180px Georgia, serif', color: "rgba(30, 18, 5, 0.9)" },
+    { text: credo.line1,  font: 'bold 190px Georgia, serif',   color: "#3a2a0a" },
+    { text: credo.line2,  font: 'bold italic 162px Georgia, serif', color: "rgba(30, 18, 5, 0.92)" },
+    { text: credo.line3,  font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
+    { text: credo.line4,  font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
+    { text: credo.line5,  font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
+    { text: credo.line6,  font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
+    { text: "",           font: '180px Georgia, serif',        color: "transparent", gap: 72 },
+    { text: credo.line7,  font: 'bold italic 210px Georgia, serif', color: "#916e29ff" },
+    { text: "",           font: '180px Georgia, serif',        color: "transparent", gap: 72 },
+    { text: credo.line8,  font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
+    { text: credo.line9,  font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
+    { text: credo.line10, font: 'bold 180px Georgia, serif',  color: "rgba(30, 18, 5, 0.9)" },
+    { text: "",           font: '180px Georgia, serif',        color: "transparent", gap: 72 },
+    { text: credo.line11, font: 'bold italic 180px Georgia, serif', color: "rgba(30, 18, 5, 0.9)" },
+    { text: credo.line12, font: 'bold italic 180px Georgia, serif', color: "rgba(30, 18, 5, 0.9)" },
   ];
 
   for (const line of lines) {
@@ -112,7 +123,7 @@ const OPEN_ANIM = "Armature|3_Opened Action _Armature";
 const CLOSE_ANIM = "Armature|1_Close Action_Armature";
 const PAPER_MESH = "Object_38";
 
-function ScrollModel3D({ isOpen, onToggle, scale = 1 }) {
+function ScrollModel3D({ isOpen, onToggle, scale = 1, translations, locale }) {
   const group = useRef();
   const { scene, animations } = useGLTF("/models/scroll.glb");
   const { actions } = useAnimations(animations, group);
@@ -141,12 +152,12 @@ function ScrollModel3D({ isOpen, onToggle, scale = 1 }) {
 
   const textTexture = useMemo(() => {
     if (typeof document === "undefined") return null;
-    const canvas = createTextCanvas();
+    const canvas = createTextCanvas(translations, locale);
     const tex = new THREE.CanvasTexture(canvas);
     tex.flipY = false;
     tex.colorSpace = THREE.SRGBColorSpace;
     return tex;
-  }, []);
+  }, [translations, locale]);
 
   // Clone paper material once
   useEffect(() => {
@@ -203,6 +214,7 @@ function ScrollModel3D({ isOpen, onToggle, scale = 1 }) {
 /* ------------------------------------------------------------------ */
 export default function InteractiveScroll({ isMobile, isSmallPhone }) {
   const [isOpen, setIsOpen] = useState(false);
+  const { t, locale } = useLanguage();
 
   const toggle = useCallback(() => setIsOpen((prev) => !prev), []);
   const open = useCallback(() => setIsOpen(true), []);
@@ -213,6 +225,27 @@ export default function InteractiveScroll({ isMobile, isSmallPhone }) {
 
   const containerWidth = isSmallPhone ? 150 : isMobile ? 175 : 220;
   const containerHeight = isSmallPhone ? 100 : isMobile ? 115 : 140;
+
+  // Get scroll translations for canvas rendering
+  const scrollTranslations = useMemo(() => ({
+    latinQuote: t("scroll.latinQuote"),
+    latinTranslation: t("scroll.latinTranslation"),
+    attribution: t("scroll.attribution"),
+    credo: {
+      line1: t("scroll.credo.line1"),
+      line2: t("scroll.credo.line2"),
+      line3: t("scroll.credo.line3"),
+      line4: t("scroll.credo.line4"),
+      line5: t("scroll.credo.line5"),
+      line6: t("scroll.credo.line6"),
+      line7: t("scroll.credo.line7"),
+      line8: t("scroll.credo.line8"),
+      line9: t("scroll.credo.line9"),
+      line10: t("scroll.credo.line10"),
+      line11: t("scroll.credo.line11"),
+      line12: t("scroll.credo.line12"),
+    }
+  }), [t]);
 
   // Generate particles outside conditional render to avoid hooks violation
   const particles = useMemo(() => {
@@ -363,10 +396,10 @@ export default function InteractiveScroll({ isMobile, isSmallPhone }) {
           {/* Scroll image centered in particle field */}
           <img
             src="/images/scroll.webp"
-            alt="Tap to read scroll"
+            alt={t("scroll.altText")}
             style={{
               // width: isSmallPhone ? '15rem' : isMobile ? 140 : 180,
-              width: '14rem',
+              width: '15rem',
               height: "auto",
               objectFit: "contain",
               position: "relative",
@@ -388,7 +421,7 @@ export default function InteractiveScroll({ isMobile, isSmallPhone }) {
           bottom: '7.5rem',
           right: '-3.5rem'
         }}>
-          Read the Credo
+          {t("scroll.readCredo")}
         </span>
       </div>
     )}
@@ -430,6 +463,8 @@ export default function InteractiveScroll({ isMobile, isSmallPhone }) {
               isOpen={isOpen}
               onToggle={toggle}
               scale={modelScale}
+              translations={scrollTranslations}
+              locale={locale}
             />
           </Canvas>
         </div>
@@ -445,7 +480,7 @@ export default function InteractiveScroll({ isMobile, isSmallPhone }) {
             cursor: "pointer",
           }}
         >
-          tap to close
+          {t("scroll.tapToClose")}
         </p>
       </div>,
       document.body

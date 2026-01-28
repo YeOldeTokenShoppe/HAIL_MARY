@@ -50,5 +50,12 @@ Praise be to the protocol. May your gas fees be low and your transactions foreve
       })();
     </script>
     <script src="./scroll.js"></script>
+    <script>
+      // Check for plaintext mode
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('plaintext') === 'true') {
+        document.getElementById('container').classList.add('plaintext');
+      }
+    </script>
   </body>
 </html>

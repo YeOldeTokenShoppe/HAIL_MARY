@@ -35,6 +35,10 @@
       "line2": "REALIDADE",
       "line3": " "
     },
+    "morphing": {
+      "line1": "sua",
+      "line2": "realidade"
+    },
     "scrollPrompt": "role para cima para continuar"
   },
   "navigation": {
@@ -123,6 +127,95 @@
   "buyModal": {
     "title": "COMPRAR_RL80_",
     "secureTransaction": "<PROTOCOLO_TRANSAÇÃO_SEGURA_ATIVO>"
+  },
+  "chatRoom": {
+    "placeholders": {
+      "typeMessage": "Digite sua mensagem...",
+      "typeMessageShort": "Digite uma mensagem..."
+    },
+    "buttons": {
+      "send": "Enviar",
+      "signInToChat": "Entre para conversar",
+      "enableAlerts": "Ativar alertas",
+      "leave": "Sair"
+    },
+    "headers": {
+      "spectatorLounge": "Sala dos Espectadores",
+      "queue": "Fila"
+    },
+    "status": {
+      "allRidesFull": "Todos os passeios lotados",
+      "you": "(você)",
+      "moreWaiting": "+{count} mais esperando..."
+    },
+    "messages": {
+      "waitlistPrompt": "Todas as bestas estão ocupadas. Gostaria de entrar na lista de espera?",
+      "waitlistAdded": "Você foi adicionado à lista de espera. Notificaremos quando uma besta estiver disponível. Aproveite a Sala Lua enquanto isso.",
+      "waitlistError": "Ocorreu um erro ao adicionar à lista de espera. Tente novamente.",
+      "alreadyRiding": "Você já está montando outra besta.",
+      "beastOccupied": "Esta besta está ocupada. Selecione uma besta disponível.",
+      "beastOccupiedChoose": "A besta já está ocupada. Escolha outra besta.",
+      "signInToRide": "Entre para montar a besta.",
+      "genericError": "Ocorreu um erro. Tente novamente.",
+      "enterMessage": "Digite uma mensagem e certifique-se de estar conectado.",
+      "rateLimited": "Aguarde um momento antes de enviar outra mensagem.",
+      "sendFailed": "Falha ao enviar mensagem. Tente novamente.",
+      "quitError": "Erro ao sair do passeio. Tente novamente.",
+      "confirmEndRide": "Tem certeza que deseja encerrar o passeio?",
+      "alreadyReported": "Você já denunciou esta mensagem.",
+      "reportSubmitted": "Denúncia enviada. Obrigado por manter a comunidade segura.",
+      "reportFailed": "Falha na denúncia. Tente novamente.",
+      "playMusicFirst": "Primeiro toque música, depois compartilhe!",
+      "djSessionEnded": "A sessão de DJ de {name} terminou",
+      "listenAlong": "Ouvir a música de {name}? Tocando: {track}"
+    },
+    "notifications": {
+      "beastReady": "Sua besta está pronta!",
+      "enjoyRide": "Aproveite seu passeio de 10 minutos no carrossel!"
+    },
+    "accessibility": {
+      "rider": "Cavaleiro"
+    },
+    "marquee": {
+      "clickToChat": "CLIQUE EM QUALQUER BESTA DISPONÍVEL PARA CONVERSAR",
+      "mustLogin": "ENTRE PARA MONTAR E DECIFRAR MENSAGENS"
+    },
+    "rideConfirm": {
+      "question": "Montar esta besta?",
+      "yes": "Sim",
+      "no": "Não"
+    },
+    "instructions": {
+      "title": "Instruções",
+      "clickBeast": "Clique em qualquer besta disponível para iniciar um <strong>passeio de 10 minutos</strong>. Após 10 minutos, você pode continuar a conversa escolhendo outra besta ou conversando no chat de espectadores.",
+      "signedIn": "Você deve estar <strong>conectado</strong> para montar",
+      "messages": "Durante o passeio, digite mensagens que aparecem na sua besta para <strong>usuários conectados verem.</strong> Visitantes não conectados verão texto criptografado.",
+      "charLimit": "As mensagens são limitadas a <strong>80 caracteres</strong>",
+      "djMode": "Ative o <strong>modo DJ</strong> para mostrar aos usuários qual música você está ouvindo. Os usuários podem sincronizar com a música.",
+      "globalChat": "Se todas as bestas estiverem ocupadas, uma <strong>barra lateral de chat global</strong> ficará disponível"
+    }
+  },
+  "scroll": {
+    "readCredo": "Ler o Credo",
+    "tapToClose": "toque para fechar",
+    "altText": "Toque para ler o pergaminho",
+    "latinQuote": "\"Bene agere est vere lucrari.\"",
+    "latinTranslation": "(Agir bem é lucrar de verdade.)",
+    "attribution": "— S. GR80",
+    "credo": {
+      "line1": "Somos sem confiança—",
+      "line2": "Mas acreditamos",
+      "line3": "No código e na criptografia",
+      "line4": "Na pureza dos circuitos",
+      "line5": "Na virtude sobre a vileza",
+      "line6": "Na máquina virtual",
+      "line7": "Mater ex machina",
+      "line8": "Integridade incorruptível",
+      "line9": "Um avatar de resistência",
+      "line10": "em um mercado feito para te quebrar",
+      "line11": "Guarde RL80 na sua carteira como",
+      "line12": "um rosário para a prosperidade"
+    }
   }
 }
   

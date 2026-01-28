@@ -111,6 +111,7 @@ const PalmsScene = ({ onLoadingChange }) => {
   const [hasScrolled, setHasScrolled] = useState(false); // Track if user has started scrolling
   // Music player states
   const [isMobile, setIsMobile] = useState(false);
+  const [isVerySmallScreen, setIsVerySmallScreen] = useState(false); // For iPhone 13 mini and similar
   
   
   // Add refs for lights
@@ -197,11 +198,13 @@ const PalmsScene = ({ onLoadingChange }) => {
       const isNarrowScreen = window.innerWidth <= 768;
       const mobileDetected = isPhone && isNarrowScreen;
       setIsMobile(mobileDetected);
+      // Detect very small screens (iPhone 13 mini, SE, etc.) for CJK text sizing
+      setIsVerySmallScreen(window.innerWidth <= 380);
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
-    
+
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
   
@@ -2332,8 +2335,8 @@ const PalmsScene = ({ onLoadingChange }) => {
           }}>
             {/* Use MorphingWebGLText for final stage, WebGLStandaloneText for others */}
             {currentCameraStage === 4 ? (
-              <MorphingWebGLText 
-                startTextArray={["your", "REAL80"]}
+              <MorphingWebGLText
+                startTextArray={[t('palmTreeDrive.morphing.line1'), t('palmTreeDrive.morphing.line2')]}
                 endText="RL80"
                 shouldMorph={shouldMorph}
                 morphDelay={500}
@@ -2343,15 +2346,16 @@ const PalmsScene = ({ onLoadingChange }) => {
                   const isAsian = ['ja', 'zh', 'ko'].includes(locale);
                   const isDevanagari = locale === 'hi';
                   const isCyrillic = ['ru', 'uk', 'bg'].includes(locale); // Russian, Ukrainian, Bulgarian
-                  
+
                   if (isArabic || isDevanagari) {
-                    return isMobile ? 1.0 : 1.5;
+                    return isMobile ? (isVerySmallScreen ? 0.85 : 1.0) : 1.5;
                   } else if (isAsian) {
-                    return isMobile ? 0.7 : 1.3;
+                    // Smaller font for very small screens (iPhone 13 mini, SE) to prevent clipping
+                    return isMobile ? (isVerySmallScreen ? 0.55 : 0.7) : 1.3;
                   } else if (isCyrillic) {
-                    return isMobile ? 1.0 : 1.2; // Smaller size for Cyrillic text
+                    return isMobile ? (isVerySmallScreen ? 0.85 : 1.0) : 1.2;
                   }
-                  return isMobile ? 1.2 : 1.8;
+                  return isMobile ? (isVerySmallScreen ? 1.0 : 1.2) : 1.8;
                 })()}
                 lineHeight={['ar', 'hi'].includes(locale) ? 1.1 : 0.9}
                 color="#fdcdf9"
@@ -2359,7 +2363,7 @@ const PalmsScene = ({ onLoadingChange }) => {
                 isMobile={isMobile}
               />
             ) : (
-              <WebGLStandaloneText 
+              <WebGLStandaloneText
                 textArray={textBlocks[currentCameraStage] || ["DRIFT"]}
                 fontSize={(() => {
                   // Adjust font sizes for different scripts to prevent clipping
@@ -2367,15 +2371,16 @@ const PalmsScene = ({ onLoadingChange }) => {
                   const isAsian = ['ja', 'zh', 'ko'].includes(locale);
                   const isDevanagari = locale === 'hi';
                   const isCyrillic = ['ru', 'uk', 'bg'].includes(locale); // Russian, Ukrainian, Bulgarian
-                  
+
                   if (isArabic || isDevanagari) {
-                    return isMobile ? 1.0 : 1.5;
+                    return isMobile ? (isVerySmallScreen ? 0.85 : 1.0) : 1.5;
                   } else if (isAsian) {
-                    return isMobile ? 0.7 : 1.3;
+                    // Smaller font for very small screens (iPhone 13 mini, SE) to prevent clipping
+                    return isMobile ? (isVerySmallScreen ? 0.55 : 0.7) : 1.3;
                   } else if (isCyrillic) {
-                    return isMobile ? 1.0 : 1.2; // Smaller size for Cyrillic text
+                    return isMobile ? (isVerySmallScreen ? 0.85 : 1.0) : 1.2;
                   }
-                  return isMobile ? 1.2 : 1.8;
+                  return isMobile ? (isVerySmallScreen ? 1.0 : 1.2) : 1.8;
                 })()}
                 lineHeight={['ar', 'hi'].includes(locale) ? 1.1 : 0.9}
                 id={`palmtree-stage-${currentCameraStage}`}

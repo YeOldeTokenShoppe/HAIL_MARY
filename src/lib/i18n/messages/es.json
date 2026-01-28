@@ -35,6 +35,10 @@
       "line2": "REALIDAD",
       "line3": " "
     },
+    "morphing": {
+      "line1": "tu",
+      "line2": "realidad"
+    },
     "scrollPrompt": "desliza hacia arriba para continuar"
   },
   "navigation": {
@@ -122,5 +126,94 @@
   "buyModal": {
     "title": "COMPRAR_RL80_",
     "secureTransaction": "<PROTOCOLO_TRANSACCIÓN_SEGURA_ACTIVO>"
+  },
+  "chatRoom": {
+    "placeholders": {
+      "typeMessage": "Escribe tu mensaje...",
+      "typeMessageShort": "Escribe un mensaje..."
+    },
+    "buttons": {
+      "send": "Enviar",
+      "signInToChat": "Inicia sesión para chatear",
+      "enableAlerts": "Activar alertas",
+      "leave": "Salir"
+    },
+    "headers": {
+      "spectatorLounge": "Sala de Espectadores",
+      "queue": "Cola"
+    },
+    "status": {
+      "allRidesFull": "Todos los paseos llenos",
+      "you": "(tú)",
+      "moreWaiting": "+{count} más esperando..."
+    },
+    "messages": {
+      "waitlistPrompt": "Todas las bestias están ocupadas. ¿Te gustaría unirte a la lista de espera?",
+      "waitlistAdded": "Has sido añadido a la lista de espera. Te notificaremos cuando una bestia esté disponible. Disfruta de la Sala Luna mientras tanto.",
+      "waitlistError": "Ocurrió un error al añadirte a la lista de espera. Por favor, intenta de nuevo.",
+      "alreadyRiding": "Ya estás montando otra bestia.",
+      "beastOccupied": "Esta bestia está ocupada. Por favor, selecciona una bestia disponible.",
+      "beastOccupiedChoose": "La bestia ya está ocupada. Por favor, elige otra bestia.",
+      "signInToRide": "Por favor, inicia sesión para montar la bestia.",
+      "genericError": "Ocurrió un error. Por favor, intenta de nuevo.",
+      "enterMessage": "Por favor, escribe un mensaje y asegúrate de haber iniciado sesión.",
+      "rateLimited": "Por favor, espera un momento antes de enviar otro mensaje.",
+      "sendFailed": "Error al enviar el mensaje. Por favor, intenta de nuevo.",
+      "quitError": "Error al salir del paseo. Por favor, intenta de nuevo.",
+      "confirmEndRide": "¿Estás seguro de que quieres terminar el paseo?",
+      "alreadyReported": "Ya has reportado este mensaje.",
+      "reportSubmitted": "Reporte enviado. Gracias por mantener la comunidad segura.",
+      "reportFailed": "Error al enviar el reporte. Por favor, intenta de nuevo.",
+      "playMusicFirst": "¡Primero reproduce música, luego compártela!",
+      "djSessionEnded": "La sesión de DJ de {name} terminó",
+      "listenAlong": "¿Escuchar la música de {name}? Reproduciendo: {track}"
+    },
+    "notifications": {
+      "beastReady": "¡Tu bestia está lista!",
+      "enjoyRide": "¡Disfruta tu paseo de 10 minutos en el carrusel!"
+    },
+    "accessibility": {
+      "rider": "Jinete"
+    },
+    "rideConfirm": {
+      "question": "¿Montar esta bestia?",
+      "yes": "Sí",
+      "no": "No"
+    },
+    "instructions": {
+      "title": "Instrucciones",
+      "clickBeast": "Haz clic en cualquier bestia disponible para iniciar un <strong>paseo de 10 minutos</strong>. Cuando terminen los 10 minutos, puedes continuar la conversación eligiendo otra bestia o chateando en el chat de espectadores.",
+      "signedIn": "Debes <strong>iniciar sesión</strong> para montar",
+      "messages": "Mientras montas, escribe mensajes que aparecen en tu bestia para que <strong>los usuarios registrados los vean.</strong> Los visitantes sin sesión verán texto encriptado.",
+      "charLimit": "Los mensajes están limitados a <strong>80 caracteres</strong>",
+      "djMode": "Activa el <strong>modo DJ</strong> para que los usuarios vean qué canción estás escuchando. Los usuarios pueden sincronizarse con la canción.",
+      "globalChat": "Si todas las bestias están ocupadas, estará disponible una <strong>barra lateral de chat global</strong>"
+    },
+    "marquee": {
+      "clickToChat": "HAZ CLIC EN CUALQUIER BESTIA DISPONIBLE PARA CHATEAR",
+      "mustLogin": "DEBES INICIAR SESIÓN PARA MONTAR Y DESCIFRAR MENSAJES"
+    }
+  },
+  "scroll": {
+    "readCredo": "Leer el Credo",
+    "tapToClose": "toca para cerrar",
+    "altText": "Toca para leer el pergamino",
+    "latinQuote": "\"Bene agere est vere lucrari.\"",
+    "latinTranslation": "(Actuar bien es ganar de verdad.)",
+    "attribution": "— San GR80",
+    "credo": {
+      "line1": "Somos sin confianza—",
+      "line2": "Pero creemos",
+      "line3": "En el código y la criptografía",
+      "line4": "En la pureza del circuito",
+      "line5": "En la virtud sobre la vileza",
+      "line6": "En la máquina virtual",
+      "line7": "Mater ex machina",
+      "line8": "Integridad incorruptible",
+      "line9": "Un avatar de resistencia",
+      "line10": "en un mercado hecho para quebrarte",
+      "line11": "Guarda RL80 en tu billetera como",
+      "line12": "un rosario para la prosperidad"
+    }
   }
 }

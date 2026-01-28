@@ -35,6 +35,10 @@
       "line2": "REALTÀ",
       "line3": " "
     },
+    "morphing": {
+      "line1": "la tua",
+      "line2": "realtà"
+    },
     "scrollPrompt": "scorri verso l'alto per continuare"
   },
   "navigation": {
@@ -123,5 +127,94 @@
   "buyModal": {
     "title": "ACQUISTA_RL80_",
     "secureTransaction": "<PROTOCOLLO_TRANSAZIONE_SICURA_ATTIVO>"
+  },
+  "chatRoom": {
+    "placeholders": {
+      "typeMessage": "Scrivi il tuo messaggio...",
+      "typeMessageShort": "Scrivi un messaggio..."
+    },
+    "buttons": {
+      "send": "Invia",
+      "signInToChat": "Accedi per chattare",
+      "enableAlerts": "Attiva avvisi",
+      "leave": "Esci"
+    },
+    "headers": {
+      "spectatorLounge": "Sala Spettatori",
+      "queue": "Coda"
+    },
+    "status": {
+      "allRidesFull": "Tutti i giri pieni",
+      "you": "(tu)",
+      "moreWaiting": "+{count} altri in attesa..."
+    },
+    "messages": {
+      "waitlistPrompt": "Tutte le bestie sono occupate. Vuoi essere aggiunto alla lista d'attesa?",
+      "waitlistAdded": "Sei stato aggiunto alla lista d'attesa. Ti avviseremo quando una bestia sarà disponibile. Goditi la Sala Luna nel frattempo.",
+      "waitlistError": "Si è verificato un errore durante l'aggiunta alla lista d'attesa. Riprova.",
+      "alreadyRiding": "Stai già cavalcando un'altra bestia.",
+      "beastOccupied": "Questa bestia è occupata. Seleziona una bestia disponibile.",
+      "beastOccupiedChoose": "La bestia è già occupata. Scegli un'altra bestia.",
+      "signInToRide": "Accedi per cavalcare la bestia.",
+      "genericError": "Si è verificato un errore. Riprova.",
+      "enterMessage": "Inserisci un messaggio e assicurati di aver effettuato l'accesso.",
+      "rateLimited": "Attendi un momento prima di inviare un altro messaggio.",
+      "sendFailed": "Invio messaggio fallito. Riprova.",
+      "quitError": "Errore durante l'uscita dal giro. Riprova.",
+      "confirmEndRide": "Sei sicuro di voler terminare il giro?",
+      "alreadyReported": "Hai già segnalato questo messaggio.",
+      "reportSubmitted": "Segnalazione inviata. Grazie per mantenere la community sicura.",
+      "reportFailed": "Segnalazione fallita. Riprova.",
+      "playMusicFirst": "Prima riproduci la musica, poi condividila!",
+      "djSessionEnded": "La sessione DJ di {name} è terminata",
+      "listenAlong": "Ascoltare la musica di {name}? In riproduzione: {track}"
+    },
+    "notifications": {
+      "beastReady": "La tua bestia è pronta!",
+      "enjoyRide": "Goditi il tuo giro di 10 minuti sulla giostra!"
+    },
+    "accessibility": {
+      "rider": "Cavaliere"
+    },
+    "rideConfirm": {
+      "question": "Cavalcare questa bestia?",
+      "yes": "Sì",
+      "no": "No"
+    },
+    "instructions": {
+      "title": "Istruzioni",
+      "clickBeast": "Clicca su una bestia disponibile per iniziare un <strong>giro di 10 minuti</strong>. Dopo 10 minuti, puoi continuare la conversazione scegliendo un'altra bestia o chattando nella chat degli spettatori.",
+      "signedIn": "Devi essere <strong>connesso</strong> per cavalcare",
+      "messages": "Durante il giro, scrivi messaggi che appaiono sulla tua bestia per farli <strong>vedere agli utenti connessi.</strong> I visitatori non connessi vedranno testo criptato.",
+      "charLimit": "I messaggi sono limitati a <strong>80 caratteri</strong>",
+      "djMode": "Attiva la <strong>modalità DJ</strong> per mostrare agli utenti quale canzone stai ascoltando. Gli utenti possono sincronizzarsi con la canzone.",
+      "globalChat": "Se tutte le bestie sono occupate, diventa disponibile una <strong>barra laterale di chat globale</strong>"
+    },
+    "marquee": {
+      "clickToChat": "CLICCA SU UNA BESTIA DISPONIBILE PER CHATTARE",
+      "mustLogin": "ACCEDI PER CAVALCARE E DECIFRARE I MESSAGGI"
+    }
+  },
+  "scroll": {
+    "readCredo": "Leggi il Credo",
+    "tapToClose": "tocca per chiudere",
+    "altText": "Tocca per leggere il rotolo",
+    "latinQuote": "\"Bene agere est vere lucrari.\"",
+    "latinTranslation": "(Agire bene è veramente profittare.)",
+    "attribution": "— S. GR80",
+    "credo": {
+      "line1": "Siamo senza fiducia—",
+      "line2": "Ma crediamo",
+      "line3": "Nel codice e nella crittografia",
+      "line4": "Nella purezza dei circuiti",
+      "line5": "Nella virtù sulla malvagità",
+      "line6": "Nella macchina virtuale",
+      "line7": "Mater ex machina",
+      "line8": "Integrità incorruttibile",
+      "line9": "Un avatar di resistenza",
+      "line10": "in un mercato fatto per spezzarti",
+      "line11": "Tieni RL80 nel tuo wallet come",
+      "line12": "un rosario per la prosperità"
+    }
   }
 }

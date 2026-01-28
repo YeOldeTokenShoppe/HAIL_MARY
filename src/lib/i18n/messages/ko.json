@@ -35,6 +35,10 @@
       "line2": "현실",
       "line3": " "
     },
+    "morphing": {
+      "line1": "당신의",
+      "line2": "현실"
+    },
     "scrollPrompt": "위로 스크롤하여 계속하기"
   },
   "navigation": {
@@ -123,5 +127,94 @@
   "buyModal": {
     "title": "구매_RL80_",
     "secureTransaction": "<보안_거래_프로토콜_활성>"
+  },
+  "chatRoom": {
+    "placeholders": {
+      "typeMessage": "메시지를 입력하세요...",
+      "typeMessageShort": "메시지 입력..."
+    },
+    "buttons": {
+      "send": "보내기",
+      "signInToChat": "로그인하여 채팅",
+      "enableAlerts": "알림 활성화",
+      "leave": "나가기"
+    },
+    "headers": {
+      "spectatorLounge": "관람객 라운지",
+      "queue": "대기열"
+    },
+    "status": {
+      "allRidesFull": "모든 탑승이 만석",
+      "you": "(나)",
+      "moreWaiting": "+{count}명 대기 중..."
+    },
+    "messages": {
+      "waitlistPrompt": "모든 비스트가 사용 중입니다. 대기 목록에 추가하시겠습니까?",
+      "waitlistAdded": "대기 목록에 추가되었습니다. 비스트가 이용 가능해지면 알려드리겠습니다. 문 룸에서 기다려 주세요.",
+      "waitlistError": "대기 목록 추가 중 오류가 발생했습니다. 다시 시도해 주세요.",
+      "alreadyRiding": "이미 다른 비스트를 타고 있습니다.",
+      "beastOccupied": "이 비스트는 사용 중입니다. 다른 비스트를 선택해 주세요.",
+      "beastOccupiedChoose": "비스트가 이미 사용 중입니다. 다른 것을 선택해 주세요.",
+      "signInToRide": "비스트를 타려면 로그인해 주세요.",
+      "genericError": "오류가 발생했습니다. 다시 시도해 주세요.",
+      "enterMessage": "메시지를 입력하고 로그인되어 있는지 확인해 주세요.",
+      "rateLimited": "다음 메시지를 보내기 전에 잠시 기다려 주세요.",
+      "sendFailed": "메시지 전송에 실패했습니다. 다시 시도해 주세요.",
+      "quitError": "탑승 종료 중 오류가 발생했습니다. 다시 시도해 주세요.",
+      "confirmEndRide": "탑승을 종료하시겠습니까?",
+      "alreadyReported": "이미 이 메시지를 신고했습니다.",
+      "reportSubmitted": "신고가 제출되었습니다. 커뮤니티 안전에 기여해 주셔서 감사합니다.",
+      "reportFailed": "신고 제출에 실패했습니다. 다시 시도해 주세요.",
+      "playMusicFirst": "먼저 음악을 재생한 다음 공유하세요!",
+      "djSessionEnded": "{name}의 DJ 세션이 종료되었습니다",
+      "listenAlong": "{name}의 음악을 들으시겠습니까? 재생 중: {track}"
+    },
+    "notifications": {
+      "beastReady": "비스트가 준비되었습니다!",
+      "enjoyRide": "10분간의 회전목마를 즐기세요!"
+    },
+    "accessibility": {
+      "rider": "라이더"
+    },
+    "marquee": {
+      "clickToChat": "이용 가능한 비스트를 클릭하여 채팅하세요",
+      "mustLogin": "탑승 및 메시지 해독을 위해 로그인하세요"
+    },
+    "rideConfirm": {
+      "question": "이 비스트를 타시겠습니까?",
+      "yes": "예",
+      "no": "아니오"
+    },
+    "instructions": {
+      "title": "이용 안내",
+      "clickBeast": "이용 가능한 비스트를 클릭하여 <strong>10분 탑승</strong>을 시작하세요. 10분 후 다른 비스트를 선택하거나 관람객 채팅에서 대화를 계속할 수 있습니다.",
+      "signedIn": "탑승하려면 <strong>로그인</strong>이 필요합니다",
+      "messages": "탑승 중 비스트에 표시되는 메시지를 입력하여 <strong>로그인한 사용자에게 보여주세요.</strong> 로그인하지 않은 방문자는 암호화된 텍스트를 보게 됩니다.",
+      "charLimit": "메시지는 <strong>80자</strong>로 제한됩니다",
+      "djMode": "<strong>DJ 모드</strong>를 켜서 듣고 있는 노래를 사용자에게 보여주세요. 사용자는 노래에 동기화할 수 있습니다.",
+      "globalChat": "모든 비스트가 사용 중이면 <strong>글로벌 채팅 사이드바</strong>가 활성화됩니다"
+    }
+  },
+  "scroll": {
+    "readCredo": "신조 읽기",
+    "tapToClose": "탭하여 닫기",
+    "altText": "탭하여 두루마리 읽기",
+    "latinQuote": "\"Bene agere est vere lucrari.\"",
+    "latinTranslation": "(선행이 참된 이익이다.)",
+    "attribution": "— 성 GR80",
+    "credo": {
+      "line1": "우리는 신뢰 없이—",
+      "line2": "그러나 우리는 믿는다",
+      "line3": "코드와 암호학을",
+      "line4": "회로의 순수함을",
+      "line5": "악덕보다 미덕을",
+      "line6": "가상 머신을",
+      "line7": "Mater ex machina",
+      "line8": "부패 없는 청렴함",
+      "line9": "저항의 아바타",
+      "line10": "널 무너뜨릴 시장에서",
+      "line11": "RL80을 지갑에 보관하라",
+      "line12": "번영의 묵주로서"
+    }
   }
 }

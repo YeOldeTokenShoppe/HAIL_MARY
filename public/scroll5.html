@@ -86,5 +86,12 @@ A document asserting authority through format rather than conclusion.<br/></span
       })();
     </script>
     <script src="./scroll.js"></script>
+    <script>
+      // Check for plaintext mode
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('plaintext') === 'true') {
+        document.getElementById('container').classList.add('plaintext');
+      }
+    </script>
   </body>
 </html>

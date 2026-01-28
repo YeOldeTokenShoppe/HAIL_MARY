@@ -35,6 +35,10 @@
       "line2": "RÉALITÉ",
       "line3": " "
     },
+    "morphing": {
+      "line1": "votre",
+      "line2": "réalité"
+    },
     "scrollPrompt": "faites défiler vers le haut pour continuer"
   },
   "navigation": {
@@ -122,5 +126,94 @@
   "buyModal": {
     "title": "ACHETER_RL80_",
     "secureTransaction": "<PROTOCOLE_TRANSACTION_SÉCURISÉE_ACTIF>"
+  },
+  "chatRoom": {
+    "placeholders": {
+      "typeMessage": "Écrivez votre message...",
+      "typeMessageShort": "Écrivez un message..."
+    },
+    "buttons": {
+      "send": "Envoyer",
+      "signInToChat": "Connectez-vous pour chatter",
+      "enableAlerts": "Activer les alertes",
+      "leave": "Quitter"
+    },
+    "headers": {
+      "spectatorLounge": "Salon des Spectateurs",
+      "queue": "File d'attente"
+    },
+    "status": {
+      "allRidesFull": "Tous les tours complets",
+      "you": "(vous)",
+      "moreWaiting": "+{count} en attente..."
+    },
+    "messages": {
+      "waitlistPrompt": "Toutes les bêtes sont occupées. Voulez-vous être ajouté à la liste d'attente?",
+      "waitlistAdded": "Vous avez été ajouté à la liste d'attente. Nous vous notifierons quand une bête sera disponible. Profitez de la Salle Lune en attendant.",
+      "waitlistError": "Une erreur s'est produite lors de l'ajout à la liste d'attente. Veuillez réessayer.",
+      "alreadyRiding": "Vous montez déjà une autre bête.",
+      "beastOccupied": "Cette bête est occupée. Veuillez sélectionner une bête disponible.",
+      "beastOccupiedChoose": "La bête est déjà occupée. Veuillez choisir une autre bête.",
+      "signInToRide": "Veuillez vous connecter pour monter la bête.",
+      "genericError": "Une erreur s'est produite. Veuillez réessayer.",
+      "enterMessage": "Veuillez entrer un message et vous assurer d'être connecté.",
+      "rateLimited": "Veuillez attendre un moment avant d'envoyer un autre message.",
+      "sendFailed": "Échec de l'envoi du message. Veuillez réessayer.",
+      "quitError": "Erreur lors de la fin du tour. Veuillez réessayer.",
+      "confirmEndRide": "Êtes-vous sûr de vouloir terminer le tour?",
+      "alreadyReported": "Vous avez déjà signalé ce message.",
+      "reportSubmitted": "Signalement envoyé. Merci de garder la communauté sûre.",
+      "reportFailed": "Échec du signalement. Veuillez réessayer.",
+      "playMusicFirst": "Jouez de la musique d'abord, puis partagez-la!",
+      "djSessionEnded": "La session DJ de {name} est terminée",
+      "listenAlong": "Écouter la musique de {name}? En cours: {track}"
+    },
+    "notifications": {
+      "beastReady": "Votre bête est prête!",
+      "enjoyRide": "Profitez de votre tour de 10 minutes sur le carrousel!"
+    },
+    "accessibility": {
+      "rider": "Cavalier"
+    },
+    "rideConfirm": {
+      "question": "Monter cette bête?",
+      "yes": "Oui",
+      "no": "Non"
+    },
+    "instructions": {
+      "title": "Instructions",
+      "clickBeast": "Cliquez sur une bête disponible pour commencer un <strong>tour de 10 minutes</strong>. Après 10 minutes, vous pouvez continuer la conversation en choisissant une autre bête ou en chattant dans le chat des spectateurs.",
+      "signedIn": "Vous devez être <strong>connecté</strong> pour monter",
+      "messages": "Pendant le tour, tapez des messages qui apparaissent sur votre bête pour que <strong>les utilisateurs connectés les voient.</strong> Les visiteurs non connectés verront du texte crypté.",
+      "charLimit": "Les messages sont limités à <strong>80 caractères</strong>",
+      "djMode": "Activez le <strong>mode DJ</strong> pour montrer aux utilisateurs quelle chanson vous écoutez. Les utilisateurs peuvent se synchroniser avec la chanson.",
+      "globalChat": "Si toutes les bêtes sont occupées, une <strong>barre latérale de chat global</strong> devient disponible"
+    },
+    "marquee": {
+      "clickToChat": "CLIQUEZ SUR UNE BÊTE DISPONIBLE POUR DISCUTER",
+      "mustLogin": "CONNECTEZ-VOUS POUR CHEVAUCHER ET DÉCRYPTER LES MESSAGES"
+    }
+  },
+  "scroll": {
+    "readCredo": "Lire le Credo",
+    "tapToClose": "appuyez pour fermer",
+    "altText": "Appuyez pour lire le parchemin",
+    "latinQuote": "\"Bene agere est vere lucrari.\"",
+    "latinTranslation": "(Bien agir, c'est vraiment profiter.)",
+    "attribution": "— St. GR80",
+    "credo": {
+      "line1": "Nous sommes sans confiance—",
+      "line2": "Mais nous croyons",
+      "line3": "Au code et à la cryptographie",
+      "line4": "À la pureté des circuits",
+      "line5": "À la vertu sur la vilenie",
+      "line6": "À la machine virtuelle",
+      "line7": "Mater ex machina",
+      "line8": "Intégrité incorruptible",
+      "line9": "Un avatar de résistance",
+      "line10": "dans un marché fait pour te briser",
+      "line11": "Garde RL80 dans ton wallet",
+      "line12": "comme chapelet de prospérité"
+    }
   }
 }

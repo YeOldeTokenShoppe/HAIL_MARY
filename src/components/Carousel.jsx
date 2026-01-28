@@ -41,6 +41,7 @@ import { useAuth } from "@clerk/nextjs"; // Add this line if it's missing
 import EmojiPicker from "emoji-picker-react";
 import "./Carousel.css";
 import { useMusic } from "./MusicContext";
+import { useLanguage } from "./LanguageProvider";
 
 // Scramble text for signed-out users to tease chat content
 const scrambleText = (text) => {
@@ -243,6 +244,16 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
   const { isSignedIn, user, isLoaded } = useUser();
   const { openSignIn } = useClerk();
   const { getToken } = useAuth();
+  const { t, locale } = useLanguage();
+
+  // Debug: log translation function results
+  console.log('[Carousel i18n Debug]', {
+    locale,
+    testKey: 'chatRoom.buttons.send',
+    testResult: t('chatRoom.buttons.send'),
+    isFunction: typeof t === 'function'
+  });
+
   const [lastMessageTime, setLastMessageTime] = useState(0); // Rate limiting
 
   const [firebaseUser, setFirebaseUser] = useState(null);
@@ -483,7 +494,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
 
   const promptWaitlistAddition = () => {
     showPopupMessage(
-      "All beasts are occupied. Would you like to be added to the waitlist?",
+      t("chatRoom.messages.waitlistPrompt"),
       handleWaitlistAddition,
       handleClosePopup
     );
@@ -508,7 +519,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
       });
 
       showPopupMessage(
-        "You have been added to the waitlist. We will notify you when a beast is available. Please enjoy the Moon Room in the meantime.",
+        t("chatRoom.messages.waitlistAdded"),
         null,
         handleClosePopup,
         true
@@ -516,7 +527,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
     } catch (error) {
       console.error("Failed to add user to the waitlist:", error);
       showPopupMessage(
-        "An error occurred while adding you to the waitlist. Please try again.",
+        t("chatRoom.messages.waitlistError"),
         null,
         handleClosePopup,
         true
@@ -540,7 +551,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
         // If this beast is broadcasting, offer listen-along
         if (beastData.djTrackName) {
           showPopupMessage(
-            `Listen along to ${beastData.username}'s music? Now playing: ${beastData.djTrackName}`,
+            t("chatRoom.messages.listenAlong").replace("{name}", beastData.username).replace("{track}", beastData.djTrackName),
             () => startListening(beastId, beastData.username)
           );
           return;
@@ -554,7 +565,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
         const existingRidesSnapshot = await getDocs(existingRidesQuery);
 
         if (!existingRidesSnapshot.empty) {
-          showPopupMessage("You are already riding another beast.");
+          showPopupMessage(t("chatRoom.messages.alreadyRiding"));
           return;
         }
 
@@ -575,7 +586,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
           promptWaitlistAddition();
         } else {
           showPopupMessage(
-            "This beast is occupied. Please select an available beast."
+            t("chatRoom.messages.beastOccupied")
           );
         }
         return;
@@ -589,7 +600,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
       const existingRidesSnapshot = await getDocs(existingRidesQuery);
 
       if (!existingRidesSnapshot.empty) {
-        showPopupMessage("You are already riding another beast.");
+        showPopupMessage(t("chatRoom.messages.alreadyRiding"));
         return;
       }
 
@@ -598,7 +609,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
       setIsRideConfirmationOpen(true);
     } catch (error) {
       console.error("Error checking beast occupancy:", error);
-      showPopupMessage("An error occurred. Please try again.");
+      showPopupMessage(t("chatRoom.messages.genericError"));
     }
   };
   const loadMessages = (beastId) => {
@@ -651,7 +662,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
   };
   const confirmRide = async () => {
     if (!user) {
-      showPopupMessage("Please sign in to ride the beast.");
+      showPopupMessage(t("chatRoom.messages.signInToRide"));
       return;
     }
 
@@ -670,7 +681,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
       const existingRidesSnapshot = await getDocs(existingRidesQuery);
 
       if (!existingRidesSnapshot.empty) {
-        showPopupMessage("You are already riding another beast.");
+        showPopupMessage(t("chatRoom.messages.alreadyRiding"));
         return; // Exit early if the user is already riding
       }
 
@@ -680,7 +691,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
 
       if (beastDoc.exists() && beastDoc.data().userId) {
         showPopupMessage(
-          "Beast is already occupied. Please choose another beast."
+          t("chatRoom.messages.beastOccupiedChoose")
         );
         return;
       }
@@ -703,7 +714,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
       setIsRideConfirmationOpen(false);
     } catch (error) {
       console.error("Failed to confirm ride:", error);
-      showPopupMessage(error.message || "Failed to confirm ride.");
+      showPopupMessage(error.message || t("chatRoom.messages.genericError"));
     }
   };
   useEffect(() => {
@@ -765,14 +776,14 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
   const handleSendMessage = async (beastId) => {
     const sanitizedMessage = sanitizeMessage(newMessage, true); // Block URLs
     if (!sanitizedMessage || sanitizedMessage === '[link removed]' || !user) {
-      showPopupMessage("Please enter a message and ensure you are logged in.");
+      showPopupMessage(t("chatRoom.messages.enterMessage"));
       return;
     }
 
     // Rate limiting
     const now = Date.now();
     if (now - lastMessageTime < RATE_LIMIT_MS) {
-      showPopupMessage("Please wait a moment before sending another message.");
+      showPopupMessage(t("chatRoom.messages.rateLimited"));
       return;
     }
     setLastMessageTime(now);
@@ -794,7 +805,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
       setNewMessage(""); // Clear input
     } catch (error) {
       console.error("Failed to send message:", error);
-      showPopupMessage("Failed to send the message. Please try again.");
+      showPopupMessage(t("chatRoom.messages.sendFailed"));
     }
   };
 
@@ -959,7 +970,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
       });
     } catch (error) {
       console.error("Failed to quit the ride:", error);
-      showPopupMessage("Error quitting the ride. Please try again.");
+      showPopupMessage(t("chatRoom.messages.quitError"));
     }
   };
 
@@ -1389,7 +1400,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
 
     // Check if already reported by this user
     if (reportedMessages.has(message.id)) {
-      showPopupMessage("You've already reported this message.");
+      showPopupMessage(t("chatRoom.messages.alreadyReported"));
       return;
     }
 
@@ -1407,10 +1418,10 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
       });
 
       setReportedMessages(prev => new Set([...prev, message.id]));
-      showPopupMessage("Report submitted. Thank you for keeping the community safe.");
+      showPopupMessage(t("chatRoom.messages.reportSubmitted"));
     } catch (error) {
       console.error("Failed to submit report:", error);
-      showPopupMessage("Failed to submit report. Please try again.");
+      showPopupMessage(t("chatRoom.messages.reportFailed"));
     }
   };
 
@@ -1431,7 +1442,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
 
         // Check if user just got assigned (was in queue, now riding)
         if (prevQueuePositionRef.current === 1 && newPosition === null && isRiding) {
-          sendNotification("Your beast is ready!", "Enjoy your 10-minute ride on the carousel!");
+          sendNotification(t("chatRoom.notifications.beastReady"), t("chatRoom.notifications.enjoyRide"));
         }
 
         setUserQueuePosition(newPosition);
@@ -1587,7 +1598,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
   const handleCloseChatBox = () => {
     if (rideActive) {
       // Show a confirmation popup only if the ride is still active
-      showPopupMessage("Are you sure you want to end the ride?", () => {
+      showPopupMessage(t("chatRoom.messages.confirmEndRide"), () => {
         quitRide(); // Quit the ride if confirmed
         setIsRiding(false); // Ensure the state is updated correctly
         setActiveBeastId(null);
@@ -1675,7 +1686,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
     } else {
       // Turn ON broadcasting
       if (!currentTrack || !isPlaying) {
-        showPopupMessage("Start playing music first, then share it!");
+        showPopupMessage(t("chatRoom.messages.playMusicFirst"));
         return;
       }
       try {
@@ -1722,7 +1733,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
     const unsub = onSnapshot(beastRef, (snapshot) => {
       if (!snapshot.exists()) {
         // Beast doc deleted — DJ's ride ended
-        showPopupMessage(`${riderName}'s DJ session ended`);
+        showPopupMessage(t("chatRoom.messages.djSessionEnded").replace("{name}", riderName));
         stopListening();
         return;
       }
@@ -1730,7 +1741,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
       const data = snapshot.data();
       if (!data.djTrackPath) {
         // DJ stopped broadcasting
-        showPopupMessage(`${riderName}'s DJ session ended`);
+        showPopupMessage(t("chatRoom.messages.djSessionEnded").replace("{name}", riderName));
         stopListening();
         return;
       }
@@ -1805,6 +1816,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
             onTouchStart={() => setIsHovered(true)}
+            onTouchEnd={() => setIsHovered(false)}
           >
             {images.map((image, index) => {
               const beastId = `beast${index + 1}`;
@@ -1822,8 +1834,8 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                   {isEven && ((Math.floor(index / 2) % 2 === 0 && !hasRidden) || (Math.floor(index / 2) % 2 === 1 && !isSignedIn)) && (
                     <div className="marquee-overlay">
                       <span>{Math.floor(index / 2) % 2 === 0
-                        ? "CLICK ANY AVAILABLE BEAST TO CHAT WHILE RIDING"
-                        : "MUST BE LOGGED IN TO RIDE AND DECRYPT MESSAGES"}</span>
+                        ? t("chatRoom.marquee.clickToChat")
+                        : t("chatRoom.marquee.mustLogin")}</span>
                     </div>
                   )}
                   {rider && (
@@ -1849,7 +1861,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                             <p className="rider-name rider-name-hidden">{isSignedIn ? rider.username : scrambleText(rider.username)}</p>
                             <img
                               src={sanitizeImageUrl(rider.imageUrl)}
-                              alt={rider.username || "Rider"}
+                              alt={rider.username || t("chatRoom.accessibility.rider")}
                               className="rider-avatar"
                             />
                             {rider.djTrackName && (
@@ -1989,7 +2001,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                     fontFamily: "Roboto, sans-serif",
                   }}
                 >
-                  Ride this beast?
+                  {t("chatRoom.rideConfirm.question")}
                 </p>
                 <div
                   style={{
@@ -2022,7 +2034,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                       e.target.style.boxShadow = "0 2px 10px rgba(212, 175, 55, 0.3)";
                     }}
                   >
-                    Yes
+                    {t("chatRoom.rideConfirm.yes")}
                   </button>
                   <button
                     onClick={() => setIsRideConfirmationOpen(false)}
@@ -2046,7 +2058,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                       e.target.style.color = "rgba(255, 255, 255, 0.8)";
                     }}
                   >
-                    No
+                    {t("chatRoom.rideConfirm.no")}
                   </button>
                 </div>
               </div>
@@ -2268,7 +2280,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                     setNewMessage(message);
                   }
                 }}
-                placeholder="Type your message..."
+                placeholder={t("chatRoom.placeholders.typeMessage")}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && newMessage.trim() !== "") {
                     handleSendMessage(activeBeastId);
@@ -2408,7 +2420,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                 fontFamily: "Oleo Script, cursive",
               }}
             >
-              Spectator Lounge
+              {t("chatRoom.headers.spectatorLounge")}
             </h3>
             <span
               style={{
@@ -2419,7 +2431,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                 borderRadius: "10px",
               }}
             >
-              All rides full
+              {t("chatRoom.status.allRidesFull")}
             </span>
           </div>
 
@@ -2434,7 +2446,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
             >
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
                 <span style={{ color: "#d4af37", fontSize: "12px", fontWeight: "bold" }}>
-                  Queue ({waitlist.length})
+                  {t("chatRoom.headers.queue")} ({waitlist.length})
                 </span>
                 {notificationPermission !== 'granted' && (
                   <button
@@ -2449,7 +2461,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                       cursor: "pointer",
                     }}
                   >
-                    🔔 Enable alerts
+                    🔔 {t("chatRoom.buttons.enableAlerts")}
                   </button>
                 )}
               </div>
@@ -2476,7 +2488,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                     />
                     <span style={{ color: "white", fontSize: "11px", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {person.username}
-                      {person.userId === user?.id && " (you)"}
+                      {person.userId === user?.id && ` ${t("chatRoom.status.you")}`}
                     </span>
                     {person.userId === user?.id && (
                       <button
@@ -2491,14 +2503,14 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                           cursor: "pointer",
                         }}
                       >
-                        Leave
+                        {t("chatRoom.buttons.leave")}
                       </button>
                     )}
                   </div>
                 ))}
                 {waitlist.length > 5 && (
                   <span style={{ color: "rgba(255, 255, 255, 0.5)", fontSize: "10px", textAlign: "center" }}>
-                    +{waitlist.length - 5} more waiting...
+                    {t("chatRoom.status.moreWaiting").replace("{count}", waitlist.length - 5)}
                   </span>
                 )}
               </div>
@@ -2648,7 +2660,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                     handleSendGlobalMessage();
                   }
                 }}
-                placeholder="Type a message..."
+                placeholder={t("chatRoom.placeholders.typeMessageShort")}
                 style={{
                   flex: 1,
                   padding: "8px 12px",
@@ -2675,7 +2687,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                   fontSize: "12px",
                 }}
               >
-                Send
+                {t("chatRoom.buttons.send")}
               </button>
             </div>
           ) : (
@@ -2698,7 +2710,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                     fontSize: "12px",
                   }}
                 >
-                  Sign in to chat
+                  {t("chatRoom.buttons.signInToChat")}
                 </button>
               </SignInButton>
             </div>

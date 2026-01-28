@@ -9,6 +9,7 @@ import CoinLoader from "@/components/CoinLoader";
 import { useUser } from "@clerk/nextjs";
 import { useMusic } from "@/components/MusicContext";
 import CyberNav from "@/components/CyberNav";
+import { useLanguage } from "@/components/LanguageProvider";
 
 const NavControlsHome = dynamic(() => import("@/components/NavControlsHome"), {
   ssr: false,
@@ -92,6 +93,7 @@ export default function CommunionPage() {
 
 
   const { user } = useUser();
+  const { t } = useLanguage();
   const {
     play,
     pause,
@@ -690,7 +692,7 @@ export default function CommunionPage() {
                   textShadow: "0 0 8px rgba(212, 175, 55, 0.4)",
                 }}
               >
-                Instructions
+                {t("chatRoom.instructions.title")}
               </h3>
 
               <ul
@@ -705,31 +707,27 @@ export default function CommunionPage() {
               >
                 <li style={{ marginBottom: "0.6rem" }}>
                   <span style={{ color: "#d4af37", marginRight: "8px" }}>&#9733;</span>
-                  Click any available beast to start a <strong>10-minute ride</strong>. When 
-                  10 minutes are up, you can keep the conversation going by choosing another beast or chatting in the spectator chat box.
+                  <span dangerouslySetInnerHTML={{ __html: t("chatRoom.instructions.clickBeast") }} />
                 </li>
                 <li style={{ marginBottom: "0.6rem" }}>
                   <span style={{ color: "#d4af37", marginRight: "8px" }}>&#9733;</span>
-                  You must be <strong>signed in</strong> to ride
+                  <span dangerouslySetInnerHTML={{ __html: t("chatRoom.instructions.signedIn") }} />
                 </li>
                 <li style={{ marginBottom: "0.6rem" }}>
                   <span style={{ color: "#d4af37", marginRight: "8px" }}>&#9733;</span>
-                  While riding, type messages that appear on your beast for <strong>signed-in users to see.</strong>
-                  { } Visitors that are not signed in will see encrypted text.
+                  <span dangerouslySetInnerHTML={{ __html: t("chatRoom.instructions.messages") }} />
                 </li>
                 <li style={{ marginBottom: "0.6rem" }}>
                   <span style={{ color: "#d4af37", marginRight: "8px" }}>&#9733;</span>
-                  Messages are limited to <strong>80 characters</strong>
+                  <span dangerouslySetInnerHTML={{ __html: t("chatRoom.instructions.charLimit") }} />
                 </li>
-                
                 <li style={{ marginBottom: "0.6rem" }}>
                   <span style={{ color: "#d4af37", marginRight: "8px" }}>&#9733;</span>
-                  Toggle <strong>DJ mode</strong> to let users see what song track you're listening to. Users can opt to 
-                  synch up with the song.
+                  <span dangerouslySetInnerHTML={{ __html: t("chatRoom.instructions.djMode") }} />
                 </li>
                 <li>
                   <span style={{ color: "#d4af37", marginRight: "8px" }}>&#9733;</span>
-                  If all beasts are occupied, a <strong>global chat sidebar</strong> becomes available
+                  <span dangerouslySetInnerHTML={{ __html: t("chatRoom.instructions.globalChat") }} />
                 </li>
               </ul>
             </div>

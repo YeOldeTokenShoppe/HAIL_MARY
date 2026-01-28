@@ -35,6 +35,10 @@
       "line2": "REALITÄT",
       "line3": " "
     },
+    "morphing": {
+      "line1": "deine",
+      "line2": "Realität"
+    },
     "scrollPrompt": "nach oben scrollen um fortzufahren"
   },
   "navigation": {
@@ -123,5 +127,94 @@
   "buyModal": {
     "title": "KAUFEN_RL80_",
     "secureTransaction": "<SICHERES_TRANSAKTIONSPROTOKOLL_AKTIV>"
+  },
+  "chatRoom": {
+    "placeholders": {
+      "typeMessage": "Nachricht eingeben...",
+      "typeMessageShort": "Nachricht schreiben..."
+    },
+    "buttons": {
+      "send": "Senden",
+      "signInToChat": "Anmelden zum Chatten",
+      "enableAlerts": "Benachrichtigungen aktivieren",
+      "leave": "Verlassen"
+    },
+    "headers": {
+      "spectatorLounge": "Zuschauerlounge",
+      "queue": "Warteschlange"
+    },
+    "status": {
+      "allRidesFull": "Alle Fahrten belegt",
+      "you": "(du)",
+      "moreWaiting": "+{count} weitere warten..."
+    },
+    "messages": {
+      "waitlistPrompt": "Alle Bestien sind besetzt. Möchtest du auf die Warteliste?",
+      "waitlistAdded": "Du wurdest zur Warteliste hinzugefügt. Wir benachrichtigen dich, wenn eine Bestie verfügbar ist. Genieße den Mondraum in der Zwischenzeit.",
+      "waitlistError": "Fehler beim Hinzufügen zur Warteliste. Bitte versuche es erneut.",
+      "alreadyRiding": "Du reitest bereits eine andere Bestie.",
+      "beastOccupied": "Diese Bestie ist besetzt. Bitte wähle eine verfügbare Bestie.",
+      "beastOccupiedChoose": "Bestie ist bereits besetzt. Bitte wähle eine andere Bestie.",
+      "signInToRide": "Bitte melde dich an, um die Bestie zu reiten.",
+      "genericError": "Ein Fehler ist aufgetreten. Bitte versuche es erneut.",
+      "enterMessage": "Bitte gib eine Nachricht ein und stelle sicher, dass du angemeldet bist.",
+      "rateLimited": "Bitte warte einen Moment, bevor du eine weitere Nachricht sendest.",
+      "sendFailed": "Nachricht konnte nicht gesendet werden. Bitte versuche es erneut.",
+      "quitError": "Fehler beim Beenden der Fahrt. Bitte versuche es erneut.",
+      "confirmEndRide": "Bist du sicher, dass du die Fahrt beenden möchtest?",
+      "alreadyReported": "Du hast diese Nachricht bereits gemeldet.",
+      "reportSubmitted": "Meldung gesendet. Danke, dass du die Community sicher hältst.",
+      "reportFailed": "Meldung fehlgeschlagen. Bitte versuche es erneut.",
+      "playMusicFirst": "Spiele zuerst Musik ab, dann teile sie!",
+      "djSessionEnded": "{name}s DJ-Session ist beendet",
+      "listenAlong": "{name}s Musik mithören? Läuft gerade: {track}"
+    },
+    "notifications": {
+      "beastReady": "Deine Bestie ist bereit!",
+      "enjoyRide": "Genieße deine 10-minütige Fahrt auf dem Karussell!"
+    },
+    "accessibility": {
+      "rider": "Reiter"
+    },
+    "rideConfirm": {
+      "question": "Diese Bestie reiten?",
+      "yes": "Ja",
+      "no": "Nein"
+    },
+    "instructions": {
+      "title": "Anleitung",
+      "clickBeast": "Klicke auf eine verfügbare Bestie, um eine <strong>10-minütige Fahrt</strong> zu starten. Nach 10 Minuten kannst du das Gespräch fortsetzen, indem du eine andere Bestie wählst oder im Zuschauer-Chat chattest.",
+      "signedIn": "Du musst <strong>angemeldet</strong> sein, um zu reiten",
+      "messages": "Während der Fahrt tippe Nachrichten, die auf deiner Bestie erscheinen, damit <strong>angemeldete Benutzer sie sehen.</strong> Nicht angemeldete Besucher sehen verschlüsselten Text.",
+      "charLimit": "Nachrichten sind auf <strong>80 Zeichen</strong> begrenzt",
+      "djMode": "Aktiviere den <strong>DJ-Modus</strong>, um Benutzern zu zeigen, welchen Song du hörst. Benutzer können sich mit dem Song synchronisieren.",
+      "globalChat": "Wenn alle Bestien besetzt sind, wird eine <strong>globale Chat-Seitenleiste</strong> verfügbar"
+    },
+    "marquee": {
+      "clickToChat": "KLICKE AUF EIN VERFÜGBARES TIER ZUM CHATTEN",
+      "mustLogin": "ANMELDUNG ERFORDERLICH ZUM REITEN UND ENTSCHLÜSSELN"
+    }
+  },
+  "scroll": {
+    "readCredo": "Das Credo lesen",
+    "tapToClose": "tippen zum Schließen",
+    "altText": "Tippen um die Schriftrolle zu lesen",
+    "latinQuote": "\"Bene agere est vere lucrari.\"",
+    "latinTranslation": "(Gut zu handeln heißt wahrhaft zu profitieren.)",
+    "attribution": "— Hl. GR80",
+    "credo": {
+      "line1": "Wir sind vertrauenslos—",
+      "line2": "Aber wir glauben",
+      "line3": "An Code und Kryptographie",
+      "line4": "An die Reinheit der Schaltkreise",
+      "line5": "An Tugend über Schurken",
+      "line6": "An die virtuelle Maschine",
+      "line7": "Mater ex machina",
+      "line8": "Unbestechliche Integrität",
+      "line9": "Ein Avatar des Widerstands",
+      "line10": "in einem Markt, der dich brechen will",
+      "line11": "Halte RL80 in deiner Wallet als",
+      "line12": "einen Rosenkranz für Wohlstand"
+    }
   }
 }
