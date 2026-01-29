@@ -61,15 +61,12 @@ const SkyGradientMaterial = {
 };
 
 // Clipping planes for the model coming through the portal
-// These will be set dynamically based on the screen angle
-// screenPlane: angled to match the laptop screen tilt (-0.35 rad on x-axis)
-const screenAngle = 0.32;
-const screenPlane = new THREE.Plane(
-  new THREE.Vector3(0, Math.sin(screenAngle), Math.cos(screenAngle)).normalize(),
-  -0.09 // More negative = more of the model pokes through
-);
+// screenPlane is updated dynamically each frame to follow the screen mesh
+const screenPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
 // yPlane: clips the bottom to keep it above the keyboard
 const yPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0.2);
+// Offset to control how much of the model pokes through the screen
+const FRONT_OFFSET = 0.05;
 
 // Holy Grail Model component
 function GrailModel({ clip = false, onBullFound = null, ...props }) {
@@ -119,7 +116,7 @@ function GrailModel({ clip = false, onBullFound = null, ...props }) {
 
 
 // Cyberpunk Laptop Frame component
-function LaptopFrame({ children, portalBlend = 0, ...props }) {
+function LaptopFrame({ children, portalBlend = 0, screenRef, ...props }) {
   const { scene } = useGLTF('/models/laptop.glb');
   const portalRef = useRef();
 
@@ -140,7 +137,7 @@ function LaptopFrame({ children, portalBlend = 0, ...props }) {
       <primitive object={clonedScene} scale={0.06} />
 
       {/* Portal positioned where the screen is - ADJUST THESE VALUES */}
-      <mesh position={[0, 0.65, -0.15]} rotation={[-0.35, 0, 0]}>
+      <mesh ref={screenRef} position={[0, 0.65, -0.15]} rotation={[-0.35, 0, 0]}>
         <planeGeometry args={[1.45, 1.0]} />
         <MeshPortalMaterial ref={portalRef} side={THREE.DoubleSide} blend={portalBlend}>
           {children}
@@ -247,6 +244,10 @@ function BreathSmokeDebug({ isMobile, bullObject }) {
 function PortalScene({ isMobile = false, isTabletPortrait = false }) {
   const [bullObject, setBullObject] = useState(null);
   const [clippedBullObject, setClippedBullObject] = useState(null);
+  const screenRef = useRef();
+  const localPlane = useRef(new THREE.Plane(new THREE.Vector3(0, 0, 1), 0));
+  const _tempPlane = useRef(new THREE.Plane());
+
   const grailScale = isMobile ? 0.65 : 0.65;
   const grailRotation = isMobile ? [0, -3.25, 0] : [0.1, -3.25, 0];
 
@@ -263,12 +264,28 @@ function PortalScene({ isMobile = false, isTabletPortrait = false }) {
   // Overall rotation to accentuate 3D dimensionality
   const sceneRotation = [0, 0.6, 0]; // Tilt up slightly, rotate to the side
 
+  // Dynamically update clipping plane to follow screen mesh world transform
+  useFrame(() => {
+    if (!screenRef.current) return;
+
+    const screen = screenRef.current;
+    screen.updateMatrixWorld();
+
+    // Transform local-space plane to world-space using screen's matrix
+    _tempPlane.current.copy(localPlane.current);
+    _tempPlane.current.applyMatrix4(screen.matrixWorld);
+
+    // Update the clipping plane
+    screenPlane.normal.copy(_tempPlane.current.normal);
+    screenPlane.constant = _tempPlane.current.constant + FRONT_OFFSET;
+  });
+
   return (
     <group>
     <FloatingGroup>
     <group rotation={sceneRotation}>
       {/* The laptop frame with portal screen */}
-      <LaptopFrame position={laptopPos} scale={laptopScale}>
+      <LaptopFrame position={laptopPos} scale={laptopScale} screenRef={screenRef}>
         {/* Sky gradient background inside the portal */}
         <mesh scale={20}>
           <sphereGeometry args={[1, 64, 64]} />

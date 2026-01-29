@@ -701,7 +701,7 @@ export default function NavControlsHome({
               onClick={() => clerk.openSignIn()}
             >
               <span style={{ fontSize: '2rem' }}>{emoji}</span>
-              <div className="avatar-status-mobile offline" />
+              <div  />
             </button>
           )}
         </div>

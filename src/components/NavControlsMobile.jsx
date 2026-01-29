@@ -295,7 +295,8 @@ export default function NavControlsMobile({
               {isUserSignedIn ? '👤' : emoji}
             </span>
           )}
-          <div className={`avatar-status-mobile ${isUserSignedIn ? '' : 'offline'}`} />
+          {/* <div className={`avatar-status-mobile ${isUserSignedIn ? '' : 'offline'}`} /> */}
+      
         </div>
 
         {/* Menu */}

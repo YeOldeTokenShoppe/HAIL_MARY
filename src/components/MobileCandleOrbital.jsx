@@ -121,164 +121,34 @@ const globalCandleCache = {
 };
 
 // Orbital candle component that receives a cloned VCANDLE
-function OrbitalCandle({ angle, radius, candleObject, userData, index, onClick, isLeader, transitionState, isViewerOpen }) {
+function OrbitalCandle({ angle, radius, candleObject, index, onClick, transitionState, isViewerOpen }) {
   const groupRef = useRef();
   const candleRef = useRef();
   const frozenTimeRef = useRef(null);
   const frozenRotationRef = useRef(null);
-  const createdTexturesRef = useRef([]);
   const createdMaterialsRef = useRef([]);
-  
+
   // Setup candle on mount
   useEffect(() => {
     if (!candleObject || !groupRef.current) return;
-    
+
     // Scale the candle appropriately for mobile
-    // VCANDLEs might be very small in the original scene
-    candleObject.scale.set(0.3, 0.3, 0.3); // Much larger scale for visibility
-    
+    candleObject.scale.set(0.3, 0.3, 0.3);
+
     // Ensure the candle is centered in its group
     const box = new THREE.Box3().setFromObject(candleObject);
     const center = box.getCenter(new THREE.Vector3());
     candleObject.position.sub(center);
-    candleObject.position.y = 0; // Reset Y to baseline
-    
-    // Apply user data to the cloned candle
-    if (userData) {
-      // Update userData on the candle object
-      candleObject.userData = {
-        ...candleObject.userData,
-        ...userData,
-        hasUser: true
-      };
-      
-      // Apply user image with username to labels if available
-      if (userData.image || userData.username || userData.userName) {
-        // Create canvas for combined image and username
-        // Use smaller texture on mobile to save memory
-        const canvas = document.createElement('canvas');
-        canvas.width = 256;  // Reduced from 1024 for mobile memory
-        canvas.height = 256;  // Reduced from 1024 for mobile memory
-        const ctx = canvas.getContext('2d');
-        
-        // Fill background
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Get username (check multiple possible fields)
-        const username = userData.username || userData.userName || userData.name || '';
-        
-        // Function to create texture with image and name
-        const createCombinedTexture = (img) => {
-          // Clear canvas
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          
-          // Draw the image (leave space at bottom for name if username exists)
-          const imageHeight = username ? canvas.height * 0.9 : canvas.height;
-          ctx.drawImage(img, 0, 0, canvas.width, imageHeight);
-          
-          // Draw username if provided
-          if (username && username.trim()) {
-            // Create gradient background for text
-            const gradient = ctx.createLinearGradient(0, imageHeight, 0, canvas.height);
-            gradient.addColorStop(0, 'rgba(0, 0, 0, 0.7)');
-            gradient.addColorStop(1, 'rgba(0, 0, 0, 0.9)');
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, imageHeight, canvas.width, canvas.height - imageHeight);
-            
-            // Draw the username
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            
-            const textY = imageHeight + (canvas.height - imageHeight) / 2;
-            
-            // Add text shadow for better readability
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-            ctx.shadowBlur = 4;
-            ctx.shadowOffsetX = 2;
-            ctx.shadowOffsetY = 2;
-            
-            ctx.fillText(username, canvas.width / 2, textY);
-          }
-          
-          // Create texture from canvas
-          const texture = new THREE.CanvasTexture(canvas);
-          texture.wrapS = THREE.ClampToEdgeWrapping;
-          texture.wrapT = THREE.ClampToEdgeWrapping;
-          texture.minFilter = THREE.LinearMipMapLinearFilter;
-          texture.magFilter = THREE.LinearFilter;
-          texture.anisotropy = 16;
-          texture.generateMipmaps = true;
-          texture.needsUpdate = true;
-          createdTexturesRef.current.push(texture); // Track for disposal
-          
-          // Apply texture to both labels
-          candleObject.traverse((child) => {
-            // Apply to Label1 objects (flipped)
-            if (child.name?.includes('Label1')) {
-              if (child.material) {
-                child.material = child.material.clone();
-                
-                // Clone and flip texture for Label1
-                const flippedTexture = texture.clone();
-                flippedTexture.center.set(0.5, 0.5);
-                flippedTexture.repeat.set(1, -1);
-                flippedTexture.needsUpdate = true;
-                
-                child.material.map = flippedTexture;
-                child.material.needsUpdate = true;
-              }
-            }
-            // Apply to Label2 objects (normal)
-            else if (child.name?.includes('Label2')) {
-              if (child.material) {
-                child.material = child.material.clone();
-                
-                // Use the texture directly (not flipped) for Label2
-                child.material.map = texture.clone();
-                child.material.needsUpdate = true;
-                
-                // Add subtle emissive glow to Label2
-                child.material.emissive = new THREE.Color(0xffffff);
-                child.material.emissiveMap = child.material.map;
-                child.material.emissiveIntensity = 0.2; // Subtle glow
-              }
-            }
-          });
-        };
-        
-        // Load and apply the image
-        if (userData.image) {
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = () => createCombinedTexture(img);
-          img.onerror = () => {
-            // If image fails to load, create texture with just the name
-            const defaultImg = new Image();
-            defaultImg.onload = () => createCombinedTexture(defaultImg);
-            defaultImg.src = '/defaultAvatar.png';
-          };
-          img.src = userData.image;
-        } else {
-          // No image provided, use default
-          const defaultImg = new Image();
-          defaultImg.onload = () => createCombinedTexture(defaultImg);
-          defaultImg.src = '/defaultAvatar.png';
-        }
-      }
-    }
-    
+    candleObject.position.y = 0;
+
     // Apply flame flicker shader to flame meshes
-    const flamePhase = Math.random() * Math.PI * 2; // Random phase for each candle
+    const flamePhase = Math.random() * Math.PI * 2;
     candleObject.traverse((child) => {
       if (child.isMesh && child.name?.toLowerCase().includes('flame')) {
         const flameMaterial = createFlameMaterial(flamePhase);
         createdMaterialsRef.current.push(flameMaterial);
         child.material = flameMaterial;
-        child.renderOrder = 10; // Render flames on top
+        child.renderOrder = 10;
       }
     });
 
@@ -287,49 +157,30 @@ function OrbitalCandle({ angle, radius, candleObject, userData, index, onClick, 
       if (child.isMesh && child.name?.toLowerCase() === 'wax') {
         const waxMaterial = child.material.clone();
         createdMaterialsRef.current.push(waxMaterial);
-        // Alternate based on index: even = red, odd = green
         if (index % 2 === 0) {
-          waxMaterial.color = new THREE.Color(0xcc2222); // Red
+          waxMaterial.color = new THREE.Color(0xcc2222);
         } else {
-          waxMaterial.color = new THREE.Color(0x22cc22); // Green
+          waxMaterial.color = new THREE.Color(0x22cc22);
         }
         child.material = waxMaterial;
       }
     });
 
-    // Enhance flame effects for the leader (brighter intensity)
-    if (isLeader) {
-      candleObject.traverse((child) => {
-        if (child.isMesh && child.name?.toLowerCase().includes('flame')) {
-          // Leader flames are already using custom shader, just make them brighter
-          if (child.material.uniforms) {
-            // The shader handles intensity via the flicker calculation
-          }
-        }
-      });
-    }
-
     // Add candle to group
     candleRef.current = candleObject;
     groupRef.current.add(candleObject);
-    
+
     // Cleanup on unmount
     return () => {
       if (candleRef.current && groupRef.current) {
         groupRef.current.remove(candleRef.current);
       }
-      // Dispose created textures
-      createdTexturesRef.current.forEach(texture => {
-        if (texture && texture.dispose) texture.dispose();
-      });
-      createdTexturesRef.current = [];
-      // Dispose created materials (including flame shaders)
       createdMaterialsRef.current.forEach(material => {
         if (material && material.dispose) material.dispose();
       });
       createdMaterialsRef.current = [];
     };
-  }, [candleObject, userData, isLeader, index]);
+  }, [candleObject, index]);
   
   useFrame((state) => {
     if (groupRef.current) {
@@ -467,8 +318,7 @@ function OrbitalCandle({ angle, radius, candleObject, userData, index, onClick, 
   
   const handleClick = (e) => {
     e.stopPropagation();
-    onClick({
-      ...userData,
+    onClick?.({
       candleId: `mobile-candle-${index}`,
       candleTimestamp: Date.now(),
     });
@@ -482,7 +332,7 @@ function OrbitalCandle({ angle, radius, candleObject, userData, index, onClick, 
 }
 
 // Main orbital system to be added to existing scene
-function MobileCandleOrbital({ candleData = [], onCandleClick, modelRef, onPaginationChange, isViewerOpen = false, sortBy }) {
+function MobileCandleOrbital({ candleData = [], onCandleClick, onPaginationChange, isViewerOpen = false }) {
   const groupRef = useRef();
   const [vcandleObjects, setVcandleObjects] = useState([]);
   const [currentPage, setCurrentPage] = useState(0);
@@ -491,12 +341,7 @@ function MobileCandleOrbital({ candleData = [], onCandleClick, modelRef, onPagin
   // Load the candle model directly
   const { scene: candleModel } = useGLTF('/models/tinyJapCanOnly.glb');
 
-  // Debug log
-  useEffect(() => {
-
-  }, [isViewerOpen]);
   const [transitionStartTime, setTransitionStartTime] = useState(0);
-  const [nextPage, setNextPage] = useState(0); // Store the page we're transitioning to
 
   // Configuration for the Illumin80
   const VISIBLE_CANDLES = 8;
@@ -538,7 +383,6 @@ function MobileCandleOrbital({ candleData = [], onCandleClick, modelRef, onPagin
       extractedCandles.push({
         object: candleInstance,
         name: `CANDLE${i}`,
-        userData: {}
       });
     }
 
@@ -552,118 +396,55 @@ function MobileCandleOrbital({ candleData = [], onCandleClick, modelRef, onPagin
     setVcandleObjects(extractedCandles);
   }, [candleModel]);
   
-  // Get all sorted user data (up to 80 for Illumin80/LAI80)
-  const allSortedData = React.useMemo(() => {
-    if (candleData.length > 0) {
-      // Data is already sorted by the hook based on sortBy prop
-      // No need to re-sort here since useFirestoreResults handles it
-      const realData = [...candleData];
-      
-      // For testing: Add mock data to make pagination visible
-      const mockData = Array(20).fill(null).map((_, i) => ({
-        id: `mock-${i}`,
-        userName: `TestUser${i + 1}`,
-        username: `TestUser${i + 1}`,
-        burnedAmount: Math.floor(Math.random() * 100),
-        image: i % 2 === 0 ? '/vvv.jpg' : '/vsClown.jpg'
-      }));
-      
-      return [...realData, ...mockData].slice(0, 80); // Combine real and mock data
-    }
-    // Fallback mock data
-    return Array(80).fill(null).map((_, i) => ({
-      id: `mock-${i}`,
-      userName: `Player${i + 1}`,
-      username: `Player${i + 1}`,
-      burnedAmount: Math.floor(Math.random() * 1000),
-      image: i % 2 === 0 ? '/vvv.jpg' : '/vsClown.jpg'
-    }));
-  }, [candleData, sortBy]);
+  // Get candle count (up to 80 for display)
+  const candleCount = React.useMemo(() => {
+    return Math.min(Math.max(candleData.length, VISIBLE_CANDLES), 80);
+  }, [candleData.length]);
 
   // Calculate total pages
-  const totalPages = Math.ceil(allSortedData.length / VISIBLE_CANDLES);
+  const totalPages = Math.ceil(candleCount / VISIBLE_CANDLES);
 
-  // Get current page of users
-  const currentPageData = React.useMemo(() => {
-    const startIdx = currentPage * VISIBLE_CANDLES;
-    const endIdx = startIdx + VISIBLE_CANDLES;
-  
-    return allSortedData.slice(startIdx, endIdx);
-  }, [allSortedData, currentPage]);
-
-  // Combine current page data with VCANDLE objects
+  // Create candle objects for display
   const combinedData = React.useMemo(() => {
     if (vcandleObjects.length === 0) return [];
-    
-    return currentPageData.map((userData, index) => {
-      const vcandleIndex = index < vcandleObjects.length ? index : index % vcandleObjects.length;
-      
-      // Deep clone the candle object
+
+    const startIdx = currentPage * VISIBLE_CANDLES;
+    const count = Math.min(VISIBLE_CANDLES, candleCount - startIdx);
+
+    return Array.from({ length: count }, (_, index) => {
+      const vcandleIndex = index % vcandleObjects.length;
       const clonedCandle = vcandleObjects[vcandleIndex].object.clone(true);
-      
-      // Only clone materials if we're going to modify them (for labels with userData)
-      // This saves significant memory by reusing materials when possible
-      if (userData && (userData.image || userData.username || userData.userName)) {
-        clonedCandle.traverse((child) => {
-          if (child.material && child.name && child.name.toLowerCase().includes('label')) {
-            // Only clone materials for label meshes that will be modified
-            if (Array.isArray(child.material)) {
-              child.material = child.material.map(mat => mat.clone());
-            } else {
-              child.material = child.material.clone();
-            }
-          }
-        });
-      }
-      
+
       return {
-        userData: {
-          ...userData,
-          // Ensure we have all the expected fields
-          userName: userData.userName || userData.username || `Player ${index + 1}`,
-          image: userData.image || userData.profileImage || null,
-          burnedAmount: userData.burnedAmount || 0,
-          message: userData.message || '',
-          createdAt: userData.createdAt || new Date()
-        },
         candleObject: clonedCandle,
-        originalName: `${vcandleObjects[vcandleIndex].name}-page${currentPage}-idx${index}`,
-        globalIndex: currentPage * VISIBLE_CANDLES + index // Track position in Illumin80
+        originalName: `candle-page${currentPage}-idx${index}`,
       };
     });
-  }, [currentPageData, vcandleObjects, currentPage]);
+  }, [vcandleObjects, currentPage, candleCount]);
   
-  // Create a stable setCurrentPage function (moved here to avoid circular dependency)
+  // Create a stable setCurrentPage function
   const handleSetCurrentPage = useCallback((page) => {
-   
-    
     // If viewer is open, just change page without transition animation
     if (isViewerOpen) {
-  
       setCurrentPage(page);
       return;
     }
-    
+
     // Start transition with current candles
     setIsTransitioning(true);
-    const startTime = Date.now();
-    setTransitionStartTime(startTime);
-    setNextPage(page); // Store where we're going
-    
+    setTransitionStartTime(Date.now());
+
     // Immediately set initial transition state
     setTransitionState({
       isTransitioning: true,
       progress: 0,
       isFadingOut: true
     });
-    
 
-    
     // Wait for candles to spiral out before changing
     setTimeout(() => {
       setCurrentPage(page);
-    
-      
+
       // Continue transition for fade-in
       setTimeout(() => {
         setIsTransitioning(false);
@@ -772,12 +553,12 @@ function MobileCandleOrbital({ candleData = [], onCandleClick, modelRef, onPagin
         setCurrentPage: handleSetCurrentPage,
         visibleRange: {
           start: currentPage * VISIBLE_CANDLES + 1,
-          end: Math.min((currentPage + 1) * VISIBLE_CANDLES, allSortedData.length)
+          end: Math.min((currentPage + 1) * VISIBLE_CANDLES, candleCount)
         },
-        total: allSortedData.length
+        total: candleCount
       });
     }
-  }, [currentPage, totalPages, allSortedData.length, onPaginationChange, handleSetCurrentPage]);
+  }, [currentPage, totalPages, candleCount, onPaginationChange, handleSetCurrentPage]);
 
   return (
     <group ref={groupRef} position={[0, -0.3, 0]}>
@@ -788,12 +569,10 @@ function MobileCandleOrbital({ candleData = [], onCandleClick, modelRef, onPagin
           <OrbitalCandle
             key={item.originalName || index}
             angle={angle}
-            radius={1} // Distance from center - increased for better spacing
+            radius={1}
             candleObject={item.candleObject}
-            userData={item.userData}
             index={index}
             onClick={onCandleClick}
-            isLeader={index === 0}
             transitionState={transitionState}
             isViewerOpen={isViewerOpen}
           />
@@ -814,12 +593,9 @@ function MobileCandleOrbital({ candleData = [], onCandleClick, modelRef, onPagin
 
 // Wrap with React.memo to prevent unnecessary re-renders and re-extractions
 export default React.memo(MobileCandleOrbital, (prevProps, nextProps) => {
-  // Only re-render if these critical props change
   return (
     prevProps.candleData === nextProps.candleData &&
-    prevProps.modelRef === nextProps.modelRef &&
     prevProps.isViewerOpen === nextProps.isViewerOpen &&
-    prevProps.sortBy === nextProps.sortBy &&
     prevProps.onCandleClick === nextProps.onCandleClick &&
     prevProps.onPaginationChange === nextProps.onPaginationChange
   );

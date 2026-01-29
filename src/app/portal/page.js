@@ -88,7 +88,7 @@ export default function PortalPage() {
         position: "fixed",
         top: isMobile ? "calc(1rem + env(safe-area-inset-top))" : "1rem",
         right: "1rem",
-        zIndex: 30000,
+        zIndex: 300,
       }}>
         <NavControlsHome
           isPlaying={contextIsPlaying}
