@@ -215,7 +215,7 @@ function GrailModel({ clip = false, onBullFound = null, ...props }) {
 function LaptopFrame({ children, portalBlend = 0, screenRef, onKeyPress, onScreenClick, ...props }) {
   const { scene } = useGLTF('/models/laptop.glb');
   const portalRef = useRef();
-  const [keyMaterials, setKeyMaterials] = useState([]);
+  const keyMaterialsRef = useRef([]);
 
   // Clone and hide original screen
   const clonedScene = React.useMemo(() => {
@@ -246,25 +246,26 @@ function LaptopFrame({ children, portalBlend = 0, screenRef, onKeyPress, onScree
         materials.push(glowMaterial);
       }
     });
-    setKeyMaterials(materials);
+    keyMaterialsRef.current = materials;
   }, [clonedScene]);
 
   // Pulse the green keys
   useFrame(({ clock }) => {
-    if (keyMaterials.length === 0) return;
+    const materials = keyMaterialsRef.current;
+    if (materials.length === 0) return;
 
     const t = clock.getElapsedTime();
     const pulse = (Math.sin(t * 4) + 1) / 2; // 0 to 1 pulse
     const intensity = pulse * 1.5 + 0.3; // Range 0.3 to 1.8
 
-    keyMaterials.forEach((mat) => {
+    materials.forEach((mat) => {
       mat.emissiveIntensity = intensity;
     });
   });
 
   // Handle click on the laptop - check if it's the green key
   const handleClick = (e) => {
-    if (e.object?.name === 'GreenKey1') {
+    if (e.object?.name === 'GreenKey1' || e.object?.name === 'GreenKeyHitArea') {
       e.stopPropagation();
       onKeyPress?.();
     }
@@ -273,9 +274,21 @@ function LaptopFrame({ children, portalBlend = 0, screenRef, onKeyPress, onScree
   return (
     <group {...props}>
       {/* The laptop model with click detection */}
-      <group onClick={handleClick}>
+      <group onPointerDown={handleClick}>
         <primitive object={clonedScene} scale={0.06} />
       </group>
+      {/* Larger invisible hit area for the green key - easier to tap on touch devices */}
+      <mesh
+        name="GreenKeyHitArea"
+        position={[-0.52, 0.02, 0.32]}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          onKeyPress?.();
+        }}
+      >
+        <boxGeometry args={[0.12, 0.05, 0.12]} />
+        <meshBasicMaterial transparent opacity={0} />
+      </mesh>
 
       {/* Portal positioned where the screen is */}
       <mesh
@@ -297,7 +310,7 @@ function LaptopFrame({ children, portalBlend = 0, screenRef, onKeyPress, onScree
 }
 
 // Floating hover wrapper
-function FloatingGroup({ children, amplitude = 0.06, speed = 1.2, rotationAmplitude = 0.08, rotationSpeed = 0.8 }) {
+function FloatingGroup({ children, amplitude = 0.0, speed = 1.2, rotationAmplitude = 0.02, rotationSpeed = 0.8 }) {
   const groupRef = useRef();
 
   useFrame(({ clock }) => {
@@ -1105,7 +1118,7 @@ function PortalScene({ isMobile = false, isTabletPortrait = false, onScreenClick
 
   // Position for clipped model (accounting for LaptopFrame transforms)
   const laptopPos = [0, isTabletPortrait ? -0.6 : -0.5, 0];
-  const laptopScale = isMobile ? 0.8 : isTabletPortrait ? 0.75 : 1.15;
+  const laptopScale = isMobile ? 0.8 : isTabletPortrait ? 0.75 : 0.9;
   const portalPos = [0, 0.65, -0.15];
 
   // Overall rotation to accentuate 3D dimensionality
@@ -1148,7 +1161,7 @@ function PortalScene({ isMobile = false, isTabletPortrait = false, onScreenClick
 
   return (
     <group>
-    <FloatingGroup amplitude={(isMobile || showScroll) ? 0 : 0.06} rotationAmplitude={(isMobile || showScroll) ? 0 : 0.08}>
+    <FloatingGroup amplitude={0} rotationAmplitude={(isMobile || showScroll) ? 0 : 0.04}>
     <group rotation={sceneRotation}>
       {/* The laptop frame with portal screen */}
       <LaptopFrame

@@ -411,20 +411,20 @@ export default function CarouselPage() {
         gap: "1rem"
       }}>
         {/* Buy RL80 Button - top right on non-mobile, hidden when portal is zoomed */}
-        {deviceDetected && !isMobileDevice && !isPortalZoomed && (
-          <div className="cyber-candle-btn" style={{
-            opacity: mounted ? 1 : 0,
-            transition: 'opacity 0.3s',
-          }}>
-            <RetroFuturisticButton
-              onClick={() => setShowBuyModal(true)}
-              disabled={isLoading}
-              className="my-custom-class"
-            >
-              BUY RL80
-            </RetroFuturisticButton>
-          </div>
-        )}
+      {/* {deviceDetected && !isMobileDevice && !isPortalZoomed && (
+        <div className="cyber-candle-btn" style={{
+          opacity: mounted ? 1 : 0,
+          transition: 'opacity 0.3s',
+        }}>
+          <RetroFuturisticButton
+            onClick={() => setShowBuyModal(true)}
+            disabled={isLoading}
+            className="my-custom-class"
+          >
+            BUY RL80
+          </RetroFuturisticButton>
+        </div>
+      )} */}
         {/* Nav Controls - hidden when buy modal is open or portal is zoomed */}
         {!carouselBuyModalOpen && !isPortalZoomed && (
           <NavControlsHome
@@ -439,6 +439,8 @@ export default function CarouselPage() {
             is80sMode={is80sMode}
             onToggle80sMode={() => setContext80sMode(!is80sMode)}
             userImage={user?.imageUrl}
+            onBuyClick={() => setShowBuyModal(true)}
+            isMobile={isMobileDevice}
           />
         )}
       </div>

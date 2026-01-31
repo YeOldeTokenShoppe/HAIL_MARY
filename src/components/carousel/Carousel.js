@@ -920,7 +920,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           gap: '12px',
           margin: '0.75rem 0',
           width: '100%',
-          maxWidth: '120px',
+          maxWidth: '200px',
         }}>
           <div style={{
             flex: 1,
@@ -943,17 +943,97 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             background: 'linear-gradient(to left, transparent, rgba(212, 175, 55, 0.4))',
           }} />
         </div>
-         <p style={{
-            marginTop: '1.5rem',
-            marginBottom: '1rem',
-            fontFamily: "'Courier New', monospace",
-            fontSize: isMobilePhone ? '1rem' : '0.9rem',
-            color: '#888',
-            textAlign: 'center',
-            lineHeight: '1.4',
-          }}>
-    <a href="/philosophy" style={{ color: '#ffff00', textDecoration: 'underline' }}> 📜 Read the whitepaper</a>
-          </p>
+         <div
+            className="navigation-group"
+            style={{
+              position: 'relative',
+              marginTop: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0',
+              transform: 'scale(1)',
+              transformOrigin: 'center center',
+              zIndex: 50,
+            }}
+          >
+            <svg
+              style={{
+                width: '220px',
+                height: '100px',
+                marginRight: '-30px',
+                pointerEvents: 'auto',
+                cursor: 'pointer',
+              }}
+              viewBox="0 0 300 150"
+              onClick={() => router.push('/philosophy')}
+              onMouseEnter={(e) => {
+                const texts = e.currentTarget.querySelectorAll('text');
+                const arrow = e.currentTarget.querySelector('#arrowPathM1');
+                const arrowHead = e.currentTarget.querySelector('.arrow-head-m1');
+                texts.forEach(text => { text.style.fontSize = '32'; text.style.fill = '#ffffff'; text.style.filter = 'url(#glowM1) drop-shadow(0 0 10px #ffcc00)'; });
+                if (arrow) { arrow.style.strokeWidth = '3.5'; arrow.style.filter = 'url(#glowM1) drop-shadow(0 0 15px #ff9500)'; }
+                if (arrowHead) { arrowHead.style.strokeWidth = '3.5'; }
+              }}
+              onMouseLeave={(e) => {
+                const texts = e.currentTarget.querySelectorAll('text');
+                const arrow = e.currentTarget.querySelector('#arrowPathM1');
+                const arrowHead = e.currentTarget.querySelector('.arrow-head-m1');
+                texts.forEach(text => { text.style.fontSize = '28'; text.style.fill = '#ffcc00'; text.style.filter = 'url(#candleGlowM1)'; });
+                if (arrow) { arrow.style.strokeWidth = '2.5'; arrow.style.filter = 'url(#glowM1)'; }
+                if (arrowHead) { arrowHead.style.strokeWidth = '2.5'; }
+              }}
+            >
+              <defs>
+                <linearGradient id="arrowGradientM1" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
+                  <stop offset="50%" stopColor="#ffcc00" stopOpacity="0.8" />
+                  <stop offset="100%" stopColor="#ff9500" stopOpacity="1" />
+                </linearGradient>
+                <filter id="glowM1">
+                  <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+                  <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+                <filter id="candleGlowM1">
+                  <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                  <feFlood floodColor="#ff9500" floodOpacity="0.4"/>
+                  <feComposite in2="coloredBlur" operator="in"/>
+                  <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+                </filter>
+              </defs>
+              <path id="arrowPathM1" d="M 20 100 Q 100 40, 200 60" stroke="url(#arrowGradientM1)" strokeWidth="2.5" fill="none" filter="url(#glowM1)" strokeLinecap="round" opacity="0.9">
+                <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="2.5s" repeatCount="indefinite" />
+              </path>
+              <path id="textPathM1" d="M 20 85 Q 100 25, 200 45" fill="none" stroke="none" />
+              <path id="textPathM1b" d="M 35 115 Q 115 55, 215 75" fill="none" stroke="none" />
+              <path className="arrow-head-m1" d="M 195 55 L 205 60 L 195 65" stroke="url(#arrowGradientM1)" strokeWidth="2.5" fill="none" filter="url(#glowM1)" strokeLinecap="round">
+                <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="2.5s" repeatCount="indefinite" />
+              </path>
+              <text fill="#ffcc00" fontSize="28" fontFamily="'UnifrakturMaguntia', cursive" filter="url(#candleGlowM1)" style={{ transition: 'all 0.3s ease' }}>
+                <textPath href="#textPathM1" startOffset="0">Read the</textPath>
+                <animate attributeName="fill-opacity" values="0.7;1;0.7" dur="3s" repeatCount="indefinite" />
+              </text>
+              <text fill="#ffcc00" fontSize="28" fontFamily="'UnifrakturMaguntia', cursive" filter="url(#candleGlowM1)" style={{ transition: 'all 0.3s ease' }}>
+                <textPath href="#textPathM1b" startOffset="0">whitepaper</textPath>
+                <animate attributeName="fill-opacity" values="0.7;1;0.7" dur="3s" repeatCount="indefinite" />
+              </text>
+              {[...Array(6)].map((_, i) => (
+                <circle key={i} r="1.5" fill="#ffcc00" filter="url(#glowM1)">
+                  <animateMotion dur={`${4 + i}s`} repeatCount="indefinite" path="M 20 100 Q 100 40, 200 60"><mpath href="#arrowPathM1" /></animateMotion>
+                  <animate attributeName="opacity" values="0;1;0" dur={`${4 + i}s`} repeatCount="indefinite" />
+                  <animate attributeName="r" values="0.5;2;0.5" dur={`${4 + i}s`} repeatCount="indefinite" />
+                </circle>
+              ))}
+            </svg>
+            <div
+              style={{ width: '60px', height: '60px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'transform 0.3s ease, filter 0.3s ease' }}
+              onClick={() => router.push('/tokenomics')}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.15) rotate(-5deg)'; e.currentTarget.style.filter = 'drop-shadow(0 0 20px #ff9500)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1) rotate(0deg)'; e.currentTarget.style.filter = 'none'; }}
+            >
+              <img src="/images/ILLUMIN80_TATTOO.webp" alt="Navigate to Philosophy" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            </div>
+          </div>
           {/* Buy Button for Mobile - at the bottom of Section 1 */}
           <div style={{ marginTop: '1.5rem', marginBottom: '1rem' }}>
             {buyButton}
@@ -1011,7 +1091,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             {/* Heading - centered for mobile/tablet portrait, right side for others */}
             <div style={{
               position: 'absolute',
-              top: isMobilePhone ? '6rem' : isTabletPortrait ? '20%' : '2rem',
+              top: isMobilePhone ? '6rem' : isTabletPortrait ? '12%' : '2rem',
               left: (isMobilePhone || isTabletPortrait) ? '50%' : 'auto',
               right: (isMobilePhone || isTabletPortrait) ? 'auto' : '5%',
               transform: (isMobilePhone || isTabletPortrait) ? 'translateX(-50%)' : 'none',
@@ -1046,7 +1126,20 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                   <br/>
                   <span style={{fontSize: '0.75em', fontStyle: 'normal', opacity: 0.7}}>(To do good is to truly profit)</span>
                 </p>
+                
               )}
+                <p style={{
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              fontSize: isSmallPhone ? '0.9rem' : '1rem',
+              color: 'rgba(255, 255, 255, 0.85)',
+              lineHeight: isSmallPhone ? '1.3' : '1.35',
+              // marginTop: '-3.5rem',
+              maxWidth: isMobilePhone ? '320px' : '450px',
+              textAlign: 'center',
+              padding: '0 1rem',
+            }}>
+     
+Placeholder            </p>
             </div>
 
             {/* Interactive Scroll - right side for desktop/tablet landscape */}
@@ -1353,7 +1446,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                   onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.15) rotate(-5deg)'; e.currentTarget.style.filter = 'drop-shadow(0 0 20px #ff9500)'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1) rotate(0deg)'; e.currentTarget.style.filter = 'none'; }}
                 >
-                  <img src="/images/SKULL_TATTOO.webp" alt="Navigate to Illumin80" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  <img src="/images/sacreCoeur.webp" alt="Navigate to Illumin80" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                 </div>
               </div>
             )}
@@ -1759,7 +1852,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           gap: '12px',
           margin: '0.75rem 0',
           width: '100%',
-          maxWidth: '120px',
+          maxWidth: '200px',
         }}>
           <div style={{
             flex: 1,
@@ -1782,31 +1875,98 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             background: 'linear-gradient(to left, transparent, rgba(212, 175, 55, 0.4))',
           }} />
         </div>
-            {/* Click instruction */}
-<p style={{
-              fontFamily: "'Courier New', monospace",
-              fontSize: isTablet ? '0.85rem' : '1rem',
-              color: '#888',
-              textAlign: 'center',
-              width: '100%',
-              maxWidth: isTabletLandscape ? '400px' : isTabletPortrait ? '300px' : '600px'
-            }}>
-              📜 Read the <a href="/philosophy" style={{
-                color: '#ffff00',
-                textDecoration: 'none',
-                borderBottom: '1px solid #ffff00',
-                transition: 'all 0.3s ease'
+            {/* Navigation group */}
+            <div
+              className="navigation-group"
+              style={{
+                position: 'relative',
+                marginTop: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0',
+                transform: 'scale(1)',
+                transformOrigin: 'center center',
+                zIndex: 50,
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = '#fff'
-                e.currentTarget.style.borderBottomColor = '#fff'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = '#ffff00'
-                e.currentTarget.style.borderBottomColor = '#ffff00'
-              }}
-              >Techno-Mythic Whitepaper</a>
-            </p>
+            >
+              <svg
+                style={{
+                  width: 'auto',
+                  height: '100px',
+                  pointerEvents: 'auto',
+                  cursor: 'pointer',
+                  marginRight: '-30px',
+                }}
+                viewBox="0 0 300 150"
+                onClick={() => router.push('/philosophy')}
+                onMouseEnter={(e) => {
+                  const texts = e.currentTarget.querySelectorAll('text');
+                  const arrow = e.currentTarget.querySelector('#arrowPathL1');
+                  const arrowHead = e.currentTarget.querySelector('.arrow-head-l1');
+                  texts.forEach(text => { text.style.fontSize = '32'; text.style.fill = '#ffffff'; text.style.filter = 'url(#glowL1) drop-shadow(0 0 10px #ffcc00)'; });
+                  if (arrow) { arrow.style.strokeWidth = '3.5'; arrow.style.filter = 'url(#glowL1) drop-shadow(0 0 15px #ff9500)'; }
+                  if (arrowHead) { arrowHead.style.strokeWidth = '3.5'; }
+                }}
+                onMouseLeave={(e) => {
+                  const texts = e.currentTarget.querySelectorAll('text');
+                  const arrow = e.currentTarget.querySelector('#arrowPathL1');
+                  const arrowHead = e.currentTarget.querySelector('.arrow-head-l1');
+                  texts.forEach(text => { text.style.fontSize = '28'; text.style.fill = '#ffcc00'; text.style.filter = 'url(#candleGlowL1)'; });
+                  if (arrow) { arrow.style.strokeWidth = '2.5'; arrow.style.filter = 'url(#glowL1)'; }
+                  if (arrowHead) { arrowHead.style.strokeWidth = '2.5'; }
+                }}
+              >
+                <defs>
+                  <linearGradient id="arrowGradientL1" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
+                    <stop offset="50%" stopColor="#ffcc00" stopOpacity="0.8" />
+                    <stop offset="100%" stopColor="#ff9500" stopOpacity="1" />
+                  </linearGradient>
+                  <filter id="glowL1">
+                    <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+                    <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                  </filter>
+                  <filter id="candleGlowL1">
+                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                    <feFlood floodColor="#ff9500" floodOpacity="0.4"/>
+                    <feComposite in2="coloredBlur" operator="in"/>
+                    <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+                  </filter>
+                </defs>
+                <path id="arrowPathL1" d="M 20 100 Q 100 40, 200 60" stroke="url(#arrowGradientL1)" strokeWidth="2.5" fill="none" filter="url(#glowL1)" strokeLinecap="round" opacity="0.9">
+                  <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="2.5s" repeatCount="indefinite" />
+                </path>
+                <path id="textPathL1" d="M 20 85 Q 100 25, 200 45" fill="none" stroke="none" />
+                <path id="textPathL1b" d="M 35 115 Q 115 55, 215 75" fill="none" stroke="none" />
+                <path className="arrow-head-l1" d="M 195 55 L 205 60 L 195 65" stroke="url(#arrowGradientL1)" strokeWidth="2.5" fill="none" filter="url(#glowL1)" strokeLinecap="round">
+                  <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="2.5s" repeatCount="indefinite" />
+                </path>
+                <text fill="#ffcc00" fontSize="28" fontFamily="'UnifrakturMaguntia', cursive" filter="url(#candleGlowL1)" style={{ transition: 'all 0.3s ease' }}>
+                  <textPath href="#textPathL1" startOffset="0">Read the</textPath>
+                  <animate attributeName="fill-opacity" values="0.7;1;0.7" dur="3s" repeatCount="indefinite" />
+                </text>
+                <text fill="#ffcc00" fontSize="28" fontFamily="'UnifrakturMaguntia', cursive" filter="url(#candleGlowL1)" style={{ transition: 'all 0.3s ease' }}>
+                  <textPath href="#textPathL1b" startOffset="0">whitepaper</textPath>
+                  <animate attributeName="fill-opacity" values="0.7;1;0.7" dur="3s" repeatCount="indefinite" />
+                </text>
+                {[...Array(6)].map((_, i) => (
+                  <circle key={i} r="1.5" fill="#ffcc00" filter="url(#glowL1)">
+                    <animateMotion dur={`${4 + i}s`} repeatCount="indefinite" path="M 20 100 Q 100 40, 200 60"><mpath href="#arrowPathL1" /></animateMotion>
+                    <animate attributeName="opacity" values="0;1;0" dur={`${4 + i}s`} repeatCount="indefinite" />
+                    <animate attributeName="r" values="0.5;2;0.5" dur={`${4 + i}s`} repeatCount="indefinite" />
+                  </circle>
+                ))}
+              </svg>
+              <div
+                style={{ width: '60px', height: '60px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'transform 0.3s ease, filter 0.3s ease' }}
+                onClick={() => router.push('/tokenomics')}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.15) rotate(-5deg)'; e.currentTarget.style.filter = 'drop-shadow(0 0 20px #ff9500)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1) rotate(0deg)'; e.currentTarget.style.filter = 'none'; }}
+              >
+                <img src="/images/ILLUMIN80_TATTOO.webp" alt="Navigate to Philosophy" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              </div>
+            </div>
             {/* Buy Button for Desktop */}
             {buyButton}
 
@@ -1887,16 +2047,19 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                 <span style={{fontSize: '0.7em', fontStyle: 'italic', textTransform: 'none', opacity: 0.8}}>(To act well is to profit truly.)</span>
                 <span style={{fontSize: '0.6em', fontStyle: 'normal', textTransform: 'none', opacity: 0.7, letterSpacing: '0.1em'}}>{"\u2014"} St. GR80</span>
               </p>
-              {/* Interactive Scroll */}
-              {/* <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                marginTop: '1rem',
-                marginBottom: '2rem',
-              }}>
-                <InteractiveScroll isMobile={false} isSmallPhone={false} />
-              </div> */}
+                <p style={{
+              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              fontSize: isSmallPhone ? '0.9rem' : '1rem',
+              color: 'rgba(255, 255, 255, 0.85)',
+              lineHeight: isSmallPhone ? '1.3' : '1.35',
+              // marginTop: '-3.5rem',
+              maxWidth: isMobilePhone ? '320px' : '450px',
+              textAlign: 'center',
+              padding: '0 1rem',
+            }}>
+     Placeholder
+              </p>
+              
             <div
               className="navigation-group"
               style={{
@@ -2442,7 +2605,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                 }}
               >
                 <img
-                  src="/images/SKULL_TATTOO.webp"
+                  src="/images/sacreCoeur.webp"
                   alt="Navigate to Illumin80"
                   style={{
                     width: '100%',

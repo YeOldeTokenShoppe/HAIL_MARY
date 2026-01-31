@@ -400,7 +400,7 @@ function VendingMachine({ scale = 1, position = [0, 0, 0], rotation = [0, 0, 0],
       const diff = targetRotation.current - currentRotationAmount.current;
 
       if (Math.abs(diff) > 0.001) {
-        const delta = diff * 0.03;
+        const delta = diff * 0.08;
         currentRotationAmount.current += delta;
 
         // Rotate on world axis

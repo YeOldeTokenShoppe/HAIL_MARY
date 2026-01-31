@@ -17,7 +17,9 @@ export default function NavControlsHome({
   is80sMode = false,
   onToggle80sMode,
   userImage = null,
-  show80sButton = true
+  show80sButton = true,
+  onBuyClick,
+  isMobile = false
 }) {
   const [emoji, setEmoji] = useState("😇");
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
@@ -26,7 +28,7 @@ export default function NavControlsHome({
   const pathname = usePathname(); // Get current path
   const { user: clerkUser } = useUser();
   const clerk = useClerk();
-  
+
   // Fix hydration mismatch by ensuring client and server render the same initially
   useEffect(() => {
     setIsHydrated(true);
@@ -49,14 +51,14 @@ export default function NavControlsHome({
   }, []);
 
   // First-visit pulse hint for the hamburger menu (only on /about)
-  useEffect(() => {
-    if (pathname !== '/about') {
-      setShowMenuHint(false);
-      return;
-    }
-    const timer = setTimeout(() => setShowMenuHint(true), 2000);
-    return () => clearTimeout(timer);
-  }, [pathname]);
+  // useEffect(() => {
+  //   if (pathname !== '/about') {
+  //     setShowMenuHint(false);
+  //     return;
+  //   }
+  //   const timer = setTimeout(() => setShowMenuHint(true), 2000);
+  //   return () => clearTimeout(timer);
+  // }, [pathname]);
 
   // Dismiss hint when menu is opened
   useEffect(() => {
@@ -607,6 +609,56 @@ export default function NavControlsHome({
           pointer-events: none;
           z-index: 1;
         }
+
+        /* Compact BUY Button with RetroFuturistic hover effects */
+        .buy-btn-compact {
+          width: 40px;
+          min-width: 40px;
+          height: 40px;
+          padding: 0 12px;
+          border-radius: 10px;
+          background: rgba(212, 175, 55, 0.05);
+          border: 1.5px solid rgba(212, 175, 55, 0.2);
+          color: #00ff41;
+          text-shadow: 0 0 8px #00ff41;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-family: 'Orbitron', monospace;
+          font-size: 11px;
+          font-weight: bold;
+          letter-spacing: 0.5px;
+          transition: all 0.3s ease, box-shadow 0.7s ease;
+          box-shadow: 0 0 8px rgba(5, 234, 250, 0.3);
+        }
+
+        .buy-btn-compact:hover {
+          transform: scale(1.02);
+          color: #c40a35;
+          border-color: rgba(5, 234, 250, 0.5);
+          background: rgba(5, 234, 250, 0.08);
+          box-shadow: 0 0 20px 2px #05eafa, 0 0 30px rgba(5, 234, 250, 0.4);
+        }
+
+        .buy-btn-compact:active {
+          transform: scale(0.98);
+        }
+
+        /* 80s mode styling for BUY button */
+        .mode-80s .buy-btn-compact {
+          background: rgba(255, 0, 255, 0.05);
+          border-color: rgba(255, 0, 255, 0.3);
+          color: #ff00ff;
+          box-shadow: 0 0 8px rgba(255, 0, 255, 0.3);
+        }
+
+        .mode-80s .buy-btn-compact:hover {
+          border-color: rgba(255, 0, 255, 0.6);
+          background: rgba(255, 0, 255, 0.15);
+          box-shadow: 0 0 20px 2px #ff00ff, 0 0 30px rgba(255, 0, 255, 0.4);
+          color: #00ffff;
+        }
       `}</style>
 
       <div className={`nav-mobile-home ${is80sMode ? 'mode-80s' : ''}`}>
@@ -624,6 +676,17 @@ export default function NavControlsHome({
             <span className="eighties-btn-text-small">
               MODE
             </span>
+          </button>
+        )}
+
+        {/* BUY Button - Desktop only */}
+        {!isMobile && onBuyClick && (
+          <button
+            className="buy-btn-compact"
+            onClick={onBuyClick}
+            title="Buy RL80"
+          >
+            BUY
           </button>
         )}
 
