@@ -1267,18 +1267,25 @@ function PortalScene({ isMobile = false, isTabletPortrait = false, onScreenClick
 
 // Loader component that waits for models before showing scene
 function SceneLoader({ children }) {
-  const { active, progress } = useProgress();
   const [ready, setReady] = useState(false);
   const hasScheduledRef = useRef(false);
 
   useEffect(() => {
-    // Only schedule once when loading completes
-    if (progress === 100 && !active && !ready && !hasScheduledRef.current) {
-      hasScheduledRef.current = true;
-      const timer = setTimeout(() => setReady(true), 50);
-      return () => clearTimeout(timer);
-    }
-  }, [progress, active, ready]);
+    // Subscribe to progress changes without causing re-renders during child renders
+    const checkProgress = (state) => {
+      if (state.progress === 100 && !state.active && !hasScheduledRef.current) {
+        hasScheduledRef.current = true;
+        setTimeout(() => setReady(true), 50);
+      }
+    };
+
+    // Check initial state
+    checkProgress(useProgress.getState());
+
+    // Subscribe to future changes
+    const unsubscribe = useProgress.subscribe(checkProgress);
+    return unsubscribe;
+  }, []);
 
   return (
     <group visible={ready}>

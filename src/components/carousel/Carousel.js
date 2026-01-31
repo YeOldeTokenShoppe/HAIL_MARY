@@ -518,8 +518,8 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           }),
           zIndex: 2,
         }}>
-          {/* Mobile Carousel Navigation - hidden on mobile phones (single section) */}
-          {!isMobilePhone && (
+          {/* Mobile Carousel Navigation - hidden on mobile phones and when portal is zoomed */}
+          {!isMobilePhone && !isPortalZoomed && (
           <>
             {/* Left Arrow */}
             <button
@@ -1524,8 +1524,8 @@ Placeholder            </p>
           }),
           zIndex: 2
         }}>
-          {/* Carousel Navigation */}
-          {isCarouselMode && (
+          {/* Carousel Navigation - hidden when portal is zoomed */}
+          {isCarouselMode && !isPortalZoomed && (
             <>
               {/* Left Arrow */}
               <button
