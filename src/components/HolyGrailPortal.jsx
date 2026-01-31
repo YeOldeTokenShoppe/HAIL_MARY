@@ -4,7 +4,7 @@ import React, { useRef, useState, useEffect, Suspense } from "react";
 import { createPortal } from "react-dom";
 import * as THREE from 'three';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { useGLTF, MeshPortalMaterial, Environment, CameraControls, Text } from '@react-three/drei';
+import { useGLTF, MeshPortalMaterial, Environment, CameraControls, Text, useProgress } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import { easing } from 'maath';
 import DarkClouds from "./Clouds";
@@ -115,7 +115,7 @@ const SkyGradientMaterial = {
 // CRT Background component with radial gradient effect
 function CRTBackground() {
   return (
-    <mesh position={[0, 0, 0.5]}>
+    <mesh position={[0, 0, 0.7]}>
       <planeGeometry args={[10, 10]} />
       <shaderMaterial
         uniforms={{
@@ -235,12 +235,9 @@ function LaptopFrame({ children, portalBlend = 0, screenRef, onKeyPress, onScree
     const materials = [];
     clonedScene.traverse((child) => {
       if (child.isMesh && child.name === 'GreenKey1') {
-        const glowMaterial = new THREE.MeshStandardMaterial({
-          color: new THREE.Color('#004400'),
-          emissive: new THREE.Color('#00ff00'),
-          emissiveIntensity: 0.5,
-          metalness: 0.3,
-          roughness: 0.4,
+        const glowMaterial = new THREE.MeshBasicMaterial({
+          color: new THREE.Color('#00ff00'),
+          toneMapped: false, // Prevents tone mapping from dimming the color
         });
         child.material = glowMaterial;
         materials.push(glowMaterial);
@@ -249,23 +246,27 @@ function LaptopFrame({ children, portalBlend = 0, screenRef, onKeyPress, onScree
     keyMaterialsRef.current = materials;
   }, [clonedScene]);
 
-  // Pulse the green keys
+  // Pulse the green keys - animate color directly for reliable cross-device rendering
   useFrame(({ clock }) => {
     const materials = keyMaterialsRef.current;
     if (materials.length === 0) return;
 
     const t = clock.getElapsedTime();
     const pulse = (Math.sin(t * 4) + 1) / 2; // 0 to 1 pulse
-    const intensity = pulse * 1.5 + 0.3; // Range 0.3 to 1.8
+
+    // Animate between dark green and bright green
+    const r = pulse * 0.2;
+    const g = 0.4 + pulse * 0.6; // 0.4 to 1.0
+    const b = pulse * 0.2;
 
     materials.forEach((mat) => {
-      mat.emissiveIntensity = intensity;
+      mat.color.setRGB(r, g, b);
     });
   });
 
-  // Handle click on the laptop - check if it's the green key
+  // Handle click on the laptop - check if it's the green key or hit areas
   const handleClick = (e) => {
-    if (e.object?.name === 'GreenKey1' || e.object?.name === 'GreenKeyHitArea') {
+    if (e.object?.name === 'GreenKey1' || e.object?.name === 'GreenKeyHitArea' || e.object?.name === 'ExtendedButtonArea') {
       e.stopPropagation();
       onKeyPress?.();
     }
@@ -274,10 +275,10 @@ function LaptopFrame({ children, portalBlend = 0, screenRef, onKeyPress, onScree
   return (
     <group {...props}>
       {/* The laptop model with click detection */}
-      <group onPointerDown={handleClick}>
+      <group onPointerDown={handleClick} onClick={handleClick}>
         <primitive object={clonedScene} scale={0.06} />
       </group>
-      {/* Larger invisible hit area for the green key - easier to tap on touch devices */}
+      {/* Larger hit area for the green key - use tiny opacity for reliable raycasting */}
       <mesh
         name="GreenKeyHitArea"
         position={[-0.52, 0.02, 0.32]}
@@ -285,9 +286,13 @@ function LaptopFrame({ children, portalBlend = 0, screenRef, onKeyPress, onScree
           e.stopPropagation();
           onKeyPress?.();
         }}
+        onClick={(e) => {
+          e.stopPropagation();
+          onKeyPress?.();
+        }}
       >
-        <boxGeometry args={[0.12, 0.05, 0.12]} />
-        <meshBasicMaterial transparent opacity={0} />
+        <boxGeometry args={[0.18, 0.08, 0.18]} />
+        <meshBasicMaterial transparent opacity={0.001} depthWrite={false} />
       </mesh>
 
       {/* Portal positioned where the screen is */}
@@ -1260,6 +1265,28 @@ function PortalScene({ isMobile = false, isTabletPortrait = false, onScreenClick
   );
 }
 
+// Loader component that waits for models before showing scene
+function SceneLoader({ children }) {
+  const { active, progress } = useProgress();
+  const [ready, setReady] = useState(false);
+  const hasScheduledRef = useRef(false);
+
+  useEffect(() => {
+    // Only schedule once when loading completes
+    if (progress === 100 && !active && !ready && !hasScheduledRef.current) {
+      hasScheduledRef.current = true;
+      const timer = setTimeout(() => setReady(true), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [progress, active, ready]);
+
+  return (
+    <group visible={ready}>
+      {children}
+    </group>
+  );
+}
+
 // Main exported component
 export default function HolyGrailPortal({ isMobile = false, isTabletPortrait = false, onZoomChange, viewOffsetX = 0, isActive = true }) {
   const [clientReady, setClientReady] = useState(false);
@@ -1427,19 +1454,21 @@ export default function HolyGrailPortal({ isMobile = false, isTabletPortrait = f
           {/* <ambientLight intensity={0.3} /> */}
           {/* Apply view offset to shift laptop to left side without affecting rotation */}
           {!isMobile && viewOffsetX !== 0 && <CameraViewOffset offsetX={viewOffsetX} />}
-          <PortalScene
-            isMobile={isMobile}
-            isTabletPortrait={isTabletPortrait}
-            onScreenClick={handleCameraZoom}
-            isZoomedIn={isZoomedIn}
-            onBuyClick={() => setShowBuyModal(true)}
-            onLineComplete={() => {
-              if (digitalTextSoundRef.current) {
-                digitalTextSoundRef.current.currentTime = 0;
-                digitalTextSoundRef.current.play().catch(() => {});
-              }
-            }}
-          />
+          <SceneLoader>
+            <PortalScene
+              isMobile={isMobile}
+              isTabletPortrait={isTabletPortrait}
+              onScreenClick={handleCameraZoom}
+              isZoomedIn={isZoomedIn}
+              onBuyClick={() => setShowBuyModal(true)}
+              onLineComplete={() => {
+                if (digitalTextSoundRef.current) {
+                  digitalTextSoundRef.current.currentTime = 0;
+                  digitalTextSoundRef.current.play().catch(() => {});
+                }
+              }}
+            />
+          </SceneLoader>
           <CameraControls
             ref={cameraControlsRef}
             makeDefault
@@ -1457,6 +1486,11 @@ export default function HolyGrailPortal({ isMobile = false, isTabletPortrait = f
               middle: 0,  // NONE
               right: 0,   // NONE
               wheel: 0,   // NONE - allow page scroll
+            }}
+            touches={{
+              one: 0,     // NONE - disable single touch rotation on mobile/tablet
+              two: 0,     // NONE - disable two-finger gestures
+              three: 0,   // NONE
             }}
           />
           <EffectComposer>
