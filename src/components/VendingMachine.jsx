@@ -18,7 +18,7 @@ const TOY_ICONS = {
   'BurningHeart': '/images/sacreCoeur.webp',
   'Coin': '/images/COIN_TATTOO.webp',
   'TATTOO': '/images/ILLUMIN80_TATTOO.webp',
-  'Unicorn': '💬',
+  'Unicorn': '/images/tiger.webp',
   'Painting': '🖼️'
 };
 
@@ -613,9 +613,16 @@ function VendingMachine({ scale = 1, position = [0, 0, 0], rotation = [0, 0, 0],
   );
 }
 
+// Collectible toy names (excludes ToyMary which is not collectible)
+const COLLECTIBLE_TOYS = TOY_NAMES.filter(name => name !== 'ToyMary');
+
 // 2D Collection bar at bottom (no WebGL to avoid context limits)
 function CollectionBar({ items, onItemClick }) {
-  if (items.length === 0) return null;
+  // Create a map of collected items by toy name for quick lookup
+  const collectedMap = {};
+  items.forEach(item => {
+    collectedMap[item.toyName] = item;
+  });
 
   return (
     <div style={{
@@ -629,42 +636,59 @@ function CollectionBar({ items, onItemClick }) {
       padding: '10px',
       boxSizing: 'border-box',
     }}>
-      {items.map((item, index) => {
-        const baseColor = CAPSULE_COLORS[item.colorIndex % CAPSULE_COLORS.length];
-        const icon = TOY_ICONS[item.toyName] || '🎁';
+      {COLLECTIBLE_TOYS.map((toyName, index) => {
+        const collectedItem = collectedMap[toyName];
+        const isCollected = !!collectedItem;
+        const baseColor = isCollected
+          ? CAPSULE_COLORS[collectedItem.colorIndex % CAPSULE_COLORS.length]
+          : 'rgba(40, 40, 40, 0.8)';
+        const icon = TOY_ICONS[toyName] || '🎁';
         const isImage = icon.startsWith('/');
+
         return (
           <button
-            key={item.id}
-            onClick={() => onItemClick(item)}
+            key={toyName}
+            onClick={() => isCollected && onItemClick(collectedItem)}
+            disabled={!isCollected}
             style={{
               width: '55px',
               height: '55px',
               borderRadius: '50%',
-              border: '2px solid rgba(255,255,255,0.3)',
+              border: isCollected
+                ? '2px solid rgba(255,255,255,0.3)'
+                : '2px dashed rgba(255,255,255,0.15)',
               background: baseColor,
-              cursor: 'pointer',
+              cursor: isCollected ? 'pointer' : 'default',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '24px',
-              animation: `pulse 2s ease-in-out ${index * 0.2}s infinite`,
-              boxShadow: '0 2px 10px rgba(0,0,0,0.5)',
+              animation: isCollected ? `pulse 2s ease-in-out ${index * 0.2}s infinite` : 'none',
+              boxShadow: isCollected ? '0 2px 10px rgba(0,0,0,0.5)' : 'inset 0 2px 8px rgba(0,0,0,0.5)',
               padding: isImage ? '8px' : 0,
+              opacity: isCollected ? 1 : 0.4,
+              transition: 'all 0.3s ease',
             }}
           >
-            {isImage ? (
-              <img
-                src={icon}
-                alt={item.toyName}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain',
-                  borderRadius: '50%',
-                }}
-              />
-            ) : icon}
+            {isCollected ? (
+              isImage ? (
+                <img
+                  src={icon}
+                  alt={toyName}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                    borderRadius: '50%',
+                  }}
+                />
+              ) : icon
+            ) : (
+              <span style={{
+                fontSize: '20px',
+                color: 'rgba(255,255,255,0.2)',
+              }}>?</span>
+            )}
           </button>
         );
       })}
@@ -888,6 +912,18 @@ export default function VendingMachineScene() {
     }
   }, []);
 
+  // Reset collection and clear localStorage
+  const handleResetCollection = useCallback(() => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (e) {
+      console.error('Failed to clear localStorage:', e);
+    }
+    setCollectedItems([]);
+    setToyIndex(0);
+    setResetKey(prev => prev + 1);
+  }, []);
+
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column' }}>
       {/* Main vending machine canvas - unmount when overlay is shown to avoid WebGL context conflict */}
@@ -927,6 +963,38 @@ export default function VendingMachineScene() {
         items={collectedItems}
         onItemClick={handleCollectedItemClick}
       />
+
+      {/* Reset button */}
+      <button
+        onClick={handleResetCollection}
+        style={{
+          position: 'absolute',
+          bottom: '90px',
+          right: '10px',
+          padding: '6px 12px',
+          fontSize: '11px',
+          fontFamily: 'monospace',
+          background: 'rgba(0,0,0,0.6)',
+          border: '1px solid rgba(255,255,255,0.2)',
+          borderRadius: '4px',
+          color: 'rgba(255,255,255,0.5)',
+          cursor: 'pointer',
+          transition: 'all 0.2s ease',
+          zIndex: 10,
+        }}
+        onMouseEnter={(e) => {
+          e.target.style.background = 'rgba(255,50,50,0.3)';
+          e.target.style.borderColor = 'rgba(255,100,100,0.5)';
+          e.target.style.color = 'rgba(255,255,255,0.8)';
+        }}
+        onMouseLeave={(e) => {
+          e.target.style.background = 'rgba(0,0,0,0.6)';
+          e.target.style.borderColor = 'rgba(255,255,255,0.2)';
+          e.target.style.color = 'rgba(255,255,255,0.5)';
+        }}
+      >
+        RESET
+      </button>
 
       {/* Scroll overlay - for Scroll toy only */}
       {showScroll && (
