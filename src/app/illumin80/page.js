@@ -51,6 +51,7 @@ export default function ShrinePage() {
   const [showWalletModal, setShowWalletModal] = useState(false)
   const [showAuthMessage, setShowAuthMessage] = useState(null)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [showHelpOverlay, setShowHelpOverlay] = useState(false) // Help/onboarding overlay
   const [currentView, setCurrentView] = useState('shrine')
   const [mounted, setMounted] = useState(false)
   const [mobileMatchstickLit, setMobileMatchstickLit] = useState(false)
@@ -756,6 +757,8 @@ useEffect(() => {
             onViewReset={() => {
               setIsHighlightingCandle(false)
             }}
+            showHelpOverlay={showHelpOverlay}
+            onToggleHelp={() => setShowHelpOverlay(prev => !prev)}
           />
         ) : null}
       </div>
@@ -1511,6 +1514,8 @@ useEffect(() => {
           userImage={user?.imageUrl}
           onBuyClick={() => setShowBuyModal(true)}
           isMobile={isMobileView}
+          onHelpClick={() => setShowHelpOverlay(prev => !prev)}
+          showHelpActive={showHelpOverlay}
         />
       </div>
       

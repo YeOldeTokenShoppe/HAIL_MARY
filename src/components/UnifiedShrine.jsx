@@ -1055,19 +1055,22 @@ function OptimizedPriceSimulator({ priceRef, shortTermPriceRef, continuousOffset
 
 
 // Main component
-const UnifiedShrine = forwardRef(function UnifiedShrine({ 
-  offerings = [], 
+const UnifiedShrine = forwardRef(function UnifiedShrine({
+  offerings = [],
   totalOfferingsCount = 0,
-  onSelectOffering, 
-  onLightCandle, 
+  onSelectOffering,
+  onLightCandle,
   onPriceChange,
-  currentUserId = 'testUser123', 
+  currentUserId = 'testUser123',
   is80sMode,
   hoveredOffering,
   justLitOffering,
   onJustLitComplete,
   user = null,
-  onViewReset 
+  onViewReset,
+  // External help overlay control (optional - uses internal state if not provided)
+  showHelpOverlay: externalShowHelp,
+  onToggleHelp
 }, ref) {
   // Track if component is mounted for SSR safety
   const [mounted, setMounted] = useState(false)
@@ -1197,6 +1200,21 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   const [clickedCandleId, setClickedCandleId] = useState(null)
   const [isRippleActive, setIsRippleActive] = useState(false)
   const [activeStatsTab, setActiveStatsTab] = useState('price') // 'price', 'staking', 'pulse', or 'leaders'
+  const [internalShowHelp, setInternalShowHelp] = useState(false) // Internal help state (fallback)
+  const [statsBoxCollapsed, setStatsBoxCollapsed] = useState(true) // Collapsed stats box - closed by default
+  const [activeAnnotationId, setActiveAnnotationId] = useState(null) // Which annotation label is shown
+
+  // Use external help control if provided, otherwise use internal state
+  const showHelpOverlay = externalShowHelp !== undefined ? externalShowHelp : internalShowHelp
+  const toggleHelpOverlay = onToggleHelp || (() => setInternalShowHelp(prev => !prev))
+  const dismissHelpOverlay = () => {
+    setActiveAnnotationId(null) // Clear active annotation when dismissing
+    if (onToggleHelp && showHelpOverlay) {
+      onToggleHelp() // Toggle off if external
+    } else {
+      setInternalShowHelp(false)
+    }
+  }
   const [userCandleData, setUserCandleData] = useState(null) // Store user's candle data for tooltip
   const [hoveredCandleId, setHoveredCandleId] = useState(null)
   const [targetCameraPosition, setTargetCameraPosition] = useState(null) // For camera movement
@@ -1969,6 +1987,38 @@ useEffect(() => {
     return { points, lastY: 30 - ((prices[prices.length - 1] - min) / range) * 28 }
   }, [priceHistory7d])
 
+  // Help overlay annotation positions (screen-space)
+  const helpAnnotations = useMemo(() => [
+    {
+      id: 'stats',
+      label: 'Stats & Info',
+      description: 'Track price, staking rewards, community pulse, and top burners',
+      position: { top: isMobile ? '150px' : '100px', right: isMobile ? '100px' : '150px' },
+      pointerDirection: 'right'
+    },
+    {
+      id: 'phone',
+      label: 'Live Feed',
+      description: 'Watch real-time offerings from the congregation',
+      position: { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
+      pointerDirection: 'none'
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      description: 'Get on the watchlist, stake tokens, or light a candle',
+      position: { top: '45%', left: isMobile ? '70px' : '120px' },
+      pointerDirection: 'left'
+    },
+    {
+      id: 'candles',
+      label: 'Candle Cloud',
+      description: 'Each candle represents a community offering',
+      position: { bottom: '30%', left: '30%' },
+      pointerDirection: 'none'
+    }
+  ], [isMobile])
+
   return (
     <div style={{ width: '100vw', height: isMobile ? '100vh' : '100vh', background: is80sMode ? 'transparent' : '#000', position: 'fixed'}}>
       {/* 80s mode background */}
@@ -2573,7 +2623,7 @@ useEffect(() => {
       {!targetCameraPosition && (
         <div style={{
           position: 'fixed',
-          top: isMobile ? '6rem' : '105px',
+          top: isMobile ? '9rem' : '160px',
           right: isMobile ? '10px' : '20px',
           zIndex: 1000,
           display: 'flex',
@@ -2581,13 +2631,71 @@ useEffect(() => {
           gap: '10px',
           alignItems: 'flex-end',
         }}>
+
+
+        {/* Collapsed Stats Tab */}
+        {statsBoxCollapsed && (
+          <button
+            onClick={() => setStatsBoxCollapsed(false)}
+            style={{
+              background: 'rgba(212, 175, 55, 0.2)',
+              
+              border: '2px solid rgba(212, 175, 55, 0.4)',
+              borderRight: 'none',
+              borderRadius: '8px 0 0 8px',
+              padding: '12px 8px',
+              color: '#d4af37',
+              fontSize: '11px',
+              fontFamily: 'monospace',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              backdropFilter: 'blur(10px)',
+              writingMode: 'vertical-rl',
+              textOrientation: 'mixed',
+              letterSpacing: '2px',
+              transition: 'all 0.2s ease',
+              position: 'fixed',
+              right: 0,
+              top: isMobile ? '45%' : '160px',
+            }}
+            title="Open stats panel"
+          >
+            STATS
+          </button>
+        )}
+
         {/* Unified Stats Box with Tabs */}
+        {!statsBoxCollapsed && (
         <div style={{
           ...unifiedStatsStyle,
           position: 'relative',
           top: 0,
           right: 0,
         }}>
+        {/* Close Tab - Side tab to collapse stats */}
+        <button
+          onClick={() => setStatsBoxCollapsed(true)}
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '-24px',
+            transform: 'translateY(-50%)',
+            background: 'rgba(212, 175, 55, 0.2)',
+            border: '2px solid rgba(212, 175, 55, 0.4)',
+            borderRight: 'none',
+            borderRadius: '8px 0 0 8px',
+            padding: '12px 6px',
+            color: '#d4af37',
+            fontSize: '14px',
+            cursor: 'pointer',
+            backdropFilter: 'blur(10px)',
+            transition: 'all 0.2s ease',
+            zIndex: 10,
+          }}
+          title="Collapse stats panel"
+        >
+          ›
+        </button>
         {/* Tab Headers */}
         <div style={{
           display: 'flex',
@@ -3084,7 +3192,8 @@ useEffect(() => {
           </>
         ) : null}
         </div>
-        
+        )}
+
         {/* Find My Candle button for mobile - positioned below stats box */}
         {isMobile && currentUserId && !targetCameraPosition && offeringCandles.some(c => c.userId === currentUserId) && (
           <button
@@ -3116,7 +3225,189 @@ useEffect(() => {
       )}
       
       {/* Removed tooltip - will be added as Html in 3D space */}
-      
+
+      {/* Help Button - Mobile only (desktop uses NavControlsHome) */}
+      {isMobile && (
+        <button
+          onClick={toggleHelpOverlay}
+          aria-label="Help"
+          style={{
+            position: 'fixed',
+            top: '55%',
+            right: '0.5rem',
+            zIndex: 1001,
+            width: '44px',
+            height: '44px',
+            borderRadius: '50%',
+            border: '2px solid #d4af37',
+            background: showHelpOverlay
+              ? 'rgba(13, 10, 20, 0.85)'
+              : 'rgba(212, 175, 55, 0.2)',
+       
+            color: '#d4af37',
+            fontSize: '1.4rem',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: showHelpOverlay
+              ? '0 0 20px rgba(212, 175, 55, 0.6)'
+              : '0 0 12px rgba(212, 175, 55, 0.3)',
+            transition: 'box-shadow 0.2s, transform 0.2s',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.boxShadow = '0 0 20px rgba(212, 175, 55, 0.6)';
+            e.currentTarget.style.transform = 'scale(1.1)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.boxShadow = showHelpOverlay
+              ? '0 0 20px rgba(212, 175, 55, 0.6)'
+              : '0 0 12px rgba(212, 175, 55, 0.3)';
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+        >
+          ?
+        </button>
+      )}
+
+      {/* Help Overlay with Annotations */}
+      {showHelpOverlay && (
+        <>
+          {/* Dimmed background */}
+          <div
+            onClick={dismissHelpOverlay}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 900,
+              cursor: 'pointer',
+            }}
+          />
+
+          {/* Annotation Markers */}
+          {helpAnnotations.map((annotation) => (
+            <div
+              key={annotation.id}
+              onClick={(e) => {
+                e.stopPropagation()
+                setActiveAnnotationId(prev => prev === annotation.id ? null : annotation.id)
+              }}
+              style={{
+                position: 'fixed',
+                ...annotation.position,
+                zIndex: 950,
+                pointerEvents: 'auto',
+                cursor: 'pointer',
+              }}
+            >
+              {/* Marker dot */}
+              <div style={{
+                width: isMobile ? '28px' : '32px',
+                height: isMobile ? '28px' : '32px',
+                borderRadius: '50%',
+                background: activeAnnotationId === annotation.id
+                  ? 'rgba(212, 175, 55, 1)'
+                  : 'rgba(212, 175, 55, 0.9)',
+                border: activeAnnotationId === annotation.id
+                  ? '3px solid #fff'
+                  : '2px solid rgba(255, 255, 255, 0.8)',
+                boxShadow: activeAnnotationId === annotation.id
+                  ? '0 0 25px rgba(212, 175, 55, 0.8), 0 0 50px rgba(212, 175, 55, 0.4)'
+                  : '0 0 15px rgba(212, 175, 55, 0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#000',
+                fontSize: isMobile ? '14px' : '16px',
+                fontWeight: 'bold',
+                transition: 'all 0.2s ease',
+                animation: activeAnnotationId === annotation.id ? 'none' : 'pulse 2s infinite',
+              }}>
+                ?
+              </div>
+
+              {/* Annotation label - only show when active */}
+              {activeAnnotationId === annotation.id && (
+                <div style={{
+                  position: 'absolute',
+                  top: annotation.pointerDirection === 'left' ? '50%' :
+                       annotation.pointerDirection === 'right' ? '50%' : '100%',
+                  left: annotation.pointerDirection === 'left' ? '100%' :
+                        annotation.pointerDirection === 'right' ? 'auto' : '50%',
+                  right: annotation.pointerDirection === 'right' ? '100%' : 'auto',
+                  transform: annotation.pointerDirection === 'left' ? 'translateY(-50%)' :
+                             annotation.pointerDirection === 'right' ? 'translateY(-50%)' : 'translateX(-50%)',
+                  marginLeft: annotation.pointerDirection === 'left' ? '12px' : 0,
+                  marginRight: annotation.pointerDirection === 'right' ? '12px' : 0,
+                  marginTop: annotation.pointerDirection === 'none' ? '12px' : 0,
+                  background: 'rgba(0, 0, 0, 0.95)',
+                  border: '2px solid rgba(212, 175, 55, 0.8)',
+                  borderRadius: '10px',
+                  padding: isMobile ? '10px 14px' : '12px 16px',
+                  minWidth: isMobile ? '140px' : '180px',
+                  maxWidth: isMobile ? '200px' : '240px',
+                  backdropFilter: 'blur(10px)',
+                  animation: 'fadeIn 0.2s ease',
+                }}>
+                  <div style={{
+                    color: '#d4af37',
+                    fontSize: isMobile ? '12px' : '14px',
+                    fontWeight: 'bold',
+                    marginBottom: '6px',
+                    fontFamily: 'system-ui, -apple-system, sans-serif',
+                  }}>
+                    {annotation.label}
+                  </div>
+                  <div style={{
+                    color: 'rgba(255, 255, 255, 0.9)',
+                    fontSize: isMobile ? '11px' : '12px',
+                    lineHeight: '1.5',
+                    fontFamily: 'system-ui, -apple-system, sans-serif',
+                  }}>
+                    {annotation.description}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Dismiss hint */}
+          <div style={{
+            position: 'fixed',
+            bottom: isMobile ? '80px' : '40px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 950,
+            background: 'rgba(0, 0, 0, 0.8)',
+            border: '1px solid rgba(212, 175, 55, 0.4)',
+            borderRadius: '20px',
+            padding: '8px 16px',
+            color: 'rgba(255, 255, 255, 0.7)',
+            fontSize: isMobile ? '11px' : '12px',
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+          }}>
+            Tap markers for info • Tap outside to close
+          </div>
+        </>
+      )}
+
+      {/* Animations for help markers */}
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.1); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+      `}</style>
+
     </div>
   )
 })

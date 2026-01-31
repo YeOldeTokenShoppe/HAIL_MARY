@@ -19,7 +19,9 @@ export default function NavControlsHome({
   userImage = null,
   show80sButton = true,
   onBuyClick,
-  isMobile = false
+  isMobile = false,
+  onHelpClick = null,
+  showHelpActive = false
 }) {
   const [emoji, setEmoji] = useState("😇");
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
@@ -708,10 +710,68 @@ export default function NavControlsHome({
           box-shadow: 0 0 20px rgba(255, 0, 255, 0.4);
           color: #00ffff;
         }
+
+        /* Help Button - matches other nav buttons */
+        .help-btn-nav {
+          width: 40px;
+          min-width: 40px;
+          height: 40px;
+          flex-shrink: 0;
+          border-radius: 10px;
+          background: ${showHelpActive
+            ? 'rgba(212, 175, 55, 0.1)'
+            : 'rgba(212, 175, 55, 0.05)'};
+          border: 1.5px solid ${showHelpActive
+            ? 'rgba(212, 175, 55, 0.4)'
+            : 'rgba(212, 175, 55, 0.2)'};
+          color: #d4af37;
+          font-size: 1.3rem;
+          font-weight: bold;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s ease;
+        }
+
+        .help-btn-nav:hover {
+          border-color: rgba(212, 175, 55, 0.4);
+          background: rgba(212, 175, 55, 0.1);
+        }
+
+        .help-btn-nav:active {
+          transform: scale(0.95);
+        }
+
+        .mode-80s .help-btn-nav {
+          background: ${showHelpActive
+            ? 'rgba(255, 0, 255, 0.1)'
+            : 'rgba(255, 0, 255, 0.05)'};
+          border-color: ${showHelpActive
+            ? 'rgba(255, 0, 255, 0.4)'
+            : 'rgba(255, 0, 255, 0.2)'};
+          color: #ff00ff;
+        }
+
+        .mode-80s .help-btn-nav:hover {
+          border-color: rgba(255, 0, 255, 0.4);
+          background: rgba(255, 0, 255, 0.1);
+        }
       `}</style>
 
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
       <div className={`nav-mobile-home ${is80sMode ? 'mode-80s' : ''}`}>
+        {/* Help Button - Desktop only, at left end */}
+        {!isMobile && onHelpClick && (
+          <button
+            className="help-btn-nav"
+            onClick={onHelpClick}
+            title="Show help annotations"
+          >
+            ?
+          </button>
+        )}
+
         {/* 80s Mode Button */}
         {show80sButton && (
           <button
