@@ -13,6 +13,7 @@ import NavControlsHome from '@/components/NavControlsHome';
 import CyberNav from '@/components/CyberNav';
 import Link from 'next/link';
 import Footer from '@/components/Footer';
+import ThirdwebBuyModal from '@/components/ThirdwebBuyModal';
 
 
 export default function TokenomicsPage() {
@@ -24,6 +25,7 @@ export default function TokenomicsPage() {
   const [emoji, setEmoji] = useState("😇");
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showBuyModal, setShowBuyModal] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -141,7 +143,7 @@ export default function TokenomicsPage() {
                     pointerEvents: "auto"
                   }}
                 >
-                  <NavControlsHome 
+                  <NavControlsHome
                     isPlaying={contextIsPlaying}
                     onPlayMusic={() => play()}
                     onStopMusic={() => pause()}
@@ -152,17 +154,25 @@ export default function TokenomicsPage() {
                     isMenuOpen={isMenuOpen}
                     is80sMode={is80sMode}
                     onToggle80sMode={() => setIs80sMode(!is80sMode)}
+                    onBuyClick={() => setShowBuyModal(true)}
+                    isMobile={isMobileDevice}
                   />
                 </div>
                 )}
                 
           {/* CyberNav Menu Panel */}
-          <CyberNav 
+          <CyberNav
             is80sMode={is80sMode}
             position="fixed"
             isOpen={isMenuOpen}
             onClose={() => setIsMenuOpen(false)}
             showButton={false}
+          />
+
+          {/* Thirdweb Buy Modal */}
+          <ThirdwebBuyModal
+            isOpen={showBuyModal}
+            onClose={() => setShowBuyModal(false)}
           />
           <div style={{
             position: 'relative',
@@ -237,7 +247,7 @@ export default function TokenomicsPage() {
               pointerEvents: "auto"
             }}
           >
-            <NavControlsHome 
+            <NavControlsHome
               isPlaying={contextIsPlaying}
               onPlayMusic={() => play()}
               onStopMusic={() => pause()}
@@ -248,16 +258,24 @@ export default function TokenomicsPage() {
               isMenuOpen={isMenuOpen}
               is80sMode={is80sMode}
               onToggle80sMode={() => setIs80sMode(!is80sMode)}
+              onBuyClick={() => setShowBuyModal(true)}
+              isMobile={isMobile}
             />
           </div>
 
           {/* CyberNav Menu Panel for Mobile */}
-          <CyberNav 
+          <CyberNav
             is80sMode={is80sMode}
             position="fixed"
             isOpen={isMenuOpen}
             onClose={() => setIsMenuOpen(false)}
             showButton={false}
+          />
+
+          {/* Thirdweb Buy Modal */}
+          <ThirdwebBuyModal
+            isOpen={showBuyModal}
+            onClose={() => setShowBuyModal(false)}
           />
 
           {/* RL80 Logo */}

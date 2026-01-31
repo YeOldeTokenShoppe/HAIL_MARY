@@ -8,6 +8,7 @@ import CoinLoader from '@/components/CoinLoader';
 import CyberNav from '@/components/CyberNav';
 import NavControlsHome from '@/components/NavControlsHome';
 import FountainDonationModal from '@/components/FountainDonationModal';
+import ThirdwebBuyModal from '@/components/ThirdwebBuyModal';
 import { useUser, SignInButton, UserButton } from '@clerk/nextjs';
 
 // Dynamic import for the FountainFrame component
@@ -28,6 +29,7 @@ export default function FountainPage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showDonationModal, setShowDonationModal] = useState(false);
   const [preselectedCharity, setPreselectedCharity] = useState(null);
+  const [showBuyModal, setShowBuyModal] = useState(false);
   const is80sMode = context80sMode;
   const iframeRef = useRef(null);
   const loadingTimeoutRef = useRef(null);
@@ -287,7 +289,7 @@ export default function FountainPage() {
         right: "1rem",
         zIndex: 30000
       }}>
-        <NavControlsHome 
+        <NavControlsHome
           isPlaying={contextIsPlaying}
           onPlayMusic={() => play()}
           onStopMusic={() => pause()}
@@ -299,6 +301,8 @@ export default function FountainPage() {
           is80sMode={is80sMode}
           onToggle80sMode={() => setContext80sMode(!is80sMode)}
           userImage={user?.imageUrl}
+          onBuyClick={() => setShowBuyModal(true)}
+          isMobile={isMobileDevice}
         />
       </div>
       
@@ -309,6 +313,12 @@ export default function FountainPage() {
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
         showButton={false}
+      />
+
+      {/* Thirdweb Buy Modal */}
+      <ThirdwebBuyModal
+        isOpen={showBuyModal}
+        onClose={() => setShowBuyModal(false)}
       />
 
       {/* Donation Modal */}

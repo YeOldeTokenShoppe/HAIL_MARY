@@ -8,6 +8,7 @@ import NavControlsHome from '@/components/NavControlsHome';
 import SkewedHeading from '@/components/SkewedHeading';
 import { useUser } from '@clerk/nextjs';
 import Link from "next/link";
+import ThirdwebBuyModal from '@/components/ThirdwebBuyModal';
 
 
 const OldsCoolTunnel = dynamic(() => import('@/components/OldsCoolTunnel'), {
@@ -48,6 +49,7 @@ export default function PortalPage() {
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [deviceDetected, setDeviceDetected] = useState(false);
   const [isTabletPortrait, setIsTabletPortrait] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 480 && window.innerWidth <= 1024 && window.innerHeight > window.innerWidth : false)
+  const [showBuyModal, setShowBuyModal] = useState(false)
   
   
   
@@ -264,6 +266,8 @@ export default function PortalPage() {
           is80sMode={is80sMode}
           onToggle80sMode={() => setContext80sMode(!is80sMode)}
           userImage={user?.imageUrl}
+          onBuyClick={() => setShowBuyModal(true)}
+          isMobile={isMobileDevice}
         />
       </div>
 
@@ -274,6 +278,12 @@ export default function PortalPage() {
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
         showButton={false}
+      />
+
+      {/* Thirdweb Buy Modal */}
+      <ThirdwebBuyModal
+        isOpen={showBuyModal}
+        onClose={() => setShowBuyModal(false)}
       />
 
       {/* Fullscreen OldsCoolTunnel */}

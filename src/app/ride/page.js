@@ -10,6 +10,7 @@ import { useUser } from "@clerk/nextjs";
 import { useMusic } from "@/components/MusicContext";
 import CyberNav from "@/components/CyberNav";
 import { useLanguage } from "@/components/LanguageProvider";
+import ThirdwebBuyModal from "@/components/ThirdwebBuyModal";
 
 const NavControlsHome = dynamic(() => import("@/components/NavControlsHome"), {
   ssr: false,
@@ -90,6 +91,7 @@ export default function CommunionPage() {
   const [fontLoaded, setFontLoaded] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
     const [isTabletPortrait, setIsTabletPortrait] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 480 && window.innerWidth <= 1024 && window.innerHeight > window.innerWidth : false)
+  const [showBuyModal, setShowBuyModal] = useState(false)
 
 
   const { user } = useUser();
@@ -351,6 +353,8 @@ export default function CommunionPage() {
           onToggle80sMode={() => setIs80sMode(!is80sMode)}
           userImage={user?.imageUrl}
           show80sButton={false}
+          onBuyClick={() => setShowBuyModal(true)}
+          isMobile={isMobileDevice}
         />
       </div>
 
@@ -361,6 +365,12 @@ export default function CommunionPage() {
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
         showButton={false}
+      />
+
+      {/* Thirdweb Buy Modal */}
+      <ThirdwebBuyModal
+        isOpen={showBuyModal}
+        onClose={() => setShowBuyModal(false)}
       />
 
       {/* Loader */}

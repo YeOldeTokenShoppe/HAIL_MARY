@@ -659,8 +659,58 @@ export default function NavControlsHome({
           box-shadow: 0 0 20px 2px #ff00ff, 0 0 30px rgba(255, 0, 255, 0.4);
           color: #00ffff;
         }
+
+        /* Mobile BUY Button - Below nav container */
+        .buy-btn-mobile {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: auto;
+          min-width: 60px;
+          height: 36px;
+          padding: 0 16px;
+          margin-top: 8px;
+          border-radius: 18px;
+          background: linear-gradient(135deg, rgba(0, 255, 65, 0.15), rgba(0, 200, 50, 0.1));
+          border: 1.5px solid rgba(0, 255, 65, 0.4);
+          color: #00ff41;
+          text-shadow: 0 0 8px rgba(0, 255, 65, 0.6);
+          cursor: pointer;
+          font-family: 'Orbitron', monospace;
+          font-size: 12px;
+          font-weight: bold;
+          letter-spacing: 1px;
+          transition: all 0.3s ease;
+          box-shadow: 0 0 12px rgba(0, 255, 65, 0.2);
+        }
+
+        .buy-btn-mobile:hover,
+        .buy-btn-mobile:active {
+          transform: scale(1.05);
+          background: linear-gradient(135deg, rgba(0, 255, 65, 0.25), rgba(0, 200, 50, 0.2));
+          border-color: rgba(0, 255, 65, 0.6);
+          box-shadow: 0 0 20px rgba(0, 255, 65, 0.4);
+        }
+
+        /* 80s mode styling for mobile BUY button */
+        .buy-btn-mobile.mode-80s {
+          background: linear-gradient(135deg, rgba(255, 0, 255, 0.15), rgba(200, 0, 200, 0.1));
+          border-color: rgba(255, 0, 255, 0.4);
+          color: #ff00ff;
+          text-shadow: 0 0 8px rgba(255, 0, 255, 0.6);
+          box-shadow: 0 0 12px rgba(255, 0, 255, 0.2);
+        }
+
+        .buy-btn-mobile.mode-80s:hover,
+        .buy-btn-mobile.mode-80s:active {
+          background: linear-gradient(135deg, rgba(255, 0, 255, 0.25), rgba(200, 0, 200, 0.2));
+          border-color: rgba(255, 0, 255, 0.6);
+          box-shadow: 0 0 20px rgba(255, 0, 255, 0.4);
+          color: #00ffff;
+        }
       `}</style>
 
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
       <div className={`nav-mobile-home ${is80sMode ? 'mode-80s' : ''}`}>
         {/* 80s Mode Button */}
         {show80sButton && (
@@ -782,7 +832,19 @@ export default function NavControlsHome({
           <span className="menu-line-mobile" />
         </button>
       </div>
-      
+
+      {/* Mobile BUY Button - Below nav container */}
+        {isMobile && onBuyClick && (
+          <button
+            className={`buy-btn-mobile ${is80sMode ? 'mode-80s' : ''}`}
+            onClick={onBuyClick}
+            title="Buy RL80"
+          >
+            BUY
+          </button>
+        )}
+      </div>
+
       {/* Unified Account Modal */}
       <UnifiedAccountModal 
         isOpen={showUnifiedModal} 

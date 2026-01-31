@@ -1497,7 +1497,7 @@ useEffect(() => {
         zIndex: 999,
         pointerEvents: 'auto'
       }}>
-        <NavControlsHome 
+        <NavControlsHome
           isPlaying={contextIsPlaying}
           onPlayMusic={() => play()}
           onStopMusic={() => pause()}
@@ -1509,6 +1509,8 @@ useEffect(() => {
           is80sMode={is80sMode}
           onToggle80sMode={() => setContext80sMode(!is80sMode)}
           userImage={user?.imageUrl}
+          onBuyClick={() => setShowBuyModal(true)}
+          isMobile={isMobileView}
         />
       </div>
       

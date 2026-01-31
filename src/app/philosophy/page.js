@@ -8,6 +8,7 @@ import CoinLoader from '@/components/CoinLoader';
 import CyberNav from '@/components/CyberNav';
 import CompactCandleModal from '@/components/CompactCandleModal';
 import NavControlsHome from '@/components/NavControlsHome';
+import ThirdwebBuyModal from '@/components/ThirdwebBuyModal';
 
 const Philosophy = dynamic(() => import('@/components/Philosophy'), {
   ssr: false,
@@ -29,6 +30,7 @@ export default function ModelViewerPage() {
   const [showCandleModal, setShowCandleModal] = useState(false);
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showBuyModal, setShowBuyModal] = useState(false);
   const is80sMode = context80sMode;
 
   
@@ -62,7 +64,7 @@ export default function ModelViewerPage() {
             right: "1rem",
             zIndex: 10000,
           }}>
-            <NavControlsHome 
+            <NavControlsHome
               isPlaying={contextIsPlaying}
               onPlayMusic={() => play()}
               onStopMusic={() => pause()}
@@ -74,16 +76,24 @@ export default function ModelViewerPage() {
               is80sMode={is80sMode}
               onToggle80sMode={() => setContext80sMode(!is80sMode)}
               userImage={user?.imageUrl}
+              onBuyClick={() => setShowBuyModal(true)}
+              isMobile={isMobileDevice}
             />
           </div>
           
           {/* CyberNav Menu Panel */}
-          <CyberNav 
+          <CyberNav
             is80sMode={is80sMode}
             position="fixed"
             isOpen={isMenuOpen}
             onClose={() => setIsMenuOpen(false)}
             showButton={false}
+          />
+
+          {/* Thirdweb Buy Modal */}
+          <ThirdwebBuyModal
+            isOpen={showBuyModal}
+            onClose={() => setShowBuyModal(false)}
           />
         </>
       )}
