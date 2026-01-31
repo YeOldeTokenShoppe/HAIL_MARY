@@ -42,6 +42,8 @@ export default function CarouselPage() {
   const [isMobileView, setIsMobileView] = useState(false)
   const [fontLoaded, setFontLoaded] = useState(false)
   const [showBuyModal, setShowBuyModal] = useState(false)
+  const [carouselBuyModalOpen, setCarouselBuyModalOpen] = useState(false)
+  const [isPortalZoomed, setIsPortalZoomed] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isMobileDevice, setIsMobileDevice] = useState(false)
   const [deviceDetected, setDeviceDetected] = useState(false)
@@ -321,6 +323,8 @@ export default function CarouselPage() {
       {/* Main carousel */}
       <CarouselComponent
         disableScrollControls={false}
+        onBuyModalChange={setCarouselBuyModalOpen}
+        onZoomChange={setIsPortalZoomed}
       />
       
       
@@ -401,13 +405,13 @@ export default function CarouselPage() {
         position: "absolute",
         top: "1rem",
         right: "1rem",
-        zIndex: 300,
+        zIndex: 3,
         display: "flex",
         alignItems: "center",
         gap: "1rem"
       }}>
-        {/* Buy RL80 Button - top right on non-mobile */}
-        {deviceDetected && !isMobileDevice && (
+        {/* Buy RL80 Button - top right on non-mobile, hidden when portal is zoomed */}
+        {deviceDetected && !isMobileDevice && !isPortalZoomed && (
           <div className="cyber-candle-btn" style={{
             opacity: mounted ? 1 : 0,
             transition: 'opacity 0.3s',
@@ -421,20 +425,22 @@ export default function CarouselPage() {
             </RetroFuturisticButton>
           </div>
         )}
-        {/* Nav Controls */}
-        <NavControlsHome 
-          isPlaying={contextIsPlaying}
-          onPlayMusic={() => play()}
-          onStopMusic={() => pause()}
-          onSkipTrack={() => nextTrack()}
-          onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
-          onUserClick={() => {}}
-          isUserSignedIn={!!user}
-          isMenuOpen={isMenuOpen}
-          is80sMode={is80sMode}
-          onToggle80sMode={() => setContext80sMode(!is80sMode)}
-          userImage={user?.imageUrl}
-        />
+        {/* Nav Controls - hidden when buy modal is open or portal is zoomed */}
+        {!carouselBuyModalOpen && !isPortalZoomed && (
+          <NavControlsHome
+            isPlaying={contextIsPlaying}
+            onPlayMusic={() => play()}
+            onStopMusic={() => pause()}
+            onSkipTrack={() => nextTrack()}
+            onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
+            onUserClick={() => {}}
+            isUserSignedIn={!!user}
+            isMenuOpen={isMenuOpen}
+            is80sMode={is80sMode}
+            onToggle80sMode={() => setContext80sMode(!is80sMode)}
+            userImage={user?.imageUrl}
+          />
+        )}
       </div>
       
       {/* CyberNav Menu Panel */}
@@ -453,32 +459,12 @@ export default function CarouselPage() {
       />
       
       
-      {/* Buy RL80 Button - bottom right on mobile */}
-      {deviceDetected && isMobileDevice && (
-        <div className="cyber-candle-btn" style={{
-          position: 'absolute',
-          bottom: '2rem',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 300,
-          opacity: mounted ? 1 : 0,
-          transition: 'opacity 0.3s',
-        }}>
-          <RetroFuturisticButton
-            onClick={() => setShowBuyModal(true)}
-            disabled={isLoading}
-            className="my-custom-class"
-          >
-            BUY RL80
-          </RetroFuturisticButton>
-        </div>
-      )}
 
-      {/* RL80 Logo - Mobile Only */}
-      {deviceDetected && isMobileDevice && (
+      {/* RL80 Logo - Mobile Only, hidden when buy modal is open or portal is zoomed */}
+      {deviceDetected && isMobileDevice && !carouselBuyModalOpen && !isPortalZoomed && (
         <div style={{
           position: "absolute",
-          top: "20px", 
+          top: "20px",
           left: "20px",
           borderRadius: "8px",
           padding: "10px",

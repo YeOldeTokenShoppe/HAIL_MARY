@@ -232,7 +232,7 @@ export default function CommunionPage() {
           borderRadius: "8px",
           padding: "10px",
           pointerEvents: "auto",
-          zIndex: 999,
+          zIndex: 1,
         }}>
           <div
             id="text"

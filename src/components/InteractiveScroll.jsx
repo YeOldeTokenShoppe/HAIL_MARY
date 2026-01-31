@@ -125,7 +125,7 @@ const PAPER_MESH = "Object_38";
 
 function ScrollModel3D({ isOpen, onToggle, scale = 1, translations, locale }) {
   const group = useRef();
-  const { scene, animations } = useGLTF("/models/scroll.glb");
+  const { scene, animations } = useGLTF("/models/scroll2.glb");
   const { actions } = useAnimations(animations, group);
 
   const materialClonedRef = useRef(false);
@@ -489,4 +489,4 @@ export default function InteractiveScroll({ isMobile, isSmallPhone }) {
   );
 }
 
-useGLTF.preload("/models/scroll.glb");
+useGLTF.preload("/models/scroll2.glb");

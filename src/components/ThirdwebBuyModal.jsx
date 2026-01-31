@@ -148,7 +148,7 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
           bottom: 0,
           backgroundColor: 'rgba(0, 0, 0, 0.95)',
           backdropFilter: 'blur(2px)',
-          zIndex: 10000,
+          zIndex: 1000000,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -215,7 +215,7 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
               alignItems: 'center',
               justifyContent: 'center',
               transition: 'transform 0.3s ease',
-              zIndex: 10,
+              zIndex: 100,
               fontWeight: 'bold',
               fontFamily: 'monospace',
             }}

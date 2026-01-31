@@ -24,7 +24,7 @@ import InteractiveScroll from '@/components/InteractiveScroll'
 import TranslatableDropInTitle from '@/components/TranslatableDropInTitle'
 import Footer from '@/components/Footer'
 
-export default function CarouselComponent({ onReady, disableScrollControls = false, buyButton }) {
+export default function CarouselComponent({ onReady, disableScrollControls = false, buyButton, onBuyModalChange, onZoomChange }) {
   const router = useRouter()
   const [hoveredCaption, setHoveredCaption] = useState(null)
   const [sceneReady, setSceneReady] = useState(false)
@@ -38,8 +38,20 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
   const [isLargeTablet, setIsLargeTablet] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 820 && window.innerWidth <= 1024 : false)
   const [isSmallLandscape, setIsSmallLandscape] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 1024 && window.innerWidth <= 1500 : false)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [isBuyModalOpen, setIsBuyModalOpen] = useState(false)
+  const [isPortalZoomed, setIsPortalZoomed] = useState(false)
   const { is80sMode } = useMusic()
   const { t, locale } = useLanguage()
+
+  // Notify parent when buy modal state changes
+  useEffect(() => {
+    onBuyModalChange?.(isBuyModalOpen);
+  }, [isBuyModalOpen, onBuyModalChange]);
+
+  // Notify parent when portal zoom state changes
+  useEffect(() => {
+    onZoomChange?.(isPortalZoomed);
+  }, [isPortalZoomed, onZoomChange]);
 
   // Horizontal carousel state (works on all screen sizes)
   const [isCarouselMode, setIsCarouselMode] = useState(true) // Carousel mode is always on
@@ -155,9 +167,9 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
     setIsManuallyPaused((prev) => !prev)
   }, [])
 
-  // Auto-rotation for carousel mode
+  // Auto-rotation for carousel mode (paused when portal is zoomed)
   useEffect(() => {
-    if (isCarouselMode && !isAutoPaused && !isManuallyPaused && !isFullscreen) {
+    if (isCarouselMode && !isAutoPaused && !isManuallyPaused && !isFullscreen && !isPortalZoomed) {
       autoRotateInterval.current = setInterval(() => {
         goToNextSection()
       }, AUTO_ROTATE_DELAY)
@@ -168,7 +180,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
         clearInterval(autoRotateInterval.current)
       }
     }
-  }, [isCarouselMode, isAutoPaused, isManuallyPaused, isFullscreen, goToNextSection])
+  }, [isCarouselMode, isAutoPaused, isManuallyPaused, isFullscreen, isPortalZoomed, goToNextSection])
 
   // Keyboard navigation for carousel
   useEffect(() => {
@@ -959,89 +971,124 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           <div style={{
             width: '100vw',
             minWidth: '100vw',
-            height: '100%',
+            height: '100vh',
+            minHeight: '100vh',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: isMobilePhone ? 'flex-start' : 'center',
-            paddingTop: isMobilePhone ? '6rem' : '2rem',
-            paddingBottom: isMobilePhone ? '1rem' : '2rem',
-            paddingLeft: isMobilePhone ? '1rem' : '2rem',
-            paddingRight: isMobilePhone ? '1rem' : '2rem',
             position: 'relative',
             flexShrink: 0,
             overflow: 'hidden',
           }}>
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              transform: (!isMobilePhone && isPortraitOrientation) ? 'scale(1)' : 'none',
-              minWidth: '25rem',
-              marginTop: '5%',
-              transformOrigin: 'center center',
-            }}>
-              
-            {/* Heading */}
-            <SkewedHeading
-              lines={[t('about.skewedHeading1.line1'), t('about.skewedHeading1.line2'), t('about.skewedHeading1.line3')]}
-              colors={["#00ff00", "#f4e4c1", "#ffd700"]}
-              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "3rem" : isTabletPortrait ? "3rem" : "3rem"}
-              isMobile={true}
-              language={locale}
-            />
-
-            {/* HolyGrailPortal Canvas */}
-            <div style={{
-              width: '100%',
-              // maxWidth: isMobilePhone ? 'min(350px, 80vw)' : '500px',
-              height: isMobilePhone ? 'min(400px, 45vh)' : isTabletPortrait ? 'min(400px, 55vh)' : 'min(400px, 45vh)',
-              marginBottom: '1rem',
-              filter: 'drop-shadow(0 0 30px rgba(0, 221, 255, 0.4))',
-              paddingTop: isMobilePhone ? '1rem' : '3rem'
-            }}>
-              <HolyGrailPortal isMobile={isMobilePhone} isTabletPortrait={isTabletPortrait} />
-            </div>
- <p style={{
-              fontFamily: "'Courier New', monospace",
-              fontSize: isTabletLandscape ? '1rem' : isTabletPortrait ? '0.9rem' : '1.2rem',
-              color: '#ffd700',
-              textAlign: 'center',
-               fontWeight: 'bold',
-              // marginTop: isTablet ? '1rem' : '1.5rem',
-              // marginBottom: isTablet ? '1.5rem' : '2rem',
-              letterSpacing: '0.05em',
-              textTransform: 'uppercase',
-              opacity: 0.9,
-              textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
-            }}>
-              {/* {"\u201C"}Uro, ergo lucreor.{"\u201D"}
-              <br/>
-              <span style={{fontSize: '0.7em', fontStyle: 'italic', textTransform: 'none', opacity: 0.8}}>(I burn, therefore I earn.)</span>
-              <br/>
-              <span style={{fontSize: '0.6em', fontStyle: 'normal', textTransform: 'none', opacity: 0.7, letterSpacing: '0.1em'}}>{"\u2014"} St. GR80</span> */}
-            </p>
-            {/* Interactive Scroll */}
-            <div style={{
-              ...(isMobilePhone ? {
+            {/* HolyGrailPortal Canvas - full viewport for all devices */}
+            <div
+              style={{
                 position: 'absolute',
-                bottom: '13%',
+                top: 0,
                 left: 0,
-                right: 0,
-              } : {}),
+                width: '100%',
+                height: '100%',
+                zIndex: 0,
+              }}
+              onTouchStart={(e) => e.stopPropagation()}
+              onTouchMove={(e) => e.stopPropagation()}
+              onTouchEnd={(e) => e.stopPropagation()}
+            >
+              <HolyGrailPortal
+                isMobile={isMobilePhone}
+                isTabletPortrait={isTabletPortrait}
+                onBuyModalChange={setIsBuyModalOpen}
+                onZoomChange={setIsPortalZoomed}
+                viewOffsetX={isMobilePhone ? 0 : isTabletPortrait ? 0 : 0.7}
+                isActive={isMobilePhone ? activeSection === 0 : activeSection === 1}
+              />
+            </div>
+
+            {/* Overlay content - hidden when portal is zoomed */}
+            {!isPortalZoomed && !isBuyModalOpen && (
+            <>
+            {/* Heading - centered for mobile/tablet portrait, right side for others */}
+            <div style={{
+              position: 'absolute',
+              top: isMobilePhone ? '6rem' : isTabletPortrait ? '20%' : '2rem',
+              left: (isMobilePhone || isTabletPortrait) ? '50%' : 'auto',
+              right: (isMobilePhone || isTabletPortrait) ? 'auto' : '5%',
+              transform: (isMobilePhone || isTabletPortrait) ? 'translateX(-50%)' : 'none',
+              zIndex: 1,
               display: 'flex',
               flexDirection: 'column',
-              alignItems: 'center',
+              alignItems: (isMobilePhone || isTabletPortrait) ? 'center' : 'flex-end',
+              maxWidth: isMobilePhone ? '90%' : isTabletPortrait ? '95%' : '45%',
             }}>
-              <InteractiveScroll isMobile={isMobilePhone} isSmallPhone={isSmallPhone} />
-    
+              <SkewedHeading
+                lines={[t('about.skewedHeading1.line1'), t('about.skewedHeading1.line2'), t('about.skewedHeading1.line3')]}
+                colors={["#00ff00", "#f4e4c1", "#ffd700"]}
+                fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "2.2rem" : "3rem"}
+                isMobile={true}
+                language={locale}
+              />
+              {/* Latin quote - tablet portrait only */}
+              {isTabletPortrait && (
+                <p style={{
+                  fontFamily: "'Courier New', monospace",
+                  fontSize: '1rem',
+                  color: '#ffd700',
+                  textAlign: 'center',
+                  fontWeight: 'bold',
+                  letterSpacing: '0.05em',
+                  fontStyle: 'italic',
+                  opacity: 0.9,
+                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)',
+                  marginTop: '0.5rem',
+                }}>
+                  {"\u201C"}Bene agere est vere lucrari{"\u201D"}
+                  <br/>
+                  <span style={{fontSize: '0.75em', fontStyle: 'normal', opacity: 0.7}}>(To do good is to truly profit)</span>
+                </p>
+              )}
+            </div>
+
+            {/* Interactive Scroll - right side for desktop/tablet landscape */}
+            {/* {!isMobilePhone && !isTabletPortrait && (
+              <div style={{
+                position: 'absolute',
+                right: '5%',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                zIndex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+              }}>
+                <InteractiveScroll isMobile={isMobilePhone} isSmallPhone={isSmallPhone} />
+              </div>
+            )} */}
+
+            {/* Interactive Scroll - bottom for mobile and tablet portrait */}
+            {/* {(isMobilePhone || isTabletPortrait) && (
+              <div style={{
+                position: 'absolute',
+                bottom: '2rem',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+              }}>
+                <InteractiveScroll isMobile={isMobilePhone} isSmallPhone={isSmallPhone} />
+              </div>
+            )} */}
 
             {/* Tokenomics Navigation - tablet portrait only */}
-            {isTabletPortrait && (
+            {isTabletPortrait || isMobile && (
               <div
                 className="navigation-group"
                 style={{
-                  position: 'relative',
+                  position: 'absolute',
+                  bottom: '10%',
+                  right: '2rem',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0',
@@ -1123,9 +1170,8 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                 </div>
               </div>
             )}
-            </div>
-            </div>
-            {/* End of scale wrapper */}
+            </>
+            )}
 
           </div>
           {/* End of Section 2 */}
@@ -1467,7 +1513,8 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             </>
           )}
 
-          {/* Our Lady of Perpetual Profit Logo - Fixed position (Desktop) */}
+          {/* Our Lady of Perpetual Profit Logo - Fixed position (Desktop), hidden when portal is zoomed */}
+          {!isPortalZoomed && (
           <h1 className='custom-title'
             id="main-title"
             style={{
@@ -1514,6 +1561,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             </span>
             <span className="title-line" style={{ display: 'block', marginLeft: "4rem", position: 'relative' }}>Profit</span>
           </h1>
+          )}
 
           {/* Navigation Group - Fixed bottom right */}
         
@@ -1766,114 +1814,89 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           </div>
           {/* End of Row 1 */}
 
-          {/* Row 2: DropInTitle on Left, HolyGrail on Right (alternated layout) */}
+          {/* Row 2: HolyGrailPortal - Full viewport canvas with overlay content */}
           <div
             className={isCarouselMode ? 'carousel-section' : ''}
             style={{
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: isTabletLandscape ? '2rem' : isTabletPortrait ? '1.5rem' : '1rem',
-              padding: isTabletLandscape ? '3% 10%' : isTabletPortrait ? '3% 2%' : isSmallLandscape ? '3% 10%' : '3% 10%',
-              minHeight: isCarouselMode ? '100vh' : '90vh',
-              minWidth: isCarouselMode ? '100vw' : 'auto',
+              minHeight: '100vh',
+              minWidth: '100vw',
               position: 'relative',
-              overflow: 'visible',
+              overflow: 'hidden',
               flexShrink: 0,
             }}>
-            {/* Left Column - HolyGrail Portal (3D pass-through effect) */}
-            <div style={{
-              flex: isTabletPortrait ? '1 1 65%' : isSmallLandscape ? '1 1 55%' : '1 1 65%',
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              // maxWidth: isTabletLandscape ? '800px' : isTabletPortrait ? '650px' : isSmallLandscape ? '550px' : '800px',
-              position: 'relative',
-              overflow: 'visible',
-            }}>
-              {/* Portal Container */}
-              <div
-                style={{
-                  position: 'relative',
-                  width: '100%',
-                  // maxWidth: isTabletLandscape ? '550px' : isTabletPortrait ? '500px' : isSmallLandscape ? '480px' : '700px',
-                  height: isTabletLandscape ? '30rem' : isTabletPortrait ? '35rem' : isSmallLandscape ? '35rem' : '35rem',
-                  transition: 'all 0.3s ease',
-                  // filter: 'drop-shadow(0 0 40px rgba(255, 215, 0, 0.5))',
-                  overflow: 'visible',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.filter = 'drop-shadow(0 0 70px rgba(9, 99, 244, 0.6)) brightness(1.1)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.filter = 'drop-shadow(0 0 40px rgba(0, 149, 255, 0.4)) brightness(1)'
-                }}
-              >
-                {/* HolyGrail Portal Canvas */}
-                <div style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: '100%',
-                  overflow: 'visible',
-                  pointerEvents: 'auto',
-                }}>
-                  <HolyGrailPortal isMobile={false} isTabletPortrait={isTabletPortrait} />
-                </div>
-              </div>
+            {/* HolyGrailPortal Canvas - full viewport */}
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                zIndex: 0,
+              }}
+              onTouchStart={(e) => e.stopPropagation()}
+              onTouchMove={(e) => e.stopPropagation()}
+              onTouchEnd={(e) => e.stopPropagation()}
+            >
+              <HolyGrailPortal
+                isMobile={false}
+                isTabletPortrait={isTabletPortrait}
+                onBuyModalChange={setIsBuyModalOpen}
+                onZoomChange={setIsPortalZoomed}
+                viewOffsetX={0.7}
+                isActive={activeSection === 1}
+              />
             </div>
 
-            {/* Right Column - Title and Text */}
+            {/* Overlay content - hidden when portal is zoomed */}
+            {!isPortalZoomed && !isBuyModalOpen && (
+            <>
+            {/* Right side content */}
             <div style={{
-              flex: isTabletPortrait ? '0 0 45%' : '1 1 50%',
+              position: 'absolute',
+              right: '5%',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              zIndex: 1,
               display: 'flex',
               flexDirection: 'column',
-              justifyContent: 'center',
               alignItems: 'center',
-              maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : isSmallLandscape ? '450px' : '550px',
-              paddingLeft: isTabletLandscape ? '1rem' : isSmallLandscape ? '1rem' : '0',
-              marginLeft: isTabletPortrait ? '-5rem' : '-10rem'
+              maxWidth: isTabletLandscape ? '450px' : isSmallLandscape ? '450px' : '550px',
             }}>
-              {/* TranslatableDropInTitle */}
+              {/* SkewedHeading */}
               <SkewedHeading
                 lines={[t('about.skewedHeading1.line1'), t('about.skewedHeading1.line2'), t('about.skewedHeading1.line3')]}
-              colors={["#00ff00", "#f4e4c1", "#ffd700"]}
+                colors={["#00ff00", "#f4e4c1", "#ffd700"]}
                 fontSize={{ mobile: "1.6rem", desktop: isTabletLandscape ? "2.5rem" : isSmallLandscape ? "3rem" : "3rem" }}
                 isMobile={false}
                 language={locale}
               />
-            <p style={{
-              fontFamily: "'Courier New', monospace",
-              fontSize: isTabletLandscape ? '1rem' : isTabletPortrait ? '0.9rem' : '1.2rem',
-              color: '#ffd700',
-              textAlign: 'center',
-               fontWeight: 'bold',
-              // marginTop: isTablet ? '1rem' : '1.5rem',
-              // marginBottom: isTablet ? '1.5rem' : '2rem',
-              letterSpacing: '0.05em',
-              textTransform: 'uppercase',
-              opacity: 0.9,
-              textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
-            }}>
-              {"\u201C"}Prosperitas vera non nascitur ex dolo, sed ex aequitate et benevolentia.{"\u201D"}
-              <br/>
-              <span style={{fontSize: '0.7em', fontStyle: 'italic', textTransform: 'none', opacity: 0.8}}>(True prosperity is not born of deceit, but of fairness and goodwill.)</span>
-
-              <span style={{fontSize: '0.6em', fontStyle: 'normal', textTransform: 'none', opacity: 0.7, letterSpacing: '0.1em'}}>{"\u2014"} St. GR80</span>
-            </p>
+              <p style={{
+                fontFamily: "'Courier New', monospace",
+                fontSize: isTabletLandscape ? '1rem' : '1.2rem',
+                color: '#ffd700',
+                textAlign: 'center',
+                fontWeight: 'bold',
+                letterSpacing: '0.05em',
+                textTransform: 'uppercase',
+                opacity: 0.9,
+                textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
+              }}>
+                {"\u201C"}Bene agere est vere lucrari.{"\u201D"}
+                <br/>
+                <span style={{fontSize: '0.7em', fontStyle: 'italic', textTransform: 'none', opacity: 0.8}}>(To act well is to profit truly.)</span>
+                <span style={{fontSize: '0.6em', fontStyle: 'normal', textTransform: 'none', opacity: 0.7, letterSpacing: '0.1em'}}>{"\u2014"} St. GR80</span>
+              </p>
               {/* Interactive Scroll */}
-              <div style={{
+              {/* <div style={{
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 marginTop: '1rem',
-                marginBottom: isTablet ? '1.5rem' : '2rem',
+                marginBottom: '2rem',
               }}>
                 <InteractiveScroll isMobile={false} isSmallPhone={false} />
-              </div>
+              </div> */}
             <div
               className="navigation-group"
               style={{
@@ -2091,14 +2114,9 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                 />
               </div>
             </div>
-          {/* )} */}
-              {/* Tokenomics Button */}
-              {/* <Link href="/tokenomics" style={{ textDecoration: 'none' }}>
-                <RetroFuturisticButton>
-                  TOKENOMICS
-                </RetroFuturisticButton>
-              </Link> */}
             </div>
+            </>
+            )}
 
           </div>
           {/* End of Row 2 */}
