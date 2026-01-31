@@ -2014,7 +2014,7 @@ Placeholder            </p>
             {/* Right side content */}
             <div style={{
               position: 'absolute',
-              right: '5%',
+              right: '15%',
               top: '50%',
               transform: 'translateY(-50%)',
               zIndex: 1,
