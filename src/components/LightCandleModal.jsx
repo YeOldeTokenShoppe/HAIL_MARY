@@ -334,21 +334,15 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
   const handlePostBurnActions = async () => {
     console.log('🔥 POST-BURN ACTIONS CALLED - This should only happen AFTER successful transaction!');
     try {
-      // Generate a random 3D position for the candle
-      // This matches the position generation in CandleShrine
-      const candlePosition = {
-        x: (Math.random() - 0.5) * 30,
-        y: (Math.random() - 0.5) * 20,
-        z: (Math.random() - 0.5) * 15
-      };
-      
       // Prepare offering data with sanitization
+      // Note: Position is NOT saved - CandleShrine generates positions using priority zones
+      // This ensures candles cluster in visible areas (front-center first, expanding outward)
       const sanitizedMessage = sanitizeText(message || '');
-      const sanitizedRecipientName = prayerFor === 'self' 
+      const sanitizedRecipientName = prayerFor === 'self'
         ? sanitizeText(user?.username || user?.firstName || 'Anonymous')
         : sanitizeText(recipientName || 'Someone');
       const validatedAmount = validateAmount(tokenAmount);
-      
+
       const baseOffering = {
         name: sanitizeText(user?.username || user?.firstName || 'Anonymous'),
         type: offeringType, // This is from a controlled enum
@@ -359,7 +353,6 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
         userImageUrl: user?.imageUrl || null,
         prayerFor: prayerFor, // This is from a controlled enum
         recipientName: sanitizedRecipientName,
-        position: candlePosition, // Store the 3D position
         createdAt: serverTimestamp(),
         timestamp: new Date().toISOString(),
         litAt: Date.now() // Add the litAt timestamp for candle melting logic

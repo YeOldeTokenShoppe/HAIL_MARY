@@ -422,8 +422,8 @@ const crtTextSequence = [
   { text: '', type: 'pause', delay: 300 },
   { text: 'Virtue over villainy and', type: 'body', delay: 1000 },
   { text: 'The Virtual machine', type: 'body', delay: 600 },
-  { text: '', type: 'pause', delay: 600 },
-  { text: 'Mater ex machina', type: 'highlight', delay: 1000 },
+  { text: '', type: 'pause', delay: 1200 },
+  { text: 'Mater ex machina', type: 'highlight', delay: 3000 },
   { text: 'Incorruptible integrity', type: 'body', delay: 600 },
   // { text: 'And fairness.', type: 'body', delay: 800 },
   { text: '', type: 'pause', delay: 400 },
@@ -764,8 +764,10 @@ function CRTScreen({ width = 2, height = 1.4, isActive = true, noBackground = fa
 
   const lineHeight = 0.05 * textScale;
   const fontSize = 0.042 * textScale;
-  // Start scrolling after about 10 lines to keep text in view
-  const scrollThreshold = 10;
+  // Start scrolling earlier to leave room for button at bottom
+  const scrollThreshold = 8;
+  // Bottom clipping - leave space for button
+  const bottomClip = -height / 2 + 0.18 * textScale;
 
   // Reset animation when becoming active
   useEffect(() => {
@@ -915,8 +917,8 @@ function CRTScreen({ width = 2, height = 1.4, isActive = true, noBackground = fa
         const y = height / 2 - 0.06 - (lineIndex * lineHeight) + scrollOffset;
         lineIndex++;
 
-        // Don't render lines that have scrolled off screen
-        if (y > height / 2 || y < -height / 2 - 0.05) return null;
+        // Don't render lines that have scrolled off screen or below button area
+        if (y > height / 2 || y < bottomClip) return null;
 
         return (
           <Text
@@ -1403,11 +1405,11 @@ export default function HolyGrailPortal({ isMobile = false, isTabletPortrait = f
       }, 500);
       // Zoom in directly facing the screen (accounting for scene rotation of 0.6 rad on Y)
       // Position camera perpendicular to screen surface
-      const distance = 1.2;
-      const sceneRotY = 0.4;
+      const distance = 1.0;
+      const sceneRotY = 0.55; // Match scene rotation for proper screen view
       const camX = Math.sin(sceneRotY) * distance;
       const camZ = Math.cos(sceneRotY) * distance;
-      controls.setLookAt(camX - 0.1, 0.65, camZ + 0.1, -0.6, 0.1, -0.2, true);
+      controls.setLookAt(camX - 0.32, 0.15, camZ, -0.55, 0.05, -0.2, true);
       setIsZoomedIn(true);
     }
   };
@@ -1489,13 +1491,13 @@ export default function HolyGrailPortal({ isMobile = false, isTabletPortrait = f
             dollySpeed={0}
             truckSpeed={0}
             mouseButtons={{
-              left: 1,    // ROTATE
+              left: 1,    // ROTATE - enable left-click drag to rotate
               middle: 0,  // NONE
               right: 0,   // NONE
               wheel: 0,   // NONE - allow page scroll
             }}
             touches={{
-              one: 0,     // NONE - disable single touch rotation on mobile/tablet
+              one: 1,     // ROTATE - enable single touch rotation
               two: 0,     // NONE - disable two-finger gestures
               three: 0,   // NONE
             }}

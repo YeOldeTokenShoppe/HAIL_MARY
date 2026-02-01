@@ -3,6 +3,83 @@ import React, { useRef, useState, useEffect, Suspense, useCallback, useMemo, for
 import { createPortal } from 'react-dom'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Stats, useGLTF, Html, OrbitControls } from '@react-three/drei'
+
+// DEBUG MODE - Set to true to see zones from bird's eye view
+const DEBUG_MODE = false
+
+// Debug visualization component - shows exclusion zones
+function DebugZoneVisualization() {
+  if (!DEBUG_MODE) return null
+
+  // Body corridor: box from z=-9 to z=6, with wobble buffer
+  // halfWidth = 3 + 1 = 4, halfHeight = 4 + 1 = 5
+  const corridorDepth = 6 - (-9) // 15 units along Z
+  const corridorCenterZ = (-9 + 6) / 2 // z = -1.5
+  const corridorWidth = 8 // 2 * halfWidth (3 + 1 wobble buffer)
+  const corridorHeight = 10 // 2 * halfHeight (4 + 1 wobble buffer)
+
+  return (
+    <group>
+      {/* Body corridor - translucent cyan box (no rotation needed) */}
+      <mesh position={[0, -1, corridorCenterZ]}>
+        <boxGeometry args={[corridorWidth, corridorHeight, corridorDepth]} />
+        <meshBasicMaterial color="#00ffff" transparent opacity={0.15} side={THREE.DoubleSide} depthWrite={false} />
+      </mesh>
+
+
+      {/* Camera position marker - yellow sphere */}
+      <mesh position={[0, 0, 0]}>
+        <sphereGeometry args={[0.5, 16, 8]} />
+        <meshBasicMaterial color="#ffff00" />
+      </mesh>
+
+      {/* Hands/phone position marker - green sphere */}
+      <mesh position={[0, -1, -6]}>
+        <sphereGeometry args={[0.5, 16, 8]} />
+        <meshBasicMaterial color="#00ff00" />
+      </mesh>
+
+      {/* Origin marker - red sphere */}
+      <mesh position={[0, 0, 0]}>
+        <sphereGeometry args={[0.3, 16, 8]} />
+        <meshBasicMaterial color="#ff0000" />
+      </mesh>
+
+      {/* Axis lines */}
+      {/* X axis - red */}
+      <line>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" count={2} array={new Float32Array([-20, 0, 0, 20, 0, 0])} itemSize={3} />
+        </bufferGeometry>
+        <lineBasicMaterial color="#ff0000" />
+      </line>
+
+      {/* Y axis - green */}
+      <line>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" count={2} array={new Float32Array([0, -20, 0, 0, 20, 0])} itemSize={3} />
+        </bufferGeometry>
+        <lineBasicMaterial color="#00ff00" />
+      </line>
+
+      {/* Z axis - blue */}
+      <line>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" count={2} array={new Float32Array([0, 0, -20, 0, 0, 20])} itemSize={3} />
+        </bufferGeometry>
+        <lineBasicMaterial color="#0000ff" />
+      </line>
+
+      {/* Labels */}
+      <Html position={[0, 0, 0]} center>
+        <div style={{ color: 'yellow', fontSize: '12px', whiteSpace: 'nowrap' }}>Camera [0,0,0]</div>
+      </Html>
+      <Html position={[0, -1, -6]} center>
+        <div style={{ color: 'lime', fontSize: '12px', whiteSpace: 'nowrap' }}>Hands [0,-1,-6]</div>
+      </Html>
+    </group>
+  )
+}
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { BlendFunction } from 'postprocessing'
 import * as THREE from 'three'
@@ -761,10 +838,10 @@ function CameraAnimator({ targetPosition, resetToDefault, isMobile }) {
         
         camera.updateProjectionMatrix()
       } else if (targetPosition && !isResetting.current) {
-        // Keep looking at target after animation from initial position
+        // Keep looking at target after animation (same offset as animation target)
         camera.lookAt(
           targetPosition.target[0],
-          targetPosition.target[1],
+          targetPosition.target[1] + 1,  // Same +1 offset used during animation
           targetPosition.target[2]
         )
         camera.updateProjectionMatrix()
@@ -1300,10 +1377,9 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   const findUserCandle = useCallback(() => {
     // Override all camera controls
     setOverrideCameraControl(true)
-    
-    // Save current rotation and reset scene to default rotation
+
+    // Save current rotation (don't reset - let camera animation handle the transition)
     savedUserRotation.current = userRotationRef.current
-    setUserRotation(0)
     
     // Find user's candle directly from the offeringCandles computed in the component
     const userCandleIndex = offeringCandles.findIndex(c => c.userId === currentUserId)
@@ -1333,12 +1409,11 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
       if (window.sharedUniforms) {
         // First clear any previous highlight
         window.sharedUniforms.uHighlightedId.value = -1
-        
+
         // Then set the new highlight after a brief moment to ensure update
         setTimeout(() => {
           window.sharedUniforms.uHighlightedId.value = actualInstanceId
         }, 100)
-        
       }
       
       // Store candle data for tooltip
@@ -1386,10 +1461,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   const resetView = useCallback(() => {
     setTargetCameraPosition(null)
     setResetCameraToDefault(true)
-    
-    // Restore the user's scene rotation
-    setUserRotation(0) // First reset to 0 to match initial state
-    
+
     // Reset flags after animation completes
     setTimeout(() => {
       setResetCameraToDefault(false)
@@ -1775,11 +1847,21 @@ useEffect(() => {
   }, [offerings, onSelectOffering, userCandleData, offeringCandles, currentUserId])
 
   const handleNewCandle = useCallback((position, offering) => {
+    const id = Date.now()
+    // Use id-based rotation so it's stable across re-renders
+    const rotation = (id % 1000) / 1000 * Math.PI * 2
     setAdditionalCandles(prev => [...prev, {
       position,
       offering,
-      id: Date.now(),
-      rotation: Math.random() * Math.PI * 2
+      id,
+      rotation,
+      x: position[0],
+      y: position[1],
+      z: position[2],
+      scale: 1.0,
+      litAt: id,
+      userId: offering?.userId || offering?.uid,
+      username: offering?.userName || offering?.username || 'Anonymous'
     }])
     
     // Show the latest polaroid on the phone screen after a delay
@@ -2113,12 +2195,20 @@ useEffect(() => {
         <div
           style={{
             position: 'fixed',
-            top: isMobile ? '120px' : '80px',
-            right: isMobile ? '16px' : '24px',
-            background: 'rgba(20, 20, 30, 0.98)',
-            borderRadius: '24px',
-            padding: isMobile ? '1.5rem' : '2rem',
-            minWidth: isMobile ? '220px' : '280px',
+            // Mobile: small bar at bottom so it doesn't block the centered candle
+            // Desktop: position at top right
+            ...(isMobile ? {
+              bottom: '100px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+            } : {
+              top: '80px',
+              right: '24px',
+            }),
+            background: 'rgba(20, 20, 30, 0.85)',
+            borderRadius: isMobile ? '20px' : '24px',
+            padding: isMobile ? '0.4rem 1rem' : '2rem',
+            minWidth: isMobile ? 'auto' : '280px',
             maxWidth: isMobile ? '280px' : '320px',
             border: '1px solid rgba(138, 43, 226, 0.4)',
             boxShadow: '0 0 60px rgba(138, 43, 226, 0.3)',
@@ -2142,6 +2232,64 @@ useEffect(() => {
             }
           `}</style>
           <div style={{ animation: 'portalSlideIn 0.4s ease-out' }}>
+            {/* Mobile: Compact horizontal bar */}
+            {isMobile ? (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+              }}>
+                {/* Small avatar */}
+                {userCandleData.userImageUrl ? (
+                  <img
+                    src={userCandleData.userImageUrl}
+                    alt={userCandleData.username}
+                    style={{
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      border: '1px solid rgba(138, 43, 226, 0.6)',
+                      flexShrink: 0
+                    }}
+                  />
+                ) : (
+                  <div style={{
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #8a2be2, #ff006e)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    color: '#fff',
+                    flexShrink: 0
+                  }}>
+                    {userCandleData.username?.charAt(0).toUpperCase() || '?'}
+                  </div>
+                )}
+                {/* Name and status inline */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <span style={{
+                    color: '#00f5d4',
+                    fontSize: '0.8rem',
+                    fontWeight: '600',
+                  }}>
+                    {userCandleData.username}
+                  </span>
+                  <span style={{
+                    fontSize: '0.65rem',
+                    color: 'rgba(255,255,255,0.7)',
+                  }}>
+                    🕯️ {userCandleData.litAt}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              /* Desktop: Full card layout */
+              <>
             {/* Icon/Avatar */}
             <div style={{ marginBottom: '1rem' }}>
               {userCandleData.userImageUrl ? (
@@ -2153,7 +2301,7 @@ useEffect(() => {
                     height: '60px',
                     borderRadius: '50%',
                     objectFit: 'cover',
-                    filter: 'drop-shadow(0 0 20px rgba(138, 43, 226, 0.8)) drop-shadow(0 0 40px rgba(138, 43, 226, 0.5))',
+                    filter: 'drop-shadow(0 0 15px rgba(138, 43, 226, 0.6))',
                     border: '2px solid rgba(138, 43, 226, 0.6)'
                   }}
                 />
@@ -2170,7 +2318,7 @@ useEffect(() => {
                   fontWeight: 'bold',
                   color: '#fff',
                   margin: '0 auto',
-                  filter: 'drop-shadow(0 0 20px rgba(138, 43, 226, 0.8)) drop-shadow(0 0 40px rgba(138, 43, 226, 0.5))',
+                  filter: 'drop-shadow(0 0 15px rgba(138, 43, 226, 0.6))',
                   border: '2px solid rgba(138, 43, 226, 0.6)'
                 }}>
                   {userCandleData.username?.charAt(0).toUpperCase() || '?'}
@@ -2180,7 +2328,7 @@ useEffect(() => {
 
             {/* Title */}
             <h2 style={{
-              fontSize: isMobile ? '1rem' : '1.2rem',
+              fontSize: '1.2rem',
               marginBottom: '0.5rem',
               fontWeight: 'bold',
               textTransform: 'uppercase',
@@ -2195,9 +2343,9 @@ useEffect(() => {
             <p style={{
               marginBottom: '1rem',
               color: '#00f5d4',
-              fontSize: isMobile ? '1rem' : '1.1rem',
+              fontSize: '1.1rem',
               fontWeight: '600',
-              lineHeight: '1.5'
+              lineHeight: '1.3'
             }}>
               {userCandleData.username}
             </p>
@@ -2218,7 +2366,7 @@ useEffect(() => {
               }}>
                 <span style={{ fontSize: '18px' }}>🕯️</span>
                 <span style={{
-                  fontSize: isMobile ? '0.85rem' : '0.9rem',
+                  fontSize: '0.9rem',
                   color: '#fff',
                   fontFamily: "'Orbitron', monospace",
                   letterSpacing: '0.5px'
@@ -2234,13 +2382,15 @@ useEffect(() => {
                 padding: '0.75rem 1rem',
                 background: 'rgba(255, 255, 255, 0.05)',
                 borderRadius: '12px',
-                fontSize: isMobile ? '0.85rem' : '0.9rem',
+                fontSize: '0.9rem',
                 color: 'rgba(255, 255, 255, 0.8)',
                 fontStyle: 'italic',
-                lineHeight: '1.5',
+                lineHeight: '1.3',
               }}>
                 "{userCandleData.message}"
               </div>
+            )}
+              </>
             )}
           </div>
         </div>,
@@ -2250,7 +2400,12 @@ useEffect(() => {
       {mounted && typeof window !== 'undefined' && (
       <CanvasErrorBoundary>
       <Canvas
-        camera={{ position: [0, isMobile ? 0 : 0, isMobile ? 2 : 0], fov: isMobile ? 75 : 70 }}
+        camera={{
+          position: DEBUG_MODE ? [0, 40, 0] : [0, isMobile ? 0 : 0, isMobile ? 2 : 0],
+          fov: DEBUG_MODE ? 90 : (isMobile ? 75 : 70),
+          near: 0.1,
+          far: 200
+        }}
         dpr={isMobile ? Math.min(window.devicePixelRatio || 1, 1.5) : Math.min(window.devicePixelRatio || 1, 2)}
         frameloop="always"
         gl={{ 
@@ -2294,6 +2449,21 @@ useEffect(() => {
         // frameloop="demand"
       >
         <SceneSetup is80sMode={is80sMode} />
+
+        {/* Debug mode - bird's eye view with orbit controls */}
+        {DEBUG_MODE && (
+          <>
+            <OrbitControls
+              enablePan={true}
+              enableZoom={true}
+              enableRotate={true}
+              target={[0, -1, -6]}
+            />
+            <DebugZoneVisualization />
+            <gridHelper args={[50, 50, '#444444', '#222222']} position={[0, -1, 0]} rotation={[0, 0, 0]} />
+          </>
+        )}
+
         <ambientLight intensity={isMobile ? 0.8 : 0.6} />
         {!isMobile && (
           <>
@@ -2306,16 +2476,18 @@ useEffect(() => {
         {/* Background gradient - reads from ref */}
         <GradientBackground is80sMode={is80sMode} />
 
-        {/* Camera animator for smooth transitions */}
-        <CameraAnimator 
-          targetPosition={targetCameraPosition} 
-          resetToDefault={resetCameraToDefault}
-          isMobile={isMobile}
-        />
+        {/* Camera animator for smooth transitions - disabled in debug mode */}
+        {!DEBUG_MODE && (
+          <CameraAnimator
+            targetPosition={targetCameraPosition}
+            resetToDefault={resetCameraToDefault}
+            isMobile={isMobile}
+          />
+        )}
         
         {/* Rotatable scene content */}
-        <SceneRotator 
-          userRotation={userRotation}
+        <SceneRotator
+          userRotation={DEBUG_MODE ? 0 : userRotation}
           onRotationStart={handlePointerDown}
           onRotationMove={handlePointerMove}
           onRotationEnd={handlePointerUp}
@@ -2345,17 +2517,12 @@ useEffect(() => {
               />
               
               {/* User candle label moved to fixed screen-space panel below */}
-              
-              {/* Particle effects for highlighted candle - Removed green ring */}
-              {/* {userCandlePosition && targetCameraPosition && (
-                <HighlightedCandleParticles position={userCandlePosition} />
-              )} */}
             </Suspense> 
             
         
             <Suspense fallback={null}>
-              <group scale={1.8} position={[0, -1, -6]}>
-                <HandsModel 
+              <group scale={1.8} position={[0, -1, -6]} rotation={[0, 0, 0]}>
+                <HandsModel
                   mousePosition={{ x: 0, y: 0 }}
                   hasReachedSection={hasReachedSection}
                   isInView={isInView}
@@ -2363,7 +2530,7 @@ useEffect(() => {
                   hoveredOffering={hoveredOffering}
                   justLitOffering={justLitOffering}
                   onJustLitComplete={onJustLitComplete}
-                  userRotation={userRotation}
+                  userRotation={DEBUG_MODE ? 0 : userRotation}
                   isHighlighting={!!targetCameraPosition}
                   priceChange={displayPrice.change}
                   hasActiveClick={clickedCandleId !== null || isRippleActive}
@@ -2376,6 +2543,14 @@ useEffect(() => {
                 />
               </group>
             </Suspense>
+
+            {/* New candle effect - inside SceneRotator so it rotates with the scene */}
+            <NewCandleEffectManager
+              ref={effectRef}
+              phonePosition={[0, -1, -5]}  // Near phone/hands at [0, -1, -6]
+              onNewCandle={handleNewCandle}
+              onCandlePulse={handleCandlePulse}
+            />
           </group>
         </SceneRotator>
         
@@ -2391,16 +2566,9 @@ useEffect(() => {
           disabled={testPriceOverride !== null}  // Disable when test controls are active
         />
         
-<NewCandleEffectManager
-  ref={effectRef}
-  phonePosition={[0, 0, 5]}
-  onNewCandle={handleNewCandle}
-  // onBloomPulse={setBloomIntensity}  // Disabled for stability
-  onCandlePulse={handleCandlePulse}  // Trigger pulse in candle cloud
-/>
         
-            {/* Camera controller for focus mode - disabled when overriding camera control */}
-            {!overrideCameraControl && <CameraController focusMode={focusMode} />}
+            {/* Camera controller for focus mode - disabled when overriding camera control or in debug mode */}
+            {!overrideCameraControl && !DEBUG_MODE && <CameraController focusMode={focusMode} />}
             
      
 
@@ -3233,7 +3401,7 @@ useEffect(() => {
           aria-label="Help"
           style={{
             position: 'fixed',
-            top: '55%',
+            top: '58%',
             right: '0.5rem',
             zIndex: 1001,
             width: '44px',

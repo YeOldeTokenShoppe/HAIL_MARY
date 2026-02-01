@@ -626,7 +626,7 @@ function CollectionBar({ items, onItemClick }) {
 
   return (
     <div style={{
-      height: '80px',
+      minHeight: '80px',
       width: '100%',
       background: 'linear-gradient(to top, rgba(0,0,0,0.9), transparent)',
       display: 'flex',
@@ -634,7 +634,9 @@ function CollectionBar({ items, onItemClick }) {
       alignItems: 'center',
       gap: '12px',
       padding: '10px',
+      paddingBottom: 'max(10px, env(safe-area-inset-bottom))',
       boxSizing: 'border-box',
+      flexShrink: 0,
     }}>
       {COLLECTIBLE_TOYS.map((toyName, index) => {
         const collectedItem = collectedMap[toyName];

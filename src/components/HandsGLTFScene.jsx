@@ -91,16 +91,35 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
   // Traverse the model to find specific meshes including phoneScreen
   useEffect(() => {
     if (!gltf) return
-    
+
     gltf.scene.traverse((child) => {
+      // Set renderOrder and depth settings for proper occlusion with candles
+      if (child.isMesh) {
+        child.renderOrder = -1
+        if (child.material) {
+          child.material.depthWrite = true
+          child.material.depthTest = true
+        }
+      }
       // Look for PhoneScreen mesh
-      if (child.name === 'PhoneScreen' || child.name === 'phonescreen' || child.name === 'phone_screen' || 
+      if (child.name === 'PhoneScreen' || child.name === 'phonescreen' || child.name === 'phone_screen' ||
           child.name === 'Phone_Screen' || child.name.toLowerCase().includes('phonescreen')) {
+        console.log('Found PhoneScreen:', child.name, 'material:', child.material?.type)
         phoneScreenRef.current = child
         // Ensure the mesh can be raycasted
         if (child.isMesh) {
           child.raycast = THREE.Mesh.prototype.raycast
+          child.material = child.material.clone()
           child.material.side = THREE.DoubleSide // Make sure both sides are clickable
+          child.material.depthWrite = true   // Write depth for proper occlusion
+          child.material.depthTest = true    // Test depth
+          child.material.transparent = false // Ensure not transparent so it fully occludes
+          child.material.opacity = 1.0
+          child.material.blending = THREE.NormalBlending  // Normal blending, not additive
+          child.material.alphaTest = 0  // No alpha testing
+          child.material.needsUpdate = true
+          child.renderOrder = 5  // Render BEFORE flames (10) so flames can depth-test against phone
+          console.log('PhoneScreen renderOrder set to:', child.renderOrder)
         }
         // Add click handler for focus mode with watchlist check
         child.userData.onClick = (event) => {
@@ -126,10 +145,23 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       
       // Look for phoneCase mesh for light ray positioning
       if (child.name === 'phoneCase' || child.name === 'PhoneCase' || child.name === 'phone_case') {
-        // console.log('Found phoneCase mesh:', child.name)
+        console.log('Found phoneCase:', child.name, 'material:', child.material?.type)
         phoneCaseRef.current = child
         // Mark that this mesh will have light rays attached
         child.userData.hasLightRays = true
+        // Render after flames to occlude them
+        if (child.isMesh && child.material) {
+          child.material = child.material.clone()
+          child.material.depthWrite = true
+          child.material.depthTest = true
+          child.material.transparent = false
+          child.material.opacity = 1.0
+          child.material.blending = THREE.NormalBlending
+          child.material.alphaTest = 0
+          child.material.needsUpdate = true
+          child.renderOrder = 5  // Render BEFORE flames so flames can depth-test against phone
+          console.log('phoneCase renderOrder set to:', child.renderOrder)
+        }
       }
       
       // Look for candle label
@@ -148,15 +180,35 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
 
 
       
-      // Store reference to Backdrop mesh
+      // Store reference to Backdrop mesh (Mary's head) - render LAST to appear on top
       if (child.name === 'Backdrop' || child.name === 'backdrop' || child.name.toLowerCase().includes('backdrop')) {
         backdropRef.current = child
+        if (child.isMesh && child.material) {
+          // Clone material to avoid modifying shared material
+          child.material = child.material.clone()
+          child.material.depthWrite = false  // Don't write depth
+          child.material.depthTest = false   // Don't test depth - always render
+          child.material.transparent = true
+          child.material.needsUpdate = true
+          child.renderOrder = 999  // Render last, on top of everything
+          console.log('Backdrop material configured:', child.material)
+        }
       }
       
-      // Store reference to Circle mesh
+      // Store reference to Circle mesh (Mary's halo) - render before face but after candles
       if (child.name === 'Circle' || child.name === 'circle' || child.name.toLowerCase().includes('circle')) {
         circleRef.current = child
+        if (child.isMesh && child.material) {
+          // Clone material to avoid modifying shared material
+          child.material = child.material.clone()
+          child.material.depthWrite = false  // Don't write depth
+          child.material.depthTest = false   // Don't test depth - always render
+          child.material.transparent = true
+          child.material.needsUpdate = true
+          child.renderOrder = 998  // Render before face (999) but after candles
+        }
       }
+
     })
     
     if (!hasReportedLoad.current) {
@@ -834,7 +886,7 @@ return (
         document.body.style.cursor = 'default';
       }}
     >
-      <meshBasicMaterial transparent opacity={0} />
+      <meshBasicMaterial transparent opacity={0} depthWrite={false} visible={false} />
     </Box>
     
     {/* Aura that follows phoneCase world position */}

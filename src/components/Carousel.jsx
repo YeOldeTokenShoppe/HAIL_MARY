@@ -247,12 +247,12 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
   const { t, locale } = useLanguage();
 
   // Debug: log translation function results
-  console.log('[Carousel i18n Debug]', {
-    locale,
-    testKey: 'chatRoom.buttons.send',
-    testResult: t('chatRoom.buttons.send'),
-    isFunction: typeof t === 'function'
-  });
+  // console.log('[Carousel i18n Debug]', {
+  //   locale,
+  //   testKey: 'chatRoom.buttons.send',
+  //   testResult: t('chatRoom.buttons.send'),
+  //   isFunction: typeof t === 'function'
+  // });
 
   const [lastMessageTime, setLastMessageTime] = useState(0); // Rate limiting
 
@@ -1894,21 +1894,20 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                                 </span>
                               </div>
                             )}
+                            {beastMessages.length > 0 && (
+                              <div className="speech-container">
+                                <div className="speech">
+                                  <p>
+                                    {isSignedIn
+                                      ? beastMessages[beastMessages.length - 1].message
+                                      : scrambleText(beastMessages[beastMessages.length - 1].message)}
+                                  </p>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
-
-                      {beastMessages.length > 0 && (
-                        <div className="speech-container">
-                          <div className="speech">
-                            <p>
-                              {isSignedIn
-                                ? beastMessages[beastMessages.length - 1].message
-                                : scrambleText(beastMessages[beastMessages.length - 1].message)}
-                            </p>
-                          </div>
-                        </div>
-                      )}
                       <img
                         src={image.src}
                         alt={image.title}

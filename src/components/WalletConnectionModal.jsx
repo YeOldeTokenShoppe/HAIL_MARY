@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { ConnectButton } from "thirdweb/react";
 import { darkTheme } from "thirdweb/react";
 import { client } from '@/lib/contract';
@@ -26,26 +27,41 @@ const customTheme = darkTheme({
   fontFamily: "'Orbitron', monospace",
 });
 
-// Combined wallet options - both existing wallets and in-app wallet creation
-const allWallets = [
+// In-app wallet with social auth options
+const socialWallet = inAppWallet({
+  auth: {
+    options: ["google", "discord", "telegram", "farcaster", "email", "x", "passkey"],
+  },
+});
+
+// Desktop wallet order - external wallets first
+const desktopWallets = [
   createWallet("io.metamask"),
   createWallet("com.coinbase.wallet"),
   createWallet("walletConnect"),
-  inAppWallet({
-    auth: {
-      options: [ "google",
-        "discord",
-        "telegram",
-        "farcaster",
-        "email",
-        "x",
-        "passkey",],
-    },
-  }),
+  socialWallet,
+];
+
+// Mobile wallet order - WalletConnect first (main way to connect external wallets on mobile)
+const mobileWallets = [
+  createWallet("walletConnect"),
+  createWallet("io.metamask"),
+  createWallet("com.coinbase.wallet"),
+  socialWallet,
 ];
 
 export function WalletConnectionModal({ onClose }) {
   const { isTestUser, switchToTestWallet } = useWalletAuth();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   return (
     <div
@@ -179,18 +195,34 @@ export function WalletConnectionModal({ onClose }) {
           </div>
         )}
 
-        {/* Thirdweb Connect Button with all wallet options */}
+        {/* Mobile tip for connecting external wallets */}
+        {isMobile && (
+          <div style={{
+            background: 'rgba(0, 245, 212, 0.05)',
+            border: '1px solid rgba(0, 245, 212, 0.15)',
+            borderRadius: '8px',
+            padding: '10px 12px',
+            marginBottom: '16px',
+            fontSize: '12px',
+            color: 'rgba(255, 255, 255, 0.7)',
+            lineHeight: '1.4',
+          }}>
+            <span style={{ color: '#00f5d4', fontWeight: '600' }}>Tip:</span> To connect MetaMask or another wallet app, select <span style={{ color: '#00f5d4' }}>WalletConnect</span> below.
+          </div>
+        )}
+
+        {/* Thirdweb Connect Button with wallet options (order varies by device) */}
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <ConnectButton
             client={client}
             chain={chain}
-            wallets={allWallets}
+            wallets={isMobile ? mobileWallets : desktopWallets}
             theme={customTheme}
             connectModal={{
               size: "compact",
               showThirdwebBranding: false,
               titleIcon: "",
-              title: "Choose Wallet",
+              title: isMobile ? "Connect Wallet" : "Choose Wallet",
             }}
             detailsModal={{
               showThirdwebBranding: false,

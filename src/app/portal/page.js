@@ -226,7 +226,7 @@ export default function PortalPage() {
                     rgba(255, 192, 203, 0.4) -1px -1px 5px,
                     rgba(0, 0, 0, 0.8) 10px 10px 15px
                   `,
-                fontSize: isTabletPortrait ? "2rem" : "2.5rem",
+                fontSize: isTabletPortrait ? "2rem" : "2rem",
                 fontWeight: 900,
                 lineHeight: 0.8,
                 transform: "rotate(-8deg) skew(-15deg)",
@@ -335,7 +335,7 @@ export default function PortalPage() {
           {/* Heading */}
           <SkewedHeading
             lines={["A TIMELESS", "ICON FOR THE", "DIGITAL AGE"]}
-            fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : "3rem"}
+            fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.2rem" : "2.5rem"}
             color="#00ff9d"
             skewAngle={0}
             shadowColor="#000"

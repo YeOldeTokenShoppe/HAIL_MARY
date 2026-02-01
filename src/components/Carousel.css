@@ -784,9 +784,10 @@ body {
   --bubble-radius: 8px;
   --arrow-size: 7px;
   --arrow-border: 5px;
-  position: relative;
-  right: -2rem;
-  top: -4rem;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: -5rem;
 }
 
 .speech-container .speech {

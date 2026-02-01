@@ -666,7 +666,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                 <span style={{ fontSize: isTabletPortrait ? "1.3rem" : "1.6rem" }}>of    </span>
                 Perpetual
               </span>
-              <span className="title-line" style={{ display: 'block', marginLeft: isTabletPortrait ? "3rem" : "3.5rem", position: 'relative' }}>Profit</span>
+              <span className="title-line" style={{ display: 'block', marginLeft: isTabletPortrait ? "3rem" : "2.5rem", position: 'relative' }}>Profit</span>
             </h1>
           )}
 
@@ -727,7 +727,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           {/* <div style={{ marginBottom: (isMobilePhone || isTabletPortrait) ? '1.5rem' : '0' }}> */}
             <SkewedHeading
               lines={[t('about.skewedHeading2.line1'), t('about.skewedHeading2.line2'), t('about.skewedHeading2.line3')]}
-              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "3rem" : isTabletPortrait ? "3rem" : "3rem"}
+              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "3rem" : "2.5rem"}
               color="#00ff9d"
               skewAngle={0}
               shadowColor="#000"
@@ -1104,7 +1104,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               <SkewedHeading
                 lines={[t('about.skewedHeading1.line1'), t('about.skewedHeading1.line2'), t('about.skewedHeading1.line3')]}
                 colors={["#00ff00", "#f4e4c1", "#ffd700"]}
-                fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "2.2rem" : "3rem"}
+                fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "3rem" : "2.5rem"}
                 isMobile={true}
                 language={locale}
               />
@@ -1299,7 +1299,7 @@ Placeholder            </p>
             <SkewedHeading
               lines={[t('about.skewedHeading3.line1'), t('about.skewedHeading3.line2'), t('about.skewedHeading3.line3')]}
              // colors={["#d4af37", "#f4e4c1", "#ffd700"]}
-              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "3rem" : isTabletPortrait ? "3rem" : "3rem"}
+              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "3rem" : "2.5rem"}
               isMobile={true}
               language={locale}
             />
@@ -1809,7 +1809,7 @@ Placeholder            </p>
             {/* Heading for desktop */}
             <SkewedHeading
               lines={[t('about.skewedHeading2.line1'), t('about.skewedHeading2.line2'), t('about.skewedHeading2.line3')]}
-              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "3rem" : isTabletPortrait ? "3rem" : "3rem"}
+              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "3rem" : "2.5rem"}
               color="#00ff9d"
               skewAngle={0}
               shadowColor="#000"
@@ -2027,7 +2027,7 @@ Placeholder            </p>
               <SkewedHeading
                 lines={[t('about.skewedHeading1.line1'), t('about.skewedHeading1.line2'), t('about.skewedHeading1.line3')]}
                 colors={["#00ff00", "#f4e4c1", "#ffd700"]}
-                fontSize={{ mobile: "1.6rem", desktop: isTabletLandscape ? "2.5rem" : isSmallLandscape ? "3rem" : "3rem" }}
+                fontSize={{ mobile: "1.6rem", desktop: isTabletLandscape ? "2.5rem" : isSmallLandscape ? "2.5rem" : "3rem" }}
                 isMobile={false}
                 language={locale}
               />
@@ -2354,7 +2354,7 @@ Placeholder            </p>
               <SkewedHeading
                  lines={[t('about.skewedHeading3.line1'), t('about.skewedHeading3.line2'), t('about.skewedHeading3.line3')]}
                 colors={["#00ff00", "#f4e4c1", "#ffd700"]}
-              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "3rem" : isTabletPortrait ? "3rem" : isSmallLandscape ? "3rem" : "3rem"}
+              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "3rem" : isSmallLandscape ? "2.5rem" : "2.5rem"}
                 isMobile={false}
                 language={locale}
                   //  scramble={true}

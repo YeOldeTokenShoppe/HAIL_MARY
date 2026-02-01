@@ -63,6 +63,7 @@ export default function ShrinePage() {
   const [hasLitCandleThisSession, setHasLitCandleThisSession] = useState(false)
   // Snapshot functionality removed - no longer needed
   const [mobileBannerType, setMobileBannerType] = useState('candle') // 'candle' or 'staking'
+  const [hasManuallySelectedBannerType, setHasManuallySelectedBannerType] = useState(false)
   const is80sMode = context80sMode
   
   // State for offerings data
@@ -689,15 +690,19 @@ useEffect(() => {
   }, []);
   
   // Auto-alternate between candle and staking banners on mobile
+  // Stop alternating if user has manually selected a mode
   useEffect(() => {
-    if (!isMobileView || hasLitCandleThisSession) return;
-    
+    if (!isMobileView) return;
+
+    // If user has manually selected a mode, don't auto-alternate
+    if (hasManuallySelectedBannerType) return;
+
     const interval = setInterval(() => {
       setMobileBannerType(prev => prev === 'candle' ? 'staking' : 'candle');
     }, 8000); // Switch every 8 seconds
-    
+
     return () => clearInterval(interval);
-  }, [isMobileView, hasLitCandleThisSession]);
+  }, [isMobileView, hasManuallySelectedBannerType]);
 
   return (
     <>
@@ -837,11 +842,8 @@ useEffect(() => {
       
       {/* Mobile CTA and Matchstick - Sliding Design */}
       {isMobileView && (
-        <div 
+        <div
           onClick={() => {
-            // Don't expand if user has already lit a candle
-            if (hasLitCandleThisSession) return;
-            
             // If collapsed, expand. If already expanded, collapse it.
             // (The icon button uses stopPropagation, so this only fires on the body area)
             if (!isExpanded) {
@@ -854,8 +856,8 @@ useEffect(() => {
             position: 'fixed',
             bottom: '16px',
             right: '16px',
-            width: (isExpanded && !hasLitCandleThisSession) ? 'calc(100% - 32px)' : '80px',
-            maxWidth: (isExpanded && !hasLitCandleThisSession) ? '340px' : '80px',
+            width: isExpanded ? 'calc(100% - 32px)' : '80px',
+            maxWidth: isExpanded ? '340px' : '80px',
             background: 'rgba(10, 10, 20, 0.4)',
             border: mobileBannerType === 'candle' 
               ? '1px solid rgba(212, 175, 55, 0.15)'
@@ -878,9 +880,8 @@ useEffect(() => {
             cursor: 'pointer',
             overflow: 'hidden',
           }}>
-          {/* Left side - Text (slides in/out, hidden if user has lit candle) */}
-          {!hasLitCandleThisSession && (
-            <div style={{
+          {/* Left side - Text (slides in/out) */}
+          <div style={{
               flex: isExpanded ? 1 : 0,
               fontFamily: "'Bebas Neue', sans-serif",
               color: 'rgba(246, 245, 241, 0.9)',
@@ -894,7 +895,7 @@ useEffect(() => {
             }}>
             {mobileBannerType === 'candle' ? (
               <>
-                <div style={{ 
+                <div style={{
                   fontSize: '1.5rem',
                   fontWeight: 400,
                   textTransform: 'uppercase',
@@ -905,7 +906,7 @@ useEffect(() => {
                 }}>
                   {t('illumin80.watchlistTitle')}
                 </div>
-                <div style={{ 
+                <div style={{
                   fontSize: '1rem',
                   opacity: 0.7,
                   fontWeight: 300,
@@ -913,7 +914,7 @@ useEffect(() => {
                 }}>
                   Light a Green Candle!
                 </div>
-                <div style={{ 
+                <div style={{
                   fontSize: '0.65rem',
                   opacity: 0.5,
                   fontWeight: 300,
@@ -927,7 +928,7 @@ useEffect(() => {
               </>
             ) : (
               <>
-                <div style={{ 
+                <div style={{
                   fontSize: '1.5rem',
                   fontWeight: 400,
                   textTransform: 'uppercase',
@@ -938,7 +939,7 @@ useEffect(() => {
                 }}>
                   STAKE RL80 TOKENS
                 </div>
-                <div style={{ 
+                <div style={{
                   fontSize: '1rem',
                   opacity: 0.7,
                   fontWeight: 300,
@@ -946,7 +947,7 @@ useEffect(() => {
                 }}>
                   Earn ETH Rewards!
                 </div>
-                <div style={{ 
+                <div style={{
                   fontSize: '0.65rem',
                   opacity: 0.5,
                   fontWeight: 300,
@@ -959,33 +960,90 @@ useEffect(() => {
                 </div>
               </>
             )}
+
+            {/* Mode toggle tabs */}
+            {isExpanded && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: '8px',
+                marginTop: '10px',
+              }}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMobileBannerType('candle');
+                    setHasManuallySelectedBannerType(true);
+                  }}
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    fontSize: '0.65rem',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    background: mobileBannerType === 'candle'
+                      ? 'rgba(212, 175, 55, 0.3)'
+                      : 'rgba(255, 255, 255, 0.1)',
+                    color: mobileBannerType === 'candle'
+                      ? 'rgba(212, 175, 55, 1)'
+                      : 'rgba(255, 255, 255, 0.5)',
+                    border: mobileBannerType === 'candle'
+                      ? '1px solid rgba(212, 175, 55, 0.4)'
+                      : '1px solid rgba(255, 255, 255, 0.1)',
+                  }}
+                >
+                  Candle
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMobileBannerType('staking');
+                    setHasManuallySelectedBannerType(true);
+                  }}
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    fontSize: '0.65rem',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    background: mobileBannerType === 'staking'
+                      ? 'rgba(0, 245, 212, 0.3)'
+                      : 'rgba(255, 255, 255, 0.1)',
+                    color: mobileBannerType === 'staking'
+                      ? 'rgba(0, 245, 212, 1)'
+                      : 'rgba(255, 255, 255, 0.5)',
+                    border: mobileBannerType === 'staking'
+                      ? '1px solid rgba(0, 245, 212, 0.4)'
+                      : '1px solid rgba(255, 255, 255, 0.1)',
+                  }}
+                >
+                  Stake
+                </button>
+              </div>
+            )}
           </div>
-          )}
-          
+
           {/* Matchstick or Stake Button - Changes based on banner type */}
-          <div 
+          <div
             onClick={(e) => {
               e.stopPropagation(); // Prevent triggering the parent onClick
-              
-              // If user has lit a candle, clicking the flame does nothing (or could reopen modal)
-              if (hasLitCandleThisSession) {
-                // Optionally, you could still allow them to light another candle:
-                // handleLightCandleClick();
-                return; // For now, just do nothing
-              }
-              
+
               // If banner is collapsed, expand it first instead of opening modal
               if (!isExpanded) {
                 setIsExpanded(true);
                 return;
               }
-              
+
               // If banner is expanded, then open the appropriate modal
               // Haptic feedback if available
               if (window.navigator && window.navigator.vibrate) {
                 window.navigator.vibrate(50) // Short vibration
               }
-              
+
               // Open different modal based on banner type
               if (mobileBannerType === 'candle') {
                 handleLightCandleClick();
@@ -998,6 +1056,7 @@ useEffect(() => {
               height: '60px',
               borderRadius: '50%',
               flexShrink: 0,
+              margin: isExpanded ? '0' : 'auto',
               background: mobileBannerType === 'candle' 
                 ? (mobileMatchstickLit 
                   ? 'radial-gradient(circle, rgba(255, 149, 0, 0.2) 0%, rgba(255, 100, 0, 0.05) 70%, transparent 100%)'

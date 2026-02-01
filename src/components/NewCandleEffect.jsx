@@ -14,6 +14,24 @@ const MOBILE_ARC_HEIGHT = 1.5 // Lower arc for mobile visibility
 const MOBILE_BREAKPOINT = 768 // px
 const BRIGHT_GLOW_DURATION = 5.0 // How long the candle stays bright after landing (seconds)
 
+// Effect landing zone - constrained to be clearly visible from initial camera at [0, 0, 15]
+// Camera has 60° FOV. Phone/hands at z=-6, Mary at z=-8 to z=-12
+// Candles should land between phone and Mary, clearly in front of the viewer
+const EFFECT_LANDING_ZONE = {
+  desktop: {
+    x: { min: 2, max: 5 },   // ±2 to ±5, will randomly negate - beside phone
+    y: { min: -1, max: 2 },  // Around eye level
+    z: { min: -8, max: -5 }, // Between phone (z=-6) and Mary (z=-10), in front of viewer
+  },
+  mobile: {
+    // Tight for narrow mobile screens (iPhone 13 etc)
+    // Phone at z=-6, Mary behind
+    x: { min: 1, max: 3 },      // Slight offset so candle is visible beside phone
+    y: { min: 0, max: 2 },      // Slightly above center
+    z: { min: -7, max: -5 },    // Just in front of/beside phone
+  }
+}
+
 // Arctic Rings config - enhanced for more fanfare
 const RING_COUNT = 7  // More rings for bigger impact
 const RING_COLORS = [
@@ -524,6 +542,9 @@ function CandleModel({ modelPath, phase, offering, onHover, onClick }) {
           child.material.emissive = new THREE.Color('#00ffcc')
           child.material.emissiveIntensity = emissionIntensity * 1.5
           child.material.toneMapped = false
+          child.material.depthTest = true
+          child.material.depthWrite = true
+          child.renderOrder = 10  // Same as main candles
           // Add extra properties for better glow
           if (child.material.metalness !== undefined) {
             child.material.metalness = 0.2
@@ -536,6 +557,10 @@ function CandleModel({ modelPath, phase, offering, onHover, onClick }) {
           child.material.emissive = new THREE.Color('#ffcc00')
           child.material.emissiveIntensity = emissionIntensity * 3.0
           child.material.toneMapped = false
+          child.material.depthTest = true
+          child.material.depthWrite = false  // Flames don't write depth
+          child.material.transparent = true
+          child.renderOrder = 15  // Same as main candle flames
           // Make flame extra bright during glowing phase
           if (phase === 'glowing') {
             child.material.emissiveIntensity = emissionIntensity * 4.0
@@ -553,6 +578,9 @@ function CandleModel({ modelPath, phase, offering, onHover, onClick }) {
           child.material.emissive = new THREE.Color('#ff6600')
           child.material.emissiveIntensity = emissionIntensity * 1.5
           child.material.toneMapped = false
+          child.material.depthTest = true
+          child.material.depthWrite = true
+          child.renderOrder = 10  // Same as main candles
         }
         
         // Ensure material updates
@@ -759,37 +787,25 @@ export const NewCandleEffectManager = forwardRef(({
   
   // Call this to trigger a new candle effect
   const triggerEffect = (offering) => {
-    // Random target position in cloud - constrained for mobile
-    let target;
-    if (isMobile) {
-      // For mobile, keep the target offset from center to avoid phone blocking view
-      // Randomly choose left or right side
-      const side = Math.random() > 0.5 ? 1 : -1;
-      // Offset from center: minimum 2 units, maximum 4 units to avoid going off-screen
-      const xOffset = side * (2 + Math.random() * 2); // ±(2 to 4)
+    // Generate target position in the visible landing zone
+    // Camera is at [0, 0, 15] looking at origin
+    // Candles should land where user can see them without camera rotation
 
-      target = [
-        xOffset, // Left or right of center, avoiding the phone
-        1.5 + Math.random() * 0.5, // Consistent Y around eye level (1.5 to 2.0)
-        Math.random() * cloudBounds.z * 0.15 - 10 // Further in front (-10 to -11.5)
-      ]
-    } else {
-      // Desktop - offset from center to avoid phone blocking view
-      // Randomly choose left or right side
-      const side = Math.random() > 0.5 ? 1 : -1;
-      // Offset from center: minimum 3 units, with random variation
-      const xOffset = side * (2 + Math.random() * cloudBounds.x * 0.25); // ±(3 to 3+30% of bounds)
+    // Use appropriate zone based on device
+    const zone = isMobile ? EFFECT_LANDING_ZONE.mobile : EFFECT_LANDING_ZONE.desktop;
 
-      target = [
-        xOffset, // Left or right of center, avoiding the phone
-        0 + Math.random() * -1.0, // Consistent Y near viewer level (0 to 1.0)
-        Math.random() * cloudBounds.z * 0.2 - 12 // Further in front (-12 to -14)
-      ]
-    }
+    // Randomly choose left or right side of the phone
+    const side = Math.random() > 0.5 ? 1 : -1;
+
+    const targetX = side * (zone.x.min + Math.random() * (zone.x.max - zone.x.min));
+    const targetY = zone.y.min + Math.random() * (zone.y.max - zone.y.min);
+    const targetZ = zone.z.min + Math.random() * (zone.z.max - zone.z.min);
+
+    const target = [targetX, targetY, targetZ];
 
     setEffectState({
       isActive: true,
-      startPosition: isMobile ? [0, -2, 4] : phonePosition, // Adjust start position for mobile too
+      startPosition: isMobile ? [0, -1, -5] : phonePosition,  // Start near phone
       endPosition: target,
       offering
     })

@@ -19,6 +19,12 @@ const sharedUniforms = {
   uPulsePosition: { value: new THREE.Vector3(0, 0, 0) }, // Position of pulse origin
   uHighlightedId: { value: -1 }, // ID of highlighted candle (user's candle)
   uCurrentTime: { value: Date.now() }, // Current time for melting calculations
+  // Exclusion zone - box that candles should avoid (pushed out in shader)
+  uExclusionCenter: { value: new THREE.Vector3(0, -1, -1.5) }, // Center of exclusion box
+  uExclusionHalfSize: { value: new THREE.Vector3(4, 5, 7.5) }, // Half-dimensions (width/2, height/2, depth/2)
+  // Head exclusion - sphere around Mary's face
+  uHeadCenter: { value: new THREE.Vector3(0, 0.5, -14) }, // Mary's head position (adjust as needed)
+  uHeadRadius: { value: 4.0 }, // Radius around head to exclude candles
 }
 
 // MEMORY FIX: Export uniforms instead of storing on window to prevent multiple references
@@ -37,17 +43,56 @@ const wobbleVertexChunk = `
   attribute mat4 instanceMatrix;
 #endif
 
-  
+
   uniform float uTime;
   uniform float uPriceDirection;
   uniform float uContinuousOffset;
   uniform float uShortTermPrice;
   uniform float uPulseTime;
   uniform vec3 uPulsePosition;
-  
+  uniform vec3 uExclusionCenter;
+  uniform vec3 uExclusionHalfSize;
+  uniform vec3 uHeadCenter;
+  uniform float uHeadRadius;
+
   // Fast hash function
   float hash(float n) {
     return fract(sin(n) * 43758.5453123);
+  }
+
+  // Calculate exclusion offset based on instance center (not per-vertex)
+  // Returns an offset to apply uniformly to all vertices of the instance
+  vec3 getExclusionOffset(vec3 instanceCenter) {
+    vec3 offset = vec3(0.0);
+
+    // Check body corridor exclusion (box)
+    vec3 relPos = instanceCenter - uExclusionCenter;
+    vec3 absRel = abs(relPos);
+
+    if (absRel.x <= uExclusionHalfSize.x &&
+        absRel.y <= uExclusionHalfSize.y &&
+        absRel.z <= uExclusionHalfSize.z) {
+      // Inside the box - calculate offset to push the whole instance out along X
+      float pushDir = relPos.x >= 0.0 ? 1.0 : -1.0;
+      float targetX = uExclusionCenter.x + pushDir * (uExclusionHalfSize.x + 0.5);
+      offset.x = targetX - instanceCenter.x;
+    }
+
+    // Check head exclusion (sphere around Mary's face)
+    vec3 toHead = instanceCenter + offset - uHeadCenter;
+    float distToHead = length(toHead);
+
+    if (distToHead < uHeadRadius) {
+      // Inside head sphere - push outward from head center
+      vec3 pushDir = normalize(toHead);
+      if (distToHead < 0.01) {
+        pushDir = vec3(1.0, 0.0, 0.0); // Default push direction if at center
+      }
+      vec3 targetPos = uHeadCenter + pushDir * (uHeadRadius + 0.5);
+      offset = targetPos - instanceCenter;
+    }
+
+    return offset;
   }
   
   // Calculate wobble offset for a candle instance with continuous movement
@@ -134,12 +179,18 @@ function createWobbleMaterial(baseColor, options = {}) {
       
       void main() {
         float id = float(gl_InstanceID);
+
+        // Get instance center (translation from instanceMatrix)
+        vec3 instanceCenter = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
+
+        // Calculate wobble based on instance center
+        vec3 wobble = getWobbleOffset(id, instanceCenter);
+        vec3 wobbledCenter = instanceCenter + wobble;
+
+        // Apply instance transform, then wobble (exclusion handled in JS position generation)
         vec4 instancePos = instanceMatrix * vec4(position, 1.0);
-        
-        // Apply wobble offset
-        vec3 wobble = getWobbleOffset(id, instancePos.xyz);
         instancePos.xyz += wobble;
-        
+
         gl_Position = projectionMatrix * modelViewMatrix * instancePos;
       }
     `,
@@ -178,11 +229,18 @@ function createXBaseMaterial() {
       void main() {
         float id = float(gl_InstanceID);
         vInstanceId = id;
-        
+
+        // Get instance center (translation from instanceMatrix)
+        vec3 instanceCenter = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
+
+        // Calculate wobble based on instance center
+        vec3 wobble = getWobbleOffset(id, instanceCenter);
+        vec3 wobbledCenter = instanceCenter + wobble;
+
+        // Apply instance transform, then wobble (exclusion handled in JS position generation)
         vec4 instancePos = instanceMatrix * vec4(position, 1.0);
-        vec3 wobble = getWobbleOffset(id, instancePos.xyz);
         instancePos.xyz += wobble;
-        
+
         gl_Position = projectionMatrix * modelViewMatrix * instancePos;
       }
     `,
@@ -214,11 +272,12 @@ function createXBaseMaterial() {
         vec3 color = priceColor;
         float intensity = 1.0;
         
-        // User's candle - bright green emissive glow
+        // User's candle - golden/orange glow that stands out from green candles
         if (isHighlighted) {
-          float pulse = sin(uTime * 2.0) * 0.1 + 0.9; // Subtle pulse
-          color = vec3(0.0, 1.0, 0.2) * pulse; // Bright green
-          intensity = 3.0; // Very bright emissive
+          float pulse = sin(uTime * 3.0) * 0.3 + 0.7; // More dramatic pulse
+          float fastPulse = sin(uTime * 8.0) * 0.15 + 0.85; // Fast shimmer
+          color = vec3(1.0, 0.6, 0.0) * pulse * fastPulse; // Golden orange
+          intensity = 5.0; // Very bright to stand out
         }
         
         // Clicked candle override - purple glow effect
@@ -232,6 +291,8 @@ function createXBaseMaterial() {
       }
     `,
     side: THREE.FrontSide,
+    depthTest: true,
+    depthWrite: true,  // Write depth normally
     // Enable instancing support
     defines: { USE_INSTANCING: '' },
   })
@@ -252,11 +313,18 @@ function createSenoraMaterial(texture) {
       void main() {
         vUv = uv;
         float id = float(gl_InstanceID);
-        
+
+        // Get instance center (translation from instanceMatrix)
+        vec3 instanceCenter = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
+
+        // Calculate wobble based on instance center
+        vec3 wobble = getWobbleOffset(id, instanceCenter);
+        vec3 wobbledCenter = instanceCenter + wobble;
+
+        // Apply instance transform, then wobble (exclusion handled in JS position generation)
         vec4 instancePos = instanceMatrix * vec4(position, 1.0);
-        vec3 wobble = getWobbleOffset(id, instancePos.xyz);
         instancePos.xyz += wobble;
-        
+
         gl_Position = projectionMatrix * modelViewMatrix * instancePos;
       }
     `,
@@ -324,35 +392,47 @@ function createFlameMaterial() {
         float stretch = 1.0 + sin(flameTime * 2.5) * 0.1 * vHeight;
         pos.y *= stretch;
         
-        // Apply instance transform first, then wobble
+        // Get instance center (translation from instanceMatrix)
+        vec3 instanceCenter = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
+
+        // Calculate wobble based on instance center
+        vec3 wobble = getWobbleOffset(id, instanceCenter);
+
+        // Apply instance transform, then wobble (exclusion handled in JS position generation)
         vec4 instancePos = instanceMatrix * vec4(pos, 1.0);
-        vec3 wobble = getWobbleOffset(id, instancePos.xyz);
         instancePos.xyz += wobble;
-        
+
         gl_Position = projectionMatrix * modelViewMatrix * instancePos;
       }
     `,
     fragmentShader: `
       uniform float uTime;
       uniform float uClickedId;
+      uniform float uHighlightedId;
       varying float vHeight;
       varying float vPhase;
       varying float vInstanceId;
-      
+
       void main() {
         float time = uTime * 3.0 + vPhase;
         bool isClicked = uClickedId >= 0.0 && abs(uClickedId - vInstanceId) < 1.0;
-        
+        bool isHighlighted = uHighlightedId >= 0.0 && abs(uHighlightedId - vInstanceId) < 1.0;
+
         // Base flame colors
         vec3 innerColor = vec3(1.0, 0.95, 0.8);
         vec3 midColor = vec3(1.0, 0.5, 0.0);
         vec3 outerColor = vec3(1.0, 0.2, 0.0);
-        
+
         // Purple glow for clicked
         vec3 purpleInner = vec3(1.0, 0.0, 1.0);
         vec3 purpleMid = vec3(0.8, 0.0, 1.0);
         vec3 purpleOuter = vec3(0.6, 0.0, 1.0);
-        
+
+        // Cyan/white glow for highlighted (user's candle)
+        vec3 highlightInner = vec3(1.0, 1.0, 1.0);
+        vec3 highlightMid = vec3(0.0, 1.0, 1.0);
+        vec3 highlightOuter = vec3(1.0, 0.8, 0.0);
+
         vec3 color;
         if (isClicked) {
           if (vHeight < 0.3) {
@@ -361,6 +441,15 @@ function createFlameMaterial() {
             color = mix(purpleMid, purpleOuter, (vHeight - 0.3) / 0.4);
           } else {
             color = mix(purpleOuter, vec3(0.8, 0.4, 1.0), (vHeight - 0.7) / 0.3);
+          }
+        } else if (isHighlighted) {
+          // User's candle - bright cyan/white flame
+          if (vHeight < 0.3) {
+            color = mix(highlightInner, highlightMid, vHeight / 0.3);
+          } else if (vHeight < 0.7) {
+            color = mix(highlightMid, highlightOuter, (vHeight - 0.3) / 0.4);
+          } else {
+            color = mix(highlightOuter, vec3(1.0, 1.0, 0.5), (vHeight - 0.7) / 0.3);
           }
         } else {
           if (vHeight < 0.3) {
@@ -371,19 +460,23 @@ function createFlameMaterial() {
             color = mix(outerColor, vec3(1.0, 0.8, 0.0), (vHeight - 0.7) / 0.3);
           }
         }
-        
+
         float flicker = sin(time * 4.0) * 0.25 + sin(time * 9.0) * 0.15 + 1.0;
-        float intensity = isClicked ? 8.0 * flicker : 3.5 * flicker;
+        float intensity = isClicked ? 8.0 * flicker : (isHighlighted ? 6.0 * flicker : 3.5 * flicker);
         float alpha = (1.0 - vHeight * 0.5) * (0.8 + flicker * 0.2);
-        
+
         gl_FragColor = vec4(color * intensity, alpha);
       }
     `,
     transparent: true,
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
-    depthWrite: true,
+    depthTest: true,    // Check depth - occluded by phone
+    depthWrite: false,  // Transparent with additive shouldn't write depth
     toneMapped: true,
+    polygonOffset: true,      // Enable polygon offset
+    polygonOffsetFactor: -4,  // Bias toward camera (negative = closer)
+    polygonOffsetUnits: -4,   // Additional bias to avoid wax occlusion while still being occluded by phone
     // Enable instancing support
     defines: { USE_INSTANCING: '' },
   })
@@ -439,63 +532,233 @@ function useClonedGeometries(modelPath) {
   }, [scene])
 }
 
-// Generate random positions with exclusion zones
+// Priority zone configuration for candle placement
+// Camera is at [0, 0, 15] looking toward negative Z
+// Mary figure is around z=-8 to z=-12
+// Hands/phone are around z=-6 (model position)
+// Candles should appear IN FRONT of Mary (around her, at negative Z values)
+// NOT behind the viewer (positive Z toward camera)
+//
+// Zone 1: Prime visibility - beside Mary, clearly visible
+// Zone 2: Good visibility - wider arc around Mary
+// Zone 3: Peripheral - higher/lower, around the scene
+// Zone 4: Background - overflow, fill in gaps
+const PRIORITY_ZONES = {
+  zone1: {
+    capacity: 25,  // First 25 candles go here
+    // To the sides of Mary, at similar depth - full X range for even distribution
+    x: { min: -10, max: 10 },
+    y: { min: -2, max: 4 },
+    z: { min: -12, max: -6 },  // Around Mary's depth (she's at z=-8 to -10)
+    randomizeXSign: false,
+  },
+  zone2: {
+    capacity: 40,  // Next 40 candles
+    x: { min: -14, max: 14 },
+    y: { min: -3, max: 6 },
+    z: { min: -14, max: -4 },  // Wider Z range around Mary
+    randomizeXSign: false,
+  },
+  zone3: {
+    capacity: 60,  // Next 60 candles
+    x: { min: -18, max: 18 },
+    y: { min: -4, max: 10 },
+    z: { min: -16, max: -2 },  // Even wider
+    randomizeXSign: false,
+  },
+  zone4: {
+    capacity: Infinity,  // Everything else
+    x: { min: -20, max: 20 },
+    y: { min: -5, max: 12 },   // Raised min from -15 to -5 for better camera angles
+    z: { min: -20, max: 0 },   // All in front of phone, not behind viewer
+    randomizeXSign: false,
+  }
+}
+
+// Body corridor exclusion - the zone representing the viewer's body behind the camera
+// Camera is at [0,0,0] (Mary's eyes), corridor extends to the phone/hands
+// Using box shape to match debug visualization
+// Note: Add wobble buffer (~1 unit) since candles drift/wobble in shader
+// CORRIDOR_VERSION: Bump this to force position regeneration after changing corridor params
+const CORRIDOR_VERSION = 9
+const WOBBLE_BUFFER = 1.0  // Candles can drift this far from their base position
+const BODY_CORRIDOR = {
+  centerX: 0,       // Centered on X axis
+  centerY: -1,      // Slightly below center (where body would be)
+  zMin: -9,         // Extends forward to reach the phone/hands
+  zMax: 6,          // Behind the camera where viewer's body would be
+  halfWidth: 3 + WOBBLE_BUFFER,     // Half-width in X direction + wobble buffer
+  halfHeight: 4 + WOBBLE_BUFFER,    // Half-height in Y direction + wobble buffer
+}
+
+// Generate a position within a specific zone, avoiding exclusion areas
+// All randomness is seeded for deterministic results
+function generateZonePosition(zone, exclusionZone, usedPositions = [], seed = 0.5) {
+  const maxAttempts = 20
+
+  // Helper to generate seeded random values
+  const seededRand = (s) => {
+    const x = Math.sin(s * 9999) * 10000
+    return x - Math.floor(x)
+  }
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    // Use seeded random for deterministic positioning
+    const r1 = seededRand(seed + attempt * 0.1)
+    const r2 = seededRand(seed + attempt * 0.2 + 100)
+    const r3 = seededRand(seed + attempt * 0.3 + 200)
+    const rSign = seededRand(seed + attempt * 0.4 + 300)
+    const rOffset = seededRand(seed + attempt * 0.5 + 400)
+
+    let x = zone.x.min + r1 * (zone.x.max - zone.x.min)
+    let y = zone.y.min + r2 * (zone.y.max - zone.y.min)
+    let z = zone.z.min + r3 * (zone.z.max - zone.z.min)
+
+    // Randomly flip X to left or right side if zone specifies
+    if (zone.randomizeXSign) {
+      const side = rSign > 0.5 ? 1 : -1
+      x = x * side
+    }
+
+    // Check body corridor - box zone from hands to viewer
+    // Only exclude if within the Z range of the corridor
+    if (z >= BODY_CORRIDOR.zMin && z <= BODY_CORRIDOR.zMax) {
+      const inXRange = Math.abs(x - BODY_CORRIDOR.centerX) < BODY_CORRIDOR.halfWidth
+      const inYRange = Math.abs(y - BODY_CORRIDOR.centerY) < BODY_CORRIDOR.halfHeight
+
+      if (inXRange && inYRange) {
+        // Push candle outward in X direction (to the sides) with seeded offset
+        const pushDirection = x >= 0 ? 1 : -1
+        x = pushDirection * (BODY_CORRIDOR.halfWidth + 1.5 + rOffset * 3)
+      }
+    }
+
+    // Avoid UI zone (bottom-left)
+    const uiCenterX = -12
+    const uiCenterY = -8
+    const distToUI = Math.sqrt(
+      Math.pow((x - uiCenterX) * 0.8, 2) +
+      Math.pow((y - uiCenterY) * 1.2, 2)
+    )
+
+    if (distToUI < 10) {
+      const angle = Math.atan2(y - uiCenterY, x - uiCenterX)
+      const pushDist = (10 - distToUI) * 0.9
+      x += Math.cos(angle) * pushDist
+      y += Math.sin(angle) * pushDist
+    }
+
+    // Check minimum distance from other candles (prevents clustering)
+    const minDistance = 2.5
+    let tooClose = false
+    for (const pos of usedPositions) {
+      const dist = Math.sqrt(
+        Math.pow(x - pos.x, 2) +
+        Math.pow(y - pos.y, 2) +
+        Math.pow(z - pos.z, 2)
+      )
+      if (dist < minDistance) {
+        tooClose = true
+        break
+      }
+    }
+
+    if (!tooClose) {
+      return { x, y, z }
+    }
+  }
+
+  // Fallback: return a position using seeded random, but still respect personal space
+  const rf1 = seededRand(seed + 500)
+  const rf2 = seededRand(seed + 600)
+  const rf3 = seededRand(seed + 700)
+  const rfOffset = seededRand(seed + 800)
+
+  let fallbackX = zone.x.min + rf1 * (zone.x.max - zone.x.min)
+  let fallbackY = zone.y.min + rf2 * (zone.y.max - zone.y.min)
+  let fallbackZ = zone.z.min + rf3 * (zone.z.max - zone.z.min)
+
+  // Ensure fallback also respects body corridor (box check)
+  if (fallbackZ >= BODY_CORRIDOR.zMin && fallbackZ <= BODY_CORRIDOR.zMax) {
+    const inXRange = Math.abs(fallbackX - BODY_CORRIDOR.centerX) < BODY_CORRIDOR.halfWidth
+    const inYRange = Math.abs(fallbackY - BODY_CORRIDOR.centerY) < BODY_CORRIDOR.halfHeight
+
+    if (inXRange && inYRange) {
+      const pushDirection = fallbackX >= 0 ? 1 : -1
+      fallbackX = pushDirection * (BODY_CORRIDOR.halfWidth + 1.5 + rfOffset * 3)
+    }
+  }
+
+  return { x: fallbackX, y: fallbackY, z: fallbackZ }
+}
+
+// Determine which zone a candle should be placed in based on its priority index
+function getZoneForIndex(index, isUserCandle = false) {
+  // User candles get priority placement in front zones
+  if (isUserCandle) {
+    if (index < PRIORITY_ZONES.zone1.capacity) return PRIORITY_ZONES.zone1
+    if (index < PRIORITY_ZONES.zone1.capacity + PRIORITY_ZONES.zone2.capacity) return PRIORITY_ZONES.zone2
+    if (index < PRIORITY_ZONES.zone1.capacity + PRIORITY_ZONES.zone2.capacity + PRIORITY_ZONES.zone3.capacity) return PRIORITY_ZONES.zone3
+    return PRIORITY_ZONES.zone4
+  }
+
+  // Base/ambient candles fill peripheral areas first to leave room for user candles
+  // They start from zone 2 outward
+  if (index < 30) return PRIORITY_ZONES.zone2
+  if (index < 70) return PRIORITY_ZONES.zone3
+  return PRIORITY_ZONES.zone4
+}
+
+// Generate priority-based positions for user offering candles
+function generateOfferingPositions(offerings, exclusionZone = null) {
+  const positions = []
+
+  for (let i = 0; i < offerings.length; i++) {
+    const offering = offerings[i]
+
+    // If offering has stored position, use it (for persistence)
+    if (offering.position?.x !== undefined) {
+      positions.push({
+        x: offering.position.x,
+        y: offering.position.y,
+        z: offering.position.z,
+      })
+      continue
+    }
+
+    // Generate new position in appropriate priority zone
+    const zone = getZoneForIndex(i, true)
+    const pos = generateZonePosition(zone, exclusionZone, positions, i * 0.1234)
+    positions.push(pos)
+  }
+
+  return positions
+}
+
+// Seeded random generator for deterministic values
+function seededRandom(seed) {
+  const x = Math.sin(seed * 9999) * 10000
+  return x - Math.floor(x)
+}
+
+// Generate random positions with exclusion zones - now uses zone system for ambient candles
 function usePositions(count, exclusionZone = null) {
   return useMemo(() => {
     const positions = []
-    
+
     for (let i = 0; i < count; i++) {
-      let x = (Math.random() - 0.5) * 40
-      let y = (Math.random() - 0.5) * 30
-      let z = (Math.random() - 0.5) * 20 - 5
-      
-      // Check if position is within exclusion cylinder (for hands model)
-      if (exclusionZone) {
-        const { center, radius, height } = exclusionZone
-        const distFromCenter = Math.sqrt(
-          Math.pow(x - center[0], 2) + 
-          Math.pow(z - center[2], 2)
-        )
-        const withinHeight = Math.abs(y - center[1]) < height / 2
-        
-        // If inside exclusion cylinder, push outside
-        if (distFromCenter < radius && withinHeight) {
-          const angle = Math.atan2(z - center[2], x - center[0])
-          const pushDistance = radius + 2 // Push outside radius + margin
-          x = center[0] + Math.cos(angle) * pushDistance
-          z = center[2] + Math.sin(angle) * pushDistance
-        }
-      }
-      
-      // Calculate "danger" level based on proximity to UI zone (bottom-left)
-      const uiCenterX = -12
-      const uiCenterY = -8
-      const distToUI = Math.sqrt(
-        Math.pow((x - uiCenterX) * 0.8, 2) + 
-        Math.pow((y - uiCenterY) * 1.2, 2)
-      )
-      
-      // If too close to UI zone, probabilistically push away
-      const dangerThreshold = 12
-      if (distToUI < dangerThreshold) {
-        const pushChance = 1 - (distToUI / dangerThreshold)
-        
-        if (Math.random() < pushChance * 0.8) {
-          // Push away from UI center
-          const angle = Math.atan2(y - uiCenterY, x - uiCenterX)
-          const pushDist = (dangerThreshold - distToUI) * 0.8
-          x += Math.cos(angle) * pushDist
-          y += Math.sin(angle) * pushDist
-        }
-      }
-      
+      // Get appropriate zone for this ambient candle
+      const zone = getZoneForIndex(i, false)
+      const pos = generateZonePosition(zone, exclusionZone, positions, i * 0.5678)
+
+      // Use index-based seeded random for deterministic values
       positions.push({
-        x,
-        y,
-        z,
-        rotation: Math.random() * Math.PI * 2,
-        scale: 0.8 + Math.random() * 0.4, // Vary size between 0.8 and 1.2
-        heightScale: 0.5 + Math.random() * 0.8, // Vary height between 0.5 and 1.3 for visual variety
+        x: pos.x,
+        y: pos.y,
+        z: pos.z,
+        rotation: seededRandom(i + 1) * Math.PI * 2,
+        scale: 0.8 + seededRandom(i + 1000) * 0.4, // Vary size between 0.8 and 1.2
+        heightScale: 0.5 + seededRandom(i + 2000) * 0.8, // Vary height between 0.5 and 1.3 for visual variety
         litAt: null, // Base candles should NOT melt - only user-lit candles with Firestore litAt should melt
         userId: null, // Will be assigned when user lights a candle
         username: null,
@@ -503,11 +766,12 @@ function usePositions(count, exclusionZone = null) {
       })
     }
     return positions
-  }, [count, exclusionZone])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [count, exclusionZone, CORRIDOR_VERSION]) // CORRIDOR_VERSION forces regeneration when corridor changes
 }
 
 // InstancedPart with melting animation
-function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.9, maxCount, onCandleClick, onCandleHover, onCandleLeave, enableMelting = false }) {
+function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.9, maxCount, onCandleClick, onCandleHover, onCandleLeave, enableMelting = false, renderOrder = 10 }) {
   const meshRef = useRef()
   const actualCount = positions.length
   const capacity = maxCount || actualCount
@@ -612,7 +876,7 @@ function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.9
       ref={meshRef}
       args={[geometry, material, capacity]}
       frustumCulled={false}
-      renderOrder={-5}
+      renderOrder={renderOrder}
       raycast={THREE.InstancedMesh.prototype.raycast}
       onClick={(event) => {
         event.stopPropagation()
@@ -702,26 +966,47 @@ export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUN
     }
   }, [geometries])
   
-  // Combine positions
+  // Combine positions - apply exclusion to additional candles too
+  // Use stable random values based on candle id to prevent position shifts on re-render
   const positions = useMemo(() => {
-    const additional = additionalCandles.map(c => ({
-      x: c.position ? c.position[0] : c.x,
-      y: c.position ? c.position[1] : c.y,
-      z: c.position ? c.position[2] : c.z,
-      rotation: c.rotation || Math.random() * Math.PI * 2,
-      scale: c.scale || 1.0,
-      litAt: c.litAt,
-      userId: c.userId,
-      username: c.username,
-      offering: c.offering
-    }))
+    const additional = additionalCandles.map(c => {
+      let x = c.position ? c.position[0] : c.x
+      let y = c.position ? c.position[1] : c.y
+      let z = c.position ? c.position[2] : c.z
+
+      // Use candle id for deterministic "random" offset
+      const idSeed = (c.id || 0) % 1000 / 1000
+
+      // Apply body corridor exclusion to additional candles
+      if (z >= BODY_CORRIDOR.zMin && z <= BODY_CORRIDOR.zMax) {
+        const inXRange = Math.abs(x - BODY_CORRIDOR.centerX) < BODY_CORRIDOR.halfWidth
+        const inYRange = Math.abs(y - BODY_CORRIDOR.centerY) < BODY_CORRIDOR.halfHeight
+
+        if (inXRange && inYRange) {
+          const pushDirection = x >= 0 ? 1 : -1
+          x = pushDirection * (BODY_CORRIDOR.halfWidth + 0.5 + idSeed * 3)
+        }
+      }
+
+      return {
+        x,
+        y,
+        z,
+        rotation: c.rotation !== undefined ? c.rotation : (idSeed * Math.PI * 2),
+        scale: c.scale || 1.0,
+        litAt: c.litAt,
+        userId: c.userId,
+        username: c.username,
+        offering: c.offering
+      }
+    })
     return [...basePositions, ...additional]
   }, [basePositions, additionalCandles])
   
   // Create materials ONCE
   const materials = useMemo(() => ({
     wax: createXBaseMaterial(),  // Now price-reactive!
-    wick: createWobbleMaterial('#222222'),
+    wick: createWobbleMaterial('#222222'),  // Normal depth writing
     flame: createFlameMaterial(),  // Or createFlameMaterialPriceReactive() for tinted flames
     candle_empty: createWobbleMaterial('#ffddaa'), // Candle body material
   }), [])
@@ -762,9 +1047,10 @@ export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUN
         isMobile={isMobile} 
       />
       
-      <InstancedPart geometry={geometries.wax} material={materials.wax} positions={positions} localMatrix={localMatrices.wax} maxCount={maxCount} onCandleClick={onCandleClick} onCandleHover={onCandleHover} onCandleLeave={onCandleLeave} enableMelting={true} />
-      <InstancedPart geometry={geometries.wick} material={materials.wick} positions={positions} localMatrix={localMatrices.wick} maxCount={maxCount} enableMelting={true} />
-      <InstancedPart geometry={geometries.flame} material={materials.flame} positions={positions} localMatrix={localMatrices.flame} maxCount={maxCount} enableMelting={true} />
+      {/* Standard render order with flames last. Flames use polygonOffset to avoid being occluded by wax while still being occluded by phone */}
+      {geometries.wax && <InstancedPart geometry={geometries.wax} material={materials.wax} positions={positions} localMatrix={localMatrices.wax} maxCount={maxCount} onCandleClick={onCandleClick} onCandleHover={onCandleHover} onCandleLeave={onCandleLeave} enableMelting={true} renderOrder={10} />}
+      {geometries.wick && <InstancedPart geometry={geometries.wick} material={materials.wick} positions={positions} localMatrix={localMatrices.wick} maxCount={maxCount} enableMelting={true} renderOrder={10} />}
+      {geometries.flame && <InstancedPart geometry={geometries.flame} material={materials.flame} positions={positions} localMatrix={localMatrices.flame} maxCount={maxCount} enableMelting={true} renderOrder={15} />}
       {geometries.candle_empty && <InstancedPart geometry={geometries.candle_empty} material={materials.candle_empty} positions={positions} localMatrix={localMatrices.candle_empty} maxCount={maxCount} enableMelting={true} />}
     </group>
   )
@@ -867,13 +1153,16 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onPrice
   }, [allPositions, currentUserId])
   
   const handleNewCandle = (position, offering) => {
+    const id = Date.now()
+    // Use id-based seeded values for stability
+    const seed = (id % 10000) / 10000
     const newCandle = {
       position,
       offering,
-      id: Date.now(),
-      rotation: Math.random() * Math.PI * 2,
-      scale: 0.8 + Math.random() * 0.4,
-      litAt: Date.now(),
+      id,
+      rotation: seed * Math.PI * 2,
+      scale: 0.8 + ((id % 1000) / 1000) * 0.4,
+      litAt: id,
       userId: currentUserId,
       username: 'Test User',
       x: position[0],
@@ -899,22 +1188,67 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onPrice
     }
   }
   
-  // Convert Firestore offerings to candles
+  // Convert Firestore offerings to candles with priority zone positioning
+  // Deduplicates: if a candle already exists in additionalCandles (from effect), skip it
   useEffect(() => {
     if (offerings && offerings.length > 0) {
-      const candlesFromOfferings = offerings.map((offering, index) => {
-        // Use stored position from Firestore if available, otherwise generate random
+      // Get userIds already in additionalCandles (from the NewCandleEffect)
+      // These candles are already visible, so we don't want duplicates
+      const existingUserIds = new Set(
+        additionalCandles
+          .filter(c => c.userId)
+          .map(c => c.userId)
+      )
+
+      // Filter out offerings that already have a candle from the effect
+      const newOfferings = offerings.filter(offering => {
+        const oderId = offering.userId || offering.uid
+        return !existingUserIds.has(oderId)
+      })
+
+      // Define exclusion zone for position generation
+      const exclusionZone = {
+        center: [0, 0, 0],
+        radius: 12,
+        height: 20
+      }
+
+      // Generate priority-based positions for filtered offerings
+      const generatedPositions = generateOfferingPositions(newOfferings, exclusionZone)
+
+      const candlesFromOfferings = newOfferings.map((offering, index) => {
+        // Use stored position from Firestore if available, otherwise use generated priority position
         const storedPos = offering.position
-        const x = storedPos?.x ?? (Math.random() - 0.5) * 30
-        const y = storedPos?.y ?? (Math.random() - 0.5) * 20  
-        const z = storedPos?.z ?? (Math.random() - 0.5) * 15
-        
+        const genPos = generatedPositions[index]
+
+        // Use offering id or index for seeded random values
+        const seedBase = offering.id ? offering.id.charCodeAt(0) + index : index
+        const seed1 = (seedBase % 1000) / 1000
+        const seed2 = ((seedBase * 7) % 1000) / 1000
+        const seed3 = ((seedBase * 13) % 1000) / 1000
+
+        let x = storedPos?.x ?? genPos.x
+        let y = storedPos?.y ?? genPos.y
+        let z = storedPos?.z ?? genPos.z
+
+        // Apply body corridor exclusion to ALL positions (including stored ones)
+        if (z >= BODY_CORRIDOR.zMin && z <= BODY_CORRIDOR.zMax) {
+          const inXRange = Math.abs(x - BODY_CORRIDOR.centerX) < BODY_CORRIDOR.halfWidth
+          const inYRange = Math.abs(y - BODY_CORRIDOR.centerY) < BODY_CORRIDOR.halfHeight
+
+          if (inXRange && inYRange) {
+            // Push candle outward in X direction with seeded offset
+            const pushDirection = x >= 0 ? 1 : -1
+            x = pushDirection * (BODY_CORRIDOR.halfWidth + 0.5 + seed1 * 3)
+          }
+        }
+
         return {
           x: x,
           y: y,
           z: z,
-          rotation: Math.random() * Math.PI * 2,
-          scale: 0.8 + Math.random() * 0.4,
+          rotation: seed2 * Math.PI * 2,
+          scale: 0.8 + seed3 * 0.4,
           litAt: offering.litAt || offering.createdAt?.toDate?.()?.getTime?.() || offering.timestamp?.toDate?.()?.getTime?.() || Date.now(),
           userId: offering.userId || offering.uid || `user_${index}`,
           username: offering.userName || offering.username || 'Anonymous',
@@ -925,7 +1259,7 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onPrice
       })
       setOfferingCandles(candlesFromOfferings)
     }
-  }, [offerings])
+  }, [offerings, additionalCandles])
   
   // Update allPositions when positions change
   useEffect(() => {

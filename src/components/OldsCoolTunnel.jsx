@@ -800,7 +800,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
         <div 
           style={{
             position: 'absolute',
-            bottom: '20px',
+            bottom: '2rem',
             left: '50%',
             transform: 'translateX(-50%)',
             backgroundColor: 'rgba(0, 0, 0, 0.7)',
