@@ -37,6 +37,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
   const [isPortraitOrientation, setIsPortraitOrientation] = useState(() => typeof window !== 'undefined' ? window.innerHeight > window.innerWidth : false)
   const [isLargeTablet, setIsLargeTablet] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 820 && window.innerWidth <= 1024 : false)
   const [isSmallLandscape, setIsSmallLandscape] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 1024 && window.innerWidth <= 1500 : false)
+  const [isConstrainedHeight, setIsConstrainedHeight] = useState(() => typeof window !== 'undefined' ? window.innerHeight < 900 : false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [isBuyModalOpen, setIsBuyModalOpen] = useState(false)
   const [isPortalZoomed, setIsPortalZoomed] = useState(false)
@@ -81,6 +82,8 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
       setIsPortraitOrientation(window.innerHeight > width)
       // Check for small phones like iPhone SE
       setIsSmallPhone(window.innerHeight <= 700)
+      // Check for constrained viewport heights (laptops with small windows, tablets, etc.)
+      setIsConstrainedHeight(window.innerHeight < 900)
     }
     checkMobile()
     window.addEventListener('resize', checkMobile)
@@ -693,7 +696,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            paddingTop: '2rem',
+            paddingTop: isTabletPortrait ? '5rem' : isConstrainedHeight ? '4rem' : '2rem',
             paddingBottom: '2rem',
             paddingLeft: '2rem',
             paddingRight: '2rem',
@@ -1299,7 +1302,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            paddingTop: '2rem',
+            paddingTop: isTabletPortrait ? '5rem' : isConstrainedHeight ? '4rem' : '2rem',
             paddingBottom: '2rem',
             paddingLeft: '2rem',
             paddingRight: '2rem',
@@ -1704,6 +1707,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               justifyContent: 'center',
               gap: isTabletLandscape ? '2rem' : isTabletPortrait ? '1.5rem' : '1rem',
               padding: isTabletLandscape ? '0 3% 100px' : isTabletPortrait ? '0 2% 140px' : isSmallLandscape ? '0 3% 100px' : '0 5% 140px',
+              paddingTop: isConstrainedHeight ? '5rem' : '0',
               minHeight: '100vh',
               minWidth: isCarouselMode ? '100vw' : 'auto',
               position: 'relative',
@@ -2039,7 +2043,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               position: 'absolute',
               right: '10%',
               marginRight: '2rem',
-              top: 'calc(50% - 70px)',
+              top: isConstrainedHeight ? 'calc(50% - 20px)' : 'calc(50% - 70px)',
               transform: 'translateY(-50%)',
               zIndex: 1,
               display: 'flex',
@@ -2051,7 +2055,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               <SkewedHeading
                 lines={[t('about.skewedHeading1.line1'), t('about.skewedHeading1.line2'), t('about.skewedHeading1.line3')]}
                 colors={["#00ff00", "#f4e4c1", "#ffd700"]}
-                fontSize={{ mobile: "2rem", desktop: isTabletLandscape ? "2.5rem" : isSmallLandscape ? "2.5rem" : "2.5rem" }}
+                fontSize={{ mobile: "2rem", desktop: isTabletLandscape ? "2rem" : isSmallLandscape ? "2.5rem" : "2.5rem" }}
                 isMobile={false}
                 language={locale}
               />
@@ -2073,9 +2077,9 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               </p>
                 <p style={{
               fontFamily: '',
-              fontSize: isSmallPhone ? '0.9rem' : '1rem',
+              fontSize: isSmallPhone ? '1rem' : '1rem',
               color: 'rgba(255, 255, 255, 0.85)',
-              lineHeight: isSmallPhone ? '1.1' : '1.2',
+              lineHeight: isSmallPhone ? '1.3' : '1.3',
               // marginTop: '-3.5rem',
               width: '100%',
               maxWidth: isMobilePhone ? '320px' : '450px',
@@ -2320,6 +2324,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               justifyContent: 'center',
               gap: isTabletLandscape ? '0' : isTabletPortrait ? '1.5rem' : '1rem',
               padding: isTabletLandscape ? '0 3% 80px' : isTabletPortrait ? '0 2% 140px' : isSmallLandscape ? '0 3% 80px' : '0 5% 140px',
+              paddingTop: isConstrainedHeight ? '5rem' : '0',
               minHeight: isCarouselMode ? '100vh' : '90vh',
               minWidth: isCarouselMode ? '100vw' : 'auto',
               position: 'relative',
@@ -2410,9 +2415,9 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
 
               <p style={{
                 // fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-                fontSize: isTabletLandscape ? '0.95rem' : isTabletPortrait ? '0.9rem' : '1.1rem',
+                fontSize: isTabletLandscape ? '1rem' : isTabletPortrait ? '1rem' : '1.1rem',
                 color: 'rgba(255, 255, 255, 0.85)',
-                lineHeight: '1.4',
+                lineHeight: '1.3',
                 marginTop: '0',
                 // marginBottom: isTablet ? '1.5rem' : '2rem',
                 maxWidth: '20rem',

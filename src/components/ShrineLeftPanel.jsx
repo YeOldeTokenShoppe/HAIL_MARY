@@ -28,12 +28,23 @@ const ShrineLeftPanel = forwardRef(({
   const [mounted, setMounted] = useState(false)
   const [isHoveringMatchstick, setIsHoveringMatchstick] = useState(false)
   const [isHoveringStake, setIsHoveringStake] = useState(false)
+  const [isConstrainedHeight, setIsConstrainedHeight] = useState(() => typeof window !== 'undefined' ? window.innerHeight < 900 : false)
   const { stakedBalance } = useStaking()
   const hasStakedTokens = parseFloat(stakedBalance || 0) > 0
-  
+
   // Set mounted state after component mounts
   useEffect(() => {
     setMounted(true)
+  }, [])
+
+  // Detect constrained viewport heights
+  useEffect(() => {
+    const checkHeight = () => {
+      setIsConstrainedHeight(window.innerHeight < 900)
+    }
+    checkHeight()
+    window.addEventListener('resize', checkHeight)
+    return () => window.removeEventListener('resize', checkHeight)
   }, [])
   
   // Expose methods via ref
@@ -126,14 +137,14 @@ const ShrineLeftPanel = forwardRef(({
       }} />
    <h1 className='custom-title'
           id="main-title"
-          style={{ 
+          style={{
             position: 'fixed',
             left:  '40px',
             top:  '40px',
             pointerEvents: 'auto',
             color: is80sMode ? "#ffffff" : "#d4af37",
             fontFamily: 'UnifrakturCook, serif',
-            textShadow: is80sMode 
+            textShadow: is80sMode
               ? `
                 0 0 20px rgba(201, 55, 255, 0.9),
                 0 0 40px rgba(201, 55, 255, 0.8),
@@ -154,7 +165,7 @@ const ShrineLeftPanel = forwardRef(({
                 rgba(255, 192, 203, 0.4) -1px -1px 5px,
                 rgba(0, 0, 0, 0.8) 10px 10px 15px
               `,
-            fontSize: "3rem",
+            fontSize: isConstrainedHeight ? "2.4rem" : "3rem",
             fontWeight: 900,
             lineHeight: 0.75,
             transform: "rotate(-8deg) skew(-15deg)",
@@ -166,10 +177,10 @@ const ShrineLeftPanel = forwardRef(({
         >
           <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
           <span className="title-line" style={{ display: 'block', position: 'relative' }}>
-            <span style={{ fontSize: "1.6rem" }}>of    </span>
+            <span style={{ fontSize: isConstrainedHeight ? "1.3rem" : "1.6rem" }}>of    </span>
             Perpetual
           </span>
-          <span className="title-line" style={{ display: 'block', marginLeft: "3rem", position: 'relative' }}>Profit</span>
+          <span className="title-line" style={{ display: 'block', marginLeft: isConstrainedHeight ? "2.4rem" : "3rem", position: 'relative' }}>Profit</span>
         </h1>
      
 
@@ -177,13 +188,13 @@ const ShrineLeftPanel = forwardRef(({
       <div style={{
         position: 'fixed',
         left: '40px',
-        top: '60%',
-        transform: 'translateY(-50%)',  // Center vertically
+        top: isConstrainedHeight ? '55%' : '60%',
+        transform: isConstrainedHeight ? 'translateY(-40%)' : 'translateY(-50%)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '15px',  // Reduced gap
+        gap: isConstrainedHeight ? '10px' : '15px',
         zIndex: 100,
         pointerEvents: 'none',  // Allow clicks to pass through to canvas
         maxHeight: '90vh',  // Ensure it doesn't overflow viewport

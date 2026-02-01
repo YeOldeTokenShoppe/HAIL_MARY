@@ -2360,9 +2360,9 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
           className="global-chat-sidebar"
           style={{
             position: "fixed",
-            right: isSidebarOpen ? "0" : "-320px",
+            right: 0,
             top: "50%",
-            transform: "translateY(-50%)",
+            transform: isSidebarOpen ? "translateY(-50%) translateX(0)" : "translateY(-50%) translateX(100%)",
             width: "300px",
             height: "400px",
             backgroundColor: "rgba(27, 23, 36, 0.95)",
@@ -2372,7 +2372,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
             display: "flex",
             flexDirection: "column",
             zIndex: 10001,
-            transition: "right 0.3s ease-in-out",
+            transition: "transform 0.3s ease-in-out",
             boxShadow: "-4px 0 15px rgba(0, 0, 0, 0.3)",
           }}
         >

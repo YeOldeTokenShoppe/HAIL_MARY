@@ -2063,30 +2063,30 @@ useEffect(() => {
   const helpAnnotations = useMemo(() => [
     {
       id: 'stats',
-      label: 'Stats & Info',
-      description: 'Track price, staking rewards, community pulse, and top burners',
-      position: { top: isMobile ? '150px' : '100px', right: isMobile ? '100px' : '150px' },
+      label: 'User-dedicated Candles',
+      description: 'Tap on any candle to see who lit it and how much time is remaining before it melts.',
+      position: { top: isMobile ? '150px' : '150px', right: isMobile ? '50%' : '50%' },
       pointerDirection: 'right'
     },
     {
       id: 'phone',
       label: 'Live Feed',
-      description: 'Watch real-time offerings from the congregation',
+      description: 'Watch real-time offerings arrive from RL80 devotees',
       position: { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
       pointerDirection: 'none'
     },
     {
       id: 'actions',
-      label: 'Actions',
-      description: 'Get on the watchlist, stake tokens, or light a candle',
-      position: { top: '45%', left: isMobile ? '70px' : '120px' },
-      pointerDirection: 'left'
+      label: 'More Buttons!',
+      description: 'Try 80s mode, sign in/out, or buy more tokens with these buttons',
+      position: { top: '15%', right: isMobile ? '70px' : '120px' },
+      pointerDirection: 'right'
     },
     {
       id: 'candles',
-      label: 'Candle Cloud',
-      description: 'Each candle represents a community offering',
-      position: { bottom: '30%', left: '30%' },
+      label: 'Action Buttons',
+      description: 'Light a candle or stake tokens by clicking the stake or match icons',
+      position: { bottom: '23%', left: '20%' },
       pointerDirection: 'none'
     }
   ], [isMobile])
@@ -2792,43 +2792,45 @@ useEffect(() => {
 
 
         {/* Collapsed Stats Tab */}
-        {statsBoxCollapsed && (
-          <button
-            onClick={() => setStatsBoxCollapsed(false)}
-            style={{
-              background: 'rgba(212, 175, 55, 0.2)',
-              
-              border: '2px solid rgba(212, 175, 55, 0.4)',
-              borderRight: 'none',
-              borderRadius: '8px 0 0 8px',
-              padding: '12px 8px',
-              color: '#d4af37',
-              fontSize: '11px',
-              fontFamily: 'monospace',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              backdropFilter: 'blur(10px)',
-              writingMode: 'vertical-rl',
-              textOrientation: 'mixed',
-              letterSpacing: '2px',
-              transition: 'all 0.2s ease',
-              position: 'fixed',
-              right: 0,
-              top: isMobile ? '45%' : '160px',
-            }}
-            title="Open stats panel"
-          >
-            STATS
-          </button>
-        )}
+        <button
+          onClick={() => setStatsBoxCollapsed(false)}
+          style={{
+            background: 'rgba(212, 175, 55, 0.2)',
+
+            border: '2px solid rgba(212, 175, 55, 0.4)',
+            borderRight: 'none',
+            borderRadius: '8px 0 0 8px',
+            padding: '12px 8px',
+            color: '#d4af37',
+            fontSize: '11px',
+            fontFamily: 'monospace',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            backdropFilter: 'blur(10px)',
+            writingMode: 'vertical-rl',
+            textOrientation: 'mixed',
+            letterSpacing: '2px',
+            transition: 'all 0.3s ease',
+            position: 'fixed',
+            right: 0,
+            top: isMobile ? '45%' : '160px',
+            opacity: statsBoxCollapsed ? 1 : 0,
+            pointerEvents: statsBoxCollapsed ? 'auto' : 'none',
+          }}
+          title="Open stats panel"
+        >
+          STATS
+        </button>
 
         {/* Unified Stats Box with Tabs */}
-        {!statsBoxCollapsed && (
         <div style={{
           ...unifiedStatsStyle,
           position: 'relative',
           top: 0,
           right: 0,
+          transform: statsBoxCollapsed ? 'translateX(calc(100% + 40px))' : 'translateX(0)',
+          transition: 'transform 0.3s ease, opacity 0.3s ease',
+          opacity: statsBoxCollapsed ? 0 : 1,
         }}>
         {/* Close Tab - Side tab to collapse stats */}
         <button
@@ -3350,7 +3352,6 @@ useEffect(() => {
           </>
         ) : null}
         </div>
-        )}
 
         {/* Find My Candle button for mobile - positioned below stats box */}
         {isMobile && currentUserId && !targetCameraPosition && offeringCandles.some(c => c.userId === currentUserId) && (
@@ -3492,7 +3493,7 @@ useEffect(() => {
           {/* Dismiss hint */}
           <div style={{
             position: 'fixed',
-            bottom: isMobile ? '80px' : '40px',
+            bottom: isMobile ? '20px' : '40px',
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 950,
