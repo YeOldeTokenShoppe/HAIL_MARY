@@ -2064,14 +2064,14 @@ useEffect(() => {
     {
       id: 'stats',
       label: 'User-dedicated Candles',
-      description: 'Tap on any candle to see who lit it and how much time is remaining before it melts.',
+      description: 'Tap on any candle to see who lit it and how much time is remaining before it melts. Candles move up and down and change color as prices change',
       position: { top: isMobile ? '150px' : '150px', right: isMobile ? '50%' : '50%' },
       pointerDirection: 'right'
     },
     {
       id: 'phone',
       label: 'Live Feed',
-      description: 'Watch real-time offerings arrive from RL80 devotees',
+      description: 'Watch real-time offerings arrive from RL80 devotees.',
       position: { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
       pointerDirection: 'none'
     },

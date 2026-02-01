@@ -166,31 +166,17 @@ const wobbleVertexChunk = `
   }
 `
 
-// Create a material with wobble animation baked in
+// Create a simple instanced material (wobble now baked into instanceMatrix)
 function createWobbleMaterial(baseColor, options = {}) {
   return new THREE.ShaderMaterial({
     uniforms: {
-      ...sharedUniforms,
       uColor: { value: new THREE.Color(baseColor) },
       uOpacity: { value: options.opacity ?? 1.0 },
     },
     vertexShader: `
-      ${wobbleVertexChunk}
-      
       void main() {
-        float id = float(gl_InstanceID);
-
-        // Get instance center (translation from instanceMatrix)
-        vec3 instanceCenter = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
-
-        // Calculate wobble based on instance center
-        vec3 wobble = getWobbleOffset(id, instanceCenter);
-        vec3 wobbledCenter = instanceCenter + wobble;
-
-        // Apply instance transform, then wobble (exclusion handled in JS position generation)
+        // Wobble is now baked into instanceMatrix for accurate raycasting
         vec4 instancePos = instanceMatrix * vec4(position, 1.0);
-        instancePos.xyz += wobble;
-
         gl_Position = projectionMatrix * modelViewMatrix * instancePos;
       }
     `,
@@ -222,25 +208,13 @@ function createXBaseMaterial() {
       uUserColor: { value: new THREE.Color('#ffaa00') },    // golden for user's candle
     },
     vertexShader: `
-      ${wobbleVertexChunk}
-      
       varying float vInstanceId;
-      
+
       void main() {
-        float id = float(gl_InstanceID);
-        vInstanceId = id;
+        vInstanceId = float(gl_InstanceID);
 
-        // Get instance center (translation from instanceMatrix)
-        vec3 instanceCenter = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
-
-        // Calculate wobble based on instance center
-        vec3 wobble = getWobbleOffset(id, instanceCenter);
-        vec3 wobbledCenter = instanceCenter + wobble;
-
-        // Apply instance transform, then wobble (exclusion handled in JS position generation)
+        // Wobble is now baked into instanceMatrix for accurate raycasting
         vec4 instancePos = instanceMatrix * vec4(position, 1.0);
-        instancePos.xyz += wobble;
-
         gl_Position = projectionMatrix * modelViewMatrix * instancePos;
       }
     `,
@@ -298,33 +272,20 @@ function createXBaseMaterial() {
   })
 }
 
-// Senora (label) material with texture
+// Senora (label) material with texture (wobble now baked into instanceMatrix)
 function createSenoraMaterial(texture) {
   return new THREE.ShaderMaterial({
     uniforms: {
-      ...sharedUniforms,
       uMap: { value: texture },
     },
     vertexShader: `
-      ${wobbleVertexChunk}
-      
       varying vec2 vUv;
-      
+
       void main() {
         vUv = uv;
-        float id = float(gl_InstanceID);
 
-        // Get instance center (translation from instanceMatrix)
-        vec3 instanceCenter = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
-
-        // Calculate wobble based on instance center
-        vec3 wobble = getWobbleOffset(id, instanceCenter);
-        vec3 wobbledCenter = instanceCenter + wobble;
-
-        // Apply instance transform, then wobble (exclusion handled in JS position generation)
+        // Wobble is now baked into instanceMatrix for accurate raycasting
         vec4 instancePos = instanceMatrix * vec4(position, 1.0);
-        instancePos.xyz += wobble;
-
         gl_Position = projectionMatrix * modelViewMatrix * instancePos;
       }
     `,
@@ -344,65 +305,67 @@ function createSenoraMaterial(texture) {
   })
 }
 
-// Flame material - most complex shader with flicker + wobble
+// Flame material - flicker animations (wobble now baked into instanceMatrix)
 function createFlameMaterial() {
   return new THREE.ShaderMaterial({
     uniforms: {
       ...sharedUniforms,
     },
     vertexShader: `
-      ${wobbleVertexChunk}
-      
+      uniform float uTime;
+
       varying float vHeight;
       varying float vPhase;
       varying float vInstanceId;
-      
+
+      // Hash function for per-instance variation
+      float hash(float n) {
+        return fract(sin(n) * 43758.5453123);
+      }
+
       void main() {
         float id = float(gl_InstanceID);
         vInstanceId = id;
         vPhase = hash(id) * 6.28318;
-        
+
         vec3 pos = position;
-        
+
         // Height normalized 0-1
         vHeight = clamp((pos.y + 0.1) / 0.6, 0.0, 1.0);
-        
-        // Flame flicker animation
+
+        // Flame flicker animation (local to flame, not whole-candle wobble)
         float flameTime = uTime * 3.0 + vPhase;
-        
+
         // Strong sway side to side
         float sway = sin(flameTime * 1.5) * 0.06 * vHeight * vHeight;
         sway += sin(flameTime * 2.3) * 0.03 * vHeight;
         pos.x += sway;
-        
+
         // Flicker height
         float flicker = sin(flameTime * 2.0) * 0.04 * vHeight;
         flicker += sin(flameTime * 3.7) * 0.02 * vHeight * vHeight;
         pos.y += flicker;
-        
-        // Z wobble
+
+        // Z wobble (flame-specific, not candle wobble)
         pos.z += cos(flameTime * 1.8) * 0.04 * vHeight * vHeight;
-        
+
         // Taper at top
         float taper = 1.0 - vHeight * 0.5;
         pos.x *= taper;
         pos.z *= taper;
-        
+
         // Vertical stretch
         float stretch = 1.0 + sin(flameTime * 2.5) * 0.1 * vHeight;
         pos.y *= stretch;
-        
-        // Get instance center (translation from instanceMatrix)
-        vec3 instanceCenter = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
 
-        // Calculate wobble based on instance center
-        vec3 wobble = getWobbleOffset(id, instanceCenter);
-
-        // Apply instance transform, then wobble (exclusion handled in JS position generation)
+        // Wobble is now baked into instanceMatrix for accurate raycasting
         vec4 instancePos = instanceMatrix * vec4(pos, 1.0);
-        instancePos.xyz += wobble;
 
         gl_Position = projectionMatrix * modelViewMatrix * instancePos;
+
+        // Clip-space depth bias - shifts flame toward camera in depth buffer
+        // This prevents wax from occluding flames while still allowing phone occlusion
+        gl_Position.z -= 0.002 * gl_Position.w;
       }
     `,
     fragmentShader: `
@@ -471,12 +434,10 @@ function createFlameMaterial() {
     transparent: true,
     blending: THREE.AdditiveBlending,
     side: THREE.DoubleSide,
-    depthTest: true,    // Check depth - occluded by phone
+    depthTest: true,    // Re-enabled - using clip space depth bias instead
     depthWrite: false,  // Transparent with additive shouldn't write depth
     toneMapped: true,
-    polygonOffset: true,      // Enable polygon offset
-    polygonOffsetFactor: -4,  // Bias toward camera (negative = closer)
-    polygonOffsetUnits: -4,   // Additional bias to avoid wax occlusion while still being occluded by phone
+    polygonOffset: false,     // Using clip-space depth bias instead
     // Enable instancing support
     defines: { USE_INSTANCING: '' },
   })
@@ -770,47 +731,98 @@ function usePositions(count, exclusionZone = null) {
   }, [count, exclusionZone, CORRIDOR_VERSION]) // CORRIDOR_VERSION forces regeneration when corridor changes
 }
 
-// InstancedPart with melting animation
+// Replicate shader wobble calculation on CPU for raycasting accuracy
+function calculateWobbleOffset(instanceId, time) {
+  // Hash function matching shader
+  const hash = (n) => {
+    const x = Math.sin(n) * 43758.5453123
+    return x - Math.floor(x)
+  }
+
+  // Phase offsets per instance (matching shader)
+  const phaseX = hash(instanceId) * 6.28318
+  const phaseY = hash(instanceId + 50.0) * 6.28318
+  const phaseZ = hash(instanceId + 100.0) * 6.28318
+
+  // Time factor (matching shader: uTime * 0.5)
+  const t = time * 0.5
+
+  // Speed variations per instance
+  const speedX = 0.3 + hash(instanceId + 100.0) * 0.2
+  const speedY = 0.25 + hash(instanceId + 200.0) * 0.15
+  const speedZ = 0.28 + hash(instanceId + 300.0) * 0.18
+
+  // Primary wave
+  let offsetX = Math.sin(t * speedX + phaseX) * 0.35
+  let offsetY = Math.sin(t * speedY + phaseY) * 0.5
+  let offsetZ = Math.sin(t * speedZ + phaseZ) * 0.3
+
+  // Secondary slower wave
+  offsetX += Math.cos(t * speedX * 0.4 + phaseX) * 0.2
+  offsetY += Math.cos(t * speedY * 0.3 + phaseY) * 0.35
+  offsetZ += Math.sin(t * speedZ * 0.5 + phaseZ + 1.0) * 0.15
+
+  // Tertiary micro-movement
+  const microSpeed = 1.5 + hash(instanceId + 400.0) * 0.5
+  offsetX += Math.sin(t * microSpeed + phaseX) * 0.05
+  offsetY += Math.cos(t * microSpeed * 0.9 + phaseY) * 0.08
+
+  return { x: offsetX, y: offsetY, z: offsetZ }
+}
+
+// InstancedPart with melting animation and wobble-synced raycasting
 function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.9, maxCount, onCandleClick, onCandleHover, onCandleLeave, enableMelting = false, renderOrder = 10 }) {
   const meshRef = useRef()
   const actualCount = positions.length
   const capacity = maxCount || actualCount
-  
-  // Update matrices per frame for melting effect
-  useFrame(() => {
-    if (!meshRef.current || !enableMelting) return
-    
-    
+
+  // Update matrices per frame - now includes wobble for accurate raycasting
+  useFrame((state) => {
+    if (!meshRef.current) return
+
+    const time = state.clock.elapsedTime
     const now = Date.now()
     const tempMatrix = new THREE.Matrix4()
     const tempPosition = new THREE.Vector3()
     const tempQuaternion = new THREE.Quaternion()
     const tempScale = new THREE.Vector3()
-    
-    let candlesWithLitAt = 0
+
+    // Update ALL candle positions with wobble for accurate raycasting
     for (let i = 0; i < actualCount; i++) {
       const pos = positions[i]
-      if (pos.litAt) {
-        candlesWithLitAt++
-        const elapsed = (now - pos.litAt) / 1000 // seconds
-        const meltProgress = Math.min(elapsed / 300, 1.0) // 0-1.0 over 5 minutes (300 seconds) - TESTING
-        const yScale = Math.max(0.01, 1.0 - meltProgress) // Scale down to almost nothing when melted
-        
-        const instanceScale = pos.scale || scale
-        
-        tempPosition.set(pos.x, pos.y, pos.z)
-        tempQuaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pos.rotation)
-        tempScale.set(instanceScale, instanceScale * yScale, instanceScale)
-        
-        tempMatrix.compose(tempPosition, tempQuaternion, tempScale)
-        if (localMatrix) {
-          tempMatrix.multiply(localMatrix)
-        }
-        meshRef.current.setMatrixAt(i, tempMatrix)
+      const instanceScale = pos.scale || scale
+
+      // Calculate wobble offset (matching shader calculation)
+      const wobble = calculateWobbleOffset(i, time)
+
+      // Apply wobble to base position
+      tempPosition.set(
+        pos.x + wobble.x,
+        pos.y + wobble.y,
+        pos.z + wobble.z
+      )
+
+      tempQuaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pos.rotation)
+
+      // Handle melting for candles with litAt
+      let yScale = pos.heightScale !== undefined ? pos.heightScale : instanceScale
+      if (enableMelting && pos.litAt) {
+        const elapsed = (now - pos.litAt) / 1000
+        const meltProgress = Math.min(elapsed / 300, 1.0)
+        yScale = Math.max(0.01, (pos.heightScale || instanceScale) * (1.0 - meltProgress))
       }
+
+      tempScale.set(instanceScale, yScale, instanceScale)
+
+      tempMatrix.compose(tempPosition, tempQuaternion, tempScale)
+      if (localMatrix) {
+        tempMatrix.multiply(localMatrix)
+      }
+      meshRef.current.setMatrixAt(i, tempMatrix)
     }
+
     meshRef.current.instanceMatrix.needsUpdate = true
-    
+
     // Update current time uniform for shader effects
     sharedUniforms.uCurrentTime.value = now
   })
