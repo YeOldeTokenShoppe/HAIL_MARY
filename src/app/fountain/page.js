@@ -74,7 +74,7 @@ export default function FountainPage() {
 
   // Handle fountain ready signal from iframe
   const handleFountainReady = useCallback(() => {
-    console.log('Fountain ready signal received');
+
     setIsLoading(false);
     // Clear the fallback timeout if it exists
     if (loadingTimeoutRef.current) {
@@ -85,7 +85,6 @@ export default function FountainPage() {
   // Loading timeout fallback (increased to 10 seconds for model loading)
   useEffect(() => {
     loadingTimeoutRef.current = setTimeout(() => {
-      console.log('Loading timeout reached, hiding loader as fallback');
       setIsLoading(false);
     }, 10000);
     return () => {
@@ -330,7 +329,6 @@ export default function FountainPage() {
         }}
         preselectedCharity={preselectedCharity}
         onDonationComplete={(donation) => {
-          console.log('Donation completed:', donation);
           // Optionally notify the iframe about the successful donation
           if (iframeRef.current) {
             try {
@@ -339,7 +337,6 @@ export default function FountainPage() {
                 '*'
               );
             } catch (e) {
-              console.log('Could not send donation notification to iframe:', e);
             }
           }
         }}

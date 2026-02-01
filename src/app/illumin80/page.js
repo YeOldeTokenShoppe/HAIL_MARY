@@ -72,11 +72,7 @@ export default function ShrinePage() {
   
   // Wrap setJustLitOffering to log ALL calls
   const setJustLitOffering = (offering) => {
-    console.log('🚨 [ALL CALLS] setJustLitOffering called with:', {
-      offering: offering?.username || offering,
-      timestamp: Date.now(),
-      stack: new Error().stack?.split('\n')[2]?.trim()
-    })
+
     setJustLitOfferingOriginal(offering)
   }
   const [priceChange, setPriceChange] = useState(0)
@@ -92,7 +88,6 @@ export default function ShrinePage() {
   const [mountKey, setMountKey] = useState(0)
 
 useEffect(() => {
-  console.log('[Illumin80] Setting isClient to true')
   setIsClient(true)
 }, [])
 
@@ -102,7 +97,6 @@ useEffect(() => {
   // Enhanced preload for navigation issues
   const handleMount = async () => {
     try {
-      console.log('[Illumin80] Page mounting, checking for navigation issues...')
       
       // Import and preload the model
       const { useGLTF } = await import('@react-three/drei')
@@ -110,18 +104,15 @@ useEffect(() => {
       // Clear the GLTF cache completely to ensure fresh load
       if (useGLTF.clear) {
         useGLTF.clear()  // Clear all cached models
-        console.log('[Illumin80] Cleared all GLTF cache')
       }
       
       // Force fresh preload of the model
       useGLTF.preload('/models/tinyJapCanOnly.glb')
-      console.log('[Illumin80] Model preload initiated after cache clear')
       
       // Reset any existing Three.js state that might interfere
       if (typeof window !== 'undefined') {
         // Reset shared uniforms if they exist
         if (window.sharedUniforms) {
-          console.log('[Illumin80] Resetting shared uniforms for fresh start')
           window.sharedUniforms.uTime.value = 0
           window.sharedUniforms.uClickedId.value = -1
           window.sharedUniforms.uPriceDirection.value = 0
@@ -133,14 +124,12 @@ useEffect(() => {
         
         // Clear any Three.js renderer cache that might exist
         if (window.__THREE_DEVTOOLS__) {
-          console.log('[Illumin80] Clearing Three.js devtools cache')
         }
         
         // Force garbage collection if available (for debugging)
         if (window.gc && typeof window.gc === 'function') {
           try {
             window.gc()
-            console.log('[Illumin80] Triggered garbage collection')
           } catch (e) {
             // GC not available, ignore
           }
@@ -153,7 +142,6 @@ useEffect(() => {
           setMountKey(Date.now()) // Ensure fresh component mount
           setDelayedMount(true)
           setIsLoading(false)
-          console.log('[Illumin80] Ready to mount UnifiedShrine')
         }
       }, 800) // Reasonable delay for model preload
       
@@ -166,7 +154,6 @@ useEffect(() => {
             setMountKey(Date.now())
             setDelayedMount(true)
             setIsLoading(false)
-            console.log('[Illumin80] Fallback mount after error')
           }
         }, 500)
       }
@@ -286,7 +273,6 @@ useEffect(() => {
                                latestOffering.walletAddress === walletAddress
           
           if (!isCurrentUser) {
-            console.log('New offering detected from another user!', latestOffering)
             
             // Trigger the pulse effect for all candles
             if (unifiedShrineRef.current) {
@@ -392,14 +378,7 @@ useEffect(() => {
   
   // Handle light candle button click with auth check
   const handleLightCandleClick = () => {
-    console.log('🔥 [BUTTON CLICK] handleLightCandleClick called', {
-      isProcessingCandle,
-      hasProcessedCandle,
-      showLightCandleModal,
-      isSignedIn,
-      isWalletConnected,
-      walletAddress
-    });
+
 
     // Don't light the matchstick here - only light it when candle is actually lit
     // This prevents the flame from showing if user cancels
@@ -411,14 +390,12 @@ useEffect(() => {
 
     // Check if user is signed in
     if (!isSignedIn) {
-      console.log('❌ [AUTH CHECK] User not signed in');
       setShowAuthMessage('sign-in');
       return;
     }
 
     // Check if wallet is connected
     if (!isWalletConnected || !walletAddress) {
-      console.log('❌ [WALLET CHECK] Wallet not connected');
       setShowWalletModal(true);
       setWaitingForWallet(true); // Set flag that we're waiting for wallet connection
       setWalletActionType('candle'); // Track that this is for lighting a candle
@@ -426,7 +403,6 @@ useEffect(() => {
     }
 
     // Both signed in and wallet connected - show the modal
-    console.log('✅ [OPENING MODAL] Setting showLightCandleModal to true');
     setModalKey(prev => prev + 1); // Force modal to remount with fresh state
     setShowLightCandleModal(true);
   };
@@ -521,10 +497,7 @@ useEffect(() => {
 
   // Handle light candle from modal
   const handleLightCandle = async (newOffering) => {
-    console.log('🚀 [HANDLE LIGHT CANDLE] Starting handleLightCandle with offering:', {
-      offering: newOffering?.username || 'Anonymous',
-      timestamp: Date.now()
-    })
+
     
     // Immediately close the modal and set processing flags
     setShowLightCandleModal(false);
@@ -541,12 +514,10 @@ useEffect(() => {
     
     // IMMEDIATELY set notification to sync with arctic rings (2.5s after candle is lit)
     setTimeout(() => {
-      console.log('🔔 [NOTIFICATION] Showing notification when arctic rings appear');
       setJustLitOffering(newOffering);
       
       // Clear notification after display duration
       setTimeout(() => {
-        console.log('⏰ [NOTIFICATION] Clearing notification');
         setJustLitOffering(null);
       }, 10000); // Show for 10 seconds - nice long display time
     }, 3500); // 2.5s to match when arctic rings appear
@@ -574,17 +545,14 @@ useEffect(() => {
     };
     
     // Snapshot functionality removed - no longer capturing polaroids
-    console.log('[ShrinePage] Snapshot capture disabled - feature removed');
     
     // Set up a function to receive the offering ID
     window.setLatestOfferingId = (id) => {
-      console.log('[ShrinePage] Setting latest offering ID:', id);
       latestOfferingRef.current = id;
     };
     
     // Set up a listener for when the polaroid is ready
     window.onPolaroidReady = async (url) => {
-      console.log('[ShrinePage] Polaroid ready:', url);
       setPolaroidUrl(url);
       
       // Update the offerings document with the polaroid URL
@@ -596,14 +564,12 @@ useEffect(() => {
             polaroidUrl: url,
             polaroidReady: false
           });
-          console.log('[ShrinePage] Updated offering with polaroid URL');
           
           // After delay, mark as ready for display
           setTimeout(async () => {
             await updateDoc(offeringDoc, {
               polaroidReady: true
             });
-            console.log('[ShrinePage] Marked polaroid as ready for display');
           }, 5000); // 5 second delay for effects to complete
         } catch (error) {
           console.error('[ShrinePage] Failed to update offering with polaroid URL:', error);
@@ -629,17 +595,12 @@ useEffect(() => {
       // Show the polaroid on the side after the candle effect completes
       // NewCandleEffect takes about 10 seconds (5s rise + 5s glow)
       setTimeout(() => {
-        console.log('[ShrinePage] Triggering polaroid snapshot display');
         setShowPolaroid(true);
         setHasDismissedPolaroid(false);
       }, 1000); // 3 seconds - shows shortly after candle lands
     };
     
-    // Trigger the candle launch animation
-    console.log('🎨 [TRIGGER EFFECT] Calling triggerCandleEffect with offering:', {
-      offering: newOffering?.username || 'Anonymous', 
-      timestamp: Date.now()
-    })
+
     if (unifiedShrineRef.current) {
       unifiedShrineRef.current.triggerCandleEffect(newOffering)
     }
@@ -669,7 +630,6 @@ useEffect(() => {
     // Reset processing flags after candle effect completes (about 15 seconds total)
     // This allows the user to light another candle if they want
     setTimeout(() => {
-      console.log('✅ [CLEANUP] Resetting candle processing flags');
       setIsProcessingCandle(false);
       setHasProcessedCandle(false);
     }, 15000); // 15 seconds - enough time for the full candle effect to complete
@@ -742,11 +702,7 @@ useEffect(() => {
             currentUserId={user?.id}
             onSelectOffering={setHoveredOffering}
             onLightCandle={(offering) => {
-              console.log('🔥 [SHRINE CALLBACK] onLightCandle called from UnifiedShrine:', {
-                offering: offering?.username || 'Anonymous',
-                timestamp: Date.now(),
-                stack: new Error().stack?.split('\n')[1]?.trim()
-              })
+
               // Don't set justLitOffering here - it's already set in handleLightCandle
               // This callback happens AFTER the effect completes, which is too late
             }}
@@ -755,7 +711,6 @@ useEffect(() => {
             hoveredOffering={hoveredOffering}
             justLitOffering={justLitOffering}
             onJustLitComplete={() => {
-              console.log('✅ [COMPLETE CALLBACK] setJustLitOffering(null) called from onJustLitComplete')
               setJustLitOffering(null)
             }}
             user={user}
@@ -1598,17 +1553,13 @@ useEffect(() => {
         key={modalKey}
         isOpen={showLightCandleModal}
         onClose={() => {
-          console.log('🚪 [MODAL] Closing modal via onClose');
           setShowLightCandleModal(false);
           // Also clear any pending actions when modal is closed
           setWalletActionType(null);
           setShowAuthMessage(null);
         }}
         onLightCandle={(offering) => {
-          console.log('💡 [MODAL CALLBACK] onLightCandle called from LightCandleModal:', {
-            offering: offering?.username || 'Anonymous',
-            timestamp: Date.now()
-          })
+
           // Close modal immediately when Light Candle is clicked
           setShowLightCandleModal(false);
           handleLightCandle(offering);
@@ -1621,7 +1572,6 @@ useEffect(() => {
         onClose={() => setShowStakeModal(false)}
         currentPhase={1} // Phase 1: Pre-rewards. Change to 2, 3, or 4 as protocol evolves
         onStake={async (stakeData) => {
-          console.log('Stake submitted:', stakeData);
           // TODO: Implement actual staking logic here
         }}
       />

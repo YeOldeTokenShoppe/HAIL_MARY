@@ -319,7 +319,6 @@ const PalmsScene = ({ onLoadingChange }) => {
   
   // Skip animation function
   const skipAnimation = useCallback(() => {
-    console.log('Skip animation clicked');
     
     // First, ensure scrolling is enabled on the body and html
     document.body.style.overflow = 'auto';
@@ -367,15 +366,12 @@ const PalmsScene = ({ onLoadingChange }) => {
       // Use the actual height of the scroll container
       const containerHeight = scrollContainer.offsetHeight;
       targetScroll = containerHeight - window.innerHeight;
-      console.log('Using scroll container height:', containerHeight, 'target:', targetScroll);
     } else {
       // Fallback to calculated height
       const viewportHeight = window.innerHeight;
       targetScroll = isMobileDevice ? (viewportHeight * 7) : (viewportHeight * 3);
-      console.log('Using calculated height, target:', targetScroll);
     }
     
-    console.log('Jumping to final stage, scrolling to:', targetScroll);
     
     // Instant scroll to the end
     window.scrollTo(0, targetScroll);
@@ -461,7 +457,6 @@ const PalmsScene = ({ onLoadingChange }) => {
     // Fallback timer to ensure loading completes
     const loadingFallback = setTimeout(() => {
       if (isSceneLoadingInternal) {
-        // console.log('Loading fallback triggered - forcing scene to show');
         setIsSceneLoading(false);
       }
     }, 8000); // 8 seconds fallback to match home
@@ -928,7 +923,6 @@ const PalmsScene = ({ onLoadingChange }) => {
       }
       
       const attemptLoad = () => {
-        // console.log(`[PalmTreeDrive] Loading ${modelName} (attempt ${retryCount[attemptKey] + 1}/${maxRetries + 1})`);
         
         loader.load(
           path,
@@ -939,7 +933,6 @@ const PalmsScene = ({ onLoadingChange }) => {
             // console.error(`[PalmTreeDrive] Error loading ${modelName} (attempt ${retryCount[attemptKey]}):`, error);
             
             if (retryCount[attemptKey] <= maxRetries) {
-              // console.log(`[PalmTreeDrive] Retrying ${modelName} in ${retryDelay}ms...`);
               setTimeout(attemptLoad, retryDelay);
             } else {
               // console.error(`[PalmTreeDrive] Failed to load ${modelName} after ${maxRetries} retries`);
@@ -964,7 +957,6 @@ const PalmsScene = ({ onLoadingChange }) => {
       const palmModel = gltf.scene;
       
       // Mark palm model as loaded
-      // console.log('[PalmTreeDrive] Palm model loaded');
       setModelsLoadState(prev => ({ ...prev, palm: 'loaded' }));
       
 
@@ -978,7 +970,6 @@ const PalmsScene = ({ onLoadingChange }) => {
         }
       });
       
-      // console.log('Total meshes found:', allMeshes.length);
       
       // Use the first mesh or try to use the whole scene
       let palmMesh = allMeshes[0];
@@ -1029,7 +1020,6 @@ const PalmsScene = ({ onLoadingChange }) => {
       const targetHeight = 14; // Desired height for palm trees
       const scaleFactor = targetHeight / maxDimension;
       
-      // console.log('Scale factor:', scaleFactor);
       
       for (let i = 0; i < instanceCount; i++) {
         const x = palmPositions[i * 3];
@@ -1092,7 +1082,6 @@ const PalmsScene = ({ onLoadingChange }) => {
       scene.add(palms);
     }, 
     (progress) => {
-      // console.log('Loading palm tree:', (progress.loaded / progress.total * 100) + '%');
     },
     (error) => {
       console.error('[CRITICAL] Palm tree model failed after all retries:', error);
@@ -1105,7 +1094,6 @@ const PalmsScene = ({ onLoadingChange }) => {
       const signModel = gltf.scene;
       
       // Mark sign model as loaded
-      // console.log('[PalmTreeDrive] Sign model loaded');
       setModelsLoadState(prev => ({ ...prev, sign: 'loaded' }));
       
       // Find the first mesh in the sign model
@@ -1207,7 +1195,6 @@ const PalmsScene = ({ onLoadingChange }) => {
       scene.add(signs);
     },
     (progress) => {
-      // console.log('Loading road sign:', (progress.loaded / progress.total * 100) + '%');
     },
     (error) => {
       console.error('[CRITICAL] Road sign model failed after all retries:', error);
@@ -1220,7 +1207,6 @@ const PalmsScene = ({ onLoadingChange }) => {
       const sun = gltf.scene;
       
       // Mark sun model as loaded
-      // console.log('[PalmTreeDrive] Sun model loaded');
       setModelsLoadState(prev => ({ ...prev, sun: 'loaded' }));
       
       // Position and scale the sun
@@ -1240,7 +1226,6 @@ const PalmsScene = ({ onLoadingChange }) => {
       scene.add(sun);
     }, 
     (progress) => {
-      // console.log('Loading sun:', (progress.loaded / progress.total * 100) + '%');
     },
     (error) => {
       console.error('[CRITICAL] Sun model failed after all retries:', error);
@@ -1267,7 +1252,6 @@ const PalmsScene = ({ onLoadingChange }) => {
             lowerName.includes('brake') ||
             lowerName.includes('suspension') ||
             lowerName.includes('axle')) {
-          // console.log('Found car part:', child.name);
           carParts.push(child);
           // Ensure car parts are visible
           child.visible = true;
@@ -1275,7 +1259,6 @@ const PalmsScene = ({ onLoadingChange }) => {
         
         // Look for Mary specifically and ensure she's visible
         if (child.name.toLowerCase().includes('mary')) {
-          // console.log('Found Mary object:', child);
           // Make sure Mary is visible
           child.visible = true;
           // If it's a mesh, ensure material is properly set
@@ -1297,9 +1280,7 @@ const PalmsScene = ({ onLoadingChange }) => {
       });
       
       if (unknownObjects.length > 0) {
-        // console.log('Unknown objects that were kept visible:');
         unknownObjects.forEach(obj => {
-          // console.log(`- ${obj.name} at position (${obj.position.x.toFixed(2)}, ${obj.position.y.toFixed(2)}, ${obj.position.z.toFixed(2)})`);
         });
       }
       
@@ -1313,10 +1294,7 @@ const PalmsScene = ({ onLoadingChange }) => {
       const animationMixers = [];
       
       if (gltf.animations && gltf.animations.length > 0) {
-        // console.log('Found animations:', gltf.animations.map(a => a.name));
-        // console.log('Animation details:');
         gltf.animations.forEach(anim => {
-          // console.log(`- ${anim.name}: duration=${anim.duration}s, tracks=${anim.tracks.length}`);
         });
         
         // Create mixer for the scene
@@ -1325,13 +1303,11 @@ const PalmsScene = ({ onLoadingChange }) => {
         // Play ALL animations on a loop
         const actions = [];
         gltf.animations.forEach((clip, index) => {
-          // console.log(`Setting up animation ${index}: ${clip.name}`);
           
           // Handle Armature/Mixamo character animations
           if (clip.name.toLowerCase().includes('armature') && 
               !clip.name.toLowerCase().includes('wheel') &&
               clip.name !== 'ArmatureAction.001') { // Don't skip UFO animation
-            // console.log(`Setting character to rest pose: ${clip.name}`);
             const action = mixer.clipAction(clip);
             action.play();
             action.paused = true; // Play but immediately pause to hold the first frame
@@ -1344,7 +1320,6 @@ const PalmsScene = ({ onLoadingChange }) => {
           
           // Check if this is the halo animation
           if (clip.name.toLowerCase().includes('halorotation.001')) {
-            // console.log(`Playing halo animation: ${clip.name}`);
             action.loop = THREE.LoopRepeat;
             action.play();
             actions.push(action);
@@ -1361,19 +1336,16 @@ const PalmsScene = ({ onLoadingChange }) => {
             // Adjust speed as needed (1.0 = normal speed, negative = reverse)
             action.timeScale = -9.0; // Increased from -3.0 to match the tripled speed
             action.play();
-            // console.log(`Playing wheel animation: ${clip.name}, duration: ${clip.duration}s, frames: ~${Math.round(clip.duration * 30)}, speed: -9x (reversed)`);
           } else if (clip.name === 'ArmatureAction.001') {
             // UFO animation - handle separately for scroll-based trigger
             action.clampWhenFinished = true;
             action.loop = THREE.LoopOnce;
             action.setEffectiveWeight(1);
 
-            // console.log('UFO animation ready:', clip.name);
           } else {
             // Play any other animations on loop
             action.loop = THREE.LoopRepeat;
             action.play();
-            // console.log(`Playing animation on loop: ${clip.name}`);
           }
           
           actions.push(action);
@@ -1410,7 +1382,6 @@ const PalmsScene = ({ onLoadingChange }) => {
       // Keep original car materials and add emissive to halo
       carScene.traverse((child) => {
         if (child.isMesh) {
-          // console.log('Processing mesh:', child.name); // Debug log
           child.castShadow = true;
           child.receiveShadow = true;
           
@@ -1420,7 +1391,6 @@ const PalmsScene = ({ onLoadingChange }) => {
           
           // Add video texture to Display mesh
           if (child.name === 'Display') { // Exact match
-            // console.log('Found Display mesh, applying video texture'); 
             child.material = new THREE.MeshBasicMaterial({
               map: videoTexture,
               transparent: true,
@@ -1503,7 +1473,6 @@ const PalmsScene = ({ onLoadingChange }) => {
     }, 
     // Progress callback (optional)
     (progress) => {
-      // console.log('Loading car:', (progress.loaded / progress.total * 100) + '%');
     },
     // Error callback (only called after all retries fail)
     (error) => {
@@ -1553,7 +1522,6 @@ const PalmsScene = ({ onLoadingChange }) => {
 
       
       if (!cameraRef.current || !controlsRef.current) {
-        console.log('Camera or controls not ready, retrying...');
         setTimeout(setupScrollAnimation, 500);
         return;
       }
@@ -1827,7 +1795,6 @@ const PalmsScene = ({ onLoadingChange }) => {
             
             // Manually set timeline progress to match scroll (debugging)
             if (Math.abs(tlProg - self.progress) > 0.01) {
-              // console.log(`[WARNING] Timeline out of sync! Setting timeline progress to ${self.progress}`);
               tl.progress(self.progress);
             }
           }
@@ -1854,7 +1821,6 @@ const PalmsScene = ({ onLoadingChange }) => {
           
           // Show button when we reach final stage on mobile
           if (isMobile && stage === 4 && !window.mobileButtonTriggered) {
-            // console.log('[Mobile] Reached final stage 4, showing button');
             window.mobileButtonTriggered = true;
             setTimeout(() => {
               setShowEnterButton(true);
@@ -1892,8 +1858,6 @@ const PalmsScene = ({ onLoadingChange }) => {
       // Log the first few timeline tweens to verify they exist
       const children = tl.getChildren();
       if (children.length > 0) {
-        // console.log('First tween targets:', children[0].targets());
-        // console.log('First tween vars:', children[0].vars);
       }
       
       // Force timeline to start at beginning
@@ -2513,7 +2477,7 @@ const PalmsScene = ({ onLoadingChange }) => {
             gap: '1.5rem',
             justifyContent: 'center',
             alignItems: 'center',
-            marginTop: '50%',
+            marginTop: '70%',
           }}>
             <button
               onClick={(e) => {

@@ -355,12 +355,10 @@ function MobileCandleOrbital({ candleData = [], onCandleClick, onPaginationChang
     // Check global cache first to prevent duplicate extractions across remounts
     const modelId = 'tinyJapCanOnly';
     if (globalCandleCache.modelId === modelId && globalCandleCache.candles) {
-      console.log('[MobileCandleOrbital] Using cached candles from global cache');
       setVcandleObjects(globalCandleCache.candles);
       return;
     }
 
-    console.log('[MobileCandleOrbital] Extracting candles from tinyJapCanOnly.glb...');
     const extractedCandles = [];
 
     // Clone the entire model as our base candle
@@ -387,7 +385,6 @@ function MobileCandleOrbital({ candleData = [], onCandleClick, onPaginationChang
     }
 
     // Debug: Log details about extracted candles
-    console.log(`[MobileCandleOrbital] Created ${extractedCandles.length} candle instances`);
 
     // Cache the extracted candles globally
     globalCandleCache.modelId = modelId;

@@ -21,13 +21,7 @@ import { WatchlistPhoneTexture } from './WatchlistPhoneTexture'
 
 
 export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView, offerings, hoveredOffering, justLitOffering, onJustLitComplete, userRotation = 0, priceChange = 0, hasActiveClick = false, is80sMode = false, onPhoneClick, user = null, showLatestPolaroid = false, isHighlighting = false }) {
-  // Debug: Log all props on mount
-  // useEffect(() => {
-  //   if (onPhoneClick) {
-  //     // console.log('onPhoneClick function:', onPhoneClick.toString());
-  //   }
-  // }, [onPhoneClick]);
-  
+
   // Get mobile state from parent or detect it locally
   const [isMobileLocal, setIsMobileLocal] = useState(false)
   useEffect(() => {
@@ -104,7 +98,6 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       // Look for PhoneScreen mesh
       if (child.name === 'PhoneScreen' || child.name === 'phonescreen' || child.name === 'phone_screen' ||
           child.name === 'Phone_Screen' || child.name.toLowerCase().includes('phonescreen')) {
-        console.log('Found PhoneScreen:', child.name, 'material:', child.material?.type)
         phoneScreenRef.current = child
         // Ensure the mesh can be raycasted
         if (child.isMesh) {
@@ -119,7 +112,6 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
           child.material.alphaTest = 0  // No alpha testing
           child.material.needsUpdate = true
           child.renderOrder = 5  // Render BEFORE flames (10) so flames can depth-test against phone
-          console.log('PhoneScreen renderOrder set to:', child.renderOrder)
         }
         // Add click handler for focus mode with watchlist check
         child.userData.onClick = (event) => {
@@ -134,10 +126,8 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
           
           // No watchlist interaction, proceed with focus mode
           if (onPhoneClick) {
-            // console.log('Calling onPhoneClick')
             onPhoneClick()
           } else {
-            console.log('onPhoneClick not defined!')
           }
         }
         child.userData.clickable = true
@@ -145,7 +135,6 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       
       // Look for phoneCase mesh for light ray positioning
       if (child.name === 'phoneCase' || child.name === 'PhoneCase' || child.name === 'phone_case') {
-        console.log('Found phoneCase:', child.name, 'material:', child.material?.type)
         phoneCaseRef.current = child
         // Mark that this mesh will have light rays attached
         child.userData.hasLightRays = true
@@ -160,7 +149,6 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
           child.material.alphaTest = 0
           child.material.needsUpdate = true
           child.renderOrder = 5  // Render BEFORE flames so flames can depth-test against phone
-          console.log('phoneCase renderOrder set to:', child.renderOrder)
         }
       }
       
@@ -191,7 +179,6 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
           child.material.transparent = true
           child.material.needsUpdate = true
           child.renderOrder = 999  // Render last, on top of everything
-          console.log('Backdrop material configured:', child.material)
         }
       }
       
@@ -241,7 +228,6 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
     const handleKeyPress = (e) => {
       if (phoneSwipeHandlers.current) {
         if (e.key === 'ArrowUp') {
-          console.log('Arrow Up - previous offering');
           // Only start browsing once, not on every key press
           if (!isBrowsing.current) {
             phoneSwipeHandlers.current.startBrowsing();
@@ -249,7 +235,6 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
           }
           phoneSwipeHandlers.current.swipeUp();
         } else if (e.key === 'ArrowDown') {
-          console.log('Arrow Down - next offering');
           // Only start browsing once, not on every key press
           if (!isBrowsing.current) {
             phoneSwipeHandlers.current.startBrowsing();
@@ -257,7 +242,6 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
           }
           phoneSwipeHandlers.current.swipeDown();
         } else if (e.key === 'Escape') {
-          console.log('Escape - stop browsing');
           phoneSwipeHandlers.current.stopBrowsing();
           isBrowsing.current = false;
         }
@@ -758,10 +742,8 @@ useEffect(() => {
     // Force browser garbage collection if available
     if (window.gc) {
       window.gc()
-      // console.log('Forced garbage collection')
     }
     
-    // console.log('HandsGLTFScene cleanup complete')
   }
 }, [disposeTexture, disposeMaterial])
 
@@ -777,9 +759,6 @@ const phoneWorldTransform = useMemo(() => {
     phoneRefLocal.getWorldPosition(worldPos)
     phoneRefLocal.getWorldQuaternion(worldQuat)
     phoneRefLocal.getWorldScale(worldScale)
-    // console.log('📱 Phone position from:', phoneCaseRef.current ? 'phoneCase' : 'phoneScreen')
-    // console.log('📱 Phone world position:', worldPos)
-    // console.log('📱 Offerings available:', offerings?.length || 0)
     
     return { position: worldPos, quaternion: worldQuat, scale: worldScale }
   }
@@ -788,7 +767,6 @@ const phoneWorldTransform = useMemo(() => {
 
 // Create local click handler for phone
 const handlePhoneClick = useCallback(() => {
-  console.log('handlePhoneClick called, onPhoneClick:', typeof onPhoneClick);
   if (onPhoneClick && typeof onPhoneClick === 'function') {
     onPhoneClick();
   } else {
@@ -853,10 +831,8 @@ return (
           // Touch swipe threshold
           if (Math.abs(deltaY) > 20) { // Higher threshold for touch
             if (deltaY < 0) { // Swipe up = next
-              console.log('Touch swipe up - next offering');
               phoneSwipeHandlers.current.swipeDown();
             } else { // Swipe down = previous
-              console.log('Touch swipe down - previous offering');
               phoneSwipeHandlers.current.swipeUp();
             }
             swipeStartY.current = e.clientY;
@@ -872,7 +848,6 @@ return (
         // For mouse/non-touch, any click toggles focus mode
         // For touch, only tap (no movement) toggles focus mode
         if (wasDragging && (e.pointerType !== 'touch' || deltaY < 10)) {
-          console.log('Phone tapped - toggling focus mode');
           handlePhoneClick();
         }
       }}
@@ -983,7 +958,6 @@ export function CameraController({ focusMode, controlsRef }) {
       targetLookAt.current.set(0, 0.0, 0) // Look slightly up at phone
       targetFOV.current = 30 // Narrow FOV for dramatic zoom effect
       if (!hasLoggedRef.current) {
-        console.log('Entering focus mode - zooming to phone')
         hasLoggedRef.current = true
       }
     } else {
@@ -1038,10 +1012,7 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        // console.log('Intersection Observer triggered:', {
-        //   isIntersecting: entry.isIntersecting,
-        //   intersectionRatio: entry.intersectionRatio
-        // })
+
         
         setIsInView(entry.isIntersecting)
         

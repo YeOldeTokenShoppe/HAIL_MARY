@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ConnectButton } from "thirdweb/react";
 import { darkTheme } from "thirdweb/react";
 import { client } from '@/lib/contract';
@@ -53,6 +53,7 @@ const mobileWallets = [
 export function WalletConnectionModal({ onClose }) {
   const { isTestUser, switchToTestWallet } = useWalletAuth();
   const [isMobile, setIsMobile] = useState(false);
+  const connectButtonRef = useRef(null);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -63,73 +64,89 @@ export function WalletConnectionModal({ onClose }) {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: 'rgba(0, 0, 0, 0.8)',
-        backdropFilter: 'blur(10px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000000,
-      }}
-      onClick={onClose}
-    >
+  // Auto-click the connect button to open Thirdweb's modal directly (for non-test users)
+  useEffect(() => {
+    if (!isTestUser && connectButtonRef.current) {
+      // Small delay to ensure button is mounted
+      const timer = setTimeout(() => {
+        const button = connectButtonRef.current?.querySelector('button');
+        if (button) {
+          button.click();
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isTestUser]);
+
+  // For test users, show the test wallet option
+  if (isTestUser) {
+    return (
       <div
+        data-wallet-connection-modal="true"
         style={{
-          background: 'rgba(20, 20, 30, 0.95)',
-          border: '1px solid rgba(138, 43, 226, 0.2)',
-          borderRadius: '12px',
-          padding: '20px',
-          maxWidth: '400px',
-          width: '90%',
-          position: 'relative',
-          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000000,
         }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={onClose}
       >
-        {/* Close button */}
-        <button
+        <div
           style={{
-            position: 'absolute',
-            top: '12px',
-            right: '12px',
-            background: 'transparent',
-            color: 'rgba(255, 255, 255, 0.6)',
-            width: '24px',
-            height: '24px',
-            borderRadius: '4px',
-            border: 'none',
-            fontSize: '18px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'color 0.2s',
+            background: 'rgba(20, 20, 30, 0.95)',
+            border: '1px solid rgba(138, 43, 226, 0.2)',
+            borderRadius: '12px',
+            padding: '20px',
+            maxWidth: '400px',
+            width: '90%',
+            position: 'relative',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
           }}
-          onMouseEnter={(e) => e.currentTarget.style.color = '#fff'}
-          onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)'}
-          onClick={onClose}
-        >×</button>
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Close button */}
+          <button
+            style={{
+              position: 'absolute',
+              top: '12px',
+              right: '12px',
+              background: 'transparent',
+              color: 'rgba(255, 255, 255, 0.6)',
+              width: '24px',
+              height: '24px',
+              borderRadius: '4px',
+              border: 'none',
+              fontSize: '18px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'color 0.2s',
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = '#fff'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)'}
+            onClick={onClose}
+          >×</button>
 
-        <h2 style={{
-          color: '#fff',
-          fontSize: '18px',
-          fontWeight: '600',
-          textAlign: 'center',
-          marginBottom: '20px',
-          fontFamily: "'Orbitron', monospace",
-          letterSpacing: '1px',
-          textShadow: '0 0 10px rgba(0, 245, 212, 0.3)',
-        }}>Connect Wallet</h2>
+          <h2 style={{
+            color: '#fff',
+            fontSize: '18px',
+            fontWeight: '600',
+            textAlign: 'center',
+            marginBottom: '20px',
+            fontFamily: "'Orbitron', monospace",
+            letterSpacing: '1px',
+            textShadow: '0 0 10px rgba(0, 245, 212, 0.3)',
+          }}>Connect Wallet</h2>
 
-        {/* Test Wallet Option (if available) */}
-        {isTestUser && (
+          {/* Test Wallet Option */}
           <button
             style={{
               background: 'rgba(255, 215, 0, 0.1)',
@@ -178,10 +195,8 @@ export function WalletConnectionModal({ onClose }) {
               RECOMMENDED
             </span>
           </button>
-        )}
 
-        {/* Divider */}
-        {isTestUser && (
+          {/* Divider */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -193,49 +208,68 @@ export function WalletConnectionModal({ onClose }) {
             <span style={{ padding: '0 12px' }}>OR</span>
             <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.1)' }} />
           </div>
-        )}
 
-        {/* Mobile tip for connecting external wallets */}
-        {isMobile && (
-          <div style={{
-            background: 'rgba(0, 245, 212, 0.05)',
-            border: '1px solid rgba(0, 245, 212, 0.15)',
-            borderRadius: '8px',
-            padding: '10px 12px',
-            marginBottom: '16px',
-            fontSize: '12px',
-            color: 'rgba(255, 255, 255, 0.7)',
-            lineHeight: '1.4',
-          }}>
-            <span style={{ color: '#00f5d4', fontWeight: '600' }}>Tip:</span> To connect MetaMask or another wallet app, select <span style={{ color: '#00f5d4' }}>WalletConnect</span> below.
+          {/* Thirdweb Connect Button */}
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <ConnectButton
+              client={client}
+              chain={chain}
+              wallets={isMobile ? mobileWallets : desktopWallets}
+              theme={customTheme}
+              connectModal={{
+                size: "compact",
+                showThirdwebBranding: false,
+                titleIcon: "",
+                title: "Choose Wallet",
+              }}
+              detailsModal={{
+                showThirdwebBranding: false,
+              }}
+              onConnect={() => {
+                onClose();
+              }}
+            />
           </div>
-        )}
-
-        {/* Thirdweb Connect Button with wallet options (order varies by device) */}
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <ConnectButton
-            client={client}
-            chain={chain}
-            wallets={isMobile ? mobileWallets : desktopWallets}
-            theme={customTheme}
-            connectModal={{
-              size: "compact",
-              showThirdwebBranding: false,
-              titleIcon: "",
-              title: isMobile ? "Connect Wallet" : "Choose Wallet",
-            }}
-            detailsModal={{
-              showThirdwebBranding: false,
-            }}
-            onConnect={() => {
-              // Close the modal when wallet connects
-              onClose();
-            }}
-          />
+          <WalletModalStyles />
         </div>
-        <WalletModalStyles />
       </div>
-    </div>
+    );
+  }
+
+  // For non-test users, render hidden ConnectButton that auto-clicks
+  return (
+    <>
+      <div
+        ref={connectButtonRef}
+        style={{
+          position: 'fixed',
+          top: '-9999px',
+          left: '-9999px',
+          opacity: 0,
+          pointerEvents: 'none',
+        }}
+      >
+        <ConnectButton
+          client={client}
+          chain={chain}
+          wallets={isMobile ? mobileWallets : desktopWallets}
+          theme={customTheme}
+          connectModal={{
+            size: "compact",
+            showThirdwebBranding: false,
+            titleIcon: "",
+            title: "Connect Wallet",
+          }}
+          detailsModal={{
+            showThirdwebBranding: false,
+          }}
+          onConnect={() => {
+            onClose();
+          }}
+        />
+      </div>
+      <WalletModalStyles />
+    </>
   );
 }
 
@@ -259,6 +293,22 @@ export const WalletModalStyles = () => (
     /* Add Orbitron font to all Thirdweb components */
     [role="dialog"] {
       font-family: 'Orbitron', monospace !important;
+    }
+
+    /* Ensure Thirdweb's modal appears ABOVE our custom WalletConnectionModal */
+    /* Thirdweb uses these selectors for their modal */
+    [data-rk],
+    [data-tw-modal],
+    .tw-modal,
+    .thirdweb-modal,
+    div[role="dialog"][aria-modal="true"] {
+      z-index: 2000000 !important;
+    }
+
+    /* Thirdweb modal backdrop */
+    [data-tw-modal-backdrop],
+    .tw-modal-backdrop {
+      z-index: 1999999 !important;
     }
   `}</style>
 );

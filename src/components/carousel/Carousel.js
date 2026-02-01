@@ -875,7 +875,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           <div style={{
             ...(isMobilePhone ? {
               position: 'absolute',
-              bottom: '10%',
+              bottom: '5%',
               left: 0,
               right: 0,
             } : {}),

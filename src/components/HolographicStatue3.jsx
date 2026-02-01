@@ -332,7 +332,7 @@ function HolographicStatue3({
         const action = mixer.clipAction(haloAnimation);
         action.play();
       } else {
-        console.warn("HaloRotation animation not found in the model");
+        // console.warn("HaloRotation animation not found in the model");
       }
 
       // Create an anchor group with initial position
@@ -386,10 +386,7 @@ function HolographicStatue3({
       // Find and store reference to HaloMaster object
       statue.traverse((child) => {
         if (child.name === 'HaloMaster' || child.name.toLowerCase() === 'halomaster') {
-          console.log("Found HaloMaster object:", child.name);
-          console.log("HaloMaster position:", child.position);
-          console.log("HaloMaster rotation:", child.rotation);
-          console.log("HaloMaster children count:", child.children.length);
+
           
           // Store direct reference to the HaloMaster object
           // We'll just rotate it as-is and let it rotate around its pivot
@@ -398,7 +395,7 @@ function HolographicStatue3({
           // Log children names for debugging
           child.traverse((subChild) => {
             if (subChild !== child) {
-              console.log("HaloMaster child found:", subChild.name, "type:", subChild.type);
+              // console.log("HaloMaster child found:", subChild.name, "type:", subChild.type);
             }
           });
         }
@@ -406,7 +403,7 @@ function HolographicStatue3({
       
       statue.traverse((child) => {
         if (child.isMesh) {
-          console.log("Mesh name:", child.name); // Enable debug logging
+          // console.log("Mesh name:", child.name); // Enable debug logging
           const meshName = child.name.toLowerCase();
       
           if (

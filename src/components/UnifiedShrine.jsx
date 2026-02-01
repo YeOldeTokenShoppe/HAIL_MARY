@@ -1227,43 +1227,35 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   useEffect(() => {
     const interval = setInterval(async () => {
       const now = Date.now()
-      console.log('🧹 Running candle cleanup check...')
       
       // Find expired offerings
       const expiredOfferings = offerings.filter(offering => {
         const litAtTime = offering.litAt || offering.createdAt?.toDate?.()?.getTime?.() || offering.timestamp?.toDate?.()?.getTime?.()
         
-        console.log(`🔍 Offering ${offering.id}: litAt=${offering.litAt}, litAtTime=${litAtTime}, now=${now}`)
         
         if (!litAtTime) {
-          console.log(`❌ No litAtTime found for offering ${offering.id}`)
           return false
         }
         
         const elapsed = (now - litAtTime) / 1000
         const isExpired = elapsed >= 299 // Remove at 99.7% melted (just before 5 minutes) - TESTING
         
-        console.log(`📏 Offering ${offering.id}: elapsed=${elapsed.toFixed(1)}s, isExpired=${isExpired}`)
         
         if (isExpired) {
-          console.log(`⏰ Found expired candle: ${offering.id}, elapsed: ${elapsed.toFixed(1)}s`)
         }
         
         return isExpired
       })
       
-      console.log(`📊 Checked ${offerings.length} offerings, found ${expiredOfferings.length} expired`)
       
       // Remove expired offerings from Firestore
       if (expiredOfferings.length > 0) {
-        console.log(`🗑️ Removing ${expiredOfferings.length} expired candles`)
         
         for (const offering of expiredOfferings) {
           try {
             // Import deleteDoc and doc from firebaseClient
             const { deleteDoc, doc, db } = await import('@/lib/firebaseClient')
             await deleteDoc(doc(db, 'offerings', offering.id))
-            console.log(`✅ Removed expired candle: ${offering.id}`)
           } catch (error) {
             console.error(`❌ Failed to remove expired candle ${offering.id}:`, error)
           }
@@ -1693,12 +1685,10 @@ useEffect(() => {
   
   // Mount immediately on client-side - no delay that could be interrupted
   useEffect(() => {
-    console.log('[UnifiedShrine] Component effect running, setting mounted = true')
     
     // Small delay to ensure parent is fully ready and GLTF is preloaded
     const timer = setTimeout(() => {
       setMounted(true)
-      console.log('[UnifiedShrine] mounted state set to true')
     }, 200) // Small delay to let parent preloading complete
     
     // Generate random initial values only on client side
