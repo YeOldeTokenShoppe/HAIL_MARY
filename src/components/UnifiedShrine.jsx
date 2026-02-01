@@ -2777,8 +2777,8 @@ useEffect(() => {
         </div>
       )}
       
-      {/* Container for Stats Box and Find My Candle button on mobile */}
-      {!targetCameraPosition && (
+      {/* Container for Stats Box and Find My Candle button on mobile - rendered via portal to escape stacking context */}
+      {!targetCameraPosition && typeof document !== 'undefined' && createPortal(
         <div style={{
           position: 'fixed',
           top: isMobile ? '9rem' : '160px',
@@ -3380,9 +3380,10 @@ useEffect(() => {
             🔍 <span>FIND MY CANDLE</span>
           </button>
         )}
-        </div>
+        </div>,
+        document.body
       )}
-      
+
       {/* Removed tooltip - will be added as Html in 3D space */}
 
       {/* Help Overlay with Annotations */}

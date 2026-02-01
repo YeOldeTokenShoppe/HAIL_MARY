@@ -732,7 +732,7 @@ function usePositions(count, exclusionZone = null) {
 }
 
 // Replicate shader wobble calculation on CPU for raycasting accuracy
-function calculateWobbleOffset(instanceId, time) {
+function calculateWobbleOffset(instanceId, time, basePosition = null) {
   // Hash function matching shader
   const hash = (n) => {
     const x = Math.sin(n) * 43758.5453123
@@ -767,6 +767,55 @@ function calculateWobbleOffset(instanceId, time) {
   offsetX += Math.sin(t * microSpeed + phaseX) * 0.05
   offsetY += Math.cos(t * microSpeed * 0.9 + phaseY) * 0.08
 
+  // Add pulse effect when a new candle lands (matching shader logic)
+  if (basePosition && sharedUniforms.uPulseTime.value > 0) {
+    const pulseAge = time - sharedUniforms.uPulseTime.value
+    if (pulseAge > 0 && pulseAge < 1.5) { // Pulse lasts 1.5 seconds
+      const pulsePos = sharedUniforms.uPulsePosition.value
+
+      // Calculate distance from pulse origin
+      const dx = basePosition.x - pulsePos.x
+      const dy = basePosition.y - pulsePos.y
+      const dz = basePosition.z - pulsePos.z
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz)
+
+      // Wave travels outward at speed of 15 units per second
+      const waveRadius = pulseAge * 15.0
+      const waveWidth = 5.0
+
+      // Check if this candle is within the wave
+      const waveDist = Math.abs(dist - waveRadius)
+      if (waveDist < waveWidth) {
+        // Smooth wave profile
+        let waveStrength = 1.0 - (waveDist / waveWidth)
+        waveStrength *= 1.0 - (pulseAge / 1.5) // Fade out over time
+
+        // Push candles outward from pulse center
+        let pushDirX = dist > 0.001 ? dx / dist : 1
+        let pushDirY = dist > 0.001 ? dy / dist : 0
+        let pushDirZ = dist > 0.001 ? dz / dist : 0
+
+        // Randomize the push slightly per candle
+        pushDirX += (hash(instanceId + 500.0) - 0.5) * 0.3
+        pushDirY += Math.abs(hash(instanceId + 600.0) - 0.5) * 0.5 // Bias upward
+        pushDirZ += (hash(instanceId + 700.0) - 0.5) * 0.3
+
+        // Normalize
+        const pushLen = Math.sqrt(pushDirX * pushDirX + pushDirY * pushDirY + pushDirZ * pushDirZ)
+        if (pushLen > 0.001) {
+          pushDirX /= pushLen
+          pushDirY /= pushLen
+          pushDirZ /= pushLen
+        }
+
+        // Apply the pulse displacement
+        offsetX += pushDirX * waveStrength * 1.5
+        offsetY += pushDirY * waveStrength * 1.5
+        offsetZ += pushDirZ * waveStrength * 1.5
+      }
+    }
+  }
+
   return { x: offsetX, y: offsetY, z: offsetZ }
 }
 
@@ -793,7 +842,9 @@ function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.9
       const instanceScale = pos.scale || scale
 
       // Calculate wobble offset (matching shader calculation)
-      const wobble = calculateWobbleOffset(i, time)
+      // Pass base position for pulse/ripple effect
+      const basePos = { x: pos.x, y: pos.y, z: pos.z }
+      const wobble = calculateWobbleOffset(i, time, basePos)
 
       // Apply wobble to base position
       tempPosition.set(
@@ -1120,6 +1171,13 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onPrice
   const pricePercent = (priceDirection * 5).toFixed(2)
   const effectManagerRef = useRef()
   const [clickedCandleId, setClickedCandleId] = useState(null)
+
+  // Trigger ripple/pulse effect when a new candle lands
+  const triggerCandlePulse = useCallback((position) => {
+    // Set pulse uniforms to trigger the ripple effect
+    sharedUniforms.uPulseTime.value = sharedUniforms.uTime.value
+    sharedUniforms.uPulsePosition.value.set(position[0], position[1], position[2])
+  }, [])
   
   // Cleanup expired candles every minute
   useEffect(() => {
@@ -1343,6 +1401,7 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onPrice
           phonePosition={[0, -3, 5]}
           cloudBounds={{ x: 20, y: 10, z: 10 }}
           onNewCandle={handleNewCandle}
+          onCandlePulse={triggerCandlePulse}
           candleModelPath="/models/tinyJapCanOnly.glb"
         />
         

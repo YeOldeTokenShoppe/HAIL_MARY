@@ -1560,11 +1560,11 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
           }}>
             {/* Yellow Guidance Box */}
             <div style={{
-              background: 'rgba(255, 193, 7, 0.95)',
+              // background: 'rgba(255, 193, 7, 0.95)',
               borderRadius: '12px',
               padding: '1rem',
               marginBottom: '1.5rem',
-              boxShadow: '0 4px 20px rgba(255, 193, 7, 0.3)'
+              // boxShadow: '0 4px 20px rgba(255, 193, 7, 0.3)'
             }}>
               <div style={{
                 fontSize: '1.5rem',
@@ -1573,7 +1573,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
 
               </div>
               <div style={{
-                color: '#000',
+                color: 'rgba(255, 193, 7, 0.95)',
                 fontSize: '0.95rem',
                 fontWeight: '600'
               }}>

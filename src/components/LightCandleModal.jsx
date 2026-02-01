@@ -224,6 +224,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
   const [showWalletLoading, setShowWalletLoading] = useState(false); // Show wallet loading indicator
   const [pendingBurnAmount, setPendingBurnAmount] = useState(0); // Store amount for confirmation
   const [validationError, setValidationError] = useState(''); // Store validation errors
+  const [highlightAmountField, setHighlightAmountField] = useState(false); // Highlight empty amount field
   const lastTransactionRef = useRef(0); // For rate limiting
 
   // Safe error display function - moved to top with other hooks
@@ -302,6 +303,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
       setShowWalletLoading(false); // Reset wallet loading
       setPendingBurnAmount(0); // Reset pending amount
       setSelectedPrayer(''); // Reset selected prayer template
+      setHighlightAmountField(false); // Reset field highlight
       // Check token balance immediately when modal opens
       // tokenBalance is a string from the provider, so convert to number
       const balance = parseInt(tokenBalance) || 0;
@@ -756,6 +758,23 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           outline: none;
           border-color: #8b5cf6;
           background: rgba(139, 92, 246, 0.05);
+        }
+
+        .token-input.highlight-error {
+          border-color: #ff6b6b !important;
+          background: rgba(255, 107, 107, 0.1) !important;
+          animation: shake 0.5s ease-in-out, pulse-error 1.5s ease-in-out infinite;
+        }
+
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+          20%, 40%, 60%, 80% { transform: translateX(4px); }
+        }
+
+        @keyframes pulse-error {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.4); }
+          50% { box-shadow: 0 0 0 4px rgba(255, 107, 107, 0.2); }
         }
 
         .token-balance {
@@ -1387,11 +1406,16 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                       id="tokens"
                       type="text"
                       inputMode="numeric"
-                      className="token-input"
+                      className={`token-input ${highlightAmountField ? 'highlight-error' : ''}`}
                       value={tokenAmount ? parseInt(tokenAmount).toLocaleString() : ''}
                       onChange={(e) => {
                         const rawValue = e.target.value.replace(/[^0-9]/g, '');
                         setTokenAmount(rawValue);
+                        // Clear highlight when user starts typing
+                        if (highlightAmountField) {
+                          setHighlightAmountField(false);
+                          setValidationError('');
+                        }
                       }}
                       placeholder="1 RL80 minimum"
                       required
@@ -1449,12 +1473,20 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                   type="button"
                   className="submit-button"
                   onClick={async () => {
+                    // Check if amount is empty or invalid first
+                    if (!tokenAmount || parseInt(tokenAmount) < 1) {
+                      setHighlightAmountField(true);
+                      showError('Please enter the amount of RL80 tokens to burn');
+                      return;
+                    }
+
                     if (!validateCandleForm()) {
                       return;
                     }
 
                     const validation = validateAmount(tokenAmount, parseInt(tokenBalance));
                     if (!validation.isValid) {
+                      setHighlightAmountField(true);
                       showError(validation.error);
                       return;
                     }
@@ -1462,8 +1494,9 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                     setPendingBurnAmount(validation.value);
                     setShowConfirmation(true);
                     setValidationError('');
+                    setHighlightAmountField(false);
                   }}
-                  disabled={isSubmitting || !tokenAmount || parseInt(tokenAmount) < 1}
+                  disabled={isSubmitting}
                   style={{ flex: 1 }}
                 >
                   {isSubmitting ? 'Processing...' : 'Light Candle'}
@@ -1508,11 +1541,11 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           }}>
             {/* Yellow Guidance Box */}
             <div style={{
-              background: 'rgba(255, 193, 7, 0.95)',
+              // background: 'rgba(255, 193, 7, 0.95)',
               borderRadius: '12px',
               padding: '1rem',
               marginBottom: '1.5rem',
-              boxShadow: '0 4px 20px rgba(255, 193, 7, 0.3)'
+              // boxShadow: '0 4px 20px rgba(255, 193, 7, 0.3)'
             }}>
               <div style={{
                 fontSize: '1.5rem',
@@ -1521,7 +1554,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                 
               </div>
               <div style={{
-                color: '#000',
+                color: 'rgba(255, 193, 7, 0.95)',
                 fontSize: '0.95rem',
                 fontWeight: '600'
               }}>
@@ -1636,8 +1669,8 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
             
             {/* Yellow Info Box */}
             <div style={{
-              background: 'rgba(255, 193, 7, 0.15)',
-              border: '1px solid rgba(255, 193, 7, 0.4)',
+              // background: 'rgba(255, 193, 7, 0.15)',
+              // border: '1px solid rgba(255, 193, 7, 0.4)',
               borderRadius: '10px',
               // padding: '1rem',
               marginBottom: '2rem'
