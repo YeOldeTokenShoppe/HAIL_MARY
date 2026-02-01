@@ -51,6 +51,11 @@
   "buttons": {
     "buy": "Comprar"
   },
+  "navControls": {
+    "eighties": "80s",
+    "mode": "MODO",
+    "buy": "COMPRA"
+  },
   "heading": {
     "ourLady": "Nuestra Señora",
     "of": "del",
@@ -214,6 +219,41 @@
       "line10": "en un mercado hecho para quebrarte",
       "line11": "Guarda RL80 en tu billetera como",
       "line12": "un rosario para la prosperidad"
+    }
+  },
+  "crtScreen": {
+    "establishing": "> ESTABLECIENDO CONEXIÓN...",
+    "receiving": "> RECIBIENDO TRANSMISIÓN...",
+    "coreModule": "MÓDULO CENTRAL RL80:",
+    "holdWallet": "> GUARDA RL80 EN TU BILLETERA",
+    "rosary": "> COMO UN ROSARIO PARA LA PROSPERIDAD",
+    "terminalTitle": "TERMINAL RL80 v1.0",
+    "secureConnection": "CONEXIÓN SEGURA",
+    "buyButton": "COMPRAR RL80",
+    "tapToReturn": "> toca en cualquier lugar para volver"
+  },
+  "oldsCoolTunnel": {
+    "images": [
+      { "year": "67 EC", "description": "Rechazando el mercado bajista" },
+      { "year": "380 EC", "description": "Mecenazgo de las artes en la era pre-meme" },
+      { "year": "1100 EC", "description": "Protocolo de staking carpático temprano" },
+      { "year": "1350 EC", "description": "Encuentro temprano con payaso se vuelve feo" },
+      { "year": "1680", "description": "Teoría monetaria para un joven corsario" },
+      { "year": "1790", "description": "Heroína de la Mitología" },
+      { "year": "2010", "description": "Presentada en popular serie de manga" },
+      { "year": "2031", "description": "Creando ritmos DeFi" },
+      { "year": "2077", "description": "Una señal de virtud popular entre autómatas vanguardistas" }
+    ],
+    "ui": {
+      "paused": "PAUSADO",
+      "playing": "REPRODUCIENDO",
+      "tapImageFocus": "Toca una imagen para enfocar",
+      "clickImageFocus": "Haz clic en una imagen para enfocar",
+      "tapToPause": "Toca para pausar",
+      "pressSpacePause": "Pulsa ESPACIO para pausar",
+      "selectImageDetail": "Selecciona imagen para vista detallada",
+      "previous": "Anterior",
+      "next": "Siguiente"
     }
   }
 }

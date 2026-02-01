@@ -51,6 +51,11 @@
   "buttons": {
     "buy": "Eme"
   },
+  "navControls": {
+    "eighties": "LXXX",
+    "mode": "MODUS",
+    "buy": "EME"
+  },
   "heading": {
     "ourLady": "Domina Nostra",
     "of": "",
@@ -215,6 +220,41 @@
       "line10": "in mercatu facto ad te frangendum",
       "line11": "Tene RL80 in sacco tuo ut",
       "line12": "rosarium pro prosperitate"
+    }
+  },
+  "crtScreen": {
+    "establishing": "> CONNEXIO CONSTITUITUR...",
+    "receiving": "> TRANSMISSIO ACCIPITUR...",
+    "coreModule": "MODULUS CENTRALIS RL80:",
+    "holdWallet": "> TENE RL80 IN SACCO TUO",
+    "rosary": "> UT ROSARIUM PRO PROSPERITATE",
+    "terminalTitle": "TERMINALE RL80 v1.0",
+    "secureConnection": "CONNEXIO SECURA",
+    "buyButton": "EME RL80",
+    "tapToReturn": "> tange ubicumque ad redeundum"
+  },
+  "oldsCoolTunnel": {
+    "images": [
+      { "year": "LXVII p.C.n.", "description": "Mercatum ursi repellens" },
+      { "year": "CCCLXXX p.C.n.", "description": "Patronatus artium aetatis ante-memae" },
+      { "year": "MC p.C.n.", "description": "Protocollum primum staking Carpathicum" },
+      { "year": "MCCCL p.C.n.", "description": "Congressus primus cum scurra fit turpis" },
+      { "year": "MDCLXXX", "description": "Theoria monetaria pro iuvene pirata" },
+      { "year": "MDCCXC", "description": "Heroina Mythologiae" },
+      { "year": "MMX", "description": "In serie manga populari apparet" },
+      { "year": "MMXXXI", "description": "Rhythmos DeFi ponens" },
+      { "year": "MMLXXVII", "description": "Signum virtutis populare inter automata avant-garde" }
+    ],
+    "ui": {
+      "paused": "INTERMISSUM",
+      "playing": "LUDENS",
+      "tapImageFocus": "Tange imaginem ad focum",
+      "clickImageFocus": "Preme imaginem ad focum",
+      "tapToPause": "Tange ad intermittendum",
+      "pressSpacePause": "Preme SPATIUM ad intermittendum",
+      "selectImageDetail": "Elige imaginem ad visum accuratum",
+      "previous": "Prior",
+      "next": "Proximus"
     }
   }
 }

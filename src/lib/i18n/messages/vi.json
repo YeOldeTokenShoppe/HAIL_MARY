@@ -51,6 +51,11 @@
   "buttons": {
     "buy": "Mua"
   },
+  "navControls": {
+    "eighties": "80s",
+    "mode": "CHẾ ĐỘ",
+    "buy": "MUA"
+  },
   "heading": {
     "ourLady": "Đức Mẹ",
     "of": "",
@@ -215,6 +220,41 @@
       "line10": "trong thị trường muốn phá bạn",
       "line11": "Giữ RL80 trong ví như",
       "line12": "tràng hạt cho thịnh vượng"
+    }
+  },
+  "crtScreen": {
+    "establishing": "> ĐANG THIẾT LẬP KẾT NỐI...",
+    "receiving": "> ĐANG NHẬN TRUYỀN DẪN...",
+    "coreModule": "MÔ-ĐUN LÕI RL80:",
+    "holdWallet": "> GIỮ RL80 TRONG VÍ",
+    "rosary": "> NHƯ TRÀNG HẠT CHO THỊNH VƯỢNG",
+    "terminalTitle": "THIẾT BỊ ĐẦU CUỐI RL80 v1.0",
+    "secureConnection": "KẾT NỐI AN TOÀN",
+    "buyButton": "MUA RL80",
+    "tapToReturn": "> chạm bất kỳ đâu để quay lại"
+  },
+  "oldsCoolTunnel": {
+    "images": [
+      { "year": "67 SCN", "description": "Đẩy lùi thị trường gấu" },
+      { "year": "380 SCN", "description": "Bảo trợ nghệ thuật thời tiền-meme" },
+      { "year": "1100 SCN", "description": "Giao thức staking Carpathian sơ khai" },
+      { "year": "1350 SCN", "description": "Cuộc gặp gỡ sớm với chú hề trở nên xấu xí" },
+      { "year": "1680", "description": "Lý thuyết tiền tệ cho cướp biển trẻ" },
+      { "year": "1790", "description": "Nữ anh hùng thần thoại" },
+      { "year": "2010", "description": "Xuất hiện trong series manga nổi tiếng" },
+      { "year": "2031", "description": "Đặt nền móng cho DeFi Beats" },
+      { "year": "2077", "description": "Tín hiệu đạo đức phổ biến trong giới automaton tiên phong" }
+    ],
+    "ui": {
+      "paused": "TẠM DỪNG",
+      "playing": "ĐANG PHÁT",
+      "tapImageFocus": "Chạm vào hình ảnh để lấy nét",
+      "clickImageFocus": "Nhấp vào hình ảnh để lấy nét",
+      "tapToPause": "Chạm để tạm dừng",
+      "pressSpacePause": "Nhấn SPACE để tạm dừng",
+      "selectImageDetail": "Chọn hình ảnh để xem chi tiết",
+      "previous": "Trước",
+      "next": "Tiếp"
     }
   }
 }

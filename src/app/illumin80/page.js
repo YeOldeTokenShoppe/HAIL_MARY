@@ -1530,6 +1530,7 @@ useEffect(() => {
           isMobile={isMobileView}
           onHelpClick={() => setShowHelpOverlay(prev => !prev)}
           showHelpActive={showHelpOverlay}
+          hideMusicOnMobile={true}
         />
       </div>
       

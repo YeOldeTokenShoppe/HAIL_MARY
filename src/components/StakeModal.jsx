@@ -328,11 +328,11 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
         ) : showSuccess ? (
           // Success Dashboard with Staking Info
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <button 
+            <button
               onClick={onClose}
               style={{
                 position: 'absolute',
-                top: '15px',
+                top: 'max(env(safe-area-inset-top, 15px), 20px)',
                 right: '15px',
                 background: 'transparent',
                 border: '1px solid rgba(255, 255, 255, 0.3)',
@@ -763,11 +763,11 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
               </h2>
               
               {/* Close button on image */}
-              <button 
+              <button
                 onClick={onClose}
                 style={{
                   position: 'absolute',
-                  top: '10px',
+                  top: 'max(env(safe-area-inset-top, 10px), 20px)',
                   right: '10px',
                   background: 'rgba(0, 0, 0, 0.5)',
                   border: '1px solid rgba(255, 255, 255, 0.3)',

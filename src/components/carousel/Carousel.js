@@ -727,7 +727,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           {/* <div style={{ marginBottom: (isMobilePhone || isTabletPortrait) ? '1.5rem' : '0' }}> */}
             <SkewedHeading
               lines={[t('about.skewedHeading2.line1'), t('about.skewedHeading2.line2'), t('about.skewedHeading2.line3')]}
-              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "3rem" : "2.5rem"}
+              fontSize={isSmallPhone ? "2rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "2.5rem" : "2.5rem"}
               color="#00ff9d"
               skewAngle={0}
               shadowColor="#000"
@@ -884,7 +884,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             alignItems: 'center',
           }}>
           {/* Additional info below portal */}
-          <p style={{
+          {/* <p style={{
             marginTop: '0.5rem',
             marginBottom: '2rem',
             fontFamily: "'Courier New', monospace",
@@ -892,26 +892,43 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             color: '#888',
             textAlign: 'center',
             lineHeight: '1.4',
-          }}>
+          }}> */}
+          <div style={{   transform: 'rotate(-11deg)',
+              display: 'inline-block',
+                  position: 'relative',
+                top: '0.5rem',
+                left: '-10%',
+                marginBottom: '2rem',
+                alignContent: 'center'}}>
             <span style={{
-            color: '#01ff00',
-            textAlign: 'center',
-            animation: 'pulse 2s ease-in-out infinite',
-}}>Tap to enter</span>
-          </p>
+ transform: 'rotate(-25deg)',
+              display: 'inline-block',
+                  position: 'relative',
+                top: '-0.5rem',
+                left: '5rem',
+                alignContent: 'center',
+                fontFamily: "'Fjalla One', monospace",
+                fontSize: '0.7rem',
+                color: '#01ff00',
+                animation: 'pulse 2s ease-in-out infinite',
+            }}>Tap to enter</span>
+            </div>
+          {/* </p> */}
  {/* Description */}
             <p style={{
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              // fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
               fontSize: isMobilePhone ? '1rem' : '1rem',
               color: 'rgba(255, 255, 255, 0.85)',
               lineHeight: '1.3',
-              marginTop: '-.5rem',
+              // marginTop: '-.5rem',
+                 marginTop: '0.5rem',
+            marginBottom: '2rem',
               maxWidth: isMobilePhone ? '320px' : '450px',
               textAlign: 'center',
               padding: '0 1rem',
             }}>
               Take a roller coaster ride through time and witness some of Our Lady's most glorious moments,
-              from antiquity to infinity.
+              from antiquity to 2077 CE.
             </p>
  <div style={{
           display: 'flex',
@@ -1065,7 +1082,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             <div
               style={{
                 position: 'absolute',
-                top: 0,
+                top: isMobilePhone ? '5%' : 0,
                 left: 0,
                 width: '100%',
                 height: '100%',
@@ -1091,7 +1108,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             {/* Heading - centered for mobile/tablet portrait, right side for others */}
             <div style={{
               position: 'absolute',
-              top: isMobilePhone ? '6rem' : isTabletPortrait ? '12%' : '2rem',
+              top: isMobilePhone ? '15%' : isTabletPortrait ? '12%' : '2rem',
               left: (isMobilePhone || isTabletPortrait) ? '50%' : 'auto',
               right: (isMobilePhone || isTabletPortrait) ? 'auto' : '5%',
               transform: (isMobilePhone || isTabletPortrait) ? 'translateX(-50%)' : 'none',
@@ -1099,12 +1116,13 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               display: 'flex',
               flexDirection: 'column',
               alignItems: (isMobilePhone || isTabletPortrait) ? 'center' : 'flex-end',
-              maxWidth: isMobilePhone ? '90%' : isTabletPortrait ? '95%' : '45%',
+              width: isMobilePhone ? '90%' : 'auto',
+              maxWidth: isMobilePhone ? '90%' : isTabletPortrait ? '100%' : '45%',
             }}>
               <SkewedHeading
                 lines={[t('about.skewedHeading1.line1'), t('about.skewedHeading1.line2'), t('about.skewedHeading1.line3')]}
                 colors={["#00ff00", "#f4e4c1", "#ffd700"]}
-                fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "3rem" : "2.5rem"}
+                fontSize={isSmallPhone ? "2rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "2.5rem" : "2.5rem"}
                 isMobile={true}
                 language={locale}
               />
@@ -1122,24 +1140,26 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                   textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)',
                   marginTop: '0.5rem',
                 }}>
-                  {"\u201C"}Bene agere est vere lucrari{"\u201D"}
+                  {"\u201C"}Domina nostra perpetui lucri, ora pro nobis!{"\u201D"}
                   <br/>
-                  <span style={{fontSize: '0.75em', fontStyle: 'normal', opacity: 0.7}}>(To do good is to truly profit)</span>
+                  <span style={{fontSize: '0.75em', fontStyle: 'normal', opacity: 0.7}}>(Our Lady of Perpetual Profit, pray for us!)</span>
                 </p>
                 
               )}
                 <p style={{
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              // fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
               fontSize: isSmallPhone ? '0.9rem' : '1rem',
               color: 'rgba(255, 255, 255, 0.85)',
               lineHeight: isSmallPhone ? '1.3' : '1.35',
               // marginTop: '-3.5rem',
-              maxWidth: isMobilePhone ? '320px' : '450px',
+              maxWidth: isMobilePhone ? '85vw' : '450px',
+              margintTop: '-0.2rem',
               textAlign: 'center',
-              padding: '0 1rem',
+              // padding: '0 1rem',
             }}>
-     
-Placeholder            </p>
+
+    The RL80 token is your safe-haven micro-asset. Start with $5 and add the Patron Saint of Portfolios to your dashboard.
+        </p>
             </div>
 
             {/* Interactive Scroll - right side for desktop/tablet landscape */}
@@ -1180,7 +1200,7 @@ Placeholder            </p>
                 className="navigation-group"
                 style={{
                   position: 'absolute',
-                  bottom: '10%',
+                  bottom: '5%',
                   right: '2rem',
                   display: 'flex',
                   alignItems: 'center',
@@ -1299,7 +1319,7 @@ Placeholder            </p>
             <SkewedHeading
               lines={[t('about.skewedHeading3.line1'), t('about.skewedHeading3.line2'), t('about.skewedHeading3.line3')]}
              // colors={["#d4af37", "#f4e4c1", "#ffd700"]}
-              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "3rem" : "2.5rem"}
+              fontSize={isSmallPhone ? "2rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "2.5rem" : "2.5rem"}
               isMobile={true}
               language={locale}
             />
@@ -1350,17 +1370,17 @@ Placeholder            </p>
               <span style={{fontSize: '0.6em', fontStyle: 'normal', textTransform: 'none', opacity: 0.7, letterSpacing: '0.1em'}}>{"\u2014"} St. GR80</span>
             </p>
             <p style={{
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              // fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
               fontSize: isSmallPhone ? '0.9rem' : '1rem',
               color: 'rgba(255, 255, 255, 0.85)',
               lineHeight: isSmallPhone ? '1.3' : '1.35',
               // marginTop: '-3.5rem',
-              maxWidth: isMobilePhone ? '320px' : '450px',
+              maxWidth: isMobilePhone ? '320px' : '20rem',
               textAlign: 'center',
               padding: '0 1rem',
             }}>
      
-              Light a candle for Our Lady and signal boost your conviction. A little sacrifice goes a long way - top 20% of token burners are rewarded with a 1.2x staking reward multiplier and other exlusive unlocks and rare indulgences. (<Link href="/tokenomics#QUERY_002" style={{color: '#ffd700', textDecoration: 'underline'}}>details</Link>)
+              Light a candle for Our Lady and signal boost your conviction. A little sacrifice goes a long way - top 20% of token burners are rewarded with a 1.2x staking reward multiplier and other rare indulgences. (<Link href="/tokenomics#QUERY_002" style={{color: '#ffd700', textDecoration: 'underline'}}>details</Link>)
             </p>
 
             {/* Illumin80 Navigation - tablet portrait only */}
@@ -1643,7 +1663,10 @@ Placeholder            </p>
               lineHeight: 0.8,
               transform: "rotate(-8deg) skew(-15deg)",
               cursor: 'pointer',
-              margin: 0,
+              marginTop: 0,
+              marginRight: 0,
+              marginBottom: 0,
+              marginLeft: 0,
               zIndex: 50
             }}
           >
@@ -1695,9 +1718,9 @@ Placeholder            </p>
             alignItems: 'flex-end',
             gap: isTablet ? '1rem' : '2rem',
             top: '3rem',
-            left: '-2rem',
+            // left: '-2rem',
             position: 'relative',
-            maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : isSmallLandscape ? '500px' : '650px'
+            maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : isSmallLandscape ? '30rem' : '650px'
           }}>
             {/* Portal Preview Container with Frame Image */}
             <div
@@ -1775,18 +1798,18 @@ Placeholder            </p>
               transform: 'rotate(-11deg)',
               display: 'inline-block',
                   position: 'relative',
-                top: '-3rem',
-                left: '-15%',
+                top: '-3.5rem',
+                left: '-35%',
                 alignContent: 'center'
             }}>
               <p style={{
 
-                fontFamily: "'Courier New', monospace",
-                fontSize: '1rem',
+                fontFamily: "'Fjalla One', monospace",
+                fontSize: '0.7rem',
                 color: '#01ff00',
                 animation: 'pulse 2s ease-in-out infinite',
               }}>
-                Click the portal to enter
+                Click to enter
               </p>
             {/* </div> */}
             {/* Link to whitepaper - Under the portal */}
@@ -1809,7 +1832,7 @@ Placeholder            </p>
             {/* Heading for desktop */}
             <SkewedHeading
               lines={[t('about.skewedHeading2.line1'), t('about.skewedHeading2.line2'), t('about.skewedHeading2.line3')]}
-              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "3rem" : "2.5rem"}
+              fontSize={isSmallPhone ? "2rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "2.5rem" : "2.5rem"}
               color="#00ff9d"
               skewAngle={0}
               shadowColor="#000"
@@ -1834,7 +1857,7 @@ Placeholder            </p>
 
             {/* Description text */}
             <p style={{
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              // fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
               fontSize: isTabletLandscape ? '0.95rem' : isTabletPortrait ? '0.9rem' : '1.1rem',
               color: 'rgba(255, 255, 255, 0.85)',
               lineHeight: '1.4',
@@ -1843,7 +1866,7 @@ Placeholder            </p>
               textAlign: 'center'
             }}>
               Take a roller coaster ride through time and witness some of Our Lady's most glorious moments,
-              from antiquity to infinity.
+              from antiquity to 2077 CE.
             </p>
  <div style={{
           display: 'flex',
@@ -2014,20 +2037,21 @@ Placeholder            </p>
             {/* Right side content */}
             <div style={{
               position: 'absolute',
-              right: '15%',
+              right: '10%',
+              marginRight: '2rem',
               top: 'calc(50% - 70px)',
               transform: 'translateY(-50%)',
               zIndex: 1,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              maxWidth: isTabletLandscape ? '450px' : isSmallLandscape ? '450px' : '550px',
+              maxWidth: isTabletLandscape ? '20rem' : isSmallLandscape ? '20rem' : '550px',
             }}>
               {/* SkewedHeading */}
               <SkewedHeading
                 lines={[t('about.skewedHeading1.line1'), t('about.skewedHeading1.line2'), t('about.skewedHeading1.line3')]}
                 colors={["#00ff00", "#f4e4c1", "#ffd700"]}
-                fontSize={{ mobile: "1.6rem", desktop: isTabletLandscape ? "2.5rem" : isSmallLandscape ? "2.5rem" : "3rem" }}
+                fontSize={{ mobile: "2rem", desktop: isTabletLandscape ? "2.5rem" : isSmallLandscape ? "2.5rem" : "2.5rem" }}
                 isMobile={false}
                 language={locale}
               />
@@ -2042,22 +2066,23 @@ Placeholder            </p>
                 opacity: 0.9,
                 textShadow: '0 2px 4px rgba(0, 0, 0, 0.8)'
               }}>
-                {"\u201C"}Bene agere est vere lucrari.{"\u201D"}
+                {"\u201C"}Domina nostra perpetui lucri, ora pro nobis!{"\u201D"}
                 <br/>
-                <span style={{fontSize: '0.7em', fontStyle: 'italic', textTransform: 'none', opacity: 0.8}}>(To act well is to profit truly.)</span>
-                <span style={{fontSize: '0.6em', fontStyle: 'normal', textTransform: 'none', opacity: 0.7, letterSpacing: '0.1em'}}>{"\u2014"} St. GR80</span>
+                <span style={{fontSize: '0.7em', fontStyle: 'italic', textTransform: 'none', opacity: 0.8}}>(Our Lady of Perpetual Profit, pray for us!)</span>
+                {/* <span style={{fontSize: '0.6em', fontStyle: 'normal', textTransform: 'none', opacity: 0.7, letterSpacing: '0.1em'}}>{"\u2014"} St. GR80</span> */}
               </p>
                 <p style={{
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              fontFamily: '',
               fontSize: isSmallPhone ? '0.9rem' : '1rem',
               color: 'rgba(255, 255, 255, 0.85)',
-              lineHeight: isSmallPhone ? '1.3' : '1.35',
+              lineHeight: isSmallPhone ? '1.1' : '1.2',
               // marginTop: '-3.5rem',
+              width: '100%',
               maxWidth: isMobilePhone ? '320px' : '450px',
               textAlign: 'center',
-              padding: '0 1rem',
+              // padding: '0 1rem',
             }}>
-     Placeholder
+    The RL80 token is your safe-haven micro-asset. Start with $5 and add the Patron Saint of Portfolios to your dashboard.
               </p>
               
             <div
@@ -2346,7 +2371,7 @@ Placeholder            </p>
               justifyContent: 'center',
               alignItems: 'center',
               maxWidth: isTabletLandscape ? '450px' : isTabletPortrait ? '400px' : isSmallLandscape ? '450px' : '550px',
-              marginLeft: isTabletLandscape ? '-5rem' : isTabletPortrait ? '0' : isSmallLandscape ? '-2rem' : '1rem',
+              marginLeft: isTabletLandscape ? '0' : isTabletPortrait ? '0' : isSmallLandscape ? '0' : '1rem',
               paddingBottom: isTabletLandscape ? '1rem' : isTabletPortrait ? '2rem' : isSmallLandscape ? '1rem' : '1rem',
               position: 'relative',
               zIndex: 5,
@@ -2354,7 +2379,7 @@ Placeholder            </p>
               <SkewedHeading
                  lines={[t('about.skewedHeading3.line1'), t('about.skewedHeading3.line2'), t('about.skewedHeading3.line3')]}
                 colors={["#00ff00", "#f4e4c1", "#ffd700"]}
-              fontSize={isSmallPhone ? "1.6rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "3rem" : isSmallLandscape ? "2.5rem" : "2.5rem"}
+              fontSize={isSmallPhone ? "2rem" : isMobilePhone ? "2.5rem" : isLargeTablet ? "2.5rem" : isTabletPortrait ? "2.5rem" : isSmallLandscape ? "2.5rem" : "2.5rem"}
                 isMobile={false}
                 language={locale}
                   //  scramble={true}
@@ -2384,19 +2409,19 @@ Placeholder            </p>
             </p>
 
               <p style={{
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                // fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
                 fontSize: isTabletLandscape ? '0.95rem' : isTabletPortrait ? '0.9rem' : '1.1rem',
                 color: 'rgba(255, 255, 255, 0.85)',
                 lineHeight: '1.4',
                 marginTop: '0',
                 // marginBottom: isTablet ? '1.5rem' : '2rem',
-                maxWidth: '450px',
+                maxWidth: '20rem',
                 textAlign: 'center'
               }}>
        
      
               {/* Light a virtual green candle and join the Illumin80 — a circle of investors who paradoxically place their faith in having none at all. */}
-              Light a candle for Our Lady and signal boost your conviction. A little sacrifice goes a long way - top 20% of token burners are rewarded with a 1.2x staking reward multiplier and other exlusive unlocks and rare indulgences. (<Link href="/tokenomics#QUERY_002" style={{color: '#ffd700', textDecoration: 'underline'}}>details</Link>)</p>
+              Light a candle for Our Lady and signal boost your conviction. A little sacrifice goes a long way - top 20% of token burners are rewarded with a 1.2x staking reward multiplier and other rare indulgences. (<Link href="/tokenomics#QUERY_002" style={{color: '#ffd700', textDecoration: 'underline'}}>details</Link>)</p>
  {/* {!isMobilePhone && ( */}
             <div
               className="navigation-group"

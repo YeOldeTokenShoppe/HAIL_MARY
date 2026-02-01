@@ -51,6 +51,11 @@
   "buttons": {
     "buy": "Acquista"
   },
+  "navControls": {
+    "eighties": "80s",
+    "mode": "MODO",
+    "buy": "COMPRA"
+  },
   "heading": {
     "ourLady": "Nostra Signora",
     "of": "del",
@@ -215,6 +220,41 @@
       "line10": "in un mercato fatto per spezzarti",
       "line11": "Tieni RL80 nel tuo wallet come",
       "line12": "un rosario per la prosperità"
+    }
+  },
+  "crtScreen": {
+    "establishing": "> STABILENDO CONNESSIONE...",
+    "receiving": "> RICEVENDO TRASMISSIONE...",
+    "coreModule": "MODULO CENTRALE RL80:",
+    "holdWallet": "> TIENI RL80 NEL TUO WALLET",
+    "rosary": "> COME UN ROSARIO PER LA PROSPERITÀ",
+    "terminalTitle": "TERMINALE RL80 v1.0",
+    "secureConnection": "CONNESSIONE SICURA",
+    "buyButton": "ACQUISTA RL80",
+    "tapToReturn": "> tocca ovunque per tornare"
+  },
+  "oldsCoolTunnel": {
+    "images": [
+      { "year": "67 d.C.", "description": "Respingere il mercato ribassista" },
+      { "year": "380 d.C.", "description": "Mecenatismo artistico nell'era pre-meme" },
+      { "year": "1100 d.C.", "description": "Primo protocollo di staking carpatico" },
+      { "year": "1350 d.C.", "description": "L'incontro precoce col pagliaccio diventa brutto" },
+      { "year": "1680", "description": "Teoria monetaria per un giovane corsaro" },
+      { "year": "1790", "description": "Eroina della Mitologia" },
+      { "year": "2010", "description": "Presente nella popolare serie manga" },
+      { "year": "2031", "description": "Creare ritmi DeFi" },
+      { "year": "2077", "description": "Un segnale di virtù popolare tra gli automi d'avanguardia" }
+    ],
+    "ui": {
+      "paused": "IN PAUSA",
+      "playing": "IN RIPRODUZIONE",
+      "tapImageFocus": "Tocca un'immagine per focalizzare",
+      "clickImageFocus": "Clicca un'immagine per focalizzare",
+      "tapToPause": "Tocca per mettere in pausa",
+      "pressSpacePause": "Premi SPAZIO per mettere in pausa",
+      "selectImageDetail": "Seleziona immagine per vista dettagliata",
+      "previous": "Precedente",
+      "next": "Successivo"
     }
   }
 }

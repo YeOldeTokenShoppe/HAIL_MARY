@@ -51,6 +51,11 @@
   "buttons": {
     "buy": "购买"
   },
+  "navControls": {
+    "eighties": "80s",
+    "mode": "模式",
+    "buy": "购买"
+  },
   "heading": {
     "ourLady": "永恒利润",
     "of": "之",
@@ -215,6 +220,41 @@
       "line10": "在想击垮你的市场中",
       "line11": "在钱包中持有RL80",
       "line12": "作为繁荣的念珠"
+    }
+  },
+  "crtScreen": {
+    "establishing": "> 正在建立连接...",
+    "receiving": "> 正在接收传输...",
+    "coreModule": "RL80 核心模块:",
+    "holdWallet": "> 在钱包中持有RL80",
+    "rosary": "> 作为繁荣的念珠",
+    "terminalTitle": "RL80 终端 v1.0",
+    "secureConnection": "安全连接",
+    "buyButton": "购买 RL80",
+    "tapToReturn": "> 点击任意处返回"
+  },
+  "oldsCoolTunnel": {
+    "images": [
+      { "year": "公元67年", "description": "击退熊市" },
+      { "year": "公元380年", "description": "前表情包时代的艺术赞助" },
+      { "year": "公元1100年", "description": "早期喀尔巴阡质押协议" },
+      { "year": "公元1350年", "description": "早期小丑遭遇变得丑陋" },
+      { "year": "1680年", "description": "年轻私掠船员的货币理论" },
+      { "year": "1790年", "description": "神话女英雄" },
+      { "year": "2010年", "description": "出现在热门漫画系列中" },
+      { "year": "2031年", "description": "奠定DeFi节拍" },
+      { "year": "2077年", "description": "前卫自动机器人中流行的美德信号" }
+    ],
+    "ui": {
+      "paused": "已暂停",
+      "playing": "播放中",
+      "tapImageFocus": "点击图片聚焦",
+      "clickImageFocus": "点击图片聚焦",
+      "tapToPause": "点击暂停",
+      "pressSpacePause": "按空格键暂停",
+      "selectImageDetail": "选择图片查看详情",
+      "previous": "上一个",
+      "next": "下一个"
     }
   }
 }

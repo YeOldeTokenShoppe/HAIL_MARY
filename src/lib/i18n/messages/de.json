@@ -51,6 +51,11 @@
   "buttons": {
     "buy": "Kaufen"
   },
+  "navControls": {
+    "eighties": "80er",
+    "mode": "MODUS",
+    "buy": "KAUF"
+  },
   "heading": {
     "ourLady": "Unsere Liebe Frau",
     "of": "des",
@@ -215,6 +220,41 @@
       "line10": "in einem Markt, der dich brechen will",
       "line11": "Halte RL80 in deiner Wallet als",
       "line12": "einen Rosenkranz für Wohlstand"
+    }
+  },
+  "crtScreen": {
+    "establishing": "> VERBINDUNG WIRD HERGESTELLT...",
+    "receiving": "> ÜBERTRAGUNG WIRD EMPFANGEN...",
+    "coreModule": "RL80 KERNMODUL:",
+    "holdWallet": "> HALTE RL80 IN DEINER WALLET",
+    "rosary": "> ALS ROSENKRANZ FÜR WOHLSTAND",
+    "terminalTitle": "RL80 TERMINAL v1.0",
+    "secureConnection": "SICHERE VERBINDUNG",
+    "buyButton": "RL80 KAUFEN",
+    "tapToReturn": "> tippe irgendwo um zurückzukehren"
+  },
+  "oldsCoolTunnel": {
+    "images": [
+      { "year": "67 n. Chr.", "description": "Den Bärenmarkt zurückdrängen" },
+      { "year": "380 n. Chr.", "description": "Kunstmäzenatentum der Vor-Meme-Ära" },
+      { "year": "1100 n. Chr.", "description": "Frühes Karpatisches Staking-Protokoll" },
+      { "year": "1350 n. Chr.", "description": "Frühe Clown-Begegnung wird hässlich" },
+      { "year": "1680", "description": "Geldtheorie für einen jungen Freibeuter" },
+      { "year": "1790", "description": "Heldin der Mythologie" },
+      { "year": "2010", "description": "In beliebter Manga-Serie vorgestellt" },
+      { "year": "2031", "description": "DeFi-Beats auflegen" },
+      { "year": "2077", "description": "Ein beliebtes Tugendsignal unter avantgardistischen Automaten" }
+    ],
+    "ui": {
+      "paused": "PAUSIERT",
+      "playing": "WIEDERGABE",
+      "tapImageFocus": "Bild antippen zum Fokussieren",
+      "clickImageFocus": "Bild anklicken zum Fokussieren",
+      "tapToPause": "Tippen zum Pausieren",
+      "pressSpacePause": "LEERTASTE zum Pausieren",
+      "selectImageDetail": "Bild auswählen für Detailansicht",
+      "previous": "Zurück",
+      "next": "Weiter"
     }
   }
 }

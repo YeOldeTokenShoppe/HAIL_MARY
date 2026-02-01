@@ -51,6 +51,11 @@
   "buttons": {
     "buy": "購入"
   },
+  "navControls": {
+    "eighties": "80s",
+    "mode": "モード",
+    "buy": "購入"
+  },
   "heading": {
     "ourLady": "永遠なる利益の",
     "of": "",
@@ -215,6 +220,41 @@
       "line10": "君を壊す市場の中で",
       "line11": "RL80をウォレットに持て",
       "line12": "繁栄のロザリオとして"
+    }
+  },
+  "crtScreen": {
+    "establishing": "> 接続を確立中...",
+    "receiving": "> 送信を受信中...",
+    "coreModule": "RL80 コアモジュール:",
+    "holdWallet": "> RL80をウォレットに持て",
+    "rosary": "> 繁栄のロザリオとして",
+    "terminalTitle": "RL80 ターミナル v1.0",
+    "secureConnection": "安全な接続",
+    "buyButton": "RL80を購入",
+    "tapToReturn": "> どこでもタップして戻る"
+  },
+  "oldsCoolTunnel": {
+    "images": [
+      { "year": "西暦67年", "description": "弱気相場を撃退" },
+      { "year": "西暦380年", "description": "ミーム以前の時代の芸術の後援" },
+      { "year": "西暦1100年", "description": "初期カルパチアのステーキングプロトコル" },
+      { "year": "西暦1350年", "description": "道化師との初期の遭遇が醜くなる" },
+      { "year": "1680年", "description": "若き私掠船員のための貨幣理論" },
+      { "year": "1790年", "description": "神話の女傑" },
+      { "year": "2010年", "description": "人気マンガシリーズに登場" },
+      { "year": "2031年", "description": "ディーファイ・ビートを刻む" },
+      { "year": "2077年", "description": "前衛的オートマトンの間で人気の美徳シグナル" }
+    ],
+    "ui": {
+      "paused": "一時停止",
+      "playing": "再生中",
+      "tapImageFocus": "画像をタップしてフォーカス",
+      "clickImageFocus": "画像をクリックしてフォーカス",
+      "tapToPause": "タップして一時停止",
+      "pressSpacePause": "スペースキーで一時停止",
+      "selectImageDetail": "画像を選択して詳細表示",
+      "previous": "前へ",
+      "next": "次へ"
     }
   }
 }

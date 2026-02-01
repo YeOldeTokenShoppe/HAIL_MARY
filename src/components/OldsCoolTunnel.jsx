@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useRef, useEffect } from 'react'
+import React, { useRef, useEffect, useMemo } from 'react'
 import * as THREE from 'three'
+import { useLanguage } from './LanguageProvider'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js'
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
@@ -67,19 +68,7 @@ class FloatingGallery extends THREE.Group {
         verticalOffset: 0.2,     // Additional vertical offset
         rotateY: Math.PI       // Rotate 180 degrees around Y-axis
       },
-      // { 
-      //   url: '/carousel_images/img2.jpg', 
-      //   year: '1975',
-      //   curvePosition: 0.18,
-      //   width: 1.2,
-      //   height: 1.2,
-      //   radialOffset: 0.7,  // Changed from -1/3 to a more visible distance
-      //   angle: -Math.PI,
-      //   verticalOffset: 0.1,
-      //   rotateY: Math.PI,     // Rotate 180 degrees around Y-axis
-      //           rotateZ: Math.PI,  // Flip upside down (180 degrees)
 
-      // },
       { 
         url: '/carousel_images/img8.jpg', 
         year: '380 CE',
@@ -176,7 +165,7 @@ class FloatingGallery extends THREE.Group {
       { 
        url: '/carousel_images/img6.jpg', 
         year: '2077',
-        description: 'Autonomous artisans provide laser-inscripted devotions',
+        description: 'A popular virtue signal among avant-garde automatons',
         curvePosition: 0.98,
         width: 1,
         height: 1,
@@ -188,31 +177,7 @@ class FloatingGallery extends THREE.Group {
         rotateY: Math.PI       // Rotate 180 degrees around Y-axis
 
       },
-      // { 
-      //   url: '/carousel_images/img12.jpg', 
-      //   year: '2020',
-      //   curvePosition: 0.2,
-      //   width: 1,
-      //   height: 1,
-      //   radialOffset: -1,
-      //   angle: -Math.PI,
-      //   verticalOffset: -0.5,
-      //   rotateY: Math.PI,       // Rotate 180 degrees around Y-axis
-      //           rotateZ: Math.PI,  // Flip upside down (180 degrees)
-
-      // },
-      // { 
-      //   url: '/carousel_images/img13.jpg', 
-      //   year: '2025',
-      //   curvePosition: 1.0,
-      //   width: 1.2,
-      //   height: 1.2,
-      //   radialOffset: 0.5,
-      //   angle: -Math.PI,
-      //   verticalOffset: 0,
-      //           rotateY: Math.PI       // Rotate 180 degrees around Y-axis
-
-      // }
+     
     ]
     
     const loader = new THREE.TextureLoader()
@@ -445,6 +410,7 @@ class FlyThrough {
 }
 
 export default function OldsCoolTunnel({ isFullscreen = false }) {
+  const { t } = useLanguage()
   const mountRef = useRef(null)
   const sceneRef = useRef(null)
   const rendererRef = useRef(null)
@@ -459,6 +425,21 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
   const mouseRef = useRef(new THREE.Vector2())
   const focusStateRef = useRef({ image: null, index: -1 })
   const wasManuallyPausedRef = useRef(false) // Track if pause was user-initiated
+
+  // Get translated image data
+  const getTranslatedImageData = useMemo(() => {
+    const translatedImages = t('oldsCoolTunnel.images')
+    return (index, baseData) => {
+      if (translatedImages && Array.isArray(translatedImages) && translatedImages[index]) {
+        return {
+          ...baseData,
+          year: translatedImages[index].year || baseData.year,
+          description: translatedImages[index].description || baseData.description
+        }
+      }
+      return baseData
+    }
+  }, [t])
 
   useEffect(() => {
     if (!mountRef.current) return
@@ -782,6 +763,13 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
     }
   }, [isFullscreen])
 
+  // Apply translations to focused image data when index changes
+  useEffect(() => {
+    if (focusedIndex >= 0 && galleryRef.current && galleryRef.current.imageData[focusedIndex]) {
+      setFocusedImageData(getTranslatedImageData(focusedIndex, galleryRef.current.imageData[focusedIndex]))
+    }
+  }, [focusedIndex, getTranslatedImageData])
+
   // No camera animation needed - we'll display the image separately
 
   return (
@@ -815,16 +803,16 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
             pointerEvents: 'none'
           }}
         >
-          <div>{isPaused ? '⏸ PAUSED' : '▶ PLAYING'}</div>
+          <div>{isPaused ? `⏸ ${t('oldsCoolTunnel.ui.paused') || 'PAUSED'}` : `▶ ${t('oldsCoolTunnel.ui.playing') || 'PLAYING'}`}</div>
           <div style={{ fontSize: '14px', marginTop: '5px', color: '#8af' }}>
-            {isPaused ? 
-              (typeof window !== 'undefined' && 'ontouchstart' in window ? 'Tap an image to focus' : 'Click an image to focus') :
-              (typeof window !== 'undefined' && 'ontouchstart' in window ? 'Tap to Pause' : 'Press SPACE to Pause')
+            {isPaused ?
+              (typeof window !== 'undefined' && 'ontouchstart' in window ? (t('oldsCoolTunnel.ui.tapImageFocus') || 'Tap an image to focus') : (t('oldsCoolTunnel.ui.clickImageFocus') || 'Click an image to focus')) :
+              (typeof window !== 'undefined' && 'ontouchstart' in window ? (t('oldsCoolTunnel.ui.tapToPause') || 'Tap to Pause') : (t('oldsCoolTunnel.ui.pressSpacePause') || 'Press SPACE to Pause'))
             }
           </div>
           {isPaused && (
             <div style={{ fontSize: '12px', marginTop: '3px', color: '#fa0' }}>
-              🔍 Select image for detailed view
+              🔍 {t('oldsCoolTunnel.ui.selectImageDetail') || 'Select image for detailed view'}
             </div>
           )}
         </div>
@@ -911,7 +899,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
                 focusStateRef.current = { image: galleryRef.current.images[prevIndex], index: prevIndex }
                 setFocusedImage(galleryRef.current.images[prevIndex])
                 setFocusedIndex(prevIndex)
-                setFocusedImageData(galleryRef.current.imageData[prevIndex])
+                setFocusedImageData(getTranslatedImageData(prevIndex, galleryRef.current.imageData[prevIndex]))
               }}
               style={{
                 background: 'transparent',
@@ -923,7 +911,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
                 fontSize: '16px'
               }}
             >
-              ← Previous
+              ← {t('oldsCoolTunnel.ui.previous') || 'Previous'}
             </button>
             <button
               onClick={(e) => {
@@ -932,7 +920,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
                 focusStateRef.current = { image: galleryRef.current.images[nextIndex], index: nextIndex }
                 setFocusedImage(galleryRef.current.images[nextIndex])
                 setFocusedIndex(nextIndex)
-                setFocusedImageData(galleryRef.current.imageData[nextIndex])
+                setFocusedImageData(getTranslatedImageData(nextIndex, galleryRef.current.imageData[nextIndex]))
               }}
               style={{
                 background: 'transparent',
@@ -944,7 +932,7 @@ export default function OldsCoolTunnel({ isFullscreen = false }) {
                 fontSize: '16px'
               }}
             >
-              Next →
+              {t('oldsCoolTunnel.ui.next') || 'Next'} →
             </button>
           </div>
           </div>

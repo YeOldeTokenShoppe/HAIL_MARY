@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState, useEffect, Suspense } from "react";
+import React, { useRef, useState, useEffect, Suspense, useMemo } from "react";
 import { createPortal } from "react-dom";
 import * as THREE from 'three';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
@@ -10,6 +10,7 @@ import { easing } from 'maath';
 import DarkClouds from "./Clouds";
 import BreathSmoke from "./BreathSmoke";
 import ThirdwebBuyModal from './ThirdwebBuyModal';
+import { useLanguage } from './LanguageProvider';
 // import { useControls, folder } from 'leva';
 
 // CRT transition shader for screen toggle effect
@@ -407,35 +408,57 @@ function BreathSmokeDebug({ isMobile, bullObject }) {
 }
 --- end leva debug version */
 
-// CRT Screen with typing effect
-const crtTextSequence = [
-  { text: '> ESTABLISHING CONNECTION...', type: 'command', delay: 800 },
-  { text: '> RECEIVING TRANSMISSION...', type: 'command', delay: 1000 },
+// CRT Screen with typing effect - now uses translations
+// RTL languages for text direction
+const RTL_LOCALES = ['ar', 'he', 'fa', 'ur'];
+
+// Locales that need the Noto Sans Mono font (non-Latin scripts)
+const NOTO_FONT_LOCALES = ['ja', 'ko', 'zh', 'ar', 'hi', 'ru'];
+
+// Font paths
+const FONT_ORBITRON = '/fonts/Orbitron.ttf';
+const FONT_NOTO = '/fonts/NotoSansMono-VariableFont_wdth,wght.ttf';
+
+// Get the appropriate font for a locale
+const getFontForLocale = (locale) => {
+  return NOTO_FONT_LOCALES.includes(locale) ? FONT_NOTO : FONT_ORBITRON;
+};
+
+// Get CSS font family stack for a locale
+const getFontFamilyForLocale = (locale) => {
+  if (NOTO_FONT_LOCALES.includes(locale)) {
+    return "'Noto Sans Mono', 'Courier New', monospace";
+  }
+  return "'Courier New', 'Orbitron', monospace";
+};
+
+const getCrtTextSequence = (t, locale = 'en') => [
+  { text: t('crtScreen.establishing') || '> ESTABLISHING CONNECTION...', type: 'command', delay: 800 },
+  { text: t('crtScreen.receiving') || '> RECEIVING TRANSMISSION...', type: 'command', delay: 1000 },
   { text: '', type: 'pause', delay: 1000 },
-  { text: 'RL80 CORE MODULE:', type: 'header', delay: 800 },
+  { text: t('crtScreen.coreModule') || 'RL80 CORE MODULE:', type: 'header', delay: 800 },
   { text: '', type: 'pause', delay: 400 },
-  { text: "We are trustless....", type: 'body', delay: 600 },
-  { text: 'but we believe in', type: 'body', delay: 600 },
+  { text: t('scroll.credo.line1') || "We are trustless—", type: 'body', delay: 600 },
+  { text: t('scroll.credo.line2') || 'But we believe', type: 'body', delay: 600 },
   { text: '', type: 'pause', delay: 300 },
-  { text: 'Code and cryptography', type: 'body', delay: 500 },
-  { text: 'purity in circuitry', type: 'body', delay: 600 },
+  { text: t('scroll.credo.line3') || 'In code and cryptography', type: 'body', delay: 500 },
+  { text: t('scroll.credo.line4') || 'In the purity of circuitry', type: 'body', delay: 600 },
   { text: '', type: 'pause', delay: 300 },
-  { text: 'Virtue over villainy and', type: 'body', delay: 1000 },
-  { text: 'The Virtual machine', type: 'body', delay: 600 },
+  { text: t('scroll.credo.line5') || 'In virtue over villainy', type: 'body', delay: 1000 },
+  { text: t('scroll.credo.line6') || 'In the virtual machine', type: 'body', delay: 600 },
   { text: '', type: 'pause', delay: 1200 },
-  { text: 'Mater ex machina', type: 'highlight', delay: 3000 },
-  { text: 'Incorruptible integrity', type: 'body', delay: 600 },
-  // { text: 'And fairness.', type: 'body', delay: 800 },
+  { text: t('scroll.credo.line7') || 'Mater ex machina', type: 'highlight', delay: 3000 },
+  { text: t('scroll.credo.line8') || 'Incorruptible integrity', type: 'body', delay: 600 },
   { text: '', type: 'pause', delay: 400 },
-  { text: 'An avatar of resistance', type: 'body', delay: 100 },
-  { text: 'in a market built to break you.', type: 'body', delay: 1200 },
+  { text: t('scroll.credo.line9') || 'An avatar of resistance', type: 'body', delay: 100 },
+  { text: t('scroll.credo.line10') || 'in a market built to break you', type: 'body', delay: 1200 },
   { text: '', type: 'pause', delay: 600 },
-  { text: '> HOLD RL80 IN YOUR WALLET', type: 'command', delay: 600 },
-  { text: '> AS A ROSARY FOR PROSPERITY', type: 'command', delay: 0 },
+  { text: t('crtScreen.holdWallet') || '> HOLD RL80 IN YOUR WALLET', type: 'command', delay: 600 },
+  { text: t('crtScreen.rosary') || '> AS A ROSARY FOR PROSPERITY', type: 'command', delay: 0 },
 ];
 
 // Fullscreen CRT Overlay for mobile
-function FullscreenCRTOverlay({ isActive, onClose, onBuyClick, onLineComplete }) {
+function FullscreenCRTOverlay({ isActive, onClose, onBuyClick, onLineComplete, t, locale }) {
   const [displayedLines, setDisplayedLines] = useState([]);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const [currentCharIndex, setCurrentCharIndex] = useState(0);
@@ -445,6 +468,10 @@ function FullscreenCRTOverlay({ isActive, onClose, onBuyClick, onLineComplete })
   const [buttonPulse, setButtonPulse] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
   const containerRef = useRef(null);
+
+  // Generate translated text sequence
+  const crtTextSequence = useMemo(() => getCrtTextSequence(t, locale), [t, locale]);
+  const isRTL = RTL_LOCALES.includes(locale);
 
   // Handle fade in/out
   useEffect(() => {
@@ -596,10 +623,11 @@ function FullscreenCRTOverlay({ isActive, onClose, onBuyClick, onLineComplete })
         alignItems: 'center',
         justifyContent: 'center',
         padding: '2rem 1.5rem',
-        fontFamily: "'Courier New', 'Orbitron', monospace",
+        fontFamily: getFontFamilyForLocale(locale),
         overflow: 'hidden',
         opacity: isVisible ? 1 : 0,
         transition: 'opacity 0.4s ease-in-out',
+        direction: isRTL ? 'rtl' : 'ltr',
       }}
     >
       {/* Scanline overlay */}
@@ -646,12 +674,13 @@ function FullscreenCRTOverlay({ isActive, onClose, onBuyClick, onLineComplete })
           textTransform: 'uppercase',
           letterSpacing: '0.1em',
           display: 'flex',
+          flexDirection: isRTL ? 'row-reverse' : 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
           opacity: 0.7,
         }}>
-          <span>RL80 TERMINAL v1.0</span>
-          <span style={{ opacity: 0.6 }}>SECURE CONNECTION</span>
+          <span>{t('crtScreen.terminalTitle') || 'RL80 TERMINAL v1.0'}</span>
+          <span style={{ opacity: 0.6 }}>{t('crtScreen.secureConnection') || 'SECURE CONNECTION'}</span>
         </div>
 
         {/* Content area */}
@@ -680,6 +709,7 @@ function FullscreenCRTOverlay({ isActive, onClose, onBuyClick, onLineComplete })
                   fontSize: getFontSize(line.type),
                   lineHeight: 1.4,
                   textShadow: `0 0 10px ${getColor(line.type)}`,
+                  textAlign: isRTL ? 'right' : 'left',
                 }}
               >
                 {line.text}
@@ -694,8 +724,13 @@ function FullscreenCRTOverlay({ isActive, onClose, onBuyClick, onLineComplete })
               fontSize: getFontSize(currentLine.type),
               lineHeight: 1.4,
               textShadow: `0 0 10px ${getColor(currentLine.type)}`,
+              textAlign: isRTL ? 'right' : 'left',
             }}>
-              {typingText}{showCursor ? '█' : ' '}
+              {isRTL ? (
+                <>{showCursor ? '█' : ' '}{typingText}</>
+              ) : (
+                <>{typingText}{showCursor ? '█' : ' '}</>
+              )}
             </div>
           )}
         </div>
@@ -722,7 +757,7 @@ function FullscreenCRTOverlay({ isActive, onClose, onBuyClick, onLineComplete })
                 padding: '0.75rem 2rem',
                 color: '#00ffaa',
                 fontSize: '1rem',
-                fontFamily: "'Courier New', monospace",
+                fontFamily: getFontFamilyForLocale(locale),
                 fontWeight: 'bold',
                 cursor: 'pointer',
                 textTransform: 'uppercase',
@@ -731,7 +766,7 @@ function FullscreenCRTOverlay({ isActive, onClose, onBuyClick, onLineComplete })
                 transition: 'all 0.2s',
               }}
             >
-              BUY RL80
+              {t('crtScreen.buyButton') || 'BUY RL80'}
             </button>
 
             {/* Exit hint */}
@@ -741,7 +776,11 @@ function FullscreenCRTOverlay({ isActive, onClose, onBuyClick, onLineComplete })
               opacity: 0.7,
               letterSpacing: '0.05em',
             }}>
-              {'> tap anywhere to return'}{showCursor ? '_' : ' '}
+              {isRTL ? (
+                <>{showCursor ? '_' : ' '}{t('crtScreen.tapToReturn') || '> tap anywhere to return'}</>
+              ) : (
+                <>{t('crtScreen.tapToReturn') || '> tap anywhere to return'}{showCursor ? '_' : ' '}</>
+              )}
             </div>
           </div>
         )}
@@ -751,7 +790,7 @@ function FullscreenCRTOverlay({ isActive, onClose, onBuyClick, onLineComplete })
 }
 
 // CRT Screen component with typing animation
-function CRTScreen({ width = 2, height = 1.4, isActive = true, noBackground = false, onButtonClick, buttonText = "ENTER THE PORTAL", onLineComplete, textScale = 1, ...props }) {
+function CRTScreen({ width = 2, height = 1.4, isActive = true, noBackground = false, onButtonClick, buttonText = "ENTER THE PORTAL", onLineComplete, textScale = 1, t, locale, ...props }) {
   const [displayedLines, setDisplayedLines] = useState([]);
   const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const [currentCharIndex, setCurrentCharIndex] = useState(0);
@@ -762,10 +801,16 @@ function CRTScreen({ width = 2, height = 1.4, isActive = true, noBackground = fa
   const [buttonHovered, setButtonHovered] = useState(false);
   const [buttonPulse, setButtonPulse] = useState(0);
 
+  // Generate translated text sequence
+  const crtTextSequence = useMemo(() => getCrtTextSequence(t, locale), [t, locale]);
+  const isRTL = RTL_LOCALES.includes(locale);
+
   const lineHeight = 0.05 * textScale;
   const fontSize = 0.042 * textScale;
   // Start scrolling earlier to leave room for button at bottom
   const scrollThreshold = 8;
+  // Top clipping - hide text before it goes above the screen
+  const topClip = height / 2 - 0.02;
   // Bottom clipping - leave space for button
   const bottomClip = -height / 2 + 0.18 * textScale;
 
@@ -918,17 +963,17 @@ function CRTScreen({ width = 2, height = 1.4, isActive = true, noBackground = fa
         lineIndex++;
 
         // Don't render lines that have scrolled off screen or below button area
-        if (y > height / 2 || y < bottomClip) return null;
+        if (y > topClip || y < bottomClip) return null;
 
         return (
           <Text
             key={index}
-            position={[-width / 2 + 0.08, y, 0.02]}
+            position={[isRTL ? (width / 2 - 0.08) : (-width / 2 + 0.08), y, 0.02]}
             fontSize={getFontSize(line.type)}
             color={getColor(line.type)}
-            anchorX="left"
+            anchorX={isRTL ? "right" : "left"}
             anchorY="top"
-            font="/fonts/Orbitron.ttf"
+            font={getFontForLocale(locale)}
             maxWidth={width - 0.16}
             renderOrder={2}
           >
@@ -940,16 +985,16 @@ function CRTScreen({ width = 2, height = 1.4, isActive = true, noBackground = fa
       {/* Current typing line with cursor */}
       {currentLine && currentLine.type !== 'pause' && currentLineIndex < crtTextSequence.length && (
         <Text
-          position={[-width / 2 + 0.08, height / 2 - 0.06 - (lineIndex * lineHeight) + scrollOffset, 0.02]}
+          position={[isRTL ? (width / 2 - 0.08) : (-width / 2 + 0.08), height / 2 - 0.06 - (lineIndex * lineHeight) + scrollOffset, 0.02]}
           fontSize={getFontSize(currentLine.type)}
           color={getColor(currentLine.type)}
-          anchorX="left"
+          anchorX={isRTL ? "right" : "left"}
           anchorY="top"
-          font="/fonts/Orbitron.ttf"
+          font={getFontForLocale(locale)}
           maxWidth={width - 0.16}
           renderOrder={2}
         >
-          {typingText}{showCursor ? '█' : ' '}
+          {isRTL ? `${showCursor ? '█' : ' '}${typingText}` : `${typingText}${showCursor ? '█' : ' '}`}
         </Text>
       )}
 
@@ -994,7 +1039,7 @@ function CRTScreen({ width = 2, height = 1.4, isActive = true, noBackground = fa
             color={buttonHovered ? '#ffffff' : '#00ffaa'}
             anchorX="center"
             anchorY="middle"
-            font="/fonts/Orbitron.ttf"
+            font={getFontForLocale(locale)}
             renderOrder={4}
           >
             {buttonText}
@@ -1091,7 +1136,7 @@ function CameraViewOffset({ offsetX = 0 }) {
   return null;
 }
 
-function PortalScene({ isMobile = false, isTabletPortrait = false, onScreenClick, isZoomedIn = false, onBuyClick, onLineComplete }) {
+function PortalScene({ isMobile = false, isTabletPortrait = false, onScreenClick, isZoomedIn = false, onBuyClick, onLineComplete, t, locale }) {
   const [bullObject, setBullObject] = useState(null);
   const [clippedBullObject, setClippedBullObject] = useState(null);
   const [showScroll, setShowScroll] = useState(false);
@@ -1125,7 +1170,7 @@ function PortalScene({ isMobile = false, isTabletPortrait = false, onScreenClick
 
   // Position for clipped model (accounting for LaptopFrame transforms)
   const laptopPos = [0, isTabletPortrait ? -0.6 : -0.5, 0];
-  const laptopScale = isMobile ? 0.8 : isTabletPortrait ? 0.75 : 0.9;
+  const laptopScale = isMobile ? 0.7 : isTabletPortrait ? 0.75 : 0.9;
   const portalPos = [0, 0.65, -0.15];
 
   // Overall rotation to accentuate 3D dimensionality
@@ -1178,26 +1223,30 @@ function PortalScene({ isMobile = false, isTabletPortrait = false, onScreenClick
         onKeyPress={handleKeyPress}
         onScreenClick={onScreenClick}
       >
-        {/* Sky gradient background inside the portal */}
-        <mesh scale={20}>
-          <sphereGeometry args={[1, 64, 64]} />
-          <shaderMaterial
-            attach="material"
-            args={[SkyGradientMaterial]}
-            side={THREE.BackSide}
-            toneMapped={false}
-          />
-        </mesh>
+        {/* Sky gradient background inside the portal - hidden when showing CRT */}
+        {!showScroll && (
+          <mesh scale={20}>
+            <sphereGeometry args={[1, 64, 64]} />
+            <shaderMaterial
+              attach="material"
+              args={[SkyGradientMaterial]}
+              side={THREE.BackSide}
+              toneMapped={false}
+            />
+          </mesh>
+        )}
         {/* Lighting inside the portal */}
         <hemisphereLight
-          skyColor={'#0000ff'}
-          groundColor={'#e100ff'}
-          intensity={1}
+          skyColor={showScroll ? '#001100' : '#0000ff'}
+          groundColor={showScroll ? '#000800' : '#e100ff'}
+          intensity={showScroll ? 0.3 : 1}
         />
-        {/* Clouds in the portal world */}
-        <group position={[1.5, 6.3, -1.7]}>
-          <DarkClouds />
-        </group>
+        {/* Clouds in the portal world - hidden when showing CRT */}
+        {!showScroll && (
+          <group position={[1.5, 6.3, -1.7]}>
+            <DarkClouds />
+          </group>
+        )}
         {/* The grail model inside the portal (no glow) - hidden when showing scroll */}
         {!showScroll && (
           <>
@@ -1245,9 +1294,11 @@ function PortalScene({ isMobile = false, isTabletPortrait = false, onScreenClick
               isActive={showScroll}
               noBackground={true}
               onButtonClick={onBuyClick}
-              buttonText="BUY RL80"
+              buttonText={t('crtScreen.buyButton') || "BUY RL80"}
               onLineComplete={onLineComplete}
               textScale={isMobile ? 0.7 : isTabletPortrait ? 0.65 : 1}
+              t={t}
+              locale={locale}
             />
           </group>
         </group>
@@ -1303,6 +1354,9 @@ export default function HolyGrailPortal({ isMobile = false, isTabletPortrait = f
   const [isZoomedIn, setIsZoomedIn] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [showFullscreenCRT, setShowFullscreenCRT] = useState(false);
+
+  // Get translations
+  const { t, locale } = useLanguage();
 
   // Audio refs for sound effects
   const pressEnterSoundRef = useRef(null);
@@ -1366,21 +1420,26 @@ export default function HolyGrailPortal({ isMobile = false, isTabletPortrait = f
         // Exiting: hide overlay first, then zoom out
         setShowFullscreenCRT(false);
         setTimeout(() => {
-          controls.setLookAt(0, 0, 3, 0, 0, 0, true);
+          controls.reset(true);
           setIsZoomedIn(false);
         }, 300);
       } else {
         // Entering: play key press sound and zoom in
         playSound(pressEnterSoundRef);
 
-        // Mobile/tablet portrait: zoom in first, then show overlay
-        const distance = isMobile ? 0.6 : 0.8; // Tablet portrait slightly further back
-        const sceneRotY = 0.55;
-        const camX = Math.sin(sceneRotY) * distance;
-        const camZ = Math.cos(sceneRotY) * distance;
-        const camY = isTabletPortrait ? 0.05 : 0.25;
-        const targetY = isTabletPortrait ? -0.1 : 0.1;
-        controls.setLookAt(camX, camY, camZ, -0.2, targetY, -0.2, true);
+        // First fully reset camera to initial state (instant) to clear any manual rotation
+        controls.reset(false);
+        // Use requestAnimationFrame to ensure reset is processed before zoom animation
+        requestAnimationFrame(() => {
+          // Mobile/tablet portrait: zoom in first, then show overlay
+          const distance = isMobile ? 0.6 : 0.8; // Tablet portrait slightly further back
+          const sceneRotY = 0.55;
+          const camX = Math.sin(sceneRotY) * distance;
+          const camZ = Math.cos(sceneRotY) * distance;
+          const camY = isTabletPortrait ? 0.05 : 0.25;
+          const targetY = isTabletPortrait ? -0.1 : 0.1;
+          controls.setLookAt(camX, camY, camZ, -0.2, targetY, -0.2, true);
+        });
         setIsZoomedIn(true);
         // Show fullscreen overlay after zoom animation, play data display sound
         setTimeout(() => {
@@ -1394,7 +1453,7 @@ export default function HolyGrailPortal({ isMobile = false, isTabletPortrait = f
     // Desktop behavior - just zoom
     if (isZoomedIn) {
       // Zoom out to default position
-      controls.setLookAt(0, 0, 3, 0, 0, 0, true);
+      controls.reset(true);
       setIsZoomedIn(false);
     } else {
       // Entering: play key press sound and zoom in
@@ -1403,13 +1462,18 @@ export default function HolyGrailPortal({ isMobile = false, isTabletPortrait = f
       setTimeout(() => {
         playSound(dataDisplaySoundRef);
       }, 500);
-      // Zoom in directly facing the screen (accounting for scene rotation of 0.6 rad on Y)
-      // Position camera perpendicular to screen surface
-      const distance = 1.0;
-      const sceneRotY = 0.55; // Match scene rotation for proper screen view
-      const camX = Math.sin(sceneRotY) * distance;
-      const camZ = Math.cos(sceneRotY) * distance;
-      controls.setLookAt(camX - 0.32, 0.15, camZ, -0.55, 0.05, -0.2, true);
+      // First fully reset camera to initial state (instant) to clear any manual rotation
+      controls.reset(false);
+      // Use requestAnimationFrame to ensure reset is processed before zoom animation
+      requestAnimationFrame(() => {
+        // Then zoom in directly facing the screen (accounting for scene rotation of 0.6 rad on Y)
+        // Position camera perpendicular to screen surface
+        const distance = 1.0;
+        const sceneRotY = 0.55; // Match scene rotation for proper screen view
+        const camX = Math.sin(sceneRotY) * distance;
+        const camZ = Math.cos(sceneRotY) * distance;
+        controls.setLookAt(camX - 0.32, 0.15, camZ, -0.55, 0.05, -0.2, true);
+      });
       setIsZoomedIn(true);
     }
   };
@@ -1476,6 +1540,8 @@ export default function HolyGrailPortal({ isMobile = false, isTabletPortrait = f
                   digitalTextSoundRef.current.play().catch(() => {});
                 }
               }}
+              t={t}
+              locale={locale}
             />
           </SceneLoader>
           <CameraControls
@@ -1552,6 +1618,8 @@ export default function HolyGrailPortal({ isMobile = false, isTabletPortrait = f
               digitalTextSoundRef.current.play().catch(() => {});
             }
           }}
+          t={t}
+          locale={locale}
         />,
         document.body
       )}

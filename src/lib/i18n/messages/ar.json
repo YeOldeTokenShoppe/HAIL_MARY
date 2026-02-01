@@ -51,6 +51,11 @@
   "buttons": {
     "buy": "شراء"
   },
+  "navControls": {
+    "eighties": "80s",
+    "mode": "الوضع",
+    "buy": "شراء"
+  },
   "heading": {
     "ourLady": "سيدة",
     "of": "",
@@ -215,6 +220,41 @@
       "line10": "في سوق بُني ليكسرك",
       "line11": "احتفظ بـ RL80 في محفظتك",
       "line12": "كمسبحة للازدهار"
+    }
+  },
+  "crtScreen": {
+    "establishing": "< جارٍ إنشاء الاتصال...",
+    "receiving": "< جارٍ استقبال الإرسال...",
+    "coreModule": ":RL80 الوحدة الأساسية",
+    "holdWallet": "< احتفظ بـ RL80 في محفظتك",
+    "rosary": "< كمسبحة للازدهار",
+    "terminalTitle": "RL80 محطة v1.0",
+    "secureConnection": "اتصال آمن",
+    "buyButton": "اشتري RL80",
+    "tapToReturn": "< انقر في أي مكان للعودة"
+  },
+  "oldsCoolTunnel": {
+    "images": [
+      { "year": "67 م", "description": "دفع السوق الهابطة للخلف" },
+      { "year": "380 م", "description": "رعاية الفنون في عصر ما قبل الميمات" },
+      { "year": "1100 م", "description": "بروتوكول ستيكينج كارباثي مبكر" },
+      { "year": "1350 م", "description": "لقاء مبكر مع المهرج يصبح قبيحًا" },
+      { "year": "1680", "description": "نظرية نقدية لقرصان شاب" },
+      { "year": "1790", "description": "بطلة الأساطير" },
+      { "year": "2010", "description": "ظهرت في سلسلة مانجا شهيرة" },
+      { "year": "2031", "description": "وضع إيقاعات ديفاي" },
+      { "year": "2077", "description": "إشارة فضيلة شائعة بين الآليين الطليعيين" }
+    ],
+    "ui": {
+      "paused": "متوقف مؤقتاً",
+      "playing": "يعمل",
+      "tapImageFocus": "اضغط على صورة للتركيز",
+      "clickImageFocus": "انقر على صورة للتركيز",
+      "tapToPause": "اضغط للإيقاف المؤقت",
+      "pressSpacePause": "اضغط مسافة للإيقاف المؤقت",
+      "selectImageDetail": "اختر صورة للعرض التفصيلي",
+      "previous": "السابق",
+      "next": "التالي"
     }
   }
 }

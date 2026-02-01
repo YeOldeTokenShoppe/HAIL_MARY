@@ -56,6 +56,11 @@
   "buttons": {
     "buy": "Buy"
   },
+  "navControls": {
+    "eighties": "80s",
+    "mode": "MODE",
+    "buy": "BUY"
+  },
   "heading": {
     "ourLady": "Our Lady",
     "of": "of",
@@ -219,6 +224,41 @@
       "line10": "in a market built to break you",
       "line11": "Hold RL80 in your wallet as",
       "line12": "a rosary for prosperity"
+    }
+  },
+  "crtScreen": {
+    "establishing": "> ESTABLISHING CONNECTION...",
+    "receiving": "> RECEIVING TRANSMISSION...",
+    "coreModule": "RL80 CORE MODULE:",
+    "holdWallet": "> HOLD RL80 IN YOUR WALLET",
+    "rosary": "> AS A ROSARY FOR PROSPERITY",
+    "terminalTitle": "RL80 TERMINAL v1.0",
+    "secureConnection": "SECURE CONNECTION",
+    "buyButton": "BUY RL80",
+    "tapToReturn": "> tap anywhere to return"
+  },
+  "oldsCoolTunnel": {
+    "images": [
+      { "year": "67 CE", "description": "Driving back a bear market" },
+      { "year": "380 CE", "description": "Pre-meme era patronage of the arts" },
+      { "year": "1100 CE", "description": "Early Carpathian staking protocol" },
+      { "year": "1350 CE", "description": "Early clown encounter turns ugly" },
+      { "year": "1680", "description": "Monetary theory for a young privateer" },
+      { "year": "1790", "description": "Heroine of Mythology" },
+      { "year": "2010", "description": "Featured in popular manga series" },
+      { "year": "2031", "description": "Laying down DeFi Beats" },
+      { "year": "2077", "description": "A popular virtue signal among avant-garde automatons" }
+    ],
+    "ui": {
+      "paused": "PAUSED",
+      "playing": "PLAYING",
+      "tapImageFocus": "Tap an image to focus",
+      "clickImageFocus": "Click an image to focus",
+      "tapToPause": "Tap to Pause",
+      "pressSpacePause": "Press SPACE to Pause",
+      "selectImageDetail": "Select image for detailed view",
+      "previous": "Previous",
+      "next": "Next"
     }
   }
 }

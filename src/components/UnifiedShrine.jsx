@@ -642,9 +642,9 @@ function HighlightedCandleGroup({ position, userData, visible }) {
       <mesh position={[0, -0.5, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[1.5, 2, 32, 1]} />
         <meshBasicMaterial
-          color="#ffaa00"
+          color="#00ff88"
           transparent
-          opacity={0.2}
+          opacity={0.25}
           side={THREE.DoubleSide}
           blending={THREE.AdditiveBlending}
         />
@@ -3357,77 +3357,32 @@ useEffect(() => {
           <button
             onClick={() => findUserCandle()}
             style={{
-              background: 'linear-gradient(135deg, #ffaa00 0%, #ff8800 100%)',
-              border: '2px solid rgba(255, 170, 0, 0.3)',
-              borderRadius: '12px',
-              padding: '10px 16px',
-              color: '#000',
+              background: 'rgba(0, 20, 20, 0.7)',
+              border: '1px solid rgba(0, 255, 136, 0.4)',
+              borderRadius: '8px',
+              padding: '6px 12px',
+              color: '#00ff88',
               fontFamily: 'system-ui, -apple-system, sans-serif',
-              fontSize: '13px',
-              fontWeight: 'bold',
+              fontSize: '11px',
+              fontWeight: '600',
               cursor: 'pointer',
-              boxShadow: '0 0 20px rgba(255, 170, 0, 0.3)',
+              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.3)',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              justifyContent: 'center',
+              gap: '5px',
               transition: 'all 0.3s ease',
               backdropFilter: 'blur(10px)',
               WebkitBackdropFilter: 'blur(10px)',
-              width: '160px', // Match stats box width
             }}
           >
-            🔍 <span style={{ fontSize: '11px' }}>FIND MY CANDLE</span>
+            🔍 <span>FIND MY CANDLE</span>
           </button>
         )}
         </div>
       )}
       
       {/* Removed tooltip - will be added as Html in 3D space */}
-
-      {/* Help Button - Mobile only (desktop uses NavControlsHome) */}
-      {isMobile && (
-        <button
-          onClick={toggleHelpOverlay}
-          aria-label="Help"
-          style={{
-            position: 'fixed',
-            top: '58%',
-            right: '0.5rem',
-            zIndex: 1001,
-            width: '44px',
-            height: '44px',
-            borderRadius: '50%',
-            border: '2px solid #d4af37',
-            background: showHelpOverlay
-              ? 'rgba(13, 10, 20, 0.85)'
-              : 'rgba(212, 175, 55, 0.2)',
-       
-            color: '#d4af37',
-            fontSize: '1.4rem',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: showHelpOverlay
-              ? '0 0 20px rgba(212, 175, 55, 0.6)'
-              : '0 0 12px rgba(212, 175, 55, 0.3)',
-            transition: 'box-shadow 0.2s, transform 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = '0 0 20px rgba(212, 175, 55, 0.6)';
-            e.currentTarget.style.transform = 'scale(1.1)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = showHelpOverlay
-              ? '0 0 20px rgba(212, 175, 55, 0.6)'
-              : '0 0 12px rgba(212, 175, 55, 0.3)';
-            e.currentTarget.style.transform = 'scale(1)';
-          }}
-        >
-          ?
-        </button>
-      )}
 
       {/* Help Overlay with Annotations */}
       {showHelpOverlay && (

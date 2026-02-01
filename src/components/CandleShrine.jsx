@@ -272,11 +272,11 @@ function createXBaseMaterial() {
         vec3 color = priceColor;
         float intensity = 1.0;
         
-        // User's candle - golden/orange glow that stands out from green candles
+        // User's candle - luminous green glow
         if (isHighlighted) {
           float pulse = sin(uTime * 3.0) * 0.3 + 0.7; // More dramatic pulse
           float fastPulse = sin(uTime * 8.0) * 0.15 + 0.85; // Fast shimmer
-          color = vec3(1.0, 0.6, 0.0) * pulse * fastPulse; // Golden orange
+          color = vec3(0.0, 1.0, 0.5) * pulse * fastPulse; // Luminous green
           intensity = 5.0; // Very bright to stand out
         }
         

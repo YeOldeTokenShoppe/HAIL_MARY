@@ -51,6 +51,11 @@
   "buttons": {
     "buy": "Acheter"
   },
+  "navControls": {
+    "eighties": "80s",
+    "mode": "MODE",
+    "buy": "ACHAT"
+  },
   "heading": {
     "ourLady": "Notre-Dame",
     "of": "du",
@@ -214,6 +219,41 @@
       "line10": "dans un marché fait pour te briser",
       "line11": "Garde RL80 dans ton wallet",
       "line12": "comme chapelet de prospérité"
+    }
+  },
+  "crtScreen": {
+    "establishing": "> ÉTABLISSEMENT DE LA CONNEXION...",
+    "receiving": "> RÉCEPTION DE LA TRANSMISSION...",
+    "coreModule": "MODULE CENTRAL RL80:",
+    "holdWallet": "> GARDE RL80 DANS TON WALLET",
+    "rosary": "> COMME CHAPELET DE PROSPÉRITÉ",
+    "terminalTitle": "TERMINAL RL80 v1.0",
+    "secureConnection": "CONNEXION SÉCURISÉE",
+    "buyButton": "ACHETER RL80",
+    "tapToReturn": "> appuyez n'importe où pour revenir"
+  },
+  "oldsCoolTunnel": {
+    "images": [
+      { "year": "67 apr. J.-C.", "description": "Repousser le marché baissier" },
+      { "year": "380 apr. J.-C.", "description": "Mécénat des arts à l'ère pré-mème" },
+      { "year": "1100 apr. J.-C.", "description": "Protocole de staking carpatique précoce" },
+      { "year": "1350 apr. J.-C.", "description": "Une rencontre précoce avec un clown tourne mal" },
+      { "year": "1680", "description": "Théorie monétaire pour un jeune corsaire" },
+      { "year": "1790", "description": "Héroïne de la Mythologie" },
+      { "year": "2010", "description": "Présentée dans une série manga populaire" },
+      { "year": "2031", "description": "Poser les beats DeFi" },
+      { "year": "2077", "description": "Un signal de vertu populaire parmi les automates avant-gardistes" }
+    ],
+    "ui": {
+      "paused": "EN PAUSE",
+      "playing": "LECTURE",
+      "tapImageFocus": "Touchez une image pour la focaliser",
+      "clickImageFocus": "Cliquez sur une image pour la focaliser",
+      "tapToPause": "Touchez pour mettre en pause",
+      "pressSpacePause": "Appuyez sur ESPACE pour mettre en pause",
+      "selectImageDetail": "Sélectionnez une image pour la vue détaillée",
+      "previous": "Précédent",
+      "next": "Suivant"
     }
   }
 }

@@ -51,6 +51,11 @@
   "buttons": {
     "buy": "Comprar"
   },
+  "navControls": {
+    "eighties": "80s",
+    "mode": "MODO",
+    "buy": "COMPRA"
+  },
   "heading": {
     "ourLady": "Nossa Senhora",
     "of": "do",
@@ -215,6 +220,41 @@
       "line10": "em um mercado feito para te quebrar",
       "line11": "Guarde RL80 na sua carteira como",
       "line12": "um rosário para a prosperidade"
+    }
+  },
+  "crtScreen": {
+    "establishing": "> ESTABELECENDO CONEXÃO...",
+    "receiving": "> RECEBENDO TRANSMISSÃO...",
+    "coreModule": "MÓDULO CENTRAL RL80:",
+    "holdWallet": "> GUARDE RL80 NA SUA CARTEIRA",
+    "rosary": "> COMO UM ROSÁRIO PARA A PROSPERIDADE",
+    "terminalTitle": "TERMINAL RL80 v1.0",
+    "secureConnection": "CONEXÃO SEGURA",
+    "buyButton": "COMPRAR RL80",
+    "tapToReturn": "> toque em qualquer lugar para voltar"
+  },
+  "oldsCoolTunnel": {
+    "images": [
+      { "year": "67 d.C.", "description": "Afastando o mercado em baixa" },
+      { "year": "380 d.C.", "description": "Mecenato das artes na era pré-meme" },
+      { "year": "1100 d.C.", "description": "Protocolo de staking carpático inicial" },
+      { "year": "1350 d.C.", "description": "Encontro precoce com palhaço fica feio" },
+      { "year": "1680", "description": "Teoria monetária para um jovem corsário" },
+      { "year": "1790", "description": "Heroína da Mitologia" },
+      { "year": "2010", "description": "Destaque em série de mangá popular" },
+      { "year": "2031", "description": "Criando batidas DeFi" },
+      { "year": "2077", "description": "Um sinal de virtude popular entre autômatos vanguardistas" }
+    ],
+    "ui": {
+      "paused": "PAUSADO",
+      "playing": "REPRODUZINDO",
+      "tapImageFocus": "Toque numa imagem para focar",
+      "clickImageFocus": "Clique numa imagem para focar",
+      "tapToPause": "Toque para pausar",
+      "pressSpacePause": "Pressione ESPAÇO para pausar",
+      "selectImageDetail": "Selecione imagem para vista detalhada",
+      "previous": "Anterior",
+      "next": "Próximo"
     }
   }
 }

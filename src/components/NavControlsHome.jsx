@@ -3,6 +3,7 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import { usePathname } from 'next/navigation';
 import { useWalletAuth } from './WalletAuthProvider';
 import { UnifiedAccountModal } from './UnifiedAccountModal';
+import { useLanguage } from './LanguageProvider';
 
 // Home page specific nav controls with integrated 80s mode button
 export default function NavControlsHome({
@@ -21,7 +22,8 @@ export default function NavControlsHome({
   onBuyClick,
   isMobile = false,
   onHelpClick = null,
-  showHelpActive = false
+  showHelpActive = false,
+  hideMusicOnMobile = false
 }) {
   const [emoji, setEmoji] = useState("😇");
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
@@ -30,6 +32,7 @@ export default function NavControlsHome({
   const pathname = usePathname(); // Get current path
   const { user: clerkUser } = useUser();
   const clerk = useClerk();
+  const { t } = useLanguage();
 
   // Fix hydration mismatch by ensuring client and server render the same initially
   useEffect(() => {
@@ -115,14 +118,15 @@ export default function NavControlsHome({
 
         /* 80s Mode Button */
         .eighties-btn-mobile {
-          width: 40px;
+          width: auto;
           height: 40px;
           min-width: 40px;
           min-height: 40px;
+          padding: 0 8px;
           flex-shrink: 0;
           border-radius: 10px;
-          background: ${is80sMode 
-            ? 'rgba(255, 0, 255, 0.1)' 
+          background: ${is80sMode
+            ? 'rgba(255, 0, 255, 0.1)'
             : 'rgba(212, 175, 55, 0.05)'};
           border: 1.5px solid ${is80sMode ? 'rgba(255, 0, 255, 0.4)' : 'rgba(212, 175, 55, 0.2)'};
           display: flex;
@@ -132,10 +136,11 @@ export default function NavControlsHome({
           gap: 0;
           cursor: pointer;
           transition: all 0.3s ease;
-          box-shadow: ${is80sMode 
-            ? '0 0 15px rgba(255, 0, 255, 0.3)' 
+          box-shadow: ${is80sMode
+            ? '0 0 15px rgba(255, 0, 255, 0.3)'
             : 'none'};
           position: relative;
+          white-space: nowrap;
         }
 
         .eighties-btn-mobile:hover {
@@ -614,7 +619,7 @@ export default function NavControlsHome({
 
         /* Compact BUY Button with RetroFuturistic hover effects */
         .buy-btn-compact {
-          width: 40px;
+          width: auto;
           min-width: 40px;
           height: 40px;
           padding: 0 12px;
@@ -633,6 +638,7 @@ export default function NavControlsHome({
           letter-spacing: 0.5px;
           transition: all 0.3s ease, box-shadow 0.7s ease;
           box-shadow: 0 0 8px rgba(5, 234, 250, 0.3);
+          white-space: nowrap;
         }
 
         .buy-btn-compact:hover {
@@ -761,8 +767,8 @@ export default function NavControlsHome({
 
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
       <div className={`nav-mobile-home ${is80sMode ? 'mode-80s' : ''}`}>
-        {/* Help Button - Desktop only, at left end */}
-        {!isMobile && onHelpClick && (
+        {/* Help Button */}
+        {onHelpClick && (
           <button
             className="help-btn-nav"
             onClick={onHelpClick}
@@ -781,10 +787,10 @@ export default function NavControlsHome({
           >
             <span className="eighties-btn-emoji">{is80sMode ? '🎸' : ''}</span>
             <span className="eighties-btn-text">
-              80s
+              {t('navControls.eighties')}
             </span>
             <span className="eighties-btn-text-small">
-              MODE
+              {t('navControls.mode')}
             </span>
           </button>
         )}
@@ -796,39 +802,41 @@ export default function NavControlsHome({
             onClick={onBuyClick}
             title="Buy RL80"
           >
-            BUY
+            {t('navControls.buy')}
           </button>
         )}
 
-        {/* Music - Splits when active */}
-        <div className="music-stack-mobile">
-          {isPlaying ? (
-            <>
-              <button 
-                className="music-btn-mobile active"
-                onClick={handleStopClick}
-                title="Stop"
+        {/* Music - Splits when active (hidden on mobile when hideMusicOnMobile is true) */}
+        {!(isMobile && hideMusicOnMobile) && (
+          <div className="music-stack-mobile">
+            {isPlaying ? (
+              <>
+                <button
+                  className="music-btn-mobile active"
+                  onClick={handleStopClick}
+                  title="Stop"
+                >
+                  ⏹
+                </button>
+                <button
+                  className="music-btn-mobile"
+                  onClick={handleSkipClick}
+                  title="Skip"
+                >
+                  ⏭
+                </button>
+              </>
+            ) : (
+              <button
+                className="music-btn-mobile single"
+                onClick={handlePlayClick}
+                title="Play"
               >
-                ⏹
+                ♫
               </button>
-              <button 
-                className="music-btn-mobile" 
-                onClick={handleSkipClick}
-                title="Skip"
-              >
-                ⏭
-              </button>
-            </>
-          ) : (
-            <button 
-              className="music-btn-mobile single"
-              onClick={handlePlayClick}
-              title="Play"
-            >
-              ♫
-            </button>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* Unified Account/Wallet Button */}
         <div className="unified-account-container">
@@ -900,7 +908,7 @@ export default function NavControlsHome({
             onClick={onBuyClick}
             title="Buy RL80"
           >
-            BUY
+            {t('navControls.buy')}
           </button>
         )}
       </div>

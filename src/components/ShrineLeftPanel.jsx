@@ -547,37 +547,38 @@ const ShrineLeftPanel = forwardRef(({
           <button
             onClick={() => onFindCandle?.()}
             style={{
-              width: '220px',
-              background: 'linear-gradient(135deg, #ffaa00 0%, #ff8800 100%)',
-              border: 'none',
-              borderRadius: '12px',
-              padding: '12px 24px',
-              color: '#000',
-              fontFamily: "'Bebas Neue', sans-serif",
-              fontSize: '14px',
-              fontWeight: 'bold',
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
+              background: 'rgba(0, 20, 20, 0.7)',
+              border: '1px solid rgba(0, 255, 136, 0.4)',
+              borderRadius: '8px',
+              padding: '10px 16px',
+              color: '#00ff88',
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              fontSize: '13px',
+              fontWeight: '600',
               cursor: 'pointer',
-              boxShadow: '0 0 30px rgba(255, 170, 0, 0.4)',
+              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.3)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '8px',
+              gap: '6px',
               transition: 'all 0.3s ease',
               marginTop: '1rem',
               pointerEvents: 'auto',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'scale(1.05)'
-              e.currentTarget.style.boxShadow = '0 0 40px rgba(255, 170, 0, 0.6)'
+              e.currentTarget.style.transform = 'scale(1.02)'
+              e.currentTarget.style.borderColor = 'rgba(0, 255, 136, 0.7)'
+              e.currentTarget.style.boxShadow = '0 4px 15px rgba(0, 255, 136, 0.2)'
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'scale(1)'
-              e.currentTarget.style.boxShadow = '0 0 30px rgba(255, 170, 0, 0.4)'
+              e.currentTarget.style.borderColor = 'rgba(0, 255, 136, 0.4)'
+              e.currentTarget.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.3)'
             }}
           >
-            <>Find My Candle</>
+            🔍 Find My Candle
           </button>
         )}
 
