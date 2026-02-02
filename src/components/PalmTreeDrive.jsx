@@ -1789,15 +1789,6 @@ const PalmsScene = ({ onLoadingChange }) => {
           // If user already skipped, don't let scroll events reset the animation
           if (animationSkippedRef.current) return;
 
-          // Debug logging to track scroll progress and timeline
-          if (self.progress > 0.9 || self.progress === 0 || Math.abs(self.progress - 0.5) < 0.01 || Math.abs(self.progress - 0.25) < 0.01 || Math.abs(self.progress - 0.75) < 0.01) {
-            const tlProg = tl.progress();
-            
-            // Manually set timeline progress to match scroll (debugging)
-            if (Math.abs(tlProg - self.progress) > 0.01) {
-              tl.progress(self.progress);
-            }
-          }
           scrollProgressRef.current = self.progress;
           
           // Mark that user has scrolled if progress > 0

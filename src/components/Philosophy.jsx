@@ -904,11 +904,9 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
         scale={scale}
         onClick={handleClick}
         onPointerOver={(e) => {
-          console.log('Primitive pointer over event triggered');
           handlePointerOver(e);
         }}
         onPointerOut={(e) => {
-          console.log('Primitive pointer out event triggered');
           handlePointerOut(e);
         }}
         onPointerMove={(e) => {
@@ -2224,7 +2222,6 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
                   e.preventDefault();
                   e.stopPropagation();
                   const newZoom = Math.max(1.0, magnifiedZoom - 0.25);
-                  console.log('Zoom Out clicked, new zoom:', newZoom);
                   setMagnifiedZoom(newZoom);
                 }}
                 style={{
@@ -2258,7 +2255,6 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
                   e.preventDefault();
                   e.stopPropagation();
                   const newZoom = Math.min(2.0, magnifiedZoom + 0.25);
-                  console.log('Zoom In clicked, new zoom:', newZoom);
                   setMagnifiedZoom(newZoom);
                 }}
                 style={{

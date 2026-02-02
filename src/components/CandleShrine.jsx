@@ -1459,7 +1459,26 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onPrice
           <h3 style={{ margin: '0 0 8px 0', color: '#ffaa00' }}>
             {selectedCandle.userId === currentUserId ? 'Your Candle' : 'Candle Info'}
           </h3>
-          {selectedCandle.username && (
+          {/* Show St. GR80 for anonymous candles, otherwise show user info */}
+          {(!selectedCandle.username || selectedCandle.username === 'Anonymous') ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <img
+                src="/images/GR80_headshot.webp"
+                alt="St. GR80"
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  objectFit: 'cover',
+                  border: '2px solid rgba(255, 170, 0, 0.6)',
+                }}
+              />
+              <div>
+                <div style={{ fontWeight: 'bold', color: '#ffaa00' }}>St. GR80</div>
+                <div style={{ fontSize: '10px', color: '#888' }}>Eternal Flame</div>
+              </div>
+            </div>
+          ) : (
             <div style={{ marginBottom: '4px' }}>
               User: {selectedCandle.username}
             </div>

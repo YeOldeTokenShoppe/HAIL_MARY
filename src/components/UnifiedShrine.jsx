@@ -551,14 +551,14 @@ function LeaderboardCarousel({ leaderboardData, isMobile }) {
         </span>
         <span style={{
           fontSize: isMobile ? '11px' : '13px',
-          color: '#fff',
+          color: (!currentLeader.username || currentLeader.username === 'Anonymous') ? '#ffaa00' : '#fff',
           fontWeight: 'bold',
           maxWidth: '100px',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap'
         }}>
-          {currentLeader.username || 'Anonymous'}
+          {(!currentLeader.username || currentLeader.username === 'Anonymous') ? 'St. GR80' : currentLeader.username}
         </span>
         <span style={{
           fontSize: isMobile ? '10px' : '12px',
@@ -2042,7 +2042,6 @@ useEffect(() => {
       : '0 0 20px 4px rgba(212, 175, 55, 0.3)',
     zIndex: 1000,
     width: isMobile ? '160px' : '240px',
-    pointerEvents: 'auto'
   }), [isMobile, is80sMode])
   
 
@@ -2660,7 +2659,7 @@ useEffect(() => {
         <div
           style={{
             position: 'absolute',
-            bottom: isMobile ? '135px' : '40px',
+            bottom: isMobile ? '135px' : '5rem',
             left: '50%',
             transform: 'translateX(-50%)',
             background: 'rgba(20, 20, 30, 0.95)',
@@ -2670,10 +2669,10 @@ useEffect(() => {
             maxWidth: isMobile ? '280px' : '320px',
             border: clickedCandleData.isCurrentUser
               ? '1px solid rgba(0, 245, 212, 0.5)'
-              : '1px solid rgba(138, 43, 226, 0.4)',
+              : '1px solid rgba(255, 105, 180, 0.4)',
             boxShadow: clickedCandleData.isCurrentUser
               ? '0 0 40px rgba(0, 245, 212, 0.3)'
-              : '0 0 40px rgba(138, 43, 226, 0.3)',
+              : '0 0 40px rgba(255, 105, 180, 0.3)',
             backdropFilter: 'blur(10px)',
             WebkitBackdropFilter: 'blur(10px)',
             zIndex: 102,
@@ -2686,8 +2685,21 @@ useEffect(() => {
             alignItems: 'center',
             gap: '12px',
           }}>
-            {/* Avatar */}
-            {clickedCandleData.userImageUrl ? (
+            {/* Avatar - Show St. GR80 for anonymous candles */}
+            {(!clickedCandleData.username || clickedCandleData.username === 'Anonymous') ? (
+              <img
+                src="/images/GR80_headshot.webp"
+                alt="St. GR80"
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  objectFit: 'cover',
+                  border: '2px solid rgba(255, 170, 0, 0.6)',
+                  flexShrink: 0
+                }}
+              />
+            ) : clickedCandleData.userImageUrl ? (
               <img
                 src={clickedCandleData.userImageUrl}
                 alt={clickedCandleData.username}
@@ -2698,7 +2710,7 @@ useEffect(() => {
                   objectFit: 'cover',
                   border: clickedCandleData.isCurrentUser
                     ? '2px solid rgba(0, 245, 212, 0.6)'
-                    : '2px solid rgba(138, 43, 226, 0.6)',
+                    : '2px solid rgba(255, 105, 180, 0.6)',
                   flexShrink: 0
                 }}
               />
@@ -2709,7 +2721,7 @@ useEffect(() => {
                 borderRadius: '50%',
                 background: clickedCandleData.isCurrentUser
                   ? 'linear-gradient(135deg, #00f5d4, #00b894)'
-                  : 'linear-gradient(135deg, #8a2be2, #ff006e)',
+                  : 'linear-gradient(135deg, #ff69b4, #ff1493)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -2718,7 +2730,7 @@ useEffect(() => {
                 color: '#fff',
                 border: clickedCandleData.isCurrentUser
                   ? '2px solid rgba(0, 245, 212, 0.6)'
-                  : '2px solid rgba(138, 43, 226, 0.6)',
+                  : '2px solid rgba(255, 105, 180, 0.6)',
                 flexShrink: 0
               }}>
                 {clickedCandleData.username?.charAt(0).toUpperCase() || '?'}
@@ -2730,14 +2742,18 @@ useEffect(() => {
               <div style={{
                 fontWeight: 'bold',
                 fontSize: isMobile ? '14px' : '15px',
-                color: clickedCandleData.isCurrentUser ? '#00f5d4' : '#fff',
+                color: (!clickedCandleData.username || clickedCandleData.username === 'Anonymous')
+                  ? '#ffaa00'
+                  : (clickedCandleData.isCurrentUser ? '#00f5d4' : '#ff69b4'),
                 fontFamily: "'Orbitron', monospace",
                 marginBottom: '2px',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis'
               }}>
-                {clickedCandleData.username}
+                {(!clickedCandleData.username || clickedCandleData.username === 'Anonymous')
+                  ? 'St. GR80'
+                  : clickedCandleData.username}
                 {clickedCandleData.isCurrentUser && (
                   <span style={{
                     fontSize: '10px',
@@ -2753,38 +2769,11 @@ useEffect(() => {
                 fontSize: isMobile ? '11px' : '12px',
                 color: 'rgba(255, 255, 255, 0.7)',
                 fontFamily: 'monospace',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
+                fontStyle: 'italic',
               }}>
-                {clickedCandleData.userImageUrl ? (
-                  <img
-                    src={clickedCandleData.userImageUrl}
-                    alt=""
-                    style={{
-                      width: '16px',
-                      height: '16px',
-                      borderRadius: '50%',
-                      objectFit: 'cover'
-                    }}
-                  />
-                ) : (
-                  <span style={{
-                    width: '16px',
-                    height: '16px',
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #8a2be2, #ff006e)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '10px',
-                    fontWeight: 'bold',
-                    color: '#fff'
-                  }}>
-                    {clickedCandleData.username?.charAt(0).toUpperCase() || '?'}
-                  </span>
-                )}
-                <span>{clickedCandleData.username || 'Anonymous'}</span>
+                {(!clickedCandleData.username || clickedCandleData.username === 'Anonymous')
+                  ? 'Keeper of the shrine'
+                  : `🕯️ ${clickedCandleData.litAt}`}
               </div>
             </div>
           </div>
@@ -2818,6 +2807,7 @@ useEffect(() => {
           flexDirection: 'column',
           gap: '10px',
           alignItems: 'flex-end',
+          pointerEvents: 'none',
         }}>
 
 
@@ -2841,7 +2831,7 @@ useEffect(() => {
             writingMode: 'vertical-rl',
             textOrientation: 'mixed',
             letterSpacing: '2px',
-            transition: 'all 0.3s ease',
+            transition: 'all 0.3s ease, pointer-events 0s',
             position: 'fixed',
             right: 0,
             top: isMobile ? '45%' : '160px',
@@ -2862,8 +2852,9 @@ useEffect(() => {
           top: 0,
           right: 0,
           transform: statsBoxCollapsed ? 'translateX(calc(100% + 40px))' : 'translateX(0)',
-          transition: 'transform 0.3s ease, opacity 0.3s ease',
+          transition: 'transform 0.3s ease, opacity 0.3s ease, pointer-events 0s',
           opacity: statsBoxCollapsed ? 0 : 1,
+          pointerEvents: statsBoxCollapsed ? 'none' : 'auto',
         }}>
         {/* Close Tab - Side tab to collapse stats */}
         <button
@@ -3419,6 +3410,7 @@ useEffect(() => {
               transition: 'all 0.3s ease',
               backdropFilter: 'blur(10px)',
               WebkitBackdropFilter: 'blur(10px)',
+              pointerEvents: 'auto',
             }}
           >
             🔍 <span>{t('illumin80.findMyCandle').toUpperCase()}</span>

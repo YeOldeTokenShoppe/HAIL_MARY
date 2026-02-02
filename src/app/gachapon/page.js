@@ -3,7 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import CyberNav from '@/components/CyberNav';
+import NavControlsHome from '@/components/NavControlsHome';
+import { UnifiedAccountModal } from '@/components/UnifiedAccountModal';
+import { useClerk } from '@clerk/nextjs';
 
 
 // Dynamic import to avoid SSR issues with Three.js
@@ -26,10 +28,34 @@ const VendingMachineScene = dynamic(() => import('@/components/VendingMachine'),
 
 export default function ToasterPage() {
   const [mounted, setMounted] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [accountModalTab, setAccountModalTab] = useState('wallet');
+  const clerk = useClerk();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Listen for custom events from VendingMachine to open wallet/sign-in
+  useEffect(() => {
+    const handleOpenWalletConnection = () => {
+      setAccountModalTab('wallet');
+      setShowAccountModal(true);
+    };
+
+    const handleOpenSignIn = () => {
+      clerk.openSignIn();
+    };
+
+    window.addEventListener('openWalletConnection', handleOpenWalletConnection);
+    window.addEventListener('openSignIn', handleOpenSignIn);
+
+    return () => {
+      window.removeEventListener('openWalletConnection', handleOpenWalletConnection);
+      window.removeEventListener('openSignIn', handleOpenSignIn);
+    };
+  }, [clerk]);
 
   return (
     <div style={{
@@ -43,16 +69,18 @@ export default function ToasterPage() {
       top: 0,
       overflow: "hidden",
     }}>
-       <div style={{
-          position: "fixed",
-          top: "20px", 
-          left: "20px",
-          borderRadius: "8px",
-          padding: "10px",
-          pointerEvents: "auto",
-          zIndex: 10,
-        }}>
-        <div 
+      {/* RL80 Logo - Top Left */}
+      <div style={{
+        position: "fixed",
+        top: "20px",
+        left: "20px",
+        borderRadius: "8px",
+        padding: "10px",
+        pointerEvents: "auto",
+        zIndex: 10,
+      }}>
+        <Link href="/about" style={{ textDecoration: 'none' }}>
+          <div
             id="text"
             style={{
               position: "relative",
@@ -62,11 +90,6 @@ export default function ToasterPage() {
               cursor: "pointer",
               userSelect: "none",
             }}
-            // onClick={(e) => {
-            //   e.preventDefault();
-            //   e.stopPropagation();
-            //   window.location.href = "/about";
-            // }}
           >
             RL80
             {Array.from({length: 100}).map((_, i) => {
@@ -81,11 +104,10 @@ export default function ToasterPage() {
                     zIndex: -1,
                     top: 0,
                     left: 0,
-                    color: `rgba(${201 - index * 2}, ${55 - index * 3}, ${256 - index * 2})` ,
-                    //   : `rgba(${255 - index * 2}, ${255 - index * 3}, ${255 - index * 2})`,
+                    color: `rgba(${201 - index * 2}, ${55 - index * 3}, ${256 - index * 2})`,
                     filter: "blur(0.1rem)",
                     transform: `translate(
-                      ${index * 0.1}rem, 
+                      ${index * 0.1}rem,
                       ${index * 0.1}rem
                     ) scale(${1 + index * 0.01})`,
                     opacity: (1 / index) * 1.5,
@@ -96,9 +118,25 @@ export default function ToasterPage() {
               );
             })}
           </div>
-              <CyberNav position="fixed" />
-        </div>
-  
+        </Link>
+      </div>
+
+      {/* Nav Controls - Top Right */}
+      <div style={{
+        position: "fixed",
+        top: "20px",
+        right: "20px",
+        zIndex: 100,
+        pointerEvents: "auto",
+      }}>
+        <NavControlsHome
+          isMenuOpen={isMenuOpen}
+          onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
+          show80sButton={false}
+          hideMusicOnMobile={true}
+        />
+      </div>
+
       {mounted && (
         <div style={{
           width: '100%',
@@ -110,6 +148,13 @@ export default function ToasterPage() {
           <VendingMachineScene />
         </div>
       )}
+
+      {/* Account Modal - for wallet connection from status bar */}
+      <UnifiedAccountModal
+        isOpen={showAccountModal}
+        onClose={() => setShowAccountModal(false)}
+        initialTab={accountModalTab}
+      />
     </div>
   );
 }

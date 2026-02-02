@@ -171,6 +171,8 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
       // Store reference to Backdrop mesh (Mary's head) - render LAST to appear on top
       if (child.name === 'Backdrop' || child.name === 'backdrop' || child.name.toLowerCase().includes('backdrop')) {
         backdropRef.current = child
+        // Disable raycasting so clicks pass through to candles behind
+        child.raycast = () => {}
         if (child.isMesh && child.material) {
           // Clone material to avoid modifying shared material
           child.material = child.material.clone()
@@ -181,10 +183,12 @@ export function HandsModel({ mousePosition, onLoad, hasReachedSection, isInView,
           child.renderOrder = 999  // Render last, on top of everything
         }
       }
-      
+
       // Store reference to Circle mesh (Mary's halo) - render before face but after candles
       if (child.name === 'Circle' || child.name === 'circle' || child.name.toLowerCase().includes('circle')) {
         circleRef.current = child
+        // Disable raycasting so clicks pass through to candles behind
+        child.raycast = () => {}
         if (child.isMesh && child.material) {
           // Clone material to avoid modifying shared material
           child.material = child.material.clone()

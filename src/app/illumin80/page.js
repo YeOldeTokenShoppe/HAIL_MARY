@@ -1501,11 +1501,11 @@ useEffect(() => {
       {fontLoaded && isMobileView && (
         <div style={{
           position: "fixed",
-          top: "20px", 
+          top: "20px",
           left: "20px",
           borderRadius: "8px",
           padding: "10px",
-          pointerEvents: "auto",
+          pointerEvents: "none",
           zIndex: 999,
         }}>
           <div 
@@ -1567,7 +1567,7 @@ useEffect(() => {
         top: "1rem",
         right: "1rem",
         zIndex: 999,
-        pointerEvents: 'auto'
+        pointerEvents: 'none'
       }}>
         <NavControlsHome
           isPlaying={contextIsPlaying}

@@ -114,6 +114,7 @@ export default function NavControlsHome({
           border-radius: 16px;
           border: 1px solid rgba(212, 175, 55, 0.15);
           box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+          pointer-events: auto;
         }
 
         /* 80s Mode Button */
@@ -690,6 +691,7 @@ export default function NavControlsHome({
           letter-spacing: 1px;
           transition: all 0.3s ease;
           box-shadow: 0 0 12px rgba(0, 255, 65, 0.2);
+          pointer-events: auto;
         }
 
         .buy-btn-mobile:hover,

@@ -173,7 +173,7 @@ const ShrineLeftPanel = forwardRef(({
             margin: 0,
             zIndex: 100,
           }}
-          onClick={() => router?.push('/about')}
+          // onClick={() => router?.push('/about')}
         >
           <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
           <span className="title-line" style={{ display: 'block', position: 'relative' }}>

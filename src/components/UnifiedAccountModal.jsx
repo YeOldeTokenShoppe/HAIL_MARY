@@ -1,40 +1,72 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useUser, useClerk, UserButton } from '@clerk/nextjs';
 import { usePathname } from 'next/navigation';
 import { useWalletAuth } from './WalletAuthProvider';
 import { WalletConnectionModal } from './WalletConnectionModal';
 import { WalletDetailsModal } from './WalletDetailsModal';
 import { collection, query, where, orderBy, getDocs, db } from '@/lib/firebaseClient';
+import { useWeeklyPrize } from '@/hooks/useWeeklyPrize';
 
-export function UnifiedAccountModal({ isOpen, onClose }) {
+export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' }) {
   const { user } = useUser();
   const { signOut } = useClerk();
   const pathname = usePathname();
-  const { 
-    walletAddress, 
-    isWalletConnected, 
+  const {
+    walletAddress,
+    isWalletConnected,
     tokenBalance,
     connectWallet,
-    disconnectWallet 
+    disconnectWallet
   } = useWalletAuth();
-  
-  const [activeTab, setActiveTab] = useState('account');
+
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  // Update active tab when initialTab changes or modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
   const [showWalletConnection, setShowWalletConnection] = useState(false);
   const [showWalletDetails, setShowWalletDetails] = useState(false);
   const [showClerkDropdown, setShowClerkDropdown] = useState(false);
-  // Polaroid and candle functionality removed
+
+  // Collection tab state
+  const [collectedPrizes, setCollectedPrizes] = useState([]);
+  const [loadingPrizes, setLoadingPrizes] = useState(false);
+  const [selectedPrize, setSelectedPrize] = useState(null);
+  const { fetchUserPrizes } = useWeeklyPrize();
   
   // Listen for external wallet details event
   useEffect(() => {
     const handleOpenWalletDetails = () => {
       setShowWalletDetails(true);
     };
-    
+
     window.addEventListener('openWalletDetails', handleOpenWalletDetails);
     return () => window.removeEventListener('openWalletDetails', handleOpenWalletDetails);
   }, []);
+
+  // Fetch collected prizes when Collection tab is active
+  useEffect(() => {
+    const loadPrizes = async () => {
+      if (!isOpen || activeTab !== 'collection' || !walletAddress) return;
+
+      setLoadingPrizes(true);
+      try {
+        const prizes = await fetchUserPrizes();
+        setCollectedPrizes(prizes);
+      } catch (error) {
+        console.error('Failed to fetch collected prizes:', error);
+      } finally {
+        setLoadingPrizes(false);
+      }
+    };
+
+    loadPrizes();
+  }, [isOpen, activeTab, walletAddress, fetchUserPrizes]);
   
   // Polaroid fetching removed
   /* Removed useEffect for fetching polaroids
@@ -199,17 +231,23 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
           
           {/* Tab Navigation */}
           <div className="modal-tabs">
-            <button 
+            <button
               className={`modal-tab ${activeTab === 'account' ? 'active' : ''}`}
               onClick={() => setActiveTab('account')}
             >
               Account
             </button>
-            <button 
+            <button
               className={`modal-tab ${activeTab === 'wallet' ? 'active' : ''}`}
               onClick={() => setActiveTab('wallet')}
             >
               Wallet
+            </button>
+            <button
+              className={`modal-tab ${activeTab === 'collection' ? 'active' : ''}`}
+              onClick={() => setActiveTab('collection')}
+            >
+              Collection
             </button>
           </div>
 
@@ -335,10 +373,104 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
                   </div>
                 )}
               </div>
-            ) : null /* Candle tab content removed */}
+            ) : activeTab === 'collection' ? (
+              <div className="collection-content">
+                {!walletAddress ? (
+                  <div className="collection-empty">
+                    <div className="empty-icon">🎁</div>
+                    <p>Connect your wallet to view your collection</p>
+                    <button
+                      className="action-button connect"
+                      onClick={() => setShowWalletConnection(true)}
+                    >
+                      Connect Wallet
+                    </button>
+                  </div>
+                ) : loadingPrizes ? (
+                  <div className="collection-loading">
+                    <div className="loading-spinner" />
+                    <p>Loading your collection...</p>
+                  </div>
+                ) : collectedPrizes.length === 0 ? (
+                  <div className="collection-empty">
+                    <div className="empty-icon">🎁</div>
+                    <h3>No prizes collected yet</h3>
+                    <p>Visit the Gachapon to claim weekly prizes!</p>
+                  </div>
+                ) : (
+                  <div className="prizes-grid">
+                    {collectedPrizes.map((prize) => (
+                      <button
+                        key={prize.id}
+                        className="prize-card"
+                        onClick={() => setSelectedPrize(prize)}
+                        style={{
+                          borderColor: prize.prizeAccentColor || '#00f5d4',
+                        }}
+                      >
+                        {prize.prizeIcon ? (
+                          <img
+                            src={prize.prizeIcon}
+                            alt={prize.prizeName}
+                            className="prize-icon"
+                          />
+                        ) : (
+                          <div className="prize-icon-placeholder">🎁</div>
+                        )}
+                        <div className="prize-name">{prize.prizeName}</div>
+                        <div className="prize-date">
+                          {prize.claimedAt?.toDate?.()
+                            ? new Date(prize.claimedAt.toDate()).toLocaleDateString()
+                            : 'Claimed'}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
+
+      {/* Prize Preview Modal */}
+      {selectedPrize && (
+        <div className="prize-preview-overlay" onClick={() => setSelectedPrize(null)}>
+          <div className="prize-preview-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="preview-close-btn" onClick={() => setSelectedPrize(null)}>×</button>
+
+            <div className="preview-content">
+              {selectedPrize.prizeIcon ? (
+                <img
+                  src={selectedPrize.prizeIcon}
+                  alt={selectedPrize.prizeName}
+                  className="preview-image"
+                />
+              ) : (
+                <div className="preview-placeholder">🎁</div>
+              )}
+
+              <h2 className="preview-title">{selectedPrize.prizeName}</h2>
+              <p className="preview-description">{selectedPrize.prizeDescription}</p>
+
+              <div className="preview-details">
+                <div className="detail-row">
+                  <span className="detail-label">Week</span>
+                  <span className="detail-value">{selectedPrize.weekIdentifier}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Claimed</span>
+                  <span className="detail-value">
+                    {selectedPrize.claimedAt?.toDate?.()
+                      ? new Date(selectedPrize.claimedAt.toDate()).toLocaleDateString()
+                      : 'Unknown'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Wallet Connection Modal */}
       {showWalletConnection && (
@@ -531,12 +663,236 @@ export function UnifiedAccountModal({ isOpen, onClose }) {
         }
         
         .account-content,
-        .wallet-content {
+        .wallet-content,
+        .collection-content {
           animation: simpleFadeIn 0.3s ease-out;
           display: flex;
           flex-direction: column;
           align-items: stretch;
           width: 100%;
+        }
+
+        .collection-content {
+          min-height: 250px;
+        }
+
+        .collection-empty {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 2rem;
+          text-align: center;
+          color: rgba(255, 255, 255, 0.6);
+        }
+
+        .collection-empty .empty-icon {
+          font-size: 3rem;
+          margin-bottom: 1rem;
+          opacity: 0.5;
+        }
+
+        .collection-empty h3 {
+          color: #fff;
+          margin: 0 0 0.5rem 0;
+          font-size: 1.1rem;
+        }
+
+        .collection-empty p {
+          margin: 0 0 1.5rem 0;
+          font-size: 0.9rem;
+        }
+
+        .collection-loading {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 2rem;
+          gap: 1rem;
+          color: rgba(255, 255, 255, 0.6);
+        }
+
+        .loading-spinner {
+          width: 32px;
+          height: 32px;
+          border: 3px solid rgba(0, 245, 212, 0.2);
+          border-top-color: #00f5d4;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+
+        .prizes-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+          gap: 1rem;
+          padding: 0.5rem;
+        }
+
+        .prize-card {
+          background: rgba(0, 0, 0, 0.3);
+          border: 2px solid rgba(0, 245, 212, 0.3);
+          border-radius: 12px;
+          padding: 1rem;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 0.5rem;
+          cursor: pointer;
+          transition: all 0.3s ease;
+        }
+
+        .prize-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 8px 20px rgba(0, 245, 212, 0.2);
+          border-color: #00f5d4;
+        }
+
+        .prize-icon {
+          width: 50px;
+          height: 50px;
+          border-radius: 50%;
+          object-fit: cover;
+        }
+
+        .prize-icon-placeholder {
+          width: 50px;
+          height: 50px;
+          border-radius: 50%;
+          background: rgba(0, 245, 212, 0.1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.5rem;
+        }
+
+        .prize-name {
+          color: #fff;
+          font-size: 0.75rem;
+          font-weight: 600;
+          text-align: center;
+          font-family: 'Orbitron', monospace;
+        }
+
+        .prize-date {
+          color: rgba(255, 255, 255, 0.4);
+          font-size: 0.65rem;
+        }
+
+        .prize-preview-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.9);
+          backdrop-filter: blur(10px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 100;
+          animation: simpleFadeIn 0.3s ease-out;
+        }
+
+        .prize-preview-modal {
+          background: rgba(20, 20, 30, 0.98);
+          border: 2px solid #00f5d4;
+          border-radius: 20px;
+          padding: 2rem;
+          max-width: 400px;
+          width: 90%;
+          position: relative;
+          box-shadow: 0 20px 60px rgba(0, 245, 212, 0.3);
+        }
+
+        .preview-close-btn {
+          position: absolute;
+          top: 0.75rem;
+          right: 0.75rem;
+          background: transparent;
+          border: none;
+          color: #00f5d4;
+          font-size: 1.5rem;
+          cursor: pointer;
+          width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .preview-content {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+        }
+
+        .preview-image {
+          width: 120px;
+          height: 120px;
+          border-radius: 50%;
+          object-fit: cover;
+          border: 3px solid #00f5d4;
+          box-shadow: 0 0 30px rgba(0, 245, 212, 0.4);
+          margin-bottom: 1.5rem;
+        }
+
+        .preview-placeholder {
+          width: 120px;
+          height: 120px;
+          border-radius: 50%;
+          background: rgba(0, 245, 212, 0.1);
+          border: 3px solid #00f5d4;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 3rem;
+          margin-bottom: 1.5rem;
+        }
+
+        .preview-title {
+          color: #00f5d4;
+          font-family: 'Orbitron', monospace;
+          font-size: 1.3rem;
+          margin: 0 0 0.5rem 0;
+        }
+
+        .preview-description {
+          color: rgba(255, 255, 255, 0.7);
+          font-size: 0.9rem;
+          margin: 0 0 1.5rem 0;
+        }
+
+        .preview-details {
+          width: 100%;
+          background: rgba(0, 0, 0, 0.3);
+          border-radius: 10px;
+          padding: 1rem;
+        }
+
+        .detail-row {
+          display: flex;
+          justify-content: space-between;
+          padding: 0.5rem 0;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .detail-row:last-child {
+          border-bottom: none;
+        }
+
+        .detail-label {
+          color: rgba(255, 255, 255, 0.5);
+          font-size: 0.8rem;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .detail-value {
+          color: #fff;
+          font-size: 0.85rem;
+          font-weight: 500;
         }
 
         .user-info {
