@@ -818,7 +818,9 @@ useEffect(() => {
               ? '1px solid rgba(212, 175, 55, 0.15)'
               : '1px solid rgba(0, 245, 212, 0.15)',
             borderRadius: '50px',
-            padding: isExpanded ? '12px 16px' : '10px',
+            paddingTop: isExpanded ? '12px' : '10px',
+            paddingRight: isExpanded ? '16px' : '10px',
+            paddingLeft: isExpanded ? '16px' : '10px',
             boxShadow: `
               0 4px 20px rgba(0, 0, 0, 0.3),
               inset 0 1px 0 rgba(255, 255, 255, 0.05)
@@ -833,7 +835,9 @@ useEffect(() => {
             gap: isExpanded ? '16px' : '0',
             transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
             cursor: 'pointer',
-            overflow: 'hidden',
+            overflow: 'visible',
+            paddingBottom: isExpanded ? '12px' : '10px',
+            marginBottom: isExpanded ? '-12px' : '0',
           }}>
           {/* Left side - Text (slides in/out) */}
           <div style={{
@@ -867,9 +871,9 @@ useEffect(() => {
                   fontWeight: 300,
                   textAlign: 'center',
                 }}>
-                  Light a Green Candle!
+                  {t('illumin80.lightGreenCandle')}
                 </div>
-                <div style={{
+                {/* <div style={{
                   fontSize: '0.65rem',
                   opacity: 0.5,
                   fontWeight: 300,
@@ -879,7 +883,7 @@ useEffect(() => {
                   width: '100%',
                 }}>
                   Sign in + hold RL80 to participate
-                </div>
+                </div> */}
               </>
             ) : (
               <>
@@ -892,7 +896,7 @@ useEffect(() => {
                   color: 'rgba(0, 245, 212, 0.9)',
                   textAlign: 'center',
                 }}>
-                  STAKE RL80 TOKENS
+                  {t('illumin80.stakeTokens')}
                 </div>
                 <div style={{
                   fontSize: '1rem',
@@ -900,9 +904,9 @@ useEffect(() => {
                   fontWeight: 300,
                   textAlign: 'center',
                 }}>
-                  Earn ETH Rewards!
+                  {t('illumin80.earnRewards')}
                 </div>
-                <div style={{
+                {/* <div style={{
                   fontSize: '0.65rem',
                   opacity: 0.5,
                   fontWeight: 300,
@@ -912,7 +916,7 @@ useEffect(() => {
                   width: '100%',
                 }}>
                   Sign in + connect wallet to stake
-                </div>
+                </div> */}
               </>
             )}
 
@@ -949,7 +953,7 @@ useEffect(() => {
                       : '1px solid rgba(255, 255, 255, 0.1)',
                   }}
                 >
-                  Candle
+                  {t('illumin80.candleTab')}
                 </button>
                 <button
                   onClick={(e) => {
@@ -976,7 +980,7 @@ useEffect(() => {
                       : '1px solid rgba(255, 255, 255, 0.1)',
                   }}
                 >
-                  Stake
+                  {t('illumin80.stakeTab')}
                 </button>
               </div>
             )}
@@ -1036,7 +1040,7 @@ useEffect(() => {
                 ? 'none'
                 : 'buttonPulse 2s ease-in-out infinite',
               position: 'relative',
-              overflow: 'hidden',
+              overflow: 'visible',
             }}
           >
             {/* Mobile button icon - changes based on banner type */}
@@ -1111,6 +1115,29 @@ useEffect(() => {
                 pointerEvents: 'none',
               }} />
             )}
+
+            {/* Action indicator - only shows when expanded */}
+            {isExpanded && (
+              <div style={{
+                position: 'absolute',
+                bottom: '-18px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                fontSize: '9px',
+                fontFamily: "'Bebas Neue', sans-serif",
+                color: mobileBannerType === 'candle'
+                  ? 'rgba(212, 175, 55, 0.9)'
+                  : 'rgba(0, 245, 212, 0.9)',
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                animation: 'tapBounce 1.5s ease-in-out infinite',
+                pointerEvents: 'none',
+                whiteSpace: 'nowrap',
+                textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)',
+              }}>
+                {mobileBannerType === 'candle' ? t('illumin80.lightIt') : t('illumin80.stakeTab')}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1143,17 +1170,28 @@ useEffect(() => {
         
         @keyframes inviteGlow {
           0%, 100% {
-            box-shadow: 
+            box-shadow:
               0 0 0 0 rgba(212, 175, 55, 0),
               0 0 10px 2px rgba(212, 175, 55, 0.2);
           }
           50% {
-            box-shadow: 
+            box-shadow:
               0 0 0 8px rgba(212, 175, 55, 0),
               0 0 20px 4px rgba(212, 175, 55, 0.3);
           }
         }
-        
+
+        @keyframes tapBounce {
+          0%, 100% {
+            transform: translateX(-50%) translateY(0);
+            opacity: 0.8;
+          }
+          50% {
+            transform: translateX(-50%) translateY(-3px);
+            opacity: 1;
+          }
+        }
+
         @keyframes buttonPulse {
           0%, 100% {
             box-shadow: 
@@ -1232,7 +1270,7 @@ useEffect(() => {
             filter: "blur(2px)",
           }} />
 
-          <div 
+          <div
             className="candle-button"
             style={{
               position: "fixed",
@@ -1251,7 +1289,9 @@ useEffect(() => {
             onClick={() => router.push('/ride')}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = "scale(1.15) rotate(-5deg)";
-              e.currentTarget.style.filter = "drop-shadow(0 0 20px #ff9500)";
+              e.currentTarget.style.filter = is80sMode
+                ? "drop-shadow(0 0 20px #ff00ff) drop-shadow(0 0 40px #00ffff)"
+                : "drop-shadow(0 0 20px #ff9500)";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = "scale(1) rotate(0deg)";
@@ -1291,11 +1331,15 @@ useEffect(() => {
           if (text) {
             text.style.fontSize = '32';
             text.style.fill = '#ffffff';
-            text.style.filter = 'url(#glow) drop-shadow(0 0 10px #ffcc00)';
+            text.style.filter = is80sMode
+              ? 'url(#glow) drop-shadow(0 0 10px #ff00ff)'
+              : 'url(#glow) drop-shadow(0 0 10px #ffcc00)';
           }
           if (arrow) {
             arrow.style.strokeWidth = '3.5';
-            arrow.style.filter = 'url(#glow) drop-shadow(0 0 15px #ff9500)';
+            arrow.style.filter = is80sMode
+              ? 'url(#glow) drop-shadow(0 0 15px #ff00ff)'
+              : 'url(#glow) drop-shadow(0 0 15px #ff9500)';
           }
           if (arrowHead) {
             arrowHead.style.strokeWidth = '3.5';
@@ -1307,8 +1351,8 @@ useEffect(() => {
           const arrowHead = e.currentTarget.querySelector('.arrow-head');
           if (text) {
             text.style.fontSize = '28';
-            text.style.fill = '#ffcc00';
-            text.style.filter = 'url(#candleGlow)';
+            text.style.fill = is80sMode ? '#00ffff' : '#ffcc00';
+            text.style.filter = is80sMode ? 'url(#candleGlow80s)' : 'url(#candleGlow)';
           }
           if (arrow) {
             arrow.style.strokeWidth = '2.5';
@@ -1321,10 +1365,11 @@ useEffect(() => {
       >
 
         <defs>
+          {/* Normal gold gradient */}
           <linearGradient id="arrowGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
-            <stop offset="50%" stopColor="#ffcc00" stopOpacity="0.8" />
-            <stop offset="100%" stopColor="#ff9500" stopOpacity="1" />
+            <stop offset="0%" stopColor={is80sMode ? "#00ffff" : "#ffffff"} stopOpacity="0.3" />
+            <stop offset="50%" stopColor={is80sMode ? "#ff00ff" : "#ffcc00"} stopOpacity="0.8" />
+            <stop offset="100%" stopColor={is80sMode ? "#ff00ff" : "#ff9500"} stopOpacity="1" />
           </linearGradient>
           <filter id="glow">
             <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
@@ -1336,6 +1381,16 @@ useEffect(() => {
           <filter id="candleGlow">
             <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
             <feFlood floodColor="#ff9500" floodOpacity="0.4"/>
+            <feComposite in2="coloredBlur" operator="in"/>
+            <feMerge>
+              <feMergeNode/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+          {/* 80s mode glow filter */}
+          <filter id="candleGlow80s">
+            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+            <feFlood floodColor="#ff00ff" floodOpacity="0.5"/>
             <feComposite in2="coloredBlur" operator="in"/>
             <feMerge>
               <feMergeNode/>
@@ -1391,10 +1446,10 @@ useEffect(() => {
         
         {/* Text along path - placeholder for user to update */}
         <text
-          fill="#ffcc00"
+          fill={is80sMode ? "#00ffff" : "#ffcc00"}
           fontSize="28"
           fontFamily="'UnifrakturMaguntia', cursive"
-          filter="url(#candleGlow)"
+          filter={is80sMode ? "url(#candleGlow80s)" : "url(#candleGlow)"}
           style={{ transition: "all 0.3s ease" }}
         >
           <textPath href="#textPath" startOffset="5%">
@@ -1413,7 +1468,7 @@ useEffect(() => {
           <circle
             key={i}
             r="1.5"
-            fill="#ffcc00"
+            fill={is80sMode ? (i % 2 === 0 ? "#ff00ff" : "#00ffff") : "#ffcc00"}
             filter="url(#glow)"
           >
             <animateMotion
@@ -1591,7 +1646,7 @@ useEffect(() => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 100,
+            zIndex: 1000,
           }}
           onClick={() => setShowAuthMessage(null)}
         >

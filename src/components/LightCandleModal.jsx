@@ -11,6 +11,7 @@ import { useSendTransaction } from 'thirdweb/react';
 import { burn } from 'thirdweb/extensions/erc20';
 import { sendAndConfirmTransaction } from 'thirdweb';
 import { validateAmount, validateMessage, validateName, validateTransaction, checkRateLimit, formatSafeErrorMessage, sanitizeText } from '@/utils/security';
+import { useLanguage } from './LanguageProvider';
 
 
 const PRAYERS_BY_LANGUAGE = {
@@ -199,6 +200,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
   const { user } = useUser();
   const { walletAddress, tokenBalance, activeAccount } = useWalletAuth();
   const { mutate: sendTransaction } = useSendTransaction();
+  const { t } = useLanguage();
 
   // Multi-step wizard state
   const [currentStep, setCurrentStep] = useState(1);
@@ -518,20 +520,20 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
 
 
   const offeringTypes = {
-    petition: { 
-      color: '#ffaa00', 
-      label: 'PETITION',
-      description: 'Ask for guidance or help'
+    petition: {
+      color: '#ffaa00',
+      label: t('lightCandleModal.offeringTypes.petition'),
+      description: t('lightCandleModal.offeringTypes.petitionDesc')
     },
-    confession: { 
-      color: '#aa66ff', 
-      label: 'CONFESSION',
-      description: 'Unburden your heart'
+    confession: {
+      color: '#aa66ff',
+      label: t('lightCandleModal.offeringTypes.confession'),
+      description: t('lightCandleModal.offeringTypes.confessionDesc')
     },
-    appreciation: { 
-      color: '#00ff66', 
-      label: 'THANKS',
-      description: 'Express gratitude for good fortune'
+    appreciation: {
+      color: '#00ff66',
+      label: t('lightCandleModal.offeringTypes.thanks'),
+      description: t('lightCandleModal.offeringTypes.thanksDesc')
     }
   };
 
@@ -1031,13 +1033,13 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                 fontWeight: '600',
                 marginBottom: '0.25rem'
               }}>
-                Transaction submitted!
+                {t('lightCandleModal.processing.submitted')}
               </div>
               <div style={{
                 color: 'rgba(255, 255, 255, 0.9)',
                 fontSize: '0.75rem'
               }}>
-                Waiting for blockchain confirmation...
+                {t('lightCandleModal.processing.waiting')}
               </div>
             </div>
             
@@ -1062,23 +1064,23 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
               textTransform: 'uppercase',
               letterSpacing: '1px'
             }}>
-              Lighting Your Candle
+              {t('lightCandleModal.processing.lightingCandle')}
             </h3>
-            
+
             <p style={{
               color: 'rgba(255, 255, 255, 0.8)',
               fontSize: '0.9rem',
               marginBottom: '1rem'
             }}>
-              Burning {parseInt(tokenAmount || '0').toLocaleString()} RL80 token{parseInt(tokenAmount) !== 1 ? 's' : ''}...
+              {t('lightCandleModal.processing.burning')} {parseInt(tokenAmount || '0').toLocaleString()} {parseInt(tokenAmount) !== 1 ? t('lightCandleModal.confirmation.tokens') : t('lightCandleModal.confirmation.token')}...
             </p>
-            
+
             <p style={{
               color: 'rgba(255, 255, 255, 0.5)',
               fontSize: '0.75rem',
               fontStyle: 'italic'
             }}>
-              This usually takes 10-30 seconds
+              {t('lightCandleModal.processing.usuallyTakes')}
             </p>
           </div>
         </div>
@@ -1089,7 +1091,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
         {/* Buy RL80 Prompt - Show this INSTEAD of the modal content */}
         {showNoBuyPrompt && transactionStatus !== 'processing' ? (
           <NoTokensPrompt
-            message="You need RL80 tokens to light a candle."
+            message={t('lightCandleModal.noTokens.message')}
             onBuy={() => {
               setShowNoBuyPrompt(false);
               setShowBuyModal(true);
@@ -1102,7 +1104,31 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
         ) : !transactionStatus ? (
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <button className="close-button" onClick={onClose}>✕</button>
-            <h2 className="modal-title">Light a Candle</h2>
+            <h2 className="modal-title">{t('lightCandleModal.title')}</h2>
+
+            {/* Candle Info Box */}
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(236, 72, 153, 0.1))',
+              border: '1px solid rgba(139, 92, 246, 0.3)',
+              borderRadius: '12px',
+              padding: '0.75rem 1rem',
+              marginBottom: '1rem',
+              fontSize: '0.7rem',
+              color: 'rgba(255, 255, 255, 0.85)',
+              lineHeight: '1.5'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                <span style={{ fontSize: '1rem' }}>🕯️</span>
+                <span style={{ fontWeight: '600', color: '#fff' }}>{t('lightCandleModal.candleInfo.burnTime')}</span>
+              </div>
+              <div style={{
+                color: 'rgba(255, 255, 255, 0.6)',
+                fontSize: '0.65rem',
+                paddingLeft: '1.5rem'
+              }}>
+                {t('lightCandleModal.candleInfo.onePerWallet')}
+              </div>
+            </div>
 
             {/* Step Indicator */}
             <div className="step-indicator">
@@ -1120,9 +1146,9 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
 
             {/* Step Title */}
             <div className="step-title">
-              {currentStep === 1 && 'Choose Your Intent'}
-              {currentStep === 2 && 'Write Your Message'}
-              {currentStep === 3 && 'Make Your Offering'}
+              {currentStep === 1 && t('lightCandleModal.steps.step1')}
+              {currentStep === 2 && t('lightCandleModal.steps.step2')}
+              {currentStep === 3 && t('lightCandleModal.steps.step3')}
             </div>
 
             {/* Validation Error Display */}
@@ -1147,7 +1173,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                 <>
                   {/* Offering Type Selection */}
                   <label className="form-label" style={{ textAlign: 'left', marginBottom: '0.5rem' }}>
-                    Prayer Protocol:
+                    {t('lightCandleModal.prayerProtocol')}
                   </label>
                   <div className="offering-types" style={{ marginBottom: '1.5rem' }}>
                     {Object.entries(offeringTypes).map(([type, config]) => (
@@ -1176,7 +1202,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                   <div style={{ marginBottom: '0.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', marginBottom: '0.6rem', gap: '0.5rem' }}>
                       <label className="form-label" style={{ margin: 0, fontSize: '0.7rem' }}>
-                        Light this candle for:
+                        {t('lightCandleModal.prayerFor.label')}
                       </label>
                     </div>
                     <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.75rem' }}>
@@ -1196,7 +1222,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                             accentColor: '#8b5cf6'
                           }}
                         />
-                        <span style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.8)' }}>Myself</span>
+                        <span style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.8)' }}>{t('lightCandleModal.prayerFor.myself')}</span>
                       </label>
                       <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
                         <input
@@ -1214,14 +1240,14 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                             accentColor: '#8b5cf6'
                           }}
                         />
-                        <span style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.8)' }}>Someone Else</span>
+                        <span style={{ fontSize: '0.85rem', color: 'rgba(255, 255, 255, 0.8)' }}>{t('lightCandleModal.prayerFor.someoneElse')}</span>
                       </label>
                     </div>
 
                     {/* Name Input */}
                     <input
                       type="text"
-                      placeholder={prayerFor === 'self' ? 'Your name' : "Enter their name"}
+                      placeholder={prayerFor === 'self' ? t('lightCandleModal.prayerFor.yourName') : t('lightCandleModal.prayerFor.theirName')}
                       value={prayerFor === 'self' ? (user?.username || user?.firstName || '') : recipientName}
                       onChange={(e) => {
                         const value = e.target.value
@@ -1253,7 +1279,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                 <>
                   <div className="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                     <label className="form-label" htmlFor="message" style={{ marginBottom: '0.5rem' }}>
-                      Your Message to 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙
+                      {t('lightCandleModal.message.label')}
                     </label>
                     <textarea
                       id="message"
@@ -1261,10 +1287,10 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                       style={{ flex: 1, minHeight: '120px' }}
                       placeholder={
                         offeringType === 'petition'
-                          ? "Write your prayer or select a template below"
+                          ? t('lightCandleModal.message.placeholderPetition')
                           : offeringType === 'confession'
-                          ? "Share what's on your heart..."
-                          : "Express your gratitude..."
+                          ? t('lightCandleModal.message.placeholderConfession')
+                          : t('lightCandleModal.message.placeholderOther')
                       }
                       value={message}
                       onChange={(e) => {
@@ -1284,7 +1310,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                     {offeringType === 'petition' && (
                       <div style={{ marginTop: '0.75rem' }}>
                         <label className="form-label" style={{ marginBottom: '0.4rem', fontSize: '0.65rem' }}>
-                          Or choose a template:
+                          {t('lightCandleModal.message.templateLabel')}
                         </label>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <select
@@ -1337,7 +1363,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                               cursor: 'pointer'
                             }}
                           >
-                            <option value="">Select a prayer...</option>
+                            <option value="">{t('lightCandleModal.message.selectPrayer')}</option>
                             {prayerTemplates.map(prayer => (
                               <option key={prayer.id} value={prayer.id}>
                                 {prayer.title}
@@ -1364,7 +1390,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                     fontSize: '0.75rem'
                   }}>
                     <div style={{ color: 'rgba(255, 255, 255, 0.6)', marginBottom: '0.25rem' }}>
-                      {offeringTypes[offeringType]?.label} for {prayerFor === 'self' ? (user?.username || user?.firstName || 'yourself') : (recipientName || 'someone')}
+                      {offeringTypes[offeringType]?.label} {t('lightCandleModal.summary.for')} {prayerFor === 'self' ? (user?.username || user?.firstName || t('lightCandleModal.summary.yourself')) : (recipientName || t('lightCandleModal.summary.someone'))}
                     </div>
                     {message && (
                       <div style={{
@@ -1392,15 +1418,15 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                     gap: '1rem',
                     justifyContent: 'center'
                   }}>
-                    <span>💎 1 token min</span>
-                    <span>⏱️ 80hr expiry</span>
-                    <span>🕯️ 1 per wallet</span>
+                    <span>💎 {t('lightCandleModal.info.minToken')}</span>
+                    <span>⏱️ {t('lightCandleModal.info.burnTime')}</span>
+                    <span>🕯️ {t('lightCandleModal.info.onePerWallet')}</span>
                   </div>
 
                   {/* Token Amount */}
                   <div className="form-group">
                     <label className="form-label" htmlFor="tokens">
-                      RL80 Tokens to Burn
+                      {t('lightCandleModal.tokens.label')}
                     </label>
                     <input
                       id="tokens"
@@ -1417,21 +1443,21 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                           setValidationError('');
                         }
                       }}
-                      placeholder="1 RL80 minimum"
+                      placeholder={t('lightCandleModal.tokens.placeholder')}
                       required
                       style={{ fontSize: '1rem', padding: '0.75rem' }}
                     />
                     {tokenBalance !== null && tokenBalance !== undefined ? (
                       <div className="token-balance" style={{ marginTop: '0.5rem' }}>
-                        Balance: {tokenBalance.toLocaleString()} RL80
+                        {t('lightCandleModal.tokens.balance')} {tokenBalance.toLocaleString()} RL80
                       </div>
                     ) : walletAddress ? (
                       <div className="token-balance">
-                        Loading balance...
+                        {t('lightCandleModal.tokens.loadingBalance')}
                       </div>
                     ) : (
                       <div className="token-balance" style={{ color: '#ff6b35' }}>
-                        Connect wallet to see balance
+                        {t('lightCandleModal.tokens.connectWallet')}
                       </div>
                     )}
                   </div>
@@ -1447,7 +1473,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                   className="nav-button back"
                   onClick={() => setCurrentStep(currentStep - 1)}
                 >
-                  Back
+                  {t('lightCandleModal.buttons.back')}
                 </button>
               )}
 
@@ -1458,7 +1484,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                   onClick={() => {
                     // Validation for step 1
                     if (currentStep === 1 && prayerFor === 'other' && !recipientName.trim()) {
-                      showError('Please enter a name for the recipient');
+                      showError(t('lightCandleModal.validation.enterRecipientName'));
                       return;
                     }
                     setCurrentStep(currentStep + 1);
@@ -1466,7 +1492,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                   }}
                   style={currentStep === 1 ? { flex: 1 } : {}}
                 >
-                  Continue
+                  {t('lightCandleModal.buttons.continue')}
                 </button>
               ) : (
                 <button
@@ -1476,7 +1502,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                     // Check if amount is empty or invalid first
                     if (!tokenAmount || parseInt(tokenAmount) < 1) {
                       setHighlightAmountField(true);
-                      showError('Please enter the amount of RL80 tokens to burn');
+                      showError(t('lightCandleModal.validation.enterAmount'));
                       return;
                     }
 
@@ -1499,7 +1525,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                   disabled={isSubmitting}
                   style={{ flex: 1 }}
                 >
-                  {isSubmitting ? 'Processing...' : 'Light Candle'}
+                  {isSubmitting ? t('lightCandleModal.buttons.processing') : t('lightCandleModal.buttons.lightCandle')}
                 </button>
               )}
             </div>
@@ -1558,10 +1584,10 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                 fontSize: '0.95rem',
                 fontWeight: '600'
               }}>
-                Please sign the transaction in your wallet
+                {t('lightCandleModal.wallet.signTransaction')}
               </div>
             </div>
-            
+
             {/* Flame Icon */}
             <div style={{
               fontSize: '3rem',
@@ -1571,7 +1597,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
             }}>
               ✍️
             </div>
-            
+
             {/* Title */}
             <h3 style={{
               fontFamily: "'Orbitron', monospace",
@@ -1582,25 +1608,25 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
               textTransform: 'uppercase',
               letterSpacing: '1px'
             }}>
-              Light a Candle
+              {t('lightCandleModal.title')}
             </h3>
-            
+
             {/* Amount Info */}
             <p style={{
               color: 'rgba(255, 255, 255, 0.8)',
               fontSize: '0.85rem',
               marginBottom: '1rem'
             }}>
-              Amount: <strong>{parseInt(tokenAmount || '0').toLocaleString()} RL80</strong>
+              {t('lightCandleModal.wallet.amount')} <strong>{parseInt(tokenAmount || '0').toLocaleString()} RL80</strong>
             </p>
-            
+
             {/* Status */}
             <p style={{
               color: 'rgba(255, 255, 255, 0.6)',
               fontSize: '0.75rem',
               fontStyle: 'italic'
             }}>
-              Waiting for wallet confirmation...
+              {t('lightCandleModal.wallet.waitingConfirmation')}
             </p>
           </div>
         </div>
@@ -1664,9 +1690,9 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
               textTransform: 'uppercase',
               letterSpacing: '2px'
             }}>
-              Ready to Light it?
+              {t('lightCandleModal.confirmation.title')}
             </h3>
-            
+
             {/* Yellow Info Box */}
             <div style={{
               // background: 'rgba(255, 193, 7, 0.15)',
@@ -1682,16 +1708,16 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                 lineHeight: '1.2',
 
               }}>
-                You're about to burn <strong style={{ fontSize: '1.2rem', color: '#ffc107' }}><br/>{pendingBurnAmount.toLocaleString()}<br/></strong> RL80 token{pendingBurnAmount !== 1 ? 's' : ''}
+                {t('lightCandleModal.confirmation.burning')} <strong style={{ fontSize: '1.2rem', color: '#ffc107' }}><br/>{pendingBurnAmount.toLocaleString()}<br/></strong> {pendingBurnAmount !== 1 ? t('lightCandleModal.confirmation.tokens') : t('lightCandleModal.confirmation.token')}
               </p>
               <p style={{
                 color: 'rgba(255, 193, 7, 0.9)',
                 fontSize: '0.85rem',
                 margin: '0.5rem',
                 fontWeight: '500',
-                    
+
               }}>
-                ⚠️ This action is permanent and cannot be undone
+                ⚠️ {t('lightCandleModal.confirmation.permanent')}
               </p>
             </div>
             
@@ -1729,7 +1755,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                   e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
-                Cancel
+                {t('lightCandleModal.buttons.cancel')}
               </button>
               
               <button
@@ -1920,7 +1946,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                 e.currentTarget.style.boxShadow = 'none';
               }}
             >
-              Light My Candle
+              {t('lightCandleModal.buttons.lightMyCandle')}
             </button>
           </div>
         </div>

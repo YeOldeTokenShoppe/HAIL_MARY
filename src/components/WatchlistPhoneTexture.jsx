@@ -316,26 +316,46 @@ export function WatchlistPhoneTexture({
   // ===========================================
   // LOAD USER AVATARS FOR ACTIVITIES
   // ===========================================
-  
+
   useEffect(() => {
     // Load avatars for all activities that have userImageUrl
     activities.forEach(activity => {
-      if (activity.userImageUrl && !activityAvatarsRef.current[activity.id]) {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => {
-          activityAvatarsRef.current[activity.id] = img;
-          // Force a redraw when avatar loads
+      // Skip if already loaded, loading, or marked as failed
+      if (!activity.userImageUrl || activityAvatarsRef.current.hasOwnProperty(activity.id)) {
+        return;
+      }
+
+      // Mark as loading to prevent duplicate attempts
+      activityAvatarsRef.current[activity.id] = 'loading';
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+
+      img.onload = () => {
+        activityAvatarsRef.current[activity.id] = img;
+        // Force a redraw when avatar loads
+        if (textureRef.current) {
+          textureRef.current.needsUpdate = true;
+        }
+      };
+
+      img.onerror = () => {
+        // Try again without crossOrigin (some servers don't support CORS but still allow loading)
+        const imgNoCors = new Image();
+        imgNoCors.onload = () => {
+          activityAvatarsRef.current[activity.id] = imgNoCors;
           if (textureRef.current) {
             textureRef.current.needsUpdate = true;
           }
         };
-        img.onerror = () => {
-          // Mark as failed so we don't keep trying
-          activityAvatarsRef.current[activity.id] = null;
+        imgNoCors.onerror = () => {
+          // Mark as failed permanently
+          activityAvatarsRef.current[activity.id] = 'failed';
         };
-        img.src = activity.userImageUrl;
-      }
+        imgNoCors.src = activity.userImageUrl;
+      };
+
+      img.src = activity.userImageUrl;
     });
   }, [activities]);
   
@@ -381,76 +401,6 @@ export function WatchlistPhoneTexture({
   // ===========================================
   
   useEffect(() => {
-    // Example activities for testing
-    const exampleActivities = [
-      {
-        id: 'ex-1',
-        type: 'CANDLE',
-        username: 'CryptoMaria',
-        amount: 500,
-        timestamp: Date.now() - 120000,
-        isNew: false,
-      },
-      {
-        id: 'ex-2',
-        type: 'STAKE',
-        username: 'DiamondHands',
-        amount: 75000,
-        timestamp: Date.now() - 300000,
-        isNew: false,
-      },
-      {
-        id: 'ex-3',
-        type: 'CANDLE',
-        username: 'anon420',
-        amount: 1,
-        timestamp: Date.now() - 480000,
-        isNew: false,
-      },
-      {
-        id: 'ex-4',
-        type: 'STAKE',
-        username: 'WhaleAlert',
-        amount: 500000,
-        timestamp: Date.now() - 720000,
-        isNew: false,
-      },
-      {
-        id: 'ex-5',
-        type: 'CANDLE',
-        username: 'ProfitProphet',
-        amount: 1000,
-        timestamp: Date.now() - 900000,
-        isNew: false,
-      },
-      {
-        id: 'ex-6',
-        type: 'CLAIM',
-        username: 'EarlyBeliever',
-        amount: 0.0847,
-        timestamp: Date.now() - 1100000,
-        isNew: false,
-      },
-      {
-        id: 'ex-7',
-        type: 'CANDLE',
-        username: 'HODLer4Life',
-        amount: 50,
-        timestamp: Date.now() - 1300000,
-        isNew: false,
-      },
-      {
-        id: 'ex-8',
-        type: 'UNSTAKE',
-        username: 'PaperHands',
-        amount: 10000,
-        timestamp: Date.now() - 1500000,
-        isNew: false,
-      },
-    ];
-    
-    setActivities(exampleActivities);
-    
     // Subscribe to Firebase offerings
     const offeringsRef = collection(db, 'offerings');
     const q = query(offeringsRef, orderBy('createdAt', 'desc'), limit(30));
@@ -715,7 +665,7 @@ export function WatchlistPhoneTexture({
     // Draw "PRAYER RECEIVED" text
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 56px -apple-system, BlinkMacSystemFont, sans-serif';
-    ctx.fillText('PRAYER RECEIVED', centerX, centerY + 40);
+    ctx.fillText('MESSAGE RECEIVED', centerX, centerY + 40);
     
     // Draw user avatar or initial
     const avatarSize = 100;
@@ -1076,47 +1026,50 @@ export function WatchlistPhoneTexture({
       const avatarX = 70;
       const avatarY = itemY + itemHeight / 2;
       let usernameX = 130; // Default position if no avatar
-      
+
       const userAvatar = activityAvatarsRef.current[activity.id];
-      if (userAvatar) {
+      // Check if it's an actual Image object (not 'loading' or 'failed' strings)
+      const isImageLoaded = userAvatar && userAvatar instanceof Image;
+
+      if (isImageLoaded) {
         // Draw avatar image
         ctx.save();
         ctx.beginPath();
         ctx.arc(avatarX, avatarY, avatarSize / 2, 0, Math.PI * 2);
         ctx.closePath();
         ctx.clip();
-        
+
         ctx.drawImage(
-          userAvatar, 
-          avatarX - avatarSize / 2, 
-          avatarY - avatarSize / 2, 
-          avatarSize, 
+          userAvatar,
+          avatarX - avatarSize / 2,
+          avatarY - avatarSize / 2,
+          avatarSize,
           avatarSize
         );
         ctx.restore();
-        
+
         // Draw border around avatar
         ctx.strokeStyle = style.borderColor || activityType.color;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(avatarX, avatarY, avatarSize / 2, 0, Math.PI * 2);
         ctx.stroke();
-        
+
         usernameX = avatarX + avatarSize / 2 + 12; // Position username after avatar
       } else if (activity.userImageUrl) {
-        // Avatar is loading, draw placeholder circle
+        // Avatar is loading or failed, draw placeholder circle with initial
         ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
         ctx.beginPath();
         ctx.arc(avatarX, avatarY, avatarSize / 2, 0, Math.PI * 2);
         ctx.fill();
-        
+
         // Draw border
         ctx.strokeStyle = style.borderColor || activityType.color;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(avatarX, avatarY, avatarSize / 2, 0, Math.PI * 2);
         ctx.stroke();
-        
+
         // Draw initial in circle
         ctx.fillStyle = style.textColor;
         ctx.font = 'bold 16px -apple-system, BlinkMacSystemFont, sans-serif';
@@ -1124,7 +1077,7 @@ export function WatchlistPhoneTexture({
         ctx.textBaseline = 'middle';
         const initial = activity.username?.charAt(0).toUpperCase() || '?';
         ctx.fillText(initial, avatarX, avatarY);
-        
+
         usernameX = avatarX + avatarSize / 2 + 10;
       }
       

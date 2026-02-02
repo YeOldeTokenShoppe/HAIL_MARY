@@ -112,7 +112,43 @@
   "illumin80": {
     "watchlistLine1": "उसकी निगरानी",
     "watchlistLine2": "सूची में आओ",
-    "watchlistTitle": "उसकी निगरानी सूची में आओ"
+    "watchlistTitle": "उसकी निगरानी सूची में आओ",
+    "lightGreenCandle": "हरी मोमबत्ती जलाओ!",
+    "stakeTokens": "RL80 टोकन स्टेक करें",
+    "earnRewards": "ETH पुरस्कार कमाएं!",
+    "candleTab": "मोमबत्ती",
+    "stakeTab": "स्टेक",
+    "lightIt": "जलाओ",
+    "findMyCandle": "मेरी मोमबत्ती खोजें",
+    "helpAnnotations": {
+      "stats": {
+        "label": "होल्डर समर्पित मोमबत्तियां",
+        "description": "एक ही दृश्य में भावना और मूल्य गतिविधि का लाइव दृश्य प्राप्त करें। मोमबत्तियां मूल्य परिवर्तन के साथ हिलती और रंग बदलती हैं (आंकड़े पैनल देखें)। किसी भी मोमबत्ती पर टैप करके देखें कि किसने जलाई और पिघलने से पहले कितना समय बचा है!"
+      },
+      "phone": {
+        "label": "लाइव फीड",
+        "description": "RL80 भक्तों से रियल-टाइम में चढ़ावा आते देखें।"
+      },
+      "actions": {
+        "label": "और बटन!",
+        "description": "80 के दशक का मोड आज़माएं, साइन इन/आउट करें, या ऊपर दाईं ओर के बटनों से और टोकन खरीदें। आप और भी डेटा देखने के लिए दाईं ओर आंकड़े पैनल खोल सकते हैं!"
+      },
+      "candles": {
+        "label": "एक्शन बटन",
+        "description": "स्टेक या माचिस आइकन पर क्लिक करके मोमबत्ती जलाएं या टोकन स्टेक करें"
+      }
+    },
+    "stats": {
+      "stats": "आंकड़े",
+      "price": "मूल्य",
+      "stake": "स्टेक",
+      "pulse": "पल्स",
+      "candles": "मोमबत्तियां",
+      "tokensBurned": "जलाए गए टोकन",
+      "totalValueLocked": "कुल लॉक मूल्य",
+      "currentAPR": "वर्तमान APR",
+      "rewardsClaimed": "प्राप्त पुरस्कार"
+    }
   },
   "cyberNav": {
     "nav00": { "date": "I-80 पर प्रतीक", "title": "रोडमैप" },
@@ -255,6 +291,204 @@
       "selectImageDetail": "विस्तृत दृश्य के लिए छवि चुनें",
       "previous": "पिछला",
       "next": "अगला"
+    }
+  },
+  "lightCandleModal": {
+    "title": "मोमबत्ती जलाएं",
+    "candleInfo": {
+      "burnTime": "आपकी मोमबत्ती 7 दिन तक जलेगी",
+      "onePerWallet": "प्रति वॉलेट एक सक्रिय मोमबत्ती। नई मोमबत्ती जलाने से मौजूदा बदल जाती है।"
+    },
+    "steps": {
+      "step1": "अपना इरादा चुनें",
+      "step2": "अपना संदेश लिखें",
+      "step3": "अपना प्रसाद दें"
+    },
+    "offeringTypes": {
+      "petition": "याचिका",
+      "petitionDesc": "मार्गदर्शन या सहायता मांगें",
+      "confession": "स्वीकारोक्ति",
+      "confessionDesc": "अपना दिल हल्का करें",
+      "thanks": "धन्यवाद",
+      "thanksDesc": "सौभाग्य के लिए आभार व्यक्त करें"
+    },
+    "prayerFor": {
+      "label": "यह मोमबत्ती किसके लिए जलाएं:",
+      "myself": "स्वयं",
+      "someoneElse": "कोई और",
+      "yourName": "आपका नाम",
+      "theirName": "उनका नाम दर्ज करें"
+    },
+    "message": {
+      "label": "शाश्वत लाभ की माता को आपका संदेश",
+      "placeholderPetition": "वैकल्पिक - अपना संदेश लिखें या नीचे टेम्पलेट चुनें",
+      "placeholderConfession": "संभावित क्षमा के लिए पाप स्वीकार करें..",
+      "placeholderOther": "वैकल्पिक - एक संदेश लिखें",
+      "templateLabel": "या टेम्पलेट चुनें:",
+      "selectPrayer": "प्रार्थना चुनें..."
+    },
+    "tokens": {
+      "label": "जलाने के लिए RL80 टोकन",
+      "placeholder": "न्यूनतम 1 RL80",
+      "balance": "शेष:",
+      "loadingBalance": "शेष लोड हो रहा है...",
+      "connectWallet": "शेष देखने के लिए वॉलेट कनेक्ट करें"
+    },
+    "summary": {
+      "for": "के लिए",
+      "yourself": "स्वयं",
+      "someone": "किसी"
+    },
+    "info": {
+      "minToken": "न्यूनतम 1 टोकन",
+      "burnTime": "7 दिन जलना",
+      "onePerWallet": "प्रति वॉलेट 1"
+    },
+    "buttons": {
+      "back": "वापस",
+      "continue": "जारी रखें",
+      "lightCandle": "मोमबत्ती जलाएं",
+      "processing": "प्रोसेसिंग...",
+      "cancel": "रद्द करें",
+      "lightMyCandle": "मेरी मोमबत्ती जलाएं"
+    },
+    "confirmation": {
+      "title": "जलाने के लिए तैयार?",
+      "burning": "आप जलाने वाले हैं",
+      "token": "RL80 टोकन",
+      "tokens": "RL80 टोकन",
+      "permanent": "यह क्रिया स्थायी है और वापस नहीं हो सकती"
+    },
+    "processing": {
+      "submitted": "लेनदेन जमा!",
+      "waiting": "ब्लॉकचेन पुष्टि की प्रतीक्षा...",
+      "lightingCandle": "आपकी मोमबत्ती जल रही है",
+      "burning": "जल रहा है",
+      "usuallyTakes": "आमतौर पर 10-30 सेकंड लगते हैं"
+    },
+    "wallet": {
+      "signTransaction": "कृपया अपने वॉलेट में लेनदेन पर हस्ताक्षर करें",
+      "waitingConfirmation": "वॉलेट पुष्टि की प्रतीक्षा...",
+      "amount": "राशि:"
+    },
+    "noTokens": {
+      "message": "मोमबत्ती जलाने के लिए RL80 टोकन चाहिए।"
+    },
+    "validation": {
+      "enterAmount": "कृपया जलाने के लिए RL80 टोकन की राशि दर्ज करें",
+      "enterRecipientName": "कृपया प्राप्तकर्ता का नाम दर्ज करें"
+    },
+    "prayerProtocol": "प्रार्थना प्रोटोकॉल:"
+  },
+  "stakeModal": {
+    "title": "RL80 टोकन स्टेक करें",
+    "dashboard": {
+      "title": "स्टेकिंग डैशबोर्ड",
+      "successTitle": "स्टेकिंग सफल!",
+      "updatingBalances": "शेष अपडेट हो रहा है..."
+    },
+    "phases": {
+      "phase1": {
+        "title": "चरण 1: पुरस्कार-पूर्व",
+        "description": "आपकी स्थिति सुरक्षित है। पुरस्कार चरण 2 में सक्रिय होंगे।"
+      },
+      "rewardsActive": {
+        "title": "चरण {{phase}}: पुरस्कार सक्रिय",
+        "phaseDescription": "{{percent}} लेनदेन कर स्टेकर्स को जाता है"
+      },
+      "stakingOpen": {
+        "title": "स्टेकिंग खुला",
+        "subtitle": "(पुरस्कार चरण 2 में सक्रिय होंगे)",
+        "description1": "अपनी स्थिति सुरक्षित करने के लिए जल्दी स्टेक करें।",
+        "description2": "तरलता और मात्रा सीमाएं पूरी होने पर पुरस्कार शुरू होंगे।"
+      },
+      "whatDoesThisMean": "इसका क्या मतलब है?",
+      "tooltipItems": {
+        "locked": "टोकन स्टेकिंग नियमों के अनुसार लॉक हैं",
+        "noRewards": "चरण 1 के दौरान कोई पुरस्कार वितरित नहीं होते",
+        "queued": "चरण 2 से पहले जमा सभी पुरस्कार कतार में हैं",
+        "firstInLine": "पुरस्कार सक्रिय होने पर शुरुआती स्टेकर्स पहले होते हैं"
+      },
+      "zeroTax": {
+        "title": "शून्य कर मोड",
+        "description": "प्रोटोकॉल आत्मनिर्भर है। कभी भी निकालें।"
+      }
+    },
+    "activity": {
+      "title": "स्टेकिंग गतिविधि",
+      "stakedAmount": "स्टेक राशि",
+      "lockStatus": "लॉक स्थिति",
+      "unlocked": "अनलॉक",
+      "rewardsEarned": "अर्जित पुरस्कार",
+      "totalPool": "कुल पूल"
+    },
+    "rewards": {
+      "claimable": "दावा योग्य पुरस्कार:",
+      "readyToClaim": "दावा के लिए तैयार!"
+    },
+    "buttons": {
+      "stakeMore": "अधिक स्टेक",
+      "locked": "लॉक",
+      "withdrawAll": "सब निकालें",
+      "claim": "दावा करें",
+      "close": "बंद करें"
+    },
+    "viewTransaction": "BaseScan पर लेनदेन देखें →",
+    "info": {
+      "hideInfo": "छुपाएं",
+      "showInfo": "जानकारी",
+      "lockDays": "7 दिन लॉक",
+      "minStake": "स्टेक के लिए न्यूनतम 1 RL80",
+      "earnEth": "ETH पुरस्कार कमाएं",
+      "proRata": "आनुपातिक वितरण"
+    },
+    "form": {
+      "amountLabel": "स्टेक राशि",
+      "placeholder": "स्टेक राशि दर्ज करें",
+      "available": "उपलब्ध:",
+      "loadingBalance": "शेष लोड हो रहा है...",
+      "connectWallet": "शेष देखने के लिए वॉलेट कनेक्ट करें"
+    },
+    "preview": {
+      "amount": "राशि:",
+      "unlock": "अनलॉक:",
+      "ethRewards": "ETH पुरस्कार आनुपातिक रूप से वितरित होते हैं"
+    },
+    "processing": {
+      "approving": "अनुमोदन...",
+      "signingStake": "स्टेक साइन कर रहे हैं...",
+      "confirming": "पुष्टि कर रहे हैं...",
+      "processing": "प्रोसेसिंग..."
+    },
+    "stake": "स्टेक",
+    "noTokensMessage": "स्टेक करने के लिए RL80 टोकन चाहिए।",
+    "walletLoading": {
+      "signTransaction": "कृपया अपने वॉलेट में लेनदेन पर हस्ताक्षर करें",
+      "stakeRL80": "RL80 स्टेक",
+      "amount": "राशि:",
+      "waitingConfirmation": "वॉलेट पुष्टि की प्रतीक्षा..."
+    },
+    "confirmation": {
+      "withdrawSuccess": {
+        "title": "निकासी सफल!",
+        "message": "आपके टोकन सफलतापूर्वक निकाले गए।"
+      },
+      "withdrawError": {
+        "title": "निकासी विफल",
+        "message": "टोकन निकालने में विफल। कृपया पुनः प्रयास करें।"
+      },
+      "claimSuccess": {
+        "title": "पुरस्कार प्राप्त!",
+        "message": "आपके ETH पुरस्कार सफलतापूर्वक प्राप्त हुए।"
+      },
+      "claimError": {
+        "title": "दावा विफल",
+        "message": "पुरस्कार प्राप्त करने में विफल। कृपया पुनः प्रयास करें।"
+      }
+    },
+    "errors": {
+      "insufficientAllowance": "टोकन अनुमति अपर्याप्त। कृपया पुनः प्रयास करें।",
+      "stakeFailed": "टोकन स्टेक करने में विफल। कृपया पुनः प्रयास करें।"
     }
   }
 }

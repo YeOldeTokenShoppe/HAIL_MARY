@@ -153,6 +153,194 @@ IMPORTANT: Always verify you have the correct token contract to avoid scams.
     },
     {
       id: 'QUERY_002',
+      command: '> QUERY: Contract.Overview',
+      title: 'How RL80 Works (Plain-English Contract Overview)',
+      response: ` LOADING CONTRACT ARCHITECTURE...
+
+RL80 is powered by three simple on-chain contracts.
+Each has one job only, keeping responsibilities separated for safety and transparency.
+
+No hidden minting.
+No backdoors.
+No custody of your funds.
+
+Just math and code.
+`,
+      status: '[CONTRACTS.VERIFIED]',
+      subQuestions: [
+        {
+          id: 'SUB_002_A',
+          command: '>> SUB.QUERY: Token.Contract',
+          title: 'The Token — RL80',
+          response: `LOADING TOKEN SPECIFICATIONS...
+
+WHAT IT DOES:
+RL80 is a standard ERC-20 token with a small trading fee that funds the ecosystem.
+
+KEY BEHAVIORS:
+• ✅ Fixed supply — 80 billion tokens, forever
+• ✅ No minting after launch
+• ✅ No blacklist or freeze functions
+• ✅ Wallet-to-wallet transfers have 0% fee
+• ✅ Only buys/sells on the liquidity pool pay a small fee (≈4%)
+
+WHY THERE'S A FEE:
+The fee supports:
+• Liquidity growth
+• Staking rewards
+• Marketing & operations
+
+This keeps the project sustainable without selling treasury tokens.
+
+LAUNCH PROTECTION:
+At launch, sell fees are temporarily higher and decay over the first hour to discourage bots and snipers.
+
+After that → normal fees.
+`,
+          status: '[TOKEN.VERIFIED]'
+        },
+        {
+          id: 'SUB_002_B',
+          command: '>> SUB.QUERY: Staking.Contract',
+          title: 'Staking — RL80Staking',
+          response: `LOADING STAKING ARCHITECTURE...
+
+WHAT IT DOES:
+Lets holders stake RL80 and earn ETH rewards collected from trading fees.
+
+HOW IT WORKS:
+1. Stake RL80
+2. Wait 7 days (lock period)
+3. Earn ETH rewards over time
+4. Claim anytime after the lock
+
+IMPORTANT DETAILS:
+• ✅ You always keep custody of your tokens (no third-party risk)
+• ✅ Rewards are distributed fairly based on stake size
+• ✅ Rewards are streamed continuously (not lottery style)
+• ✅ Emergency unstake available if the contract is paused
+• ✅ No staking fees
+
+WHERE REWARDS COME FROM:
+Trading fees → swapped to ETH → sent directly to stakers.
+
+No inflation or token printing.
+`,
+          status: '[STAKING.VERIFIED]'
+        },
+        {
+          id: 'SUB_002_C',
+          command: '>> SUB.QUERY: Splitter.Contract',
+          title: 'Fee Splitter — RewardsSplitter',
+          response: `LOADING SPLITTER MECHANICS...
+
+WHAT IT DOES:
+Automatically converts collected fees into ETH and distributes them.
+
+Think of it like an autopilot treasury.
+
+FLOW:
+Trading fees → swap to ETH → split automatically:
+• Treasury
+• Stakers
+• Marketing
+
+SAFETY FEATURES:
+• ✅ Cannot custody user funds
+• ✅ Distribution percentages are transparent
+• ✅ Fails gracefully (one recipient can't block others)
+• ✅ No manual "trust me" transfers
+• ✅ Can be permanently locked once stable
+
+This means funds move by rules, not promises.
+`,
+          status: '[SPLITTER.VERIFIED]'
+        },
+        {
+          id: 'SUB_002_D',
+          command: '>> SUB.QUERY: Design.Philosophy',
+          title: 'Design Philosophy',
+          response: `LOADING CORE PRINCIPLES...
+
+RL80 follows three principles:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. SEPARATION OF POWERS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Token handles transfers
+• Staking handles rewards
+• Splitter handles fees
+
+No single contract controls everything.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+2. MINIMAL TRUST
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• No admin can mint
+• No admin can seize wallets
+• No hidden upgradeability
+• Core behavior is deterministic
+
+Admins only manage configuration (fees, shares, etc.), not your funds.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+3. TRANSPARENCY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Everything happens on-chain:
+• Rewards
+• Swaps
+• Treasury funding
+• Staking balances
+
+Anyone can verify in a block explorer.
+`,
+          status: '[PHILOSOPHY.DEFINED]'
+        },
+        {
+          id: 'SUB_002_E',
+          command: '>> SUB.QUERY: What.NOT',
+          title: 'What RL80 Does NOT Do',
+          response: `LOADING SECURITY GUARANTEES...
+
+For clarity:
+
+❌ No minting after launch
+❌ No wallet freezing
+❌ No hidden taxes
+❌ No "owner can drain funds" functions
+❌ No staking rug mechanisms
+❌ No custody of your assets
+
+If you hold RL80 in your wallet, it's yours.
+`,
+          status: '[GUARANTEES.CONFIRMED]'
+        },
+        {
+          id: 'SUB_002_F',
+          command: '>> SUB.QUERY: Summary',
+          title: 'Summary',
+          response: `GENERATING SUMMARY...
+
+RL80 is:
+• A fixed-supply token
+• With small trading fees
+• That fund staking rewards and growth
+• Enforced entirely by open-source smart contracts
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Simple. Predictable. Verifiable.
+
+As it should be.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+`,
+          status: '[SUMMARY.COMPLETE]'
+        }
+      ]
+    },
+    {
+      id: 'QUERY_003',
       command: '> QUERY: Special.Status',
       title: 'What is The Illumin80?',
       response: ` LOADING LUMINARY MODULE...
@@ -169,7 +357,7 @@ QUALIFICATION:
       status: '[REQUIREMENTS.LISTED]',
       subQuestions: [
         {
-          id: 'SUB_002_A',
+          id: 'SUB_003_A',
           command: '>> SUB.QUERY: Staking.Multiplier',
           title: 'What is the 1.2x staking multiplier?',
           response: `LOADING MULTIPLIER DETAILS...
@@ -191,7 +379,7 @@ This rewards long-term believers who demonstrate commitment through burning.
           status: '[MULTIPLIER.ACTIVE]'
         },
         {
-          id: 'SUB_002_B',
+          id: 'SUB_003_B',
           command: '>> SUB.QUERY: Qualification',
           title: 'How do I qualify for Illumin80?',
           response: `LOADING QUALIFICATION CRITERIA...
@@ -212,7 +400,7 @@ The threshold adjusts dynamically. As the community grows, you may need to burn 
           status: '[QUALIFICATION.LOADED]'
         },
         {
-          id: 'SUB_002_C',
+          id: 'SUB_003_C',
           command: '>> SUB.QUERY: Burn.Protocol',
           title: 'How do I burn a candle?',
           response: `RETRIEVING INSTRUCTIONS...
@@ -226,7 +414,7 @@ Candles melt over 80 hours. When fully melted, they expire and are removed from 
       ]
     },
     {
-      id: 'QUERY_003',
+      id: 'QUERY_004',
       command: '> QUERY: Rewards',
       title: 'Staking & Rewards',
       response: ` ACCESSING STAKING PROTOCOL...
@@ -239,7 +427,7 @@ RL80 uses a phased rollout for staking rewards. Staking is open from day one, bu
       status: '[TERMS.LOADED]',
       subQuestions: [
         {
-          id: 'SUB_003_A',
+          id: 'SUB_004_A',
           command: '>> SUB.QUERY: Phased.Rollout',
           title: 'How does the phased rewards system work?',
           response: `LOADING PHASE CONFIGURATION...
@@ -272,7 +460,7 @@ This phased approach ensures liquidity is established before rewards begin flowi
           status: '[PHASES.LOADED]'
         },
         {
-          id: 'SUB_003_B',
+          id: 'SUB_004_B',
           command: '>> SUB.QUERY: APY.Current',
           title: 'What are the current staking returns?',
           response: `CALCULATING ...
@@ -293,7 +481,7 @@ You can view your pending rewards in the staking interface before claiming.
           status: '[REWARDS.CALCULATED]'
         },
         {
-          id: 'SUB_003_C',
+          id: 'SUB_004_C',
           command: '>> SUB.QUERY: Rewards.Distribution',
           title: 'Where do staking rewards come from?',
           response: `LOADING DISTRIBUTION LOGIC...
@@ -311,7 +499,7 @@ The distributor swaps collected RL80 for ETH and forwards the staking allocation
           status: '[DISTRIBUTION.CONFIGURED]'
         },
         {
-          id: 'SUB_003_D',
+          id: 'SUB_004_D',
           command: '>> SUB.QUERY: Reward.Mechanism',
           title: 'How are rewards calculated?',
           response: `ANALYZING ...
@@ -329,7 +517,7 @@ Early stakers who position themselves in Phase 1 will be included in the first r
           status: '[REWARDS.CALCULATED]'
         },
         {
-          id: 'SUB_003_E',
+          id: 'SUB_004_E',
           command: '>> SUB.QUERY: LOCK.Mechanism',
           title: 'Is there a lockup?',
           response: `ANALYZING ...
@@ -341,7 +529,7 @@ This applies in all phases — even in Phase 1 when rewards haven't activated ye
           status: '[LOCKUP.CLARIFIED]'
         },
         {
-          id: 'SUB_003_F',
+          id: 'SUB_004_F',
           command: '>> SUB.QUERY: CLAIM.Mechanism',
           title: 'When can I claim rewards?',
           response: `ANALYZING ...
@@ -355,7 +543,7 @@ Because claiming requires an on-chain transaction, a minimum threshold is used t
           status: '[CLAIM.READY]'
         },
         {
-          id: 'SUB_003_G',
+          id: 'SUB_004_G',
           command: '>> SUB.QUERY: Early.Staking',
           title: 'Why stake early in Phase 1?',
           response: `ANALYZING EARLY STAKER BENEFITS...
@@ -379,7 +567,7 @@ This is intentional design, not a delay. Building liquidity first creates a stro
       ]
     },
     {
-      id: 'QUERY_004',
+      id: 'QUERY_005',
       command: '> QUERY: Burn.Protocol',
       title: 'Candle Burning',
       response: ` INITIALIZING METANARRATIVE...
@@ -394,7 +582,7 @@ If you burn again before your candle expires, your new candle replaces the exist
       status: '[PROTOCOL.READY]',
       subQuestions: [
         {
-          id: 'SUB_004_A',
+          id: 'SUB_005_A',
           command: '>> SUB.QUERY: Burn.Mechanics',
           title: 'How does the burn mechanism work?',
           response: `LOADING BURN PROTOCOL...
@@ -409,7 +597,7 @@ Burning is irreversible by design.
           status: '[BURN.ACTIVE]'
         },
         {
-          id: 'SUB_004_B',
+          id: 'SUB_005_B',
           command: '>> SUB.QUERY: Ritual.Significance',
           title: 'What is the ritual significance?',
           response: `ACCESSING SACRED PROTOCOLS...
@@ -424,7 +612,7 @@ Spiritual ROI: ∞`,
           status: '[RITUAL.CONFIRMATION]'
         },
         {
-          id: 'SUB_004_C',
+          id: 'SUB_005_C',
           command: '>> SUB.QUERY: Burn.Impact',
           title: 'How does burning affect token value?',
           response: `CALCULATING ECONOMIC IMPACT...
@@ -462,7 +650,7 @@ Your safety matters more than platform convenience.
     },
 
     {
-      id: 'QUERY_005',
+      id: 'QUERY_006',
       command: '> QUERY: Legal.Compliance',
       title: 'Legal and Tax Info',
       response: ` CONNECTING TO LEGAL ADVISOR...
@@ -478,7 +666,7 @@ Legal framework and compliance:
       status: '[LEGAL.ONLINE]',
       subQuestions: [
         {
-          id: 'SUB_005_A',
+          id: 'SUB_006_A',
           command: '>> SUB.QUERY: Disclaimers',
           title: 'What are the key disclaimers?',
           response: `LOADING DISCLAIMERS...
@@ -503,7 +691,7 @@ BLOCKCHAIN DISCLAIMER:
           status: '[DISCLAIMERS.LOADED]'
         },
         {
-          id: 'SUB_005_B',
+          id: 'SUB_006_B',
           command: '>> SUB.QUERY: Terms.Service',
           title: 'What are the terms of service?',
           response: `LOADING TERMS OF SERVICE...
@@ -523,7 +711,7 @@ https://app.termly.io/policy-viewer/policy.html?policyUUID=350b7b1c-556c-490e-b0
           status: '[TERMS.DISPLAYED]'
         },
         {
-          id: 'SUB_005_C',
+          id: 'SUB_006_C',
           command: '>> SUB.QUERY: Privacy.Policy',
           title: 'How is my data protected?',
           response: `ACCESSING PRIVACY PROTOCOLS...
@@ -543,7 +731,7 @@ https://app.termly.io/policy-viewer/policy.html?policyUUID=c79eb066-d5de-4656-b6
           status: '[PRIVACY.SECURED]'
         },
         {
-          id: 'SUB_005_D',
+          id: 'SUB_006_D',
           command: '>> SUB.QUERY: Tax.Info',
           title: 'What about taxes?',
           response: `LOADING TAX INFORMATION...
@@ -562,7 +750,7 @@ This is not tax advice. Tax treatment varies by jurisdiction.
       ]
     },
     {
-      id: 'QUERY_006',
+      id: 'QUERY_007',
       command: '> QUERY: Safety.Protocol',
       title: 'Anti-Scam & Safety',
       response: ` LOADING SECURITY PROTOCOLS...
@@ -574,7 +762,7 @@ REMEMBER: When in doubt, verify everything through our official channels.
       status: '[SECURITY.ACTIVE]',
       subQuestions: [
         {
-          id: 'SUB_006_A',
+          id: 'SUB_007_A',
           command: '>> SUB.QUERY: Official.Channels',
           title: 'What are the official channels?',
           response: `VERIFYING OFFICIAL SOURCES...
@@ -592,7 +780,7 @@ If you see anyone promoting an RL80 Discord, Telegram, or alternative website, r
           status: '[CHANNELS.VERIFIED]'
         },
         {
-          id: 'SUB_006_B',
+          id: 'SUB_007_B',
           command: '>> SUB.QUERY: DM.Policy',
           title: 'Will RL80 ever DM me?',
           response: `LOADING CONTACT POLICY...
@@ -610,7 +798,7 @@ Do not engage. Block and report immediately.
           status: '[POLICY.CLEAR]'
         },
         {
-          id: 'SUB_006_C',
+          id: 'SUB_007_C',
           command: '>> SUB.QUERY: Wallet.Safety',
           title: 'How do I protect my wallet?',
           response: `LOADING WALLET SECURITY PROTOCOLS...
@@ -629,7 +817,7 @@ Your seed phrase = your funds. Share it with no one.
           status: '[WALLET.SECURED]'
         },
         {
-          id: 'SUB_006_D',
+          id: 'SUB_007_D',
           command: '>> SUB.QUERY: Community.Guidelines',
           title: 'How should I interact with the community?',
           response: `LOADING COMMUNITY PROTOCOLS...
@@ -647,7 +835,7 @@ If something feels off, trust your instincts.
           status: '[COMMUNITY.GUIDELINES]'
         },
         {
-          id: 'SUB_006_E',
+          id: 'SUB_007_E',
           command: '>> SUB.QUERY: No.Guarantees',
           title: 'Are profits guaranteed?',
           response: `LOADING FINANCIAL REALITY CHECK...
@@ -666,7 +854,7 @@ INVEST ONLY WHAT YOU CAN AFFORD TO LOSE.
           status: '[REALITY.CHECK]'
         },
         {
-          id: 'SUB_006_F',
+          id: 'SUB_007_F',
           command: '>> SUB.QUERY: Report.Scam',
           title: 'How do I report a scam or impersonation?',
           response: `LOADING REPORT PROTOCOL...
@@ -683,7 +871,7 @@ Help us protect the community by reporting suspicious activity.
           status: '[REPORT.READY]'
         },
         {
-          id: 'SUB_006_G',
+          id: 'SUB_007_G',
           command: '>> SUB.QUERY: Design.Philosophy',
           title: 'Why no Discord or Telegram?',
           response: `LOADING DESIGN PHILOSOPHY...
@@ -1062,7 +1250,7 @@ This is a feature, not a limitation.
                     borderRadius: '5px',
                     filter: 'brightness(1.2) contrast(1.3) saturate(1.2) drop-shadow(2px 0px 0px rgba(255, 0, 100, 0.5)) drop-shadow(-2px 0px 0px rgba(0, 255, 255, 0.5))',
                     boxShadow: '0 0 30px rgba(255, 215, 0, 0.3), 0 0 60px rgba(0, 255, 0, 0.2)',
-                    animation: 'transmissionGlitch1 3.7s infinite linear, transmissionGlitch2 5.3s infinite linear, transmissionGlitch3 7.1s infinite linear'
+                    // animation: 'transmissionGlitch1 3.7s infinite linear, transmissionGlitch2 5.3s infinite linear, transmissionGlitch3 7.1s infinite linear'
                   }}
                 />
                 

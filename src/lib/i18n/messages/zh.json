@@ -112,7 +112,43 @@
   "illumin80": {
     "watchlistLine1": "进入她的",
     "watchlistLine2": "观察名单",
-    "watchlistTitle": "进入她的观察名单"
+    "watchlistTitle": "进入她的观察名单",
+    "lightGreenCandle": "点燃绿色蜡烛！",
+    "stakeTokens": "质押RL80代币",
+    "earnRewards": "赚取ETH奖励！",
+    "candleTab": "蜡烛",
+    "stakeTab": "质押",
+    "lightIt": "点燃",
+    "findMyCandle": "找到我的蜡烛",
+    "helpAnnotations": {
+      "stats": {
+        "label": "持有者专属蜡烛",
+        "description": "一览实时情绪和价格走势。蜡烛随价格变化而移动和变色（请查看统计面板）。点击任何蜡烛查看谁点燃了它以及还有多长时间融化！"
+      },
+      "phone": {
+        "label": "实时动态",
+        "description": "实时观看RL80信徒的供奉到来。"
+      },
+      "actions": {
+        "label": "更多按钮！",
+        "description": "尝试80年代模式、登录/登出，或使用右上角的按钮购买更多代币。您可以打开右侧的统计面板查看更多数据！"
+      },
+      "candles": {
+        "label": "操作按钮",
+        "description": "点击质押或火柴图标来点燃蜡烛或质押代币"
+      }
+    },
+    "stats": {
+      "stats": "统计",
+      "price": "价格",
+      "stake": "质押",
+      "pulse": "脉冲",
+      "candles": "蜡烛",
+      "tokensBurned": "已燃烧代币",
+      "totalValueLocked": "锁定总价值",
+      "currentAPR": "当前APR",
+      "rewardsClaimed": "已领取奖励"
+    }
   },
   "cyberNav": {
     "nav00": { "date": "I-80上的图标", "title": "路线图" },
@@ -255,6 +291,204 @@
       "selectImageDetail": "选择图片查看详情",
       "previous": "上一个",
       "next": "下一个"
+    }
+  },
+  "lightCandleModal": {
+    "title": "点燃蜡烛",
+    "candleInfo": {
+      "burnTime": "您的蜡烛将燃烧7天",
+      "onePerWallet": "每个钱包一支活跃蜡烛。点燃新蜡烛将替换现有蜡烛。"
+    },
+    "steps": {
+      "step1": "选择您的意图",
+      "step2": "写下您的消息",
+      "step3": "献上供品"
+    },
+    "offeringTypes": {
+      "petition": "祈愿",
+      "petitionDesc": "寻求指引或帮助",
+      "confession": "忏悔",
+      "confessionDesc": "释放心灵",
+      "thanks": "感谢",
+      "thanksDesc": "表达对好运的感激"
+    },
+    "prayerFor": {
+      "label": "为谁点燃这支蜡烛：",
+      "myself": "我自己",
+      "someoneElse": "其他人",
+      "yourName": "您的名字",
+      "theirName": "输入他们的名字"
+    },
+    "message": {
+      "label": "致永恒利润圣母的消息",
+      "placeholderPetition": "可选 - 写下消息或选择下方模板",
+      "placeholderConfession": "为可能的赦免忏悔罪过..",
+      "placeholderOther": "可选 - 写一条消息",
+      "templateLabel": "或选择模板：",
+      "selectPrayer": "选择祈祷文..."
+    },
+    "tokens": {
+      "label": "要销毁的RL80代币",
+      "placeholder": "最少1 RL80",
+      "balance": "余额：",
+      "loadingBalance": "正在加载余额...",
+      "connectWallet": "连接钱包查看余额"
+    },
+    "summary": {
+      "for": "为",
+      "yourself": "你自己",
+      "someone": "某人"
+    },
+    "info": {
+      "minToken": "最少1代币",
+      "burnTime": "燃烧7天",
+      "onePerWallet": "每钱包1支"
+    },
+    "buttons": {
+      "back": "返回",
+      "continue": "继续",
+      "lightCandle": "点燃蜡烛",
+      "processing": "处理中...",
+      "cancel": "取消",
+      "lightMyCandle": "点燃我的蜡烛"
+    },
+    "confirmation": {
+      "title": "准备好点燃了吗？",
+      "burning": "您即将销毁",
+      "token": "RL80代币",
+      "tokens": "RL80代币",
+      "permanent": "此操作是永久性的，无法撤销"
+    },
+    "processing": {
+      "submitted": "交易已提交！",
+      "waiting": "等待区块链确认...",
+      "lightingCandle": "正在点燃您的蜡烛",
+      "burning": "销毁中",
+      "usuallyTakes": "通常需要10-30秒"
+    },
+    "wallet": {
+      "signTransaction": "请在钱包中签署交易",
+      "waitingConfirmation": "等待钱包确认...",
+      "amount": "金额："
+    },
+    "noTokens": {
+      "message": "您需要RL80代币才能点燃蜡烛。"
+    },
+    "validation": {
+      "enterAmount": "请输入要销毁的RL80代币数量",
+      "enterRecipientName": "请输入收件人姓名"
+    },
+    "prayerProtocol": "祈祷协议："
+  },
+  "stakeModal": {
+    "title": "质押RL80代币",
+    "dashboard": {
+      "title": "质押仪表板",
+      "successTitle": "质押成功！",
+      "updatingBalances": "正在更新余额..."
+    },
+    "phases": {
+      "phase1": {
+        "title": "第1阶段：预奖励",
+        "description": "您的仓位已确保。奖励将在第2阶段激活。"
+      },
+      "rewardsActive": {
+        "title": "第{{phase}}阶段: 奖励激活",
+        "phaseDescription": "{{percent}}的交易税流向质押者"
+      },
+      "stakingOpen": {
+        "title": "质押开放",
+        "subtitle": "（奖励在第2阶段激活）",
+        "description1": "尽早质押以确保您的仓位。",
+        "description2": "达到流动性和交易量阈值后奖励开始。"
+      },
+      "whatDoesThisMean": "这意味着什么？",
+      "tooltipItems": {
+        "locked": "代币按质押规则锁定",
+        "noRewards": "第1阶段不分配奖励",
+        "queued": "第2阶段之前累积的所有奖励都在队列中",
+        "firstInLine": "早期质押者在奖励激活时排在最前面"
+      },
+      "zeroTax": {
+        "title": "零税模式",
+        "description": "协议自我维持。随时可提取。"
+      }
+    },
+    "activity": {
+      "title": "质押活动",
+      "stakedAmount": "质押金额",
+      "lockStatus": "锁定状态",
+      "unlocked": "已解锁",
+      "rewardsEarned": "已赚取奖励",
+      "totalPool": "总池"
+    },
+    "rewards": {
+      "claimable": "可领取奖励：",
+      "readyToClaim": "准备领取！"
+    },
+    "buttons": {
+      "stakeMore": "质押更多",
+      "locked": "已锁定",
+      "withdrawAll": "全部提取",
+      "claim": "领取",
+      "close": "关闭"
+    },
+    "viewTransaction": "在BaseScan上查看交易 →",
+    "info": {
+      "hideInfo": "隐藏",
+      "showInfo": "信息",
+      "lockDays": "7天锁定",
+      "minStake": "最低1 RL80可质押",
+      "earnEth": "赚取ETH奖励",
+      "proRata": "按比例分配"
+    },
+    "form": {
+      "amountLabel": "质押金额",
+      "placeholder": "输入质押金额",
+      "available": "可用：",
+      "loadingBalance": "正在加载余额...",
+      "connectWallet": "连接钱包查看余额"
+    },
+    "preview": {
+      "amount": "金额：",
+      "unlock": "解锁：",
+      "ethRewards": "ETH奖励按比例分配"
+    },
+    "processing": {
+      "approving": "批准中...",
+      "signingStake": "签署质押中...",
+      "confirming": "确认中...",
+      "processing": "处理中..."
+    },
+    "stake": "质押",
+    "noTokensMessage": "您需要RL80代币才能质押。",
+    "walletLoading": {
+      "signTransaction": "请在钱包中签署交易",
+      "stakeRL80": "质押RL80",
+      "amount": "金额：",
+      "waitingConfirmation": "等待钱包确认..."
+    },
+    "confirmation": {
+      "withdrawSuccess": {
+        "title": "提取成功！",
+        "message": "您的代币已成功提取。"
+      },
+      "withdrawError": {
+        "title": "提取失败",
+        "message": "代币提取失败。请重试。"
+      },
+      "claimSuccess": {
+        "title": "奖励已领取！",
+        "message": "您的ETH奖励已成功领取。"
+      },
+      "claimError": {
+        "title": "领取失败",
+        "message": "奖励领取失败。请重试。"
+      }
+    },
+    "errors": {
+      "insufficientAllowance": "代币授权不足。请重试。",
+      "stakeFailed": "代币质押失败。请重试。"
     }
   }
 }

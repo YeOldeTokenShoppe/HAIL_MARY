@@ -112,7 +112,43 @@
   "illumin80": {
     "watchlistLine1": "ادخل في",
     "watchlistLine2": "قائمة مراقبتها",
-    "watchlistTitle": "ادخل في قائمة مراقبتها"
+    "watchlistTitle": "ادخل في قائمة مراقبتها",
+    "lightGreenCandle": "أشعل شمعة خضراء!",
+    "stakeTokens": "رهن توكنات RL80",
+    "earnRewards": "اربح مكافآت ETH!",
+    "candleTab": "شمعة",
+    "stakeTab": "رهن",
+    "lightIt": "أشعلها",
+    "findMyCandle": "ابحث عن شمعتي",
+    "helpAnnotations": {
+      "stats": {
+        "label": "شموع مخصصة للحاملين",
+        "description": "احصل على نظرة مباشرة على المشاعر وحركة الأسعار في عرض واحد. تتحرك الشموع وتتغير ألوانها مع تغير الأسعار (انظر لوحة الإحصائيات). اضغط على أي شمعة لترى من أشعلها وكم من الوقت متبقي قبل أن تذوب!"
+      },
+      "phone": {
+        "label": "البث المباشر",
+        "description": "شاهد القرابين تصل في الوقت الفعلي من أتباع RL80."
+      },
+      "actions": {
+        "label": "المزيد من الأزرار!",
+        "description": "جرب وضع الثمانينات، سجل الدخول/الخروج، أو اشترِ المزيد من التوكنات بالأزرار في أعلى اليمين. يمكنك فتح لوحة الإحصائيات على اليمين لرؤية المزيد من البيانات!"
+      },
+      "candles": {
+        "label": "أزرار الإجراءات",
+        "description": "أشعل شمعة أو راهن التوكنات بالنقر على أيقونات الرهن أو عود الثقاب"
+      }
+    },
+    "stats": {
+      "stats": "إحصائيات",
+      "price": "السعر",
+      "stake": "رهن",
+      "pulse": "نبض",
+      "candles": "الشموع",
+      "tokensBurned": "التوكنات المحروقة",
+      "totalValueLocked": "إجمالي القيمة المقفلة",
+      "currentAPR": "العائد السنوي الحالي",
+      "rewardsClaimed": "المكافآت المستلمة"
+    }
   },
   "cyberNav": {
     "nav00": { "date": "أيقونة على I-80", "title": "خارطة الطريق" },
@@ -255,6 +291,204 @@
       "selectImageDetail": "اختر صورة للعرض التفصيلي",
       "previous": "السابق",
       "next": "التالي"
+    }
+  },
+  "lightCandleModal": {
+    "title": "إشعال شمعة",
+    "candleInfo": {
+      "burnTime": "ستحترق شمعتك لمدة 7 أيام",
+      "onePerWallet": "شمعة واحدة نشطة لكل محفظة. إشعال شمعة جديدة يستبدل الحالية."
+    },
+    "steps": {
+      "step1": "اختر نيتك",
+      "step2": "اكتب رسالتك",
+      "step3": "قدّم قربانك"
+    },
+    "offeringTypes": {
+      "petition": "التماس",
+      "petitionDesc": "طلب التوجيه أو المساعدة",
+      "confession": "اعتراف",
+      "confessionDesc": "أفرغ قلبك",
+      "thanks": "شكر",
+      "thanksDesc": "التعبير عن الامتنان للحظ السعيد"
+    },
+    "prayerFor": {
+      "label": "أشعل هذه الشمعة لـ:",
+      "myself": "نفسي",
+      "someoneElse": "شخص آخر",
+      "yourName": "اسمك",
+      "theirName": "أدخل اسمهم"
+    },
+    "message": {
+      "label": "رسالتك إلى سيدة الربح الدائم",
+      "placeholderPetition": "اختياري - اكتب رسالتك أو اختر قالباً أدناه",
+      "placeholderConfession": "اعترف بخطاياك للغفران المحتمل..",
+      "placeholderOther": "اختياري - اكتب رسالة",
+      "templateLabel": "أو اختر قالباً:",
+      "selectPrayer": "اختر صلاة..."
+    },
+    "tokens": {
+      "label": "رموز RL80 للحرق",
+      "placeholder": "الحد الأدنى 1 RL80",
+      "balance": "الرصيد:",
+      "loadingBalance": "جارٍ تحميل الرصيد...",
+      "connectWallet": "اربط المحفظة لرؤية الرصيد"
+    },
+    "summary": {
+      "for": "لـ",
+      "yourself": "نفسك",
+      "someone": "شخص ما"
+    },
+    "info": {
+      "minToken": "الحد الأدنى 1 رمز",
+      "burnTime": "7 أيام احتراق",
+      "onePerWallet": "1 لكل محفظة"
+    },
+    "buttons": {
+      "back": "رجوع",
+      "continue": "متابعة",
+      "lightCandle": "أشعل الشمعة",
+      "processing": "جارٍ المعالجة...",
+      "cancel": "إلغاء",
+      "lightMyCandle": "أشعل شمعتي"
+    },
+    "confirmation": {
+      "title": "مستعد لإشعالها؟",
+      "burning": "أنت على وشك حرق",
+      "token": "رمز RL80",
+      "tokens": "رموز RL80",
+      "permanent": "هذا الإجراء دائم ولا يمكن التراجع عنه"
+    },
+    "processing": {
+      "submitted": "تم إرسال المعاملة!",
+      "waiting": "في انتظار تأكيد البلوكتشين...",
+      "lightingCandle": "جارٍ إشعال شمعتك",
+      "burning": "جارٍ الحرق",
+      "usuallyTakes": "هذا عادة يستغرق 10-30 ثانية"
+    },
+    "wallet": {
+      "signTransaction": "يرجى توقيع المعاملة في محفظتك",
+      "waitingConfirmation": "في انتظار تأكيد المحفظة...",
+      "amount": "المبلغ:"
+    },
+    "noTokens": {
+      "message": "تحتاج رموز RL80 لإشعال شمعة."
+    },
+    "validation": {
+      "enterAmount": "يرجى إدخال كمية رموز RL80 للحرق",
+      "enterRecipientName": "يرجى إدخال اسم المستلم"
+    },
+    "prayerProtocol": "بروتوكول الصلاة:"
+  },
+  "stakeModal": {
+    "title": "رهن توكنات RL80",
+    "dashboard": {
+      "title": "لوحة الرهن",
+      "successTitle": "الرهن ناجح!",
+      "updatingBalances": "جارٍ تحديث الأرصدة..."
+    },
+    "phases": {
+      "phase1": {
+        "title": "المرحلة 1: ما قبل المكافآت",
+        "description": "موقعك مؤمن. تنشط المكافآت في المرحلة 2."
+      },
+      "rewardsActive": {
+        "title": "المرحلة {{phase}}: المكافآت نشطة",
+        "phaseDescription": "{{percent}} من ضريبة المعاملات تتدفق إلى الراهنين"
+      },
+      "stakingOpen": {
+        "title": "الرهن مفتوح",
+        "subtitle": "(المكافآت تنشط في المرحلة 2)",
+        "description1": "ارهن مبكراً لتأمين موقعك.",
+        "description2": "تبدأ المكافآت عند الوصول إلى عتبات السيولة والحجم."
+      },
+      "whatDoesThisMean": "ماذا يعني هذا؟",
+      "tooltipItems": {
+        "locked": "التوكنات مقفلة حسب قواعد الرهن",
+        "noRewards": "لا توزع مكافآت خلال المرحلة 1",
+        "queued": "جميع المكافآت المتراكمة قبل المرحلة 2 في قائمة الانتظار",
+        "firstInLine": "الراهنون الأوائل هم الأوائل عند تفعيل المكافآت"
+      },
+      "zeroTax": {
+        "title": "وضع بدون ضريبة",
+        "description": "البروتوكول مستدام ذاتياً. اسحب في أي وقت."
+      }
+    },
+    "activity": {
+      "title": "نشاط الرهن",
+      "stakedAmount": "المبلغ المرهون",
+      "lockStatus": "حالة القفل",
+      "unlocked": "مفتوح",
+      "rewardsEarned": "المكافآت المكتسبة",
+      "totalPool": "إجمالي المجمع"
+    },
+    "rewards": {
+      "claimable": "المكافآت القابلة للمطالبة:",
+      "readyToClaim": "جاهزة للمطالبة!"
+    },
+    "buttons": {
+      "stakeMore": "ارهن المزيد",
+      "locked": "مقفل",
+      "withdrawAll": "اسحب الكل",
+      "claim": "طالب",
+      "close": "إغلاق"
+    },
+    "viewTransaction": "عرض المعاملة على BaseScan ←",
+    "info": {
+      "hideInfo": "إخفاء",
+      "showInfo": "معلومات",
+      "lockDays": "7 أيام قفل",
+      "minStake": "الحد الأدنى 1 RL80 للرهن",
+      "earnEth": "اكسب مكافآت ETH",
+      "proRata": "توزيع نسبي"
+    },
+    "form": {
+      "amountLabel": "المبلغ للرهن",
+      "placeholder": "أدخل المبلغ للرهن",
+      "available": "متاح:",
+      "loadingBalance": "جارٍ تحميل الرصيد...",
+      "connectWallet": "اربط المحفظة لرؤية الرصيد"
+    },
+    "preview": {
+      "amount": "المبلغ:",
+      "unlock": "فتح القفل:",
+      "ethRewards": "مكافآت ETH توزع بشكل نسبي"
+    },
+    "processing": {
+      "approving": "جارٍ الموافقة...",
+      "signingStake": "جارٍ توقيع الرهن...",
+      "confirming": "جارٍ التأكيد...",
+      "processing": "جارٍ المعالجة..."
+    },
+    "stake": "رهن",
+    "noTokensMessage": "تحتاج توكنات RL80 للرهن.",
+    "walletLoading": {
+      "signTransaction": "يرجى توقيع المعاملة في محفظتك",
+      "stakeRL80": "رهن RL80",
+      "amount": "المبلغ:",
+      "waitingConfirmation": "في انتظار تأكيد المحفظة..."
+    },
+    "confirmation": {
+      "withdrawSuccess": {
+        "title": "السحب ناجح!",
+        "message": "تم سحب توكناتك بنجاح."
+      },
+      "withdrawError": {
+        "title": "فشل السحب",
+        "message": "فشل سحب التوكنات. يرجى المحاولة مرة أخرى."
+      },
+      "claimSuccess": {
+        "title": "تم المطالبة بالمكافآت!",
+        "message": "تم المطالبة بمكافآت ETH الخاصة بك بنجاح."
+      },
+      "claimError": {
+        "title": "فشل المطالبة",
+        "message": "فشل المطالبة بالمكافآت. يرجى المحاولة مرة أخرى."
+      }
+    },
+    "errors": {
+      "insufficientAllowance": "إذن التوكنات غير كافٍ. يرجى المحاولة مرة أخرى.",
+      "stakeFailed": "فشل رهن التوكنات. يرجى المحاولة مرة أخرى."
     }
   }
 }

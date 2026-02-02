@@ -1230,9 +1230,107 @@ export default function CyberTokenomicsSection({ isMobile }) {
         </div>
       </div>
 
+      {/* TL;DR Section */}
+      <div style={{
+        marginTop: '3rem',
+        padding: isMobile ? '20px' : '25px 30px',
+        background: 'rgba(5, 10, 15, 0.95)',
+        border: '1px solid rgba(0, 255, 170, 0.5)',
+        borderRadius: '8px',
+        boxShadow: '0 0 25px rgba(0, 255, 170, 0.15)',
+      }}>
+        <h3 style={{
+          fontSize: isMobile ? '16px' : '18px',
+          fontWeight: 'bold',
+          background: 'linear-gradient(135deg, #ffd700 0%, #00ff00 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
+          marginBottom: '20px',
+          fontFamily: 'Fjalla One, sans-serif',
+          textTransform: 'uppercase',
+          letterSpacing: '2px',
+          textAlign: 'center',
+          filter: 'drop-shadow(0 0 10px rgba(255, 215, 0, 0.4))',
+        }}>
+          RL80 Tokenomics — TL;DR
+        </h3>
+
+        <div style={{
+          display: 'grid',
+          gap: '12px',
+        }}>
+          {[
+            { icon: '🔒', text: 'Fixed supply — 80B forever', color: '#ffd700' },
+            { icon: '✓', text: '0% tax on normal transfers', color: '#00ff00' },
+            { icon: '📊', text: '~4% trading fee only on DEX buys/sells', color: '#0fa' },
+            { icon: '🔄', text: 'Fees → swapped to ETH → split to:', color: '#0fa', indent: false },
+            { text: 'Treasury (liquidity)', color: 'rgba(255, 255, 255, 0.7)', subItem: true },
+            { text: 'Stakers (rewards)', color: 'rgba(255, 255, 255, 0.7)', subItem: true },
+            { text: 'Marketing', color: 'rgba(255, 255, 255, 0.7)', subItem: true },
+            { icon: '💎', text: 'Stake RL80 → earn ETH', color: '#00ff00' },
+            { icon: '🛡️', text: 'No minting • No wallet freezes • No hidden taxes', color: '#ffd700' },
+          ].map((item, idx) => (
+            <div
+              key={idx}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                paddingLeft: item.subItem ? '32px' : '0',
+              }}
+            >
+              {item.icon && (
+                <span style={{
+                  fontSize: '14px',
+                  width: '22px',
+                  textAlign: 'center',
+                }}>
+                  {item.icon}
+                </span>
+              )}
+              {item.subItem && (
+                <span style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  background: item.color,
+                  flexShrink: 0,
+                }} />
+              )}
+              <span style={{
+                color: item.color,
+                fontSize: isMobile ? '12px' : '13px',
+                fontFamily: 'monospace',
+                letterSpacing: '0.5px',
+              }}>
+                {item.text}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div style={{
+          marginTop: '20px',
+          paddingTop: '16px',
+          borderTop: '1px solid rgba(0, 255, 170, 0.2)',
+          textAlign: 'center',
+        }}>
+          <span style={{
+            color: '#0fa',
+            fontSize: isMobile ? '11px' : '12px',
+            fontFamily: 'monospace',
+            letterSpacing: '1px',
+            fontStyle: 'italic',
+          }}>
+            Simple, sustainable, on-chain.
+          </span>
+        </div>
+      </div>
+
       {/* Verification Links */}
       <div style={{
-        marginTop: '4.5rem',
+        marginTop: '2rem',
         padding: '20px',
         background: 'rgba(5, 10, 15, 0.9)',
         border: '1px solid rgba(0, 255, 170, 0.3)',

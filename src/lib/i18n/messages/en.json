@@ -116,7 +116,43 @@
   "illumin80": {
     "watchlistLine1": "Get on her",
     "watchlistLine2": "watchlist",
-    "watchlistTitle": "Get On Her Watchlist"
+    "watchlistTitle": "Get On Her Watchlist",
+    "lightGreenCandle": "Light a Green Candle!",
+    "stakeTokens": "STAKE RL80 TOKENS",
+    "earnRewards": "Earn ETH Rewards!",
+    "candleTab": "Candle",
+    "stakeTab": "Stake",
+    "lightIt": "Light it",
+    "findMyCandle": "Find My Candle",
+    "helpAnnotations": {
+      "stats": {
+        "label": "Holder-dedicated Candles",
+        "description": "Get a live look at sentiment and price action all in one view. Candles move and change color as prices change (see the Stats Panel). Tap on any candle to see who lit it and how much time is remaining before it melts!"
+      },
+      "phone": {
+        "label": "Live Feed",
+        "description": "Watch real-time offerings arrive from RL80 devotees."
+      },
+      "actions": {
+        "label": "More Buttons!",
+        "description": "Try 80s mode, sign in/out, or buy more tokens with the buttons at the top right. You can open the stats panel on the right to see even more data!"
+      },
+      "candles": {
+        "label": "Action Buttons",
+        "description": "Light a candle or stake tokens by clicking the stake or match icons"
+      }
+    },
+    "stats": {
+      "stats": "STATS",
+      "price": "Price",
+      "stake": "Stake",
+      "pulse": "Pulse",
+      "candles": "Candles",
+      "tokensBurned": "Tokens Burned",
+      "totalValueLocked": "Total Value Locked",
+      "currentAPR": "Current APR",
+      "rewardsClaimed": "Rewards Claimed"
+    }
   },
   "cyberNav": {
     "nav00": { "date": "ICON ON I-80", "title": "ROADMAP" },
@@ -259,6 +295,204 @@
       "selectImageDetail": "Select image for detailed view",
       "previous": "Previous",
       "next": "Next"
+    }
+  },
+  "lightCandleModal": {
+    "title": "Light a Candle",
+    "candleInfo": {
+      "burnTime": "Your candle will burn for 7 days",
+      "onePerWallet": "One active candle per wallet. Lighting a new candle replaces any existing one."
+    },
+    "steps": {
+      "step1": "Choose Your Intent",
+      "step2": "Write Your Message",
+      "step3": "Make Your Offering"
+    },
+    "offeringTypes": {
+      "petition": "PETITION",
+      "petitionDesc": "Ask for guidance or help",
+      "confession": "CONFESSION",
+      "confessionDesc": "Unburden your heart",
+      "thanks": "THANKS",
+      "thanksDesc": "Express gratitude for good fortune"
+    },
+    "prayerFor": {
+      "label": "Light this candle for:",
+      "myself": "Myself",
+      "someoneElse": "Someone Else",
+      "yourName": "Your name",
+      "theirName": "Enter their name"
+    },
+    "message": {
+      "label": "Your Message to Our Lady of Perpetual Profit",
+      "placeholderPetition": "OPTIONAL - Write your message or select a template below",
+      "placeholderConfession": "Confess your sins for possible absolution..",
+      "placeholderOther": "OPTIONAL - Write a message",
+      "templateLabel": "Or choose a template:",
+      "selectPrayer": "Select a prayer..."
+    },
+    "tokens": {
+      "label": "RL80 Tokens to Burn",
+      "placeholder": "1 RL80 minimum",
+      "balance": "Balance:",
+      "loadingBalance": "Loading balance...",
+      "connectWallet": "Connect wallet to see balance"
+    },
+    "summary": {
+      "for": "for",
+      "yourself": "yourself",
+      "someone": "someone"
+    },
+    "info": {
+      "minToken": "1 token min",
+      "burnTime": "7 day burn",
+      "onePerWallet": "1 per wallet"
+    },
+    "buttons": {
+      "back": "Back",
+      "continue": "Continue",
+      "lightCandle": "Light Candle",
+      "processing": "Processing...",
+      "cancel": "Cancel",
+      "lightMyCandle": "Light My Candle"
+    },
+    "confirmation": {
+      "title": "Ready to Light it?",
+      "burning": "You're about to burn",
+      "token": "RL80 token",
+      "tokens": "RL80 tokens",
+      "permanent": "This action is permanent and cannot be undone"
+    },
+    "processing": {
+      "submitted": "Transaction submitted!",
+      "waiting": "Waiting for blockchain confirmation...",
+      "lightingCandle": "Lighting Your Candle",
+      "burning": "Burning",
+      "usuallyTakes": "This usually takes 10-30 seconds"
+    },
+    "wallet": {
+      "signTransaction": "Please sign the transaction in your wallet",
+      "waitingConfirmation": "Waiting for wallet confirmation...",
+      "amount": "Amount:"
+    },
+    "noTokens": {
+      "message": "You need RL80 tokens to light a candle."
+    },
+    "validation": {
+      "enterAmount": "Please enter the amount of RL80 tokens to burn",
+      "enterRecipientName": "Please enter a name for the recipient"
+    },
+    "prayerProtocol": "Prayer Protocol:"
+  },
+  "stakeModal": {
+    "title": "Stake RL80 Tokens",
+    "dashboard": {
+      "title": "STAKING DASHBOARD",
+      "successTitle": "Staking Successful!",
+      "updatingBalances": "Updating balances..."
+    },
+    "phases": {
+      "phase1": {
+        "title": "Phase 1: Pre-Rewards",
+        "description": "Your position is secured. Rewards activate in Phase 2."
+      },
+      "rewardsActive": {
+        "title": "Phase {{phase}}: Rewards Active",
+        "phaseDescription": "{{percent}} of transaction tax flowing to stakers"
+      },
+      "stakingOpen": {
+        "title": "Staking is Open",
+        "subtitle": "(Rewards Activate in Phase 2)",
+        "description1": "Stake early to secure your position.",
+        "description2": "Rewards begin once liquidity and volume thresholds are met."
+      },
+      "whatDoesThisMean": "What does this mean?",
+      "tooltipItems": {
+        "locked": "Tokens are locked per staking rules",
+        "noRewards": "No rewards are distributed during Phase 1",
+        "queued": "All rewards accrued before Phase 2 are queued",
+        "firstInLine": "Early stakers are first in line when rewards activate"
+      },
+      "zeroTax": {
+        "title": "Zero Tax Mode",
+        "description": "Protocol is self-sustaining. Withdraw anytime."
+      }
+    },
+    "activity": {
+      "title": "STAKING ACTIVITY",
+      "stakedAmount": "Staked Amount",
+      "lockStatus": "Lock Status",
+      "unlocked": "Unlocked",
+      "rewardsEarned": "Rewards Earned",
+      "totalPool": "Total Pool"
+    },
+    "rewards": {
+      "claimable": "Claimable Rewards:",
+      "readyToClaim": "Ready to claim!"
+    },
+    "buttons": {
+      "stakeMore": "STAKE MORE",
+      "locked": "LOCKED",
+      "withdrawAll": "WITHDRAW ALL",
+      "claim": "CLAIM",
+      "close": "Close"
+    },
+    "viewTransaction": "View transaction on BaseScan →",
+    "info": {
+      "hideInfo": "Hide",
+      "showInfo": "Info",
+      "lockDays": "7 day lock",
+      "minStake": "Min 1 RL80 to stake",
+      "earnEth": "Earn ETH rewards",
+      "proRata": "Pro-rata distribution"
+    },
+    "form": {
+      "amountLabel": "Amount to Stake",
+      "placeholder": "Enter amount to stake",
+      "available": "Available:",
+      "loadingBalance": "Loading balance...",
+      "connectWallet": "Connect wallet to see balance"
+    },
+    "preview": {
+      "amount": "Amount:",
+      "unlock": "Unlock:",
+      "ethRewards": "ETH rewards distributed proportionally"
+    },
+    "processing": {
+      "approving": "Approving...",
+      "signingStake": "Signing Stake...",
+      "confirming": "Confirming...",
+      "processing": "Processing..."
+    },
+    "stake": "Stake",
+    "noTokensMessage": "You need RL80 tokens to stake.",
+    "walletLoading": {
+      "signTransaction": "Please sign the transaction in your wallet",
+      "stakeRL80": "Stake RL80",
+      "amount": "Amount:",
+      "waitingConfirmation": "Waiting for wallet confirmation..."
+    },
+    "confirmation": {
+      "withdrawSuccess": {
+        "title": "Withdrawal Successful!",
+        "message": "Your tokens have been withdrawn successfully."
+      },
+      "withdrawError": {
+        "title": "Withdrawal Failed",
+        "message": "Failed to withdraw tokens. Please try again."
+      },
+      "claimSuccess": {
+        "title": "Rewards Claimed!",
+        "message": "Your ETH rewards have been claimed successfully."
+      },
+      "claimError": {
+        "title": "Claim Failed",
+        "message": "Failed to claim rewards. Please try again."
+      }
+    },
+    "errors": {
+      "insufficientAllowance": "Insufficient token allowance. Please try again.",
+      "stakeFailed": "Failed to stake tokens. Please try again."
     }
   }
 }

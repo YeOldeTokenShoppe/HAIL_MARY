@@ -80,38 +80,38 @@ const ShrineLeftPanel = forwardRef(({
       <style jsx>{`
         @keyframes buttonPulse {
           0%, 100% {
-            box-shadow: 
-              0 0 0 0 rgba(212, 175, 55, 0.4),
-              0 0 10px 2px rgba(212, 175, 55, 0.2);
-            border-color: rgba(212, 175, 55, 0.15);
+            box-shadow:
+              0 0 0 0 ${is80sMode ? 'rgba(255, 0, 255, 0.4)' : 'rgba(212, 175, 55, 0.4)'},
+              0 0 10px 2px ${is80sMode ? 'rgba(255, 0, 255, 0.2)' : 'rgba(212, 175, 55, 0.2)'};
+            border-color: ${is80sMode ? 'rgba(255, 0, 255, 0.2)' : 'rgba(212, 175, 55, 0.15)'};
           }
           50% {
-            box-shadow: 
-              0 0 0 6px rgba(212, 175, 55, 0),
-              0 0 20px 4px rgba(212, 175, 55, 0.3);
-            border-color: rgba(212, 175, 55, 0.3);
+            box-shadow:
+              0 0 0 6px ${is80sMode ? 'rgba(255, 0, 255, 0)' : 'rgba(212, 175, 55, 0)'},
+              0 0 20px 4px ${is80sMode ? 'rgba(255, 0, 255, 0.4)' : 'rgba(212, 175, 55, 0.3)'};
+            border-color: ${is80sMode ? 'rgba(255, 0, 255, 0.4)' : 'rgba(212, 175, 55, 0.3)'};
           }
         }
-        
+
         @keyframes pulse {
           0% { transform: scale(1); opacity: 0.6; }
           50% { transform: scale(1.2); opacity: 0; }
           100% { transform: scale(1.4); opacity: 0; }
         }
-        
+
         @keyframes inviteGlow {
           0%, 100% {
-            box-shadow: 
-              0 0 0 0 rgba(212, 175, 55, 0),
-              0 0 10px 2px rgba(212, 175, 55, 0.2);
+            box-shadow:
+              0 0 0 0 ${is80sMode ? 'rgba(255, 0, 255, 0)' : 'rgba(212, 175, 55, 0)'},
+              0 0 10px 2px ${is80sMode ? 'rgba(255, 0, 255, 0.2)' : 'rgba(212, 175, 55, 0.2)'};
           }
           50% {
-            box-shadow: 
-              0 0 0 8px rgba(212, 175, 55, 0),
-              0 0 20px 4px rgba(212, 175, 55, 0.3);
+            box-shadow:
+              0 0 0 8px ${is80sMode ? 'rgba(255, 0, 255, 0)' : 'rgba(212, 175, 55, 0)'},
+              0 0 20px 4px ${is80sMode ? 'rgba(255, 0, 255, 0.4)' : 'rgba(212, 175, 55, 0.3)'};
           }
         }
-        
+
         @keyframes slideIn {
           from {
             transform: translateY(-50%) translateX(-20px);
@@ -217,12 +217,18 @@ const ShrineLeftPanel = forwardRef(({
           fontFamily: "'Bebas Neue', sans-serif",
           fontSize: isMobile ? '1rem' : '1rem',
           fontWeight: 300,
-          color: 'rgba(246, 245, 241, 0.95)',
-          textShadow: `
-            0 0 20px rgba(212, 175, 55, 0.4),
-            0 0 40px rgba(212, 175, 55, 0.2),
-            2px 2px 4px rgba(0, 0, 0, 0.6)
-          `,
+          color: is80sMode ? '#00ffff' : 'rgba(246, 245, 241, 0.95)',
+          textShadow: is80sMode
+            ? `
+              0 0 20px rgba(255, 0, 255, 0.6),
+              0 0 40px rgba(0, 255, 255, 0.4),
+              2px 2px 4px rgba(0, 0, 0, 0.6)
+            `
+            : `
+              0 0 20px rgba(212, 175, 55, 0.4),
+              0 0 40px rgba(212, 175, 55, 0.2),
+              2px 2px 4px rgba(0, 0, 0, 0.6)
+            `,
           letterSpacing: '0.06em',
           textAlign: 'center',
           lineHeight: 1.2,
@@ -262,7 +268,7 @@ const ShrineLeftPanel = forwardRef(({
         </div>
         
         {/* Stake button - circular background matching matchstick style */}
-        <div 
+        <div
           onClick={() => {
             if (onStakeClick) {
               onStakeClick()
@@ -273,14 +279,14 @@ const ShrineLeftPanel = forwardRef(({
             width: '5.5rem',
             height: '5.5rem',
             borderRadius: '50%',
-            background: 'rgba(212, 175, 55, 0.1)',
-            border: '1.5px solid rgba(212, 175, 55, 0.15)',
+            background: is80sMode ? 'rgba(255, 0, 255, 0.1)' : 'rgba(212, 175, 55, 0.1)',
+            border: is80sMode ? '1.5px solid rgba(255, 0, 255, 0.2)' : '1.5px solid rgba(212, 175, 55, 0.15)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
             transition: 'all 0.3s ease',
-            boxShadow: '0 0 0 0 rgba(212, 175, 55, 0)',
+            boxShadow: is80sMode ? '0 0 0 0 rgba(255, 0, 255, 0)' : '0 0 0 0 rgba(212, 175, 55, 0)',
             animation: 'buttonPulse 2s ease-in-out infinite',
             position: 'relative',
             overflow: 'visible',
@@ -290,17 +296,17 @@ const ShrineLeftPanel = forwardRef(({
           onMouseEnter={(e) => {
             setIsHoveringStake(true);
             e.currentTarget.style.animation = 'none';
-            e.currentTarget.style.background = 'rgba(212, 175, 55, 0.15)';
-            e.currentTarget.style.border = '1.5px solid rgba(212, 175, 55, 0.25)';
-            e.currentTarget.style.boxShadow = '0 0 20px rgba(212, 175, 55, 0.3)';
+            e.currentTarget.style.background = is80sMode ? 'rgba(255, 0, 255, 0.2)' : 'rgba(212, 175, 55, 0.15)';
+            e.currentTarget.style.border = is80sMode ? '1.5px solid rgba(255, 0, 255, 0.4)' : '1.5px solid rgba(212, 175, 55, 0.25)';
+            e.currentTarget.style.boxShadow = is80sMode ? '0 0 20px rgba(255, 0, 255, 0.4), 0 0 40px rgba(0, 255, 255, 0.2)' : '0 0 20px rgba(212, 175, 55, 0.3)';
             e.currentTarget.style.transform = 'scale(1.05)';
           }}
           onMouseLeave={(e) => {
             setIsHoveringStake(false);
             e.currentTarget.style.animation = 'buttonPulse 2s ease-in-out infinite';
-            e.currentTarget.style.background = 'rgba(212, 175, 55, 0.1)';
-            e.currentTarget.style.border = '1.5px solid rgba(212, 175, 55, 0.15)';
-            e.currentTarget.style.boxShadow = '0 0 0 0 rgba(212, 175, 55, 0)';
+            e.currentTarget.style.background = is80sMode ? 'rgba(255, 0, 255, 0.1)' : 'rgba(212, 175, 55, 0.1)';
+            e.currentTarget.style.border = is80sMode ? '1.5px solid rgba(255, 0, 255, 0.2)' : '1.5px solid rgba(212, 175, 55, 0.15)';
+            e.currentTarget.style.boxShadow = is80sMode ? '0 0 0 0 rgba(255, 0, 255, 0)' : '0 0 0 0 rgba(212, 175, 55, 0)';
             e.currentTarget.style.transform = 'scale(1)';
           }}
         >
@@ -311,11 +317,11 @@ const ShrineLeftPanel = forwardRef(({
               left: '110%',
               top: '50%',
               whiteSpace: 'nowrap',
-              backgroundColor: 'rgba(10, 10, 20, 0.9)',
+              backgroundColor: is80sMode ? 'rgba(20, 0, 40, 0.95)' : 'rgba(10, 10, 20, 0.9)',
               padding: '10px 20px',
               borderRadius: '8px',
-              border: '1px solid rgba(212, 175, 55, 0.3)',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+              border: is80sMode ? '1px solid rgba(255, 0, 255, 0.4)' : '1px solid rgba(212, 175, 55, 0.3)',
+              boxShadow: is80sMode ? '0 4px 12px rgba(0, 0, 0, 0.5), 0 0 20px rgba(255, 0, 255, 0.2)' : '0 4px 12px rgba(0, 0, 0, 0.5)',
               animation: 'slideIn 0.3s ease-out forwards',
               pointerEvents: 'none',
               zIndex: 1000,
@@ -324,8 +330,8 @@ const ShrineLeftPanel = forwardRef(({
                 fontFamily: "'Bebas Neue', sans-serif",
                 fontSize: '0.9rem',
                 fontWeight: 300,
-                color: 'rgba(246, 245, 241, 0.95)',
-                textShadow: '0 0 10px rgba(212, 175, 55, 0.3)',
+                color: is80sMode ? '#00ffff' : 'rgba(246, 245, 241, 0.95)',
+                textShadow: is80sMode ? '0 0 10px rgba(0, 255, 255, 0.5)' : '0 0 10px rgba(212, 175, 55, 0.3)',
                 letterSpacing: '0.05em',
                 lineHeight: 1.4,
               }}>
@@ -352,7 +358,7 @@ const ShrineLeftPanel = forwardRef(({
             width: '100%',
             height: '100%',
             borderRadius: '50%',
-            boxShadow: '0 0 0 0 rgba(212, 175, 55, 0.4)',
+            boxShadow: is80sMode ? '0 0 0 0 rgba(255, 0, 255, 0.4)' : '0 0 0 0 rgba(212, 175, 55, 0.4)',
             animation: 'inviteGlow 3s ease-in-out infinite',
             pointerEvents: 'none',
           }} />
@@ -371,22 +377,27 @@ const ShrineLeftPanel = forwardRef(({
           <div style={{
             flex: 1,
             height: '1px',
-            background: 'linear-gradient(to right, transparent, rgba(212, 175, 55, 0.4))',
+            background: is80sMode
+              ? 'linear-gradient(to right, transparent, rgba(255, 0, 255, 0.5))'
+              : 'linear-gradient(to right, transparent, rgba(212, 175, 55, 0.4))',
           }} />
           <span style={{
             fontFamily: "'Bebas Neue', sans-serif",
             fontSize: '0.85rem',
-            color: 'rgba(212, 175, 55, 0.7)',
+            color: is80sMode ? 'rgba(0, 255, 255, 0.8)' : 'rgba(212, 175, 55, 0.7)',
             textTransform: 'lowercase',
             letterSpacing: '0.1em',
             fontStyle: 'italic',
+            textShadow: is80sMode ? '0 0 10px rgba(0, 255, 255, 0.5)' : 'none',
           }}>
             or
           </span>
           <div style={{
             flex: 1,
             height: '1px',
-            background: 'linear-gradient(to left, transparent, rgba(212, 175, 55, 0.4))',
+            background: is80sMode
+              ? 'linear-gradient(to left, transparent, rgba(255, 0, 255, 0.5))'
+              : 'linear-gradient(to left, transparent, rgba(212, 175, 55, 0.4))',
           }} />
         </div>
 
@@ -394,12 +405,18 @@ const ShrineLeftPanel = forwardRef(({
           fontFamily: "'Bebas Neue', sans-serif",
           fontSize: isMobile ? '1rem' : '1.1rem',
           fontWeight: 300,
-          color: 'rgba(246, 245, 241, 0.95)',
-          textShadow: `
-            0 0 20px rgba(212, 175, 55, 0.4),
-            0 0 40px rgba(212, 175, 55, 0.2),
-            2px 2px 4px rgba(0, 0, 0, 0.6)
-          `,
+          color: is80sMode ? '#00ffff' : 'rgba(246, 245, 241, 0.95)',
+          textShadow: is80sMode
+            ? `
+              0 0 20px rgba(255, 0, 255, 0.6),
+              0 0 40px rgba(0, 255, 255, 0.4),
+              2px 2px 4px rgba(0, 0, 0, 0.6)
+            `
+            : `
+              0 0 20px rgba(212, 175, 55, 0.4),
+              0 0 40px rgba(212, 175, 55, 0.2),
+              2px 2px 4px rgba(0, 0, 0, 0.6)
+            `,
           letterSpacing: '0.06em',
           textAlign: 'center',
           lineHeight: 1.2,
@@ -428,15 +445,15 @@ const ShrineLeftPanel = forwardRef(({
         </div>
 
         {/* Matchstick with circular background - matching mobile style */}
-        <div 
+        <div
           onClick={handleMatchClick}
           onMouseEnter={(e) => {
             setIsHoveringMatchstick(true);
             if (!isLit) {
               e.currentTarget.style.animation = 'none';
-              e.currentTarget.style.background = 'rgba(212, 175, 55, 0.15)';
-              e.currentTarget.style.border = '1.5px solid rgba(212, 175, 55, 0.25)';
-              e.currentTarget.style.boxShadow = '0 0 20px rgba(212, 175, 55, 0.3)';
+              e.currentTarget.style.background = is80sMode ? 'rgba(255, 0, 255, 0.2)' : 'rgba(212, 175, 55, 0.15)';
+              e.currentTarget.style.border = is80sMode ? '1.5px solid rgba(255, 0, 255, 0.4)' : '1.5px solid rgba(212, 175, 55, 0.25)';
+              e.currentTarget.style.boxShadow = is80sMode ? '0 0 20px rgba(255, 0, 255, 0.4), 0 0 40px rgba(0, 255, 255, 0.2)' : '0 0 20px rgba(212, 175, 55, 0.3)';
               e.currentTarget.style.transform = 'scale(1.05)';
             }
           }}
@@ -444,9 +461,9 @@ const ShrineLeftPanel = forwardRef(({
             setIsHoveringMatchstick(false);
             if (!isLit) {
               e.currentTarget.style.animation = 'buttonPulse 2s ease-in-out infinite';
-              e.currentTarget.style.background = 'rgba(212, 175, 55, 0.1)';
-              e.currentTarget.style.border = '1.5px solid rgba(212, 175, 55, 0.15)';
-              e.currentTarget.style.boxShadow = '0 0 0 0 rgba(212, 175, 55, 0)';
+              e.currentTarget.style.background = is80sMode ? 'rgba(255, 0, 255, 0.1)' : 'rgba(212, 175, 55, 0.1)';
+              e.currentTarget.style.border = is80sMode ? '1.5px solid rgba(255, 0, 255, 0.2)' : '1.5px solid rgba(212, 175, 55, 0.15)';
+              e.currentTarget.style.boxShadow = is80sMode ? '0 0 0 0 rgba(255, 0, 255, 0)' : '0 0 0 0 rgba(212, 175, 55, 0)';
               e.currentTarget.style.transform = 'scale(1)';
             } else {
               e.currentTarget.style.transform = 'scale(1)';
@@ -457,12 +474,12 @@ const ShrineLeftPanel = forwardRef(({
             width: '5.5rem',
             height: '5.5rem',
             borderRadius: '50%',
-            background: isLit 
+            background: isLit
               ? 'radial-gradient(circle, rgba(255, 149, 0, 0.2) 0%, rgba(255, 100, 0, 0.05) 70%, transparent 100%)'
-              : 'rgba(212, 175, 55, 0.1)',
-            border: isLit 
-              ? '1.5px solid rgba(255, 149, 0, 0.4)' 
-              : '1.5px solid rgba(212, 175, 55, 0.15)',
+              : (is80sMode ? 'rgba(255, 0, 255, 0.1)' : 'rgba(212, 175, 55, 0.1)'),
+            border: isLit
+              ? '1.5px solid rgba(255, 149, 0, 0.4)'
+              : (is80sMode ? '1.5px solid rgba(255, 0, 255, 0.2)' : '1.5px solid rgba(212, 175, 55, 0.15)'),
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -470,7 +487,7 @@ const ShrineLeftPanel = forwardRef(({
             transition: 'all 0.3s ease',
             boxShadow: isLit
               ? '0 0 15px rgba(255, 149, 0, 0.3)'
-              : '0 0 0 0 rgba(212, 175, 55, 0)',
+              : (is80sMode ? '0 0 0 0 rgba(255, 0, 255, 0)' : '0 0 0 0 rgba(212, 175, 55, 0)'),
             animation: isLit
               ? 'none'
               : 'buttonPulse 2s ease-in-out infinite',
@@ -487,11 +504,11 @@ const ShrineLeftPanel = forwardRef(({
               left: '110%',
               top: '50%',
               whiteSpace: 'nowrap',
-              backgroundColor: 'rgba(10, 10, 20, 0.9)',
+              backgroundColor: is80sMode ? 'rgba(20, 0, 40, 0.95)' : 'rgba(10, 10, 20, 0.9)',
               padding: '10px 20px',
               borderRadius: '8px',
-              border: '1px solid rgba(212, 175, 55, 0.3)',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+              border: is80sMode ? '1px solid rgba(255, 0, 255, 0.4)' : '1px solid rgba(212, 175, 55, 0.3)',
+              boxShadow: is80sMode ? '0 4px 12px rgba(0, 0, 0, 0.5), 0 0 20px rgba(255, 0, 255, 0.2)' : '0 4px 12px rgba(0, 0, 0, 0.5)',
               animation: 'slideIn 0.3s ease-out forwards',
               pointerEvents: 'none',
               zIndex: 1000,
@@ -500,16 +517,17 @@ const ShrineLeftPanel = forwardRef(({
                 fontFamily: "'Bebas Neue', sans-serif",
                 fontSize: '0.9rem',
                 fontWeight: 300,
-                color: 'rgba(246, 245, 241, 0.95)',
-                textShadow: '0 0 10px rgba(212, 175, 55, 0.3)',
+                color: is80sMode ? '#00ffff' : 'rgba(246, 245, 241, 0.95)',
+                textShadow: is80sMode ? '0 0 10px rgba(0, 255, 255, 0.5)' : '0 0 10px rgba(212, 175, 55, 0.3)',
                 letterSpacing: '0.05em',
                 lineHeight: 1.4,
               }}>
                 <div style={{ marginBottom: '4px' }}>Light a green candle.</div>
-                <div style={{ 
-                  fontSize: '0.8rem', 
+                <div style={{
+                  fontSize: '0.8rem',
                   opacity: 0.8,
-                  color: 'rgba(212, 175, 55, 0.9)'
+                  color: is80sMode ? 'rgba(255, 0, 255, 0.9)' : 'rgba(212, 175, 55, 0.9)',
+                  textShadow: is80sMode ? '0 0 8px rgba(255, 0, 255, 0.5)' : 'none',
                 }}>RL80 tokens required.</div>
               </div>
             </div>
@@ -547,7 +565,7 @@ const ShrineLeftPanel = forwardRef(({
               width: '100%',
               height: '100%',
               borderRadius: '50%',
-              boxShadow: '0 0 0 0 rgba(212, 175, 55, 0.4)',
+              boxShadow: is80sMode ? '0 0 0 0 rgba(255, 0, 255, 0.4)' : '0 0 0 0 rgba(212, 175, 55, 0.4)',
               animation: 'inviteGlow 3s ease-in-out infinite',
               pointerEvents: 'none',
             }} />
@@ -589,7 +607,7 @@ const ShrineLeftPanel = forwardRef(({
               e.currentTarget.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.3)'
             }}
           >
-            🔍 Find My Candle
+            🔍 {t('illumin80.findMyCandle')}
           </button>
         )}
 

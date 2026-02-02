@@ -67,6 +67,7 @@ export const MusicProvider = ({ children }) => {
   const currentTrackIndexRef = React.useRef(0);
   const is80sModeRef = React.useRef(false);
   const loadTrackRef = React.useRef(null);
+  const shuffleHistoryRef = React.useRef([]);
   
   // Update refs when values change
   React.useEffect(() => {
@@ -76,6 +77,10 @@ export const MusicProvider = ({ children }) => {
   React.useEffect(() => {
     is80sModeRef.current = is80sMode;
   }, [is80sMode]);
+
+  React.useEffect(() => {
+    shuffleHistoryRef.current = shuffleHistory;
+  }, [shuffleHistory]);
   
   
   // Load and play track function
@@ -546,21 +551,53 @@ export const MusicProvider = ({ children }) => {
     
     // Add ended event listener that uses refs for current values
     const handleEnded = () => {
-      
+
       // Set playing to false first to stop animation
       setIsPlaying(false);
-      
+
       // For auto-advance, always play the next track
       const playlist = is80sModeRef.current ? eightyTracks : non80sTracks;
       const savedState = globalAudioManager?.getState();
       const shuffled = savedState?.isShuffled !== undefined ? savedState.isShuffled : true;
-      
+
       if (shuffled) {
-        // Get a random next track
+        // Get current state
         const currentIdx = currentTrackIndexRef.current;
-        const availableIndices = playlist.map((_, i) => i).filter(i => i !== currentIdx);
+        const history = shuffleHistoryRef.current || [];
+
+        // Check if we've played all tracks - if so, reset history
+        let availableIndices;
+        if (history.length >= playlist.length - 1) {
+          // All tracks have been played, start fresh (exclude only current track)
+          availableIndices = playlist.map((_, i) => i).filter(i => i !== currentIdx);
+          // Reset the history
+          setShuffleHistory([currentIdx]);
+          shuffleHistoryRef.current = [currentIdx];
+          if (globalAudioManager) {
+            globalAudioManager.setState({ shuffleHistory: [currentIdx] });
+          }
+        } else {
+          // Filter out tracks we've already played AND the current track
+          availableIndices = playlist.map((_, i) => i).filter(i =>
+            i !== currentIdx && !history.includes(i)
+          );
+
+          // Fallback if somehow all tracks are exhausted
+          if (availableIndices.length === 0) {
+            availableIndices = playlist.map((_, i) => i).filter(i => i !== currentIdx);
+          }
+        }
+
         const nextIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
-        
+
+        // Update shuffle history with the current track (the one that just ended)
+        const newHistory = [...history, currentIdx];
+        setShuffleHistory(newHistory);
+        shuffleHistoryRef.current = newHistory;
+        if (globalAudioManager) {
+          globalAudioManager.setState({ shuffleHistory: newHistory });
+        }
+
         setTimeout(() => {
           if (loadTrackRef.current) {
             loadTrackRef.current(nextIndex, true);

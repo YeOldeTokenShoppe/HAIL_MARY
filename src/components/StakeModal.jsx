@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useWalletAuth } from './WalletAuthProvider';
+import { useLanguage } from './LanguageProvider';
 import { db, collection, addDoc, serverTimestamp } from '@/lib/firebaseClient';
 import ThirdwebBuyModal from './ThirdwebBuyModal';
 import NoTokensPrompt from './NoTokensPrompt';
@@ -19,6 +20,7 @@ import { useStaking } from '@/hooks/useStaking';
 import { validateAmount, validateTransaction, checkRateLimit, formatSafeErrorMessage } from '@/utils/security';
 
 const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
+  const { t } = useLanguage();
   const { user } = useUser();
   const { walletAddress, tokenBalance, refreshBalance, activeAccount } = useWalletAuth();
   const [showPhaseTooltip, setShowPhaseTooltip] = useState(false);
@@ -181,20 +183,28 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
           padding: 1.5rem;
           width: 90%;
           max-width: 480px;
-          max-height: 90vh;
-          overflow: hidden;
+          max-height: 92vh;
+          overflow-y: auto;
           position: relative;
           animation: fadeIn 0.4s ease-out;
           display: flex;
           flex-direction: column;
           box-shadow: 0 20px 60px rgba(0, 245, 212, 0.3);
         }
-        
-        /* Height-based media queries */
+
+        /* Height-based media queries for small phones */
+        @media (max-height: 750px) {
+          .modal-content {
+            max-height: 96vh;
+            padding: 1rem;
+          }
+        }
+
         @media (max-height: 700px) {
           .modal-content {
-            max-height: 95vh;
-            padding: 1rem;
+            max-height: 98vh;
+            padding: 0.75rem;
+            border-radius: 16px;
           }
         }
 
@@ -297,7 +307,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
-        
+
         @keyframes pulse {
           0%, 80%, 100% {
             opacity: 0.3;
@@ -309,13 +319,78 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
           }
         }
 
+        .stake-image-wrapper {
+          width: 100%;
+          height: 280px;
+          margin-bottom: 0.75rem;
+          overflow: hidden;
+          position: relative;
+          background: linear-gradient(180deg, rgba(20,20,30,0) 0%, rgba(20,20,30,0.9) 100%);
+          flex-shrink: 0;
+        }
+
+        @media (max-height: 750px) {
+          .stake-image-wrapper {
+            height: 220px;
+          }
+        }
+
+        @media (max-height: 680px) {
+          .stake-image-wrapper {
+            height: 180px;
+          }
+        }
+
+        @media (max-height: 600px) {
+          .stake-image-wrapper {
+            height: 140px;
+          }
+        }
+
+        .phase-banner {
+          padding: 1rem;
+          margin-bottom: 1rem;
+        }
+
+        @media (max-height: 750px) {
+          .phase-banner {
+            padding: 0.6rem 0.8rem;
+            margin-bottom: 0.6rem;
+          }
+          .phase-banner p {
+            margin: 0.15rem 0 0 0 !important;
+          }
+          .stake-input {
+            padding: 0.6rem !important;
+            font-size: 0.85rem !important;
+          }
+          .form-label {
+            font-size: 0.7rem !important;
+            margin-bottom: 0.3rem !important;
+          }
+          .form-group {
+            margin-bottom: 0.5rem !important;
+          }
+          .submit-button {
+            padding: 0.7rem !important;
+            margin-top: 0.6rem !important;
+          }
+        }
+
+        @media (max-height: 680px) {
+          .phase-banner {
+            padding: 0.5rem 0.6rem;
+            margin-bottom: 0.5rem;
+          }
+        }
+
       `}</style>
 
       <div className="modal-overlay" onClick={showSuccess ? undefined : onClose}>
         {/* Buy RL80 Prompt - Show this INSTEAD of the modal content */}
         {showNoBuyPrompt ? (
           <NoTokensPrompt
-            message="You need RL80 tokens to stake."
+            message={t('stakeModal.noTokensMessage')}
             onBuy={() => {
               setShowNoBuyPrompt(false);
               setShowBuyModal(true);
@@ -378,7 +453,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                 textTransform: 'uppercase',
                 letterSpacing: '2px'
               }}>
-                {successData?.showDashboard ? 'STAKING DASHBOARD' : 'Staking Successful!'}
+                {successData?.showDashboard ? t('stakeModal.dashboard.title') : t('stakeModal.dashboard.successTitle')}
               </h2>
               {isDataRefreshing && (
                 <div style={{
@@ -388,7 +463,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                   opacity: 0.8,
                   animation: 'pulse 1.5s ease-in-out infinite'
                 }}>
-                  Updating balances...
+                  {t('stakeModal.dashboard.updatingBalances')}
                 </div>
               )}
             </div>
@@ -412,14 +487,14 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                     fontWeight: '600',
                     color: '#d4af37',
                   }}>
-                    Phase 1: Pre-Rewards
+                    {t('stakeModal.phases.phase1.title')}
                   </span>
                   <p style={{
                     fontSize: '0.7rem',
                     color: 'rgba(255, 255, 255, 0.6)',
                     margin: '0.2rem 0 0 0',
                   }}>
-                    Your position is secured. Rewards activate in Phase 2.
+                    {t('stakeModal.phases.phase1.description')}
                   </p>
                 </div>
               </div>
@@ -443,14 +518,14 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                     fontWeight: '600',
                     color: '#00f5d4',
                   }}>
-                    Phase {currentPhase}: Rewards Active
+                    {t('stakeModal.phases.rewardsActive.title', { phase: currentPhase })}
                   </span>
                   <p style={{
                     fontSize: '0.7rem',
                     color: 'rgba(255, 255, 255, 0.6)',
                     margin: '0.2rem 0 0 0',
                   }}>
-                    {currentPhase === 2 ? '1%' : '2%'} of transaction tax flowing to stakers
+                    {t('stakeModal.phases.rewardsActive.phaseDescription', { percent: currentPhase === 2 ? '1%' : '2%' })}
                   </p>
                 </div>
               </div>
@@ -469,7 +544,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                 textTransform: 'uppercase',
                 letterSpacing: '1px'
               }}>
-                STAKING ACTIVITY
+                {t('stakeModal.activity.title')}
               </h3>
               
               <div style={{
@@ -485,7 +560,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                     marginBottom: '0.25rem',
                     textTransform: 'uppercase'
                   }}>
-                    Staked Amount
+                    {t('stakeModal.activity.stakedAmount')}
                   </div>
                   <div style={{
                     fontSize: '1.2rem',
@@ -503,7 +578,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                     marginBottom: '0.25rem',
                     textTransform: 'uppercase'
                   }}>
-                    Lock Status
+                    {t('stakeModal.activity.lockStatus')}
                   </div>
                   <div style={{
                     fontSize: '1.2rem',
@@ -512,7 +587,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                   }}>
                     {successData?.isNewStake
                       ? `${LOCK_DURATION_MINUTES} min`
-                      : (canWithdraw ? 'Unlocked' : timeUntilUnlockFormatted)}
+                      : (canWithdraw ? t('stakeModal.activity.unlocked') : timeUntilUnlockFormatted)}
                   </div>
                 </div>
                 
@@ -523,7 +598,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                     marginBottom: '0.25rem',
                     textTransform: 'uppercase'
                   }}>
-                    Rewards Earned
+                    {t('stakeModal.activity.rewardsEarned')}
                   </div>
                   <div style={{
                     fontSize: '1.2rem',
@@ -541,7 +616,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                     marginBottom: '0.25rem',
                     textTransform: 'uppercase'
                   }}>
-                    Total Pool
+                    {t('stakeModal.activity.totalPool')}
                   </div>
                   <div style={{
                     fontSize: '1.2rem',
@@ -570,13 +645,13 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                   fontSize: '0.85rem',
                   color: '#00f5d4'
                 }}>
-                  Claimable Rewards: {parseFloat(earnedRewards).toFixed(6)} ETH
+                  {t('stakeModal.rewards.claimable')} {parseFloat(earnedRewards).toFixed(6)} ETH
                 </span>
                 <span style={{
                   fontSize: '0.75rem',
                   color: '#00f5d4'
                 }}>
-                  Ready to claim!
+                  {t('stakeModal.rewards.readyToClaim')}
                 </span>
               </div>
             )}
@@ -612,7 +687,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                   e.currentTarget.style.opacity = '1';
                 }}
               >
-                STAKE MORE
+                {t('stakeModal.buttons.stakeMore')}
               </button>
               
               <TransactionButton
@@ -646,7 +721,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                   width: '100%'
                 }}
               >
-                {(successData?.isNewStake || !canWithdraw) ? `🔒 LOCKED` : `WITHDRAW ALL (${parseFloat(successData?.optimisticStakedAmount || stakedBalance || 0).toLocaleString()} RL80)`}
+                {(successData?.isNewStake || !canWithdraw) ? `🔒 ${t('stakeModal.buttons.locked')}` : `${t('stakeModal.buttons.withdrawAll')} (${parseFloat(successData?.optimisticStakedAmount || stakedBalance || 0).toLocaleString()} RL80)`}
               </TransactionButton>
             </div>
             
@@ -684,7 +759,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                   marginBottom: '1rem'
                 }}
               >
-                CLAIM {parseFloat(earnedRewards).toFixed(6)} ETH
+                {t('stakeModal.buttons.claim')} {parseFloat(earnedRewards).toFixed(6)} ETH
               </TransactionButton>
             )}
             
@@ -705,7 +780,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                     textDecoration: 'none'
                   }}
                 >
-                  View transaction on BaseScan →
+                  {t('stakeModal.viewTransaction')}
                 </a>
               </div>
             )}
@@ -713,16 +788,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
         ) : (
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             {/* Decorative Image with Title Overlay */}
-            <div style={{
-              width: '100%',
-              height: '300px',
-              marginBottom: '0.75rem',
-              // borderRadius: '12px',
-              overflow: 'hidden',
-              position: 'relative',
-              background: 'linear-gradient(180deg, rgba(20,20,30,0) 0%, rgba(20,20,30,0.9) 100%)',
-              flexShrink: 0,
-            }}>
+            <div className="stake-image-wrapper">
         
               <img 
                 src="/carousel_images/img13.jpg" 
@@ -759,7 +825,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                 textShadow: '0 2px 10px rgba(0,0,0,0.7)',
                 width: '100%',
               }}>
-                Stake RL80 Tokens {IS_TESTNET && <span style={{ fontSize: '0.7em', color: '#00f5d4' }}>(Testnet)</span>}
+                {t('stakeModal.title')}
               </h2>
               
               {/* Close button on image */}
@@ -799,12 +865,10 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
             
             {/* Phase Status Banner */}
             {currentPhase === 1 && (
-              <div style={{
+              <div className="phase-banner" style={{
                 background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.15), rgba(255, 193, 7, 0.1))',
                 border: '1px solid rgba(212, 175, 55, 0.4)',
                 borderRadius: '12px',
-                padding: '1rem',
-                marginBottom: '1rem',
                 position: 'relative',
               }}>
                 {/* Main Status */}
@@ -822,14 +886,14 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                     fontFamily: "'Orbitron', monospace",
                     letterSpacing: '0.5px',
                   }}>
-                    Staking is Open
+                    {t('stakeModal.phases.stakingOpen.title')}
                   </span>
                   <span style={{
                     fontSize: '0.75rem',
                     color: 'rgba(255, 255, 255, 0.7)',
                     fontStyle: 'italic',
                   }}>
-                    (Rewards Activate in Phase 2)
+                    {t('stakeModal.phases.stakingOpen.subtitle')}
                   </span>
                 </div>
 
@@ -840,7 +904,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                   margin: '0 0 0.25rem 0',
                   lineHeight: '1.4',
                 }}>
-                  Stake early to secure your position.
+                  {t('stakeModal.phases.stakingOpen.description1')}
                 </p>
                 <p style={{
                   fontSize: '0.75rem',
@@ -848,7 +912,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                   margin: 0,
                   lineHeight: '1.4',
                 }}>
-                  Rewards begin once liquidity and volume thresholds are met.
+                  {t('stakeModal.phases.stakingOpen.description2')}
                 </p>
 
                 {/* Tooltip Toggle */}
@@ -872,7 +936,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                   onMouseLeave={(e) => e.target.style.opacity = '0.9'}
                 >
                   <span>{showPhaseTooltip ? '▼' : '▶'}</span>
-                  What does this mean?
+                  {t('stakeModal.phases.whatDoesThisMean')}
                 </button>
 
                 {/* Expanded Tooltip */}
@@ -890,16 +954,16 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                       lineHeight: '1.6',
                     }}>
                       <li style={{ marginBottom: '0.3rem' }}>
-                        <span style={{ color: '#d4af37' }}>•</span> Tokens are locked per staking rules
+                        <span style={{ color: '#d4af37' }}>•</span> {t('stakeModal.phases.tooltipItems.locked')}
                       </li>
                       <li style={{ marginBottom: '0.3rem' }}>
-                        <span style={{ color: '#d4af37' }}>•</span> No rewards are distributed during Phase 1
+                        <span style={{ color: '#d4af37' }}>•</span> {t('stakeModal.phases.tooltipItems.noRewards')}
                       </li>
                       <li style={{ marginBottom: '0.3rem' }}>
-                        <span style={{ color: '#d4af37' }}>•</span> All rewards accrued before Phase 2 are queued
+                        <span style={{ color: '#d4af37' }}>•</span> {t('stakeModal.phases.tooltipItems.queued')}
                       </li>
                       <li>
-                        <span style={{ color: '#d4af37' }}>•</span> Early stakers are first in line when rewards activate
+                        <span style={{ color: '#d4af37' }}>•</span> {t('stakeModal.phases.tooltipItems.firstInLine')}
                       </li>
                     </ul>
                   </div>
@@ -927,14 +991,14 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                     color: '#00f5d4',
                     fontFamily: "'Orbitron', monospace",
                   }}>
-                    Rewards Active
+                    {t('stakeModal.phases.rewardsActive.title', { phase: currentPhase })}
                   </span>
                   <span style={{
                     fontSize: '0.75rem',
                     color: 'rgba(255, 255, 255, 0.7)',
                     marginLeft: '0.5rem',
                   }}>
-                    Phase {currentPhase}: {currentPhase === 2 ? '1%' : '2%'} of tax → staking rewards
+                    {t('stakeModal.phases.rewardsActive.phaseDescription', { percent: currentPhase === 2 ? '1%' : '2%' })}
                   </span>
                 </div>
               </div>
@@ -960,14 +1024,14 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                     color: '#9b59b6',
                     fontFamily: "'Orbitron', monospace",
                   }}>
-                    Zero Tax Mode
+                    {t('stakeModal.phases.zeroTax.title')}
                   </span>
                   <span style={{
                     fontSize: '0.75rem',
                     color: 'rgba(255, 255, 255, 0.7)',
                     marginLeft: '0.5rem',
                   }}>
-                    Protocol is self-sustaining. Withdraw anytime.
+                    {t('stakeModal.phases.zeroTax.description')}
                   </span>
                 </div>
               </div>
@@ -995,7 +1059,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                 onMouseEnter={(e) => e.target.style.opacity = '1'}
                 onMouseLeave={(e) => e.target.style.opacity = '0.7'}
               >
-                {showInfo ? '▼ Hide' : '▶ Info'}
+                {showInfo ? t('stakeModal.info.hideInfo') : t('stakeModal.info.showInfo')}
               </button>
             </div>
             
@@ -1011,18 +1075,18 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                 color: 'rgba(255, 255, 255, 0.8)',
                 lineHeight: '1.4',
               }}>
-                <ul style={{ 
-                  margin: 0, 
+                <ul style={{
+                  margin: 0,
                   paddingLeft: '1rem',
                   listStyle: 'none',
                   display: 'grid',
                   gridTemplateColumns: 'repeat(2, 1fr)',
                   gap: '0.3rem'
                 }}>
-                  <li>🧪 <strong>TESTNET</strong> - 10min lock</li>
-                  <li>💎 Min 1 RL80 to stake</li>
-                  <li>💰 Earn ETH rewards</li>
-                  <li>📊 Pro-rata distribution</li>
+                  <li>🧪 <strong>{t('stakeModal.info.lockDays')}</strong></li>
+                  <li>💎 {t('stakeModal.info.minStake')}</li>
+                  <li>💰 {t('stakeModal.info.earnEth')}</li>
+                  <li>📊 {t('stakeModal.info.proRata')}</li>
                 </ul>
               </div>
             )}
@@ -1033,7 +1097,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
               gap: '0.5rem'
             }}>
               {/* Compact Lock Period Display - Info Banner Style */}
-              <div style={{
+              {/* <div style={{
                 background: 'linear-gradient(90deg, rgba(0, 245, 212, 0.05), rgba(0, 187, 255, 0.05))',
                 border: 'none',
                 borderLeft: '3px solid #00f5d4',
@@ -1078,12 +1142,12 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                   <span>💰</span>
                   ETH Rewards
                 </div>
-              </div>
+              </div> */}
 
               {/* Stake Amount Input */}
               <div className="form-group" style={{ marginBottom: '0' }}>
                 <label className="form-label" htmlFor="stakeAmount">
-                  Amount to Stake
+                  {t('stakeModal.form.amountLabel')}
                 </label>
                 <input
                   id="stakeAmount"
@@ -1093,20 +1157,20 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                   max={parseInt(tokenBalance) > 0 ? parseInt(tokenBalance) : 100000}
                   value={stakeAmount}
                   onChange={(e) => setStakeAmount(e.target.value)}
-                  placeholder="Enter amount to stake"
+                  placeholder={t('stakeModal.form.placeholder')}
                   required
                 />
                 {tokenBalance !== null && tokenBalance !== undefined ? (
                   <div className="token-balance">
-                    Available: {tokenBalance.toLocaleString()} RL80
+                    {t('stakeModal.form.available')} {tokenBalance.toLocaleString()} RL80
                   </div>
                 ) : walletAddress ? (
                   <div className="token-balance">
-                    Loading balance...
+                    {t('stakeModal.form.loadingBalance')}
                   </div>
                 ) : (
                   <div className="token-balance" style={{ color: '#ff6b35' }}>
-                    Connect wallet to see balance
+                    {t('stakeModal.form.connectWallet')}
                   </div>
                 )}
               </div>
@@ -1138,8 +1202,8 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                   color: 'rgba(255, 255, 255, 0.8)',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                    <span>Amount: <strong>{parseInt(stakeAmount).toLocaleString()} RL80</strong></span>
-                    <span>Unlock: <strong>{IS_TESTNET 
+                    <span>{t('stakeModal.preview.amount')} <strong>{parseInt(stakeAmount).toLocaleString()} RL80</strong></span>
+                    <span>{t('stakeModal.preview.unlock')} <strong>{IS_TESTNET
                       ? new Date(Date.now() + 10 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                       : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString()
                     }</strong></span>
@@ -1150,7 +1214,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                     textAlign: 'center',
                     marginTop: '0.25rem'
                   }}>
-                    ETH rewards distributed proportionally
+                    {t('stakeModal.preview.ethRewards')}
                   </div>
                 </div>
               )}
@@ -1299,10 +1363,10 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                     cursor: isSubmitting ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  {transactionStatus === 'signing' || transactionStatus === 'approving' ? 'Approving...' : 
-                   transactionStatus === 'staking' ? 'Signing Stake...' :
-                   transactionStatus === 'confirming' ? 'Confirming...' : 
-                   `Stake ${stakeAmount || '0'} RL80`}
+                  {transactionStatus === 'signing' || transactionStatus === 'approving' ? t('stakeModal.processing.approving') :
+                   transactionStatus === 'staking' ? t('stakeModal.processing.signingStake') :
+                   transactionStatus === 'confirming' ? t('stakeModal.processing.confirming') :
+                   `${t('stakeModal.stake')} ${stakeAmount || '0'} RL80`}
                 </button>
               ) : (
                 // Regular wallet - manual approval and stake flow
@@ -1459,7 +1523,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
 
                                 // Check for specific error signatures
                                 if (error?.message?.includes('0xfb8f41b2')) {
-                                  showError('Insufficient token allowance. Please try again.');
+                                  showError(t('stakeModal.errors.insufficientAllowance'));
                                 } else if (!error?.message?.includes('User rejected') &&
                                     !error?.message?.includes('User denied')) {
                                   showError(formatSafeErrorMessage(error));
@@ -1484,7 +1548,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                       console.error("Failed to initiate staking");
                       setIsSubmitting(false);
                       setShowWalletLoading(false); // Hide wallet loading on error
-                      showError('Failed to stake tokens. Please try again.');
+                      showError(t('stakeModal.errors.stakeFailed'));
                     }
                   }}
                   disabled={!stakeAmount || parseInt(stakeAmount) < 1 || isSubmitting}
@@ -1502,7 +1566,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                     transition: 'all 0.3s'
                   }}
                 >
-                  {isSubmitting ? 'Processing...' : `Stake ${stakeAmount || '0'} RL80`}
+                  {isSubmitting ? t('stakeModal.processing.processing') : `${t('stakeModal.stake')} ${stakeAmount || '0'} RL80`}
                 </button>
               )}
               </form>
@@ -1577,7 +1641,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                 fontSize: '0.95rem',
                 fontWeight: '600'
               }}>
-                Please sign the transaction in your wallet
+                {t('stakeModal.walletLoading.signTransaction')}
               </div>
             </div>
 
@@ -1601,7 +1665,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
               textTransform: 'uppercase',
               letterSpacing: '1px'
             }}>
-              Stake RL80
+              {t('stakeModal.walletLoading.stakeRL80')}
             </h3>
 
             {/* Amount Info */}
@@ -1610,7 +1674,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
               fontSize: '0.85rem',
               marginBottom: '1rem'
             }}>
-              Amount: <strong>{stakeAmount} RL80</strong>
+              {t('stakeModal.walletLoading.amount')} <strong>{stakeAmount} RL80</strong>
             </p>
 
             {/* Status */}
@@ -1619,7 +1683,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
               fontSize: '0.75rem',
               fontStyle: 'italic'
             }}>
-              Waiting for wallet confirmation...
+              {t('stakeModal.walletLoading.waitingConfirmation')}
             </p>
           </div>
         </div>
@@ -1706,10 +1770,10 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
               letterSpacing: '2px',
               fontFamily: "'Orbitron', monospace"
             }}>
-              {showConfirmationMessage === 'withdraw-success' && 'Withdrawal Successful!'}
-              {showConfirmationMessage === 'withdraw-error' && 'Withdrawal Failed'}
-              {showConfirmationMessage === 'claim-success' && 'Rewards Claimed!'}
-              {showConfirmationMessage === 'claim-error' && 'Claim Failed'}
+              {showConfirmationMessage === 'withdraw-success' && t('stakeModal.confirmation.withdrawSuccess.title')}
+              {showConfirmationMessage === 'withdraw-error' && t('stakeModal.confirmation.withdrawError.title')}
+              {showConfirmationMessage === 'claim-success' && t('stakeModal.confirmation.claimSuccess.title')}
+              {showConfirmationMessage === 'claim-error' && t('stakeModal.confirmation.claimError.title')}
             </h2>
             <p style={{
               marginBottom: '2rem',
@@ -1717,10 +1781,10 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
               fontSize: '0.95rem',
               lineHeight: '1.5'
             }}>
-              {showConfirmationMessage === 'withdraw-success' && 'Your tokens have been withdrawn successfully.'}
-              {showConfirmationMessage === 'withdraw-error' && 'Failed to withdraw tokens. Please try again.'}
-              {showConfirmationMessage === 'claim-success' && 'Your ETH rewards have been claimed successfully.'}
-              {showConfirmationMessage === 'claim-error' && 'Failed to claim rewards. Please try again.'}
+              {showConfirmationMessage === 'withdraw-success' && t('stakeModal.confirmation.withdrawSuccess.message')}
+              {showConfirmationMessage === 'withdraw-error' && t('stakeModal.confirmation.withdrawError.message')}
+              {showConfirmationMessage === 'claim-success' && t('stakeModal.confirmation.claimSuccess.message')}
+              {showConfirmationMessage === 'claim-error' && t('stakeModal.confirmation.claimError.message')}
             </p>
             <button
               onClick={() => setShowConfirmationMessage(null)}
@@ -1747,7 +1811,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                 e.target.style.transform = 'translateY(0)';
               }}
             >
-              Close
+              {t('stakeModal.buttons.close')}
             </button>
           </div>
         </div>

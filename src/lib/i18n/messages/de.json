@@ -112,7 +112,43 @@
   "illumin80": {
     "watchlistLine1": "Komm auf ihre",
     "watchlistLine2": "Beobachtungsliste",
-    "watchlistTitle": "Komm Auf Ihre Beobachtungsliste"
+    "watchlistTitle": "Komm Auf Ihre Beobachtungsliste",
+    "lightGreenCandle": "Zünde eine Grüne Kerze an!",
+    "stakeTokens": "RL80 TOKENS STAKEN",
+    "earnRewards": "ETH Belohnungen verdienen!",
+    "candleTab": "Kerze",
+    "stakeTab": "Stake",
+    "lightIt": "Anzünden",
+    "findMyCandle": "Meine Kerze Finden",
+    "helpAnnotations": {
+      "stats": {
+        "label": "Holder-gewidmete Kerzen",
+        "description": "Erhalten Sie einen Live-Blick auf Stimmung und Preisentwicklung in einer Ansicht. Kerzen bewegen sich und ändern ihre Farbe bei Preisänderungen (siehe Statistik-Panel). Tippen Sie auf eine Kerze, um zu sehen, wer sie angezündet hat und wie viel Zeit bleibt, bevor sie schmilzt!"
+      },
+      "phone": {
+        "label": "Live-Feed",
+        "description": "Beobachten Sie Opfergaben von RL80-Anhängern in Echtzeit."
+      },
+      "actions": {
+        "label": "Mehr Buttons!",
+        "description": "Probieren Sie den 80er-Modus, melden Sie sich an/ab oder kaufen Sie mehr Token mit den Buttons oben rechts. Sie können das Statistik-Panel rechts öffnen, um noch mehr Daten zu sehen!"
+      },
+      "candles": {
+        "label": "Aktions-Buttons",
+        "description": "Zünden Sie eine Kerze an oder staken Sie Token durch Klicken auf die Stake- oder Streichholz-Symbole"
+      }
+    },
+    "stats": {
+      "stats": "STATISTIKEN",
+      "price": "Preis",
+      "stake": "Stake",
+      "pulse": "Puls",
+      "candles": "Kerzen",
+      "tokensBurned": "Verbrannte Tokens",
+      "totalValueLocked": "Gesamtwert Gesperrt",
+      "currentAPR": "Aktueller APR",
+      "rewardsClaimed": "Beanspruchte Belohnungen"
+    }
   },
   "cyberNav": {
     "nav00": { "date": "IKONE AUF DER I-80", "title": "FAHRPLAN" },
@@ -255,6 +291,204 @@
       "selectImageDetail": "Bild auswählen für Detailansicht",
       "previous": "Zurück",
       "next": "Weiter"
+    }
+  },
+  "lightCandleModal": {
+    "title": "Kerze Anzünden",
+    "candleInfo": {
+      "burnTime": "Deine Kerze brennt 7 Tage lang",
+      "onePerWallet": "Eine aktive Kerze pro Wallet. Eine neue Kerze ersetzt die bestehende."
+    },
+    "steps": {
+      "step1": "Wähle Deine Absicht",
+      "step2": "Schreibe Deine Nachricht",
+      "step3": "Bringe Dein Opfer"
+    },
+    "offeringTypes": {
+      "petition": "BITTGEBET",
+      "petitionDesc": "Um Führung oder Hilfe bitten",
+      "confession": "BEICHTE",
+      "confessionDesc": "Entlaste dein Herz",
+      "thanks": "DANKE",
+      "thanksDesc": "Dankbarkeit für gutes Geschick ausdrücken"
+    },
+    "prayerFor": {
+      "label": "Diese Kerze anzünden für:",
+      "myself": "Mich selbst",
+      "someoneElse": "Jemand Anderen",
+      "yourName": "Dein Name",
+      "theirName": "Deren Namen eingeben"
+    },
+    "message": {
+      "label": "Deine Nachricht an Unsere Liebe Frau des Ewigen Profits",
+      "placeholderPetition": "OPTIONAL - Schreibe deine Nachricht oder wähle eine Vorlage unten",
+      "placeholderConfession": "Bekenne deine Sünden für mögliche Absolution..",
+      "placeholderOther": "OPTIONAL - Schreibe eine Nachricht",
+      "templateLabel": "Oder wähle eine Vorlage:",
+      "selectPrayer": "Wähle ein Gebet..."
+    },
+    "tokens": {
+      "label": "RL80 Token zum Verbrennen",
+      "placeholder": "1 RL80 Minimum",
+      "balance": "Guthaben:",
+      "loadingBalance": "Lade Guthaben...",
+      "connectWallet": "Wallet verbinden um Guthaben zu sehen"
+    },
+    "summary": {
+      "for": "für",
+      "yourself": "dich selbst",
+      "someone": "jemanden"
+    },
+    "info": {
+      "minToken": "1 Token min",
+      "burnTime": "7 Tage brennen",
+      "onePerWallet": "1 pro Wallet"
+    },
+    "buttons": {
+      "back": "Zurück",
+      "continue": "Weiter",
+      "lightCandle": "Kerze Anzünden",
+      "processing": "Verarbeitung...",
+      "cancel": "Abbrechen",
+      "lightMyCandle": "Meine Kerze Anzünden"
+    },
+    "confirmation": {
+      "title": "Bereit zum Anzünden?",
+      "burning": "Du wirst verbrennen",
+      "token": "RL80 Token",
+      "tokens": "RL80 Token",
+      "permanent": "Diese Aktion ist dauerhaft und nicht rückgängig zu machen"
+    },
+    "processing": {
+      "submitted": "Transaktion eingereicht!",
+      "waiting": "Warte auf Blockchain-Bestätigung...",
+      "lightingCandle": "Zünde Deine Kerze An",
+      "burning": "Verbrennung",
+      "usuallyTakes": "Dies dauert normalerweise 10-30 Sekunden"
+    },
+    "wallet": {
+      "signTransaction": "Bitte signiere die Transaktion in deiner Wallet",
+      "waitingConfirmation": "Warte auf Wallet-Bestätigung...",
+      "amount": "Betrag:"
+    },
+    "noTokens": {
+      "message": "Du brauchst RL80 Token um eine Kerze anzuzünden."
+    },
+    "validation": {
+      "enterAmount": "Bitte gib die Anzahl der zu verbrennenden RL80 Token ein",
+      "enterRecipientName": "Bitte gib einen Namen für den Empfänger ein"
+    },
+    "prayerProtocol": "Gebetsprotokoll:"
+  },
+  "stakeModal": {
+    "title": "RL80 Token Staken",
+    "dashboard": {
+      "title": "STAKING-DASHBOARD",
+      "successTitle": "Staking Erfolgreich!",
+      "updatingBalances": "Guthaben wird aktualisiert..."
+    },
+    "phases": {
+      "phase1": {
+        "title": "Phase 1: Vor-Belohnungen",
+        "description": "Deine Position ist gesichert. Belohnungen aktivieren sich in Phase 2."
+      },
+      "rewardsActive": {
+        "title": "Phase {{phase}}: Belohnungen Aktiv",
+        "phaseDescription": "{{percent}} der Transaktionssteuer fließt an Staker"
+      },
+      "stakingOpen": {
+        "title": "Staking Offen",
+        "subtitle": "(Belohnungen Aktivieren in Phase 2)",
+        "description1": "Stake früh um deine Position zu sichern.",
+        "description2": "Belohnungen beginnen sobald Liquiditäts- und Volumenschwellen erreicht sind."
+      },
+      "whatDoesThisMean": "Was bedeutet das?",
+      "tooltipItems": {
+        "locked": "Token sind gemäß Staking-Regeln gesperrt",
+        "noRewards": "Keine Belohnungen werden in Phase 1 verteilt",
+        "queued": "Alle vor Phase 2 angesammelten Belohnungen sind in der Warteschlange",
+        "firstInLine": "Frühe Staker sind zuerst dran wenn Belohnungen aktiviert werden"
+      },
+      "zeroTax": {
+        "title": "Null-Steuer-Modus",
+        "description": "Protokoll ist selbsttragend. Jederzeit abheben."
+      }
+    },
+    "activity": {
+      "title": "STAKING-AKTIVITÄT",
+      "stakedAmount": "Gestaketer Betrag",
+      "lockStatus": "Sperrstatus",
+      "unlocked": "Entsperrt",
+      "rewardsEarned": "Verdiente Belohnungen",
+      "totalPool": "Gesamtpool"
+    },
+    "rewards": {
+      "claimable": "Abrufbare Belohnungen:",
+      "readyToClaim": "Bereit zum Abrufen!"
+    },
+    "buttons": {
+      "stakeMore": "MEHR STAKEN",
+      "locked": "GESPERRT",
+      "withdrawAll": "ALLES ABHEBEN",
+      "claim": "ABRUFEN",
+      "close": "Schließen"
+    },
+    "viewTransaction": "Transaktion auf BaseScan ansehen →",
+    "info": {
+      "hideInfo": "Ausblenden",
+      "showInfo": "Info",
+      "lockDays": "7 Tage Sperre",
+      "minStake": "Min 1 RL80 zum Staken",
+      "earnEth": "ETH Belohnungen verdienen",
+      "proRata": "Proportionale Verteilung"
+    },
+    "form": {
+      "amountLabel": "Betrag zum Staken",
+      "placeholder": "Betrag zum Staken eingeben",
+      "available": "Verfügbar:",
+      "loadingBalance": "Lade Guthaben...",
+      "connectWallet": "Wallet verbinden um Guthaben zu sehen"
+    },
+    "preview": {
+      "amount": "Betrag:",
+      "unlock": "Entsperrung:",
+      "ethRewards": "ETH Belohnungen werden proportional verteilt"
+    },
+    "processing": {
+      "approving": "Genehmigung...",
+      "signingStake": "Stake wird signiert...",
+      "confirming": "Bestätigung...",
+      "processing": "Verarbeitung..."
+    },
+    "stake": "Staken",
+    "noTokensMessage": "Du brauchst RL80 Token zum Staken.",
+    "walletLoading": {
+      "signTransaction": "Bitte signiere die Transaktion in deiner Wallet",
+      "stakeRL80": "RL80 Staken",
+      "amount": "Betrag:",
+      "waitingConfirmation": "Warte auf Wallet-Bestätigung..."
+    },
+    "confirmation": {
+      "withdrawSuccess": {
+        "title": "Abhebung Erfolgreich!",
+        "message": "Deine Token wurden erfolgreich abgehoben."
+      },
+      "withdrawError": {
+        "title": "Abhebung Fehlgeschlagen",
+        "message": "Token konnten nicht abgehoben werden. Bitte erneut versuchen."
+      },
+      "claimSuccess": {
+        "title": "Belohnungen Abgerufen!",
+        "message": "Deine ETH Belohnungen wurden erfolgreich abgerufen."
+      },
+      "claimError": {
+        "title": "Abruf Fehlgeschlagen",
+        "message": "Belohnungen konnten nicht abgerufen werden. Bitte erneut versuchen."
+      }
+    },
+    "errors": {
+      "insufficientAllowance": "Unzureichende Token-Genehmigung. Bitte erneut versuchen.",
+      "stakeFailed": "Token-Staking fehlgeschlagen. Bitte erneut versuchen."
     }
   }
 }

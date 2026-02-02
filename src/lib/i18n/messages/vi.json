@@ -112,7 +112,43 @@
   "illumin80": {
     "watchlistLine1": "Vào danh sách",
     "watchlistLine2": "theo dõi của cô ấy",
-    "watchlistTitle": "Vào Danh Sách Theo Dõi Của Cô Ấy"
+    "watchlistTitle": "Vào Danh Sách Theo Dõi Của Cô Ấy",
+    "lightGreenCandle": "Thắp Nến Xanh!",
+    "stakeTokens": "ĐẶT CỌC TOKEN RL80",
+    "earnRewards": "Kiếm Phần Thưởng ETH!",
+    "candleTab": "Nến",
+    "stakeTab": "Đặt Cọc",
+    "lightIt": "Thắp",
+    "findMyCandle": "Tìm Nến Của Tôi",
+    "helpAnnotations": {
+      "stats": {
+        "label": "Nến Dành Riêng Cho Người Nắm Giữ",
+        "description": "Xem trực tiếp tâm lý và biến động giá trong một góc nhìn. Nến di chuyển và đổi màu khi giá thay đổi (xem Bảng Thống Kê). Nhấn vào bất kỳ ngọn nến nào để xem ai đã thắp và còn bao lâu trước khi tan chảy!"
+      },
+      "phone": {
+        "label": "Nguồn Cấp Trực Tiếp",
+        "description": "Xem lễ vật đến theo thời gian thực từ những tín đồ RL80."
+      },
+      "actions": {
+        "label": "Thêm Nút!",
+        "description": "Thử chế độ 80s, đăng nhập/đăng xuất, hoặc mua thêm token bằng các nút ở góc trên bên phải. Bạn có thể mở bảng thống kê bên phải để xem thêm dữ liệu!"
+      },
+      "candles": {
+        "label": "Nút Hành Động",
+        "description": "Thắp nến hoặc đặt cọc token bằng cách nhấp vào biểu tượng đặt cọc hoặc que diêm"
+      }
+    },
+    "stats": {
+      "stats": "THỐNG KÊ",
+      "price": "Giá",
+      "stake": "Đặt Cọc",
+      "pulse": "Nhịp",
+      "candles": "Nến",
+      "tokensBurned": "Token Đã Đốt",
+      "totalValueLocked": "Tổng Giá Trị Khóa",
+      "currentAPR": "APR Hiện Tại",
+      "rewardsClaimed": "Phần Thưởng Đã Nhận"
+    }
   },
   "cyberNav": {
     "nav00": { "date": "BIỂU TƯỢNG TRÊN I-80", "title": "LỘ TRÌNH" },
@@ -255,6 +291,204 @@
       "selectImageDetail": "Chọn hình ảnh để xem chi tiết",
       "previous": "Trước",
       "next": "Tiếp"
+    }
+  },
+  "lightCandleModal": {
+    "title": "Thắp Nến",
+    "candleInfo": {
+      "burnTime": "Nến của bạn sẽ cháy trong 7 ngày",
+      "onePerWallet": "Một nến hoạt động mỗi ví. Thắp nến mới sẽ thay thế nến hiện tại."
+    },
+    "steps": {
+      "step1": "Chọn Ý Định",
+      "step2": "Viết Tin Nhắn",
+      "step3": "Dâng Lễ Vật"
+    },
+    "offeringTypes": {
+      "petition": "THỈNH CẦU",
+      "petitionDesc": "Xin sự hướng dẫn hoặc giúp đỡ",
+      "confession": "THÚ TỘI",
+      "confessionDesc": "Giải tỏa tâm hồn",
+      "thanks": "CẢM ƠN",
+      "thanksDesc": "Bày tỏ lòng biết ơn về may mắn"
+    },
+    "prayerFor": {
+      "label": "Thắp nến này cho:",
+      "myself": "Bản thân",
+      "someoneElse": "Người Khác",
+      "yourName": "Tên của bạn",
+      "theirName": "Nhập tên họ"
+    },
+    "message": {
+      "label": "Tin Nhắn Gửi Đức Mẹ Lợi Nhuận Vĩnh Cửu",
+      "placeholderPetition": "TÙY CHỌN - Viết tin nhắn hoặc chọn mẫu bên dưới",
+      "placeholderConfession": "Thú nhận tội lỗi để được tha thứ..",
+      "placeholderOther": "TÙY CHỌN - Viết tin nhắn",
+      "templateLabel": "Hoặc chọn mẫu:",
+      "selectPrayer": "Chọn lời cầu nguyện..."
+    },
+    "tokens": {
+      "label": "Token RL80 để Đốt",
+      "placeholder": "Tối thiểu 1 RL80",
+      "balance": "Số dư:",
+      "loadingBalance": "Đang tải số dư...",
+      "connectWallet": "Kết nối ví để xem số dư"
+    },
+    "summary": {
+      "for": "cho",
+      "yourself": "bạn",
+      "someone": "ai đó"
+    },
+    "info": {
+      "minToken": "Tối thiểu 1 token",
+      "burnTime": "Cháy 7 ngày",
+      "onePerWallet": "1 mỗi ví"
+    },
+    "buttons": {
+      "back": "Quay lại",
+      "continue": "Tiếp tục",
+      "lightCandle": "Thắp Nến",
+      "processing": "Đang xử lý...",
+      "cancel": "Hủy",
+      "lightMyCandle": "Thắp Nến Của Tôi"
+    },
+    "confirmation": {
+      "title": "Sẵn sàng thắp?",
+      "burning": "Bạn sắp đốt",
+      "token": "token RL80",
+      "tokens": "token RL80",
+      "permanent": "Hành động này là vĩnh viễn và không thể hoàn tác"
+    },
+    "processing": {
+      "submitted": "Giao dịch đã gửi!",
+      "waiting": "Đang chờ xác nhận blockchain...",
+      "lightingCandle": "Đang Thắp Nến Của Bạn",
+      "burning": "Đang đốt",
+      "usuallyTakes": "Thường mất 10-30 giây"
+    },
+    "wallet": {
+      "signTransaction": "Vui lòng ký giao dịch trong ví",
+      "waitingConfirmation": "Đang chờ xác nhận ví...",
+      "amount": "Số lượng:"
+    },
+    "noTokens": {
+      "message": "Bạn cần token RL80 để thắp nến."
+    },
+    "validation": {
+      "enterAmount": "Vui lòng nhập số lượng token RL80 để đốt",
+      "enterRecipientName": "Vui lòng nhập tên người nhận"
+    },
+    "prayerProtocol": "Giao Thức Cầu Nguyện:"
+  },
+  "stakeModal": {
+    "title": "Đặt Cọc Token RL80",
+    "dashboard": {
+      "title": "BẢNG ĐIỀU KHIỂN ĐẶT CỌC",
+      "successTitle": "Đặt Cọc Thành Công!",
+      "updatingBalances": "Đang cập nhật số dư..."
+    },
+    "phases": {
+      "phase1": {
+        "title": "Giai đoạn 1: Trước Phần Thưởng",
+        "description": "Vị trí của bạn đã được đảm bảo. Phần thưởng kích hoạt ở Giai đoạn 2."
+      },
+      "rewardsActive": {
+        "title": "Giai đoạn {{phase}}: Phần Thưởng Đang Hoạt Động",
+        "phaseDescription": "{{percent}} thuế giao dịch chảy đến người đặt cọc"
+      },
+      "stakingOpen": {
+        "title": "Đặt Cọc Đang Mở",
+        "subtitle": "(Phần Thưởng Kích Hoạt ở Giai đoạn 2)",
+        "description1": "Đặt cọc sớm để đảm bảo vị trí của bạn.",
+        "description2": "Phần thưởng bắt đầu khi đạt ngưỡng thanh khoản và khối lượng."
+      },
+      "whatDoesThisMean": "Điều này có nghĩa gì?",
+      "tooltipItems": {
+        "locked": "Token bị khóa theo quy tắc đặt cọc",
+        "noRewards": "Không phân phối phần thưởng trong Giai đoạn 1",
+        "queued": "Tất cả phần thưởng tích lũy trước Giai đoạn 2 đang trong hàng đợi",
+        "firstInLine": "Người đặt cọc sớm xếp hàng đầu khi phần thưởng kích hoạt"
+      },
+      "zeroTax": {
+        "title": "Chế Độ Không Thuế",
+        "description": "Giao thức tự duy trì. Rút bất cứ lúc nào."
+      }
+    },
+    "activity": {
+      "title": "HOẠT ĐỘNG ĐẶT CỌC",
+      "stakedAmount": "Số Tiền Đặt Cọc",
+      "lockStatus": "Trạng Thái Khóa",
+      "unlocked": "Đã Mở Khóa",
+      "rewardsEarned": "Phần Thưởng Kiếm Được",
+      "totalPool": "Tổng Pool"
+    },
+    "rewards": {
+      "claimable": "Phần Thưởng Có Thể Nhận:",
+      "readyToClaim": "Sẵn sàng nhận!"
+    },
+    "buttons": {
+      "stakeMore": "ĐẶT CỌC THÊM",
+      "locked": "ĐÃ KHÓA",
+      "withdrawAll": "RÚT TẤT CẢ",
+      "claim": "NHẬN",
+      "close": "Đóng"
+    },
+    "viewTransaction": "Xem giao dịch trên BaseScan →",
+    "info": {
+      "hideInfo": "Ẩn",
+      "showInfo": "Thông tin",
+      "lockDays": "Khóa 7 ngày",
+      "minStake": "Tối thiểu 1 RL80 để đặt cọc",
+      "earnEth": "Kiếm phần thưởng ETH",
+      "proRata": "Phân phối theo tỷ lệ"
+    },
+    "form": {
+      "amountLabel": "Số Lượng Đặt Cọc",
+      "placeholder": "Nhập số lượng đặt cọc",
+      "available": "Khả dụng:",
+      "loadingBalance": "Đang tải số dư...",
+      "connectWallet": "Kết nối ví để xem số dư"
+    },
+    "preview": {
+      "amount": "Số lượng:",
+      "unlock": "Mở khóa:",
+      "ethRewards": "Phần thưởng ETH được phân phối theo tỷ lệ"
+    },
+    "processing": {
+      "approving": "Đang phê duyệt...",
+      "signingStake": "Đang ký đặt cọc...",
+      "confirming": "Đang xác nhận...",
+      "processing": "Đang xử lý..."
+    },
+    "stake": "Đặt cọc",
+    "noTokensMessage": "Bạn cần token RL80 để đặt cọc.",
+    "walletLoading": {
+      "signTransaction": "Vui lòng ký giao dịch trong ví",
+      "stakeRL80": "Đặt cọc RL80",
+      "amount": "Số lượng:",
+      "waitingConfirmation": "Đang chờ xác nhận ví..."
+    },
+    "confirmation": {
+      "withdrawSuccess": {
+        "title": "Rút Thành Công!",
+        "message": "Token của bạn đã được rút thành công."
+      },
+      "withdrawError": {
+        "title": "Rút Thất Bại",
+        "message": "Không thể rút token. Vui lòng thử lại."
+      },
+      "claimSuccess": {
+        "title": "Đã Nhận Phần Thưởng!",
+        "message": "Phần thưởng ETH của bạn đã được nhận thành công."
+      },
+      "claimError": {
+        "title": "Nhận Thất Bại",
+        "message": "Không thể nhận phần thưởng. Vui lòng thử lại."
+      }
+    },
+    "errors": {
+      "insufficientAllowance": "Quyền token không đủ. Vui lòng thử lại.",
+      "stakeFailed": "Đặt cọc token thất bại. Vui lòng thử lại."
     }
   }
 }

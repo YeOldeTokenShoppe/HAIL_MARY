@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useUser } from '@clerk/nextjs';
 import { useWalletAuth } from './WalletAuthProvider';
 import { useStaking } from '@/hooks/useStaking';
 import { TransactionButton, useSendAndConfirmTransaction, useActiveAccount } from "thirdweb/react";
@@ -9,12 +10,14 @@ import { toWei } from "thirdweb/utils";
 import { tokenFunctions, erc20Contract } from '@/lib/contract';
 import { sendTransaction } from "thirdweb";
 import { approve } from "thirdweb/extensions/erc20";
+import { db, collection, addDoc, serverTimestamp } from '@/lib/firebaseClient';
 
 
 export function WalletDetailsModal({ onClose }) {
-  const { 
-    walletAddress, 
-    tokenBalance, 
+  const { user } = useUser();
+  const {
+    walletAddress,
+    tokenBalance,
     disconnectWallet,
     refreshBalance
   } = useWalletAuth();
@@ -316,26 +319,45 @@ export function WalletDetailsModal({ onClose }) {
                   console.log("Withdraw transaction sent");
                   setTransactionStatus('waiting');
                 }}
-                onTransactionConfirmed={async () => {
+                onTransactionConfirmed={async (result) => {
                   console.log("Withdraw successful");
                   setTransactionStatus('confirmed');
-                  
+
+                  // Save unstake to Firebase for activity feed
+                  try {
+                    const unstakeData = {
+                      action: 'unstake',
+                      amount: stakedBalance,
+                      userId: user?.id,
+                      walletAddress: walletAddress,
+                      userImageUrl: user?.imageUrl || null,
+                      name: user?.username || user?.firstName || 'Anonymous',
+                      createdAt: serverTimestamp(),
+                      timestamp: new Date().toISOString(),
+                      txHash: result?.transactionHash || null
+                    };
+                    await addDoc(collection(db, 'stakes'), unstakeData);
+                    console.log('Unstake saved to Firestore');
+                  } catch (firestoreError) {
+                    console.error('Error saving unstake to Firestore:', firestoreError);
+                  }
+
                   // Wait 2 seconds showing confirmed
                   await new Promise(resolve => setTimeout(resolve, 2000));
-                  
+
                   setTransactionStatus('updating');
                   setIsUpdatingBalance(true);
                   setIsUpdatingStaking(true);
-                  
+
                   // Show updating message for a bit
                   await new Promise(resolve => setTimeout(resolve, 1000));
-                  
+
                   await refreshStaking();
                   await refreshBalance();
-                  
+
                   // Keep showing update message to ensure data propagates
                   await new Promise(resolve => setTimeout(resolve, 2000));
-                  
+
                   setIsUpdatingBalance(false);
                   setIsUpdatingStaking(false);
                   setTransactionStatus('');
@@ -374,7 +396,26 @@ export function WalletDetailsModal({ onClose }) {
             canWithdraw ? (
               <TransactionButton
                 transaction={() => stakingTransactions.prepareClaimRewards()}
-                onTransactionConfirmed={async () => {
+                onTransactionConfirmed={async (result) => {
+                  // Save claim to Firebase for activity feed
+                  try {
+                    const claimData = {
+                      action: 'claim',
+                      amount: earnedRewards,
+                      userId: user?.id,
+                      walletAddress: walletAddress,
+                      userImageUrl: user?.imageUrl || null,
+                      name: user?.username || user?.firstName || 'Anonymous',
+                      createdAt: serverTimestamp(),
+                      timestamp: new Date().toISOString(),
+                      txHash: result?.transactionHash || null
+                    };
+                    await addDoc(collection(db, 'stakes'), claimData);
+                    console.log('Claim saved to Firestore');
+                  } catch (firestoreError) {
+                    console.error('Error saving claim to Firestore:', firestoreError);
+                  }
+
                   await refreshStaking();
                   await refreshBalance();
                 }}

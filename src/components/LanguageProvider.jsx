@@ -26,24 +26,10 @@ const LanguageContext = createContext({
   isAutoDetected: false,
 });
 
-// Read the saved manual preference synchronously so useState starts
-// with the correct locale — avoids a flash of English and survives
-// component remounts during Next.js navigation.
-function getInitialLocale() {
-  if (typeof window === 'undefined') return 'en';
-  try {
-    const manual = localStorage.getItem('manualLanguage');
-    if (manual && translations[manual]) return manual;
-    const saved = localStorage.getItem('preferredLanguage');
-    if (saved && translations[saved]) return saved;
-  } catch (_) {
-    // localStorage unavailable (private browsing, etc.)
-  }
-  return 'en';
-}
-
+// Always start with 'en' to match server render and avoid hydration mismatch.
+// The actual language preference is applied after mount in useEffect.
 export function LanguageProvider({ children }) {
-  const [locale, setLocale] = useState(getInitialLocale);
+  const [locale, setLocale] = useState('en');
   const [detectedLanguage, setDetectedLanguage] = useState(null);
   const [isAutoDetected, setIsAutoDetected] = useState(false);
 
@@ -111,8 +97,8 @@ export function LanguageProvider({ children }) {
     localStorage.setItem('manualLanguage', newLocale);
   };
 
-  // Translation function
-  const t = (key) => {
+  // Translation function with interpolation support
+  const t = (key, params = {}) => {
     const keys = key.split('.');
     let value = translations[locale];
 
@@ -120,7 +106,16 @@ export function LanguageProvider({ children }) {
       value = value?.[k];
     }
 
-    return value || key; // Return key if translation not found
+    if (!value) return key; // Return key if translation not found
+
+    // Handle interpolation: replace {{variable}} with params.variable
+    if (typeof value === 'string' && Object.keys(params).length > 0) {
+      return value.replace(/\{\{(\w+)\}\}/g, (match, paramKey) => {
+        return params[paramKey] !== undefined ? params[paramKey] : match;
+      });
+    }
+
+    return value;
   };
 
   return (

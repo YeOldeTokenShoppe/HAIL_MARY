@@ -112,7 +112,43 @@
   "illumin80": {
     "watchlistLine1": "彼女の",
     "watchlistLine2": "監視リストに入れ",
-    "watchlistTitle": "彼女の監視リストに入れ"
+    "watchlistTitle": "彼女の監視リストに入れ",
+    "lightGreenCandle": "グリーンキャンドルを灯せ！",
+    "stakeTokens": "RL80トークンをステーク",
+    "earnRewards": "ETH報酬を獲得！",
+    "candleTab": "キャンドル",
+    "stakeTab": "ステーク",
+    "lightIt": "点灯",
+    "findMyCandle": "私のキャンドルを探す",
+    "helpAnnotations": {
+      "stats": {
+        "label": "ホルダー専用キャンドル",
+        "description": "センチメントと価格動向をリアルタイムで一目で確認できます。キャンドルは価格変動に応じて動き、色が変わります（統計パネルを参照）。キャンドルをタップして、誰が灯したか、溶けるまでの残り時間を確認しましょう！"
+      },
+      "phone": {
+        "label": "ライブフィード",
+        "description": "RL80信者からのお供えがリアルタイムで届く様子をご覧ください。"
+      },
+      "actions": {
+        "label": "その他のボタン！",
+        "description": "右上のボタンで80年代モード、サインイン/アウト、またはトークンの購入をお試しください。右側の統計パネルを開くとさらに多くのデータを見ることができます！"
+      },
+      "candles": {
+        "label": "アクションボタン",
+        "description": "ステークまたはマッチアイコンをクリックして、キャンドルを灯すかトークンをステークしてください"
+      }
+    },
+    "stats": {
+      "stats": "統計",
+      "price": "価格",
+      "stake": "ステーク",
+      "pulse": "パルス",
+      "candles": "キャンドル",
+      "tokensBurned": "バーンされたトークン",
+      "totalValueLocked": "ロック総額",
+      "currentAPR": "現在のAPR",
+      "rewardsClaimed": "受け取った報酬"
+    }
   },
   "cyberNav": {
     "nav00": { "date": "I-80のアイコン", "title": "ロードマップ" },
@@ -255,6 +291,204 @@
       "selectImageDetail": "画像を選択して詳細表示",
       "previous": "前へ",
       "next": "次へ"
+    }
+  },
+  "lightCandleModal": {
+    "title": "キャンドルを灯す",
+    "candleInfo": {
+      "burnTime": "キャンドルは7日間燃え続けます",
+      "onePerWallet": "ウォレットにつき1本のアクティブなキャンドル。新しいキャンドルは既存のものを置き換えます。"
+    },
+    "steps": {
+      "step1": "意図を選択",
+      "step2": "メッセージを書く",
+      "step3": "供物を捧げる"
+    },
+    "offeringTypes": {
+      "petition": "嘆願",
+      "petitionDesc": "導きや助けを求める",
+      "confession": "告白",
+      "confessionDesc": "心を解放する",
+      "thanks": "感謝",
+      "thanksDesc": "幸運への感謝を表す"
+    },
+    "prayerFor": {
+      "label": "このキャンドルを灯す対象：",
+      "myself": "自分自身",
+      "someoneElse": "他の誰か",
+      "yourName": "あなたの名前",
+      "theirName": "名前を入力"
+    },
+    "message": {
+      "label": "永遠なる利益の聖母へのメッセージ",
+      "placeholderPetition": "任意 - メッセージを書くか、下のテンプレートを選択",
+      "placeholderConfession": "赦しを求めて罪を告白..",
+      "placeholderOther": "任意 - メッセージを書く",
+      "templateLabel": "またはテンプレートを選択：",
+      "selectPrayer": "祈りを選択..."
+    },
+    "tokens": {
+      "label": "燃やすRL80トークン",
+      "placeholder": "最低1 RL80",
+      "balance": "残高：",
+      "loadingBalance": "残高を読み込み中...",
+      "connectWallet": "残高を見るにはウォレットを接続"
+    },
+    "summary": {
+      "for": "のため",
+      "yourself": "あなた自身",
+      "someone": "誰か"
+    },
+    "info": {
+      "minToken": "最低1トークン",
+      "burnTime": "7日間燃焼",
+      "onePerWallet": "ウォレットにつき1つ"
+    },
+    "buttons": {
+      "back": "戻る",
+      "continue": "続ける",
+      "lightCandle": "キャンドルを灯す",
+      "processing": "処理中...",
+      "cancel": "キャンセル",
+      "lightMyCandle": "私のキャンドルを灯す"
+    },
+    "confirmation": {
+      "title": "灯す準備はできましたか？",
+      "burning": "燃やそうとしています",
+      "token": "RL80トークン",
+      "tokens": "RL80トークン",
+      "permanent": "この操作は永続的で元に戻せません"
+    },
+    "processing": {
+      "submitted": "トランザクションが送信されました！",
+      "waiting": "ブロックチェーンの確認を待っています...",
+      "lightingCandle": "キャンドルを灯しています",
+      "burning": "燃焼中",
+      "usuallyTakes": "通常10-30秒かかります"
+    },
+    "wallet": {
+      "signTransaction": "ウォレットでトランザクションに署名してください",
+      "waitingConfirmation": "ウォレットの確認を待っています...",
+      "amount": "金額："
+    },
+    "noTokens": {
+      "message": "キャンドルを灯すにはRL80トークンが必要です。"
+    },
+    "validation": {
+      "enterAmount": "燃やすRL80トークンの量を入力してください",
+      "enterRecipientName": "受取人の名前を入力してください"
+    },
+    "prayerProtocol": "祈りのプロトコル："
+  },
+  "stakeModal": {
+    "title": "RL80トークンをステーク",
+    "dashboard": {
+      "title": "ステーキングダッシュボード",
+      "successTitle": "ステーキング成功！",
+      "updatingBalances": "残高を更新中..."
+    },
+    "phases": {
+      "phase1": {
+        "title": "フェーズ1：報酬前",
+        "description": "あなたのポジションは確保されています。報酬はフェーズ2で有効になります。"
+      },
+      "rewardsActive": {
+        "title": "フェーズ{{phase}}: 報酬アクティブ",
+        "phaseDescription": "{{percent}}の取引税がステーカーに流れます"
+      },
+      "stakingOpen": {
+        "title": "ステーキング開始",
+        "subtitle": "（報酬はフェーズ2で有効化）",
+        "description1": "早めにステークしてポジションを確保しましょう。",
+        "description2": "流動性と取引量のしきい値が達成されると報酬が始まります。"
+      },
+      "whatDoesThisMean": "これはどういう意味ですか？",
+      "tooltipItems": {
+        "locked": "トークンはステーキングルールに従ってロックされます",
+        "noRewards": "フェーズ1では報酬は配布されません",
+        "queued": "フェーズ2以前に蓄積されたすべての報酬はキューに入っています",
+        "firstInLine": "早期ステーカーは報酬が有効になった時最初に並びます"
+      },
+      "zeroTax": {
+        "title": "ゼロ税モード",
+        "description": "プロトコルは自立しています。いつでも引き出せます。"
+      }
+    },
+    "activity": {
+      "title": "ステーキング活動",
+      "stakedAmount": "ステーク額",
+      "lockStatus": "ロック状態",
+      "unlocked": "ロック解除",
+      "rewardsEarned": "獲得報酬",
+      "totalPool": "総プール"
+    },
+    "rewards": {
+      "claimable": "請求可能な報酬：",
+      "readyToClaim": "請求準備完了！"
+    },
+    "buttons": {
+      "stakeMore": "さらにステーク",
+      "locked": "ロック中",
+      "withdrawAll": "すべて引き出す",
+      "claim": "請求",
+      "close": "閉じる"
+    },
+    "viewTransaction": "BaseScanで取引を見る →",
+    "info": {
+      "hideInfo": "非表示",
+      "showInfo": "情報",
+      "lockDays": "7日間ロック",
+      "minStake": "最低1 RL80でステーク",
+      "earnEth": "ETH報酬を獲得",
+      "proRata": "比例配分"
+    },
+    "form": {
+      "amountLabel": "ステーク額",
+      "placeholder": "ステーク額を入力",
+      "available": "利用可能：",
+      "loadingBalance": "残高を読み込み中...",
+      "connectWallet": "残高を見るにはウォレットを接続"
+    },
+    "preview": {
+      "amount": "金額：",
+      "unlock": "ロック解除：",
+      "ethRewards": "ETH報酬は比例して配分されます"
+    },
+    "processing": {
+      "approving": "承認中...",
+      "signingStake": "ステークに署名中...",
+      "confirming": "確認中...",
+      "processing": "処理中..."
+    },
+    "stake": "ステーク",
+    "noTokensMessage": "ステークするにはRL80トークンが必要です。",
+    "walletLoading": {
+      "signTransaction": "ウォレットでトランザクションに署名してください",
+      "stakeRL80": "RL80をステーク",
+      "amount": "金額：",
+      "waitingConfirmation": "ウォレットの確認を待っています..."
+    },
+    "confirmation": {
+      "withdrawSuccess": {
+        "title": "引き出し成功！",
+        "message": "トークンが正常に引き出されました。"
+      },
+      "withdrawError": {
+        "title": "引き出し失敗",
+        "message": "トークンの引き出しに失敗しました。再試行してください。"
+      },
+      "claimSuccess": {
+        "title": "報酬を請求しました！",
+        "message": "ETH報酬が正常に請求されました。"
+      },
+      "claimError": {
+        "title": "請求失敗",
+        "message": "報酬の請求に失敗しました。再試行してください。"
+      }
+    },
+    "errors": {
+      "insufficientAllowance": "トークン承認が不足しています。再試行してください。",
+      "stakeFailed": "トークンのステークに失敗しました。再試行してください。"
     }
   }
 }

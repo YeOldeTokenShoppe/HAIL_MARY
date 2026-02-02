@@ -112,7 +112,43 @@
   "illumin80": {
     "watchlistLine1": "그녀의",
     "watchlistLine2": "감시 목록에 오르다",
-    "watchlistTitle": "그녀의 감시 목록에 오르다"
+    "watchlistTitle": "그녀의 감시 목록에 오르다",
+    "lightGreenCandle": "그린 캔들을 켜세요!",
+    "stakeTokens": "RL80 토큰 스테이킹",
+    "earnRewards": "ETH 보상 획득!",
+    "candleTab": "캔들",
+    "stakeTab": "스테이크",
+    "lightIt": "점화",
+    "findMyCandle": "내 캔들 찾기",
+    "helpAnnotations": {
+      "stats": {
+        "label": "홀더 전용 캔들",
+        "description": "한 화면에서 시장 심리와 가격 움직임을 실시간으로 확인하세요. 캔들은 가격 변동에 따라 움직이고 색이 변합니다(통계 패널 참조). 캔들을 탭하여 누가 불을 붙였는지, 녹기까지 얼마나 남았는지 확인하세요!"
+      },
+      "phone": {
+        "label": "라이브 피드",
+        "description": "RL80 신자들의 제물이 실시간으로 도착하는 것을 시청하세요."
+      },
+      "actions": {
+        "label": "더 많은 버튼!",
+        "description": "오른쪽 상단의 버튼으로 80년대 모드를 사용해 보거나, 로그인/로그아웃하거나, 더 많은 토큰을 구매하세요. 오른쪽의 통계 패널을 열어 더 많은 데이터를 확인할 수 있습니다!"
+      },
+      "candles": {
+        "label": "액션 버튼",
+        "description": "스테이크 또는 성냥 아이콘을 클릭하여 캔들을 켜거나 토큰을 스테이킹하세요"
+      }
+    },
+    "stats": {
+      "stats": "통계",
+      "price": "가격",
+      "stake": "스테이크",
+      "pulse": "펄스",
+      "candles": "캔들",
+      "tokensBurned": "소각된 토큰",
+      "totalValueLocked": "총 예치 가치",
+      "currentAPR": "현재 APR",
+      "rewardsClaimed": "수령한 보상"
+    }
   },
   "cyberNav": {
     "nav00": { "date": "I-80의 아이콘", "title": "로드맵" },
@@ -255,6 +291,204 @@
       "selectImageDetail": "이미지를 선택하여 상세 보기",
       "previous": "이전",
       "next": "다음"
+    }
+  },
+  "lightCandleModal": {
+    "title": "촛불 켜기",
+    "candleInfo": {
+      "burnTime": "촛불은 7일 동안 타오릅니다",
+      "onePerWallet": "지갑당 하나의 활성 촛불. 새 촛불은 기존 것을 대체합니다."
+    },
+    "steps": {
+      "step1": "의도 선택",
+      "step2": "메시지 작성",
+      "step3": "제물 바치기"
+    },
+    "offeringTypes": {
+      "petition": "청원",
+      "petitionDesc": "인도나 도움 요청",
+      "confession": "고백",
+      "confessionDesc": "마음을 비우다",
+      "thanks": "감사",
+      "thanksDesc": "행운에 대한 감사 표현"
+    },
+    "prayerFor": {
+      "label": "이 촛불을 켜는 대상:",
+      "myself": "나 자신",
+      "someoneElse": "다른 사람",
+      "yourName": "당신의 이름",
+      "theirName": "이름 입력"
+    },
+    "message": {
+      "label": "영원한 수익의 성모님께 보내는 메시지",
+      "placeholderPetition": "선택 사항 - 메시지를 작성하거나 아래 템플릿 선택",
+      "placeholderConfession": "용서를 구하며 죄를 고백..",
+      "placeholderOther": "선택 사항 - 메시지 작성",
+      "templateLabel": "또는 템플릿 선택:",
+      "selectPrayer": "기도 선택..."
+    },
+    "tokens": {
+      "label": "소각할 RL80 토큰",
+      "placeholder": "최소 1 RL80",
+      "balance": "잔액:",
+      "loadingBalance": "잔액 로딩 중...",
+      "connectWallet": "잔액을 보려면 지갑 연결"
+    },
+    "summary": {
+      "for": "를 위해",
+      "yourself": "당신 자신",
+      "someone": "누군가"
+    },
+    "info": {
+      "minToken": "최소 1 토큰",
+      "burnTime": "7일 연소",
+      "onePerWallet": "지갑당 1개"
+    },
+    "buttons": {
+      "back": "뒤로",
+      "continue": "계속",
+      "lightCandle": "촛불 켜기",
+      "processing": "처리 중...",
+      "cancel": "취소",
+      "lightMyCandle": "내 촛불 켜기"
+    },
+    "confirmation": {
+      "title": "켤 준비가 되셨나요?",
+      "burning": "소각하려고 합니다",
+      "token": "RL80 토큰",
+      "tokens": "RL80 토큰",
+      "permanent": "이 작업은 영구적이며 되돌릴 수 없습니다"
+    },
+    "processing": {
+      "submitted": "거래가 제출되었습니다!",
+      "waiting": "블록체인 확인 대기 중...",
+      "lightingCandle": "촛불을 켜는 중",
+      "burning": "소각 중",
+      "usuallyTakes": "보통 10-30초 걸립니다"
+    },
+    "wallet": {
+      "signTransaction": "지갑에서 거래에 서명해 주세요",
+      "waitingConfirmation": "지갑 확인 대기 중...",
+      "amount": "금액:"
+    },
+    "noTokens": {
+      "message": "촛불을 켜려면 RL80 토큰이 필요합니다."
+    },
+    "validation": {
+      "enterAmount": "소각할 RL80 토큰 양을 입력해 주세요",
+      "enterRecipientName": "수신자 이름을 입력해 주세요"
+    },
+    "prayerProtocol": "기도 프로토콜:"
+  },
+  "stakeModal": {
+    "title": "RL80 토큰 스테이킹",
+    "dashboard": {
+      "title": "스테이킹 대시보드",
+      "successTitle": "스테이킹 성공!",
+      "updatingBalances": "잔액 업데이트 중..."
+    },
+    "phases": {
+      "phase1": {
+        "title": "1단계: 보상 전",
+        "description": "귀하의 포지션이 확보되었습니다. 보상은 2단계에서 활성화됩니다."
+      },
+      "rewardsActive": {
+        "title": "{{phase}}단계: 보상 활성화",
+        "phaseDescription": "{{percent}}의 거래 세금이 스테이커에게 흐릅니다"
+      },
+      "stakingOpen": {
+        "title": "스테이킹 오픈",
+        "subtitle": "(보상은 2단계에서 활성화)",
+        "description1": "포지션 확보를 위해 일찍 스테이킹하세요.",
+        "description2": "유동성과 거래량 임계값이 충족되면 보상이 시작됩니다."
+      },
+      "whatDoesThisMean": "이것은 무엇을 의미하나요?",
+      "tooltipItems": {
+        "locked": "토큰은 스테이킹 규칙에 따라 잠깁니다",
+        "noRewards": "1단계 동안 보상이 배포되지 않습니다",
+        "queued": "2단계 이전에 축적된 모든 보상이 대기 중입니다",
+        "firstInLine": "초기 스테이커가 보상 활성화 시 먼저 줄을 섭니다"
+      },
+      "zeroTax": {
+        "title": "제로 세금 모드",
+        "description": "프로토콜은 자립적입니다. 언제든지 출금하세요."
+      }
+    },
+    "activity": {
+      "title": "스테이킹 활동",
+      "stakedAmount": "스테이킹 금액",
+      "lockStatus": "잠금 상태",
+      "unlocked": "잠금 해제",
+      "rewardsEarned": "획득 보상",
+      "totalPool": "총 풀"
+    },
+    "rewards": {
+      "claimable": "청구 가능 보상:",
+      "readyToClaim": "청구 준비 완료!"
+    },
+    "buttons": {
+      "stakeMore": "더 스테이킹",
+      "locked": "잠김",
+      "withdrawAll": "전체 출금",
+      "claim": "청구",
+      "close": "닫기"
+    },
+    "viewTransaction": "BaseScan에서 거래 보기 →",
+    "info": {
+      "hideInfo": "숨기기",
+      "showInfo": "정보",
+      "lockDays": "7일 잠금",
+      "minStake": "최소 1 RL80 스테이킹",
+      "earnEth": "ETH 보상 획득",
+      "proRata": "비례 배분"
+    },
+    "form": {
+      "amountLabel": "스테이킹 금액",
+      "placeholder": "스테이킹할 금액 입력",
+      "available": "사용 가능:",
+      "loadingBalance": "잔액 로딩 중...",
+      "connectWallet": "잔액을 보려면 지갑 연결"
+    },
+    "preview": {
+      "amount": "금액:",
+      "unlock": "잠금 해제:",
+      "ethRewards": "ETH 보상이 비례적으로 배분됩니다"
+    },
+    "processing": {
+      "approving": "승인 중...",
+      "signingStake": "스테이킹 서명 중...",
+      "confirming": "확인 중...",
+      "processing": "처리 중..."
+    },
+    "stake": "스테이킹",
+    "noTokensMessage": "스테이킹하려면 RL80 토큰이 필요합니다.",
+    "walletLoading": {
+      "signTransaction": "지갑에서 거래에 서명해 주세요",
+      "stakeRL80": "RL80 스테이킹",
+      "amount": "금액:",
+      "waitingConfirmation": "지갑 확인 대기 중..."
+    },
+    "confirmation": {
+      "withdrawSuccess": {
+        "title": "출금 성공!",
+        "message": "토큰이 성공적으로 출금되었습니다."
+      },
+      "withdrawError": {
+        "title": "출금 실패",
+        "message": "토큰 출금에 실패했습니다. 다시 시도해 주세요."
+      },
+      "claimSuccess": {
+        "title": "보상 청구 완료!",
+        "message": "ETH 보상이 성공적으로 청구되었습니다."
+      },
+      "claimError": {
+        "title": "청구 실패",
+        "message": "보상 청구에 실패했습니다. 다시 시도해 주세요."
+      }
+    },
+    "errors": {
+      "insufficientAllowance": "토큰 승인이 부족합니다. 다시 시도해 주세요.",
+      "stakeFailed": "토큰 스테이킹에 실패했습니다. 다시 시도해 주세요."
     }
   }
 }

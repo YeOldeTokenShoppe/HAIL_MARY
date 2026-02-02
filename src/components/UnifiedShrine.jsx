@@ -3,6 +3,7 @@ import React, { useRef, useState, useEffect, Suspense, useCallback, useMemo, for
 import { createPortal } from 'react-dom'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Stats, useGLTF, Html, OrbitControls } from '@react-three/drei'
+import { useLanguage } from './LanguageProvider'
 
 // DEBUG MODE - Set to true to see zones from bird's eye view
 const DEBUG_MODE = false
@@ -1149,6 +1150,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   showHelpOverlay: externalShowHelp,
   onToggleHelp
 }, ref) {
+  const { t } = useLanguage()
   // Track if component is mounted for SSR safety
   const [mounted, setMounted] = useState(false)
   // Mobile detection
@@ -2028,18 +2030,20 @@ useEffect(() => {
     top: isMobile ? '100px' : '105px',
     right: isMobile ? '10px' : '20px',
     // background: 'rgba(0, 0, 0, 0.8)',
-    border: '2px solid rgba(212, 175, 55, 0.3)',
+    border: is80sMode ? '2px solid rgba(255, 0, 255, 0.4)' : '2px solid rgba(212, 175, 55, 0.3)',
     borderRadius: '12px',
     padding: isMobile ? '10px 12px' : '18px',
     color: '#fff',
     fontFamily: 'monospace',
     fontSize: isMobile ? '11px' : '14px',
     backdropFilter: 'blur(20px)',
-    boxShadow: '0 0 20px 4px rgba(212, 175, 55, 0.3)',
+    boxShadow: is80sMode
+      ? '0 0 20px 4px rgba(255, 0, 255, 0.3), 0 0 40px 8px rgba(0, 255, 255, 0.15)'
+      : '0 0 20px 4px rgba(212, 175, 55, 0.3)',
     zIndex: 1000,
     width: isMobile ? '160px' : '240px',
     pointerEvents: 'auto'
-  }), [isMobile])
+  }), [isMobile, is80sMode])
   
 
   // Memoize 7-day price sparkline
@@ -2063,33 +2067,33 @@ useEffect(() => {
   const helpAnnotations = useMemo(() => [
     {
       id: 'stats',
-      label: 'User-dedicated Candles',
-      description: 'Tap on any candle to see who lit it and how much time is remaining before it melts. Candles move up and down and change color as prices change',
+      label: t('illumin80.helpAnnotations.stats.label'),
+      description: t('illumin80.helpAnnotations.stats.description'),
       position: { top: isMobile ? '150px' : '150px', right: isMobile ? '50%' : '50%' },
       pointerDirection: 'right'
     },
     {
       id: 'phone',
-      label: 'Live Feed',
-      description: 'Watch real-time offerings arrive from RL80 devotees.',
+      label: t('illumin80.helpAnnotations.phone.label'),
+      description: t('illumin80.helpAnnotations.phone.description'),
       position: { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
       pointerDirection: 'none'
     },
     {
       id: 'actions',
-      label: 'More Buttons!',
-      description: 'Try 80s mode, sign in/out, or buy more tokens with these buttons',
-      position: { top: '15%', right: isMobile ? '70px' : '120px' },
+      label: t('illumin80.helpAnnotations.actions.label'),
+      description: t('illumin80.helpAnnotations.actions.description'),
+      position: { top: '17%', right: isMobile ? '15rem' : '15rem' },
       pointerDirection: 'right'
     },
     {
       id: 'candles',
-      label: 'Action Buttons',
-      description: 'Light a candle or stake tokens by clicking the stake or match icons',
+      label: t('illumin80.helpAnnotations.candles.label'),
+      description: t('illumin80.helpAnnotations.candles.description'),
       position: { bottom: '23%', left: '20%' },
       pointerDirection: 'none'
     }
-  ], [isMobile])
+  ], [isMobile, t])
 
   return (
     <div style={{ width: '100vw', height: isMobile ? '100vh' : '100vh', background: is80sMode ? 'transparent' : '#000', position: 'fixed'}}>
@@ -2188,7 +2192,7 @@ useEffect(() => {
             // Mobile: small bar at bottom so it doesn't block the centered candle
             // Desktop: position at top right
             ...(isMobile ? {
-              bottom: '100px',
+              bottom: '120px',
               left: '50%',
               transform: 'translateX(-50%)',
             } : {
@@ -2656,7 +2660,7 @@ useEffect(() => {
         <div
           style={{
             position: 'absolute',
-            bottom: isMobile ? '100px' : '40px',
+            bottom: isMobile ? '135px' : '40px',
             left: '50%',
             transform: 'translateX(-50%)',
             background: 'rgba(20, 20, 30, 0.95)',
@@ -2753,8 +2757,34 @@ useEffect(() => {
                 alignItems: 'center',
                 gap: '6px'
               }}>
-                <span>🕯️</span>
-                <span>{clickedCandleData.litAt}</span>
+                {clickedCandleData.userImageUrl ? (
+                  <img
+                    src={clickedCandleData.userImageUrl}
+                    alt=""
+                    style={{
+                      width: '16px',
+                      height: '16px',
+                      borderRadius: '50%',
+                      objectFit: 'cover'
+                    }}
+                  />
+                ) : (
+                  <span style={{
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #8a2be2, #ff006e)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '10px',
+                    fontWeight: 'bold',
+                    color: '#fff'
+                  }}>
+                    {clickedCandleData.username?.charAt(0).toUpperCase() || '?'}
+                  </span>
+                )}
+                <span>{clickedCandleData.username || 'Anonymous'}</span>
               </div>
             </div>
           </div>
@@ -2795,13 +2825,14 @@ useEffect(() => {
         <button
           onClick={() => setStatsBoxCollapsed(false)}
           style={{
-            background: 'rgba(212, 175, 55, 0.2)',
-
-            border: '2px solid rgba(212, 175, 55, 0.4)',
+            background: is80sMode ? 'rgba(255, 0, 255, 0.2)' : 'rgba(212, 175, 55, 0.2)',
+            borderTop: is80sMode ? '2px solid rgba(255, 0, 255, 0.5)' : '2px solid rgba(212, 175, 55, 0.4)',
+            borderBottom: is80sMode ? '2px solid rgba(255, 0, 255, 0.5)' : '2px solid rgba(212, 175, 55, 0.4)',
+            borderLeft: is80sMode ? '2px solid rgba(255, 0, 255, 0.5)' : '2px solid rgba(212, 175, 55, 0.4)',
             borderRight: 'none',
             borderRadius: '8px 0 0 8px',
             padding: '12px 8px',
-            color: '#d4af37',
+            color: is80sMode ? '#ff00ff' : '#d4af37',
             fontSize: '11px',
             fontFamily: 'monospace',
             fontWeight: 'bold',
@@ -2816,10 +2847,12 @@ useEffect(() => {
             top: isMobile ? '45%' : '160px',
             opacity: statsBoxCollapsed ? 1 : 0,
             pointerEvents: statsBoxCollapsed ? 'auto' : 'none',
+            boxShadow: is80sMode ? '0 0 15px rgba(255, 0, 255, 0.3)' : 'none',
+            textShadow: is80sMode ? '0 0 10px #ff00ff' : 'none',
           }}
           title="Open stats panel"
         >
-          STATS
+          {t('illumin80.stats.stats')}
         </button>
 
         {/* Unified Stats Box with Tabs */}
@@ -2840,17 +2873,20 @@ useEffect(() => {
             top: '50%',
             left: '-24px',
             transform: 'translateY(-50%)',
-            background: 'rgba(212, 175, 55, 0.2)',
-            border: '2px solid rgba(212, 175, 55, 0.4)',
+            background: is80sMode ? 'rgba(255, 0, 255, 0.2)' : 'rgba(212, 175, 55, 0.2)',
+            borderTop: is80sMode ? '2px solid rgba(255, 0, 255, 0.5)' : '2px solid rgba(212, 175, 55, 0.4)',
+            borderBottom: is80sMode ? '2px solid rgba(255, 0, 255, 0.5)' : '2px solid rgba(212, 175, 55, 0.4)',
+            borderLeft: is80sMode ? '2px solid rgba(255, 0, 255, 0.5)' : '2px solid rgba(212, 175, 55, 0.4)',
             borderRight: 'none',
             borderRadius: '8px 0 0 8px',
             padding: '12px 6px',
-            color: '#d4af37',
+            color: is80sMode ? '#ff00ff' : '#d4af37',
             fontSize: '14px',
             cursor: 'pointer',
             backdropFilter: 'blur(10px)',
             transition: 'all 0.2s ease',
             zIndex: 10,
+            boxShadow: is80sMode ? '0 0 10px rgba(255, 0, 255, 0.3)' : 'none',
           }}
           title="Collapse stats panel"
         >
@@ -2869,10 +2905,16 @@ useEffect(() => {
             style={{
               flex: 1,
               padding: isMobile ? '4px 4px' : '6px 8px',
-              background: activeStatsTab === 'price' ? 'rgba(212, 175, 55, 0.2)' : 'transparent',
+              background: activeStatsTab === 'price'
+                ? (is80sMode ? 'rgba(255, 0, 255, 0.2)' : 'rgba(212, 175, 55, 0.2)')
+                : 'transparent',
               border: 'none',
-              borderBottom: activeStatsTab === 'price' ? '2px solid #d4af37' : '2px solid transparent',
-              color: activeStatsTab === 'price' ? '#d4af37' : '#ccc',
+              borderBottom: activeStatsTab === 'price'
+                ? (is80sMode ? '2px solid #ff00ff' : '2px solid #d4af37')
+                : '2px solid transparent',
+              color: activeStatsTab === 'price'
+                ? (is80sMode ? '#ff00ff' : '#d4af37')
+                : '#ccc',
               fontSize: isMobile ? '10px' : '12px',
               fontFamily: 'monospace',
               fontWeight: activeStatsTab === 'price' ? 'bold' : 'normal',
@@ -2882,9 +2924,10 @@ useEffect(() => {
               marginBottom: '-1px',
               minWidth: 0,
               overflow: 'hidden',
+              textShadow: activeStatsTab === 'price' && is80sMode ? '0 0 10px #ff00ff' : 'none',
             }}
           >
-            Price
+            {t('illumin80.stats.price')}
           </button>
           <button
             onClick={() => setActiveStatsTab('staking')}
@@ -2906,7 +2949,7 @@ useEffect(() => {
               overflow: 'hidden',
             }}
           >
-            Stake
+            {t('illumin80.stats.stake')}
           </button>
           <button
             onClick={() => setActiveStatsTab('pulse')}
@@ -2928,7 +2971,7 @@ useEffect(() => {
               overflow: 'hidden',
             }}
           >
-            Pulse
+            {t('illumin80.stats.pulse')}
           </button>
           <button
             onClick={() => setActiveStatsTab('leaders')}
@@ -3000,16 +3043,17 @@ useEffect(() => {
           {/* Candles */}
           <div style={{
             padding: isMobile ? '8px' : '10px',
-            background: 'rgba(212, 175, 55, 0.1)',
+            background: is80sMode ? 'rgba(255, 0, 255, 0.1)' : 'rgba(212, 175, 55, 0.1)',
             borderRadius: '8px',
-            border: '1px solid rgba(212, 175, 55, 0.3)',
+            border: is80sMode ? '1px solid rgba(255, 0, 255, 0.3)' : '1px solid rgba(212, 175, 55, 0.3)',
             textAlign: 'center'
           }}>
-            <div style={{ 
-              fontSize: isMobile ? '16px' : '16px', 
+            <div style={{
+              fontSize: isMobile ? '16px' : '16px',
               fontWeight: 'bold',
-              color: '#d4af37',
-              marginBottom: '4px'
+              color: is80sMode ? '#ff00ff' : '#d4af37',
+              marginBottom: '4px',
+              textShadow: is80sMode ? '0 0 10px #ff00ff' : 'none',
             }}>
               {/* <img 
                 src="/images/GreenCandleIcon.webp"
@@ -3039,7 +3083,7 @@ useEffect(() => {
               textTransform: 'uppercase',
               letterSpacing: '0.5px'
             }}>
-              Candles
+              {t('illumin80.stats.candles')}
             </div>
           </div>
           
@@ -3069,9 +3113,9 @@ useEffect(() => {
               textTransform: 'uppercase',
               letterSpacing: '0.5px',
               marginBottom: '-8px'
-   
+
             }}>
-              Tokens Burned
+              {t('illumin80.stats.tokensBurned')}
             </div>
           </div>
         </div>
@@ -3143,7 +3187,7 @@ useEffect(() => {
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px'
               }}>
-                Total Value Locked
+                {t('illumin80.stats.totalValueLocked')}
               </div>
             </div>
             
@@ -3176,10 +3220,10 @@ useEffect(() => {
                   textTransform: 'uppercase',
                   letterSpacing: '0.5px'
                 }}>
-                  Current APR
+                  {t('illumin80.stats.currentAPR')}
                 </div>
               </div>
-              
+
               {/* Total Rewards Paid */}
               <div style={{
                 padding: isMobile ? '8px' : '10px',
@@ -3202,11 +3246,11 @@ useEffect(() => {
                   textTransform: 'uppercase',
                   letterSpacing: '0.5px'
                 }}>
-                  Rewards Claimed
+                  {t('illumin80.stats.rewardsClaimed')}
                 </div>
               </div>
             </div>
-            
+
             {/* Total Staked Tokens */}
             {/* <div style={{
               padding: isMobile ? '8px' : '10px',
@@ -3377,7 +3421,7 @@ useEffect(() => {
               WebkitBackdropFilter: 'blur(10px)',
             }}
           >
-            🔍 <span>FIND MY CANDLE</span>
+            🔍 <span>{t('illumin80.findMyCandle').toUpperCase()}</span>
           </button>
         )}
         </div>,
@@ -3426,22 +3470,27 @@ useEffect(() => {
                 height: isMobile ? '28px' : '32px',
                 borderRadius: '50%',
                 background: activeAnnotationId === annotation.id
-                  ? 'rgba(212, 175, 55, 1)'
-                  : 'rgba(212, 175, 55, 0.9)',
+                  ? (is80sMode ? 'rgba(255, 0, 255, 1)' : 'rgba(212, 175, 55, 1)')
+                  : (is80sMode ? 'rgba(255, 0, 255, 0.9)' : 'rgba(212, 175, 55, 0.9)'),
                 border: activeAnnotationId === annotation.id
-                  ? '3px solid #fff'
-                  : '2px solid rgba(255, 255, 255, 0.8)',
+                  ? (is80sMode ? '3px solid #00ffff' : '3px solid #fff')
+                  : (is80sMode ? '2px solid rgba(0, 255, 255, 0.8)' : '2px solid rgba(255, 255, 255, 0.8)'),
                 boxShadow: activeAnnotationId === annotation.id
-                  ? '0 0 25px rgba(212, 175, 55, 0.8), 0 0 50px rgba(212, 175, 55, 0.4)'
-                  : '0 0 15px rgba(212, 175, 55, 0.5)',
+                  ? (is80sMode
+                      ? '0 0 25px rgba(255, 0, 255, 0.8), 0 0 50px rgba(0, 255, 255, 0.4)'
+                      : '0 0 25px rgba(212, 175, 55, 0.8), 0 0 50px rgba(212, 175, 55, 0.4)')
+                  : (is80sMode
+                      ? '0 0 15px rgba(255, 0, 255, 0.6), 0 0 30px rgba(0, 255, 255, 0.3)'
+                      : '0 0 15px rgba(212, 175, 55, 0.5)'),
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#000',
+                color: is80sMode ? '#00ffff' : '#000',
                 fontSize: isMobile ? '14px' : '16px',
                 fontWeight: 'bold',
                 transition: 'all 0.2s ease',
                 animation: activeAnnotationId === annotation.id ? 'none' : 'pulse 2s infinite',
+                textShadow: is80sMode ? '0 0 10px #00ffff' : 'none',
               }}>
                 ?
               </div>
@@ -3460,29 +3509,32 @@ useEffect(() => {
                   marginLeft: annotation.pointerDirection === 'left' ? '12px' : 0,
                   marginRight: annotation.pointerDirection === 'right' ? '12px' : 0,
                   marginTop: annotation.pointerDirection === 'none' ? '12px' : 0,
-                  background: 'rgba(0, 0, 0, 0.95)',
-                  border: '2px solid rgba(212, 175, 55, 0.8)',
+                  background: is80sMode ? 'rgba(20, 0, 40, 0.95)' : 'rgba(0, 0, 0, 0.95)',
+                  border: is80sMode ? '2px solid rgba(255, 0, 255, 0.8)' : '2px solid rgba(212, 175, 55, 0.8)',
                   borderRadius: '10px',
                   padding: isMobile ? '10px 14px' : '12px 16px',
                   minWidth: isMobile ? '140px' : '180px',
                   maxWidth: isMobile ? '200px' : '240px',
                   backdropFilter: 'blur(10px)',
                   animation: 'fadeIn 0.2s ease',
+                  boxShadow: is80sMode ? '0 0 20px rgba(255, 0, 255, 0.3), 0 0 40px rgba(0, 255, 255, 0.2)' : 'none',
                 }}>
                   <div style={{
-                    color: '#d4af37',
+                    color: is80sMode ? '#ff00ff' : '#d4af37',
                     fontSize: isMobile ? '12px' : '14px',
                     fontWeight: 'bold',
                     marginBottom: '6px',
                     fontFamily: 'system-ui, -apple-system, sans-serif',
+                    textShadow: is80sMode ? '0 0 10px #ff00ff' : 'none',
                   }}>
                     {annotation.label}
                   </div>
                   <div style={{
-                    color: 'rgba(255, 255, 255, 0.9)',
+                    color: is80sMode ? 'rgba(0, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.9)',
                     fontSize: isMobile ? '11px' : '12px',
                     lineHeight: '1.5',
                     fontFamily: 'system-ui, -apple-system, sans-serif',
+                    textShadow: is80sMode ? '0 0 5px rgba(0, 255, 255, 0.5)' : 'none',
                   }}>
                     {annotation.description}
                   </div>
@@ -3498,13 +3550,15 @@ useEffect(() => {
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 950,
-            background: 'rgba(0, 0, 0, 0.8)',
-            border: '1px solid rgba(212, 175, 55, 0.4)',
+            background: is80sMode ? 'rgba(20, 0, 40, 0.9)' : 'rgba(0, 0, 0, 0.8)',
+            border: is80sMode ? '1px solid rgba(255, 0, 255, 0.5)' : '1px solid rgba(212, 175, 55, 0.4)',
             borderRadius: '20px',
             padding: '8px 16px',
-            color: 'rgba(255, 255, 255, 0.7)',
+            color: is80sMode ? 'rgba(0, 255, 255, 0.8)' : 'rgba(255, 255, 255, 0.7)',
             fontSize: isMobile ? '11px' : '12px',
             fontFamily: 'system-ui, -apple-system, sans-serif',
+            boxShadow: is80sMode ? '0 0 15px rgba(255, 0, 255, 0.3)' : 'none',
+            textShadow: is80sMode ? '0 0 5px rgba(0, 255, 255, 0.5)' : 'none',
           }}>
             Tap markers for info • Tap outside to close
           </div>

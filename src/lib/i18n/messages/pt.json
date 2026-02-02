@@ -112,7 +112,43 @@
   "illumin80": {
     "watchlistLine1": "Entre na sua",
     "watchlistLine2": "lista de observação",
-    "watchlistTitle": "Entre Na Sua Lista De Observação"
+    "watchlistTitle": "Entre Na Sua Lista De Observação",
+    "lightGreenCandle": "Acenda uma Vela Verde!",
+    "stakeTokens": "STAKE DE TOKENS RL80",
+    "earnRewards": "Ganhe Recompensas ETH!",
+    "candleTab": "Vela",
+    "stakeTab": "Stake",
+    "lightIt": "Acender",
+    "findMyCandle": "Encontrar Minha Vela",
+    "helpAnnotations": {
+      "stats": {
+        "label": "Velas Dedicadas aos Holders",
+        "description": "Obtenha uma visão ao vivo do sentimento e da ação do preço em uma única visualização. As velas se movem e mudam de cor conforme os preços mudam (veja o Painel de Estatísticas). Toque em qualquer vela para ver quem a acendeu e quanto tempo resta antes de derreter!"
+      },
+      "phone": {
+        "label": "Feed ao Vivo",
+        "description": "Assista às oferendas chegarem em tempo real dos devotos do RL80."
+      },
+      "actions": {
+        "label": "Mais Botões!",
+        "description": "Experimente o modo anos 80, faça login/logout, ou compre mais tokens com os botões no canto superior direito. Você pode abrir o painel de estatísticas à direita para ver ainda mais dados!"
+      },
+      "candles": {
+        "label": "Botões de Ação",
+        "description": "Acenda uma vela ou faça stake de tokens clicando nos ícones de stake ou fósforo"
+      }
+    },
+    "stats": {
+      "stats": "ESTATÍSTICAS",
+      "price": "Preço",
+      "stake": "Stake",
+      "pulse": "Pulso",
+      "candles": "Velas",
+      "tokensBurned": "Tokens Queimados",
+      "totalValueLocked": "Valor Total Bloqueado",
+      "currentAPR": "APR Atual",
+      "rewardsClaimed": "Recompensas Reivindicadas"
+    }
   },
   "cyberNav": {
     "nav00": { "date": "ÍCONE NA I-80", "title": "ROTEIRO" },
@@ -255,6 +291,204 @@
       "selectImageDetail": "Selecione imagem para vista detalhada",
       "previous": "Anterior",
       "next": "Próximo"
+    }
+  },
+  "lightCandleModal": {
+    "title": "Acender uma Vela",
+    "candleInfo": {
+      "burnTime": "Sua vela queimará por 7 dias",
+      "onePerWallet": "Uma vela ativa por carteira. Acender uma nova vela substitui a existente."
+    },
+    "steps": {
+      "step1": "Escolha Sua Intenção",
+      "step2": "Escreva Sua Mensagem",
+      "step3": "Faça Sua Oferta"
+    },
+    "offeringTypes": {
+      "petition": "PETIÇÃO",
+      "petitionDesc": "Pedir orientação ou ajuda",
+      "confession": "CONFISSÃO",
+      "confessionDesc": "Alivie seu coração",
+      "thanks": "OBRIGADO",
+      "thanksDesc": "Expressar gratidão pela boa fortuna"
+    },
+    "prayerFor": {
+      "label": "Acender esta vela para:",
+      "myself": "Mim mesmo",
+      "someoneElse": "Outra Pessoa",
+      "yourName": "Seu nome",
+      "theirName": "Digite o nome dela"
+    },
+    "message": {
+      "label": "Sua Mensagem para Nossa Senhora do Lucro Perpétuo",
+      "placeholderPetition": "OPCIONAL - Escreva sua mensagem ou selecione um modelo abaixo",
+      "placeholderConfession": "Confesse seus pecados para possível absolvição..",
+      "placeholderOther": "OPCIONAL - Escreva uma mensagem",
+      "templateLabel": "Ou escolha um modelo:",
+      "selectPrayer": "Selecione uma oração..."
+    },
+    "tokens": {
+      "label": "Tokens RL80 para Queimar",
+      "placeholder": "1 RL80 mínimo",
+      "balance": "Saldo:",
+      "loadingBalance": "Carregando saldo...",
+      "connectWallet": "Conecte a carteira para ver o saldo"
+    },
+    "summary": {
+      "for": "para",
+      "yourself": "você mesmo",
+      "someone": "alguém"
+    },
+    "info": {
+      "minToken": "1 token mín",
+      "burnTime": "7 dias de queima",
+      "onePerWallet": "1 por carteira"
+    },
+    "buttons": {
+      "back": "Voltar",
+      "continue": "Continuar",
+      "lightCandle": "Acender Vela",
+      "processing": "Processando...",
+      "cancel": "Cancelar",
+      "lightMyCandle": "Acender Minha Vela"
+    },
+    "confirmation": {
+      "title": "Pronto para acender?",
+      "burning": "Você está prestes a queimar",
+      "token": "token RL80",
+      "tokens": "tokens RL80",
+      "permanent": "Esta ação é permanente e não pode ser desfeita"
+    },
+    "processing": {
+      "submitted": "Transação enviada!",
+      "waiting": "Aguardando confirmação na blockchain...",
+      "lightingCandle": "Acendendo Sua Vela",
+      "burning": "Queimando",
+      "usuallyTakes": "Isso geralmente leva 10-30 segundos"
+    },
+    "wallet": {
+      "signTransaction": "Por favor assine a transação na sua carteira",
+      "waitingConfirmation": "Aguardando confirmação da carteira...",
+      "amount": "Quantidade:"
+    },
+    "noTokens": {
+      "message": "Você precisa de tokens RL80 para acender uma vela."
+    },
+    "validation": {
+      "enterAmount": "Por favor digite a quantidade de tokens RL80 para queimar",
+      "enterRecipientName": "Por favor digite um nome para o destinatário"
+    },
+    "prayerProtocol": "Protocolo de Oração:"
+  },
+  "stakeModal": {
+    "title": "Stake de Tokens RL80",
+    "dashboard": {
+      "title": "PAINEL DE STAKING",
+      "successTitle": "Staking Bem-sucedido!",
+      "updatingBalances": "Atualizando saldos..."
+    },
+    "phases": {
+      "phase1": {
+        "title": "Fase 1: Pré-Recompensas",
+        "description": "Sua posição está garantida. Recompensas ativam na Fase 2."
+      },
+      "rewardsActive": {
+        "title": "Fase {{phase}}: Recompensas Ativas",
+        "phaseDescription": "{{percent}} do imposto de transação fluindo para stakers"
+      },
+      "stakingOpen": {
+        "title": "Staking Aberto",
+        "subtitle": "(Recompensas Ativam na Fase 2)",
+        "description1": "Faça stake cedo para garantir sua posição.",
+        "description2": "Recompensas começam quando os limites de liquidez e volume são atingidos."
+      },
+      "whatDoesThisMean": "O que isso significa?",
+      "tooltipItems": {
+        "locked": "Tokens estão bloqueados conforme as regras de staking",
+        "noRewards": "Nenhuma recompensa distribuída durante a Fase 1",
+        "queued": "Todas as recompensas acumuladas antes da Fase 2 estão na fila",
+        "firstInLine": "Stakers antecipados são os primeiros quando as recompensas ativam"
+      },
+      "zeroTax": {
+        "title": "Modo Sem Taxa",
+        "description": "O protocolo é autossustentável. Retire a qualquer momento."
+      }
+    },
+    "activity": {
+      "title": "ATIVIDADE DE STAKING",
+      "stakedAmount": "Quantidade em Stake",
+      "lockStatus": "Status de Bloqueio",
+      "unlocked": "Desbloqueado",
+      "rewardsEarned": "Recompensas Ganhas",
+      "totalPool": "Pool Total"
+    },
+    "rewards": {
+      "claimable": "Recompensas Reivindicáveis:",
+      "readyToClaim": "Prontas para reivindicar!"
+    },
+    "buttons": {
+      "stakeMore": "MAIS STAKE",
+      "locked": "BLOQUEADO",
+      "withdrawAll": "RETIRAR TUDO",
+      "claim": "REIVINDICAR",
+      "close": "Fechar"
+    },
+    "viewTransaction": "Ver transação no BaseScan →",
+    "info": {
+      "hideInfo": "Ocultar",
+      "showInfo": "Info",
+      "lockDays": "7 dias de bloqueio",
+      "minStake": "Mín 1 RL80 para stake",
+      "earnEth": "Ganhe recompensas ETH",
+      "proRata": "Distribuição proporcional"
+    },
+    "form": {
+      "amountLabel": "Quantidade para Stake",
+      "placeholder": "Digite a quantidade para stake",
+      "available": "Disponível:",
+      "loadingBalance": "Carregando saldo...",
+      "connectWallet": "Conecte a carteira para ver o saldo"
+    },
+    "preview": {
+      "amount": "Quantidade:",
+      "unlock": "Desbloqueio:",
+      "ethRewards": "Recompensas ETH distribuídas proporcionalmente"
+    },
+    "processing": {
+      "approving": "Aprovando...",
+      "signingStake": "Assinando Stake...",
+      "confirming": "Confirmando...",
+      "processing": "Processando..."
+    },
+    "stake": "Stake",
+    "noTokensMessage": "Você precisa de tokens RL80 para fazer stake.",
+    "walletLoading": {
+      "signTransaction": "Por favor assine a transação na sua carteira",
+      "stakeRL80": "Stake RL80",
+      "amount": "Quantidade:",
+      "waitingConfirmation": "Aguardando confirmação da carteira..."
+    },
+    "confirmation": {
+      "withdrawSuccess": {
+        "title": "Retirada Bem-sucedida!",
+        "message": "Seus tokens foram retirados com sucesso."
+      },
+      "withdrawError": {
+        "title": "Retirada Falhou",
+        "message": "Falha ao retirar tokens. Tente novamente."
+      },
+      "claimSuccess": {
+        "title": "Recompensas Reivindicadas!",
+        "message": "Suas recompensas ETH foram reivindicadas com sucesso."
+      },
+      "claimError": {
+        "title": "Reivindicação Falhou",
+        "message": "Falha ao reivindicar recompensas. Tente novamente."
+      }
+    },
+    "errors": {
+      "insufficientAllowance": "Autorização de tokens insuficiente. Tente novamente.",
+      "stakeFailed": "Falha ao fazer stake dos tokens. Tente novamente."
     }
   }
 }

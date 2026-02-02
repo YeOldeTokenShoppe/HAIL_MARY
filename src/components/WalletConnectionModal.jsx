@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { ConnectButton } from "thirdweb/react";
+import { useState, useEffect } from 'react';
+import { ConnectButton, ConnectEmbed } from "thirdweb/react";
 import { darkTheme } from "thirdweb/react";
 import { client } from '@/lib/contract';
 import { defineChain } from "thirdweb/chains";
@@ -53,7 +53,6 @@ const mobileWallets = [
 export function WalletConnectionModal({ onClose }) {
   const { isTestUser, switchToTestWallet } = useWalletAuth();
   const [isMobile, setIsMobile] = useState(false);
-  const connectButtonRef = useRef(null);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -63,20 +62,6 @@ export function WalletConnectionModal({ onClose }) {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-
-  // Auto-click the connect button to open Thirdweb's modal directly (for non-test users)
-  useEffect(() => {
-    if (!isTestUser && connectButtonRef.current) {
-      // Small delay to ensure button is mounted
-      const timer = setTimeout(() => {
-        const button = connectButtonRef.current?.querySelector('button');
-        if (button) {
-          button.click();
-        }
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [isTestUser]);
 
   // For test users, show the test wallet option
   if (isTestUser) {
@@ -236,40 +221,90 @@ export function WalletConnectionModal({ onClose }) {
     );
   }
 
-  // For non-test users, render hidden ConnectButton that auto-clicks
+  // For non-test users, render ConnectEmbed directly in a modal
   return (
-    <>
+    <div
+      data-wallet-connection-modal="true"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'rgba(0, 0, 0, 0.8)',
+        backdropFilter: 'blur(10px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000000,
+      }}
+      onClick={onClose}
+    >
       <div
-        ref={connectButtonRef}
         style={{
-          position: 'fixed',
-          top: '-9999px',
-          left: '-9999px',
-          opacity: 0,
-          pointerEvents: 'none',
+          background: 'rgba(20, 20, 30, 0.98)',
+          border: '1px solid rgba(0, 245, 212, 0.2)',
+          borderRadius: '12px',
+          padding: '20px',
+          maxWidth: '400px',
+          width: '90%',
+          position: 'relative',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.5)',
         }}
+        onClick={(e) => e.stopPropagation()}
       >
-        <ConnectButton
-          client={client}
-          chain={chain}
-          wallets={isMobile ? mobileWallets : desktopWallets}
-          theme={customTheme}
-          connectModal={{
-            size: "compact",
-            showThirdwebBranding: false,
-            titleIcon: "",
-            title: "Connect Wallet",
+        {/* Close button */}
+        <button
+          style={{
+            position: 'absolute',
+            top: '12px',
+            right: '12px',
+            background: 'transparent',
+            color: 'rgba(255, 255, 255, 0.6)',
+            width: '24px',
+            height: '24px',
+            borderRadius: '4px',
+            border: 'none',
+            fontSize: '18px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'color 0.2s',
+            zIndex: 10,
           }}
-          detailsModal={{
-            showThirdwebBranding: false,
-          }}
-          onConnect={() => {
-            onClose();
-          }}
-        />
+          onMouseEnter={(e) => e.currentTarget.style.color = '#fff'}
+          onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255, 255, 255, 0.6)'}
+          onClick={onClose}
+        >×</button>
+
+        <h2 style={{
+          color: '#fff',
+          fontSize: '18px',
+          fontWeight: '600',
+          textAlign: 'center',
+          marginBottom: '20px',
+          fontFamily: "'Orbitron', monospace",
+          letterSpacing: '1px',
+          textShadow: '0 0 10px rgba(0, 245, 212, 0.3)',
+        }}>Connect Wallet</h2>
+
+        {/* ConnectEmbed - inline wallet connection UI */}
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <ConnectEmbed
+            client={client}
+            chain={chain}
+            wallets={isMobile ? mobileWallets : desktopWallets}
+            theme={customTheme}
+            showThirdwebBranding={false}
+            onConnect={() => {
+              onClose();
+            }}
+          />
+        </div>
+        <WalletModalStyles />
       </div>
-      <WalletModalStyles />
-    </>
+    </div>
   );
 }
 

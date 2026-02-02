@@ -126,7 +126,11 @@ const wobbleVertexChunk = `
     float microSpeed = 1.5 + hash(instanceId + 400.0) * 0.5;
     offsetX += sin(t * microSpeed + phaseX) * 0.05;
     offsetY += cos(t * microSpeed * 0.9 + phaseY) * 0.08;
-    
+
+    // Price-reactive vertical shift (bounded, not cumulative)
+    // uPriceDirection ranges roughly -1 to 1, so max shift is ±0.4 units
+    offsetY += uPriceDirection * 0.4;
+
     // Add pulse effect when a new candle lands
     if (uPulseTime > 0.0) {
       float pulseAge = uTime - uPulseTime;
@@ -452,7 +456,6 @@ function useClonedGeometries(modelPath) {
   return useMemo(() => {
     
     if (!scene) {
-      console.error('[useClonedGeometries] No scene found in GLTF')
       return { geometries: {}, textures: {}, localMatrices: {} }
     }
     
@@ -816,6 +819,10 @@ function calculateWobbleOffset(instanceId, time, basePosition = null) {
     }
   }
 
+  // Price-reactive vertical shift (bounded, not cumulative)
+  // uPriceDirection ranges roughly -1 to 1, so max shift is ±0.4 units
+  offsetY += sharedUniforms.uPriceDirection.value * 0.4
+
   return { x: offsetX, y: offsetY, z: offsetZ }
 }
 
@@ -859,7 +866,7 @@ function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.9
       let yScale = pos.heightScale !== undefined ? pos.heightScale : instanceScale
       if (enableMelting && pos.litAt) {
         const elapsed = (now - pos.litAt) / 1000
-        const meltProgress = Math.min(elapsed / 300, 1.0)
+        const meltProgress = Math.min(elapsed / 604800, 1.0) // 604800 = 1 week in seconds
         yScale = Math.max(0.01, (pos.heightScale || instanceScale) * (1.0 - meltProgress))
       }
 
@@ -1186,7 +1193,7 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onPrice
       setAdditionalCandles(prev => prev.filter(candle => {
         if (!candle.litAt) return true
         const elapsed = (now - candle.litAt) / 1000
-        return elapsed < 300 // Keep if less than 5 minutes old - TESTING
+        return elapsed < 604800 // Keep if less than 1 week old (604800 seconds)
       }))
     }, 60000) // Check every minute
     
@@ -1195,26 +1202,18 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onPrice
   
   // Find and focus on user's candle
   const findUserCandle = useCallback(() => {
-    console.log('🔍 Finding candle for userId:', currentUserId)
-    console.log('📊 Total positions:', allPositions.length)
-    console.log('🕯️ Positions with litAt:', allPositions.filter(p => p.litAt).length)
     
     const userCandleIndex = allPositions.findIndex(p => p.userId === currentUserId)
     if (userCandleIndex !== -1) {
       const candle = allPositions[userCandleIndex]
-      console.log('✅ Found user candle at index:', userCandleIndex)
-      console.log('🕯️ Candle data:', { userId: candle.userId, litAt: candle.litAt, hasLitAt: !!candle.litAt })
       
       setHighlightedCandleId(userCandleIndex)
       setSelectedCandle({ ...candle, instanceId: userCandleIndex })
       
       // Update shader uniform to highlight the candle
       sharedUniforms.uHighlightedId.value = userCandleIndex
-      console.log('🎯 Set highlighted candle ID to:', userCandleIndex)
     } else {
       // No candle found
-      console.log('❌ No candle found for userId:', currentUserId)
-      console.log('📋 Available userIds:', allPositions.map(p => p.userId).filter(Boolean))
       sharedUniforms.uHighlightedId.value = -1
       setHighlightedCandleId(-1)
       setSelectedCandle(null)
@@ -1471,7 +1470,13 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onPrice
                 Lit: {new Date(selectedCandle.litAt).toLocaleTimeString()}
               </div>
               <div style={{ marginBottom: '4px', color: '#00ff66' }}>
-                Remaining: {Math.max(0, 300 - (Date.now() - selectedCandle.litAt) / 1000).toFixed(1)} seconds ({Math.max(0, 100 * (1 - (Date.now() - selectedCandle.litAt) / (1000 * 300))).toFixed(1)}%)
+                Remaining: {(() => {
+                  const remaining = Math.max(0, 604800 - (Date.now() - selectedCandle.litAt) / 1000);
+                  const days = Math.floor(remaining / 86400);
+                  const hours = Math.floor((remaining % 86400) / 3600);
+                  const minutes = Math.floor((remaining % 3600) / 60);
+                  return `${days}d ${hours}h ${minutes}m`;
+                })()} ({Math.max(0, 100 * (1 - (Date.now() - selectedCandle.litAt) / (1000 * 604800))).toFixed(1)}%)
               </div>
             </>
           )}
@@ -1484,7 +1489,7 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onPrice
       )}
       
       {/* Find My Candle button - only visible when user has an active lit candle */}
-      {allPositions.some(p => p.userId === currentUserId && p.litAt && (Date.now() - p.litAt) / 1000 < 300) && (
+      {allPositions.some(p => p.userId === currentUserId && p.litAt && (Date.now() - p.litAt) / 1000 < 604800) && (
         <button
           onClick={findUserCandle}
           style={{

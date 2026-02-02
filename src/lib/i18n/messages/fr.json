@@ -111,7 +111,43 @@
   "illumin80": {
     "watchlistLine1": "Entrez sur sa",
     "watchlistLine2": "liste de surveillance",
-    "watchlistTitle": "Entrez Sur Sa Liste De Surveillance"
+    "watchlistTitle": "Entrez Sur Sa Liste De Surveillance",
+    "lightGreenCandle": "Allumez une Bougie Verte!",
+    "stakeTokens": "STAKER DES TOKENS RL80",
+    "earnRewards": "Gagnez des Récompenses ETH!",
+    "candleTab": "Bougie",
+    "stakeTab": "Stake",
+    "lightIt": "L'allumer",
+    "findMyCandle": "Trouver Ma Bougie",
+    "helpAnnotations": {
+      "stats": {
+        "label": "Bougies Dédiées aux Détenteurs",
+        "description": "Obtenez un aperçu en direct du sentiment et de l'action des prix en une seule vue. Les bougies bougent et changent de couleur selon les prix (voir le Panneau des Statistiques). Appuyez sur n'importe quelle bougie pour voir qui l'a allumée et combien de temps il reste avant qu'elle ne fonde!"
+      },
+      "phone": {
+        "label": "Flux en Direct",
+        "description": "Regardez les offrandes arriver en temps réel des dévots de RL80."
+      },
+      "actions": {
+        "label": "Plus de Boutons!",
+        "description": "Essayez le mode années 80, connectez/déconnectez-vous, ou achetez plus de tokens avec les boutons en haut à droite. Vous pouvez ouvrir le panneau de statistiques à droite pour voir encore plus de données!"
+      },
+      "candles": {
+        "label": "Boutons d'Action",
+        "description": "Allumez une bougie ou stakez des tokens en cliquant sur les icônes stake ou allumette"
+      }
+    },
+    "stats": {
+      "stats": "STATISTIQUES",
+      "price": "Prix",
+      "stake": "Stake",
+      "pulse": "Pouls",
+      "candles": "Bougies",
+      "tokensBurned": "Tokens Brûlés",
+      "totalValueLocked": "Valeur Totale Verrouillée",
+      "currentAPR": "APR Actuel",
+      "rewardsClaimed": "Récompenses Réclamées"
+    }
   },
   "cyberNav": {
     "nav00": { "date": "ICÔNE SUR LA I-80", "title": "FEUILLE DE ROUTE" },
@@ -254,6 +290,204 @@
       "selectImageDetail": "Sélectionnez une image pour la vue détaillée",
       "previous": "Précédent",
       "next": "Suivant"
+    }
+  },
+  "lightCandleModal": {
+    "title": "Allumer une Bougie",
+    "candleInfo": {
+      "burnTime": "Votre bougie brûlera pendant 7 jours",
+      "onePerWallet": "Une bougie active par portefeuille. Allumer une nouvelle bougie remplace l'ancienne."
+    },
+    "steps": {
+      "step1": "Choisissez Votre Intention",
+      "step2": "Écrivez Votre Message",
+      "step3": "Faites Votre Offrande"
+    },
+    "offeringTypes": {
+      "petition": "PÉTITION",
+      "petitionDesc": "Demander de l'aide ou des conseils",
+      "confession": "CONFESSION",
+      "confessionDesc": "Libérer votre cœur",
+      "thanks": "MERCI",
+      "thanksDesc": "Exprimer de la gratitude pour la bonne fortune"
+    },
+    "prayerFor": {
+      "label": "Allumer cette bougie pour :",
+      "myself": "Moi-même",
+      "someoneElse": "Quelqu'un d'Autre",
+      "yourName": "Votre nom",
+      "theirName": "Entrez leur nom"
+    },
+    "message": {
+      "label": "Votre Message à Notre-Dame du Profit Perpétuel",
+      "placeholderPetition": "OPTIONNEL - Écrivez votre message ou sélectionnez un modèle ci-dessous",
+      "placeholderConfession": "Confessez vos péchés pour une possible absolution..",
+      "placeholderOther": "OPTIONNEL - Écrivez un message",
+      "templateLabel": "Ou choisissez un modèle :",
+      "selectPrayer": "Sélectionnez une prière..."
+    },
+    "tokens": {
+      "label": "Jetons RL80 à Brûler",
+      "placeholder": "1 RL80 minimum",
+      "balance": "Solde :",
+      "loadingBalance": "Chargement du solde...",
+      "connectWallet": "Connectez le portefeuille pour voir le solde"
+    },
+    "summary": {
+      "for": "pour",
+      "yourself": "vous-même",
+      "someone": "quelqu'un"
+    },
+    "info": {
+      "minToken": "1 jeton min",
+      "burnTime": "7 jours de brûlage",
+      "onePerWallet": "1 par portefeuille"
+    },
+    "buttons": {
+      "back": "Retour",
+      "continue": "Continuer",
+      "lightCandle": "Allumer la Bougie",
+      "processing": "Traitement...",
+      "cancel": "Annuler",
+      "lightMyCandle": "Allumer Ma Bougie"
+    },
+    "confirmation": {
+      "title": "Prêt à l'allumer ?",
+      "burning": "Vous êtes sur le point de brûler",
+      "token": "jeton RL80",
+      "tokens": "jetons RL80",
+      "permanent": "Cette action est permanente et irréversible"
+    },
+    "processing": {
+      "submitted": "Transaction soumise !",
+      "waiting": "En attente de confirmation blockchain...",
+      "lightingCandle": "Allumage de Votre Bougie",
+      "burning": "Brûlage",
+      "usuallyTakes": "Cela prend généralement 10-30 secondes"
+    },
+    "wallet": {
+      "signTransaction": "Veuillez signer la transaction dans votre portefeuille",
+      "waitingConfirmation": "En attente de confirmation du portefeuille...",
+      "amount": "Montant :"
+    },
+    "noTokens": {
+      "message": "Vous avez besoin de jetons RL80 pour allumer une bougie."
+    },
+    "validation": {
+      "enterAmount": "Veuillez entrer le montant de jetons RL80 à brûler",
+      "enterRecipientName": "Veuillez entrer un nom pour le destinataire"
+    },
+    "prayerProtocol": "Protocole de Prière :"
+  },
+  "stakeModal": {
+    "title": "Staker des Tokens RL80",
+    "dashboard": {
+      "title": "TABLEAU DE BORD STAKING",
+      "successTitle": "Staking Réussi !",
+      "updatingBalances": "Mise à jour des soldes..."
+    },
+    "phases": {
+      "phase1": {
+        "title": "Phase 1 : Pré-Récompenses",
+        "description": "Votre position est sécurisée. Les récompenses s'activent en Phase 2."
+      },
+      "rewardsActive": {
+        "title": "Phase {{phase}} : Récompenses Actives",
+        "phaseDescription": "{{percent}} de la taxe de transaction vers les stakers"
+      },
+      "stakingOpen": {
+        "title": "Staking Ouvert",
+        "subtitle": "(Récompenses Activées en Phase 2)",
+        "description1": "Stakez tôt pour sécuriser votre position.",
+        "description2": "Les récompenses commencent une fois les seuils de liquidité et volume atteints."
+      },
+      "whatDoesThisMean": "Qu'est-ce que cela signifie ?",
+      "tooltipItems": {
+        "locked": "Les tokens sont verrouillés selon les règles de staking",
+        "noRewards": "Aucune récompense distribuée pendant la Phase 1",
+        "queued": "Toutes les récompenses accumulées avant la Phase 2 sont en file",
+        "firstInLine": "Les premiers stakers sont prioritaires quand les récompenses s'activent"
+      },
+      "zeroTax": {
+        "title": "Mode Sans Taxe",
+        "description": "Le protocole est autonome. Retirez à tout moment."
+      }
+    },
+    "activity": {
+      "title": "ACTIVITÉ DE STAKING",
+      "stakedAmount": "Montant Staké",
+      "lockStatus": "État de Verrouillage",
+      "unlocked": "Déverrouillé",
+      "rewardsEarned": "Récompenses Gagnées",
+      "totalPool": "Pool Total"
+    },
+    "rewards": {
+      "claimable": "Récompenses Réclamables :",
+      "readyToClaim": "Prêtes à réclamer !"
+    },
+    "buttons": {
+      "stakeMore": "STAKER PLUS",
+      "locked": "VERROUILLÉ",
+      "withdrawAll": "TOUT RETIRER",
+      "claim": "RÉCLAMER",
+      "close": "Fermer"
+    },
+    "viewTransaction": "Voir la transaction sur BaseScan →",
+    "info": {
+      "hideInfo": "Masquer",
+      "showInfo": "Info",
+      "lockDays": "7 jours de verrouillage",
+      "minStake": "Min 1 RL80 pour staker",
+      "earnEth": "Gagnez des récompenses ETH",
+      "proRata": "Distribution proportionnelle"
+    },
+    "form": {
+      "amountLabel": "Montant à Staker",
+      "placeholder": "Entrez le montant à staker",
+      "available": "Disponible :",
+      "loadingBalance": "Chargement du solde...",
+      "connectWallet": "Connectez le portefeuille pour voir le solde"
+    },
+    "preview": {
+      "amount": "Montant :",
+      "unlock": "Déverrouillage :",
+      "ethRewards": "Récompenses ETH distribuées proportionnellement"
+    },
+    "processing": {
+      "approving": "Approbation...",
+      "signingStake": "Signature du Stake...",
+      "confirming": "Confirmation...",
+      "processing": "Traitement..."
+    },
+    "stake": "Staker",
+    "noTokensMessage": "Vous avez besoin de tokens RL80 pour staker.",
+    "walletLoading": {
+      "signTransaction": "Veuillez signer la transaction dans votre portefeuille",
+      "stakeRL80": "Staker RL80",
+      "amount": "Montant :",
+      "waitingConfirmation": "En attente de confirmation du portefeuille..."
+    },
+    "confirmation": {
+      "withdrawSuccess": {
+        "title": "Retrait Réussi !",
+        "message": "Vos tokens ont été retirés avec succès."
+      },
+      "withdrawError": {
+        "title": "Échec du Retrait",
+        "message": "Échec du retrait des tokens. Veuillez réessayer."
+      },
+      "claimSuccess": {
+        "title": "Récompenses Réclamées !",
+        "message": "Vos récompenses ETH ont été réclamées avec succès."
+      },
+      "claimError": {
+        "title": "Échec de la Réclamation",
+        "message": "Échec de la réclamation des récompenses. Veuillez réessayer."
+      }
+    },
+    "errors": {
+      "insufficientAllowance": "Autorisation de tokens insuffisante. Veuillez réessayer.",
+      "stakeFailed": "Échec du staking des tokens. Veuillez réessayer."
     }
   }
 }

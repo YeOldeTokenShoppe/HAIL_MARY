@@ -777,6 +777,17 @@ export default function NavControlsHome({
             ?
           </button>
         )}
+         {/* BUY Button - Desktop only */}
+        {!isMobile && onBuyClick && (
+          <button
+            className="buy-btn-compact"
+            onClick={onBuyClick}
+            title="Buy RL80"
+          >
+            {t('navControls.buy')}
+          </button>
+        )}
+
 
         {/* 80s Mode Button */}
         {show80sButton && (
@@ -795,17 +806,7 @@ export default function NavControlsHome({
           </button>
         )}
 
-        {/* BUY Button - Desktop only */}
-        {!isMobile && onBuyClick && (
-          <button
-            className="buy-btn-compact"
-            onClick={onBuyClick}
-            title="Buy RL80"
-          >
-            {t('navControls.buy')}
-          </button>
-        )}
-
+       
         {/* Music - Splits when active (hidden on mobile when hideMusicOnMobile is true) */}
         {!(isMobile && hideMusicOnMobile) && (
           <div className="music-stack-mobile">

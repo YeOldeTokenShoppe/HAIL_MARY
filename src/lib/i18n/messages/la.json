@@ -112,7 +112,43 @@
   "illumin80": {
     "watchlistLine1": "In eius indicem",
     "watchlistLine2": "vigilantiae inscribe",
-    "watchlistTitle": "In Eius Indicem Vigilantiae Inscribe"
+    "watchlistTitle": "In Eius Indicem Vigilantiae Inscribe",
+    "lightGreenCandle": "Candelam Viridem Accende!",
+    "stakeTokens": "SIGNA RL80 DEPONE",
+    "earnRewards": "Praemia ETH Lucra!",
+    "candleTab": "Candela",
+    "stakeTab": "Depositum",
+    "lightIt": "Accende",
+    "findMyCandle": "Invenire Candelam Meam",
+    "helpAnnotations": {
+      "stats": {
+        "label": "Candelae Possessoribus Dedicatae",
+        "description": "Obtine visum vivum sententiarum et motuum pretiorum in uno conspectu. Candelae moventur et colorem mutant cum pretia mutantur (vide Tabulam Statisticam). Tange quamlibet candelam ut videas quis eam accenderit et quantum temporis restet antequam liquescat!"
+      },
+      "phone": {
+        "label": "Fons Vivus",
+        "description": "Specta oblationes tempore reali advenientes a devotis RL80."
+      },
+      "actions": {
+        "label": "Plures Bullae!",
+        "description": "Tempta modum annorum 80, intra/exi, vel eme plura signa bullis in summo dextro. Potes aperire tabulam statisticam ad dextram ut plura data videas!"
+      },
+      "candles": {
+        "label": "Bullae Actionum",
+        "description": "Accende candelam vel depone signa pulsando icones depositi vel sulfurati"
+      }
+    },
+    "stats": {
+      "stats": "STATISTICA",
+      "price": "Pretium",
+      "stake": "Depositum",
+      "pulse": "Pulsus",
+      "candles": "Candelae",
+      "tokensBurned": "Signa Combusta",
+      "totalValueLocked": "Valor Totalis Clausus",
+      "currentAPR": "APR Praesens",
+      "rewardsClaimed": "Praemia Accepta"
+    }
   },
   "cyberNav": {
     "nav00": { "date": "ICON IN VIA I-80", "title": "ITER" },
@@ -255,6 +291,204 @@
       "selectImageDetail": "Elige imaginem ad visum accuratum",
       "previous": "Prior",
       "next": "Proximus"
+    }
+  },
+  "lightCandleModal": {
+    "title": "Candelam Accende",
+    "candleInfo": {
+      "burnTime": "Candela tua VII dies ardebit",
+      "onePerWallet": "Una candela activa per sacculum. Nova candela veterem substituit."
+    },
+    "steps": {
+      "step1": "Elige Intentionem",
+      "step2": "Scribe Nuntium",
+      "step3": "Offer Oblationem"
+    },
+    "offeringTypes": {
+      "petition": "PETITIO",
+      "petitionDesc": "Pete consilium vel auxilium",
+      "confession": "CONFESSIO",
+      "confessionDesc": "Cor tuum leva",
+      "thanks": "GRATIAS",
+      "thanksDesc": "Gratiam pro fortuna bona exprime"
+    },
+    "prayerFor": {
+      "label": "Hanc candelam accende pro:",
+      "myself": "Me ipso",
+      "someoneElse": "Alio",
+      "yourName": "Nomen tuum",
+      "theirName": "Nomen eorum inscribe"
+    },
+    "message": {
+      "label": "Nuntius Tuus ad Dominam Nostram Lucri Perpetui",
+      "placeholderPetition": "AD LIBITUM - Scribe nuntium vel elige exemplar infra",
+      "placeholderConfession": "Peccata tua confitere pro possibili absolutione..",
+      "placeholderOther": "AD LIBITUM - Scribe nuntium",
+      "templateLabel": "Vel elige exemplar:",
+      "selectPrayer": "Elige orationem..."
+    },
+    "tokens": {
+      "label": "Signa RL80 ad Urendum",
+      "placeholder": "Minimum I RL80",
+      "balance": "Saldo:",
+      "loadingBalance": "Saldum cargitur...",
+      "connectWallet": "Coniunge sacculum ad saldum videndum"
+    },
+    "summary": {
+      "for": "pro",
+      "yourself": "te ipso",
+      "someone": "aliquo"
+    },
+    "info": {
+      "minToken": "min I signum",
+      "burnTime": "VII dies ardens",
+      "onePerWallet": "I per sacculum"
+    },
+    "buttons": {
+      "back": "Retro",
+      "continue": "Perge",
+      "lightCandle": "Accende Candelam",
+      "processing": "Processans...",
+      "cancel": "Annulla",
+      "lightMyCandle": "Accende Meam Candelam"
+    },
+    "confirmation": {
+      "title": "Paratusne ad accendendum?",
+      "burning": "Ures",
+      "token": "signum RL80",
+      "tokens": "signa RL80",
+      "permanent": "Haec actio permanens est et revocari non potest"
+    },
+    "processing": {
+      "submitted": "Transactio missa!",
+      "waiting": "Exspectans confirmationem blockchain...",
+      "lightingCandle": "Candelam Tuam Accendens",
+      "burning": "Urens",
+      "usuallyTakes": "Hoc plerumque X-XXX secundas capit"
+    },
+    "wallet": {
+      "signTransaction": "Quaeso subscribe transactionem in sacculo tuo",
+      "waitingConfirmation": "Exspectans confirmationem sacculi...",
+      "amount": "Quantitas:"
+    },
+    "noTokens": {
+      "message": "Signis RL80 opus est ad candelam accendendam."
+    },
+    "validation": {
+      "enterAmount": "Quaeso inscribe quantitatem signorum RL80 ad urendum",
+      "enterRecipientName": "Quaeso inscribe nomen recipientis"
+    },
+    "prayerProtocol": "Protocollum Orationis:"
+  },
+  "stakeModal": {
+    "title": "Signa RL80 Depone",
+    "dashboard": {
+      "title": "TABULA DEPOSITI",
+      "successTitle": "Depositum Successum!",
+      "updatingBalances": "Salda renovans..."
+    },
+    "phases": {
+      "phase1": {
+        "title": "Phase I: Ante-Praemia",
+        "description": "Positio tua secura est. Praemia in Phase II activantur."
+      },
+      "rewardsActive": {
+        "title": "Phase {{phase}}: Praemia Activa",
+        "phaseDescription": "{{percent}} vectigalis transactionis ad depositores fluit"
+      },
+      "stakingOpen": {
+        "title": "Depositum Apertum",
+        "subtitle": "(Praemia in Phase II Activantur)",
+        "description1": "Depone mature ad positionem tuam securandam.",
+        "description2": "Praemia incipiunt cum limina liquiditatis et voluminis attinguntur."
+      },
+      "whatDoesThisMean": "Quid hoc significat?",
+      "tooltipItems": {
+        "locked": "Signa clauduntur secundum regulas depositi",
+        "noRewards": "Nulla praemia distribuuntur in Phase I",
+        "queued": "Omnia praemia ante Phase II accumulata in ordine sunt",
+        "firstInLine": "Primi depositores primi sunt cum praemia activantur"
+      },
+      "zeroTax": {
+        "title": "Modus Sine Vectigali",
+        "description": "Protocollum se sustinet. Quovis tempore extrahe."
+      }
+    },
+    "activity": {
+      "title": "ACTIVITAS DEPOSITI",
+      "stakedAmount": "Quantitas Deposita",
+      "lockStatus": "Status Clausurae",
+      "unlocked": "Aperta",
+      "rewardsEarned": "Praemia Lucrata",
+      "totalPool": "Piscina Totalis"
+    },
+    "rewards": {
+      "claimable": "Praemia Petenda:",
+      "readyToClaim": "Parata ad petendum!"
+    },
+    "buttons": {
+      "stakeMore": "PLUS DEPONE",
+      "locked": "CLAUSUM",
+      "withdrawAll": "OMNIA EXTRAHE",
+      "claim": "PETE",
+      "close": "Claude"
+    },
+    "viewTransaction": "Vide transactionem in BaseScan →",
+    "info": {
+      "hideInfo": "Absconde",
+      "showInfo": "Informatio",
+      "lockDays": "VII dies clausurae",
+      "minStake": "Min I RL80 ad deponendum",
+      "earnEth": "Praemia ETH lucra",
+      "proRata": "Distributio proportionalis"
+    },
+    "form": {
+      "amountLabel": "Quantitas ad Deponendum",
+      "placeholder": "Inscribe quantitatem ad deponendum",
+      "available": "Praesto:",
+      "loadingBalance": "Saldum cargitur...",
+      "connectWallet": "Coniunge sacculum ad saldum videndum"
+    },
+    "preview": {
+      "amount": "Quantitas:",
+      "unlock": "Aperitio:",
+      "ethRewards": "Praemia ETH proportionaliter distribuuntur"
+    },
+    "processing": {
+      "approving": "Approbans...",
+      "signingStake": "Depositum Subscribens...",
+      "confirming": "Confirmans...",
+      "processing": "Processans..."
+    },
+    "stake": "Depone",
+    "noTokensMessage": "Signis RL80 opus est ad deponendum.",
+    "walletLoading": {
+      "signTransaction": "Quaeso subscribe transactionem in sacculo tuo",
+      "stakeRL80": "Depone RL80",
+      "amount": "Quantitas:",
+      "waitingConfirmation": "Exspectans confirmationem sacculi..."
+    },
+    "confirmation": {
+      "withdrawSuccess": {
+        "title": "Extractio Successa!",
+        "message": "Signa tua feliciter extracta sunt."
+      },
+      "withdrawError": {
+        "title": "Extractio Defecit",
+        "message": "Signa extrahere defecit. Iterum conare."
+      },
+      "claimSuccess": {
+        "title": "Praemia Accepta!",
+        "message": "Praemia ETH tua feliciter accepta sunt."
+      },
+      "claimError": {
+        "title": "Petitio Defecit",
+        "message": "Praemia petere defecit. Iterum conare."
+      }
+    },
+    "errors": {
+      "insufficientAllowance": "Permissio signorum insufficiens. Iterum conare.",
+      "stakeFailed": "Signa deponere defecit. Iterum conare."
     }
   }
 }
