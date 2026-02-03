@@ -50,7 +50,7 @@ export default function ModelViewerPage() {
   return (
     <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
       <Philosophy
-        modelPath="/models/saint_robot2.glb"
+        modelPath="/models/saint_robot3.glb"
         onLoadingChange={setIsPageLoading}
         is80sMode={is80sMode}
       />

@@ -1215,7 +1215,7 @@ function PyramidModel() {
 // Preload the pyramid model
 useGLTF.preload('/models/pyramid.glb');
 
-export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onLoadingChange, is80sMode = false }) {
+export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onLoadingChange, is80sMode = false }) {
   const { locale } = useLanguage();
   const [selectedChart, setSelectedChart] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
