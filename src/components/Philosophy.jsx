@@ -426,6 +426,17 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
       }
     }
   }, [scene, onLoaded, modelPath]);
+
+  // Center the model's pivot point based on bounding box
+  useEffect(() => {
+    if (scene) {
+      const box = new THREE.Box3().setFromObject(scene);
+      const center = box.getCenter(new THREE.Vector3());
+      // Shift scene so its center becomes the origin (pivot point)
+      scene.position.sub(center);
+      setCenterOffset(center);
+    }
+  }, [scene]);
   
   // Control Neon mesh visibility based on 80s mode
   useEffect(() => {
@@ -1839,22 +1850,21 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
           />
           <Environment preset="night" />
           {/* <FlatCharts onChartClick={setSelectedChart} /> */}
-          <OrbitControls 
-            enablePan={true}
+          <OrbitControls
+            enablePan={false}
             enableZoom={true}
             enableRotate={true}
             minDistance={3}
             maxDistance={10}
-            minPolarAngle={Math.PI / 6}  // 30 degrees - prevent looking too far up
-            maxPolarAngle={Math.PI / 2.2}  // ~82 degrees - prevent looking too far down
-            minAzimuthAngle={-Math.PI / 3}  // -60 degrees horizontal rotation
-            maxAzimuthAngle={Math.PI / 3}   // 60 degrees horizontal rotation
-            panSpeed={0.8}
-            rotateSpeed={0.5}
+            minPolarAngle={Math.PI / 3}    // ~60° - allow looking slightly from above
+            maxPolarAngle={Math.PI / 2.2}  // ~82° - prevent looking from below
+            minAzimuthAngle={-Math.PI / 8}  // -22.5 degrees
+            maxAzimuthAngle={Math.PI / 8}   // +22.5 degrees (±22.5° total range)
+            rotateSpeed={0.3}
             zoomSpeed={0.8}
             dampingFactor={0.05}
             enableDamping={true}
-            target={[0, 0, 0]}  // Focus on center of scene
+            target={[0, 0, 0]}
           />
         </Suspense>
         {is80sMode ? (
@@ -2019,7 +2029,8 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
       
       {/* Numerology Modal Overlay - Styled like Pyramid viewer */}
       {showNumerology && (
-        <div 
+        <div
+          onClick={() => setShowNumerology(false)}
           style={{
             position: 'fixed',
             top: 0,
@@ -2032,84 +2043,64 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
             flexDirection: 'column',
             justifyContent: 'center',
             alignItems: 'center',
-            padding: '2rem'
+            padding: '2rem',
+            cursor: 'pointer'
           }}
         >
-          {/* Close button */}
-          <button
-            onClick={() => setShowNumerology(false)}
+          {/* Content wrapper - stops click propagation */}
+          <div
+            onClick={(e) => e.stopPropagation()}
             style={{
-              position: 'absolute',
-              top: '2rem',
-              right: '2rem',
-              background: 'rgba(212, 175, 55, 0.2)',
-              border: '2px solid #d4af37',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              cursor: 'default'
+            }}
+          >
+            {/* Title */}
+            <h2 style={{
               color: '#d4af37',
-              padding: '0.5rem 1rem',
-              borderRadius: '0.5rem',
-              cursor: 'pointer',
-              fontSize: '1.2rem',
-              fontFamily: 'Georgia, serif',
-              transition: 'all 0.3s ease',
-              zIndex: 10001
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.background = 'rgba(212, 175, 55, 0.4)';
-              e.target.style.transform = 'scale(1.05)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.background = 'rgba(212, 175, 55, 0.2)';
-              e.target.style.transform = 'scale(1)';
-            }}
-          >
-            Close ✕
-          </button>
-          
-          {/* Title */}
-          <h2 style={{
-            color: '#d4af37',
-            fontFamily: 'UnifrakturCook',
-            fontSize: '2.5rem',
-            marginBottom: '1rem',
-            textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)',
-            textAlign: 'center'
-          }}>
-            The Oracle's Wisdom
-          </h2>
-          
-          {/* Content container with glow effect */}
-          <div 
-            style={{
-              position: 'relative',
-              width: windowWidth > 768 ? '600px' : '100%',
-              maxHeight: windowWidth > 768 ? '600px' : '70vh',
-              background: 'radial-gradient(ellipse at center, rgba(74, 144, 226, 0.1) 0%, rgba(0, 0, 0, 0.8) 100%)',
-              borderRadius: '1rem',
-              border: '2px solid rgba(74, 144, 226, 0.5)',
-              boxShadow: '0 0 30px rgba(74, 144, 226, 0.3)',
-              padding: '2rem',
-              overflow: 'auto'
-            }}
-          >
-            {/* Numerology component */}
-            <Numerology isMobile={windowWidth <= 768} />
+              fontFamily: 'UnifrakturCook',
+              fontSize: '2.5rem',
+              marginBottom: '1rem',
+              textShadow: '2px 2px 4px rgba(0, 0, 0, 0.8)',
+              textAlign: 'center'
+            }}>
+              Magic 80-Ball
+            </h2>
+
+            {/* Content container with glow effect */}
+            <div
+              style={{
+                position: 'relative',
+                width: windowWidth > 768 ? '600px' : '100%',
+                maxHeight: windowWidth > 768 ? '600px' : '70vh',
+                background: 'radial-gradient(ellipse at center, rgba(74, 144, 226, 0.1) 0%, rgba(0, 0, 0, 0.8) 100%)',
+                borderRadius: '1rem',
+                border: '2px solid rgba(74, 144, 226, 0.5)',
+                boxShadow: '0 0 30px rgba(74, 144, 226, 0.3)',
+                padding: '2rem',
+                overflow: 'auto'
+              }}
+            >
+              {/* Numerology component */}
+              <Numerology isMobile={windowWidth <= 768} />
+            </div>
+
+            {/* Description */}
+            <p style={{
+              color: '#d4af37',
+              fontSize: '1.1rem',
+              maxWidth: '20rem',
+              textAlign: 'center',
+              marginTop: '1.5rem',
+              lineHeight: 1.6,
+              textShadow: '1px 1px 2px rgba(0, 0, 0, 0.8)'
+            }}>
+              Consult the mystical 8-ball for divine numerological insights and ancient wisdom.<br/>
+              (Not financial advice.)
+            </p>
           </div>
-          
-          {/* Description */}
-          <p style={{
-            color: '#d4af37',
-            fontFamily: '"Georgia", "Times New Roman", serif',
-            fontSize: '1.1rem',
-            maxWidth: '600px',
-            textAlign: 'center',
-            marginTop: '1.5rem',
-            lineHeight: 1.6,
-            textShadow: '1px 1px 2px rgba(0, 0, 0, 0.8)'
-          }}>
-            Consult the mystical 8-ball for divine numerological insights and ancient wisdom.<br/>
-            (Not financial advice.)
-            {/* The sacred sphere reveals wisdom through the ancient art of numbers. */}
-          </p>
         </div>
       )}
       

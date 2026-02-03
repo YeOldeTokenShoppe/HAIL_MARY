@@ -18,15 +18,26 @@ div {
 
 #container {
   font-family: UnifrakturMaguntia;
-  width: clamp(50%, 65vmin, 90%);
-  height: clamp(35vh, 50vmin, 65vh);
-  max-height: 45rem;
-  top: 60%;
+  width: 350px;
+  height: 70%;
+  max-height: 500px;
+  top: 50%;
   left: 50%;
-  -webkit-perspective: 290rem;
-  perspective: 290rem;
+  -webkit-perspective: 5000px;
+  perspective: 5000px;
   transform: translate(-50%, -50%) rotateY(20deg);
-  font-size: clamp(0.85rem, 2vmin, 1.2rem);
+}
+
+@media (max-width: 480px) {
+  #container {
+    transform: translate(-50%, -50%) rotateY(20deg) scale(0.85);
+  }
+}
+
+@media (max-width: 380px) {
+  #container {
+    transform: translate(-50%, -50%) rotateY(20deg) scale(0.75);
+  }
 }
 
 #container.plaintext {

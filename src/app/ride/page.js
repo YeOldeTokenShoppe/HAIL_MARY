@@ -478,18 +478,18 @@ export default function CommunionPage() {
                 setCarouselLoaded={setCarouselLoaded}
                 onRidingChange={setIsRiding}
                 images={[
-                  { src: "/seaMonster.png", title: "Sea Monster" },
-                  { src: "/bull.png", title: "Bull" },
-                  { src: "/bear.png", title: "Bear" },
-                  { src: "/gator.png", title: "G8r" },
-                  { src: "/chupa.png", title: "Chupacabra" },
-                  { src: "/snowman.png", title: "Yeti" },
-                  { src: "/unicorn.png", title: "Unicorn" },
-                  { src: "/jackalope.png", title: "Jackalope" },
-                  { src: "/liger.png", title: "Liger" },
-                  { src: "/dire.png", title: "Dire Wolf" },
-                  { src: "/warthog.png", title: "Warthog" },
-                  { src: "/mothmanRide.png", title: "Mothman" },
+                  { src: "/seaMonster.webp", title: "Sea Monster" },
+                  { src: "/bull.webp", title: "Bull" },
+                  { src: "/bear.webp", title: "Bear" },
+                  { src: "/gator.webp", title: "G8r" },
+                  { src: "/chupa.webp", title: "Chupacabra" },
+                  { src: "/snowman.webp", title: "Yeti" },
+                  { src: "/unicorn.webp", title: "Unicorn" },
+                  { src: "/jackalope.webp", title: "Jackalope" },
+                  { src: "/liger.webp", title: "Liger" },
+                  { src: "/dire.webp", title: "Dire Wolf" },
+                  { src: "/warthog.webp", title: "Warthog" },
+                  { src: "/mothmanRide.webp", title: "Mothman" },
                 ]}
               />
             </div>
@@ -574,7 +574,7 @@ export default function CommunionPage() {
 
         {/* X (Twitter) */}
         <a
-          href="https://x.com/rlaborare"
+          href="https://x.com/rl80token"
           target="_blank"
           rel="noopener noreferrer"
           aria-label="X (Twitter)"
