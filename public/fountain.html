@@ -3414,17 +3414,14 @@
 										showAimReminderModal();
 										return;
 									}
-									console.log('[Toggle] Toss Coin selected - triggering free coin toss');
 									triggerCoinToss(true);
 									break;
 								case 'aspca':
 									// Open donation modal immediately - coin toss happens after successful donation
-									console.log('[Toggle] ASPCA selected - opening donation modal');
 									window.parent.postMessage({ type: 'openDonation', charity: 'ASPCA' }, '*');
 									break;
 								case 'stlukes':
 									// Open donation modal immediately - coin toss happens after successful donation
-									console.log('[Toggle] St. Jude selected - opening donation modal');
 									window.parent.postMessage({ type: 'openDonation', charity: 'ST_JUDES' }, '*');
 									break;
 							}
@@ -6087,7 +6084,7 @@
 			<div class="fountain-toggle">
 				<div class="fountain-toggle__track">
 					<div class="indicator"></div>
-					<label for="tossCoin">Toss Coin</label>
+					<label for="tossCoin">Toss Free Coin</label>
 					<input class="sr-only" type="radio" name="fountainMode" id="tossCoin" checked />
 					<input class="sr-only" type="radio" name="fountainMode" id="donate" />
 					<label for="donate" class="donate-main-label"></label>
@@ -6209,7 +6206,7 @@
 			}
 			
 			.donate-main-label::after {
-				content: 'Donate';
+				content: 'Donate RL80';
 				display: block;
 				width: 100%;
 				height: 100%;

@@ -301,7 +301,6 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
 
       // Check if all images are loaded
       if (newSet.size === images.length) {
-        console.log("✅ All images loaded successfully");
         setInitialLoadComplete(true);
 
         // Add a small delay to ensure images are actually visible
@@ -327,7 +326,6 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
 
     const preloadImages = async () => {
       try {
-        console.log(`🔄 Preloading ${images.length} carousel images...`);
         const imageLoadPromises = images.map((image) => {
           return new Promise((resolve, reject) => {
             const img = new window.Image(); // Use window.Image explicitly
@@ -344,7 +342,6 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
         });
 
         await Promise.all(imageLoadPromises);
-        console.log("✅ All carousel images preloaded");
       } catch (error) {
         console.error("Error preloading images:", error);
         setInitialLoadComplete(true);
@@ -845,7 +842,6 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
 
         await batch.commit();
       } else {
-        console.log(`No chat messages to delete for beastId: ${beastId}`);
       }
     } catch (error) {
       console.error(`Error deleting messages for beastId: ${beastId}`, error);
@@ -877,13 +873,10 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
           const elapsedTime = currentTime - rideStartTime;
 
           if (elapsedTime >= maxRideTime) {
-            console.log(
-              `Ride expired for beast: ${doc.id}. Deleting related data.`
-            );
+
 
             // Delete beast document
             await deleteDoc(doc.ref);
-            console.log(`Successfully deleted beast document: ${doc.id}`);
 
             // Delete associated chat messages
             await deleteMessagesForBeast(doc.id);
@@ -1103,7 +1096,6 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
       const waitlistSnapshot = await getDocs(waitlistQuery);
 
       if (!waitlistSnapshot.empty) {
-        console.log("User is already on the waitlist:", username);
         return; // User is already on the waitlist, exit early
       }
 
@@ -1113,7 +1105,6 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
       const ridersSnapshot = await getDocs(ridersQuery);
 
       if (!ridersSnapshot.empty) {
-        console.log("User is already riding:", username);
         return; // User is already riding, exit early
       }
 
@@ -1124,7 +1115,6 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
         imageUrl,
         timestamp: serverTimestamp(),
       });
-      console.log("User added to waitlist:", username);
     } catch (error) {
       console.error("Failed to add user to waitlist:", error);
     }
@@ -1169,13 +1159,10 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
           await deleteDoc(nextUserDoc.ref);
 
           console.log(
-            `Assigned beast ${availableBeast} to user: ${userData.username}`
           );
         } else {
-          console.log("No available beasts to assign.");
         }
       } else {
-        console.log("Waitlist is empty.");
       }
     } catch (error) {
       console.error("Error assigning beast from waitlist:", error);
@@ -1250,8 +1237,6 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
     return `${minutes}m ${seconds}s`;
   };
   useEffect(() => {
-    console.log("Active riders:", riders);
-    console.log("Waitlist:", waitlist);
   }, [riders, waitlist]);
 
   // Check if all 12 beasts are occupied
@@ -1304,7 +1289,6 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
           batch.delete(doc.ref);
         });
         await batch.commit();
-        console.log(`Cleaned up ${snapshot.size} old global chat messages`);
       }
     } catch (error) {
       console.error("Error cleaning up old messages:", error);
@@ -1385,7 +1369,6 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
 
       if (!snapshot.empty) {
         await deleteDoc(snapshot.docs[0].ref);
-        console.log("User left the waitlist");
       }
     } catch (error) {
       console.error("Failed to leave waitlist:", error);
@@ -1462,7 +1445,6 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
         const currentTime = Date.now();
 
         if (beastsSnapshot.empty) {
-          // console.log("No active rides to process.");
           return;
         }
 
@@ -1479,11 +1461,9 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
           const elapsedTime = currentTime - rideStartTime;
 
           if (elapsedTime >= maxRideTime) {
-            console.log(`Ride expired. Deleting beast ${doc.id} and messages.`);
 
             try {
               await deleteDoc(doc.ref);
-              console.log(`Successfully deleted beast ${doc.id}`);
             } catch (error) {
               console.error(`Failed to delete beast ${doc.id}:`, error);
               continue; // Skip to next iteration
@@ -1510,7 +1490,6 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
               return updatedMessages;
             });
 
-            console.log("Attempting to assign from waitlist...");
             await assignBeastFromWaitlist(doc.id);
           }
         }
@@ -1557,7 +1536,6 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
       collection(db, "carouselBeasts"),
       (snapshot) => {
         if (snapshot.empty) {
-          console.log("No beasts found in Firestore.");
           setRiders({});
           // If no beasts exist and user was riding, end their ride
           if (isRiding) {
@@ -1582,13 +1560,11 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
 
         // If user was riding but their beast is no longer in the list, end their ride
         if (isRiding && !userStillRiding) {
-          console.log("User's ride ended - beast no longer exists");
           setIsRiding(false);
           setActiveBeastId(null);
           setMessages({});
         }
 
-        console.log("Updated riders from Firestore:", updatedRiders);
         setRiders(updatedRiders);
       }
     );

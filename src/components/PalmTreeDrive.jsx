@@ -2506,10 +2506,7 @@ const PalmsScene = ({ onLoadingChange }) => {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                // Disable ScrollTriggers temporarily when opening menu
-                const triggers = ScrollTrigger.getAll();
-                triggers.forEach(trigger => trigger.disable());
-                setIsCyberNavOpen(true);
+                router.push('/about');
               }}
               style={{
                 padding: isMobile ? '10px 25px' : '15px 40px',

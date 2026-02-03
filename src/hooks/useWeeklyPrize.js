@@ -76,8 +76,6 @@ export function useWeeklyPrize() {
   // ============================================
   useEffect(() => {
     if (TEST_MODE) {
-      console.log('[useWeeklyPrize] TEST MODE ENABLED');
-      console.log('[useWeeklyPrize] Test scenario:', TEST_SCENARIO);
 
       if (TEST_SCENARIO === 'no_prize') {
         setCurrentPrize(null);
