@@ -1239,7 +1239,7 @@ function PortalScene({ isMobile = false, isTabletPortrait = false, onScreenClick
         <hemisphereLight
           skyColor={showScroll ? '#001100' : '#0000ff'}
           groundColor={showScroll ? '#000800' : '#e100ff'}
-          intensity={showScroll ? 0.3 : 1}
+          intensity={showScroll ? 0.3 : (isMobile ? 0.6 : 1)}
         />
         {/* Clouds in the portal world - hidden when showing CRT */}
         {!showScroll && (
@@ -1306,7 +1306,7 @@ function PortalScene({ isMobile = false, isTabletPortrait = false, onScreenClick
 
 
       {/* Ambient light to see the laptop model */}
-      <ambientLight intensity={0.7} />
+      <ambientLight intensity={isMobile ? 0.5 : 0.7} />
       {/* <directionalLight position={[2, 2, 2]} intensity={1} /> */}
     </group>
     </FloatingGroup>
@@ -1570,8 +1570,8 @@ export default function HolyGrailPortal({ isMobile = false, isTabletPortrait = f
           />
           <EffectComposer>
             <Bloom
-              intensity={0.4}
-                 radius={0.4}
+              intensity={isMobile ? 0.15 : 0.4}
+              radius={isMobile ? 0.2 : 0.4}
               luminanceThreshold={0.9}
               luminanceSmoothing={0.9}
               mipmapBlur

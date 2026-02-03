@@ -491,6 +491,10 @@
       "insufficientAllowance": "Недостаточное разрешение токенов. Попробуйте снова.",
       "stakeFailed": "Стейкинг токенов не удался. Попробуйте снова."
     }
+  },
+  "unifiedAccountModal": {
+    "connectWallet": "Подключить Кошелёк",
+    "collectionTab": "Коллекция"
   }
 }
 

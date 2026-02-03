@@ -490,5 +490,9 @@
       "insufficientAllowance": "Autorizzazione token insufficiente. Riprova.",
       "stakeFailed": "Staking token fallito. Riprova."
     }
+  },
+  "unifiedAccountModal": {
+    "connectWallet": "Collega Portafoglio",
+    "collectionTab": "Collezione"
   }
 }

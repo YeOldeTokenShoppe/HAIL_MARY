@@ -490,5 +490,9 @@
       "insufficientAllowance": "Unzureichende Token-Genehmigung. Bitte erneut versuchen.",
       "stakeFailed": "Token-Staking fehlgeschlagen. Bitte erneut versuchen."
     }
+  },
+  "unifiedAccountModal": {
+    "connectWallet": "Wallet Verbinden",
+    "collectionTab": "Sammlung"
   }
 }

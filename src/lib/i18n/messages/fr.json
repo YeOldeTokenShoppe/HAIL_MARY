@@ -489,5 +489,9 @@
       "insufficientAllowance": "Autorisation de tokens insuffisante. Veuillez réessayer.",
       "stakeFailed": "Échec du staking des tokens. Veuillez réessayer."
     }
+  },
+  "unifiedAccountModal": {
+    "connectWallet": "Connecter le Portefeuille",
+    "collectionTab": "Collection"
   }
 }

@@ -494,5 +494,9 @@
       "insufficientAllowance": "Insufficient token allowance. Please try again.",
       "stakeFailed": "Failed to stake tokens. Please try again."
     }
+  },
+  "unifiedAccountModal": {
+    "connectWallet": "Connect Wallet",
+    "collectionTab": "Collection"
   }
 }

@@ -490,5 +490,9 @@
       "insufficientAllowance": "代币授权不足。请重试。",
       "stakeFailed": "代币质押失败。请重试。"
     }
+  },
+  "unifiedAccountModal": {
+    "connectWallet": "连接钱包",
+    "collectionTab": "收藏"
   }
 }

@@ -490,5 +490,9 @@
       "insufficientAllowance": "إذن التوكنات غير كافٍ. يرجى المحاولة مرة أخرى.",
       "stakeFailed": "فشل رهن التوكنات. يرجى المحاولة مرة أخرى."
     }
+  },
+  "unifiedAccountModal": {
+    "connectWallet": "ربط المحفظة",
+    "collectionTab": "المجموعة"
   }
 }

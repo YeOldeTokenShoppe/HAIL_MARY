@@ -490,5 +490,9 @@
       "insufficientAllowance": "Permissio signorum insufficiens. Iterum conare.",
       "stakeFailed": "Signa deponere defecit. Iterum conare."
     }
+  },
+  "unifiedAccountModal": {
+    "connectWallet": "Coniunge Sacculum",
+    "collectionTab": "Collectio"
   }
 }

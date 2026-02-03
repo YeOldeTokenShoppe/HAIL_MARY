@@ -490,5 +490,9 @@
       "insufficientAllowance": "टोकन अनुमति अपर्याप्त। कृपया पुनः प्रयास करें।",
       "stakeFailed": "टोकन स्टेक करने में विफल। कृपया पुनः प्रयास करें।"
     }
+  },
+  "unifiedAccountModal": {
+    "connectWallet": "वॉलेट कनेक्ट करें",
+    "collectionTab": "संग्रह"
   }
 }

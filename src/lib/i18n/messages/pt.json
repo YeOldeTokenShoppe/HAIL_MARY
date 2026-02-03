@@ -490,6 +490,10 @@
       "insufficientAllowance": "Autorização de tokens insuficiente. Tente novamente.",
       "stakeFailed": "Falha ao fazer stake dos tokens. Tente novamente."
     }
+  },
+  "unifiedAccountModal": {
+    "connectWallet": "Conectar Carteira",
+    "collectionTab": "Coleção"
   }
 }
   

@@ -490,5 +490,9 @@
       "insufficientAllowance": "Quyền token không đủ. Vui lòng thử lại.",
       "stakeFailed": "Đặt cọc token thất bại. Vui lòng thử lại."
     }
+  },
+  "unifiedAccountModal": {
+    "connectWallet": "Kết Nối Ví",
+    "collectionTab": "Bộ Sưu Tập"
   }
 }

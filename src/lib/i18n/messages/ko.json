@@ -490,5 +490,9 @@
       "insufficientAllowance": "토큰 승인이 부족합니다. 다시 시도해 주세요.",
       "stakeFailed": "토큰 스테이킹에 실패했습니다. 다시 시도해 주세요."
     }
+  },
+  "unifiedAccountModal": {
+    "connectWallet": "지갑 연결",
+    "collectionTab": "컬렉션"
   }
 }

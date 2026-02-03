@@ -490,5 +490,9 @@
       "insufficientAllowance": "トークン承認が不足しています。再試行してください。",
       "stakeFailed": "トークンのステークに失敗しました。再試行してください。"
     }
+  },
+  "unifiedAccountModal": {
+    "connectWallet": "ウォレットを接続",
+    "collectionTab": "コレクション"
   }
 }

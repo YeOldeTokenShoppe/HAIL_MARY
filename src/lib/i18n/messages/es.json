@@ -489,5 +489,9 @@
       "insufficientAllowance": "Permiso de tokens insuficiente. Por favor intenta de nuevo.",
       "stakeFailed": "Error al stakear tokens. Por favor intenta de nuevo."
     }
+  },
+  "unifiedAccountModal": {
+    "connectWallet": "Conectar Billetera",
+    "collectionTab": "Colección"
   }
 }
