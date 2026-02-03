@@ -732,12 +732,12 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
   const rotation = [0, baseRotationY + userRotation, 0];
   
   const position = isDesktop 
-    ? [centerOffset.x + 0.5, centerOffset.y - 0, centerOffset.z + 2] // Desktop: offset to right side
+    ? [centerOffset.x + 1, centerOffset.y - 0, centerOffset.z + 2] // Desktop: offset to right side
     : isTabletPortrait
     ? [centerOffset.x + 1, centerOffset.y - 0, centerOffset.z] // Tablet portrait: offset right
     : isTablet
-    ? [centerOffset.x + 3.5, centerOffset.y - 0.5, centerOffset.z + 1] // Tablet landscape: slightly offset
-    : [centerOffset.x, centerOffset.y - 1, centerOffset.z - 1]; // Mobile: centered
+    ? [centerOffset.x + 2, centerOffset.y + 0.5, centerOffset.z + 1] // Tablet landscape: closer and higher
+    : [centerOffset.x, centerOffset.y + 0.5, centerOffset.z - 1]; // Mobile: centered, higher
   
   const scale = isDesktop ? 2 : isTablet ? 1.8 : 1.5; // Tablet: between desktop and mobile
 
@@ -1279,14 +1279,14 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
       // iPad Pro 12.9"
       'ipad-pro-12-portrait': {
         left: '2%',
-        bottom: '12rem',
-        width: '45%',
+        bottom: '10rem',
+        width: '55%',
         height: '40%'
       },
       'ipad-pro-12-landscape': {
-        left: '5%',
+        left: '3%',
         bottom: '10rem',
-        width: '40%',
+        width: '45%',
         height: '45%'
       },
       // iPad Pro 11"
@@ -1305,7 +1305,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
       // iPad Mini
       'ipad-mini-portrait': {
         left: '3%',
-        bottom: '10rem',
+        bottom: '5rem',
         width: '58%',
         height: '45%'
       },
