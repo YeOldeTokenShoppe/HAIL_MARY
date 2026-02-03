@@ -716,10 +716,10 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
   const isDesktop = windowWidth > 1024;
   const isTablet = windowWidth >= 768 && windowWidth <= 1024;
   const isMobile = windowWidth <= 768;
-  
+
   // Check if tablet is in portrait mode (height > width)
   const isTabletPortrait = isTablet && windowHeight > windowWidth;
-  
+
   // Different settings for desktop vs tablet vs mobile with user rotation
   const baseRotationY = isDesktop 
     ? -Math.PI/2
@@ -732,15 +732,15 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
   const rotation = [0, baseRotationY + userRotation, 0];
   
   const position = isDesktop 
-    ? [centerOffset.x + 1, centerOffset.y - 2, centerOffset.z + 3] // Desktop: offset to right side
+    ? [centerOffset.x + 0.5, centerOffset.y - 0, centerOffset.z + 2] // Desktop: offset to right side
     : isTabletPortrait
-    ? [centerOffset.x + 2, centerOffset.y - 2, centerOffset.z] // Tablet portrait: centered
+    ? [centerOffset.x + 1, centerOffset.y - 0, centerOffset.z] // Tablet portrait: offset right
     : isTablet
-    ? [centerOffset.x + 3.5, centerOffset.y - 2.5, centerOffset.z + 1] // Tablet landscape: slightly offset
+    ? [centerOffset.x + 3.5, centerOffset.y - 0.5, centerOffset.z + 1] // Tablet landscape: slightly offset
     : [centerOffset.x, centerOffset.y - 1, centerOffset.z - 1]; // Mobile: centered
   
   const scale = isDesktop ? 2 : isTablet ? 1.8 : 1.5; // Tablet: between desktop and mobile
-  
+
   // Pulsing animation for scroll objects and ball
   useFrame(({ clock }) => {
     if (scrollMaterialsRef.current.length > 0) {
@@ -907,12 +907,9 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
   }, [isDragging, lastMouseX, userRotation]);
 
   return (
-    <group ref={group}>
-      <primitive 
-        position={position} 
-        rotation={rotation} 
-        object={scene} 
-        scale={scale}
+    <group ref={group} position={position} rotation={rotation} scale={scale}>
+      <primitive
+        object={scene}
         onClick={handleClick}
         onPointerOver={(e) => {
           handlePointerOver(e);
@@ -1801,7 +1798,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
           style={{ position: 'relative', zIndex: 1, pointerEvents: 'auto' }}
           camera={{ 
             position: isDesktop 
-              ? [-5, 1, 6.5] 
+              ? [-7, 1, 6.5] 
               : isTablet 
               ? [-6, 1.5, 6] 
               : [4, 1, 5], 
