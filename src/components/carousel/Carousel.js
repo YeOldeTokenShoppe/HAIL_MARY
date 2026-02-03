@@ -1098,7 +1098,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             <div
               style={{
                 position: 'absolute',
-                top: isMobilePhone ? '5%' : 0,
+                top: isMobilePhone ? '7%' : 0,
                 left: 0,
                 width: '100%',
                 height: '100%',
@@ -1174,7 +1174,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               // padding: '0 1rem',
             }}>
 
-    The RL80 token is your safe-haven micro-asset. Start with $5 and add the Patron Saint of Portfolios to your dashboard.
+    The RL80 token is your safe-haven micro-asset, and name-sake token of 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙. Start with $5 and add the Patron Saint of Portfolios to your dashboard.
         </p>
             </div>
 
@@ -2099,7 +2099,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               textAlign: 'center',
               // padding: '0 1rem',
             }}>
-    The RL80 token is your safe-haven micro-asset. Start with $5 and add the Patron Saint of Portfolios to your dashboard.
+    The RL80 token is your safe-haven micro-asset, and name-sake token of 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙. Start with $5 and add the Patron Saint of Portfolios to your dashboard.
               </p>
               
             <div
