@@ -779,8 +779,8 @@ export default function NavControlsHome({
             ?
           </button>
         )}
-         {/* BUY Button - Desktop only */}
-        {!isMobile && onBuyClick && (
+         {/* BUY Button - Desktop, or mobile when 80s button is hidden */}
+        {(!isMobile || !show80sButton) && onBuyClick && (
           <button
             className="buy-btn-compact"
             onClick={onBuyClick}
@@ -904,8 +904,8 @@ export default function NavControlsHome({
         </button>
       </div>
 
-      {/* Mobile BUY Button - Below nav container */}
-        {isMobile && onBuyClick && (
+      {/* Mobile BUY Button - Below nav container (only when 80s button is shown, otherwise it's inline) */}
+        {isMobile && show80sButton && onBuyClick && (
           <button
             className={`buy-btn-mobile ${is80sMode ? 'mode-80s' : ''}`}
             onClick={onBuyClick}

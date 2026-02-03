@@ -1475,7 +1475,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
           left: 0, 
           right: 0, 
           bottom: 0,
-          zIndex: 9999,
+          zIndex: 99999,
           background: '#000000'
         }}>
           <CoinLoader />
@@ -2210,12 +2210,14 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
             {/* Magnified iframe with zoom controls */}
             <div style={{
               display: 'flex',
+              flexWrap: 'wrap',
               justifyContent: 'center',
               marginBottom: '0.5rem',
-              gap: '1rem',
+              gap: isMobile ? '0.5rem' : '1rem',
               position: 'relative',
               zIndex: 10002,
-              pointerEvents: 'auto'
+              pointerEvents: 'auto',
+              padding: isMobile ? '0 3rem' : '0'
             }}>
               <button
                 onClick={(e) => {
@@ -2290,8 +2292,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
                   borderRadius: '0.25rem',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
-                  zIndex: 10002,
-                  marginLeft: '1rem'
+                  zIndex: 10002
                 }}
                 onMouseEnter={(e) => {
                   e.target.style.background = 'rgba(212, 175, 55, 0.4)';
@@ -2307,7 +2308,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
             {/* Iframe container with overflow for zooming */}
             <div style={{
               width: '100%',
-              height: 'calc(100% - 6rem)',
+              height: isMobile ? 'calc(100% - 9rem)' : 'calc(100% - 6rem)',
               overflow: 'auto',
               borderRadius: '0.5rem',
             }}>

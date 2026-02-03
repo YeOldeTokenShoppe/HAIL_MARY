@@ -207,10 +207,10 @@ export default function GachaponPage() {
           <div
             style={{
               position: 'fixed',
-              top: '80px',
+              bottom: '100px',
               left: '50%',
               transform: 'translateX(-50%)',
-              zIndex: 50,
+              zIndex: 500,
               animation: 'badgeBounce 2s ease-in-out infinite, badgeGlow 2s ease-in-out infinite',
               background: 'linear-gradient(135deg, #00f5d4, #00d4aa)',
               borderRadius: '20px',
