@@ -2282,10 +2282,10 @@ const PalmsScene = ({ onLoadingChange }) => {
             overflow: 'visible',
           }}
         >
-          <div style={{ 
-            marginBottom: isMobile ? '0' : '0', 
-            position: 'relative', 
-            height: '700px',  // Increased to accommodate 3 lines of text
+          <div style={{
+            marginBottom: isMobile ? '0' : '0',
+            position: 'relative',
+            height: '700px',
             minHeight: '450px',
           }}>
             {/* Use MorphingWebGLText for final stage, WebGLStandaloneText for others */}
@@ -2343,35 +2343,30 @@ const PalmsScene = ({ onLoadingChange }) => {
               />
             )}
           </div>
-          {/* Make dots invisible instead of removing them to prevent layout shift */}
-          <div 
-            className="progress-dots"
-            style={{
-              display: 'flex',
-              gap: '8px',
-              marginTop: '1rem',
-              justifyContent: 'center',
-              visibility: (currentCameraStage === 4 && shouldMorph) ? 'hidden' : 'visible',
-            }}>
-              {[0, 1, 2, 3, 4].map((index) => (
-                <div
-                  key={index}
-                  style={{
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    backgroundColor: 'white',
-                    opacity: index === currentCameraStage ? 1 : 0.3,
-                    transition: 'all 0.3s ease',
-                    boxShadow: index === currentCameraStage ? '0 0 10px rgba(255, 255, 255, 0.8)' : 'none',
-                  }}
-                />
-              ))}
-            </div>
-          
+        </div>
+      )}
+
+      {/* Scroll Camera Indicator removed for production */}
+      </div>
+
+      {/* Progress dots and scroll hint - fixed position, separate from text container */}
+      {!isSceneLoading && scrollCameraActive && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: isMobile ? '80px' : '50px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '8px',
+            zIndex: 1000,
+            pointerEvents: 'none',
+            visibility: (currentCameraStage === 4 && shouldMorph) ? 'hidden' : 'visible',
+          }}>
           {/* Scroll hint - fades out when user scrolls */}
           <div style={{
-            marginTop: '1rem',
             fontSize: '12px',
             color: '#01ff00',
             opacity: hasScrolled ? 0 : 0.5,
@@ -2379,16 +2374,35 @@ const PalmsScene = ({ onLoadingChange }) => {
             fontFamily: 'monospace',
             animation: hasScrolled ? 'none' : 'pulse 2s ease-in-out infinite',
             transition: 'opacity 0.5s ease',
-            pointerEvents: 'none',
           }}>
             {t('palmTreeDrive.scrollPrompt')}
           </div>
+
+          <div
+            className="progress-dots"
+            style={{
+              display: 'flex',
+              gap: '8px',
+              justifyContent: 'center',
+            }}>
+            {[0, 1, 2, 3, 4].map((index) => (
+              <div
+                key={index}
+                style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  backgroundColor: 'white',
+                  opacity: index === currentCameraStage ? 1 : 0.3,
+                  transition: 'all 0.3s ease',
+                  boxShadow: index === currentCameraStage ? '0 0 10px rgba(255, 255, 255, 0.8)' : 'none',
+                }}
+              />
+            ))}
+          </div>
         </div>
       )}
-      
-      {/* Scroll Camera Indicator removed for production */}
-      </div>
-      
+
       {/* Skip Animation Button - bottom right - Outside pointer-events:none container */}
       {!hasScrolled && currentCameraStage < 4 && (
         <button
