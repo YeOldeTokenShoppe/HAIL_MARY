@@ -28,8 +28,15 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
   const router = useRouter()
   const [hoveredCaption, setHoveredCaption] = useState(null)
   const [sceneReady, setSceneReady] = useState(false)
+  // Detect actual mobile phones via user agent (works regardless of orientation)
+  const getIsMobilePhone = () => {
+    if (typeof window === 'undefined') return false
+    const isMobileUserAgent = /iPhone|iPod|Android.*Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    const isIPad = /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+    return (isMobileUserAgent && !isIPad) || (window.innerWidth <= 480 && !isIPad)
+  }
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
-  const [isMobilePhone, setIsMobilePhone] = useState(() => typeof window !== 'undefined' ? window.innerWidth <= 480 : false)
+  const [isMobilePhone, setIsMobilePhone] = useState(getIsMobilePhone)
   const [isSmallPhone, setIsSmallPhone] = useState(() => typeof window !== 'undefined' ? window.innerHeight <= 700 : false)
   const [isTablet, setIsTablet] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 480 && window.innerWidth <= 1024 : false)
   const [isTabletPortrait, setIsTabletPortrait] = useState(() => typeof window !== 'undefined' ? window.innerWidth > 480 && window.innerWidth <= 1024 && window.innerHeight > window.innerWidth : false)
@@ -71,8 +78,10 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
     const checkMobile = () => {
       const width = window.innerWidth
       setIsMobile(width <= 768)
-      // Check specifically for mobile phones (not tablets)
-      setIsMobilePhone(width <= 480)
+      // Check specifically for mobile phones (not tablets) - use user agent for orientation-independent detection
+      const isMobileUserAgent = /iPhone|iPod|Android.*Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      const isIPad = /iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+      setIsMobilePhone((isMobileUserAgent && !isIPad) || (width <= 480 && !isIPad))
       // Check for tablets
       setIsTablet(width > 480 && width <= 1024)
       setIsTabletPortrait(width > 480 && width <= 1024 && window.innerHeight > width)
@@ -87,7 +96,11 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
     }
     checkMobile()
     window.addEventListener('resize', checkMobile)
-    return () => window.removeEventListener('resize', checkMobile)
+    window.addEventListener('orientationchange', checkMobile)
+    return () => {
+      window.removeEventListener('resize', checkMobile)
+      window.removeEventListener('orientationchange', checkMobile)
+    }
   }, [])
   
   // Set scene ready when using OldsCoolTunnel for desktop

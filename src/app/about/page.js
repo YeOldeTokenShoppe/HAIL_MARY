@@ -114,21 +114,25 @@ export default function CarouselPage() {
       const width = window.innerWidth
       const height = window.innerHeight
       const isPortrait = height > width
-      
+
       // Detect if it's likely an iPad (including iPad Mini)
-      const isIPad = /iPad/.test(navigator.userAgent) || 
+      const isIPad = /iPad/.test(navigator.userAgent) ||
                      (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
-      
+
+      // Detect actual mobile phones via user agent (works regardless of orientation)
+      const isMobileUserAgent = /iPhone|iPod|Android.*Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+
       // For tablets: check if it's in portrait and width is tablet-like (768px)
       const isTabletPortrait = isIPad && isPortrait && width >= 768 && width <= 834
-      
-      // Phone breakpoint - only true phones, not tablets even in portrait
-      const isPhone = width < 480 && !isIPad
-      
+
+      // Phone detection: either detected via user agent OR small screen in portrait
+      // Once detected as mobile via user agent, stays mobile regardless of orientation
+      const isPhone = (isMobileUserAgent && !isIPad) || (width < 480 && !isIPad)
+
       // Mobile view for other UI elements
       const isMobileView = width <= 1024 && !isIPad
-      
-      
+
+
       // Only phones get mobile treatment, not tablets even in portrait
       setIsMobileDevice(prevState => {
         if (prevState !== isPhone) {

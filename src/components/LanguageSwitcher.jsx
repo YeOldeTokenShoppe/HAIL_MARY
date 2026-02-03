@@ -1,27 +1,12 @@
 'use client';
 
-import React, { useState, useEffect }  from 'react';
+import React from 'react';
 
 import { useLanguage } from './LanguageProvider';
 
 export default function LanguageSwitcher() {
-  const { locale, setLocale, detectedLanguage, isAutoDetected } = useLanguage();
-    const [isMobileView, setIsMobileView] = useState(false);
-    const [isMobileDevice, setIsMobileDevice] = useState(false);
-  
-  // Set mobile device state after component mounts
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobileDevice(window.innerWidth <= 768);
-      setIsMobileView(window.innerWidth <= 768);
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-  
+  const { locale, setLocale } = useLanguage();
+
   const languages = [
     // Most common first
     { code: 'en', label: 'English' },
@@ -45,18 +30,25 @@ export default function LanguageSwitcher() {
   ];
   
   return (
-    <div style={{
-      position: 'fixed',
-      top: '5rem',
-      right: '1rem',
-                    width: isMobileDevice ? "3rem" : "3.5rem",
-      zIndex: 9999,
-      backgroundColor: 'transparent',
-  
-      // padding: '4px',
-      borderRadius: '4px',
-      border: '1px solid rgba(255, 255, 255, 0.3)'
-    }}>
+    <div
+      className="language-switcher-container"
+      style={{
+        position: 'fixed',
+        top: '5rem',
+        right: '1rem',
+        width: '3.5rem',
+        zIndex: 9999,
+        backgroundColor: 'transparent',
+        borderRadius: '4px',
+        border: '1px solid rgba(255, 255, 255, 0.3)'
+      }}>
+      <style jsx>{`
+        @media (max-width: 768px) {
+          .language-switcher-container {
+            width: 3rem !important;
+          }
+        }
+      `}</style>
       <select 
         value={locale} 
         onChange={(e) => setLocale(e.target.value)}
