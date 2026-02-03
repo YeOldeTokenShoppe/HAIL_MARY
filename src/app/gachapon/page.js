@@ -1,11 +1,16 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import NavControlsHome from '@/components/NavControlsHome';
+import CyberNav from '@/components/CyberNav';
 import { UnifiedAccountModal } from '@/components/UnifiedAccountModal';
-import { useClerk } from '@clerk/nextjs';
+import ThirdwebBuyModal from '@/components/ThirdwebBuyModal';
+import { useClerk, useUser } from '@clerk/nextjs';
+import { useWalletAuth } from '@/components/WalletAuthProvider';
+import { useMusic } from '@/components/MusicContext';
+import { useWeeklyPrize } from '@/hooks/useWeeklyPrize';
 
 
 // Dynamic import to avoid SSR issues with Three.js
@@ -26,20 +31,52 @@ const VendingMachineScene = dynamic(() => import('@/components/VendingMachine'),
   )
 });
 
-export default function ToasterPage() {
+export default function GachaponPage() {
   const [mounted, setMounted] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [accountModalTab, setAccountModalTab] = useState('wallet');
+  const [showBuyModal, setShowBuyModal] = useState(false);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+
   const clerk = useClerk();
+  const { user } = useUser();
+  const { isWalletConnected } = useWalletAuth();
+  const wasOpenedForWallet = useRef(false);
+
+  // Music context
+  const {
+    play,
+    pause,
+    isPlaying: contextIsPlaying,
+    nextTrack,
+    is80sMode: context80sMode,
+    setIs80sMode: setContext80sMode
+  } = useMusic();
+
+  // Weekly prize for new collectible call-out
+  const { currentPrize, claimStatus, remainingClaims } = useWeeklyPrize();
+  const [showCallout, setShowCallout] = useState(true);
 
   useEffect(() => {
     setMounted(true);
+    // Detect mobile device
+    const checkMobile = () => {
+      setIsMobileDevice(window.innerWidth <= 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   // Listen for custom events from VendingMachine to open wallet/sign-in
   useEffect(() => {
     const handleOpenWalletConnection = () => {
+      // If wallet is already connected, no need to show the modal
+      if (isWalletConnected) {
+        return;
+      }
+      wasOpenedForWallet.current = true;
       setAccountModalTab('wallet');
       setShowAccountModal(true);
     };
@@ -55,7 +92,15 @@ export default function ToasterPage() {
       window.removeEventListener('openWalletConnection', handleOpenWalletConnection);
       window.removeEventListener('openSignIn', handleOpenSignIn);
     };
-  }, [clerk]);
+  }, [clerk, isWalletConnected]);
+
+  // Auto-close the modal when wallet becomes connected (if it was opened for wallet connection)
+  useEffect(() => {
+    if (isWalletConnected && showAccountModal && wasOpenedForWallet.current) {
+      setShowAccountModal(false);
+      wasOpenedForWallet.current = false;
+    }
+  }, [isWalletConnected, showAccountModal]);
 
   return (
     <div style={{
@@ -130,12 +175,94 @@ export default function ToasterPage() {
         pointerEvents: "auto",
       }}>
         <NavControlsHome
-          isMenuOpen={isMenuOpen}
+          isPlaying={contextIsPlaying}
+          onPlayMusic={() => play()}
+          onStopMusic={() => pause()}
+          onSkipTrack={() => nextTrack()}
           onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
+          isUserSignedIn={!!user}
+          isMenuOpen={isMenuOpen}
+          is80sMode={context80sMode}
+          onToggle80sMode={() => setContext80sMode(!context80sMode)}
+          userImage={user?.imageUrl}
+          onBuyClick={() => setShowBuyModal(true)}
+          isMobile={isMobileDevice}
           show80sButton={false}
-          hideMusicOnMobile={true}
         />
       </div>
+
+      {/* New Collectible Call-out - Simple badge */}
+      {showCallout && currentPrize && (claimStatus === 'available' || claimStatus === 'ineligible') && (
+        <>
+          <style>{`
+            @keyframes badgeBounce {
+              0%, 100% { transform: translateX(-50%) translateY(0); }
+              50% { transform: translateX(-50%) translateY(-4px); }
+            }
+            @keyframes badgeGlow {
+              0%, 100% { box-shadow: 0 0 15px rgba(0, 245, 212, 0.5), 0 4px 15px rgba(0, 0, 0, 0.3); }
+              50% { box-shadow: 0 0 25px rgba(0, 245, 212, 0.7), 0 4px 20px rgba(0, 0, 0, 0.4); }
+            }
+          `}</style>
+          <div
+            style={{
+              position: 'fixed',
+              top: '80px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 50,
+              animation: 'badgeBounce 2s ease-in-out infinite, badgeGlow 2s ease-in-out infinite',
+              background: 'linear-gradient(135deg, #00f5d4, #00d4aa)',
+              borderRadius: '20px',
+              padding: '8px 12px 8px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            <span style={{ fontSize: '1rem' }}>✨</span>
+            <span style={{
+              color: '#000',
+              fontFamily: "'Orbitron', monospace",
+              fontSize: '0.7rem',
+              fontWeight: '700',
+              textTransform: 'uppercase',
+              letterSpacing: '1px',
+            }}>
+              New Drop!
+            </span>
+            <button
+              onClick={() => setShowCallout(false)}
+              style={{
+                background: 'rgba(0, 0, 0, 0.2)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '18px',
+                height: '18px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'rgba(0, 0, 0, 0.6)',
+                cursor: 'pointer',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                transition: 'all 0.2s',
+                marginLeft: '2px',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.3)';
+                e.currentTarget.style.color = '#000';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.2)';
+                e.currentTarget.style.color = 'rgba(0, 0, 0, 0.6)';
+              }}
+            >
+              ×
+            </button>
+          </div>
+        </>
+      )}
 
       {mounted && (
         <div style={{
@@ -154,6 +281,21 @@ export default function ToasterPage() {
         isOpen={showAccountModal}
         onClose={() => setShowAccountModal(false)}
         initialTab={accountModalTab}
+      />
+
+      {/* CyberNav Menu Panel */}
+      <CyberNav
+        is80sMode={context80sMode}
+        position="fixed"
+        isOpen={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
+        showButton={false}
+      />
+
+      {/* Thirdweb Buy Modal */}
+      <ThirdwebBuyModal
+        isOpen={showBuyModal}
+        onClose={() => setShowBuyModal(false)}
       />
     </div>
   );

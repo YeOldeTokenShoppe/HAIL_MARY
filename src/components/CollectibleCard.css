@@ -1,0 +1,623 @@
+/* Collectible Card Styles - NFT Trading Card with Flip */
+@import url('https://fonts.googleapis.com/css2?family=Bangers&family=Rubik:wght@400;600;700;800&display=swap');
+
+/* Container for 3D flip effect */
+.collectible-card-container {
+  width: 280px;
+  height: 420px;
+  perspective: 1000px;
+  cursor: pointer;
+}
+
+.collectible-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-style: preserve-3d;
+}
+
+.collectible-card-inner.flipped {
+  transform: rotateY(180deg);
+}
+
+/* Both card faces */
+.collectible-card {
+  --card-bg: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  --border-color: #4a5568;
+  --accent-color: #00f5d4;
+
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 16px;
+  border: 6px solid var(--border-color);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--card-bg);
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.5),
+    0 0 0 2px rgba(255, 255, 255, 0.1) inset;
+  overflow: hidden;
+  font-family: 'Rubik', sans-serif;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+.card-front {
+  z-index: 2;
+}
+
+.card-back {
+  transform: rotateY(180deg);
+  z-index: 1;
+}
+
+.collectible-card-container:hover .collectible-card-inner:not(.flipped) {
+  transform: translateY(-4px) scale(1.02);
+}
+
+.collectible-card-container:hover .collectible-card-inner.flipped {
+  transform: rotateY(180deg) translateY(-4px) scale(1.02);
+}
+
+/* Rarity-based color schemes */
+.collectible-card.common {
+  --card-bg: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
+  --border-color: #4a5568;
+}
+
+.collectible-card.rare {
+  --card-bg: linear-gradient(135deg, #1e3a5f 0%, #0d253f 100%);
+  --border-color: #3182ce;
+}
+
+.collectible-card.epic {
+  --card-bg: linear-gradient(135deg, #44337a 0%, #2d1f5e 100%);
+  --border-color: #9f7aea;
+}
+
+.collectible-card.legendary {
+  --card-bg: linear-gradient(135deg, #744210 0%, #5c3d0e 50%, #742a2a 100%);
+  --border-color: #f6e05e;
+  animation: legendary-border-pulse 2s ease-in-out infinite;
+}
+
+@keyframes legendary-border-pulse {
+  0%, 100% { border-color: #f6e05e; }
+  50% { border-color: #fbd38d; }
+}
+
+/* Header section */
+.collectible-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.collectible-title-section {
+  flex: 1;
+  min-width: 0;
+}
+
+.collectible-name {
+  font-family: 'Bangers', cursive;
+  font-size: 1.5rem;
+  font-weight: normal;
+  color: #fff;
+  margin: 0;
+  line-height: 1.1;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.collectible-subtitle {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+  display: block;
+  margin-top: 2px;
+}
+
+.collectible-edition {
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--accent-color);
+  padding: 6px 10px;
+  border-radius: 12px;
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  font-weight: 800;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    0 0 20px rgba(var(--accent-color), 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.edition-hash {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.edition-number {
+  font-size: 1.3rem;
+  font-family: 'Rubik', sans-serif;
+  text-shadow: 0 0 10px var(--accent-color);
+}
+
+/* Week badge */
+.week-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  width: fit-content;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.week-icon {
+  font-size: 0.8rem;
+}
+
+/* Prize image */
+.collectible-image {
+  flex: 1;
+  min-height: 140px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.3) inset,
+    0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.image-frame {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+}
+
+.image-frame img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+}
+
+.image-placeholder {
+  font-size: 4rem;
+  opacity: 0.3;
+}
+
+.image-caption {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
+  color: rgba(255, 255, 255, 0.8);
+  padding: 20px 10px 8px;
+  font-size: 0.65rem;
+  font-weight: 500;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Stats section */
+.collectible-stats {
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.stats-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.stats-value {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.progress-bar {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  position: relative;
+  overflow: visible;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-color), #00d9ff);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+  box-shadow: 0 0 10px var(--accent-color);
+}
+
+.progress-marker {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 12px;
+  background: #fff;
+  border-radius: 50%;
+  border: 2px solid var(--accent-color);
+  box-shadow: 0 0 8px var(--accent-color);
+}
+
+.stats-footer {
+  margin-top: 6px;
+  text-align: center;
+}
+
+.stats-hint {
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+}
+
+/* Card footer */
+.collectible-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.token-id {
+  font-size: 0.55rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 0.03em;
+  font-family: monospace;
+}
+
+.rarity-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.rarity-badge.common {
+  background: rgba(74, 85, 104, 0.5);
+  color: #a0aec0;
+}
+
+.rarity-badge.rare {
+  background: rgba(49, 130, 206, 0.3);
+  color: #63b3ed;
+}
+
+.rarity-badge.epic {
+  background: rgba(159, 122, 234, 0.3);
+  color: #b794f4;
+}
+
+.rarity-badge.legendary {
+  background: linear-gradient(90deg, rgba(246, 224, 94, 0.3), rgba(237, 137, 54, 0.3));
+  color: #fbd38d;
+  animation: legendary-badge-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes legendary-badge-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Flip hint */
+.flip-hint {
+  position: absolute;
+  bottom: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  color: rgba(255, 255, 255, 0.6);
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.6rem;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.collectible-card-container:hover .flip-hint {
+  opacity: 1;
+}
+
+/* Holographic effect */
+.holo-effect {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.03) 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.03) 75%,
+    transparent 100%
+  );
+  background-size: 200% 200%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.collectible-card-container:hover .card-front .holo-effect {
+  opacity: 1;
+  animation: holo-shine 3s linear infinite;
+}
+
+@keyframes holo-shine {
+  0% { background-position: 200% 200%; }
+  100% { background-position: -200% -200%; }
+}
+
+/* Rarity glow effect */
+.rarity-glow {
+  position: absolute;
+  inset: -2px;
+  border-radius: 18px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+}
+
+.collectible-card.legendary .rarity-glow {
+  background: radial-gradient(ellipse at center, rgba(246, 224, 94, 0.4) 0%, transparent 70%);
+  opacity: 0.5;
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+.collectible-card.epic .rarity-glow {
+  background: radial-gradient(ellipse at center, rgba(159, 122, 234, 0.3) 0%, transparent 70%);
+}
+
+.collectible-card.rare .rarity-glow {
+  background: radial-gradient(ellipse at center, rgba(49, 130, 206, 0.3) 0%, transparent 70%);
+}
+
+.collectible-card-container:hover .rarity-glow {
+  opacity: 0.8;
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.02); }
+}
+
+/* Active state */
+.collectible-card.active {
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.6),
+    0 0 40px rgba(var(--accent-color), 0.3),
+    0 0 0 3px rgba(255, 255, 255, 0.2) inset;
+}
+
+.collectible-card.active .holo-effect {
+  opacity: 0.8;
+}
+
+/* ==================== */
+/* BACK SIDE STYLES     */
+/* ==================== */
+
+.card-back {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.back-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.back-header .collectible-name {
+  font-size: 1.3rem;
+}
+
+.back-header .collectible-edition {
+  padding: 4px 8px;
+}
+
+.back-header .edition-number {
+  font-size: 1.1rem;
+}
+
+/* 3D Model Canvas Container */
+.model-canvas-container {
+  flex: 1;
+  min-height: 280px;
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.05) 0%, transparent 70%);
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.model-canvas-container canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.no-model-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.no-model-placeholder span {
+  font-size: 4rem;
+  margin-bottom: 10px;
+}
+
+.no-model-placeholder p {
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+/* Back footer */
+.back-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.flip-back-hint {
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+}
+
+/* Tap to expand hint */
+.tap-to-expand-hint {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  color: rgba(255, 255, 255, 0.8);
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.6rem;
+  font-weight: 500;
+  pointer-events: none;
+  animation: pulse-hint 2s ease-in-out infinite;
+}
+
+@keyframes pulse-hint {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+/* ==================== */
+/* EXPANDED VIDEO       */
+/* ==================== */
+
+.expanded-video-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.95) 100%);
+  cursor: pointer;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.expanded-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.video-close-btn {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+  padding: 6px 14px;
+  border-radius: 16px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  z-index: 10;
+}
+
+.video-close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: #00f5d4;
+  color: #00f5d4;
+}
+
+/* ==================== */
+/* MOBILE RESPONSIVENESS */
+/* ==================== */
+
+@media (max-width: 480px) {
+  .collectible-card-container {
+    width: 240px;
+    height: 360px;
+  }
+
+  .collectible-card {
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .collectible-name {
+    font-size: 1.3rem;
+  }
+
+  .collectible-edition {
+    padding: 4px 8px;
+  }
+
+  .edition-number {
+    font-size: 1.1rem;
+  }
+
+  .collectible-image {
+    min-height: 100px;
+  }
+
+  .model-canvas-container {
+    min-height: 200px;
+  }
+}

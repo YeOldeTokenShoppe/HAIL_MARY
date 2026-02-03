@@ -27,15 +27,17 @@ const TEST_MODE = true;
 // Mock prize data for testing
 const MOCK_PRIZE = {
   id: 'test_prize_001',
-  modelPath: '/models/ipadMaryToy.glb',
-  name: 'iPad Mary',
-  description: 'Our Lady of Tech - Weekly Prize',
-  weekIdentifier: '2024-W05',
+  modelPath: '/models/Collectible1.glb',           // Vending machine display (with capsule)
+  collectibleModelPath: '/models/Collectible1.glb', // Collection card display (no capsule)
+  videoSrc: '/videos/neon80s.mp4',                 // Video texture for 3D model screen
+  name: 'Trade Life RL80',
+  description: 'Our Lady of Perpetual Profit',
+  weekIdentifier: '2026-W05',
   isActive: true,
   maxClaims: 100,
   claimCount: 23, // Change this to test different remaining counts
   previewConfig: {
-    icon: '/images/ipadMary.webp',
+    icon: '/images/maryToy.webp',
     accentColor: '#00f5d4'
   }
 };
@@ -95,11 +97,14 @@ export function useWeeklyPrize() {
           prizeId: MOCK_PRIZE.id,
           prizeName: MOCK_PRIZE.name,
           prizeDescription: MOCK_PRIZE.description,
-          prizeModelPath: MOCK_PRIZE.modelPath,
+          prizeModelPath: MOCK_PRIZE.collectibleModelPath, // Use collectible model (no capsule)
+          prizeVideoSrc: MOCK_PRIZE.videoSrc,              // Video for 3D model screen
           prizeIcon: MOCK_PRIZE.previewConfig?.icon,
           prizeAccentColor: MOCK_PRIZE.previewConfig?.accentColor,
           claimedAt: { toDate: () => new Date() },
-          weekIdentifier: MOCK_PRIZE.weekIdentifier
+          weekIdentifier: MOCK_PRIZE.weekIdentifier,
+          claimNumber: MOCK_PRIZE.claimCount,
+          maxClaims: MOCK_PRIZE.maxClaims
         });
       } else {
         setUserClaim(null);
@@ -231,10 +236,13 @@ export function useWeeklyPrize() {
         claimedAt: { toDate: () => new Date() },
         weekIdentifier: currentPrize.weekIdentifier,
         prizeName: currentPrize.name,
-        prizeModelPath: currentPrize.modelPath,
+        prizeModelPath: currentPrize.collectibleModelPath || currentPrize.modelPath,
+        prizeVideoSrc: currentPrize.videoSrc,
         prizeDescription: currentPrize.description,
         prizeIcon: currentPrize.previewConfig?.icon,
-        prizeAccentColor: currentPrize.previewConfig?.accentColor
+        prizeAccentColor: currentPrize.previewConfig?.accentColor,
+        claimNumber: claimCount + 1,
+        maxClaims: currentPrize.maxClaims
       };
 
       setUserClaim(mockClaim);
@@ -309,7 +317,8 @@ export function useWeeklyPrize() {
           weekIdentifier: prizeData.weekIdentifier,
           // Denormalized data for easy display
           prizeName: prizeData.name,
-          prizeModelPath: prizeData.modelPath,
+          prizeModelPath: prizeData.collectibleModelPath || prizeData.modelPath,
+          prizeVideoSrc: prizeData.videoSrc || null,
           prizeDescription: prizeData.description,
           prizeIcon: prizeData.previewConfig?.icon || null,
           prizeAccentColor: prizeData.previewConfig?.accentColor || '#00f5d4'
@@ -349,14 +358,17 @@ export function useWeeklyPrize() {
       // Add some mock historical prizes for testing the collection view
       mockCollection.push({
         id: 'test_claim_historic_1',
-        prizeId: 'test_prize_old_1',
-        prizeName: 'Crypto Rosary',
-        prizeDescription: 'Blessed beads of blockchain',
-        prizeModelPath: '/models/rosary.glb',
-        prizeIcon: '/images/sacreCoeur.webp',
-        prizeAccentColor: '#ff6b35',
-        claimedAt: { toDate: () => new Date('2024-01-15') },
-        weekIdentifier: '2024-W03'
+        prizeId: MOCK_PRIZE.id,
+        prizeName: MOCK_PRIZE.name,
+        prizeDescription: MOCK_PRIZE.description,
+        prizeModelPath: MOCK_PRIZE.collectibleModelPath,
+        prizeVideoSrc: MOCK_PRIZE.videoSrc,
+        prizeIcon: MOCK_PRIZE.previewConfig?.icon,
+        prizeAccentColor: MOCK_PRIZE.previewConfig?.accentColor,
+        claimedAt: { toDate: () => new Date('2026-01-27') },
+        weekIdentifier: MOCK_PRIZE.weekIdentifier,
+        claimNumber: 23,
+        maxClaims: MOCK_PRIZE.maxClaims
       });
 
       return mockCollection;

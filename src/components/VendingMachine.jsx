@@ -15,7 +15,7 @@ import { useUser } from '@clerk/nextjs';
 const CAPSULE_COLORS = ['#3943BC', '#14A122', '#A81814'];
 
 // Centered capsule model that appears when capsule is clicked
-function CenteredCapsule({ visible, onToyClick, modelPath, capsuleColorIndex = 0 }) {
+function CenteredCapsule({ visible, onToyClick, onZoomComplete, modelPath, capsuleColorIndex = 0 }) {
   const { scene } = useGLTF(modelPath || '/models/ipadMaryToy.glb');
   const { camera } = useThree();
   const groupRef = useRef();
@@ -24,10 +24,11 @@ function CenteredCapsule({ visible, onToyClick, modelPath, capsuleColorIndex = 0
   const toyRef = useRef();
   const [isOpening, setIsOpening] = useState(false);
   const [isZooming, setIsZooming] = useState(false);
+  const [zoomComplete, setZoomComplete] = useState(false);
 
   const initialPositions = useRef({ glass: null, base: null, toy: null });
   const initialCameraPos = useRef(null);
-  const zoomTarget = useRef(new THREE.Vector3(0, 0.3, 0.8));
+  const zoomTarget = useRef(new THREE.Vector3(0, 0.25, 0.65));
 
   const clonedScene = useMemo(() => {
     const clone = scene.clone(true);
@@ -44,14 +45,16 @@ function CenteredCapsule({ visible, onToyClick, modelPath, capsuleColorIndex = 0
     if (!visible) {
       setIsOpening(false);
       setIsZooming(false);
+      setZoomComplete(false);
+      if (onZoomComplete) onZoomComplete(false);
       if (initialCameraPos.current && camera) {
         camera.position.copy(initialCameraPos.current);
       }
       initialCameraPos.current = null;
     }
-  }, [visible, camera]);
+  }, [visible, camera, onZoomComplete]);
 
-  // Find capsule parts and toy
+  // Find capsule parts and toy, then start opening + zoom immediately
   useEffect(() => {
     if (groupRef.current && visible) {
       groupRef.current.traverse((child) => {
@@ -79,9 +82,18 @@ function CenteredCapsule({ visible, onToyClick, modelPath, capsuleColorIndex = 0
           }
         }
       });
-      setTimeout(() => setIsOpening(true), 300);
+
+      // Start opening animation and zoom simultaneously
+      setTimeout(() => {
+        setIsOpening(true);
+        // Save camera position and start zooming
+        if (!initialCameraPos.current) {
+          initialCameraPos.current = camera.position.clone();
+        }
+        setIsZooming(true);
+      }, 300);
     }
-  }, [visible, capsuleColorIndex]);
+  }, [visible, capsuleColorIndex, camera]);
 
   // Animation
   useFrame((state) => {
@@ -111,30 +123,27 @@ function CenteredCapsule({ visible, onToyClick, modelPath, capsuleColorIndex = 0
       toyRef.current.rotation.y += 0.003;
     }
 
-    // Camera zoom animation when toy is clicked
+    // Camera zoom animation - starts automatically when visible
     if (isZooming && camera) {
       const target = zoomTarget.current;
-      camera.position.lerp(target, 0.08);
+      camera.position.lerp(target, 0.15);
 
       const dist = camera.position.distanceTo(target);
-      if (dist < 0.05) {
+      if (dist < 0.1) {
         setIsZooming(false);
-        setTimeout(() => {
-          if (onToyClick) onToyClick();
-        }, 2000);
+        setZoomComplete(true);
+        if (onZoomComplete) onZoomComplete(true);
       }
     }
   });
 
+  // Handle click - only triggers claim after zoom is complete
   const handleClick = useCallback((e) => {
-    if (!isZooming) {
-      e.stopPropagation();
-      if (!initialCameraPos.current) {
-        initialCameraPos.current = camera.position.clone();
-      }
-      setIsZooming(true);
+    e.stopPropagation();
+    if (zoomComplete) {
+      if (onToyClick) onToyClick();
     }
-  }, [isZooming, camera]);
+  }, [zoomComplete, onToyClick]);
 
   if (!visible) return null;
 
@@ -143,7 +152,7 @@ function CenteredCapsule({ visible, onToyClick, modelPath, capsuleColorIndex = 0
       ref={groupRef}
       position={[0, 0.2, 0.5]}
       onClick={handleClick}
-      onPointerOver={() => { document.body.style.cursor = 'pointer'; }}
+      onPointerOver={() => { document.body.style.cursor = zoomComplete ? 'pointer' : 'default'; }}
       onPointerOut={() => { document.body.style.cursor = 'auto'; }}
     >
       <primitive object={clonedScene} scale={0.3} />
@@ -157,6 +166,7 @@ function VendingMachine({ scale = 1, position = [0, 0, 0], rotation = [0, 0, 0],
   const groupRef = useRef();
   const { actions } = useAnimations(animations, groupRef);
   const dialRef = useRef();
+  const dialMaterialsRef = useRef([]); // Store dial materials for glow effect
   const capsuleGlassRef = useRef();
   const capsuleBaseRef = useRef();
   const toyRef = useRef(); // Reference to the IpadMary toy object
@@ -227,9 +237,19 @@ function VendingMachine({ scale = 1, position = [0, 0, 0], rotation = [0, 0, 0],
   // Find objects after the scene is mounted
   useEffect(() => {
     if (groupRef.current) {
+      dialMaterialsRef.current = []; // Reset materials array
       groupRef.current.traverse((child) => {
         if (child.name === 'DIAL') {
           dialRef.current = child;
+          // Collect all materials from the dial for glow effect
+          child.traverse((dialChild) => {
+            if (dialChild.isMesh && dialChild.material) {
+              const mat = dialChild.material;
+              mat.emissive = new THREE.Color(0x00f5d4); // Teal glow color
+              mat.emissiveIntensity = 0;
+              dialMaterialsRef.current.push(mat);
+            }
+          });
         }
         if (child.name === 'CapsuleGlassA') {
           capsuleGlassRef.current = child;
@@ -314,7 +334,7 @@ function VendingMachine({ scale = 1, position = [0, 0, 0], rotation = [0, 0, 0],
   const rotationAxis = useMemo(() => new THREE.Vector3(1, 0, 0), []);
 
   // Smooth dial rotation animation
-  useFrame(() => {
+  useFrame((state) => {
     if (dialRef.current) {
       const diff = targetRotation.current - currentRotationAmount.current;
 
@@ -330,6 +350,22 @@ function VendingMachine({ scale = 1, position = [0, 0, 0], rotation = [0, 0, 0],
           if (onDialComplete) onDialComplete();
         }
         targetRotation.current = 0;
+      }
+
+      // Pulsing glow effect on dial when not disabled (eligible to claim)
+      if (dialMaterialsRef.current.length > 0) {
+        if (!disabled && !capsuleVisible) {
+          // Subtle pulse between 0.05 and 0.15 intensity
+          const pulseIntensity = 0.1 + Math.sin(state.clock.elapsedTime * 1.5) * 0.05;
+          dialMaterialsRef.current.forEach(mat => {
+            mat.emissiveIntensity = pulseIntensity;
+          });
+        } else {
+          // No glow when disabled or capsule is visible
+          dialMaterialsRef.current.forEach(mat => {
+            mat.emissiveIntensity = 0;
+          });
+        }
       }
     }
 
@@ -527,13 +563,13 @@ function PrizeStatusBar({ currentPrize, claimStatus, remainingClaims, eligibilit
       case 'loading':
         return { text: 'Loading...', color: 'rgba(255, 255, 255, 0.5)' };
       case 'no_prize':
-        return { text: 'Check back for next weekly prize', color: 'rgba(255, 255, 255, 0.5)' };
+        return { text: 'Check back soon for the next collectible!', color: 'rgba(255, 255, 255, 0.5)', isNoPrize: true };
       case 'available':
         return { text: `${remainingClaims} of ${currentPrize?.maxClaims || 100} remaining`, color: '#00f5d4' };
       case 'claimed':
         return { text: "You collected this week's prize!", color: '#00ff88' };
       case 'sold_out':
-        return { text: 'All 100 prizes claimed!', color: '#ff6b6b' };
+        return { text: 'All 100 prizes claimed! Check back next week.', color: '#ff6b6b', isNoPrize: true };
       case 'ineligible':
         if (!eligibilityDetails.isSignedIn) {
           return { text: 'Sign in to claim', color: '#ffd700', action: onSignIn };
@@ -551,6 +587,62 @@ function PrizeStatusBar({ currentPrize, claimStatus, remainingClaims, eligibilit
   };
 
   const status = getStatusMessage();
+
+  // Show enhanced message when no prize is available
+  if (status.isNoPrize) {
+    return (
+      <div style={{
+        minHeight: '120px',
+        width: '100%',
+        background: 'linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.7), transparent)',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: '12px',
+        padding: '20px 15px',
+        paddingBottom: 'max(25px, calc(env(safe-area-inset-bottom) + 15px))',
+        boxSizing: 'border-box',
+        flexShrink: 0,
+      }}>
+        <div style={{
+          fontSize: '2rem',
+          opacity: 0.6,
+        }}>
+          🎁
+        </div>
+        <div style={{
+          color: '#fff',
+          fontFamily: "'Orbitron', monospace",
+          fontSize: '0.85rem',
+          fontWeight: '600',
+          textAlign: 'center',
+          textShadow: '0 0 10px rgba(0,0,0,0.5)',
+        }}>
+          {claimStatus === 'sold_out' ? 'Sold Out!' : 'Coming Soon'}
+        </div>
+        <div style={{
+          color: status.color,
+          fontFamily: "'Orbitron', monospace",
+          fontSize: '0.7rem',
+          letterSpacing: '0.5px',
+          textAlign: 'center',
+          lineHeight: '1.5',
+          maxWidth: '280px',
+        }}>
+          {status.text}
+        </div>
+        <div style={{
+          color: 'rgba(255, 255, 255, 0.4)',
+          fontSize: '0.65rem',
+          textAlign: 'center',
+          fontStyle: 'italic',
+        }}>
+          New collectibles drop weekly for RL80 holders
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -618,6 +710,65 @@ function PrizeStatusBar({ currentPrize, claimStatus, remainingClaims, eligibilit
   );
 }
 
+// 3D Model Preview component for displaying collectibles
+function ModelPreviewScene({ modelPath }) {
+  const { scene } = useGLTF(modelPath);
+  const modelRef = useRef();
+
+  const clonedScene = useMemo(() => {
+    const clone = scene.clone(true);
+    clone.traverse((child) => {
+      if (child.isMesh) {
+        child.material = child.material.clone();
+      }
+    });
+    return clone;
+  }, [scene]);
+
+  // Auto-rotate the model
+  useFrame((state) => {
+    if (modelRef.current) {
+      modelRef.current.rotation.y += 0.01;
+    }
+  });
+
+  // Find the toy object (IpadMary or similar) and only show that
+  useEffect(() => {
+    if (modelRef.current) {
+      modelRef.current.traverse((child) => {
+        // Hide capsule parts, only show the toy
+        if (child.name.includes('Capsule') || child.name.includes('Glass') || child.name.includes('Base')) {
+          child.visible = false;
+        }
+      });
+    }
+  }, [clonedScene]);
+
+  return (
+    <primitive ref={modelRef} object={clonedScene} scale={3.5} position={[0, -0.1, 0]} />
+  );
+}
+
+// Exportable Model Preview component with Canvas
+export function ModelPreview({ modelPath, size = 150 }) {
+  if (!modelPath) return null;
+
+  return (
+    <div style={{ width: size, height: size, margin: '0 auto' }}>
+      <Canvas
+        camera={{ position: [0, 0.2, 1.2], fov: 45 }}
+        style={{ background: 'transparent' }}
+      >
+        <ambientLight intensity={0.8} />
+        <directionalLight position={[2, 2, 2]} intensity={1} />
+        <Suspense fallback={null}>
+          <ModelPreviewScene modelPath={modelPath} />
+        </Suspense>
+      </Canvas>
+    </div>
+  );
+}
+
 // Success Modal after claiming
 function ClaimSuccessModal({ isOpen, prize, onClose }) {
   if (!isOpen || !prize) return null;
@@ -666,7 +817,23 @@ function ClaimSuccessModal({ isOpen, prize, onClose }) {
           animation: 'scaleIn 0.4s ease-out, glow 2s ease-in-out infinite',
         }}
       >
-        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎉</div>
+        {/* Prize Image */}
+        <div style={{ marginBottom: '1rem' }}>
+          {prize.icon ? (
+            <img
+              src={prize.icon}
+              alt={prize.name}
+              style={{
+                width: '150px',
+                height: '150px',
+                objectFit: 'contain',
+                borderRadius: '12px',
+              }}
+            />
+          ) : (
+            <div style={{ fontSize: '3rem' }}>🎉</div>
+          )}
+        </div>
         <h2 style={{
           fontFamily: "'Orbitron', monospace",
           fontSize: '1.5rem',
@@ -719,7 +886,7 @@ function ClaimSuccessModal({ isOpen, prize, onClose }) {
 }
 
 // Inner scene component to access OrbitControls ref
-function VendingSceneInner({ onToyClick, resetKey, capsuleColorIndex, modelPath, disabled }) {
+function VendingSceneInner({ onToyClick, onZoomComplete, resetKey, capsuleColorIndex, modelPath, disabled }) {
   const controlsRef = useRef();
   const [showCenteredCapsule, setShowCenteredCapsule] = useState(false);
 
@@ -746,6 +913,7 @@ function VendingSceneInner({ onToyClick, resetKey, capsuleColorIndex, modelPath,
       <CenteredCapsule
         visible={showCenteredCapsule}
         onToyClick={onToyClick}
+        onZoomComplete={onZoomComplete}
         modelPath={modelPath}
         capsuleColorIndex={capsuleColorIndex}
       />
@@ -791,9 +959,15 @@ export default function VendingMachineScene() {
   const [resetKey, setResetKey] = useState(0);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [claimedPrize, setClaimedPrize] = useState(null);
+  const [showClaimButton, setShowClaimButton] = useState(false);
 
   // Determine if dial should be interactive
   const isDialDisabled = claimStatus !== 'available';
+
+  // Handle zoom complete from CenteredCapsule
+  const handleZoomComplete = useCallback((isComplete) => {
+    setShowClaimButton(isComplete);
+  }, []);
 
   // Handle toy click - this is when the user wants to claim the prize
   const handleToyClick = useCallback(async () => {
@@ -842,6 +1016,18 @@ export default function VendingMachineScene() {
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column' }}>
+      <style>{`
+        @keyframes claimButtonPulse {
+          0%, 100% {
+            transform: scale(1);
+            box-shadow: 0 0 30px rgba(0, 245, 212, 0.5), 0 0 60px rgba(0, 245, 212, 0.3);
+          }
+          50% {
+            transform: scale(1.02);
+            box-shadow: 0 0 40px rgba(0, 245, 212, 0.7), 0 0 80px rgba(0, 245, 212, 0.4);
+          }
+        }
+      `}</style>
       {/* Main vending machine canvas */}
       <div style={{ flex: 1, position: 'relative' }}>
         {showMainCanvas && (
@@ -865,6 +1051,7 @@ export default function VendingMachineScene() {
             <Suspense fallback={null}>
               <VendingSceneInner
                 onToyClick={handleToyClick}
+                onZoomComplete={handleZoomComplete}
                 resetKey={resetKey}
                 capsuleColorIndex={0}
                 modelPath={modelPath}
@@ -872,6 +1059,50 @@ export default function VendingMachineScene() {
               />
             </Suspense>
           </Canvas>
+        )}
+
+        {/* Click to Claim button - shows after zoom completes */}
+        {showClaimButton && claimStatus === 'available' && (
+          <div style={{
+            position: 'absolute',
+            bottom: '20%',
+            left: 0,
+            right: 0,
+            display: 'flex',
+            justifyContent: 'center',
+            pointerEvents: 'auto',
+            zIndex: 10,
+          }}>
+            <button
+              onClick={handleToyClick}
+              style={{
+                padding: '1rem 2.5rem',
+                background: 'linear-gradient(135deg, #00f5d4, #00bbf9)',
+                border: 'none',
+                borderRadius: '50px',
+                color: '#000',
+                fontFamily: "'Orbitron', monospace",
+                fontSize: '1rem',
+                fontWeight: '700',
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+                letterSpacing: '2px',
+                boxShadow: '0 0 30px rgba(0, 245, 212, 0.5), 0 0 60px rgba(0, 245, 212, 0.3)',
+                animation: 'claimButtonPulse 2s ease-in-out infinite',
+                transition: 'all 0.3s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.transform = 'scale(1.05)';
+                e.target.style.boxShadow = '0 0 40px rgba(0, 245, 212, 0.7), 0 0 80px rgba(0, 245, 212, 0.4)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = 'scale(1)';
+                e.target.style.boxShadow = '0 0 30px rgba(0, 245, 212, 0.5), 0 0 60px rgba(0, 245, 212, 0.3)';
+              }}
+            >
+              Click to Claim
+            </button>
+          </div>
         )}
 
         {/* Disabled overlay when not available */}
