@@ -7,7 +7,7 @@ export const AUTHORIZED_TEST_EMAILS = [
   '503crj@gmail.com', // Replace with actual tester email
   'jfast1979@gmail.com', // Replace with actual tester email
   'sherriekvamme@gmail.com', // Replace with actual tester email
-  'tester5@example.com', // Replace with actual tester email
+  'randyorear@yahoo.com', // Replace with actual tester email
   'tester6@example.com', // Replace with actual tester email
 ];
 

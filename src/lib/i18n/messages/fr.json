@@ -436,7 +436,7 @@
     "info": {
       "hideInfo": "Masquer",
       "showInfo": "Info",
-      "lockDays": "7 jours de verrouillage",
+      "lockDays": "10 minutes de verrouillage",
       "minStake": "Min 1 RL80 pour staker",
       "earnEth": "Gagnez des récompenses ETH",
       "proRata": "Distribution proportionnelle"

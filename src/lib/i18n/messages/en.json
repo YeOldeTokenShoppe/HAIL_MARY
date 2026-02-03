@@ -441,7 +441,7 @@
     "info": {
       "hideInfo": "Hide",
       "showInfo": "Info",
-      "lockDays": "7 day lock",
+      "lockDays": "10 minute lock",
       "minStake": "Min 1 RL80 to stake",
       "earnEth": "Earn ETH rewards",
       "proRata": "Pro-rata distribution"

@@ -436,7 +436,7 @@
     "info": {
       "hideInfo": "Ocultar",
       "showInfo": "Info",
-      "lockDays": "7 días de bloqueo",
+      "lockDays": "10 minutos de bloqueo",
       "minStake": "Mín 1 RL80 para stakear",
       "earnEth": "Gana recompensas ETH",
       "proRata": "Distribución proporcional"
