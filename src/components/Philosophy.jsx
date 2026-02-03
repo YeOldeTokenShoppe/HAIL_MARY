@@ -1012,160 +1012,152 @@ function FlatCharts({ onChartClick }) {
   };
   
   // Fetch Ethereum data from CoinGecko
-  useEffect(() => {
-    const fetchEthereumData = async () => {
-      try {
-        // Fetch 30-day data to calculate proper RSI and MA
-        const response = await fetch(
-          'https://api.coingecko.com/api/v3/coins/ethereum/market_chart?vs_currency=usd&days=30&interval=daily'
-        );
+  // useEffect(() => {
+  //   const fetchEthereumData = async () => {
+  //     try {
+  //       // Fetch 30-day data to calculate proper RSI and MA
+  //       const response = await fetch(
+  //         'https://api.coingecko.com/api/v3/coins/ethereum/market_chart?vs_currency=usd&days=30&interval=daily'
+  //       );
         
-        if (!response.ok) {
-          throw new Error('Failed to fetch Ethereum data');
-        }
+  //       if (!response.ok) {
+  //         throw new Error('Failed to fetch Ethereum data');
+  //       }
         
-        const data = await response.json();
+  //       const data = await response.json();
         
-        // Process price data (last 7 days)
-        if (data.prices && data.prices.length > 0) {
-          const last7Days = data.prices.slice(-8, -1); // Get last 7 complete days
-          const dates = last7Days.map(([timestamp]) => {
-            const date = new Date(timestamp);
-            return date.toLocaleDateString('en-US', { weekday: 'short' });
-          });
+  //       // Process price data (last 7 days)
+  //       if (data.prices && data.prices.length > 0) {
+  //         const last7Days = data.prices.slice(-8, -1); // Get last 7 complete days
+  //         const dates = last7Days.map(([timestamp]) => {
+  //           const date = new Date(timestamp);
+  //           return date.toLocaleDateString('en-US', { weekday: 'short' });
+  //         });
           
-          const prices = last7Days.map(([, price]) => Math.round(price));
-          const allPrices = data.prices.map(([, price]) => price);
+  //         const prices = last7Days.map(([, price]) => Math.round(price));
+  //         const allPrices = data.prices.map(([, price]) => price);
           
-          setPriceChartData({
-            timestamps: dates,
-            values: prices
-          });
+  //         setPriceChartData({
+  //           timestamps: dates,
+  //           values: prices
+  //         });
           
-          // Calculate and set RSI
-          const rsiValues = calculateRSI(allPrices);
-          setRsiChartData({
-            timestamps: dates,
-            values: rsiValues
-          });
-          // console.log('RSI Data:', { timestamps: dates, values: rsiValues });
+  //         // Calculate and set RSI
+  //         const rsiValues = calculateRSI(allPrices);
+  //         setRsiChartData({
+  //           timestamps: dates,
+  //           values: rsiValues
+  //         });
+  //         // console.log('RSI Data:', { timestamps: dates, values: rsiValues });
           
-          // Calculate and set Moving Averages
-          const ma7 = calculateMA(allPrices, 7).slice(-7);
-          const ma3 = calculateMA(allPrices, 3).slice(-7);
+  //         // Calculate and set Moving Averages
+  //         const ma7 = calculateMA(allPrices, 7).slice(-7);
+  //         const ma3 = calculateMA(allPrices, 3).slice(-7);
           
-          setMaChartData({
-            timestamps: dates,
-            values: prices,
-            ma7: ma7,
-            ma3: ma3
-          });
-          // console.log('MA Data:', { timestamps: dates, values: prices, ma7, ma3 });
-        }
+  //         setMaChartData({
+  //           timestamps: dates,
+  //           values: prices,
+  //           ma7: ma7,
+  //           ma3: ma3
+  //         });
+  //         // console.log('MA Data:', { timestamps: dates, values: prices, ma7, ma3 });
+  //       }
         
-        // Process market cap data (convert to billions)
-        if (data.market_caps && data.market_caps.length > 0) {
-          const last7Days = data.market_caps.slice(-8, -1);
-          const dates = last7Days.map(([timestamp]) => {
-            const date = new Date(timestamp);
-            return date.toLocaleDateString('en-US', { weekday: 'short' });
-          });
+  //       // Process market cap data (convert to billions)
+  //       if (data.market_caps && data.market_caps.length > 0) {
+  //         const last7Days = data.market_caps.slice(-8, -1);
+  //         const dates = last7Days.map(([timestamp]) => {
+  //           const date = new Date(timestamp);
+  //           return date.toLocaleDateString('en-US', { weekday: 'short' });
+  //         });
           
-          const marketCaps = last7Days.map(([, cap]) => 
-            Math.round(cap / 1000000000) // Convert to billions
-          );
+  //         const marketCaps = last7Days.map(([, cap]) => 
+  //           Math.round(cap / 1000000000) // Convert to billions
+  //         );
           
-          setMarketCapChartData({
-            timestamps: dates,
-            values: marketCaps
-          });
-          // console.log('Market Cap Data:', { timestamps: dates, values: marketCaps });
-        }
-      } catch (error) {
-        console.error('Error fetching Ethereum data:', error);
-        // Fallback to dummy data if API fails
-        const fallbackDates = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        setPriceChartData({
-          timestamps: fallbackDates,
-          values: [2200, 2450, 2300, 2800, 3100, 2900, 3050]
-        });
-        setMarketCapChartData({
-          timestamps: fallbackDates,
-          values: [265, 295, 276, 336, 372, 348, 366]
-        });
-        setRsiChartData({
-          timestamps: fallbackDates,
-          values: [45, 52, 48, 65, 72, 68, 70]
-        });
-        setMaChartData({
-          timestamps: fallbackDates,
-          values: [2200, 2450, 2300, 2800, 3100, 2900, 3050],
-          ma7: [2150, 2250, 2350, 2450, 2550, 2650, 2750],
-          ma3: [2100, 2350, 2400, 2520, 2730, 2930, 3020]
-        });
-      }
-    };
+  //         setMarketCapChartData({
+  //           timestamps: dates,
+  //           values: marketCaps
+  //         });
+  //         // console.log('Market Cap Data:', { timestamps: dates, values: marketCaps });
+  //       }
+  //     } catch (error) {
+  //       console.error('Error fetching Ethereum data:', error);
+  //       // Fallback to dummy data if API fails
+  //       const fallbackDates = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  //       setPriceChartData({
+  //         timestamps: fallbackDates,
+  //         values: [2200, 2450, 2300, 2800, 3100, 2900, 3050]
+  //       });
+  //       setMarketCapChartData({
+  //         timestamps: fallbackDates,
+  //         values: [265, 295, 276, 336, 372, 348, 366]
+  //       });
+  //       setRsiChartData({
+  //         timestamps: fallbackDates,
+  //         values: [45, 52, 48, 65, 72, 68, 70]
+  //       });
+  //       setMaChartData({
+  //         timestamps: fallbackDates,
+  //         values: [2200, 2450, 2300, 2800, 3100, 2900, 3050],
+  //         ma7: [2150, 2250, 2350, 2450, 2550, 2650, 2750],
+  //         ma3: [2100, 2350, 2400, 2520, 2730, 2930, 3020]
+  //       });
+  //     }
+  //   };
     
-    fetchEthereumData();
-    // Refresh data every 5 minutes
-    const interval = setInterval(fetchEthereumData, 300000);
+  //   fetchEthereumData();
+  //   // Refresh data every 5 minutes
+  //   const interval = setInterval(fetchEthereumData, 300000);
     
-    return () => clearInterval(interval);
-  }, []);
+  //   return () => clearInterval(interval);
+  // }, []);
   
-  const charts = useMemo(() => {
-    const chartsArray = [];
-    const chartTypes = [
-      { data: priceChartData, type: 'line', label: 'ETH Price' },
-      { data: marketCapChartData, type: 'bar', label: 'Market Cap (B)' },
-      { data: rsiChartData, type: 'line', label: 'RSI' },
-      { data: maChartData, type: 'line', label: 'Moving Averages' }
-    ];
+  // const charts = useMemo(() => {
+  //   const chartsArray = [];
+  //   const chartTypes = [
+  //     { data: priceChartData, type: 'line', label: 'ETH Price' },
+  //     { data: marketCapChartData, type: 'bar', label: 'Market Cap (B)' },
+  //     { data: rsiChartData, type: 'line', label: 'RSI' },
+  //     { data: maChartData, type: 'line', label: 'Moving Averages' }
+  //   ];
     
-    // console.log('Creating charts with data:', {
-    //   price: priceChartData,
-    //   marketCap: marketCapChartData,
-    //   rsi: rsiChartData,
-    //   ma: maChartData
-    // });
     
-    // Arrange charts in a 2x2 grid in front of the model
-    const positions = [
-      [-2.5, 1.5, 3],   // Top left
-      [2.5, 1.5, 3],    // Top right
-      [-2.5, -0.5, 3],  // Bottom left
-      [2.5, -0.5, 3]    // Bottom right
-    ];
+  //   const positions = [
+  //     [-2.5, 1.5, 3],   // Top left
+  //     [2.5, 1.5, 3],    // Top right
+  //     [-2.5, -0.5, 3],  // Bottom left
+  //     [2.5, -0.5, 3]    // Bottom right
+  //   ];
     
-    for (let i = 0; i < 4; i++) {
-      const chartConfig = chartTypes[i];
+  //   for (let i = 0; i < 4; i++) {
+  //     const chartConfig = chartTypes[i];
       
-      chartsArray.push({
-        position: positions[i],
-        data: chartConfig.data,
-        type: chartConfig.type,
-        label: chartConfig.label
-      });
-    }
-    // console.log('Charts created:', chartsArray.map(c => c.label));
-    return chartsArray;
-  }, [priceChartData, marketCapChartData, rsiChartData, maChartData]);
+  //     chartsArray.push({
+  //       position: positions[i],
+  //       data: chartConfig.data,
+  //       type: chartConfig.type,
+  //       label: chartConfig.label
+  //     });
+  //   }
+  //   return chartsArray;
+  // }, [priceChartData, marketCapChartData, rsiChartData, maChartData]);
   
-  return (
-    <>
-      {charts.map((chart, index) => (
-        <FloatingChart
-          key={index}
-          position={chart.position}
-          chartData={chart.data}
-          chartType={chart.type}
-          chartLabel={chart.label}
-          index={index}
-          onChartClick={onChartClick}
-        />
-      ))}
-    </>
-  );
+  // return (
+  //   <>
+  //     {charts.map((chart, index) => (
+  //       <FloatingChart
+  //         key={index}
+  //         position={chart.position}
+  //         chartData={chart.data}
+  //         chartType={chart.type}
+  //         chartLabel={chart.label}
+  //         index={index}
+  //         onChartClick={onChartClick}
+  //       />
+  //     ))}
+  //   </>
+  // );
 }
 
 
@@ -1338,7 +1330,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
       // Mobile
       'mobile': {
         left: '1rem',
-        bottom: '3rem',
+        bottom: '4rem',
         width: 'calc(100% - 2rem)',
         height: '40%'
       }

@@ -11,6 +11,7 @@ import { useClerk, useUser } from '@clerk/nextjs';
 import { useWalletAuth } from '@/components/WalletAuthProvider';
 import { useMusic } from '@/components/MusicContext';
 import { useWeeklyPrize } from '@/hooks/useWeeklyPrize';
+import CoinLoader from '@/components/CoinLoader';
 
 
 // Dynamic import to avoid SSR issues with Three.js
@@ -38,6 +39,9 @@ export default function GachaponPage() {
   const [accountModalTab, setAccountModalTab] = useState('wallet');
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [fontLoaded, setFontLoaded] = useState(false);
+  const [modelLoaded, setModelLoaded] = useState(false);
 
   const clerk = useClerk();
   const { user } = useUser();
@@ -68,6 +72,93 @@ export default function GachaponPage() {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Check if UnifrakturCook font is loaded
+  useEffect(() => {
+    const checkFont = async () => {
+      try {
+        // Wait for all fonts to be ready first
+        await document.fonts.ready;
+        // Then specifically check for UnifrakturCook
+        const fontCheck = await document.fonts.load("1em 'UnifrakturCook'");
+        if (fontCheck.length > 0) {
+          setFontLoaded(true);
+          document.documentElement.classList.add('fonts-loaded');
+        } else {
+          // Font not found, wait a bit and try again or give up
+          setTimeout(() => {
+            setFontLoaded(true);
+            document.documentElement.classList.add('fonts-loaded');
+          }, 2000);
+        }
+      } catch (e) {
+        // Fallback after delay
+        setTimeout(() => {
+          setFontLoaded(true);
+          document.documentElement.classList.add('fonts-loaded');
+        }, 2000);
+      }
+    };
+    checkFont();
+  }, []);
+
+  // Preload the GLB model
+  useEffect(() => {
+    let isCancelled = false;
+
+    const preloadModel = async () => {
+      try {
+        const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
+        const loader = new GLTFLoader();
+
+        loader.load(
+          '/models/toyVENDnft.glb',
+          () => {
+            // Model loaded successfully
+            if (!isCancelled) {
+              setModelLoaded(true);
+            }
+          },
+          undefined,
+          (error) => {
+            console.warn('Failed to preload model:', error);
+            // Still mark as loaded to not block the page
+            if (!isCancelled) {
+              setModelLoaded(true);
+            }
+          }
+        );
+      } catch (e) {
+        console.warn('Error loading GLTFLoader:', e);
+        if (!isCancelled) {
+          setModelLoaded(true);
+        }
+      }
+    };
+
+    preloadModel();
+
+    // Fallback timeout in case model takes too long
+    const fallbackTimer = setTimeout(() => {
+      setModelLoaded(true);
+    }, 10000); // 10 second max wait
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(fallbackTimer);
+    };
+  }, []);
+
+  // Handle loading state - wait for mount, font, AND model
+  useEffect(() => {
+    if (mounted && fontLoaded && modelLoaded) {
+      // Add a small delay for smooth transition
+      const timer = setTimeout(() => {
+        setIsLoading(false);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [mounted, fontLoaded, modelLoaded]);
 
   // Listen for custom events from VendingMachine to open wallet/sign-in
   useEffect(() => {
@@ -114,6 +205,9 @@ export default function GachaponPage() {
       top: 0,
       overflow: "hidden",
     }}>
+      {/* CoinLoader */}
+      <CoinLoader loading={isLoading} />
+
       {/* RL80 Logo - Top Left */}
       <div style={{
         position: "fixed",
@@ -264,7 +358,7 @@ export default function GachaponPage() {
         </>
       )}
 
-      {mounted && (
+      {!isLoading && (
         <div style={{
           width: '100%',
           height: '100%',
