@@ -130,7 +130,7 @@ const CyberNav = ({
   }, [isMenuOpen]);
 
   const navItems = [
-    { id: '00', date: t('cyberNav.nav00.date'), title: t('cyberNav.nav00.title'), path: '/', thumbnail: '/images/I80.png' },
+    { id: '00', date: t('cyberNav.nav00.date'), title: t('cyberNav.nav00.title'), path: '/', thumbnail: '/images/I-80.webp' },
     { id: '01', date: t('cyberNav.nav01.date'), title: t('cyberNav.nav01.title'), path: '/about', thumbnail: '/images/ROSE_TATTOO.webp' },
     { id: '02', date: t('cyberNav.nav03.date'), title: t('cyberNav.nav03.title'), path: '/tokenomics', thumbnail: '/images/COIN_TATTOO.webp' },
     { id: '03', date: t('cyberNav.nav04.date'), title: t('cyberNav.nav04.title'), path: '/illumin80', thumbnail: '/images/sacreCoeur.webp' },

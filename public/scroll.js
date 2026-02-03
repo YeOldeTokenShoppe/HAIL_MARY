@@ -95,7 +95,10 @@ function createScrollOverlay(el, panelHeight, num, angle) {
     bottomParent = bottomPanel;
   }
 
-  syncPanelContent(tops, bottoms, 0, container.clientHeight, panelHeight);
+  // Start with a slight curl at the top (as if already scrolled down a bit)
+  var initialScroll = 80;
+  el.scrollTop = initialScroll;
+  syncPanelContent(tops, bottoms, initialScroll, container.clientHeight, panelHeight);
 
   function update() {
     var scrollTop = el.scrollTop;
