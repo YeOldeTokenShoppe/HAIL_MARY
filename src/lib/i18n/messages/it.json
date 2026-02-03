@@ -158,7 +158,8 @@
     "nav04": { "date": "UTILITÀ DI LUCE", "title": "GLI ILLUMINATI" },
     "nav05": { "date": "SOCIETÀ CORTESE", "title": "SALA CHAT" },
     "nav06": { "date": "ETICA E MORALITÀ", "title": "PERGAMENE DI S. GR80" },
-    "nav07": { "date": "SPERANZA E CARITÀ", "title": "FONTANA DI MONETE" }
+    "nav07": { "date": "SPERANZA E CARITÀ", "title": "FONTANA DI MONETE" },
+    "nav08": { "date": "wow!", "title": "CIANFRUSAGLIE MIRACOLOSE" }
   },
   "about": {
     "skewedHeading1": { "line1": "PROSPERITÀ", "line2": "PER TUTTA", "line3": "L'UMANITÀ!" },

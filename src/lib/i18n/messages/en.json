@@ -162,7 +162,8 @@
     "nav04": { "date": "LIGHT UTIL80", "title": "THE ILLUMIN80" },
     "nav05": { "date": "HI SOCI80", "title": "SOCIAL HUB" },
     "nav06": { "date": "ETHICS & MORAL80", "title": "SCROLLS OF ST. GR80" },
-    "nav07": { "date": "HOPE & CHAR80", "title": "COIN FOUNTAIN" }
+    "nav07": { "date": "HOPE & CHAR80", "title": "COIN FOUNTAIN" },
+    "nav08": { "date": "wow!", "title": "MIRACLE TRINKETS" }
   },
   "about": {
     "skewedHeading1": { "line1": "PROSPER80", "line2": "FOR ALL", "line3": "HUMAN80!" },

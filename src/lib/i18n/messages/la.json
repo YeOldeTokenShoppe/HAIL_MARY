@@ -158,7 +158,8 @@
     "nav04": { "date": "UTILITAS LUCIS", "title": "ILLUMINATI" },
     "nav05": { "date": "SOCIETAS URBANA", "title": "CONCLAVE COLLOQUII" },
     "nav06": { "date": "ETHICA ET MORALITAS", "title": "VOLUMINA S. GR80" },
-    "nav07": { "date": "SPES ET CARITAS", "title": "FONS NUMMORUM" }
+    "nav07": { "date": "SPES ET CARITAS", "title": "FONS NUMMORUM" },
+    "nav08": { "date": "mirum!", "title": "ORNAMENTA MIRACULA" }
   },
   "about": {
     "skewedHeading1": { "line1": "PROSPERITAS", "line2": "PRO OMNI", "line3": "HUMANITATE!" },

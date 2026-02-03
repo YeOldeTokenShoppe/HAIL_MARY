@@ -157,7 +157,8 @@
     "nav04": { "date": "UTILITÉ LUMINEUSE", "title": "LES ILLUMINATI" },
     "nav05": { "date": "SOCIÉTÉ POLIE", "title": "SALON DE DISCUSSION" },
     "nav06": { "date": "ÉTHIQUE ET MORALITÉ", "title": "PARCHEMINS DE ST. GR80" },
-    "nav07": { "date": "ESPOIR ET CHARITÉ", "title": "FONTAINE À PIÈCES" }
+    "nav07": { "date": "ESPOIR ET CHARITÉ", "title": "FONTAINE À PIÈCES" },
+    "nav08": { "date": "waouh!", "title": "BIBELOTS MIRACULEUX" }
   },
   "about": {
     "skewedHeading1": { "line1": "PROSPÉRITÉ", "line2": "POUR TOUTE", "line3": "L'HUMANITÉ!" },

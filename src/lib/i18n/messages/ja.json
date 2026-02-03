@@ -158,7 +158,8 @@
     "nav04": { "date": "光の効用", "title": "イルミナティ" },
     "nav05": { "date": "上品な社会", "title": "チャットルーム" },
     "nav06": { "date": "倫理と道徳", "title": "聖GR80の巻物" },
-    "nav07": { "date": "希望と慈善", "title": "コイン噴水" }
+    "nav07": { "date": "希望と慈善", "title": "コイン噴水" },
+    "nav08": { "date": "わぁ!", "title": "奇跡のトリンケット" }
   },
   "about": {
     "skewedHeading1": { "line1": "繁栄を", "line2": "すべての", "line3": "人類に!" },

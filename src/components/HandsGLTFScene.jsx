@@ -1188,7 +1188,7 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
           maxPolarAngle={Math.PI / 2}
           minPolarAngle={Math.PI / 2}
           enableDamping={true}
-          dampingFactor={0.05}
+          dampingFactor={0.1}
           rotateSpeed={0.5}
           mouseButtons={{
             LEFT: THREE.MOUSE.ROTATE,

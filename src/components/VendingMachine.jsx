@@ -2,7 +2,7 @@
 
 import React, { useRef, Suspense, useEffect, useMemo, useCallback, useState } from "react";
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { useGLTF, OrbitControls, useAnimations } from '@react-three/drei';
+import { useGLTF, OrbitControls, useAnimations, useHelper } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import InteractiveScroll2 from './InteractiveScroll2';
@@ -229,6 +229,8 @@ function VendingMachine({ scale = 1, position = [0, 0, 0], rotation = [0, 0, 0],
     clone.traverse((child) => {
       if (child.isMesh) {
         child.material = child.material.clone();
+        child.castShadow = true;
+        child.receiveShadow = true;
       }
     });
     return clone;
@@ -759,8 +761,8 @@ export function ModelPreview({ modelPath, size = 150 }) {
         camera={{ position: [0, 0.2, 1.2], fov: 45 }}
         style={{ background: 'transparent' }}
       >
-        <ambientLight intensity={0.8} />
-        <directionalLight position={[2, 2, 2]} intensity={1} />
+        <ambientLight intensity={1} />
+        {/* <directionalLight position={[-2, 2, 0]} intensity={5} /> */}
         <Suspense fallback={null}>
           <ModelPreviewScene modelPath={modelPath} />
         </Suspense>
@@ -885,10 +887,45 @@ function ClaimSuccessModal({ isOpen, prize, onClose }) {
   );
 }
 
+// Checkerboard floor component
+function CheckerboardFloor({ position = [0, -0.65, 0], size = 6 }) {
+  const texture = useMemo(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+
+    const tileSize = 8;
+    for (let y = 0; y < 64; y += tileSize) {
+      for (let x = 0; x < 64; x += tileSize) {
+        const isWhite = ((x / tileSize) + (y / tileSize)) % 2 === 0;
+        ctx.fillStyle = isWhite ? '#ffffff' : '#000000';
+        ctx.fillRect(x, y, tileSize, tileSize);
+      }
+    }
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(4, 4);
+    return tex;
+  }, []);
+
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={position} receiveShadow>
+      <planeGeometry args={[size, size]} />
+      <meshStandardMaterial map={texture} />
+    </mesh>
+  );
+}
+
 // Inner scene component to access OrbitControls ref
 function VendingSceneInner({ onToyClick, onZoomComplete, resetKey, capsuleColorIndex, modelPath, disabled }) {
   const controlsRef = useRef();
+  const spotlightRef = useRef();
   const [showCenteredCapsule, setShowCenteredCapsule] = useState(false);
+
+  // Spotlight helper for debugging - shows cone and direction
+  // useHelper(spotlightRef, THREE.SpotLightHelper, 'cyan');
 
   useEffect(() => {
     setShowCenteredCapsule(false);
@@ -899,6 +936,28 @@ function VendingSceneInner({ onToyClick, onZoomComplete, resetKey, capsuleColorI
       <ambientLight intensity={0.5} />
       <directionalLight position={[5, 5, 5]} intensity={1} />
       {/* <pointLight position={[-3, 2, 2]} color="#ffffff" intensity={0.5} /> */}
+
+      {/* Spotlight for dramatic effect */}
+      <spotLight
+        ref={spotlightRef}
+        color={0xffffff}
+        intensity={30}
+        position={[0.5, 2, 1.5]}
+        angle={0.52}
+        penumbra={1}
+        decay={2}
+        distance={0}
+        castShadow
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+        shadow-camera-near={2}
+        shadow-camera-far={10}
+        shadow-focus={1}
+        shadow-bias={-0.003}
+      />
+
+      {/* Checkerboard floor */}
+      <CheckerboardFloor position={[0, -0.65, 0]} size={6} />
 
       <VendingMachine
         scale={0.3}
@@ -1032,13 +1091,14 @@ export default function VendingMachineScene() {
       <div style={{ flex: 1, position: 'relative' }}>
         {showMainCanvas && (
           <Canvas
+            shadows
             gl={{
               antialias: true,
               alpha: true,
             }}
             camera={{
               fov: 45,
-              position: [0, 0.6, 2.5],
+              position: [0, 0.4, 2.1],
               near: 0.1,
               far: 500
             }}

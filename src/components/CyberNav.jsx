@@ -140,7 +140,7 @@ const CyberNav = ({
         ...(isMobile ? [{ id: '06', date: t('cyberNav.nav02.date'), title: t('cyberNav.nav02.title'), path: '/portal', thumbnail: '/images/timePortal.webp' }] : []),
 
   { id: '07', date: t('cyberNav.nav07.date'), title: t('cyberNav.nav07.title'), path: '/fountain', thumbnail: '/images/DIAMOND_TATTOO2.webp' },
-    { id: '08', date: 'wow!', title: 'MIRACLE TRINKETS', path: '/gachapon', thumbnail: '/images/RL80_KNUCKLES.webp' },
+    { id: '08', date: t('cyberNav.nav08.date'), title: t('cyberNav.nav08.title'), path: '/gachapon', thumbnail: '/images/RL80_KNUCKLES.webp' },
   ];
 
   // Always use mobile-style menu

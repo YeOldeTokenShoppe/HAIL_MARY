@@ -157,7 +157,8 @@
     "nav04": { "date": "UTILIDAD DE LUZ", "title": "LOS ILLUMINATI" },
     "nav05": { "date": "SOCIEDAD CORTÉS", "title": "SALA DE CHAT" },
     "nav06": { "date": "ÉTICA Y MORALIDAD", "title": "PERGAMINOS DE SAN GR80" },
-    "nav07": { "date": "ESPERANZA Y CARIDAD", "title": "FUENTE DE MONEDAS" }
+    "nav07": { "date": "ESPERANZA Y CARIDAD", "title": "FUENTE DE MONEDAS" },
+    "nav08": { "date": "¡guau!", "title": "BARATIJAS MILAGROSAS" }
   },
   "about": {
     "skewedHeading1": { "line1": "PROSPERIDAD", "line2": "PARA TODA", "line3": "LA HUMANIDAD!" },

@@ -158,7 +158,8 @@
     "nav04": { "date": "TIỆN ÍCH ÁNH SÁNG", "title": "HỘI ILLUMINATI" },
     "nav05": { "date": "XÃ HỘI LỊCH SỰ", "title": "PHÒNG TRÒ CHUYỆN" },
     "nav06": { "date": "ĐẠO ĐỨC VÀ LUÂN LÝ", "title": "CUỘN GIẤY THÁNH GR80" },
-    "nav07": { "date": "HY VỌNG VÀ TỪ THIỆN", "title": "ĐÀI PHUN TIỀN XU" }
+    "nav07": { "date": "HY VỌNG VÀ TỪ THIỆN", "title": "ĐÀI PHUN TIỀN XU" },
+    "nav08": { "date": "ồ!", "title": "ĐỒ LƯU NIỆM THẦN KỲ" }
   },
   "about": {
     "skewedHeading1": { "line1": "THỊNH VƯỢNG", "line2": "CHO TẤT CẢ", "line3": "NHÂN LOẠI!" },

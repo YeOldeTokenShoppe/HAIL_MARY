@@ -158,7 +158,8 @@
     "nav04": { "date": "빛의 효용", "title": "일루미나티" },
     "nav05": { "date": "예의 바른 사회", "title": "채팅방" },
     "nav06": { "date": "윤리와 도덕", "title": "성 GR80의 두루마리" },
-    "nav07": { "date": "희망과 자선", "title": "코인 분수" }
+    "nav07": { "date": "희망과 자선", "title": "코인 분수" },
+    "nav08": { "date": "와우!", "title": "기적의 소품" }
   },
   "about": {
     "skewedHeading1": { "line1": "번영을", "line2": "모든", "line3": "인류에게!" },

@@ -158,7 +158,8 @@
     "nav04": { "date": "光之效用", "title": "光明会" },
     "nav05": { "date": "文明社会", "title": "聊天室" },
     "nav06": { "date": "伦理与道德", "title": "圣GR80卷轴" },
-    "nav07": { "date": "希望与慈善", "title": "许愿池" }
+    "nav07": { "date": "希望与慈善", "title": "许愿池" },
+    "nav08": { "date": "哇!", "title": "奇迹小饰品" }
   },
   "about": {
     "skewedHeading1": { "line1": "繁荣", "line2": "属于全", "line3": "人类!" },
