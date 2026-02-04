@@ -151,7 +151,7 @@ const Footer = ({ isMobile = false, compact = false }) => {
           </Link>
 
           <a
-            href="https://x.com/rlaborare"
+            href="https://x.com/rl80token"
             target="_blank"
             rel="noopener noreferrer"
             style={{
