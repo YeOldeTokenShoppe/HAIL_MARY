@@ -109,7 +109,13 @@ export default function GachaponPage() {
     const preloadModel = async () => {
       try {
         const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
+        const { DRACOLoader } = await import('three/examples/jsm/loaders/DRACOLoader.js');
+
+        const dracoLoader = new DRACOLoader();
+        dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+
         const loader = new GLTFLoader();
+        loader.setDRACOLoader(dracoLoader);
 
         loader.load(
           '/models/toyVENDnft.glb',
@@ -118,6 +124,7 @@ export default function GachaponPage() {
             if (!isCancelled) {
               setModelLoaded(true);
             }
+            dracoLoader.dispose();
           },
           undefined,
           (error) => {
@@ -126,6 +133,7 @@ export default function GachaponPage() {
             if (!isCancelled) {
               setModelLoaded(true);
             }
+            dracoLoader.dispose();
           }
         );
       } catch (e) {

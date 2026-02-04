@@ -8,7 +8,7 @@ import { WalletConnectionModal } from './WalletConnectionModal';
 import { WalletDetailsModal } from './WalletDetailsModal';
 import { collection, query, where, orderBy, getDocs, db } from '@/lib/firebaseClient';
 import { useWeeklyPrize } from '@/hooks/useWeeklyPrize';
-import CollectibleCard from './CollectibleCard';
+import CapsuleCollectible from './CapsuleCollectible';
 
 export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' }) {
   const { user } = useUser();
@@ -38,7 +38,18 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' })
   const [collectedPrizes, setCollectedPrizes] = useState([]);
   const [loadingPrizes, setLoadingPrizes] = useState(false);
   const [selectedPrize, setSelectedPrize] = useState(null);
+  const [isMobile, setIsMobile] = useState(false);
   const { fetchUserPrizes } = useWeeklyPrize();
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent));
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   // Listen for external wallet details event
   useEffect(() => {
@@ -399,27 +410,26 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' })
                     <p>Visit the Gachapon to claim weekly prizes!</p>
                   </div>
                 ) : (
-                  <div className="collectible-cards-grid">
-                    {collectedPrizes.map((prize) => (
-                      <div
+                  <>
+                    <p className="collection-hint">Tap a thumbnail to view</p>
+                    <div className="capsule-grid">
+                      {collectedPrizes.map((prize) => (
+                      <CapsuleCollectible
                         key={prize.id}
-                        className="collectible-thumbnail"
+                        prizeName={prize.prizeName}
+                        prizeModelPath={prize.prizeModelPath}
+                        prizeCapsuleModelPath={prize.prizeCapsuleModelPath}
+                        prizeImage={prize.prizeIcon}
+                        editionNumber={prize.claimNumber || 1}
+                        maxEditions={prize.maxClaims || 100}
+                        mintedAt={prize.claimedAt}
+                        weekIdentifier={prize.weekIdentifier}
+                        accentColor={prize.prizeAccentColor || '#00f5d4'}
                         onClick={() => setSelectedPrize(prize)}
-                      >
-                        <CollectibleCard
-                          prizeName={prize.prizeName}
-                          prizeDescription={prize.prizeDescription}
-                          prizeImage={prize.prizeIcon}
-                          prizeModelPath={null} // Disable flip on thumbnail
-                          weekIdentifier={prize.weekIdentifier}
-                          editionNumber={prize.claimNumber || 1}
-                          maxEditions={prize.maxClaims || 100}
-                          mintedAt={prize.claimedAt}
-                          accentColor={prize.prizeAccentColor || '#00f5d4'}
-                        />
-                      </div>
-                    ))}
-                  </div>
+                      />
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
             ) : null}
@@ -428,24 +438,26 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' })
       </div>
 
 
-      {/* Full-size Collectible Card Modal */}
+      {/* Full-size Capsule Preview Modal */}
       {selectedPrize && (
-        <div className="card-preview-overlay" onClick={() => setSelectedPrize(null)}>
-          <div className="card-preview-container" onClick={(e) => e.stopPropagation()}>
-            <button className="card-preview-close" onClick={() => setSelectedPrize(null)}>×</button>
-            <CollectibleCard
+        <div className="capsule-preview-overlay" onClick={() => setSelectedPrize(null)}>
+          <div className="capsule-preview-container" onClick={(e) => e.stopPropagation()}>
+            <button className="capsule-preview-close" onClick={() => setSelectedPrize(null)}>×</button>
+            <CapsuleCollectible
               prizeName={selectedPrize.prizeName}
-              prizeDescription={selectedPrize.prizeDescription}
-              prizeImage={selectedPrize.prizeIcon}
               prizeModelPath={selectedPrize.prizeModelPath}
-              prizeVideoSrc={selectedPrize.prizeVideoSrc}
-              weekIdentifier={selectedPrize.weekIdentifier}
+              prizeCapsuleModelPath={selectedPrize.prizeCapsuleModelPath}
+              prizeImage={selectedPrize.prizeIcon}
               editionNumber={selectedPrize.claimNumber || 1}
               maxEditions={selectedPrize.maxClaims || 100}
               mintedAt={selectedPrize.claimedAt}
+              weekIdentifier={selectedPrize.weekIdentifier}
               accentColor={selectedPrize.prizeAccentColor || '#00f5d4'}
+              isPreview={true}
             />
-            <p className="card-preview-hint">Click card to flip and see 3D model with video</p>
+            <p className="capsule-preview-hint">
+              {isMobile ? 'Tap to view capsule, then tap again to open' : 'Tap capsule to reveal your collectible inside'}
+            </p>
           </div>
         </div>
       )}
@@ -533,7 +545,8 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' })
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 50;
+          z-index: 1001;
+          pointer-events: auto;
         }
 
         .unified-modal {
@@ -552,6 +565,7 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' })
           box-shadow: 0 20px 60px rgba(0, 245, 212, 0.3);
           display: flex;
           flex-direction: column;
+          pointer-events: auto;
         }
 
         .modal-close-btn {
@@ -703,31 +717,24 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' })
           animation: spin 1s linear infinite;
         }
 
-        .collectible-cards-grid {
+        .collection-hint {
+          text-align: center;
+          font-size: 0.75rem;
+          color: rgba(255, 255, 255, 0.4);
+          margin: 0 0 0.75rem 0;
+          font-family: 'Orbitron', monospace;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .capsule-grid {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-          gap: 0.75rem;
+          grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+          gap: 1rem;
           padding: 0.5rem;
-          justify-items: center;
         }
 
-        .collectible-thumbnail {
-          transform: scale(0.42);
-          transform-origin: top center;
-          margin-bottom: -250px;
-          cursor: pointer;
-          transition: transform 0.2s ease;
-        }
-
-        .collectible-thumbnail:hover {
-          transform: scale(0.45);
-        }
-
-        .collectible-thumbnail :global(.flip-hint) {
-          display: none;
-        }
-
-        .card-preview-overlay {
+        .capsule-preview-overlay {
           position: fixed;
           top: 0;
           left: 0;
@@ -739,27 +746,29 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' })
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          z-index: 200;
+          z-index: 1002;
           animation: simpleFadeIn 0.3s ease-out;
         }
 
-        .card-preview-container {
+        .capsule-preview-container {
           position: relative;
           display: flex;
           flex-direction: column;
           align-items: center;
           gap: 1rem;
+          width: 320px;
+          max-width: 90vw;
         }
 
-        .card-preview-close {
+        .capsule-preview-close {
           position: absolute;
-          top: -40px;
-          right: -40px;
+          top: -50px;
+          right: 0;
           background: rgba(0, 0, 0, 0.5);
           border: 1px solid rgba(255, 255, 255, 0.2);
           color: #fff;
-          width: 36px;
-          height: 36px;
+          width: 40px;
+          height: 40px;
           border-radius: 50%;
           font-size: 1.5rem;
           cursor: pointer;
@@ -767,19 +776,21 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' })
           display: flex;
           align-items: center;
           justify-content: center;
+          z-index: 10;
         }
 
-        .card-preview-close:hover {
+        .capsule-preview-close:hover {
           background: rgba(255, 255, 255, 0.1);
           border-color: #00f5d4;
           color: #00f5d4;
         }
 
-        .card-preview-hint {
+        .capsule-preview-hint {
           color: rgba(255, 255, 255, 0.5);
           font-size: 0.8rem;
           margin: 0;
           font-style: italic;
+          text-align: center;
         }
 
         .prizes-grid {

@@ -28,7 +28,8 @@ const TEST_MODE = true;
 const MOCK_PRIZE = {
   id: 'test_prize_001',
   modelPath: '/models/Collectible1.glb',           // Vending machine display (with capsule)
-  collectibleModelPath: '/models/Collectible1.glb', // Collection card display (no capsule)
+  collectibleModelPath: '/models/Collectible1.glb', // Toy only (for full preview)
+  capsuleModelPath: '/models/ipadMaryToy.glb',     // Toy in capsule (for collection grid)
   videoSrc: '/videos/neon80s.mp4',                 // Video texture for 3D model screen
   name: 'Trade Life RL80',
   description: 'Our Lady of Perpetual Profit',
@@ -95,7 +96,8 @@ export function useWeeklyPrize() {
           prizeId: MOCK_PRIZE.id,
           prizeName: MOCK_PRIZE.name,
           prizeDescription: MOCK_PRIZE.description,
-          prizeModelPath: MOCK_PRIZE.collectibleModelPath, // Use collectible model (no capsule)
+          prizeModelPath: MOCK_PRIZE.collectibleModelPath, // Toy only (for full preview)
+          prizeCapsuleModelPath: MOCK_PRIZE.capsuleModelPath, // Toy in capsule (for grid)
           prizeVideoSrc: MOCK_PRIZE.videoSrc,              // Video for 3D model screen
           prizeIcon: MOCK_PRIZE.previewConfig?.icon,
           prizeAccentColor: MOCK_PRIZE.previewConfig?.accentColor,
@@ -234,7 +236,8 @@ export function useWeeklyPrize() {
         claimedAt: { toDate: () => new Date() },
         weekIdentifier: currentPrize.weekIdentifier,
         prizeName: currentPrize.name,
-        prizeModelPath: currentPrize.collectibleModelPath || currentPrize.modelPath,
+        prizeModelPath: currentPrize.collectibleModelPath || currentPrize.modelPath, // Toy only
+        prizeCapsuleModelPath: currentPrize.capsuleModelPath, // Toy in capsule
         prizeVideoSrc: currentPrize.videoSrc,
         prizeDescription: currentPrize.description,
         prizeIcon: currentPrize.previewConfig?.icon,
@@ -345,7 +348,7 @@ export function useWeeklyPrize() {
     // TEST MODE: Return mock collection
     // ============================================
     if (TEST_MODE) {
-      console.log('[useWeeklyPrize] TEST MODE: Returning mock prize collection');
+      // console.log('[useWeeklyPrize] TEST MODE: Returning mock prize collection');
       // Return the current claim if it exists, plus some mock historical prizes
       const mockCollection = [];
 
@@ -359,7 +362,8 @@ export function useWeeklyPrize() {
         prizeId: MOCK_PRIZE.id,
         prizeName: MOCK_PRIZE.name,
         prizeDescription: MOCK_PRIZE.description,
-        prizeModelPath: MOCK_PRIZE.collectibleModelPath,
+        prizeModelPath: MOCK_PRIZE.collectibleModelPath, // Toy only
+        prizeCapsuleModelPath: MOCK_PRIZE.capsuleModelPath, // Toy in capsule
         prizeVideoSrc: MOCK_PRIZE.videoSrc,
         prizeIcon: MOCK_PRIZE.previewConfig?.icon,
         prizeAccentColor: MOCK_PRIZE.previewConfig?.accentColor,

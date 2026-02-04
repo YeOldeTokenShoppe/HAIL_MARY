@@ -11,6 +11,9 @@ import { useWeeklyPrize } from '@/hooks/useWeeklyPrize';
 import { useWalletAuth } from './WalletAuthProvider';
 import { useUser } from '@clerk/nextjs';
 
+// Configure DRACO loader for compressed GLB files
+useGLTF.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+
 // Capsule base colors that cycle
 const CAPSULE_COLORS = ['#3943BC', '#14A122', '#A81814'];
 

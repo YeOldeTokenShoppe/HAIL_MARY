@@ -193,6 +193,17 @@ const CollectibleCard = ({
 }) => {
   const [isFlipped, setIsFlipped] = useState(false);
   const [showFullscreenVideo, setShowFullscreenVideo] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768 || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent));
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Use mintedAt if provided, fall back to claimedAt for backwards compatibility
   const mintTimestamp = mintedAt || claimedAt;
@@ -319,9 +330,65 @@ const CollectibleCard = ({
             </div>
           </div>
 
-          {/* 3D Model Canvas or Expanded Video */}
+          {/* 3D Model Canvas or Expanded Video - Lazy load on mobile */}
           <div className="model-canvas-container">
-            {isFlipped && prizeModelPath && !showFullscreenVideo && (
+            {/* Mobile: Show video/image by default, with option to load 3D */}
+            {isMobile && isFlipped && !showFullscreenVideo && (
+              <div className="mobile-back-content">
+                {prizeVideoSrc ? (
+                  <video
+                    className="mobile-video-player"
+                    src={prizeVideoSrc}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    poster={prizeImage}
+                  />
+                ) : prizeImage ? (
+                  <img src={prizeImage} alt={prizeName} className="mobile-back-image" />
+                ) : (
+                  <div className="no-model-placeholder">
+                    <span>🎁</span>
+                    <p>{prizeName}</p>
+                  </div>
+                )}
+                {/* Button to load 3D model on mobile */}
+                {prizeModelPath && (
+                  <button
+                    className="load-3d-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowFullscreenVideo(true); // Reuse this state for "show 3D mode"
+                    }}
+                  >
+                    View 3D Model
+                  </button>
+                )}
+              </div>
+            )}
+            {/* Mobile: 3D viewer when requested */}
+            {isMobile && isFlipped && showFullscreenVideo && prizeModelPath && (
+              <div className="mobile-3d-container">
+                <ModelCanvas
+                  modelPath={prizeModelPath}
+                  accentColor={accentColor}
+                  videoSrc={null}
+                  onScreenClick={() => {}}
+                />
+                <button
+                  className="back-to-video-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowFullscreenVideo(false);
+                  }}
+                >
+                  ✕ Back
+                </button>
+              </div>
+            )}
+            {/* Desktop: Full 3D experience */}
+            {!isMobile && isFlipped && prizeModelPath && !showFullscreenVideo && (
               <ModelCanvas
                 modelPath={prizeModelPath}
                 accentColor={accentColor}
@@ -329,7 +396,7 @@ const CollectibleCard = ({
                 onScreenClick={() => prizeVideoSrc && setShowFullscreenVideo(true)}
               />
             )}
-            {isFlipped && showFullscreenVideo && prizeVideoSrc && (
+            {!isMobile && isFlipped && showFullscreenVideo && prizeVideoSrc && (
               <div className="expanded-video-container">
                 <video
                   className="expanded-video"
@@ -350,13 +417,13 @@ const CollectibleCard = ({
                 </button>
               </div>
             )}
-            {!prizeModelPath && (
+            {!isMobile && !prizeModelPath && (
               <div className="no-model-placeholder">
                 <span>🎁</span>
                 <p>3D Model Coming Soon</p>
               </div>
             )}
-            {prizeVideoSrc && isFlipped && !showFullscreenVideo && (
+            {!isMobile && prizeVideoSrc && isFlipped && !showFullscreenVideo && (
               <div className="tap-to-expand-hint">Tap model to expand video</div>
             )}
           </div>
@@ -364,7 +431,11 @@ const CollectibleCard = ({
           {/* Back footer */}
           <div className="back-footer">
             <span className={`rarity-badge ${rarity}`}>{rarityLabel}</span>
-            <span className="flip-back-hint">{showFullscreenVideo ? 'Tap video to return' : 'Click to flip back'}</span>
+            <span className="flip-back-hint">
+              {isMobile
+                ? (showFullscreenVideo ? 'Viewing 3D model' : 'Tap to flip back')
+                : (showFullscreenVideo ? 'Tap video to return' : 'Click to flip back')}
+            </span>
           </div>
 
           {/* Rarity glow effect */}
