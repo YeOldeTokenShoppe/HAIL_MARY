@@ -223,7 +223,7 @@ const CapsuleCollectible = ({
               </div>
             )}
             <Canvas
-              camera={{ position: [0, 0.5, 2.5], fov: 45 }}
+              camera={{ position: [0, 0.5, 1.5], fov: 45 }}
               style={{ background: 'transparent' }}
               dpr={isMobile ? [1, 1.5] : [1, 2]}
               performance={{ min: 0.5 }}

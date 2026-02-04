@@ -18,6 +18,9 @@ export const useMusic = () => {
   return context;
 };
 
+// Ride page starting track (also part of non80sTracks playlist)
+export const gangstasParadiseTrack = { name: "Gangsta's Paradise - Coolio", path: "/audio/gangstas_paradise.mp3", bpm: 80 };
+
 // Track lists
 const non80sTracks = [
   { name: "Paradise City - GnR", path: "audio/06 Paradise City.mp3", bpm: 140 },
@@ -25,10 +28,9 @@ const non80sTracks = [
   { name: "Lifetimes", path: "audio/07 Lifetimes.m4a", bpm: 105 },
   { name: "Magnetic - Tunde Adebimpe", path: "audio/01 Magnetic.m4a", bpm: 130 },
   { name: "Rocket Man - Steven Drozd", path: "audio/rocketMan.m4a", bpm: 45 },
-    { name: "Ox Out The Cage - Cannibal Ox", path: "audio/Ox.mp3", bpm: 100 },
-        { name: "Corner of My Eye - Future Islands", path: "/audio/Future Islands - Corner of My Eye.mp3", bpm: 100 },
-                { name: "Gangsta's Pardise - Coolio", path: "/audio/gangstas_paradise.mp3", bpm: 100 }
-
+  { name: "Ox Out The Cage - Cannibal Ox", path: "audio/Ox.mp3", bpm: 100 },
+  { name: "Corner of My Eye - Future Islands", path: "/audio/Future Islands - Corner of My Eye.mp3", bpm: 100 },
+  gangstasParadiseTrack,
 ];
 const eightyTracks = [
   { name: "Girls on Film - Duran Duran", path: "audio/Girls On Film.mp3", bpm: 100 },
