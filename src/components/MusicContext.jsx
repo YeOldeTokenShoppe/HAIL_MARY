@@ -18,9 +18,6 @@ export const useMusic = () => {
   return context;
 };
 
-// Ride page starting track (also part of non80sTracks playlist)
-export const gangstasParadiseTrack = { name: "Gangsta's Paradise - Coolio", path: "/audio/gangstas_paradise.mp3", bpm: 80 };
-
 // Track lists
 const non80sTracks = [
   { name: "Paradise City - GnR", path: "audio/06 Paradise City.mp3", bpm: 140 },
@@ -30,8 +27,10 @@ const non80sTracks = [
   { name: "Rocket Man - Steven Drozd", path: "audio/rocketMan.m4a", bpm: 45 },
   { name: "Ox Out The Cage - Cannibal Ox", path: "audio/Ox.mp3", bpm: 100 },
   { name: "Corner of My Eye - Future Islands", path: "/audio/Future Islands - Corner of My Eye.mp3", bpm: 100 },
-  gangstasParadiseTrack,
 ];
+
+// Ride page exclusive track
+export const gangstasParadiseTrack = { name: "Gangsta's Paradise - Coolio", path: "/audio/gangstas_paradise.mp3", bpm: 80 };
 const eightyTracks = [
   { name: "Girls on Film - Duran Duran", path: "audio/Girls On Film.mp3", bpm: 100 },
   { name: "For Those About To Rock - AC/DC", path: "audio/for-those-about-to-rock-ac-dc.m4a", bpm: 75 },
@@ -66,13 +65,43 @@ export const MusicProvider = ({ children }) => {
   const [shuffleQueue, setShuffleQueue] = useState([]);
   const [preloadedUrl, setPreloadedUrl] = useState(null);
   const [preloadedIndex, setPreloadedIndex] = useState(null);
+  const [pageSpecificTracks, setPageSpecificTracks] = useState([]);
   
   // Use refs to track current values for event handlers
   const currentTrackIndexRef = React.useRef(0);
   const is80sModeRef = React.useRef(false);
   const loadTrackRef = React.useRef(null);
   const shuffleHistoryRef = React.useRef([]);
+  const pageSpecificTracksRef = React.useRef([]);
+  const pendingRemovalTracksRef = React.useRef([]);
   
+  // Combined playlist including page-specific tracks
+  const getCurrentPlaylist = useCallback(() => {
+    const baseTracks = is80sMode ? eightyTracks : non80sTracks;
+    return [...baseTracks, ...pageSpecificTracks];
+  }, [is80sMode, pageSpecificTracks]);
+
+  // Add a track for the current page
+  const addPageTrack = useCallback((track) => {
+    setPageSpecificTracks(prev => {
+      if (prev.some(t => t.path === track.path)) return prev;
+      return [...prev, track];
+    });
+  }, []);
+
+  // Remove a track when leaving a page (deferred if currently playing)
+  const removePageTrack = useCallback((track) => {
+    // Check if this track is currently playing
+    const isCurrentlyPlaying = currentTrack && currentTrack.path === track.path;
+
+    if (isCurrentlyPlaying) {
+      // Defer removal until track ends
+      pendingRemovalTracksRef.current = [...pendingRemovalTracksRef.current, track.path];
+    } else {
+      setPageSpecificTracks(prev => prev.filter(t => t.path !== track.path));
+    }
+  }, [currentTrack]);
+
   // Update refs when values change
   React.useEffect(() => {
     currentTrackIndexRef.current = currentTrackIndex;
@@ -85,11 +114,15 @@ export const MusicProvider = ({ children }) => {
   React.useEffect(() => {
     shuffleHistoryRef.current = shuffleHistory;
   }, [shuffleHistory]);
+
+  React.useEffect(() => {
+    pageSpecificTracksRef.current = pageSpecificTracks;
+  }, [pageSpecificTracks]);
   
   
   // Load and play track function
   const loadTrack = useCallback(async (index, shouldAutoPlay = false) => {
-    const playlist = is80sMode ? eightyTracks : non80sTracks;
+    const playlist = getCurrentPlaylist();
     
     if (index < 0 || index >= playlist.length) {
       return;
@@ -225,7 +258,7 @@ export const MusicProvider = ({ children }) => {
       setIsPlaying(false);
       return false;
     }
-  }, [is80sMode, setCurrentTrackBPM]);
+  }, [getCurrentPlaylist, setCurrentTrackBPM]);
   
   // Load a track by its Firebase Storage path (for DJ listener mode)
   const loadTrackByPath = useCallback(async (path, trackName, bpm = 100, seekSeconds = 0) => {
@@ -329,8 +362,8 @@ export const MusicProvider = ({ children }) => {
         console.warn('[MusicContext] Skipping track preload - Firebase storage not properly initialized');
         return;
       }
-      
-      const playlist = is80sMode ? eightyTracks : non80sTracks;
+
+      const playlist = getCurrentPlaylist();
       if (playlist.length > 0) {
         let index = 0;
         // Use random starting track if shuffle is enabled
@@ -371,7 +404,7 @@ export const MusicProvider = ({ children }) => {
     if (!audioRef.current?.src) {
       preloadFirstTrack();
     }
-  }, [is80sMode, isShuffled]);
+  }, [getCurrentPlaylist, isShuffled]);
 
   // Play/Pause functions
   const play = useCallback(() => {
@@ -380,7 +413,7 @@ export const MusicProvider = ({ children }) => {
       if (!audioRef.current.src) {
         if (preloadedUrl && preloadedIndex !== null) {
           // Use the preloaded URL for instant playback
-          const playlist = is80sMode ? eightyTracks : non80sTracks;
+          const playlist = getCurrentPlaylist();
           
           audioRef.current.src = preloadedUrl;
           audioRef.current.load();
@@ -413,7 +446,7 @@ export const MusicProvider = ({ children }) => {
           });
         } else {
           // Fallback: Load from Firebase Storage
-          const playlist = is80sMode ? eightyTracks : non80sTracks;
+          const playlist = getCurrentPlaylist();
           let startIndex = 0;
 
           // Use random starting track if shuffle is enabled
@@ -450,7 +483,7 @@ export const MusicProvider = ({ children }) => {
         });
       }
     }
-  }, [loadTrack, is80sMode, isShuffled, preloadedUrl, preloadedIndex, setCurrentTrackBPM]);
+  }, [loadTrack, getCurrentPlaylist, isShuffled, preloadedUrl, preloadedIndex, setCurrentTrackBPM]);
   
   const pause = useCallback(() => {
     if (audioRef.current) {
@@ -485,7 +518,7 @@ export const MusicProvider = ({ children }) => {
 
   // Next track function
   const nextTrack = useCallback(() => {
-    const playlist = is80sMode ? eightyTracks : non80sTracks;
+    const playlist = getCurrentPlaylist();
     
     let nextIndex;
     if (isShuffled) {
@@ -502,11 +535,11 @@ export const MusicProvider = ({ children }) => {
     
     const wasPlaying = audioRef.current && !audioRef.current.paused;
     loadTrack(nextIndex, wasPlaying);
-  }, [currentTrackIndex, is80sMode, isShuffled, shuffleHistory, getRandomTrackIndex, loadTrack]);
+  }, [currentTrackIndex, getCurrentPlaylist, isShuffled, shuffleHistory, getRandomTrackIndex, loadTrack]);
   
   // Previous track function
   const prevTrack = useCallback(() => {
-    const playlist = is80sMode ? eightyTracks : non80sTracks;
+    const playlist = getCurrentPlaylist();
     let prevIndex;
     
     if (isShuffled && shuffleHistory.length > 0) {
@@ -523,7 +556,7 @@ export const MusicProvider = ({ children }) => {
     
     const wasPlaying = audioRef.current && !audioRef.current.paused;
     loadTrack(prevIndex, wasPlaying);
-  }, [currentTrackIndex, is80sMode, isShuffled, shuffleHistory, loadTrack]);
+  }, [currentTrackIndex, getCurrentPlaylist, isShuffled, shuffleHistory, loadTrack]);
   
   
   // Initialize audio element and restore state on mount
@@ -559,8 +592,17 @@ export const MusicProvider = ({ children }) => {
       // Set playing to false first to stop animation
       setIsPlaying(false);
 
+      // Clean up any tracks that were pending removal (deferred while playing)
+      if (pendingRemovalTracksRef.current.length > 0) {
+        const pathsToRemove = pendingRemovalTracksRef.current;
+        setPageSpecificTracks(prev => prev.filter(t => !pathsToRemove.includes(t.path)));
+        pageSpecificTracksRef.current = pageSpecificTracksRef.current.filter(t => !pathsToRemove.includes(t.path));
+        pendingRemovalTracksRef.current = [];
+      }
+
       // For auto-advance, always play the next track
-      const playlist = is80sModeRef.current ? eightyTracks : non80sTracks;
+      const baseTracks = is80sModeRef.current ? eightyTracks : non80sTracks;
+      const playlist = [...baseTracks, ...pageSpecificTracksRef.current];
       const savedState = globalAudioManager?.getState();
       const shuffled = savedState?.isShuffled !== undefined ? savedState.isShuffled : true;
 
@@ -637,9 +679,9 @@ export const MusicProvider = ({ children }) => {
     // If we have a track playing or paused, reload from the new playlist
     if (audioRef.current && audioRef.current.src) {
       const wasPlaying = !audioRef.current.paused;
-      
+
       // Get the playlist for the new mode
-      const playlist = is80sMode ? eightyTracks : non80sTracks;
+      const playlist = getCurrentPlaylist();
       
       // Choose a random track if shuffled, otherwise start at 0
       let newTrackIndex = 0;
@@ -706,6 +748,8 @@ export const MusicProvider = ({ children }) => {
     eightyTracks,
     loadTrackByPath,
     isShuffled,
+    addPageTrack,
+    removePageTrack,
     setIsShuffled: (shuffled) => {
       setIsShuffled(shuffled);
       if (globalAudioManager) {

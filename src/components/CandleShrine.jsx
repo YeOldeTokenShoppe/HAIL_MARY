@@ -5,8 +5,8 @@ import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { NewCandleEffectManager } from './NewCandleEffect'
 
-const CANDLE_COUNT = 100
-const MAX_ADDITIONAL = 500
+const CANDLE_COUNT = 80
+const MAX_ADDITIONAL = 0
 
 // Shared time uniform - all materials reference this single object
 const sharedUniforms = {

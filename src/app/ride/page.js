@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -103,7 +103,8 @@ export default function CommunionPage() {
     nextTrack,
     is80sMode,
     setIs80sMode,
-    loadTrackByPath,
+    addPageTrack,
+    removePageTrack,
   } = useMusic();
 
   // Handle transition from loading to content
@@ -191,22 +192,17 @@ export default function CommunionPage() {
     checkFont();
   }, []);
 
-  // Track if Gangsta's Paradise has been loaded for this session
-  const rideTrackLoaded = useRef(false);
-
-  // Custom play handler for ride page - plays Gangsta's Paradise on first play
-  const handlePlayMusic = () => {
-    if (!rideTrackLoaded.current && loadTrackByPath) {
-      rideTrackLoaded.current = true;
-      loadTrackByPath(
-        gangstasParadiseTrack.path,
-        gangstasParadiseTrack.name,
-        gangstasParadiseTrack.bpm
-      );
-    } else {
-      play();
+  // Add Gangsta's Paradise to playlist on this page
+  useEffect(() => {
+    if (addPageTrack) {
+      addPageTrack(gangstasParadiseTrack);
     }
-  };
+    return () => {
+      if (removePageTrack) {
+        removePageTrack(gangstasParadiseTrack);
+      }
+    };
+  }, [addPageTrack, removePageTrack]);
 
   // Escape key closes help modal
   useEffect(() => {
@@ -360,7 +356,7 @@ export default function CommunionPage() {
       >
         <NavControlsHome
           isPlaying={contextIsPlaying}
-          onPlayMusic={handlePlayMusic}
+          onPlayMusic={() => play()}
           onStopMusic={() => pause()}
           onSkipTrack={() => nextTrack()}
           onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
