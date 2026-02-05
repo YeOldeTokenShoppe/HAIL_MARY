@@ -944,7 +944,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               padding: '0 1rem',
             }}>
               Take a roller coaster ride through time and witness some of Our Lady's most glorious moments,
-              from antiquity to 2077 CE.
+              from antiquity to the singularity.
             </p>
  <div style={{
           display: 'flex',
@@ -1883,7 +1883,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               textAlign: 'center'
             }}>
               Take a roller coaster ride through time and witness some of Our Lady's most glorious moments,
-              from antiquity to 2077 CE.
+              from antiquity to the singularity.
             </p>
  <div style={{
           display: 'flex',

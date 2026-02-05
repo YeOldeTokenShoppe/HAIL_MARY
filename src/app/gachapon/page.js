@@ -59,7 +59,10 @@ export default function GachaponPage() {
   } = useMusic();
 
   // Weekly prize for new collectible call-out
-  const { currentPrize, claimStatus, remainingClaims } = useWeeklyPrize();
+  // Drops not enabled yet — badge hidden until first drop is live
+  const weeklyPrize = useWeeklyPrize();
+  const currentPrize = null;
+  const claimStatus = 'no_prize';
   const [showCallout, setShowCallout] = useState(true);
 
   useEffect(() => {
@@ -293,7 +296,7 @@ export default function GachaponPage() {
         />
       </div>
 
-      {/* New Collectible Call-out - Simple badge */}
+      {/* New Collectible Call-out - Simple badge (shown when a prize is actively available) */}
       {showCallout && currentPrize && (claimStatus === 'available' || claimStatus === 'ineligible') && (
         <>
           <style>{`

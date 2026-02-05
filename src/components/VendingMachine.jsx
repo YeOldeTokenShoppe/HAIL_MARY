@@ -14,6 +14,9 @@ import { useUser } from '@clerk/nextjs';
 // Configure DRACO loader for compressed GLB files
 useGLTF.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
 
+// Set to true when the first collectible drop is ready to go live
+const DROPS_ENABLED = false;
+
 // Capsule base colors that cycle
 const CAPSULE_COLORS = ['#3943BC', '#14A122', '#A81814'];
 
@@ -568,7 +571,7 @@ function PrizeStatusBar({ currentPrize, claimStatus, remainingClaims, eligibilit
       case 'loading':
         return { text: 'Loading...', color: 'rgba(255, 255, 255, 0.5)' };
       case 'no_prize':
-        return { text: 'Check back soon for the next collectible!', color: 'rgba(255, 255, 255, 0.5)', isNoPrize: true };
+        return { text: 'Check back for the first collectible drop coming soon', color: 'rgba(255, 255, 255, 0.5)', isNoPrize: true };
       case 'available':
         return { text: `${remainingClaims} of ${currentPrize?.maxClaims || 100} remaining`, color: '#00f5d4' };
       case 'claimed':
@@ -643,7 +646,7 @@ function PrizeStatusBar({ currentPrize, claimStatus, remainingClaims, eligibilit
           textAlign: 'center',
           fontStyle: 'italic',
         }}>
-          New collectibles drop weekly for RL80 holders
+          Collectibles for RL80 holders
         </div>
       </div>
     );
@@ -1006,16 +1009,16 @@ function VendingSceneInner({ onToyClick, onZoomComplete, resetKey, capsuleColorI
 export default function VendingMachineScene() {
   const { user } = useUser();
   const { isWalletConnected } = useWalletAuth();
-  const {
-    currentPrize,
-    claimStatus,
-    remainingClaims,
-    claimPrize,
-    isClaimLoading,
-    isEligible,
-    eligibilityDetails,
-    userClaim
-  } = useWeeklyPrize();
+  const weeklyPrize = useWeeklyPrize();
+
+  // Override prize data when drops aren't enabled yet
+  const currentPrize = DROPS_ENABLED ? weeklyPrize.currentPrize : null;
+  const claimStatus = DROPS_ENABLED ? weeklyPrize.claimStatus : 'no_prize';
+  const remainingClaims = DROPS_ENABLED ? weeklyPrize.remainingClaims : 0;
+  const claimPrize = weeklyPrize.claimPrize;
+  const isClaimLoading = weeklyPrize.isClaimLoading;
+  const eligibilityDetails = DROPS_ENABLED ? weeklyPrize.eligibilityDetails : {};
+  const userClaim = weeklyPrize.userClaim;
 
   const [showMainCanvas, setShowMainCanvas] = useState(true);
   const [resetKey, setResetKey] = useState(0);
