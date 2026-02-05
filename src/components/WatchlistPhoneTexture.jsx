@@ -25,6 +25,10 @@ const CONFIG = {
   MAX_VISIBLE_ITEMS: 6,
   ITEM_HEIGHT: 85,
   ITEM_GAP: 12,
+  XPOST_ITEM_HEIGHT: 300,
+  AUTO_SCROLL_PAUSE: 3000,       // Pause at top before scrolling
+  AUTO_SCROLL_SPEED: 0.4,        // Pixels per frame for auto-scroll
+  AUTO_SCROLL_BOTTOM_PAUSE: 2000, // Pause at bottom before resetting
 };
 
 // ===========================================
@@ -56,6 +60,12 @@ const ACTIVITY_TYPES = {
     verb: 'Claimed ETH',
     unit: 'ETH',
     color: '#ffeb3b'
+  },
+  XPOST: {
+    icon: '𝕏',
+    verb: 'posted',
+    unit: '',
+    color: '#1d9bf0'
   },
 };
 
@@ -176,6 +186,7 @@ export function WatchlistPhoneTexture({
   
   // User avatar cache for activity items
   const activityAvatarsRef = useRef({});
+  const screenshotImagesRef = useRef({});
 
   // Illumin80 badge state
   const [illumin80UserIds, setIllumin80UserIds] = useState(new Set());
@@ -255,12 +266,12 @@ export function WatchlistPhoneTexture({
         // Check if click is in tab area
         const tabY = 175;
         const tabHeight = 45;
-        const tabWidth = (canvas.width - 60) / 3;
-        
+        const tabs = ['ALL', 'CANDLES', 'STAKING', 'XPOSTS'];
+        const tabWidth = (canvas.width - 60) / tabs.length;
+
         if (y >= tabY && y <= tabY + tabHeight && x >= 30 && x <= canvas.width - 30) {
           // Determine which tab was clicked
           const tabIndex = Math.floor((x - 30) / tabWidth);
-          const tabs = ['ALL', 'CANDLES', 'STAKING'];
           
           if (tabIndex >= 0 && tabIndex < tabs.length) {
             setActiveTab(tabs[tabIndex]);
@@ -358,7 +369,31 @@ export function WatchlistPhoneTexture({
       img.src = activity.userImageUrl;
     });
   }, [activities]);
-  
+
+  // ===========================================
+  // LOAD SCREENSHOT IMAGES FOR XPOSTS
+  // ===========================================
+
+  useEffect(() => {
+    activities.forEach(activity => {
+      if (activity.type !== 'XPOST' || !activity.screenshotUrl) return;
+      if (screenshotImagesRef.current.hasOwnProperty(activity.id)) return;
+
+      screenshotImagesRef.current[activity.id] = 'loading';
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        screenshotImagesRef.current[activity.id] = img;
+        if (textureRef.current) textureRef.current.needsUpdate = true;
+      };
+      img.onerror = () => {
+        screenshotImagesRef.current[activity.id] = 'failed';
+      };
+      img.src = activity.screenshotUrl;
+    });
+  }, [activities]);
+
   // ===========================================
   // CANVAS & TEXTURE INITIALIZATION
   // ===========================================
@@ -465,18 +500,54 @@ export function WatchlistPhoneTexture({
       if (stakingActivities.length > 0) {
         setActivities(prev => {
           // Merge with existing candle activities
-          const candleActivities = prev.filter(a => a.type === 'CANDLE');
-          const merged = [...candleActivities, ...stakingActivities];
+          const otherActivities = prev.filter(a => !['STAKE', 'UNSTAKE', 'CLAIM'].includes(a.type));
+          const merged = [...otherActivities, ...stakingActivities];
           return merged.sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
         });
       }
     }, (error) => {
       console.error('Error fetching stakes:', error);
     });
-    
+
+    // Subscribe to Firebase xPosts
+    const xPostsRef = collection(db, 'xPost');
+    const xPostsQuery = query(xPostsRef, orderBy('createdAt', 'desc'), limit(20));
+
+    const unsubscribeXPosts = onSnapshot(xPostsQuery, (snapshot) => {
+      const xPostActivities = [];
+
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        xPostActivities.push({
+          id: doc.id,
+          type: 'XPOST',
+          username: data.author || 'Unknown',
+          handle: data.handle || '',
+          tweetText: data.text || '',
+          tweetUrl: data.tweetUrl || '',
+          userImageUrl: data.authorImageUrl || '',
+          screenshotUrl: data.screenshotUrl || '',
+          amount: 0,
+          timestamp: data.createdAt?.toMillis?.() || Date.now(),
+          isNew: false,
+        });
+      });
+
+      if (xPostActivities.length > 0) {
+        setActivities(prev => {
+          const nonXPostActivities = prev.filter(a => a.type !== 'XPOST');
+          const merged = [...nonXPostActivities, ...xPostActivities];
+          return merged.sort((a, b) => b.timestamp - a.timestamp).slice(0, 50);
+        });
+      }
+    }, (error) => {
+      console.error('Error fetching xPosts:', error);
+    });
+
     return () => {
       unsubscribe();
       unsubscribeStakes();
+      unsubscribeXPosts();
     };
   }, []);
   
@@ -624,6 +695,7 @@ export function WatchlistPhoneTexture({
     if (activeTab === 'ALL') return true;
     if (activeTab === 'CANDLES') return activity.type === 'CANDLE';
     if (activeTab === 'STAKING') return ['STAKE', 'UNSTAKE', 'CLAIM'].includes(activity.type);
+    if (activeTab === 'XPOSTS') return activity.type === 'XPOST';
     return true;
   });
   
@@ -870,6 +942,7 @@ export function WatchlistPhoneTexture({
       { id: 'ALL', label: '🔥 ALL' },
       { id: 'CANDLES', label: '🕯️ CANDLES' },
       { id: 'STAKING', label: '💎 STAKING' },
+      { id: 'XPOSTS', label: '𝕏 POSTS' },
     ];
     
     const tabWidth = (width - 60) / tabs.length;
@@ -962,7 +1035,14 @@ export function WatchlistPhoneTexture({
     
     // Draw activity items
     filteredActivities.forEach((activity, index) => {
-      const itemHeight = CONFIG.ITEM_HEIGHT;
+      const hasScreenshot = activity.type === 'XPOST' && activity.screenshotUrl && screenshotImagesRef.current[activity.id] instanceof Image;
+      let itemHeight = CONFIG.ITEM_HEIGHT;
+      if (hasScreenshot) {
+        const ss = screenshotImagesRef.current[activity.id];
+        const ssDisplayW = width - 40;
+        const ssDisplayH = ssDisplayW / (ss.naturalWidth / ss.naturalHeight);
+        itemHeight = ssDisplayH; // Full image height, no cap
+      }
       const itemY = currentY;
       
       // Skip if not visible
@@ -970,7 +1050,24 @@ export function WatchlistPhoneTexture({
         currentY += itemHeight + CONFIG.ITEM_GAP;
         return;
       }
-      
+
+      // XPOST with screenshot: draw just the image, no card frame
+      if (hasScreenshot) {
+        const screenshot = screenshotImagesRef.current[activity.id];
+        const ssW = width - 40;
+        const ssH = ssW / (screenshot.naturalWidth / screenshot.naturalHeight);
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(20, itemY, ssW, ssH, 10);
+        ctx.clip();
+        ctx.drawImage(screenshot, 20, itemY, ssW, ssH);
+        ctx.restore();
+
+        currentY += itemHeight + CONFIG.ITEM_GAP;
+        return;
+      }
+
       const tier = getActivityTier(activity.type, activity.amount);
       const style = getTierStyle(tier);
       const activityType = ACTIVITY_TYPES[activity.type];
@@ -1000,6 +1097,9 @@ export function WatchlistPhoneTexture({
       } else if (['STAKE', 'UNSTAKE', 'CLAIM'].includes(activity.type)) {
         bgGradient.addColorStop(0, '#071f39ff');  // Blue for staking
         bgGradient.addColorStop(1, '#357abd');
+      } else if (activity.type === 'XPOST') {
+        bgGradient.addColorStop(0, '#15202b');  // Dark X/Twitter theme
+        bgGradient.addColorStop(1, '#192734');
       } else {
         bgGradient.addColorStop(0, style.bgGradient[0]);
         bgGradient.addColorStop(1, style.bgGradient[1]);
@@ -1103,55 +1203,107 @@ export function WatchlistPhoneTexture({
       ctx.textAlign = 'right';
       ctx.fillText(formatTimeAgo(activity.timestamp), width - 40, itemY + 35);
       
-      // Action description (align with username)
-      ctx.textAlign = 'left';
-      ctx.fillStyle = '#000';
-      ctx.font = '22px -apple-system, BlinkMacSystemFont, sans-serif';
+      if (activity.type === 'XPOST') {
+        // Show @handle next to username
+        if (activity.handle) {
+          const usernameWidth = ctx.measureText(activity.username).width;
+          ctx.fillStyle = '#8899a6';
+          ctx.font = '20px -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.textAlign = 'left';
+          ctx.fillText(`@${activity.handle}`, usernameX + usernameWidth + 8, itemY + 35);
+        }
 
-      ctx.fillText(activityType.verb, usernameX, itemY + 62);
-      
-      // Amount (bottom right)
-      ctx.textAlign = 'right';
-      ctx.fillStyle = activityType.color;
-      ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, sans-serif';
-      
-      const amountText = activity.type === 'CANDLE' 
-        ? `+${formatAmount(activity.amount, activity.type)}`
-        : `${activity.type === 'UNSTAKE' ? '-' : '+'}${formatAmount(activity.amount, activity.type)} ${activityType.unit}`;
-      ctx.fillText(amountText, width - 40, itemY + 62);
-      
-      // Prayer type badge (for candles only)
-      if (activity.type === 'CANDLE' && activity.prayerType) {
-        const typeConfig = {
-          petition: { icon: '🙏', color: '#ffaa00', label: 'PETITION' },
-          confession: { icon: '🖤', color: '#aa66ff', label: 'CONFESSION' },
-          appreciation: { icon: '✨', color: '#00ff66', label: 'APPRECIATION' }
-        };
-        const config = typeConfig[activity.prayerType] || typeConfig.petition;
-        
-        // Draw prayer type badge on the right side
-        const badgeText = `${config.icon} ${config.label}`;
-        ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, sans-serif';
-        
-        // Measure text for badge background
-        const metrics = ctx.measureText(badgeText);
-        const badgeX = width - 235;
-        const badgeY = itemY + 10;
-        const padding = 8;
-        
-        // Draw badge background
-        ctx.fillStyle = config.color + '22'; // Low opacity background
-        ctx.strokeStyle = config.color;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.roundRect(badgeX, badgeY, metrics.width + padding * 2, 28, 6);
-        ctx.fill();
-        ctx.stroke();
-        
-        // Draw badge text
-        ctx.fillStyle = config.color;
+        // X badge (top right, before time)
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 22px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText('𝕏', width - 90, itemY + 35);
+
+        // Check for screenshot image
+        const screenshot = screenshotImagesRef.current[activity.id];
+        const hasLoadedScreenshot = screenshot instanceof Image;
+
+        if (hasLoadedScreenshot) {
+          // Draw screenshot below the header, fit to full width
+          const ssPad = 15;
+          const ssX = 20 + ssPad;
+          const ssY = itemY + 75;
+          const ssW = width - 40 - ssPad * 2;
+          const ssH = ssW / (screenshot.naturalWidth / screenshot.naturalHeight);
+
+          // Draw with rounded corners
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(ssX, ssY, ssW, ssH, 8);
+          ctx.clip();
+          ctx.drawImage(screenshot, ssX, ssY, ssW, ssH);
+          ctx.restore();
+        } else {
+          // Fallback: show tweet text
+          ctx.fillStyle = '#e1e8ed';
+          ctx.font = '20px -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.textAlign = 'left';
+          const maxTextWidth = width - usernameX - 50;
+          let displayText = activity.tweetText || '';
+          if (ctx.measureText(displayText).width > maxTextWidth) {
+            while (ctx.measureText(displayText + '...').width > maxTextWidth && displayText.length > 0) {
+              displayText = displayText.slice(0, -1);
+            }
+            displayText += '...';
+          }
+          ctx.fillText(displayText, usernameX, itemY + 62);
+        }
+      } else {
+        // Action description (align with username)
         ctx.textAlign = 'left';
-        ctx.fillText(badgeText, badgeX + padding, badgeY + 20);
+        ctx.fillStyle = '#000';
+        ctx.font = '22px -apple-system, BlinkMacSystemFont, sans-serif';
+
+        ctx.fillText(activityType.verb, usernameX, itemY + 62);
+
+        // Amount (bottom right)
+        ctx.textAlign = 'right';
+        ctx.fillStyle = activityType.color;
+        ctx.font = 'bold 24px -apple-system, BlinkMacSystemFont, sans-serif';
+
+        const amountText = activity.type === 'CANDLE'
+          ? `+${formatAmount(activity.amount, activity.type)}`
+          : `${activity.type === 'UNSTAKE' ? '-' : '+'}${formatAmount(activity.amount, activity.type)} ${activityType.unit}`;
+        ctx.fillText(amountText, width - 40, itemY + 62);
+
+        // Prayer type badge (for candles only)
+        if (activity.type === 'CANDLE' && activity.prayerType) {
+          const typeConfig = {
+            petition: { icon: '🙏', color: '#ffaa00', label: 'PETITION' },
+            confession: { icon: '🖤', color: '#aa66ff', label: 'CONFESSION' },
+            appreciation: { icon: '✨', color: '#00ff66', label: 'APPRECIATION' }
+          };
+          const config = typeConfig[activity.prayerType] || typeConfig.petition;
+
+          // Draw prayer type badge on the right side
+          const badgeText = `${config.icon} ${config.label}`;
+          ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, sans-serif';
+
+          // Measure text for badge background
+          const metrics = ctx.measureText(badgeText);
+          const badgeX = width - 235;
+          const badgeY = itemY + 10;
+          const padding = 8;
+
+          // Draw badge background
+          ctx.fillStyle = config.color + '22'; // Low opacity background
+          ctx.strokeStyle = config.color;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.roundRect(badgeX, badgeY, metrics.width + padding * 2, 28, 6);
+          ctx.fill();
+          ctx.stroke();
+
+          // Draw badge text
+          ctx.fillStyle = config.color;
+          ctx.textAlign = 'left';
+          ctx.fillText(badgeText, badgeX + padding, badgeY + 20);
+        }
       }
       
       ctx.textAlign = 'left';
@@ -1240,17 +1392,83 @@ export function WatchlistPhoneTexture({
   }, [filteredActivities, activeTab, breakthroughEvent, candleCount, totalBurned, totalStaked, onlineCount, showPrayerReceived, currentNotification, drawPrayerReceived, currentTime]);
   
   // ===========================================
+  // COMPUTE TOTAL CONTENT HEIGHT
+  // ===========================================
+
+  const getTotalContentHeight = useCallback(() => {
+    const canvasW = 640;
+    return filteredActivities.reduce((sum, a) => {
+      let h = CONFIG.ITEM_HEIGHT;
+      if (a.type === 'XPOST' && a.screenshotUrl && screenshotImagesRef.current[a.id] instanceof Image) {
+        const ss = screenshotImagesRef.current[a.id];
+        const ssDisplayW = canvasW - 40;
+        const ssDisplayH = ssDisplayW / (ss.naturalWidth / ss.naturalHeight);
+        h = ssDisplayH;
+      }
+      return sum + h + CONFIG.ITEM_GAP;
+    }, 0);
+  }, [filteredActivities]);
+
+  // ===========================================
+  // AUTO-SCROLL STATE
+  // ===========================================
+
+  const autoScrollStateRef = useRef('pausing'); // 'pausing' | 'scrolling' | 'bottom_pause'
+  const autoScrollPauseStartRef = useRef(Date.now());
+
+  // Reset auto-scroll when tab changes or new items arrive
+  useEffect(() => {
+    scrollPositionRef.current = 0;
+    targetScrollRef.current = 0;
+    autoScrollStateRef.current = 'pausing';
+    autoScrollPauseStartRef.current = Date.now();
+  }, [activeTab]);
+
+  // ===========================================
   // ANIMATION LOOP
   // ===========================================
-  
+
   useFrame(() => {
     const now = Date.now();
-    
-    // Smooth scrolling
+
+    // Auto-scroll logic for real-phone-like behavior
+    const feedVisibleHeight = 1280 - 100 - (175 + 45 + 20); // feedEndY - feedStartY
+    const totalHeight = getTotalContentHeight();
+    const maxScroll = Math.max(0, totalHeight - feedVisibleHeight);
+
+    if (maxScroll > 0) {
+      if (autoScrollStateRef.current === 'pausing') {
+        // Wait at the top before starting to scroll
+        if (now - autoScrollPauseStartRef.current > CONFIG.AUTO_SCROLL_PAUSE) {
+          autoScrollStateRef.current = 'scrolling';
+        }
+      } else if (autoScrollStateRef.current === 'scrolling') {
+        // Slowly scroll down
+        scrollPositionRef.current += CONFIG.AUTO_SCROLL_SPEED;
+        targetScrollRef.current = scrollPositionRef.current;
+
+        if (scrollPositionRef.current >= maxScroll) {
+          scrollPositionRef.current = maxScroll;
+          targetScrollRef.current = maxScroll;
+          autoScrollStateRef.current = 'bottom_pause';
+          autoScrollPauseStartRef.current = now;
+        }
+      } else if (autoScrollStateRef.current === 'bottom_pause') {
+        // Pause at the bottom, then reset to top
+        if (now - autoScrollPauseStartRef.current > CONFIG.AUTO_SCROLL_BOTTOM_PAUSE) {
+          scrollPositionRef.current = 0;
+          targetScrollRef.current = 0;
+          autoScrollStateRef.current = 'pausing';
+          autoScrollPauseStartRef.current = now;
+        }
+      }
+    }
+
+    // Smooth scrolling for manual/programmatic scroll
     if (Math.abs(targetScrollRef.current - scrollPositionRef.current) > 0.5) {
       scrollPositionRef.current += (targetScrollRef.current - scrollPositionRef.current) * CONFIG.SCROLL_SPEED;
     }
-    
+
     // Redraw at ~60fps
     if (now - lastUpdateTimeRef.current > 16) {
       drawWatchlist();
@@ -1274,9 +1492,14 @@ export function WatchlistPhoneTexture({
   }, []);
   
   const scrollBy = useCallback((delta) => {
-    const maxScroll = Math.max(0, filteredActivities.length * (CONFIG.ITEM_HEIGHT + CONFIG.ITEM_GAP) - 400);
+    const feedVisibleHeight = 1280 - 100 - (175 + 45 + 20);
+    const totalHeight = getTotalContentHeight();
+    const maxScroll = Math.max(0, totalHeight - feedVisibleHeight);
     targetScrollRef.current = Math.max(0, Math.min(maxScroll, targetScrollRef.current + delta));
-  }, [filteredActivities.length]);
+    // Interrupt auto-scroll when manually scrolling
+    autoScrollStateRef.current = 'pausing';
+    autoScrollPauseStartRef.current = Date.now() + 5000; // Extra delay before auto-scroll resumes
+  }, [getTotalContentHeight]);
   
   return null;
 }

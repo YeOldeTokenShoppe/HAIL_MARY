@@ -135,7 +135,7 @@
       },
       "candles": {
         "label": "Pulsanti Azione",
-        "description": "Accendi una candela o metti in stake i token cliccando sulle icone stake o fiammifero"
+        "description": "Accendi una candela o metti in stake i token cliccando sulle icone stake o fiammifero qui sotto"
       }
     },
     "stats": {

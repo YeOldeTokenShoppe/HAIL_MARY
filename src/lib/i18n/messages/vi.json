@@ -135,7 +135,7 @@
       },
       "candles": {
         "label": "Nút Hành Động",
-        "description": "Thắp nến hoặc đặt cọc token bằng cách nhấp vào biểu tượng đặt cọc hoặc que diêm"
+        "description": "Thắp nến hoặc đặt cọc token bằng cách nhấp vào biểu tượng đặt cọc hoặc que diêm bên dưới"
       }
     },
     "stats": {

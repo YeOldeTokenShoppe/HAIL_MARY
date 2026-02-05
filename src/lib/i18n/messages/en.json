@@ -126,20 +126,16 @@
     "findMyCandle": "Find My Candle",
     "helpAnnotations": {
       "stats": {
-        "label": "Holder-dedicated Candles",
-        "description": "Get a live look at sentiment and price action all in one view. Candles move and change color as prices change (see the Stats Panel). Tap on any candle to see who lit it and how much time is remaining before it melts!"
+        "label": "The Illumin80",
+        "description": "These holder-dedicated candles provide a live look at sentiment and price action all in one view"
       },
       "phone": {
         "label": "Live Feed",
-        "description": "Watch real-time offerings arrive from RL80 devotees."
-      },
-      "actions": {
-        "label": "More Buttons!",
-        "description": "Try 80s mode, sign in/out, or buy more tokens with the buttons at the top right. You can open the stats panel on the right to see even more data!"
+        "description": "Watch Our Lady of Perpetual Profit's timeline in real time"
       },
       "candles": {
-        "label": "Action Buttons",
-        "description": "Light a candle or stake tokens by clicking the stake or match icons"
+        "label": "Light Utility",
+        "description": "Light a candle or stake tokens by clicking the stake or match icons below"
       }
     },
     "stats": {

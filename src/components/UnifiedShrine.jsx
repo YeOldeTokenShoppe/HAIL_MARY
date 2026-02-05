@@ -462,11 +462,11 @@ function LeaderboardCarousel({ leaderboardData, isMobile, sortMode = 'topBurners
   }
 
   const getRankDisplay = (index) => {
-    if (sortMode === 'recent') return '🕯️'
-    if (index === 0) return '👑'
-    if (index === 1) return '🥈'
-    if (index === 2) return '🥉'
-    return `#${index + 1}`
+    // if (sortMode === 'recent') return '🕯️'
+    // if (index === 0) return '👑'
+    // if (index === 1) return '🥈'
+    // if (index === 2) return '🥉'
+    // return `#${index + 1}`
   }
 
   const getTimeAgo = (timestamp) => {
@@ -589,52 +589,44 @@ function LeaderboardCarousel({ leaderboardData, isMobile, sortMode = 'topBurners
         }}>
           {getRankDisplay(currentIndex)}
         </span>
-        <span style={{
-          fontSize: isMobile ? '11px' : '13px',
-          color: (!currentLeader.username || currentLeader.username === 'Anonymous') ? '#ffaa00' : '#fff',
-          fontWeight: 'bold',
-          maxWidth: '100px',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap'
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'flex-start',
         }}>
-          {(!currentLeader.username || currentLeader.username === 'Anonymous') ? 'St. GR80' : currentLeader.username}
-        </span>
-        <span style={{
-          fontSize: isMobile ? '10px' : '12px',
-          color: sortMode === 'recent' ? '#00f5d4' : '#ff9500',
-          fontFamily: 'monospace',
-          fontWeight: 'bold'
-        }}>
-          {sortMode === 'recent' ? getTimeAgo(currentLeader.litAt) : formatBurned(currentLeader.totalBurned)}
-        </span>
+          <span style={{
+            fontSize: isMobile ? '11px' : '13px',
+            color: (!currentLeader.username || currentLeader.username === 'Anonymous') ? '#ffaa00' : '#fff',
+            fontWeight: 'bold',
+          }}>
+            {(!currentLeader.username || currentLeader.username === 'Anonymous') ? 'St. GR80' : currentLeader.username}
+          </span>
+          <span style={{
+            fontSize: isMobile ? '9px' : '10px',
+            color: sortMode === 'recent' ? '#00f5d4' : '#ff9500',
+            fontFamily: 'monospace',
+            fontWeight: 'bold'
+          }}>
+            {sortMode === 'recent' ? getTimeAgo(currentLeader.litAt) : formatBurned(currentLeader.totalBurned)}
+          </span>
+        </div>
       </div>
 
-      {/* Dot Indicators */}
+      {/* Position Counter */}
       {leaderboardData.length > 1 && (
         <div style={{
           position: 'absolute',
-          top: '8px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          display: 'flex',
-          gap: '4px',
+          top: '6px',
+          right: '8px',
+          background: 'rgba(0, 0, 0, 0.5)',
+          borderRadius: '10px',
+          padding: '2px 8px',
+          fontSize: isMobile ? '9px' : '10px',
+          color: 'rgba(255, 255, 255, 0.6)',
+          fontFamily: 'monospace',
           zIndex: 10
         }}>
-          {leaderboardData.slice(0, 5).map((_, idx) => (
-            <div
-              key={idx}
-              onClick={() => setCurrentIndex(idx)}
-              style={{
-                width: '6px',
-                height: '6px',
-                borderRadius: '50%',
-                background: idx === currentIndex ? '#ff9500' : 'rgba(255, 255, 255, 0.3)',
-                cursor: 'pointer',
-                transition: 'background 0.2s'
-              }}
-            />
-          ))}
+          {currentIndex + 1}/{leaderboardData.length}
         </div>
       )}
     </div>
@@ -1204,6 +1196,9 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   const [isMobile, setIsMobile] = useState(false)
   // Focus mode for phone zoom
   const [focusMode, setFocusMode] = useState(false)
+  // Fresh avatar URL for selected candle (fetched from Clerk API)
+  const [selectedAvatarUrl, setSelectedAvatarUrl] = useState(null)
+  const [selectedAvatarFailed, setSelectedAvatarFailed] = useState(false)
   // Use refs for real-time price and movement (no re-renders)
   const priceRef = useRef(0)
   const shortTermPriceRef = useRef(0)
@@ -1356,6 +1351,33 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
     console.log('[UnifiedShrine] offeringCandles computed:', result.length, 'candles')
     return result
   }, [offerings])
+
+  // Fetch fresh avatar when selected candle changes
+  useEffect(() => {
+    setSelectedAvatarUrl(null)
+    setSelectedAvatarFailed(false)
+    if (!selectedCandle) return
+    const userId = selectedCandle.userId || selectedCandle.uid
+    if (!userId || selectedCandle.isPlaceholder) {
+      // Use stored URL for placeholders
+      setSelectedAvatarUrl(selectedCandle.userImageUrl || null)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/user-avatar/${userId}`)
+        if (!cancelled && res.ok) {
+          const data = await res.json()
+          setSelectedAvatarUrl(data.imageUrl || selectedCandle.userImageUrl || null)
+          return
+        }
+      } catch (e) { /* fall through */ }
+      // Fallback to stored URL
+      if (!cancelled) setSelectedAvatarUrl(selectedCandle.userImageUrl || null)
+    })()
+    return () => { cancelled = true }
+  }, [selectedCandle?.id, selectedCandle?.userId])
 
   // Recent offerings sorted by time for carousel display
   const recentOfferingsData = useMemo(() => {
@@ -1530,6 +1552,9 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   
   // Method to find and highlight user's candle
   const findUserCandle = useCallback(() => {
+    // Cancel any in-progress reset so the find animation takes priority
+    setResetCameraToDefault(false)
+
     // Override all camera controls
     setOverrideCameraControl(true)
 
@@ -1605,6 +1630,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
           ...userCandle.offering,
           meltPercentage: parseFloat(meltPercentage),
           timeAgo,
+          sceneY: userCandle.y,
           isUserCandle: true
         })
       }
@@ -1973,6 +1999,7 @@ useEffect(() => {
             ...offering,
             meltPercentage,
             timeAgo,
+            sceneY: candle.y,
             isUserCandle: true
           })
         }
@@ -1999,6 +2026,7 @@ useEffect(() => {
               ...offering,
               meltPercentage,
               timeAgo,
+              sceneY: candle.y,
               isUserCandle: candle.userId === currentUserId
             })
           }
@@ -2208,7 +2236,7 @@ useEffect(() => {
   // Memoize styles
   const unifiedStatsStyle = useMemo(() => ({
     position: 'absolute',  // Use fixed positioning for proper layering
-    top: isMobile ? '100px' : '105px',
+    top: isMobile ? '120px' : '105px',
     right: isMobile ? '10px' : '20px',
     // background: 'rgba(0, 0, 0, 0.8)',
     border: is80sMode ? '2px solid rgba(255, 0, 255, 0.4)' : '2px solid rgba(212, 175, 55, 0.3)',
@@ -2249,28 +2277,30 @@ useEffect(() => {
       id: 'stats',
       label: t('illumin80.helpAnnotations.stats.label'),
       description: t('illumin80.helpAnnotations.stats.description'),
-      position: { top: isMobile ? '150px' : '150px', right: isMobile ? '50%' : '50%' },
+      position: { top: isMobile ? '16rem' : '120px', right: isMobile ? '50%' : '50%' },
       pointerDirection: 'right'
     },
     {
       id: 'phone',
       label: t('illumin80.helpAnnotations.phone.label'),
       description: t('illumin80.helpAnnotations.phone.description'),
-      position: { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' },
+      position: { top: '50%', left: '40%', transform: 'translate(-50%, -50%)' },
       pointerDirection: 'none'
     },
-    {
-      id: 'actions',
-      label: t('illumin80.helpAnnotations.actions.label'),
-      description: t('illumin80.helpAnnotations.actions.description'),
-      position: { top: '17%', right: isMobile ? '15rem' : '15rem' },
-      pointerDirection: 'right'
-    },
+    // {
+    //   id: 'actions',
+    //   label: t('illumin80.helpAnnotations.actions.label'),
+    //   description: t('illumin80.helpAnnotations.actions.description'),
+    //   position: { top: '22%', right: isMobile ? '13rem' : '15rem' },
+    //   pointerDirection: 'right'
+    // },
     {
       id: 'candles',
       label: t('illumin80.helpAnnotations.candles.label'),
-      description: t('illumin80.helpAnnotations.candles.description'),
-      position: { bottom: '23%', left: '20%' },
+      description: isMobile
+        ? 'Light a candle or stake tokens by clicking the stake or match icons below'
+        : t('illumin80.helpAnnotations.candles.description'),
+      position: { bottom: isMobile ? '29%' : '23%', left: '20%' },
       pointerDirection: 'none'
     }
   ], [isMobile, t])
@@ -2648,10 +2678,26 @@ useEffect(() => {
         }}>
 
 
-        {/* Collapsed Stats Tab */}
+        {/* Unified Stats Box with Tabs */}
+        <div style={{
+          ...unifiedStatsStyle,
+          position: 'relative',
+          top: '-1.5rem',
+          right: 0,
+          transform: statsBoxCollapsed
+            ? `translateX(calc(100% + ${isMobile ? '10px' : '20px'}))`
+            : 'translateX(0)',
+          transition: 'transform 0.3s ease',
+          pointerEvents: statsBoxCollapsed ? 'none' : 'auto',
+          overflow: 'visible',
+        }}>
+        {/* Stats Tab - inside panel so it shares the same transform (zero lag) */}
         <button
-          onClick={() => setStatsBoxCollapsed(false)}
+          onClick={(e) => { e.stopPropagation(); setStatsBoxCollapsed(prev => !prev) }}
           style={{
+            position: 'absolute',
+            top: isMobile ? '40%' : '80px',
+            right: '100%',
             background: is80sMode ? 'rgba(255, 0, 255, 0.2)' : 'rgba(212, 175, 55, 0.2)',
             borderTop: is80sMode ? '2px solid rgba(255, 0, 255, 0.5)' : '2px solid rgba(212, 175, 55, 0.4)',
             borderBottom: is80sMode ? '2px solid rgba(255, 0, 255, 0.5)' : '2px solid rgba(212, 175, 55, 0.4)',
@@ -2668,57 +2714,14 @@ useEffect(() => {
             writingMode: 'vertical-rl',
             textOrientation: 'mixed',
             letterSpacing: '2px',
-            transition: 'all 0.3s ease, pointer-events 0s',
-            position: 'fixed',
-            right: 0,
-            top: isMobile ? '45%' : '160px',
-            opacity: statsBoxCollapsed ? 1 : 0,
-            pointerEvents: statsBoxCollapsed ? 'auto' : 'none',
+            zIndex: 10,
             boxShadow: is80sMode ? '0 0 15px rgba(255, 0, 255, 0.3)' : 'none',
             textShadow: is80sMode ? '0 0 10px #ff00ff' : 'none',
+            pointerEvents: 'auto',
           }}
-          title="Open stats panel"
+          title={statsBoxCollapsed ? 'Open stats panel' : 'Collapse stats panel'}
         >
           {t('illumin80.stats.stats')}
-        </button>
-
-        {/* Unified Stats Box with Tabs */}
-        <div style={{
-          ...unifiedStatsStyle,
-          position: 'relative',
-          top: 0,
-          right: 0,
-          transform: statsBoxCollapsed ? 'translateX(calc(100% + 40px))' : 'translateX(0)',
-          transition: 'transform 0.3s ease, opacity 0.3s ease, pointer-events 0s',
-          opacity: statsBoxCollapsed ? 0 : 1,
-          pointerEvents: statsBoxCollapsed ? 'none' : 'auto',
-        }}>
-        {/* Close Tab - Side tab to collapse stats */}
-        <button
-          onClick={() => setStatsBoxCollapsed(true)}
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: '-24px',
-            transform: 'translateY(-50%)',
-            background: is80sMode ? 'rgba(255, 0, 255, 0.2)' : 'rgba(212, 175, 55, 0.2)',
-            borderTop: is80sMode ? '2px solid rgba(255, 0, 255, 0.5)' : '2px solid rgba(212, 175, 55, 0.4)',
-            borderBottom: is80sMode ? '2px solid rgba(255, 0, 255, 0.5)' : '2px solid rgba(212, 175, 55, 0.4)',
-            borderLeft: is80sMode ? '2px solid rgba(255, 0, 255, 0.5)' : '2px solid rgba(212, 175, 55, 0.4)',
-            borderRight: 'none',
-            borderRadius: '8px 0 0 8px',
-            padding: '12px 6px',
-            color: is80sMode ? '#ff00ff' : '#d4af37',
-            fontSize: '14px',
-            cursor: 'pointer',
-            backdropFilter: 'blur(10px)',
-            transition: 'all 0.2s ease',
-            zIndex: 10,
-            boxShadow: is80sMode ? '0 0 10px rgba(255, 0, 255, 0.3)' : 'none',
-          }}
-          title="Collapse stats panel"
-        >
-          ›
         </button>
         {/* Tab Headers */}
         <div style={{
@@ -3107,7 +3110,11 @@ useEffect(() => {
                   borderRadius: '8px',
                   border: selectedCandle.isPlaceholder
                     ? '1px solid rgba(138, 43, 226, 0.3)'
-                    : '1px solid rgba(212, 175, 55, 0.3)'
+                    : '1px solid rgba(212, 175, 55, 0.5)',
+                  boxShadow: selectedCandle.isPlaceholder
+                    ? '0 0 12px rgba(138, 43, 226, 0.3), inset 0 0 12px rgba(138, 43, 226, 0.05)'
+                    : '0 0 12px rgba(212, 175, 55, 0.25), 0 0 24px rgba(212, 175, 55, 0.1), inset 0 0 12px rgba(212, 175, 55, 0.03)',
+                  animation: 'candlePanelGlow 2s ease-in-out infinite alternate',
                 }}>
                   <div style={{
                     display: 'flex',
@@ -3115,10 +3122,11 @@ useEffect(() => {
                     gap: '10px',
                     marginBottom: selectedCandle.isPlaceholder ? '0' : '8px'
                   }}>
-                    {selectedCandle.userImageUrl ? (
+                    {selectedAvatarUrl && !selectedAvatarFailed ? (
                       <img
-                        src={selectedCandle.userImageUrl}
+                        src={selectedAvatarUrl}
                         alt=""
+                        onError={() => setSelectedAvatarFailed(true)}
                         style={{
                           width: isMobile ? '32px' : '40px',
                           height: isMobile ? '32px' : '40px',
@@ -3129,22 +3137,30 @@ useEffect(() => {
                             : '2px solid rgba(212, 175, 55, 0.5)',
                           boxShadow: selectedCandle.isPlaceholder
                             ? '0 0 10px rgba(138, 43, 226, 0.4)'
-                            : 'none'
+                            : 'none',
+                          flexShrink: 0,
                         }}
                       />
                     ) : (
                       <div style={{
+                        display: 'flex',
                         width: isMobile ? '32px' : '40px',
                         height: isMobile ? '32px' : '40px',
                         borderRadius: '50%',
-                        background: 'rgba(212, 175, 55, 0.2)',
-                        display: 'flex',
+                        background: selectedCandle.isPlaceholder
+                          ? 'linear-gradient(135deg, rgba(138, 43, 226, 0.4), rgba(138, 43, 226, 0.2))'
+                          : 'linear-gradient(135deg, rgba(212, 175, 55, 0.4), rgba(180, 130, 20, 0.2))',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: isMobile ? '16px' : '20px',
-                        border: '2px solid rgba(212, 175, 55, 0.5)'
+                        fontSize: isMobile ? '14px' : '17px',
+                        fontWeight: 'bold',
+                        color: selectedCandle.isPlaceholder ? '#a78bfa' : '#d4af37',
+                        border: selectedCandle.isPlaceholder
+                          ? '2px solid rgba(138, 43, 226, 0.5)'
+                          : '2px solid rgba(212, 175, 55, 0.5)',
+                        flexShrink: 0,
                       }}>
-                        🕯️
+                        {(selectedCandle.name || 'A').charAt(0).toUpperCase()}
                       </div>
                     )}
                     <div style={{ flex: 1 }}>
@@ -3520,6 +3536,10 @@ useEffect(() => {
         @keyframes fadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
+        }
+        @keyframes candlePanelGlow {
+          0% { box-shadow: 0 0 10px rgba(212, 175, 55, 0.2), 0 0 20px rgba(212, 175, 55, 0.08); }
+          100% { box-shadow: 0 0 16px rgba(212, 175, 55, 0.35), 0 0 32px rgba(212, 175, 55, 0.15); }
         }
       `}</style>
 

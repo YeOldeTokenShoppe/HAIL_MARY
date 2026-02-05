@@ -134,7 +134,7 @@
       },
       "candles": {
         "label": "Boutons d'Action",
-        "description": "Allumez une bougie ou stakez des tokens en cliquant sur les icônes stake ou allumette"
+        "description": "Allumez une bougie ou stakez des tokens en cliquant sur les icônes stake ou allumette ci-dessous"
       }
     },
     "stats": {

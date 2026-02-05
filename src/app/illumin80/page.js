@@ -82,6 +82,9 @@ export default function ShrinePage() {
   const [sortOption, setSortOption] = useState('topBurners') // 'topBurners' or 'recent'
   const [selectedCandle, setSelectedCandle] = useState(null) // Currently selected candle from 3D scene
 
+  // Choir audio for candle lighting ceremony
+  const choirContextRef = useRef(null)
+  const choirBufferRef = useRef(null)
 
   const [isClient, setIsClient] = useState(false)
   const [delayedMount, setDelayedMount] = useState(false)
@@ -92,9 +95,130 @@ useEffect(() => {
   setIsClient(true)
 }, [])
 
+// Preload choir audio buffer for candle lighting ceremony
+useEffect(() => {
+  const loadChoir = async () => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext
+      if (!AudioCtx) return
+      const ctx = new AudioCtx()
+      choirContextRef.current = ctx
+
+      const response = await fetch('/choir.mp3')
+      const arrayBuffer = await response.arrayBuffer()
+      const audioBuffer = await ctx.decodeAudioData(arrayBuffer)
+      choirBufferRef.current = audioBuffer
+    } catch (e) {
+      console.warn('Failed to load choir audio:', e)
+    }
+  }
+  loadChoir()
+  return () => {
+    if (choirContextRef.current) {
+      choirContextRef.current.close().catch(() => {})
+    }
+  }
+}, [])
+
+// Play layered choir swell — Dm chord (root, minor 3rd, 5th)
+const playChoirSwell = useCallback(() => {
+  const ctx = choirContextRef.current
+  const buffer = choirBufferRef.current
+  if (!ctx || !buffer) return
+
+  if (ctx.state === 'suspended') ctx.resume()
+
+  const pitches = [1.0, 1.189, 1.498] // D, F, A — Dm chord
+  const now = ctx.currentTime
+
+  pitches.forEach((rate, i) => {
+    const source = ctx.createBufferSource()
+    source.buffer = buffer
+    source.playbackRate.value = rate
+
+    const gain = ctx.createGain()
+    gain.gain.setValueAtTime(0, now)
+    gain.gain.linearRampToValueAtTime(0.15, now + 1.5 + i * 0.3) // Staggered fade in
+    gain.gain.linearRampToValueAtTime(0, now + 7)                 // Fade out
+
+    source.connect(gain)
+    gain.connect(ctx.destination)
+
+    source.start(now + i * 0.4) // Stagger each voice
+    source.stop(now + 8)
+  })
+}, [])
+
+// Play a single short choir note pitched to candle scene height (D minor pentatonic)
+const playCandleNote = useCallback((sceneY) => {
+  const ctx = choirContextRef.current
+  const buffer = choirBufferRef.current
+  if (!ctx || !buffer) return
+
+  if (ctx.state === 'suspended') ctx.resume()
+
+  // D minor pentatonic — always sounds harmonious
+  const pentatonic = [0.75, 1.0, 1.189, 1.335, 1.498, 1.782, 2.0]
+
+  // Map scene Y (-5 to 12) to scale index
+  const y = sceneY ?? 0
+  const normalized = Math.max(0, Math.min(1, (y + 5) / 17))
+  const noteIndex = Math.floor(normalized * (pentatonic.length - 1))
+  const rate = pentatonic[noteIndex]
+
+  const now = ctx.currentTime
+  const source = ctx.createBufferSource()
+  source.buffer = buffer
+  source.playbackRate.value = rate
+
+  const gain = ctx.createGain()
+  gain.gain.setValueAtTime(0, now)
+  gain.gain.linearRampToValueAtTime(0.09, now + 0.15)  // Quick attack
+  gain.gain.linearRampToValueAtTime(0.06, now + 0.5)   // Gentle sustain
+  gain.gain.linearRampToValueAtTime(0, now + 1.5)      // Fade out
+
+  source.connect(gain)
+  gain.connect(ctx.destination)
+
+  source.start(now)
+  source.stop(now + 2)
+}, [])
+
+// Soft distant note when another user's candle arrives
+const playArrivalNote = useCallback((posY) => {
+  const ctx = choirContextRef.current
+  const buffer = choirBufferRef.current
+  if (!ctx || !buffer) return
+
+  if (ctx.state === 'suspended') ctx.resume()
+
+  const pentatonic = [0.75, 1.0, 1.189, 1.335, 1.498, 1.782, 2.0]
+  const y = posY ?? 0
+  const normalized = Math.max(0, Math.min(1, (y + 5) / 17))
+  const noteIndex = Math.floor(normalized * (pentatonic.length - 1))
+  const rate = pentatonic[noteIndex]
+
+  const now = ctx.currentTime
+  const source = ctx.createBufferSource()
+  source.buffer = buffer
+  source.playbackRate.value = rate
+
+  const gain = ctx.createGain()
+  gain.gain.setValueAtTime(0, now)
+  gain.gain.linearRampToValueAtTime(0.045, now + 0.6)  // Slow, soft attack
+  gain.gain.linearRampToValueAtTime(0.03, now + 1.5)   // Gentle sustain
+  gain.gain.linearRampToValueAtTime(0, now + 3.5)      // Long ethereal fade
+
+  source.connect(gain)
+  gain.connect(ctx.destination)
+
+  source.start(now)
+  source.stop(now + 4)
+}, [])
+
 useEffect(() => {
   let mounted = true
-  
+
   // Enhanced preload for navigation issues
   const handleMount = async () => {
     try {
@@ -261,16 +385,14 @@ useEffect(() => {
       const snapshot = await getDocs(offeringsQuery)
       const fetchedOfferings = []
 
+      // TEMP: Only show 1 St. GR80 candle + real user candles
       snapshot.forEach((doc) => {
-        fetchedOfferings.push(formatOffering(doc))
+        const o = formatOffering(doc)
+        if (!o.isPlaceholder) fetchedOfferings.push(o)
       })
 
-      // Pad with St. GR80 placeholder candles to always have 80 total
-      const userCandleCount = fetchedOfferings.length
-      if (userCandleCount < 80) {
-        const placeholders = generateStGR80Candles(userCandleCount, 80 - userCandleCount)
-        fetchedOfferings.push(...placeholders)
-      }
+      // Just one St. GR80 candle
+      fetchedOfferings.push(...generateStGR80Candles(fetchedOfferings.length, 1))
 
       console.log('[fetchOfferings] Setting offerings:', fetchedOfferings.length, 'total (', fetchedOfferings.filter(o => !o.isPlaceholder).length, 'users,', fetchedOfferings.filter(o => o.isPlaceholder).length, 'placeholders)')
       setOfferings(fetchedOfferings)
@@ -313,19 +435,23 @@ useEffect(() => {
                                latestOffering.walletAddress === walletAddress
           
           if (!isCurrentUser) {
-            
+
             // Trigger the pulse effect for all candles
             if (unifiedShrineRef.current) {
               unifiedShrineRef.current.triggerCandleEffect(latestOffering)
             }
+
+            // Soft choir note when candle lands (~3s into flight animation)
+            setTimeout(() => {
+              playArrivalNote(latestOffering.position?.y)
+            }, 3000)
           }
           
           // Always update the offerings list regardless of who lit the candle
-          // Delay fetching to sync count update with ripple effect
+          // Short delay to let Firestore write propagate, then fetch permanent candle
           setTimeout(() => {
-            // Fetch will update both offerings list AND total count
             fetchOfferings()
-          }, 3000) // 3 second delay - ripple is well visible before count updates
+          }, 500)
         }
         
         lastOfferingId = latestDoc.id
@@ -521,8 +647,11 @@ useEffect(() => {
 
   // Handle light candle from modal
   const handleLightCandle = async (newOffering) => {
+    // Resume audio context on user gesture (before the setTimeout loses gesture context)
+    if (choirContextRef.current?.state === 'suspended') {
+      choirContextRef.current.resume()
+    }
 
-    
     // Immediately close the modal and set processing flags
     setShowLightCandleModal(false);
     setIsProcessingCandle(true);
@@ -536,9 +665,10 @@ useEffect(() => {
     setHasDismissedPolaroid(false);
     setPolaroidUrl(null);
     
-    // IMMEDIATELY set notification to sync with arctic rings (2.5s after candle is lit)
+    // Set notification to sync with arctic rings + choir swell
     setTimeout(() => {
       setJustLitOffering(newOffering);
+      playChoirSwell();
       
       // Clear notification after display duration
       setTimeout(() => {
@@ -726,7 +856,8 @@ useEffect(() => {
             currentUserId={user?.id}
             onSelectOffering={(offering) => {
               setHoveredOffering(offering)
-              setSelectedCandle(offering) // Also update selected candle for stats panel
+              setSelectedCandle(offering)
+              playCandleNote(offering.sceneY)
             }}
             onLightCandle={(offering) => {
               // Don't set justLitOffering here - it's already set in handleLightCandle

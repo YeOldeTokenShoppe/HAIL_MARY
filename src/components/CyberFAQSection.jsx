@@ -58,6 +58,47 @@ export default function CyberFAQSection({ isMobile = false }) {
   // FAQ data with terminal-style queries
   const faqData = [
     {
+      id: 'QUERY_000',
+      command: '> QUERY: Crypto.Ethics',
+      title: 'Is Crypto Evil?',
+      response: ` ACCESSING MORAL FRAMEWORK...
+
+No.
+
+Crypto is a tool — and like any tool, it reflects the intent of the people using it.
+
+Speculation, scams, and hype cycles make headlines, but those are human failures, not protocol failures. We don't call email evil because of spam, or the internet evil because of fraud. We improve the systems and keep building.
+
+At its core, cryptocurrency began with Bitcoin as a simple idea:
+money that doesn't require permission, middlemen, or blind trust.
+
+Open ledgers. Verifiable rules. Math instead of promises.
+
+Platforms like Ethereum extended that idea — allowing code to handle savings, trading, and coordination transparently, where anyone can audit the logic.
+
+That's not corruption.
+That's accountability.
+
+Markets rise and fall. Narratives sour. Bears arrive.
+But the principles remain:
+\t•\tself-custody
+\t•\topen access
+\t•\tcensorship resistance
+\t•\tprogrammable fairness
+
+Crypto isn't a religion or a casino.
+It's infrastructure.
+
+And like all infrastructure, it quietly becomes useful long before it becomes popular.
+
+RL80 builds on that quieter layer — not hype, not promises, just mechanisms that run exactly as written.
+
+Trust less. Verify more. Light a candle if you like.
+`,
+      status: '[ETHICS.RESOLVED]',
+      subQuestions: []
+    },
+    {
       id: 'QUERY_001',
       command: '> QUERY: Token.Information',
       title: 'What is RL80"?',
@@ -345,12 +386,12 @@ As it should be.
       title: 'What is The Illumin80?',
       response: ` LOADING LUMINARY MODULE...
 
-The Illumin80 is an elite status for RL80's most dedicated participants. Members who qualify receive a 1.2x multiplier on staking rewards.
+The Illumin80 is anyone who lights a candle on the shrine. By burning RL80 tokens and offering a prayer, message, or intention, you become part of the Illumin80 — a living congregation of participants whose candles form a collective display of conviction.
 
-QUALIFICATION:
-• Top 20% of cumulative token burners
+STAKING MULTIPLIER:
+• The top 20% of cumulative token burners qualify for a 1.2x multiplier on staking rewards
 • Evaluated monthly
-• Status applies for the following month
+• Multiplier applies for the following month
 • Rankings may change as participation grows
 
 `,
@@ -362,17 +403,17 @@ QUALIFICATION:
           title: 'What is the 1.2x staking multiplier?',
           response: `LOADING MULTIPLIER DETAILS...
 
-Illumin80 members receive a 1.2x multiplier on all staking rewards.
+The top 20% of cumulative token burners receive a 1.2x multiplier on all staking rewards.
 
 EXAMPLE:
 • Standard staker earns 100 ETH in rewards
-• Illumin80 staker earns 120 ETH for the same stake
+• Top 20% burner earns 120 ETH for the same stake
 
 HOW IT WORKS:
-• Multiplier applies automatically when you have Illumin80 status
-• Status is evaluated monthly based on cumulative burn rankings
+• Multiplier applies automatically when you rank in the top 20% of burners
+• Rankings are evaluated monthly based on cumulative burn totals
 • If you qualify this month, multiplier applies next month
-• Multiplier stacks with your proportional stake — bigger stake + Illumin80 = maximum rewards
+• Multiplier stacks with your proportional stake — bigger stake + top 20% status = maximum rewards
 
 This rewards long-term believers who demonstrate commitment through burning.
 `,
@@ -381,13 +422,14 @@ This rewards long-term believers who demonstrate commitment through burning.
         {
           id: 'SUB_003_B',
           command: '>> SUB.QUERY: Qualification',
-          title: 'How do I qualify for Illumin80?',
+          title: 'How do I qualify for the staking multiplier?',
           response: `LOADING QUALIFICATION CRITERIA...
 
-ILLUMIN80 QUALIFICATION:
-• Rank in the top 20% of cumulative token burners
+STAKING MULTIPLIER QUALIFICATION:
+• Anyone who lights a candle is Illumin80
+• The top 20% of cumulative token burners earn a 1.2x staking multiplier
 • Rankings are evaluated monthly
-• Status applies for the following month
+• Multiplier applies for the following month
 
 IMPORTANT NOTES:
 • It's cumulative — all your burns count toward your total
@@ -407,7 +449,7 @@ The threshold adjusts dynamically. As the community grows, you may need to burn 
 
 To burn a candle, visit the /illumin80 page and simply click the button, fill out a quick form, and sign your digital wallet transaction.
 
-Candles melt over 80 hours. When fully melted, they expire and are removed from the scene. Burn again to maintain your presence on the shrine and build toward Illumin80 status.
+Candles melt over 24 hours. When fully melted, they expire and are removed from the scene. Burn again to maintain your presence on the shrine and build toward Illumin80 status.
 `,
           status: '[INSTRUCTIONS.LISTED]'
         }
@@ -574,7 +616,7 @@ This is intentional design, not a delay. Building liquidity first creates a stro
 To burn a candle, visit the /illumin80 page and follow the on-screen steps.
 Burning RL80 is optional and accessible—any amount may be burned to participate. Each burn lights a candle and adds your message to the shrine.
 
-Each candle burns for 80 hours.
+Each candle burns for 24 hours.
 
 Only one candle may be active per wallet at a time.
 If you burn again before your candle expires, your new candle replaces the existing one—renewing your light rather than stacking visibility.

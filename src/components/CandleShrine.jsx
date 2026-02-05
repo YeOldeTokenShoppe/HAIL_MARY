@@ -18,6 +18,7 @@ const sharedUniforms = {
   uPulseTime: { value: -1 }, // Time when pulse started, -1 = no pulse
   uPulsePosition: { value: new THREE.Vector3(0, 0, 0) }, // Position of pulse origin
   uHighlightedId: { value: -1 }, // ID of highlighted candle (user's candle)
+  uHighlightedPos: { value: new THREE.Vector3(0, 0, 0) }, // World position of highlighted candle center
   uCurrentTime: { value: Date.now() }, // Current time for melting calculations
   // Exclusion zone - box that candles should avoid (pushed out in shader)
   uExclusionCenter: { value: new THREE.Vector3(0, -1, -1.5) }, // Center of exclusion box
@@ -213,12 +214,23 @@ function createXBaseMaterial() {
     },
     vertexShader: `
       varying float vInstanceId;
+      uniform float uHighlightedId;
+      uniform vec3 uHighlightedPos;
 
       void main() {
         vInstanceId = float(gl_InstanceID);
 
         // Wobble is now baked into instanceMatrix for accurate raycasting
         vec4 instancePos = instanceMatrix * vec4(position, 1.0);
+
+        // Scale up and push highlighted candle toward camera so it's always visible
+        bool isHighlighted = uHighlightedId >= 0.0 && abs(uHighlightedId - vInstanceId) < 1.0;
+        if (isHighlighted) {
+          // Scale all parts from the shared candle world center (keeps wax+flame aligned)
+          instancePos.xyz = uHighlightedPos + (instancePos.xyz - uHighlightedPos) * 1.6;
+          instancePos.z += 2.5;
+        }
+
         gl_Position = projectionMatrix * modelViewMatrix * instancePos;
       }
     `,
@@ -317,6 +329,8 @@ function createFlameMaterial() {
     },
     vertexShader: `
       uniform float uTime;
+      uniform float uHighlightedId;
+      uniform vec3 uHighlightedPos;
 
       varying float vHeight;
       varying float vPhase;
@@ -364,6 +378,13 @@ function createFlameMaterial() {
 
         // Wobble is now baked into instanceMatrix for accurate raycasting
         vec4 instancePos = instanceMatrix * vec4(pos, 1.0);
+
+        // Scale up and push highlighted candle toward camera (same center as wax)
+        bool isHighlighted = uHighlightedId >= 0.0 && abs(uHighlightedId - id) < 1.0;
+        if (isHighlighted) {
+          instancePos.xyz = uHighlightedPos + (instancePos.xyz - uHighlightedPos) * 1.6;
+          instancePos.z += 2.5;
+        }
 
         gl_Position = projectionMatrix * modelViewMatrix * instancePos;
 
@@ -859,6 +880,12 @@ function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.9
         pos.y + wobble.y,
         pos.z + wobble.z
       )
+
+      // Track highlighted candle's world center for shader scaling
+      const highlightedId = Math.round(sharedUniforms.uHighlightedId.value)
+      if (i === highlightedId) {
+        sharedUniforms.uHighlightedPos.value.set(tempPosition.x, tempPosition.y, tempPosition.z)
+      }
 
       tempQuaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), pos.rotation)
 

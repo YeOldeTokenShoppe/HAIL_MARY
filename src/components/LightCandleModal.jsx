@@ -388,7 +388,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
 
       // NOW save to Firestore after the animation
       // First, check for existing active offering for this wallet
-      const EXPIRATION_HOURS = 80;
+      const EXPIRATION_HOURS = 24;
       
       let docRef = null;
       try {
