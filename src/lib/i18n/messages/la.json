@@ -297,7 +297,7 @@
   "lightCandleModal": {
     "title": "Candelam Accende",
     "candleInfo": {
-      "burnTime": "Candela tua VII dies ardebit",
+      "burnTime": "Candela tua XXIV horas ardebit",
       "onePerWallet": "Una candela activa per sacculum. Nova candela veterem substituit."
     },
     "steps": {
@@ -342,7 +342,7 @@
     },
     "info": {
       "minToken": "min I signum",
-      "burnTime": "VII dies ardens",
+      "burnTime": "XXIV horae ardens",
       "onePerWallet": "I per sacculum"
     },
     "buttons": {

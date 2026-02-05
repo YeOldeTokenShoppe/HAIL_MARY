@@ -413,10 +413,10 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
         console.log('🕐 Checking for existing offerings for user');
         // User authenticated - proceeding with offering creation
         
-        // Query for existing offerings from this wallet
+        // Query for existing offerings from this user (by userId, not wallet)
         const existingQuery = query(
           collection(db, 'offerings'),
-          where('walletAddress', '==', walletAddress)
+          where('userId', '==', user?.id)
         );
         
         const existingSnapshot = await getDocs(existingQuery);

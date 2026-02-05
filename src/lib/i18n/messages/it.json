@@ -297,7 +297,7 @@
   "lightCandleModal": {
     "title": "Accendi una Candela",
     "candleInfo": {
-      "burnTime": "La tua candela brucerà per 7 giorni",
+      "burnTime": "La tua candela brucerà per 24 ore",
       "onePerWallet": "Una candela attiva per portafoglio. Accendere una nuova candela sostituisce quella esistente."
     },
     "steps": {
@@ -342,7 +342,7 @@
     },
     "info": {
       "minToken": "1 token min",
-      "burnTime": "7 giorni di bruciatura",
+      "burnTime": "24 ore di bruciatura",
       "onePerWallet": "1 per portafoglio"
     },
     "buttons": {

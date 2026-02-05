@@ -297,7 +297,7 @@
   "lightCandleModal": {
     "title": "Acender uma Vela",
     "candleInfo": {
-      "burnTime": "Sua vela queimará por 7 dias",
+      "burnTime": "Sua vela queimará por 24 horas",
       "onePerWallet": "Uma vela ativa por carteira. Acender uma nova vela substitui a existente."
     },
     "steps": {
@@ -342,7 +342,7 @@
     },
     "info": {
       "minToken": "1 token mín",
-      "burnTime": "7 dias de queima",
+      "burnTime": "24 horas de queima",
       "onePerWallet": "1 por carteira"
     },
     "buttons": {

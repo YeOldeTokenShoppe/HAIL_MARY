@@ -296,7 +296,7 @@
   "lightCandleModal": {
     "title": "Encender una Vela",
     "candleInfo": {
-      "burnTime": "Tu vela arderá durante 7 días",
+      "burnTime": "Tu vela arderá durante 24 horas",
       "onePerWallet": "Una vela activa por billetera. Encender una nueva vela reemplaza la existente."
     },
     "steps": {
@@ -341,7 +341,7 @@
     },
     "info": {
       "minToken": "1 token mín",
-      "burnTime": "7 días de quema",
+      "burnTime": "24 horas de quema",
       "onePerWallet": "1 por billetera"
     },
     "buttons": {

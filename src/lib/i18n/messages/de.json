@@ -297,7 +297,7 @@
   "lightCandleModal": {
     "title": "Kerze Anzünden",
     "candleInfo": {
-      "burnTime": "Deine Kerze brennt 7 Tage lang",
+      "burnTime": "Deine Kerze brennt 24 Stunden lang",
       "onePerWallet": "Eine aktive Kerze pro Wallet. Eine neue Kerze ersetzt die bestehende."
     },
     "steps": {
@@ -342,7 +342,7 @@
     },
     "info": {
       "minToken": "1 Token min",
-      "burnTime": "7 Tage brennen",
+      "burnTime": "24 Stunden brennen",
       "onePerWallet": "1 pro Wallet"
     },
     "buttons": {

@@ -297,7 +297,7 @@
   "lightCandleModal": {
     "title": "Thắp Nến",
     "candleInfo": {
-      "burnTime": "Nến của bạn sẽ cháy trong 7 ngày",
+      "burnTime": "Nến của bạn sẽ cháy trong 24 giờ",
       "onePerWallet": "Một nến hoạt động mỗi ví. Thắp nến mới sẽ thay thế nến hiện tại."
     },
     "steps": {
@@ -342,7 +342,7 @@
     },
     "info": {
       "minToken": "Tối thiểu 1 token",
-      "burnTime": "Cháy 7 ngày",
+      "burnTime": "Cháy 24 giờ",
       "onePerWallet": "1 mỗi ví"
     },
     "buttons": {

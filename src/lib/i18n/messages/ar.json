@@ -297,7 +297,7 @@
   "lightCandleModal": {
     "title": "إشعال شمعة",
     "candleInfo": {
-      "burnTime": "ستحترق شمعتك لمدة 7 أيام",
+      "burnTime": "ستحترق شمعتك لمدة 24 ساعة",
       "onePerWallet": "شمعة واحدة نشطة لكل محفظة. إشعال شمعة جديدة يستبدل الحالية."
     },
     "steps": {
@@ -342,7 +342,7 @@
     },
     "info": {
       "minToken": "الحد الأدنى 1 رمز",
-      "burnTime": "7 أيام احتراق",
+      "burnTime": "24 ساعة احتراق",
       "onePerWallet": "1 لكل محفظة"
     },
     "buttons": {

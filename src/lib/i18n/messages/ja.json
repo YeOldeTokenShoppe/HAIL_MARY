@@ -297,7 +297,7 @@
   "lightCandleModal": {
     "title": "キャンドルを灯す",
     "candleInfo": {
-      "burnTime": "キャンドルは7日間燃え続けます",
+      "burnTime": "キャンドルは24時間燃え続けます",
       "onePerWallet": "ウォレットにつき1本のアクティブなキャンドル。新しいキャンドルは既存のものを置き換えます。"
     },
     "steps": {
@@ -342,7 +342,7 @@
     },
     "info": {
       "minToken": "最低1トークン",
-      "burnTime": "7日間燃焼",
+      "burnTime": "24時間燃焼",
       "onePerWallet": "ウォレットにつき1つ"
     },
     "buttons": {

@@ -7,6 +7,7 @@ import { useLanguage } from './LanguageProvider'
 
 // DEBUG MODE - Set to true to see zones from bird's eye view
 const DEBUG_MODE = false
+const CANDLE_DURATION_SECONDS = 86400 // 1 day
 
 // Debug visualization component - shows exclusion zones
 function DebugZoneVisualization() {
@@ -375,11 +376,36 @@ function SpinningVotive({ imageUrl, spinTrigger }) {
   )
 }
 
+// Scrollable message for candle prayers - fixed height on mobile
+function ExpandableMessage({ message, isMobile }) {
+  return (
+    <div style={{
+      fontSize: isMobile ? '10px' : '11px',
+      color: 'rgba(255, 255, 255, 0.7)',
+      fontStyle: 'italic',
+      padding: '8px',
+      background: 'rgba(255, 255, 255, 0.05)',
+      borderRadius: '6px',
+      lineHeight: '1.4',
+      maxHeight: isMobile ? '3.6em' : '5em',
+      overflowY: 'auto',
+      WebkitOverflowScrolling: 'touch',
+    }}>
+      "{message}"
+    </div>
+  )
+}
+
 // Leaderboard Trophy Carousel
-function LeaderboardCarousel({ leaderboardData, isMobile }) {
+function LeaderboardCarousel({ leaderboardData, isMobile, sortMode = 'topBurners' }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [spinTrigger, setSpinTrigger] = useState(0)
   const [freshAvatars, setFreshAvatars] = useState({})
+
+  // Reset index when data changes (e.g., sort mode switch)
+  useEffect(() => {
+    setCurrentIndex(0)
+  }, [sortMode])
 
   // Fetch fresh avatar URLs from Clerk via API
   useEffect(() => {
@@ -436,10 +462,24 @@ function LeaderboardCarousel({ leaderboardData, isMobile }) {
   }
 
   const getRankDisplay = (index) => {
+    if (sortMode === 'recent') return '🕯️'
     if (index === 0) return '👑'
     if (index === 1) return '🥈'
     if (index === 2) return '🥉'
     return `#${index + 1}`
+  }
+
+  const getTimeAgo = (timestamp) => {
+    if (!timestamp) return ''
+    const now = Date.now()
+    const diff = now - timestamp
+    const minutes = Math.floor(diff / 60000)
+    const hours = Math.floor(diff / 3600000)
+    const days = Math.floor(diff / 86400000)
+    if (minutes < 1) return 'just now'
+    if (minutes < 60) return `${minutes}m ago`
+    if (hours < 24) return `${hours}h ago`
+    return `${days}d ago`
   }
 
   if (!currentLeader) return null
@@ -562,11 +602,11 @@ function LeaderboardCarousel({ leaderboardData, isMobile }) {
         </span>
         <span style={{
           fontSize: isMobile ? '10px' : '12px',
-          color: '#ff9500',
+          color: sortMode === 'recent' ? '#00f5d4' : '#ff9500',
           fontFamily: 'monospace',
           fontWeight: 'bold'
         }}>
-          {formatBurned(currentLeader.totalBurned)}
+          {sortMode === 'recent' ? getTimeAgo(currentLeader.litAt) : formatBurned(currentLeader.totalBurned)}
         </span>
       </div>
 
@@ -1316,6 +1356,29 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
     console.log('[UnifiedShrine] offeringCandles computed:', result.length, 'candles')
     return result
   }, [offerings])
+
+  // Recent offerings sorted by time for carousel display
+  const recentOfferingsData = useMemo(() => {
+    if (!offerings || offerings.length === 0) return []
+    const realOfferings = [...offerings].filter(o => !o.isPlaceholder)
+    const sorted = realOfferings.sort((a, b) => {
+      const aTime = a.litAt || a.createdAt?.toDate?.()?.getTime?.() || a.timestamp?.toDate?.()?.getTime?.() || 0
+      const bTime = b.litAt || b.createdAt?.toDate?.()?.getTime?.() || b.timestamp?.toDate?.()?.getTime?.() || 0
+      return bTime - aTime // Most recent first
+    })
+    const result = sorted.map((offering, index) => ({
+      id: offering.id,
+      rank: index + 1,
+      userId: offering.userId || offering.uid,
+      username: offering.name || offering.userName || offering.username || 'Anonymous',
+      userImageUrl: offering.userImageUrl || offering.userImage || offering.avatar,
+      totalBurned: offering.tokensBurned || 0,
+      litAt: offering.litAt || offering.createdAt?.toDate?.()?.getTime?.() || offering.timestamp?.toDate?.()?.getTime?.()
+    }))
+    console.log('[UnifiedShrine] recentOfferingsData:', result.length, 'real offerings out of', offerings.length, 'total')
+    return result
+  }, [offerings])
+
   // Debug logging: track candle count changes
   useEffect(() => {
     console.log(`[UnifiedShrine] Candles: ${offeringCandles.length} total`)
@@ -1339,7 +1402,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
         }
         
         const elapsed = (now - litAtTime) / 1000
-        const isExpired = elapsed >= 299 // Remove at 99.7% melted (just before 5 minutes) - TESTING
+        const isExpired = elapsed >= (CANDLE_DURATION_SECONDS - 1) // Remove just before fully melted
         
         
         if (isExpired) {
@@ -1391,7 +1454,6 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   const [userCandlePosition, setUserCandlePosition] = useState(null) // Store 3D position
   const [resetCameraToDefault, setResetCameraToDefault] = useState(false) // Reset camera flag
   const [overrideCameraControl, setOverrideCameraControl] = useState(false) // Override all camera controls
-  const [clickedCandleData, setClickedCandleData] = useState(null) // Data for any clicked candle tooltip
   const [leaderboardData, setLeaderboardData] = useState([]) // Top burners for leaderboard
   const [leaderboardLoading, setLeaderboardLoading] = useState(false)
 
@@ -1524,7 +1586,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
       }
       
       // Calculate melt percentage (how much has melted, not remaining)
-      const meltPercentage = Math.min(100, (elapsed / 300) * 100).toFixed(1) // 5 minutes test duration
+      const meltPercentage = Math.min(100, (elapsed / CANDLE_DURATION_SECONDS) * 100).toFixed(1)
       const formattedDate = `lit ${timeAgo}, ${meltPercentage}% melted`
       setUserCandleData({
         instanceId: actualInstanceId,
@@ -1880,77 +1942,67 @@ useEffect(() => {
       delete timeoutRefs.current[instanceId]
     }
 
-    // Clear any existing tooltip timeout
-    if (timeoutRefs.current['tooltip']) {
-      clearTimeout(timeoutRefs.current['tooltip'])
-      delete timeoutRefs.current['tooltip']
-    }
-
     setClickedCandleId(instanceId)
+
+    // Switch to Leaders tab to show candle details
+    setActiveStatsTab('leaders')
+    if (statsBoxCollapsed) setStatsBoxCollapsed(false)
+
+    const baseCandles = 0 // No base candles - all candles are from offerings
 
     // Check if this is the user's candle
     if (userCandleData && instanceId === userCandleData.instanceId) {
-      // Toggle hover state for user's candle
       setHoveredCandleId(prev => prev === instanceId ? null : instanceId)
-      setClickedCandleData(null) // Don't show tooltip for user's own candle
+
+      // Also show in stats panel
+      const offeringIndex = instanceId - baseCandles
+      if (offeringIndex >= 0 && offeringIndex < offeringCandles.length) {
+        const candle = offeringCandles[offeringIndex]
+        const offering = candle.offering
+        const litAtTime = candle.litAt || offering?.createdAt?.toDate?.()?.getTime?.() || Date.now()
+        const elapsed = (Date.now() - litAtTime) / 1000
+        const meltPercentage = parseFloat(Math.min(100, (elapsed / CANDLE_DURATION_SECONDS) * 100).toFixed(1))
+        let timeAgo
+        if (elapsed < 60) timeAgo = `${Math.floor(elapsed)}s ago`
+        else if (elapsed < 3600) timeAgo = `${Math.floor(elapsed / 60)}m ago`
+        else if (elapsed < 86400) timeAgo = `${Math.floor(elapsed / 3600)}h ago`
+        else timeAgo = `${Math.floor(elapsed / 86400)}d ago`
+
+        if (onSelectOffering) {
+          onSelectOffering({
+            ...offering,
+            meltPercentage,
+            timeAgo,
+            isUserCandle: true
+          })
+        }
+      }
     } else {
       // Check if this is an offering candle with real data
-      const baseCandles = 100
       if (instanceId >= baseCandles && offeringCandles.length > 0) {
         const offeringIndex = instanceId - baseCandles
         if (offeringIndex < offeringCandles.length) {
           const candle = offeringCandles[offeringIndex]
           const offering = candle.offering
 
-          // Calculate time info
           const litAtTime = candle.litAt || offering?.createdAt?.toDate?.()?.getTime?.() || Date.now()
-          const now = Date.now()
-          const elapsed = (now - litAtTime) / 1000
-
-          // Format time ago
+          const elapsed = (Date.now() - litAtTime) / 1000
+          const meltPercentage = parseFloat(Math.min(100, (elapsed / CANDLE_DURATION_SECONDS) * 100).toFixed(1))
           let timeAgo
-          if (elapsed < 60) {
-            timeAgo = `${Math.floor(elapsed)}s ago`
-          } else if (elapsed < 3600) {
-            timeAgo = `${Math.floor(elapsed / 60)}m ago`
-          } else if (elapsed < 86400) {
-            timeAgo = `${Math.floor(elapsed / 3600)}h ago`
-          } else {
-            timeAgo = `${Math.floor(elapsed / 86400)}d ago`
+          if (elapsed < 60) timeAgo = `${Math.floor(elapsed)}s ago`
+          else if (elapsed < 3600) timeAgo = `${Math.floor(elapsed / 60)}m ago`
+          else if (elapsed < 86400) timeAgo = `${Math.floor(elapsed / 3600)}h ago`
+          else timeAgo = `${Math.floor(elapsed / 86400)}d ago`
+
+          if (onSelectOffering) {
+            onSelectOffering({
+              ...offering,
+              meltPercentage,
+              timeAgo,
+              isUserCandle: candle.userId === currentUserId
+            })
           }
-
-          // Calculate melt percentage
-          const meltPercentage = Math.min(100, (elapsed / 300) * 100).toFixed(1)
-
-          setClickedCandleData({
-            username: offering?.name || candle.username || 'Anonymous',
-            userImageUrl: offering?.userImageUrl || null,
-            litAt: `lit ${timeAgo}, ${meltPercentage}% melted`,
-            message: offering?.message || null,
-            isCurrentUser: candle.userId === currentUserId
-          })
-
-          // Auto-dismiss tooltip after 4 seconds
-          timeoutRefs.current['tooltip'] = setTimeout(() => {
-            setClickedCandleData(null)
-            delete timeoutRefs.current['tooltip']
-          }, 4000)
         }
-      } else {
-        // Base candle (no owner data)
-        setClickedCandleData({
-          username: '',
-          userImageUrl: null,
-          litAt: '',
-          message: null,
-          isCurrentUser: false
-        })
-
-        // Auto-dismiss tooltip after 3 seconds
-        timeoutRefs.current['tooltip'] = setTimeout(() => {
-          setClickedCandleData(null)
-          delete timeoutRefs.current['tooltip']
-        }, 3000)
       }
 
       // Clear purple glow after 2 seconds
@@ -1958,17 +2010,8 @@ useEffect(() => {
         setClickedCandleId(null)
         delete timeoutRefs.current[instanceId]
       }, 2000)
-
-      if (offerings?.length > 0 && onSelectOffering) {
-        if (instanceId >= baseCandles) {
-          const offeringIndex = instanceId - baseCandles
-          if (offeringIndex < offerings.length) {
-            onSelectOffering(offerings[offeringIndex])
-          }
-        }
-      }
     }
-  }, [offerings, onSelectOffering, userCandleData, offeringCandles, currentUserId])
+  }, [offerings, onSelectOffering, userCandleData, offeringCandles, currentUserId, statsBoxCollapsed])
 
   // Called when NewCandleEffect completes - candle is already in Firestore with stored position
   const handleNewCandleComplete = useCallback((position, offering) => {
@@ -2233,7 +2276,7 @@ useEffect(() => {
   ], [isMobile, t])
 
   return (
-    <div style={{ width: '100vw', height: isMobile ? '100vh' : '100vh', background: is80sMode ? 'transparent' : '#000', position: 'fixed'}}>
+    <div style={{ width: '100vw', height: isMobile ? '100dvh' : '100dvh', background: is80sMode ? 'transparent' : '#000', position: 'fixed'}}>
       {/* 80s mode background */}
       {is80sMode && (
         <img
@@ -2259,7 +2302,7 @@ useEffect(() => {
         ref={canvasRef} 
         style={{ 
           width: '100vw', 
-          height: '100vh', 
+          height: '100dvh', 
           position: 'fixed', 
           zIndex: 2,
           background: is80sMode ? 'transparent' : '#000',
@@ -2588,147 +2631,7 @@ useEffect(() => {
         }
     `}</style>
 
-      {/* Clicked candle tooltip - shows owner info */}
-      {clickedCandleData && !targetCameraPosition && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: isMobile ? '135px' : '5rem',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'rgba(20, 20, 30, 0.95)',
-            borderRadius: '16px',
-            padding: isMobile ? '12px 16px' : '14px 20px',
-            minWidth: isMobile ? '200px' : '240px',
-            maxWidth: isMobile ? '280px' : '320px',
-            border: clickedCandleData.isCurrentUser
-              ? '1px solid rgba(0, 245, 212, 0.5)'
-              : '1px solid rgba(255, 105, 180, 0.4)',
-            boxShadow: clickedCandleData.isCurrentUser
-              ? '0 0 40px rgba(0, 245, 212, 0.3)'
-              : '0 0 40px rgba(255, 105, 180, 0.3)',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
-            zIndex: 102,
-            animation: 'slideUpFade 0.3s ease-out',
-            pointerEvents: 'none',
-          }}
-        >
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-          }}>
-            {/* Avatar - Show St. GR80 for anonymous candles */}
-            {(!clickedCandleData.username || clickedCandleData.username === 'Anonymous') ? (
-              <img
-                src="/images/GR80_headshot.webp"
-                alt="St. GR80"
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  objectFit: 'cover',
-                  border: '2px solid rgba(255, 170, 0, 0.6)',
-                  flexShrink: 0
-                }}
-              />
-            ) : clickedCandleData.userImageUrl ? (
-              <img
-                src={clickedCandleData.userImageUrl}
-                alt={clickedCandleData.username}
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  objectFit: 'cover',
-                  border: clickedCandleData.isCurrentUser
-                    ? '2px solid rgba(0, 245, 212, 0.6)'
-                    : '2px solid rgba(255, 105, 180, 0.6)',
-                  flexShrink: 0
-                }}
-              />
-            ) : (
-              <div style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '50%',
-                background: clickedCandleData.isCurrentUser
-                  ? 'linear-gradient(135deg, #00f5d4, #00b894)'
-                  : 'linear-gradient(135deg, #ff69b4, #ff1493)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '16px',
-                fontWeight: 'bold',
-                color: '#fff',
-                border: clickedCandleData.isCurrentUser
-                  ? '2px solid rgba(0, 245, 212, 0.6)'
-                  : '2px solid rgba(255, 105, 180, 0.6)',
-                flexShrink: 0
-              }}>
-                {clickedCandleData.username?.charAt(0).toUpperCase() || '?'}
-              </div>
-            )}
-
-            {/* Info */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{
-                fontWeight: 'bold',
-                fontSize: isMobile ? '14px' : '15px',
-                color: (!clickedCandleData.username || clickedCandleData.username === 'Anonymous')
-                  ? '#ffaa00'
-                  : (clickedCandleData.isCurrentUser ? '#00f5d4' : '#ff69b4'),
-                fontFamily: "'Orbitron', monospace",
-                marginBottom: '2px',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}>
-                {(!clickedCandleData.username || clickedCandleData.username === 'Anonymous')
-                  ? 'St. GR80'
-                  : clickedCandleData.username}
-                {clickedCandleData.isCurrentUser && (
-                  <span style={{
-                    fontSize: '10px',
-                    marginLeft: '6px',
-                    opacity: 0.8,
-                    fontWeight: 'normal'
-                  }}>
-                    (you)
-                  </span>
-                )}
-              </div>
-              <div style={{
-                fontSize: isMobile ? '11px' : '12px',
-                color: 'rgba(255, 255, 255, 0.7)',
-                fontFamily: 'monospace',
-                fontStyle: 'italic',
-              }}>
-                {(!clickedCandleData.username || clickedCandleData.username === 'Anonymous')
-                  ? 'Keeper of the shrine'
-                  : `🕯️ ${clickedCandleData.litAt}`}
-              </div>
-            </div>
-          </div>
-
-          {/* Message if present */}
-          {clickedCandleData.message && (
-            <div style={{
-              marginTop: '10px',
-              paddingTop: '10px',
-              borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-              fontSize: isMobile ? '12px' : '13px',
-              color: 'rgba(255, 255, 255, 0.8)',
-              fontStyle: 'italic',
-              lineHeight: '1.4',
-              textAlign: 'center'
-            }}>
-              "{clickedCandleData.message}"
-            </div>
-          )}
-        </div>
-      )}
+      {/* Candle details now shown in stats panel instead of floating popup */}
       
       {/* Container for Stats Box and Find My Candle button on mobile - rendered via portal to escape stacking context */}
       {!targetCameraPosition && typeof document !== 'undefined' && createPortal(
@@ -2736,7 +2639,7 @@ useEffect(() => {
           position: 'fixed',
           top: isMobile ? '9rem' : '160px',
           right: isMobile ? '10px' : '20px',
-          zIndex: 1000,
+          zIndex: 100,
           display: 'flex',
           flexDirection: 'column',
           gap: '10px',
@@ -2876,28 +2779,6 @@ useEffect(() => {
             }}
           >
             {t('illumin80.stats.price')}
-          </button>
-          <button
-            onClick={() => setActiveStatsTab('staking')}
-            style={{
-              flex: 1,
-              padding: isMobile ? '4px 4px' : '6px 8px',
-              background: activeStatsTab === 'staking' ? 'rgba(0, 245, 212, 0.2)' : 'transparent',
-              border: 'none',
-              borderBottom: activeStatsTab === 'staking' ? '2px solid #00f5d4' : '2px solid transparent',
-              color: activeStatsTab === 'staking' ? '#00f5d4' : '#ccc',
-              fontSize: isMobile ? '10px' : '12px',
-              fontFamily: 'monospace',
-              fontWeight: activeStatsTab === 'staking' ? 'bold' : 'normal',
-              cursor: 'pointer',
-              textTransform: 'uppercase',
-              transition: 'all 0.2s',
-              marginBottom: '-1px',
-              minWidth: 0,
-              overflow: 'hidden',
-            }}
-          >
-            {t('illumin80.stats.stake')}
           </button>
           <button
             onClick={() => setActiveStatsTab('pulse')}
@@ -3084,119 +2965,6 @@ useEffect(() => {
             />
           </svg>
         </div>
-          </>
-        ) : activeStatsTab === 'staking' ? (
-          <>
-            {/* Staking Tab Content - Global Stats */}
-            {/* TVL Section - Prominent */}
-            <div style={{
-              marginBottom: isMobile ? '10px' : '15px',
-              padding: isMobile ? '8px' : '12px',
-              background: 'rgba(0, 245, 212, 0.1)',
-              borderRadius: '8px',
-              border: '1px solid rgba(0, 245, 212, 0.3)'
-            }}>
-              <div style={{ 
-                fontSize: isMobile ? '18px' : '24px', 
-                fontWeight: 'bold',
-                color: '#00f5d4',
-                marginBottom: '6px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                <span>${calculateTVL}</span>
-              </div>
-              <div style={{
-                fontSize: isMobile ? '11px' : '12px',
-                color: '#ccc',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px'
-              }}>
-                {t('illumin80.stats.totalValueLocked')}
-              </div>
-            </div>
-            
-            {/* APR & Total Rewards - Side by side */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '1fr 1fr',
-              gap: isMobile ? '8px' : '10px',
-              marginBottom: isMobile ? '10px' : '15px'
-            }}>
-              {/* Current APR */}
-              <div style={{
-                padding: isMobile ? '8px' : '10px',
-                background: 'rgba(0, 255, 102, 0.1)',
-                borderRadius: '8px',
-                border: '1px solid rgba(0, 255, 102, 0.3)',
-                textAlign: 'center'
-              }}>
-                <div style={{ 
-                  fontSize: isMobile ? '16px' : '16px', 
-                  fontWeight: 'bold',
-                  color: '#00ff66',
-                  marginBottom: '4px'
-                }}>
-                  {calculateAPR}%
-                </div>
-                <div style={{
-                  fontSize: isMobile ? '10px' : '11px',
-                  color: '#ccc',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
-                }}>
-                  {t('illumin80.stats.currentAPR')}
-                </div>
-              </div>
-
-              {/* Total Rewards Paid */}
-              <div style={{
-                padding: isMobile ? '8px' : '10px',
-                background: 'rgba(255, 215, 0, 0.1)',
-                borderRadius: '8px',
-                border: '1px solid rgba(255, 215, 0, 0.3)',
-                textAlign: 'center'
-              }}>
-                <div style={{ 
-                  fontSize: isMobile ? '14px' : '14px', 
-                  fontWeight: 'bold',
-                  color: '#ffd700',
-                  marginBottom: '4px'
-                }}>
-                  {totalRewardsPaid}
-                </div>
-                <div style={{
-                  fontSize: isMobile ? '10px' : '11px',
-                  color: '#ccc',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
-                }}>
-                  {t('illumin80.stats.rewardsClaimed')}
-                </div>
-              </div>
-            </div>
-
-            {/* Total Staked Tokens */}
-            {/* <div style={{
-              padding: isMobile ? '8px' : '10px',
-              background: 'rgba(138, 43, 226, 0.05)',
-              borderRadius: '8px',
-              border: '1px solid rgba(138, 43, 226, 0.2)',
-              fontSize: isMobile ? '11px' : '12px',
-              color: '#ccc',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <span>Total Staked:</span>
-              <span style={{ 
-                color: '#fff', 
-                fontWeight: 'bold' 
-              }}>
-                {parseFloat(totalStaked || 0).toLocaleString()} RL80
-              </span>
-            </div> */}
           </>
         ) : activeStatsTab === 'pulse' ? (
           <>
@@ -3496,17 +3264,7 @@ useEffect(() => {
                       This candle awaits a devotee...
                     </div>
                   ) : selectedCandle.message && (
-                    <div style={{
-                      fontSize: isMobile ? '10px' : '11px',
-                      color: 'rgba(255, 255, 255, 0.7)',
-                      fontStyle: 'italic',
-                      padding: '8px',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      borderRadius: '6px',
-                      lineHeight: '1.4'
-                    }}>
-                      "{selectedCandle.message}"
-                    </div>
+                    <ExpandableMessage message={selectedCandle.message} isMobile={isMobile} />
                   )}
                 </div>
               ) : (
@@ -3529,7 +3287,7 @@ useEffect(() => {
               )}
 
               {/* Trophy Candle Carousel */}
-              {leaderboardLoading ? (
+              {leaderboardLoading && sortOption !== 'recent' ? (
                 <div style={{
                   textAlign: 'center',
                   padding: '20px',
@@ -3538,7 +3296,7 @@ useEffect(() => {
                 }}>
                   Loading...
                 </div>
-              ) : leaderboardData.length === 0 ? (
+              ) : (sortOption === 'recent' ? recentOfferingsData : leaderboardData).length === 0 ? (
                 <div style={{
                   textAlign: 'center',
                   padding: '20px',
@@ -3555,7 +3313,11 @@ useEffect(() => {
                   border: '1px solid rgba(255, 149, 0, 0.2)',
                   overflow: 'hidden'
                 }}>
-                  <LeaderboardCarousel leaderboardData={leaderboardData} isMobile={isMobile} />
+                  <LeaderboardCarousel
+                  leaderboardData={sortOption === 'recent' ? recentOfferingsData : leaderboardData}
+                  isMobile={isMobile}
+                  sortMode={sortOption}
+                />
                 </div>
               )}
 

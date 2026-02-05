@@ -297,7 +297,7 @@
   "lightCandleModal": {
     "title": "촛불 켜기",
     "candleInfo": {
-      "burnTime": "촛불은 7일 동안 타오릅니다",
+      "burnTime": "촛불은 24시간 동안 타오릅니다",
       "onePerWallet": "지갑당 하나의 활성 촛불. 새 촛불은 기존 것을 대체합니다."
     },
     "steps": {
@@ -342,7 +342,7 @@
     },
     "info": {
       "minToken": "최소 1 토큰",
-      "burnTime": "7일 연소",
+      "burnTime": "24시간 연소",
       "onePerWallet": "지갑당 1개"
     },
     "buttons": {

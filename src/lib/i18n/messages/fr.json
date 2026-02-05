@@ -296,7 +296,7 @@
   "lightCandleModal": {
     "title": "Allumer une Bougie",
     "candleInfo": {
-      "burnTime": "Votre bougie brûlera pendant 7 jours",
+      "burnTime": "Votre bougie brûlera pendant 24 heures",
       "onePerWallet": "Une bougie active par portefeuille. Allumer une nouvelle bougie remplace l'ancienne."
     },
     "steps": {
@@ -341,7 +341,7 @@
     },
     "info": {
       "minToken": "1 jeton min",
-      "burnTime": "7 jours de brûlage",
+      "burnTime": "24 heures de brûlage",
       "onePerWallet": "1 par portefeuille"
     },
     "buttons": {

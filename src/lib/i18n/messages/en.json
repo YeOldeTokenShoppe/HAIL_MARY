@@ -301,7 +301,7 @@
   "lightCandleModal": {
     "title": "Light a Candle",
     "candleInfo": {
-      "burnTime": "Your candle will burn for 7 days",
+      "burnTime": "Your candle will burn for 24 hours",
       "onePerWallet": "One active candle per wallet. Lighting a new candle replaces any existing one."
     },
     "steps": {
@@ -346,7 +346,7 @@
     },
     "info": {
       "minToken": "1 token min",
-      "burnTime": "7 day burn",
+      "burnTime": "24 hour burn",
       "onePerWallet": "1 per wallet"
     },
     "buttons": {

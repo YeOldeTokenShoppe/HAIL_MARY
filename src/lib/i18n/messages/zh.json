@@ -297,7 +297,7 @@
   "lightCandleModal": {
     "title": "点燃蜡烛",
     "candleInfo": {
-      "burnTime": "您的蜡烛将燃烧7天",
+      "burnTime": "您的蜡烛将燃烧24小时",
       "onePerWallet": "每个钱包一支活跃蜡烛。点燃新蜡烛将替换现有蜡烛。"
     },
     "steps": {
@@ -342,7 +342,7 @@
     },
     "info": {
       "minToken": "最少1代币",
-      "burnTime": "燃烧7天",
+      "burnTime": "燃烧24小时",
       "onePerWallet": "每钱包1支"
     },
     "buttons": {
