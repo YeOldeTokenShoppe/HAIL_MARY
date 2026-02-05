@@ -1185,8 +1185,8 @@ export default function HandsGLTFScene({ onLoadComplete, offerings, hoveredOffer
           enablePan={false}
           enableZoom={false}
           enableRotate={true}
-          maxPolarAngle={Math.PI / 2}
-          minPolarAngle={Math.PI / 2}
+          maxPolarAngle={Math.PI * 0.6}  // Can look slightly down (about 18° below horizontal)
+          minPolarAngle={Math.PI / 3}    // Can look up (about 30° above horizontal)
           enableDamping={true}
           dampingFactor={0.1}
           rotateSpeed={0.5}

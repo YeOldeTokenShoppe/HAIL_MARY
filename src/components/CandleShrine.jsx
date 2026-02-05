@@ -5,8 +5,8 @@ import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import * as THREE from 'three'
 import { NewCandleEffectManager } from './NewCandleEffect'
 
-const CANDLE_COUNT = 80
-const MAX_ADDITIONAL = 0
+const CANDLE_COUNT = 0  // No base candles - all candles come from offerings
+const MAX_ADDITIONAL = 85  // 80 offering candles + buffer for NewCandleEffect overlap
 
 // Shared time uniform - all materials reference this single object
 const sharedUniforms = {
@@ -985,7 +985,18 @@ function AnimationController({ priceDirection, priceRef, shortTermPriceRef, cont
 }
 
 export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUNT, priceDirection = 0, priceRef, shortTermPriceRef, continuousOffsetRef, additionalCandles = [], onCandleClick, onCandleHover, onCandleLeave, clickedCandleId, isMobile = false, exclusionZone = null }) {
-  
+
+  // Debug: Track candle count changes
+  const prevCandleCountRef = useRef(0)
+  useEffect(() => {
+    const prevCount = prevCandleCountRef.current
+    console.log('[CandleCloud] additionalCandles:', prevCount, '->', additionalCandles.length)
+    if (prevCount > 0 && additionalCandles.length === 0) {
+      console.error('[CandleCloud] 🚨 CANDLES DISAPPEARED! Had', prevCount, 'now have 0')
+    }
+    prevCandleCountRef.current = additionalCandles.length
+  }, [additionalCandles.length])
+
   // ALL HOOKS MUST BE CALLED UNCONDITIONALLY - NO EARLY RETURNS BEFORE ALL HOOKS
   
   // Reset uniforms on mount to ensure clean state
@@ -1039,13 +1050,25 @@ export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUN
   // Combine positions - apply exclusion to additional candles too
   // Use stable random values based on candle id to prevent position shifts on re-render
   const positions = useMemo(() => {
+    // Hash function to convert string IDs to numbers
+    const hashId = (id) => {
+      if (typeof id === 'number') return id
+      if (!id) return 0
+      let hash = 0
+      for (let i = 0; i < id.length; i++) {
+        hash = ((hash << 5) - hash) + id.charCodeAt(i)
+        hash = hash & hash
+      }
+      return Math.abs(hash)
+    }
+
     const additional = additionalCandles.map(c => {
       let x = c.position ? c.position[0] : c.x
       let y = c.position ? c.position[1] : c.y
       let z = c.position ? c.position[2] : c.z
 
-      // Use candle id for deterministic "random" offset
-      const idSeed = (c.id || 0) % 1000 / 1000
+      // Use candle id for deterministic "random" offset (handle string IDs)
+      const idSeed = hashId(c.id) % 1000 / 1000
 
       // Apply body corridor exclusion to additional candles
       if (z >= BODY_CORRIDOR.zMin && z <= BODY_CORRIDOR.zMax) {
@@ -1507,33 +1530,7 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onPrice
         </div>
       )}
       
-      {/* Find My Candle button - only visible when user has an active lit candle */}
-      {allPositions.some(p => p.userId === currentUserId && p.litAt && (Date.now() - p.litAt) / 1000 < 604800) && (
-        <button
-          onClick={findUserCandle}
-          style={{
-            position: 'fixed',
-            bottom: '120px',
-            left: '30px',
-            background: 'linear-gradient(135deg, #ffaa00 0%, #ff8800 100%)',
-            border: 'none',
-            borderRadius: '12px',
-            padding: '12px 24px',
-            color: '#000',
-            fontFamily: 'monospace',
-            fontSize: '14px',
-            fontWeight: 'bold',
-            cursor: 'pointer',
-            boxShadow: '0 0 30px rgba(255, 170, 0, 0.4)',
-            zIndex: 10000,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          🔍 Find My Candle
-        </button>
-      )}
+      {/* Find My Candle button moved to UnifiedShrine stats tab */}
     </div>
   )
 }

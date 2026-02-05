@@ -79,7 +79,8 @@ export default function ShrinePage() {
   const [offerings, setOfferings] = useState([])
   const [totalOfferingsCount, setTotalOfferingsCount] = useState(0)
   const [isLoadingOfferings, setIsLoadingOfferings] = useState(true)
-  const [isHighlightingCandle, setIsHighlightingCandle] = useState(false)
+  const [sortOption, setSortOption] = useState('topBurners') // 'topBurners' or 'recent'
+  const [selectedCandle, setSelectedCandle] = useState(null) // Currently selected candle from 3D scene
 
 
   const [isClient, setIsClient] = useState(false)
@@ -168,81 +169,120 @@ useEffect(() => {
   }
 }, [])
 
-  // Fetch offerings from Firestore
+  // Helper to format offering data from Firestore doc
+  const formatOffering = (doc) => {
+    const data = doc.data()
+    const offering = {
+      id: doc.id,
+      name: data.name || 'Anonymous',
+      type: data.type || 'petition',
+      message: data.message || '',
+      tokensBurned: data.tokensBurned || 0,
+      userId: data.userId,
+      walletAddress: data.walletAddress,
+      userImageUrl: data.userImageUrl,
+      polaroidUrl: data.polaroidUrl,
+      imageUrl: data.imageUrl,
+      timestamp: data.timestamp || 'just now',
+      createdAt: data.createdAt,
+      litAt: data.litAt,
+      // Include stored position for consistent candle placement
+      position: data.position,
+      rotation: data.rotation,
+      scale: data.scale,
+      icon: data.type === 'petition' ? '🙏' :
+            data.type === 'appreciation' ? '✨' : '🖤'
+    }
+
+    // Format timestamp
+    if (data.createdAt) {
+      const date = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt)
+      const now = new Date()
+      const diff = now - date
+      const minutes = Math.floor(diff / 60000)
+      const hours = Math.floor(minutes / 60)
+      const days = Math.floor(hours / 24)
+
+      if (minutes < 1) {
+        offering.timestamp = 'just now'
+      } else if (minutes < 60) {
+        offering.timestamp = `${minutes} minute${minutes > 1 ? 's' : ''} ago`
+      } else if (hours < 24) {
+        offering.timestamp = `${hours} hour${hours > 1 ? 's' : ''} ago`
+      } else {
+        offering.timestamp = `${days} day${days > 1 ? 's' : ''} ago`
+      }
+    }
+
+    return offering
+  }
+
+  // Generate St. GR80 placeholder candles to fill empty slots
+  const generateStGR80Candles = (startIndex, count) => {
+    const placeholders = []
+    for (let i = 0; i < count; i++) {
+      const index = startIndex + i
+      placeholders.push({
+        id: `st-gr80-${index}`,
+        name: 'St. GR80',
+        type: 'shrine-keeper',
+        message: '',
+        tokensBurned: 0,
+        userId: `st-gr80-${index}`,
+        walletAddress: null,
+        userImageUrl: '/images/GR80_headshot.webp',
+        polaroidUrl: null,
+        imageUrl: null,
+        timestamp: 'eternal',
+        createdAt: null,
+        icon: '🕯️',
+        isPlaceholder: true, // Flag to identify St. GR80 candles
+      })
+    }
+    return placeholders
+  }
+
+  // Fetch offerings from Firestore - always 80 candles total (users + St. GR80 placeholders)
   const fetchOfferings = useCallback(async () => {
     try {
       setIsLoadingOfferings(true)
-      
-      // Get total count of all offerings (more efficient than fetching all docs)
-      // Note: If count() is not available in your Firebase version, uncomment the lines below
-      // const countSnapshot = await getDocs(collection(db, 'offerings'))
-      // setTotalOfferingsCount(countSnapshot.size)
-      
-      // For now, using getDocs until we verify Firebase version supports count()
+
+      // Get total count of all offerings
       const countSnapshot = await getDocs(collection(db, 'offerings'))
       setTotalOfferingsCount(countSnapshot.size)
-      
-      // Get recent offerings for display
+
+      // Query based on current sort option
       const offeringsQuery = query(
         collection(db, 'offerings'),
-        orderBy('createdAt', 'desc'),
-        limit(50)  // Increased from 20 to 50
+        orderBy(sortOption === 'topBurners' ? 'tokensBurned' : 'createdAt', 'desc'),
+        limit(80)
       )
-      
+
       const snapshot = await getDocs(offeringsQuery)
       const fetchedOfferings = []
-      
+
       snapshot.forEach((doc) => {
-        const data = doc.data()
-        const offering = {
-          id: doc.id,
-          name: data.name || 'Anonymous',
-          type: data.type || 'petition',
-          message: data.message || '',
-          tokensBurned: data.tokensBurned || 0,
-          userId: data.userId,
-          walletAddress: data.walletAddress,
-          userImageUrl: data.userImageUrl,
-          polaroidUrl: data.polaroidUrl, // Add polaroidUrl field
-          imageUrl: data.imageUrl, // Also check for imageUrl field
-          timestamp: data.timestamp || 'just now',
-          createdAt: data.createdAt, // Preserve the original Firestore timestamp
-          icon: data.type === 'petition' ? '🙏' : 
-                data.type === 'appreciation' ? '✨' : '🖤'
-        }
-        
-        // Format timestamp
-        if (data.createdAt) {
-          const date = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt)
-          const now = new Date()
-          const diff = now - date
-          const minutes = Math.floor(diff / 60000)
-          const hours = Math.floor(minutes / 60)
-          const days = Math.floor(hours / 24)
-          
-          if (minutes < 1) {
-            offering.timestamp = 'just now'
-          } else if (minutes < 60) {
-            offering.timestamp = `${minutes} minute${minutes > 1 ? 's' : ''} ago`
-          } else if (hours < 24) {
-            offering.timestamp = `${hours} hour${hours > 1 ? 's' : ''} ago`
-          } else {
-            offering.timestamp = `${days} day${days > 1 ? 's' : ''} ago`
-          }
-        }
-        
-        fetchedOfferings.push(offering)
+        fetchedOfferings.push(formatOffering(doc))
       })
-      
+
+      // Pad with St. GR80 placeholder candles to always have 80 total
+      const userCandleCount = fetchedOfferings.length
+      if (userCandleCount < 80) {
+        const placeholders = generateStGR80Candles(userCandleCount, 80 - userCandleCount)
+        fetchedOfferings.push(...placeholders)
+      }
+
+      console.log('[fetchOfferings] Setting offerings:', fetchedOfferings.length, 'total (', fetchedOfferings.filter(o => !o.isPlaceholder).length, 'users,', fetchedOfferings.filter(o => o.isPlaceholder).length, 'placeholders)')
       setOfferings(fetchedOfferings)
     } catch (error) {
-      console.error('Error fetching offerings:', error)
-      // Fallback to empty array on error
-      setOfferings([])
+      console.error('[fetchOfferings] Error fetching offerings:', error)
+      // On error, show all St. GR80 candles
+      console.log('[fetchOfferings] Setting fallback St. GR80 candles')
+      setOfferings(generateStGR80Candles(0, 80))
     } finally {
       setIsLoadingOfferings(false)
     }
-  }, [])
+  }, [sortOption])
 
   // Set up real-time listener for new offerings
   useEffect(() => {
@@ -427,24 +467,8 @@ useEffect(() => {
     setShowStakeModal(true);
   };
 
-  // Handle finding user's candle
-  const handleFindCandle = () => {
-    setIsHighlightingCandle(true);
-    // Call the UnifiedShrine's findUserCandle method
-    if (unifiedShrineRef.current) {
-      unifiedShrineRef.current.findUserCandle();
-    }
-  };
+  // Find My Candle functionality moved to stats tab in UnifiedShrine
 
-  // Handle returning to main view
-  const handleResetView = () => {
-    setIsHighlightingCandle(false);
-    // Call the UnifiedShrine's resetView method
-    if (unifiedShrineRef.current) {
-      unifiedShrineRef.current.resetView();
-    }
-  };
-  
   // Track if we're waiting for wallet connection and what action triggered it
   const [waitingForWallet, setWaitingForWallet] = useState(false);
   const [walletActionType, setWalletActionType] = useState(null); // 'candle' or 'stake'
@@ -694,15 +718,17 @@ useEffect(() => {
         pointerEvents: 'auto'
       }}>
         {isClient && delayedMount ? (
-          <UnifiedShrine 
+          <UnifiedShrine
             ref={unifiedShrineRef}
             key={`shrine-scene-${pathname}-${mountKey}`} // Force complete remount when cache cleared
             offerings={offerings}
             totalOfferingsCount={totalOfferingsCount}
             currentUserId={user?.id}
-            onSelectOffering={setHoveredOffering}
+            onSelectOffering={(offering) => {
+              setHoveredOffering(offering)
+              setSelectedCandle(offering) // Also update selected candle for stats panel
+            }}
             onLightCandle={(offering) => {
-
               // Don't set justLitOffering here - it's already set in handleLightCandle
               // This callback happens AFTER the effect completes, which is too late
             }}
@@ -715,10 +741,14 @@ useEffect(() => {
             }}
             user={user}
             onViewReset={() => {
-              setIsHighlightingCandle(false)
+              // View reset handled internally by UnifiedShrine
             }}
             showHelpOverlay={showHelpOverlay}
             onToggleHelp={() => setShowHelpOverlay(prev => !prev)}
+            sortOption={sortOption}
+            onSortChange={setSortOption}
+            selectedCandle={selectedCandle}
+            onRefreshOfferings={fetchOfferings}
           />
         ) : null}
       </div>
@@ -783,15 +813,6 @@ useEffect(() => {
           onLightCandle={handleLightCandleClick}
           onStakeClick={handleStakeClick}
           router={router}
-          onFindCandle={handleFindCandle}
-          onResetView={handleResetView}
-          isHighlighting={isHighlightingCandle}
-          hasActiveCandle={offerings.some(o => {
-            if (o.userId !== user?.id) return false
-            const litAt = o.createdAt?.toDate?.()?.getTime?.() || o.createdAt
-            if (!litAt) return false
-            return (Date.now() - litAt) / 1000 < 300
-          })}
         />
       )}
       

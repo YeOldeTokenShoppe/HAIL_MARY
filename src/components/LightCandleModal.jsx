@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useWalletAuth } from './WalletAuthProvider';
 import { db, collection, addDoc, doc, serverTimestamp, query, where, getDocs, deleteDoc, setDoc, increment } from '@/lib/firebaseClient';
+import { generateCandlePosition, generateCandleRotation, generateCandleScale } from '@/utils/candlePositions';
 import ThirdwebBuyModal from './ThirdwebBuyModal';
 import NoTokensPrompt from './NoTokensPrompt';
 import { erc20Contract } from '@/lib/contract';
@@ -347,6 +348,12 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
         : sanitizeText(recipientName || 'Someone');
       const validatedAmount = validateAmount(tokenAmount);
 
+      // Generate a unique seed for position (user ID + timestamp ensures uniqueness)
+      const positionSeed = `${user?.id || 'anon'}-${Date.now()}`
+      const position = generateCandlePosition(positionSeed, 0) // Index 0 = prime zone for new candles
+      const rotation = generateCandleRotation(positionSeed)
+      const scale = generateCandleScale(positionSeed)
+
       const baseOffering = {
         name: sanitizeText(user?.username || user?.firstName || 'Anonymous'),
         type: offeringType, // This is from a controlled enum
@@ -359,7 +366,11 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
         recipientName: sanitizedRecipientName,
         createdAt: serverTimestamp(),
         timestamp: new Date().toISOString(),
-        litAt: Date.now() // Add the litAt timestamp for candle melting logic
+        litAt: Date.now(), // Add the litAt timestamp for candle melting logic
+        // Store position so it's consistent between NewCandleEffect and the permanent candle
+        position: { x: position.x, y: position.y, z: position.z },
+        rotation,
+        scale
       };
       
 

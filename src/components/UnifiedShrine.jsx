@@ -1148,7 +1148,13 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   onViewReset,
   // External help overlay control (optional - uses internal state if not provided)
   showHelpOverlay: externalShowHelp,
-  onToggleHelp
+  onToggleHelp,
+  // Sort and selection props for stats panel
+  sortOption = 'topBurners',
+  onSortChange,
+  selectedCandle = null,
+  // Callback to refresh offerings after candle effect completes
+  onRefreshOfferings
 }, ref) {
   const { t } = useLanguage()
   // Track if component is mounted for SSR safety
@@ -1176,60 +1182,152 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   const testPriceOverride = null // const [testPriceOverride, setTestPriceOverride] = useState(null)
   // const [showTestControls, setShowTestControls] = useState(true)
   
-  const [additionalCandles, setAdditionalCandles] = useState([])
-  
+  // additionalCandles removed - candles now use stored positions from Firestore
+  // The NewCandleEffect flies to the exact position stored with the offering
+
+  // Track previous offering candles to prevent sudden disappearance
+  const prevOfferingCandlesRef = useRef([])
+
   // Convert offerings to candle positions for CandleCloud
+  // Uses priority zone system to position candles in front of the camera
   const offeringCandles = useMemo(() => {
-    if (!offerings || offerings.length === 0) return []
-    
-    // Simple hash function to generate consistent random values from a string
+    console.log('[UnifiedShrine] offeringCandles useMemo - offerings:', offerings?.length, 'prev:', prevOfferingCandlesRef.current?.length)
+
+    if (!offerings || offerings.length === 0) {
+      // If we had candles before but offerings is now empty, this might be a bug
+      // Return previous candles to prevent flickering
+      if (prevOfferingCandlesRef.current.length > 0) {
+        console.warn('[UnifiedShrine] offerings became empty but had candles before - preserving previous candles')
+        return prevOfferingCandlesRef.current
+      }
+      return []
+    }
+
+    // Priority zones - candles positioned in front of camera (looking at negative Z)
+    // Camera is at [0, 0, 15], Mary is at z=-8 to -12
+    const PRIORITY_ZONES = [
+      { capacity: 25, x: { min: -10, max: 10 }, y: { min: -2, max: 4 }, z: { min: -12, max: -6 } },   // Zone 1: Prime visibility
+      { capacity: 40, x: { min: -14, max: 14 }, y: { min: -3, max: 6 }, z: { min: -14, max: -4 } },   // Zone 2: Good visibility
+      { capacity: 60, x: { min: -18, max: 18 }, y: { min: -4, max: 10 }, z: { min: -16, max: -2 } },  // Zone 3: Peripheral
+      { capacity: Infinity, x: { min: -20, max: 20 }, y: { min: -5, max: 12 }, z: { min: -20, max: 0 } } // Zone 4: Overflow
+    ]
+
+    // Body corridor exclusion (viewer's body area)
+    const BODY_CORRIDOR = {
+      centerX: 0, centerY: -1,
+      zMin: -9, zMax: 6,
+      halfWidth: 4, halfHeight: 5
+    }
+
+    // Simple hash function for consistent random values
     const hashCode = (str) => {
       let hash = 0
       for (let i = 0; i < str.length; i++) {
         const char = str.charCodeAt(i)
         hash = ((hash << 5) - hash) + char
-        hash = hash & hash // Convert to 32bit integer
+        hash = hash & hash
       }
       return Math.abs(hash)
     }
-    
+
     // Seeded random generator
     const seededRandom = (seed, min = 0, max = 1) => {
       const x = Math.sin(seed) * 10000
       return min + (x - Math.floor(x)) * (max - min)
     }
-    
-    return offerings.map((offering, index) => {
-      // Use offering ID or index as seed for consistent randomness
+
+    // Get appropriate zone for candle index
+    const getZone = (index) => {
+      let count = 0
+      for (const zone of PRIORITY_ZONES) {
+        count += zone.capacity
+        if (index < count) return zone
+      }
+      return PRIORITY_ZONES[PRIORITY_ZONES.length - 1]
+    }
+
+    const usedPositions = []
+
+    const result = offerings.map((offering, index) => {
       const seed = hashCode(offering.id || `offering_${index}`)
-      
+
       // Use stored position from Firestore if available
       const storedPos = offering.position
-      const x = storedPos?.x ?? seededRandom(seed + 1, -15, 15)
-      const y = storedPos?.y ?? seededRandom(seed + 2, -10, 10)
-      const z = storedPos?.z ?? seededRandom(seed + 3, -7.5, 7.5)
-      
+      let x, y, z
+
+      if (storedPos?.x !== undefined) {
+        x = storedPos.x
+        y = storedPos.y
+        z = storedPos.z
+      } else {
+        // Generate position in appropriate priority zone
+        const zone = getZone(index)
+
+        // Try multiple attempts to find non-overlapping position
+        for (let attempt = 0; attempt < 10; attempt++) {
+          const attemptSeed = seed + attempt * 100
+          x = seededRandom(attemptSeed + 1, zone.x.min, zone.x.max)
+          y = seededRandom(attemptSeed + 2, zone.y.min, zone.y.max)
+          z = seededRandom(attemptSeed + 3, zone.z.min, zone.z.max)
+
+          // Check body corridor exclusion
+          if (z >= BODY_CORRIDOR.zMin && z <= BODY_CORRIDOR.zMax) {
+            const inXRange = Math.abs(x - BODY_CORRIDOR.centerX) < BODY_CORRIDOR.halfWidth
+            const inYRange = Math.abs(y - BODY_CORRIDOR.centerY) < BODY_CORRIDOR.halfHeight
+            if (inXRange && inYRange) {
+              // Push outward
+              const pushDir = x >= 0 ? 1 : -1
+              x = pushDir * (BODY_CORRIDOR.halfWidth + 1 + seededRandom(attemptSeed + 10, 0, 2))
+            }
+          }
+
+          // Check minimum distance from other candles
+          const tooClose = usedPositions.some(pos => {
+            const dist = Math.sqrt((x - pos.x) ** 2 + (y - pos.y) ** 2 + (z - pos.z) ** 2)
+            return dist < 2.0
+          })
+
+          if (!tooClose) break
+        }
+      }
+
+      usedPositions.push({ x, y, z })
+
       return {
         position: [x, y, z],
-        x: x,
-        y: y,
-        z: z,
+        x, y, z,
         rotation: seededRandom(seed + 4, 0, Math.PI * 2),
         scale: seededRandom(seed + 5, 0.8, 1.2),
         offering: offering,
         userId: offering.userId || offering.uid || `user_${index}`,
         username: offering.userName || offering.username || 'Anonymous',
         id: offering.id || `offering_${index}`,
-        litAt: offering.litAt || offering.createdAt?.toDate?.()?.getTime?.() || offering.timestamp?.toDate?.()?.getTime?.()
+        litAt: offering.litAt || offering.createdAt?.toDate?.()?.getTime?.() || offering.timestamp?.toDate?.()?.getTime?.(),
+        isPlaceholder: offering.isPlaceholder || false
       }
     })
+
+    // Store the computed candles to prevent sudden disappearance
+    if (result.length > 0) {
+      prevOfferingCandlesRef.current = result
+    }
+
+    console.log('[UnifiedShrine] offeringCandles computed:', result.length, 'candles')
+    return result
   }, [offerings])
-  
+  // Debug logging: track candle count changes
+  useEffect(() => {
+    console.log(`[UnifiedShrine] Candles: ${offeringCandles.length} total`)
+    if (offeringCandles.length === 0 && prevOfferingCandlesRef.current.length > 0) {
+      console.error('[UnifiedShrine] WARNING: All candles disappeared! Previous count was:', prevOfferingCandlesRef.current.length)
+    }
+  }, [offeringCandles])
+
   // Cleanup expired candles every minute
   useEffect(() => {
     const interval = setInterval(async () => {
       const now = Date.now()
-      
+
       // Find expired offerings
       const expiredOfferings = offerings.filter(offering => {
         const litAtTime = offering.litAt || offering.createdAt?.toDate?.()?.getTime?.() || offering.timestamp?.toDate?.()?.getTime?.()
@@ -1270,7 +1368,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   
   const [clickedCandleId, setClickedCandleId] = useState(null)
   const [isRippleActive, setIsRippleActive] = useState(false)
-  const [activeStatsTab, setActiveStatsTab] = useState('price') // 'price', 'staking', 'pulse', or 'leaders'
+  const [activeStatsTab, setActiveStatsTab] = useState('leaders') // 'leaders', 'price', 'staking', or 'pulse'
   const [internalShowHelp, setInternalShowHelp] = useState(false) // Internal help state (fallback)
   const [statsBoxCollapsed, setStatsBoxCollapsed] = useState(true) // Collapsed stats box - closed by default
   const [activeAnnotationId, setActiveAnnotationId] = useState(null) // Which annotation label is shown
@@ -1381,10 +1479,8 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
     if (userCandleIndex !== -1) {
       const userCandle = offeringCandles[userCandleIndex]
       
-      // Calculate the actual instance ID (base candles + offering index)
-      // Base candles are 0-299 on mobile, 0-499 on desktop
-      const baseCandles = isMobile ? 100 : 100
-      const actualInstanceId = baseCandles + userCandleIndex
+      // Instance ID is simply the index since all candles come from offerings (CANDLE_COUNT = 0)
+      const actualInstanceId = userCandleIndex
       
 
       
@@ -1433,14 +1529,22 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
         instanceId: actualInstanceId,
         litAt: formattedDate,
         litDate: litAt,
+        meltPercentage: parseFloat(meltPercentage),
         message: userCandle.offering.message || userCandle.offering.text,
         username: userCandle.offering.name || userCandle.username || 'Anonymous',
         userImageUrl: userCandle.offering.userImageUrl || userCandle.offering.imageUrl || null,
         userId: userCandle.userId
       })
-      
-      // Don't show tooltip immediately - wait for hover
-      // Just store the data for when user hovers
+
+      // Also select this candle in the stats panel
+      if (onSelectOffering) {
+        onSelectOffering({
+          ...userCandle.offering,
+          meltPercentage: parseFloat(meltPercentage),
+          timeAgo,
+          isUserCandle: true
+        })
+      }
     } else {
       // Clear any existing highlight
       if (window.sharedUniforms) {
@@ -1478,13 +1582,34 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   useImperativeHandle(ref, () => ({
     triggerCandleEffect: (offering) => {
       if (effectRef.current) {
+        // Pass the stored position from the offering to the effect
         effectRef.current.triggerEffect(offering)
         // NOTE: onLightCandle is NOT called here to prevent duplicate Prayer Received
         // The onLightCandle callback should be called by the component that triggers this effect
-        
+
         // Activate ripple state to trigger purple screen and brighter aura
         setIsRippleActive(true)
         setTimeout(() => setIsRippleActive(false), 8000) // Match the justLitOffering duration
+
+        // Move camera to watch the candle land at its final position
+        if (offering?.position) {
+          const pos = offering.position
+          // Set camera to look at the candle landing spot
+          setTargetCameraPosition({
+            target: [pos.x, pos.y, pos.z]
+          })
+          setOverrideCameraControl(true)
+
+          // Reset camera after the effect completes
+          setTimeout(() => {
+            setTargetCameraPosition(null)
+            setResetCameraToDefault(true)
+            setTimeout(() => {
+              setResetCameraToDefault(false)
+              setOverrideCameraControl(false)
+            }, 1600)
+          }, 12000) // After NewCandleEffect finishes (~10-12 seconds)
+        }
       }
     },
     findUserCandle,
@@ -1838,39 +1963,30 @@ useEffect(() => {
     }
   }, [offerings, onSelectOffering, userCandleData, offeringCandles, currentUserId])
 
-  const handleNewCandle = useCallback((position, offering) => {
-    const id = Date.now()
-    // Use id-based rotation so it's stable across re-renders
-    const rotation = (id % 1000) / 1000 * Math.PI * 2
-    setAdditionalCandles(prev => [...prev, {
-      position,
-      offering,
-      id,
-      rotation,
-      x: position[0],
-      y: position[1],
-      z: position[2],
-      scale: 1.0,
-      litAt: id,
-      userId: offering?.userId || offering?.uid,
-      username: offering?.userName || offering?.username || 'Anonymous'
-    }])
-    
+  // Called when NewCandleEffect completes - candle is already in Firestore with stored position
+  const handleNewCandleComplete = useCallback((position, offering) => {
+    console.log('[UnifiedShrine] handleNewCandleComplete - candle landed at:', position)
+
+    // Refresh offerings to show the candle at its stored position
+    // This ensures the candle appears immediately after the effect ends
+    if (onRefreshOfferings) {
+      onRefreshOfferings()
+    }
+
     // Show the latest polaroid on the phone screen after a delay
     setTimeout(() => {
-      setShowLatestPolaroid(true);
+      setShowLatestPolaroid(true)
       // Hide it after 8 seconds
       setTimeout(() => {
-        setShowLatestPolaroid(false);
-      }, 8000);
-    }, 2000); // Show after 2 seconds (when burst is complete)
-    
-    // Stats update automatically from offerings prop
-    
+        setShowLatestPolaroid(false)
+      }, 8000)
+    }, 2000) // Show after 2 seconds (when burst is complete)
+
+    // Notify parent - candle is already in Firestore, no need to add to local state
     if (onLightCandle) {
       onLightCandle(offering)
     }
-  }, [onLightCandle])
+  }, [onLightCandle, onRefreshOfferings])
 
   // Trigger pulse in candle cloud when Arctic Rings fire
   const handleCandlePulse = useCallback((position) => {
@@ -2183,213 +2299,8 @@ useEffect(() => {
         </div>
       )}
 
-      {/* Fixed screen-space panel for user's candle info - rendered via portal to escape stacking context */}
-      {targetCameraPosition && userCandleData && typeof document !== 'undefined' && createPortal(
-        <div
-          style={{
-            position: 'fixed',
-            // Mobile: small bar at bottom so it doesn't block the centered candle
-            // Desktop: position at top right
-            ...(isMobile ? {
-              bottom: '120px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-            } : {
-              top: '80px',
-              right: '24px',
-            }),
-            background: 'rgba(20, 20, 30, 0.85)',
-            borderRadius: isMobile ? '20px' : '24px',
-            padding: isMobile ? '0.4rem 1rem' : '2rem',
-            minWidth: isMobile ? 'auto' : '280px',
-            maxWidth: isMobile ? '280px' : '320px',
-            border: '1px solid rgba(138, 43, 226, 0.4)',
-            boxShadow: '0 0 60px rgba(138, 43, 226, 0.3)',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
-            zIndex: 500,
-            pointerEvents: 'none',
-            textAlign: 'center',
-          }}
-        >
-          <style>{`
-            @keyframes portalSlideIn {
-              from {
-                opacity: 0;
-                transform: translateX(30px);
-              }
-              to {
-                opacity: 1;
-                transform: translateX(0);
-              }
-            }
-          `}</style>
-          <div style={{ animation: 'portalSlideIn 0.4s ease-out' }}>
-            {/* Mobile: Compact horizontal bar */}
-            {isMobile ? (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-              }}>
-                {/* Small avatar */}
-                {userCandleData.userImageUrl ? (
-                  <img
-                    src={userCandleData.userImageUrl}
-                    alt={userCandleData.username}
-                    style={{
-                      width: '28px',
-                      height: '28px',
-                      borderRadius: '50%',
-                      objectFit: 'cover',
-                      border: '1px solid rgba(138, 43, 226, 0.6)',
-                      flexShrink: 0
-                    }}
-                  />
-                ) : (
-                  <div style={{
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #8a2be2, #ff006e)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
-                    color: '#fff',
-                    flexShrink: 0
-                  }}>
-                    {userCandleData.username?.charAt(0).toUpperCase() || '?'}
-                  </div>
-                )}
-                {/* Name and status inline */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span style={{
-                    color: '#00f5d4',
-                    fontSize: '0.8rem',
-                    fontWeight: '600',
-                  }}>
-                    {userCandleData.username}
-                  </span>
-                  <span style={{
-                    fontSize: '0.65rem',
-                    color: 'rgba(255,255,255,0.7)',
-                  }}>
-                    🕯️ {userCandleData.litAt}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              /* Desktop: Full card layout */
-              <>
-            {/* Icon/Avatar */}
-            <div style={{ marginBottom: '1rem' }}>
-              {userCandleData.userImageUrl ? (
-                <img
-                  src={userCandleData.userImageUrl}
-                  alt={userCandleData.username}
-                  style={{
-                    width: '60px',
-                    height: '60px',
-                    borderRadius: '50%',
-                    objectFit: 'cover',
-                    filter: 'drop-shadow(0 0 15px rgba(138, 43, 226, 0.6))',
-                    border: '2px solid rgba(138, 43, 226, 0.6)'
-                  }}
-                />
-              ) : (
-                <div style={{
-                  width: '60px',
-                  height: '60px',
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #8a2be2, #ff006e)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '24px',
-                  fontWeight: 'bold',
-                  color: '#fff',
-                  margin: '0 auto',
-                  filter: 'drop-shadow(0 0 15px rgba(138, 43, 226, 0.6))',
-                  border: '2px solid rgba(138, 43, 226, 0.6)'
-                }}>
-                  {userCandleData.username?.charAt(0).toUpperCase() || '?'}
-                </div>
-              )}
-            </div>
+      {/* User candle info now shown in the stats panel instead of a separate overlay */}
 
-            {/* Title */}
-            <h2 style={{
-              fontSize: '1.2rem',
-              marginBottom: '0.5rem',
-              fontWeight: 'bold',
-              textTransform: 'uppercase',
-              letterSpacing: '2px',
-              fontFamily: "'Orbitron', monospace",
-              color: '#fff'
-            }}>
-              Your Candle
-            </h2>
-
-            {/* Username */}
-            <p style={{
-              marginBottom: '1rem',
-              color: '#00f5d4',
-              fontSize: '1.1rem',
-              fontWeight: '600',
-              lineHeight: '1.3'
-            }}>
-              {userCandleData.username}
-            </p>
-
-            {/* Candle stats */}
-            <div style={{
-              padding: '0.75rem 1rem',
-              background: 'rgba(138, 43, 226, 0.15)',
-              borderRadius: '12px',
-              border: '1px solid rgba(138, 43, 226, 0.3)',
-              marginBottom: userCandleData.message ? '1rem' : '0'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-              }}>
-                <span style={{ fontSize: '18px' }}>🕯️</span>
-                <span style={{
-                  fontSize: '0.9rem',
-                  color: '#fff',
-                  fontFamily: "'Orbitron', monospace",
-                  letterSpacing: '0.5px'
-                }}>
-                  {userCandleData.litAt}
-                </span>
-              </div>
-            </div>
-
-            {/* Message if present */}
-            {userCandleData.message && (
-              <div style={{
-                padding: '0.75rem 1rem',
-                background: 'rgba(255, 255, 255, 0.05)',
-                borderRadius: '12px',
-                fontSize: '0.9rem',
-                color: 'rgba(255, 255, 255, 0.8)',
-                fontStyle: 'italic',
-                lineHeight: '1.3',
-              }}>
-                "{userCandleData.message}"
-              </div>
-            )}
-              </>
-            )}
-          </div>
-        </div>,
-        document.body
-      )}
-      
       {mounted && typeof window !== 'undefined' && (
       <CanvasErrorBoundary>
       <Canvas
@@ -2489,11 +2400,11 @@ useEffect(() => {
           <group position={[0, 0, 0]}>
             <Suspense >
               <CandleCloud
-                count={isMobile ? 100 : 100}
+                count={0}  // No base candles - all 80 come from offerings (users + St. GR80)
                 priceRef={priceRef}
                 shortTermPriceRef={shortTermPriceRef}
                 continuousOffsetRef={continuousOffsetRef}
-                additionalCandles={[...offeringCandles, ...additionalCandles]}
+                additionalCandles={offeringCandles}
                 onCandleClick={handleCandleClick}
                 clickedCandleId={clickedCandleId}
                 isMobile={isMobile}
@@ -2541,7 +2452,7 @@ useEffect(() => {
             <NewCandleEffectManager
               ref={effectRef}
               phonePosition={[0, -1, -5]}  // Near phone/hands at [0, -1, -6]
-              onNewCandle={handleNewCandle}
+              onNewCandle={handleNewCandleComplete}
               onCandlePulse={handleCandlePulse}
             />
           </group>
@@ -2891,6 +2802,29 @@ useEffect(() => {
           borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
           overflow: 'hidden',
         }}>
+          {/* 🔥 Leaders Tab - Now First */}
+          <button
+            onClick={() => setActiveStatsTab('leaders')}
+            style={{
+              flex: 1,
+              padding: isMobile ? '4px 4px' : '6px 8px',
+              background: activeStatsTab === 'leaders' ? 'rgba(255, 149, 0, 0.2)' : 'transparent',
+              border: 'none',
+              borderBottom: activeStatsTab === 'leaders' ? '2px solid #ff9500' : '2px solid transparent',
+              color: activeStatsTab === 'leaders' ? '#ff9500' : '#ccc',
+              fontSize: isMobile ? '10px' : '12px',
+              fontFamily: 'monospace',
+              fontWeight: activeStatsTab === 'leaders' ? 'bold' : 'normal',
+              cursor: 'pointer',
+              textTransform: 'uppercase',
+              transition: 'all 0.2s',
+              marginBottom: '-1px',
+              minWidth: 0,
+              overflow: 'hidden',
+            }}
+          >
+            🔥
+          </button>
           <button
             onClick={() => setActiveStatsTab('price')}
             style={{
@@ -2963,28 +2897,6 @@ useEffect(() => {
             }}
           >
             {t('illumin80.stats.pulse')}
-          </button>
-          <button
-            onClick={() => setActiveStatsTab('leaders')}
-            style={{
-              flex: 1,
-              padding: isMobile ? '4px 4px' : '6px 8px',
-              background: activeStatsTab === 'leaders' ? 'rgba(255, 149, 0, 0.2)' : 'transparent',
-              border: 'none',
-              borderBottom: activeStatsTab === 'leaders' ? '2px solid #ff9500' : '2px solid transparent',
-              color: activeStatsTab === 'leaders' ? '#ff9500' : '#ccc',
-              fontSize: isMobile ? '10px' : '12px',
-              fontFamily: 'monospace',
-              fontWeight: activeStatsTab === 'leaders' ? 'bold' : 'normal',
-              cursor: 'pointer',
-              textTransform: 'uppercase',
-              transition: 'all 0.2s',
-              marginBottom: '-1px',
-              minWidth: 0,
-              overflow: 'hidden',
-            }}
-          >
-            🔥
           </button>
         </div>
         
@@ -3320,14 +3232,13 @@ useEffect(() => {
           </>
         ) : activeStatsTab === 'leaders' ? (
           <>
-            {/* Leaders Tab Content */}
+            {/* Leaders Tab Content - Updated with sort toggle and selected candle */}
             <div style={{
               padding: 0,
               margin: isMobile ? '-2px' : '-4px',
             }}>
-              {/* Header */}
+              {/* Header with Sort Toggle */}
               <div style={{
-                textAlign: 'center',
                 marginBottom: isMobile ? '8px' : '12px',
                 padding: '8px',
                 background: 'rgba(255, 149, 0, 0.1)',
@@ -3335,23 +3246,264 @@ useEffect(() => {
                 border: '1px solid rgba(255, 149, 0, 0.2)'
               }}>
                 <div style={{
+                  textAlign: 'center',
                   fontSize: isMobile ? '11px' : '12px',
                   color: '#ff9500',
                   textTransform: 'uppercase',
                   letterSpacing: '1px',
                   fontFamily: "'Orbitron', monospace",
-                  fontWeight: 'bold'
+                  fontWeight: 'bold',
+                  marginBottom: '8px'
                 }}>
                   🔥 Illumin80 🔥
                 </div>
+
+                {/* Sort Toggle Buttons */}
                 <div style={{
-                  fontSize: isMobile ? '9px' : '10px',
-                  color: 'rgba(255, 255, 255, 0.6)',
-                  marginTop: '2px'
+                  display: 'flex',
+                  gap: '6px',
+                  justifyContent: 'center'
                 }}>
-                  Top Burners
+                  <button
+                    onClick={() => onSortChange && onSortChange('topBurners')}
+                    style={{
+                      padding: isMobile ? '4px 10px' : '5px 14px',
+                      fontSize: isMobile ? '9px' : '10px',
+                      fontFamily: 'monospace',
+                      fontWeight: sortOption === 'topBurners' ? 'bold' : 'normal',
+                      background: sortOption === 'topBurners' ? 'rgba(255, 149, 0, 0.3)' : 'rgba(255, 255, 255, 0.05)',
+                      border: sortOption === 'topBurners' ? '1px solid rgba(255, 149, 0, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      color: sortOption === 'topBurners' ? '#ff9500' : 'rgba(255, 255, 255, 0.6)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}
+                  >
+                    Top Burners
+                  </button>
+                  <button
+                    onClick={() => onSortChange && onSortChange('recent')}
+                    style={{
+                      padding: isMobile ? '4px 10px' : '5px 14px',
+                      fontSize: isMobile ? '9px' : '10px',
+                      fontFamily: 'monospace',
+                      fontWeight: sortOption === 'recent' ? 'bold' : 'normal',
+                      background: sortOption === 'recent' ? 'rgba(0, 245, 212, 0.3)' : 'rgba(255, 255, 255, 0.05)',
+                      border: sortOption === 'recent' ? '1px solid rgba(0, 245, 212, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      color: sortOption === 'recent' ? '#00f5d4' : 'rgba(255, 255, 255, 0.6)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px'
+                    }}
+                  >
+                    Most Recent
+                  </button>
                 </div>
               </div>
+
+              {/* Selected Candle Display */}
+              {selectedCandle ? (
+                <div style={{
+                  marginBottom: isMobile ? '8px' : '12px',
+                  padding: isMobile ? '10px' : '12px',
+                  background: selectedCandle.isPlaceholder
+                    ? 'rgba(138, 43, 226, 0.1)'
+                    : 'rgba(0, 0, 0, 0.4)',
+                  borderRadius: '8px',
+                  border: selectedCandle.isPlaceholder
+                    ? '1px solid rgba(138, 43, 226, 0.3)'
+                    : '1px solid rgba(212, 175, 55, 0.3)'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    marginBottom: selectedCandle.isPlaceholder ? '0' : '8px'
+                  }}>
+                    {selectedCandle.userImageUrl ? (
+                      <img
+                        src={selectedCandle.userImageUrl}
+                        alt=""
+                        style={{
+                          width: isMobile ? '32px' : '40px',
+                          height: isMobile ? '32px' : '40px',
+                          borderRadius: '50%',
+                          objectFit: 'cover',
+                          border: selectedCandle.isPlaceholder
+                            ? '2px solid rgba(138, 43, 226, 0.6)'
+                            : '2px solid rgba(212, 175, 55, 0.5)',
+                          boxShadow: selectedCandle.isPlaceholder
+                            ? '0 0 10px rgba(138, 43, 226, 0.4)'
+                            : 'none'
+                        }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: isMobile ? '32px' : '40px',
+                        height: isMobile ? '32px' : '40px',
+                        borderRadius: '50%',
+                        background: 'rgba(212, 175, 55, 0.2)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: isMobile ? '16px' : '20px',
+                        border: '2px solid rgba(212, 175, 55, 0.5)'
+                      }}>
+                        🕯️
+                      </div>
+                    )}
+                    <div style={{ flex: 1 }}>
+                      <div style={{
+                        fontSize: isMobile ? '12px' : '14px',
+                        fontWeight: 'bold',
+                        color: selectedCandle.isPlaceholder ? '#a78bfa' : '#d4af37',
+                        marginBottom: '2px'
+                      }}>
+                        {selectedCandle.name || 'Anonymous'}
+                      </div>
+                      <div style={{
+                        fontSize: isMobile ? '10px' : '11px',
+                        color: 'rgba(255, 255, 255, 0.6)'
+                      }}>
+                        {selectedCandle.isPlaceholder
+                          ? 'Shrine Keeper'
+                          : (selectedCandle.timestamp || 'recently')}
+                      </div>
+                    </div>
+                    {!selectedCandle.isPlaceholder && (
+                      <div style={{
+                        textAlign: 'right'
+                      }}>
+                        <div style={{
+                          fontSize: isMobile ? '12px' : '14px',
+                          fontWeight: 'bold',
+                          color: '#ff9500'
+                        }}>
+                          {(selectedCandle.tokensBurned || 0).toLocaleString()}
+                        </div>
+                        <div style={{
+                          fontSize: isMobile ? '8px' : '9px',
+                          color: 'rgba(255, 255, 255, 0.5)',
+                          textTransform: 'uppercase'
+                        }}>
+                          RL80 burned
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {/* User's candle indicator */}
+                  {selectedCandle.isUserCandle && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      marginBottom: '8px',
+                      padding: '6px 10px',
+                      background: 'rgba(0, 245, 212, 0.15)',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(0, 245, 212, 0.3)'
+                    }}>
+                      <span style={{ fontSize: '12px' }}>✨</span>
+                      <span style={{
+                        fontSize: isMobile ? '10px' : '11px',
+                        color: '#00f5d4',
+                        fontWeight: 'bold',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.5px'
+                      }}>
+                        Your Candle
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Melt percentage bar for user's candle */}
+                  {selectedCandle.meltPercentage !== undefined && (
+                    <div style={{ marginBottom: '8px' }}>
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: '4px'
+                      }}>
+                        <span style={{
+                          fontSize: isMobile ? '9px' : '10px',
+                          color: 'rgba(255, 255, 255, 0.6)'
+                        }}>
+                          🕯️ {selectedCandle.timeAgo || selectedCandle.timestamp}
+                        </span>
+                        <span style={{
+                          fontSize: isMobile ? '10px' : '11px',
+                          color: selectedCandle.meltPercentage > 80 ? '#ff6b6b' : '#00f5d4',
+                          fontWeight: 'bold'
+                        }}>
+                          {selectedCandle.meltPercentage.toFixed(1)}% melted
+                        </span>
+                      </div>
+                      <div style={{
+                        height: '6px',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        borderRadius: '3px',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${100 - selectedCandle.meltPercentage}%`,
+                          background: selectedCandle.meltPercentage > 80
+                            ? 'linear-gradient(90deg, #ff6b6b, #ff9500)'
+                            : 'linear-gradient(90deg, #00f5d4, #00d4aa)',
+                          borderRadius: '3px',
+                          transition: 'width 0.3s ease'
+                        }} />
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedCandle.isPlaceholder ? (
+                    <div style={{
+                      fontSize: isMobile ? '9px' : '10px',
+                      color: 'rgba(167, 139, 250, 0.8)',
+                      fontStyle: 'italic',
+                      marginTop: '6px',
+                      textAlign: 'center'
+                    }}>
+                      This candle awaits a devotee...
+                    </div>
+                  ) : selectedCandle.message && (
+                    <div style={{
+                      fontSize: isMobile ? '10px' : '11px',
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      fontStyle: 'italic',
+                      padding: '8px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      borderRadius: '6px',
+                      lineHeight: '1.4'
+                    }}>
+                      "{selectedCandle.message}"
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{
+                  marginBottom: isMobile ? '8px' : '12px',
+                  padding: isMobile ? '12px' : '16px',
+                  background: 'rgba(0, 0, 0, 0.2)',
+                  borderRadius: '8px',
+                  border: '1px dashed rgba(255, 255, 255, 0.1)',
+                  textAlign: 'center'
+                }}>
+                  <div style={{
+                    fontSize: isMobile ? '10px' : '11px',
+                    color: 'rgba(255, 255, 255, 0.4)',
+                    fontStyle: 'italic'
+                  }}>
+                    Click a candle to see details
+                  </div>
+                </div>
+              )}
 
               {/* Trophy Candle Carousel */}
               {leaderboardLoading ? (
@@ -3374,7 +3526,7 @@ useEffect(() => {
                 </div>
               ) : (
                 <div style={{
-                  height: isMobile ? '200px' : '240px',
+                  height: isMobile ? '140px' : '160px',
                   background: 'rgba(0, 0, 0, 0.3)',
                   borderRadius: '8px',
                   border: '1px solid rgba(255, 149, 0, 0.2)',
@@ -3383,39 +3535,56 @@ useEffect(() => {
                   <LeaderboardCarousel leaderboardData={leaderboardData} isMobile={isMobile} />
                 </div>
               )}
+
+              {/* Find My Candle Button - inside stats tab */}
+              {currentUserId && offeringCandles.some(c => c.userId === currentUserId) && (
+                <button
+                  onClick={() => {
+                    if (targetCameraPosition) {
+                      // Already highlighting - reset view
+                      resetView()
+                    } else {
+                      findUserCandle()
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    marginTop: isMobile ? '8px' : '12px',
+                    padding: isMobile ? '10px 12px' : '12px 16px',
+                    background: targetCameraPosition
+                      ? 'rgba(255, 100, 100, 0.2)'
+                      : 'rgba(0, 255, 136, 0.15)',
+                    border: targetCameraPosition
+                      ? '1px solid rgba(255, 100, 100, 0.4)'
+                      : '1px solid rgba(0, 255, 136, 0.4)',
+                    borderRadius: '8px',
+                    color: targetCameraPosition ? '#ff6b6b' : '#00ff88',
+                    fontFamily: 'monospace',
+                    fontSize: isMobile ? '11px' : '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    transition: 'all 0.3s ease',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}
+                >
+                  {targetCameraPosition ? (
+                    <>✕ {t('illumin80.resetView')}</>
+                  ) : (
+                    <>🔍 {t('illumin80.findMyCandle')}</>
+                  )}
+                </button>
+              )}
             </div>
           </>
         ) : null}
         </div>
 
-        {/* Find My Candle button for mobile - positioned below stats box */}
-        {isMobile && currentUserId && !targetCameraPosition && offeringCandles.some(c => c.userId === currentUserId) && (
-          <button
-            onClick={() => findUserCandle()}
-            style={{
-              background: 'rgba(0, 20, 20, 0.7)',
-              border: '1px solid rgba(0, 255, 136, 0.4)',
-              borderRadius: '8px',
-              padding: '6px 12px',
-              color: '#00ff88',
-              fontFamily: 'system-ui, -apple-system, sans-serif',
-              fontSize: '11px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.3)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '5px',
-              transition: 'all 0.3s ease',
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
-              pointerEvents: 'auto',
-            }}
-          >
-            🔍 <span>{t('illumin80.findMyCandle').toUpperCase()}</span>
-          </button>
-        )}
+        {/* Find My Candle button moved inside stats tab */}
         </div>,
         document.body
       )}

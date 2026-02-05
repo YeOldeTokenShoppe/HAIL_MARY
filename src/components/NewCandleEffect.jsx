@@ -13,6 +13,7 @@ const ARC_HEIGHT = 3 // How high the arc goes above the midpoint
 const MOBILE_ARC_HEIGHT = 1.5 // Lower arc for mobile visibility
 const MOBILE_BREAKPOINT = 768 // px
 const BRIGHT_GLOW_DURATION = 5.0 // How long the candle stays bright after landing (seconds)
+const FADE_OUT_DURATION = 1.5 // How long to fade out (gives time for Firestore fetch)
 
 // Effect landing zone - constrained to be clearly visible from initial camera at [0, 0, 15]
 // Camera has 60° FOV. Phone/hands at z=-6, Mary at z=-8 to z=-12
@@ -197,7 +198,8 @@ export function NewCandleEffect({
   startPosition = [0, 0, 0], // Phone screen position
   endPosition = [5, 2, -3],   // Target in candle cloud
   onComplete = () => {},
-  onFullyComplete = () => {},
+  onFadeStart = () => {}, // Called when fade begins - trigger Firestore refresh here
+  onFullyComplete = () => {}, // Called when fade ends - hide effect candle here
   candleModelPath = '/models/tinyJapCanOnly.glb',
   isActive = true,
   isMobile = false,
@@ -207,11 +209,15 @@ export function NewCandleEffect({
 }) {
   const groupRef = useRef()
   const trailRef = useRef()
-  const [phase, setPhase] = useState('emerging') // 'emerging' | 'traveling' | 'arriving' | 'glowing' | 'complete'
+  const [phase, setPhase] = useState('emerging') // 'emerging' | 'traveling' | 'arriving' | 'glowing' | 'fading' | 'complete'
   const progressRef = useRef(0)
   const trailParticles = useRef([])
   const glowTimeRef = useRef(0) // Track how long we've been glowing
+  const fadeTimeRef = useRef(0) // Track how long we've been fading
   const hasTriggeredRipple = useRef(false) // Track if ripple has been triggered
+  const hasTriggeredFadeStart = useRef(false) // Track if fade start was triggered
+  const hasTriggeredFadeComplete = useRef(false) // Track if fade complete was triggered
+  const [opacity, setOpacity] = useState(1) // For fade-out transition
   
   // Calculate arc path control point
   const controlPoint = useMemo(() => {
@@ -243,9 +249,13 @@ export function NewCandleEffect({
     if (isActive) {
       progressRef.current = 0
       glowTimeRef.current = 0
+      fadeTimeRef.current = 0
       setPhase('emerging')
+      setOpacity(1)
       trailParticles.current = []
       hasTriggeredRipple.current = false // Reset ripple trigger
+      hasTriggeredFadeStart.current = false // Reset fade start trigger
+      hasTriggeredFadeComplete.current = false // Reset fade complete trigger
     }
   }, [isActive])
   
@@ -257,29 +267,53 @@ export function NewCandleEffect({
     // Handle glowing phase separately
     if (phase === 'glowing') {
       glowTimeRef.current += delta
-      
+
       // Pulsing effect during glow
       const pulseIntensity = 1 + Math.sin(glowTimeRef.current * 3) * 0.2
       groupRef.current.scale.setScalar(1.1 * pulseIntensity)
-      
+
       // Continue gentle rotation
       groupRef.current.rotation.y += delta * 0.5
-      
-      // After glow duration, complete
-      if (glowTimeRef.current >= BRIGHT_GLOW_DURATION) {
+
+      // After glow duration, transition to fading phase
+      if (glowTimeRef.current >= BRIGHT_GLOW_DURATION && !hasTriggeredFadeStart.current) {
+        hasTriggeredFadeStart.current = true
+        setPhase('fading')
+        fadeTimeRef.current = 0
+        // Call onFadeStart NOW to trigger the Firestore refresh
+        // The effect candle stays visible during fade while permanent candle loads
+        onFadeStart()
+      }
+      // Don't return early - let trail particles continue updating below
+    }
+
+    // Handle fading phase - keep candle visible but fade out
+    if (phase === 'fading') {
+      fadeTimeRef.current += delta
+
+      // Calculate fade progress (0 to 1)
+      const fadeProgress = Math.min(fadeTimeRef.current / FADE_OUT_DURATION, 1)
+      const newOpacity = 1 - easeOutCubic(fadeProgress)
+      setOpacity(newOpacity)
+
+      // Keep candle gently rotating and shrinking slightly
+      groupRef.current.rotation.y += delta * 0.3
+      groupRef.current.scale.setScalar(1.1 * (1 - fadeProgress * 0.2))
+
+      // After fade completes, mark as complete and hide effect candle
+      if (fadeProgress >= 1 && !hasTriggeredFadeComplete.current) {
+        hasTriggeredFadeComplete.current = true
         setPhase('complete')
-        // onComplete already called when landing, don't call again
-        // But do call onFullyComplete to signal the effect is truly done
         onFullyComplete()
       }
       // Don't return early - let trail particles continue updating below
     }
     
-    // Only update travel progress if not glowing
+    // Only update travel progress if not glowing or fading
     let currentPos = groupRef.current.position.clone()
     let easedProgress = 1
-    
-    if (phase !== 'glowing') {
+
+    if (phase !== 'glowing' && phase !== 'fading') {
       // Update progress for travel phases
       progressRef.current += delta / ANIMATION_DURATION
       const rawProgress = Math.min(progressRef.current, 1)
@@ -310,8 +344,8 @@ export function NewCandleEffect({
       groupRef.current.position.copy(currentPos)
     }
     
-    // Scale animation - skip if glowing (already handled above)
-    if (phase !== 'glowing') {
+    // Scale animation - skip if glowing or fading (already handled above)
+    if (phase !== 'glowing' && phase !== 'fading') {
       const rawProgress = progressRef.current
       let scale
       if (rawProgress < 0.15) {
@@ -346,10 +380,11 @@ export function NewCandleEffect({
       groupRef.current.rotation.x *= 0.9
     }
     
-    // Update trail particles - including during glowing phase
-    if (phase === 'traveling' || phase === 'emerging' || phase === 'arriving' || phase === 'glowing') {
-      // Spawn new particle - more particles during arrival and glowing for fanfare
-      const spawnChance = (phase === 'arriving' || phase === 'glowing') ? 0.9 : 0.7
+    // Update trail particles - including during glowing and fading phases
+    if (phase === 'traveling' || phase === 'emerging' || phase === 'arriving' || phase === 'glowing' || phase === 'fading') {
+      // Spawn new particle - more particles during arrival and glowing for fanfare, fewer during fade
+      const spawnChance = phase === 'fading' ? 0.2 * opacity :
+        (phase === 'arriving' || phase === 'glowing') ? 0.9 : 0.7
       // MEMORY FIX: Hard cap to prevent unbounded array growth
       if (Math.random() < spawnChance && trailParticles.current.length < TRAIL_PARTICLE_COUNT) {
         trailParticles.current.push({
@@ -360,9 +395,11 @@ export function NewCandleEffect({
             (Math.random() - 0.5) * ((phase === 'arriving' || phase === 'glowing') ? 0.8 : 0.5),
             (Math.random() - 0.5) * ((phase === 'arriving' || phase === 'glowing') ? 0.8 : 0.5)
           ),
-          size: (phase === 'arriving' || phase === 'glowing') ? 0.08 + Math.random() * 0.15 : 0.05 + Math.random() * 0.1,
-          color: (phase === 'arriving' || phase === 'glowing') ?
-            (Math.random() > 0.5 ? '#00ff66' : '#00ffff') : '#00ff66'
+          size: phase === 'fading' ? (0.03 + Math.random() * 0.05) * opacity :
+            (phase === 'arriving' || phase === 'glowing') ? 0.08 + Math.random() * 0.15 : 0.05 + Math.random() * 0.1,
+          color: phase === 'fading' ? '#00cccc' :
+            (phase === 'arriving' || phase === 'glowing') ?
+              (Math.random() > 0.5 ? '#00ff66' : '#00ffff') : '#00ff66'
         })
       }
     }
@@ -415,9 +452,10 @@ export function NewCandleEffect({
     <group>
       {/* Main candle */}
       <group ref={groupRef} position={startPosition}>
-        <CandleModel 
-          modelPath={candleModelPath} 
+        <CandleModel
+          modelPath={candleModelPath}
           phase={phase}
+          opacity={opacity}
           offering={offering}
           onHover={onHover}
           onClick={onClick}
@@ -425,14 +463,15 @@ export function NewCandleEffect({
         
         {/* No glow spheres - let the candle model itself and the light provide the glow */}
         
-        {/* Point light that follows - extra bright during glow */}
+        {/* Point light that follows - extra bright during glow, fades out */}
         <pointLight
-          color={phase === 'glowing' ? '#00ffff' : '#00ff66'}
+          color={phase === 'glowing' || phase === 'fading' ? '#00ffff' : '#00ff66'}
           intensity={
+            phase === 'fading' ? 2 * opacity :
             phase === 'glowing' ? 3 + Math.sin(glowTimeRef.current * 3) :
             phase === 'arriving' ? 2 : 1
           }
-          distance={phase === 'glowing' ? 5 : 3}
+          distance={phase === 'glowing' || phase === 'fading' ? 5 : 3}
         />
       </group>
       
@@ -513,17 +552,18 @@ function TrailParticleMaterial() {
 // ============================================
 // CANDLE MODEL FOR THE EFFECT
 // ============================================
-function CandleModel({ modelPath, phase, offering, onHover, onClick }) {
+function CandleModel({ modelPath, phase, opacity = 1, offering, onHover, onClick }) {
   const { scene } = useGLTF(modelPath)
   const clonedScene = useMemo(() => scene.clone(true), [scene])
-  
+
   // Boost emission based on phase
   useEffect(() => {
-    const emissionIntensity = 
+    const emissionIntensity =
       phase === 'emerging' ? 1.5 :
       phase === 'traveling' ? 2.0 :
       phase === 'arriving' ? 3.0 :
-      phase === 'glowing' ? 4.0 : 1.0
+      phase === 'glowing' ? 4.0 :
+      phase === 'fading' ? 2.0 * opacity : 1.0
     
     clonedScene.traverse((child) => {
       // Skip the parent empty object
@@ -550,6 +590,11 @@ function CandleModel({ modelPath, phase, offering, onHover, onClick }) {
             child.material.metalness = 0.2
             child.material.roughness = 0.6
           }
+          // Apply fade opacity
+          if (phase === 'fading') {
+            child.material.transparent = true
+            child.material.opacity = opacity
+          }
         }
         // Check for Flame mesh
         else if (meshName === 'Flame') {
@@ -566,6 +611,10 @@ function CandleModel({ modelPath, phase, offering, onHover, onClick }) {
             child.material.emissiveIntensity = emissionIntensity * 4.0
             child.material.emissive = new THREE.Color('#ffff00')
           }
+          // Apply fade opacity
+          if (phase === 'fading') {
+            child.material.opacity = opacity
+          }
           // Make flame material more emissive
           if (child.material.metalness !== undefined) {
             child.material.metalness = 0
@@ -581,16 +630,21 @@ function CandleModel({ modelPath, phase, offering, onHover, onClick }) {
           child.material.depthTest = true
           child.material.depthWrite = true
           child.renderOrder = 10  // Same as main candles
+          // Apply fade opacity
+          if (phase === 'fading') {
+            child.material.transparent = true
+            child.material.opacity = opacity
+          }
         }
         
         // Ensure material updates
         child.material.needsUpdate = true
-        
+
         // Store complete offering and user data on the mesh for raycasting
         if (offering) {
           child.userData.offering = offering
           child.userData.isNewCandleEffect = true // Flag to identify this is from the effect
-          
+
           // Store user-specific data for avatar/name display
           child.userData.userId = offering.userId || offering.uid
           child.userData.userName = offering.name || offering.userName || offering.username || 'Anonymous'
@@ -603,7 +657,7 @@ function CandleModel({ modelPath, phase, offering, onHover, onClick }) {
         }
       }
     })
-  }, [clonedScene, phase, offering])
+  }, [clonedScene, phase, opacity, offering])
   
   return (
     <primitive 
@@ -787,21 +841,23 @@ export const NewCandleEffectManager = forwardRef(({
   
   // Call this to trigger a new candle effect
   const triggerEffect = (offering) => {
-    // Generate target position in the visible landing zone
-    // Camera is at [0, 0, 15] looking at origin
-    // Candles should land where user can see them without camera rotation
+    let target
 
-    // Use appropriate zone based on device
-    const zone = isMobile ? EFFECT_LANDING_ZONE.mobile : EFFECT_LANDING_ZONE.desktop;
-
-    // Randomly choose left or right side of the phone
-    const side = Math.random() > 0.5 ? 1 : -1;
-
-    const targetX = side * (zone.x.min + Math.random() * (zone.x.max - zone.x.min));
-    const targetY = zone.y.min + Math.random() * (zone.y.max - zone.y.min);
-    const targetZ = zone.z.min + Math.random() * (zone.z.max - zone.z.min);
-
-    const target = [targetX, targetY, targetZ];
+    // Use stored position from offering if available (computed when candle was created)
+    if (offering?.position) {
+      target = [offering.position.x, offering.position.y, offering.position.z]
+      console.log('[NewCandleEffect] Using stored position:', target)
+    } else {
+      // Fallback: Generate target position in the visible landing zone
+      // Camera is at [0, 0, 15] looking at origin
+      console.log('[NewCandleEffect] No stored position, generating random')
+      const zone = isMobile ? EFFECT_LANDING_ZONE.mobile : EFFECT_LANDING_ZONE.desktop
+      const side = Math.random() > 0.5 ? 1 : -1
+      const targetX = side * (zone.x.min + Math.random() * (zone.x.max - zone.x.min))
+      const targetY = zone.y.min + Math.random() * (zone.y.max - zone.y.min)
+      const targetZ = zone.z.min + Math.random() * (zone.z.max - zone.z.min)
+      target = [targetX, targetY, targetZ]
+    }
 
     setEffectState({
       isActive: true,
@@ -850,12 +906,14 @@ export const NewCandleEffectManager = forwardRef(({
         isActive={effectState.isActive}
         offering={effectState.offering}
         onComplete={handleEffectComplete}
-        onFullyComplete={() => {
-          // Add the permanent candle now that glow is done
+        onFadeStart={() => {
+          // Trigger Firestore refresh NOW so permanent candle loads during fade
           if (effectState.pendingCandle) {
             onNewCandle?.(effectState.pendingCandle.position, effectState.pendingCandle.offering)
           }
-          // Now reset the effect state
+        }}
+        onFullyComplete={() => {
+          // Fade is complete - now hide the effect candle
           setEffectState(prev => ({ ...prev, isActive: false, pendingCandle: null }))
         }}
         candleModelPath={candleModelPath}
