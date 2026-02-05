@@ -1013,13 +1013,14 @@ function CandleLabel({ position, data, visible }) {
 }
 
 // Scene rotation controller - handles rotation without blocking clicks
-function SceneRotator({ children, userRotation, onRotationStart, onRotationMove, onRotationEnd }) {
+function SceneRotator({ children, userRotation, userVerticalRotation = 0, onRotationStart, onRotationMove, onRotationEnd }) {
   const groupRef = useRef()
   const [isPointerDown, setIsPointerDown] = useState(false)
-  
+
   useFrame(() => {
     if (groupRef.current) {
       groupRef.current.rotation.y = userRotation
+      groupRef.current.rotation.x = userVerticalRotation
     }
   })
   
@@ -1616,14 +1617,20 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
     resetView
   }), [findUserCandle, resetView])
   const [userRotation, setUserRotation] = useState(0)
-  
+  const [userVerticalRotation, setUserVerticalRotation] = useState(0)
+
+  // Vertical rotation limits (in radians)
+  // Negative rotation.x = looking up, Positive = looking down
+  const MAX_VERTICAL_ROTATION = 0 // No looking down (horizontal)
+  const MIN_VERTICAL_ROTATION = -Math.PI / 6  // ~30° up
+
   // Keep ref in sync with state
   useEffect(() => {
     userRotationRef.current = userRotation
   }, [userRotation])
-  
+
   const isDragging = useRef(false)
-  const dragStart = useRef({ x: 0, rotation: 0 })
+  const dragStart = useRef({ x: 0, y: 0, rotation: 0, verticalRotation: 0 })
   const hasDraggedEnough = useRef(false) // Track if we've moved enough to start rotating
   const DRAG_THRESHOLD = 5 // Pixels to move before rotation starts
   const hasReachedSection = true // const [hasReachedSection, setHasReachedSection] = useState(true)
@@ -2000,21 +2007,29 @@ useEffect(() => {
     // Mark potential drag start but don't start rotating yet
     isDragging.current = true
     hasDraggedEnough.current = false
+    const clientX = event.clientX || event.touches?.[0]?.clientX || 0
+    const clientY = event.clientY || event.touches?.[0]?.clientY || 0
     dragStart.current = {
-      x: event.clientX || event.touches?.[0]?.clientX || 0,
+      x: clientX,
+      y: clientY,
       rotation: userRotation,
-      startX: event.clientX || event.touches?.[0]?.clientX || 0 // Store initial position
+      verticalRotation: userVerticalRotation,
+      startX: clientX,
+      startY: clientY
     }
     // Don't change cursor yet - wait for actual drag
-  }, [userRotation])
+  }, [userRotation, userVerticalRotation])
 
   const handlePointerMove = useCallback((event) => {
     if (isDragging.current) {
       const clientX = event.clientX || event.touches?.[0]?.clientX || 0
-      
+      const clientY = event.clientY || event.touches?.[0]?.clientY || 0
+
       // Check if we've moved enough to start rotating
       if (!hasDraggedEnough.current) {
-        const distanceMoved = Math.abs(clientX - dragStart.current.startX)
+        const distanceMovedX = Math.abs(clientX - dragStart.current.startX)
+        const distanceMovedY = Math.abs(clientY - dragStart.current.startY)
+        const distanceMoved = Math.sqrt(distanceMovedX ** 2 + distanceMovedY ** 2)
         if (distanceMoved >= DRAG_THRESHOLD) {
           hasDraggedEnough.current = true
           // Now we're actually dragging - update cursor
@@ -2026,17 +2041,24 @@ useEffect(() => {
           return
         }
       }
-      
+
       // Only rotate if we've dragged enough
       if (hasDraggedEnough.current) {
+        // Horizontal rotation (unlimited)
         const deltaX = (clientX - dragStart.current.x) * 0.01
         const newRotation = dragStart.current.rotation + deltaX
-        
-        // Allow full 360 degree rotation
         setUserRotation(newRotation)
+
+        // Vertical rotation (clamped)
+        const deltaY = (clientY - dragStart.current.y) * 0.005 // Less sensitive for vertical
+        const newVerticalRotation = Math.max(
+          MIN_VERTICAL_ROTATION,
+          Math.min(MAX_VERTICAL_ROTATION, dragStart.current.verticalRotation - deltaY)
+        )
+        setUserVerticalRotation(newVerticalRotation)
       }
     }
-  }, [])
+  }, [MAX_VERTICAL_ROTATION, MIN_VERTICAL_ROTATION])
 
   const handlePointerUp = useCallback(() => {
     isDragging.current = false
@@ -2392,6 +2414,7 @@ useEffect(() => {
         {/* Rotatable scene content */}
         <SceneRotator
           userRotation={DEBUG_MODE ? 0 : userRotation}
+          userVerticalRotation={DEBUG_MODE ? 0 : userVerticalRotation}
           onRotationStart={handlePointerDown}
           onRotationMove={handlePointerMove}
           onRotationEnd={handlePointerUp}
