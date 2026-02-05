@@ -57,10 +57,10 @@ class FloatingGallery extends THREE.Group {
     this.geometries = [] // Track geometries for disposal
     this.imageData = [
       { 
-        url: '/carousel_images/img1.jpg', 
+        url: '/carousel_images/img1.jpg',
         year: '67 CE',
         description: 'Driving back a bear market',
-        curvePosition: 0.11,  // Position along curve (0-1)
+        curvePosition: 0.09,  // Position along curve (0-1)
         width: 1.2,
         height: 1.2,
         radialOffset: -1,     // Distance from center of tunnel
@@ -68,28 +68,40 @@ class FloatingGallery extends THREE.Group {
         verticalOffset: 0.2,     // Additional vertical offset
         rotateY: Math.PI       // Rotate 180 degrees around Y-axis
       },
-
-      { 
-        url: '/carousel_images/img8.jpg', 
+      {
+        url: '/carousel_images/img12.jpg',
+        year: '599 CE',
+        description: 'Our Lady shows how followers how to find their own four tunas',
+        curvePosition: 0.26,
+        width: 1,
+        height: 1,
+        radialOffset: 0.7,
+        angle: Math.PI,
+        verticalOffset: 0.1,
+        rotateY: Math.PI,
+        rotateZ: Math.PI / 8
+      },
+      {
+        url: '/carousel_images/img8.jpg',
         year: '380 CE',
         description: 'Pre-meme era patronage of the arts',
-        curvePosition: 0.27,
+        curvePosition: 0.34,
         width: 1,
         height: 1,
         radialOffset: -0.6,
-        angle: -Math.PI,
+        // angle: -Math.PI,
         rotateY: Math.PI,
-    rotateZ: Math.PI/7,  // Flip upside down (180 degrees)
+    rotateZ: -Math.PI * 0.02,  // Flip upside down (180 degrees)
         verticalOffset: 0.5
       },
       { 
-        url: '/carousel_images/img13.jpg', 
+        url: '/carousel_images/img13.jpg',
         year: '1100 CE',
       description: 'Early Carpathian staking protocol',
-        curvePosition: 0.37,
+        curvePosition: 0.39,
         width: 1,
         height: 1,
-        radialOffset: 0.5,
+        radialOffset: 0.7,
         angle: Math.PI,
         rotateY: Math.PI,
 
@@ -97,10 +109,10 @@ class FloatingGallery extends THREE.Group {
 
       },
       { 
-        url: '/carousel_images/img3.jpg', 
+        url: '/carousel_images/img3.jpg',
         year: '1350 CE',
         description: 'Early clown encounter turns ugly',
-        curvePosition: 0.46,
+        curvePosition: 0.47,
         width: 1,
         height: 1,
         radialOffset: -0.65,
@@ -111,10 +123,10 @@ class FloatingGallery extends THREE.Group {
 
       },
       { 
-        url: '/carousel_images/img9.jpg', 
+        url: '/carousel_images/img9.jpg',
         year: '1680',
         description: 'Monetary theory for a young privateer',
-        curvePosition: 0.55,
+        curvePosition: 0.54,
         width: 1.3,
         height: 1.3,
         radialOffset: -0.5,
@@ -124,10 +136,10 @@ class FloatingGallery extends THREE.Group {
 
       },
       { 
-        url: '/carousel_images/img11.jpg', 
+        url: '/carousel_images/img11.jpg',
         year: '1790',
         description: 'Heroine of Mythology',
-        curvePosition: 0.66,
+        curvePosition: 0.63,
         width: 1.4,
         height: 1.4,
         radialOffset: 1,
@@ -136,27 +148,40 @@ class FloatingGallery extends THREE.Group {
         rotateY: Math.PI       // Rotate 180 degrees around Y-axis
 
       },
-      { 
-     url: '/carousel_images/img4.jpg', 
+      {
+        url: '/carousel_images/img2.jpg',
+        year: '1991 CE',
+        description: 'The Guardian of Good Times',
+        curvePosition: 0.71,
+        width: 1.1,
+        height: 1.1,
+        radialOffset: -0.8,
+        angle: -Math.PI,
+        verticalOffset: 0.3,
+        rotateY: Math.PI
+      },
+      {
+     url: '/carousel_images/img4.jpg',
         year: '2010',
         description: 'Featured in popular manga series',
-        curvePosition: 0.74,
+        curvePosition: 0.78,
         width: 1.2,
         height: 1.2,
         radialOffset: 0.6,
         angle: -Math.PI,
         verticalOffset: 0.4,
-        rotateY: Math.PI       // Rotate 180 degrees around Y-axis
+        rotateY: Math.PI,
+        rotateZ: -Math.PI / 2.25
 
       },
-      { 
-        url: '/carousel_images/img5.jpg', 
+      {
+        url: '/carousel_images/img5.jpg',
         year: '2031',
         description: 'Laying down DeFi Beats',
-        curvePosition: 0.83,
+        curvePosition: 0.86,
         width: 1,
         height: 1,
-        radialOffset: 0.6,
+        radialOffset: 0.75,
         angle: -Math.PI,
         verticalOffset: 0.2,
         rotateY: Math.PI,  // 180° + 30° to fix mirror and rotation
@@ -315,13 +340,15 @@ class WireTunnel extends THREE.LineSegments {
     const basePoints = [
       { x: 6.097824119373165, y: 2.962665382204997, z: 1.7433171949691226 },
       { x: 2.498887329278077, y: 1.876906878980996, z: -6.263607800877008 },
+      { x: 0.405, y: 5.021, z: -3.628 },
       { x: -2.157131886014289, y: 6.643373663865348, z: 0.46083444814894103 },
       { x: -3.4743927694436687, y: -3.0277132522771772, z: 5.268922787973147 },
+      { x: -5.980, y: -2.381, z: 1.233 },
       { x: -6.004952702196002, y: 0.16039311931742395, z: -3.59371911696846 }
     ]
-    
+
     const curve = new THREE.CatmullRomCurve3(basePoints, true, 'catmullrom', 0.7)
-    const tube = new THREE.TubeGeometry(curve, 100, 0.2, 7, true)
+    const tube = new THREE.TubeGeometry(curve, 130, 0.2, 7, true)
     const wire = new THREE.EdgesGeometry(tube, 1.125)
 
     super(

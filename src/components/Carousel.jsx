@@ -1787,7 +1787,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
             style={{
               "--rotation-time": "30s",
               "--elements": images.length,
-              animationPlayState: isHovered ? "paused" : "running",
+              ...(isHovered ? { animationPlayState: "paused" } : {}),
             }}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}

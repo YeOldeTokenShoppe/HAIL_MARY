@@ -156,6 +156,7 @@ export default function TokenomicsPage() {
                     onToggle80sMode={() => setIs80sMode(!is80sMode)}
                     onBuyClick={() => setShowBuyModal(true)}
                     isMobile={isMobileDevice}
+                    show80sButton={false}
                   />
                 </div>
                 )}
@@ -260,6 +261,7 @@ export default function TokenomicsPage() {
               onToggle80sMode={() => setIs80sMode(!is80sMode)}
               onBuyClick={() => setShowBuyModal(true)}
               isMobile={isMobile}
+              show80sButton={false}
             />
           </div>
 
@@ -282,7 +284,7 @@ export default function TokenomicsPage() {
           <div style={{
             position: "absolute",
             top: "20px", 
-            left: "20px",
+            left: "0.5rem",
             borderRadius: "8px",
             padding: "10px",
             pointerEvents: "auto",

@@ -1045,14 +1045,21 @@ function CandleLabel({ position, data, visible }) {
 }
 
 // Scene rotation controller - handles rotation without blocking clicks
-function SceneRotator({ children, userRotation, userVerticalRotation = 0, onRotationStart, onRotationMove, onRotationEnd }) {
+function SceneRotator({ children, userRotation, userVerticalRotation = 0, smoothTransition = false, onRotationStart, onRotationMove, onRotationEnd }) {
   const groupRef = useRef()
   const [isPointerDown, setIsPointerDown] = useState(false)
 
   useFrame(() => {
     if (groupRef.current) {
-      groupRef.current.rotation.y = userRotation
-      groupRef.current.rotation.x = userVerticalRotation
+      if (smoothTransition) {
+        // Lerp toward target for smooth reset animation
+        groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, userRotation, 0.08)
+        groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, userVerticalRotation, 0.08)
+      } else {
+        // Snap immediately during active dragging
+        groupRef.current.rotation.y = userRotation
+        groupRef.current.rotation.x = userVerticalRotation
+      }
     }
   })
   
@@ -1242,9 +1249,9 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
     // Priority zones - candles positioned in front of camera (looking at negative Z)
     // Camera is at [0, 0, 15], Mary is at z=-8 to -12
     const PRIORITY_ZONES = [
-      { capacity: 25, x: { min: -10, max: 10 }, y: { min: -2, max: 4 }, z: { min: -12, max: -6 } },   // Zone 1: Prime visibility
-      { capacity: 40, x: { min: -14, max: 14 }, y: { min: -3, max: 6 }, z: { min: -14, max: -4 } },   // Zone 2: Good visibility
-      { capacity: 60, x: { min: -18, max: 18 }, y: { min: -4, max: 10 }, z: { min: -16, max: -2 } },  // Zone 3: Peripheral
+      { capacity: 25, x: { min: -6, max: 6 }, y: { min: -1, max: 3 }, z: { min: -8, max: -4 } },      // Zone 1: Tight cluster flanking phone
+      { capacity: 40, x: { min: -10, max: 10 }, y: { min: -2, max: 5 }, z: { min: -10, max: -3 } },   // Zone 2: Good visibility
+      { capacity: 60, x: { min: -14, max: 14 }, y: { min: -3, max: 8 }, z: { min: -14, max: -2 } },   // Zone 3: Peripheral
       { capacity: Infinity, x: { min: -20, max: 20 }, y: { min: -5, max: 12 }, z: { min: -20, max: 0 } } // Zone 4: Overflow
     ]
 
@@ -1311,9 +1318,9 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
             const inXRange = Math.abs(x - BODY_CORRIDOR.centerX) < BODY_CORRIDOR.halfWidth
             const inYRange = Math.abs(y - BODY_CORRIDOR.centerY) < BODY_CORRIDOR.halfHeight
             if (inXRange && inYRange) {
-              // Push outward
-              const pushDir = x >= 0 ? 1 : -1
-              x = pushDir * (BODY_CORRIDOR.halfWidth + 1 + seededRandom(attemptSeed + 10, 0, 2))
+              // Alternate sides based on index + attempt for even distribution
+              const pushDir = (index + attempt) % 2 === 0 ? 1 : -1
+              x = pushDir * (BODY_CORRIDOR.halfWidth + 0.5 + seededRandom(attemptSeed + 10, 0, 2))
             }
           }
 
@@ -1476,6 +1483,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   const [userCandlePosition, setUserCandlePosition] = useState(null) // Store 3D position
   const [resetCameraToDefault, setResetCameraToDefault] = useState(false) // Reset camera flag
   const [overrideCameraControl, setOverrideCameraControl] = useState(false) // Override all camera controls
+  const [smoothRotationReset, setSmoothRotationReset] = useState(false) // Smooth lerp back to center
   const [leaderboardData, setLeaderboardData] = useState([]) // Top burners for leaderboard
   const [leaderboardLoading, setLeaderboardLoading] = useState(false)
 
@@ -2075,6 +2083,8 @@ useEffect(() => {
   }, [])
 
   const handlePointerDown = useCallback((event) => {
+    // Cancel any in-progress smooth reset so drag feels responsive
+    setSmoothRotationReset(false)
     // Mark potential drag start but don't start rotating yet
     isDragging.current = true
     hasDraggedEnough.current = false
@@ -2132,13 +2142,26 @@ useEffect(() => {
   }, [MAX_VERTICAL_ROTATION, MIN_VERTICAL_ROTATION])
 
   const handlePointerUp = useCallback(() => {
+    const wasDragging = hasDraggedEnough.current
     isDragging.current = false
     hasDraggedEnough.current = false
     // Only reset cursor if we actually started dragging
     if (typeof document !== 'undefined' && document.body && document.body.style.cursor === 'grabbing') {
       document.body.style.cursor = 'auto'
     }
-  }, [])
+
+    // If it was a click (not a drag) on the background, reset the view
+    if (!wasDragging) {
+      // Enable smooth lerp, then set target to 0
+      setSmoothRotationReset(true)
+      setUserRotation(0)
+      setUserVerticalRotation(0)
+      // Reset camera and clear any highlights
+      resetView()
+      // Clear smooth flag after lerp completes (~1s at 0.08 per frame)
+      setTimeout(() => setSmoothRotationReset(false), 1000)
+    }
+  }, [resetView])
 
   // Track reload attempts to prevent infinite loops
   const reloadAttempts = useRef(0)
@@ -2238,7 +2261,7 @@ useEffect(() => {
     position: 'absolute',  // Use fixed positioning for proper layering
     top: isMobile ? '120px' : '105px',
     right: isMobile ? '10px' : '20px',
-    // background: 'rgba(0, 0, 0, 0.8)',
+    background: isMobile ? 'rgba(0, 0, 0, 0.35)' : 'rgba(0, 0, 0, 0.3)',
     border: is80sMode ? '2px solid rgba(255, 0, 255, 0.4)' : '2px solid rgba(212, 175, 55, 0.3)',
     borderRadius: '12px',
     padding: isMobile ? '10px 12px' : '18px',
@@ -2488,6 +2511,7 @@ useEffect(() => {
         <SceneRotator
           userRotation={DEBUG_MODE ? 0 : userRotation}
           userVerticalRotation={DEBUG_MODE ? 0 : userVerticalRotation}
+          smoothTransition={smoothRotationReset}
           onRotationStart={handlePointerDown}
           onRotationMove={handlePointerMove}
           onRotationEnd={handlePointerUp}
@@ -2698,7 +2722,9 @@ useEffect(() => {
             position: 'absolute',
             top: isMobile ? '40%' : '80px',
             right: '100%',
-            background: is80sMode ? 'rgba(255, 0, 255, 0.2)' : 'rgba(212, 175, 55, 0.2)',
+            background: is80sMode
+              ? (isMobile ? 'rgba(255, 0, 255, 0.35)' : 'rgba(255, 0, 255, 0.2)')
+              : (isMobile ? 'rgba(0, 0, 0, 0.35)' : 'rgba(212, 175, 55, 0.2)'),
             borderTop: is80sMode ? '2px solid rgba(255, 0, 255, 0.5)' : '2px solid rgba(212, 175, 55, 0.4)',
             borderBottom: is80sMode ? '2px solid rgba(255, 0, 255, 0.5)' : '2px solid rgba(212, 175, 55, 0.4)',
             borderLeft: is80sMode ? '2px solid rgba(255, 0, 255, 0.5)' : '2px solid rgba(212, 175, 55, 0.4)',

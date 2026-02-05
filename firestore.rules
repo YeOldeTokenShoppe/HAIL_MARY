@@ -168,6 +168,29 @@
         allow update, delete: if false; // Only admin
       }
 
+      // =========================================================================
+      // CANDLE SHRINE OFFERINGS
+      // =========================================================================
+
+      // Offerings - candles lit by users
+      match /offerings/{offeringId} {
+        allow read: if true;
+        allow create: if request.auth != null
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.keys().hasAll(['name', 'type', 'userId', 'createdAt', 'litAt', 'position']);
+        allow update: if false;
+        allow delete: if request.auth != null
+          && resource.data.userId == request.auth.uid;
+      }
+
+      // User Stats - leaderboard tracking
+      match /userStats/{userId} {
+        allow read: if true;
+        allow create, update: if request.auth != null
+          && request.auth.uid == userId;
+        allow delete: if false;
+      }
+
       // Users collection
       match /users/{userId} {
         allow read: if true;

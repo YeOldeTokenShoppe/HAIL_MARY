@@ -223,7 +223,7 @@ export default function GachaponPage() {
       <div style={{
         position: "fixed",
         top: "20px",
-        left: "20px",
+        left: "0.5rem",
         borderRadius: "8px",
         padding: "10px",
         pointerEvents: "auto",

@@ -975,7 +975,7 @@
 							text-transform: uppercase;
 							font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 							letter-spacing: 0.5px;
-						">🪙 Wishes</div>
+						">🪙 Fountain</div>
 						<div style="
 							font-size: 16px;
 							font-weight: 700;
@@ -983,7 +983,7 @@
 							line-height: 1;
 							font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 						">
-							<span id="mobileCurrentCount">0</span><span style="font-size: 0.7em; opacity: 0.7;">/200</span>
+							<span id="mobileCurrentCount">0</span><span style="font-size: 0.7em; opacity: 0.7;">/500</span>
 						</div>
 					</div>
 					<div style="width: 1px; height: 28px; background: rgba(255,255,255,0.2);"></div>
@@ -994,7 +994,7 @@
 							color: rgba(255, 215, 0, 0.8);
 							font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 							letter-spacing: 0.5px;
-						">💎 Donated</div>
+						">💎 Total Given</div>
 						<div style="
 							font-size: 14px;
 							font-weight: 700;
@@ -1120,7 +1120,7 @@
 				border-radius: 10px;
 			">
 				<span class="coin-emoji" style="font-size: 16px;">🪙</span>
-				<span style="flex: 1; color: rgba(255, 255, 255, 0.95); font-size: 12px;">Wishes: <span id="coinCount" style="font-weight: 700;">0</span> / 200</span>
+				<span style="flex: 1; color: rgba(255, 255, 255, 0.95); font-size: 12px;">Fountain: <span id="coinCount" style="font-weight: 700;">0</span> / 500</span>
 			</div>
 			<div style="
 				display: flex;
@@ -1132,7 +1132,7 @@
 				border: 1px solid rgba(255, 215, 0, 0.3);
 			">
 				<span style="font-size: 16px;">💎</span>
-				<span style="flex: 1; color: #FFD700; font-size: 12px;">Donated: <span id="totalRL80Donated" style="font-weight: 700;">0</span> RL80</span>
+				<span style="flex: 1; color: #FFD700; font-size: 12px;">Total Given: <span id="totalRL80Donated" style="font-weight: 700;">0</span> RL80</span>
 			</div>
 			<div style="
 				padding: 6px 10px;
@@ -2063,10 +2063,10 @@
 			// Mobile detection for other optimizations
 			const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 768;
 			
-			// Reduced performance settings for all devices to prevent crashes
-			const MAX_STATIC_COINS = 100; // Reduced from 300
-			const COINS_TO_LOAD = 75; // Reduced from 200
-			const RESET_THRESHOLD = 100; // Reduced from 200, same for all devices
+			// Performance settings - InstancedMesh handles these efficiently in a single draw call
+			const MAX_STATIC_COINS = 500;
+			const COINS_TO_LOAD = 500;
+			const RESET_THRESHOLD = 500;
 			
 			function updateCoinCounter() {
 				const coinCountElement = document.getElementById('coinCount');

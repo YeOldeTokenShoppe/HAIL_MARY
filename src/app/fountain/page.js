@@ -300,8 +300,9 @@ export default function FountainPage() {
           is80sMode={is80sMode}
           onToggle80sMode={() => setContext80sMode(!is80sMode)}
           userImage={user?.imageUrl}
-          onBuyClick={() => setShowBuyModal(true)}
+          onBuyClick={isMobileDevice ? null : () => setShowBuyModal(true)}
           isMobile={isMobileDevice}
+          hideMusicOnMobile={true}
         />
       </div>
       

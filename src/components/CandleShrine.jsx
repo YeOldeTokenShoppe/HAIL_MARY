@@ -531,24 +531,26 @@ function useClonedGeometries(modelPath) {
 const PRIORITY_ZONES = {
   zone1: {
     capacity: 25,  // First 25 candles go here
-    // To the sides of Mary, at similar depth - full X range for even distribution
-    x: { min: -10, max: 10 },
-    y: { min: -2, max: 4 },
-    z: { min: -12, max: -6 },  // Around Mary's depth (she's at z=-8 to -10)
+    // Tight cluster flanking the phone - clearly visible in front of viewer
+    // These candles hug just outside the body corridor so they're close to center
+    x: { min: -6, max: 6 },
+    y: { min: -1, max: 3 },
+    z: { min: -8, max: -4 },  // Between Mary and phone - prime visible area
     randomizeXSign: false,
+    alternateSides: true,  // Force left/right alternation for even distribution
   },
   zone2: {
     capacity: 40,  // Next 40 candles
-    x: { min: -14, max: 14 },
-    y: { min: -3, max: 6 },
-    z: { min: -14, max: -4 },  // Wider Z range around Mary
+    x: { min: -10, max: 10 },
+    y: { min: -2, max: 5 },
+    z: { min: -10, max: -3 },  // Wider Z range around phone/Mary
     randomizeXSign: false,
   },
   zone3: {
     capacity: 60,  // Next 60 candles
-    x: { min: -18, max: 18 },
-    y: { min: -4, max: 10 },
-    z: { min: -16, max: -2 },  // Even wider
+    x: { min: -14, max: 14 },
+    y: { min: -3, max: 8 },
+    z: { min: -14, max: -2 },  // Even wider
     randomizeXSign: false,
   },
   zone4: {
@@ -565,7 +567,7 @@ const PRIORITY_ZONES = {
 // Using box shape to match debug visualization
 // Note: Add wobble buffer (~1 unit) since candles drift/wobble in shader
 // CORRIDOR_VERSION: Bump this to force position regeneration after changing corridor params
-const CORRIDOR_VERSION = 9
+const CORRIDOR_VERSION = 10
 const WOBBLE_BUFFER = 1.0  // Candles can drift this far from their base position
 const BODY_CORRIDOR = {
   centerX: 0,       // Centered on X axis
@@ -586,6 +588,9 @@ function generateZonePosition(zone, exclusionZone, usedPositions = [], seed = 0.
     const x = Math.sin(s * 9999) * 10000
     return x - Math.floor(x)
   }
+
+  // Derive a candle index from seed for alternating sides
+  const candleIndex = Math.round(seed * 1000)
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     // Use seeded random for deterministic positioning
@@ -612,9 +617,10 @@ function generateZonePosition(zone, exclusionZone, usedPositions = [], seed = 0.
       const inYRange = Math.abs(y - BODY_CORRIDOR.centerY) < BODY_CORRIDOR.halfHeight
 
       if (inXRange && inYRange) {
-        // Push candle outward in X direction (to the sides) with seeded offset
-        const pushDirection = x >= 0 ? 1 : -1
-        x = pushDirection * (BODY_CORRIDOR.halfWidth + 1.5 + rOffset * 3)
+        // Alternate sides based on candle index + attempt to distribute evenly
+        // This prevents all candles from being pushed to the same side
+        const pushDirection = (candleIndex + attempt) % 2 === 0 ? 1 : -1
+        x = pushDirection * (BODY_CORRIDOR.halfWidth + 0.5 + rOffset * 2)
       }
     }
 
@@ -669,8 +675,9 @@ function generateZonePosition(zone, exclusionZone, usedPositions = [], seed = 0.
     const inYRange = Math.abs(fallbackY - BODY_CORRIDOR.centerY) < BODY_CORRIDOR.halfHeight
 
     if (inXRange && inYRange) {
-      const pushDirection = fallbackX >= 0 ? 1 : -1
-      fallbackX = pushDirection * (BODY_CORRIDOR.halfWidth + 1.5 + rfOffset * 3)
+      // Alternate sides based on candle index for even distribution
+      const pushDirection = candleIndex % 2 === 0 ? 1 : -1
+      fallbackX = pushDirection * (BODY_CORRIDOR.halfWidth + 0.5 + rfOffset * 2)
     }
   }
 
@@ -1089,7 +1096,7 @@ export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUN
       return Math.abs(hash)
     }
 
-    const additional = additionalCandles.map(c => {
+    const additional = additionalCandles.map((c, index) => {
       let x = c.position ? c.position[0] : c.x
       let y = c.position ? c.position[1] : c.y
       let z = c.position ? c.position[2] : c.z
@@ -1103,8 +1110,9 @@ export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUN
         const inYRange = Math.abs(y - BODY_CORRIDOR.centerY) < BODY_CORRIDOR.halfHeight
 
         if (inXRange && inYRange) {
-          const pushDirection = x >= 0 ? 1 : -1
-          x = pushDirection * (BODY_CORRIDOR.halfWidth + 0.5 + idSeed * 3)
+          // Alternate sides based on index for even distribution
+          const pushDirection = index % 2 === 0 ? 1 : -1
+          x = pushDirection * (BODY_CORRIDOR.halfWidth + 0.5 + idSeed * 2)
         }
       }
 
@@ -1356,9 +1364,9 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onPrice
           const inYRange = Math.abs(y - BODY_CORRIDOR.centerY) < BODY_CORRIDOR.halfHeight
 
           if (inXRange && inYRange) {
-            // Push candle outward in X direction with seeded offset
-            const pushDirection = x >= 0 ? 1 : -1
-            x = pushDirection * (BODY_CORRIDOR.halfWidth + 0.5 + seed1 * 3)
+            // Alternate sides based on index for even distribution
+            const pushDirection = index % 2 === 0 ? 1 : -1
+            x = pushDirection * (BODY_CORRIDOR.halfWidth + 0.5 + seed1 * 2)
           }
         }
 

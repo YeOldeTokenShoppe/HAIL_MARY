@@ -1516,24 +1516,23 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
         </div>
       )}
       
-      {/* Mobile Heading - Show only after loading is complete */}
+      {/* Mobile Heading + Intro Text - Show only after loading is complete */}
       {windowWidth < 768 && !isLoading && (
         <div style={{
           position: 'absolute',
-          // top: '5rem',
+          top: '2rem',
           left: '1rem',
-          right: '1rem',
+
           zIndex: 100,
           textAlign: 'left',
           pointerEvents: 'none',
-          // backgroundColor: 'rgba(0, 0, 0, 0.3)', // Subtle black background
-          borderRadius: '10px', // Rounded corners
+          borderRadius: '10px',
           padding: '1rem',
-          maxWidth: 'fit-content'
+          maxWidth: '75%'
         }}>
-          <h1 style={{ 
+          <h1 style={{
             color: '#8e662b',
-            fontFamily: 'UnifrakturCook, serif', // Georgia works reliably
+            fontFamily: 'UnifrakturCook, serif',
             textShadow: '3px 3px 5px #000, -1px -1px 5px pink',
             fontSize: windowWidth <= 480 ? '2.5rem' : '3rem',
             fontWeight: 700,
@@ -1543,6 +1542,62 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
             opacity: 1,
             visibility: 'visible'
           }}>The <br/>Scrolls <span style={{fontSize: '1.5rem', position: 'relative', top: '-0.5rem', left: '-0.5rem'}}>of</span><br/>St. GR80</h1>
+
+          {/* Mobile intro text */}
+          {showIntroText && (
+            <div style={{
+              marginTop: '1rem',
+              padding: '0.4rem',
+              background: 'linear-gradient(135deg, rgba(194, 154, 77, 0.2) 0%, rgba(142, 102, 43, 0.15) 50%, rgba(194, 154, 77, 0.2) 100%)',
+              border: '2px double #8e662b',
+              maxWidth: '220px',
+              position: 'relative',
+              pointerEvents: 'none',
+              boxShadow: 'inset 0 0 20px rgba(142, 102, 43, 0.3), 0 3px 6px rgba(0, 0, 0, 0.5)',
+              clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%)',
+              transform: 'rotate(0deg) skew(0deg)',
+            }}>
+              <p style={{
+                color: '#d4af37',
+                fontSize: '0.72rem',
+                fontWeight: 500,
+                letterSpacing: '0.02em',
+                lineHeight: 1.2,
+                margin: 0,
+                textAlign: 'center',
+                textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9), 0 0 15px rgba(212, 175, 55, 0.3)',
+                fontStyle: 'italic',
+                pointerEvents: 'none'
+              }}>
+                Here you can find the works of devout RL80 devotee, Saint GR80, the anachronistic android, mystic and medieval scholar.
+              </p>
+              <button
+                onClick={() => setShowIntroText(false)}
+                style={{
+                  position: 'absolute',
+                  bottom: '-6px',
+                  right: '-6px',
+                  background: 'rgba(142, 102, 43, 0.4)',
+                  border: '1px solid #8e662b',
+                  color: '#8e662b',
+                  width: '1rem',
+                  height: '1rem',
+                  cursor: 'pointer',
+                  fontSize: '0.7rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0,
+                  opacity: 0.6,
+                  pointerEvents: 'auto'
+                }}
+                aria-label="Hide introduction"
+                title="Hide this message"
+              >
+                ×
+              </button>
+            </div>
+          )}
         </div>
       )}
       
@@ -1631,7 +1686,6 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
                     {/* Main text content */}
                     <p style={{
                       color: '#d4af37',
-                      fontFamily: 'Georgia, "Times New Roman", serif',
                       fontSize: '0.9rem',
                       fontWeight: 500,
                       letterSpacing: '0.03em',

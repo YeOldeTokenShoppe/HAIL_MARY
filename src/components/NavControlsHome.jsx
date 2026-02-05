@@ -779,8 +779,8 @@ export default function NavControlsHome({
             ?
           </button>
         )}
-         {/* BUY Button - Desktop, or mobile when 80s button is hidden */}
-        {(!isMobile || !show80sButton) && onBuyClick && (
+         {/* BUY Button */}
+        {onBuyClick && (
           <button
             className="buy-btn-compact"
             onClick={onBuyClick}
@@ -809,8 +809,8 @@ export default function NavControlsHome({
         )}
 
        
-        {/* Music - Splits when active (hidden on mobile when hideMusicOnMobile is true) */}
-        {!(isMobile && hideMusicOnMobile) && (
+        {/* Music - Splits when active (hidden when no callbacks or on mobile with hideMusicOnMobile) */}
+        {onPlayMusic && !(isMobile && hideMusicOnMobile) && (
           <div className="music-stack-mobile">
             {isPlaying ? (
               <>
@@ -904,16 +904,6 @@ export default function NavControlsHome({
         </button>
       </div>
 
-      {/* Mobile BUY Button - Below nav container (only when 80s button is shown, otherwise it's inline) */}
-        {isMobile && show80sButton && onBuyClick && (
-          <button
-            className={`buy-btn-mobile ${is80sMode ? 'mode-80s' : ''}`}
-            onClick={onBuyClick}
-            title="Buy RL80"
-          >
-            {t('navControls.buy')}
-          </button>
-        )}
       </div>
 
       {/* Unified Account Modal */}

@@ -22,7 +22,7 @@ export async function POST(request) {
     const coinCount = snapshot.size;
     console.log('Found', coinCount, 'coins in fountain');
     
-    if (coinCount < 200) {
+    if (coinCount < 500) {
       return NextResponse.json({ 
         message: 'Not enough coins to archive', 
         currentCount: coinCount 

@@ -28,13 +28,13 @@ body {
 #carousel {
   width: 150px;
   height: 250px;
-  transform: perspective(1000px);
   margin-top: 0px;
   transform-style: preserve-3d;
   animation: var(--rotation-time) carousel linear reverse infinite;
+  animation-play-state: running;
   rotate: x 0deg;
   transition: margin-top 1s ease-in-out;
-  transform: scale(0.5);
+  transform: perspective(1000px) scale(0.5);
 }
 
 #carousel:hover {

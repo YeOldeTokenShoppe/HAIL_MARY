@@ -268,6 +268,7 @@ export default function PortalPage() {
           userImage={user?.imageUrl}
           onBuyClick={() => setShowBuyModal(true)}
           isMobile={isMobileDevice}
+          show80sButton={false}
         />
       </div>
 

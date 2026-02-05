@@ -244,7 +244,7 @@ export default function CommunionPage() {
         <div style={{
           position: "fixed",
           top: "20px",
-          left: "20px",
+          left: "0.5rem",
           borderRadius: "8px",
           padding: "10px",
           pointerEvents: "auto",
@@ -543,14 +543,16 @@ export default function CommunionPage() {
         </div>
       )}
 
-      {/* Social Links + Help Button - right side */}
+      {/* Social Links + Help Button - bottom right on desktop, bottom center on mobile */}
       <div
         style={{
           position: "fixed",
-          bottom: "30px",
-          right: "30px",
+          bottom: isMobileDevice ? "calc(16px + env(safe-area-inset-bottom, 0px))" : "30px",
+          right: isMobileDevice ? "auto" : "30px",
+          left: isMobileDevice ? "50%" : "auto",
+          transform: isMobileDevice ? "translateX(-50%)" : "none",
           display: "flex",
-          flexDirection: "column",
+          flexDirection: isMobileDevice ? "row" : "column",
           alignItems: "center",
           gap: "12px",
           zIndex: 10,

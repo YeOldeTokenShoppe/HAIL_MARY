@@ -51,7 +51,7 @@ export default function ShrinePage() {
   const [showWalletModal, setShowWalletModal] = useState(false)
   const [showAuthMessage, setShowAuthMessage] = useState(null)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [showHelpOverlay, setShowHelpOverlay] = useState(false) // Help/onboarding overlay
+  const [showHelpOverlay, setShowHelpOverlay] = useState(false) // Help/onboarding overlay - set on mount from localStorage
   const [currentView, setCurrentView] = useState('shrine')
   const [mounted, setMounted] = useState(false)
   const [mobileMatchstickLit, setMobileMatchstickLit] = useState(false)
@@ -479,6 +479,13 @@ useEffect(() => {
     
     // Then mount
     setMounted(true);
+
+    // Show help annotations on first visit
+    const hasVisited = localStorage.getItem('illumin80_visited')
+    if (!hasVisited) {
+      setShowHelpOverlay(true)
+      localStorage.setItem('illumin80_visited', '1')
+    }
   }, []);
 
   // Auto-expand and collapse effect for mobile banner
@@ -1654,7 +1661,7 @@ useEffect(() => {
         <div style={{
           position: "fixed",
           top: "20px",
-          left: "20px",
+          left: "0.5rem",
           borderRadius: "8px",
           padding: "10px",
           pointerEvents: "none",
@@ -1717,7 +1724,7 @@ useEffect(() => {
       <div style={{
         position: "fixed",
         top: "1rem",
-        right: "1rem",
+        right: "0.5rem",
         zIndex: 999,
         pointerEvents: 'none'
       }}>
@@ -1735,14 +1742,46 @@ useEffect(() => {
           userImage={user?.imageUrl}
           onBuyClick={() => setShowBuyModal(true)}
           isMobile={isMobileView}
-          onHelpClick={() => setShowHelpOverlay(prev => !prev)}
-          showHelpActive={showHelpOverlay}
+          onHelpClick={null}
+          showHelpActive={false}
           hideMusicOnMobile={true}
         />
       </div>
-      
+
+      {/* Help Button - bottom left */}
+      <button
+        onClick={() => setShowHelpOverlay(prev => !prev)}
+        title="Show help annotations"
+        style={{
+          position: 'fixed',
+          bottom: isMobileView ? 20 : 28,
+          left: isMobileView ? 20 : 28,
+          zIndex: 50,
+          width: 40,
+          height: 40,
+          borderRadius: 10,
+          background: showHelpOverlay
+            ? (is80sMode ? 'rgba(255, 0, 255, 0.15)' : 'rgba(212, 175, 55, 0.15)')
+            : (is80sMode ? 'rgba(255, 0, 255, 0.05)' : 'rgba(212, 175, 55, 0.05)'),
+          border: `1.5px solid ${showHelpOverlay
+            ? (is80sMode ? 'rgba(255, 0, 255, 0.5)' : 'rgba(212, 175, 55, 0.5)')
+            : (is80sMode ? 'rgba(255, 0, 255, 0.2)' : 'rgba(212, 175, 55, 0.2)')}`,
+          color: is80sMode ? '#ff00ff' : '#d4af37',
+          fontSize: '1.3rem',
+          fontWeight: 'bold',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'all 0.2s ease',
+          backdropFilter: 'blur(8px)',
+        }}
+      >
+        ?
+      </button>
+
       {/* CyberNav Menu Panel */}
-      <CyberNav 
+      <CyberNav
         is80sMode={is80sMode}
         position="fixed"
         isOpen={isMenuOpen}
