@@ -1662,7 +1662,7 @@ const PalmsScene = ({ onLoadingChange }) => {
           targetZ: 23.6150,
           fov: 42.106054,
           duration: 0.2,
-          ease: "power2.inOut"
+          ease: "none"
         })
         // Waypoint 2: Side view at car level
         .to(cameraPath, {
@@ -1674,7 +1674,7 @@ const PalmsScene = ({ onLoadingChange }) => {
           targetZ: 23.5889,
           fov: 42.106054,
           duration: 0.2,
-          ease: "power2.inOut"
+          ease: "none"
         })
         // Waypoint 3: Low front angle
         .to(cameraPath, {
@@ -1686,7 +1686,7 @@ const PalmsScene = ({ onLoadingChange }) => {
           targetZ: 23.5831,
           fov: 42.106054,
           duration: 0.15,
-          ease: "power2.inOut"
+          ease: "none"
         })
         // Waypoint 4: Approaching car from behind
         .to(cameraPath, {
@@ -1698,7 +1698,7 @@ const PalmsScene = ({ onLoadingChange }) => {
           targetZ: 22.9299,
           fov: 38,
           duration: 0.15,
-          ease: "power2.inOut"
+          ease: "none"
         })
         // Waypoint 5: Close to dashboard
         .to(cameraPath, {
@@ -1710,7 +1710,7 @@ const PalmsScene = ({ onLoadingChange }) => {
           targetZ: 22.9043,
           fov: 30,
           duration: 0.25,
-          ease: "power2.inOut"
+          ease: "none"
         })
         // Final close-up: Face to face with Mary
         .to(cameraPath, {
@@ -1893,15 +1893,21 @@ const PalmsScene = ({ onLoadingChange }) => {
           autoPlayTweenRef.current = null;
         }
         // Re-enable ScrollTrigger so user can scroll manually from current position
-        if (scrollTriggerRef.current) {
-          // Sync scroll position to match current timeline progress before re-enabling
+        if (scrollTriggerRef.current && scrollTimelineRef.current) {
+          // Sync scroll position to match current timeline progress
           const scrollContainer = document.getElementById('scroll-container');
-          if (scrollContainer && scrollTimelineRef.current) {
+          if (scrollContainer) {
             const maxScroll = scrollContainer.offsetHeight - window.innerHeight;
             const currentProgress = scrollTimelineRef.current.progress();
             window.scrollTo(0, currentProgress * maxScroll);
           }
-          scrollTriggerRef.current.enable();
+          // Delay re-enable so browser settles scroll position first
+          setTimeout(() => {
+            if (scrollTriggerRef.current) {
+              scrollTriggerRef.current.enable();
+              ScrollTrigger.refresh();
+            }
+          }, 100);
         }
         // Remove the cancel listeners once cancelled
         window.removeEventListener('wheel', cancelAutoPlay);
@@ -1965,15 +1971,8 @@ const PalmsScene = ({ onLoadingChange }) => {
           },
           onComplete: () => {
             autoPlayTweenRef.current = null;
-            // Sync scroll to end and re-enable ScrollTrigger
-            const scrollContainer = document.getElementById('scroll-container');
-            if (scrollContainer) {
-              const maxScroll = scrollContainer.offsetHeight - window.innerHeight;
-              window.scrollTo(0, maxScroll);
-            }
-            if (scrollTriggerRef.current) {
-              scrollTriggerRef.current.enable();
-            }
+            // Animation complete — user is at final stage with CTA visible.
+            // Don't re-enable ScrollTrigger to avoid it snapping the timeline back.
             // Clean up listeners
             window.removeEventListener('wheel', cancelAutoPlay);
             window.removeEventListener('touchstart', cancelAutoPlay);
