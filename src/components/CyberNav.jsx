@@ -137,7 +137,7 @@ const CyberNav = ({
     { id: '04', date: t('cyberNav.nav05.date'), title: t('cyberNav.nav05.title'), path: '/ride', thumbnail: '/images/beast.webp' },
     // { id: '03', date: 'PRAYER & PROBABIL80', title: 'TRADE SCHOOL', path: '/trade', thumbnail: '/images/3ACES_TATTOO.webp' },
     { id: '05', date: t('cyberNav.nav06.date'), title: t('cyberNav.nav06.title'), path: '/philosophy', thumbnail: '/images/ILLUMIN80_TATTOO.webp' },
-        ...(isMobile ? [{ id: '06', date: t('cyberNav.nav02.date'), title: t('cyberNav.nav02.title'), path: '/portal', thumbnail: '/painting.webp' }] : []),
+        ...(isMobile ? [{ id: '06', date: t('cyberNav.nav02.date'), title: t('cyberNav.nav02.title'), path: '/portal', thumbnail: '/images/SNAKE8_TATTOO.webp' }] : []),
 
   { id: '07', date: t('cyberNav.nav07.date'), title: t('cyberNav.nav07.title'), path: '/fountain', thumbnail: '/images/ANCHOR_TATTOO.webp' },
     { id: '08', date: t('cyberNav.nav08.date'), title: t('cyberNav.nav08.title'), path: '/gachapon', thumbnail: '/images/RL80_KNUCKLES.webp' },

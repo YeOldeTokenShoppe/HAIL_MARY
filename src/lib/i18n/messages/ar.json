@@ -139,14 +139,16 @@
     },
     "stats": {
       "stats": "إحصائيات",
-      "price": "السعر",
+      "token": "توكن",
       "stake": "رهن",
       "pulse": "نبض",
       "candles": "الشموع",
-      "tokensBurned": "التوكنات المحروقة",
-      "totalValueLocked": "إجمالي القيمة المقفلة",
-      "currentAPR": "العائد السنوي الحالي",
-      "rewardsClaimed": "المكافآت المستلمة"
+      "tokensBurned": "محروقة",
+      "totalSupply": "العرض",
+      "circulatingSupply": "المتداول",
+      "totalStaked": "مرهونة",
+      "percentStaked": "% مرهون",
+      "priceTBA": "السعر: قريباً"
     }
   },
   "cyberNav": {

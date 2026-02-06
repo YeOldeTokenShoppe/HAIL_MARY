@@ -139,14 +139,16 @@
     },
     "stats": {
       "stats": "통계",
-      "price": "가격",
+      "token": "토큰",
       "stake": "스테이크",
       "pulse": "펄스",
       "candles": "캔들",
-      "tokensBurned": "소각된 토큰",
-      "totalValueLocked": "총 예치 가치",
-      "currentAPR": "현재 APR",
-      "rewardsClaimed": "수령한 보상"
+      "tokensBurned": "소각됨",
+      "totalSupply": "총 공급량",
+      "circulatingSupply": "유통량",
+      "totalStaked": "스테이킹됨",
+      "percentStaked": "% 스테이킹",
+      "priceTBA": "가격: 출시 예정"
     }
   },
   "cyberNav": {

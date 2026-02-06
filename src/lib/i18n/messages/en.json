@@ -139,14 +139,16 @@
     },
     "stats": {
       "stats": "STATS",
-      "price": "Price",
+      "token": "Token",
       "stake": "Stake",
       "pulse": "Pulse",
       "candles": "Candles",
-      "tokensBurned": "Tokens Burned",
-      "totalValueLocked": "Total Value Locked",
-      "currentAPR": "Current APR",
-      "rewardsClaimed": "Rewards Claimed"
+      "tokensBurned": "Burned",
+      "totalSupply": "Supply",
+      "circulatingSupply": "Circulating",
+      "totalStaked": "Staked",
+      "percentStaked": "% Staked",
+      "priceTBA": "Price: Coming Soon"
     }
   },
   "cyberNav": {

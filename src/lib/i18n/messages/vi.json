@@ -139,14 +139,16 @@
     },
     "stats": {
       "stats": "THỐNG KÊ",
-      "price": "Giá",
+      "token": "Token",
       "stake": "Đặt Cọc",
       "pulse": "Nhịp",
       "candles": "Nến",
-      "tokensBurned": "Token Đã Đốt",
-      "totalValueLocked": "Tổng Giá Trị Khóa",
-      "currentAPR": "APR Hiện Tại",
-      "rewardsClaimed": "Phần Thưởng Đã Nhận"
+      "tokensBurned": "Đã Đốt",
+      "totalSupply": "Tổng Cung",
+      "circulatingSupply": "Lưu Hành",
+      "totalStaked": "Đã Stake",
+      "percentStaked": "% Đã Stake",
+      "priceTBA": "Giá: Sắp Ra Mắt"
     }
   },
   "cyberNav": {

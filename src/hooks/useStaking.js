@@ -198,6 +198,7 @@ export function useStaking() {
     // Staking data
     stakedBalance: formatValue(stakingData.stakedBalance),
     earnedRewards: formatValue(stakingData.earnedRewards),
+    rewardPerToken: formatValue(stakingData.rewardPerToken),
     totalStaked: formatValue(stakingData.totalStaked),
     
     // Testnet specific data

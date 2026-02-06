@@ -139,14 +139,16 @@
     },
     "stats": {
       "stats": "统计",
-      "price": "价格",
+      "token": "代币",
       "stake": "质押",
       "pulse": "脉冲",
       "candles": "蜡烛",
-      "tokensBurned": "已燃烧代币",
-      "totalValueLocked": "锁定总价值",
-      "currentAPR": "当前APR",
-      "rewardsClaimed": "已领取奖励"
+      "tokensBurned": "已燃烧",
+      "totalSupply": "总供应",
+      "circulatingSupply": "流通量",
+      "totalStaked": "已质押",
+      "percentStaked": "% 已质押",
+      "priceTBA": "价格：即将公布"
     }
   },
   "cyberNav": {

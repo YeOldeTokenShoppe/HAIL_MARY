@@ -139,14 +139,16 @@
     },
     "stats": {
       "stats": "統計",
-      "price": "価格",
+      "token": "トークン",
       "stake": "ステーク",
       "pulse": "パルス",
       "candles": "キャンドル",
-      "tokensBurned": "バーンされたトークン",
-      "totalValueLocked": "ロック総額",
-      "currentAPR": "現在のAPR",
-      "rewardsClaimed": "受け取った報酬"
+      "tokensBurned": "バーン済",
+      "totalSupply": "総供給量",
+      "circulatingSupply": "流通量",
+      "totalStaked": "ステーク済",
+      "percentStaked": "% ステーク",
+      "priceTBA": "価格：近日公開"
     }
   },
   "cyberNav": {

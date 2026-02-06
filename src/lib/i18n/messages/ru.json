@@ -140,14 +140,16 @@
     },
     "stats": {
       "stats": "СТАТИСТИКА",
-      "price": "Цена",
+      "token": "Токен",
       "stake": "Стейк",
       "pulse": "Пульс",
       "candles": "Свечи",
-      "tokensBurned": "Сожжённые Токены",
-      "totalValueLocked": "Общая Заблокированная Стоимость",
-      "currentAPR": "Текущий APR",
-      "rewardsClaimed": "Полученные Награды"
+      "tokensBurned": "Сожжено",
+      "totalSupply": "Эмиссия",
+      "circulatingSupply": "В обращении",
+      "totalStaked": "В стейке",
+      "percentStaked": "% в стейке",
+      "priceTBA": "Цена: Скоро"
     }
   },
   "cyberNav": {

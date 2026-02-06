@@ -463,10 +463,10 @@ export default function TokenomicsPage() {
                 </p>
               </div>
 
-              {/* Stats Cards - Cyber Style */}
-              {/* <div style={{ marginBottom: '50px' }}>
+              {/* Stats Cards - Live On-Chain Data */}
+              <div style={{ marginBottom: '50px' }}>
                 <CyberStatsSection isMobile={isMobile} />
-              </div> */}
+              </div>
 
               {/* Tokenomics Content - Cyber Style */}
               <div style={{ marginBottom: '50px' }}>

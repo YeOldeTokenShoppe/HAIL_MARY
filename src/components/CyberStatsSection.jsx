@@ -1,117 +1,132 @@
 'use client';
-import React, { useRef } from 'react';
+import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { motion, useInView } from 'framer-motion';
 import AnimatedCounter from './AnimatedCounter';
+import { useReadContract } from 'thirdweb/react';
+import { totalSupply } from 'thirdweb/extensions/erc20';
+import { erc20Contract } from '@/lib/contract';
+import { stakingContract } from '@/lib/stakingContract';
+
+const INITIAL_SUPPLY = 80_000_000_000; // 80 billion
+
+// Format a large number into { value, suffix } for AnimatedCounter
+function formatLargeNumber(num) {
+  if (num >= 1e9) return { value: parseFloat((num / 1e9).toFixed(1)), suffix: 'B' };
+  if (num >= 1e6) return { value: parseFloat((num / 1e6).toFixed(1)), suffix: 'M' };
+  if (num >= 1e3) return { value: parseFloat((num / 1e3).toFixed(1)), suffix: 'K' };
+  return { value: num, suffix: '' };
+}
 
 export default function CyberStatsSection({ isMobile }) {
   const statsRef = useRef(null);
   const isInView = useInView(statsRef, { threshold: 0.3 });
 
-  const stakingMetrics = [
-    { 
-      id: 'stakers',
-      value: 1337, 
-      suffix: '', 
-      prefix: '', 
-      label: 'ACTIVE POSITIONS', 
-      status: 'OPERATIONAL',
-      secLevel: 'ALPHA',
-      power: 87.3,
-      description: 'Neural network participants maintaining system stability',
-      icon: '⚡'
-    },
-    { 
-      id: 'tvl',
-      value: 888.8, 
-      suffix: 'K', 
-      prefix: '$', 
-      label: 'TOTAL VALUE LOCKED', 
-      status: 'SECURE',
-      secLevel: 'BETA',
-      power: 92.5,
-      description: 'Protected assets within the quantum vault matrix',
-      icon: '🔒'
-    },
-    { 
-      id: 'pnl',
-      value: 42.86, 
-      suffix: '%', 
-      prefix: '+', 
-      label: 'PROFIT MARGIN', 
-      status: 'ASCENDING',
-      secLevel: 'GAMMA',
-      power: 78.9,
-      description: 'Algorithmic profit optimization protocols active',
-      icon: '📈'
-    },
-    { 
-      id: 'apy',
-      value: 69.42, 
-      suffix: '%', 
-      prefix: '', 
-      label: 'NEURAL APY', 
-      status: 'ACTIVE',
-      secLevel: 'DELTA',
-      power: 94.1,
-      description: 'Yield generation through quantum entanglement',
-      icon: '🔮'
-    }
-  ];
+  // Read total supply from ERC20 contract
+  const { data: totalSupplyData } = useReadContract(
+    totalSupply,
+    { contract: erc20Contract }
+  );
 
-  const marketMetrics = [
-    { 
-      id: 'mcap',
-      value: 144.7, 
-      suffix: 'K', 
-      prefix: '$', 
-      label: 'MARKET DOMINANCE', 
-      status: 'EXPANDING',
-      secLevel: 'EPSILON',
-      power: 85.2,
-      description: 'System influence across decentralized networks',
-      icon: '💎'
-    },
-    { 
-      id: 'holders',
-      value: 134, 
-      suffix: '', 
-      prefix: '', 
-      label: 'NETWORK NODES', 
-      status: 'CONNECTED',
-      secLevel: 'ZETA',
-      power: 73.4,
-      description: 'Distributed consciousness maintaining consensus',
-      icon: '🌐'
-    },
-    { 
-      id: 'burned',
-      value: 2.8, 
-      suffix: '%', 
-      prefix: '', 
-      label: 'ENTROPY RATE', 
-      status: 'CONTROLLED',
-      secLevel: 'ETA',
-      power: 66.7,
-      description: 'Systematic token reduction for deflation',
-      icon: '🔥'
-    },
-    { 
-      id: 'liquidity',
-      value: 42.0, 
-      suffix: 'K', 
-      prefix: '$', 
-      label: 'LIQUIDITY DEPTH', 
-      status: 'STABLE',
-      secLevel: 'THETA',
-      power: 88.9,
-      description: 'Trading pool stability maintained at optimal levels',
-      icon: '💧'
-    }
-  ];
+  // Read total staked from staking contract (works without wallet)
+  const { data: totalStakedData } = useReadContract({
+    contract: stakingContract,
+    method: "function totalStaked() view returns (uint256)",
+    params: [],
+  });
 
-  const renderMetricCard = (metric, index, isMarket = false) => {
-    const delay = isMarket ? 0.05 * (index + 4) : 0.05 * index;
-    
+  // Fetch holder count from our API route (BaseScan)
+  const [holderCount, setHolderCount] = useState(null);
+  useEffect(() => {
+    fetch('/api/token-stats')
+      .then(res => res.json())
+      .then(data => {
+        if (data.holderCount) setHolderCount(data.holderCount);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Derive stats from contract data
+  const currentSupply = useMemo(() => {
+    if (totalSupplyData !== undefined && totalSupplyData !== null) {
+      return Number(totalSupplyData / BigInt(10 ** 18));
+    }
+    return null;
+  }, [totalSupplyData]);
+
+  const totalStakedTokens = useMemo(() => {
+    if (totalStakedData !== undefined && totalStakedData !== null) {
+      return Number(totalStakedData / BigInt(10 ** 18));
+    }
+    return 0;
+  }, [totalStakedData]);
+
+  const burnedTokens = useMemo(() => {
+    if (currentSupply === null) return 0;
+    return INITIAL_SUPPLY - currentSupply;
+  }, [currentSupply]);
+
+  const dataLoaded = currentSupply !== null;
+
+  // Build the 4 metric cards from real data
+  const metrics = useMemo(() => {
+    const supply = dataLoaded ? formatLargeNumber(currentSupply) : { value: 0, suffix: 'B' };
+    const burned = formatLargeNumber(burnedTokens);
+    const staked = formatLargeNumber(totalStakedTokens);
+    return [
+      {
+        id: 'supply',
+        value: supply.value,
+        suffix: supply.suffix,
+        prefix: '',
+        label: 'TOTAL SUPPLY',
+        status: 'LIVE',
+        secLevel: 'ALPHA',
+        power: dataLoaded ? 99.9 : 0,
+        description: `Initial mint of ${INITIAL_SUPPLY.toLocaleString()} RL80 tokens on Base mainnet`,
+        icon: '💎'
+      },
+      {
+        id: 'burned',
+        value: burned.value,
+        suffix: burned.suffix,
+        prefix: '',
+        label: 'TOKENS BURNED',
+        status: 'DEFLATIONARY',
+        secLevel: 'BETA',
+        power: dataLoaded ? Math.min((burnedTokens / INITIAL_SUPPLY) * 100 * 10, 99.9).toFixed(1) : 0,
+        description: 'Permanently removed from circulation via candle offerings and burns',
+        icon: '🔥'
+      },
+      {
+        id: 'staked',
+        value: staked.value,
+        suffix: staked.suffix,
+        prefix: '',
+        label: 'TOTAL STAKED',
+        status: totalStakedTokens > 0 ? 'LOCKED' : 'AWAITING',
+        secLevel: 'GAMMA',
+        power: dataLoaded && currentSupply > 0 ? ((totalStakedTokens / currentSupply) * 100).toFixed(1) : 0,
+        description: 'Tokens committed to the staking contract earning future ETH rewards',
+        icon: '⚡'
+      },
+      {
+        id: 'holders',
+        value: holderCount || 0,
+        suffix: '',
+        prefix: '',
+        label: 'HOLDERS',
+        status: holderCount ? 'CONNECTED' : 'LOADING',
+        secLevel: 'DELTA',
+        power: holderCount ? Math.min(holderCount / 10, 99.9).toFixed(1) : 0,
+        description: 'Unique wallets holding RL80 tokens on Base network',
+        icon: '🌐'
+      }
+    ];
+  }, [dataLoaded, currentSupply, burnedTokens, totalStakedTokens, holderCount]);
+
+  const renderMetricCard = (metric, index) => {
+    const delay = 0.05 * index;
+
     return (
       <motion.div
         key={metric.id}
@@ -143,7 +158,7 @@ export default function CyberStatsSection({ isMobile }) {
           transition: 'all 0.3s ease',
           zIndex: -2,
         }} className="card-glow" />
-        
+
         <div style={{
           position: 'absolute',
           top: 0,
@@ -189,7 +204,7 @@ export default function CyberStatsSection({ isMobile }) {
             <div style={{ color: '#0fa' }}>{`#${metric.id.toUpperCase()}`}</div>
             <div style={{ color: '#f55' }}>SEC.LVL: {metric.secLevel}</div>
           </div>
-          
+
           <div style={{
             fontSize: '1.2rem',
             marginBottom: '10px',
@@ -201,7 +216,7 @@ export default function CyberStatsSection({ isMobile }) {
           }} className="card-title">
             {metric.label}
           </div>
-          
+
           <div style={{
             fontSize: '3rem',
             textAlign: 'center',
@@ -209,7 +224,7 @@ export default function CyberStatsSection({ isMobile }) {
           }} className="card-symbol">
             {metric.icon}
           </div>
-          
+
           <div style={{
             fontSize: isMobile ? '28px' : '36px',
             fontWeight: 'bold',
@@ -219,13 +234,17 @@ export default function CyberStatsSection({ isMobile }) {
             fontFamily: 'monospace',
             textShadow: '0 0 10px rgba(0, 255, 0, 0.5)',
           }}>
-            <AnimatedCounter 
-              target={metric.value} 
-              suffix={metric.suffix} 
-              prefix={metric.prefix} 
-            />
+            {(metric.id === 'holders' ? holderCount !== null : dataLoaded) ? (
+              <AnimatedCounter
+                target={metric.value}
+                suffix={metric.suffix}
+                prefix={metric.prefix}
+              />
+            ) : (
+              <span style={{ opacity: 0.4 }}>...</span>
+            )}
           </div>
-          
+
           <div style={{
             fontSize: '0.75rem',
             marginBottom: '15px',
@@ -244,7 +263,7 @@ export default function CyberStatsSection({ isMobile }) {
           }} className="card-description">
             {metric.description}
           </div>
-          
+
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -253,7 +272,7 @@ export default function CyberStatsSection({ isMobile }) {
             fontFamily: 'monospace',
           }} className="card-footer-area">
             <div style={{ color: '#0fa' }}>PWR: {metric.power}%</div>
-            <div style={{ color: metric.status === 'CRITICAL' ? '#f55' : '#0fa' }}>
+            <div style={{ color: metric.status === 'AWAITING' ? '#ff0' : '#0fa' }}>
               STATUS: {metric.status}
             </div>
           </div>
@@ -285,11 +304,11 @@ export default function CyberStatsSection({ isMobile }) {
             color: '#0fa',
             fontFamily: 'monospace',
           }} className="terminal-title">
-            SYSTEM://METRICS_DASHBOARD
+            SYSTEM://ON_CHAIN_METRICS
           </div>
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
             gap: '8px',
             marginLeft: isMobile ? '0' : 'auto',
             flexShrink: 0
@@ -299,11 +318,11 @@ export default function CyberStatsSection({ isMobile }) {
               width: '10px',
               height: '10px',
               borderRadius: '50%',
-              backgroundColor: '#0f0',
+              backgroundColor: dataLoaded ? '#0f0' : '#ff0',
               animation: 'pulse 1.5s infinite',
             }} className="status-dot" />
-            <span style={{ color: '#0f0', fontFamily: 'monospace', fontSize: isMobile ? '0.7rem' : '0.9rem' }}>
-              LIVE DATA
+            <span style={{ color: dataLoaded ? '#0f0' : '#ff0', fontFamily: 'monospace', fontSize: isMobile ? '0.7rem' : '0.9rem' }}>
+              {dataLoaded ? 'LIVE DATA' : 'LOADING...'}
             </span>
           </div>
         </div>
@@ -314,7 +333,7 @@ export default function CyberStatsSection({ isMobile }) {
         }} className="terminal-line" />
       </div>
 
-      <div style={{ marginBottom: '40px' }}>
+      <div>
         <h3 style={{
           fontSize: isMobile ? '14px' : '16px',
           fontWeight: 'bold',
@@ -329,81 +348,17 @@ export default function CyberStatsSection({ isMobile }) {
           textAlign: 'center',
           filter: 'drop-shadow(0 0 10px rgba(255, 215, 0, 0.3))',
         }}>
-          :: STAKING PROTOCOLS ::
+          :: TOKEN METRICS :: BASE MAINNET ::
         </h3>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? 'repeat(1, 1fr)' : 'repeat(2, 1fr) repeat(2, 1fr)',
+          gridTemplateColumns: isMobile ? 'repeat(1, 1fr)' : 'repeat(4, 1fr)',
           gap: isMobile ? '20px' : '30px',
           width: '100%',
         }}>
-          {stakingMetrics.map((metric, index) => renderMetricCard(metric, index))}
+          {metrics.map((metric, index) => renderMetricCard(metric, index))}
         </div>
       </div>
-
-      <div>
-        <h3 style={{
-          fontSize: isMobile ? '14px' : '16px',
-          fontWeight: 'bold',
-          background: 'linear-gradient(135deg, #b8ff00 0%, #00ff00 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
-          marginBottom: '20px',
-           fontFamily: 'Blackletter, serif !important',
-          textTransform: 'uppercase',
-          letterSpacing: '2px',
-          textAlign: 'center',
-          filter: 'drop-shadow(0 0 10px rgba(0, 255, 0, 0.5))',
-        }}>
-          :: MARKET DYNAMICS ::
-        </h3>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? 'repeat(1, 1fr)' : 'repeat(2, 1fr) repeat(2, 1fr)',
-          gap: isMobile ? '20px' : '30px',
-          width: '100%',
-        }}>
-          {marketMetrics.map((metric, index) => renderMetricCard(metric, index, true))}
-        </div>
-      </div>
-
-      {/* <div style={{
-        background: 'rgba(5, 10, 15, 0.9)',
-        border: '1px solid rgba(0, 255, 170, 0.7)',
-        borderRadius: '5px',
-        padding: '10px 15px',
-        marginTop: '30px',
-        boxShadow: '0 0 15px rgba(0, 255, 170, 0.7)',
-      }} className="terminal-footer">
-        <div style={{
-          height: '1px',
-          background: 'linear-gradient(to right, transparent, rgba(0, 255, 170, 0.7), transparent)',
-          marginBottom: '8px',
-        }} className="terminal-line" />
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
-          <div style={{
-            fontSize: '0.9rem',
-            opacity: 0.8,
-            color: '#0fa',
-            fontFamily: 'monospace',
-          }} className="terminal-info">
-            HOVER TO INTERACT
-          </div>
-          <div style={{
-            color: '#ff0',
-            fontSize: '0.9rem',
-            fontFamily: 'monospace',
-            animation: 'blink 2s infinite',
-          }} className="terminal-warning">
-            SYSTEM STABILITY: OPTIMAL
-          </div>
-        </div>
-      </div> */}
 
       <style jsx>{`
         @keyframes scanline {
@@ -419,7 +374,7 @@ export default function CyberStatsSection({ isMobile }) {
             opacity: 0.1;
           }
         }
-        
+
         @keyframes pulse {
           0%, 100% {
             opacity: 1;
@@ -428,16 +383,7 @@ export default function CyberStatsSection({ isMobile }) {
             opacity: 0.3;
           }
         }
-        
-        @keyframes blink {
-          0%, 100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.3;
-          }
-        }
-        
+
         .cyber-card:hover .card-glow {
           filter: blur(20px);
           opacity: 0.9;

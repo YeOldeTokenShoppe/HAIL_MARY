@@ -94,6 +94,7 @@ import { useStaking } from '@/hooks/useStaking'
 import { useReadContract } from 'thirdweb/react'
 import { totalSupply } from 'thirdweb/extensions/erc20'
 import { erc20Contract } from '@/lib/contract'
+import { stakingContract } from '@/lib/stakingContract'
 import CongregationSentiment from './SentimentData'
 import { db, collection, query, orderBy, limit, getDocs } from '@/lib/firebaseClient'
 
@@ -1232,16 +1233,11 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   const effectRef = useRef()
   
   
-  // State only for UI display (throttled updates)
+  // State only for UI display (throttled updates) - used by 3D visual effects
   const [displayPrice, setDisplayPrice] = useState({
     direction: 0,
     change: 0,
-    tokenPrice: 0.000420,
   })
-  
-  // TEST SLIDER CONTROL - Disabled
-  const testPriceOverride = null // const [testPriceOverride, setTestPriceOverride] = useState(null)
-  // const [showTestControls, setShowTestControls] = useState(true)
   
   // additionalCandles removed - candles now use stored positions from Firestore
   // The NewCandleEffect flies to the exact position stored with the offering
@@ -1495,7 +1491,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   const [clickedCandleId, setClickedCandleId] = useState(null)
   const [isRippleActive, setIsRippleActive] = useState(false)
   const [animatingCandleUserId, setAnimatingCandleUserId] = useState(null) // Hide permanent candle while effect plays
-  const [activeStatsTab, setActiveStatsTab] = useState('leaders') // 'leaders', 'price', 'staking', or 'pulse'
+  const [activeStatsTab, setActiveStatsTab] = useState('leaders') // 'leaders', 'token', 'staking', or 'pulse'
   const [internalShowHelp, setInternalShowHelp] = useState(false) // Internal help state (fallback)
   const [statsBoxCollapsed, setStatsBoxCollapsed] = useState(true) // Collapsed stats box - closed by default
   const [activeAnnotationId, setActiveAnnotationId] = useState(null) // Which annotation label is shown
@@ -1552,41 +1548,15 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
     return () => clearInterval(interval)
   }, [])
 
-  // Get staking data
-  const { 
-    totalStaked,
-    rewardPerToken
-  } = useStaking()
-  
-  // Calculate TVL based on total staked
-  const calculateTVL = useMemo(() => {
-    // Using the actual token price from displayPrice
-    const tokenPrice = displayPrice.tokenPrice || 0.001
-    const tvl = (parseFloat(totalStaked || 0) * tokenPrice)
-    // Format based on size
-    if (tvl >= 1000000) return `${(tvl / 1000000).toFixed(2)}M`
-    if (tvl >= 1000) return `${(tvl / 1000).toFixed(2)}K`
-    return tvl.toFixed(2)
-  }, [totalStaked, displayPrice.tokenPrice])
-  
-  // Calculate APR based on reward rate
-  const calculateAPR = useMemo(() => {
-    if (!totalStaked || parseFloat(totalStaked) === 0) return '0.0'
-    
-    // Base APR calculation - this is a simplified version
-    // In production, would need to factor in reward rate from contract
-    const rewardRate = parseFloat(rewardPerToken || 0)
-    const baseAPR = rewardRate > 0 ? (rewardRate * 365 * 100).toFixed(1) : '15.0' // Default 15% APR
-    
-    return baseAPR
-  }, [totalStaked, rewardPerToken])
-  
-  // Mock total rewards paid (in production, fetch from contract events)
-  const totalRewardsPaid = useMemo(() => {
-    // This would be calculated from contract events
-    const mockRewards = 0.05 // Mock 0.05 ETH total rewards
-    return mockRewards.toFixed(4)
-  }, [])
+  // Initialize staking hook (wallet-dependent features used elsewhere)
+  useStaking()
+
+  // Read totalStaked directly from contract (works without wallet connection)
+  const { data: totalStakedData } = useReadContract({
+    contract: stakingContract,
+    method: "function totalStaked() view returns (uint256)",
+    params: [],
+  })
   
   // Store the user's rotation before resetting
   const savedUserRotation = useRef(0)
@@ -1864,23 +1834,6 @@ useEffect(() => {
   }
 }, [])
   
-  // Price history - update much less frequently
-  const [priceHistory, setPriceHistory] = useState(() =>
-    Array(20).fill(0.00042) // Start with consistent values for SSR
-  )
-
-  // 7-day price history for sparkline - mock data until token launches
-  const [priceHistory7d] = useState(() => [
-    0.000410, // 7 days ago
-    0.000425, // 6 days ago
-    0.000418, // 5 days ago
-    0.000435, // 4 days ago
-    0.000428, // 3 days ago
-    0.000422, // 2 days ago
-    0.000416  // today (matches current price)
-  ])
-  const lastHistoryUpdate = useRef(0)
-  const HISTORY_UPDATE_INTERVAL = 500 // Update chart every 500ms
   
   // Calculate stats from offerings
   const [displayedCandleCount, setDisplayedCandleCount] = useState(100)
@@ -1971,9 +1924,6 @@ useEffect(() => {
       setMounted(true)
     }, 200) // Small delay to let parent preloading complete
     
-    // Generate random initial values only on client side
-    setPriceHistory(Array(20).fill(0).map(() => 0.00042 + Math.random() * 0.00001 - 0.000005))
-    
     // Add ESC key handler for tooltip and view reset
     const handleEscape = (e) => {
       if (e.key === 'Escape') {
@@ -1995,30 +1945,19 @@ useEffect(() => {
     }
   }, [])
 
-  // Throttled UI update handler
+  // Throttled UI update handler - drives 3D visual effects and forwards to parent
   const handleUIUpdate = useCallback((price) => {
-    // Use test override if set, otherwise use simulated price
-    const effectivePrice = testPriceOverride !== null ? testPriceOverride : price
-    const changePercent = effectivePrice * 5
-    const newTokenPrice = 0.000420 * (1 + changePercent / 100)
-    
+    const changePercent = price * 5
+
     setDisplayPrice({
-      direction: effectivePrice,
+      direction: price,
       change: changePercent,
-      tokenPrice: newTokenPrice,
     })
-    
-    // Update history even less frequently
-    const now = Date.now()
-    if (now - lastHistoryUpdate.current > HISTORY_UPDATE_INTERVAL) {
-      lastHistoryUpdate.current = now
-      setPriceHistory(prev => [...prev.slice(1), newTokenPrice])
-    }
-    
+
     if (onPriceChange) {
       onPriceChange(changePercent)
     }
-  }, [onPriceChange, testPriceOverride])
+  }, [onPriceChange])
 
   const handleCandleClick = useCallback((instanceId, position) => {
     if (timeoutRefs.current[instanceId]) {
@@ -2323,42 +2262,6 @@ useEffect(() => {
     }
   }, [])
   
-  // Handle test slider changes
-  useEffect(() => {
-    if (testPriceOverride !== null) {
-      // Normalize the test price for shader (expecting -1 to 1 range)
-      const normalizedPrice = testPriceOverride / 20
-      
-      // Update price ref for color changes
-      priceRef.current = normalizedPrice
-      
-      // Force UI update
-      handleUIUpdate(testPriceOverride)
-    }
-  }, [testPriceOverride, handleUIUpdate])
-  
-  // Separate effect to continuously update offset even in test mode
-  useEffect(() => {
-    if (testPriceOverride === null) return
-    
-    let animationId
-    let lastTime = performance.now()
-    
-    const updateOffset = (currentTime) => {
-      const deltaTime = (currentTime - lastTime) / 1000
-      lastTime = currentTime
-      
-      // Constant rate - same as auto mode
-      const CONSTANT_SPEED = 0.5
-      continuousOffsetRef.current += deltaTime * CONSTANT_SPEED
-      
-      animationId = requestAnimationFrame(updateOffset)
-    }
-    
-    animationId = requestAnimationFrame(updateOffset)
-    return () => cancelAnimationFrame(animationId)
-  }, [testPriceOverride])
-
   // Memoize exclusionZone to prevent CandleCloud re-renders
   // Adjusted to match actual model position and scale
   const exclusionZone = useMemo(() => ({
@@ -2388,22 +2291,30 @@ useEffect(() => {
   }), [isMobile, is80sMode])
   
 
-  // Memoize 7-day price sparkline
-  const priceSparkline = useMemo(() => {
-    const prices = priceHistory7d
-    const min = Math.min(...prices)
-    const max = Math.max(...prices)
-    const range = max - min || 0.000001 // Prevent division by zero
+  // Derive on-chain stats for the Token tab
+  const currentSupply = useMemo(() => {
+    if (totalSupplyData !== undefined && totalSupplyData !== null) {
+      return Number(totalSupplyData / BigInt(10 ** 18))
+    }
+    return null
+  }, [totalSupplyData])
 
-    // Generate SVG points for polyline
-    const points = prices.map((price, i) => {
-      const x = (i / (prices.length - 1)) * 100
-      const y = 30 - ((price - min) / range) * 28 // Invert Y (SVG coords)
-      return `${x},${y}`
-    }).join(' ')
+  const totalStakedTokens = useMemo(() => {
+    if (totalStakedData !== undefined && totalStakedData !== null) {
+      return Number(totalStakedData / BigInt(10 ** 18))
+    }
+    return 0
+  }, [totalStakedData])
 
-    return { points, lastY: 30 - ((prices[prices.length - 1] - min) / range) * 28 }
-  }, [priceHistory7d])
+  const circulatingSupply = useMemo(() => {
+    if (currentSupply === null) return null
+    return currentSupply - totalStakedTokens
+  }, [currentSupply, totalStakedTokens])
+
+  const percentStaked = useMemo(() => {
+    if (!currentSupply || currentSupply === 0) return 0
+    return (totalStakedTokens / currentSupply) * 100
+  }, [currentSupply, totalStakedTokens])
 
   // Help overlay annotation positions (screen-space)
   const helpAnnotations = useMemo(() => [
@@ -2705,7 +2616,7 @@ useEffect(() => {
           shortTermPriceRef={shortTermPriceRef}
           continuousOffsetRef={continuousOffsetRef}
           onUIUpdate={handleUIUpdate}
-          disabled={testPriceOverride !== null}  // Disable when test controls are active
+          disabled={false}
         />
         
         
@@ -2898,33 +2809,33 @@ useEffect(() => {
             🔥
           </button>
           <button
-            onClick={() => setActiveStatsTab('price')}
+            onClick={() => setActiveStatsTab('token')}
             style={{
               flex: 1,
               padding: isMobile ? '4px 4px' : '6px 8px',
-              background: activeStatsTab === 'price'
+              background: activeStatsTab === 'token'
                 ? (is80sMode ? 'rgba(255, 0, 255, 0.2)' : 'rgba(212, 175, 55, 0.2)')
                 : 'transparent',
               border: 'none',
-              borderBottom: activeStatsTab === 'price'
+              borderBottom: activeStatsTab === 'token'
                 ? (is80sMode ? '2px solid #ff00ff' : '2px solid #d4af37')
                 : '2px solid transparent',
-              color: activeStatsTab === 'price'
+              color: activeStatsTab === 'token'
                 ? (is80sMode ? '#ff00ff' : '#d4af37')
                 : '#ccc',
               fontSize: isMobile ? '10px' : '12px',
               fontFamily: 'monospace',
-              fontWeight: activeStatsTab === 'price' ? 'bold' : 'normal',
+              fontWeight: activeStatsTab === 'token' ? 'bold' : 'normal',
               cursor: 'pointer',
               textTransform: 'uppercase',
               transition: 'all 0.2s',
               marginBottom: '-1px',
               minWidth: 0,
               overflow: 'hidden',
-              textShadow: activeStatsTab === 'price' && is80sMode ? '0 0 10px #ff00ff' : 'none',
+              textShadow: activeStatsTab === 'token' && is80sMode ? '0 0 10px #ff00ff' : 'none',
             }}
           >
-            {t('illumin80.stats.price')}
+            {t('illumin80.stats.token')}
           </button>
           <button
             onClick={() => setActiveStatsTab('pulse')}
@@ -2951,166 +2862,211 @@ useEffect(() => {
         </div>
         
         {/* Tab Content */}
-        {activeStatsTab === 'price' ? (
+        {activeStatsTab === 'token' ? (
           <>
-            {/* Price Tab Content - Original content */}
-        {/* Price Action - Prominent */}
-        <div style={{
-          marginBottom: isMobile ? '10px' : '15px',
-          padding: isMobile ? '8px' : '12px',
-          background: displayPrice.change >= 0 
-            ? 'rgba(0, 255, 102, 0.1)' 
-            : 'rgba(255, 68, 68, 0.1)',
-          borderRadius: '8px',
-          border: `1px solid ${displayPrice.change >= 0 
-            ? 'rgba(0, 255, 102, 0.3)' 
-            : 'rgba(255, 68, 68, 0.3)'}`
-        }}>
-          <div style={{ 
-            fontSize: isMobile ? '18px' : '24px', 
-            fontWeight: 'bold',
-            color: displayPrice.change >= 0 ? '#00ff66' : '#ff4444',
-            marginBottom: '6px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <span>{displayPrice.change >= 0 ? '+' : ''}{displayPrice.change.toFixed(2)}%</span>
-          </div>
-          <div style={{
-            fontSize: isMobile ? '12px' : '14px',
-            color: '#ccc',
-            fontFamily: 'monospace'
-          }}>
-            ${displayPrice.tokenPrice.toFixed(7)}
-          </div>
-        </div>
-        
-        {/* Candles & Burn Stats - Side by side */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: isMobile ? '8px' : '10px',
-          marginBottom: isMobile ? '0' : '15px'
-        }}>
-          {/* Candles */}
-          <div style={{
-            padding: isMobile ? '8px' : '10px',
-            background: is80sMode ? 'rgba(255, 0, 255, 0.1)' : 'rgba(212, 175, 55, 0.1)',
-            borderRadius: '8px',
-            border: is80sMode ? '1px solid rgba(255, 0, 255, 0.3)' : '1px solid rgba(212, 175, 55, 0.3)',
-            textAlign: 'center'
-          }}>
+            {/* Token Tab Content - Real on-chain stats */}
             <div style={{
-              fontSize: isMobile ? '16px' : '16px',
-              fontWeight: 'bold',
-              color: is80sMode ? '#ff00ff' : '#d4af37',
-              marginBottom: '4px',
-              textShadow: is80sMode ? '0 0 10px #ff00ff' : 'none',
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: isMobile ? '6px' : '8px',
+              marginBottom: isMobile ? '6px' : '10px'
             }}>
-              {/* <img 
-                src="/images/GreenCandleIcon.webp"
-                alt=""
-                style={{
-                  width: '1.2em',
-                  height: '1.2em',
-                  objectFit: 'contain',
-                  verticalAlign: 'middle',
-                  marginRight: '0.3em',
-                  display: 'inline-block'
-                }}
-              />  */}
-              <span 
-                style={{
-                  display: 'inline-block',
-                  animation: candleCountAnimation ? 'pulseScale 1.5s ease-out' : 'none',
-                  color: candleCountAnimation ? '#ffee00' : 'inherit'
-                }}
-              >
-                {displayedCandleCount.toLocaleString()}
-              </span>
-            </div>
-            <div style={{
-              fontSize: isMobile ? '10px' : '11px',
-              color: '#ccc',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px'
-            }}>
-              {t('illumin80.stats.candles')}
-            </div>
-          </div>
-          
-          {/* Burned */}
-          <div style={{
-            padding: isMobile ? '8px' : '10px',
-            background: 'rgba(255, 149, 0, 0.1)',
-            borderRadius: '8px',
-            border: '1px solid rgba(255, 149, 0, 0.3)',
-            textAlign: 'center'
-          }}>
-            <div style={{ 
-              fontSize: isMobile ? '16px' : '16px', 
-              fontWeight: 'bold',
-              color: '#ff9500',
-              marginBottom: '4px'
-            }}>
-               {displayedBurnTotal >= 1000000 
-                ? `${(displayedBurnTotal / 1000000).toFixed(2)}M`
-                : displayedBurnTotal >= 1000 
-                ? `${(displayedBurnTotal / 1000).toFixed(1)}K`
-                : displayedBurnTotal.toLocaleString()}
-            </div>
-            <div style={{
-              fontSize: isMobile ? '10px' : '11px',
-              color: '#ccc',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              marginBottom: '-8px'
+              {/* Total Supply */}
+              <div style={{
+                padding: isMobile ? '7px' : '10px',
+                background: is80sMode ? 'rgba(255, 0, 255, 0.08)' : 'rgba(212, 175, 55, 0.08)',
+                borderRadius: '8px',
+                border: is80sMode ? '1px solid rgba(255, 0, 255, 0.25)' : '1px solid rgba(212, 175, 55, 0.25)',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  fontSize: isMobile ? '13px' : '15px',
+                  fontWeight: 'bold',
+                  color: is80sMode ? '#ff00ff' : '#d4af37',
+                  marginBottom: '3px',
+                  textShadow: is80sMode ? '0 0 8px #ff00ff' : 'none',
+                }}>
+                  {currentSupply !== null
+                    ? (currentSupply >= 1e9 ? `${(currentSupply / 1e9).toFixed(1)}B` : currentSupply >= 1e6 ? `${(currentSupply / 1e6).toFixed(1)}M` : currentSupply.toLocaleString())
+                    : '...'}
+                </div>
+                <div style={{
+                  fontSize: isMobile ? '9px' : '10px',
+                  color: '#aaa',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  {t('illumin80.stats.totalSupply')}
+                </div>
+              </div>
 
-            }}>
-              {t('illumin80.stats.tokensBurned')}
+              {/* Burned */}
+              <div style={{
+                padding: isMobile ? '7px' : '10px',
+                background: 'rgba(255, 149, 0, 0.08)',
+                borderRadius: '8px',
+                border: '1px solid rgba(255, 149, 0, 0.25)',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  fontSize: isMobile ? '13px' : '15px',
+                  fontWeight: 'bold',
+                  color: '#ff9500',
+                  marginBottom: '3px'
+                }}>
+                  {displayedBurnTotal >= 1e6
+                    ? `${(displayedBurnTotal / 1e6).toFixed(2)}M`
+                    : displayedBurnTotal >= 1000
+                    ? `${(displayedBurnTotal / 1000).toFixed(1)}K`
+                    : displayedBurnTotal.toLocaleString()}
+                </div>
+                <div style={{
+                  fontSize: isMobile ? '9px' : '10px',
+                  color: '#aaa',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  {t('illumin80.stats.tokensBurned')}
+                </div>
+              </div>
+
+              {/* Candles Lit */}
+              <div style={{
+                padding: isMobile ? '7px' : '10px',
+                background: is80sMode ? 'rgba(0, 255, 255, 0.08)' : 'rgba(212, 175, 55, 0.08)',
+                borderRadius: '8px',
+                border: is80sMode ? '1px solid rgba(0, 255, 255, 0.25)' : '1px solid rgba(212, 175, 55, 0.25)',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  fontSize: isMobile ? '13px' : '15px',
+                  fontWeight: 'bold',
+                  color: is80sMode ? '#00ffff' : '#d4af37',
+                  marginBottom: '3px',
+                  textShadow: is80sMode ? '0 0 8px #00ffff' : 'none',
+                }}>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      animation: candleCountAnimation ? 'pulseScale 1.5s ease-out' : 'none',
+                      color: candleCountAnimation ? '#ffee00' : 'inherit'
+                    }}
+                  >
+                    {displayedCandleCount.toLocaleString()}
+                  </span>
+                </div>
+                <div style={{
+                  fontSize: isMobile ? '9px' : '10px',
+                  color: '#aaa',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  {t('illumin80.stats.candles')}
+                </div>
+              </div>
+
+              {/* Total Staked */}
+              <div style={{
+                padding: isMobile ? '7px' : '10px',
+                background: 'rgba(99, 102, 241, 0.08)',
+                borderRadius: '8px',
+                border: '1px solid rgba(99, 102, 241, 0.25)',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  fontSize: isMobile ? '13px' : '15px',
+                  fontWeight: 'bold',
+                  color: '#818cf8',
+                  marginBottom: '3px'
+                }}>
+                  {totalStakedTokens >= 1e9
+                    ? `${(totalStakedTokens / 1e9).toFixed(1)}B`
+                    : totalStakedTokens >= 1e6
+                    ? `${(totalStakedTokens / 1e6).toFixed(1)}M`
+                    : totalStakedTokens >= 1000
+                    ? `${(totalStakedTokens / 1000).toFixed(1)}K`
+                    : totalStakedTokens.toLocaleString()}
+                </div>
+                <div style={{
+                  fontSize: isMobile ? '9px' : '10px',
+                  color: '#aaa',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  {t('illumin80.stats.totalStaked')}
+                </div>
+              </div>
+
+              {/* Circulating */}
+              <div style={{
+                padding: isMobile ? '7px' : '10px',
+                background: 'rgba(34, 197, 94, 0.08)',
+                borderRadius: '8px',
+                border: '1px solid rgba(34, 197, 94, 0.25)',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  fontSize: isMobile ? '13px' : '15px',
+                  fontWeight: 'bold',
+                  color: '#4ade80',
+                  marginBottom: '3px'
+                }}>
+                  {circulatingSupply !== null
+                    ? (circulatingSupply >= 1e9 ? `${(circulatingSupply / 1e9).toFixed(1)}B` : circulatingSupply >= 1e6 ? `${(circulatingSupply / 1e6).toFixed(1)}M` : circulatingSupply.toLocaleString())
+                    : '...'}
+                </div>
+                <div style={{
+                  fontSize: isMobile ? '9px' : '10px',
+                  color: '#aaa',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  {t('illumin80.stats.circulatingSupply')}
+                </div>
+              </div>
+
+              {/* % Staked */}
+              <div style={{
+                padding: isMobile ? '7px' : '10px',
+                background: 'rgba(168, 85, 247, 0.08)',
+                borderRadius: '8px',
+                border: '1px solid rgba(168, 85, 247, 0.25)',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  fontSize: isMobile ? '13px' : '15px',
+                  fontWeight: 'bold',
+                  color: '#c084fc',
+                  marginBottom: '3px'
+                }}>
+                  {percentStaked.toFixed(2)}%
+                </div>
+                <div style={{
+                  fontSize: isMobile ? '9px' : '10px',
+                  color: '#aaa',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}>
+                  {t('illumin80.stats.percentStaked')}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-        
-        {/* 7-day price sparkline */}
-        <div style={{
-          marginTop: isMobile ? '8px' : '12px',
-          padding: isMobile ? '8px' : '10px',
-          background: 'rgba(255, 255, 255, 0.02)',
-          borderRadius: '6px',
-          border: '1px solid rgba(255, 255, 255, 0.05)'
-        }}>
-          <div style={{
-            fontSize: isMobile ? '9px' : '10px',
-            color: '#888',
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px',
-            marginBottom: '6px',
-            fontFamily: 'monospace'
-          }}>
-            7-Day Chart
-          </div>
-          <svg viewBox="0 0 100 30" style={{ width: '100%', height: '30px' }}>
-            <polyline
-              fill="none"
-              stroke={displayPrice.change >= 0 ? '#4ade80' : '#f87171'}
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              points={priceSparkline.points}
-            />
-            <circle
-              cx="100"
-              cy={priceSparkline.lastY}
-              r="3"
-              fill={displayPrice.change >= 0 ? '#4ade80' : '#f87171'}
-              style={{
-                filter: `drop-shadow(0 0 4px ${displayPrice.change >= 0 ? '#4ade80' : '#f87171'})`
-              }}
-            />
-          </svg>
-        </div>
+
+            {/* Price Coming Soon indicator */}
+            <div style={{
+              padding: isMobile ? '6px 8px' : '8px 10px',
+              background: 'rgba(255, 255, 255, 0.03)',
+              borderRadius: '6px',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              textAlign: 'center',
+              fontSize: isMobile ? '9px' : '10px',
+              color: '#666',
+              fontFamily: 'monospace',
+              textTransform: 'uppercase',
+              letterSpacing: '1px'
+            }}>
+              {t('illumin80.stats.priceTBA')}
+            </div>
           </>
         ) : activeStatsTab === 'pulse' ? (
           <>

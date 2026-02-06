@@ -139,14 +139,16 @@
     },
     "stats": {
       "stats": "STATISTICHE",
-      "price": "Prezzo",
+      "token": "Token",
       "stake": "Stake",
       "pulse": "Impulso",
       "candles": "Candele",
-      "tokensBurned": "Token Bruciati",
-      "totalValueLocked": "Valore Totale Bloccato",
-      "currentAPR": "APR Attuale",
-      "rewardsClaimed": "Ricompense Richieste"
+      "tokensBurned": "Bruciati",
+      "totalSupply": "Offerta",
+      "circulatingSupply": "Circolante",
+      "totalStaked": "In Stake",
+      "percentStaked": "% in Stake",
+      "priceTBA": "Prezzo: In Arrivo"
     }
   },
   "cyberNav": {

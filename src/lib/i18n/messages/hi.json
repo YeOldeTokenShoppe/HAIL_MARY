@@ -139,14 +139,16 @@
     },
     "stats": {
       "stats": "आंकड़े",
-      "price": "मूल्य",
+      "token": "टोकन",
       "stake": "स्टेक",
       "pulse": "पल्स",
       "candles": "मोमबत्तियां",
-      "tokensBurned": "जलाए गए टोकन",
-      "totalValueLocked": "कुल लॉक मूल्य",
-      "currentAPR": "वर्तमान APR",
-      "rewardsClaimed": "प्राप्त पुरस्कार"
+      "tokensBurned": "जलाए गए",
+      "totalSupply": "कुल आपूर्ति",
+      "circulatingSupply": "परिचालित",
+      "totalStaked": "स्टेक किए",
+      "percentStaked": "% स्टेक",
+      "priceTBA": "मूल्य: जल्द आ रहा"
     }
   },
   "cyberNav": {

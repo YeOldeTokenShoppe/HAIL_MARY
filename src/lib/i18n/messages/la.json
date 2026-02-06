@@ -139,14 +139,16 @@
     },
     "stats": {
       "stats": "STATISTICA",
-      "price": "Pretium",
+      "token": "Signum",
       "stake": "Depositum",
       "pulse": "Pulsus",
       "candles": "Candelae",
-      "tokensBurned": "Signa Combusta",
-      "totalValueLocked": "Valor Totalis Clausus",
-      "currentAPR": "APR Praesens",
-      "rewardsClaimed": "Praemia Accepta"
+      "tokensBurned": "Combusta",
+      "totalSupply": "Copia",
+      "circulatingSupply": "Circulans",
+      "totalStaked": "Deposita",
+      "percentStaked": "% Deposita",
+      "priceTBA": "Pretium: Mox"
     }
   },
   "cyberNav": {

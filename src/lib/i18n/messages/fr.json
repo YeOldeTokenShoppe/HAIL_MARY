@@ -138,14 +138,16 @@
     },
     "stats": {
       "stats": "STATISTIQUES",
-      "price": "Prix",
+      "token": "Token",
       "stake": "Stake",
       "pulse": "Pouls",
       "candles": "Bougies",
-      "tokensBurned": "Tokens Brûlés",
-      "totalValueLocked": "Valeur Totale Verrouillée",
-      "currentAPR": "APR Actuel",
-      "rewardsClaimed": "Récompenses Réclamées"
+      "tokensBurned": "Brûlés",
+      "totalSupply": "Offre",
+      "circulatingSupply": "Circulant",
+      "totalStaked": "Stakés",
+      "percentStaked": "% Staké",
+      "priceTBA": "Prix : Bientôt"
     }
   },
   "cyberNav": {
