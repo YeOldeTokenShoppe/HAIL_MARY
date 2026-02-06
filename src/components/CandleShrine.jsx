@@ -177,11 +177,24 @@ function createWobbleMaterial(baseColor, options = {}) {
     uniforms: {
       uColor: { value: new THREE.Color(baseColor) },
       uOpacity: { value: options.opacity ?? 1.0 },
+      ...sharedUniforms,
     },
     vertexShader: `
+      uniform float uHighlightedId;
+      uniform vec3 uHighlightedPos;
+
       void main() {
+        float id = float(gl_InstanceID);
         // Wobble is now baked into instanceMatrix for accurate raycasting
         vec4 instancePos = instanceMatrix * vec4(position, 1.0);
+
+        // Scale up and push highlighted candle toward camera (same as wax + flame)
+        bool isHighlighted = uHighlightedId >= 0.0 && abs(uHighlightedId - id) < 1.0;
+        if (isHighlighted) {
+          instancePos.xyz = uHighlightedPos + (instancePos.xyz - uHighlightedPos) * 1.6;
+          instancePos.z += 2.5;
+        }
+
         gl_Position = projectionMatrix * modelViewMatrix * instancePos;
       }
     `,
@@ -529,15 +542,23 @@ function useClonedGeometries(modelPath) {
 // Zone 3: Peripheral - higher/lower, around the scene
 // Zone 4: Background - overflow, fill in gaps
 const PRIORITY_ZONES = {
+  zone0: {
+    capacity: 10,  // First 10 candles - central cluster
+    // z is IN FRONT of body corridor (z < zMin of -9) so candles can use x≈0
+    x: { min: -4, max: 4 },
+    y: { min: 0, max: 3 },
+    z: { min: -11, max: -9.5 },
+    randomizeXSign: false,
+    alternateSides: true,
+  },
   zone1: {
-    capacity: 25,  // First 25 candles go here
-    // Tight cluster flanking the phone - clearly visible in front of viewer
-    // These candles hug just outside the body corridor so they're close to center
-    x: { min: -6, max: 6 },
+    capacity: 15,  // Next 15 candles (total 25)
+    // Slightly wider cluster flanking the phone
+    x: { min: -7, max: 7 },
     y: { min: -1, max: 3 },
     z: { min: -8, max: -4 },  // Between Mary and phone - prime visible area
     randomizeXSign: false,
-    alternateSides: true,  // Force left/right alternation for even distribution
+    alternateSides: true,
   },
   zone2: {
     capacity: 40,  // Next 40 candles
@@ -688,9 +709,13 @@ function generateZonePosition(zone, exclusionZone, usedPositions = [], seed = 0.
 function getZoneForIndex(index, isUserCandle = false) {
   // User candles get priority placement in front zones
   if (isUserCandle) {
-    if (index < PRIORITY_ZONES.zone1.capacity) return PRIORITY_ZONES.zone1
-    if (index < PRIORITY_ZONES.zone1.capacity + PRIORITY_ZONES.zone2.capacity) return PRIORITY_ZONES.zone2
-    if (index < PRIORITY_ZONES.zone1.capacity + PRIORITY_ZONES.zone2.capacity + PRIORITY_ZONES.zone3.capacity) return PRIORITY_ZONES.zone3
+    if (index < PRIORITY_ZONES.zone0.capacity) return PRIORITY_ZONES.zone0
+    const z0 = PRIORITY_ZONES.zone0.capacity
+    if (index < z0 + PRIORITY_ZONES.zone1.capacity) return PRIORITY_ZONES.zone1
+    const z1 = z0 + PRIORITY_ZONES.zone1.capacity
+    if (index < z1 + PRIORITY_ZONES.zone2.capacity) return PRIORITY_ZONES.zone2
+    const z2 = z1 + PRIORITY_ZONES.zone2.capacity
+    if (index < z2 + PRIORITY_ZONES.zone3.capacity) return PRIORITY_ZONES.zone3
     return PRIORITY_ZONES.zone4
   }
 
@@ -900,7 +925,7 @@ function InstancedPart({ geometry, material, positions, localMatrix, scale = 0.9
       let yScale = pos.heightScale !== undefined ? pos.heightScale : instanceScale
       if (enableMelting && pos.litAt) {
         const elapsed = (now - pos.litAt) / 1000
-        const meltProgress = Math.min(elapsed / 604800, 1.0) // 604800 = 1 week in seconds
+        const meltProgress = Math.min(elapsed / 86400, 1.0) // 86400 = 24 hours in seconds
         yScale = Math.max(0.01, (pos.heightScale || instanceScale) * (1.0 - meltProgress))
       }
 
@@ -1251,7 +1276,7 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onPrice
       setAdditionalCandles(prev => prev.filter(candle => {
         if (!candle.litAt) return true
         const elapsed = (now - candle.litAt) / 1000
-        return elapsed < 604800 // Keep if less than 1 week old (604800 seconds)
+        return elapsed < 86400 // Keep if less than 24 hours old (86400 seconds)
       }))
     }, 60000) // Check every minute
     
@@ -1548,12 +1573,11 @@ export default function CandleShrine({ offerings = [], onSelectOffering, onPrice
               </div>
               <div style={{ marginBottom: '4px', color: '#00ff66' }}>
                 Remaining: {(() => {
-                  const remaining = Math.max(0, 604800 - (Date.now() - selectedCandle.litAt) / 1000);
-                  const days = Math.floor(remaining / 86400);
-                  const hours = Math.floor((remaining % 86400) / 3600);
+                  const remaining = Math.max(0, 86400 - (Date.now() - selectedCandle.litAt) / 1000);
+                  const hours = Math.floor(remaining / 3600);
                   const minutes = Math.floor((remaining % 3600) / 60);
-                  return `${days}d ${hours}h ${minutes}m`;
-                })()} ({Math.max(0, 100 * (1 - (Date.now() - selectedCandle.litAt) / (1000 * 604800))).toFixed(1)}%)
+                  return `${hours}h ${minutes}m`;
+                })()} ({Math.max(0, 100 * (1 - (Date.now() - selectedCandle.litAt) / (1000 * 86400))).toFixed(1)}%)
               </div>
             </>
           )}

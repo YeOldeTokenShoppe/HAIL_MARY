@@ -817,6 +817,7 @@ export const NewCandleEffectManager = forwardRef(({
   useArcticRings = true, // Toggle between Arctic Rings and original burst
   onBloomPulse, // Callback to update bloom intensity: (intensity) => setBloomIntensity(intensity)
   onCandlePulse, // Callback to trigger pulse effect in candle cloud: (position) => triggerPulse(position)
+  onEffectComplete, // Called when effect candle fully fades out (safe to show permanent candle)
   onHover, // Hover handler for metadata display
   onClick // Click handler for metadata display
 }, ref) => {
@@ -868,17 +869,23 @@ export const NewCandleEffectManager = forwardRef(({
   }
   
   const handleEffectComplete = () => {
+    // Trigger candle cloud ripple IMMEDIATELY when candle lands
+    // Don't wait for React re-render → ArcticRingsEffect → onRingsStart chain
+    // This fires in the same useFrame tick so the pulse starts next frame
+    console.log('[NewCandleEffect] handleEffectComplete fired, endPosition:', effectState.endPosition)
+    onCandlePulse?.(effectState.endPosition)
+
     // Show burst at final position
     setBurstPosition(effectState.endPosition)
     setShowBurst(true)
-    
+
     // DON'T add permanent candle yet - wait until after glow phase
     // Store the position and offering for later
-    setEffectState(prev => ({ 
-      ...prev, 
+    setEffectState(prev => ({
+      ...prev,
       pendingCandle: { position: effectState.endPosition, offering: effectState.offering }
     }))
-    
+
     // DON'T reset isActive here - let the glowing phase complete first
     // The NewCandleEffect will handle its own completion after glowing
   }
@@ -913,8 +920,9 @@ export const NewCandleEffectManager = forwardRef(({
           }
         }}
         onFullyComplete={() => {
-          // Fade is complete - now hide the effect candle
+          // Fade is complete - now hide the effect candle and reveal permanent candle
           setEffectState(prev => ({ ...prev, isActive: false, pendingCandle: null }))
+          onEffectComplete?.()
         }}
         candleModelPath={candleModelPath}
         isMobile={isMobile}
@@ -929,7 +937,6 @@ export const NewCandleEffectManager = forwardRef(({
           isActive={showBurst}
           onComplete={handleBurstComplete}
           onBloomPulse={onBloomPulse}
-          onRingsStart={() => onCandlePulse?.(burstPosition)}
         />
       ) : (
         <ArrivalBurst

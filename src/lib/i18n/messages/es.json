@@ -38,8 +38,7 @@
     "morphing": {
       "line1": "tu",
       "line2": "realidad"
-    },
-    "scrollPrompt": "desliza hacia arriba para continuar"
+    }
   },
   "navigation": {
   },
@@ -437,7 +436,7 @@
     "info": {
       "hideInfo": "Ocultar",
       "showInfo": "Info",
-      "lockDays": "10 minutos de bloqueo",
+      "lockDays": "7 días de bloqueo",
       "minStake": "Mín 1 RL80 para stakear",
       "earnEth": "Gana recompensas ETH",
       "proRata": "Distribución proporcional"

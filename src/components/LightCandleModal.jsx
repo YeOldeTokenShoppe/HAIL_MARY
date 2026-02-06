@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useUser } from '@clerk/nextjs';
 import { useWalletAuth } from './WalletAuthProvider';
 import { db, collection, addDoc, doc, serverTimestamp, query, where, getDocs, deleteDoc, setDoc, increment } from '@/lib/firebaseClient';
@@ -229,6 +230,31 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
   const [validationError, setValidationError] = useState(''); // Store validation errors
   const [highlightAmountField, setHighlightAmountField] = useState(false); // Highlight empty amount field
   const lastTransactionRef = useRef(0); // For rate limiting
+
+  // Track actual visible viewport dimensions (fixes iOS Safari where vh/vw include toolbar/offscreen area)
+  // Using window.innerWidth/innerHeight gives the true visible area
+  const [viewport, setViewport] = useState(() => ({
+    w: typeof window !== 'undefined' ? window.innerWidth : 400,
+    h: typeof window !== 'undefined' ? window.innerHeight : 800,
+  }))
+  const isMobileModal = viewport.w < 500
+  const modalMaxWidth = isMobileModal ? viewport.w - 48 : Math.min(420, viewport.w - 48) // 24px margin each side
+  const modalMaxHeight = isMobileModal ? Math.floor(viewport.h * 0.75) : Math.floor(viewport.h * 0.82)
+  const modalPadding = isMobileModal ? '1rem' : '1.5rem'
+  useEffect(() => {
+    const update = () => {
+      // Force scroll reset first — iOS Safari can leave viewport offset after app-switch
+      window.scrollTo(0, 0)
+      setViewport({ w: window.innerWidth, h: window.innerHeight })
+    }
+    update()
+    window.addEventListener('resize', update)
+    document.addEventListener('visibilitychange', update)
+    return () => {
+      window.removeEventListener('resize', update)
+      document.removeEventListener('visibilitychange', update)
+    }
+  }, [])
 
   // Safe error display function - moved to top with other hooks
   const showError = useCallback((message) => {
@@ -548,7 +574,11 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
     }
   };
 
-  return (
+  // Portal to document.body so modals escape the page's fixed-position stacking context
+  // and appear above portaled elements like the stats panel
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <>
       <style jsx>{`
         @keyframes fadeIn {
@@ -596,6 +626,16 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           to { transform: rotate(360deg); }
         }
 
+        @keyframes candleGlow {
+          0%, 100% { filter: drop-shadow(0 0 15px rgba(255,170,0,0.6)); }
+          50% { filter: drop-shadow(0 0 25px rgba(255,170,0,0.9)) drop-shadow(0 0 50px rgba(255,100,0,0.3)); }
+        }
+
+        @keyframes gradientSpin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
         .modal-overlay {
           position: fixed;
           top: 0;
@@ -609,6 +649,8 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           justify-content: center;
           z-index: 5000;
           animation: fadeIn 0.3s ease-out;
+          overflow: hidden;
+          touch-action: none;
         }
 
         .modal-content {
@@ -622,19 +664,18 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           padding: 1.5rem;
           width: 90%;
           max-width: 480px;
-          max-height: 90vh;
-          overflow: hidden;
+          /* max-height set via inline style using window.innerHeight for iOS Safari accuracy */
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
           position: relative;
           animation: fadeIn 0.4s ease-out;
           display: flex;
           flex-direction: column;
           box-shadow: 0 20px 60px rgba(139, 92, 246, 0.3);
         }
-        
-        /* Height-based media queries */
+
         @media (max-height: 700px) {
           .modal-content {
-            max-height: 95vh;
             padding: 1rem;
           }
         }
@@ -876,10 +917,10 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
         .submit-button {
           width: 100%;
           padding: 0.7rem;
-          background: #fff;
+          background: linear-gradient(135deg, #8b5cf6, #ec4899);
           border: none;
           border-radius: 50px;
-          color: #000;
+          color: #fff;
           font-size: 0.85rem;
           font-weight: 600;
           cursor: pointer;
@@ -887,12 +928,12 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           position: relative;
           overflow: hidden;
           margin-top: 0.5rem;
+          box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
         }
 
         .submit-button:hover:not(:disabled) {
           transform: translateY(-2px);
-          box-shadow: 0 10px 30px rgba(255, 255, 255, 0.2);
-          background: #f0f0f0;
+          box-shadow: 0 10px 30px rgba(139, 92, 246, 0.5);
         }
 
         .submit-button:disabled {
@@ -1001,95 +1042,126 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
       {/* Separate overlay for transaction progress with Blue Guidance Box */}
       {transactionStatus === 'processing' && (
         <div className="modal-overlay" style={{ display: 'flex' }}>
-          <div 
+          <div
             style={{
-              position: 'fixed',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
               background: 'rgba(20, 20, 30, 0.98)',
               border: '2px solid transparent',
               backgroundImage: 'linear-gradient(rgba(20, 20, 30, 0.98), rgba(20, 20, 30, 0.98)), linear-gradient(135deg, #8b5cf6, #ec4899)',
               backgroundOrigin: 'border-box',
               backgroundClip: 'padding-box, border-box',
-              borderRadius: '24px',
-              padding: '2rem',
+              borderRadius: isMobileModal ? '16px' : '24px',
+              padding: modalPadding,
               textAlign: 'center',
               color: '#fff',
-              boxShadow: '0 20px 60px rgba(139, 92, 246, 0.5)',
+              boxShadow: '0 10px 40px rgba(139, 92, 246, 0.4)',
               zIndex: 10000,
-              minWidth: '320px',
+              width: `${modalMaxWidth}px`,
+              maxHeight: `${modalMaxHeight}px`,
+              overflowY: 'auto',
               animation: 'fadeInNoMove 0.3s ease-out'
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Blue Guidance Box for Transaction Confirming */}
+            {/* Guidance Box - frosted glass with blue accent */}
             <div style={{
-              background: 'rgba(0, 123, 255, 0.95)',
-              borderRadius: '12px',
-              padding: '1rem',
-              marginBottom: '1.5rem',
-              boxShadow: '0 4px 20px rgba(0, 123, 255, 0.3)'
+              background: 'rgba(255,255,255,0.05)',
+              borderLeft: '3px solid rgba(59, 130, 246, 0.8)',
+              borderRadius: '0 10px 10px 0',
+              padding: '0.65rem 0.75rem',
+              marginBottom: '1.25rem',
+              backdropFilter: 'blur(8px)',
+              textAlign: 'left'
             }}>
               <div style={{
-                fontSize: '1.5rem',
-                marginBottom: '0.5rem',
-                animation: 'spin 2s linear infinite'
-              }}>
-                ⏳
-              </div>
-              <div style={{
-                color: '#fff',
-                fontSize: '0.9rem',
+                color: 'rgba(59, 130, 246, 0.95)',
+                fontSize: '0.8rem',
                 fontWeight: '600',
-                marginBottom: '0.25rem'
+                marginBottom: '0.15rem'
               }}>
                 {t('lightCandleModal.processing.submitted')}
               </div>
               <div style={{
-                color: 'rgba(255, 255, 255, 0.9)',
-                fontSize: '0.75rem'
+                color: 'rgba(255, 255, 255, 0.6)',
+                fontSize: '0.65rem'
               }}>
                 {t('lightCandleModal.processing.waiting')}
               </div>
             </div>
-            
-            {/* Animated Flame Icon */}
+
+            {/* Candle Icon with glow + pulse + spinner ring */}
             <div style={{
-              fontSize: '3rem',
-              marginBottom: '1rem',
-              filter: 'drop-shadow(0 0 30px rgba(255, 170, 0, 0.8)) drop-shadow(0 0 60px rgba(255, 100, 0, 0.4))',
-              animation: 'pulse 2s ease-in-out infinite',
+              position: 'relative',
+              marginBottom: '0.75rem',
               display: 'inline-block'
             }}>
-              🔥
+              {/* Gradient spinner ring */}
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                width: '4.5rem',
+                height: '4.5rem',
+                marginTop: '-2.25rem',
+                marginLeft: '-2.25rem',
+                borderRadius: '50%',
+                border: '2px solid rgba(139, 92, 246, 0.15)',
+                borderTopColor: '#8b5cf6',
+                borderRightColor: '#ec4899',
+                animation: 'spin 2s linear infinite',
+                boxShadow: '0 0 12px rgba(139, 92, 246, 0.2)',
+                pointerEvents: 'none'
+              }} />
+              {/* Warm glow backdrop */}
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '5rem',
+                height: '5rem',
+                borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(255,170,0,0.2) 0%, rgba(255,100,0,0.05) 50%, transparent 70%)',
+                pointerEvents: 'none'
+              }} />
+              <img
+                src="/images/candleIcon.webp"
+                alt="Candle"
+                style={{
+                  width: '2.5rem',
+                  height: 'auto',
+                  objectFit: 'contain',
+                  position: 'relative',
+                  animation: 'candleGlow 3s ease-in-out infinite',
+                }}
+              />
             </div>
-            
-            {/* Processing Message */}
+
+            {/* Processing Message - softer */}
             <h3 style={{
               fontFamily: "'Orbitron', monospace",
-              fontSize: '1.2rem',
+              fontSize: '0.9rem',
               fontWeight: '600',
               color: '#fff',
-              marginBottom: '0.75rem',
+              marginBottom: '0.5rem',
               textTransform: 'uppercase',
-              letterSpacing: '1px'
+              letterSpacing: '2px',
+              textShadow: '0 0 20px rgba(255,170,0,0.2)'
             }}>
               {t('lightCandleModal.processing.lightingCandle')}
             </h3>
 
             <p style={{
-              color: 'rgba(255, 255, 255, 0.8)',
-              fontSize: '0.9rem',
-              marginBottom: '1rem'
+              color: 'rgba(255, 255, 255, 0.7)',
+              fontSize: '0.85rem',
+              marginBottom: '0.75rem'
             }}>
               {t('lightCandleModal.processing.burning')} {parseInt(tokenAmount || '0').toLocaleString()} {parseInt(tokenAmount) !== 1 ? t('lightCandleModal.confirmation.tokens') : t('lightCandleModal.confirmation.token')}...
             </p>
 
             <p style={{
-              color: 'rgba(255, 255, 255, 0.5)',
-              fontSize: '0.75rem',
-              fontStyle: 'italic'
+              color: 'rgba(255, 255, 255, 0.4)',
+              fontSize: '0.7rem',
+              letterSpacing: '0.5px'
             }}>
               {t('lightCandleModal.processing.usuallyTakes')}
             </p>
@@ -1113,7 +1185,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
             }}
           />
         ) : !transactionStatus ? (
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-content" style={{ maxWidth: `${modalMaxWidth}px`, maxHeight: `${modalMaxHeight}px`, padding: modalPadding }} onClick={(e) => e.stopPropagation()}>
             <button className="close-button" onClick={onClose}>✕</button>
             <h2 className="modal-title">{t('lightCandleModal.title')}</h2>
 
@@ -1416,10 +1488,10 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                     )}
                   </div>
 
-                  {/* Info Section */}
+                  {/* Info Section - glass-morphism */}
                   <div style={{
-                    background: 'rgba(0, 245, 212, 0.05)',
-                    border: '1px solid rgba(0, 245, 212, 0.2)',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(0, 245, 212, 0.15)',
                     borderRadius: '10px',
                     padding: '0.6rem',
                     marginBottom: '1rem',
@@ -1427,7 +1499,8 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                     color: 'rgba(255, 255, 255, 0.7)',
                     display: 'flex',
                     gap: '1rem',
-                    justifyContent: 'center'
+                    justifyContent: 'center',
+                    backdropFilter: 'blur(8px)'
                   }}>
                     <span>💎 {t('lightCandleModal.info.minToken')}</span>
                     <span>⏱️ {t('lightCandleModal.info.burnTime')}</span>
@@ -1559,6 +1632,8 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 10002,
+          overflow: 'hidden',
+          touchAction: 'none',
           animation: 'fadeIn 0.3s ease-out'
         }}>
           <div style={{
@@ -1567,78 +1642,141 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
             backgroundImage: 'linear-gradient(rgba(20, 20, 30, 0.98), rgba(20, 20, 30, 0.98)), linear-gradient(135deg, #8b5cf6, #ec4899)',
             backgroundOrigin: 'border-box',
             backgroundClip: 'padding-box, border-box',
-            borderRadius: '24px',
-            padding: '2rem',
+            borderRadius: isMobileModal ? '16px' : '24px',
+            padding: modalPadding,
             textAlign: 'center',
             color: '#fff',
-            boxShadow: '0 20px 60px rgba(139, 92, 246, 0.4)',
-            maxWidth: '380px',
-            width: '90%',
+            boxShadow: '0 10px 40px rgba(139, 92, 246, 0.4)',
+            width: `${modalMaxWidth}px`,
+            maxHeight: `${modalMaxHeight}px`,
+            overflowY: 'auto',
             position: 'relative'
           }}>
-            {/* Yellow Guidance Box */}
+            {/* Sign Transaction Guidance - frosted amber banner */}
             <div style={{
-              // background: 'rgba(255, 193, 7, 0.95)',
-              borderRadius: '12px',
-              padding: '1rem',
-              marginBottom: '1.5rem',
-              // boxShadow: '0 4px 20px rgba(255, 193, 7, 0.3)'
+              background: 'rgba(255,255,255,0.05)',
+              borderLeft: '3px solid rgba(255,193,7,0.8)',
+              borderRadius: '0 10px 10px 0',
+              padding: '0.65rem 0.75rem',
+              marginBottom: '1.25rem',
+              backdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
             }}>
-              <div style={{
-                fontSize: '1.5rem',
-                marginBottom: '0.5rem'
-              }}>
-                
-              </div>
-              <div style={{
+              <span style={{ fontSize: '0.85rem' }}>✍️</span>
+              <span style={{
                 color: 'rgba(255, 193, 7, 0.95)',
-                fontSize: '0.95rem',
+                fontSize: '0.8rem',
                 fontWeight: '600'
               }}>
                 {t('lightCandleModal.wallet.signTransaction')}
-              </div>
+              </span>
             </div>
 
-            {/* Flame Icon */}
+            {/* Candle Icon with warm glow */}
             <div style={{
-              fontSize: '3rem',
-              marginBottom: '1rem',
-              filter: 'drop-shadow(0 0 20px rgba(255, 170, 0, 0.8))',
-              animation: 'pulse 1.5s ease-in-out infinite'
+              position: 'relative',
+              marginBottom: '0.75rem',
+              display: 'inline-block'
             }}>
-              ✍️
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '4rem',
+                height: '4rem',
+                borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(255,170,0,0.2) 0%, rgba(255,100,0,0.05) 50%, transparent 70%)',
+                pointerEvents: 'none'
+              }} />
+              <img
+                src="/images/candleIcon.webp"
+                alt="Candle"
+                style={{
+                  width: '2.5rem',
+                  height: 'auto',
+                  objectFit: 'contain',
+                  position: 'relative',
+                  animation: 'candleGlow 3s ease-in-out infinite',
+                }}
+              />
             </div>
 
-            {/* Title */}
+            {/* Title - softer */}
             <h3 style={{
               fontFamily: "'Orbitron', monospace",
-              fontSize: '1.1rem',
+              fontSize: '0.9rem',
               fontWeight: '600',
               color: '#fff',
               marginBottom: '0.75rem',
               textTransform: 'uppercase',
-              letterSpacing: '1px'
+              letterSpacing: '2px',
+              textShadow: '0 0 20px rgba(255,170,0,0.2)'
             }}>
               {t('lightCandleModal.title')}
             </h3>
 
-            {/* Amount Info */}
-            <p style={{
-              color: 'rgba(255, 255, 255, 0.8)',
-              fontSize: '0.85rem',
+            {/* Amount Pill */}
+            <div style={{
+              display: 'inline-block',
+              padding: '2px',
+              borderRadius: '14px',
+              background: 'linear-gradient(135deg, #8b5cf6, #ec4899)',
               marginBottom: '1rem'
             }}>
-              {t('lightCandleModal.wallet.amount')} <strong>{parseInt(tokenAmount || '0').toLocaleString()} RL80</strong>
-            </p>
+              <div style={{
+                background: 'rgba(20, 20, 30, 0.95)',
+                borderRadius: '12px',
+                padding: '0.5rem 1.25rem',
+                textAlign: 'center'
+              }}>
+                <span style={{
+                  fontSize: '1.1rem',
+                  fontWeight: '700',
+                  color: '#fff',
+                  fontFamily: "'Orbitron', monospace"
+                }}>
+                  {parseInt(tokenAmount || '0').toLocaleString()}
+                </span>
+                <span style={{
+                  color: 'rgba(255,255,255,0.5)',
+                  fontSize: '0.7rem',
+                  marginLeft: '0.4rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px'
+                }}>
+                  RL80
+                </span>
+              </div>
+            </div>
 
-            {/* Status */}
-            <p style={{
-              color: 'rgba(255, 255, 255, 0.6)',
-              fontSize: '0.75rem',
-              fontStyle: 'italic'
+            {/* Animated spinner ring */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              marginTop: '0.25rem'
             }}>
-              {t('lightCandleModal.wallet.waitingConfirmation')}
-            </p>
+              <div style={{
+                width: '16px',
+                height: '16px',
+                borderRadius: '50%',
+                border: '2px solid rgba(139, 92, 246, 0.2)',
+                borderTopColor: '#8b5cf6',
+                animation: 'spin 1s linear infinite',
+                boxShadow: '0 0 8px rgba(139, 92, 246, 0.3)'
+              }} />
+              <span style={{
+                color: 'rgba(255, 255, 255, 0.5)',
+                fontSize: '0.7rem',
+                letterSpacing: '0.5px'
+              }}>
+                {t('lightCandleModal.wallet.waitingConfirmation')}
+              </span>
+            </div>
           </div>
         </div>
       )}
@@ -1657,6 +1795,8 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 10001,
+          overflow: 'hidden',
+          touchAction: 'none',
           animation: 'fadeIn 0.3s ease-out'
         }}>
           <div style={{
@@ -1665,77 +1805,130 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
             backgroundImage: 'linear-gradient(rgba(20, 20, 30, 0.98), rgba(20, 20, 30, 0.98)), linear-gradient(135deg, #8b5cf6, #ec4899)',
             backgroundOrigin: 'border-box',
             backgroundClip: 'padding-box, border-box',
-            borderRadius: '24px',
-            padding: '1.5rem',
+            borderRadius: isMobileModal ? '16px' : '24px',
+            padding: modalPadding,
             textAlign: 'center',
             color: '#fff',
-            boxShadow: '0 20px 60px rgba(139, 92, 246, 0.5)',
-            maxWidth: '400px',
-            width: '90%'
+            boxShadow: '0 10px 40px rgba(139, 92, 246, 0.4)',
+            width: `${modalMaxWidth}px`,
+            maxHeight: `${modalMaxHeight}px`,
+            overflowY: 'auto',
           }}>
-            {/* Flame Icon */}
+            {/* Candle Icon with Amber Glow Backdrop */}
             <div style={{
-              marginBottom: '1.5rem',
-              filter: 'drop-shadow(0 0 30px rgba(255, 170, 0, 0.8)) drop-shadow(0 0 60px rgba(255, 100, 0, 0.4))',
-              // animation: 'pulse 2s ease-in-out infinite',
+              position: 'relative',
+              marginBottom: '1rem',
               display: 'inline-block'
             }}>
+              {/* Radial glow backdrop */}
+              <div style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '5rem',
+                height: '5rem',
+                borderRadius: '50%',
+                background: 'radial-gradient(circle, rgba(255,170,0,0.25) 0%, rgba(255,100,0,0.08) 50%, transparent 70%)',
+                pointerEvents: 'none'
+              }} />
               <img
                 src="/images/candleIcon.webp"
                 alt="Candle"
                 style={{
-                  width: '4rem',
+                  width: '3rem',
                   height: 'auto',
                   objectFit: 'contain',
+                  position: 'relative',
+                  animation: 'candleGlow 3s ease-in-out infinite',
                 }}
               />
             </div>
-            
-            {/* Title */}
+
+            {/* Title - softer */}
             <h3 style={{
               fontFamily: "'Orbitron', monospace",
-              fontSize: '1.4rem',
-              fontWeight: '700',
+              fontSize: '1rem',
+              fontWeight: '600',
               color: '#fff',
               marginBottom: '1rem',
               textTransform: 'uppercase',
-              letterSpacing: '2px'
+              letterSpacing: '3px',
+              textShadow: '0 0 20px rgba(255,170,0,0.3)'
             }}>
               {t('lightCandleModal.confirmation.title')}
             </h3>
 
-            {/* Yellow Info Box */}
+            {/* Token Amount Pill */}
             <div style={{
-              // background: 'rgba(255, 193, 7, 0.15)',
-              // border: '1px solid rgba(255, 193, 7, 0.4)',
-              borderRadius: '10px',
-              // padding: '1rem',
-              marginBottom: '2rem'
+              display: 'inline-block',
+              padding: '2px',
+              borderRadius: '16px',
+              background: 'linear-gradient(135deg, #8b5cf6, #ec4899)',
+              marginBottom: '1rem'
             }}>
-              <p style={{
-                color: '#fff',
-                fontSize: '1rem',
-                marginBottom: '1rem',
-                lineHeight: '1.2',
-
+              <div style={{
+                background: 'rgba(20, 20, 30, 0.95)',
+                borderRadius: '14px',
+                padding: '0.75rem 1.5rem',
+                textAlign: 'center'
               }}>
-                {t('lightCandleModal.confirmation.burning')} <strong style={{ fontSize: '1.2rem', color: '#ffc107' }}><br/>{pendingBurnAmount.toLocaleString()}<br/></strong> {pendingBurnAmount !== 1 ? t('lightCandleModal.confirmation.tokens') : t('lightCandleModal.confirmation.token')}
-              </p>
-              <p style={{
-                color: 'rgba(255, 193, 7, 0.9)',
-                fontSize: '0.85rem',
-                margin: '0.5rem',
-                fontWeight: '500',
-
-              }}>
-                ⚠️ {t('lightCandleModal.confirmation.permanent')}
-              </p>
+                <div style={{
+                  color: 'rgba(255,255,255,0.6)',
+                  fontSize: '0.7rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  marginBottom: '0.25rem'
+                }}>
+                  {t('lightCandleModal.confirmation.burning')}
+                </div>
+                <div style={{
+                  fontSize: '1.5rem',
+                  fontWeight: '700',
+                  color: '#fff',
+                  fontFamily: "'Orbitron', monospace",
+                  lineHeight: '1.2'
+                }}>
+                  {pendingBurnAmount.toLocaleString()}
+                </div>
+                <div style={{
+                  color: 'rgba(255,255,255,0.5)',
+                  fontSize: '0.7rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  marginTop: '0.15rem'
+                }}>
+                  {pendingBurnAmount !== 1 ? t('lightCandleModal.confirmation.tokens') : t('lightCandleModal.confirmation.token')}
+                </div>
+              </div>
             </div>
-            
-            {/* Buttons */}
+
+            {/* Warning - frosted glass bar with amber accent */}
+            <div style={{
+              background: 'rgba(255,255,255,0.05)',
+              borderLeft: '3px solid rgba(255,193,7,0.8)',
+              borderRadius: '0 8px 8px 0',
+              padding: '0.6rem 0.75rem',
+              marginBottom: '1.25rem',
+              backdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem'
+            }}>
+              <span style={{ fontSize: '0.85rem' }}>⚠️</span>
+              <span style={{
+                color: 'rgba(255, 193, 7, 0.9)',
+                fontSize: '0.75rem',
+                fontWeight: '500',
+              }}>
+                {t('lightCandleModal.confirmation.permanent')}
+              </span>
+            </div>
+
+            {/* Buttons - pill shaped, matching widths */}
             <div style={{
               display: 'flex',
-              gap: '1rem',
+              gap: '0.75rem',
               justifyContent: 'center'
             }}>
               <button
@@ -1743,32 +1936,34 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                   setShowConfirmation(false);
                   setPendingBurnAmount(0);
                 }}
-               style={{
-                  padding: '0.9rem',
-                  background: '#b61f2bff',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: '#000',
-                  fontSize: '0.9rem',
+                style={{
+                  flex: 1,
+                  padding: '0.75rem 1.25rem',
+                  background: 'transparent',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  borderRadius: '50px',
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  fontSize: '0.85rem',
                   fontWeight: '600',
                   cursor: 'pointer',
                   transition: 'all 0.3s',
-                  textTransform: 'uppercase'
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(175, 40, 40, 0.94)';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
                   e.currentTarget.style.color = '#fff';
                   e.currentTarget.style.transform = 'translateY(-2px)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                  e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
                   e.currentTarget.style.color = 'rgba(255, 255, 255, 0.7)';
                   e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >
                 {t('lightCandleModal.buttons.cancel')}
               </button>
-              
+
               <button
                 onClick={async () => {
                   setShowConfirmation(false);
@@ -1936,28 +2131,31 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                   setShowWalletLoading(false);
                 }
               }}
-            style={{
-                  padding: '0.9rem',
-                  background: '#00f5d4',
+                style={{
+                  flex: 1,
+                  padding: '0.75rem 1.25rem',
+                  background: 'linear-gradient(135deg, #8b5cf6, #ec4899)',
                   border: 'none',
-                  borderRadius: '8px',
-                  color: '#000',
-                  fontSize: '0.9rem',
+                  borderRadius: '50px',
+                  color: '#fff',
+                  fontSize: '0.85rem',
                   fontWeight: '600',
                   cursor: 'pointer',
                   transition: 'all 0.3s',
-                  textTransform: 'uppercase'
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  boxShadow: '0 4px 20px rgba(139, 92, 246, 0.3)'
                 }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 10px 30px rgba(139, 92, 246, 0.3)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            >
-              {t('lightCandleModal.buttons.lightMyCandle')}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 10px 30px rgba(139, 92, 246, 0.5)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(139, 92, 246, 0.3)';
+                }}
+              >
+                {t('lightCandleModal.buttons.lightMyCandle')}
             </button>
           </div>
         </div>
@@ -1979,8 +2177,9 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           }} 
         />
       )}
-      
-    </>
+
+    </>,
+    document.body
   );
 };
 

@@ -2,11 +2,14 @@
 // Used both when creating offerings (to store position) and when rendering
 
 // Priority zones - candles positioned in front of camera (looking at negative Z)
-// Camera is at [0, 0, 15], Mary is at z=-8 to -12
+// Camera is at [0, 0, 15], phone/hands at [0, -1, -6], Mary at z=-8 to -12
+// Zone 0 keeps the first few candles clustered tight beside the phone
+// so even with 2-3 candles the scene doesn't look sparse
 export const PRIORITY_ZONES = [
-  { capacity: 25, x: { min: -10, max: 10 }, y: { min: -2, max: 4 }, z: { min: -12, max: -6 } },   // Zone 1: Prime visibility
-  { capacity: 40, x: { min: -14, max: 14 }, y: { min: -3, max: 6 }, z: { min: -14, max: -4 } },   // Zone 2: Good visibility
-  { capacity: 60, x: { min: -18, max: 18 }, y: { min: -4, max: 10 }, z: { min: -16, max: -2 } },  // Zone 3: Peripheral
+  { capacity: 10, x: { min: -4, max: 4 }, y: { min: 0, max: 3 }, z: { min: -11, max: -9.5 } },    // Zone 0: Central cluster IN FRONT of body corridor (z < -9), can use x≈0
+  { capacity: 15, x: { min: -7, max: 7 }, y: { min: -1, max: 3 }, z: { min: -8, max: -4 } },      // Zone 1: Flanking phone (inside corridor, will get x-pushed)
+  { capacity: 40, x: { min: -10, max: 10 }, y: { min: -2, max: 5 }, z: { min: -10, max: -3 } },   // Zone 2: Good visibility
+  { capacity: 60, x: { min: -14, max: 14 }, y: { min: -3, max: 8 }, z: { min: -14, max: -2 } },   // Zone 3: Peripheral
   { capacity: Infinity, x: { min: -20, max: 20 }, y: { min: -5, max: 12 }, z: { min: -20, max: 0 } } // Zone 4: Overflow
 ]
 
@@ -86,9 +89,11 @@ export const generateCandlePosition = (offeringId, index = 0, usedPositions = []
     z = adjusted.z
 
     // Check minimum distance from other candles
+    // Tighter packing for early candles (Zone 0) so they cluster nicely
+    const minDist = index < 10 ? 1.5 : 2.0
     const tooClose = usedPositions.some(pos => {
       const dist = Math.sqrt((x - pos.x) ** 2 + (y - pos.y) ** 2 + (z - pos.z) ** 2)
-      return dist < 2.0
+      return dist < minDist
     })
 
     if (!tooClose) break

@@ -144,6 +144,11 @@ const PalmsScene = ({ onLoadingChange }) => {
   const animationFrameRef = useRef(null); // Track animation frame ID for cleanup
   const hasScrolledRef = useRef(false); // Track if user has started scrolling
   const animationSkippedRef = useRef(false); // Track if user clicked Skip
+  const autoPlayTweenRef = useRef(null); // Track auto-play GSAP tween
+  const autoPlayTimeoutRef = useRef(null); // Track auto-play delay timeout
+  const autoPlayCancelRef = useRef(null); // Track cancel function for cleanup
+  const scrollTriggerRef = useRef(null); // Track ScrollTrigger instance for auto-play toggle
+  const scrollTimelineRef = useRef(null); // Track scroll animation timeline
 
   // Force initial scroll position on mount and page load
   useEffect(() => {
@@ -319,7 +324,16 @@ const PalmsScene = ({ onLoadingChange }) => {
   
   // Skip animation function
   const skipAnimation = useCallback(() => {
-    
+    // Kill auto-play if running
+    if (autoPlayTimeoutRef.current) {
+      clearTimeout(autoPlayTimeoutRef.current);
+      autoPlayTimeoutRef.current = null;
+    }
+    if (autoPlayTweenRef.current) {
+      autoPlayTweenRef.current.kill();
+      autoPlayTweenRef.current = null;
+    }
+
     // First, ensure scrolling is enabled on the body and html
     document.body.style.overflow = 'auto';
     document.body.style.height = 'auto';
@@ -1573,6 +1587,7 @@ const PalmsScene = ({ onLoadingChange }) => {
         defaults: { ease: "none" },
         paused: true // Ensure timeline doesn't auto-play
       });
+      scrollTimelineRef.current = tl;
       
       // Define camera path from aerial to Mary's face
       const cameraPath = {
@@ -1694,7 +1709,7 @@ const PalmsScene = ({ onLoadingChange }) => {
           targetY: 1.3046,
           targetZ: 22.9043,
           fov: 30,
-          duration: 0.15,
+          duration: 0.25,
           ease: "power2.inOut"
         })
         // Final close-up: Face to face with Mary
@@ -1844,8 +1859,9 @@ const PalmsScene = ({ onLoadingChange }) => {
           }
         }
       });
-      
-      
+
+      scrollTriggerRef.current = st;
+
       // Log the first few timeline tweens to verify they exist
       const children = tl.getChildren();
       if (children.length > 0) {
@@ -1864,8 +1880,109 @@ const PalmsScene = ({ onLoadingChange }) => {
       // Force refresh to ensure proper initialization
       st.refresh();
       ScrollTrigger.refresh();
+
+      // --- Hybrid auto-play: desktop only, if user doesn't scroll within 4s, drive timeline directly ---
+      if (isMobile) return;
+      const cancelAutoPlay = autoPlayCancelRef.current = () => {
+        if (autoPlayTimeoutRef.current) {
+          clearTimeout(autoPlayTimeoutRef.current);
+          autoPlayTimeoutRef.current = null;
+        }
+        if (autoPlayTweenRef.current) {
+          autoPlayTweenRef.current.kill();
+          autoPlayTweenRef.current = null;
+        }
+        // Re-enable ScrollTrigger so user can scroll manually from current position
+        if (scrollTriggerRef.current) {
+          // Sync scroll position to match current timeline progress before re-enabling
+          const scrollContainer = document.getElementById('scroll-container');
+          if (scrollContainer && scrollTimelineRef.current) {
+            const maxScroll = scrollContainer.offsetHeight - window.innerHeight;
+            const currentProgress = scrollTimelineRef.current.progress();
+            window.scrollTo(0, currentProgress * maxScroll);
+          }
+          scrollTriggerRef.current.enable();
+        }
+        // Remove the cancel listeners once cancelled
+        window.removeEventListener('wheel', cancelAutoPlay);
+        window.removeEventListener('touchstart', cancelAutoPlay);
+        window.removeEventListener('keydown', cancelAutoPlayOnKey);
+      };
+
+      const cancelAutoPlayOnKey = (e) => {
+        // Only cancel on navigation keys (arrows, space, page up/down)
+        if (['ArrowDown', 'ArrowUp', 'Space', 'PageDown', 'PageUp', ' '].includes(e.key)) {
+          cancelAutoPlay();
+        }
+      };
+
+      // Listen for user interaction to cancel auto-play
+      window.addEventListener('wheel', cancelAutoPlay, { passive: true });
+      window.addEventListener('touchstart', cancelAutoPlay, { passive: true });
+      window.addEventListener('keydown', cancelAutoPlayOnKey, { passive: true });
+
+      autoPlayTimeoutRef.current = setTimeout(() => {
+        // Only auto-play if user hasn't scrolled yet
+        if (hasScrolledRef.current || animationSkippedRef.current) {
+          cancelAutoPlay();
+          return;
+        }
+
+        // Disable ScrollTrigger so it doesn't fight with direct timeline control
+        if (scrollTriggerRef.current) {
+          scrollTriggerRef.current.disable();
+        }
+
+        // Drive the timeline directly — no scroll middleman, buttery smooth
+        autoPlayTweenRef.current = gsap.to(tl, {
+          progress: 1,
+          duration: isMobile ? 30 : 25,
+          ease: "none",
+          onUpdate: () => {
+            const p = tl.progress();
+            scrollProgressRef.current = p;
+
+            // Mark as scrolled to hide hint
+            if (p > 0 && !hasScrolledRef.current) {
+              hasScrolledRef.current = true;
+              setHasScrolled(true);
+            }
+
+            // Stage detection (same logic as ScrollTrigger onUpdate)
+            let stage = 0;
+            if (p < 0.2) stage = 0;
+            else if (p < 0.4) stage = 1;
+            else if (p < 0.6) stage = 2;
+            else if (p < 0.8) stage = 3;
+            else stage = 4;
+            setCurrentCameraStage(stage);
+
+            // Trigger enter button at final stage
+            if (stage === 4 && !window.autoPlayButtonTriggered) {
+              window.autoPlayButtonTriggered = true;
+              setTimeout(() => setShowEnterButton(true), 1500);
+            }
+          },
+          onComplete: () => {
+            autoPlayTweenRef.current = null;
+            // Sync scroll to end and re-enable ScrollTrigger
+            const scrollContainer = document.getElementById('scroll-container');
+            if (scrollContainer) {
+              const maxScroll = scrollContainer.offsetHeight - window.innerHeight;
+              window.scrollTo(0, maxScroll);
+            }
+            if (scrollTriggerRef.current) {
+              scrollTriggerRef.current.enable();
+            }
+            // Clean up listeners
+            window.removeEventListener('wheel', cancelAutoPlay);
+            window.removeEventListener('touchstart', cancelAutoPlay);
+            window.removeEventListener('keydown', cancelAutoPlayOnKey);
+          }
+        });
+      }, 4000); // 4 second delay before auto-play starts
     };
-    
+
     // Set up scroll animation after a short delay to ensure scene is ready
     setTimeout(() => {
       // Enable ScrollTrigger for mobile with better touch handling
@@ -2107,6 +2224,12 @@ const PalmsScene = ({ onLoadingChange }) => {
         cancelAnimationFrame(animationFrameRef.current);
       }
       
+      // Kill auto-play tween, timeout, and event listeners
+      if (autoPlayCancelRef.current) {
+        autoPlayCancelRef.current();
+        autoPlayCancelRef.current = null;
+      }
+
       // Kill all ScrollTriggers
       ScrollTrigger.getAll().forEach(t => t.kill());
       
@@ -2215,6 +2338,14 @@ const PalmsScene = ({ onLoadingChange }) => {
           }
           50% {
             opacity: 0.8;
+          }
+        }
+        @keyframes scrollBounce {
+          0%, 100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-10px);
           }
         }
       `}</style>
@@ -2365,17 +2496,32 @@ const PalmsScene = ({ onLoadingChange }) => {
             pointerEvents: 'none',
             visibility: (currentCameraStage === 4 && shouldMorph) ? 'hidden' : 'visible',
           }}>
-          {/* Scroll hint - fades out when user scrolls */}
+          {/* Scroll hint - animated chevrons */}
           <div style={{
-            fontSize: '12px',
-            color: '#01ff00',
-            opacity: hasScrolled ? 0 : 0.5,
-            textAlign: 'center',
-            fontFamily: 'monospace',
-            animation: hasScrolled ? 'none' : 'pulse 2s ease-in-out infinite',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '0px',
+            opacity: hasScrolled ? 0 : 0.7,
             transition: 'opacity 0.5s ease',
+            animation: hasScrolled ? 'none' : 'scrollBounce 1.5s ease-in-out infinite',
           }}>
-            {t('palmTreeDrive.scrollPrompt')}
+            <div style={{
+              width: '24px',
+              height: '24px',
+              borderLeft: '2px solid #01ff00',
+              borderBottom: '2px solid #01ff00',
+              transform: 'rotate(135deg)',
+            }} />
+            <div style={{
+              width: '24px',
+              height: '24px',
+              borderLeft: '2px solid #01ff00',
+              borderBottom: '2px solid #01ff00',
+              transform: 'rotate(135deg)',
+              marginTop: '-10px',
+              opacity: 0.5,
+            }} />
           </div>
 
           <div
@@ -2404,7 +2550,7 @@ const PalmsScene = ({ onLoadingChange }) => {
       )}
 
       {/* Skip Animation Button - bottom right - Outside pointer-events:none container */}
-      {!hasScrolled && currentCameraStage < 4 && (
+      {currentCameraStage < 4 && (
         <button
           onClick={skipAnimation}
           style={{

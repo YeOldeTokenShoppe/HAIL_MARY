@@ -31,6 +31,8 @@ export default function ShrinePage() {
   const unifiedShrineRef = useRef()
   const shrineLeftPanelRef = useRef()
   const latestOfferingRef = useRef(null) // Track the latest offering ID for updating with polaroid URL
+  const pendingCandleEffectRef = useRef(null) // Queue candle effects when page is hidden (e.g. user in MetaMask)
+  const localCandleEffectActiveRef = useRef(false) // Flag: this client just triggered a candle effect locally
   const { 
     play, 
     pause, 
@@ -118,6 +120,45 @@ useEffect(() => {
       choirContextRef.current.close().catch(() => {})
     }
   }
+}, [])
+
+// Lock viewport scale for this page — prevents iOS Safari from auto-zooming when modals appear
+useEffect(() => {
+  const meta = document.querySelector('meta[name="viewport"]')
+  const originalContent = meta?.getAttribute('content') || ''
+  if (meta) {
+    meta.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no')
+  }
+  return () => {
+    if (meta && originalContent) meta.setAttribute('content', originalContent)
+  }
+}, [])
+
+// When user returns from MetaMask (or any background), play any queued candle effects
+// and aggressively reset the viewport
+useEffect(() => {
+  const handleVisibilityChange = () => {
+    if (!document.hidden) {
+      // Force viewport reset — iOS Safari can leave viewport offset/zoomed after app-switch
+      window.scrollTo(0, 0)
+      // Re-clamp any zoom that iOS applied while backgrounded
+      const meta = document.querySelector('meta[name="viewport"]')
+      if (meta) {
+        meta.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no')
+      }
+
+      if (pendingCandleEffectRef.current) {
+        const pending = pendingCandleEffectRef.current
+        pendingCandleEffectRef.current = null
+        // Small delay so the page is fully visible before effects fire
+        setTimeout(() => {
+          pending()
+        }, 600)
+      }
+    }
+  }
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
 }, [])
 
 // Play layered choir swell — Dm chord (root, minor 3rd, 5th)
@@ -361,6 +402,8 @@ useEffect(() => {
         createdAt: null,
         icon: '🕯️',
         isPlaceholder: true, // Flag to identify St. GR80 candles
+        // First candle gets a fixed centered position for visibility (especially on mobile)
+        ...(i === 0 ? { position: { x: 0, y: 1.5, z: -10 } } : {}),
       })
     }
     return placeholders
@@ -410,14 +453,14 @@ useEffect(() => {
   useEffect(() => {
     // Initial fetch
     fetchOfferings()
-    
+
     // Set up real-time listener for new offerings
     const offeringsQuery = query(
       collection(db, 'offerings'),
       orderBy('createdAt', 'desc'),
       limit(1)
     )
-    
+
     let lastOfferingId = null
     const unsubscribe = onSnapshot(offeringsQuery, (snapshot) => {
       if (!snapshot.empty) {
@@ -426,46 +469,62 @@ useEffect(() => {
           id: latestDoc.id,
           ...latestDoc.data()
         }
-        
+
         // Check if this is a new offering (not initial load and different from last)
         if (lastOfferingId && lastOfferingId !== latestDoc.id) {
-          // Only trigger the effect if this is from ANOTHER user (not the current user)
-          // The current user's candle effect is already triggered in handleLightCandle
-          const isCurrentUser = latestOffering.userId === user?.id || 
-                               latestOffering.walletAddress === walletAddress
-          
-          if (!isCurrentUser) {
+          console.log('[onSnapshot] New offering detected:', latestDoc.id)
 
-            // Trigger the pulse effect for all candles
+          // Skip if THIS client already triggered the effect locally via handleLightCandle.
+          // Using a local flag avoids identity-matching edge cases (null===null, same user
+          // on multiple devices, etc.). Only the browser tab that lit the candle sets this flag.
+          if (localCandleEffectActiveRef.current) {
+            console.log('[onSnapshot] Skipping effect - already triggered locally')
+          } else {
+            console.log('[onSnapshot] Triggering NewCandleEffect for remote offering, position:', latestOffering.position)
+            // Trigger the full candle flight + ripple + arctic rings effect
             if (unifiedShrineRef.current) {
               unifiedShrineRef.current.triggerCandleEffect(latestOffering)
+            } else {
+              console.warn('[onSnapshot] unifiedShrineRef.current is null - 3D scene not ready')
             }
+
+            // Show notification + choir swell synced with arctic rings (~3.5s into flight)
+            setTimeout(() => {
+              setJustLitOffering(latestOffering)
+              playChoirSwell()
+              // Clear notification after display duration
+              setTimeout(() => {
+                setJustLitOffering(null)
+              }, 10000)
+            }, 3500)
 
             // Soft choir note when candle lands (~3s into flight animation)
             setTimeout(() => {
               playArrivalNote(latestOffering.position?.y)
             }, 3000)
           }
-          
+
           // Always update the offerings list regardless of who lit the candle
           // Short delay to let Firestore write propagate, then fetch permanent candle
           setTimeout(() => {
             fetchOfferings()
           }, 500)
         }
-        
+
         lastOfferingId = latestDoc.id
       }
+    }, (error) => {
+      console.error('[onSnapshot] Listener error:', error)
     })
-    
+
     // Refresh offerings every 30 seconds as backup
     const interval = setInterval(fetchOfferings, 30000)
-    
+
     return () => {
       unsubscribe()
       clearInterval(interval)
     }
-  }, [fetchOfferings, unifiedShrineRef, user?.id, walletAddress])
+  }, [fetchOfferings, unifiedShrineRef])
 
   // Set mounted state after hydration
   useEffect(() => {
@@ -672,24 +731,13 @@ useEffect(() => {
     setHasDismissedPolaroid(false);
     setPolaroidUrl(null);
     
-    // Set notification to sync with arctic rings + choir swell
-    setTimeout(() => {
-      setJustLitOffering(newOffering);
-      playChoirSwell();
-      
-      // Clear notification after display duration
-      setTimeout(() => {
-        setJustLitOffering(null);
-      }, 10000); // Show for 10 seconds - nice long display time
-    }, 3500); // 2.5s to match when arctic rings appear
-    
     // Map offering types to background images
     const backgroundMap = {
       petition: 'tradingView',      // Hopeful, asking for guidance
       confession: 'sunset', // Darker, introspective
       appreciation: 'chart'    // Warm, grateful
     };
-    
+
     // Trigger snapshot capture with the offering data
     const snapData = {
       name: newOffering.name,
@@ -704,18 +752,18 @@ useEffect(() => {
       username: user?.username || user?.firstName || 'Anonymous',
       createdBy: user?.id || '',
     };
-    
+
     // Snapshot functionality removed - no longer capturing polaroids
-    
+
     // Set up a function to receive the offering ID
     window.setLatestOfferingId = (id) => {
       latestOfferingRef.current = id;
     };
-    
+
     // Set up a listener for when the polaroid is ready
     window.onPolaroidReady = async (url) => {
       setPolaroidUrl(url);
-      
+
       // Update the offerings document with the polaroid URL
       if (latestOfferingRef.current) {
         try {
@@ -725,7 +773,7 @@ useEffect(() => {
             polaroidUrl: url,
             polaroidReady: false
           });
-          
+
           // After delay, mark as ready for display
           setTimeout(async () => {
             await updateDoc(offeringDoc, {
@@ -736,7 +784,7 @@ useEffect(() => {
           console.error('[ShrinePage] Failed to update offering with polaroid URL:', error);
         }
       }
-      
+
       // Save to localStorage for retrieval in account modal
       try {
         const savedPolaroids = JSON.parse(localStorage.getItem('userPolaroids') || '[]');
@@ -752,7 +800,7 @@ useEffect(() => {
       } catch (e) {
         console.error('Failed to save polaroid to localStorage:', e);
       }
-      
+
       // Show the polaroid on the side after the candle effect completes
       // NewCandleEffect takes about 10 seconds (5s rise + 5s glow)
       setTimeout(() => {
@@ -760,44 +808,62 @@ useEffect(() => {
         setHasDismissedPolaroid(false);
       }, 1000); // 3 seconds - shows shortly after candle lands
     };
-    
 
-    if (unifiedShrineRef.current) {
-      unifiedShrineRef.current.triggerCandleEffect(newOffering)
-    }
-    
-    // Set the matchstick to lit state when candle is successfully lit
-    if (isMobileView) {
-      setMobileMatchstickLit(true);
-      // Mark that user has lit a candle this session
-      setHasLitCandleThisSession(true);
-      // Collapse the banner if it's expanded
-      setIsExpanded(false);
-    } else if (shrineLeftPanelRef.current) {
-      // Light the desktop matchstick
-      shrineLeftPanelRef.current.lightMatchstick();
-    }
-    
-    // Mobile haptic feedback
-    if (isMobileView && window.navigator && window.navigator.vibrate) {
-      window.navigator.vibrate([50, 50, 50]) // Pattern vibration
-    }
-    
-    // Delay refreshing offerings to sync with ripple animation
-    setTimeout(() => {
-      fetchOfferings()
-    }, 3000) // 3 second delay - same as remote offerings
+    // All visual/audio effects bundled so they can be deferred if page is hidden
+    // (e.g. user is in MetaMask signing the transaction on mobile)
+    const playEffects = () => {
+      // Notification + choir swell synced with arctic rings
+      setTimeout(() => {
+        setJustLitOffering(newOffering);
+        playChoirSwell();
 
-    // Reset processing flags after candle effect completes (about 15 seconds total)
-    // This allows the user to light another candle if they want
-    setTimeout(() => {
-      setIsProcessingCandle(false);
-      setHasProcessedCandle(false);
-    }, 15000); // 15 seconds - enough time for the full candle effect to complete
+        // Clear notification after display duration
+        setTimeout(() => {
+          setJustLitOffering(null);
+        }, 10000); // Show for 10 seconds
+      }, 3500); // Matches when arctic rings appear
 
-    // Don't reset matchsticks anymore - they stay lit after user lights a candle
-    // The desktop matchstick will stay lit via hasLitCandleThisSession state
-    // The mobile matchstick already stays lit
+      // 3D candle animation
+      if (unifiedShrineRef.current) {
+        // Flag that THIS client is already playing the effect locally
+        // so the onSnapshot listener won't double-trigger it
+        localCandleEffectActiveRef.current = true
+        setTimeout(() => { localCandleEffectActiveRef.current = false }, 20000)
+
+        unifiedShrineRef.current.triggerCandleEffect(newOffering)
+      }
+
+      // Matchstick lighting
+      if (isMobileView) {
+        setMobileMatchstickLit(true);
+        setHasLitCandleThisSession(true);
+        setIsExpanded(false);
+      } else if (shrineLeftPanelRef.current) {
+        shrineLeftPanelRef.current.lightMatchstick();
+      }
+
+      // Mobile haptic feedback
+      if (isMobileView && window.navigator && window.navigator.vibrate) {
+        window.navigator.vibrate([50, 50, 50])
+      }
+
+      // Refresh offerings after ripple animation
+      setTimeout(() => fetchOfferings(), 3000)
+
+      // Reset processing flags after full effect completes
+      setTimeout(() => {
+        setIsProcessingCandle(false);
+        setHasProcessedCandle(false);
+      }, 15000);
+    }
+
+    // If user is looking at the page, play immediately.
+    // If page is hidden (user in MetaMask/another app), queue until they return.
+    if (document.hidden) {
+      pendingCandleEffectRef.current = playEffects
+    } else {
+      playEffects()
+    }
   };
   
   // Listen for openBuyModal event
@@ -825,8 +891,44 @@ useEffect(() => {
     return () => clearInterval(interval);
   }, [isMobileView, hasManuallySelectedBannerType]);
 
+  // Lock body scroll on mount to prevent mobile viewport bounce/shift
+  useEffect(() => {
+    const html = document.documentElement
+    const body = document.body
+    const savedHtmlOverflow = html.style.overflow
+    const savedBodyOverflow = body.style.overflow
+    const savedBodyPosition = body.style.position
+    const savedBodyWidth = body.style.width
+    const savedBodyHeight = body.style.height
+    const savedBodyTop = body.style.top
+
+    html.style.overflow = 'hidden'
+    body.style.overflow = 'hidden'
+    body.style.position = 'fixed'
+    body.style.width = '100%'
+    body.style.height = '100%'
+    body.style.top = '0'
+
+    return () => {
+      html.style.overflow = savedHtmlOverflow
+      body.style.overflow = savedBodyOverflow
+      body.style.position = savedBodyPosition
+      body.style.width = savedBodyWidth
+      body.style.height = savedBodyHeight
+      body.style.top = savedBodyTop
+    }
+  }, [])
+
   return (
-    <>
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      width: '100%',
+      height: '100%',
+      overflow: 'hidden',
+      overscrollBehavior: 'none',
+    }}>
       {/* CoinLoader */}
       <CoinLoader loading={isLoading} />
       
@@ -852,7 +954,8 @@ useEffect(() => {
         width: "100%",
         height: "100%",
         zIndex: 1,
-        pointerEvents: 'auto'
+        pointerEvents: 'auto',
+        touchAction: 'none',
       }}>
         {isClient && delayedMount ? (
           <UnifiedShrine
@@ -1952,7 +2055,7 @@ useEffect(() => {
 
       
       {/* CandleSnapshotRenderer removed - snapshots no longer needed */}
-      
-    </>
+
+    </div>
   )
 }

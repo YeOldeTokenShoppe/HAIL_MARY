@@ -263,13 +263,14 @@ export function WatchlistPhoneTexture({
         const x = (1 - uv.x) * canvas.width; // Flip X coordinate for texture mapping
         const y = (1 - uv.y) * canvas.height; // Flip Y coordinate
         
-        // Check if click is in tab area
+        // Check if click is in tab area (generous padding for touch targets)
         const tabY = 175;
         const tabHeight = 45;
+        const tabPadding = 30; // Extra padding above and below for easier mobile taps
         const tabs = ['ALL', 'CANDLES', 'STAKING', 'XPOSTS'];
         const tabWidth = (canvas.width - 60) / tabs.length;
 
-        if (y >= tabY && y <= tabY + tabHeight && x >= 30 && x <= canvas.width - 30) {
+        if (y >= tabY - tabPadding && y <= tabY + tabHeight + tabPadding && x >= 10 && x <= canvas.width - 10) {
           // Determine which tab was clicked
           const tabIndex = Math.floor((x - 30) / tabWidth);
           

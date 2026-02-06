@@ -43,8 +43,7 @@
     "morphing": {
       "line1": "your",
       "line2": "REAL80"
-    },
-    "scrollPrompt": "scroll up to continue"
+    }
   },
   "navigation": {
   },
@@ -438,7 +437,7 @@
     "info": {
       "hideInfo": "Hide",
       "showInfo": "Info",
-      "lockDays": "10 minute lock",
+      "lockDays": "7 day lock",
       "minStake": "Min 1 RL80 to stake",
       "earnEth": "Earn ETH rewards",
       "proRata": "Pro-rata distribution"

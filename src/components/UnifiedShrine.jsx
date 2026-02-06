@@ -85,7 +85,7 @@ function DebugZoneVisualization() {
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { BlendFunction } from 'postprocessing'
 import * as THREE from 'three'
-import { HandsModel, CameraController } from './HandsGLTFScene'
+import { HandsModel } from './HandsGLTFScene'
 // IMPORTANT: Import from the optimized version!
 import { CandleCloud, GradientBackground, SceneSetup } from './CandleShrine'
 import { NewCandleEffectManager } from './NewCandleEffect'
@@ -504,7 +504,15 @@ function LeaderboardCarousel({ leaderboardData, isMobile, sortMode = 'topBurners
             spinTrigger={spinTrigger}
           />
         </Suspense>
-        <OrbitControls enableZoom={false} enablePan={false} autoRotate={false} />
+        <OrbitControls
+          enableZoom={false}
+          enablePan={false}
+          autoRotate={false}
+          enableDamping={true}
+          dampingFactor={0.08}
+          rotateSpeed={0.5}
+          touches={{ ONE: THREE.TOUCH.ROTATE, TWO: null }}
+        />
         <EffectComposer>
           <Bloom
             intensity={1.5}
@@ -770,134 +778,148 @@ function HighlightedCandleGroup({ position, userData, visible }) {
   )
 }
 
-// Camera animator for smooth look-at transitions and reset to default
-function CameraAnimator({ targetPosition, resetToDefault, isMobile }) {
+// Unified camera controller - handles default view, focus mode, candle look-at, and reset
+function CameraAnimator({ targetPosition, resetToDefault, isMobile, focusMode }) {
   const { camera } = useThree()
+
+  // Default camera settings (single source of truth)
+  const DEFAULT_POSITION = useMemo(() => new THREE.Vector3(0, 0, 5), [])
+  const DEFAULT_LOOKAT = useMemo(() => new THREE.Vector3(0, 0, 0), [])
+  const DEFAULT_FOV = 45
+
+  // Focus mode settings (phone zoom) - closer on mobile since model is smaller
+  const FOCUS_POSITION = useMemo(() => new THREE.Vector3(0, isMobile ? 0.3 : 0.7, isMobile ? 1.5 : 2.5), [isMobile])
+  const FOCUS_LOOKAT = useMemo(() => new THREE.Vector3(0, isMobile ? -0.1 : 0, 0), [isMobile])
+  const FOCUS_FOV = isMobile ? 22 : 30
+
+  // Animation state
+  const currentPosition = useRef(new THREE.Vector3(0, 0, 5))
+  const currentLookAt = useRef(new THREE.Vector3(0, 0, 0))
+  const currentFOV = useRef(DEFAULT_FOV)
+
+  // Transition animation state (for candle look-at and reset)
   const startQuaternion = useRef(null)
   const startPosition = useRef(null)
+  const startFOV = useRef(null)
   const targetQuaternion = useRef(new THREE.Quaternion())
   const targetPositionVec = useRef(new THREE.Vector3())
+  const targetFOVVal = useRef(null)
   const tempMatrix = useRef(new THREE.Matrix4())
   const progress = useRef(0)
-  const isResetting = useRef(false)
-  const initialCameraState = useRef(null)
-  const startFOV = useRef(null)
-  const targetFOV = useRef(null)
-  
-  // Store the initial camera state on first render
+  const isAnimating = useRef(false)
+
+  // Cancel any in-progress animation when focus mode toggles so it takes effect immediately
   useEffect(() => {
-    if (!initialCameraState.current) {
-      initialCameraState.current = {
-        position: camera.position.clone(),
-        quaternion: camera.quaternion.clone(),
-        fov: camera.fov
-      }
-    }
-  }, [camera])
-  
-  // Default camera settings (fallback if initial state not captured)
-  const defaultPosition = initialCameraState.current?.position || new THREE.Vector3(0, 0, isMobile ? 2 : 0)
-  const defaultQuaternion = initialCameraState.current?.quaternion || new THREE.Quaternion()
-  
+    isAnimating.current = false
+  }, [focusMode])
+
+  // Initialize camera
   useEffect(() => {
-    if (resetToDefault && initialCameraState.current) {
-      // Reset to initial camera position and rotation
+    camera.position.copy(DEFAULT_POSITION)
+    currentPosition.current.copy(DEFAULT_POSITION)
+    camera.fov = DEFAULT_FOV
+    currentFOV.current = DEFAULT_FOV
+    camera.lookAt(DEFAULT_LOOKAT)
+    camera.updateProjectionMatrix()
+  }, [camera, DEFAULT_POSITION, DEFAULT_LOOKAT])
+
+  // Handle candle look-at and reset transitions
+  useEffect(() => {
+    if (resetToDefault) {
       startPosition.current = camera.position.clone()
       startQuaternion.current = camera.quaternion.clone()
       startFOV.current = camera.fov
-      
-      // Use the stored initial camera state
-      targetQuaternion.current.copy(initialCameraState.current.quaternion)
-      targetPositionVec.current.copy(initialCameraState.current.position)
-      targetFOV.current = initialCameraState.current.fov
-      
+
+      targetPositionVec.current.copy(DEFAULT_POSITION)
+      // Calculate quaternion for looking at default lookAt from default position
+      tempMatrix.current.lookAt(DEFAULT_POSITION, DEFAULT_LOOKAT, camera.up)
+      targetQuaternion.current.setFromRotationMatrix(tempMatrix.current)
+      targetFOVVal.current = DEFAULT_FOV
+
       progress.current = 0
-      isResetting.current = true
-    } else if (targetPosition && initialCameraState.current) {
-      // First move camera to initial position, then look at candle
+      isAnimating.current = true
+    } else if (targetPosition) {
       startPosition.current = camera.position.clone()
       startQuaternion.current = camera.quaternion.clone()
       startFOV.current = camera.fov
-      
-      // Keep camera at initial position but look at candle
-      targetPositionVec.current.copy(initialCameraState.current.position)
-      
-      // Calculate rotation to look at candle from initial position
+
+      // Stay at default position but look at candle
+      targetPositionVec.current.copy(DEFAULT_POSITION)
+
       const lookAtPos = new THREE.Vector3(
         targetPosition.target[0],
-        targetPosition.target[1] + 1,  // Look slightly above the candle base
+        targetPosition.target[1] + 1,
         targetPosition.target[2]
       )
-      
-      tempMatrix.current.lookAt(initialCameraState.current.position, lookAtPos, camera.up)
+
+      tempMatrix.current.lookAt(DEFAULT_POSITION, lookAtPos, camera.up)
       targetQuaternion.current.setFromRotationMatrix(tempMatrix.current)
-      
-      // Modest zoom in by reducing FOV when looking at candle
-      targetFOV.current = isMobile ? 50 : 45  // Less aggressive zoom
-      
+      targetFOVVal.current = isMobile ? 50 : 45
+
       progress.current = 0
-      isResetting.current = false
+      isAnimating.current = true
     }
-  }, [targetPosition, resetToDefault, camera, isMobile])
-  
+  }, [targetPosition, resetToDefault, camera, isMobile, DEFAULT_POSITION, DEFAULT_LOOKAT])
+
   useFrame((state, delta) => {
-    if ((targetPosition || isResetting.current) && startQuaternion.current) {
+    // Priority 1: Animated transitions (candle look-at, reset)
+    if (isAnimating.current && startQuaternion.current) {
       if (progress.current < 1) {
-        // Animate over 1.5 seconds
         progress.current = Math.min(progress.current + delta * 0.67, 1)
-        
-        const easeProgress = 1 - Math.pow(1 - progress.current, 3) // Ease out cubic
-        
-        // Always interpolate rotation
-        camera.quaternion.slerpQuaternions(
-          startQuaternion.current,
-          targetQuaternion.current,
-          easeProgress
-        )
-        
-        // Always interpolate position (for both reset and look-at)
+        const ease = 1 - Math.pow(1 - progress.current, 3)
+
+        camera.quaternion.slerpQuaternions(startQuaternion.current, targetQuaternion.current, ease)
+
         if (startPosition.current) {
-          camera.position.lerpVectors(
-            startPosition.current,
-            targetPositionVec.current,
-            easeProgress
-          )
+          camera.position.lerpVectors(startPosition.current, targetPositionVec.current, ease)
+          currentPosition.current.copy(camera.position)
         }
-        
-        // Interpolate FOV for zoom effect
-        if (startFOV.current && targetFOV.current) {
-          camera.fov = THREE.MathUtils.lerp(startFOV.current, targetFOV.current, easeProgress)
+
+        if (startFOV.current != null && targetFOVVal.current != null) {
+          camera.fov = THREE.MathUtils.lerp(startFOV.current, targetFOVVal.current, ease)
+          currentFOV.current = camera.fov
         }
-        
+
         camera.updateProjectionMatrix()
-      } else if (targetPosition && !isResetting.current) {
-        // Keep looking at target after animation (same offset as animation target)
+        return
+      }
+
+      if (targetPosition && !resetToDefault) {
+        // Hold look-at on candle after animation finishes
         camera.lookAt(
           targetPosition.target[0],
-          targetPosition.target[1] + 1,  // Same +1 offset used during animation
+          targetPosition.target[1] + 1,
           targetPosition.target[2]
         )
         camera.updateProjectionMatrix()
-      } else if (isResetting.current && initialCameraState.current) {
-        // Ensure we're at initial position after reset
-        camera.position.copy(initialCameraState.current.position)
-        camera.quaternion.copy(initialCameraState.current.quaternion)
-        camera.updateProjectionMatrix()
-        isResetting.current = false
+        return
       }
-    } else if (!targetPosition) {
-      // Smoothly reset to look at center
-      const center = new THREE.Vector3(0, 0, 0)
-      const currentLookAt = new THREE.Vector3(0, 0, -1)
-      currentLookAt.applyQuaternion(camera.quaternion)
-      currentLookAt.add(camera.position)
-      
-      currentLookAt.lerp(center, 0.05)
-      camera.lookAt(currentLookAt)
-      camera.updateProjectionMatrix()
+
+      // Reset animation finished
+      isAnimating.current = false
+    }
+
+    // Priority 2: Focus mode or default - smooth lerp each frame (frame-rate independent)
+    if (!targetPosition) {
+      const goalPos = focusMode ? FOCUS_POSITION : DEFAULT_POSITION
+      const goalLookAt = focusMode ? FOCUS_LOOKAT : DEFAULT_LOOKAT
+      const goalFOV = focusMode ? FOCUS_FOV : DEFAULT_FOV
+      const f = 1 - Math.exp(-12 * Math.min(delta, 0.05))
+
+      currentPosition.current.lerp(goalPos, f)
+      currentLookAt.current.lerp(goalLookAt, f)
+      currentFOV.current = THREE.MathUtils.lerp(currentFOV.current, goalFOV, f)
+
+      camera.position.copy(currentPosition.current)
+      camera.lookAt(currentLookAt.current)
+
+      if (Math.abs(camera.fov - currentFOV.current) > 0.01) {
+        camera.fov = currentFOV.current
+        camera.updateProjectionMatrix()
+      }
     }
   })
-  
+
   return null
 }
 
@@ -1049,17 +1071,13 @@ function SceneRotator({ children, userRotation, userVerticalRotation = 0, smooth
   const groupRef = useRef()
   const [isPointerDown, setIsPointerDown] = useState(false)
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     if (groupRef.current) {
-      if (smoothTransition) {
-        // Lerp toward target for smooth reset animation
-        groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, userRotation, 0.08)
-        groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, userVerticalRotation, 0.08)
-      } else {
-        // Snap immediately during active dragging
-        groupRef.current.rotation.y = userRotation
-        groupRef.current.rotation.x = userVerticalRotation
-      }
+      // Frame-rate independent damping: fast tracking during drag/momentum, slower during reset
+      const speed = smoothTransition ? 5 : 18
+      const f = 1 - Math.exp(-speed * Math.min(delta, 0.05))
+      groupRef.current.rotation.y += (userRotation - groupRef.current.rotation.y) * f
+      groupRef.current.rotation.x += (userVerticalRotation - groupRef.current.rotation.x) * f
     }
   })
   
@@ -1247,9 +1265,12 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
     }
 
     // Priority zones - candles positioned in front of camera (looking at negative Z)
-    // Camera is at [0, 0, 15], Mary is at z=-8 to -12
+    // Camera is at [0, 0, 15], phone/hands at [0, -1, -6], Mary at z=-8 to -12
+    // Zone 0 keeps the first few candles clustered tight beside the phone
+    // so even with 2-3 candles the scene doesn't look sparse
     const PRIORITY_ZONES = [
-      { capacity: 25, x: { min: -6, max: 6 }, y: { min: -1, max: 3 }, z: { min: -8, max: -4 } },      // Zone 1: Tight cluster flanking phone
+      { capacity: 10, x: { min: -4, max: 4 }, y: { min: 0, max: 3 }, z: { min: -11, max: -9.5 } },    // Zone 0: Central cluster IN FRONT of body corridor (z < -9), can use x≈0
+      { capacity: 15, x: { min: -7, max: 7 }, y: { min: -1, max: 3 }, z: { min: -8, max: -4 } },      // Zone 1: Flanking phone (inside corridor, will get x-pushed)
       { capacity: 40, x: { min: -10, max: 10 }, y: { min: -2, max: 5 }, z: { min: -10, max: -3 } },   // Zone 2: Good visibility
       { capacity: 60, x: { min: -14, max: 14 }, y: { min: -3, max: 8 }, z: { min: -14, max: -2 } },   // Zone 3: Peripheral
       { capacity: Infinity, x: { min: -20, max: 20 }, y: { min: -5, max: 12 }, z: { min: -20, max: 0 } } // Zone 4: Overflow
@@ -1297,8 +1318,22 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
       // Use stored position from Firestore if available
       const storedPos = offering.position
       let x, y, z
+      let useStoredPos = storedPos?.x !== undefined
 
-      if (storedPos?.x !== undefined) {
+      // For the first few candles, only use stored position if it's already
+      // within the tight front zone. Old positions from before the zone update
+      // could be way too far out, making sparse scenes look bad.
+      if (useStoredPos && index < 10) {
+        const tightZone = PRIORITY_ZONES[0]
+        const outOfZone = storedPos.x < tightZone.x.min || storedPos.x > tightZone.x.max ||
+          storedPos.y < tightZone.y.min || storedPos.y > tightZone.y.max ||
+          storedPos.z < tightZone.z.min || storedPos.z > tightZone.z.max
+        if (outOfZone) {
+          useStoredPos = false // Regenerate in tight zone instead
+        }
+      }
+
+      if (useStoredPos) {
         x = storedPos.x
         y = storedPos.y
         z = storedPos.z
@@ -1325,9 +1360,11 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
           }
 
           // Check minimum distance from other candles
+          // Tighter packing for early candles (Zone 0) so they cluster nicely
+          const minDist = index < 10 ? 1.5 : 2.0
           const tooClose = usedPositions.some(pos => {
             const dist = Math.sqrt((x - pos.x) ** 2 + (y - pos.y) ** 2 + (z - pos.z) ** 2)
-            return dist < 2.0
+            return dist < minDist
           })
 
           if (!tooClose) break
@@ -1454,13 +1491,14 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
           }
         }
       }
-    }, 10000) // Check every 10 seconds for testing
+    }, 60000) // Check every 60 seconds
     
     return () => clearInterval(interval)
   }, [offerings])
   
   const [clickedCandleId, setClickedCandleId] = useState(null)
   const [isRippleActive, setIsRippleActive] = useState(false)
+  const [animatingCandleUserId, setAnimatingCandleUserId] = useState(null) // Hide permanent candle while effect plays
   const [activeStatsTab, setActiveStatsTab] = useState('leaders') // 'leaders', 'price', 'staking', or 'pulse'
   const [internalShowHelp, setInternalShowHelp] = useState(false) // Internal help state (fallback)
   const [statsBoxCollapsed, setStatsBoxCollapsed] = useState(true) // Collapsed stats box - closed by default
@@ -1482,7 +1520,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   const [targetCameraPosition, setTargetCameraPosition] = useState(null) // For camera movement
   const [userCandlePosition, setUserCandlePosition] = useState(null) // Store 3D position
   const [resetCameraToDefault, setResetCameraToDefault] = useState(false) // Reset camera flag
-  const [overrideCameraControl, setOverrideCameraControl] = useState(false) // Override all camera controls
+  // overrideCameraControl removed - unified CameraAnimator handles all modes via priority
   const [smoothRotationReset, setSmoothRotationReset] = useState(false) // Smooth lerp back to center
   const [leaderboardData, setLeaderboardData] = useState([]) // Top burners for leaderboard
   const [leaderboardLoading, setLeaderboardLoading] = useState(false)
@@ -1562,9 +1600,6 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   const findUserCandle = useCallback(() => {
     // Cancel any in-progress reset so the find animation takes priority
     setResetCameraToDefault(false)
-
-    // Override all camera controls
-    setOverrideCameraControl(true)
 
     // Save current rotation (don't reset - let camera animation handle the transition)
     savedUserRotation.current = userRotationRef.current
@@ -1660,7 +1695,6 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
     // Reset flags after animation completes
     setTimeout(() => {
       setResetCameraToDefault(false)
-      setOverrideCameraControl(false)
     }, 1600)
     if (window.sharedUniforms) {
       window.sharedUniforms.uHighlightedId.value = -1
@@ -1684,6 +1718,10 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
         // NOTE: onLightCandle is NOT called here to prevent duplicate Prayer Received
         // The onLightCandle callback should be called by the component that triggers this effect
 
+        // Hide permanent candle at this position while the effect candle is visible
+        const userId = offering?.userId || offering?.uid
+        if (userId) setAnimatingCandleUserId(userId)
+
         // Activate ripple state to trigger purple screen and brighter aura
         setIsRippleActive(true)
         setTimeout(() => setIsRippleActive(false), 8000) // Match the justLitOffering duration
@@ -1695,7 +1733,6 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
           setTargetCameraPosition({
             target: [pos.x, pos.y, pos.z]
           })
-          setOverrideCameraControl(true)
 
           // Reset camera after the effect completes
           setTimeout(() => {
@@ -1703,7 +1740,6 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
             setResetCameraToDefault(true)
             setTimeout(() => {
               setResetCameraToDefault(false)
-              setOverrideCameraControl(false)
             }, 1600)
           }, 12000) // After NewCandleEffect finishes (~10-12 seconds)
         }
@@ -1729,6 +1765,24 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   const dragStart = useRef({ x: 0, y: 0, rotation: 0, verticalRotation: 0 })
   const hasDraggedEnough = useRef(false) // Track if we've moved enough to start rotating
   const DRAG_THRESHOLD = 5 // Pixels to move before rotation starts
+
+  // Momentum / velocity tracking for buttery smooth inertia on release
+  const lastMoveTime = useRef(0)
+  const lastMoveX = useRef(0)
+  const lastMoveY = useRef(0)
+  const angularVelX = useRef(0)
+  const angularVelY = useRef(0)
+  const momentumRaf = useRef(null)
+
+  // Cleanup momentum animation on unmount
+  useEffect(() => {
+    return () => {
+      if (momentumRaf.current) {
+        cancelAnimationFrame(momentumRaf.current)
+      }
+    }
+  }, [])
+
   const hasReachedSection = true // const [hasReachedSection, setHasReachedSection] = useState(true)
   const isInView = true // const [isInView, setIsInView] = useState(true)
   const canvasRef = useRef()
@@ -2085,6 +2139,13 @@ useEffect(() => {
   const handlePointerDown = useCallback((event) => {
     // Cancel any in-progress smooth reset so drag feels responsive
     setSmoothRotationReset(false)
+    // Cancel any running momentum so drag takes over immediately
+    if (momentumRaf.current) {
+      cancelAnimationFrame(momentumRaf.current)
+      momentumRaf.current = null
+    }
+    angularVelX.current = 0
+    angularVelY.current = 0
     // Mark potential drag start but don't start rotating yet
     isDragging.current = true
     hasDraggedEnough.current = false
@@ -2098,7 +2159,10 @@ useEffect(() => {
       startX: clientX,
       startY: clientY
     }
-    // Don't change cursor yet - wait for actual drag
+    // Initialize velocity tracking position
+    lastMoveX.current = clientX
+    lastMoveY.current = clientY
+    lastMoveTime.current = performance.now()
   }, [userRotation, userVerticalRotation])
 
   const handlePointerMove = useCallback((event) => {
@@ -2125,21 +2189,39 @@ useEffect(() => {
 
       // Only rotate if we've dragged enough
       if (hasDraggedEnough.current) {
+        // Sensitivity: halved on mobile for small screens / fat fingers
+        const hSens = isMobile ? 0.005 : 0.01
+        const vSens = isMobile ? 0.0025 : 0.005
+
         // Horizontal rotation (unlimited)
-        const deltaX = (clientX - dragStart.current.x) * 0.01
+        const deltaX = (clientX - dragStart.current.x) * hSens
         const newRotation = dragStart.current.rotation + deltaX
         setUserRotation(newRotation)
 
         // Vertical rotation (clamped)
-        const deltaY = (clientY - dragStart.current.y) * 0.005 // Less sensitive for vertical
+        const deltaY = (clientY - dragStart.current.y) * vSens
         const newVerticalRotation = Math.max(
           MIN_VERTICAL_ROTATION,
           Math.min(MAX_VERTICAL_ROTATION, dragStart.current.verticalRotation - deltaY)
         )
         setUserVerticalRotation(newVerticalRotation)
+
+        // Track angular velocity for momentum (EMA smoothed for jitter-free inertia)
+        const now = performance.now()
+        const elapsed = now - lastMoveTime.current
+        if (elapsed > 0 && elapsed < 100) {
+          const alpha = 0.3
+          const rawVelX = (clientX - lastMoveX.current) * hSens / (elapsed / 1000)
+          const rawVelY = (clientY - lastMoveY.current) * vSens / (elapsed / 1000)
+          angularVelX.current = angularVelX.current * (1 - alpha) + rawVelX * alpha
+          angularVelY.current = angularVelY.current * (1 - alpha) + rawVelY * alpha
+        }
+        lastMoveTime.current = now
+        lastMoveX.current = clientX
+        lastMoveY.current = clientY
       }
     }
-  }, [MAX_VERTICAL_ROTATION, MIN_VERTICAL_ROTATION])
+  }, [MAX_VERTICAL_ROTATION, MIN_VERTICAL_ROTATION, isMobile])
 
   const handlePointerUp = useCallback(() => {
     const wasDragging = hasDraggedEnough.current
@@ -2150,18 +2232,51 @@ useEffect(() => {
       document.body.style.cursor = 'auto'
     }
 
-    // If it was a click (not a drag) on the background, reset the view
     if (!wasDragging) {
-      // Enable smooth lerp, then set target to 0
+      // Click on background (not a drag) - reset the view
       setSmoothRotationReset(true)
       setUserRotation(0)
       setUserVerticalRotation(0)
-      // Reset camera and clear any highlights
       resetView()
-      // Clear smooth flag after lerp completes (~1s at 0.08 per frame)
       setTimeout(() => setSmoothRotationReset(false), 1000)
+    } else {
+      // Drag ended - apply momentum if velocity is significant
+      // Discard stale velocity if pointer stopped moving before release
+      if (performance.now() - lastMoveTime.current > 60) {
+        angularVelX.current = 0
+        angularVelY.current = 0
+      }
+
+      const hasVelocity = Math.abs(angularVelX.current) > 0.1 || Math.abs(angularVelY.current) > 0.05
+      if (hasVelocity) {
+        let lastTime = performance.now()
+        const FRICTION = 8.0 // Exponential decay rate (higher = faster stop)
+
+        const animateMomentum = () => {
+          const now = performance.now()
+          const dt = Math.min((now - lastTime) / 1000, 0.05)
+          lastTime = now
+
+          // Frame-rate independent exponential decay
+          const decay = Math.exp(-FRICTION * dt)
+          angularVelX.current *= decay
+          angularVelY.current *= decay
+
+          if (Math.abs(angularVelX.current) > 0.01 || Math.abs(angularVelY.current) > 0.01) {
+            setUserRotation(prev => prev + angularVelX.current * dt)
+            setUserVerticalRotation(prev => {
+              const next = prev - angularVelY.current * dt
+              return Math.max(MIN_VERTICAL_ROTATION, Math.min(MAX_VERTICAL_ROTATION, next))
+            })
+            momentumRaf.current = requestAnimationFrame(animateMomentum)
+          } else {
+            momentumRaf.current = null
+          }
+        }
+        momentumRaf.current = requestAnimationFrame(animateMomentum)
+      }
     }
-  }, [resetView])
+  }, [resetView, MIN_VERTICAL_ROTATION, MAX_VERTICAL_ROTATION])
 
   // Track reload attempts to prevent infinite loops
   const reloadAttempts = useRef(0)
@@ -2329,7 +2444,7 @@ useEffect(() => {
   ], [isMobile, t])
 
   return (
-    <div style={{ width: '100vw', height: isMobile ? '100dvh' : '100dvh', background: is80sMode ? 'transparent' : '#000', position: 'fixed'}}>
+    <div style={{ width: '100%', height: '100dvh', background: is80sMode ? 'transparent' : '#000', position: 'fixed', top: 0, left: 0 }}>
       {/* 80s mode background */}
       {is80sMode && (
         <img
@@ -2354,9 +2469,11 @@ useEffect(() => {
       <div 
         ref={canvasRef} 
         style={{ 
-          width: '100vw', 
-          height: '100dvh', 
-          position: 'fixed', 
+          width: '100%',
+          height: '100dvh',
+          position: 'fixed',
+          top: 0,
+          left: 0,
           zIndex: 2,
           background: is80sMode ? 'transparent' : '#000',
           cursor: targetCameraPosition ? 'pointer' : 'auto'
@@ -2368,8 +2485,8 @@ useEffect(() => {
           }
         }}
       >
-      {/* Focus Mode Indicator */}
-      {focusMode && (
+      {/* Focus Mode Indicator - desktop only */}
+      {focusMode && !isMobile && (
         <div
           style={{
             position: 'absolute',
@@ -2393,7 +2510,7 @@ useEffect(() => {
       )}
       
       {/* Hint for returning from candle view */}
-      {targetCameraPosition && (
+      {!isMobile && targetCameraPosition && (
         <div
           style={{
             position: 'absolute',
@@ -2423,8 +2540,8 @@ useEffect(() => {
       <CanvasErrorBoundary>
       <Canvas
         camera={{
-          position: DEBUG_MODE ? [0, 40, 0] : [0, isMobile ? 0 : 0, isMobile ? 2 : 0],
-          fov: DEBUG_MODE ? 90 : (isMobile ? 75 : 70),
+          position: DEBUG_MODE ? [0, 40, 0] : [0, 0, 5],
+          fov: DEBUG_MODE ? 90 : 45,
           near: 0.1,
           far: 200
         }}
@@ -2504,6 +2621,7 @@ useEffect(() => {
             targetPosition={targetCameraPosition}
             resetToDefault={resetCameraToDefault}
             isMobile={isMobile}
+            focusMode={focusMode}
           />
         )}
         
@@ -2524,7 +2642,9 @@ useEffect(() => {
                 priceRef={priceRef}
                 shortTermPriceRef={shortTermPriceRef}
                 continuousOffsetRef={continuousOffsetRef}
-                additionalCandles={offeringCandles}
+                additionalCandles={animatingCandleUserId
+                  ? offeringCandles.filter(c => c.userId !== animatingCandleUserId)
+                  : offeringCandles}
                 onCandleClick={handleCandleClick}
                 clickedCandleId={clickedCandleId}
                 isMobile={isMobile}
@@ -2560,6 +2680,7 @@ useEffect(() => {
                   hasActiveClick={clickedCandleId !== null || isRippleActive}
                   user={user}
                   onPhoneClick={() => {
+                    setResetCameraToDefault(false)
                     setFocusMode(!focusMode);
                   }}
                   is80sMode={is80sMode}
@@ -2574,6 +2695,7 @@ useEffect(() => {
               phonePosition={[0, -1, -5]}  // Near phone/hands at [0, -1, -6]
               onNewCandle={handleNewCandleComplete}
               onCandlePulse={handleCandlePulse}
+              onEffectComplete={() => setAnimatingCandleUserId(null)}
             />
           </group>
         </SceneRotator>
@@ -2591,8 +2713,7 @@ useEffect(() => {
         />
         
         
-            {/* Camera controller for focus mode - disabled when overriding camera control or in debug mode */}
-            {!overrideCameraControl && !DEBUG_MODE && <CameraController focusMode={focusMode} />}
+            {/* Camera control is now unified in CameraAnimator above */}
             
      
 
