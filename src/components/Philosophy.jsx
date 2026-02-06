@@ -2160,7 +2160,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
             background: 'rgba(0, 0, 0, 0.9)',
             display: 'flex',
             justifyContent: 'center',
-            alignItems: 'center',
+            alignItems: isMobile ? 'flex-start' : 'center',
             zIndex: 10001,
             backdropFilter: 'blur(5px)'
           }}
@@ -2169,14 +2169,17 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
             onClick={(e) => e.stopPropagation()}
             style={{
               position: 'relative',
-              width: '95vw',
+              width: isMobile ? '100vw' : '95vw',
               maxWidth: isMobile ? 'none' : '50vw',
-              height: '95vh',
+              height: isMobile ? '100dvh' : '95vh',
+              maxHeight: isMobile ? '-webkit-fill-available' : 'none',
               background: 'rgba(20, 20, 20, 0.95)',
-              borderRadius: '1rem',
-              border: '2px solid #8e662b',
-              padding: isMobile ? '0' : '1rem',
-              overflow: 'hidden'
+              borderRadius: isMobile ? '0' : '1rem',
+              border: isMobile ? 'none' : '2px solid #8e662b',
+              padding: isMobile ? '0.5rem 0.5rem 0' : '1rem',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column'
             }}
           >
             {/* Close button */}
@@ -2187,18 +2190,18 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
               }}
               style={{
                 position: 'absolute',
-                top: '1rem',
-                right: '1rem',
-                background: 'none',
-                border: 'none',
+                top: isMobile ? '0.25rem' : '1rem',
+                right: isMobile ? '0.25rem' : '1rem',
+                background: isMobile ? 'rgba(20, 20, 20, 0.8)' : 'none',
+                border: isMobile ? '1px solid #8e662b' : 'none',
                 color: '#d4af37',
                 fontSize: '1.5rem',
                 cursor: 'pointer',
                 fontWeight: 'bold',
                 padding: '0.5rem',
                 borderRadius: '50%',
-                width: '3rem',
-                height: '3rem',
+                width: '2.5rem',
+                height: '2.5rem',
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
@@ -2210,7 +2213,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
                 e.target.style.transform = 'scale(1.1)';
               }}
               onMouseLeave={(e) => {
-                e.target.style.background = 'none';
+                e.target.style.background = isMobile ? 'rgba(20, 20, 20, 0.8)' : 'none';
                 e.target.style.transform = 'scale(1)';
               }}
             >
@@ -2220,11 +2223,13 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
             {/* Title */}
             <div style={{
               color: '#d4af37',
-              fontSize: '1.2rem',
+              fontSize: isMobile ? '1rem' : '1.2rem',
               fontWeight: 'bold',
-              marginBottom: '1rem',
+              marginBottom: isMobile ? '0.5rem' : '1rem',
+              marginTop: isMobile ? '0.25rem' : '0',
               textAlign: 'center',
-              fontFamily: '"UnifrakturCook", serif'
+              fontFamily: '"UnifrakturCook", serif',
+              flexShrink: 0
             }}>
               {(() => {
                 const romanNumerals = { '1': 'I', '2': 'II', '3': 'III', '4': 'IV', '5': 'V' };
@@ -2246,12 +2251,13 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
               display: 'flex',
               flexWrap: 'wrap',
               justifyContent: 'center',
-              marginBottom: '0.5rem',
-              gap: isMobile ? '0.5rem' : '1rem',
+              marginBottom: isMobile ? '0.25rem' : '0.5rem',
+              gap: isMobile ? '0.4rem' : '1rem',
               position: 'relative',
               zIndex: 10002,
               pointerEvents: 'auto',
-              padding: isMobile ? '0 3rem' : '0'
+              padding: isMobile ? '0 2.5rem' : '0',
+              flexShrink: 0
             }}>
               <button
                 onClick={(e) => {
@@ -2342,7 +2348,8 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
             {/* Iframe container with overflow for zooming */}
             <div style={{
               width: '100%',
-              height: isMobile ? 'calc(100% - 9rem)' : 'calc(100% - 6rem)',
+              flex: 1,
+              minHeight: 0,
               overflow: 'auto',
               borderRadius: '0.5rem',
             }}>
