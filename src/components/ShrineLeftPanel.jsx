@@ -16,8 +16,11 @@ const ShrineLeftPanel = forwardRef(({
   isMobile = false,
   onLightCandle,
   onStakeClick,
-  router
-  // Find My Candle functionality moved to stats tab in UnifiedShrine
+  router,
+  onFindCandle,
+  onResetView,
+  isHighlighting = false,
+  hasActiveCandle = false
 }, ref) => {
   const { t } = useLanguage()
   const [isLit, setIsLit] = useState(false)
@@ -170,7 +173,7 @@ const ShrineLeftPanel = forwardRef(({
             margin: 0,
             zIndex: 100,
           }}
-          // onClick={() => router?.push('/about')}
+          onClick={() => router?.push('/about')}
         >
           <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
           <span className="title-line" style={{ display: 'block', position: 'relative' }}>
@@ -568,7 +571,45 @@ const ShrineLeftPanel = forwardRef(({
             }} />
           )}
         </div>
-        {/* Find My Candle button moved to stats tab in UnifiedShrine */}
+        {/* Find My Candle button - only visible when user has an active lit candle */}
+        {onFindCandle && !isHighlighting && hasActiveCandle && (
+          <button
+            onClick={() => onFindCandle?.()}
+            style={{
+              background: 'rgba(0, 20, 20, 0.7)',
+              border: '1px solid rgba(0, 255, 136, 0.4)',
+              borderRadius: '8px',
+              padding: '10px 16px',
+              color: '#00ff88',
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              fontSize: '13px',
+              fontWeight: '600',
+              cursor: 'pointer',
+              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              transition: 'all 0.3s ease',
+              marginTop: '1rem',
+              pointerEvents: 'auto',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.02)'
+              e.currentTarget.style.borderColor = 'rgba(0, 255, 136, 0.7)'
+              e.currentTarget.style.boxShadow = '0 4px 15px rgba(0, 255, 136, 0.2)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)'
+              e.currentTarget.style.borderColor = 'rgba(0, 255, 136, 0.4)'
+              e.currentTarget.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.3)'
+            }}
+          >
+            🔍 {t('illumin80.findMyCandle')}
+          </button>
+        )}
 
       </div>
     </>

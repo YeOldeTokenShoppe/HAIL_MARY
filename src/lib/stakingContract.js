@@ -94,7 +94,7 @@ export const stakingFunctions = {
       return result;
     } catch (error) {
       console.error("Error getting lock duration:", error);
-      return "600"; // Default to 10 minutes for testnet
+      return "604800"; // Default to 7 days
     }
   },
   
@@ -205,7 +205,7 @@ export const formatStakingData = async (userAddress) => {
       earnedRewards: "0",
       rewardPerToken: "0",
       totalStaked: "0",
-      lockDuration: "600",
+      lockDuration: "604800",
       unlockTime: "0",
       canWithdraw: false,
       timeUntilUnlock: 0,

@@ -401,11 +401,12 @@ function HolographicStatue3({
         }
       });
       
+      let bodyRenderOrder = 10; // Incrementing renderOrder for body meshes to prevent sort-order flipping
       statue.traverse((child) => {
         if (child.isMesh) {
           // console.log("Mesh name:", child.name); // Enable debug logging
           const meshName = child.name.toLowerCase();
-      
+
           if (
             meshName.includes("halotext1") ||
             meshName.includes("halotext2")
@@ -418,12 +419,12 @@ function HolographicStatue3({
               roughness: 0.2,
               side: THREE.DoubleSide,
               transparent: true,
-              depthWrite: true,
+              depthWrite: false,
               depthTest: true,
               blending: THREE.AdditiveBlending,
               // needsUpdate: true, // Remove this line - it's causing the warning
             });
-            child.renderOrder = 2;
+            child.renderOrder = 100;
           } else if (meshName === "heart3_1" || meshName === "heart3_2") {
             // Apply green shader to heart3 parts with enhanced visibility
             const clonedMaterial = heartHolographicMaterial.clone();
@@ -435,7 +436,7 @@ function HolographicStatue3({
             clonedMaterial.side = THREE.DoubleSide; // Render both sides
             clonedMaterial.depthTest = false; // Always render on top
             child.material = clonedMaterial;
-            child.renderOrder = 3; // Higher render order to draw last
+            child.renderOrder = 200; // Higher render order to draw last
             animatedMaterialsRef.current.push(clonedMaterial);
           } else if (meshName === "heart4_1" || meshName === "heart4_2" || meshName === "heart4") {
             // Apply white shader to heart4 parts with enhanced visibility
@@ -448,7 +449,7 @@ function HolographicStatue3({
             clonedMaterial.side = THREE.DoubleSide; // Render both sides
             clonedMaterial.depthTest = false; // Always render on top
             child.material = clonedMaterial;
-            child.renderOrder = 3; // Higher render order to draw last
+            child.renderOrder = 200; // Higher render order to draw last
             animatedMaterialsRef.current.push(clonedMaterial);
           } else if (meshName === "heart1" || meshName === "heart") {
             // Hide heart1 temporarily
@@ -461,7 +462,9 @@ function HolographicStatue3({
               uTime: { value: 0 },
               uColor: { value: new THREE.Color(0xff0000) } // Make it bright red so we can see it
             };
+            clonedMaterial.depthWrite = false;
             child.material = clonedMaterial;
+            child.renderOrder = 150;
             animatedMaterialsRef.current.push(clonedMaterial);
           } else {
             // Main statue parts
@@ -471,7 +474,7 @@ function HolographicStatue3({
               uColor: { value: new THREE.Color(0x00ffff) }
             };
             child.material = clonedMaterial;
-            child.renderOrder = 1;
+            child.renderOrder = bodyRenderOrder++;
             animatedMaterialsRef.current.push(clonedMaterial);
           }
         }

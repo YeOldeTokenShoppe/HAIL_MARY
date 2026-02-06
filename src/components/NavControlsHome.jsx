@@ -23,7 +23,8 @@ export default function NavControlsHome({
   isMobile = false,
   onHelpClick = null,
   showHelpActive = false,
-  hideMusicOnMobile = false
+  hideMusicOnMobile = false,
+  hideUserOnMobile = false
 }) {
   const [emoji, setEmoji] = useState("😇");
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
@@ -842,6 +843,7 @@ export default function NavControlsHome({
         )}
 
         {/* Unified Account/Wallet Button */}
+        {!(isMobile && hideUserOnMobile) && (
         <div className="unified-account-container">
           {isHydrated && clerkUser ? (
             <button 
@@ -889,6 +891,7 @@ export default function NavControlsHome({
             </button>
           )}
         </div>
+        )}
 
         {/* Menu */}
         <button

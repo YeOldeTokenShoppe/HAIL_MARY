@@ -219,11 +219,11 @@ WHAT IT DOES:
 RL80 is a standard ERC-20 token with a small trading fee that funds the ecosystem.
 
 KEY BEHAVIORS:
-• ✅ Fixed supply — 80 billion tokens, forever
+• ✅ Capped supply — 80 billion tokens
 • ✅ No minting after launch
 • ✅ No blacklist or freeze functions
 • ✅ Wallet-to-wallet transfers have 0% fee
-• ✅ Only buys/sells on the liquidity pool pay a small fee (≈4%)
+• ✅ Only buys and sells through the liquidity pool pay a small fee (≈4%)
 
 WHY THERE'S A FEE:
 The fee supports:
@@ -263,10 +263,12 @@ IMPORTANT DETAILS:
 • ✅ No staking fees
 
 WHERE REWARDS COME FROM:
-Trading fees → swapped to ETH → sent directly to stakers.
+Trading fees → swapped to ETH → sent to the staking contract for distribution to stakers.
 
 No inflation or token printing.
-`,
+Rewards come from actual trading activity, not from issuing new tokens to pay existing holders.
+
+Rewards vary with trading activity — higher volume generates more rewards, while quieter markets generate less.`,
           status: '[STAKING.VERIFIED]'
         },
         {
@@ -276,12 +278,10 @@ No inflation or token printing.
           response: `LOADING SPLITTER MECHANICS...
 
 WHAT IT DOES:
-Automatically converts collected fees into ETH and distributes them.
-
-Think of it like an autopilot treasury.
+Converts collected fees into ETH and distributes them.
 
 FLOW:
-Trading fees → swap to ETH → split automatically:
+Trading fees → swap to ETH → splits between:
 • Treasury
 • Stakers
 • Marketing
@@ -291,7 +291,8 @@ SAFETY FEATURES:
 • ✅ Distribution percentages are transparent
 • ✅ Fails gracefully (one recipient can't block others)
 • ✅ No manual "trust me" transfers
-• ✅ Can be permanently locked once stable
+• ✅ Configuration can be permanently locked once stable, removing administrative changes
+• ✅ Execution is automated and becomes permissionless if swaps are not triggered
 
 This means funds move by rules, not promises.
 `,
@@ -324,6 +325,14 @@ No single contract controls everything.
 
 Admins only manage configuration (fees, shares, etc.), not your funds.
 
+
+Administrative permissions exist only for operational configuration
+during early stages (fee routing, swap thresholds, exchange integration).
+These permissions cannot mint tokens, seize wallets, or withdraw user funds.
+
+As the ecosystem stabilizes, configuration can be permanently locked
+and administrative control minimized.
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 3. TRANSPARENCY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -334,6 +343,9 @@ Everything happens on-chain:
 • Staking balances
 
 Anyone can verify in a block explorer.
+Execution can be triggered by anyone if automation fails, ensuring distribution cannot be blocked.
+Operational controls exist to maintain stability during early operation,
+not to change outcomes or override the rules enforced by the contracts.
 `,
           status: '[PHILOSOPHY.DEFINED]'
         },
@@ -366,13 +378,15 @@ RL80 is:
 • A fixed-supply token
 • With small trading fees
 • That fund staking rewards and growth
-• Enforced entirely by open-source smart contracts
+• Enforced by open-source smart contracts, with no trust assumptions and execution triggered on-chain.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Simple. Predictable. Verifiable.
 
-As it should be.
+Rules are enforced by code.
+Operations are guided by transparency.
+Trust is minimized by design.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `,
@@ -386,7 +400,7 @@ As it should be.
       title: 'What is The Illumin80?',
       response: ` LOADING LUMINARY MODULE...
 
-The Illumin80 is anyone who lights a candle on the shrine. By burning RL80 tokens and offering a prayer, message, or intention, you become part of the Illumin80 — a living congregation of participants whose candles form a collective display of conviction.
+The Illumin80 is anyone who lights a candle on the shrine. By burning RL80 tokens and offering a prayer, message, or intention, you become part of the Illumin80.
 
 STAKING MULTIPLIER:
 • The top 20% of cumulative token burners qualify for a 1.2x multiplier on staking rewards
@@ -1034,6 +1048,10 @@ This is a feature, not a limitation.
       setSubTypedText({});
       setIsSubTyping({});
     } else {
+      // Capture scroll offset relative to clicked element before layout changes
+      const element = document.getElementById(faqData[index].id);
+      const offsetBefore = element ? element.getBoundingClientRect().top : null;
+
       // Opening new section - clear any existing intervals first
       if (typewriterIntervalRef.current) {
         clearInterval(typewriterIntervalRef.current);
@@ -1057,6 +1075,17 @@ This is a feature, not a limitation.
       } else {
         typewriterEffect(faqData[index].response, index);
       }
+
+      // After state update and render, restore scroll so the clicked item stays in place
+      if (element && offsetBefore !== null) {
+        requestAnimationFrame(() => {
+          const offsetAfter = element.getBoundingClientRect().top;
+          const drift = offsetAfter - offsetBefore;
+          if (Math.abs(drift) > 1) {
+            window.scrollBy(0, drift);
+          }
+        });
+      }
     }
   };
 
@@ -1073,6 +1102,10 @@ This is a feature, not a limitation.
       setSubTypedText(prev => ({ ...prev, [key]: '' }));
       setIsSubTyping(prev => ({ ...prev, [key]: false }));
     } else {
+      // Capture scroll offset relative to clicked element before layout changes
+      const clickedEl = e.currentTarget;
+      const offsetBefore = clickedEl.getBoundingClientRect().top;
+
       setActiveSubQuery(prev => ({ ...prev, [key]: true }));
       const subQuestion = faqData[parentIndex].subQuestions[subIndex];
 
@@ -1083,6 +1116,15 @@ This is a feature, not a limitation.
       } else {
         subTypewriterEffect(subQuestion.response, parentIndex, subIndex);
       }
+
+      // After state update and render, restore scroll so the clicked sub-item stays in place
+      requestAnimationFrame(() => {
+        const offsetAfter = clickedEl.getBoundingClientRect().top;
+        const drift = offsetAfter - offsetBefore;
+        if (Math.abs(drift) > 1) {
+          window.scrollBy(0, drift);
+        }
+      });
     }
   };
 
@@ -1397,7 +1439,7 @@ This is a feature, not a limitation.
             width: '100%'
           }}>
             {faqData.map((faq, index) => (
-              <div key={faq.id} id={faq.id} style={{ marginBottom: '15px' }}>
+              <div key={faq.id} id={faq.id} style={{ marginBottom: '15px', overflowAnchor: 'none' }}>
                 <motion.div
                   onClick={() => handleQueryClick(index)}
                   whileHover={{ scale: 1.02 }}

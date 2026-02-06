@@ -933,9 +933,9 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
  {/* Description */}
             <p style={{
               // fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-              fontSize: isMobilePhone ? '1rem' : '1rem',
+       fontSize: isSmallPhone ? '1rem' : '1rem',
               color: 'rgba(255, 255, 255, 0.85)',
-              lineHeight: '1.3',
+              lineHeight: isSmallPhone ? '1.3' : '1.3',
               // marginTop: '-.5rem',
                  marginTop: '0.5rem',
             marginBottom: '2rem',
@@ -1084,8 +1084,8 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           <div style={{
             width: '100vw',
             minWidth: '100vw',
-            height: '100vh',
-            minHeight: '100vh',
+            height: isMobilePhone ? '100dvh' : '100vh',
+            minHeight: isMobilePhone ? '100dvh' : '100vh',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -1098,10 +1098,10 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             <div
               style={{
                 position: 'absolute',
-                top: isMobilePhone ? '7%' : 0,
+                top: isMobilePhone ? '30%' : 0,
                 left: 0,
                 width: '100%',
-                height: '100%',
+                height: isMobilePhone ? '68%' : '100%',
                 zIndex: 0,
               }}
               onTouchStart={(e) => e.stopPropagation()}
@@ -1174,7 +1174,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               // padding: '0 1rem',
             }}>
 
-    The RL80 token is your safe-haven micro-asset, and name-sake token of 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙. Start with $5 and add the Patron Saint of Portfolios to your dashboard.
+    The RL80 token is your safe haven micro-asset, and name-sake token of 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙. Start with $5 and add the Patron Saint of Portfolios to your dashboard.
         </p>
             </div>
 
@@ -1216,7 +1216,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                 className="navigation-group"
                 style={{
                   position: 'absolute',
-                  bottom: '5%',
+                  bottom: '2%',
                   right: '2rem',
                   display: 'flex',
                   alignItems: 'center',
@@ -1875,9 +1875,9 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             {/* Description text */}
             <p style={{
               // fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-              fontSize: isTabletLandscape ? '0.95rem' : isTabletPortrait ? '0.9rem' : '1.1rem',
+            fontSize: isSmallPhone ? '1rem' : '1rem',
               color: 'rgba(255, 255, 255, 0.85)',
-              lineHeight: '1.4',
+              lineHeight: isSmallPhone ? '1.3' : '1.3',
               marginBottom: isTablet ? '1.5rem' : '2rem',
               maxWidth: '450px',
               textAlign: 'center'
@@ -2428,9 +2428,9 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
 
               <p style={{
                 // fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-                fontSize: isTabletLandscape ? '1rem' : isTabletPortrait ? '1rem' : '1.1rem',
-                color: 'rgba(255, 255, 255, 0.85)',
-                lineHeight: '1.3',
+     fontSize: isSmallPhone ? '1rem' : '1rem',
+              color: 'rgba(255, 255, 255, 0.85)',
+              lineHeight: isSmallPhone ? '1.3' : '1.3',
                 marginTop: '0',
                 // marginBottom: isTablet ? '1.5rem' : '2rem',
                 maxWidth: '20rem',

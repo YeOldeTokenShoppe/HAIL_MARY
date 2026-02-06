@@ -1434,7 +1434,7 @@ useEffect(() => {
             style={{
               position: "fixed",
               bottom: "30px",
-              right: "30px",
+              right: "3rem",
               width: "80px",
               height: "80px",
               zIndex: 297,
@@ -1458,11 +1458,11 @@ useEffect(() => {
             }}
           >
             <img 
-              src="/images/tiger.webp"
+              src="/images/tigerChat.webp"
               alt="Tiny Candle Button"
               style={{
-                width: "100%",
-                height: "100%",
+                width: "9rem",
+                height: "auto",
                 objectFit: "contain",
               }}
             />

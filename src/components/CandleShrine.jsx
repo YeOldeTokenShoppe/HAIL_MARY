@@ -1201,9 +1201,9 @@ export function GradientBackground({ is80sMode = false }) {
     side: THREE.BackSide,
     depthWrite: false,
   }), [])
-  
+
   if (is80sMode) return null
-  
+
   return (
     <mesh material={material}>
       <sphereGeometry args={[100, 32, 16]} />

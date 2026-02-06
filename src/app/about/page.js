@@ -198,7 +198,7 @@ export default function CarouselPage() {
       height: '100dvh',
       overflow: 'hidden',
       ...(is80sMode && isMobileDevice ? {
-        backgroundImage: 'url("/images/retro.webp")',
+        backgroundImage: 'url("/images/retro2.webp")',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat'
@@ -408,7 +408,7 @@ export default function CarouselPage() {
       <div style={{
         position: "absolute",
         top: "1rem",
-        right: "1rem",
+        right: "0.5rem",
         zIndex: 3,
         display: "flex",
         alignItems: "center",
@@ -445,6 +445,7 @@ export default function CarouselPage() {
             userImage={user?.imageUrl}
             onBuyClick={() => setShowBuyModal(true)}
             isMobile={isMobileDevice}
+            hideUserOnMobile={true}
           />
         )}
       </div>

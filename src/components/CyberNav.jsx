@@ -348,7 +348,7 @@ const CyberNav = ({
                         style={{
                           width: "100%",
                           height: "100%",
-                          objectFit: "cover",
+                          objectFit: "contain",
                           opacity: isActive ? 1 : 0.8,
                           filter: is80sMode && !isActive ? 'hue-rotate(270deg) saturate(1.5)' : 'none'
                         }}

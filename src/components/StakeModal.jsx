@@ -48,9 +48,9 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
   const isStakeSignedRef = useRef(false); // Track if stake was actually signed
   const lastTransactionRef = useRef(0); // For rate limiting
   
-  // Testnet contract has a 10-minute lock period by default
-  const LOCK_DURATION_MINUTES = 10;
-  const IS_TESTNET = true; // Flag to show testnet UI
+  // Production: 7-day lock period (10080 minutes)
+  const LOCK_DURATION_MINUTES = 10080;
+  const IS_TESTNET = false;
 
   // Reset form when modal opens
   useEffect(() => {
@@ -586,7 +586,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                     color: (successData?.isNewStake || !canWithdraw) ? '#ff6b6b' : '#00ff88'
                   }}>
                     {successData?.isNewStake
-                      ? `${LOCK_DURATION_MINUTES} min`
+                      ? '7 days'
                       : (canWithdraw ? t('stakeModal.activity.unlocked') : timeUntilUnlockFormatted)}
                   </div>
                 </div>
@@ -1117,7 +1117,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                     textTransform: 'uppercase',
                     letterSpacing: '1px'
                   }}>
-                    🔐 Testnet Mode
+                    🔐 Staking Active
                   </span>
                   <span style={{ 
                     color: 'rgba(255, 255, 255, 0.7)', 
@@ -1129,7 +1129,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                     color: 'rgba(255, 255, 255, 0.7)', 
                     fontSize: '0.75rem'
                   }}>
-                    10 minute lock period
+                    7 day lock period
                   </span>
                 </div>
                 <div style={{ 
@@ -1203,10 +1203,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
                     <span>{t('stakeModal.preview.amount')} <strong>{parseInt(stakeAmount).toLocaleString()} RL80</strong></span>
-                    <span>{t('stakeModal.preview.unlock')} <strong>{IS_TESTNET
-                      ? new Date(Date.now() + 10 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString()
-                    }</strong></span>
+                    <span>{t('stakeModal.preview.unlock')} <strong>{new Date(Date.now() + LOCK_DURATION_MINUTES * 60 * 1000).toLocaleDateString()}</strong></span>
                   </div>
                   <div style={{
                     fontSize: '0.6rem',
@@ -1308,9 +1305,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                       // Show success immediately with optimistic update
                       setSuccessData({
                         amount: parseInt(stakeAmount),
-                        unlockTime: IS_TESTNET
-                          ? new Date(Date.now() + LOCK_DURATION_MINUTES * 60 * 1000)
-                          : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                        unlockTime: new Date(Date.now() + LOCK_DURATION_MINUTES * 60 * 1000),
                         txHash: result.transactionHash,
                         optimisticStakedAmount: (parseFloat(stakedBalance || 0) + parseInt(stakeAmount)).toString(),
                         isNewStake: true // Flag to show tokens as locked immediately
@@ -1486,9 +1481,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                               // setTransactionStatus('success');
                               setSuccessData({
                                 amount: parseInt(stakeAmount),
-                                unlockTime: IS_TESTNET
-                                  ? new Date(Date.now() + LOCK_DURATION_MINUTES * 60 * 1000)
-                                  : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+                                unlockTime: new Date(Date.now() + LOCK_DURATION_MINUTES * 60 * 1000),
                                 txHash: stakeResult.transactionHash || stakeResult.hash,
                                 optimisticStakedAmount: (parseFloat(stakedBalance || 0) + parseInt(stakeAmount)).toString(),
                                 isNewStake: true // Flag to show tokens as locked immediately
