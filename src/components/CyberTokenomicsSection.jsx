@@ -12,7 +12,7 @@ import {
 // Register Chart.js components
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-const CONTRACT_ADDRESS = "0x3841c83409714e0ba0ea33444a0d4354da19a084";
+const CONTRACT_ADDRESS = "0x30D01555d88c76500a82754A1D53cAc082A6CB75";
 
 export default function CyberTokenomicsSection({ isMobile }) {
   const [activeCard, setActiveCard] = useState(null);

@@ -1295,7 +1295,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                   onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.15) rotate(-5deg)'; e.currentTarget.style.filter = 'drop-shadow(0 0 20px #ff9500)'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1) rotate(0deg)'; e.currentTarget.style.filter = 'none'; }}
                 >
-                  <img src="/images/COIN_TATTOO.webp" alt="Navigate to Tokenomics" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                  <img src="/images/DIAMOND_TATTOO2.webp" alt="Navigate to Tokenomics" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                 </div>
               </div>
             )}
@@ -2309,7 +2309,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                 }}
               >
                 <img
-                  src="/images/COIN_TATTOO.webp"
+                  src="/images/DIAMOND_TATTOO2.webp"
                   alt="Navigate to Tokenomics"
                   style={{
                     width: '100%',

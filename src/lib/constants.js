@@ -1,10 +1,10 @@
 import { getContract, defineChain, createThirdwebClient } from "thirdweb";
-import { sepolia, mainnet } from "thirdweb/chains";
+import { base, mainnet } from "thirdweb/chains";
 import { ethereum } from "thirdweb/chains";
 export const CHAIN2 = defineChain(mainnet);
-export const CHAIN = defineChain(sepolia);
+export const CHAIN = defineChain(base);
 
-const CONTRACT_ADDRESS = "0x3841c83409714e0ba0ea33444a0d4354da19a084";
+const CONTRACT_ADDRESS = "0x30D01555d88c76500a82754A1D53cAc082A6CB75";
 export const abi = [
   [{"inputs":[{"internalType":"address","name":"_token","type":"address"},{"internalType":"address","name":"_rewardsSplitter","type":"address"},{"internalType":"address","name":"_stakingContract","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"OwnableInvalidOwner","type":"error"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"OwnableUnauthorizedAccount","type":"error"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"staking","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"ETHSentToStaking","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"simulator","type":"address"},{"indexed":false,"internalType":"uint256","name":"taxAmount","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"ethEquivalent","type":"uint256"}],"name":"TradingSimulated","type":"event"},{"inputs":[],"name":"SIMULATED_TAX_AMOUNT","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"SIMULATION_COOLDOWN","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"emergencyWithdraw","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"fundSimulator","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"fundWithETH","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"injectRewardsToStaking","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"lastSimulation","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"rewardsSplitter","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"simulateTrade","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"simulatorStatus","outputs":[{"internalType":"uint256","name":"tokenBalance","type":"uint256"},{"internalType":"uint256","name":"ethBalance","type":"uint256"},{"internalType":"uint256","name":"simulationsAvailable","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"stakingContract","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"token","outputs":[{"internalType":"contract OurLadyOfPerpetualProfit","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"stateMutability":"payable","type":"receive"}],
 ];
@@ -15,6 +15,6 @@ export const client = createThirdwebClient({ clientId: CLIENT_ID });
 
 export const CONTRACT = getContract({
   client: client,
-  chain: defineChain(sepolia),
-  address: "0x3841c83409714e0ba0ea33444a0d4354da19a084",
+  chain: defineChain(base),
+  address: "0x30D01555d88c76500a82754A1D53cAc082A6CB75",
 });

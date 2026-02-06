@@ -1,5 +1,5 @@
 // Test wallets for non-crypto native users
-// These wallets should be pre-funded with RL80 tokens on Base Sepolia
+// These wallets should be pre-funded with RL80 tokens on Base
 
 // IMPORTANT: Update these email addresses with your actual testers
 export const AUTHORIZED_TEST_EMAILS = [

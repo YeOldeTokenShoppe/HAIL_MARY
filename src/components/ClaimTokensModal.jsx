@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { ClaimButton } from 'thirdweb/react';
-import { baseSepolia } from 'thirdweb/chains';
+import { base } from 'thirdweb/chains';
 import { client } from '@/lib/constants';
 import { useActiveAccount } from 'thirdweb/react';
 
@@ -174,7 +174,7 @@ const ClaimTokensModal = ({ isOpen, onClose, walletAddress }) => {
           
           <p className="modal-description">
             These test tokens allow you to participate in the shrine by lighting candles. 
-            Each claim gives you 100 RL80 tokens on Base Sepolia testnet.
+            Each claim gives you 100 RL80 tokens on Base.
           </p>
 
           <div className="claim-button-wrapper">
@@ -215,7 +215,7 @@ const ClaimTokensModal = ({ isOpen, onClose, walletAddress }) => {
                 )}
                 <ClaimButton
                   contractAddress="0x71e90d43a3f00b02d140d5c714422e8eb78459fa"
-                  chain={baseSepolia}
+                  chain={base}
                   client={client}
                   claimParams={{
                     type: "ERC20",
@@ -267,7 +267,7 @@ const ClaimTokensModal = ({ isOpen, onClose, walletAddress }) => {
 
           <div className="info-box">
             <p className="info-text">
-              ℹ️ Make sure you're connected to Base Sepolia network. 
+              ℹ️ Make sure you're connected to Base network. 
               The transaction will require a small amount of ETH for gas fees.
               <br /><br />
               ⚠️ If you see a popup blocker warning, please allow popups for this site to connect your wallet.

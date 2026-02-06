@@ -888,9 +888,9 @@
 					• RL80 tokens go directly to charity wallets<br>
 					• At ~$500 value, tokens convert to ETH<br>
 					• ETH forwarded via <a href="https://thegivingblock.com" target="_blank" style="color: #FFD700; text-decoration: underline;">The Giving Block</a><br><br>
-					<strong style="color: #FFD700;">Charity Wallets (Base Sepolia):</strong><br>
-					🏥 <a href="https://sepolia.basescan.org/address/0xbAC39697250cDF6A808Bd39D2D1828388DF87967" target="_blank" style="color: #00e572; text-decoration: underline;">St. Jude's</a><br>
-					🐾 <a href="https://sepolia.basescan.org/address/0xF9EAdD659e730BbC05f4BFfe618A98fB0b910fDD" target="_blank" style="color: #00e572; text-decoration: underline;">ASPCA</a><br><br>
+					<strong style="color: #FFD700;">Charity Wallets (Base):</strong><br>
+					🏥 <a href="https://basescan.org/address/0xbAC39697250cDF6A808Bd39D2D1828388DF87967" target="_blank" style="color: #00e572; text-decoration: underline;">St. Jude's</a><br>
+					🐾 <a href="https://basescan.org/address/0xF9EAdD659e730BbC05f4BFfe618A98fB0b910fDD" target="_blank" style="color: #00e572; text-decoration: underline;">ASPCA</a><br><br>
 					<span style="font-size: 9px; opacity: 0.8;">All transactions visible on-chain for full transparency.</span>
 				</span>
 				<span class="desktop-text" style="font-size: 12px; line-height: 1.6;">
@@ -898,9 +898,9 @@
 					• RL80 tokens are sent directly to charity wallets held by 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙<br>
 					• When pool value reaches ~$500, tokens are converted to ETH<br>
 					• ETH is forwarded to charities via <a href="https://thegivingblock.com" target="_blank" style="color: #FFD700; text-decoration: underline;">The Giving Block</a><br><br>
-					<strong style="color: #FFD700;">Verify Charity Wallets (Base Sepolia):</strong><br>
-					🏥 <a href="https://sepolia.basescan.org/address/0xbAC39697250cDF6A808Bd39D2D1828388DF87967" target="_blank" style="color: #00e572; text-decoration: underline;">St. Jude's Children's Research Hospital</a><br>
-					🐾 <a href="https://sepolia.basescan.org/address/0xF9EAdD659e730BbC05f4BFfe618A98fB0b910fDD" target="_blank" style="color: #00e572; text-decoration: underline;">ASPCA</a><br><br>
+					<strong style="color: #FFD700;">Verify Charity Wallets (Base):</strong><br>
+					🏥 <a href="https://basescan.org/address/0xbAC39697250cDF6A808Bd39D2D1828388DF87967" target="_blank" style="color: #00e572; text-decoration: underline;">St. Jude's Children's Research Hospital</a><br>
+					🐾 <a href="https://basescan.org/address/0xF9EAdD659e730BbC05f4BFfe618A98fB0b910fDD" target="_blank" style="color: #00e572; text-decoration: underline;">ASPCA</a><br><br>
 					<span style="font-size: 10px; opacity: 0.8;">All transactions are recorded on-chain for complete transparency. Click wallet links to verify donations on BaseScan.</span>
 				</span>
 			</div>
@@ -1497,7 +1497,6 @@
 			}
 
 			function triggerCelebration(charity) {
-				console.log('[Celebration] Triggering celebration for:', charity);
 
 				const flash = document.getElementById('goldenFlash');
 				const banner = document.getElementById('thankYouBanner');
@@ -1592,7 +1591,6 @@
 						}
 					});
 					illumin80Cache.loaded = true;
-					console.log('Illumin80 users loaded:', illumin80Cache.userIds.size);
 				} catch (err) {
 					console.warn('Failed to load Illumin80 users:', err);
 				}
@@ -1734,7 +1732,7 @@
 				// Add click handler to open BaseScan transaction
 				if (donation.txHash) {
 					toast.addEventListener('click', () => {
-						window.open(`https://sepolia.basescan.org/tx/${donation.txHash}`, '_blank');
+						window.open(`https://basescan.org/tx/${donation.txHash}`, '_blank');
 					});
 					toast.title = 'Click to view transaction on BaseScan';
 				}
@@ -1997,7 +1995,6 @@
 		<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
 		<script type="module">
-			console.log('Fountain module script starting...');
 			
 			import * as THREE from 'three';
 			import Stats from 'three/addons/libs/stats.module.js';
@@ -2013,7 +2010,6 @@
 			import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 			import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 			
-			console.log('Fountain imports successful!');
 
 			// --- Coin Material and Geometry (moved up for Firebase functions) ---
 			const baseCoinMaterial = new THREE.MeshStandardMaterial({
@@ -2153,11 +2149,9 @@
 						
 						// Check if we need to reset the fountain
 						if (totalCoinCount >= RESET_THRESHOLD && !isResetting) {
-							console.log('Fountain full (real-time update)! Archiving and resetting...');
 							archiveAndResetFountain();
 						}
 						
-						console.log('Real-time update: Total coins =', totalCoinCount);
 					},
 					(error) => {
 						console.error('Error with real-time listener:', error);
@@ -2204,7 +2198,6 @@
 
 							// Show toast for NEW donations (not on initial load)
 							if (!isFirstSnapshot && !previousDonationIds.has(doc.id)) {
-								console.log('[Toast] New donation detected:', donationWithId);
 								showNewDonationToast(donationWithId);
 							}
 						});
@@ -2227,7 +2220,6 @@
 						// Update the display
 						updateCoinCounter();
 
-						console.log('Real-time donation update: Total RL80 =', totalRL80Donated, 'By charity:', rl80ByCharity, 'Donations:', allDonations.length);
 					},
 					(error) => {
 						console.error('Error with donation listener:', error);
@@ -2237,10 +2229,8 @@
 
 			// Archive and reset the fountain
 			async function archiveAndResetFountain() {
-				console.log('archiveAndResetFountain called, isResetting:', isResetting, 'totalCoinCount:', totalCoinCount);
 				
 				if (isResetting) {
-					console.log('Already resetting, skipping...');
 					return; // Prevent multiple resets
 				}
 				
@@ -2251,7 +2241,6 @@
 				}
 				
 				try {
-					console.log('Sending archive request to API...');
 					const response = await fetch('/api/archive-fountain-coins', {
 						method: 'POST',
 						headers: {
@@ -2260,10 +2249,8 @@
 					});
 					
 					const data = await response.json();
-					console.log('Archive response:', response.status, data);
 					
 					if (response.ok) {
-						console.log('Fountain archived successfully:', data);
 						
 						// Update collected count
 						collectedCoinCount = data.cumulativeTotal || (collectedCoinCount + data.archivedCount);
@@ -2354,7 +2341,6 @@
 				staticCoinInstancedMesh.renderOrder = 99;
 				scene.add(staticCoinInstancedMesh);
 				
-				console.log(`Created instanced mesh with ${instanceCount} coins`);
 			}
 			
 			// --- Firebase Configuration and Initialization ---
@@ -2388,7 +2374,6 @@
 					coinsCollection = db.collection('fountain_coins');
 					donationsCollection = db.collection('fountain_donations');
 
-					console.log("Firebase initialized successfully");
 
 					// Load collected total first
 					await loadCollectedTotal();
@@ -2429,9 +2414,7 @@
 						isInUpperBowl: coinData.isInUpperBowl || false,
 						charity: coinData.charity || null
 					});
-					console.log("Coin saved with ID: ", docRef.id);
 					if (coinData.charity) {
-						console.log("Supporting charity:", coinData.charity);
 					}
 					return docRef.id;
 				} catch (error) {
@@ -2458,9 +2441,7 @@
 					updateCoinCounter();
 					
 					// Check if we need to reset the fountain on load
-					console.log('Checking fountain status - Count:', totalCoinCount, 'Threshold:', RESET_THRESHOLD);
 					if (totalCoinCount >= RESET_THRESHOLD && !isResetting) {
-						console.log('Fountain has ' + totalCoinCount + ' coins (threshold: ' + RESET_THRESHOLD + ') - triggering reset...');
 						await archiveAndResetFountain();
 						return; // Don't load coins since we're resetting
 					}
@@ -2496,7 +2477,6 @@
 					// Create instanced mesh for all static coins
 					createStaticCoinInstances();
 					
-					console.log(`Total coins in fountain: ${totalCoinCount}, Rendering: ${Math.min(staticCoinData.length, MAX_STATIC_COINS)}`);
 				} catch (error) {
 					console.error("Error loading saved coins: ", error);
 				}
@@ -2825,7 +2805,6 @@
 						pointTexture: { value: new THREE.TextureLoader().load('/images/cloud.png', 
 							() => {
 								assetsToLoad.cloudTexture = true;
-								console.log('[Fountain] Cloud texture loaded');
 								checkAllAssetsLoaded();
 							},
 							undefined,
@@ -2976,11 +2955,9 @@
 			function checkAllAssetsLoaded() {
 				const loadedAssets = Object.entries(assetsToLoad).filter(([key, value]) => value === true);
 				const totalAssets = Object.keys(assetsToLoad).length;
-				console.log(`[Fountain] Assets loaded: ${loadedAssets.length}/${totalAssets}`, assetsToLoad);
 				
 				const allLoaded = Object.values(assetsToLoad).every(loaded => loaded === true);
 				if (allLoaded && !hasCheckedModelLoading) {
-					console.log('[Fountain] ✅ All assets loaded successfully, hiding loader and sending ready signal');
 					hideLoader();
 					hasCheckedModelLoading = true;
 					// Start cinematic camera animation
@@ -3022,7 +2999,6 @@
 			}
 			
 			function startCinematicIntro() {
-				console.log('[Fountain] Starting cinematic camera intro');
 				
 				// Hide UI elements during intro
 				const elementsToHide = [
@@ -3078,7 +3054,6 @@
 						requestAnimationFrame(animateCamera);
 					} else {
 						// Animation complete, enable controls
-						console.log('[Fountain] Cinematic intro complete, enabling controls');
 						controls.enabled = true;
 						controls.update();
 						
@@ -3113,7 +3088,6 @@
 				// Notify parent window that fountain is fully loaded
 				if (window.parent !== window) {
 					window.parent.postMessage({ type: 'fountainReady' }, '*');
-					console.log('[Fountain] Sent fountainReady message to parent');
 				}
 			}
 
@@ -3121,7 +3095,6 @@
 
 			// Cleanup function for memory management
 			function cleanup() {
-				console.log('Cleaning up fountain resources...');
 				
 				// Stop animation
 				if (renderer) {
@@ -3341,7 +3314,6 @@
 						e.stopPropagation();
 						selectedCharity = e.currentTarget.getAttribute('data-charity');
 						const charityName = e.currentTarget.textContent.trim();
-						console.log('Charity selected:', selectedCharity);
 						
 						// Update button text to show selected charity
 						if (tossCoinButton3D) {
@@ -3441,7 +3413,6 @@
 						}
 						// Handle donation completion - let user aim, then toss
 						else if (event.data.type === 'donationComplete') {
-							console.log('[Fountain] Donation completed, waiting for user to aim...', event.data.donation);
 							selectedCharity = event.data.donation?.charity || 'donation';
 
 							// Store pending toss and wait for user to click water
@@ -3538,12 +3509,10 @@
                 // Handle WebGL context loss (important for mobile stability)
                 renderer.domElement.addEventListener('webglcontextlost', function(event) {
                     event.preventDefault();
-                    console.log('WebGL context lost - attempting recovery');
                     cancelAnimationFrame(animationId);
                 }, false);
                 
                 renderer.domElement.addEventListener('webglcontextrestored', function() {
-                    console.log('WebGL context restored');
                     init(); // Reinitialize the scene
                 }, false);
                 
@@ -3564,7 +3533,6 @@
 
 				const env = await rgbeLoader.loadAsync( 'venice_sunset_1k.hdr' ).then(
 					(texture) => {
-						console.log('[Fountain] Venice sunset environment map loaded');
 						assetsToLoad.envMap = true;
 						checkAllAssetsLoaded();
 						return texture;
@@ -3574,7 +3542,6 @@
 						// Fallback to the original sunrise HDR
 						return rgbeLoader.loadAsync( 'blouberg_sunrise_2_1k.hdr' ).then(
 							(texture) => {
-								console.log('[Fountain] Fallback environment map loaded');
 								assetsToLoad.envMap = true;
 								checkAllAssetsLoaded();
 								return texture;
@@ -3649,7 +3616,6 @@
 				dracoLoader.setDecoderPath('/draco/'); // Path to DRACO decoder files
 				loader.setDRACOLoader(dracoLoader);
 				
-				console.log('[Fountain] Starting to load model: /models/fountain2.glb with DRACO compression');
 				
 				// Add timeout for model loading
 				let modelLoadTimeout = setTimeout(() => {
@@ -3669,18 +3635,14 @@
                 const fallHeight = 0.94; // Match the height from the SDF (bowl bottom to top water level approx)
                 const fallSegments = 64; // Resolution
 
-                // console.log("Searching for GoldCoin in model...");
                 let goldCoin = null;
                 // Log the full model structure to see all available objects
-                console.log("=== SCANNING MODEL FOR RAYBANS ===");
                 let totalNodes = 0;
                 fountainModel.traverse(function(node) {
                     totalNodes++;
                     if (node.name) {
-                        console.log(`Node: ${node.name} (${node.type})`);
                     }
                 });
-                console.log(`Total nodes in model: ${totalNodes}`);
                 
                 fountainModel.traverse(function(node) {
                     // Log all nodes to help identify object names
@@ -3689,13 +3651,11 @@
                         if (node.name.toLowerCase().includes('ray') || 
                             node.name.toLowerCase().includes('sun') || 
                             node.name.toLowerCase().includes('glass')) {
-                            console.log("⚠️ Potential Raybans/Sunglasses:", node.name, node.type, node.material ? "has material" : "no material");
                         }
                     }
                     
                     // Check for Neon objects
                     if (node.name && node.name.startsWith('Neon')) {
-                        console.log("Found Neon object:", node.name);
                         neonObjects.push(node);
                         // Set visibility based on current 80s mode state
                         node.visible = is80sMode;
@@ -3703,7 +3663,6 @@
                     
                     // Check for Raybans objects (case-insensitive, partial match)
                     if (node.name && (node.name.toLowerCase().includes('rayban') || node.name.toLowerCase().includes('sunglasses'))) {
-                        console.log("Found Raybans/Sunglasses object:", node.name, "Type:", node.type);
                         raybansObjects.push(node);
                         node.visible = is80sMode; // Only visible if already in 80s mode
                         node.userData.isRaybans = true; // Mark for later reference
@@ -3712,7 +3671,6 @@
                     // Force GoldCoin objects to match dynamic coin appearance in normal mode
                     if (node.name && (node.name.includes('GoldCoin') || 
                         node.name.startsWith('GoldCoin'))) {
-                        console.log(`Found gold object: ${node.name}`);
                         if (node.material && !is80sMode) {
                             node.material.color = new THREE.Color(0xcebb43);
                             node.material.emissive = new THREE.Color(0x000000);
@@ -3725,13 +3683,6 @@
                     
                     // Look for GoldCoin by name (case insensitive to be safe)
                     if (node.name.toLowerCase().includes("coin") || node.name.toLowerCase().includes("gold")) {
-                        // console.log("FOUND POTENTIAL COIN OBJECT:", node.name);
-                        // console.log("Position:", node.position);
-                        // console.log("Rotation:", node.rotation);
-                        // console.log("Scale:", node.scale);
-                        // console.log("Visible:", node.visible);
-                        // console.log("Full details:", node);
-                        
                         // Store a reference
                         goldCoin = node;
                         
@@ -3780,7 +3731,6 @@
                 fallingWaterMesh.receiveShadow = true; // Or false if preferred
 
                 scene.add(fallingWaterMesh);
-                console.log("Falling water cylinder added.");
 
 						// --- Adjust position, scale, rotation as needed ---
 						// Center it roughly where the water is
@@ -3813,23 +3763,15 @@
 									child.material.opacity = 1.0;
 									child.material.transparent = false;
 									// Log material info
-									console.log(`Mesh ${meshCount}:`, child.name, 'Material type:', child.material.type);
 								}
 							}
 						} );
-						console.log(`Total meshes found in model: ${meshCount}`);
 
 						scene.add( fountainModel );
-						console.log("Fountain model loaded and added.");
-						console.log("Model position:", fountainModel.position);
-						console.log("Model scale:", fountainModel.scale);
-						console.log("Model visible:", fountainModel.visible);
 						
 						// Calculate bounding box to see actual size
 						const box = new THREE.Box3().setFromObject(fountainModel);
 						const size = box.getSize(new THREE.Vector3());
-						console.log("Model bounding box size:", size);
-						console.log("Model bounding box:", box);
 						
 						// Mark model as loaded
 						fountainModelLoaded = true;
@@ -3841,7 +3783,6 @@
 					function ( xhr ) {
 						if (xhr.total > 0) {
 							const percentLoaded = (xhr.loaded / xhr.total * 100).toFixed(1);
-							console.log(`[Fountain] DRACO model loading: ${percentLoaded}% (${(xhr.loaded / 1024 / 1024).toFixed(2)}MB / ${(xhr.total / 1024 / 1024).toFixed(2)}MB)`);
 						}
 					},
 					// Called when loading has errors
@@ -3919,13 +3860,11 @@
 				isLoading = false;
 				
 				// Check if all assets are already loaded (in case they loaded synchronously or very quickly)
-				console.log('[Fountain] Initial asset check:', assetsToLoad);
 				checkAllAssetsLoaded();
 				
 				// Keep a reasonable fallback timer just in case
 				setTimeout(() => {
 					if (!hasCheckedModelLoading) {
-						console.log('[Fountain] Fallback timer - checking assets:', assetsToLoad);
 						// Force all assets as loaded if still waiting
 						Object.keys(assetsToLoad).forEach(key => {
 							if (!assetsToLoad[key]) {
@@ -4117,7 +4056,6 @@
 				// IMPORTANT: Replace 'path/to/your/fountain_mask.png' with the actual path
 				const alphaMaskTexture = textureLoader.load('/images/octagon.png',
 					(texture) => {
-						console.log("Alpha mask loaded successfully.");
 						assetsToLoad.alphaMask = true;
 						checkAllAssetsLoaded();
 						// Optional: Configure texture wrapping/filtering if needed
@@ -4490,7 +4428,6 @@
 			
 			function toggle80sMode(enabled) {
 				is80sMode = enabled;
-				console.log('80s Mode:', enabled);
 				
 				if (enabled) {
 					enable80sMode();
@@ -4528,7 +4465,6 @@
 				
 				// Show Raybans objects from the model
 				raybansObjects.forEach(obj => {
-					console.log("Enabling Raybans visibility for:", obj.name);
 					obj.visible = true;
 				});
 				
@@ -4647,7 +4583,6 @@
 				
 				// Hide Raybans objects from the model
 				raybansObjects.forEach(obj => {
-					console.log("Disabling Raybans visibility for:", obj.name);
 					obj.visible = false;
 				});
 			}
@@ -4803,7 +4738,6 @@
 				const pointerY = - ( event.clientY / dom.clientHeight ) * 2 + 1;
 				const currentPointerCoords = new THREE.Vector2(pointerX, pointerY); // Use temporary vector for this event
 				
-				console.log("[Pointer Down] Event Coords:", currentPointerCoords.x.toFixed(2), currentPointerCoords.y.toFixed(2));
 
 				raycaster.setFromCamera( currentPointerCoords, camera ); 
 
@@ -4828,22 +4762,17 @@
 					if (waterIntersects.length > 0) {
 						const firstHit = waterIntersects[0].object;
 						if (firstHit === meshRay || firstHit === upperMeshRay) {
-							console.log("[Pointer Down] Water interaction plane clicked.");
 							// Update both mouseCoords (for water effect) and aimedCoords (for coin aiming)
 							mouseCoords.copy(currentPointerCoords);
 							aimedCoords.copy(currentPointerCoords); // Save aimed position for coin tosses
 							hasAimed = true; // Mark that user has aimed
-							console.log(`[Pointer Down] Updated global mouseCoords: (${mouseCoords.x.toFixed(2)}, ${mouseCoords.y.toFixed(2)})`);
-							console.log(`[Pointer Down] Updated aimedCoords: (${aimedCoords.x.toFixed(2)}, ${aimedCoords.y.toFixed(2)})`);
 							mousedown = true; // Enable water disturbance via raycast() function
 							waterClicked = true;
 
 							// Optional: Log hit point for debugging water interaction itself
-							console.log("Water raycast successful on click at:", waterIntersects[0].point);
 
 							// If there's a pending donation toss, trigger it now that user has aimed
 							if (window.pendingDonationToss) {
-								console.log('[Fountain] User aimed - triggering pending donation coin toss!');
 								hideAimForDonationMessage();
 								window.pendingDonationToss = false;
 								// Small delay so user sees the water ripple first
@@ -4864,27 +4793,20 @@
 			}
             function onKeyDown( event ) {
                 if ( event.key.toLowerCase() === 'c' ) {
-                    console.log("'c' key pressed - Tossing coin");
                     triggerCoinToss(); // Use the refactored function
                 }
             }
 
             function triggerCoinToss(isLocalCoin = false) {
                 // Use the aimed coordinates (set when water was clicked) to determine target
-                console.log(`[Coin Toss] Using aimedCoords: (${aimedCoords.x.toFixed(2)}, ${aimedCoords.y.toFixed(2)})`); // Log coords
-                console.log(`[Coin Toss] Local coin: ${isLocalCoin}`);
                 raycaster.setFromCamera( aimedCoords, camera );
 
                 // Raycast towards the invisible water plane (meshRay)
-                console.log(`[Coin Toss] Raycasting against meshRay at position: (${meshRay.position.x.toFixed(2)}, ${meshRay.position.y.toFixed(2)}, ${meshRay.position.z.toFixed(2)})`); // Log mesh position
-                console.log(`[Coin Toss] Camera position: (${camera.position.x.toFixed(2)}, ${camera.position.y.toFixed(2)}, ${camera.position.z.toFixed(2)})`); // Log camera position
 
                 const intersects = raycaster.intersectObject( meshRay );
-                console.log(`[Coin Toss] Intersection results count: ${intersects.length}`); // Log intersections count
 
                 if ( intersects.length > 0 ) {
                     const targetPoint = intersects[0].point; // Where the coin should land (approx)
-                    console.log(`[Coin Toss] Target point determined: (${targetPoint.x.toFixed(2)}, ${targetPoint.y.toFixed(2)}, ${targetPoint.z.toFixed(2)})`);
 
                     // --- Calculate Starting Position & Velocity ---
                     // Start slightly above and in front of the camera, aimed towards the target
@@ -4907,7 +4829,6 @@
                     createCoin(startPosition, initialVelocity, isLocalCoin);
 
                 } else {
-                    console.log("[Coin Toss] Cannot determine target point for coin toss.");
                 }
             }
         
@@ -4933,7 +4854,6 @@
                 // Hide UI elements for cinematic view
                 hideUIForCinematic();
                 
-                console.log('[Camera] Starting to follow coin');
             }
             
             function hideUIForCinematic() {
@@ -5039,7 +4959,6 @@
                         
                         if (coinPos.y < waterLevel + 0.2 && coinVel.y < 0) {
                             cameraPhase = 'impact';
-                            console.log('[Camera] Transitioning to impact view');
                         }
                         break;
                         
@@ -5061,7 +4980,6 @@
                         if (followedCoin.userData.underwater) {
                             cameraPhase = 'underwater';
                             underwaterStartTime = Date.now();
-                            console.log('[Camera] Coin entered water, switching to underwater view');
                         }
                         break;
                         
@@ -5087,7 +5005,6 @@
                         if (followedCoin.userData.stopped && Date.now() - underwaterStartTime > 4000) {
                             cameraPhase = 'returning';
                             cameraReturnTimer = 0;
-                            console.log('[Camera] Starting return to original position');
                         }
                         break;
                         
@@ -5118,7 +5035,6 @@
                             // Show UI elements again
                             showUIAfterCinematic();
                             
-                            console.log('[Camera] Returned to original position');
                         }
                         break;
                 }
@@ -5164,9 +5080,8 @@
                 coin.renderOrder = 99; // Extremely high render order to ensure it renders last
                 scene.add( coin );
                 coins.push( coin );
-                console.log(`${isLocalCoin ? 'Local' : 'Real'} coin created at`, startPosition.x.toFixed(2), startPosition.y.toFixed(2), startPosition.z.toFixed(2), "with velocity", initialVelocity.x.toFixed(2), initialVelocity.y.toFixed(2), initialVelocity.z.toFixed(2) );
                 if (!isLocalCoin && selectedCharity) {
-                    console.log(`Coin will support: ${selectedCharity}`);
+
                 }
                 
                 // Initiate camera follow for this coin
@@ -5191,7 +5106,6 @@
 				if (coinCamToggle) {
 					coinCamToggle.addEventListener('change', function(e) {
 						coinCamEnabled = e.target.checked;
-						console.log('[Coin Cam] Camera follow is now', coinCamEnabled ? 'enabled' : 'disabled');
 					});
 				}
 			}, 100);
@@ -5361,7 +5275,6 @@
                             // If directly above and close enough (using actual coin dimensions)
                             // COIN_RADIUS = 0.04, COIN_THICKNESS = 0.01
                             if (hDist < 0.08 && dy > 0 && dy < 0.05 && velocity.y <= 0) {
-                                console.log(`COLLISION! Stacking coin ${i} on coin ${j}! hDist=${hDist.toFixed(3)}, dy=${dy.toFixed(3)}`);
                                 coin.position.y = other.position.y + 0.01; // Use actual thickness
                                 velocity.y = 0;
                                 // Force coin to lie flat when stacking
@@ -5369,7 +5282,6 @@
                                 coin.rotation.y = 0;
                                 coin.rotation.z = Math.random() * Math.PI * 2; // Random rotation on flat plane
                                 if (coin.userData.underwater) {
-                                    console.log(`Coin ${i} stopped on coin ${j}`);
                                     coin.userData.stopped = true;
                                     velocity.set(0,0,0);
                                 }
@@ -5446,7 +5358,6 @@
                             
                             // If we hit something within our travel distance
                             if (intersects.length > 0 && intersects[0].distance < distanceToTravel + 0.01) {
-                                console.log("Coin hit fountain part:", intersects[0].object.name);
                                 
                                 // Get normal of the surface hit
                                 const surfaceNormal = intersects[0].face.normal.clone();
@@ -5526,9 +5437,7 @@
                                                 coin.userData.isStaticObstacle = true; // Mark as static obstacle
 
                                                 // Check if we've reached the reset threshold
-                                                console.log('Coin saved. Total count:', totalCoinCount, 'Threshold:', RESET_THRESHOLD);
                                                 if (totalCoinCount >= RESET_THRESHOLD && !isResetting) {
-                                                    console.log('Fountain full! Archiving and resetting...');
                                                     archiveAndResetFountain();
                                                 }
                                             }
@@ -5573,7 +5482,6 @@
                             const isFalling = velocity.y <= 0;
                             
                             if (isAbove && isOverlapping && isFalling) {
-                                console.log(`STACKING! Coin ${i} on coin ${j}: hDist=${horizontalDist.toFixed(3)}, vDist=${dy.toFixed(3)}`);
                                 
                                 // Place this coin exactly on top of the other
                                 nextPosition.y = otherPos.y + coinThickness;
@@ -5583,7 +5491,6 @@
                                 
                                 // If underwater, stop completely
                                 if (isUnderwater) {
-                                    console.log(`Coin ${i} stopping on coin ${j} underwater`);
                                     coin.userData.stopped = true;
                                     velocity.set(0, 0, 0);
                                     landedOnCoin = true;
@@ -5599,7 +5506,6 @@
                             }
                             // Prevent side collisions at same height
                             else if (Math.abs(dy) < coinThickness && horizontalDist < coinRadius * 2) {
-                                console.log(`SIDE COLLISION! Pushing coins ${i} and ${j} apart`);
                                 // Push apart horizontally
                                 if (horizontalDist > 0.001) {
                                     const pushFactor = (coinRadius * 2 - horizontalDist) / horizontalDist;
@@ -5658,7 +5564,6 @@
                                         
                                         // Force flat rotation
                                         coin.rotation.set(-Math.PI / 2, 0, Math.random() * Math.PI * 2);
-                                        console.log(`Coin stacked on static coin at height ${nextPosition.y}`);
                                         break;
                                     }
                                 }
@@ -5689,9 +5594,7 @@
                                         coin.userData.isStaticObstacle = true; // Mark as static obstacle
 
                                         // Check if we've reached the reset threshold
-                                        console.log('Coin saved (stacked). Total count:', totalCoinCount, 'Threshold:', RESET_THRESHOLD);
                                         if (totalCoinCount >= RESET_THRESHOLD && !isResetting) {
-                                            console.log('Fountain full! Archiving and resetting...');
                                             archiveAndResetFountain();
                                         }
                                     }
@@ -5716,13 +5619,11 @@
                         
                         // Trigger splash FIRST, then slow down
                         if (!isUnderwater && coin.position.y <= waterLevel && velocity.y < 0 && isInWaterArea) {
-                            console.log("Coin entered water at", coin.position.x.toFixed(2), coin.position.y.toFixed(2), coin.position.z.toFixed(2), "water level:", waterLevel, "in", isInUpperBowl ? "upper" : "lower", "bowl");
 
                             // --- Trigger Splash Immediately ---
                             const impactX = coin.position.x;
                             const impactZ = coin.position.z;
                             uniforms['mousePos'].value.set( impactX, impactZ );
-                            console.log("Setting splash at", impactX, impactZ);
 
                             if ( coinSplashTimeout !== null ) clearTimeout( coinSplashTimeout );
                             coinSplashTimeout = setTimeout( () => {
@@ -5743,7 +5644,6 @@
 
                         // --- Check for Reaching Bottom ---
                         if (isUnderwater && coin.position.y <= bottomDepth + 0.01) { // Check if close to or past bottom
-                             console.log(`Coin ${i} reached bottom at y=${coin.position.y.toFixed(3)}, stopping`);
                              coin.position.y = bottomDepth; // Settle exactly at bottom
                              coin.userData.stopped = true;
                              velocity.set(0, 0, 0); // Stop all movement
@@ -5778,9 +5678,7 @@
                                          coin.userData.isStaticObstacle = true; // Mark as static obstacle
 
                                          // Check if we've reached the reset threshold
-                                         console.log('Coin saved. Total count:', totalCoinCount, 'Threshold:', RESET_THRESHOLD);
                                          if (totalCoinCount >= RESET_THRESHOLD && !isResetting) {
-                                             console.log('Fountain full! Archiving and resetting...');
                                              archiveAndResetFountain();
                                          }
                                      }
@@ -5806,7 +5704,6 @@
                                 
                                 // If stuck for more than 0.5 seconds on the statue area (high up)
                                 if (coin.userData.stuckTimer > 0.5 && coin.position.y > 0.5) {
-                                    console.log("Coin stuck on statue, applying slide");
                                     // Apply a small random sideways velocity to make it slide off
                                     velocity.x += (Math.random() - 0.5) * 0.3;
                                     velocity.z += (Math.random() - 0.5) * 0.3;
@@ -5816,7 +5713,6 @@
                                 
                                 // If stuck for too long anywhere, just drop it
                                 if (coin.userData.stuckTimer > 2.0) {
-                                    console.log("Coin stuck too long, forcing drop");
                                     velocity.y = -1.0; // Force it to fall
                                     coin.userData.stuckTimer = 0;
                                 }
@@ -5827,7 +5723,6 @@
 
                     // --- Cleanup Check ---
                     if ( coin.position.y < -10 ) {
-                         console.log("Coin out of bounds, removing");
                          scene.remove( coin );
                          coins.splice( i, 1 );
                     }

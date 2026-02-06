@@ -12,7 +12,7 @@ import { inAppWallet } from "thirdweb/wallets/in-app";
 import { createWallet } from "thirdweb/wallets";
 import { db, collection, addDoc, serverTimestamp } from '@/lib/firebaseClient';
 
-const chain = defineChain(84532); // Base Sepolia
+const chain = defineChain(8453); // Base
 
 // Custom theme matching the donation modal style
 const donationWalletTheme = darkTheme({
@@ -149,19 +149,15 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
       const paddedDecimal = decPart.padEnd(decimals, '0').slice(0, decimals);
       const amountInWei = BigInt(intPart + paddedDecimal);
 
-      console.log('Amount calculation:', { amount, decimals, intPart, decPart, paddedDecimal, amountInWei: amountInWei.toString() });
 
       // Prepare the transfer transaction
       const transaction = tokenFunctions.transfer(charity.address, amountInWei);
-      console.log('Prepared transaction:', transaction);
-      console.log('Active account:', activeAccount);
 
       // Send the transaction using sendAndConfirmTransaction with the active account
       const result = await sendAndConfirmTransaction({
         transaction,
         account: activeAccount
       });
-      console.log('Transaction result:', result);
 
       // Get transaction hash from result
       const txHashValue = result?.transactionHash || result?.hash || '';
@@ -181,7 +177,7 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
           amountWei: amountInWei.toString(),
           txHash: txHashValue,
           timestamp: serverTimestamp(),
-          network: 'base-sepolia'
+          network: 'base'
         });
       } catch (firestoreError) {
         console.error('Error logging donation to Firestore:', firestoreError);
@@ -674,7 +670,7 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
 
               {txHash && (
                 <a
-                  href={`https://sepolia.basescan.org/tx/${txHash}`}
+                  href={`https://basescan.org/tx/${txHash}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{

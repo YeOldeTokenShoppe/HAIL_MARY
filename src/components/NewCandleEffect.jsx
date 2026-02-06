@@ -847,11 +847,9 @@ export const NewCandleEffectManager = forwardRef(({
     // Use stored position from offering if available (computed when candle was created)
     if (offering?.position) {
       target = [offering.position.x, offering.position.y, offering.position.z]
-      console.log('[NewCandleEffect] Using stored position:', target)
     } else {
       // Fallback: Generate target position in the visible landing zone
       // Camera is at [0, 0, 15] looking at origin
-      console.log('[NewCandleEffect] No stored position, generating random')
       const zone = isMobile ? EFFECT_LANDING_ZONE.mobile : EFFECT_LANDING_ZONE.desktop
       const side = Math.random() > 0.5 ? 1 : -1
       const targetX = side * (zone.x.min + Math.random() * (zone.x.max - zone.x.min))
@@ -872,7 +870,6 @@ export const NewCandleEffectManager = forwardRef(({
     // Trigger candle cloud ripple IMMEDIATELY when candle lands
     // Don't wait for React re-render → ArcticRingsEffect → onRingsStart chain
     // This fires in the same useFrame tick so the pulse starts next frame
-    console.log('[NewCandleEffect] handleEffectComplete fired, endPosition:', effectState.endPosition)
     onCandlePulse?.(effectState.endPosition)
 
     // Show burst at final position

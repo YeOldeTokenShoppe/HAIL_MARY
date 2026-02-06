@@ -713,7 +713,6 @@ Your safety matters more than platform convenience.
 
 Legal framework and compliance:
 
-• Platform registered in Oregon, United States
 • Terms of Service and Privacy Policy enforced
 • 18+ age requirement for all users
 • AI-generated content and financial disclaimers in effect
@@ -758,7 +757,6 @@ Key Terms:
 • User assumes all risks related to cryptocurrency
 • All sales and donations are final
 • We reserve the right to terminate accounts
-• Oregon state law governs all disputes
 • Binding arbitration for dispute resolution
 
 View full Terms of Service:

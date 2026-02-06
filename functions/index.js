@@ -277,7 +277,7 @@ const ownerPrivateKey = defineSecret("OWNER_PRIVATE_KEY");
 // Contract configuration
 const PREDICTION_MARKET_ADDRESS = "0x3e34244D9F9c6CD1Ad970Cf02247d74e5451818c";
 const THIRDWEB_CLIENT_ID = "cbae42251fe95b7e26a19a326b96ce5c";
-const CHAIN_ID = 84532; // Base Sepolia
+const CHAIN_ID = 8453; // Base
 
 // Oracle options for prediction markets
 const ORACLE_OPTIONS = [

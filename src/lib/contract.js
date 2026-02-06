@@ -28,14 +28,14 @@ const client = createThirdwebClient({
   clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || "cbae42251fe95b7e26a19a326b96ce5c",
 });
 
-// Define Base Sepolia chain (chainId: 84532)
-const chain = defineChain(84532);
+// Define Base chain (chainId: 8453)
+const chain = defineChain(8453);
 
 // ERC-20 contract instance
 export const erc20Contract = getContract({
   client,
   chain,
-  address: "0x3841c83409714e0ba0ea33444a0d4354da19a084",
+  address: "0x30D01555d88c76500a82754A1D53cAc082A6CB75",
 });
 
 // Export commonly used functions

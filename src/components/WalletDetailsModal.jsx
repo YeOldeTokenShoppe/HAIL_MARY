@@ -65,16 +65,10 @@ export function WalletDetailsModal({ onClose }) {
     try {
       setIsApproving(true);
       const amount = toWei(stakeAmount);
-      console.log('Manual approve - amount:', stakeAmount);
-      console.log('Manual approve - amount in wei:', amount.toString());
-      console.log('Manual approve - spender:', stakingContract.address);
-      console.log('Active account:', activeAccount);
       
       // Check actual balance first
       const balance = await tokenFunctions.getBalance(walletAddress);
-      console.log('Your actual RL80 balance:', balance.toString());
-      console.log('Amount you want to approve:', amount.toString());
-      console.log('Do you have enough?', BigInt(balance) >= BigInt(amount));
+
       
       if (BigInt(balance) < BigInt(amount)) {
         alert(`Insufficient RL80 balance. You have ${balance} but need ${amount}`);
@@ -83,7 +77,6 @@ export function WalletDetailsModal({ onClose }) {
       }
       
       const transaction = tokenFunctions.approve(stakingContract.address, amount);
-      console.log('Manual approve - transaction prepared:', transaction);
       
       setTransactionStatus('approving');
       
@@ -93,17 +86,14 @@ export function WalletDetailsModal({ onClose }) {
         account: activeAccount
       });
       
-      console.log('Transaction sent, waiting for confirmation...');
       setTransactionStatus('waiting');
       
       // Wait a bit for the transaction to be mined
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      console.log('Manual approve success:', result);
       
       // Re-check allowance
       const newAllowance = await tokenFunctions.getAllowance(walletAddress, stakingContract.address);
-      console.log('New allowance:', newAllowance.toString());
       
       if (BigInt(newAllowance) >= BigInt(amount)) {
         setNeedsApproval(false);
@@ -152,31 +142,24 @@ export function WalletDetailsModal({ onClose }) {
       try {
         setIsCheckingApproval(true);
         const amountInWei = toWei(stakeAmount);
-        console.log('Checking approval for amount:', stakeAmount);
-        console.log('Amount in wei:', amountInWei.toString());
         
         // Get the RL80 token address from staking contract
         const { stakingFunctions } = await import('@/lib/stakingContract');
         const rl80TokenAddress = await stakingFunctions.getRl80TokenAddress();
-        console.log('RL80 Token address from staking contract:', rl80TokenAddress);
-        console.log('HAIL Token address from contract.js:', (await import('@/lib/contract')).erc20Contract.address);
         
         // Check ETH balance for gas
         try {
           const { client, chain } = await import('@/lib/contract');
           const { getWalletBalance } = await import('thirdweb/wallets');
           // We'll just log this for debugging
-          console.log('Checking ETH balance for gas...');
         } catch (e) {
           console.error('Error checking ETH balance:', e);
         }
         
         // The staking contract expects RL80 tokens, but we need to check/approve our HAIL (ERC20) token
         const currentAllowance = await tokenFunctions.getAllowance(walletAddress, stakingContract.address);
-        console.log('Current allowance:', currentAllowance.toString());
         
         const userBalance = await tokenFunctions.getBalance(walletAddress);
-        console.log('User RL80 balance:', userBalance.toString());
         
         // Check if user has enough balance
         if (BigInt(userBalance) < BigInt(amountInWei)) {
@@ -316,11 +299,10 @@ export function WalletDetailsModal({ onClose }) {
               <TransactionButton
                 transaction={() => stakingTransactions.prepareWithdrawAll()}
                 onTransactionSent={() => {
-                  console.log("Withdraw transaction sent");
                   setTransactionStatus('waiting');
                 }}
                 onTransactionConfirmed={async (result) => {
-                  console.log("Withdraw successful");
+            
                   setTransactionStatus('confirmed');
 
                   // Save unstake to Firebase for activity feed
@@ -337,7 +319,6 @@ export function WalletDetailsModal({ onClose }) {
                       txHash: result?.transactionHash || null
                     };
                     await addDoc(collection(db, 'stakes'), unstakeData);
-                    console.log('Unstake saved to Firestore');
                   } catch (firestoreError) {
                     console.error('Error saving unstake to Firestore:', firestoreError);
                   }
@@ -411,7 +392,6 @@ export function WalletDetailsModal({ onClose }) {
                       txHash: result?.transactionHash || null
                     };
                     await addDoc(collection(db, 'stakes'), claimData);
-                    console.log('Claim saved to Firestore');
                   } catch (firestoreError) {
                     console.error('Error saving claim to Firestore:', firestoreError);
                   }
@@ -518,23 +498,19 @@ export function WalletDetailsModal({ onClose }) {
                   <TransactionButton
                     transaction={() => {
                       const amount = toWei(stakeAmount || '0');
-                      console.log('Approving amount:', stakeAmount);
-                      console.log('Approval amount in wei:', amount.toString());
-                      console.log('Spender address:', stakingContract.address);
                       // Use prepareApprove which returns the prepared transaction
                       return tokenFunctions.prepareApprove(stakingContract.address, amount);
                     }}
                     onTransactionSent={() => {
-                      console.log("Approval transaction sent");
                       setTransactionStatus('waiting');
                     }}
                     onTransactionConfirmed={async (receipt) => {
-                      console.log("Approval successful:", receipt);
+                
                       setTransactionStatus('confirmed');
                       // Re-check the allowance after approval
                       try {
                         const newAllowance = await tokenFunctions.getAllowance(walletAddress, stakingContract.address);
-                        console.log("New allowance after approval:", newAllowance.toString());
+
                         if (BigInt(newAllowance) >= BigInt(toWei(stakeAmount || '0'))) {
                           setNeedsApproval(false);
                         } else {
@@ -571,16 +547,11 @@ export function WalletDetailsModal({ onClose }) {
                   <TransactionButton
                     transaction={() => {
                       const amount = toWei(stakeAmount || '0');
-                      console.log('Staking amount:', stakeAmount);
-                      console.log('Staking amount in wei:', amount.toString());
-                      console.log('Staking contract address:', stakingContract.address);
                       return stakingTransactions.prepareStake(amount);
                     }}
                     onTransactionSent={(result) => {
-                      console.log("Stake transaction sent:", result);
                     }}
                     onTransactionConfirmed={async (receipt) => {
-                      console.log("Stake successful:", receipt);
                       setTransactionStatus('confirmed');
                       
                       // Wait 2 seconds showing confirmed
@@ -642,7 +613,7 @@ export function WalletDetailsModal({ onClose }) {
         {/* Explorer Link */}
         <div className="explorer-link">
           <a 
-            href={`https://sepolia.basescan.org/address/${walletAddress}`}
+            href={`https://basescan.org/address/${walletAddress}`}
             target="_blank"
             rel="noopener noreferrer"
           >

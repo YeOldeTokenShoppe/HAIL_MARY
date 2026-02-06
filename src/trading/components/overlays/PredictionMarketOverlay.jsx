@@ -19,7 +19,7 @@ import {
 } from '@/lib/contract';
 
 // Chain config for wallet connection
-const chain = defineChain(84532); // Base Sepolia
+const chain = defineChain(8453); // Base
 
 // Wallet options for prediction market
 const predictionWallets = [
@@ -663,8 +663,8 @@ const MarketCard = ({ market, onSelect, isSelected, walletAddress }) => {
   );
 };
 
-// RL80 Token address on Base Sepolia
-const RL80_TOKEN_ADDRESS = "0x3841c83409714e0ba0ea33444a0d4354da19a084";
+// RL80 Token address on Base
+const RL80_TOKEN_ADDRESS = "0x30D01555d88c76500a82754A1D53cAc082A6CB75";
 
 // Bet panel component - handles both binary and multi-option
 const BetPanel = ({ market, onClose, userId = 'anonymous', onBetPlaced }) => {

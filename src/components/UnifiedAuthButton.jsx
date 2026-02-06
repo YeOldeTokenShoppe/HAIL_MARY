@@ -7,7 +7,7 @@ import { client } from '@/lib/contract';
 import { defineChain } from "thirdweb/chains";
 import { inAppWallet } from "thirdweb/wallets/in-app";
 
-const chain = defineChain(84532); // Base Sepolia
+const chain = defineChain(8453); // Base
 
 export function UnifiedAuthButton() {
   const {
@@ -80,7 +80,6 @@ export function UnifiedAuthButton() {
             }}
             onConnect={(wallet) => {
               // Wallet is connected, it will auto-sync with Clerk via our provider
-              console.log('Wallet connected:', wallet.getAccount()?.address);
             }}
           />
         </div>
@@ -136,7 +135,6 @@ export function UnifiedAuthButton() {
               }
               onClick={() => {
                 // Open a modal or navigate to wallet page
-                console.log('Wallet details clicked');
               }}
             />
             {walletAddress && (

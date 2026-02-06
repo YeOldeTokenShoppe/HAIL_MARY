@@ -437,12 +437,10 @@ useEffect(() => {
       // Just one St. GR80 candle
       fetchedOfferings.push(...generateStGR80Candles(fetchedOfferings.length, 1))
 
-      console.log('[fetchOfferings] Setting offerings:', fetchedOfferings.length, 'total (', fetchedOfferings.filter(o => !o.isPlaceholder).length, 'users,', fetchedOfferings.filter(o => o.isPlaceholder).length, 'placeholders)')
       setOfferings(fetchedOfferings)
     } catch (error) {
       console.error('[fetchOfferings] Error fetching offerings:', error)
       // On error, show all St. GR80 candles
-      console.log('[fetchOfferings] Setting fallback St. GR80 candles')
       setOfferings(generateStGR80Candles(0, 80))
     } finally {
       setIsLoadingOfferings(false)
@@ -472,15 +470,12 @@ useEffect(() => {
 
         // Check if this is a new offering (not initial load and different from last)
         if (lastOfferingId && lastOfferingId !== latestDoc.id) {
-          console.log('[onSnapshot] New offering detected:', latestDoc.id)
 
           // Skip if THIS client already triggered the effect locally via handleLightCandle.
           // Using a local flag avoids identity-matching edge cases (null===null, same user
           // on multiple devices, etc.). Only the browser tab that lit the candle sets this flag.
           if (localCandleEffectActiveRef.current) {
-            console.log('[onSnapshot] Skipping effect - already triggered locally')
           } else {
-            console.log('[onSnapshot] Triggering NewCandleEffect for remote offering, position:', latestOffering.position)
             // Trigger the full candle flight + ripple + arctic rings effect
             if (unifiedShrineRef.current) {
               unifiedShrineRef.current.triggerCandleEffect(latestOffering)
@@ -1561,10 +1556,10 @@ useEffect(() => {
             }}
           >
             <img 
-              src="/images/tigerChat.webp"
+              src="/images/beast.webp"
               alt="Tiny Candle Button"
               style={{
-                width: "9rem",
+                width: "100%",
                 height: "auto",
                 objectFit: "contain",
               }}

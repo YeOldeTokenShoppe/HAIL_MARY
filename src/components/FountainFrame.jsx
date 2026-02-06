@@ -53,9 +53,7 @@ const FountainFrame = forwardRef(({ is80sMode = false, onFullyLoaded, onDonateCl
             { type: '80sMode', value: is80sMode },
             '*'
           );
-          console.log('Sent 80s mode state to iframe after load:', is80sMode);
         } catch (e) {
-          console.log('Could not send initial message to iframe:', e);
         }
       }, 100); // Small delay to ensure iframe is fully initialized
     }

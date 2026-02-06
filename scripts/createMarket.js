@@ -48,7 +48,7 @@ async function createMarket() {
 
   // Initialize client
   const client = createThirdwebClient({ clientId: THIRDWEB_CLIENT_ID });
-  const chain = defineChain(84532); // Base Sepolia
+  const chain = defineChain(8453); // Base
 
   // Get account from private key
   const account = privateKeyToAccount({ client, privateKey });

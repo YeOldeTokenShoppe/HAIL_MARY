@@ -27,7 +27,6 @@ export function PhoneScreenTexture({
   
   useEffect(() => {
     return () => {
-      console.log(`[PhoneScreenTexture-${instanceId.current}] Component unmounting - cleaning up`);
       
       // Clean up image objects
       imagesToCleanup.current.forEach(img => {
@@ -592,14 +591,7 @@ export function PhoneScreenTexture({
           drawOffering(ctx, displayOffering, width, height, true)
         }
       } else if (hoveredOffering) {
-        // Check if we have hovered polaroid data ready
-        console.log('[PhoneScreen] 🖼️ Drawing hovered offering:', {
-          hasHoveredPolaroid: !!hoveredPolaroid,
-          isLoaded: hoveredPolaroidLoadedRef.current,
-          hasImage: !!hoveredPolaroidImageRef.current,
-          hoveredId: hoveredPolaroid?.id,
-          hoveredUsername: hoveredPolaroid?.username
-        });
+
         
         if (hoveredPolaroid && hoveredPolaroidLoadedRef.current && hoveredPolaroidImageRef.current) {
           // Temporarily swap in the hovered polaroid data
@@ -614,7 +606,6 @@ export function PhoneScreenTexture({
           polaroidLoadedRef.current = true;
           polaroidReadyRef.current = true;
           
-          console.log('[PhoneScreen] 🎨 Drawing polaroid for:', hoveredPolaroid.username);
           // Draw the hovered offering as a polaroid
           drawPolaroid(ctx, width, height);
           
@@ -624,7 +615,6 @@ export function PhoneScreenTexture({
           polaroidLoadedRef.current = savedLoaded;
           polaroidReadyRef.current = savedReady;
         } else {
-          console.log('[PhoneScreen] 📝 Polaroid not ready, skipping render');
           // No polaroid data or still loading, don't render anything
           return;
         }
@@ -1267,29 +1257,19 @@ export function PhoneScreenTexture({
     const offeringId = justLitOffering ? 
       `${justLitOffering.id || justLitOffering.createdBy || justLitOffering.username}-${justLitOffering.tokensBurned}-${Math.floor(now / 60000)}` : // Round to minute to group rapid changes
       null
-    
-    console.log(`[PhoneScreen-${instanceId.current}] 📊 justLitOffering changed:`, {
-      current: justLitOffering?.username || 'null',
-      previous: previousJustLitOffering.current?.username || 'null', 
-      offeringId,
-      alreadyShown: offeringId ? shownPrayerForOfferings.has(offeringId) : false,
-      willStartTimer: !!(justLitOffering && !previousJustLitOffering.current && offeringId && !shownPrayerForOfferings.has(offeringId)),
-      currentTime: now
-    })
+
     
     // Only start timer if:
     // 1. We have a justLitOffering 
     // 2. Previous was null (new offering)
     // 3. We haven't shown Prayer Received for this specific offering yet
     if (justLitOffering && !previousJustLitOffering.current && offeringId && !shownPrayerForOfferings.has(offeringId)) {
-      console.log(`[PhoneScreen-${instanceId.current}] 🙏 Starting Prayer Received timer for:`, justLitOffering.username || 'Anonymous', 'ID:', offeringId)
       prayerReceivedStartTime.current = now
       shownPrayerForOfferings.set(offeringId, now)
       
       // Clean up old offerings after 5 minutes to prevent memory leaks
       const cleanupTimer = setTimeout(() => {
         shownPrayerForOfferings.delete(offeringId)
-        console.log(`[PhoneScreen] 🧹 Cleaned up offering ID:`, offeringId)
       }, 5 * 60 * 1000)
       
       // Add cleanup timer to cleanup list
@@ -1302,7 +1282,6 @@ export function PhoneScreenTexture({
         }
       }
     } else if (justLitOffering && !previousJustLitOffering.current && offeringId && shownPrayerForOfferings.has(offeringId)) {
-      console.log(`[PhoneScreen-${instanceId.current}] ⏭️ Skipping Prayer Received - already shown for offering:`, offeringId)
     }
     
     previousJustLitOffering.current = justLitOffering

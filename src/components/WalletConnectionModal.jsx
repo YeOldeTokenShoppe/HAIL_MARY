@@ -9,7 +9,7 @@ import { inAppWallet } from "thirdweb/wallets/in-app";
 import { createWallet } from "thirdweb/wallets";
 import { useWalletAuth } from '@/components/WalletAuthProvider';
 
-const chain = defineChain(84532); // Base Sepolia
+const chain = defineChain(8453); // Base
 
 // Custom theme for the wallet modal
 const customTheme = darkTheme({

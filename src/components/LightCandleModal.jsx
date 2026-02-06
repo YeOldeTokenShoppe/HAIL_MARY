@@ -311,11 +311,9 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
       // Only prevent reset if we're in the middle of burning (don't check hasCompletedBurn)
       // This allows the modal to be reopened after a burn completes
       if (isBurnInProgress) {
-        console.log('[LightCandleModal] Preventing reset - burn in progress');
         return;
       }
 
-      console.log('[LightCandleModal] Resetting modal state on open');
       setCurrentStep(1); // Reset to step 1
       setOfferingType('petition');
       setMessage('');
@@ -363,7 +361,6 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
 
   // Function to handle actions after successful burn
   const handlePostBurnActions = async () => {
-    console.log('🔥 POST-BURN ACTIONS CALLED - This should only happen AFTER successful transaction!');
     try {
       // Prepare offering data with sanitization
       // Note: Position is NOT saved - CandleShrine generates positions using priority zones
@@ -404,11 +401,9 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
       // WITHOUT saving to Firebase yet
       const newOffering = {...baseOffering};
       
-      console.log('🎬 Triggering candle animation and Prayer Received');
       // Trigger the effect immediately (this will show "Prayer Received")
       await onLightCandle(newOffering);
       
-      console.log('⏱️ Waiting for Prayer Received animation to complete');
       // Wait for the "Prayer Received" animation to show (1.5 seconds)
       await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -429,14 +424,8 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           throw new Error('Firebase Firestore collection function is not working properly.');
         }
 
-        // Test Firestore connectivity
-        console.log('✅ Firebase DB status:', {
-          db: !!db,
-          testCollection: !!testCollection,
-          hasAddDoc: typeof addDoc === 'function'
-        });
+
         
-        console.log('🕐 Checking for existing offerings for user');
         // User authenticated - proceeding with offering creation
         
         // Query for existing offerings from this user (by userId, not wallet)
@@ -446,7 +435,6 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
         );
         
         const existingSnapshot = await getDocs(existingQuery);
-        console.log('📊 Found existing offerings:', existingSnapshot.size);
         
         // Delete ALL existing offerings for this wallet (expired and active)
         // New candle will replace any existing ones and restart the timer
@@ -458,26 +446,15 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
           const createdAt = data.createdAt?.toDate?.() || new Date(data.timestamp);
           const ageMs = now.getTime() - createdAt.getTime();
           
-          console.log('🔍 Existing offering:', {
-            id: docSnapshot.id,
-            ageHours: Math.round(ageMs / (1000 * 60 * 60)),
-            willBeReplaced: true,
-            offeringUserId: data.userId,
-            currentUserId: user?.id,
-            userIdsMatch: data.userId === user?.id
-          });
           
           allOfferingsToDelete.push(docSnapshot.id);
         });
         
         // Clean up ALL existing offerings (replacement model)
         if (allOfferingsToDelete.length > 0) {
-          console.log('🔄 Attempting to replace existing offerings:', allOfferingsToDelete);
           for (const offeringId of allOfferingsToDelete) {
             try {
-              console.log('🗑️ Attempting to delete offering:', offeringId);
               await deleteDoc(doc(db, 'offerings', offeringId));
-              console.log('✅ Successfully deleted existing offering:', offeringId);
             } catch (deleteError) {
               console.error('❌ Failed to delete existing offering:', offeringId, deleteError);
               console.error('❌ Error details:', {
@@ -488,11 +465,9 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
               // Continue with other deletions even if one fails
             }
           }
-          console.log('🕯️ Deletion attempts completed');
         }
         
         // Now create the new offering
-        console.log('✨ Creating new offering for wallet:', walletAddress);
         docRef = await addDoc(collection(db, 'offerings'), baseOffering);
         baseOffering.id = docRef.id;
 
@@ -508,7 +483,6 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
             walletAddress: walletAddress,
             userId: user.id
           }, { merge: true });
-          console.log('📊 Updated user stats for leaderboard');
         } catch (statsError) {
           // Don't block the main flow if stats update fails
           console.error('⚠️ Failed to update user stats (non-blocking):', statsError);
@@ -1990,9 +1964,6 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                   
                   try {
                     // Check if we have an active account
-                    console.log('[LightCandleModal] Checking activeAccount:', activeAccount);
-                    console.log('[LightCandleModal] Wallet address:', walletAddress);
-                    console.log('[LightCandleModal] Token balance:', tokenBalance);
                     
                     if (!activeAccount) {
                       console.error('[LightCandleModal] No active account available');
@@ -2010,12 +1981,10 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                       amount: amountInWei,
                     });
 
-                    console.log('[LightCandleModal] Sending transaction for user to sign with account:', activeAccount.address);
                     // Keep showWalletLoading visible while user signs in their wallet
 
                     // Check if this is a test wallet account (has sendTransaction method)
                     if (activeAccount.sendTransaction) {
-                      console.log('[LightCandleModal] Using test wallet account to send transaction');
                       
                       try {
                         // For test wallets, use the account's sendTransaction directly
@@ -2024,7 +1993,6 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                           account: activeAccount
                         });
                         
-                        console.log('[LightCandleModal] Transaction confirmed:', result);
 
                         // Hide wallet loading after successful signing
                         setShowWalletLoading(false);
@@ -2057,7 +2025,6 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                       // For regular wallets, use the sendTransaction hook
                       sendTransaction(transaction, {
                         onSuccess: async (result) => {
-                          console.log('[LightCandleModal] Transaction signed and sent to blockchain');
                           // Hide wallet loading immediately after signing
                           setShowWalletLoading(false);
                           // NOW show the progress indicator for blockchain confirmation
@@ -2078,7 +2045,6 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
                           }
                           
                           // Clear progress indicator
-                          console.log('[LightCandleModal] Transaction confirmed, hiding progress indicator');
                           setTransactionStatus('');
                           
                           // Now save to Firebase after actual blockchain confirmation

@@ -1252,7 +1252,6 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   // Convert offerings to candle positions for CandleCloud
   // Uses priority zone system to position candles in front of the camera
   const offeringCandles = useMemo(() => {
-    console.log('[UnifiedShrine] offeringCandles useMemo - offerings:', offerings?.length, 'prev:', prevOfferingCandlesRef.current?.length)
 
     if (!offerings || offerings.length === 0) {
       // If we had candles before but offerings is now empty, this might be a bug
@@ -1392,7 +1391,6 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
       prevOfferingCandlesRef.current = result
     }
 
-    console.log('[UnifiedShrine] offeringCandles computed:', result.length, 'candles')
     return result
   }, [offerings])
 
@@ -1441,13 +1439,11 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
       totalBurned: offering.tokensBurned || 0,
       litAt: offering.litAt || offering.createdAt?.toDate?.()?.getTime?.() || offering.timestamp?.toDate?.()?.getTime?.()
     }))
-    console.log('[UnifiedShrine] recentOfferingsData:', result.length, 'real offerings out of', offerings.length, 'total')
     return result
   }, [offerings])
 
   // Debug logging: track candle count changes
   useEffect(() => {
-    console.log(`[UnifiedShrine] Candles: ${offeringCandles.length} total`)
     if (offeringCandles.length === 0 && prevOfferingCandlesRef.current.length > 0) {
       console.error('[UnifiedShrine] WARNING: All candles disappeared! Previous count was:', prevOfferingCandlesRef.current.length)
     }

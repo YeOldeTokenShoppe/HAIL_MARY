@@ -17,7 +17,6 @@ export const useAudio = () => {
           const handleInteraction = () => {
             if (audioContext.current && audioContext.current.state === 'suspended') {
               audioContext.current.resume().then(() => {
-                console.log('Audio context resumed for tablet');
               });
             }
           };
@@ -43,7 +42,6 @@ export const useAudio = () => {
         
         // Add event listeners for tablet debugging
         audio.addEventListener('canplaythrough', () => {
-          console.log(`Audio ready: ${soundId}`);
         });
         
         audio.addEventListener('error', (e) => {
@@ -51,7 +49,6 @@ export const useAudio = () => {
         });
         
         audioRefs.current[soundId] = audio;
-        console.log(`Audio loaded: ${soundId} from ${soundPath}`);
       }
     } catch (error) {
       console.warn('Audio load error:', error);

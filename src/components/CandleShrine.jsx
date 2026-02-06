@@ -1049,7 +1049,6 @@ export const CandleCloud = React.memo(function CandleCloud({ count = CANDLE_COUN
   const prevCandleCountRef = useRef(0)
   useEffect(() => {
     const prevCount = prevCandleCountRef.current
-    console.log('[CandleCloud] additionalCandles:', prevCount, '->', additionalCandles.length)
     if (prevCount > 0 && additionalCandles.length === 0) {
       console.error('[CandleCloud] 🚨 CANDLES DISAPPEARED! Had', prevCount, 'now have 0')
     }

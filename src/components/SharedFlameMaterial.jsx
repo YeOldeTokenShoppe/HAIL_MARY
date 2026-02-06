@@ -312,7 +312,6 @@ export function CandleGeometryWithSharedFlame({
       
       // Check for flame with multiple possible names
       if (name === 'flame' || name.includes('flame') || name.includes('fire')) {
-        console.log('Applying shared flame material to:', child.name)
         const flameMat = getSharedFlameMaterial('candle-shrine') // Use specific context
         child.material = flameMat
         child.visible = true // Ensure it's visible
@@ -334,7 +333,6 @@ export function CandleGeometryWithSharedFlame({
     
     // If no flame mesh found, create one
     if (!foundFlame) {
-      console.log('No flame mesh found, creating one...')
       const flameGeometry = new THREE.ConeGeometry(0.05, 0.15, 8, 1)
       const flameMesh = new THREE.Mesh(flameGeometry, getSharedFlameMaterial('candle-shrine'))
       flameMesh.name = 'flame'

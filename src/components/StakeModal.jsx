@@ -697,7 +697,6 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                   params: []
                 })}
                 onTransactionConfirmed={async () => {
-                  console.log('Withdrawn successfully!');
                   await refreshStakingData();
                   await refreshBalance();
                   setShowConfirmationMessage('withdraw-success');
@@ -734,7 +733,6 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                   params: []
                 })}
                 onTransactionConfirmed={async () => {
-                  console.log('Rewards claimed successfully!');
                   await refreshStakingData();
                   await refreshBalance();
                   setShowConfirmationMessage('claim-success');
@@ -772,7 +770,7 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                 marginBottom: '1rem'
               }}>
                 <a 
-                  href={`https://sepolia.basescan.org/tx/${successData.txHash}`}
+                  href={`https://basescan.org/tx/${successData.txHash}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{
@@ -1240,10 +1238,8 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                       }
                       
                       const amountInWei = toWei(validation.value.toString());
-                      console.log("Test wallet staking amount:", amountInWei.toString());
                       
                       // First approve the tokens
-                      console.log("Approving tokens...");
                       const approveTx = approve({
                         contract: erc20Contract,
                         spender: stakingContract.address,
@@ -1255,12 +1251,10 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                         account: activeAccount
                       });
                       
-                      console.log("Approval confirmed:", approvalResult);
                       
                       // Small delay to ensure approval is fully processed
                       await new Promise(resolve => setTimeout(resolve, 1000));
                       
-                      console.log("Now staking...");
                       setTransactionStatus('confirming');
                       
                       // Then stake the tokens
@@ -1275,7 +1269,6 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                         account: activeAccount
                       });
                       
-                      console.log("Stake successful!", result);
                       setTransactionStatus('success');
                       setShowWalletLoading(false); // Hide wallet loading after success
 
@@ -1296,7 +1289,6 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
 
                       try {
                         const docRef = await addDoc(collection(db, 'stakes'), stakeData);
-                        console.log('Stake saved to Firestore with ID:', docRef.id);
                         stakeData.id = docRef.id;
                       } catch (firestoreError) {
                         console.error('Error saving stake to Firestore:', firestoreError);
@@ -1320,7 +1312,6 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                         refreshStakingData(),
                         refreshBalance ? refreshBalance() : Promise.resolve()
                       ]).then(() => {
-                        console.log('Data refreshed after staking');
                         setIsDataRefreshing(false);
                       }).catch(err => {
                         console.error('Error refreshing data:', err);
@@ -1390,7 +1381,6 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                       const amountInWei = toWei(validation.value.toString());
                       
                       // Step 1: Approval
-                      console.log("Starting approval process...");
                       // Don't set transaction status for regular wallets
                       // setTransactionStatus('approving');
                       
@@ -1403,21 +1393,16 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                       // Send approval transaction
                       sendTransaction(approvalTx, {
                         onSuccess: async (approvalResult) => {
-                          console.log("Approval SIGNED by user and sent to blockchain");
                           
                           // Keep showing Step 1 while approval confirms
                           
                           // Wait for approval confirmation
                           if (approvalResult?.wait) {
-                            console.log("Waiting for approval to be mined...");
                             await approvalResult.wait();
                           } else {
-                            // For networks that don't return a wait function, wait a bit
-                            console.log("Waiting for approval to propagate...");
                             await new Promise(resolve => setTimeout(resolve, 3000));
                           }
                           
-                          console.log("Approval CONFIRMED on blockchain!");
                           
                           // Don't set transaction status for regular wallets
                           // setTransactionStatus('staking');
@@ -1432,16 +1417,13 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                             params: [amountInWei]
                           });
                           
-                          console.log("About to call sendTransaction for stake...");
                           
                           // Add a longer delay to ensure approval is fully processed before staking
                           setTimeout(() => {
-                            console.log("Now calling sendTransaction for stake - wallet will prompt user...");
                             
                             // Send stake transaction - this will prompt the user
                             sendTransaction(stakeTx, {
                               onSuccess: async (stakeResult) => {
-                                console.log("Stake onSuccess fired - user has signed the stake!");
                                 setShowWalletLoading(false); // Hide wallet loading after user signs
 
                                 // Don't show confirming box for regular wallets
@@ -1452,7 +1434,6 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                                 await stakeResult.wait();
                               }
                               
-                              console.log("Stake confirmed!");
                               
                               // Save to Firestore
                               const stakeData = {
@@ -1471,7 +1452,6 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
 
                               try {
                                 const docRef = await addDoc(collection(db, 'stakes'), stakeData);
-                                console.log('Stake saved to Firestore with ID:', docRef.id);
                                 stakeData.id = docRef.id;
                               } catch (firestoreError) {
                                 console.error('Error saving stake to Firestore:', firestoreError);
@@ -1496,7 +1476,6 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
                                 refreshStakingData(),
                                 refreshBalance ? refreshBalance() : Promise.resolve()
                               ]).then(() => {
-                                console.log('Data refreshed after staking');
                                 setIsDataRefreshing(false);
                               }).catch(err => {
                                 console.error('Error refreshing data:', err);
