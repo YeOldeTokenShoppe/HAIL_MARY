@@ -143,7 +143,7 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
           bottom: 0,
           backgroundColor: 'rgba(0, 0, 0, 0.95)',
           backdropFilter: 'blur(2px)',
-          zIndex: 1000000,
+          zIndex: 10000,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -357,6 +357,7 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
       tokenAddress="0x30D01555d88c76500a82754A1D53cAc082A6CB75"
       amount="100"
       theme="dark"
+      paymentMethods={["crypto", "card"]}
     />
             </div>
           </div>
