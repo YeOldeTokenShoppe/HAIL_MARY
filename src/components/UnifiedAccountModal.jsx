@@ -3,12 +3,158 @@
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useUser, useClerk, UserButton } from '@clerk/nextjs';
 import { usePathname } from 'next/navigation';
+import { useConnect } from "thirdweb/react";
+import { client } from '@/lib/contract';
+import { defineChain } from "thirdweb/chains";
+import { inAppWallet } from "thirdweb/wallets/in-app";
+import { createWallet } from "thirdweb/wallets";
 import { useWalletAuth } from './WalletAuthProvider';
-import { WalletConnectionModal } from './WalletConnectionModal';
 import { WalletDetailsModal } from './WalletDetailsModal';
 import { collection, query, where, orderBy, getDocs, db } from '@/lib/firebaseClient';
 import { useWeeklyPrize } from '@/hooks/useWeeklyPrize';
 import CapsuleCollectible from './CapsuleCollectible';
+
+const chain = defineChain(8453); // Base
+
+// Map Clerk provider names to thirdweb strategies
+const clerkToThirdweb = {
+  google: 'google',
+  oauth_google: 'google',
+  discord: 'discord',
+  oauth_discord: 'discord',
+  oauth_x: 'x',
+  x: 'x',
+  oauth_farcaster: 'farcaster',
+  farcaster: 'farcaster',
+  oauth_telegram: 'telegram',
+  telegram: 'telegram',
+};
+
+const providerLabels = {
+  google: 'Google',
+  discord: 'Discord',
+  x: 'X',
+  farcaster: 'Farcaster',
+  telegram: 'Telegram',
+};
+
+// Custom wallet connect UI — bypasses thirdweb's UI components which have React 19 click issues
+function WalletConnectOptions({ connectSocial, connectExternal, connectingMethod, isMobile, clerkUser }) {
+  // Detect how user signed into Clerk to offer a matching wallet-creation option
+  const clerkProvider = clerkUser?.externalAccounts?.[0]?.provider;
+  const primaryStrategy = clerkToThirdweb[clerkProvider] || null;
+  const primaryLabel = primaryStrategy ? providerLabels[primaryStrategy] : null;
+
+  const walletOptions = isMobile
+    ? [
+        { id: 'walletConnect', label: 'WalletConnect' },
+        { id: 'io.metamask', label: 'MetaMask' },
+        { id: 'com.coinbase.wallet', label: 'Coinbase' },
+      ]
+    : [
+        { id: 'io.metamask', label: 'MetaMask' },
+        { id: 'com.coinbase.wallet', label: 'Coinbase' },
+        { id: 'walletConnect', label: 'WalletConnect' },
+      ];
+
+  const btnBase = {
+    background: 'rgba(0, 0, 0, 0.4)',
+    border: '1px solid rgba(0, 245, 212, 0.25)',
+    borderRadius: '10px',
+    padding: '12px 14px',
+    color: '#fff',
+    fontSize: '13px',
+    fontFamily: "'Orbitron', monospace",
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    width: '100%',
+    textAlign: 'left',
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%', padding: '0.5rem 0' }}>
+      {/* External wallet options — front and center */}
+      {walletOptions.map(({ id, label }) => (
+        <button
+          key={id}
+          style={{
+            ...btnBase,
+            padding: '14px 16px',
+            opacity: connectingMethod && connectingMethod !== id ? 0.5 : 1,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 245, 212, 0.5)'; e.currentTarget.style.background = 'rgba(0, 245, 212, 0.08)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 245, 212, 0.25)'; e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)'; }}
+          onClick={() => connectExternal(id)}
+          disabled={!!connectingMethod}
+        >
+          <span style={{ flex: 1, fontWeight: 500 }}>{connectingMethod === id ? 'Connecting...' : label}</span>
+        </button>
+      ))}
+
+      {/* Divider + new-to-wallets helper */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        margin: '6px 0 2px',
+        color: 'rgba(255,255,255,0.25)',
+        fontSize: '10px',
+      }}>
+        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
+        <span style={{ padding: '0 10px', fontFamily: "'Orbitron', monospace", letterSpacing: '1px' }}>
+          NEW TO WALLETS?
+        </span>
+        <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
+      </div>
+
+      <p style={{
+        color: 'rgba(255,255,255,0.5)',
+        fontSize: '12px',
+        lineHeight: '1.5',
+        margin: 0,
+        textAlign: 'center',
+      }}>
+        {primaryLabel
+          ? `A wallet will be created for you using your ${primaryLabel} sign-in.`
+          : 'A wallet will be created for you automatically.'}
+      </p>
+
+      {/* Primary create-wallet button matching their Clerk auth */}
+      <button
+        style={{
+          background: 'linear-gradient(135deg, #00f5d4, #00bbff)',
+          border: 'none',
+          borderRadius: '10px',
+          padding: '13px 16px',
+          color: '#000',
+          fontSize: '13px',
+          fontWeight: '600',
+          fontFamily: "'Orbitron', monospace",
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+          width: '100%',
+          letterSpacing: '0.5px',
+          textTransform: 'uppercase',
+          opacity: connectingMethod && connectingMethod !== (primaryStrategy || 'google') ? 0.5 : 1,
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 245, 212, 0.3)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
+        onClick={() => connectSocial(primaryStrategy || 'google')}
+        disabled={!!connectingMethod}
+      >
+        {connectingMethod === (primaryStrategy || 'google')
+          ? 'Creating wallet...'
+          : `Create Wallet${primaryLabel ? ` with ${primaryLabel}` : ''}`}
+      </button>
+    </div>
+  );
+}
 
 export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' }) {
   const { user } = useUser();
@@ -22,7 +168,9 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' })
     disconnectWallet
   } = useWalletAuth();
 
+  const { connect, isConnecting: isThirdwebConnecting } = useConnect();
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [connectingMethod, setConnectingMethod] = useState(null); // Track which method is connecting
 
   // Update active tab when initialTab changes or modal opens
   useEffect(() => {
@@ -30,7 +178,6 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' })
       setActiveTab(initialTab);
     }
   }, [isOpen, initialTab]);
-  const [showWalletConnection, setShowWalletConnection] = useState(false);
   const [showWalletDetails, setShowWalletDetails] = useState(false);
   const [showClerkDropdown, setShowClerkDropdown] = useState(false);
 
@@ -50,7 +197,41 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' })
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-  
+
+  // Connect with social auth (Google, Discord, etc.) using our own buttons
+  const connectSocial = useCallback(async (strategy) => {
+    setConnectingMethod(strategy);
+    try {
+      const wallet = inAppWallet();
+      await connect(async () => {
+        await wallet.connect({ client, chain, strategy });
+        return wallet;
+      });
+    } catch (e) {
+      // User cancelled or popup blocked — not a real error
+      if (e?.message) console.warn('Social connect cancelled:', e.message);
+    } finally {
+      setConnectingMethod(null);
+    }
+  }, [connect]);
+
+  // Connect external wallet (MetaMask, Coinbase, WalletConnect)
+  const connectExternal = useCallback(async (walletId) => {
+    setConnectingMethod(walletId);
+    try {
+      const wallet = createWallet(walletId);
+      await connect(async () => {
+        await wallet.connect({ client, chain });
+        return wallet;
+      });
+    } catch (e) {
+      // User rejected or wallet not installed — not a real error
+      if (e?.message) console.warn('Wallet connect cancelled:', e.message);
+    } finally {
+      setConnectingMethod(null);
+    }
+  }, [connect]);
+
   // Listen for external wallet details event
   useEffect(() => {
     const handleOpenWalletDetails = () => {
@@ -374,30 +555,25 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' })
                     </div>
                   </>
                 ) : (
-                  <div className="wallet-connect">
-                    <p>No wallet connected</p>
-                    <button 
-                      className="action-button connect"
-                      onClick={() => setShowWalletConnection(true)}
-                    >
-                      Connect Wallet
-                    </button>
-                  </div>
+                  <WalletConnectOptions
+                    connectSocial={connectSocial}
+                    connectExternal={connectExternal}
+                    connectingMethod={connectingMethod}
+                    isMobile={isMobile}
+                    clerkUser={user}
+                  />
                 )}
               </div>
             ) : activeTab === 'collection' ? (
               <div className="collection-content">
                 {!walletAddress ? (
-                  <div className="collection-empty">
-                    <div className="empty-icon">🎁</div>
-                    <p>Connect your wallet to view your collection</p>
-                    <button
-                      className="action-button connect"
-                      onClick={() => setShowWalletConnection(true)}
-                    >
-                      Connect Wallet
-                    </button>
-                  </div>
+                  <WalletConnectOptions
+                    connectSocial={connectSocial}
+                    connectExternal={connectExternal}
+                    connectingMethod={connectingMethod}
+                    isMobile={isMobile}
+                    clerkUser={user}
+                  />
                 ) : loadingPrizes ? (
                   <div className="collection-loading">
                     <div className="loading-spinner" />
@@ -462,13 +638,6 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' })
         </div>
       )}
 
-      {/* Wallet Connection Modal */}
-      {showWalletConnection && (
-        <WalletConnectionModal
-          onClose={() => setShowWalletConnection(false)}
-        />
-      )}
-      
       {/* Wallet Details Modal */}
       {showWalletDetails && (
         <WalletDetailsModal 

@@ -1037,6 +1037,10 @@ export function WatchlistPhoneTexture({
     // Draw activity items
     filteredActivities.forEach((activity, index) => {
       const hasScreenshot = activity.type === 'XPOST' && activity.screenshotUrl && screenshotImagesRef.current[activity.id] instanceof Image;
+      // Hide XPOST items while their screenshot is still loading to prevent "Unknown" flash
+      if (activity.type === 'XPOST' && activity.screenshotUrl && !hasScreenshot) {
+        return;
+      }
       let itemHeight = CONFIG.ITEM_HEIGHT;
       if (hasScreenshot) {
         const ss = screenshotImagesRef.current[activity.id];

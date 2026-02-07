@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Stats, useGLTF, Html, OrbitControls } from '@react-three/drei'
 import { useLanguage } from './LanguageProvider'
+import { createChart, ColorType, AreaSeries } from 'lightweight-charts'
 
 // DEBUG MODE - Set to true to see zones from bird's eye view
 const DEBUG_MODE = false
@@ -94,7 +95,6 @@ import { useStaking } from '@/hooks/useStaking'
 import { useReadContract } from 'thirdweb/react'
 import { totalSupply } from 'thirdweb/extensions/erc20'
 import { erc20Contract } from '@/lib/contract'
-import { stakingContract } from '@/lib/stakingContract'
 import CongregationSentiment from './SentimentData'
 import { db, collection, query, orderBy, limit, getDocs } from '@/lib/firebaseClient'
 
@@ -1551,13 +1551,9 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
   // Initialize staking hook (wallet-dependent features used elsewhere)
   useStaking()
 
-  // Read totalStaked directly from contract (works without wallet connection)
-  const { data: totalStakedData } = useReadContract({
-    contract: stakingContract,
-    method: "function totalStaked() view returns (uint256)",
-    params: [],
-  })
-  
+  // Price chart ref
+  const priceChartRef = useRef(null)
+
   // Store the user's rotation before resetting
   const savedUserRotation = useRef(0)
   const userRotationRef = useRef(0)
@@ -1837,7 +1833,7 @@ useEffect(() => {
   
   
   // Calculate stats from offerings
-  const [displayedCandleCount, setDisplayedCandleCount] = useState(100)
+  const [displayedCandleCount, setDisplayedCandleCount] = useState(0)
   const [displayedBurnTotal, setDisplayedBurnTotal] = useState(0) // Will be updated with real data
   const [candleCountAnimation, setCandleCountAnimation] = useState(false)
   const [showLatestPolaroid, setShowLatestPolaroid] = useState(true) // Always show polaroids
@@ -1846,8 +1842,7 @@ useEffect(() => {
   const realCandleCount = useMemo(() => {
     // Use totalOfferingsCount if provided, otherwise fall back to offerings.length
     const offeringsCount = totalOfferingsCount > 0 ? totalOfferingsCount : offerings.length
-    const count = 100 + offeringsCount
-    return count
+    return offeringsCount
   }, [totalOfferingsCount, offerings.length])
   // Read total supply from the contract using the proper thirdweb extension
   const { data: totalSupplyData, isLoading: isLoadingSupply } = useReadContract(
@@ -1894,6 +1889,69 @@ useEffect(() => {
   useEffect(() => {
     setDisplayedBurnTotal(realBurnTotal)
   }, [realBurnTotal])
+
+  // Initialize price mini-chart (placeholder until DEX trading pair is live)
+  useEffect(() => {
+    if (!priceChartRef.current) return
+    const container = priceChartRef.current
+    // Clear any previous chart
+    container.querySelectorAll(':not([style*="pointer-events: none"])').forEach(el => {
+      if (el.tagName !== 'DIV') return
+    })
+
+    const chart = createChart(container, {
+      width: container.clientWidth,
+      height: container.clientHeight,
+      layout: {
+        background: { type: ColorType.Solid, color: 'transparent' },
+        textColor: 'transparent',
+      },
+      grid: {
+        vertLines: { visible: false },
+        horzLines: { visible: false },
+      },
+      rightPriceScale: { visible: false },
+      timeScale: { visible: false },
+      handleScroll: false,
+      handleScale: false,
+      crosshair: { mode: 0 },
+    })
+
+    const lineColor = is80sMode ? 'rgba(0, 255, 255, 0.5)' : 'rgba(212, 175, 55, 0.5)'
+    const topColor = is80sMode ? 'rgba(0, 255, 255, 0.15)' : 'rgba(212, 175, 55, 0.15)'
+    const bottomColor = 'rgba(0, 0, 0, 0)'
+
+    const series = chart.addSeries(AreaSeries, {
+      lineColor,
+      topColor,
+      bottomColor,
+      lineWidth: 1,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+    })
+
+    // Placeholder: gentle sine wave to show chart is working
+    const now = Math.floor(Date.now() / 1000)
+    const daySeconds = 86400
+    const placeholderData = Array.from({ length: 30 }, (_, i) => ({
+      time: now - (29 - i) * daySeconds,
+      value: 0.001 + Math.sin(i * 0.4) * 0.0002 + Math.cos(i * 0.15) * 0.0001,
+    }))
+    series.setData(placeholderData)
+    chart.timeScale().fitContent()
+
+    const handleResize = () => {
+      chart.applyOptions({ width: container.clientWidth })
+    }
+    const resizeObserver = new ResizeObserver(handleResize)
+    resizeObserver.observe(container)
+
+    return () => {
+      resizeObserver.disconnect()
+      chart.remove()
+    }
+  }, [is80sMode])
 
   // Store timeout refs for cleanup
   const timeoutRefs = useRef({})
@@ -2295,29 +2353,6 @@ useEffect(() => {
   
 
   // Derive on-chain stats for the Token tab
-  const currentSupply = useMemo(() => {
-    if (totalSupplyData !== undefined && totalSupplyData !== null) {
-      return Number(totalSupplyData / BigInt(10 ** 18))
-    }
-    return null
-  }, [totalSupplyData])
-
-  const totalStakedTokens = useMemo(() => {
-    if (totalStakedData !== undefined && totalStakedData !== null) {
-      return Number(totalStakedData / BigInt(10 ** 18))
-    }
-    return 0
-  }, [totalStakedData])
-
-  const circulatingSupply = useMemo(() => {
-    if (currentSupply === null) return null
-    return currentSupply - totalStakedTokens
-  }, [currentSupply, totalStakedTokens])
-
-  const percentStaked = useMemo(() => {
-    if (!currentSupply || currentSupply === 0) return 0
-    return (totalStakedTokens / currentSupply) * 100
-  }, [currentSupply, totalStakedTokens])
 
   // Help overlay annotation positions (screen-space)
   const helpAnnotations = useMemo(() => [
@@ -2867,72 +2902,13 @@ useEffect(() => {
         {/* Tab Content */}
         {activeStatsTab === 'token' ? (
           <>
-            {/* Token Tab Content - Real on-chain stats */}
+            {/* Token Tab Content */}
             <div style={{
               display: 'grid',
               gridTemplateColumns: '1fr 1fr',
               gap: isMobile ? '6px' : '8px',
-              marginBottom: isMobile ? '6px' : '10px'
+              marginBottom: isMobile ? '6px' : '8px'
             }}>
-              {/* Total Supply */}
-              <div style={{
-                padding: isMobile ? '7px' : '10px',
-                background: is80sMode ? 'rgba(255, 0, 255, 0.08)' : 'rgba(212, 175, 55, 0.08)',
-                borderRadius: '8px',
-                border: is80sMode ? '1px solid rgba(255, 0, 255, 0.25)' : '1px solid rgba(212, 175, 55, 0.25)',
-                textAlign: 'center'
-              }}>
-                <div style={{
-                  fontSize: isMobile ? '13px' : '15px',
-                  fontWeight: 'bold',
-                  color: is80sMode ? '#ff00ff' : '#d4af37',
-                  marginBottom: '3px',
-                  textShadow: is80sMode ? '0 0 8px #ff00ff' : 'none',
-                }}>
-                  {currentSupply !== null
-                    ? (currentSupply >= 1e9 ? `${(currentSupply / 1e9).toFixed(1)}B` : currentSupply >= 1e6 ? `${(currentSupply / 1e6).toFixed(1)}M` : currentSupply.toLocaleString())
-                    : '...'}
-                </div>
-                <div style={{
-                  fontSize: isMobile ? '9px' : '10px',
-                  color: '#aaa',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
-                }}>
-                  {t('illumin80.stats.totalSupply')}
-                </div>
-              </div>
-
-              {/* Burned */}
-              <div style={{
-                padding: isMobile ? '7px' : '10px',
-                background: 'rgba(255, 149, 0, 0.08)',
-                borderRadius: '8px',
-                border: '1px solid rgba(255, 149, 0, 0.25)',
-                textAlign: 'center'
-              }}>
-                <div style={{
-                  fontSize: isMobile ? '13px' : '15px',
-                  fontWeight: 'bold',
-                  color: '#ff9500',
-                  marginBottom: '3px'
-                }}>
-                  {displayedBurnTotal >= 1e6
-                    ? `${(displayedBurnTotal / 1e6).toFixed(2)}M`
-                    : displayedBurnTotal >= 1000
-                    ? `${(displayedBurnTotal / 1000).toFixed(1)}K`
-                    : displayedBurnTotal.toLocaleString()}
-                </div>
-                <div style={{
-                  fontSize: isMobile ? '9px' : '10px',
-                  color: '#aaa',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
-                }}>
-                  {t('illumin80.stats.tokensBurned')}
-                </div>
-              </div>
-
               {/* Candles Lit */}
               <div style={{
                 padding: isMobile ? '7px' : '10px',
@@ -2968,27 +2944,25 @@ useEffect(() => {
                 </div>
               </div>
 
-              {/* Total Staked */}
+              {/* Burned */}
               <div style={{
                 padding: isMobile ? '7px' : '10px',
-                background: 'rgba(99, 102, 241, 0.08)',
+                background: 'rgba(255, 149, 0, 0.08)',
                 borderRadius: '8px',
-                border: '1px solid rgba(99, 102, 241, 0.25)',
+                border: '1px solid rgba(255, 149, 0, 0.25)',
                 textAlign: 'center'
               }}>
                 <div style={{
                   fontSize: isMobile ? '13px' : '15px',
                   fontWeight: 'bold',
-                  color: '#818cf8',
+                  color: '#ff9500',
                   marginBottom: '3px'
                 }}>
-                  {totalStakedTokens >= 1e9
-                    ? `${(totalStakedTokens / 1e9).toFixed(1)}B`
-                    : totalStakedTokens >= 1e6
-                    ? `${(totalStakedTokens / 1e6).toFixed(1)}M`
-                    : totalStakedTokens >= 1000
-                    ? `${(totalStakedTokens / 1000).toFixed(1)}K`
-                    : totalStakedTokens.toLocaleString()}
+                  {displayedBurnTotal >= 1e6
+                    ? `${(displayedBurnTotal / 1e6).toFixed(2)}M`
+                    : displayedBurnTotal >= 1000
+                    ? `${(displayedBurnTotal / 1000).toFixed(1)}K`
+                    : displayedBurnTotal.toLocaleString()}
                 </div>
                 <div style={{
                   fontSize: isMobile ? '9px' : '10px',
@@ -2996,79 +2970,81 @@ useEffect(() => {
                   textTransform: 'uppercase',
                   letterSpacing: '0.5px'
                 }}>
-                  {t('illumin80.stats.totalStaked')}
-                </div>
-              </div>
-
-              {/* Circulating */}
-              <div style={{
-                padding: isMobile ? '7px' : '10px',
-                background: 'rgba(34, 197, 94, 0.08)',
-                borderRadius: '8px',
-                border: '1px solid rgba(34, 197, 94, 0.25)',
-                textAlign: 'center'
-              }}>
-                <div style={{
-                  fontSize: isMobile ? '13px' : '15px',
-                  fontWeight: 'bold',
-                  color: '#4ade80',
-                  marginBottom: '3px'
-                }}>
-                  {circulatingSupply !== null
-                    ? (circulatingSupply >= 1e9 ? `${(circulatingSupply / 1e9).toFixed(1)}B` : circulatingSupply >= 1e6 ? `${(circulatingSupply / 1e6).toFixed(1)}M` : circulatingSupply.toLocaleString())
-                    : '...'}
-                </div>
-                <div style={{
-                  fontSize: isMobile ? '9px' : '10px',
-                  color: '#aaa',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
-                }}>
-                  {t('illumin80.stats.circulatingSupply')}
-                </div>
-              </div>
-
-              {/* % Staked */}
-              <div style={{
-                padding: isMobile ? '7px' : '10px',
-                background: 'rgba(168, 85, 247, 0.08)',
-                borderRadius: '8px',
-                border: '1px solid rgba(168, 85, 247, 0.25)',
-                textAlign: 'center'
-              }}>
-                <div style={{
-                  fontSize: isMobile ? '13px' : '15px',
-                  fontWeight: 'bold',
-                  color: '#c084fc',
-                  marginBottom: '3px'
-                }}>
-                  {percentStaked.toFixed(2)}%
-                </div>
-                <div style={{
-                  fontSize: isMobile ? '9px' : '10px',
-                  color: '#aaa',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
-                }}>
-                  {t('illumin80.stats.percentStaked')}
+                  {t('illumin80.stats.tokensBurned')}
                 </div>
               </div>
             </div>
 
-            {/* Price Coming Soon indicator */}
+            {/* RL80 Price Chart */}
             <div style={{
-              padding: isMobile ? '6px 8px' : '8px 10px',
-              background: 'rgba(255, 255, 255, 0.03)',
-              borderRadius: '6px',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              textAlign: 'center',
-              fontSize: isMobile ? '9px' : '10px',
-              color: '#666',
-              fontFamily: 'monospace',
-              textTransform: 'uppercase',
-              letterSpacing: '1px'
+              borderRadius: '8px',
+              border: is80sMode ? '1px solid rgba(0, 255, 255, 0.2)' : '1px solid rgba(212, 175, 55, 0.2)',
+              background: 'rgba(0, 0, 0, 0.3)',
+              overflow: 'hidden'
             }}>
-              {t('illumin80.stats.priceTBA')}
+              {/* Price header */}
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: isMobile ? '5px 8px' : '6px 10px',
+                borderBottom: is80sMode ? '1px solid rgba(0, 255, 255, 0.1)' : '1px solid rgba(212, 175, 55, 0.1)',
+              }}>
+                <div style={{
+                  fontSize: isMobile ? '11px' : '13px',
+                  fontWeight: 'bold',
+                  color: is80sMode ? '#00ffff' : '#d4af37',
+                  textShadow: is80sMode ? '0 0 6px #00ffff' : 'none',
+                }}>
+                  RL80 <span style={{ color: '#888', fontWeight: 'normal', fontSize: isMobile ? '9px' : '11px' }}>/ USD</span>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{
+                    fontSize: isMobile ? '11px' : '13px',
+                    fontWeight: 'bold',
+                    color: '#888',
+                  }}>
+                    --
+                  </span>
+                  <span style={{
+                    fontSize: isMobile ? '8px' : '9px',
+                    color: '#666',
+                    marginLeft: '4px',
+                  }}>
+                    --%
+                  </span>
+                </div>
+              </div>
+              {/* Chart container */}
+              <div
+                ref={priceChartRef}
+                style={{
+                  width: '100%',
+                  height: isMobile ? '70px' : '100px',
+                  position: 'relative',
+                }}
+              >
+                {/* "No trading data yet" overlay */}
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  zIndex: 2,
+                  pointerEvents: 'none',
+                }}>
+                  <span style={{
+                    fontSize: isMobile ? '8px' : '9px',
+                    color: '#555',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1px',
+                    fontFamily: 'monospace',
+                  }}>
+                    No trading data yet
+                  </span>
+                </div>
+              </div>
             </div>
           </>
         ) : activeStatsTab === 'pulse' ? (
@@ -3133,7 +3109,7 @@ useEffect(() => {
               padding: 0,
               margin: isMobile ? '-2px' : '-4px',
             }}>
-              {/* Header with Sort Toggle */}
+              {/* Header */}
               <div style={{
                 marginBottom: isMobile ? '8px' : '12px',
                 padding: '8px',
@@ -3149,55 +3125,8 @@ useEffect(() => {
                   letterSpacing: '1px',
                   fontFamily: "'Orbitron', monospace",
                   fontWeight: 'bold',
-                  marginBottom: '8px'
                 }}>
                   🔥 Illumin80 🔥
-                </div>
-
-                {/* Sort Toggle Buttons */}
-                <div style={{
-                  display: 'flex',
-                  gap: '6px',
-                  justifyContent: 'center'
-                }}>
-                  <button
-                    onClick={() => onSortChange && onSortChange('topBurners')}
-                    style={{
-                      padding: isMobile ? '4px 10px' : '5px 14px',
-                      fontSize: isMobile ? '9px' : '10px',
-                      fontFamily: 'monospace',
-                      fontWeight: sortOption === 'topBurners' ? 'bold' : 'normal',
-                      background: sortOption === 'topBurners' ? 'rgba(255, 149, 0, 0.3)' : 'rgba(255, 255, 255, 0.05)',
-                      border: sortOption === 'topBurners' ? '1px solid rgba(255, 149, 0, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '12px',
-                      color: sortOption === 'topBurners' ? '#ff9500' : 'rgba(255, 255, 255, 0.6)',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
-                    }}
-                  >
-                    Top Burners
-                  </button>
-                  <button
-                    onClick={() => onSortChange && onSortChange('recent')}
-                    style={{
-                      padding: isMobile ? '4px 10px' : '5px 14px',
-                      fontSize: isMobile ? '9px' : '10px',
-                      fontFamily: 'monospace',
-                      fontWeight: sortOption === 'recent' ? 'bold' : 'normal',
-                      background: sortOption === 'recent' ? 'rgba(0, 245, 212, 0.3)' : 'rgba(255, 255, 255, 0.05)',
-                      border: sortOption === 'recent' ? '1px solid rgba(0, 245, 212, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '12px',
-                      color: sortOption === 'recent' ? '#00f5d4' : 'rgba(255, 255, 255, 0.6)',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.5px'
-                    }}
-                  >
-                    Most Recent
-                  </button>
                 </div>
               </div>
 
@@ -3404,7 +3333,52 @@ useEffect(() => {
                 </div>
               )}
 
-              {/* Trophy Candle Carousel */}
+              {/* Sort Toggle + Trophy Candle Carousel */}
+              <div style={{
+                display: 'flex',
+                gap: '6px',
+                justifyContent: 'center',
+                marginBottom: isMobile ? '6px' : '8px'
+              }}>
+                <button
+                  onClick={() => onSortChange && onSortChange('topBurners')}
+                  style={{
+                    padding: isMobile ? '4px 10px' : '5px 14px',
+                    fontSize: isMobile ? '9px' : '10px',
+                    fontFamily: 'monospace',
+                    fontWeight: sortOption === 'topBurners' ? 'bold' : 'normal',
+                    background: sortOption === 'topBurners' ? 'rgba(255, 149, 0, 0.3)' : 'rgba(255, 255, 255, 0.05)',
+                    border: sortOption === 'topBurners' ? '1px solid rgba(255, 149, 0, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '12px',
+                    color: sortOption === 'topBurners' ? '#ff9500' : 'rgba(255, 255, 255, 0.6)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}
+                >
+                  Top Burners
+                </button>
+                <button
+                  onClick={() => onSortChange && onSortChange('recent')}
+                  style={{
+                    padding: isMobile ? '4px 10px' : '5px 14px',
+                    fontSize: isMobile ? '9px' : '10px',
+                    fontFamily: 'monospace',
+                    fontWeight: sortOption === 'recent' ? 'bold' : 'normal',
+                    background: sortOption === 'recent' ? 'rgba(0, 245, 212, 0.3)' : 'rgba(255, 255, 255, 0.05)',
+                    border: sortOption === 'recent' ? '1px solid rgba(0, 245, 212, 0.5)' : '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '12px',
+                    color: sortOption === 'recent' ? '#00f5d4' : 'rgba(255, 255, 255, 0.6)',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}
+                >
+                  Most Recent
+                </button>
+              </div>
               {leaderboardLoading && sortOption !== 'recent' ? (
                 <div style={{
                   textAlign: 'center',
