@@ -166,7 +166,7 @@ RL80 is available on the Base network. There are several ways to acquire it:
 
 OPTION 1: BUY WITH CREDIT/DEBIT CARD (Easiest)
 • Use our built-in purchase widget on the site
-• Pay with credit card, debit card, or bank transfer
+• Pay with credit card or debit card
 • No existing crypto or wallet required
 • A non-custodial wallet is automatically created for you
 • Tokens are delivered directly to your new wallet
@@ -184,7 +184,7 @@ OPTION 3: BUY VIA UNISWAP
 • Swap ETH or other tokens for RL80
 
 CONTRACT ADDRESS (Base):
-[Contract address will be displayed here - verify before transacting]
+0x30D01555d88c76500a82754A1D53cAc082A6CB75
 
 IMPORTANT: Always verify you have the correct token contract to avoid scams.
 `,
