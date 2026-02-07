@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 const EMOJIS = [
-  "🚀", "🥸", "🤑", "😭", "😈", "💬", "💬", "💬",
+  "🚀", "🥸", "🤑", "😭", "😈", "💬", "💬",
   "🔥", "💎", "😇", "❤️‍🔥", "💰", "💵", "🪙"
 ];
 
