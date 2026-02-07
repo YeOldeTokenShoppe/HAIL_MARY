@@ -1837,7 +1837,8 @@ useEffect(() => {
   const [displayedBurnTotal, setDisplayedBurnTotal] = useState(0) // Will be updated with real data
   const [candleCountAnimation, setCandleCountAnimation] = useState(false)
   const [showLatestPolaroid, setShowLatestPolaroid] = useState(true) // Always show polaroids
-  
+  const [rl80Price, setRl80Price] = useState(null) // { price, priceChange24h, ohlcv }
+
   // Calculate real stats from offerings
   const realCandleCount = useMemo(() => {
     // Use totalOfferingsCount if provided, otherwise fall back to offerings.length
@@ -1890,14 +1891,24 @@ useEffect(() => {
     setDisplayedBurnTotal(realBurnTotal)
   }, [realBurnTotal])
 
-  // Initialize price mini-chart (placeholder until DEX trading pair is live)
+  // Fetch RL80 price data from DEX
+  useEffect(() => {
+    let cancelled = false
+    const fetchPrice = () => {
+      fetch('/api/rl80-price')
+        .then(r => r.json())
+        .then(data => { if (!cancelled) setRl80Price(data) })
+        .catch(() => {})
+    }
+    fetchPrice()
+    const interval = setInterval(fetchPrice, 60_000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [])
+
+  // Initialize price mini-chart
   useEffect(() => {
     if (!priceChartRef.current) return
     const container = priceChartRef.current
-    // Clear any previous chart
-    container.querySelectorAll(':not([style*="pointer-events: none"])').forEach(el => {
-      if (el.tagName !== 'DIV') return
-    })
 
     const chart = createChart(container, {
       width: container.clientWidth,
@@ -1931,14 +1942,18 @@ useEffect(() => {
       crosshairMarkerVisible: false,
     })
 
-    // Placeholder: gentle sine wave to show chart is working
-    const now = Math.floor(Date.now() / 1000)
-    const daySeconds = 86400
-    const placeholderData = Array.from({ length: 30 }, (_, i) => ({
-      time: now - (29 - i) * daySeconds,
-      value: 0.001 + Math.sin(i * 0.4) * 0.0002 + Math.cos(i * 0.15) * 0.0001,
-    }))
-    series.setData(placeholderData)
+    // Use real OHLCV if available, otherwise placeholder
+    if (rl80Price?.ohlcv?.length > 1) {
+      series.setData(rl80Price.ohlcv)
+    } else {
+      const now = Math.floor(Date.now() / 1000)
+      const daySeconds = 86400
+      const basePrice = rl80Price?.price || 0.00000003
+      series.setData(Array.from({ length: 30 }, (_, i) => ({
+        time: now - (29 - i) * daySeconds,
+        value: basePrice + Math.sin(i * 0.4) * basePrice * 0.1,
+      })))
+    }
     chart.timeScale().fitContent()
 
     const handleResize = () => {
@@ -1951,7 +1966,7 @@ useEffect(() => {
       resizeObserver.disconnect()
       chart.remove()
     }
-  }, [is80sMode])
+  }, [is80sMode, rl80Price])
 
   // Store timeout refs for cleanup
   const timeoutRefs = useRef({})
@@ -3002,16 +3017,20 @@ useEffect(() => {
                   <span style={{
                     fontSize: isMobile ? '11px' : '13px',
                     fontWeight: 'bold',
-                    color: '#888',
+                    color: rl80Price?.price ? (is80sMode ? '#00ffff' : '#d4af37') : '#888',
                   }}>
-                    --
+                    {rl80Price?.price
+                      ? `$${rl80Price.price < 0.0001 ? rl80Price.price.toExponential(2) : rl80Price.price.toFixed(6)}`
+                      : '--'}
                   </span>
                   <span style={{
                     fontSize: isMobile ? '8px' : '9px',
-                    color: '#666',
+                    color: rl80Price?.priceChange24h > 0 ? '#4ade80' : rl80Price?.priceChange24h < 0 ? '#ef4444' : '#666',
                     marginLeft: '4px',
                   }}>
-                    --%
+                    {rl80Price?.price
+                      ? `${rl80Price.priceChange24h >= 0 ? '+' : ''}${rl80Price.priceChange24h.toFixed(1)}%`
+                      : '--%'}
                   </span>
                 </div>
               </div>
@@ -3024,26 +3043,28 @@ useEffect(() => {
                   position: 'relative',
                 }}
               >
-                {/* "No trading data yet" overlay */}
-                <div style={{
-                  position: 'absolute',
-                  inset: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  zIndex: 2,
-                  pointerEvents: 'none',
-                }}>
-                  <span style={{
-                    fontSize: isMobile ? '8px' : '9px',
-                    color: '#555',
-                    textTransform: 'uppercase',
-                    letterSpacing: '1px',
-                    fontFamily: 'monospace',
+                {/* "No trading data yet" overlay — hidden once OHLCV is available */}
+                {(!rl80Price?.ohlcv?.length || rl80Price.ohlcv.length <= 1) && (
+                  <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 2,
+                    pointerEvents: 'none',
                   }}>
-                    No trading data yet
-                  </span>
-                </div>
+                    <span style={{
+                      fontSize: isMobile ? '8px' : '9px',
+                      color: '#555',
+                      textTransform: 'uppercase',
+                      letterSpacing: '1px',
+                      fontFamily: 'monospace',
+                    }}>
+                      No trading data yet
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </>
