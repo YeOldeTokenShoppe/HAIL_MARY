@@ -133,13 +133,17 @@ export default function CommunionPage() {
     return () => clearTimeout(timeoutId);
   }, [isLoading]);
 
-  // Make body transparent for starry background
+  // Make body transparent for starry background + prevent scroll
   useEffect(() => {
     document.body.style.background = "transparent";
     document.documentElement.style.background = "transparent";
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
     return () => {
       document.body.style.background = "#1b1724";
       document.documentElement.style.background = "#1b1724";
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
     };
   }, []);
 
@@ -418,8 +422,8 @@ export default function CommunionPage() {
             opacity: contentOpacity,
             transition: "opacity 0.8s ease-in",
             width: "100vw",
-            height: "100vh",
-            overflow: "visible",
+            height: "100dvh",
+            overflow: "hidden",
             position: "relative",
             zIndex: 1,
             background: "transparent",

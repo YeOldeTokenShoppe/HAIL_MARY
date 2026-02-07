@@ -7209,3 +7209,46 @@ body .cl-profileSection__security .cl-profileSectionPrimaryButton {
   }
 }
 
+/* Mobile sign-in modal: fill viewport and allow scroll */
+@media (max-width: 768px) {
+  body .cl-modalBackdrop {
+    padding: 0 !important;
+    align-items: flex-start !important;
+  }
+
+  body .cl-modalContent {
+    max-width: 100vw !important;
+    max-height: 100dvh !important;
+    width: 100% !important;
+  }
+
+  body .cl-signIn-root,
+  body .cl-signUp-root {
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    max-height: 100dvh !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+  }
+
+  body .cl-signIn-root .cl-internal-dsfs4w,
+  body .cl-signUp-root .cl-internal-dsfs4w {
+    overflow-y: auto !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+  }
+
+  body .cl-signIn-root .cl-card,
+  body .cl-signUp-root .cl-card {
+    overflow-y: auto !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+  }
+
+  body .cl-signIn-root .cl-cardBox,
+  body .cl-signUp-root .cl-cardBox {
+    border-radius: 0 !important;
+    max-height: 100dvh !important;
+  }
+}
+

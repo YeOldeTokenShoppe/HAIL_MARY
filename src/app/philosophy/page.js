@@ -40,15 +40,25 @@ export default function ModelViewerPage() {
       const isMobile = window.innerWidth <= 768;
       setIsMobileDevice(isMobile);
     };
-    
+
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Prevent scroll on this page
+  // useEffect(() => {
+  //   document.body.style.overflow = "hidden";
+  //   document.documentElement.style.overflow = "hidden";
+  //   return () => {
+  //     document.body.style.overflow = "";
+  //     document.documentElement.style.overflow = "";
+  //   };
+  // }, []);
+
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
+    <div style={{ position: 'relative', width: '100%', height: '100dvh' }}>
       <Philosophy
         modelPath="/models/saint_robot2.glb"
         onLoadingChange={setIsPageLoading}

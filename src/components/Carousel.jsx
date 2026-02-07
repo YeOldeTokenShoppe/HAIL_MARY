@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 
 import {
@@ -258,6 +258,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
 
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [isHovered, setIsHovered] = useState(false);
+  const carouselRef = useRef(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [riders, setRiders] = useState({});
   const [isRideConfirmationOpen, setIsRideConfirmationOpen] = useState(false);
@@ -293,6 +294,29 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
       setHasRidden(true);
     }
   }, [isRiding, onRidingChange]);
+
+  // Force-restart CSS animation after mount (mobile Safari defers animations on opacity:0 elements)
+  useEffect(() => {
+    if (visibleImagesLoaded && carouselRef.current) {
+      const el = carouselRef.current;
+      el.style.animation = 'none';
+      void el.offsetHeight; // force reflow
+      el.style.animation = '';
+    }
+  }, [visibleImagesLoaded]);
+
+  // On mobile, only pause while finger is actively down — use a timeout
+  // to auto-resume in case touchEnd doesn't fire reliably
+  const touchTimeoutRef = useRef(null);
+  const handleTouchStart = useCallback(() => {
+    if (touchTimeoutRef.current) clearTimeout(touchTimeoutRef.current);
+    setIsHovered(true);
+    touchTimeoutRef.current = setTimeout(() => setIsHovered(false), 2000);
+  }, []);
+  const handleTouchEnd = useCallback(() => {
+    if (touchTimeoutRef.current) clearTimeout(touchTimeoutRef.current);
+    setIsHovered(false);
+  }, []);
 
   const handleImageLoad = (src) => {
     setLoadedImages((prev) => {
@@ -1784,6 +1808,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
         <main>
           <div
             id="carousel"
+            ref={carouselRef}
             style={{
               "--rotation-time": "30s",
               "--elements": images.length,
@@ -1791,8 +1816,8 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
             }}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            onTouchStart={() => setIsHovered(true)}
-            onTouchEnd={() => setIsHovered(false)}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
           >
             {images.map((image, index) => {
               const beastId = `beast${index + 1}`;

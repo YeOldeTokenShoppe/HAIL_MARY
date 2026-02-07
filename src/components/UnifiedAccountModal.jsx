@@ -408,12 +408,7 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' })
 
   const handleSignOut = async () => {
     onClose();
-    // Sign out without redirectUrl to avoid a race condition where
-    // Clerk's redirect fires while React is still reconciling the
-    // auth state change — which causes a removeChild error when
-    // non-default languages are active (extra re-render cycles).
-    await signOut();
-    window.location.href = pathname || '/';
+    await signOut({ redirectUrl: pathname || '/' });
   };
 
   return (
@@ -465,7 +460,7 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' })
                 <div className="account-actions">
                   {/* Hidden UserButton that we'll trigger programmatically */}
                   <div style={{ position: 'absolute', visibility: 'hidden', pointerEvents: 'none' }}>
-                    <UserButton afterSignOutUrl={pathname || "/"} />
+                    <UserButton afterSignOutUrl={pathname || window.location.pathname} />
                   </div>
                   
                   <button 

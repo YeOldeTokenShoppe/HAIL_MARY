@@ -2,6 +2,7 @@
 
 import { useWalletAuth } from './WalletAuthProvider';
 import { SignInButton, UserButton } from '@clerk/nextjs';
+import { usePathname } from 'next/navigation';
 import { ConnectButton } from "thirdweb/react";
 import { client } from '@/lib/contract';
 import { defineChain } from "thirdweb/chains";
@@ -20,6 +21,7 @@ export function UnifiedAuthButton() {
     testWallet,
     isTestUser
   } = useWalletAuth();
+  const pathname = usePathname();
 
   // If user is not signed in with Clerk, show sign in
   if (!isSignedIn) {
@@ -109,7 +111,7 @@ export function UnifiedAuthButton() {
       {/* Clerk User Button with custom content */}
       <div className="relative">
         <UserButton
-          afterSignOutUrl="/"
+          afterSignOutUrl={pathname || "/"}
           appearance={{
             elements: {
               userButtonAvatarBox: {
