@@ -373,7 +373,8 @@ style={{borderRadius: '0px'}}
       client={client}
       description={"𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙"}
       currency={"USD"}
-      chain={defineChain(42161)}
+      chain={defineChain(8453)}
+      tokenAddress="0x30D01555d88c76500a82754A1D53cAc082A6CB75"
       amount={"0.002"}
       tokenEditable={false}
     />
