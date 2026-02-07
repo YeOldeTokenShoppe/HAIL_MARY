@@ -4247,7 +4247,7 @@ export default function Home() {
                   }}
                 />
               ) : (
-                <SignInButton mode="modal">
+                <SignInButton mode="modal" forceRedirectUrl="/lightClub">
                   <button
                     style={{
                       width: isMobile ? "3rem" : "3.5rem",

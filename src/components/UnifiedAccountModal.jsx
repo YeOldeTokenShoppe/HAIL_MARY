@@ -407,8 +407,8 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' })
   }; */
 
   const handleSignOut = async () => {
-    onClose();
     await signOut({ redirectUrl: pathname || '/' });
+    onClose();
   };
 
   return (

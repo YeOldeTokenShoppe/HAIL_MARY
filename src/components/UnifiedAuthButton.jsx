@@ -26,7 +26,7 @@ export function UnifiedAuthButton() {
   // If user is not signed in with Clerk, show sign in
   if (!isSignedIn) {
     return (
-      <SignInButton mode="modal">
+      <SignInButton mode="modal" forceRedirectUrl={pathname || "/"}>
         <button className="px-6 py-2.5 bg-gradient-to-r from-[#ff006e] to-[#8338ec] text-white rounded-full font-bold text-sm uppercase tracking-wider hover:scale-105 transition-transform"
                 style={{
                   boxShadow: '0 0 25px rgba(255, 0, 110, 0.4)',

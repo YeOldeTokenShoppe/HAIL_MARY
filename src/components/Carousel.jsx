@@ -2698,7 +2698,7 @@ const Carousel = ({ images, setCarouselLoaded, onRidingChange }) => {
                 textAlign: "center",
               }}
             >
-              <SignInButton mode="modal">
+              <SignInButton mode="modal" forceRedirectUrl={pathname || "/"}>
                 <button
                   style={{
                     padding: "8px 20px",
