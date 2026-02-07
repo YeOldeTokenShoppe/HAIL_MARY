@@ -190,8 +190,8 @@ const playChoirSwell = useCallback(() => {
   })
 }, [])
 
-// Play a single short choir note pitched to candle scene height (D minor pentatonic)
-const playCandleNote = useCallback((sceneY) => {
+// Play a single short choir note pitched by candle index (D minor pentatonic)
+const playCandleNote = useCallback((candleIndex) => {
   const ctx = choirContextRef.current
   const buffer = choirBufferRef.current
   if (!ctx || !buffer) return
@@ -201,10 +201,9 @@ const playCandleNote = useCallback((sceneY) => {
   // D minor pentatonic — always sounds harmonious
   const pentatonic = [0.75, 1.0, 1.189, 1.335, 1.498, 1.782, 2.0]
 
-  // Map scene Y (-5 to 12) to scale index
-  const y = sceneY ?? 0
-  const normalized = Math.max(0, Math.min(1, (y + 5) / 17))
-  const noteIndex = Math.floor(normalized * (pentatonic.length - 1))
+  // Each candle gets a unique note by cycling through the scale
+  const idx = candleIndex ?? 0
+  const noteIndex = idx % pentatonic.length
   const rate = pentatonic[noteIndex]
 
   const now = ctx.currentTime
@@ -962,7 +961,7 @@ useEffect(() => {
             onSelectOffering={(offering) => {
               setHoveredOffering(offering)
               setSelectedCandle(offering)
-              playCandleNote(offering.sceneY)
+              playCandleNote(offering.candleIndex)
             }}
             onLightCandle={(offering) => {
               // Don't set justLitOffering here - it's already set in handleLightCandle

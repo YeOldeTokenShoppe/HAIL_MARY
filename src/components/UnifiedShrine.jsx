@@ -601,7 +601,7 @@ function LeaderboardCarousel({ leaderboardData, isMobile, sortMode = 'topBurners
         <div style={{
           display: 'flex',
           flexDirection: 'column',
-          alignItems: 'flex-start',
+          alignItems: 'center',
         }}>
           <span style={{
             fontSize: isMobile ? '11px' : '13px',
@@ -1640,6 +1640,7 @@ const UnifiedShrine = forwardRef(function UnifiedShrine({
           meltPercentage: parseFloat(meltPercentage),
           timeAgo,
           sceneY: userCandle.y,
+          candleIndex: instanceId,
           isUserCandle: true
         })
       }
@@ -1997,6 +1998,7 @@ useEffect(() => {
             meltPercentage,
             timeAgo,
             sceneY: candle.y,
+            candleIndex: instanceId,
             isUserCandle: true
           })
         }
@@ -2024,6 +2026,7 @@ useEffect(() => {
               meltPercentage,
               timeAgo,
               sceneY: candle.y,
+              candleIndex: instanceId,
               isUserCandle: candle.userId === currentUserId
             })
           }
