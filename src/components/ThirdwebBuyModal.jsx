@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { BuyWidget, darkTheme } from "thirdweb/react";
+import { BuyWidget } from "thirdweb/react";
 import { createThirdwebClient } from "thirdweb";
 import { defineChain } from "thirdweb/chains";
 import { useLanguage } from './LanguageProvider';
@@ -357,26 +357,11 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
             
             <div suppressHydrationWarning>
 <BuyWidget
-style={{borderRadius: '0px'}}
-      theme={darkTheme({
-        colors: {
-          // modalBg: "hsl(50, 61%, 22%)",
-          // tertiaryBg: "hsl(0, 1%, 17%)",
-          // skeletonBg: "hsl(99, 44%, 23%)",
-          // accentButtonBg: "hsl(221, 87%, 41%)",
-          // accentButtonText: "hsl(0, 0%, 100%)",
-          // connectedButtonBg: "hsl(0, 85%, 4%)",
-          // borderColor: "hsl(0, 0%, 15%)",
-          // accentText: "hsl(0, 0%, 0%)",
-        },
-      })}
       client={client}
-      description={"𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙"}
-      currency={"USD"}
       chain={defineChain(8453)}
       tokenAddress="0x30D01555d88c76500a82754A1D53cAc082A6CB75"
-      amount={"0.002"}
-      tokenEditable={false}
+      amount="100"
+      theme="dark"
     />
             </div>
           </div>
