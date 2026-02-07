@@ -2,14 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { BuyWidget } from "thirdweb/react";
-import { createThirdwebClient } from "thirdweb";
 import { defineChain } from "thirdweb/chains";
 import { useLanguage } from './LanguageProvider';
-
-// Create client with your Client ID
-const client = createThirdwebClient({
-  clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID,
-});
+import { client } from '@/lib/contract';
 
 const ThirdwebBuyModal = ({ isOpen, onClose }) => {
   const [glitchActive, setGlitchActive] = useState(false);
