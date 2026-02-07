@@ -823,7 +823,7 @@ REMEMBER: When in doubt, verify everything through our official channels.
 
 OFFICIAL CHANNELS:
 • Website: https://rl80.com
-• X (Twitter): @rlaborare
+• X (Twitter): @rl80token
 • Email: 411@rl80.com
 
 IMPORTANT: We do NOT have a Discord or Telegram.
@@ -914,7 +914,7 @@ INVEST ONLY WHAT YOU CAN AFFORD TO LOSE.
           response: `LOADING REPORT PROTOCOL...
 
 TO REPORT SCAMS OR IMPERSONATION:
-• Tweet or DM @rlaborare on X with details
+• Tweet or DM @rl80token on X with details
 • Email 411@rl80.com with screenshots if possible
 • Block and report the scammer on the platform
 
@@ -924,25 +924,25 @@ Help us protect the community by reporting suspicious activity.
 `,
           status: '[REPORT.READY]'
         },
-        {
-          id: 'SUB_007_G',
-          command: '>> SUB.QUERY: Design.Philosophy',
-          title: 'Why no Discord or Telegram?',
-          response: `LOADING DESIGN PHILOSOPHY...
+//         {
+//           id: 'SUB_007_G',
+//           command: '>> SUB.QUERY: Design.Philosophy',
+//           title: 'Why no Discord or Telegram?',
+//           response: `LOADING DESIGN PHILOSOPHY...
 
-We intentionally avoid Discord and Telegram because:
+// We intentionally avoid Discord and Telegram because:
 
-• These platforms are common vectors for scams
-• Private groups enable impersonation and manipulation
-• "Alpha" channels create information asymmetry
-• Moderation is difficult at scale
+// • These platforms are common vectors for scams
+// • Private groups enable impersonation and manipulation
+// • "Alpha" channels create information asymmetry
+// • Moderation is difficult at scale
 
-RL80 is designed for transparency. Everything you need is public: the website, the contract, the tokenomics, and official announcements on X.
+// RL80 is designed for transparency. Everything you need is public: the website, the contract, the tokenomics, and official announcements on X.
 
-This is a feature, not a limitation.
-`,
-          status: '[PHILOSOPHY.LOADED]'
-        }
+// This is a feature, not a limitation.
+// `,
+//           status: '[PHILOSOPHY.LOADED]'
+//         }
       ]
     }
   ];

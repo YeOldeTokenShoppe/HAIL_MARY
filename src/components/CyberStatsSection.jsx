@@ -82,7 +82,7 @@ export default function CyberStatsSection({ isMobile }) {
         status: 'LIVE',
         secLevel: 'ALPHA',
         power: dataLoaded ? 99.9 : 0,
-        description: `Initial mint of ${INITIAL_SUPPLY.toLocaleString()} RL80 tokens on Base mainnet`,
+        description: `One time mint of ${INITIAL_SUPPLY.toLocaleString()} RL80 tokens on Base mainnet`,
         icon: '💎'
       },
       {
