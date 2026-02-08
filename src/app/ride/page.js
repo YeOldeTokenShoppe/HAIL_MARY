@@ -624,6 +624,38 @@ export default function CommunionPage() {
           <img src="/images/x_logo.svg" alt="X (Twitter)" style={{ width: "18px", height: "18px", filter: "brightness(0) invert(1)" }} />
         </a>
 
+        {/* Telegram */}
+        <a
+          href="https://t.me/rl80token"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Telegram"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "44px",
+            height: "44px",
+            borderRadius: "50%",
+            border: "1px solid rgba(212, 175, 55, 0.5)",
+            background: "rgba(13, 10, 20, 0.85)",
+            transition: "all 0.3s ease",
+            cursor: "pointer",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "rgba(212, 175, 55, 0.1)";
+            e.currentTarget.style.boxShadow = "0 0 15px rgba(212, 175, 55, 0.4)";
+            e.currentTarget.style.transform = "scale(1.1)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "rgba(13, 10, 20, 0.85)";
+            e.currentTarget.style.boxShadow = "none";
+            e.currentTarget.style.transform = "scale(1)";
+          }}
+        >
+          <img src="/images/telegram_blue.webp" alt="Telegram" style={{ width: "42px", height: "42px" }} />
+        </a>
+
         {/* Help Button */}
         <button
           onClick={() => setShowHelp(true)}

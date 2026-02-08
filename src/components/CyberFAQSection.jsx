@@ -691,7 +691,7 @@ INITIAL SUPPLY: 80B RL80`,
       title: 'Chat Room',
       response: ` LOADING COMMUNICATION PROTOCOLS...
 
-RL80 uses a built-in chat room on the site rather than Discord or Telegram.
+RL80 uses a built-in chat room on the site as an alternative to Discord or Telegram.
 
 This is a deliberate safety decision. Discord and Telegram are the most common platforms where crypto scammers operate — impersonating admins, sending phishing links in DMs, and running fake "support" channels.
 
