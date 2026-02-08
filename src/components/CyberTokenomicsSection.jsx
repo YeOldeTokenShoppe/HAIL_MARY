@@ -1390,8 +1390,81 @@ export default function CyberTokenomicsSection({ isMobile }) {
               }}
             />
           </a>
-          
+          <a
+            href="https://dexscreener.com/base/0x40d827acdbefd8ef46953e2b1ac87b8697b82203"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '10px 15px',
+              background: 'rgba(0, 0, 0, 0.4)',
+              borderRadius: '6px',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              transition: 'all 0.3s ease',
+              textDecoration: 'none',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 255, 170, 0.1)';
+              e.currentTarget.style.borderColor = 'rgba(0, 255, 170, 0.4)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)';
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <img
+              src="/images/dexscreener.webp"
+              alt="DexScreener"
+              style={{
+                height: '24px',
+                width: 'auto',
+                filter: 'brightness(0.9)',
+              }}
+            />
+          </a>
+          <a
+            href="https://tokensniffer.com/token/base/0x30d01555d88c76500a82754a1d53cac082a6cb75"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '10px 15px',
+              background: 'rgba(0, 0, 0, 0.4)',
+              borderRadius: '6px',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              transition: 'all 0.3s ease',
+              textDecoration: 'none',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 255, 170, 0.1)';
+              e.currentTarget.style.borderColor = 'rgba(0, 255, 170, 0.4)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)';
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <img
+              src="/images/tokensniffer.webp"
+              alt="TokenSniffer"
+              style={{
+                height: '24px',
+                width: 'auto',
+                filter: 'brightness(0.9)',
+              }}
+            />
+          </a>
+
         </div>
+
       </div>
 
       <style jsx>{`
