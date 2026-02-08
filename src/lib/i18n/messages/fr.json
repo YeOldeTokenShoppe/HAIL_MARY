@@ -224,7 +224,7 @@
       "no": "Non"
     },
     "instructions": {
-      "title": "Instructions",
+      "title": "Directives",
       "clickBeast": "Cliquez sur une bête disponible pour commencer un <strong>tour de 10 minutes</strong>. Après 10 minutes, vous pouvez continuer la conversation en choisissant une autre bête ou en chattant dans le chat des spectateurs.",
       "signedIn": "Vous devez être <strong>connecté</strong> pour monter",
       "messages": "Pendant le tour, tapez des messages qui apparaissent sur votre bête pour que <strong>les utilisateurs connectés les voient.</strong> Les visiteurs non connectés verront du texte crypté.",

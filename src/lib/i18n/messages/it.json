@@ -225,7 +225,7 @@
       "no": "No"
     },
     "instructions": {
-      "title": "Istruzioni",
+      "title": "Linee guida",
       "clickBeast": "Clicca su una bestia disponibile per iniziare un <strong>giro di 10 minuti</strong>. Dopo 10 minuti, puoi continuare la conversazione scegliendo un'altra bestia o chattando nella chat degli spettatori.",
       "signedIn": "Devi essere <strong>connesso</strong> per cavalcare",
       "messages": "Durante il giro, scrivi messaggi che appaiono sulla tua bestia per farli <strong>vedere agli utenti connessi.</strong> I visitatori non connessi vedranno testo criptato.",

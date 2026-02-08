@@ -229,7 +229,7 @@
       "no": "Non"
     },
     "instructions": {
-      "title": "Instructiones",
+      "title": "Praecepta",
       "clickBeast": "Preme quamlibet bestiam praesto ut <strong>vecturam X minutarum</strong> incipias. Post X minuta, colloquium continuare potes alia bestia eligendo aut in colloquio spectatorum.",
       "signedIn": "Debes <strong>intrare</strong> ut equites",
       "messages": "Dum equitas, scribe nuntios qui in bestia tua apparent ut <strong>utentes intrati videant.</strong> Visitatores non intrati textum crypticum videbunt.",

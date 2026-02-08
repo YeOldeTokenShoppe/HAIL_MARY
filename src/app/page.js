@@ -366,6 +366,86 @@ export default function Home() {
       </div>
         </div>
       )}
+
+      {/* Social Links - Bottom Right */}
+      {!isSceneLoading && (
+        <div
+          style={{
+            position: "fixed",
+            bottom:  "5rem",
+            right:  "2rem",
+            left: "auto",
+            transform: isMobileDevice ? "translateY(-50%)" : "none",
+            display: "flex",
+            flexDirection:  "column",
+            alignItems: "center",
+            gap: "12px",
+            zIndex: 10,
+          }}
+        >
+          <a
+            href="https://x.com/rl80token"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="X (Twitter)"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "44px",
+              height: "44px",
+              borderRadius: "50%",
+              border: "1px solid rgba(255, 255, 255, 0.3)",
+              background: "rgba(0, 0, 0, 0.5)",
+              transition: "all 0.3s ease",
+              cursor: "pointer",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+              e.currentTarget.style.boxShadow = "0 0 15px rgba(255, 255, 255, 0.3)";
+              e.currentTarget.style.transform = "scale(1.1)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+              e.currentTarget.style.boxShadow = "none";
+              e.currentTarget.style.transform = "scale(1)";
+            }}
+          >
+            <img src="/x_logo_white.webp" alt="X (Twitter)" style={{ width: "18px", height: "18px" }} />
+          </a>
+
+          <a
+            href="https://t.me/rl80token"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Telegram"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "44px",
+              height: "44px",
+              borderRadius: "50%",
+              border: "1px solid rgba(255, 255, 255, 0.3)",
+              background: "rgba(0, 0, 0, 0.5)",
+              transition: "all 0.3s ease",
+              cursor: "pointer",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+              e.currentTarget.style.boxShadow = "0 0 15px rgba(255, 255, 255, 0.3)";
+              e.currentTarget.style.transform = "scale(1.1)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+              e.currentTarget.style.boxShadow = "none";
+              e.currentTarget.style.transform = "scale(1)";
+            }}
+          >
+            <img src="/telegram_logo_white.webp" alt="Telegram" style={{ width: "20px", height: "20px" }} />
+          </a>
+        </div>
+      )}
     </div>
   );
 }

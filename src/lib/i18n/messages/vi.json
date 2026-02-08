@@ -229,7 +229,7 @@
       "no": "Không"
     },
     "instructions": {
-      "title": "Hướng dẫn",
+      "title": "Nguyên tắc",
       "clickBeast": "Nhấn vào bất kỳ thú cưỡi nào để bắt đầu <strong>chuyến đi 10 phút</strong>. Sau 10 phút, bạn có thể tiếp tục trò chuyện bằng cách chọn thú khác hoặc chat trong phòng khán giả.",
       "signedIn": "Bạn phải <strong>đăng nhập</strong> để cưỡi",
       "messages": "Trong khi cưỡi, nhập tin nhắn hiển thị trên thú của bạn cho <strong>người dùng đã đăng nhập xem.</strong> Khách chưa đăng nhập sẽ thấy văn bản mã hóa.",

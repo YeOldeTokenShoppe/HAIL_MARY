@@ -225,7 +225,7 @@
       "no": "Nein"
     },
     "instructions": {
-      "title": "Anleitung",
+      "title": "Richtlinien",
       "clickBeast": "Klicke auf eine verfügbare Bestie, um eine <strong>10-minütige Fahrt</strong> zu starten. Nach 10 Minuten kannst du das Gespräch fortsetzen, indem du eine andere Bestie wählst oder im Zuschauer-Chat chattest.",
       "signedIn": "Du musst <strong>angemeldet</strong> sein, um zu reiten",
       "messages": "Während der Fahrt tippe Nachrichten, die auf deiner Bestie erscheinen, damit <strong>angemeldete Benutzer sie sehen.</strong> Nicht angemeldete Besucher sehen verschlüsselten Text.",

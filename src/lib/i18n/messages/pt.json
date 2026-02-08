@@ -229,7 +229,7 @@
       "no": "Não"
     },
     "instructions": {
-      "title": "Instruções",
+      "title": "Diretrizes",
       "clickBeast": "Clique em qualquer besta disponível para iniciar um <strong>passeio de 10 minutos</strong>. Após 10 minutos, você pode continuar a conversa escolhendo outra besta ou conversando no chat de espectadores.",
       "signedIn": "Você deve estar <strong>conectado</strong> para montar",
       "messages": "Durante o passeio, digite mensagens que aparecem na sua besta para <strong>usuários conectados verem.</strong> Visitantes não conectados verão texto criptografado.",

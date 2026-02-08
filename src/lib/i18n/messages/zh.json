@@ -229,7 +229,7 @@
       "no": "否"
     },
     "instructions": {
-      "title": "说明",
+      "title": "准则",
       "clickBeast": "点击任何可用的神兽开始<strong>10分钟骑乘</strong>。10分钟后，你可以选择另一只神兽或在观众聊天室继续对话。",
       "signedIn": "你必须<strong>登录</strong>才能骑乘",
       "messages": "骑乘时，输入的消息会显示在你的神兽上供<strong>已登录用户查看。</strong>未登录的访客将看到加密文字。",

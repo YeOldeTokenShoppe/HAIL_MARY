@@ -224,7 +224,7 @@
       "no": "No"
     },
     "instructions": {
-      "title": "Instrucciones",
+      "title": "Directrices",
       "clickBeast": "Haz clic en cualquier bestia disponible para iniciar un <strong>paseo de 10 minutos</strong>. Cuando terminen los 10 minutos, puedes continuar la conversación eligiendo otra bestia o chateando en el chat de espectadores.",
       "signedIn": "Debes <strong>iniciar sesión</strong> para montar",
       "messages": "Mientras montas, escribe mensajes que aparecen en tu bestia para que <strong>los usuarios registrados los vean.</strong> Los visitantes sin sesión verán texto encriptado.",

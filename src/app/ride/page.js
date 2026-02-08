@@ -497,8 +497,8 @@ export default function CommunionPage() {
                 onRidingChange={setIsRiding}
                 images={[
                   { src: "/seaMonster.webp", title: "Sea Monster" },
-                  { src: "/bull.webp", title: "Bull" },
-                  { src: "/bear.webp", title: "Bear" },
+                  { src: "/bull2.webp", title: "Bull" },
+                  { src: "/bear2.webp", title: "Bear" },
                   { src: "/gator.webp", title: "G8r" },
                   { src: "/chupa.webp", title: "Chupacabra" },
                   { src: "/snowman.webp", title: "Yeti" },

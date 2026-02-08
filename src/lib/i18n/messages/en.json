@@ -229,7 +229,7 @@
       "no": "No"
     },
     "instructions": {
-      "title": "Instructions",
+      "title": "Guidelines",
       "clickBeast": "Click any available beast to start a <strong>10-minute ride</strong>. When 10 minutes are up, you can keep the conversation going by choosing another beast or chatting in the spectator chat box.",
       "signedIn": "You must be <strong>signed in</strong> to ride",
       "messages": "While riding, type messages that appear on your beast for <strong>signed-in users to see.</strong> Visitors that are not signed in will see encrypted text.",
