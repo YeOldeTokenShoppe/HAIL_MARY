@@ -676,7 +676,7 @@ export function WatchlistPhoneTexture({
     img.onload = () => {
       avatarImageRef.current = img;
     };
-    img.src = '/images/electricRL80.png';
+    img.src = '/images/coinFront1.png';
   }, []);
 
   // Update time every second
@@ -1459,8 +1459,14 @@ export function WatchlistPhoneTexture({
           autoScrollPauseStartRef.current = now;
         }
       } else if (autoScrollStateRef.current === 'bottom_pause') {
-        // Pause at the bottom, then reset to top
+        // Pause at the bottom, then smoothly scroll back to top
         if (now - autoScrollPauseStartRef.current > CONFIG.AUTO_SCROLL_BOTTOM_PAUSE) {
+          targetScrollRef.current = 0;
+          autoScrollStateRef.current = 'scrolling_up';
+        }
+      } else if (autoScrollStateRef.current === 'scrolling_up') {
+        // Smooth scroll back to top (lerp handled below), then pause
+        if (scrollPositionRef.current < 1) {
           scrollPositionRef.current = 0;
           targetScrollRef.current = 0;
           autoScrollStateRef.current = 'pausing';
@@ -1471,7 +1477,8 @@ export function WatchlistPhoneTexture({
 
     // Smooth scrolling for manual/programmatic scroll
     if (Math.abs(targetScrollRef.current - scrollPositionRef.current) > 0.5) {
-      scrollPositionRef.current += (targetScrollRef.current - scrollPositionRef.current) * CONFIG.SCROLL_SPEED;
+      const speed = autoScrollStateRef.current === 'scrolling_up' ? 0.04 : CONFIG.SCROLL_SPEED;
+      scrollPositionRef.current += (targetScrollRef.current - scrollPositionRef.current) * speed;
     }
 
     // Redraw at ~60fps

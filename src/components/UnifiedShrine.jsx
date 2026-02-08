@@ -1966,7 +1966,7 @@ useEffect(() => {
       resizeObserver.disconnect()
       chart.remove()
     }
-  }, [is80sMode, rl80Price])
+  }, [is80sMode, rl80Price, activeStatsTab])
 
   // Store timeout refs for cleanup
   const timeoutRefs = useRef({})
@@ -2689,6 +2689,9 @@ useEffect(() => {
       
       {/* CSS for animations */}
       <style jsx>{`
+        .price-mini-chart :global(a[href*="tradingview"]) {
+          display: none !important;
+        }
         @keyframes pulseScale {
           0% { 
             transform: scale(1);
@@ -3034,9 +3037,10 @@ useEffect(() => {
                   </span>
                 </div>
               </div>
-              {/* Chart container */}
+              {/* Chart container — hide TradingView watermark */}
               <div
                 ref={priceChartRef}
+                className="price-mini-chart"
                 style={{
                   width: '100%',
                   height: isMobile ? '70px' : '100px',

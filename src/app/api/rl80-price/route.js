@@ -11,20 +11,29 @@ export async function GET() {
   }
 
   try {
-    const [poolRes, ohlcvRes] = await Promise.all([
+    // Fetch pool data and both daily + hourly OHLCV
+    const [poolRes, dailyRes, hourlyRes] = await Promise.all([
       fetch(`${GECKO_BASE}/${POOL_ADDRESS}`, {
         headers: { Accept: 'application/json' },
       }),
       fetch(`${GECKO_BASE}/${POOL_ADDRESS}/ohlcv/day?aggregate=1&limit=30`, {
         headers: { Accept: 'application/json' },
       }),
+      fetch(`${GECKO_BASE}/${POOL_ADDRESS}/ohlcv/hour?aggregate=1&limit=48`, {
+        headers: { Accept: 'application/json' },
+      }),
     ])
 
     const poolJson = await poolRes.json()
-    const ohlcvJson = await ohlcvRes.json()
+    const dailyJson = await dailyRes.json()
+    const hourlyJson = await hourlyRes.json()
 
     const pool = poolJson?.data?.attributes || {}
-    const ohlcvList = ohlcvJson?.data?.attributes?.ohlcv_list || []
+    const dailyList = dailyJson?.data?.attributes?.ohlcv_list || []
+    const hourlyList = hourlyJson?.data?.attributes?.ohlcv_list || []
+
+    // Use daily data when enough history exists, otherwise fall back to hourly
+    const ohlcvList = dailyList.length > 2 ? dailyList : hourlyList
 
     const price = parseFloat(pool.base_token_price_usd) || null
     const priceChange24h = parseFloat(pool.price_change_percentage?.h24) || 0
@@ -43,6 +52,7 @@ export async function GET() {
       fdv,
       liquidity,
       ohlcv,
+      timeframe: dailyList.length > 2 ? 'daily' : 'hourly',
       timestamp: new Date().toISOString(),
     }
 
