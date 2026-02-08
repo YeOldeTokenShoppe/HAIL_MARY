@@ -380,7 +380,8 @@ export default function Home() {
             flexDirection:  "column",
             alignItems: "center",
             gap: "12px",
-            zIndex: 10,
+            zIndex: 1001,
+            pointerEvents: "auto",
           }}
         >
           <a
