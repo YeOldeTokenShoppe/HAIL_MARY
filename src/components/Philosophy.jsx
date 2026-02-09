@@ -1770,7 +1770,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
             }}>
               <div style={{ width: '100%', height: '100%', position: 'relative' }}>
                 {/* Double-click magnify button */}
-                <button
+                {/* <button
                   onClick={() => {
                     setMagnifiedZoom(1.25); // Reset zoom to default when opening
                     setShowMagnifiedScroll(true);
@@ -1792,7 +1792,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
                   title="Magnify scroll"
                 >
                   🔍
-                </button>
+                </button> */}
                 
                 <iframe
                   ref={scrollIframeRef}
@@ -2045,7 +2045,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
               }}
             >
               {/* Mobile magnify button - positioned better */}
-              <button
+              {/* <button
                 onClick={() => {
                   setMagnifiedZoom(1.25); // Reset zoom to default when opening
                   setShowMagnifiedScroll(true);
@@ -2083,7 +2083,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
                 aria-label="Magnify scroll for better reading"
               >
                 🔍
-              </button>
+              </button> */}
               
               <iframe
                 ref={mobileScrollIframeRef}
