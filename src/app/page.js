@@ -103,7 +103,7 @@ export default function Home() {
   return (
     <div style={{ width: '100vw', minHeight: '100vh' }}>
       {/* Language Switcher for debugging */}
-      {/* <LanguageSwitcher /> */}
+      <LanguageSwitcher />
       
       {/* Show loader when scene is loading */}
       {isSceneLoading && (
@@ -368,7 +368,7 @@ export default function Home() {
       )}
 
       {/* Social Links - Bottom Right */}
-      {/* {!isSceneLoading && (
+      {!isSceneLoading && (
         <div
           style={{
             position: "fixed",
@@ -477,7 +477,7 @@ export default function Home() {
             <img src="/farcaster_logo.webp" alt="Farcaster" style={{ width: "20px", height: "20px" }} />
           </a>
         </div>
-      )} */}
+      )}
     </div>
   );
 }

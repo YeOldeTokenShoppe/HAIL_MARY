@@ -1289,6 +1289,11 @@ const PalmsScene = ({ onLoadingChange }) => {
             // Store original emissive properties
             child.userData.originalEmissive = child.material.emissive ? child.material.emissive.clone() : new THREE.Color(0x000000);
             child.userData.originalEmissiveIntensity = child.material.emissiveIntensity || 0;
+
+            // TEMPORARY: Strong emissive glow for video capture
+            child.material.emissive = new THREE.Color(0x88ccff);
+            child.material.emissiveIntensity = 1.5;
+            child.material.needsUpdate = true;
           }
         }
       });
@@ -2122,7 +2127,7 @@ const PalmsScene = ({ onLoadingChange }) => {
           }
           if (maryMeshRef.current.material) {
             gsap.to(maryMeshRef.current.material, {
-              emissiveIntensity: 0.7,
+              emissiveIntensity: 2.5,
               duration: 0.3
             });
           }
@@ -2137,7 +2142,7 @@ const PalmsScene = ({ onLoadingChange }) => {
           }
           if (maryMeshRef.current.material) {
             gsap.to(maryMeshRef.current.material, {
-              emissiveIntensity: 0.5,
+              emissiveIntensity: 1.5,
               duration: 0.3
             });
           }
