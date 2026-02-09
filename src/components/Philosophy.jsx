@@ -477,7 +477,7 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
             // console.log(`${scrollName} clicked!`);
             if (onScrollClick) {
               const scrollNumber = scrollName.toLowerCase().replace('scroll', '');
-              onScrollClick(`scroll${scrollNumber}.html`);
+              onScrollClick(`/scroll${scrollNumber}.html`);
             }
           };
           
@@ -1520,7 +1520,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
       {windowWidth < 768 && !isLoading && (
         <div style={{
           position: 'absolute',
-          top: '2rem',
+          top: '0.5rem',
           left: '1rem',
 
           zIndex: 100,
@@ -1546,7 +1546,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
           {/* Mobile intro text */}
           {showIntroText && (
             <div style={{
-              marginTop: '1rem',
+              marginTop: '3rem',
               padding: '0.4rem',
               background: 'linear-gradient(135deg, rgba(194, 154, 77, 0.2) 0%, rgba(142, 102, 43, 0.15) 50%, rgba(194, 154, 77, 0.2) 100%)',
               border: '2px double #8e662b',
