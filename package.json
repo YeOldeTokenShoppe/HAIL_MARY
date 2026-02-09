@@ -15,10 +15,13 @@
   "dependencies": {
     "@clerk/nextjs": "^6.31.1",
     "@clerk/themes": "^2.4.46",
+    "@farcaster/miniapp-sdk": "^0.2.3",
+    "@farcaster/miniapp-wagmi-connector": "^1.1.1",
     "@react-three/drei": "^10.6.1",
     "@react-three/fiber": "^9.3.0",
     "@react-three/postprocessing": "^3.0.4",
     "@tailwindcss/postcss": "^4.1.18",
+    "@tanstack/react-query": "^5.90.20",
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
     "dotenv": "^16.4.5",
@@ -43,7 +46,9 @@
     "tailwind-merge": "^3.3.1",
     "thirdweb": "^5.116.1",
     "three": "^0.164.1",
-    "three-stdlib": "^2.36.0"
+    "three-stdlib": "^2.36.0",
+    "viem": "^2.45.2",
+    "wagmi": "^3.4.2"
   },
   "devDependencies": {
     "tailwindcss": "^4.1.14"

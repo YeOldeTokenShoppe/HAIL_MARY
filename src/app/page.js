@@ -103,7 +103,7 @@ export default function Home() {
   return (
     <div style={{ width: '100vw', minHeight: '100vh' }}>
       {/* Language Switcher for debugging */}
-      <LanguageSwitcher />
+      {/* <LanguageSwitcher /> */}
       
       {/* Show loader when scene is loading */}
       {isSceneLoading && (
@@ -368,7 +368,7 @@ export default function Home() {
       )}
 
       {/* Social Links - Bottom Right */}
-      {!isSceneLoading && (
+      {/* {!isSceneLoading && (
         <div
           style={{
             position: "fixed",
@@ -445,8 +445,39 @@ export default function Home() {
           >
             <img src="/telegram_logo_white.webp" alt="Telegram" style={{ width: "20px", height: "20px" }} />
           </a>
+
+          <a
+            href="https://farcaster.xyz/rl80"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Farcaster"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "44px",
+              height: "44px",
+              borderRadius: "50%",
+              border: "1px solid rgba(255, 255, 255, 0.3)",
+              background: "rgba(0, 0, 0, 0.5)",
+              transition: "all 0.3s ease",
+              cursor: "pointer",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+              e.currentTarget.style.boxShadow = "0 0 15px rgba(255, 255, 255, 0.3)";
+              e.currentTarget.style.transform = "scale(1.1)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+              e.currentTarget.style.boxShadow = "none";
+              e.currentTarget.style.transform = "scale(1)";
+            }}
+          >
+            <img src="/farcaster_logo.webp" alt="Farcaster" style={{ width: "20px", height: "20px" }} />
+          </a>
         </div>
-      )}
+      )} */}
     </div>
   );
 }

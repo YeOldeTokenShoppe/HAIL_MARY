@@ -565,7 +565,7 @@ function VendingMachine({ scale = 1, position = [0, 0, 0], rotation = [0, 0, 0],
 }
 
 // Prize Status Bar - shows claim count and status
-function PrizeStatusBar({ currentPrize, claimStatus, remainingClaims, eligibilityDetails, onSignIn, onConnectWallet }) {
+export function PrizeStatusBar({ currentPrize, claimStatus, remainingClaims, eligibilityDetails, onSignIn, onConnectWallet }) {
   const getStatusMessage = () => {
     switch (claimStatus) {
       case 'loading':
@@ -778,7 +778,7 @@ export function ModelPreview({ modelPath, size = 150 }) {
 }
 
 // Success Modal after claiming
-function ClaimSuccessModal({ isOpen, prize, onClose }) {
+export function ClaimSuccessModal({ isOpen, prize, onClose }) {
   if (!isOpen || !prize) return null;
 
   return (
@@ -925,7 +925,7 @@ function CheckerboardFloor({ position = [0, -0.65, 0], size = 6 }) {
 }
 
 // Inner scene component to access OrbitControls ref
-function VendingSceneInner({ onToyClick, onZoomComplete, resetKey, capsuleColorIndex, modelPath, disabled }) {
+export function VendingSceneInner({ onToyClick, onZoomComplete, resetKey, capsuleColorIndex, modelPath, disabled }) {
   const controlsRef = useRef();
   const spotlightRef = useRef();
   const [showCenteredCapsule, setShowCenteredCapsule] = useState(false);
