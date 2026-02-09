@@ -1204,7 +1204,7 @@ function PyramidModel() {
 // Preload the pyramid model
 useGLTF.preload('/models/pyramid.glb');
 
-export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onLoadingChange, is80sMode = false }) {
+export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onLoadingChange, is80sMode = false, isMiniApp = false }) {
   const { locale } = useLanguage();
   const [selectedChart, setSelectedChart] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -1520,7 +1520,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
       {windowWidth < 768 && !isLoading && (
         <div style={{
           position: 'absolute',
-          top: '0.5rem',
+          top: isMiniApp ? '0.5rem' : '2rem',
           left: '1rem',
 
           zIndex: 100,
@@ -1543,10 +1543,10 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
             visibility: 'visible'
           }}>The <br/>Scrolls <span style={{fontSize: '1.5rem', position: 'relative', top: '-0.5rem', left: '-0.5rem'}}>of</span><br/>St. GR80</h1>
 
-          {/* Mobile intro text */}
-          {showIntroText && (
+          {/* Mobile intro text - only in non-miniapp version */}
+          {!isMiniApp && showIntroText && (
             <div style={{
-              marginTop: '3rem',
+              marginTop: '1rem',
               padding: '0.4rem',
               background: 'linear-gradient(135deg, rgba(194, 154, 77, 0.2) 0%, rgba(142, 102, 43, 0.15) 50%, rgba(194, 154, 77, 0.2) 100%)',
               border: '2px double #8e662b',
@@ -1952,7 +1952,78 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
         {/* Mobile overlays - only show on actual mobile devices */}
         {windowWidth <= 768 && !deviceType.includes('ipad') && (
           <>
-            
+            {/* MiniApp intro text - positioned above scroll area */}
+            {isMiniApp && showIntroText && (
+              <div style={{
+                position: 'absolute',
+                bottom: 'calc(70%)',
+                left: '1rem',
+                // right: '0.5rem',
+                zIndex: 6,
+                pointerEvents: 'none',
+              }}>
+                <div style={{
+                  padding: '0.4rem',
+                  background: 'linear-gradient(135deg, rgba(194, 154, 77, 0.2) 0%, rgba(142, 102, 43, 0.15) 50%, rgba(194, 154, 77, 0.2) 100%)',
+                  border: '2px double #8e662b',
+                  maxWidth: '280px',
+                  margin: '0 auto',
+                  position: 'relative',
+                  boxShadow: 'inset 0 0 20px rgba(142, 102, 43, 0.3), 0 3px 6px rgba(0, 0, 0, 0.5)',
+                  clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%)',
+                }}>
+                  <p style={{
+                    color: '#d4af37',
+                    fontSize: '0.72rem',
+                    fontWeight: 500,
+                    letterSpacing: '0.02em',
+                    lineHeight: 1.2,
+                    margin: 0,
+                    textAlign: 'center',
+                    textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9), 0 0 15px rgba(212, 175, 55, 0.3)',
+                    fontStyle: 'italic',
+                  }}>
+                    Here you can find the works of devout RL80 devotee, Saint GR80, the anachronistic android, mystic and medieval scholar.
+                  </p>
+                  <p style={{
+                    color: '#8e662b',
+                    fontSize: '0.65rem',
+                    margin: '0.3rem 0 0',
+                    textAlign: 'center',
+                    letterSpacing: '0.05em',
+                    textShadow: '1px 1px 3px rgba(0, 0, 0, 0.8)',
+                  }}>
+                    Tap the glowing scrolls to read
+                  </p>
+                  <button
+                    onClick={() => setShowIntroText(false)}
+                    style={{
+                      position: 'absolute',
+                      bottom: '-6px',
+                      right: '-6px',
+                      background: 'rgba(142, 102, 43, 0.4)',
+                      border: '1px solid #8e662b',
+                      color: '#8e662b',
+                      width: '1rem',
+                      height: '1rem',
+                      cursor: 'pointer',
+                      fontSize: '0.7rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: 0,
+                      opacity: 0.6,
+                      pointerEvents: 'auto'
+                    }}
+                    aria-label="Hide introduction"
+                    title="Hide this message"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Scroll overlay for mobile/iPad - repositioned and resized based on device */}
             <div
               style={{

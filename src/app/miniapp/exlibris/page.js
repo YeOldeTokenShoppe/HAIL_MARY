@@ -28,6 +28,7 @@ export default function MiniappExlibrisPage() {
         modelPath="/models/saint_robot2.glb"
         onLoadingChange={setIsPageLoading}
         is80sMode={false}
+        isMiniApp={true}
       />
     </div>
   );
