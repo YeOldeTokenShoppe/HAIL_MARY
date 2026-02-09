@@ -1,0 +1,20 @@
+{
+  "accountAssociation": {
+    "header": "PASTE_FROM_FARCASTER_DEV_TOOLS",
+    "payload": "PASTE_FROM_FARCASTER_DEV_TOOLS",
+    "signature": "PASTE_FROM_FARCASTER_DEV_TOOLS"
+  },
+  "frame": {
+    "version": "1",
+    "name": "The Scrolls of St. GR80",
+    "homeUrl": "https://rl80.com/miniapp/exlibris",
+    "iconUrl": "https://rl80.com/favicon.svg",
+    "splashImageUrl": "https://rl80.com/favicon.svg",
+    "splashBackgroundColor": "#0a0a0a",
+    "subtitle": "Ancient scrolls from the anachronistic android",
+    "description": "Explore the writings of Saint GR80, the anachronistic android, mystic and medieval scholar.",
+    "primaryCategory": "games",
+    "tags": ["rl80", "scrolls", "3d", "collectibles"],
+    "requiredChains": ["eip155:8453"]
+  }
+}
