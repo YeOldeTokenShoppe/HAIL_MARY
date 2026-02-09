@@ -2028,7 +2028,8 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
             <div
               style={{
                 position: 'absolute',
-                bottom: deviceType === 'ipad-mini' ? '5rem' :
+                bottom: isMiniApp ? '2rem' :
+                        deviceType === 'ipad-mini' ? '5rem' :
                         deviceType === 'ipad' ? '4rem' : '3rem',
                 left: deviceType === 'ipad-mini' ? '25%' :
                       deviceType === 'ipad' ? '20%' : '1rem',
