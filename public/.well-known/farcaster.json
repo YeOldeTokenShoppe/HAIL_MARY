@@ -1,8 +1,8 @@
 {
-  "accountAssociation": {
-    "header": "PASTE_FROM_FARCASTER_DEV_TOOLS",
-    "payload": "PASTE_FROM_FARCASTER_DEV_TOOLS",
-    "signature": "PASTE_FROM_FARCASTER_DEV_TOOLS"
+ "accountAssociation": {
+    "header": "eyJmaWQiOjEzMjM1ODQsInR5cGUiOiJhdXRoIiwia2V5IjoiMHhGOTRFOGY5MjA0MTEwQkVGQWVDODg3ODgwZDRCNTY3QjUyRTc1ZTIyIn0",
+    "payload": "eyJkb21haW4iOiJybDgwLmNvbSJ9",
+    "signature": "WDDe7kl1UlrytWHioFslbAubpiHpGBK5d9NorMdekDwNO2DMWbl15edm85+p4Plzc8yXv+U2yg4IRvUVao4b8Bw="
   },
   "frame": {
     "version": "1",
