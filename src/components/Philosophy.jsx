@@ -1956,7 +1956,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
             {isMiniApp && showIntroText && (
               <div style={{
                 position: 'absolute',
-                bottom: 'calc(70%)',
+                bottom: 'calc(40%)',
                 left: '1rem',
                 // right: '0.5rem',
                 zIndex: 6,
