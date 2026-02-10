@@ -10,9 +10,7 @@ export async function generateMetadata({ searchParams }) {
   const prizeId = params?.prize || '';
   const edition = params?.edition || '';
 
-  const ogUrl = new URL('/api/og/prize', process.env.NEXT_PUBLIC_SITE_URL || 'https://rl80.com');
-  if (prizeId) ogUrl.searchParams.set('prize', prizeId);
-  if (edition) ogUrl.searchParams.set('edition', edition);
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://rl80.com';
 
   return {
     title: `RL80 Gachapon Prize #${edition}`,
@@ -22,7 +20,7 @@ export async function generateMetadata({ searchParams }) {
       description: 'Claim weekly collectibles from the RL80 Gachapon machine',
       images: [
         {
-          url: ogUrl.toString(),
+          url: `${siteUrl}/gachaponPrize.jpg`,
           width: 1200,
           height: 800,
           alt: 'RL80 Gachapon Prize',

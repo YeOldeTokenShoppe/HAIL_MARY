@@ -346,12 +346,14 @@ export default function MiniappGachaponPage() {
     }
 
     try {
-      await claimPrize();
+      const claim = await claimPrize();
       setClaimedPrize({
         name: currentPrize.name,
         description: currentPrize.description,
         modelPath: currentPrize.modelPath,
         icon: currentPrize.previewConfig?.icon,
+        edition: claim?.claimNumber,
+        maxEditions: currentPrize.maxClaims || 80,
       });
       setShowSuccessModal(true);
     } catch (error) {

@@ -2,7 +2,7 @@ const embedData = {
   version: "1",
   imageUrl: "https://rl80.com/gachaponScreenshot.jpg",
   button: {
-    title: "Play Gachapon",
+    title: "Claim Prize",
     action: {
       type: "launch_frame",
       name: "RL80 Gachapon",

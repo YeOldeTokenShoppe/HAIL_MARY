@@ -861,6 +861,17 @@ export function ClaimSuccessModal({ isOpen, prize, onClose, isMiniApp = false })
         }}>
           Prize Claimed!
         </h2>
+        {prize.edition && (
+          <p style={{
+            color: '#00f5d4',
+            fontSize: '0.85rem',
+            fontFamily: "'Orbitron', monospace",
+            marginBottom: '0.5rem',
+            opacity: 0.8,
+          }}>
+            Edition #{prize.edition}/{prize.maxEditions || 80}
+          </p>
+        )}
         <p style={{
           color: '#fff',
           fontSize: '1.1rem',
@@ -1059,6 +1070,8 @@ export default function VendingMachineScene() {
         description: currentPrize.description,
         modelPath: currentPrize.modelPath,
         icon: currentPrize.previewConfig?.icon,
+        edition: claim?.claimNumber,
+        maxEditions: currentPrize.maxClaims || 80,
       });
       setShowSuccessModal(true);
     } catch (error) {
