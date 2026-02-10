@@ -99,7 +99,7 @@ export async function GET(request) {
               display: 'flex',
             }}
           >
-            #{edition}/100
+            #{edition}/80
           </div>
         </div>
 

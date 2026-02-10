@@ -373,7 +373,7 @@ export default function MiniappGachaponPage() {
     const shareUrl = `${window.location.origin}/miniapp/gachapon/share?prize=${encodeURIComponent(currentPrize?.id || '')}&edition=${edition}`;
 
     sdk.actions.composeCast({
-      text: `I claimed "${claimedPrize.name}" #${edition}/100 from the RL80 Gachapon!`,
+      text: `I claimed "${claimedPrize.name}" #${edition}/80 from the RL80 Gachapon!`,
       embeds: [shareUrl],
     });
   }, [claimedPrize, weeklyPrize.claimCount, currentPrize]);

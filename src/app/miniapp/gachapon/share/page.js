@@ -18,7 +18,7 @@ export async function generateMetadata({ searchParams }) {
     title: `RL80 Gachapon Prize #${edition}`,
     description: 'Claim weekly collectibles from the RL80 Gachapon machine',
     openGraph: {
-      title: `RL80 Gachapon Prize #${edition}/100`,
+      title: `RL80 Gachapon Prize #${edition}/80`,
       description: 'Claim weekly collectibles from the RL80 Gachapon machine',
       images: [
         {
