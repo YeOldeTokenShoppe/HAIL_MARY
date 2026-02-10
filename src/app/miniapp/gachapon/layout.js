@@ -1,18 +1,3 @@
-const embedData = {
-  version: "1",
-  imageUrl: "https://rl80.com/api/og/prize?name=RL80+Gachapon&edition=100",
-  button: {
-    title: "Play Gachapon",
-    action: {
-      type: "launch_frame",
-      name: "RL80",
-      url: "https://rl80.com/miniapp/gachapon",
-      splashImageUrl: "https://rl80.com/images/saintbot.png",
-      splashBackgroundColor: "#0a0a0a"
-    }
-  }
-};
-
 export const metadata = {
   title: 'RL80 Gachapon',
   description: 'Claim weekly collectibles from the RL80 Gachapon machine. Hold RL80 tokens to play.',
@@ -27,9 +12,6 @@ export const metadata = {
         alt: 'RL80 Gachapon',
       },
     ],
-  },
-  other: {
-    'fc:miniapp': JSON.stringify(embedData),
   },
 };
 
