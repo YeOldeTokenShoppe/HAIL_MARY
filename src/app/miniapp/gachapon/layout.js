@@ -1,6 +1,6 @@
 const embedData = {
   version: "1",
-  imageUrl: "https://rl80.com/api/og/prize?name=RL80+Gachapon&edition=80",
+  imageUrl: "https://rl80.com/gachaponScreenshot.jpg",
   button: {
     title: "Play Gachapon",
     action: {
@@ -21,7 +21,7 @@ export const metadata = {
     description: 'Claim weekly collectibles from the RL80 Gachapon machine',
     images: [
       {
-        url: 'https://rl80.com/api/og/prize?name=RL80+Gachapon&edition=80',
+        url: 'https://rl80.com/gachaponScreenshot.jpg',
         width: 1200,
         height: 800,
         alt: 'RL80 Gachapon',
