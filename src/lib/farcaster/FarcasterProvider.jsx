@@ -10,6 +10,10 @@ export function FarcasterProvider({ children }) {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
+    // Signal to Warpcast immediately so the splash screen clears
+    sdk.actions.ready();
+    setIsReady(true);
+
     const init = async () => {
       try {
         // Read context from the SDK (provides FID, username, etc.)
@@ -18,11 +22,6 @@ export function FarcasterProvider({ children }) {
       } catch (err) {
         console.warn('[FarcasterProvider] Could not read SDK context:', err);
       }
-
-      // Signal to Warpcast that the miniapp is ready to display
-      // Without this, users see an infinite loading screen
-      sdk.actions.ready();
-      setIsReady(true);
     };
 
     init();
