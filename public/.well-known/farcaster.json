@@ -13,7 +13,7 @@
     "splashBackgroundColor": "#0a0a0a",
     "subtitle": "Claim weekly NFT collectibles",
     "description": "Hold RL80 tokens to claim free weekly NFT collectibles from the Gachapon machine. 80 unique editions per drop.",
-    "primaryCategory": "games",
+    "primaryCategory": "entertainment",
     "tags": ["rl80", "nft", "gachapon", "collectibles"],
     "requiredChains": ["eip155:8453"],
     "webhookUrl": "https://api.neynar.com/f/app/d757bb65-dd51-4d2f-b61e-d77ad46e260c/event"

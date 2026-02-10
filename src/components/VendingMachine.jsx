@@ -689,39 +689,65 @@ export function PrizeStatusBar({ currentPrize, claimStatus, remainingClaims, eli
       flexDirection: 'column',
       justifyContent: 'center',
       alignItems: 'center',
-      gap: '8px',
-      padding: '15px 10px',
-      paddingBottom: 'max(20px, calc(env(safe-area-inset-bottom) + 10px))',
+      gap: '5px',
+      padding: '10px 10px',
+      paddingBottom: 'max(15px, calc(env(safe-area-inset-bottom) + 8px))',
       boxSizing: 'border-box',
       flexShrink: 0,
     }}>
       {currentPrize && (
         <div style={{
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          gap: '10px',
+          gap: '2px',
         }}>
-          {currentPrize.previewConfig?.icon && (
-            <img
-              src={currentPrize.previewConfig.icon}
-              alt={currentPrize.name}
-              style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '50%',
-                border: `2px solid ${currentPrize.previewConfig?.accentColor || '#00f5d4'}`,
-                boxShadow: `0 0 10px ${currentPrize.previewConfig?.accentColor || '#00f5d4'}40`,
-              }}
-            />
-          )}
           <div style={{
-            color: '#fff',
+            fontSize: '0.5rem',
             fontFamily: "'Orbitron', monospace",
-            fontSize: '0.9rem',
-            fontWeight: '600',
-            textShadow: '0 0 10px rgba(0,0,0,0.5)',
+            fontWeight: '700',
+            letterSpacing: '3px',
+            textTransform: 'uppercase',
+            color: '#ffd700',
+            textShadow: '0 0 8px rgba(255, 215, 0, 0.4)',
           }}>
-            {currentPrize.name}
+            Genesis Drop
+          </div>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+          }}>
+            {currentPrize.previewConfig?.icon && (
+              <img
+                src={currentPrize.previewConfig.icon}
+                alt={currentPrize.name}
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  border: `2px solid ${currentPrize.previewConfig?.accentColor || '#00f5d4'}`,
+                  boxShadow: `0 0 10px ${currentPrize.previewConfig?.accentColor || '#00f5d4'}40`,
+                }}
+              />
+            )}
+            <div style={{
+              color: '#fff',
+              fontFamily: "'Orbitron', monospace",
+              fontSize: '0.9rem',
+              fontWeight: '600',
+              textShadow: '0 0 10px rgba(0,0,0,0.5)',
+            }}>
+              {currentPrize.name}
+            </div>
+          </div>
+          <div style={{
+            fontSize: '0.5rem',
+            fontFamily: "'Orbitron', monospace",
+            color: 'rgba(255, 255, 255, 0.5)',
+            letterSpacing: '0.5px',
+          }}>
+            Limited edition — claim yours before they're gone
           </div>
         </div>
       )}
@@ -892,6 +918,8 @@ export function ClaimSuccessModal({ isOpen, prize, onClose, isMiniApp = false })
               src={prize.icon}
               alt={prize.name}
               style={{
+                position: 'relative',
+                top: '10%',
                 width: '150px',
                 height: '150px',
                 objectFit: 'contain',
