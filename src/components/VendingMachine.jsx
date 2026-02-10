@@ -172,6 +172,7 @@ function CenteredCapsule({ visible, onToyClick, onZoomComplete, capsuleColorInde
     if (!isOpening) {
       // First click: open the capsule
       setIsOpening(true);
+      try { new Audio('/choir.mp3').play(); } catch (e) {}
     } else if (capsuleOpened) {
       // Second click: trigger claim
       if (onToyClick) onToyClick();

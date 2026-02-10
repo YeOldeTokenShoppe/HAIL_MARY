@@ -1,10 +1,10 @@
 const embedData = {
-  version: "1",
+  version: "next",
   imageUrl: "https://rl80.com/gachaponScreenshot.jpg",
   button: {
     title: "Turn the Dial to Claim Your Prize!",
     action: {
-      type: "launch_frame",
+      type: "launch_miniapp",
       name: "RL80 Gachapon",
       url: "https://rl80.com/miniapp/gachapon",
       splashImageUrl: "https://rl80.com/gachaponPrize.jpg",
