@@ -151,6 +151,7 @@ const VendingMachineCanvas = dynamic(
             eligibilityDetails={eligibilityDetails}
             onSignIn={() => {}} // No-op in Farcaster (auto-signed in)
             onConnectWallet={() => {}} // No-op in Farcaster (auto-connected)
+            isMiniApp
           />
 
           {/* Success modal with share */}

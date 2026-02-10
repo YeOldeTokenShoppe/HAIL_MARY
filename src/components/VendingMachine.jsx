@@ -592,7 +592,7 @@ function VendingMachine({ scale = 1, position = [0, 0, 0], rotation = [0, 0, 0],
 }
 
 // Prize Status Bar - shows claim count and status
-export function PrizeStatusBar({ currentPrize, claimStatus, remainingClaims, eligibilityDetails, onSignIn, onConnectWallet }) {
+export function PrizeStatusBar({ currentPrize, claimStatus, remainingClaims, eligibilityDetails, onSignIn, onConnectWallet, isMiniApp = false }) {
   const getStatusMessage = () => {
     switch (claimStatus) {
       case 'loading':
@@ -602,9 +602,9 @@ export function PrizeStatusBar({ currentPrize, claimStatus, remainingClaims, eli
       case 'available':
         return { text: `${remainingClaims} of ${currentPrize?.maxClaims || 80} remaining`, color: '#00f5d4' };
       case 'claimed':
-        return { text: "You collected the available prize!", color: '#00ff88' };
+        return { text: "You collected the available prize!", color: '#00ff88', subtitle: isMiniApp ? 'Add the app to get notified when the next prize drops' : null };
       case 'sold_out':
-        return { text: 'All 80 prizes claimed! Check back or add the app to get notified.', color: '#ff6b6b', isNoPrize: true };
+        return { text: 'All 80 prizes claimed! Check back.', color: '#ff6b6b', isNoPrize: true };
       case 'ineligible':
         if (!eligibilityDetails.isSignedIn) {
           return { text: 'Sign in to claim', color: '#ffd700', action: onSignIn };
@@ -761,6 +761,18 @@ export function PrizeStatusBar({ currentPrize, claimStatus, remainingClaims, eli
           {status.text}
         </div>
       )}
+      {status.subtitle && (
+        <div style={{
+          color: 'rgba(255, 255, 255, 0.45)',
+          fontFamily: "'Orbitron', monospace",
+          fontSize: '0.6rem',
+          textAlign: 'center',
+          letterSpacing: '0.3px',
+          padding: '0 20px',
+        }}>
+          {status.subtitle}
+        </div>
+      )}
     </div>
   );
 }
@@ -866,7 +878,7 @@ export function ClaimSuccessModal({ isOpen, prize, onClose, isMiniApp = false })
           background: 'rgba(20, 20, 30, 0.98)',
           border: '2px solid #00f5d4',
           borderRadius: '20px',
-          padding: '2rem',
+          padding: '1rem',
           maxWidth: '400px',
           textAlign: 'center',
           animation: 'scaleIn 0.4s ease-out, glow 2s ease-in-out infinite',
@@ -918,7 +930,7 @@ export function ClaimSuccessModal({ isOpen, prize, onClose, isMiniApp = false })
         <p style={{
           color: 'rgba(255, 255, 255, 0.6)',
           fontSize: '0.9rem',
-          marginBottom: '1.5rem',
+          marginBottom: '1rem',
         }}>
           {prize.description}
         </p>
@@ -931,7 +943,7 @@ export function ClaimSuccessModal({ isOpen, prize, onClose, isMiniApp = false })
         <button
           onClick={onClose}
           style={{
-            marginTop: '1.5rem',
+            marginTop: '1rem',
             padding: '0.75rem 2rem',
             background: '#00f5d4',
             border: 'none',
