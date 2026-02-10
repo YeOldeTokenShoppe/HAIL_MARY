@@ -33,6 +33,7 @@ const VendingMachineCanvas = dynamic(
       onSuccessClose,
       isClaimLoading,
       onSharePrize,
+      onModelReady,
     }) {
       return (
         <div style={{ width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column' }}>
@@ -74,6 +75,7 @@ const VendingMachineCanvas = dynamic(
                   capsuleColorIndex={0}
                   modelPath={modelPath}
                   disabled={disabled}
+                  onModelReady={onModelReady}
                 />
               </Suspense>
             </Canvas>
@@ -283,48 +285,17 @@ export default function MiniappGachaponPage() {
     checkFont();
   }, []);
 
-  // Model preload
+  // Model ready callback from the 3D scene
+  const handleModelReady = useCallback(() => {
+    setModelLoaded(true);
+  }, []);
+
+  // Fallback timer in case model load callback never fires
   useEffect(() => {
-    let isCancelled = false;
-
-    const preloadModel = async () => {
-      try {
-        const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
-        const { DRACOLoader } = await import('three/examples/jsm/loaders/DRACOLoader.js');
-
-        const dracoLoader = new DRACOLoader();
-        dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
-
-        const loader = new GLTFLoader();
-        loader.setDRACOLoader(dracoLoader);
-
-        loader.load(
-          '/models/toyVENDnft.glb',
-          () => {
-            if (!isCancelled) setModelLoaded(true);
-            dracoLoader.dispose();
-          },
-          undefined,
-          () => {
-            if (!isCancelled) setModelLoaded(true);
-            dracoLoader.dispose();
-          }
-        );
-      } catch {
-        if (!isCancelled) setModelLoaded(true);
-      }
-    };
-
-    preloadModel();
-
     const fallbackTimer = setTimeout(() => {
       setModelLoaded(true);
     }, 10000);
-
-    return () => {
-      isCancelled = true;
-      clearTimeout(fallbackTimer);
-    };
+    return () => clearTimeout(fallbackTimer);
   }, []);
 
   // Loading complete
@@ -375,7 +346,7 @@ export default function MiniappGachaponPage() {
     const shareUrl = `${window.location.origin}/miniapp/gachapon/share?prize=${encodeURIComponent(currentPrize?.id || '')}&edition=${edition}`;
 
     sdk.actions.composeCast({
-      text: `I claimed "${claimedPrize.name}" #${edition}/80 from the RL80 Gachapon!`,
+      text: `I claimed "${claimedPrize.name}" #${edition}/80 from the RL80 Gachapon Machine!`,
       embeds: [shareUrl],
     });
   }, [claimedPrize, weeklyPrize.claimCount, currentPrize]);
@@ -394,8 +365,8 @@ export default function MiniappGachaponPage() {
       }}>
         <CoinLoader loading={isLoading} />
 
-        {/* RL80 Logo - Top Left */}
-        {!isLoading && (
+        {/* RL80 Logo - Top Left (hidden during zoom/claim view) */}
+        {!isLoading && !showClaimButton && (
           <div style={{
             position: "fixed",
             top: "20px",
@@ -464,6 +435,7 @@ export default function MiniappGachaponPage() {
               onSuccessClose={handleSuccessClose}
               isClaimLoading={isClaimLoading}
               onSharePrize={handleSharePrize}
+              onModelReady={handleModelReady}
             />
           </div>
         )}

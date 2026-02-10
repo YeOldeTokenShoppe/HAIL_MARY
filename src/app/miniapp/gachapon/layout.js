@@ -2,12 +2,12 @@ const embedData = {
   version: "1",
   imageUrl: "https://rl80.com/gachaponScreenshot.jpg",
   button: {
-    title: "Claim Prize",
+    title: "Hold RL80 - Turn the Dial",
     action: {
       type: "launch_frame",
       name: "RL80 Gachapon",
       url: "https://rl80.com/miniapp/gachapon",
-      splashImageUrl: "https://rl80.com/favicon.svg",
+      splashImageUrl: "https://rl80.com/gachaponPrize.jpg",
       splashBackgroundColor: "#0a0a0a"
     }
   }

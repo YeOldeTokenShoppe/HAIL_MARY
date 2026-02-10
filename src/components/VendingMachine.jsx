@@ -36,7 +36,8 @@ function CenteredCapsule({ visible, onToyClick, onZoomComplete, capsuleColorInde
 
   const initialPositions = useRef({ glass: null, base: null, toy: null });
   const initialCameraPos = useRef(null);
-  const zoomTarget = useRef(new THREE.Vector3(0, 0.25, 0.65));
+  const zoomTarget = useRef(new THREE.Vector3(0, 0.05, 0.65));
+  const choirAudioRef = useRef(null);
 
   const clonedScene = useMemo(() => {
     const clone = scene.clone(true);
@@ -60,6 +61,11 @@ function CenteredCapsule({ visible, onToyClick, onZoomComplete, capsuleColorInde
         camera.position.copy(initialCameraPos.current);
       }
       initialCameraPos.current = null;
+      // Stop choir audio
+      if (choirAudioRef.current) {
+        choirAudioRef.current.pause();
+        choirAudioRef.current = null;
+      }
     }
   }, [visible, camera, onZoomComplete]);
 
@@ -98,6 +104,16 @@ function CenteredCapsule({ visible, onToyClick, onZoomComplete, capsuleColorInde
           initialCameraPos.current = camera.position.clone();
         }
         setIsZooming(true);
+
+        // Play choir audio on zoom
+        try {
+          const audio = new Audio('/choir.mp3');
+          audio.volume = 0.5;
+          audio.play();
+          choirAudioRef.current = audio;
+        } catch (e) {
+          // Audio may fail silently on some browsers
+        }
       }, 300);
     }
   }, [visible, capsuleColorIndex, camera]);
@@ -708,23 +724,43 @@ export function PrizeStatusBar({ currentPrize, claimStatus, remainingClaims, eli
           </div>
         </div>
       )}
-      <div
-        onClick={status.action}
-        style={{
-          color: status.color,
-          fontFamily: "'Orbitron', monospace",
-          fontSize: '0.7rem',
-          letterSpacing: '0.5px',
-          textTransform: 'uppercase',
-          cursor: status.action ? 'pointer' : 'default',
-          transition: 'all 0.3s ease',
-          textAlign: 'center',
-          padding: '0 15px',
-          lineHeight: '1.4',
-        }}
-      >
-        {status.text}
-      </div>
+      {status.action ? (
+        <button
+          onClick={status.action}
+          style={{
+            background: `linear-gradient(135deg, ${status.color}, ${status.color}cc)`,
+            border: `1px solid ${status.color}`,
+            borderRadius: '50px',
+            color: '#000',
+            fontFamily: "'Orbitron', monospace",
+            fontSize: '0.75rem',
+            fontWeight: '700',
+            letterSpacing: '1.5px',
+            textTransform: 'uppercase',
+            cursor: 'pointer',
+            padding: '10px 24px',
+            boxShadow: `0 0 20px ${status.color}40`,
+            transition: 'all 0.3s ease',
+          }}
+        >
+          {status.text}
+        </button>
+      ) : (
+        <div
+          style={{
+            color: status.color,
+            fontFamily: "'Orbitron', monospace",
+            fontSize: '0.7rem',
+            letterSpacing: '0.5px',
+            textTransform: 'uppercase',
+            textAlign: 'center',
+            padding: '0 15px',
+            lineHeight: '1.4',
+          }}
+        >
+          {status.text}
+        </div>
+      )}
     </div>
   );
 }
@@ -946,8 +982,20 @@ function CheckerboardFloor({ position = [0, -0.65, 0], size = 6 }) {
   );
 }
 
+// Helper that fires a callback once mounted (i.e. after Suspense resolves)
+function OnReady({ onReady }) {
+  const called = useRef(false);
+  useEffect(() => {
+    if (!called.current && onReady) {
+      called.current = true;
+      onReady();
+    }
+  }, [onReady]);
+  return null;
+}
+
 // Inner scene component to access OrbitControls ref
-export function VendingSceneInner({ onToyClick, onZoomComplete, resetKey, capsuleColorIndex, modelPath, disabled }) {
+export function VendingSceneInner({ onToyClick, onZoomComplete, resetKey, capsuleColorIndex, modelPath, disabled, onModelReady }) {
   const controlsRef = useRef();
   const spotlightRef = useRef();
   const [showCenteredCapsule, setShowCenteredCapsule] = useState(false);
@@ -996,6 +1044,7 @@ export function VendingSceneInner({ onToyClick, onZoomComplete, resetKey, capsul
         capsuleColorIndex={capsuleColorIndex}
         disabled={disabled}
       />
+      <OnReady onReady={onModelReady} />
 
       <CenteredCapsule
         visible={showCenteredCapsule}
