@@ -1,54 +1,47 @@
 /**
- * Farcaster Mini-App Push Notification Sender (Phase 2)
+ * Farcaster Mini-App Push Notification Sender via Neynar
  *
- * Sends notifications to users who have opted in.
- * Used to notify about new weekly prize drops.
+ * Broadcasts notifications to all users who have opted in.
+ * Neynar manages notification token storage — we just call their API.
  *
  * Usage:
  *   await sendNotification({
- *     token: 'user_notification_token',
- *     url: 'https://api.warpcast.com/v1/miniapp-notifications',
  *     title: 'New Drop!',
  *     body: 'A new collectible is available in the RL80 Gachapon!',
- *     targetUrl: 'https://yourdomain.com/miniapp/gachapon',
+ *     targetUrl: 'https://rl80.com/miniapp/gachapon',
  *   });
  */
 
-export async function sendNotification({ token, url, title, body, targetUrl }) {
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        notificationId: crypto.randomUUID(),
-        title,
-        body,
-        targetUrl,
-        tokens: [token],
-      }),
-    });
+const NEYNAR_API_URL = 'https://api.neynar.com/v2/farcaster/frame/notifications';
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Notification failed (${response.status}): ${errorText}`);
-    }
-
-    const result = await response.json();
-    return result;
-  } catch (error) {
-    console.error('[sendNotification] Error:', error);
-    throw error;
+export async function sendNotification({
+  title = 'New Drop!',
+  body = 'A new collectible is available in the RL80 Gachapon!',
+  targetUrl = 'https://rl80.com/miniapp/gachapon',
+} = {}) {
+  const apiKey = process.env.NEYNAR_API_KEY;
+  if (!apiKey) {
+    throw new Error('NEYNAR_API_KEY is not set');
   }
-}
 
-/**
- * Send "New Drop!" notification to all opted-in users.
- * TODO Phase 2: Fetch all tokens from Firebase `farcasterNotifications` collection
- * and send notifications in batches.
- */
-export async function notifyNewDrop({ prizeName }) {
-  // TODO: Implement when Firebase notification storage is set up
-  console.log(`[notifyNewDrop] Would notify about: ${prizeName}`);
+  const response = await fetch(NEYNAR_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+    },
+    body: JSON.stringify({
+      target_fids: [],
+      notification: { title, body, target_url: targetUrl },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Neynar notification failed (${response.status}): ${errorText}`);
+  }
+
+  const result = await response.json();
+  console.log('[sendNotification] Success:', JSON.stringify(result));
+  return result;
 }

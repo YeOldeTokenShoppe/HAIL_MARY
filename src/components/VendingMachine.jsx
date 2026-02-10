@@ -36,7 +36,7 @@ function CenteredCapsule({ visible, onToyClick, onZoomComplete, capsuleColorInde
 
   const initialPositions = useRef({ glass: null, base: null, toy: null });
   const initialCameraPos = useRef(null);
-  const zoomTarget = useRef(new THREE.Vector3(0, 0.05, 0.65));
+  const zoomTarget = useRef(new THREE.Vector3(0, 0.3, 0.65));
   const choirAudioRef = useRef(null);
 
   const clonedScene = useMemo(() => {
