@@ -598,13 +598,13 @@ export function PrizeStatusBar({ currentPrize, claimStatus, remainingClaims, eli
       case 'loading':
         return { text: 'Loading...', color: 'rgba(255, 255, 255, 0.5)' };
       case 'no_prize':
-        return { text: 'Check back for the first collectible drop coming soon', color: 'rgba(255, 255, 255, 0.5)', isNoPrize: true };
+        return { text: 'Check back for the next drop coming soon', color: 'rgba(255, 255, 255, 0.5)', isNoPrize: true };
       case 'available':
         return { text: `${remainingClaims} of ${currentPrize?.maxClaims || 80} remaining`, color: '#00f5d4' };
       case 'claimed':
-        return { text: "You collected this week's prize!", color: '#00ff88' };
+        return { text: "You collected the available prize!", color: '#00ff88' };
       case 'sold_out':
-        return { text: 'All 80 prizes claimed! Check back next week.', color: '#ff6b6b', isNoPrize: true };
+        return { text: 'All 80 prizes claimed! Check back or add the app to get notified.', color: '#ff6b6b', isNoPrize: true };
       case 'ineligible':
         if (!eligibilityDetails.isSignedIn) {
           return { text: 'Sign in to claim', color: '#ffd700', action: onSignIn };
