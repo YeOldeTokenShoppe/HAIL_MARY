@@ -908,38 +908,36 @@ export function ClaimSuccessModal({ isOpen, prize, onClose, isMiniApp = false })
         }}
       >
         {/* Prize Image */}
-        <div style={{ marginBottom: '1rem' }}>
+        <div style={{ marginBottom: '0.5rem' }}>
           {prize.icon ? (
             <img
               src={prize.icon}
               alt={prize.name}
               style={{
-                position: 'relative',
-                top: '10%',
-                width: '150px',
-                height: '150px',
+                width: '110px',
+                height: '110px',
                 objectFit: 'contain',
                 borderRadius: '12px',
               }}
             />
           ) : (
-            <div style={{ fontSize: '3rem' }}>🎉</div>
+            <div style={{ fontSize: '2.5rem' }}>🎉</div>
           )}
         </div>
         <h2 style={{
           fontFamily: "'Orbitron', monospace",
-          fontSize: '1.5rem',
+          fontSize: '1.2rem',
           color: '#00f5d4',
-          marginBottom: '0.5rem',
+          marginBottom: '0.3rem',
         }}>
           Prize Claimed!
         </h2>
         {prize.edition && (
           <p style={{
             color: '#00f5d4',
-            fontSize: '0.85rem',
+            fontSize: '0.75rem',
             fontFamily: "'Orbitron', monospace",
-            marginBottom: '0.5rem',
+            marginBottom: '0.3rem',
             opacity: 0.8,
           }}>
             Edition #{prize.edition}/{prize.maxEditions || 80}
@@ -947,29 +945,29 @@ export function ClaimSuccessModal({ isOpen, prize, onClose, isMiniApp = false })
         )}
         <p style={{
           color: '#fff',
-          fontSize: '1.1rem',
-          marginBottom: '0.5rem',
+          fontSize: '0.95rem',
+          marginBottom: '0.3rem',
         }}>
           {prize.name}
         </p>
         <p style={{
           color: 'rgba(255, 255, 255, 0.6)',
-          fontSize: '0.9rem',
-          marginBottom: '1rem',
+          fontSize: '0.8rem',
+          marginBottom: '0.5rem',
         }}>
           {prize.description}
         </p>
         <p style={{
           color: 'rgba(255, 255, 255, 0.5)',
-          fontSize: '0.75rem',
+          fontSize: '0.7rem',
         }}>
           {isMiniApp ? 'NFT minted to your wallet' : 'View your collection in Account > Collection'}
         </p>
         <button
           onClick={onClose}
           style={{
-            marginTop: '1rem',
-            padding: '0.75rem 2rem',
+            marginTop: '0.5rem',
+            padding: '0.6rem 1.8rem',
             background: '#00f5d4',
             border: 'none',
             borderRadius: '50px',
