@@ -16,6 +16,7 @@ const embedData = {
 export const metadata = {
   other: {
     'fc:miniapp': JSON.stringify(embedData),
+    'base:app_id': '698a7e3fe6f6a95ae49e0002',
   },
 };
 
