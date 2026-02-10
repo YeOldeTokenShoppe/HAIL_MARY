@@ -1325,7 +1325,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
         left: '0',
         bottom: '4rem',
         width: '50%',
-        height: '60%'
+        height: '55%'
       },
       // Mobile
       'mobile': {
@@ -1843,11 +1843,11 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
         <CleanCanvas
           style={{ position: 'relative', zIndex: 1, pointerEvents: 'auto' }}
           camera={{ 
-            position: isDesktop 
-              ? [-7, 1, 6.5] 
-              : isTablet 
-              ? [-6, 1.5, 6] 
-              : [4, 1, 5], 
+            position: isDesktop
+              ? [-7, 1, 6.5]
+              : isTablet
+              ? [-6, 1.5, 6]
+              : [4, 1, 5],
             fov: isDesktop ? 40 : isTablet ? 45 : 50 
           }}
           gl={{ 

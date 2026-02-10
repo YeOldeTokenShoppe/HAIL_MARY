@@ -1,0 +1,38 @@
+const embedData = {
+  version: "1",
+  imageUrl: "https://rl80.com/api/og/prize?name=RL80+Gachapon&edition=100",
+  button: {
+    title: "Play Gachapon",
+    action: {
+      type: "launch_frame",
+      name: "RL80",
+      url: "https://rl80.com/miniapp/gachapon",
+      splashImageUrl: "https://rl80.com/images/saintbot.png",
+      splashBackgroundColor: "#0a0a0a"
+    }
+  }
+};
+
+export const metadata = {
+  title: 'RL80 Gachapon',
+  description: 'Claim weekly collectibles from the RL80 Gachapon machine. Hold RL80 tokens to play.',
+  openGraph: {
+    title: 'RL80 Gachapon',
+    description: 'Claim weekly collectibles from the RL80 Gachapon machine',
+    images: [
+      {
+        url: 'https://rl80.com/api/og/prize?name=RL80+Gachapon&edition=100',
+        width: 1200,
+        height: 800,
+        alt: 'RL80 Gachapon',
+      },
+    ],
+  },
+  other: {
+    'fc:miniapp': JSON.stringify(embedData),
+  },
+};
+
+export default function GachaponLayout({ children }) {
+  return children;
+}

@@ -378,14 +378,6 @@ export default function MiniappGachaponPage() {
   }, [claimedPrize, weeklyPrize.claimCount, currentPrize]);
 
   return (
-    <>
-      {/* fc:miniapp meta tag for embed card */}
-      <head>
-        <meta property="fc:miniapp" content="true" />
-        <meta property="og:title" content="RL80 Gachapon" />
-        <meta property="og:description" content="Claim weekly collectibles from the RL80 Gachapon machine" />
-      </head>
-
       <div style={{
         backgroundColor: "#0a0a0a",
         height: "100dvh",
@@ -398,6 +390,52 @@ export default function MiniappGachaponPage() {
         overflow: "hidden",
       }}>
         <CoinLoader loading={isLoading} />
+
+        {/* RL80 Logo - Top Left */}
+        {!isLoading && (
+          <div style={{
+            position: "fixed",
+            top: "20px",
+            left: "0.5rem",
+            borderRadius: "8px",
+            padding: "10px",
+            pointerEvents: "none",
+            zIndex: 10,
+          }}>
+            <div
+              style={{
+                position: "relative",
+                fontFamily: "'UnifrakturMaguntia', serif",
+                fontSize: "3rem",
+                color: "#ffffff",
+                userSelect: "none",
+              }}
+            >
+              RL80
+              {Array.from({length: 100}).map((_, i) => {
+                const index = i + 1;
+                return (
+                  <div
+                    key={index}
+                    style={{
+                      position: "absolute",
+                      pointerEvents: "none",
+                      zIndex: -1,
+                      top: 0,
+                      left: 0,
+                      color: `rgba(${201 - index * 2}, ${55 - index * 3}, ${256 - index * 2})`,
+                      filter: "blur(0.1rem)",
+                      transform: `translate(${index * 0.1}rem, ${index * 0.1}rem) scale(${1 + index * 0.01})`,
+                      opacity: (1 / index) * 1.5,
+                    }}
+                  >
+                    RL80
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {!isLoading && (
           <div style={{
@@ -427,6 +465,5 @@ export default function MiniappGachaponPage() {
           </div>
         )}
       </div>
-    </>
   );
 }
