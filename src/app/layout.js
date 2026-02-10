@@ -14,6 +14,9 @@ export const metadata = {
     icon: '/favicon.svg', // or '/icon.png' if you use PNG
     apple: '/apple-icon.png', // optional: for Apple devices
   },
+  other: {
+    'base:app_id': '698a7e3fe6f6a95ae49e0002',
+  },
 };
 
 export const viewport = {
