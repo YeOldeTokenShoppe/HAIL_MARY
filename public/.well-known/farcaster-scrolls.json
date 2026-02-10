@@ -6,15 +6,15 @@
   },
   "frame": {
     "version": "1",
-    "name": "RL80 Gachapon",
-    "homeUrl": "https://rl80.com/miniapp/gachapon",
+    "name": "The Scrolls of St. GR80",
+    "homeUrl": "https://rl80.com/miniapp/exlibris",
     "iconUrl": "https://rl80.com/favicon.svg",
     "splashImageUrl": "https://rl80.com/favicon.svg",
     "splashBackgroundColor": "#0a0a0a",
-    "subtitle": "Claim weekly NFT collectibles",
-    "description": "Hold RL80 tokens to claim free weekly NFT collectibles from the Gachapon machine. 80 unique editions per drop.",
+    "subtitle": "Ancient scrolls from the anachronistic android",
+    "description": "Explore the writings of Saint GR80, the anachronistic android, mystic and medieval scholar.",
     "primaryCategory": "games",
-    "tags": ["rl80", "nft", "gachapon", "collectibles"],
+    "tags": ["rl80", "scrolls", "3d", "collectibles"],
     "requiredChains": ["eip155:8453"]
   }
 }

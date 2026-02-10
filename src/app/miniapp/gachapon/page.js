@@ -156,6 +156,7 @@ const VendingMachineCanvas = dynamic(
             isOpen={showSuccessModal}
             prize={claimedPrize}
             onClose={onSuccessClose}
+            isMiniApp={true}
           />
 
           {/* Share button overlay when success modal is showing */}

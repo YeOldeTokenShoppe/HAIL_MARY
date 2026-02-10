@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useWalletAuth } from '@/components/WalletAuthProvider';
+import { getContract, prepareContractCall, sendTransaction } from 'thirdweb';
+import { client, chain } from '@/lib/contract';
 import {
   db,
   collection,
@@ -17,6 +19,10 @@ import {
   orderBy,
   limit
 } from '@/lib/firebaseClient';
+
+// NFT Drop (DropERC721) on Base — 80 unique editions
+const NFT_DROP_ADDRESS = '0xBF6f792075C5893DAF380D640B2f90296ea30C22';
+const NATIVE_TOKEN = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 
 // ============================================
 // TESTING MODE CONFIGURATION
@@ -35,7 +41,7 @@ const MOCK_PRIZE = {
   description: 'Our Lady of Perpetual Profit',
   weekIdentifier: '2026-W05',
   isActive: true,
-  maxClaims: 100,
+  maxClaims: 80,
   claimCount: 23, // Change this to test different remaining counts
   previewConfig: {
     icon: '/images/maryToy.webp',
@@ -56,7 +62,7 @@ const TEST_SCENARIO = 'available'; // 'available' | 'claimed' | 'sold_out' | 'no
  */
 export function useWeeklyPrize() {
   const { user, isSignedIn } = useUser();
-  const { walletAddress, isWalletConnected, tokenBalance } = useWalletAuth();
+  const { walletAddress, isWalletConnected, tokenBalance, activeAccount } = useWalletAuth();
 
   // State
   const [currentPrize, setCurrentPrize] = useState(null);
@@ -203,7 +209,7 @@ export function useWeeklyPrize() {
       return;
     }
 
-    if (claimCount >= (currentPrize.maxClaims || 100)) {
+    if (claimCount >= (currentPrize.maxClaims || 80)) {
       setClaimStatus('sold_out');
       return;
     }
@@ -281,7 +287,7 @@ export function useWeeklyPrize() {
 
         const prizeData = prizeSnapshot.data();
         const currentCount = prizeData.claimCount || 0;
-        const maxClaims = prizeData.maxClaims || 100;
+        const maxClaims = prizeData.maxClaims || 80;
 
         if (currentCount >= maxClaims) {
           throw new Error('All prizes have been claimed');
@@ -322,17 +328,53 @@ export function useWeeklyPrize() {
           prizeVideoSrc: prizeData.videoSrc || null,
           prizeDescription: prizeData.description,
           prizeIcon: prizeData.previewConfig?.icon || null,
-          prizeAccentColor: prizeData.previewConfig?.accentColor || '#00f5d4'
+          prizeAccentColor: prizeData.previewConfig?.accentColor || '#00f5d4',
+          mintStatus: 'pending'
         };
 
         return newClaim;
       });
 
-      // Add the claim document (outside transaction since we just need to write)
+      // Save claim to Firebase
       const claimsRef = collection(db, 'prizeClaims');
-      await addDoc(claimsRef, claimData);
+      const claimDocRef = await addDoc(claimsRef, claimData);
 
-      return claimData;
+      // Mint NFT on-chain via DropERC721.claim()
+      let mintStatus = 'pending';
+      let txHash = null;
+      try {
+        const nftContract = getContract({ client, chain, address: NFT_DROP_ADDRESS });
+        const tx = prepareContractCall({
+          contract: nftContract,
+          method: 'function claim(address _receiver, uint256 _quantity, address _currency, uint256 _pricePerToken, (bytes32[] proof, uint256 quantityLimitPerWallet, uint256 pricePerToken, address currency) _allowlistProof, bytes _data) payable',
+          params: [
+            walletAddress,
+            1n,
+            NATIVE_TOKEN,
+            0n,
+            {
+              proof: [],
+              quantityLimitPerWallet: 0n,
+              pricePerToken: 0n,
+              currency: NATIVE_TOKEN
+            },
+            '0x'
+          ],
+        });
+        const result = await sendTransaction({ account: activeAccount, transaction: tx });
+        txHash = result.transactionHash;
+        mintStatus = 'success';
+      } catch (mintErr) {
+        console.error('NFT mint failed (claim saved with pending status):', mintErr);
+      }
+
+      // Update Firebase doc with mint result
+      if (mintStatus === 'success' && txHash) {
+        const { updateDoc } = await import('firebase/firestore');
+        await updateDoc(claimDocRef, { mintStatus: 'success', txHash });
+      }
+
+      return { ...claimData, mintStatus, txHash };
     } catch (err) {
       console.error('Error claiming prize:', err);
       setError(err.message);
@@ -340,7 +382,7 @@ export function useWeeklyPrize() {
     } finally {
       setIsClaimLoading(false);
     }
-  }, [currentPrize, user, walletAddress, claimStatus]);
+  }, [currentPrize, user, walletAddress, claimStatus, activeAccount]);
 
   // Fetch all user's claimed prizes (for collection display)
   const fetchUserPrizes = useCallback(async () => {
@@ -403,7 +445,7 @@ export function useWeeklyPrize() {
     // Prize data
     currentPrize,
     claimCount,
-    remainingClaims: currentPrize ? Math.max(0, (currentPrize.maxClaims || 100) - claimCount) : 0,
+    remainingClaims: currentPrize ? Math.max(0, (currentPrize.maxClaims || 80) - claimCount) : 0,
 
     // Claim state
     claimStatus,

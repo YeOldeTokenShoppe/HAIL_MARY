@@ -15,14 +15,15 @@ import { useUser } from '@clerk/nextjs';
 useGLTF.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
 
 // Set to true when the first collectible drop is ready to go live
-const DROPS_ENABLED = false;
+const DROPS_ENABLED = true;
 
 // Capsule base colors that cycle
 const CAPSULE_COLORS = ['#3943BC', '#14A122', '#A81814'];
 
 // Centered capsule model that appears when capsule is clicked
-function CenteredCapsule({ visible, onToyClick, onZoomComplete, modelPath, capsuleColorIndex = 0 }) {
-  const { scene } = useGLTF(modelPath || '/models/ipadMaryToy.glb');
+function CenteredCapsule({ visible, onToyClick, onZoomComplete, capsuleColorIndex = 0 }) {
+  // Always use ipadMaryToy.glb — it has the capsule parts (Glass, Base) + IpadMary toy
+  const { scene } = useGLTF('/models/ipadMaryToy.glb');
   const { camera } = useThree();
   const groupRef = useRef();
   const glassRef = useRef();
@@ -31,6 +32,7 @@ function CenteredCapsule({ visible, onToyClick, onZoomComplete, modelPath, capsu
   const [isOpening, setIsOpening] = useState(false);
   const [isZooming, setIsZooming] = useState(false);
   const [zoomComplete, setZoomComplete] = useState(false);
+  const [capsuleOpened, setCapsuleOpened] = useState(false);
 
   const initialPositions = useRef({ glass: null, base: null, toy: null });
   const initialCameraPos = useRef(null);
@@ -52,6 +54,7 @@ function CenteredCapsule({ visible, onToyClick, onZoomComplete, modelPath, capsu
       setIsOpening(false);
       setIsZooming(false);
       setZoomComplete(false);
+      setCapsuleOpened(false);
       if (onZoomComplete) onZoomComplete(false);
       if (initialCameraPos.current && camera) {
         camera.position.copy(initialCameraPos.current);
@@ -60,7 +63,7 @@ function CenteredCapsule({ visible, onToyClick, onZoomComplete, modelPath, capsu
     }
   }, [visible, camera, onZoomComplete]);
 
-  // Find capsule parts and toy, then start opening + zoom immediately
+  // Find capsule parts and toy, then start zoom (but NOT opening)
   useEffect(() => {
     if (groupRef.current && visible) {
       groupRef.current.traverse((child) => {
@@ -89,10 +92,8 @@ function CenteredCapsule({ visible, onToyClick, onZoomComplete, modelPath, capsu
         }
       });
 
-      // Start opening animation and zoom simultaneously
+      // Start zoom only (capsule stays closed until user clicks)
       setTimeout(() => {
-        setIsOpening(true);
-        // Save camera position and start zooming
         if (!initialCameraPos.current) {
           initialCameraPos.current = camera.position.clone();
         }
@@ -105,13 +106,16 @@ function CenteredCapsule({ visible, onToyClick, onZoomComplete, modelPath, capsu
   useFrame((state) => {
     if (!visible || !groupRef.current) return;
 
-    // Opening animation for capsule parts
+    // Opening animation for capsule parts (only after user clicks)
     if (isOpening) {
       if (glassRef.current && initialPositions.current.glass !== null) {
         const targetY = initialPositions.current.glass + 0.15;
         const diff = targetY - glassRef.current.position.y;
         if (Math.abs(diff) > 0.01) {
           glassRef.current.position.y += diff * 0.03;
+        } else if (!capsuleOpened) {
+          setCapsuleOpened(true);
+          if (onZoomComplete) onZoomComplete(true);
         }
       }
       if (baseRef.current && initialPositions.current.base !== null) {
@@ -123,13 +127,13 @@ function CenteredCapsule({ visible, onToyClick, onZoomComplete, modelPath, capsu
       }
     }
 
-    // Floating animation for the toy
-    if (toyRef.current && initialPositions.current.toy !== undefined) {
+    // Floating animation for the toy (only after capsule opens)
+    if (toyRef.current && initialPositions.current.toy !== undefined && isOpening) {
       toyRef.current.position.y = initialPositions.current.toy + Math.sin(state.clock.elapsedTime * 0.5) * 0.05;
       toyRef.current.rotation.y += 0.003;
     }
 
-    // Camera zoom animation - starts automatically when visible
+    // Camera zoom animation
     if (isZooming && camera) {
       const target = zoomTarget.current;
       camera.position.lerp(target, 0.15);
@@ -138,18 +142,25 @@ function CenteredCapsule({ visible, onToyClick, onZoomComplete, modelPath, capsu
       if (dist < 0.1) {
         setIsZooming(false);
         setZoomComplete(true);
-        if (onZoomComplete) onZoomComplete(true);
       }
     }
   });
 
-  // Handle click - only triggers claim after zoom is complete
+  // Handle click:
+  // 1st click (after zoom) → open capsule
+  // 2nd click (after capsule opened) → claim prize
   const handleClick = useCallback((e) => {
     e.stopPropagation();
-    if (zoomComplete) {
+    if (!zoomComplete) return;
+
+    if (!isOpening) {
+      // First click: open the capsule
+      setIsOpening(true);
+    } else if (capsuleOpened) {
+      // Second click: trigger claim
       if (onToyClick) onToyClick();
     }
-  }, [zoomComplete, onToyClick]);
+  }, [zoomComplete, isOpening, capsuleOpened, onToyClick]);
 
   if (!visible) return null;
 
@@ -158,7 +169,7 @@ function CenteredCapsule({ visible, onToyClick, onZoomComplete, modelPath, capsu
       ref={groupRef}
       position={[0, 0.2, 0.5]}
       onClick={handleClick}
-      onPointerOver={() => { document.body.style.cursor = zoomComplete ? 'pointer' : 'default'; }}
+      onPointerOver={() => { document.body.style.cursor = (zoomComplete && !isZooming) ? 'pointer' : 'default'; }}
       onPointerOut={() => { document.body.style.cursor = 'auto'; }}
     >
       <primitive object={clonedScene} scale={0.3} />
@@ -573,11 +584,11 @@ export function PrizeStatusBar({ currentPrize, claimStatus, remainingClaims, eli
       case 'no_prize':
         return { text: 'Check back for the first collectible drop coming soon', color: 'rgba(255, 255, 255, 0.5)', isNoPrize: true };
       case 'available':
-        return { text: `${remainingClaims} of ${currentPrize?.maxClaims || 100} remaining`, color: '#00f5d4' };
+        return { text: `${remainingClaims} of ${currentPrize?.maxClaims || 80} remaining`, color: '#00f5d4' };
       case 'claimed':
         return { text: "You collected this week's prize!", color: '#00ff88' };
       case 'sold_out':
-        return { text: 'All 100 prizes claimed! Check back next week.', color: '#ff6b6b', isNoPrize: true };
+        return { text: 'All 80 prizes claimed! Check back next week.', color: '#ff6b6b', isNoPrize: true };
       case 'ineligible':
         if (!eligibilityDetails.isSignedIn) {
           return { text: 'Sign in to claim', color: '#ffd700', action: onSignIn };
@@ -778,7 +789,7 @@ export function ModelPreview({ modelPath, size = 150 }) {
 }
 
 // Success Modal after claiming
-export function ClaimSuccessModal({ isOpen, prize, onClose }) {
+export function ClaimSuccessModal({ isOpen, prize, onClose, isMiniApp = false }) {
   if (!isOpen || !prize) return null;
 
   return (
@@ -868,7 +879,7 @@ export function ClaimSuccessModal({ isOpen, prize, onClose }) {
           color: 'rgba(255, 255, 255, 0.5)',
           fontSize: '0.75rem',
         }}>
-          View your collection in Account &gt; Collection
+          {isMiniApp ? 'NFT minted to your wallet' : 'View your collection in Account > Collection'}
         </p>
         <button
           onClick={onClose}
@@ -979,7 +990,6 @@ export function VendingSceneInner({ onToyClick, onZoomComplete, resetKey, capsul
         visible={showCenteredCapsule}
         onToyClick={onToyClick}
         onZoomComplete={onZoomComplete}
-        modelPath={modelPath}
         capsuleColorIndex={capsuleColorIndex}
       />
 
