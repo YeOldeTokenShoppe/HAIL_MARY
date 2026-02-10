@@ -51,7 +51,7 @@ const CLAIM_ABI = [{
 // ============================================
 // TESTING MODE CONFIGURATION
 // ============================================
-const TEST_MODE = true;
+const TEST_MODE = false;
 
 const MOCK_PRIZE = {
   id: 'test_prize_001',
