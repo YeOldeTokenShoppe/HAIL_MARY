@@ -908,7 +908,7 @@ export function ClaimSuccessModal({ isOpen, prize, onClose, isMiniApp = false })
         }}
       >
         {/* Prize Image */}
-        <div style={{ marginBottom: '0.5rem' }}>
+        <div style={{ marginBottom: '0.51rem' }}>
           {prize.icon ? (
             <img
               src={prize.icon}
