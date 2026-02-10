@@ -105,15 +105,6 @@ function CenteredCapsule({ visible, onToyClick, onZoomComplete, capsuleColorInde
         }
         setIsZooming(true);
 
-        // Play choir audio on zoom
-        try {
-          const audio = new Audio('/choir.mp3');
-          audio.volume = 0.5;
-          audio.play();
-          choirAudioRef.current = audio;
-        } catch (e) {
-          // Audio may fail silently on some browsers
-        }
       }, 300);
     }
   }, [visible, capsuleColorIndex, camera]);
@@ -172,7 +163,12 @@ function CenteredCapsule({ visible, onToyClick, onZoomComplete, capsuleColorInde
     if (!isOpening) {
       // First click: open the capsule
       setIsOpening(true);
-      try { new Audio('/choir.mp3').play(); } catch (e) {}
+      try {
+        const audio = new Audio('/choir.mp3');
+        audio.volume = 0.5;
+        audio.play();
+        choirAudioRef.current = audio;
+      } catch (e) {}
     } else if (capsuleOpened) {
       // Second click: trigger claim
       if (onToyClick) onToyClick();
