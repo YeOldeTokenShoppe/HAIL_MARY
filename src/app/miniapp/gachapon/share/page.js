@@ -54,7 +54,7 @@ export default function SharePage({ searchParams }) {
         WebkitTextFillColor: 'transparent',
         fontWeight: '800',
       }}>
-        RL80 GACHAPON
+        RL80 GACHAPON NFT MACHINE
       </div>
       <p style={{
         color: 'rgba(255, 255, 255, 0.6)',
@@ -62,7 +62,7 @@ export default function SharePage({ searchParams }) {
         textAlign: 'center',
         maxWidth: '300px',
       }}>
-        Open in Warpcast to play the Gachapon and claim weekly collectibles
+        Try the gachapon (vending) machine and claim a special RL80 NFT drop
       </p>
     </div>
   );
