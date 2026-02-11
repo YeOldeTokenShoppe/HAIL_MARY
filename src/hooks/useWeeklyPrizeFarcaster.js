@@ -397,14 +397,22 @@ export function useWeeklyPrizeFarcaster({ farcasterFid, farcasterUsername, walle
         });
         mintStatus = 'success';
       } catch (mintErr) {
-        console.error('NFT mint failed (claim saved with pending status):', mintErr);
+        console.error('NFT mint failed, rolling back Firebase claim:', mintErr);
+        // Roll back: delete the claim and decrement claimCount
+        try {
+          const { deleteDoc: delDoc, updateDoc: updDoc } = await import('firebase/firestore');
+          await delDoc(claimDocRef);
+          const prizeRef = doc(db, 'weeklyPrizes', currentPrize.id);
+          await updDoc(prizeRef, { claimCount: Math.max(0, claimCount) });
+        } catch (rollbackErr) {
+          console.error('Rollback failed:', rollbackErr);
+        }
+        throw new Error('NFT mint failed — no gas or transaction rejected');
       }
 
       // Update Firebase doc with mint result
-      if (mintStatus === 'success' && txHash) {
-        const { updateDoc } = await import('firebase/firestore');
-        await updateDoc(claimDocRef, { mintStatus: 'success', txHash });
-      }
+      const { updateDoc } = await import('firebase/firestore');
+      await updateDoc(claimDocRef, { mintStatus: 'success', txHash });
 
       return { ...claimData, mintStatus, txHash };
     } catch (err) {
