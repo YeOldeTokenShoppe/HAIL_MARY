@@ -21,7 +21,7 @@ const DROPS_ENABLED = true;
 const CAPSULE_COLORS = ['#3943BC', '#14A122', '#A81814'];
 
 // Centered capsule model that appears when capsule is clicked
-function CenteredCapsule({ visible, onToyClick, onZoomComplete, capsuleColorIndex = 0 }) {
+function CenteredCapsule({ visible, onToyClick, onZoomComplete, capsuleColorIndex = 0, onReveal }) {
   // Always use ipadMaryToy.glb — it has the capsule parts (Glass, Base) + IpadMary toy
   const { scene } = useGLTF('/models/ipadMaryToy.glb');
   const { camera } = useThree();
@@ -29,6 +29,8 @@ function CenteredCapsule({ visible, onToyClick, onZoomComplete, capsuleColorInde
   const glassRef = useRef();
   const baseRef = useRef();
   const toyRef = useRef();
+  const spotlightRef = useRef();
+  const darkOverlayRef = useRef();
   const [isOpening, setIsOpening] = useState(false);
   const [isZooming, setIsZooming] = useState(false);
   const [zoomComplete, setZoomComplete] = useState(false);
@@ -36,8 +38,9 @@ function CenteredCapsule({ visible, onToyClick, onZoomComplete, capsuleColorInde
 
   const initialPositions = useRef({ glass: null, base: null, toy: null });
   const initialCameraPos = useRef(null);
-  const zoomTarget = useRef(new THREE.Vector3(0, 0.3, 0.65));
+  const zoomTarget = useRef(new THREE.Vector3(0, 0.25, 0.65));
   const choirAudioRef = useRef(null);
+  const revealProgress = useRef(0);
 
   const clonedScene = useMemo(() => {
     const clone = scene.clone(true);
@@ -66,8 +69,17 @@ function CenteredCapsule({ visible, onToyClick, onZoomComplete, capsuleColorInde
         choirAudioRef.current.pause();
         choirAudioRef.current = null;
       }
+      revealProgress.current = 0;
+      if (onReveal) onReveal(false);
+      // Reset capsule part positions so they appear closed next time
+      if (glassRef.current && initialPositions.current.glass !== null) {
+        glassRef.current.position.y = initialPositions.current.glass;
+      }
+      if (baseRef.current && initialPositions.current.base !== null) {
+        baseRef.current.position.y = initialPositions.current.base;
+      }
     }
-  }, [visible, camera, onZoomComplete]);
+  }, [visible, camera, onZoomComplete, onReveal]);
 
   // Find capsule parts and toy, then start zoom (but NOT opening)
   useEffect(() => {
@@ -140,10 +152,22 @@ function CenteredCapsule({ visible, onToyClick, onZoomComplete, capsuleColorInde
       toyRef.current.rotation.y += 0.003;
     }
 
+    // Reveal effect: fade in spotlight + darken surroundings
+    if (isOpening && revealProgress.current < 1) {
+      revealProgress.current = Math.min(1, revealProgress.current + 0.02);
+      const t = revealProgress.current;
+      if (spotlightRef.current) {
+        spotlightRef.current.intensity = t * 40;
+      }
+      if (darkOverlayRef.current) {
+        darkOverlayRef.current.material.opacity = t * 0.7;
+      }
+    }
+
     // Camera zoom animation
     if (isZooming && camera) {
       const target = zoomTarget.current;
-      camera.position.lerp(target, 0.15);
+      camera.position.lerp(target, 0.05);
 
       const dist = camera.position.distanceTo(target);
       if (dist < 0.1) {
@@ -163,6 +187,7 @@ function CenteredCapsule({ visible, onToyClick, onZoomComplete, capsuleColorInde
     if (!isOpening) {
       // First click: open the capsule
       setIsOpening(true);
+      if (onReveal) onReveal(true);
       try {
         const audio = new Audio('/choir.mp3');
         audio.volume = 0.5;
@@ -173,20 +198,41 @@ function CenteredCapsule({ visible, onToyClick, onZoomComplete, capsuleColorInde
       // Second click: trigger claim
       if (onToyClick) onToyClick();
     }
-  }, [zoomComplete, isOpening, capsuleOpened, onToyClick]);
+  }, [zoomComplete, isOpening, capsuleOpened, onToyClick, onReveal]);
 
   if (!visible) return null;
 
   return (
-    <group
-      ref={groupRef}
-      position={[0, 0.2, 0.5]}
-      onClick={handleClick}
-      onPointerOver={() => { document.body.style.cursor = (zoomComplete && !isZooming) ? 'pointer' : 'default'; }}
-      onPointerOut={() => { document.body.style.cursor = 'auto'; }}
-    >
-      <primitive object={clonedScene} scale={0.3} />
-    </group>
+    <>
+      {/* Dark overlay sphere that fades in on reveal */}
+      <mesh ref={darkOverlayRef} position={[0, 0, 0]} renderOrder={-1}>
+        <sphereGeometry args={[5, 16, 16]} />
+        <meshBasicMaterial color="#000000" transparent opacity={0} side={THREE.BackSide} depthWrite={false} />
+      </mesh>
+
+      {/* Spotlight on the toy */}
+      <spotLight
+        ref={spotlightRef}
+        color={0xffffff}
+        intensity={0}
+        position={[0, 1.5, 1.2]}
+        angle={0.4}
+        penumbra={0.8}
+        decay={1.5}
+        distance={5}
+        target-position={[0, 0.2, 0.5]}
+      />
+
+      <group
+        ref={groupRef}
+        position={[0, 0.2, 0.5]}
+        onClick={handleClick}
+        onPointerOver={() => { document.body.style.cursor = (zoomComplete && !isZooming) ? 'pointer' : 'default'; }}
+        onPointerOut={() => { document.body.style.cursor = 'auto'; }}
+      >
+        <primitive object={clonedScene} scale={0.3} />
+      </group>
+    </>
   );
 }
 
@@ -320,7 +366,6 @@ function VendingMachine({ scale = 1, position = [0, 0, 0], rotation = [0, 0, 0],
       const startOffset = anim.dropHeight;
       capsuleGlassRef.current.position.y = anim.initialPositions.glass + startOffset;
       if (capsuleBaseRef.current) capsuleBaseRef.current.position.y = anim.initialPositions.base + startOffset;
-      if (toyRef.current) toyRef.current.position.y = anim.initialPositions.toy + startOffset;
 
       capsuleGlassRef.current.visible = true;
       if (capsuleBaseRef.current) {
@@ -355,9 +400,6 @@ function VendingMachine({ scale = 1, position = [0, 0, 0], rotation = [0, 0, 0],
       // Hide IpadMary toy when capsule is hidden
       if (toyRef.current) {
         toyRef.current.visible = false;
-        if (anim.initialPositions.toy !== null) {
-          toyRef.current.position.y = anim.initialPositions.toy;
-        }
       }
     }
   }, [capsuleVisible, capsuleClicked, capsuleDropping, capsuleColorIndex]);
@@ -435,16 +477,8 @@ function VendingMachine({ scale = 1, position = [0, 0, 0], rotation = [0, 0, 0],
       if (capsuleBaseRef.current && anim.initialPositions.base !== null) {
         capsuleBaseRef.current.position.y = anim.initialPositions.base + offset;
       }
-      // Animate IpadMary toy drop along with capsule
-      if (toyRef.current && anim.initialPositions.toy !== null) {
-        toyRef.current.position.y = anim.initialPositions.toy + offset;
-      }
     }
 
-    // Rotate IpadMary toy continuously while visible
-    if (toyRef.current && toyRef.current.visible) {
-      toyRef.current.rotation.y += 0.01;
-    }
   });
 
   const isCapsuleObject = useCallback((obj) => {
@@ -1050,19 +1084,40 @@ function OnReady({ onReady }) {
 export function VendingSceneInner({ onToyClick, onZoomComplete, resetKey, capsuleColorIndex, modelPath, disabled, onModelReady }) {
   const controlsRef = useRef();
   const spotlightRef = useRef();
+  const ambientRef = useRef();
+  const directionalRef = useRef();
   const [showCenteredCapsule, setShowCenteredCapsule] = useState(false);
+  const [isRevealing, setIsRevealing] = useState(false);
 
   // Spotlight helper for debugging - shows cone and direction
   // useHelper(spotlightRef, THREE.SpotLightHelper, 'cyan');
 
   useEffect(() => {
     setShowCenteredCapsule(false);
+    setIsRevealing(false);
   }, [resetKey]);
+
+  // Dim scene lights during reveal
+  useFrame(() => {
+    if (!ambientRef.current || !directionalRef.current) return;
+    const targetAmbient = isRevealing ? 0.08 : 0.5;
+    const targetDirectional = isRevealing ? 0.1 : 1;
+    ambientRef.current.intensity += (targetAmbient - ambientRef.current.intensity) * 0.04;
+    directionalRef.current.intensity += (targetDirectional - directionalRef.current.intensity) * 0.04;
+    if (spotlightRef.current) {
+      const targetSpot = isRevealing ? 5 : 30;
+      spotlightRef.current.intensity += (targetSpot - spotlightRef.current.intensity) * 0.04;
+    }
+  });
+
+  const handleReveal = useCallback((revealing) => {
+    setIsRevealing(revealing);
+  }, []);
 
   return (
     <>
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[5, 5, 5]} intensity={1} />
+      <ambientLight ref={ambientRef} intensity={0.5} />
+      <directionalLight ref={directionalRef} position={[5, 5, 5]} intensity={1} />
       {/* <pointLight position={[-3, 2, 2]} color="#ffffff" intensity={0.5} /> */}
 
       {/* Spotlight for dramatic effect */}
@@ -1103,6 +1158,7 @@ export function VendingSceneInner({ onToyClick, onZoomComplete, resetKey, capsul
         onToyClick={onToyClick}
         onZoomComplete={onZoomComplete}
         capsuleColorIndex={capsuleColorIndex}
+        onReveal={handleReveal}
       />
 
       <OrbitControls
@@ -1260,9 +1316,38 @@ export default function VendingMachineScene() {
             right: 0,
             display: 'flex',
             justifyContent: 'center',
+            gap: '12px',
             pointerEvents: 'auto',
             zIndex: 10,
           }}>
+            <button
+              onClick={() => setResetKey(prev => prev + 1)}
+              style={{
+                padding: '1rem 1.5rem',
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '50px',
+                color: '#fff',
+                fontFamily: "'Orbitron', monospace",
+                fontSize: '0.85rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+                letterSpacing: '1.5px',
+                backdropFilter: 'blur(4px)',
+                transition: 'all 0.3s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.background = 'rgba(255, 255, 255, 0.2)';
+                e.target.style.borderColor = 'rgba(255, 255, 255, 0.5)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+                e.target.style.borderColor = 'rgba(255, 255, 255, 0.3)';
+              }}
+            >
+              Cancel
+            </button>
             <button
               onClick={handleToyClick}
               style={{
@@ -1290,7 +1375,7 @@ export default function VendingMachineScene() {
                 e.target.style.boxShadow = '0 0 30px rgba(0, 245, 212, 0.5), 0 0 60px rgba(0, 245, 212, 0.3)';
               }}
             >
-              Click to Claim
+              Claim
             </button>
           </div>
         )}

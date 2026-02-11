@@ -34,6 +34,7 @@ const VendingMachineCanvas = dynamic(
       isClaimLoading,
       onSharePrize,
       onModelReady,
+      onCancel,
     }) {
       return (
         <div style={{ width: '100%', height: '100%', position: 'relative', display: 'flex', flexDirection: 'column' }}>
@@ -89,9 +90,30 @@ const VendingMachineCanvas = dynamic(
                 right: 0,
                 display: 'flex',
                 justifyContent: 'center',
+                gap: '12px',
                 pointerEvents: 'auto',
                 zIndex: 10,
               }}>
+                <button
+                  onClick={onCancel}
+                  disabled={isClaimLoading}
+                  style={{
+                    padding: '1rem 1.5rem',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    border: '1px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: '50px',
+                    color: '#fff',
+                    fontFamily: "'Orbitron', monospace",
+                    fontSize: '0.85rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    textTransform: 'uppercase',
+                    letterSpacing: '1.5px',
+                    backdropFilter: 'blur(4px)',
+                  }}
+                >
+                  Cancel
+                </button>
                 <button
                   onClick={onToyClick}
                   disabled={isClaimLoading}
@@ -112,7 +134,7 @@ const VendingMachineCanvas = dynamic(
                     opacity: isClaimLoading ? 0.7 : 1,
                   }}
                 >
-                  {isClaimLoading ? 'Claiming...' : 'Click to Claim'}
+                  {isClaimLoading ? 'Claiming...' : 'Claim'}
                 </button>
               </div>
             )}
@@ -334,6 +356,10 @@ export default function MiniappGachaponPage() {
     }
   }, [claimStatus, isClaimLoading, claimPrize, currentPrize]);
 
+  const handleCancel = useCallback(() => {
+    setResetKey(prev => prev + 1);
+  }, []);
+
   const handleSuccessClose = useCallback(() => {
     setShowSuccessModal(false);
     setClaimedPrize(null);
@@ -437,6 +463,7 @@ export default function MiniappGachaponPage() {
               isClaimLoading={isClaimLoading}
               onSharePrize={handleSharePrize}
               onModelReady={handleModelReady}
+              onCancel={handleCancel}
             />
           </div>
         )}
