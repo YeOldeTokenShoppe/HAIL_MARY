@@ -28,7 +28,7 @@ const NATIVE_TOKEN = '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE';
 // TESTING MODE CONFIGURATION
 // ============================================
 // Set to true to use mock data instead of Firebase
-const TEST_MODE = true;
+const TEST_MODE = false;
 
 // Mock prize data for testing
 const MOCK_PRIZE = {
@@ -277,105 +277,92 @@ export function useWeeklyPrize() {
     try {
       const prizeRef = doc(db, 'weeklyPrizes', currentPrize.id);
 
-      // Use transaction to atomically check and increment claim count
+      // Step 1: Validate eligibility (read-only, no writes yet)
+      const { getDoc: fetchDoc } = await import('firebase/firestore');
+      const prizeSnapshot = await fetchDoc(prizeRef);
+
+      if (!prizeSnapshot.exists()) {
+        throw new Error('Prize no longer exists');
+      }
+
+      const prizeData = prizeSnapshot.data();
+      const currentCount = prizeData.claimCount || 0;
+      const maxClaims = prizeData.maxClaims || 80;
+
+      if (currentCount >= maxClaims) {
+        throw new Error('All prizes have been claimed');
+      }
+
+      if (!prizeData.isActive) {
+        throw new Error('This prize is no longer active');
+      }
+
+      // Dedup check
+      const claimsRef = collection(db, 'prizeClaims');
+      const existingClaimQuery = query(
+        claimsRef,
+        where('prizeId', '==', currentPrize.id),
+        where('walletAddress', '==', walletAddress.toLowerCase())
+      );
+      const existingClaims = await getDocs(existingClaimQuery);
+
+      if (!existingClaims.empty) {
+        throw new Error('You have already claimed this prize');
+      }
+
+      // Step 2: Mint NFT on-chain FIRST (before any Firebase writes)
+      const nftContract = getContract({ client, chain, address: NFT_DROP_ADDRESS });
+      const tx = prepareContractCall({
+        contract: nftContract,
+        method: 'function claim(address _receiver, uint256 _quantity, address _currency, uint256 _pricePerToken, (bytes32[] proof, uint256 quantityLimitPerWallet, uint256 pricePerToken, address currency) _allowlistProof, bytes _data) payable',
+        params: [
+          walletAddress,
+          1n,
+          NATIVE_TOKEN,
+          0n,
+          {
+            proof: [],
+            quantityLimitPerWallet: 0n,
+            pricePerToken: 0n,
+            currency: NATIVE_TOKEN
+          },
+          '0x'
+        ],
+      });
+      const result = await sendTransaction({ account: activeAccount, transaction: tx });
+      const txHash = result.transactionHash;
+
+      // Step 3: Mint succeeded — now write to Firebase
       const claimData = await runTransaction(db, async (transaction) => {
-        const prizeSnapshot = await transaction.get(prizeRef);
+        const freshSnapshot = await transaction.get(prizeRef);
+        const freshData = freshSnapshot.data();
+        const freshCount = freshData.claimCount || 0;
 
-        if (!prizeSnapshot.exists()) {
-          throw new Error('Prize no longer exists');
-        }
-
-        const prizeData = prizeSnapshot.data();
-        const currentCount = prizeData.claimCount || 0;
-        const maxClaims = prizeData.maxClaims || 80;
-
-        if (currentCount >= maxClaims) {
-          throw new Error('All prizes have been claimed');
-        }
-
-        if (!prizeData.isActive) {
-          throw new Error('This prize is no longer active');
-        }
-
-        // Check if user already claimed (double check within transaction)
-        const claimsRef = collection(db, 'prizeClaims');
-        const existingClaimQuery = query(
-          claimsRef,
-          where('prizeId', '==', currentPrize.id),
-          where('walletAddress', '==', walletAddress.toLowerCase())
-        );
-        const existingClaims = await getDocs(existingClaimQuery);
-
-        if (!existingClaims.empty) {
-          throw new Error('You have already claimed this prize');
-        }
-
-        // Increment claim count
         transaction.update(prizeRef, {
-          claimCount: currentCount + 1
+          claimCount: freshCount + 1
         });
 
-        // Create claim record
-        const newClaim = {
+        return {
           prizeId: currentPrize.id,
           userId: user.id,
           walletAddress: walletAddress.toLowerCase(),
           claimedAt: serverTimestamp(),
-          weekIdentifier: prizeData.weekIdentifier,
-          // Denormalized data for easy display
-          prizeName: prizeData.name,
-          prizeModelPath: prizeData.collectibleModelPath || prizeData.modelPath,
-          prizeVideoSrc: prizeData.videoSrc || null,
-          prizeDescription: prizeData.description,
-          prizeIcon: prizeData.previewConfig?.icon || null,
-          prizeAccentColor: prizeData.previewConfig?.accentColor || '#00f5d4',
-          claimNumber: currentCount + 1,
-          mintStatus: 'pending'
+          weekIdentifier: freshData.weekIdentifier,
+          prizeName: freshData.name,
+          prizeModelPath: freshData.collectibleModelPath || freshData.modelPath,
+          prizeVideoSrc: freshData.videoSrc || null,
+          prizeDescription: freshData.description,
+          prizeIcon: freshData.previewConfig?.icon || null,
+          prizeAccentColor: freshData.previewConfig?.accentColor || '#00f5d4',
+          claimNumber: freshCount + 1,
+          mintStatus: 'success',
+          txHash,
         };
-
-        return newClaim;
       });
 
-      // Save claim to Firebase
-      const claimsRef = collection(db, 'prizeClaims');
-      const claimDocRef = await addDoc(claimsRef, claimData);
+      await addDoc(claimsRef, claimData);
 
-      // Mint NFT on-chain via DropERC721.claim()
-      let mintStatus = 'pending';
-      let txHash = null;
-      try {
-        const nftContract = getContract({ client, chain, address: NFT_DROP_ADDRESS });
-        const tx = prepareContractCall({
-          contract: nftContract,
-          method: 'function claim(address _receiver, uint256 _quantity, address _currency, uint256 _pricePerToken, (bytes32[] proof, uint256 quantityLimitPerWallet, uint256 pricePerToken, address currency) _allowlistProof, bytes _data) payable',
-          params: [
-            walletAddress,
-            1n,
-            NATIVE_TOKEN,
-            0n,
-            {
-              proof: [],
-              quantityLimitPerWallet: 0n,
-              pricePerToken: 0n,
-              currency: NATIVE_TOKEN
-            },
-            '0x'
-          ],
-        });
-        const result = await sendTransaction({ account: activeAccount, transaction: tx });
-        txHash = result.transactionHash;
-        mintStatus = 'success';
-      } catch (mintErr) {
-        console.error('NFT mint failed (claim saved with pending status):', mintErr);
-      }
-
-      // Update Firebase doc with mint result
-      if (mintStatus === 'success' && txHash) {
-        const { updateDoc } = await import('firebase/firestore');
-        await updateDoc(claimDocRef, { mintStatus: 'success', txHash });
-      }
-
-      return { ...claimData, mintStatus, txHash };
+      return { ...claimData, mintStatus: 'success', txHash };
     } catch (err) {
       console.error('Error claiming prize:', err);
       setError(err.message);

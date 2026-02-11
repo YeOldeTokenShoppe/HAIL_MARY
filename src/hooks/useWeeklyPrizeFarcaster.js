@@ -363,6 +363,7 @@ export function useWeeklyPrizeFarcaster({ farcasterFid, farcasterUsername, walle
           },
           '0x'
         ],
+        value: 0n,
       });
 
       // Step 3: Mint succeeded — now write to Firebase
