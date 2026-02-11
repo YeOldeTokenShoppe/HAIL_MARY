@@ -158,10 +158,12 @@ export function useWeeklyPrizeFarcaster({ farcasterFid, farcasterUsername, walle
     if (TEST_MODE) return;
 
     if (!db) {
+      console.error('[useWeeklyPrizeFarcaster] Firebase db is null — cannot fetch prizes');
       setClaimStatus('no_prize');
       return;
     }
 
+    console.log('[useWeeklyPrizeFarcaster] Subscribing to weeklyPrizes...');
     const prizesRef = collection(db, 'weeklyPrizes');
     const activeQuery = query(
       prizesRef,
@@ -172,6 +174,7 @@ export function useWeeklyPrizeFarcaster({ farcasterFid, farcasterUsername, walle
     const unsubscribe = onSnapshot(
       activeQuery,
       (snapshot) => {
+        console.log('[useWeeklyPrizeFarcaster] Snapshot received, empty:', snapshot.empty, 'size:', snapshot.size);
         if (snapshot.empty) {
           setCurrentPrize(null);
           setClaimStatus('no_prize');
@@ -181,11 +184,12 @@ export function useWeeklyPrizeFarcaster({ farcasterFid, farcasterUsername, walle
 
         const prizeDoc = snapshot.docs[0];
         const prizeData = { id: prizeDoc.id, ...prizeDoc.data() };
+        console.log('[useWeeklyPrizeFarcaster] Prize found:', prizeData.name, 'active:', prizeData.isActive);
         setCurrentPrize(prizeData);
         setClaimCount(prizeData.claimCount || 0);
       },
       (err) => {
-        console.error('Error fetching active prize:', err);
+        console.error('[useWeeklyPrizeFarcaster] Error fetching active prize:', err);
         setError(err.message);
         setClaimStatus('no_prize');
       }

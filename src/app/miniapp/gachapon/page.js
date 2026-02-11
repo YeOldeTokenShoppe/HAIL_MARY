@@ -330,14 +330,14 @@ export default function MiniappGachaponPage() {
       setShowSuccessModal(true);
     } catch (error) {
       console.error('Failed to claim prize:', error);
+      setResetKey(prev => prev + 1);
     }
-
-    setResetKey(prev => prev + 1);
   }, [claimStatus, isClaimLoading, claimPrize, currentPrize]);
 
   const handleSuccessClose = useCallback(() => {
     setShowSuccessModal(false);
     setClaimedPrize(null);
+    setResetKey(prev => prev + 1);
   }, []);
 
   const handleSharePrize = useCallback(() => {

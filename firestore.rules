@@ -198,6 +198,21 @@
           && request.auth.uid == userId;
       }
 
+      // =========================================================================
+      // WEEKLY PRIZES / GACHAPON
+      // =========================================================================
+
+      // Weekly Prizes - public read, allow claimCount increment
+      match /weeklyPrizes/{prizeId} {
+        allow read: if true;
+        allow update: if true;
+      }
+
+      // Prize Claims - public read, allow creating claims
+      match /prizeClaims/{claimId} {
+        allow read, create: if true;
+      }
+
       // Default rules - SECURE by default
       match /{document=**} {
         allow read: if true;
