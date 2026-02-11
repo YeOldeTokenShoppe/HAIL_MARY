@@ -961,7 +961,24 @@ export function ClaimSuccessModal({ isOpen, prize, onClose, isMiniApp = false })
           color: 'rgba(255, 255, 255, 0.5)',
           fontSize: '0.7rem',
         }}>
-          {isMiniApp ? 'NFT minted to your wallet' : 'View your collection in Account > Collection'}
+          <a
+            href={`https://opensea.io/item/base/0xBF6f792075C5893DAF380D640B2f90296ea30C22/${prize.edition != null ? prize.edition - 1 : 0}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            style={{ color: '#00f5d4', textDecoration: 'underline' }}
+          >
+            View on OpenSea
+          </a>
+          {' · '}
+          <a
+            href="/models/Collectible1.glb"
+            download="RL80_TradeLife.glb"
+            onClick={(e) => e.stopPropagation()}
+            style={{ color: 'rgba(255, 255, 255, 0.5)', textDecoration: 'underline' }}
+          >
+            Download 3D Model
+          </a>
         </p>
         <button
           onClick={onClose}

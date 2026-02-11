@@ -363,6 +363,7 @@ export function useWeeklyPrizeFarcaster({ farcasterFid, farcasterUsername, walle
           prizeDescription: prizeData.description,
           prizeIcon: prizeData.previewConfig?.icon || null,
           prizeAccentColor: prizeData.previewConfig?.accentColor || '#00f5d4',
+          claimNumber: currentCount + 1,
           mintStatus: 'pending'
         };
 
