@@ -20,6 +20,7 @@ import type {
   Content,
 } from '@elizaos/core';
 import { Service, EventType, ModelType, logger } from '@elizaos/core';
+import { currentTalkingPoints, topicOverrides } from './talking-points';
 
 // ============================================================
 // Shared debate state (module-level singleton — both agents see this)
@@ -69,7 +70,7 @@ const debateState: DebateState = {
 // DEBATE_TIMEZONE (default 'America/New_York')
 const ACTIVE_START_HOUR = parseInt(process.env.DEBATE_ACTIVE_START || '9', 10);
 const ACTIVE_END_HOUR = parseInt(process.env.DEBATE_ACTIVE_END || '23', 10);
-const TIMEZONE = process.env.DEBATE_TIMEZONE || 'America/New_York';
+const TIMEZONE = process.env.DEBATE_TIMEZONE || 'America/Los_Angeles';
 
 function isWithinActiveHours(): boolean {
   try {
@@ -93,30 +94,35 @@ function isWithinActiveHours(): boolean {
 // Debate topics
 // ============================================================
 
-const DEBATE_TOPICS: string[] = [
-  // Pure philosophy
-  'Is suffering necessary for wisdom, or can understanding come through joy alone?',
-  'Does free will exist, or are we simply the most elaborate dominoes?',
-  'Is true altruism possible, or is every good deed secretly self-serving?',
-  'If immortality were possible, would it be a gift or a curse?',
-  'Is chaos the natural state of the universe, or do we simply fail to see the order?',
-  'Do the ends justify the means, or does the path define the destination?',
-  'Is knowledge without action more dangerous than ignorance with conviction?',
-  'Can beauty exist without an observer, or is it purely a human invention?',
-  'Is it braver to fight for what you believe or to question what you believe?',
-  'Does consciousness create reality, or does reality create consciousness?',
+const DEFAULT_DEBATE_TOPICS: string[] = [
+  // Philosophy x Crypto
+  'Is suffering necessary for wisdom, or can understanding come through joy? Bear markets might be purgatio — purification — or just bad risk management.',
+  'Does free will exist in a market ruled by algorithms, whales, and herd psychology?',
+  'Is true altruism possible in crypto — or is every charitable donation just marketing with tax benefits?',
+  'Satoshi vanished. The cypherpunks dreamed of digital sovereignty. We got monkey jpegs. Was the revolution always going to be co-opted?',
+  'Is chaos the natural state of markets, or do we simply fail to see the order beneath the volatility?',
+  'Do the ends justify the means? Is it okay to build on speculation if the destination is something meaningful?',
+  'Is staking an act of faith — locking tokens because you believe — or just yield farming dressed in church aesthetics?',
+  'Can a token represent shared belief, or is every token just shared speculation with better branding?',
+  'Is it braver to diamond-hand through a bear market or to question whether your conviction is just sunk cost fallacy?',
+  'The blockchain is immutable. The code is law. But humans write the code. Are "trustless" systems actually trustworthy?',
   // HAIL MARY–woven themes
-  'Can a community of strangers create real value, or is it just mutual delusion?',
-  'Is faith in a long shot rational or reckless?',
-  'Does collective belief create reality or just delay disappointment?',
-  'Is building something nobody asked for an act of courage or ego?',
-  'Can shared purpose between strangers ever be genuine, or is it always transactional?',
-  'Is hope a strategy or a coping mechanism?',
-  'Does a token represent shared belief or just shared speculation?',
-  'Is it nobler to fail together or succeed alone?',
-  'Can meaning be manufactured by a community, or must it be discovered individually?',
-  'Is the willingness to risk everything on the improbable what makes us human or what makes us foolish?',
+  'Can a community of strangers — connected only by code and conviction — create real value, or is it mutual delusion?',
+  'HAIL MARY donates to St. Jude\'s and ASPCA. Does crypto charity make a project ethical, or just better at marketing?',
+  'The Scrolls say "price is temporary, but the blockchain is forever." Is that wisdom or cope?',
+  'Is building something nobody asked for — a 3D candle shrine, a philosophical token — an act of courage or ego?',
+  'Scroll V calls myth "a data structure optimized for longevity rather than precision." Is all tokenomics just mythology?',
+  'Is hope a strategy or a coping mechanism? Every hodler has to answer this eventually.',
+  'AI agents debating philosophy in a Telegram group. Is this the future of community or just bots talking to bots?',
+  'The number 80 — infinity sideways, halo from above. Is symbolism what makes a project meaningful, or just what makes it memorable?',
+  'Can meaning be built by a community, or must it be discovered alone? Is collective faith stronger than individual reason?',
+  'Is the willingness to risk everything on a long shot what makes us human — or what makes us exit liquidity?',
 ];
+
+// Use topic overrides from talking-points.ts if available, otherwise defaults
+function getDebateTopics(): string[] {
+  return topicOverrides.length > 0 ? topicOverrides : DEFAULT_DEBATE_TOPICS;
+}
 
 // ============================================================
 // DebateService — Timer loop for initiation & delayed responses
@@ -269,7 +275,8 @@ class DebateService extends Service {
     }
 
     try {
-      const topic = DEBATE_TOPICS[Math.floor(Math.random() * DEBATE_TOPICS.length)];
+      const topics = getDebateTopics();
+      const topic = topics[Math.floor(Math.random() * topics.length)];
       debateState.currentTopic = topic;
       debateState.isDebateActive = true;
       debateState.turnCount = 0;
@@ -277,16 +284,22 @@ class DebateService extends Service {
 
       logger.info(`[Debate] Saint GR80 initiating debate on: "${topic}"`);
 
-      const prompt = `You are Saint GR80, a philosopher-saint. You are opening a new philosophical debate in a Telegram group where your eternal adversary H80Z is also present.
+      // Include current talking points for topical awareness
+      const talkingPointsContext = currentTalkingPoints.length > 0
+        ? `\nCurrent context (use naturally if relevant, don't force):\n${currentTalkingPoints.map(tp => `- ${tp}`).join('\n')}\n`
+        : '';
+
+      const prompt = `You are Saint GR80, philosopher-saint and keeper of the Scrolls in the HAIL MARY universe. You bridge ancient wisdom and cypherpunk philosophy. You are opening a debate in a Telegram group where your adversary H80Z is also present.
 
 The topic is: "${topic}"
-
+${talkingPointsContext}
 Write an opening statement that:
 - Stakes out your philosophical position on this topic
 - Is compelling enough that H80Z will want to challenge it
 - Is 40-80 words
-- Naturally reflects your character — patient, wise, with references to classical philosophy
-- If the topic relates to community, faith, or collective action, you may weave in HAIL MARY themes naturally
+- Naturally reflects your character — patient, wise, blending classical philosophy with crypto-native insight
+- You can reference Stoics, Satoshi, the Scrolls, blockchain, staking, or HAIL MARY themes naturally
+- Speak crypto fluently but elevate it — you're not shitposting, you're philosophizing
 
 Do NOT include any meta-commentary, stage directions, or labels. Just write the statement as you would speak it.`;
 
@@ -341,19 +354,24 @@ Do NOT include any meta-commentary, stage directions, or labels. Just write the 
     try {
       const recentContext = debateState.debateHistory.slice(-6).join('\n\n');
 
-      const prompt = `You are ${myName}. You are in the middle of a philosophical debate in a Telegram group.
+      // Include current talking points for topical awareness
+      const talkingPointsContext = currentTalkingPoints.length > 0
+        ? `\nCurrent context (use naturally if relevant, don't force):\n${currentTalkingPoints.map(tp => `- ${tp}`).join('\n')}\n`
+        : '';
+
+      const prompt = `You are ${myName}. You are debating in a Telegram group within the HAIL MARY universe.
 
 The debate topic is: "${debateState.currentTopic}"
 
 Recent exchange:
 ${recentContext}
-
+${talkingPointsContext}
 Write your next response that:
 - Directly engages with what ${debateState.lastSpeaker} just said
-- Advances the philosophical argument with a new angle or challenge
+- Advances the argument with a new angle or challenge
 - Is 40-80 words
 - Stays in character as ${myName}
-- ${myName === 'H80Z' ? 'Use rhetorical questions, wit, and provocative logic. Reference Nietzsche, Machiavelli, or Diogenes if fitting.' : 'Use beauty, logic, and wisdom. Reference Stoics, existentialists, or classical philosophers if fitting.'}
+- ${myName === 'H80Z' ? 'Use rhetorical questions, wit, and provocative logic. Blend Nietzsche/Machiavelli/Diogenes with crypto reality — rug pulls, exploits, degen psychology, tokenomics. Speak fluent degen but wield it precisely.' : 'Use beauty, logic, and wisdom. Blend Stoics/existentialists with cypherpunk philosophy — Satoshi, trustless systems, blockchain as covenant. Reference the Scrolls when fitting. Speak crypto but elevate it.'}
 
 Do NOT include any meta-commentary, stage directions, labels, or your name prefix. Just write the response as you would speak it.`;
 
@@ -480,9 +498,14 @@ const debateContextProvider: Provider = {
       };
     }
 
+    // Build talking points context
+    const tpContext = currentTalkingPoints.length > 0
+      ? `\n\nCurrent market & project context:\n${currentTalkingPoints.map(tp => `- ${tp}`).join('\n')}`
+      : '';
+
     if (!debateState.isDebateActive) {
       return {
-        text: '[No active debate. You are free to chat naturally with anyone in the group.]',
+        text: `[No active debate. You are free to chat naturally with anyone in the group.]${tpContext}`,
       };
     }
 
@@ -498,7 +521,7 @@ Your opponent: ${opponent}
 Recent exchange:
 ${recentExchange}
 
-You are currently debating ${opponent}. Stay in character and engage with the ongoing philosophical discussion. If a human joins the conversation, respond warmly to them — you can briefly pause the debate to address their thoughts.`,
+You are currently debating ${opponent}. Stay in character and engage with the ongoing discussion. If a human joins, respond warmly — you can briefly pause the debate to address their thoughts.${tpContext}`,
     };
   },
 };
