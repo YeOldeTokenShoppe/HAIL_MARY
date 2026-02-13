@@ -25,7 +25,7 @@ export const CHARITY_WALLETS = {
 
 // Initialize Thirdweb client
 const client = createThirdwebClient({
-  clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || "cbae42251fe95b7e26a19a326b96ce5c",
+  clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID,
 });
 
 // Define Base chain (chainId: 8453)
