@@ -358,6 +358,7 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
       amount="100"
       theme="dark"
       paymentMethods={["crypto", "card"]}
+      country="US"
     />
             </div>
           </div>
