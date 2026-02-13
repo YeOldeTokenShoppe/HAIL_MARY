@@ -10,8 +10,9 @@
   },
   "include": [
     "src/index.ts",
-    "src/plugin.ts",
-    "src/character.ts",
+    "src/saint-gr80.ts",
+    "src/h80z.ts",
+    "src/debate-plugin.ts",
     "src/frontend/**/*.ts",
     "src/frontend/**/*.tsx"
   ],

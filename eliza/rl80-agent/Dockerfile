@@ -1,5 +1,5 @@
-# RL80 - Our Lady of Perpetual Profit
-# ElizaOS Agent for HAIL_MARY Trading System
+# HAIL MARY Debate Agents — Saint GR80 vs H80Z
+# ElizaOS Two-Agent Philosophical Debate System
 
 FROM node:23.3.0-slim
 
@@ -59,5 +59,5 @@ ENV LOG_LEVEL=info
 # Expose the port
 EXPOSE 3000
 
-# Start RL80
+# Start debate agents
 CMD ["elizaos", "start"]
