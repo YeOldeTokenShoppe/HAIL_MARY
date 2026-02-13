@@ -498,14 +498,27 @@ const debateContextProvider: Provider = {
       };
     }
 
+    // === Human-to-human detection ===
+    // If no bot is mentioned and no debate is active, the message is probably
+    // directed at other humans. Tell the bot to stay quiet unless directly relevant.
+    const mentionsAnyBot = mentionsMe || mentionsOpponent;
+    const isFromHuman = !isFromOtherBot && senderName !== myName;
+    const isReplyToBot = (message.content as any)?.replyTo?.name === myName;
+
     // Build talking points context
     const tpContext = currentTalkingPoints.length > 0
       ? `\n\nCurrent market & project context:\n${currentTalkingPoints.map(tp => `- ${tp}`).join('\n')}`
       : '';
 
     if (!debateState.isDebateActive) {
+      // No debate active — only respond if directly addressed
+      if (isFromHuman && !mentionsMe && !isReplyToBot) {
+        return {
+          text: `[ROUTING] No active debate. This message does NOT mention you (@${BOT_USERNAMES[myName]}) and is not a reply to you. The humans are talking to each other. You MUST use the IGNORE action. Do NOT respond unless someone @mentions you or replies to one of your messages.`,
+        };
+      }
       return {
-        text: `[No active debate. You are free to chat naturally with anyone in the group.]${tpContext}`,
+        text: `[You were directly addressed. Respond naturally and in character. No active debate.]${tpContext}`,
       };
     }
 
