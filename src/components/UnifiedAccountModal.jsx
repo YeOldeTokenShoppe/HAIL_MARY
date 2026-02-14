@@ -532,7 +532,7 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' })
                           setShowWalletDetails(true);
                         }}
                       >
-                        View Details & Stake
+                        View Details
                       </button>
                       <button 
                         className="action-button disconnect"

@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useImperativeHandle, forwardRef } from 'react'
 import Link from 'next/link'
 import styles from './Matchstick.module.css'
-import { useStaking } from '@/hooks/useStaking'
 import SkewedHeading from './SkewedHeading'
 import { useLanguage } from './LanguageProvider'
 
@@ -15,7 +14,6 @@ const ShrineLeftPanel = forwardRef(({
   is80sMode = false,
   isMobile = false,
   onLightCandle,
-  onStakeClick,
   router,
   onFindCandle,
   onResetView,
@@ -27,10 +25,7 @@ const ShrineLeftPanel = forwardRef(({
   const [hasLitCandleThisSession, setHasLitCandleThisSession] = useState(false)
   const [mounted, setMounted] = useState(false)
   const [isHoveringMatchstick, setIsHoveringMatchstick] = useState(false)
-  const [isHoveringStake, setIsHoveringStake] = useState(false)
   const [isConstrainedHeight, setIsConstrainedHeight] = useState(() => typeof window !== 'undefined' ? window.innerHeight < 900 : false)
-  const { stakedBalance } = useStaking()
-  const hasStakedTokens = parseFloat(stakedBalance || 0) > 0
 
   // Set mounted state after component mounts
   useEffect(() => {
@@ -212,194 +207,6 @@ const ShrineLeftPanel = forwardRef(({
         {/* CTA Text - Clean modern font */}
        
 
-        {/* Stake Token Frame - Duplicate style below matchstick */}
-        <div style={{
-          fontFamily: "'Bebas Neue', sans-serif",
-          fontSize: isMobile ? '1rem' : '1rem',
-          fontWeight: 300,
-          color: is80sMode ? '#00ffff' : 'rgba(246, 245, 241, 0.95)',
-          textShadow: is80sMode
-            ? `
-              0 0 20px rgba(255, 0, 255, 0.6),
-              0 0 40px rgba(0, 255, 255, 0.4),
-              2px 2px 4px rgba(0, 0, 0, 0.6)
-            `
-            : `
-              0 0 20px rgba(212, 175, 55, 0.4),
-              0 0 40px rgba(212, 175, 55, 0.2),
-              2px 2px 4px rgba(0, 0, 0, 0.6)
-            `,
-          letterSpacing: '0.06em',
-          textAlign: 'center',
-          lineHeight: 1.2,
-          maxWidth: isMobile ? '260px' : '280px',
-          alignSelf: 'center',
-          marginTop: '0.5rem'
-        }}>
-          <span style={{ 
-            display: 'block',
-            fontWeight: 400,
-            textTransform: 'uppercase',
-            letterSpacing: '0.08em',
-            fontSize: '0.95rem',
-          }}>
-            STAKE RL80
-          </span>
-          {/* <span style={{ 
-            display: 'block', 
-            fontSize: isMobile ? '0.9rem' : '0.9rem',
-            opacity: 0.8,
-            marginTop: '6px',
-            fontWeight: 300,
-            fontStyle: 'italic',
-          }}>
-            Earn rewards
-          </span> */}
-          {/* <span style={{ 
-            display: 'block', 
-            fontSize: '0.65rem',
-            opacity: 0.5,
-            marginTop: '0.5rem',
-            fontWeight: 300,
-            fontStyle: 'italic',
-          }}>
-            Sign in + hold RL80 to participate
-          </span> */}
-        </div>
-        
-        {/* Stake button - circular background matching matchstick style */}
-        <div
-          onClick={() => {
-            if (onStakeClick) {
-              onStakeClick()
-            }
-          }}
-          style={{
-            pointerEvents: 'auto',  // Enable clicks on the stake button
-            width: '5.5rem',
-            height: '5.5rem',
-            borderRadius: '50%',
-            background: is80sMode ? 'rgba(255, 0, 255, 0.1)' : 'rgba(212, 175, 55, 0.1)',
-            border: is80sMode ? '1.5px solid rgba(255, 0, 255, 0.2)' : '1.5px solid rgba(212, 175, 55, 0.15)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            cursor: 'pointer',
-            transition: 'all 0.3s ease',
-            boxShadow: is80sMode ? '0 0 0 0 rgba(255, 0, 255, 0)' : '0 0 0 0 rgba(212, 175, 55, 0)',
-            animation: 'buttonPulse 2s ease-in-out infinite',
-            position: 'relative',
-            overflow: 'visible',
-            backdropFilter: 'blur(10px)',
-            WebkitBackdropFilter: 'blur(10px)',
-          }}
-          onMouseEnter={(e) => {
-            setIsHoveringStake(true);
-            e.currentTarget.style.animation = 'none';
-            e.currentTarget.style.background = is80sMode ? 'rgba(255, 0, 255, 0.2)' : 'rgba(212, 175, 55, 0.15)';
-            e.currentTarget.style.border = is80sMode ? '1.5px solid rgba(255, 0, 255, 0.4)' : '1.5px solid rgba(212, 175, 55, 0.25)';
-            e.currentTarget.style.boxShadow = is80sMode ? '0 0 20px rgba(255, 0, 255, 0.4), 0 0 40px rgba(0, 255, 255, 0.2)' : '0 0 20px rgba(212, 175, 55, 0.3)';
-            e.currentTarget.style.transform = 'scale(1.05)';
-          }}
-          onMouseLeave={(e) => {
-            setIsHoveringStake(false);
-            e.currentTarget.style.animation = 'buttonPulse 2s ease-in-out infinite';
-            e.currentTarget.style.background = is80sMode ? 'rgba(255, 0, 255, 0.1)' : 'rgba(212, 175, 55, 0.1)';
-            e.currentTarget.style.border = is80sMode ? '1.5px solid rgba(255, 0, 255, 0.2)' : '1.5px solid rgba(212, 175, 55, 0.15)';
-            e.currentTarget.style.boxShadow = is80sMode ? '0 0 0 0 rgba(255, 0, 255, 0)' : '0 0 0 0 rgba(212, 175, 55, 0)';
-            e.currentTarget.style.transform = 'scale(1)';
-          }}
-        >
-          {/* Hover text that slides out for staking */}
-          {isHoveringStake && (
-            <div style={{
-              position: 'absolute',
-              left: '110%',
-              top: '50%',
-              whiteSpace: 'nowrap',
-              backgroundColor: is80sMode ? 'rgba(20, 0, 40, 0.95)' : 'rgba(10, 10, 20, 0.9)',
-              padding: '10px 20px',
-              borderRadius: '8px',
-              border: is80sMode ? '1px solid rgba(255, 0, 255, 0.4)' : '1px solid rgba(212, 175, 55, 0.3)',
-              boxShadow: is80sMode ? '0 4px 12px rgba(0, 0, 0, 0.5), 0 0 20px rgba(255, 0, 255, 0.2)' : '0 4px 12px rgba(0, 0, 0, 0.5)',
-              animation: 'slideIn 0.3s ease-out forwards',
-              pointerEvents: 'none',
-              zIndex: 1000,
-            }}>
-              <div style={{
-                fontFamily: "'Bebas Neue', sans-serif",
-                fontSize: '0.9rem',
-                fontWeight: 300,
-                color: is80sMode ? '#00ffff' : 'rgba(246, 245, 241, 0.95)',
-                textShadow: is80sMode ? '0 0 10px rgba(0, 255, 255, 0.5)' : '0 0 10px rgba(212, 175, 55, 0.3)',
-                letterSpacing: '0.05em',
-                lineHeight: 1.4,
-              }}>
-                <div style={{ marginBottom: '4px' }}>Lock RL80 and earn Eth.</div>
-              </div>
-            </div>
-          )}
-          <img 
-            src="/images/stakeIcon.webp"
-            alt="Stake Tokens"
-            style={{
-              width: '70%',
-              height: '70%',
-              objectFit: 'contain',
-              opacity: 0.9,
-              filter: 'brightness(1.1)',
-              pointerEvents: 'none',
-            }}
-          />
-          
-          {/* Subtle glow ring animation */}
-          <div style={{
-            position: 'absolute',
-            width: '100%',
-            height: '100%',
-            borderRadius: '50%',
-            boxShadow: is80sMode ? '0 0 0 0 rgba(255, 0, 255, 0.4)' : '0 0 0 0 rgba(212, 175, 55, 0.4)',
-            animation: 'inviteGlow 3s ease-in-out infinite',
-            pointerEvents: 'none',
-          }} />
-        </div>
-
-        {/* "Or" divider between Stake and Get Lit */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '12px',
-          margin: '0.75rem 0',
-          width: '100%',
-          maxWidth: '120px',
-        }}>
-          <div style={{
-            flex: 1,
-            height: '1px',
-            background: is80sMode
-              ? 'linear-gradient(to right, transparent, rgba(255, 0, 255, 0.5))'
-              : 'linear-gradient(to right, transparent, rgba(212, 175, 55, 0.4))',
-          }} />
-          <span style={{
-            fontFamily: "'Bebas Neue', sans-serif",
-            fontSize: '0.85rem',
-            color: is80sMode ? 'rgba(0, 255, 255, 0.8)' : 'rgba(212, 175, 55, 0.7)',
-            textTransform: 'lowercase',
-            letterSpacing: '0.1em',
-            fontStyle: 'italic',
-            textShadow: is80sMode ? '0 0 10px rgba(0, 255, 255, 0.5)' : 'none',
-          }}>
-            or
-          </span>
-          <div style={{
-            flex: 1,
-            height: '1px',
-            background: is80sMode
-              ? 'linear-gradient(to left, transparent, rgba(255, 0, 255, 0.5))'
-              : 'linear-gradient(to left, transparent, rgba(212, 175, 55, 0.4))',
-          }} />
-        </div>
 
         <div style={{
           fontFamily: "'Bebas Neue', sans-serif",

@@ -8,7 +8,6 @@ import { useMusic } from '@/components/MusicContext'
 import { useWalletAuth } from '@/components/WalletAuthProvider'
 import ThirdwebBuyModal from '@/components/ThirdwebBuyModal'
 import LightCandleModal from '@/components/LightCandleModal'
-import StakeModal from '@/components/StakeModal'
 import { WalletConnectionModal } from '@/components/WalletConnectionModal'
 import { useRouter, usePathname } from 'next/navigation'
 import { useLanguage } from '@/components/LanguageProvider'
@@ -49,7 +48,6 @@ export default function ShrinePage() {
   const [modalKey, setModalKey] = useState(0) // Force modal to remount by changing key
   const [isProcessingCandle, setIsProcessingCandle] = useState(false) // Prevent modal from reopening during processing
   const [hasProcessedCandle, setHasProcessedCandle] = useState(false) // Track if candle was already processed this session
-  const [showStakeModal, setShowStakeModal] = useState(false)
   const [showWalletModal, setShowWalletModal] = useState(false)
   const [showAuthMessage, setShowAuthMessage] = useState(null)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -64,8 +62,6 @@ export default function ShrinePage() {
   const [hasDismissedPolaroid, setHasDismissedPolaroid] = useState(false)
   const [hasLitCandleThisSession, setHasLitCandleThisSession] = useState(false)
   // Snapshot functionality removed - no longer needed
-  const [mobileBannerType, setMobileBannerType] = useState('candle') // 'candle' or 'staking'
-  const [hasManuallySelectedBannerType, setHasManuallySelectedBannerType] = useState(false)
   const is80sMode = context80sMode
   
   // State for offerings data
@@ -633,46 +629,24 @@ useEffect(() => {
     setShowLightCandleModal(true);
   };
   
-  // Handle stake button click with auth check
-  const handleStakeClick = () => {
-    // Check if user is signed in
-    if (!isSignedIn) {
-      setShowAuthMessage('sign-in-stake');
-      return;
-    }
-
-    // Check if wallet is connected
-    if (!isWalletConnected || !walletAddress) {
-      setShowWalletModal(true);
-      setWaitingForWallet(true); // Set flag that we're waiting for wallet connection for staking
-      setWalletActionType('stake'); // Track that this is for staking
-      return;
-    }
-
-    // Both signed in and wallet connected - show the modal
-    setShowStakeModal(true);
-  };
 
   // Find My Candle functionality moved to stats tab in UnifiedShrine
 
   // Track if we're waiting for wallet connection and what action triggered it
   const [waitingForWallet, setWaitingForWallet] = useState(false);
-  const [walletActionType, setWalletActionType] = useState(null); // 'candle' or 'stake'
-  
+  const [walletActionType, setWalletActionType] = useState(null); // 'candle'
+
   // Watch for wallet connection
   useEffect(() => {
     if (isWalletConnected && (showWalletModal || waitingForWallet)) {
       setShowWalletModal(false);
       setWaitingForWallet(false);
-      
-      // Open the appropriate modal based on what action triggered wallet connection
-      // But only if we're not already processing a candle and haven't processed one
-      if (walletActionType === 'stake') {
-        setShowStakeModal(true);
-      } else if (walletActionType === 'candle' && !isProcessingCandle && !hasProcessedCandle) {
+
+      // Open the candle modal if that's what triggered wallet connection
+      if (walletActionType === 'candle' && !isProcessingCandle && !hasProcessedCandle) {
         setShowLightCandleModal(true);
       }
-      
+
       setWalletActionType(null); // Reset the action type
     }
   }, [isWalletConnected, showWalletModal, waitingForWallet, walletActionType, isProcessingCandle, hasProcessedCandle]);
@@ -680,10 +654,8 @@ useEffect(() => {
   // Watch for successful sign-in and resume the intended action
   useEffect(() => {
     if (isSignedIn && userLoaded && showAuthMessage) {
-      // Clear the auth message
-      const actionType = showAuthMessage;
       setShowAuthMessage(null);
-      
+
       // Small delay to allow test wallet auto-assignment to complete
       setTimeout(() => {
         // After sign-in, check wallet connection
@@ -691,13 +663,10 @@ useEffect(() => {
           // Need wallet connection
           setShowWalletModal(true);
           setWaitingForWallet(true);
-          setWalletActionType(actionType === 'sign-in-stake' ? 'stake' : 'candle');
+          setWalletActionType('candle');
         } else {
-          // Already have wallet, show the appropriate modal
-          // But only if we're not already processing a candle and haven't processed one
-          if (actionType === 'sign-in-stake') {
-            setShowStakeModal(true);
-          } else if (!isProcessingCandle && !hasProcessedCandle) {
+          // Already have wallet, show the candle modal
+          if (!isProcessingCandle && !hasProcessedCandle) {
             setShowLightCandleModal(true);
           }
         }
@@ -870,21 +839,6 @@ useEffect(() => {
     return () => window.removeEventListener('openBuyModal', handleOpenBuyModal);
   }, []);
   
-  // Auto-alternate between candle and staking banners on mobile
-  // Stop alternating if user has manually selected a mode
-  useEffect(() => {
-    if (!isMobileView) return;
-
-    // If user has manually selected a mode, don't auto-alternate
-    if (hasManuallySelectedBannerType) return;
-
-    const interval = setInterval(() => {
-      setMobileBannerType(prev => prev === 'candle' ? 'staking' : 'candle');
-    }, 8000); // Switch every 8 seconds
-
-    return () => clearInterval(interval);
-  }, [isMobileView, hasManuallySelectedBannerType]);
-
   // Lock body scroll on mount to prevent mobile viewport bounce/shift
   useEffect(() => {
     const html = document.documentElement
@@ -1046,7 +1000,6 @@ useEffect(() => {
           is80sMode={is80sMode}
           isMobile={false}
           onLightCandle={handleLightCandleClick}
-          onStakeClick={handleStakeClick}
           router={router}
         />
       )}
@@ -1070,9 +1023,7 @@ useEffect(() => {
             width: isExpanded ? 'calc(100% - 32px)' : '80px',
             maxWidth: isExpanded ? '340px' : '80px',
             background: 'rgba(10, 10, 20, 0.4)',
-            border: mobileBannerType === 'candle' 
-              ? '1px solid rgba(212, 175, 55, 0.15)'
-              : '1px solid rgba(0, 245, 212, 0.15)',
+            border: '1px solid rgba(212, 175, 55, 0.15)',
             borderRadius: '50px',
             paddingTop: isExpanded ? '12px' : '10px',
             paddingRight: isExpanded ? '16px' : '10px',
@@ -1108,141 +1059,28 @@ useEffect(() => {
               overflow: 'hidden',
               whiteSpace: 'nowrap',
             }}>
-            {mobileBannerType === 'candle' ? (
-              <>
-                <div style={{
-                  fontSize: '1.5rem',
-                  fontWeight: 400,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
-                  marginBottom: '2px',
-                  color: 'rgba(212, 175, 55, 0.9)',
-                  textAlign: 'center',
-                }}>
-                  {t('illumin80.watchlistTitle')}
-                </div>
-                <div style={{
-                  fontSize: '1rem',
-                  opacity: 0.7,
-                  fontWeight: 300,
-                  textAlign: 'center',
-                }}>
-                  {t('illumin80.lightGreenCandle')}
-                </div>
-                {/* <div style={{
-                  fontSize: '0.65rem',
-                  opacity: 0.5,
-                  fontWeight: 300,
-                  marginTop: '0.3rem',
-                  fontStyle: 'italic',
-                  textAlign: 'center',
-                  width: '100%',
-                }}>
-                  Sign in + hold RL80 to participate
-                </div> */}
-              </>
-            ) : (
-              <>
-                <div style={{
-                  fontSize: '1.5rem',
-                  fontWeight: 400,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
-                  marginBottom: '2px',
-                  color: 'rgba(0, 245, 212, 0.9)',
-                  textAlign: 'center',
-                }}>
-                  {t('illumin80.stakeTokens')}
-                </div>
-                <div style={{
-                  fontSize: '1rem',
-                  opacity: 0.7,
-                  fontWeight: 300,
-                  textAlign: 'center',
-                }}>
-                  {t('illumin80.earnRewards')}
-                </div>
-                {/* <div style={{
-                  fontSize: '0.65rem',
-                  opacity: 0.5,
-                  fontWeight: 300,
-                  marginTop: '0.3rem',
-                  fontStyle: 'italic',
-                  textAlign: 'center',
-                  width: '100%',
-                }}>
-                  Sign in + connect wallet to stake
-                </div> */}
-              </>
-            )}
-
-            {/* Mode toggle tabs */}
-            {isExpanded && (
-              <div style={{
-                display: 'flex',
-                justifyContent: 'center',
-                gap: '8px',
-                marginTop: '10px',
-              }}>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMobileBannerType('candle');
-                    setHasManuallySelectedBannerType(true);
-                  }}
-                  style={{
-                    padding: '4px 12px',
-                    borderRadius: '12px',
-                    border: 'none',
-                    fontSize: '0.65rem',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    background: mobileBannerType === 'candle'
-                      ? 'rgba(212, 175, 55, 0.3)'
-                      : 'rgba(255, 255, 255, 0.1)',
-                    color: mobileBannerType === 'candle'
-                      ? 'rgba(212, 175, 55, 1)'
-                      : 'rgba(255, 255, 255, 0.5)',
-                    border: mobileBannerType === 'candle'
-                      ? '1px solid rgba(212, 175, 55, 0.4)'
-                      : '1px solid rgba(255, 255, 255, 0.1)',
-                  }}
-                >
-                  {t('illumin80.candleTab')}
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMobileBannerType('staking');
-                    setHasManuallySelectedBannerType(true);
-                  }}
-                  style={{
-                    padding: '4px 12px',
-                    borderRadius: '12px',
-                    border: 'none',
-                    fontSize: '0.65rem',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    transition: 'all 0.2s ease',
-                    background: mobileBannerType === 'staking'
-                      ? 'rgba(0, 245, 212, 0.3)'
-                      : 'rgba(255, 255, 255, 0.1)',
-                    color: mobileBannerType === 'staking'
-                      ? 'rgba(0, 245, 212, 1)'
-                      : 'rgba(255, 255, 255, 0.5)',
-                    border: mobileBannerType === 'staking'
-                      ? '1px solid rgba(0, 245, 212, 0.4)'
-                      : '1px solid rgba(255, 255, 255, 0.1)',
-                  }}
-                >
-                  {t('illumin80.stakeTab')}
-                </button>
-              </div>
-            )}
+            <div style={{
+              fontSize: '1.5rem',
+              fontWeight: 400,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              marginBottom: '2px',
+              color: 'rgba(212, 175, 55, 0.9)',
+              textAlign: 'center',
+            }}>
+              {t('illumin80.watchlistTitle')}
+            </div>
+            <div style={{
+              fontSize: '1rem',
+              opacity: 0.7,
+              fontWeight: 300,
+              textAlign: 'center',
+            }}>
+              {t('illumin80.lightGreenCandle')}
+            </div>
           </div>
 
-          {/* Matchstick or Stake Button - Changes based on banner type */}
+          {/* Matchstick Button */}
           <div
             onClick={(e) => {
               e.stopPropagation(); // Prevent triggering the parent onClick
@@ -1253,18 +1091,12 @@ useEffect(() => {
                 return;
               }
 
-              // If banner is expanded, then open the appropriate modal
               // Haptic feedback if available
               if (window.navigator && window.navigator.vibrate) {
                 window.navigator.vibrate(50) // Short vibration
               }
 
-              // Open different modal based on banner type
-              if (mobileBannerType === 'candle') {
-                handleLightCandleClick();
-              } else {
-                handleStakeClick();
-              }
+              handleLightCandleClick();
             }}
             style={{
               width: '60px',
@@ -1272,26 +1104,20 @@ useEffect(() => {
               borderRadius: '50%',
               flexShrink: 0,
               margin: isExpanded ? '0' : 'auto',
-              background: mobileBannerType === 'candle' 
-                ? (mobileMatchstickLit 
-                  ? 'radial-gradient(circle, rgba(255, 149, 0, 0.2) 0%, rgba(255, 100, 0, 0.05) 70%, transparent 100%)'
-                  : 'rgba(212, 175, 55, 0.1)')
-                : 'rgba(0, 245, 212, 0.1)',
-              border: mobileBannerType === 'candle'
-                ? (mobileMatchstickLit 
-                  ? '1.5px solid rgba(255, 149, 0, 0.4)' 
-                  : '1.5px solid rgba(212, 175, 55, 0.15)')
-                : '1.5px solid rgba(0, 245, 212, 0.15)',
+              background: mobileMatchstickLit
+                ? 'radial-gradient(circle, rgba(255, 149, 0, 0.2) 0%, rgba(255, 100, 0, 0.05) 70%, transparent 100%)'
+                : 'rgba(212, 175, 55, 0.1)',
+              border: mobileMatchstickLit
+                ? '1.5px solid rgba(255, 149, 0, 0.4)'
+                : '1.5px solid rgba(212, 175, 55, 0.15)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
               transition: 'all 0.3s ease',
-              boxShadow: mobileBannerType === 'candle'
-                ? (mobileMatchstickLit
-                  ? '0 0 15px rgba(255, 149, 0, 0.3)'
-                  : '0 0 0 0 rgba(212, 175, 55, 0)')
-                : '0 0 0 0 rgba(0, 245, 212, 0)',
+              boxShadow: mobileMatchstickLit
+                ? '0 0 15px rgba(255, 149, 0, 0.3)'
+                : '0 0 0 0 rgba(212, 175, 55, 0)',
               animation: mobileMatchstickLit
                 ? 'none'
                 : 'buttonPulse 2s ease-in-out infinite',
@@ -1308,40 +1134,24 @@ useEffect(() => {
               height: '100%',
               pointerEvents: 'none',  // Prevent internal click handling
             }}>
-              {mobileBannerType === 'candle' ? (
-                // Candle mode - show matchstick or flame
-                mobileMatchstickLit ? (
-                  // Lit state - flame emoji
-                  <div style={{
-                    fontSize: '32px',
-                    animation: 'flicker 0.5s ease-in-out infinite',
-                  }}>
-                    🔥
-                  </div>
-                ) : (
-                  // Unlit state - matchstick SVG
-                  <img 
-                    src="/images/torchIcon.webp"
-                    alt="Matchstick"
-                    style={{
-                      width: '28px',
-                      height: '28px',
-                      opacity: 0.9,
-                      filter: 'brightness(1.2)',
-                    }}
-                  />
-                )
+              {mobileMatchstickLit ? (
+                // Lit state - flame emoji
+                <div style={{
+                  fontSize: '32px',
+                  animation: 'flicker 0.5s ease-in-out infinite',
+                }}>
+                  🔥
+                </div>
               ) : (
-                // Staking mode - show stake icon
-                <img 
-                  src="/images/stakeIcon.webp"
-                  alt="Stake"
+                // Unlit state - matchstick SVG
+                <img
+                  src="/images/torchIcon.webp"
+                  alt="Matchstick"
                   style={{
-                    width: '44px',
-                    height: '44px',
-                    objectFit: 'contain',
+                    width: '28px',
+                    height: '28px',
                     opacity: 0.9,
-                    filter: 'brightness(1.1)',
+                    filter: 'brightness(1.2)',
                   }}
                 />
               )}
@@ -1381,9 +1191,7 @@ useEffect(() => {
                 transform: 'translateX(-50%)',
                 fontSize: '9px',
                 fontFamily: "'Bebas Neue', sans-serif",
-                color: mobileBannerType === 'candle'
-                  ? 'rgba(212, 175, 55, 0.9)'
-                  : 'rgba(0, 245, 212, 0.9)',
+                color: 'rgba(212, 175, 55, 0.9)',
                 textTransform: 'uppercase',
                 letterSpacing: '1px',
                 animation: 'tapBounce 1.5s ease-in-out infinite',
@@ -1391,7 +1199,7 @@ useEffect(() => {
                 whiteSpace: 'nowrap',
                 textShadow: '0 1px 3px rgba(0, 0, 0, 0.5)',
               }}>
-                {mobileBannerType === 'candle' ? t('illumin80.lightIt') : t('illumin80.stakeTab')}
+                {t('illumin80.lightIt')}
               </div>
             )}
           </div>
@@ -1910,18 +1718,8 @@ useEffect(() => {
         }}
       />
       
-      {/* Stake Modal */}
-      <StakeModal
-        isOpen={showStakeModal}
-        onClose={() => setShowStakeModal(false)}
-        currentPhase={1} // Phase 1: Pre-rewards. Change to 2, 3, or 4 as protocol evolves
-        onStake={async (stakeData) => {
-          // TODO: Implement actual staking logic here
-        }}
-      />
-      
       {/* Sign-In Message Overlay */}
-      {(showAuthMessage === 'sign-in' || showAuthMessage === 'sign-in-stake') && (
+      {showAuthMessage === 'sign-in' && (
         <div 
           style={{
             position: 'fixed',
@@ -2008,7 +1806,7 @@ useEffect(() => {
               fontSize: '0.95rem',
               lineHeight: '1.5'
             }}>
-              Please sign in to {showAuthMessage === 'sign-in-stake' ? 'stake tokens' : 'light a candle'}.
+              Please sign in to light a candle.
             </p>
             <SignInButton mode="modal" forceRedirectUrl="/illumin80">
               <button style={{
