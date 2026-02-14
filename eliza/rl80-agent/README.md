@@ -70,9 +70,8 @@ After editing: push to GitHub, Railway auto-redeploys. For local dev: save and r
 | `SAINT_GR80_TWITTER_API_SECRET_KEY` | No | Twitter/X API secret |
 | `SAINT_GR80_TWITTER_ACCESS_TOKEN` | No | Twitter/X access token (OAuth 1.0a) |
 | `SAINT_GR80_TWITTER_ACCESS_TOKEN_SECRET` | No | Twitter/X access token secret |
-| `TWITTER_POST_ENABLE` | No | Default: `true` — allow posting tweets |
-| `TWITTER_SEARCH_ENABLE` | No | Default: `true` — allow searching/listening |
-| `TWITTER_DRY_RUN` | No | Default: `true` — log tweets without posting |
+| `TWITTER_ENABLE_POST` | No | Default: `false` — set `true` to enable posting tweets |
+| `TWITTER_DRY_RUN` | No | Default: `false` — set `true` to log tweets without posting |
 
 Set these in Railway's Variables tab (not in the repo). The `.env` file is gitignored.
 
