@@ -2,6 +2,7 @@ import { logger, type IAgentRuntime, type Project, type ProjectAgent } from '@el
 import debatePlugin from './debate-plugin.ts';
 import { saintGr80Character } from './saint-gr80.ts';
 import { h80zCharacter } from './h80z.ts';
+import { ourLadyCharacter } from './our-lady.ts';
 
 /**
  * HAIL MARY Debate Agents — Saint GR80 vs H80Z
@@ -21,21 +22,15 @@ const initSaintGr80 = async ({ runtime }: { runtime: IAgentRuntime }) => {
   logger.info({ name: runtime.character.name }, 'Initializing character:');
 
   const hasTelegram = !!process.env.SAINT_GR80_TELEGRAM_BOT_TOKEN;
-  const hasTwitter = !!process.env.SAINT_GR80_TWITTER_API_KEY;
   const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
 
   logger.info({
     telegram: hasTelegram ? 'connected' : 'NOT CONFIGURED',
-    twitter: hasTwitter ? 'connected' : 'NOT CONFIGURED',
     anthropic: hasAnthropic ? 'available' : 'NOT CONFIGURED',
   }, 'Saint GR80 service status:');
 
   if (!hasTelegram) {
     logger.warn('SAINT_GR80_TELEGRAM_BOT_TOKEN not set — bot will not connect to Telegram');
-  }
-
-  if (!hasTwitter) {
-    logger.warn('SAINT_GR80_TWITTER_API_KEY not set — bot will not connect to Twitter/X');
   }
 
   logger.info('Saint GR80 initialized — "Let us reason together."');
@@ -62,6 +57,27 @@ const initH80Z = async ({ runtime }: { runtime: IAgentRuntime }) => {
   logger.info('H80Z initialized — "Question everything."');
 };
 
+const initOurLady = async ({ runtime }: { runtime: IAgentRuntime }) => {
+  logger.info('===========================================');
+  logger.info('   𝕆𝖚𝖗 𝕷𝖆𝖉𝖞 of Perpetual Profit — Twitter');
+  logger.info('===========================================');
+  logger.info({ name: runtime.character.name }, 'Initializing character:');
+
+  const hasTwitter = !!process.env.SAINT_GR80_TWITTER_API_KEY;
+  const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
+
+  logger.info({
+    twitter: hasTwitter ? 'connected' : 'NOT CONFIGURED',
+    anthropic: hasAnthropic ? 'available' : 'NOT CONFIGURED',
+  }, 'Our Lady service status:');
+
+  if (!hasTwitter) {
+    logger.warn('SAINT_GR80_TWITTER_API_KEY not set — Our Lady will not connect to Twitter/X');
+  }
+
+  logger.info('Our Lady initialized — "Blessings upon your portfolio."');
+};
+
 const saintGr80Agent: ProjectAgent = {
   character: saintGr80Character,
   init: async (runtime: IAgentRuntime) => await initSaintGr80({ runtime }),
@@ -74,8 +90,13 @@ const h80zAgent: ProjectAgent = {
   plugins: [debatePlugin],
 };
 
+const ourLadyAgent: ProjectAgent = {
+  character: ourLadyCharacter,
+  init: async (runtime: IAgentRuntime) => await initOurLady({ runtime }),
+};
+
 const project: Project = {
-  agents: [saintGr80Agent, h80zAgent],
+  agents: [saintGr80Agent, h80zAgent, ourLadyAgent],
 };
 
 export default project;

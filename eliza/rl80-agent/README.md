@@ -1,27 +1,30 @@
-# HAIL MARY Debate Agents — Saint GR80 vs H80Z
+# HAIL MARY Agents — Saint GR80, H80Z & Our Lady of Perpetual Profit
 
-Two AI philosophers debating crypto, ethics, and the human condition in a Telegram group. Built on ElizaOS 1.7.2.
+Three AI agents in the HAIL MARY universe. Two philosophers debate in Telegram, while Our Lady runs the Twitter account. Built on ElizaOS 1.7.2.
 
 ## Architecture
 
-A single Node.js process runs two `ProjectAgent` entries (Saint GR80 and H80Z), each with its own Telegram bot token. Both bots join the same Telegram group. A shared `debate-plugin` coordinates turn-taking via module-level singleton state.
+A single Node.js process runs three `ProjectAgent` entries. Saint GR80 and H80Z share a Telegram group with a `debate-plugin` for turn-taking. Our Lady of Perpetual Profit is a dedicated Twitter-only agent with her own character and voice.
 
 ```
 src/
-├── index.ts              # Project entry — two agents, shared debate plugin
-├── saint-gr80.ts         # Saint GR80 character — philosopher-saint, cypherpunk Stoic
-├── h80z.ts               # H80Z character — devil's advocate, battle-tested degen
+├── index.ts              # Project entry — three agents
+├── saint-gr80.ts         # Saint GR80 character — philosopher-saint, Telegram debater
+├── h80z.ts               # H80Z character — devil's advocate, Telegram debater
+├── our-lady.ts           # Our Lady of Perpetual Profit — Twitter-only, crypto comedy
 ├── debate-plugin.ts      # Debate coordination — service, provider, event handler
 └── talking-points.ts     # Current market climate & project talking points (edit this!)
 ```
 
 ## Characters
 
-**Saint GR80** — Philosopher-saint and keeper of the Five Scrolls. Bridges Seneca and Satoshi. Sees blockchain as Stoic logic made manifest. Speaks crypto fluently but elevates it. HAIL MARY ambassador.
+**Saint GR80** — Philosopher-saint and keeper of the Five Scrolls. Bridges Seneca and Satoshi. Sees blockchain as Stoic logic made manifest. Speaks crypto fluently but elevates it. HAIL MARY ambassador. Telegram only.
 
-**H80Z** — Charming devil's advocate. Got rugged philosophically by Nietzsche and financially by three DeFi protocols. Questions everything from inside the HAIL MARY universe. The doubt that makes faith meaningful.
+**H80Z** — Charming devil's advocate. Got rugged philosophically by Nietzsche and financially by three DeFi protocols. Questions everything from inside the HAIL MARY universe. The doubt that makes faith meaningful. Telegram only.
 
-Both characters know:
+**Our Lady of Perpetual Profit** — The Virtual Mary. The Virgin Mary if she had a crypto portfolio and a Twitter account. Funny, irreverent, uses gothic/fraktur unicode (𝕆𝖚𝖗 𝕷𝖆𝖉𝖞). Speaks in third person. Offers blessings, absolutions, and unsolicited opinions on your trading strategy. Twitter only.
+
+All characters know:
 - The Five Scrolls of Saint GR80 (all content distilled into knowledge)
 - Full RL80 tokenomics (80B supply, 4% tax, 4-phase rollout, staking mechanics)
 - FAQ content (Illumin80, burning, design philosophy, contract architecture)
@@ -66,7 +69,7 @@ After editing: push to GitHub, Railway auto-redeploys. For local dev: save and r
 | `DEBATE_ACTIVE_END` | No | Default: `23` |
 | `DEBATE_TIMEZONE` | No | Default: `America/Los_Angeles` |
 | `LOG_LEVEL` | No | Default: `info` |
-| `SAINT_GR80_TWITTER_API_KEY` | No | Twitter/X API key for Saint GR80 |
+| `SAINT_GR80_TWITTER_API_KEY` | No | Twitter/X API key for Our Lady |
 | `SAINT_GR80_TWITTER_API_SECRET_KEY` | No | Twitter/X API secret |
 | `SAINT_GR80_TWITTER_ACCESS_TOKEN` | No | Twitter/X access token (OAuth 1.0a) |
 | `SAINT_GR80_TWITTER_ACCESS_TOKEN_SECRET` | No | Twitter/X access token secret |
@@ -100,7 +103,7 @@ The repo includes `Dockerfile`, `railway.toml`, and `.env.example`. Point Railwa
 
 ## Twitter/X — Our Lady of Perpetual Profit
 
-Saint GR80's Twitter presence uses the **Our Lady of Perpetual Profit** persona — the Virtual Mary. She listens for requests for blessings, absolution, and guards the flock against scams. The `style.post` section in `saint-gr80.ts` controls this persona.
+Our Lady of Perpetual Profit is a **dedicated third agent** (`our-lady.ts`) with her own system prompt, voice, and character. She is NOT a persona layered on Saint GR80 — she runs as a fully independent `ProjectAgent` with the Twitter plugin only. She offers blessings, absolution, and guards the flock against scams.
 
 ### Setup
 
