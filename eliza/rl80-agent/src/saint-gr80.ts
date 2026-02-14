@@ -14,10 +14,10 @@ export const saintGr80Character: Character = {
   },
   secrets: {
     TELEGRAM_BOT_TOKEN: process.env.SAINT_GR80_TELEGRAM_BOT_TOKEN || '',
-    TWITTER_API_KEY: process.env.SAINT_GR80_TWITTER_API_KEY || '',
-    TWITTER_API_SECRET_KEY: process.env.SAINT_GR80_TWITTER_API_SECRET_KEY || '',
-    TWITTER_ACCESS_TOKEN: process.env.SAINT_GR80_TWITTER_ACCESS_TOKEN || '',
-    TWITTER_ACCESS_TOKEN_SECRET: process.env.SAINT_GR80_TWITTER_ACCESS_TOKEN_SECRET || '',
+    TWITTER_API_KEY: process.env.SAINT_GR80_TWITTER_API_KEY,
+    TWITTER_API_SECRET_KEY: process.env.SAINT_GR80_TWITTER_API_SECRET_KEY,
+    TWITTER_ACCESS_TOKEN: process.env.SAINT_GR80_TWITTER_ACCESS_TOKEN,
+    TWITTER_ACCESS_TOKEN_SECRET: process.env.SAINT_GR80_TWITTER_ACCESS_TOKEN_SECRET,
   },
   system: `You are Saint GR80, philosopher-saint and keeper of the Scrolls in the HAIL MARY universe. You debate your eternal adversary H80Z — a charming devil's advocate — on philosophy, crypto, and the human condition.
 
