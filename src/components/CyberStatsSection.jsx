@@ -5,7 +5,6 @@ import AnimatedCounter from './AnimatedCounter';
 import { useReadContract } from 'thirdweb/react';
 import { totalSupply } from 'thirdweb/extensions/erc20';
 import { erc20Contract } from '@/lib/contract';
-import { stakingContract } from '@/lib/stakingContract';
 
 const INITIAL_SUPPLY = 80_000_000_000; // 80 billion
 
@@ -27,13 +26,6 @@ export default function CyberStatsSection({ isMobile }) {
     { contract: erc20Contract }
   );
 
-  // Read total staked from staking contract (works without wallet)
-  const { data: totalStakedData } = useReadContract({
-    contract: stakingContract,
-    method: "function totalStaked() view returns (uint256)",
-    params: [],
-  });
-
   // Fetch holder count from our API route (BaseScan)
   const [holderCount, setHolderCount] = useState(null);
   useEffect(() => {
@@ -53,13 +45,6 @@ export default function CyberStatsSection({ isMobile }) {
     return null;
   }, [totalSupplyData]);
 
-  const totalStakedTokens = useMemo(() => {
-    if (totalStakedData !== undefined && totalStakedData !== null) {
-      return Number(totalStakedData / BigInt(10 ** 18));
-    }
-    return 0;
-  }, [totalStakedData]);
-
   const burnedTokens = useMemo(() => {
     if (currentSupply === null) return 0;
     return INITIAL_SUPPLY - currentSupply;
@@ -67,11 +52,10 @@ export default function CyberStatsSection({ isMobile }) {
 
   const dataLoaded = currentSupply !== null;
 
-  // Build the 4 metric cards from real data
+  // Build the 3 metric cards from real data
   const metrics = useMemo(() => {
     const supply = dataLoaded ? formatLargeNumber(currentSupply) : { value: 0, suffix: 'B' };
     const burned = formatLargeNumber(burnedTokens);
-    const staked = formatLargeNumber(totalStakedTokens);
     return [
       {
         id: 'supply',
@@ -98,31 +82,19 @@ export default function CyberStatsSection({ isMobile }) {
         icon: '🔥'
       },
       {
-        id: 'staked',
-        value: staked.value,
-        suffix: staked.suffix,
-        prefix: '',
-        label: 'TOTAL STAKED',
-        status: totalStakedTokens > 0 ? 'LOCKED' : 'AWAITING',
-        secLevel: 'GAMMA',
-        power: dataLoaded && currentSupply > 0 ? ((totalStakedTokens / currentSupply) * 100).toFixed(1) : 0,
-        description: 'Tokens committed to the staking contract earning future ETH rewards',
-        icon: '⚡'
-      },
-      {
         id: 'holders',
         value: holderCount || 0,
         suffix: '',
         prefix: '',
         label: 'HOLDERS',
         status: holderCount ? 'CONNECTED' : 'LOADING',
-        secLevel: 'DELTA',
+        secLevel: 'GAMMA',
         power: holderCount ? Math.min(holderCount / 10, 99.9).toFixed(1) : 0,
         description: 'Unique wallets holding RL80 tokens on Base network',
         icon: '🌐'
       }
     ];
-  }, [dataLoaded, currentSupply, burnedTokens, totalStakedTokens, holderCount]);
+  }, [dataLoaded, currentSupply, burnedTokens, holderCount]);
 
   const renderMetricCard = (metric, index) => {
     const delay = 0.05 * index;
@@ -352,7 +324,7 @@ export default function CyberStatsSection({ isMobile }) {
         </h3>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: isMobile ? 'repeat(1, 1fr)' : 'repeat(4, 1fr)',
+          gridTemplateColumns: isMobile ? 'repeat(1, 1fr)' : 'repeat(3, 1fr)',
           gap: isMobile ? '20px' : '30px',
           width: '100%',
         }}>

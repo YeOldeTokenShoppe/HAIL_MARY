@@ -120,8 +120,7 @@ You can simply hold RL80, or you can actively engage with its features.
 Nothing is required, and no action is framed as an obligation. The system is designed so that meaning and utility emerge from how the community chooses to participate.
 Depending on how you choose to engage, RL80 allows you to:
 	•	Hold as a long-term signal of alignment
-	•	Stake to participate in rewards
-	•	Burn tokens for symbolic acts of sacrifice and deflationary impact, or to earn Illumin80 status. 
+	•	Burn tokens for symbolic acts of sacrifice and deflationary impact, or to earn Illumin80 status
 
 `,
           status: '[UTILITY.LOADED]'
@@ -198,12 +197,9 @@ IMPORTANT: Always verify you have the correct token contract to avoid scams.
       title: 'How RL80 Works (Plain-English Contract Overview)',
       response: ` LOADING CONTRACT ARCHITECTURE...
 
-RL80 is powered by three simple on-chain contracts.
-Each has one job only, keeping responsibilities separated for safety and transparency.
+RL80 is a renounced ERC-20 token on Base with 0% tax on all transactions.
 
-No hidden minting.
-No backdoors.
-No custody of your funds.
+Ownership has been permanently renounced. No admin can modify the contract. No hidden minting. No backdoors. No custody of your funds.
 
 Just math and code.
 `,
@@ -216,87 +212,20 @@ Just math and code.
           response: `LOADING TOKEN SPECIFICATIONS...
 
 WHAT IT DOES:
-RL80 is a standard ERC-20 token with a small trading fee that funds the ecosystem.
+RL80 is a standard ERC-20 token on Base with a permanently renounced contract and 0% tax on all transactions.
 
 KEY BEHAVIORS:
 • ✅ Capped supply — 80 billion tokens
 • ✅ No minting after launch
 • ✅ No blacklist or freeze functions
-• ✅ Wallet-to-wallet transfers have 0% fee
-• ✅ Only buys and sells through the liquidity pool pay a small fee (≈4%)
+• ✅ 0% tax on ALL transactions (buy, sell, and transfer)
+• ✅ Contract ownership permanently renounced
+• ✅ No admin can modify the contract
 
-WHY THERE'S A FEE:
-The fee supports:
-• Liquidity growth
-• Staking rewards
-• Marketing & operations
-
-This keeps the project sustainable without selling treasury tokens.
-
-LAUNCH PROTECTION:
-At launch, sell fees are temporarily higher and decay over the first hour to discourage bots and snipers.
-
-After that → normal fees.
+RENOUNCED STATUS:
+The contract has been permanently renounced. This means no one — including the original deployer — can change fees, mint tokens, freeze wallets, or modify any contract behavior. The code is immutable.
 `,
           status: '[TOKEN.VERIFIED]'
-        },
-        {
-          id: 'SUB_002_B',
-          command: '>> SUB.QUERY: Staking.Contract',
-          title: 'Staking — RL80Staking',
-          response: `LOADING STAKING ARCHITECTURE...
-
-WHAT IT DOES:
-Lets holders stake RL80 and earn ETH rewards collected from trading fees.
-
-HOW IT WORKS:
-1. Stake RL80
-2. Wait 7 days (lock period)
-3. Earn ETH rewards over time
-4. Claim anytime after the lock
-
-IMPORTANT DETAILS:
-• ✅ You always keep custody of your tokens (no third-party risk)
-• ✅ Rewards are distributed fairly based on stake size
-• ✅ Rewards are streamed continuously (not lottery style)
-• ✅ Emergency unstake available if the contract is paused
-• ✅ No staking fees
-
-WHERE REWARDS COME FROM:
-Trading fees → swapped to ETH → sent to the staking contract for distribution to stakers.
-
-No inflation or token printing.
-Rewards come from actual trading activity, not from issuing new tokens to pay existing holders.
-
-Rewards vary with trading activity — higher volume generates more rewards, while quieter markets generate less.`,
-          status: '[STAKING.VERIFIED]'
-        },
-        {
-          id: 'SUB_002_C',
-          command: '>> SUB.QUERY: Splitter.Contract',
-          title: 'Fee Splitter — RewardsSplitter',
-          response: `LOADING SPLITTER MECHANICS...
-
-WHAT IT DOES:
-Converts collected fees into ETH and distributes them.
-
-FLOW:
-Trading fees → swap to ETH → splits between:
-• Treasury
-• Stakers
-• Marketing
-
-SAFETY FEATURES:
-• ✅ Cannot custody user funds
-• ✅ Distribution percentages are transparent
-• ✅ Fails gracefully (one recipient can't block others)
-• ✅ No manual "trust me" transfers
-• ✅ Configuration can be permanently locked once stable, removing administrative changes
-• ✅ Execution is automated and becomes permissionless if swaps are not triggered
-
-This means funds move by rules, not promises.
-`,
-          status: '[SPLITTER.VERIFIED]'
         },
         {
           id: 'SUB_002_D',
@@ -307,13 +236,14 @@ This means funds move by rules, not promises.
 RL80 follows three principles:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. SEPARATION OF POWERS
+1. IMMUTABILITY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-• Token handles transfers
-• Staking handles rewards
-• Splitter handles fees
+• Contract ownership permanently renounced
+• 0% tax on all transactions
+• No admin functions remain
+• Code is frozen forever
 
-No single contract controls everything.
+No one can change anything. The contract runs exactly as written.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 2. MINIMAL TRUST
@@ -323,29 +253,17 @@ No single contract controls everything.
 • No hidden upgradeability
 • Core behavior is deterministic
 
-Admins only manage configuration (fees, shares, etc.), not your funds.
-
-
-Administrative permissions exist only for operational configuration
-during early stages (fee routing, swap thresholds, exchange integration).
-These permissions cannot mint tokens, seize wallets, or withdraw user funds.
-
-As the ecosystem stabilizes, configuration can be permanently locked
-and administrative control minimized.
+There are no admin keys. The contract is fully autonomous.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 3. TRANSPARENCY
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Everything happens on-chain:
-• Rewards
-• Swaps
-• Treasury funding
-• Staking balances
+• Token transfers
+• Burns
+• Supply tracking
 
 Anyone can verify in a block explorer.
-Execution can be triggered by anyone if automation fails, ensuring distribution cannot be blocked.
-Operational controls exist to maintain stability during early operation,
-not to change outcomes or override the rules enforced by the contracts.
 `,
           status: '[PHILOSOPHY.DEFINED]'
         },
@@ -360,8 +278,8 @@ For clarity:
 ❌ No minting after launch
 ❌ No wallet freezing
 ❌ No hidden taxes
+❌ No admin keys (contract renounced)
 ❌ No "owner can drain funds" functions
-❌ No staking rug mechanisms
 ❌ No custody of your assets
 
 If you hold RL80 in your wallet, it's yours.
@@ -375,18 +293,18 @@ If you hold RL80 in your wallet, it's yours.
           response: `GENERATING SUMMARY...
 
 RL80 is:
-• A fixed-supply token
-• With small trading fees
-• That fund staking rewards and growth
-• Enforced by open-source smart contracts, with no trust assumptions and execution triggered on-chain.
+• A fixed-supply, deflationary token
+• With 0% tax on all transactions
+• Contract permanently renounced — no admin, no changes
+• Enforced by open-source smart contracts, with no trust assumptions
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Simple. Predictable. Verifiable.
+Simple. Immutable. Verifiable.
 
 Rules are enforced by code.
-Operations are guided by transparency.
-Trust is minimized by design.
+No one holds the keys.
+Trust is eliminated by design.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `,
@@ -402,223 +320,22 @@ Trust is minimized by design.
 
 The Illumin80 is anyone who lights a candle on the shrine. By burning RL80 tokens and offering a prayer, message, or intention, you become part of the Illumin80.
 
-STAKING MULTIPLIER:
-• The top 20% of cumulative token burners qualify for a 1.2x multiplier on staking rewards
-• Evaluated monthly
-• Multiplier applies for the following month
-• Rankings may change as participation grows
+Every burn permanently reduces the token supply, increasing scarcity for all holders. The more you burn, the higher you rank on the leaderboard.
 
 `,
       status: '[REQUIREMENTS.LISTED]',
       subQuestions: [
         {
           id: 'SUB_003_A',
-          command: '>> SUB.QUERY: Staking.Multiplier',
-          title: 'What is the 1.2x staking multiplier?',
-          response: `LOADING MULTIPLIER DETAILS...
-
-The top 20% of cumulative token burners receive a 1.2x multiplier on all staking rewards.
-
-EXAMPLE:
-• Standard staker earns 100 ETH in rewards
-• Top 20% burner earns 120 ETH for the same stake
-
-HOW IT WORKS:
-• Multiplier applies automatically when you rank in the top 20% of burners
-• Rankings are evaluated monthly based on cumulative burn totals
-• If you qualify this month, multiplier applies next month
-• Multiplier stacks with your proportional stake — bigger stake + top 20% status = maximum rewards
-
-This rewards long-term believers who demonstrate commitment through burning.
-`,
-          status: '[MULTIPLIER.ACTIVE]'
-        },
-        {
-          id: 'SUB_003_B',
-          command: '>> SUB.QUERY: Qualification',
-          title: 'How do I qualify for the staking multiplier?',
-          response: `LOADING QUALIFICATION CRITERIA...
-
-STAKING MULTIPLIER QUALIFICATION:
-• Anyone who lights a candle is Illumin80
-• The top 20% of cumulative token burners earn a 1.2x staking multiplier
-• Rankings are evaluated monthly
-• Multiplier applies for the following month
-
-IMPORTANT NOTES:
-• It's cumulative — all your burns count toward your total
-• Rankings may shift as more participants join
-• You don't lose past burns, but others may catch up
-• Check your ranking on the /illumin80 leaderboard
-
-The threshold adjusts dynamically. As the community grows, you may need to burn more to maintain top 20% status.
-`,
-          status: '[QUALIFICATION.LOADED]'
-        },
-        {
-          id: 'SUB_003_C',
           command: '>> SUB.QUERY: Burn.Protocol',
           title: 'How do I burn a candle?',
           response: `RETRIEVING INSTRUCTIONS...
 
 To burn a candle, visit the /illumin80 page and simply click the button, fill out a quick form, and sign your digital wallet transaction.
 
-Candles melt over 24 hours. When fully melted, they expire and are removed from the scene. Burn again to maintain your presence on the shrine and build toward Illumin80 status.
+Candles melt over 24 hours. When fully melted, they expire and are removed from the scene. Burn again to maintain your presence on the shrine and climb the leaderboard.
 `,
           status: '[INSTRUCTIONS.LISTED]'
-        }
-      ]
-    },
-    {
-      id: 'QUERY_004',
-      command: '> QUERY: Rewards',
-      title: 'Staking & Rewards',
-      response: ` ACCESSING STAKING PROTOCOL...
-
-Staking lets you deposit RL80 into the staking vault to participate in the system's reward stream. While staked, your tokens remain yours, but they are locked in the staking contract until your unlock period ends after 7 days from your last staking deposit.
-
-RL80 uses a phased rollout for staking rewards. Staking is open from day one, but rewards activate progressively as the protocol matures.
-
-`,
-      status: '[TERMS.LOADED]',
-      subQuestions: [
-        {
-          id: 'SUB_004_A',
-          command: '>> SUB.QUERY: Phased.Rollout',
-          title: 'How does the phased rewards system work?',
-          response: `LOADING PHASE CONFIGURATION...
-
-RL80 staking rewards are distributed according to a 4-phase rollout:
-
-PHASE 1: LIQUIDITY BUILD (Current)
-• Staking is OPEN — stake early to secure your position
-• No rewards distributed yet
-• All rewards accrued are queued for Phase 2
-• Early stakers are first in line when rewards activate
-
-PHASE 2: PILOT DIVIDENDS
-• 1% of transaction tax flows to staking rewards
-• Rewards paid in ETH
-• Protocol begins testing reward distribution at scale
-
-PHASE 3: STAKING DOMINANT
-• 2% of transaction tax flows to staking rewards
-• Full staking rewards activated
-• Mature protocol stage
-
-PHASE 4: ZERO TAX MODE (Optional)
-• 0% transaction tax
-• Protocol becomes self-sustaining
-• Staking rewards cease; withdraw anytime
-
-This phased approach ensures liquidity is established before rewards begin flowing, creating a more stable foundation for long-term stakers.
-`,
-          status: '[PHASES.LOADED]'
-        },
-        {
-          id: 'SUB_004_B',
-          command: '>> SUB.QUERY: APY.Current',
-          title: 'What are the current staking returns?',
-          response: `CALCULATING ...
-
-RL80 staking does not offer a fixed or guaranteed rate of return.
-
-CURRENT STATUS: Phase 1 (Pre-Rewards)
-• Staking is open, but rewards have not yet activated
-• Stake now to secure your position for Phase 2
-
-WHEN REWARDS ACTIVATE (Phase 2+):
-Rewards are paid in ETH and depend on how much ETH is routed into the staking contract from the RL80 tax infrastructure. The amount you earn is proportional to your share of the total staked supply.
-
-Because rewards come from real on-chain activity (taxes converted to ETH via the rewards splitter), the effective return varies over time and is influenced by market conditions and token flow.
-
-You can view your pending rewards in the staking interface before claiming.
-`,
-          status: '[REWARDS.CALCULATED]'
-        },
-        {
-          id: 'SUB_004_C',
-          command: '>> SUB.QUERY: Rewards.Distribution',
-          title: 'Where do staking rewards come from?',
-          response: `LOADING DISTRIBUTION LOGIC...
-
-Staking rewards are paid in ETH. When rewards are active (Phase 2+), ETH is routed into the staking contract from RL80's transaction tax via a distributor module.
-
-TAX ALLOCATION BY PHASE:
-• Phase 1: 0% to staking (liquidity focus)
-• Phase 2: 1% to staking (pilot rewards)
-• Phase 3: 2% to staking (full rewards)
-• Phase 4: 0% to staking (zero tax mode)
-
-The distributor swaps collected RL80 for ETH and forwards the staking allocation to the rewards contract for distribution to stakers.
-`,
-          status: '[DISTRIBUTION.CONFIGURED]'
-        },
-        {
-          id: 'SUB_004_D',
-          command: '>> SUB.QUERY: Reward.Mechanism',
-          title: 'How are rewards calculated?',
-          response: `ANALYZING ...
-
-Rewards are distributed proportionally based on how much RL80 you have staked and for how long. The contract uses a cumulative per-token accounting model so rewards remain fair across deposits and withdrawals.
-
-STANDARD CALCULATION:
-Your share = (Your Staked Amount / Total Staked) × Rewards Distributed
-
-ILLUMIN80 BONUS:
-Members with Illumin80 status receive a 1.2x multiplier on all staking rewards. Qualify by ranking in the top 20% of cumulative token burners (evaluated monthly).
-
-Early stakers who position themselves in Phase 1 will be included in the first reward distributions when Phase 2 activates.
-`,
-          status: '[REWARDS.CALCULATED]'
-        },
-        {
-          id: 'SUB_004_E',
-          command: '>> SUB.QUERY: LOCK.Mechanism',
-          title: 'Is there a lockup?',
-          response: `ANALYZING ...
-
-Yes. Staked RL80 has a 7-day lock period. Each new staking deposit resets your unlock timer.
-
-This applies in all phases — even in Phase 1 when rewards haven't activated yet. Your tokens are locked per standard staking rules regardless of reward status.
-`,
-          status: '[LOCKUP.CLARIFIED]'
-        },
-        {
-          id: 'SUB_004_F',
-          command: '>> SUB.QUERY: CLAIM.Mechanism',
-          title: 'When can I claim rewards?',
-          response: `ANALYZING ...
-
-You can claim rewards at any time once they are available (Phase 2+), as long as your accrued rewards meet the minimum claim threshold.
-
-IMPORTANT: During Phase 1, there are no rewards to claim yet. The staking interface will show your staked position, but claimable rewards will be zero until Phase 2 activates.
-
-Because claiming requires an on-chain transaction, a minimum threshold is used to help prevent gas-inefficient micro-claims. You remain in full control of when to claim.
-`,
-          status: '[CLAIM.READY]'
-        },
-        {
-          id: 'SUB_004_G',
-          command: '>> SUB.QUERY: Early.Staking',
-          title: 'Why stake early in Phase 1?',
-          response: `ANALYZING EARLY STAKER BENEFITS...
-
-Staking during Phase 1 offers several advantages:
-
-• SECURE YOUR POSITION: Be first in line when rewards activate
-• NO RUSH: Stake at your own pace before Phase 2 competition
-• SAME LOCK RULES: 7-day lock applies — your commitment is real
-• QUEUED REWARDS: Early stakers are included from the first distribution
-• BUILD ILLUMIN80 STATUS: Burn tokens now to qualify for 1.2x multiplier
-
-Think of Phase 1 staking like getting in line before the doors open. When Phase 2 activates, you're already positioned to receive your proportional share of the first reward distribution.
-
-PRO TIP: Use Phase 1 to both stake AND burn. Qualify for Illumin80 status now, and when rewards activate in Phase 2, you'll receive the 1.2x multiplier on your staking rewards.
-
-This is intentional design, not a delay. Building liquidity first creates a stronger foundation for sustainable rewards.
-`,
-          status: '[BENEFITS.LOADED]'
         }
       ]
     },
@@ -792,7 +509,7 @@ https://app.termly.io/policy-viewer/policy.html?policyUUID=c79eb066-d5de-4656-b6
 
 TAX NOTICE:
 • You are responsible for reporting crypto transactions
-• Token burns, trades, and rewards may be taxable events
+• Token burns and trades may be taxable events
 • Consult a qualified tax professional in your jurisdiction
 • We do not provide tax advice
 • Keep records of all transactions for tax purposes

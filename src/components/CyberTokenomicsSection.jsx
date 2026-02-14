@@ -16,8 +16,6 @@ const CONTRACT_ADDRESS = "0x30D01555d88c76500a82754A1D53cAc082A6CB75";
 
 export default function CyberTokenomicsSection({ isMobile }) {
   const [activeCard, setActiveCard] = useState(null);
-  const [activePhase, setActivePhase] = useState('phase1');
-  const [viewMode, setViewMode] = useState('distribution'); // 'distribution' or 'tax'
   const [copied, setCopied] = useState(false);
   const chartRef = useRef(null);
   const isInView = useInView(chartRef, { once: true, threshold: 0.3 });
@@ -90,297 +88,44 @@ export default function CyberTokenomicsSection({ isMobile }) {
     ],
   };
 
-  // Phase configurations for tax distribution (3-phase rollout)
-  const phaseConfigs = {
-    phase1: {
-      id: 'PHASE1',
-      label: 'PHASE 1: LIQUIDITY BUILD',
-      status: 'BOOT',
-      tax: {
-        id: 'TAX001',
-        label: 'BUY / SELL TAX',
-        value: '4%',
-        description:
-          'Liquidity-first routing while the pool is thin. Deepens LP, stabilizes price discovery.',
-        breakdown: [
-          { label: 'Liquidity (Build)', value: '2.5%', color: '#ffd700' },
-          { label: 'Treasury (LP ops)', value: '1.0%', color: '#00ff00' },
-          { label: 'Marketing', value: '0.5%', color: '#d946ef' },
-          { label: 'Staking (Queued)', value: '0%', color: '#555' },
-          { label: 'Wallet Transfers', value: '0%', color: '#0fa', always: true },
-        ],
-      },
-      note:
-        'Staking rewards queued but not distributed. Advances to Phase 2 once LP depth + organic volume thresholds are met.',
-    },
-    phase2: {
-      id: 'PHASE2',
-      label: 'PHASE 2: PILOT DIVIDENDS',
-      status: 'HYBRID',
-      tax: {
-        id: 'TAX001',
-        label: 'BUY / SELL TAX',
-        value: '4%',
-        description:
-          'Hybrid mode: staking rewards come online while liquidity growth continues.',
-        breakdown: [
-          { label: 'Liquidity (Growth)', value: '2.0%', color: '#ffd700' },
-          { label: 'Staking Rewards', value: '1.0%', color: '#00ff00' },
-          { label: 'Marketing', value: '0.5%', color: '#d946ef' },
-          { label: 'Treasury', value: '0.5%', color: '#0fa' },
-          { label: 'Wallet Transfers', value: '0%', color: '#0fa', always: true },
-        ],
-      },
-      note:
-        'Pilot dividends active. LP remains primary recipient. Advances to Phase 3 once rewards are meaningful + LP is sturdy.',
-    },
-    phase3: {
-      id: 'PHASE3',
-      label: 'PHASE 3: STAKING DOMINANT',
-      status: 'MATURE',
-      tax: {
-        id: 'TAX001',
-        label: 'BUY / SELL TAX',
-        value: '4%',
-        description:
-          'Mature mode: staking is the main character. Liquidity is healthy; rewards maximized for holders.',
-        breakdown: [
-          { label: 'Staking Rewards', value: '2.0%', color: '#00ff00' },
-          { label: 'Liquidity (Maintenance)', value: '1.5%', color: '#ffd700' },
-          { label: 'Marketing', value: '0.5%', color: '#d946ef' },
-          { label: 'Wallet Transfers', value: '0%', color: '#0fa', always: true },
-        ],
-      },
-      note:
-        'Full dividend mode. Liquidity allocation maintains long-term pool stability.',
-    },
-    phase4: {
-      id: 'PHASE4',
-      label: 'PHASE 4: ZERO TAX',
-      status: 'FINAL',
-      tax: {
-        id: 'TAX001',
-        label: 'ALL TRANSACTIONS',
-        value: '0%',
-        description:
-          'Zero-tax mode: protocol generates sufficient non-tax revenue to support staking rewards. Full frictionless trading.',
-        breakdown: [
-          { label: 'Buy Tax', value: '0%', color: '#fff' },
-          { label: 'Sell Tax', value: '0%', color: '#fff' },
-          { label: 'Wallet Transfers', value: '0%', color: '#0fa', always: true },
-        ],
-      },
-      note:
-        'Optional final state. Enacted only when liquidity is mature and non-tax revenue sustains staking rewards. Transition will be gradual and announced in advance.',
-    },
-  };
+  const tokenomicsData = tokenDistribution.data;
 
-  const currentPhase = phaseConfigs[activePhase] || phaseConfigs.phase1;
-
-  const taxProtocols = [
-    {
-      ...currentPhase.tax,
-      phaseLabel: currentPhase.label,
-      phaseStatus: currentPhase.status,
-      phaseNote: currentPhase.note,
-    },
-  ];
-
-  // Phase-aware tax distribution data for pie chart
-  const distributionConfigs = {
-    phase1: {
-      title: 'TAX ALLOCATION',
-      subtitle: '4% FEE DISTRIBUTION',
-      data: [
-        {
-          id: 'DIST001',
-          title: 'LIQUIDITY',
-          percentage: 62.5,
-          amount: '2.5%',
-          color: '#ffd700',
-          description: 'Primary allocation to deepen liquidity pool during bootstrap phase',
-          details: ['LP depth building', 'Price stability', 'Slippage reduction', 'DEX reserves'],
-          status: 'ACTIVE',
-          securityLevel: 'PRIORITY',
-        },
-        {
-          id: 'DIST002',
-          title: 'TREASURY',
-          percentage: 25,
-          amount: '1.0%',
-          color: '#00ff00',
-          description: 'Operational runway for LP management and protocol development',
-          details: ['LP operations', 'Development funding', 'Emergency reserves', 'Infrastructure'],
-          status: 'SECURED',
-          securityLevel: 'HIGH',
-        },
-        {
-          id: 'DIST003',
-          title: 'MARKETING',
-          percentage: 12.5,
-          amount: '0.5%',
-          color: '#d946ef',
-          description: 'Growth acceleration and community expansion initiatives',
-          details: ['Community growth', 'Partnerships', 'Content creation', 'Exchange outreach'],
-          status: 'ACTIVE',
-          securityLevel: 'STANDARD',
-        },
-      ],
-    },
-    phase2: {
-      title: 'TAX ALLOCATION',
-      subtitle: '4% FEE DISTRIBUTION',
-      data: [
-        {
-          id: 'DIST001',
-          title: 'LIQUIDITY',
-          percentage: 50,
-          amount: '2.0%',
-          color: '#ffd700',
-          description: 'Continued liquidity growth while staking rewards begin',
-          details: ['LP expansion', 'Price stability', 'Volume support', 'DEX reserves'],
-          status: 'ACTIVE',
-          securityLevel: 'HIGH',
-        },
-        {
-          id: 'DIST002',
-          title: 'STAKING',
-          percentage: 25,
-          amount: '1.0%',
-          color: '#00ff00',
-          description: 'Pilot staking rewards distributed to token holders',
-          details: ['Holder rewards', 'Staking yields', 'Dividend pool', 'Reward distribution'],
-          status: 'LIVE',
-          securityLevel: 'PRIORITY',
-        },
-        {
-          id: 'DIST003',
-          title: 'MARKETING',
-          percentage: 12.5,
-          amount: '0.5%',
-          color: '#d946ef',
-          description: 'Sustained growth and awareness campaigns',
-          details: ['Community events', 'Partnerships', 'Content creation', 'Influencer ops'],
-          status: 'ACTIVE',
-          securityLevel: 'STANDARD',
-        },
-        {
-          id: 'DIST004',
-          title: 'TREASURY',
-          percentage: 12.5,
-          amount: '0.5%',
-          color: '#0fa',
-          description: 'Reduced treasury allocation as protocol matures',
-          details: ['Operations', 'Development', 'Emergency fund', 'Infrastructure'],
-          status: 'SECURED',
-          securityLevel: 'STANDARD',
-        },
-      ],
-    },
-    phase3: {
-      title: 'TAX ALLOCATION',
-      subtitle: '4% FEE DISTRIBUTION',
-      data: [
-        {
-          id: 'DIST001',
-          title: 'STAKING',
-          percentage: 50,
-          amount: '2.0%',
-          color: '#00ff00',
-          description: 'Maximum staking rewards - the main feature of mature protocol',
-          details: ['Max holder rewards', 'Dividend priority', 'Yield optimization', 'Reward pool'],
-          status: 'DOMINANT',
-          securityLevel: 'MAXIMUM',
-        },
-        {
-          id: 'DIST002',
-          title: 'LIQUIDITY',
-          percentage: 37.5,
-          amount: '1.5%',
-          color: '#ffd700',
-          description: 'Maintenance allocation to sustain healthy liquidity levels',
-          details: ['LP maintenance', 'Stability ops', 'Volume support', 'Long-term reserves'],
-          status: 'STABLE',
-          securityLevel: 'HIGH',
-        },
-        {
-          id: 'DIST003',
-          title: 'MARKETING',
-          percentage: 12.5,
-          amount: '0.5%',
-          color: '#d946ef',
-          description: 'Ongoing community and ecosystem growth',
-          details: ['Brand building', 'Partnerships', 'Community events', 'Ecosystem expansion'],
-          status: 'ACTIVE',
-          securityLevel: 'STANDARD',
-        },
-      ],
-    },
-    phase4: {
-      title: 'TAX ALLOCATION',
-      subtitle: 'ZERO TAX MODE',
-      data: [
-        {
-          id: 'DIST001',
-          title: 'NO TAX',
-          percentage: 100,
-          amount: '0%',
-          color: '#ffd700',
-          description: 'All transaction fees eliminated - fully frictionless trading',
-          details: ['Zero buy tax', 'Zero sell tax', 'Zero transfer tax', 'Maximum freedom'],
-          status: 'FINAL',
-          securityLevel: 'COMPLETE',
-        },
-      ],
-    },
-  };
-
-  // Select data based on view mode
-  const currentDistribution = viewMode === 'distribution'
-    ? tokenDistribution
-    : (distributionConfigs[activePhase] || distributionConfigs.phase1);
-  const tokenomicsData = currentDistribution.data;
-
-
-  // Set up Chart.js data when component mounts, comes into view, view mode, or phase changes
+  // Set up Chart.js data when component mounts and comes into view
   useEffect(() => {
     if (isInView) {
-      const data = viewMode === 'distribution'
-        ? tokenDistribution.data
-        : (distributionConfigs[activePhase]?.data || distributionConfigs.phase1.data);
       setChartData({
-        labels: data.map(item => item.title),
+        labels: tokenDistribution.data.map(item => item.title),
         datasets: [
           {
-            data: data.map(item => item.percentage),
-            backgroundColor: data.map(item => item.color),
-            borderColor: data.map(item => item.color),
+            data: tokenDistribution.data.map(item => item.percentage),
+            backgroundColor: tokenDistribution.data.map(item => item.color),
+            borderColor: tokenDistribution.data.map(item => item.color),
             borderWidth: 2,
             hoverBorderWidth: 4,
           },
         ],
       });
     }
-  }, [isInView, activePhase, viewMode]);
+  }, [isInView]);
 
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        display: false, // We'll use custom labels
+        display: false,
       },
       tooltip: {
-        enabled: false, // Using custom hover cards instead
+        enabled: false,
       },
     },
     animation: {
       animateRotate: true,
-      animateScale: false, // Disable scale animation to prevent snake effect
+      animateScale: false,
       duration: 1500,
       easing: 'easeOutQuart',
       delay: (context) => {
-        return context.dataIndex * 300; // Stagger each segment by 300ms
+        return context.dataIndex * 300;
       },
     },
     elements: {
@@ -396,6 +141,66 @@ export default function CyberTokenomicsSection({ isMobile }) {
 
   return (
     <div style={{ width: '100%', position: 'relative' }}>
+      {/* Contract Renounced + Zero Tax Banner */}
+      <div style={{
+        background: 'rgba(0, 0, 0, 0.9)',
+        border: '2px solid #00ff00',
+        borderRadius: '5px',
+        padding: isMobile ? '16px' : '20px 25px',
+        marginBottom: '30px',
+        boxShadow: '0 0 25px rgba(0, 255, 0, 0.5), inset 0 0 15px rgba(0, 255, 0, 0.05)',
+        textAlign: 'center',
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '12px',
+          marginBottom: '10px',
+          flexWrap: 'wrap',
+        }}>
+          <span style={{
+            display: 'inline-block',
+            padding: '4px 12px',
+            background: 'rgba(0, 255, 0, 0.15)',
+            border: '1px solid #00ff00',
+            borderRadius: '3px',
+            color: '#00ff00',
+            fontSize: isMobile ? '11px' : '13px',
+            fontFamily: 'monospace',
+            fontWeight: 'bold',
+            letterSpacing: '2px',
+            textTransform: 'uppercase',
+          }}>
+            CONTRACT RENOUNCED
+          </span>
+          <span style={{
+            display: 'inline-block',
+            padding: '4px 12px',
+            background: 'rgba(255, 215, 0, 0.15)',
+            border: '1px solid #ffd700',
+            borderRadius: '3px',
+            color: '#ffd700',
+            fontSize: isMobile ? '11px' : '13px',
+            fontFamily: 'monospace',
+            fontWeight: 'bold',
+            letterSpacing: '2px',
+            textTransform: 'uppercase',
+          }}>
+            0% TAX
+          </span>
+        </div>
+        <p style={{
+          color: 'rgba(255, 255, 255, 0.7)',
+          fontSize: isMobile ? '11px' : '12px',
+          fontFamily: 'monospace',
+          lineHeight: '1.5',
+          margin: 0,
+        }}>
+          Ownership has been permanently renounced. All transaction taxes have been removed. No admin can modify the contract.
+        </p>
+      </div>
+
       <div style={{
         background: 'rgba(5, 10, 15, 0.9)',
         border: '1px solid rgba(0, 255, 170, 0.7)',
@@ -515,75 +320,20 @@ export default function CyberTokenomicsSection({ isMobile }) {
             fontFamily: 'monospace',
             lineHeight: '1.4',
           }}>
-            ⚠️ Always verify the contract address before buying. Only purchase RL80 through official links or by pasting this exact address.
+            Always verify the contract address before buying. Only purchase RL80 through official links or by pasting this exact address.
           </div>
         </div>
       </div>
 
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-        gap: isMobile ? '40px' : '50px',
-        alignItems: 'start'
+        maxWidth: '600px',
+        margin: '0 auto',
       }}>
         <div>
-          {/* View Mode Toggle */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            gap: '4px',
-            marginBottom: '15px',
-          }}>
-            <button
-              onClick={() => setViewMode('distribution')}
-              style={{
-                padding: '6px 12px',
-                background: viewMode === 'distribution'
-                  ? 'rgba(0, 255, 0, 0.15)'
-                  : 'rgba(0, 0, 0, 0.4)',
-                border: viewMode === 'distribution'
-                  ? '1px solid #00ff00'
-                  : '1px solid rgba(255, 255, 255, 0.15)',
-                borderRadius: '4px 0 0 4px',
-                color: viewMode === 'distribution' ? '#00ff00' : 'rgba(255, 255, 255, 0.5)',
-                fontFamily: 'monospace',
-                fontSize: '9px',
-                letterSpacing: '0.5px',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-              }}
-            >
-              TOKEN DIST
-            </button>
-            <button
-              onClick={() => setViewMode('tax')}
-              style={{
-                padding: '6px 12px',
-                background: viewMode === 'tax'
-                  ? 'rgba(0, 255, 170, 0.15)'
-                  : 'rgba(0, 0, 0, 0.4)',
-                border: viewMode === 'tax'
-                  ? '1px solid #0fa'
-                  : '1px solid rgba(255, 255, 255, 0.15)',
-                borderRadius: '0 4px 4px 0',
-                color: viewMode === 'tax' ? '#0fa' : 'rgba(255, 255, 255, 0.5)',
-                fontFamily: 'monospace',
-                fontSize: '9px',
-                letterSpacing: '0.5px',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-              }}
-            >
-              TAX ALLOC
-            </button>
-          </div>
-
           <h3 style={{
             fontSize: isMobile ? '14px' : '16px',
             fontWeight: 'bold',
-            backgroundImage: viewMode === 'distribution'
-              ? 'linear-gradient(135deg, #66ff00 0%, #00ff00 100%)'
-              : 'linear-gradient(135deg, #00ffaa 0%, #0fa 100%)',
+            backgroundImage: 'linear-gradient(135deg, #66ff00 0%, #00ff00 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             backgroundClip: 'text',
@@ -592,70 +342,23 @@ export default function CyberTokenomicsSection({ isMobile }) {
             textTransform: 'uppercase',
             letterSpacing: '2px',
             textAlign: 'center',
-            filter: viewMode === 'distribution'
-              ? 'drop-shadow(0 0 10px rgba(0, 255, 0, 0.5))'
-              : 'drop-shadow(0 0 10px rgba(0, 255, 170, 0.5))',
+            filter: 'drop-shadow(0 0 10px rgba(0, 255, 0, 0.5))',
           }}>
-            :: {currentDistribution.title} ::
+            :: {tokenDistribution.title} ::
           </h3>
           <div style={{
             textAlign: 'center',
-            marginBottom: viewMode === 'tax' ? '10px' : '20px',
-            color: viewMode === 'distribution'
-              ? 'rgba(0, 255, 0, 0.8)'
-              : (activePhase === 'phase4' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 255, 170, 0.8)'),
+            marginBottom: '20px',
+            color: 'rgba(0, 255, 0, 0.8)',
             fontSize: '11px',
             fontFamily: 'monospace',
             letterSpacing: '1px',
           }}>
-            {currentDistribution.subtitle}
+            {tokenDistribution.subtitle}
           </div>
 
-          {/* Phase selector - only show in tax allocation mode */}
-          {viewMode === 'tax' && (
-            <div style={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: '6px',
-              marginBottom: '15px',
-              flexWrap: 'wrap',
-            }}>
-              {['phase1', 'phase2', 'phase3', 'phase4'].map((phase) => {
-                const isActive = activePhase === phase;
-                const phaseColors = {
-                  phase1: { border: '#ffd700', text: '#ffd700' },
-                  phase2: { border: '#0fa', text: '#0fa' },
-                  phase3: { border: '#00ff00', text: '#00ff00' },
-                  phase4: { border: '#fff', text: '#fff' },
-                };
-                const colors = phaseColors[phase];
-                return (
-                  <button
-                    key={phase}
-                    onClick={() => setActivePhase(phase)}
-                    style={{
-                      padding: '4px 8px',
-                      background: isActive ? `${colors.border}20` : 'transparent',
-                      border: isActive
-                        ? `1px solid ${colors.border}`
-                        : '1px solid rgba(255, 255, 255, 0.15)',
-                      borderRadius: '3px',
-                      color: isActive ? colors.text : 'rgba(255, 255, 255, 0.4)',
-                      fontFamily: 'monospace',
-                      fontSize: '9px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                    }}
-                  >
-                    P{phase.replace('phase', '')}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
           <div style={{ position: 'relative', marginBottom: '30px' }}>
-            <div 
+            <div
               ref={chartRef}
               style={{
                 position: 'relative',
@@ -673,15 +376,15 @@ export default function CyberTokenomicsSection({ isMobile }) {
                 borderRadius: '50%',
               }}>
                 {chartData && (
-                  <Pie 
-                    data={chartData} 
+                  <Pie
+                    data={chartData}
                     options={chartOptions}
                     style={{
                       filter: 'drop-shadow(0 0 20px rgba(0, 255, 170, 0.3))',
                     }}
                   />
                 )}
-                
+
                 {/* Center text overlay with background */}
                 <div style={{
                   position: 'absolute',
@@ -697,37 +400,25 @@ export default function CyberTokenomicsSection({ isMobile }) {
                   borderRadius: '50%',
                   width: isMobile ? '100px' : '120px',
                   height: isMobile ? '100px' : '120px',
-                  border: viewMode === 'distribution'
-                    ? '2px solid rgba(0, 255, 0, 0.3)'
-                    : `2px solid ${activePhase === 'phase4' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 255, 170, 0.3)'}`,
+                  border: '2px solid rgba(0, 255, 0, 0.3)',
                   backdropFilter: 'blur(10px)',
                 }}>
                   <motion.div
-                    key={`${viewMode}-${activePhase}`}
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.3 }}
                     style={{
                       fontSize: isMobile ? '1.8em' : '2.2em',
                       fontWeight: '800',
-                      color: viewMode === 'distribution'
-                        ? '#ffd700'
-                        : (activePhase === 'phase4' ? '#fff' : '#0fa'),
+                      color: '#ffd700',
                       lineHeight: '1',
-                      textShadow: viewMode === 'distribution'
-                        ? '0 0 10px rgba(255, 215, 0, 0.5)'
-                        : (activePhase === 'phase4'
-                          ? '0 0 15px rgba(255, 255, 255, 0.6)'
-                          : '0 0 10px rgba(0, 255, 170, 0.5)'),
+                      textShadow: '0 0 10px rgba(255, 215, 0, 0.5)',
                       fontFamily: 'monospace',
                     }}
                   >
-                    {viewMode === 'distribution'
-                      ? '80B'
-                      : (activePhase === 'phase4' ? '0%' : '4%')}
+                    80B
                   </motion.div>
                   <motion.div
-                    key={`label-${viewMode}-${activePhase}`}
                     initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.1, duration: 0.3 }}
@@ -741,67 +432,30 @@ export default function CyberTokenomicsSection({ isMobile }) {
                       textAlign: 'center',
                     }}
                   >
-                    {viewMode === 'distribution'
-                      ? 'TOTAL'
-                      : (activePhase === 'phase4' ? 'NO TAX' : 'TAX')}
+                    TOTAL
                   </motion.div>
                 </div>
               </div>
 
               {tokenomicsData.map((item, index) => {
-                // Calculate position based on pie segment angle
-                // Pie starts at 12 o'clock (270°) and goes clockwise
                 const totalPercentage = tokenomicsData.reduce((sum, d) => sum + d.percentage, 0);
                 const previousPercentage = tokenomicsData.slice(0, index).reduce((sum, d) => sum + d.percentage, 0);
                 const segmentCenter = previousPercentage + (item.percentage / 2);
 
-                // Convert percentage to angle (starting at top, going clockwise)
-                // 0% = top (270° or -90°), 25% = right (0°), 50% = bottom (90°), 75% = left (180°)
                 const angleInDegrees = (segmentCenter / totalPercentage) * 360 - 90;
                 const angleInRadians = (angleInDegrees * Math.PI) / 180;
 
-                // Calculate position on a circle around the chart
-                // Use percentage of container size for positioning
-                const radius = 58; // percentage from center
+                const radius = 58;
                 const centerX = 50;
                 const centerY = 50;
                 const x = centerX + radius * Math.cos(angleInRadians);
                 const y = centerY + radius * Math.sin(angleInRadians);
 
-                // Determine if label should be on left or right side
                 const isRightSide = x > 50;
-
-                // For Phase 4 in tax mode, show image instead of label
-                if (viewMode === 'tax' && activePhase === 'phase4') {
-                  return (
-                    <motion.div
-                      key={`${activePhase}-image`}
-                      initial={{ opacity: 0, scale: 0.85 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: 0.2 }}
-                      style={{
-                        position: 'absolute',
-                        bottom: '-6.5rem',
-                        left: '-1rem',
-                        transform: 'translateX(-50%)',
-                      }}
-                    >
-                      <img
-                        src="/images/muryTokenomics.webp"
-                        alt="Zero Tax Mode"
-                        style={{
-                          width: '20rem',
-                          height: 'auto',
-                          filter: 'drop-shadow(0 0 15px rgba(255, 255, 255, 0.3))',
-                        }}
-                      />
-                    </motion.div>
-                  );
-                }
 
                 return (
                   <motion.div
-                    key={`${viewMode}-${activePhase}-${item.id}`}
+                    key={item.id}
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.15 * index }}
@@ -961,273 +615,6 @@ export default function CyberTokenomicsSection({ isMobile }) {
             </motion.div>
           )}
         </div>
-
-        <div>
-          <h3 style={{
-            fontSize: isMobile ? '14px' : '16px',
-            fontWeight: 'bold',
-            background: 'linear-gradient(135deg, #33ff00 0%, #00ff00 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            marginBottom: '15px',
-            fontFamily: 'Fjalla One !important',
-            textTransform: 'uppercase',
-            letterSpacing: '2px',
-            textAlign: 'center',
-            filter: 'drop-shadow(0 0 10px rgba(0, 255, 0, 0.5))',
-          }}>
-            :: TAX PROTOCOLS ::
-          </h3>
-
-          {/* Phase Toggle Buttons */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            gap: '8px',
-            marginBottom: '20px',
-            flexWrap: 'wrap',
-          }}>
-            {['phase1', 'phase2', 'phase3', 'phase4'].map((phase) => {
-              const isActive = activePhase === phase;
-              const phaseColors = {
-                phase1: { bg: 'rgba(255, 215, 0, 0.2)', border: '#ffd700', text: '#ffd700' },
-                phase2: { bg: 'rgba(0, 255, 170, 0.2)', border: '#0fa', text: '#0fa' },
-                phase3: { bg: 'rgba(0, 255, 0, 0.2)', border: '#00ff00', text: '#00ff00' },
-                phase4: { bg: 'rgba(255, 255, 255, 0.15)', border: '#fff', text: '#fff' },
-              };
-              const colors = phaseColors[phase];
-              return (
-                <button
-                  key={phase}
-                  onClick={() => setActivePhase(phase)}
-                  style={{
-                    padding: '8px 14px',
-                    background: isActive ? colors.bg : 'rgba(0, 0, 0, 0.6)',
-                    border: isActive
-                      ? `1px solid ${colors.border}`
-                      : '1px solid rgba(255, 255, 255, 0.2)',
-                    borderRadius: '4px',
-                    color: isActive ? colors.text : 'rgba(255, 255, 255, 0.6)',
-                    fontFamily: 'monospace',
-                    fontSize: '10px',
-                    letterSpacing: '1px',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    boxShadow: isActive ? `0 0 10px ${colors.border}40` : 'none',
-                  }}
-                >
-                  {phase.toUpperCase().replace('PHASE', 'PHASE ')}
-                </button>
-              );
-            })}
-          </div>
-
-          {taxProtocols.map((tax, index) => (
-            <motion.div
-              key={tax.id}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 + index * 0.2 }}
-              style={{
-                background: 'rgba(10, 15, 25, 0.85)',
-                border: '1px solid rgba(0, 255, 170, 0.5)',
-                borderRadius: '10px',
-                padding: '25px',
-                marginBottom: '20px',
-                position: 'relative',
-                overflow: 'hidden',
-                maxWidth: '500px',
-                margin: '0 auto 20px auto',
-              }}
-            >
-              <div style={{
-                position: 'absolute',
-                top: '-5px',
-                left: '-5px',
-                right: '-5px',
-                bottom: '-5px',
-                borderRadius: '15px',
-                background: 'radial-gradient(circle, rgba(0, 255, 170, 0.3) 0%, transparent 70%)',
-                filter: 'blur(15px)',
-                opacity: 0.5,
-                zIndex: -1,
-              }} />
-              
-              {/* Phase Label Pill */}
-              {(() => {
-                const pillColors = {
-                  phase1: { bg: 'rgba(255, 215, 0, 0.15)', border: 'rgba(255, 215, 0, 0.4)', text: '#ffd700' },
-                  phase2: { bg: 'rgba(0, 255, 170, 0.15)', border: 'rgba(0, 255, 170, 0.4)', text: '#0fa' },
-                  phase3: { bg: 'rgba(0, 255, 0, 0.15)', border: 'rgba(0, 255, 0, 0.4)', text: '#00ff00' },
-                  phase4: { bg: 'rgba(255, 255, 255, 0.1)', border: 'rgba(255, 255, 255, 0.4)', text: '#fff' },
-                };
-                const colors = pillColors[activePhase] || pillColors.phase1;
-                return (
-                  <div style={{
-                    display: 'inline-block',
-                    padding: '4px 10px',
-                    background: colors.bg,
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: '3px',
-                    marginBottom: '12px',
-                  }}>
-                    <span style={{
-                      color: colors.text,
-                      fontSize: '10px',
-                      fontFamily: 'monospace',
-                      letterSpacing: '1px',
-                    }}>
-                      {tax.phaseLabel}
-                    </span>
-                  </div>
-                );
-              })()}
-
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '10px'
-              }}>
-                <div>
-                  <div style={{
-                    color: '#0fa',
-                    fontSize: '10px',
-                    fontFamily: 'monospace',
-                    marginBottom: '4px',
-                    opacity: 0.8
-                  }}>
-                    {tax.id}
-                  </div>
-                  <h4 style={{
-                    color: '#fff',
-                    fontSize: '18px',
-                    fontFamily: 'Fjalla One !important',
-                    margin: 0,
-                    letterSpacing: '1px'
-                  }}>
-                    {tax.label}
-                  </h4>
-                </div>
-                <div style={{
-                  fontSize: '36px',
-                  fontWeight: 'bold',
-                  color: '#00ff00',
-                  fontFamily: 'monospace',
-                  textShadow: '0 0 10px rgba(0, 255, 0, 0.5)',
-                }}>
-                  {tax.value}
-                </div>
-              </div>
-
-              {/* Phase Status */}
-              {(() => {
-                const statusColors = {
-                  phase1: 'rgba(255, 215, 0, 0.85)',
-                  phase2: 'rgba(0, 255, 170, 0.85)',
-                  phase3: 'rgba(0, 255, 0, 0.85)',
-                  phase4: 'rgba(255, 255, 255, 0.9)',
-                };
-                return (
-                  <div style={{
-                    color: statusColors[activePhase] || statusColors.phase1,
-                    fontSize: '10px',
-                    fontFamily: 'monospace',
-                    marginBottom: '12px',
-                    letterSpacing: '1px',
-                  }}>
-                    STATUS: {tax.phaseStatus}
-                  </div>
-                );
-              })()}
-              
-              <p style={{
-                color: 'rgba(255, 255, 255, 0.7)',
-                fontSize: '11px',
-                marginBottom: '15px',
-                fontFamily: 'monospace'
-              }}>
-                {tax.description}
-              </p>
-              
-              <div style={{
-                borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-                paddingTop: '15px'
-              }}>
-                {tax.breakdown.map((item, idx) => (
-                  <div key={idx} style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '10px',
-                    ...(item.always && {
-                      marginTop: '12px',
-                      paddingTop: '10px',
-                      borderTop: '1px dashed rgba(0, 255, 170, 0.3)',
-                    }),
-                  }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}>
-                      <span style={{
-                        width: '8px',
-                        height: '8px',
-                        borderRadius: '50%',
-                        background: item.color,
-                        boxShadow: `0 0 10px ${item.color}`,
-                      }} />
-                      <span style={{
-                        color: item.always ? '#0fa' : 'rgba(255, 255, 255, 0.8)',
-                        fontSize: '12px',
-                        fontFamily: 'monospace'
-                      }}>
-                        {item.label}
-                        {item.always && (
-                          <span style={{
-                            marginLeft: '6px',
-                            fontSize: '9px',
-                            color: 'rgba(0, 255, 170, 0.7)',
-                            textTransform: 'uppercase',
-                          }}>
-                            (always)
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                    <span style={{
-                      color: item.color,
-                      fontSize: '14px',
-                      fontWeight: 'bold',
-                      fontFamily: 'monospace'
-                    }}>
-                      {item.value}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Phase Note */}
-              {tax.phaseNote && (
-                <div style={{
-                  marginTop: '14px',
-                  paddingTop: '12px',
-                  borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-                  color: 'rgba(255, 255, 255, 0.65)',
-                  fontSize: '10px',
-                  fontFamily: 'monospace',
-                  lineHeight: '1.5',
-                  fontStyle: 'italic',
-                }}>
-                  <span style={{ color: '#0fa', fontStyle: 'normal' }}>NOTE:</span> {tax.phaseNote}
-                </div>
-              )}
-            </motion.div>
-          ))}
-
-        </div>
       </div>
 
       {/* TL;DR Section */}
@@ -1262,14 +649,10 @@ export default function CyberTokenomicsSection({ isMobile }) {
         }}>
           {[
             { icon: '🔒', text: 'Fixed supply — 80B forever', color: '#ffd700' },
-            { icon: '✓', text: '0% tax on normal transfers', color: '#00ff00' },
-            { icon: '📊', text: '~4% trading fee only on DEX buys/sells', color: '#0fa' },
-            { icon: '🔄', text: 'Fees → swapped to ETH → split to:', color: '#0fa', indent: false },
-            { text: 'Treasury (liquidity)', color: 'rgba(255, 255, 255, 0.7)', subItem: true },
-            { text: 'Stakers (rewards)', color: 'rgba(255, 255, 255, 0.7)', subItem: true },
-            { text: 'Marketing', color: 'rgba(255, 255, 255, 0.7)', subItem: true },
-            { icon: '💎', text: 'Stake RL80 → earn ETH', color: '#00ff00' },
-            { icon: '🛡️', text: 'No minting • No wallet freezes • No hidden taxes', color: '#ffd700' },
+            { icon: '✓', text: 'Contract renounced — no admin, no changes, fully immutable', color: '#00ff00' },
+            { icon: '✓', text: '0% tax on ALL transactions (buy, sell, and transfer)', color: '#00ff00' },
+            { icon: '🔥', text: 'Deflationary — tokens burned permanently via candle offerings', color: '#0fa' },
+            { icon: '🛡️', text: 'No minting • No wallet freezes • No hidden taxes • No admin keys', color: '#ffd700' },
           ].map((item, idx) => (
             <div
               key={idx}
@@ -1277,7 +660,6 @@ export default function CyberTokenomicsSection({ isMobile }) {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
-                paddingLeft: item.subItem ? '32px' : '0',
               }}
             >
               {item.icon && (
@@ -1288,15 +670,6 @@ export default function CyberTokenomicsSection({ isMobile }) {
                 }}>
                   {item.icon}
                 </span>
-              )}
-              {item.subItem && (
-                <span style={{
-                  width: '6px',
-                  height: '6px',
-                  borderRadius: '50%',
-                  background: item.color,
-                  flexShrink: 0,
-                }} />
               )}
               <span style={{
                 color: item.color,
@@ -1323,7 +696,7 @@ export default function CyberTokenomicsSection({ isMobile }) {
             letterSpacing: '1px',
             fontStyle: 'italic',
           }}>
-            Simple, sustainable, on-chain.
+            Simple, immutable, on-chain.
           </span>
         </div>
       </div>
