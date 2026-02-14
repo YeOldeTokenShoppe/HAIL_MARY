@@ -66,6 +66,13 @@ After editing: push to GitHub, Railway auto-redeploys. For local dev: save and r
 | `DEBATE_ACTIVE_END` | No | Default: `23` |
 | `DEBATE_TIMEZONE` | No | Default: `America/Los_Angeles` |
 | `LOG_LEVEL` | No | Default: `info` |
+| `SAINT_GR80_TWITTER_API_KEY` | No | Twitter/X API key for Saint GR80 |
+| `SAINT_GR80_TWITTER_API_SECRET_KEY` | No | Twitter/X API secret |
+| `SAINT_GR80_TWITTER_ACCESS_TOKEN` | No | Twitter/X access token (OAuth 1.0a) |
+| `SAINT_GR80_TWITTER_ACCESS_TOKEN_SECRET` | No | Twitter/X access token secret |
+| `TWITTER_POST_ENABLE` | No | Default: `true` — allow posting tweets |
+| `TWITTER_SEARCH_ENABLE` | No | Default: `true` — allow searching/listening |
+| `TWITTER_DRY_RUN` | No | Default: `true` — log tweets without posting |
 
 Set these in Railway's Variables tab (not in the repo). The `.env` file is gitignored.
 
@@ -91,6 +98,22 @@ bun run dev
 ## Railway Deployment
 
 The repo includes `Dockerfile`, `railway.toml`, and `.env.example`. Point Railway to the `eliza/rl80-agent` subdirectory. Set environment variables in the Railway dashboard.
+
+## Twitter/X — Our Lady of Perpetual Profit
+
+Saint GR80's Twitter presence uses the **Our Lady of Perpetual Profit** persona — the Virtual Mary. She listens for requests for blessings, absolution, and guards the flock against scams. The `style.post` section in `saint-gr80.ts` controls this persona.
+
+### Setup
+
+1. Go to the [X Developer Portal](https://developer.x.com/) and create a project/app
+2. Generate OAuth 1.0a credentials (API Key, API Secret, Access Token, Access Token Secret)
+3. Set the four `SAINT_GR80_TWITTER_*` env vars in Railway
+4. Start with `TWITTER_DRY_RUN=true` — the agent logs tweet intentions without posting
+5. Once verified, set `TWITTER_DRY_RUN=false` to go live
+
+### Cost
+
+X API uses pay-per-use credits. Estimated ~$20/month for a moderately active agent (posting a few times daily, searching mentions). Monitor usage in the X Developer Portal dashboard.
 
 ## Anti-Scam Protection
 

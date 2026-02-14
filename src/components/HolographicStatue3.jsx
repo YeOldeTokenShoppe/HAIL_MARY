@@ -480,6 +480,65 @@ function HolographicStatue3({
         }
       });
 
+      // Create depth mask clone — renders first to fill depth buffer,
+      // so the holographic visual pass depth-tests correctly.
+      // Uses the same vertex shader (with glitch displacement) to stay in sync.
+      const depthMaterial = new THREE.ShaderMaterial({
+        precision: "lowp",
+        uniforms: {
+          uTime: { value: 0.0 },
+        },
+        vertexShader: holographicMaterial.vertexShader,
+        fragmentShader: `
+          uniform float uTime;
+          varying vec3 vPosition;
+          varying vec3 vNormal;
+          void main() {
+            // Holographic scan-line stripes (matches the visual shader pattern)
+            float stripes = mod((vPosition.y - uTime * 0.02) * 14.0, 1.0);
+            stripes = pow(stripes, 3.0);
+
+            // Fresnel — edges are more transparent
+            vec3 normal = normalize(vNormal);
+            if (!gl_FrontFacing) normal *= -1.0;
+            vec3 viewDirection = normalize(vPosition - cameraPosition);
+            float fresnel = dot(viewDirection, normal) + 1.0;
+            fresnel = pow(fresnel, 1.6);
+
+            // Discard where the holographic effect is strongest
+            // (stripe peaks + edges), letting words show through
+            float mask = stripes * fresnel + fresnel * 0.3;
+            if (mask > 0.01) discard;
+
+            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+          }
+        `,
+        colorWrite: false,
+        depthWrite: true,
+        depthTest: true,
+        side: THREE.FrontSide,
+      });
+      // Track for uTime updates in the animation loop
+      animatedMaterialsRef.current.push(depthMaterial);
+
+      const depthClone = statue.clone(true);
+      depthClone.traverse((child) => {
+        if (child.isMesh) {
+          child.material = depthMaterial;
+          child.renderOrder = 0;
+        }
+      });
+
+      // Set visual statue renderOrder to 1 so it draws after depth mask
+      statue.traverse((child) => {
+        if (child.isMesh && child.renderOrder < 1) {
+          child.renderOrder = 1;
+        }
+      });
+
+      // Add depth clone as sibling inside the rotation group
+      rotationGroup.add(depthClone);
+
       // Add the anchor group to the scene
       scene.add(anchorGroup);
       hasLoadedRef.current = true;
@@ -557,7 +616,7 @@ function HolographicStatue3({
       // Apply hover animation to the anchor group only if hover is enabled
       if (hover) {
         groupRef.current.anchor.position.y =
-          initialY.current + Math.sin(state.clock.elapsedTime * 0.1) * 0.01;
+          initialY.current + Math.sin(state.clock.elapsedTime * 0.5) * 0.3;
       }
 
       // Apply rotation to the rotation group only if rotate is enabled

@@ -21,15 +21,21 @@ const initSaintGr80 = async ({ runtime }: { runtime: IAgentRuntime }) => {
   logger.info({ name: runtime.character.name }, 'Initializing character:');
 
   const hasTelegram = !!process.env.SAINT_GR80_TELEGRAM_BOT_TOKEN;
+  const hasTwitter = !!process.env.SAINT_GR80_TWITTER_API_KEY;
   const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
 
   logger.info({
     telegram: hasTelegram ? 'connected' : 'NOT CONFIGURED',
+    twitter: hasTwitter ? 'connected' : 'NOT CONFIGURED',
     anthropic: hasAnthropic ? 'available' : 'NOT CONFIGURED',
   }, 'Saint GR80 service status:');
 
   if (!hasTelegram) {
     logger.warn('SAINT_GR80_TELEGRAM_BOT_TOKEN not set — bot will not connect to Telegram');
+  }
+
+  if (!hasTwitter) {
+    logger.warn('SAINT_GR80_TWITTER_API_KEY not set — bot will not connect to Twitter/X');
   }
 
   logger.info('Saint GR80 initialized — "Let us reason together."');
