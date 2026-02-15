@@ -107,23 +107,27 @@ if (!content.includes('PATCH: always fetch latest mentions without cursor')) {
       } catch (e) {
         // Cashtag search may fail on some API tiers — that's OK
       }
-      // Summon whitelist — ONLY respond to tweets with magic words
-      const RL80_TOKEN = /(?:@rl80token|\\$rl80|#rl80|\\brl80\\b)/gi;
+      // Summon whitelist — respond to direct @mentions + magic words
       function isSummon(t) {
         const text = (t.text || "");
         const lower = text.toLowerCase();
-        // Pattern 1: "rl80" three times (Beetlejuice) — any form
-        const matches = lower.match(RL80_TOKEN);
-        if (matches && matches.length >= 3) return true;
-        // Pattern 2: "hey rl80" — any form (hey $rl80, hey #rl80, hey @rl80token)
+        // Pattern 1: direct @rl80token mention — this IS a summon
+        if (lower.includes("@rl80token")) return true;
+        // Pattern 2: "rl80" three times (Beetlejuice) — any form ($rl80, #rl80, rl80)
+        const rl80Matches = lower.match(/(?:\\$rl80|#rl80|\\brl80\\b)/gi);
+        if (rl80Matches && rl80Matches.length >= 3) return true;
+        // Pattern 3: "hey rl80" — any form (hey $rl80, hey #rl80, hey rl80)
         if (/hey\\s+(?:@rl80token|\\$rl80|#rl80|rl80)/i.test(text)) return true;
         return false;
       }
-      // Combine, deduplicate, and only keep summons
+      // Combine, deduplicate, and only keep summons (skip own tweets)
+      const ownUsername = twitterUsername?.toLowerCase();
       const seenIds = new Set();
       const mentionCandidates = [];
       for (const tweet of [...(mentionResult.tweets || []), ...cashtagTweets]) {
-        if (!seenIds.has(tweet.id) && isSummon(tweet)) {
+        if (seenIds.has(tweet.id)) continue;
+        if (tweet.username?.toLowerCase() === ownUsername) continue;
+        if (isSummon(tweet)) {
           seenIds.add(tweet.id);
           mentionCandidates.push(tweet);
         }
@@ -138,13 +142,14 @@ if (!content.includes('PATCH: always fetch latest mentions without cursor')) {
   }
 
   // 2b: Increase max interactions per run from 10 to 50
-  const originalMax = `TWITTER_MAX_ENGAGEMENTS_PER_RUN") || "10"`;
-  const patchedMax = `TWITTER_MAX_ENGAGEMENTS_PER_RUN") || "50"`;
+  const originalMax = `|| process.env.TWITTER_MAX_ENGAGEMENTS_PER_RUN || "10"`;
+  const patchedMax = `|| process.env.TWITTER_MAX_ENGAGEMENTS_PER_RUN || "50"`;
 
-  if (content.includes(originalMax)) {
-    content = content.replace(originalMax, patchedMax);
+  const maxOccurrences = (content.match(/\|\| process\.env\.TWITTER_MAX_ENGAGEMENTS_PER_RUN \|\| "10"/g) || []).length;
+  if (maxOccurrences > 0) {
+    content = content.replaceAll(originalMax, patchedMax);
     patchCount++;
-    console.log('[patch] Applied: increased max mention engagements to 50');
+    console.log(`[patch] Applied: increased max engagements to 50 (${maxOccurrences} occurrences)`);
   } else {
     console.warn('[patch] WARNING: max engagements default changed — limit patch skipped');
   }
