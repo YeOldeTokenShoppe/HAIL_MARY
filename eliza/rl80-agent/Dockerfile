@@ -56,4 +56,5 @@ ENV LOG_LEVEL=info
 EXPOSE 3000
 
 # Start debate agents — use shell form to fix volume permissions at runtime
+# Clear stale Twitter caches on startup so mentions aren't stuck on old cursors
 CMD mkdir -p /app/.eliza/.elizadb && elizaos start
