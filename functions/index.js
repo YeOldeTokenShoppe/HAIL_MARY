@@ -7,7 +7,7 @@ const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {onRequest} = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 const {initializeApp} = require("firebase-admin/app");
-const {getFirestore} = require("firebase-admin/firestore");
+const {getFirestore, FieldValue} = require("firebase-admin/firestore");
 
 // Initialize Firebase Admin
 initializeApp();
@@ -822,3 +822,186 @@ async function resolveWeeklyMarket(privateKey, marketId = null) {
 //     res.status(500).json({ error: error.message });
 //   }
 // });
+
+// =============================================================================
+// FETCH @rl80token X POSTS (AGENT REPLIES)
+// =============================================================================
+
+const X_API_BASE = "https://api.twitter.com/2";
+const RL80_USERNAME = "rl80token";
+
+/**
+ * Core logic: fetch @rl80token's recent replies and write them to Firestore xPost collection.
+ * Uses X API v2 with expansions to get both the agent reply and the parent tweet in one call.
+ */
+async function fetchAndStoreXPosts(bearerToken) {
+  // 1. Get @rl80token user ID
+  const userRes = await fetch(
+    `${X_API_BASE}/users/by/username/${RL80_USERNAME}?user.fields=id`,
+    { headers: { Authorization: `Bearer ${bearerToken}` } }
+  );
+
+  if (!userRes.ok) {
+    const errText = await userRes.text();
+    throw new Error(`User lookup failed (${userRes.status}): ${errText}`);
+  }
+
+  const userData = await userRes.json();
+  if (!userData.data) throw new Error("User @rl80token not found");
+  const userId = userData.data.id;
+
+  // 2. Check for since_id to avoid refetching
+  const metaDoc = await db.collection("xPost").doc("_meta").get();
+  const sinceId = metaDoc.exists ? metaDoc.data().sinceId : null;
+
+  // 3. Fetch recent tweets with expansions
+  const params = new URLSearchParams({
+    max_results: "10",
+    expansions: "referenced_tweets.id,referenced_tweets.id.author_id,author_id",
+    "tweet.fields": "created_at,text,referenced_tweets,in_reply_to_user_id",
+    "user.fields": "name,username,profile_image_url",
+  });
+  if (sinceId) params.set("since_id", sinceId);
+
+  const tweetsRes = await fetch(
+    `${X_API_BASE}/users/${userId}/tweets?${params}`,
+    { headers: { Authorization: `Bearer ${bearerToken}` } }
+  );
+
+  if (tweetsRes.status === 429) {
+    logger.warn("[XPosts] Rate limited, will retry next run");
+    return { fetched: 0, written: 0, rateLimited: true };
+  }
+
+  if (!tweetsRes.ok) {
+    const errText = await tweetsRes.text();
+    throw new Error(`Tweets fetch failed (${tweetsRes.status}): ${errText}`);
+  }
+
+  const tweetsData = await tweetsRes.json();
+
+  if (!tweetsData.data || tweetsData.data.length === 0) {
+    logger.info("[XPosts] No new tweets found");
+    return { fetched: 0, written: 0 };
+  }
+
+  // Build lookup maps from includes
+  const includedTweets = {};
+  (tweetsData.includes?.tweets || []).forEach((t) => {
+    includedTweets[t.id] = t;
+  });
+
+  const includedUsers = {};
+  (tweetsData.includes?.users || []).forEach((u) => {
+    includedUsers[u.id] = u;
+  });
+
+  // 4. Process replies
+  let written = 0;
+  let latestId = sinceId;
+
+  for (const tweet of tweetsData.data) {
+    // Only process replies (tweets that reference another tweet as "replied_to")
+    const repliedRef = tweet.referenced_tweets?.find(
+      (r) => r.type === "replied_to"
+    );
+    if (!repliedRef) continue;
+
+    const parentTweet = includedTweets[repliedRef.id];
+    if (!parentTweet) continue; // Parent not in expansion (e.g. deleted)
+
+    // Find parent author
+    const parentAuthor = includedUsers[parentTweet.author_id] || {};
+
+    // Build xPost document
+    const xPostDoc = {
+      author: parentAuthor.name || "Unknown",
+      handle: parentAuthor.username || "",
+      text: parentTweet.text || "",
+      replyText: tweet.text || "",
+      replyAuthor: "Our Lady of Perpetual Profit",
+      replyHandle: RL80_USERNAME,
+      tweetUrl: `https://x.com/${RL80_USERNAME}/status/${tweet.id}`,
+      authorImageUrl: parentAuthor.profile_image_url || "",
+      screenshotUrl: "",
+      tweetId: tweet.id,
+      parentTweetId: parentTweet.id,
+      createdAt: tweet.created_at
+        ? new Date(tweet.created_at)
+        : FieldValue.serverTimestamp(),
+    };
+
+    // Use tweetId as doc ID to prevent duplicates
+    await db.collection("xPost").doc(tweet.id).set(xPostDoc);
+    written++;
+
+    // Track latest ID for pagination
+    if (!latestId || BigInt(tweet.id) > BigInt(latestId)) {
+      latestId = tweet.id;
+    }
+  }
+
+  // 5. Store since_id for next run
+  if (latestId) {
+    await db.collection("xPost").doc("_meta").set(
+      { sinceId: latestId, updatedAt: new Date() },
+      { merge: true }
+    );
+  }
+
+  logger.info(`[XPosts] Done: fetched=${tweetsData.data.length}, written=${written}`);
+  return { fetched: tweetsData.data.length, written };
+}
+
+// Scheduled: every 15 minutes
+exports.fetchXPosts = onSchedule({
+  schedule: "*/15 * * * *",
+  timeZone: "UTC",
+  memory: "256MiB",
+  timeoutSeconds: 60,
+  secrets: ["X_BEARER_TOKEN"],
+}, async (event) => {
+  try {
+    logger.info("[XPosts] Starting scheduled fetch...");
+
+    const bearerToken = process.env.X_BEARER_TOKEN;
+    if (!bearerToken) {
+      logger.error("[XPosts] X_BEARER_TOKEN not configured");
+      return;
+    }
+
+    const result = await fetchAndStoreXPosts(bearerToken);
+    logger.info("[XPosts] Scheduled fetch complete:", result);
+  } catch (error) {
+    logger.error("[XPosts] Scheduled fetch error:", error);
+  }
+});
+
+// Manual trigger for testing
+exports.fetchXPostsManual = onRequest({
+  secrets: ["X_BEARER_TOKEN", "CRON_SECRET"],
+}, async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (!authHeader || authHeader !== "Bearer " + cronSecret) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  try {
+    logger.info("[XPosts] Manual trigger requested");
+
+    const bearerToken = process.env.X_BEARER_TOKEN;
+    if (!bearerToken) {
+      res.status(500).json({ error: "X_BEARER_TOKEN not configured" });
+      return;
+    }
+
+    const result = await fetchAndStoreXPosts(bearerToken);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    logger.error("[XPosts] Manual trigger failed:", error);
+    res.status(500).json({ error: error.message });
+  }
+});

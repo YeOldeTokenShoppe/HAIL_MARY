@@ -101,6 +101,43 @@ function truncateAddress(address) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
+function wrapText(ctx, text, maxWidth, maxLines) {
+  const words = text.split(' ');
+  const lines = [];
+  let currentLine = '';
+
+  for (const word of words) {
+    const testLine = currentLine ? currentLine + ' ' + word : word;
+    if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+      lines.push(currentLine);
+      if (lines.length >= maxLines) break;
+      currentLine = word;
+    } else {
+      currentLine = testLine;
+    }
+  }
+  if (currentLine && lines.length < maxLines) {
+    // Truncate last line if needed
+    if (ctx.measureText(currentLine).width > maxWidth) {
+      while (ctx.measureText(currentLine + '...').width > maxWidth && currentLine.length > 0) {
+        currentLine = currentLine.slice(0, -1);
+      }
+      currentLine += '...';
+    }
+    lines.push(currentLine);
+  } else if (lines.length === maxLines) {
+    // Add ellipsis to last line if we truncated
+    let last = lines[maxLines - 1];
+    if (words.length > lines.join(' ').split(' ').length) {
+      while (ctx.measureText(last + '...').width > maxWidth && last.length > 0) {
+        last = last.slice(0, -1);
+      }
+      lines[maxLines - 1] = last + '...';
+    }
+  }
+  return lines;
+}
+
 function getActivityTier(type, amount) {
   const threshold = CONFIG.WHALE_THRESHOLDS[type] || CONFIG.WHALE_THRESHOLDS.CANDLE;
   
@@ -173,7 +210,7 @@ export function WatchlistPhoneTexture({
   
   // Activity feed state
   const [activities, setActivities] = useState([]);
-  const [activeTab, setActiveTab] = useState('ALL'); // ALL | CANDLES | STAKING
+  const [activeTab, setActiveTab] = useState('XPOSTS');
   const [breakthroughEvent, setBreakthroughEvent] = useState(null);
 
   // Live time display state
@@ -251,37 +288,11 @@ export function WatchlistPhoneTexture({
   // ===========================================
   
   
-  // Add click handling to the 3D mesh instead of canvas
+  // Click handling on the 3D mesh (tabs removed — single XPOSTS view)
   useEffect(() => {
     if (meshRef && meshRef.material) {
-      // Store the click handler on the mesh's userData
       meshRef.userData.onWatchlistClick = (uv) => {
-        if (!uv) return;
-        
-        // Convert UV coordinates to canvas coordinates  
-        const canvas = canvasRef.current;
-        const x = (1 - uv.x) * canvas.width; // Flip X coordinate for texture mapping
-        const y = (1 - uv.y) * canvas.height; // Flip Y coordinate
-        
-        // Check if click is in tab area (generous padding for touch targets)
-        const tabY = 175;
-        const tabHeight = 45;
-        const tabPadding = 30; // Extra padding above and below for easier mobile taps
-        const tabs = ['ALL', 'CANDLES', 'STAKING', 'XPOSTS'];
-        const tabWidth = (canvas.width - 60) / tabs.length;
-
-        if (y >= tabY - tabPadding && y <= tabY + tabHeight + tabPadding && x >= 10 && x <= canvas.width - 10) {
-          // Determine which tab was clicked
-          const tabIndex = Math.floor((x - 30) / tabWidth);
-          
-          if (tabIndex >= 0 && tabIndex < tabs.length) {
-            setActiveTab(tabs[tabIndex]);
-            scrollPositionRef.current = 0;
-            targetScrollRef.current = 0;
-            return true; // Indicate that we handled the click
-          }
-        }
-        return false; // Let other handlers process the click
+        return false;
       };
     }
   }, [meshRef]);
@@ -518,6 +529,7 @@ export function WatchlistPhoneTexture({
       const xPostActivities = [];
 
       snapshot.forEach((doc) => {
+        if (doc.id === '_meta') return; // Skip metadata doc
         const data = doc.data();
         xPostActivities.push({
           id: doc.id,
@@ -525,6 +537,8 @@ export function WatchlistPhoneTexture({
           username: data.author || 'Unknown',
           handle: data.handle || '',
           tweetText: data.text || '',
+          replyText: data.replyText || '',
+          replyHandle: data.replyHandle || '',
           tweetUrl: data.tweetUrl || '',
           userImageUrl: data.authorImageUrl || '',
           screenshotUrl: data.screenshotUrl || '',
@@ -832,47 +846,9 @@ export function WatchlistPhoneTexture({
     // BACKGROUND
     // ===========================================
     
-    // Draw background image if loaded, otherwise fallback to gradient
-    if (backgroundImageRef.current) {
-      const img = backgroundImageRef.current;
-      
-      // Scale up to ensure full coverage (like CSS object-fit: cover)
-      const imgAspect = img.naturalWidth / img.naturalHeight;
-      const canvasAspect = width / height;
-      
-      let drawWidth, drawHeight, offsetX = 0, offsetY = 0;
-      
-      if (imgAspect > canvasAspect) {
-        // Image is wider - scale by height and center horizontally
-        drawHeight = height;
-        drawWidth = height * imgAspect;
-        offsetX = (width - drawWidth) / 2;
-      } else {
-        // Image is taller - scale by width and center vertically  
-        drawWidth = width;
-        drawHeight = width / imgAspect;
-        offsetY = (height - drawHeight) / 2;
-      }
-      
-      // Add 10% padding to ensure full coverage
-      const padding = 1.01;
-      drawWidth *= padding;
-      drawHeight *= padding;
-      offsetX -= (drawWidth - width) / 2;
-      offsetY -= (drawHeight - height) / 2;
-      
-      ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
-    } else {
-      // Fallback gradient
-      const backgroundGradient = ctx.createLinearGradient(0, 0, 0, height);
-      backgroundGradient.addColorStop(0, '#1d065aff');    // Dark blue-purple top
-      backgroundGradient.addColorStop(0.3, '#4005c9ff');  // Deep blue
-      backgroundGradient.addColorStop(0.7, '#1967c7ff');  // Ocean blue
-      backgroundGradient.addColorStop(1, '#190b62ff');    // Dark bottom
-      
-      ctx.fillStyle = backgroundGradient;
-      ctx.fillRect(0, 0, width, height);
-    }
+    // Solid dark background matching tweet card theme
+    ctx.fillStyle = '#15202b';
+    ctx.fillRect(0, 0, width, height);
     
     // Reset text alignment for content below
     ctx.textAlign = 'left';
@@ -928,62 +904,16 @@ export function WatchlistPhoneTexture({
     }
     
     // Draw title text
-    ctx.fillStyle = '#060606ff';
+    ctx.fillStyle = '#00ff66';
     ctx.font = 'bold 28px serif';
     ctx.textAlign = 'left';
     ctx.fillText('𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙', avatarX + avatarSize / 2 + 15, headerY + 8);
     
     // ===========================================
-    // TABS
-    // ===========================================
-    
-    const tabY = 175;
-    const tabHeight = 45;
-    const tabs = [
-      { id: 'ALL', label: '🔥 ALL' },
-      { id: 'CANDLES', label: '🕯️ CANDLES' },
-      { id: 'STAKING', label: '💎 STAKING' },
-      { id: 'XPOSTS', label: '𝕏 POSTS' },
-    ];
-    
-    const tabWidth = (width - 60) / tabs.length;
-    
-    tabs.forEach((tab, index) => {
-      const tabX = 30 + index * tabWidth;
-      const isActive = activeTab === tab.id;
-      
-      // Tab background with strong contrast
-      ctx.fillStyle = isActive ? '#1a1a2e' : 'rgba(0, 0, 0, 0.4)';
-      ctx.beginPath();
-      ctx.roundRect(tabX, tabY, tabWidth - 10, tabHeight, 8);
-      ctx.fill();
-      
-      // Tab border for extra definition
-      ctx.strokeStyle = isActive ? '#6c5ce7' : 'rgba(255, 255, 255, 0.2)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      
-      // Tab text with strong contrast
-      ctx.fillStyle = '#fff';
-      ctx.font = `${isActive ? 'bold ' : ''}20px -apple-system, BlinkMacSystemFont, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText(tab.label, tabX + (tabWidth - 10) / 2, tabY + 30);
-      ctx.textAlign = 'left';
-    });
-    
-    // Tab underline
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(30, tabY + tabHeight + 10);
-    ctx.lineTo(width - 30, tabY + tabHeight + 10);
-    ctx.stroke();
-    
-    // ===========================================
     // ACTIVITY FEED
     // ===========================================
-    
-    const feedStartY = tabY + tabHeight + 20;
+
+    const feedStartY = 185;
     const feedEndY = height - 100;
     const feedHeight = feedEndY - feedStartY;
     
@@ -1047,6 +977,8 @@ export function WatchlistPhoneTexture({
         const ssDisplayW = width - 40;
         const ssDisplayH = ssDisplayW / (ss.naturalWidth / ss.naturalHeight);
         itemHeight = ssDisplayH; // Full image height, no cap
+      } else if (activity.type === 'XPOST' && activity.replyText) {
+        itemHeight = 200; // Taller card for reply pairs
       }
       const itemY = currentY;
       
@@ -1243,8 +1175,48 @@ export function WatchlistPhoneTexture({
           ctx.clip();
           ctx.drawImage(screenshot, ssX, ssY, ssW, ssH);
           ctx.restore();
+        } else if (activity.replyText) {
+          // Reply pair: show source tweet + agent reply
+          const textX = usernameX;
+          const maxTextWidth = width - textX - 40;
+
+          // Source tweet text (wrap up to 2 lines)
+          ctx.fillStyle = '#e1e8ed';
+          ctx.font = '19px -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.textAlign = 'left';
+          const srcLines = wrapText(ctx, activity.tweetText || '', maxTextWidth, 2);
+          let textY = itemY + 58;
+          srcLines.forEach(line => {
+            ctx.fillText(line, textX, textY);
+            textY += 24;
+          });
+
+          // Divider line
+          textY += 6;
+          ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(textX, textY);
+          ctx.lineTo(width - 40, textY);
+          ctx.stroke();
+          textY += 12;
+
+          // Reply label
+          ctx.fillStyle = '#1d9bf0';
+          ctx.font = 'bold 17px -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.fillText(`@${activity.replyHandle}`, textX, textY);
+          textY += 22;
+
+          // Reply text (wrap up to 3 lines)
+          ctx.fillStyle = '#ccd6dd';
+          ctx.font = '19px -apple-system, BlinkMacSystemFont, sans-serif';
+          const replyLines = wrapText(ctx, activity.replyText, maxTextWidth, 3);
+          replyLines.forEach(line => {
+            ctx.fillText(line, textX, textY);
+            textY += 24;
+          });
         } else {
-          // Fallback: show tweet text
+          // Fallback: show tweet text only (no reply)
           ctx.fillStyle = '#e1e8ed';
           ctx.font = '20px -apple-system, BlinkMacSystemFont, sans-serif';
           ctx.textAlign = 'left';
@@ -1409,6 +1381,8 @@ export function WatchlistPhoneTexture({
         const ssDisplayW = canvasW - 40;
         const ssDisplayH = ssDisplayW / (ss.naturalWidth / ss.naturalHeight);
         h = ssDisplayH;
+      } else if (a.type === 'XPOST' && a.replyText) {
+        h = 200;
       }
       return sum + h + CONFIG.ITEM_GAP;
     }, 0);
@@ -1437,7 +1411,7 @@ export function WatchlistPhoneTexture({
     const now = Date.now();
 
     // Auto-scroll logic for real-phone-like behavior
-    const feedVisibleHeight = 1280 - 100 - (175 + 45 + 20); // feedEndY - feedStartY
+    const feedVisibleHeight = 1280 - 100 - 185; // feedEndY - feedStartY
     const totalHeight = getTotalContentHeight();
     const maxScroll = Math.max(0, totalHeight - feedVisibleHeight);
 
@@ -1488,23 +1462,12 @@ export function WatchlistPhoneTexture({
     }
   });
   
-  // ===========================================
-  // TAB SWITCHING (expose for external control)
-  // ===========================================
-  
-  // You can call these from parent via ref if needed
-  const switchTab = useCallback((tabId) => {
-    setActiveTab(tabId);
-    scrollPositionRef.current = 0;
-    targetScrollRef.current = 0;
-  }, []);
-  
   const scrollToTop = useCallback(() => {
     targetScrollRef.current = 0;
   }, []);
   
   const scrollBy = useCallback((delta) => {
-    const feedVisibleHeight = 1280 - 100 - (175 + 45 + 20);
+    const feedVisibleHeight = 1280 - 100 - 185;
     const totalHeight = getTotalContentHeight();
     const maxScroll = Math.max(0, totalHeight - feedVisibleHeight);
     targetScrollRef.current = Math.max(0, Math.min(maxScroll, targetScrollRef.current + delta));
