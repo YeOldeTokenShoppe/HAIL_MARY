@@ -55,7 +55,7 @@
     "vite": "^7.2.6"
   },
   "scripts": {
-    "postinstall": "node patches/fix-discovery-self-reply.js",
+    "postinstall": "node patches/fix-discovery-self-reply.cjs",
     "start": "elizaos start",
     "dev": "elizaos dev",
     "build": "bun run build.ts",

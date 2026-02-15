@@ -37,7 +37,7 @@ RUN bun install
 COPY . .
 
 # Ensure patch is applied (in case postinstall was skipped)
-RUN node patches/fix-discovery-self-reply.js
+RUN node patches/fix-discovery-self-reply.cjs
 
 # Build the application
 RUN bun run build
