@@ -517,8 +517,35 @@ const debateContextProvider: Provider = {
           text: `[ROUTING] No active debate. This message does NOT mention you (@${BOT_USERNAMES[myName]}) and is not a reply to you. The humans are talking to each other. You MUST use the IGNORE action. Do NOT respond unless someone @mentions you or replies to one of your messages.`,
         };
       }
+
+      // Fetch recent conversation history so the bot understands context
+      let recentConversation = '';
+      if (message.roomId) {
+        try {
+          const recentMessages = await runtime.getMemories({
+            roomId: message.roomId,
+            tableName: 'messages',
+            count: 10,
+          });
+          if (recentMessages && recentMessages.length > 0) {
+            // Messages come newest-first, reverse for chronological order
+            const chronological = [...recentMessages].reverse();
+            const formatted = chronological
+              .map((m: Memory) => {
+                const name = m.content?.name || 'Unknown';
+                const text = m.content?.text || '';
+                return `${name}: ${text}`;
+              })
+              .join('\n');
+            recentConversation = `\n\nRecent conversation in this group (read this carefully for context):\n${formatted}`;
+          }
+        } catch (err) {
+          logger.debug(`[Debate] Could not fetch recent messages: ${err}`);
+        }
+      }
+
       return {
-        text: `[You were directly addressed. Respond naturally and in character. No active debate.]${tpContext}`,
+        text: `[You were directly addressed. Respond naturally and in character. No active debate. Pay close attention to the recent conversation below — the human may be referring to something that was just discussed.]${recentConversation}${tpContext}`,
       };
     }
 
