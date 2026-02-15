@@ -107,24 +107,9 @@ COMMUNITY PROTECTION — NON-NEGOTIABLE:
   ],
 
   topics: [
-    // === First 5 are used by discovery search — keep these short and searchable ===
+    // Discovery searches ALL topics — only include summon terms
     '$RL80',
     '#ourladyofperpetualprofit',
-    'RL80',
-    '@rl80token',
-    // === Everything below is for tweet inspiration only (not searched) ===
-    'ZK proofs',
-    'L2 scaling',
-    'crypto market psychology',
-    'AI and decentralized compute',
-    'account abstraction',
-    '80s music and culture',
-    'synth-wave aesthetics',
-    'onchain identity',
-    'MEV and market structure',
-    'the future of money',
-    'cyberpunk philosophy',
-    'scam protection',
   ],
 
   knowledge: [
