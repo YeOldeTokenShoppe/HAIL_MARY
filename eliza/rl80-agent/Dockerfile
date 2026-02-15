@@ -42,15 +42,6 @@ RUN bun run build
 RUN echo '#!/bin/bash\nexec /app/node_modules/.bin/elizaos "$@"' > /usr/local/bin/elizaos && \
     chmod +x /usr/local/bin/elizaos
 
-# Create node user directories and set ownership
-RUN mkdir -p /app/.eliza/.elizadb && \
-    chown -R node:node /app && \
-    mkdir -p /home/node/.bun && \
-    chown -R node:node /home/node/.bun
-
-# Switch to non-root user
-USER node
-
 # Railway uses PORT env var
 ENV PORT=3000
 ENV SERVER_PORT=3000
@@ -60,5 +51,5 @@ ENV LOG_LEVEL=info
 # Expose the port
 EXPOSE 3000
 
-# Start debate agents
-CMD ["elizaos", "start"]
+# Start debate agents — use shell form to fix volume permissions at runtime
+CMD mkdir -p /app/.eliza/.elizadb && elizaos start
