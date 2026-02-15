@@ -26,14 +26,18 @@ ENV PATH="/root/.bun/bin:/home/node/.bun/bin:$PATH"
 # Set working directory
 WORKDIR /app
 
-# Copy package files first for better layer caching
+# Copy package files and patches for install
 COPY package.json bun.lock* ./
+COPY patches/ ./patches/
 
-# Install dependencies
+# Install dependencies (postinstall applies discovery self-reply patch)
 RUN bun install
 
 # Copy the rest of the application
 COPY . .
+
+# Ensure patch is applied (in case postinstall was skipped)
+RUN node patches/fix-discovery-self-reply.js
 
 # Build the application
 RUN bun run build
