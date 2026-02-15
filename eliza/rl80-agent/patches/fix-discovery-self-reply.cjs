@@ -107,11 +107,26 @@ if (!content.includes('PATCH: always fetch latest mentions without cursor')) {
       } catch (e) {
         // Cashtag search may fail on some API tiers — that's OK
       }
-      // Combine and deduplicate by tweet ID
+      // Spam/pump filter
+      const SPAM_PATTERNS = /\\b(guaranteed|100x|1000x|next gem|hidden gem|pump|moonshot|presale|airdrop|whitelist|dm me|send me|giveaway|free mint)\\b/i;
+      function isSpamTweet(t) {
+        const text = (t.text || "").toLowerCase();
+        // Mass @mentions (3+ different @usernames) = spam
+        const mentions = text.match(/@\\w+/g) || [];
+        const uniqueMentions = new Set(mentions);
+        if (uniqueMentions.size >= 3) return true;
+        // Pump/spam keywords
+        if (SPAM_PATTERNS.test(t.text || "")) return true;
+        // Tons of cashtags (3+) = pump signal
+        const cashtags = text.match(/\\$[a-zA-Z]+/g) || [];
+        if (cashtags.length >= 3) return true;
+        return false;
+      }
+      // Combine, deduplicate, and filter spam
       const seenIds = new Set();
       const mentionCandidates = [];
       for (const tweet of [...(mentionResult.tweets || []), ...cashtagTweets]) {
-        if (!seenIds.has(tweet.id)) {
+        if (!seenIds.has(tweet.id) && !isSpamTweet(tweet)) {
           seenIds.add(tweet.id);
           mentionCandidates.push(tweet);
         }
