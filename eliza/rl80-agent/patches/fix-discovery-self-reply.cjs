@@ -107,15 +107,12 @@ if (!content.includes('PATCH: always fetch latest mentions without cursor')) {
       } catch (e) {
         // Cashtag search may fail on some API tiers — that's OK
       }
-      // Summon whitelist — ONLY magic words trigger a response
+      // Summon whitelist — must contain BOTH @rl80token AND $RL80
       function isSummon(t) {
         const text = (t.text || "");
         const lower = text.toLowerCase();
-        // Pattern 1: "rl80" three times (Beetlejuice) — any form ($rl80, #rl80, @rl80token, rl80)
-        const rl80Matches = lower.match(/(?:@rl80token|\\$rl80|#rl80|\\brl80\\b)/gi);
-        if (rl80Matches && rl80Matches.length >= 3) return true;
-        // Pattern 2: "hey rl80" — any form (hey $rl80, hey #rl80, hey @rl80token, hey rl80)
-        if (/hey\\s+(?:@rl80token|\\$rl80|#rl80|rl80)/i.test(text)) return true;
+        // Require both @rl80token AND $rl80 in the same tweet
+        if (lower.includes("@rl80token") && lower.includes("$rl80")) return true;
         return false;
       }
       // Combine, deduplicate, and only keep summons (skip own tweets)
