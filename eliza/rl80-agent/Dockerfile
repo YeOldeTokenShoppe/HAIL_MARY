@@ -43,7 +43,8 @@ RUN echo '#!/bin/bash\nexec /app/node_modules/.bin/elizaos "$@"' > /usr/local/bi
     chmod +x /usr/local/bin/elizaos
 
 # Create node user directories and set ownership
-RUN chown -R node:node /app && \
+RUN mkdir -p /app/.eliza/.elizadb && \
+    chown -R node:node /app && \
     mkdir -p /home/node/.bun && \
     chown -R node:node /home/node/.bun
 
