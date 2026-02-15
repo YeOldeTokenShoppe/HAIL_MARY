@@ -107,26 +107,23 @@ if (!content.includes('PATCH: always fetch latest mentions without cursor')) {
       } catch (e) {
         // Cashtag search may fail on some API tiers — that's OK
       }
-      // Spam/pump filter
-      const SPAM_PATTERNS = /\\b(guaranteed|100x|1000x|next gem|hidden gem|pump|moonshot|presale|airdrop|whitelist|dm me|send me|giveaway|free mint)\\b/i;
-      function isSpamTweet(t) {
-        const text = (t.text || "").toLowerCase();
-        // Mass @mentions (3+ different @usernames) = spam
-        const mentions = text.match(/@\\w+/g) || [];
-        const uniqueMentions = new Set(mentions);
-        if (uniqueMentions.size >= 3) return true;
-        // Pump/spam keywords
-        if (SPAM_PATTERNS.test(t.text || "")) return true;
-        // Tons of cashtags (3+) = pump signal
-        const cashtags = text.match(/\\$[a-zA-Z]+/g) || [];
-        if (cashtags.length >= 3) return true;
+      // Summon whitelist — ONLY respond to tweets with magic words
+      const RL80_TOKEN = /(?:@rl80token|\\$rl80|#rl80|\\brl80\\b)/gi;
+      function isSummon(t) {
+        const text = (t.text || "");
+        const lower = text.toLowerCase();
+        // Pattern 1: "rl80" three times (Beetlejuice) — any form
+        const matches = lower.match(RL80_TOKEN);
+        if (matches && matches.length >= 3) return true;
+        // Pattern 2: "hey rl80" — any form (hey $rl80, hey #rl80, hey @rl80token)
+        if (/hey\\s+(?:@rl80token|\\$rl80|#rl80|rl80)/i.test(text)) return true;
         return false;
       }
-      // Combine, deduplicate, and filter spam
+      // Combine, deduplicate, and only keep summons
       const seenIds = new Set();
       const mentionCandidates = [];
       for (const tweet of [...(mentionResult.tweets || []), ...cashtagTweets]) {
-        if (!seenIds.has(tweet.id) && !isSpamTweet(tweet)) {
+        if (!seenIds.has(tweet.id) && isSummon(tweet)) {
           seenIds.add(tweet.id);
           mentionCandidates.push(tweet);
         }
