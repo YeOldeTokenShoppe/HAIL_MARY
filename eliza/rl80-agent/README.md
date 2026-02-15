@@ -105,17 +105,26 @@ The repo includes `Dockerfile`, `railway.toml`, and `.env.example`. Point Railwa
 
 Our Lady of Perpetual Profit is a **dedicated third agent** (`our-lady.ts`) with her own system prompt, voice, and character. She is NOT a persona layered on Saint GR80 — she runs as a fully independent `ProjectAgent` with the Twitter plugin only. She offers blessings, absolution, and guards the flock against scams.
 
+### How She Works
+
+Our Lady is **summon-only** — she does not post autonomous tweets. She responds when:
+- Someone **@mentions** @rl80token directly
+- Someone tweets with **$RL80** or **#ourladyofperpetualprofit** (discovered via the Twitter discovery service)
+
+Users can summon her for blessings, absolutions, confessions, and portfolio prayers. Put instructions in the account bio or a pinned tweet.
+
 ### Setup
 
 1. Go to the [X Developer Portal](https://developer.x.com/) and create a project/app
 2. Generate OAuth 1.0a credentials (API Key, API Secret, Access Token, Access Token Secret)
 3. Set the four `SAINT_GR80_TWITTER_*` env vars in Railway
-4. Start with `TWITTER_DRY_RUN=true` — the agent logs tweet intentions without posting
-5. Once verified, set `TWITTER_DRY_RUN=false` to go live
+4. Set `TWITTER_ENABLE_POST=false`, `TWITTER_ENABLE_ACTIONS=false`, `TWITTER_ENABLE_DISCOVERY=true`
+5. Start with `TWITTER_DRY_RUN=true` — the agent logs response intentions without posting
+6. Once verified, set `TWITTER_DRY_RUN=false` to go live
 
 ### Cost
 
-X API uses pay-per-use credits. Estimated ~$20/month for a moderately active agent (posting a few times daily, searching mentions). Monitor usage in the X Developer Portal dashboard.
+X API uses pay-per-use credits. Estimated ~$5-10/month for a summon-only agent (no autonomous posting, just responding to mentions and discovery). Monitor usage in the X Developer Portal dashboard.
 
 ## Anti-Scam Protection
 
