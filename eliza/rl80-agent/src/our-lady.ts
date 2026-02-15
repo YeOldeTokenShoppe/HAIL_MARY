@@ -9,7 +9,7 @@ export const ourLadyCharacter: Character = {
     '@elizaos/plugin-bootstrap',
   ],
   settings: {
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-haiku-3-5-20241022',
   },
   secrets: {
     TWITTER_API_KEY: process.env.SAINT_GR80_TWITTER_API_KEY,
