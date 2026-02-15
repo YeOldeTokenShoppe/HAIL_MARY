@@ -98,7 +98,7 @@ const DEFAULT_DEBATE_TOPICS: string[] = [
   // Philosophy x Crypto
   'Is suffering necessary for wisdom, or can understanding come through joy? Bear markets might be purgatio — purification — or just bad risk management.',
   'Does free will exist in a market ruled by algorithms, whales, and herd psychology?',
-  'Is true altruism possible in crypto — or is every charitable donation just marketing with tax benefits?',
+  'Is true altruism possible in crypto — or is every good deed just marketing with better optics?',
   'Satoshi vanished. The cypherpunks dreamed of digital sovereignty. We got monkey jpegs. Was the revolution always going to be co-opted?',
   'Is chaos the natural state of markets, or do we simply fail to see the order beneath the volatility?',
   'Do the ends justify the means? Is it okay to build on speculation if the destination is something meaningful?',
@@ -108,7 +108,7 @@ const DEFAULT_DEBATE_TOPICS: string[] = [
   'The blockchain is immutable. The code is law. But humans write the code. Are "trustless" systems actually trustworthy?',
   // HAIL MARY–woven themes
   'Can a community of strangers — connected only by code and conviction — create real value, or is it mutual delusion?',
-  'HAIL MARY donates to St. Jude\'s and ASPCA. Does crypto charity make a project ethical, or just better at marketing?',
+  'Can a token with a 3D shrine, sacred scrolls, and philosophical agents be anything more than elaborate theater — or is the theater itself the point?',
   'The Scrolls say "price is temporary, but the blockchain is forever." Is that wisdom or cope?',
   'Is building something nobody asked for — a 3D candle shrine, a philosophical token — an act of courage or ego?',
   'Scroll V calls myth "a data structure optimized for longevity rather than precision." Is all tokenomics just mythology?',
