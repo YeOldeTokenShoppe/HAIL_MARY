@@ -1,5 +1,5 @@
 "use client";
-import React, { Suspense, useState, useEffect, useRef, useCallback } from 'react';
+import React, { Suspense, useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import CleanCanvas from '@/components/CleanCanvas';
 import { OrbitControls, Stats, Cloud, Clouds } from '@react-three/drei';
@@ -9,49 +9,37 @@ import StarField from '@/components/StarField';
 import Link from 'next/link';
 import PostProcessingEffects from '@/components/PostProcessingEffects';
 import CyborgTempleScene from '@/components/CyborgTempleScene';
-import { Illumin80ClerkButton } from "@/components/Illumin80Display";
 import VideoScreens from "@/components/VideoScreens";
+// import VideoScreensOptimized from "@/components/VideoScreensOptimized";
 import TickerDisplay3 from "@/components/TickerDisplay3";
 import { useMusic } from '@/components/MusicContext';
-import { useUser, SignInButton, UserButton, useClerk } from "@clerk/nextjs";
+import { useUser, useClerk } from "@clerk/nextjs";
 import CyberNav from '@/components/CyberNav';
 import NavControls from '@/components/NavControls';
 import NavControlsMobile from '@/components/NavControlsMobile';
 import SimpleTextLoader from '@/components/SimpleTextLoader';
 import SynthSunset from '@/components/SynthSunset';
-import FocusedAgentCard from '@/components/FocusedAgentCard';
-import InteractiveScroll2 from '@/components/InteractiveScroll2';
-import BurningPageEffect from '@/components/BurningPageEffect';
-import EmojiBurstEffect from '@/components/EmojiBurstEffect';
 
 
 export default function CyborgTemple() {
-  const modelRef = useRef(null); // Reference to the 3D model for candle extraction
   const [isMobileView, setIsMobileView] = useState(false);
   const [fontLoaded, setFontLoaded] = useState(false);
-  const [showMusicControls, setShowMusicControls] = useState(false);
-  const [emoji, setEmoji] = useState("😇");
   const [mounted, setMounted] = useState(false);
   const [isSceneLoading, setIsSceneLoading] = useState(true);
   const [sceneReady, setSceneReady] = useState(false);
   const [modelLoaded, setModelLoaded] = useState(false);
+  const [tickerLoaded, setTickerLoaded] = useState(false);
   const [canvasReady, setCanvasReady] = useState(false);
   const [tickerReady, setTickerReady] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
-  const [modelLoadStartTime] = useState(Date.now()); // Track when loading started
+  const [loadingMessage, setLoadingMessage] = useState("Initializing");
+  const [modelLoadStartTime] = useState(Date.now());
   const [isCandleModalOpen, setIsCandleModalOpen] = useState(false);
-  const [shouldRenderCanvas, setShouldRenderCanvas] = useState(true);
-  const [focusedAgent, setFocusedAgent] = useState(null); // Track which agent is focused
-  const [showAgentCard, setShowAgentCard] = useState(false); // Track card visibility separately
-  const [useAurora, setUseAurora] = useState(true); // Toggle between Aurora and StarField
-  const [userHasInteracted, setUserHasInteracted] = useState(false); // Track if user has clicked around
-  const [isMobileDevice, setIsMobileDevice] = useState(false)
-  const [showCyberNav, setShowCyberNav] = useState(false); // Track CyberNav visibility
-  const isTogglingRef = useRef(false); // Add ref for toggle state
-  const [showScroll, setShowScroll] = useState(false); // Show InteractiveScroll when Coin1 tapped
-  const [showBurning, setShowBurning] = useState(false); // Show burning effect when Coin2 tapped
-  const [showEmojiBurst, setShowEmojiBurst] = useState(false); // Show emoji burst when Coin4 tapped
-  const [emojiBurstOrigin, setEmojiBurstOrigin] = useState({ x: null, y: null }); // Origin point for emoji burst
+  const [focusedAgent, setFocusedAgent] = useState(null);
+  const [useAurora, setUseAurora] = useState(true);
+  const [userHasInteracted, setUserHasInteracted] = useState(false);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+  const [showCyberNav, setShowCyberNav] = useState(false);
   
   // Get music context
   const { 
@@ -65,15 +53,6 @@ export default function CyborgTemple() {
   } = useMusic();
     
 
-
-    // Emoji animation
-    useEffect(() => {
-      const emojiInterval = setInterval(() => {
-        setEmoji((prevEmoji) => (prevEmoji === "😇" ? "😈" : "😇"));
-      }, 3000);
-      return () => clearInterval(emojiInterval);
-    }, []);
-
     // Check if mobile view and device
     useEffect(() => {
       const checkMobile = () => {
@@ -86,62 +65,248 @@ export default function CyborgTemple() {
       return () => window.removeEventListener('resize', checkMobile);
     }, []);
   
-    // Sync showMusicControls with playing state
-    useEffect(() => {
-      if (contextIsPlaying && !showMusicControls) {
-        setShowMusicControls(true);
-      }
-    }, [contextIsPlaying, showMusicControls]);
-
-  // Initialize mounted and scene ready states
-  useEffect(() => {
-    setMounted(true);
-    setFontLoaded(true);
-    // Give the scene a moment to initialize before showing
-    const timer = setTimeout(() => {
-      setSceneReady(true);
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Handle coin tap from CyborgTempleScene
-  const handleCoinTap = useCallback((coinName, position) => {
-    if (coinName === 'Coin1') {
-      setShowScroll(true);
-    } else if (coinName === 'Coin2') {
-      setShowBurning(true);
-    } else if (coinName === 'Coin4') {
-      setEmojiBurstOrigin({ x: position?.x, y: position?.y });
-      setShowEmojiBurst(true);
-    }
-    // Add handlers for other coins here as needed
-  }, []);
-
   // Get user context and auth functions
   const { isSignedIn, user } = useUser();
-  const { openSignIn, openUserProfile, signOut } = useClerk();
+  const { openSignIn, openUserProfile } = useClerk();
 
-
-  // Sync showMusicControls with playing state
+  // Suppress WebGL context lost warnings when modal is open
   useEffect(() => {
-    if (contextIsPlaying && !showMusicControls) {
-      setShowMusicControls(true);
+    if (typeof window !== 'undefined') {
+      const originalWarn = console.warn;
+      const originalError = console.error;
+      
+      console.warn = (...args) => {
+        // Suppress Three.js context lost warning
+        if (typeof args[0] === 'string' && args[0].includes('Context Lost')) {
+          // console.log('🎨 3D scene paused for modal display');
+          return;
+        }
+        originalWarn.apply(console, args);
+      };
+      
+      console.error = (...args) => {
+        // Also suppress as error in case it comes that way
+        if (typeof args[0] === 'string' && args[0].includes('Context Lost')) {
+          return;
+        }
+        originalError.apply(console, args);
+      };
+      
+      return () => {
+        console.warn = originalWarn;
+        console.error = originalError;
+      };
     }
-  }, [contextIsPlaying, showMusicControls]);
+  }, []);
 
+  // Removed auto-collapse timer - only manual interaction collapses the panel
 
+  // Check if mobile on mount
+  useEffect(() => {
+    const checkMobile = () => {
+      if (typeof window !== 'undefined') {
+        const isMobile = window.innerWidth <= 768;
+        setIsMobileView(isMobile);
+        
+        // Preload the appropriate model
+      const modelToPreload = isMobile ? '/models/MOBILE.glb' : '/models/RL80_4anims.glb';
+        
+        if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
+          const link = document.createElement('link');
+          link.rel = 'preload';
+          link.as = 'fetch';
+          link.href = modelToPreload;
+          link.crossOrigin = 'anonymous';
+          link.type = 'model/gltf-binary';
+          document.head.appendChild(link);
+          // console.log(`[Temple] Preloading ${modelToPreload}`);
+          
+          // Also actively fetch the model to warm up the cache
+          fetch(modelToPreload, { 
+            mode: 'cors',
+            cache: 'force-cache'
+          })
+          .then(response => {
+            if (!response.ok) {
+              throw new Error(`Failed to preload: ${response.status}`);
+            }
+            // console.log(`[Temple] Successfully preloaded ${modelToPreload}`);
+            return response.blob();
+          })
+          .then(blob => {
+            // console.log(`[Temple] Model size: ${(blob.size / 1024 / 1024).toFixed(2)} MB`);
+          })
+          .catch(error => {
+            console.error(`[Temple] Failed to preload model:`, error);
+          });
+        }
+      }
+    };
+    checkMobile();
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', checkMobile);
+      
+      // Suppress WebGL context lost errors when intentionally unmounting
+      const handleContextLost = (e) => {
+        if (isCandleModalOpen) {
+          e.preventDefault();
+          console.log('WebGL context disposed for memory optimization');
+        }
+      };
+      
+      const canvas = document.querySelector('canvas');
+      if (canvas) {
+        canvas.addEventListener('webglcontextlost', handleContextLost);
+      }
+    }
+    setMounted(true);
+    setLoadingProgress(10);
+    setLoadingMessage("Setting up environment");
+    
+    // Now we can start Canvas immediately since we're using a lightweight loader
+    setCanvasReady(true);
+    setLoadingProgress(20);
+    setLoadingMessage("Loading 3D Model...");
+    
+    // Don't set tickerReady here - wait for model to load first
+    
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('resize', checkMobile);
+      }
+    };
+  }, []);
 
- 
+  // Check if font is loaded
+  useEffect(() => {
+    const checkFont = async () => {
+      if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+        try {
+          await document.fonts.load("1em 'UnifrakturMaguntia'");
+          setFontLoaded(true);
+          setLoadingProgress(prev => Math.min(prev + 10, 100));
+        } catch (e) {
+          // console.log('Font load failed, using fallback');
+          setTimeout(() => {
+            setFontLoaded(true);
+            setLoadingProgress(prev => Math.min(prev + 10, 100));
+          }, 100);
+        }
+      } else {
+        // Server-side fallback
+        setFontLoaded(true);
+        setLoadingProgress(prev => Math.min(prev + 10, 100));
+      }
+    };
+    checkFont();
+  }, []);
 
+  // Handle model loading completion
+  const handleSceneLoad = () => {
+    // console.log('🎨 CyborgTempleScene loaded - GLB model ready');
+    // console.log('ModelRef current:', modelRef.current);
+    setModelLoaded(true);
+    setLoadingProgress(70);
+    setLoadingMessage("Finalizing...");
+    
+    // Only enable TickerDisplay3 on desktop
+    if (!isMobileView) {
+      // console.log('🎯 Enabling TickerDisplay3 rendering');
+      setTickerReady(true);
+    }
+  };
 
+  // Handle ticker loading completion
+  const handleTickerLoad = () => {
+    // console.log('📊 TickerDisplay3 loaded');
+    setTickerLoaded(true);
+    setLoadingProgress(90);
+    setLoadingMessage("Almost ready");
+  };
 
+  // Comprehensive loading coordination
+  useEffect(() => {
+    // console.log('🔄 Loading state check:', {
+    //   fontLoaded,
+    //   mounted,
+    //   modelLoaded,
+    //   tickerReady,
+    //   tickerLoaded
+    // });
+    
+    // Only hide loading when everything is ready
+    // Model MUST be loaded before proceeding
+    if (!modelLoaded) {
+      // console.log('⏳ Waiting for model to load...');
+      return; // Don't proceed until model is loaded
+    }
+    
+    // Check ticker condition only after model is loaded
+    // On mobile, we don't need to wait for ticker at all
+    const tickerCondition = isMobileView ? true : (!tickerReady || (tickerReady && tickerLoaded));
+    
+    // console.log('📋 Ticker condition:', tickerCondition, 'tickerReady:', tickerReady, 'tickerLoaded:', tickerLoaded);
+    
+    if (fontLoaded && mounted && modelLoaded && tickerCondition) {
+      // console.log('✅ All conditions met! Starting scene reveal sequence...');
+      
+      // Calculate time elapsed since loading started
+      const timeElapsed = Date.now() - modelLoadStartTime;
+      const minimumLoadTime = 2000; // Minimum 2 seconds to prevent flash
+      const remainingTime = Math.max(0, minimumLoadTime - timeElapsed);
+      
+      setLoadingProgress(100);
+      setLoadingMessage("Ready!");
+      
+      // Add delay to ensure smooth transition
+      const timer = setTimeout(() => {
+        // console.log('🚀 Setting scene ready!');
+        setSceneReady(true);
+        setTimeout(() => {
+          // console.log('🎬 Hiding loading screen!');
+          setIsSceneLoading(false);
+        }, 500); // Brief additional delay for smooth transition
+      }, remainingTime + (isMobileView ? 500 : 1000)); // Wait for minimum time plus transition
+      
+      return () => clearTimeout(timer);
+    }
+  }, [fontLoaded, mounted, modelLoaded, tickerLoaded, tickerReady, isMobileView, modelLoadStartTime]);
 
+  // Fallback timeout to prevent infinite loading
+  useEffect(() => {
+    const fallbackTimer = setTimeout(() => {
+      if (isSceneLoading && !modelLoaded) {
+        // Only force ready if model still hasn't loaded after extended timeout
+        console.log('[Temple] Fallback timeout reached, model still not loaded');
+        console.log('[Temple] Consider checking network or model file size');
+        // Don't reveal the scene - keep showing loader
+        // Just log the issue for debugging
+      } else if (isSceneLoading && modelLoaded) {
+        // If model is loaded but scene is still loading, it's safe to reveal
+        console.log('[Temple] Fallback timeout reached but model is loaded, revealing scene');
+        setSceneReady(true);
+        setIsSceneLoading(false);
+      }
+    }, isMobileView ? 30000 : 30000); // 30 seconds for both - give model time to load
+
+    return () => clearTimeout(fallbackTimer);
+  }, [isSceneLoading, isMobileView, modelLoaded]);
+
+  // Don't render on server-side
+  if (!mounted) {
+    return <SimpleTextLoader loading={true} progress={0} message="Loading" />;
+  }
 
   // Removed inline handler - using global listener instead
 
   return (
     <>
-  
+      {/* Loading Screen */}
+      <SimpleTextLoader 
+        loading={isSceneLoading} 
+        progress={loadingProgress}
+        message={loadingMessage}
+      />
           
       <div 
         style={{ 
@@ -184,11 +349,6 @@ export default function CyborgTemple() {
         [style*="UnifrakturMaguntia"] {
           opacity: 1 !important;
           visibility: visible !important;
-        }
-        
-        /* Override h3 color for mainnet readiness heading */
-        .mainnet-readiness-heading {
-          color: #00FFB8 !important;
         }
         
         @keyframes spin {
@@ -287,12 +447,41 @@ export default function CyborgTemple() {
           </div>
         </div>
         
-       
-            
-            
-            
-         
-    
+        {/* Temple Description Panel - Separate from RL80 logo */}
+        <div 
+          onClick={() => {
+            if (!userHasInteracted) {
+              console.log('Panel clicked, collapsing');
+              setUserHasInteracted(true);
+            }
+          }}
+          onTouchStart={() => {
+            if (!userHasInteracted) {
+              console.log('Panel touched, collapsing');
+              setUserHasInteracted(true);
+            }
+          }}
+          style={{
+          position: "fixed",
+          // Mobile: always 5.5rem from bottom
+          // Desktop: stays in same position (120px from top) even when collapsed
+          top: isMobileView ? "auto" : "120px",
+          bottom: isMobileView ? "5.5rem" : "auto",
+          left: isMobileView ? "0.625rem" : "1.25rem",
+          right: isMobileView ? "0.625rem" : "auto",
+          maxWidth: userHasInteracted ? 
+            (isMobileView ? "100%" : "350px") : 
+            (isMobileView ? "100%" : "380px"),
+          padding: isMobileView ? "0.5rem" : "1rem",
+          zIndex: 10,
+          transition: "all 0.5s ease-in-out",
+          cursor: userHasInteracted ? "default" : "pointer",
+          // Allow touch events to pass through when collapsed
+          pointerEvents: "auto",
+        }}>
+        </div>
+        {/* Aurora Background - Only render when Aurora is selected AND (not in 80s mode OR on mobile) */}
+        {canvasReady && useAurora && !isCandleModalOpen && (!context80sMode || isMobileView) && (
           <div style={{ 
             position: 'absolute', 
             inset: 0, 
@@ -300,14 +489,15 @@ export default function CyborgTemple() {
           }}>
             <Aurora />
           </div>
-    
+        )}
 
-  
+        {/* Main Canvas - Unmounted when modal is open for memory optimization */}
+        {canvasReady && !isCandleModalOpen && (
         <CleanCanvas
           key="temple-canvas"
           camera={{ 
-            position:[-0.3, -0.8, 2] , 
-            fov: 35
+            position: isMobileView ? [0, 0, 2] : [0, 0.5, 6.5], 
+            fov: isMobileView ? 35 : 50 
           }}
           gl={{ 
             antialias: !isMobileView,
@@ -398,31 +588,172 @@ export default function CyborgTemple() {
                   />
                 </mesh>
                 
-  
+                {/* Synthwave sun model */}
+                <SynthSunset 
+                  position={[0, 8, -20]}
+                  scale={[8, 8, 8]}
+                  rotation={[0, 0, 0]}
+                />
                 
-               
+                {/* Scattered clouds for 80s atmosphere - avoiding SynthSunset area */}
+                <Clouds material={THREE.MeshBasicMaterial}>
+                  {/* Clouds positioned to avoid the sunset at [0, 8, -20] */}
+                  {/* Far left side clouds */}
+                  <Cloud 
+                    position={[-45, 16, 0]} 
+                    speed={0.18} 
+                    opacity={0.26}
+                    color="#fb5607"
+                    scale={[3.5, 2, 4]}
+                  />
+                  <Cloud 
+                    position={[-40, 11, -35]} 
+                    speed={0.22} 
+                    opacity={0.32}
+                    color="#8338ec"
+                    scale={[4, 2.5, 3]}
+                  />
+                  <Cloud 
+                    position={[-50, 19, 20]} 
+                    speed={0.14} 
+                    opacity={0.24}
+                    color="#c233b1"
+                    scale={[3, 2, 3.5]}
+                  />
+                  {/* Far right side clouds */}
+                  <Cloud 
+                    position={[45, 13, -35]} 
+                    speed={0.2} 
+                    opacity={0.3}
+                    color="#3a86ff"
+                    scale={[3.5, 2, 4]}
+                  />
+                  <Cloud 
+                    position={[50, 22, -10]} 
+                    speed={0.16} 
+                    opacity={0.2}
+                    color="#ff006e"
+                    scale={[2.8, 1.8, 3]}
+                  />
+                  <Cloud 
+                    position={[40, 18, 10]} 
+                    speed={0.1} 
+                    opacity={0.2}
+                    color="#ffbe0b"
+                    scale={[2.5, 1.5, 3]}
+                  />
+                  {/* Behind/side positions */}
+                  <Cloud 
+                    position={[25, 10, 35]} 
+                    speed={0.25} 
+                    opacity={0.35}
+                    color="#8338ec"
+                    scale={[3.5, 2, 4]}
+                  />
+                  <Cloud 
+                    position={[0, 14, 45]} 
+                    speed={0.18} 
+                    opacity={0.28}
+                    color="#3a86ff"
+                    scale={[4, 2.5, 3]}
+                  />
+                  <Cloud 
+                    position={[-30, 20, 30]} 
+                    speed={0.12} 
+                    opacity={0.22}
+                    color="#ff006e"
+                    scale={[3, 1.8, 3.5]}
+                  />
+                  <Cloud 
+                    position={[20, 25, 25]} 
+                    speed={0.11} 
+                    opacity={0.18}
+                    color="#8338ec"
+                    scale={[4, 2, 3.5]}
+                  />
+                  {/* High clouds that won't obstruct */}
+                  <Cloud 
+                    position={[-25, 28, -15]} 
+                    speed={0.15} 
+                    opacity={0.2}
+                    color="#fb5607"
+                    scale={[3, 1.5, 2.5]}
+                  />
+                  <Cloud 
+                    position={[30, 30, -25]} 
+                    speed={0.13} 
+                    opacity={0.18}
+                    color="#ff006e"
+                    scale={[2.5, 1.5, 3]}
+                  />
+                </Clouds>
               </>
             )}
             
-            
+            {/* Starfield background - only show when Aurora is off AND (not in 80s mode OR on mobile) */}
+            {!useAurora && (!context80sMode || isMobileView) && (
+              <StarField 
+                radius={150} 
+                count1={isMobileView ? 200 : 500} 
+                count2={isMobileView ? 150 : 300} 
+                is80sMode={false} 
+              />
+            )}
             
             {/* CyborgTempleScene with the RL80 model */}
             <CyborgTempleScene
-              position={[-0.05, -0.3, 0] }
-              scale={[1, 1, 1]}
+              position={isMobileView ? [0, -1.2, 0] : [0, -1.5, 0]}
+              scale={[1.2, 1.2, 1.2]}
               rotation={[0, 0, 0]}
               isPlaying={false}
+              onLoad={handleSceneLoad}
+              showAnnotations={true}
               is80sMode={context80sMode}
               isMobile={isMobileView}
-              onCoinTap={handleCoinTap}
+              onAgentClick={(agentId) => {
+                if (agentId) {
+                  setFocusedAgent(agentId);
+                  if (!userHasInteracted) {
+                    setTimeout(() => {
+                      setUserHasInteracted(true);
+                    }, 500);
+                  }
+                } else {
+                  setFocusedAgent(null);
+                }
+              }}
             />
 
+            {/* TickerDisplay3 - Only load on desktop with RL80_4anims.glb model */}
+            {!isMobileView && tickerReady && !isCandleModalOpen && (
+              <TickerDisplay3 modelRef={null} onLoad={handleTickerLoad} />
+            )}
 
+          
+            {/* Constellation */}
+            <ConstellationModel  
+              groupScale={[10, 10, 10]} 
+              groupPosition={[0, 15, -80]} 
+              isVisible={true} 
+            />
 
+            {/* Using optimized version with single video texture */}
+            <VideoScreens is80sMode={context80sMode} />
 
-
+              {/* <NeuralNetworkR3F 
+              theme={2}
+              opacity={0.8}            // Slightly dimmed
+              useNormalBlending={true}
+              formation={0}
+              density={300}
+              position={[0.64, -0.72, 0.37]}
+              scale={0.005}
+              enableInteraction={true}
+              nodeSize={0.06}  
+            /> */}
             
-         
+            {/* OrbitControls - Disabled on mobile */}
+            {!isMobileView && (
               <OrbitControls 
                 makeDefault
                 enabled={!focusedAgent}  // Disable when focusing on an agent
@@ -434,22 +765,20 @@ export default function CyborgTemple() {
                 minDistance={0.1}
                 maxDistance={10}
                 zoomToCursor={true}
-               
+                autoRotate={true}
+                autoRotateSpeed={0.2}
                 target={[0, 0, 0]}
               />
-   
+            )}
           </Suspense>
           {/* <Stats className="stats-monitor" /> */}
         </CleanCanvas>
-     
-
+        )}
         
 
         {/* Top Controls Container - Music, User, and Nav */}
         {mounted && (
           <>
-           
-            
             {/* Nav Controls - Desktop vs Mobile */}
             <div
               style={{
@@ -503,211 +832,11 @@ export default function CyborgTemple() {
               showButton={false}
             />
             
-            {/* Music controls are now integrated into NavControls */}
-            <div style={{ display: "none" }}>
-                    {
-                        !showMusicControls ? (
-                          <button
-                            onClick={() => handleMusicToggle(true)}
-                            style={{
-                              width: isMobileDevice ? "3.5rem" : "3.5rem",
-                              height: isMobileDevice ? "3.5rem" : "3.5rem",
-                              borderRadius: "0.5rem",
-                              backgroundColor: context80sMode ? "rgba(217, 70, 239, 0.2)" : "rgba(0, 0, 0, 0.7)",
-                              border: context80sMode ? "2px solid #D946EF" : "2px solid rgba(255, 255, 255, 0.2)",
-                              color: context80sMode ? "#67e8f9" : "#ffffff",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              cursor: "pointer",
-                              transition: "all 0.3s ease",
-                              backdropFilter: "blur(10px)",
-                              boxShadow: "0 0.125rem 0.5rem rgba(0, 0, 0, 0.3)",
-                            }}
-                            title="Toggle Music"
-                          >
-                            <svg
-                              width={isMobileDevice ? "20" : "30"}
-                              height={isMobileDevice ? "20" : "30"}
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M9 18V5l12-2v13" />
-                              <circle cx="6" cy="18" r="3" />
-                              <circle cx="18" cy="16" r="3" />
-                            </svg>
-                          </button>
-                        ) : (
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "0.5rem",
-                            }}
-                          >
-                            {/* Spinning Album Art */}
-                            <div
-                              style={{
-                                width: isMobileDevice ? "3rem" : "3.5rem",
-                                height: isMobileDevice ? "3rem" : "3.5rem",
-                                borderRadius: "50%",
-                                overflow: "hidden",
-                                animation: contextIsPlaying ? "spin 4s linear infinite" : "none",
-                                cursor: "pointer"
-                              }}
-                              onClick={() => {
-                                if (contextIsPlaying) {
-                                  pause();
-                                } else {
-                                  play();
-                                }
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: "100%",
-                                  height: "100%",
-                                  backgroundImage: "url('/virginRecords.jpg')",
-                                  backgroundSize: "cover",
-                                  backgroundPosition: "center"
-                                }}
-                              />
-                            </div>
-                            
-                            {/* Skip Button */}
-                            <button
-                              onClick={() => nextTrack && nextTrack()}
-                              style={{
-                                width: isMobileDevice ? "2rem" : "2.5rem",
-                                height: isMobileDevice ? "2rem" : "2.5rem",
-                                borderRadius: "0.25rem",
-                                backgroundColor: context80sMode ? "rgba(217, 70, 239, 0.2)" : "rgba(0, 0, 0, 0.7)",
-                                border: context80sMode ? "2px solid #D946EF" : "2px solid rgba(255, 255, 255, 0.2)",
-                                color: context80sMode ? "#67e8f9" : "#ffffff",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                cursor: "pointer",
-                                transition: "all 0.3s ease",
-                                backdropFilter: "blur(10px)",
-                                boxShadow: "0 0.125rem 0.375rem rgba(0, 0, 0, 0.3)",
-                              }}
-                              title="Next Track"
-                            >
-                              <svg width={isMobileDevice ? "14" : "18"} height={isMobileDevice ? "14" : "18"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polygon points="5 4 15 12 5 20 5 4"/>
-                                <line x1="19" y1="5" x2="19" y2="19"/>
-                              </svg>
-                            </button>
-                            
-                            {/* Close Button */}
-                            <button
-                              onClick={() => {
-                                handleMusicToggle(false);
-                                pause && pause();
-                              }}
-                              style={{
-                                width: isMobileDevice ? "1.75rem" : "2rem",
-                                height: isMobileDevice ? "1.75rem" : "2rem",
-                                borderRadius: "0.25rem",
-                                backgroundColor: context80sMode ? "rgba(217, 70, 239, 0.2)" : "rgba(0, 0, 0, 0.7)",
-                                border: context80sMode ? "1px solid #D946EF" : "1px solid rgba(255, 255, 255, 0.2)",
-                                color: context80sMode ? "#67e8f9" : "#ffffff",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                cursor: "pointer",
-                                transition: "all 0.3s ease",
-                                backdropFilter: "blur(10px)",
-                                boxShadow: "0 0.125rem 0.375rem rgba(0, 0, 0, 0.3)",
-                              }}
-                              title="Close Music"
-                            >
-                              <svg width={isMobileDevice ? "12" : "14"} height={isMobileDevice ? "12" : "14"} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="18" y1="6" x2="6" y2="18"/>
-                                <line x1="6" y1="6" x2="18" y2="18"/>
-                              </svg>
-                            </button>
-                          </div>
-                        )
-                      }
-                  </div>
-                  
-            
-                  
-             
-                 
-          
 
           </>
         )}
-        
-        
       </div>
     </div>
-
-    {/* Burning page effect when Coin2 is tapped */}
-    {showBurning && (
-      <BurningPageEffect
-        targetUrl="/illumin80"
-        duration={5000}
-      />
-    )}
-
-    {/* Emoji burst effect when Coin4 is tapped */}
-    {showEmojiBurst && (
-      <EmojiBurstEffect
-        targetUrl="/ride"
-        navigateDelay={3000}
-        emojisPerBurst={5}
-        burstInterval={400}
-        originX={emojiBurstOrigin.x}
-        originY={emojiBurstOrigin.y}
-      />
-    )}
-
-    {/* InteractiveScroll overlay when Coin1 is tapped */}
-    {showScroll && (
-      <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          zIndex: 10000,
-          background: 'rgba(0, 0, 0, 0.9)',
-        }}
-      >
-        <button
-          onClick={() => setShowScroll(false)}
-          style={{
-            position: 'absolute',
-            top: '1rem',
-            right: '1rem',
-            zIndex: 10001,
-            background: 'rgba(255, 255, 255, 0.1)',
-            border: '1px solid rgba(255, 255, 255, 0.3)',
-            borderRadius: '50%',
-            width: '40px',
-            height: '40px',
-            color: '#fff',
-            fontSize: '20px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          ✕
-        </button>
-        <InteractiveScroll2 onClose={() => setShowScroll(false)} />
-      </div>
-    )}
     </>
   );
 }

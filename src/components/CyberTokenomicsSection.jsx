@@ -735,12 +735,14 @@ export default function CyberTokenomicsSection({ isMobile }) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              padding: '10px 15px',
+              width: '180px',
+              height: '44px',
               background: 'rgba(0, 0, 0, 0.4)',
               borderRadius: '6px',
               border: '1px solid rgba(255, 255, 255, 0.1)',
               transition: 'all 0.3s ease',
               textDecoration: 'none',
+              overflow: 'hidden',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'rgba(0, 255, 170, 0.1)';
@@ -771,12 +773,14 @@ export default function CyberTokenomicsSection({ isMobile }) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              padding: '10px 15px',
+              width: '180px',
+              height: '44px',
               background: 'rgba(0, 0, 0, 0.4)',
               borderRadius: '6px',
               border: '1px solid rgba(255, 255, 255, 0.1)',
               transition: 'all 0.3s ease',
               textDecoration: 'none',
+              overflow: 'hidden',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'rgba(0, 255, 170, 0.1)';
@@ -796,6 +800,7 @@ export default function CyberTokenomicsSection({ isMobile }) {
                 height: '24px',
                 width: 'auto',
                 filter: 'brightness(0.9)',
+                transform: 'scale(1.8)',
               }}
             />
           </a>
@@ -807,12 +812,14 @@ export default function CyberTokenomicsSection({ isMobile }) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              padding: '10px 15px',
+              width: '180px',
+              height: '44px',
               background: 'rgba(0, 0, 0, 0.4)',
               borderRadius: '6px',
               border: '1px solid rgba(255, 255, 255, 0.1)',
               transition: 'all 0.3s ease',
               textDecoration: 'none',
+              overflow: 'hidden',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = 'rgba(0, 255, 170, 0.1)';
@@ -832,6 +839,45 @@ export default function CyberTokenomicsSection({ isMobile }) {
                 height: '24px',
                 width: 'auto',
                 filter: 'brightness(0.9)',
+              }}
+            />
+          </a>
+          <a
+            href="https://www.geckoterminal.com/base/pools/0x40d827acdbefd8ef46953e2b1ac87b8697b82203?utm_source=coingecko&utm_medium=referral&utm_campaign=searchresults"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '180px',
+              height: '44px',
+              background: 'rgba(0, 0, 0, 0.4)',
+              borderRadius: '6px',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              transition: 'all 0.3s ease',
+              textDecoration: 'none',
+              overflow: 'hidden',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 255, 170, 0.1)';
+              e.currentTarget.style.borderColor = 'rgba(0, 255, 170, 0.4)';
+              e.currentTarget.style.transform = 'translateY(-2px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)';
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            <img
+              src="/coinGeckoTerminalLogo.webp"
+              alt="GeckoTerminal"
+              style={{
+                height: '24px',
+                width: 'auto',
+                filter: 'brightness(0.9)',
+                transform: 'scale(1.2)',
               }}
             />
           </a>

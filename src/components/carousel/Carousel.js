@@ -1396,7 +1396,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               padding: '0 1rem',
             }}>
      
-              Light a candle for Our Lady and signal boost your conviction. A little sacrifice goes a long way - top 20% of token burners are rewarded with a 1.2x staking reward multiplier and other rare indulgences. (<Link href="/tokenomics#QUERY_002" style={{color: '#ffd700', textDecoration: 'underline'}}>details</Link>)
+              Light a candle for Our Lady and signal boost your conviction about $RL80 and enter the orbit of crypto's first AI patron saint. Plus, she'll light up your timeline if you ask.
             </p>
 
             {/* Illumin80 Navigation - tablet portrait only */}
@@ -2439,7 +2439,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
        
      
               {/* Light a virtual green candle and join the Illumin80 — a circle of investors who paradoxically place their faith in having none at all. */}
-              Light a candle for Our Lady and signal boost your conviction. A little sacrifice goes a long way - top 20% of token burners are rewarded with a 1.2x staking reward multiplier and other rare indulgences. (<Link href="/tokenomics#QUERY_002" style={{color: '#ffd700', textDecoration: 'underline'}}>details</Link>)</p>
+              Light a candle for Our Lady and signal boost your conviction about $RL80 and enter the orbit of crypto's first AI patron saint. Plus, she'll light up your timeline if you ask.</p>
  {/* {!isMobilePhone && ( */}
             <div
               className="navigation-group"
