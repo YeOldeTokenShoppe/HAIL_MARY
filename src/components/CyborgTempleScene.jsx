@@ -175,9 +175,9 @@ const CyborgTempleScene = ({
     blinkProgress: 0
   });
   
-  // Demon animation state
+  // Demon animation state (uses Root.001|* prefixed animations)
   const demonAnimStateRef = useRef({
-    currentAnimation: 'Typing',
+    currentAnimation: 'Root.001|Typing',
     lastSwitchTime: 0,
     nextSwitchDelay: Math.random() * 10000 + 8000,
   });
@@ -190,9 +190,9 @@ const CyborgTempleScene = ({
     recentAnimations: [],
   });
 
-  // Monk animation state
+  // Monk animation state (uses *_monk suffixed animations)
   const monkAnimStateRef = useRef({
-    currentAnimation: 'Typing',
+    currentAnimation: 'typing_monk',
     lastSwitchTime: 0,
     nextSwitchDelay: Math.random() * 10000 + 15000,
   });
@@ -523,16 +523,17 @@ const CyborgTempleScene = ({
           if (firstTrackBone === 'Pelvis') {
             targetCharacters = ['Demon'];
           }
-          // Monk animations (Root_2-based skeleton)
-          else if (firstTrackBone === 'Root_2') {
+          // Monk animations (Root_2-based skeleton or *_monk named)
+          else if (firstTrackBone === 'Root_2' || animName.endsWith('_monk')) {
             targetCharacters = ['Monk'];
           }
-          // Standard Root-based animations — shared by all 4 characters
+          // Standard Root-based animations for RL80 and Tekno only
+          // (Demon uses Root.001|* / Pelvis animations, Monk uses *_monk animations)
           else if (firstTrackBone === 'Root' ||
                    animName === 'Typing' || animName === 'Idle' ||
                    animName === 'Disbelief' || animName === 'FistPump' ||
                    animName === 'Clap' || animName === 'Victory' || animName === 'Cheer') {
-            targetCharacters = ['RL80', 'Tekno', 'Demon', 'Monk'];
+            targetCharacters = ['RL80', 'Tekno'];
           }
 
           
@@ -554,7 +555,7 @@ const CyborgTempleScene = ({
             }
           });
         });
-        
+
         // Play initial animations for each character
         Object.entries(actionsRef.current).forEach(([charName, charActions]) => {
           const availableAnims = Object.keys(charActions);
@@ -577,18 +578,18 @@ const CyborgTempleScene = ({
               defaultAnimName = availableAnims[0];
             }
           } else if (charName === 'Demon') {
-            if (charActions['Typing']) {
-              defaultAnimName = 'Typing';
-            } else if (charActions['Idle']) {
-              defaultAnimName = 'Idle';
+            if (charActions['Root.001|Typing']) {
+              defaultAnimName = 'Root.001|Typing';
+            } else if (charActions['Root.001|Disbelief']) {
+              defaultAnimName = 'Root.001|Disbelief';
             } else {
               defaultAnimName = availableAnims[0];
             }
           } else if (charName === 'Monk') {
-            if (charActions['Typing']) {
-              defaultAnimName = 'Typing';
-            } else if (charActions['Idle']) {
-              defaultAnimName = 'Idle';
+            if (charActions['typing_monk']) {
+              defaultAnimName = 'typing_monk';
+            } else if (charActions['idle_monk']) {
+              defaultAnimName = 'idle_monk';
             } else {
               defaultAnimName = availableAnims[0];
             }
@@ -1528,9 +1529,11 @@ const CyborgTempleScene = ({
         const demonActions = actionsRef.current['Demon'];
         const availableAnimations = Object.keys(demonActions);
 
-        // Use only animations that actually exist from the available set
-        const loopAnimations = availableAnimations.filter(a => a === 'Typing' || a === 'Idle');
-        const specialAnimations = availableAnimations.filter(a => a === 'FistPump' || a === 'Disbelief');
+        // Demon animations use Root.001|* prefix — classify by suffix
+        const loopAnimations = availableAnimations.filter(a =>
+          /typing|idle|laughing/i.test(a));
+        const specialAnimations = availableAnimations.filter(a =>
+          /fistpump|disbelief|clap/i.test(a));
 
         if (availableAnimations.length === 0) return;
 
@@ -1597,7 +1600,7 @@ const CyborgTempleScene = ({
         demonState.currentAnimation = nextAnimation;
 
         if (loopAnimations.includes(nextAnimation)) {
-          demonState.nextSwitchDelay = nextAnimation === 'Idle'
+          demonState.nextSwitchDelay = /idle/i.test(nextAnimation)
             ? Math.random() * 3000 + 4000
             : Math.random() * 10000 + 8000;
         } else {
@@ -1772,8 +1775,11 @@ const CyborgTempleScene = ({
         const monkActions = actionsRef.current['Monk'];
         const availableAnimations = Object.keys(monkActions);
 
-        const loopAnimations = availableAnimations.filter(a => a === 'Typing' || a === 'Idle');
-        const specialAnimations = availableAnimations.filter(a => a === 'Disbelief' || a === 'FistPump');
+        // Monk animations use *_monk suffix — classify by name
+        const loopAnimations = availableAnimations.filter(a =>
+          /typing|idle|laughing/i.test(a));
+        const specialAnimations = availableAnimations.filter(a =>
+          /disbelief|disapproval|clap|fistpump/i.test(a));
 
         if (availableAnimations.length === 0) return;
 
@@ -1840,7 +1846,7 @@ const CyborgTempleScene = ({
         monkState.currentAnimation = nextAnimation;
 
         if (loopAnimations.includes(nextAnimation)) {
-          monkState.nextSwitchDelay = nextAnimation === 'Idle'
+          monkState.nextSwitchDelay = /idle/i.test(nextAnimation)
             ? Math.random() * 3000 + 5000
             : Math.random() * 10000 + 12000;
         } else {
