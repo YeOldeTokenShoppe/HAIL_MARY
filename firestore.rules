@@ -213,6 +213,24 @@
         allow read, create: if true;
       }
 
+      // X OAuth tokens - server writes, no client access
+      match /config/{document} {
+        allow read: if false;
+        allow write: if true;
+      }
+
+      // Followers data - public read, server write
+      match /followers/{document} {
+        allow read: if true;
+        allow write: if true;
+      }
+
+      // Tweets data - public read, server write
+      match /tweets/{document} {
+        allow read: if true;
+        allow write: if true;
+      }
+
       // Default rules - SECURE by default
       match /{document=**} {
         allow read: if true;

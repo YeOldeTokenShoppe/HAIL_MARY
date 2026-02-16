@@ -40,6 +40,7 @@ export default function CyborgTemple() {
   const [userHasInteracted, setUserHasInteracted] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [showCyberNav, setShowCyberNav] = useState(false);
+  const [followerWords, setFollowerWords] = useState([]);
   
   // Get music context
   const { 
@@ -52,6 +53,18 @@ export default function CyborgTemple() {
     setIs80sMode: setContext80sMode
   } = useMusic();
     
+
+    // Fetch follower display names for word cluster
+    useEffect(() => {
+      fetch('/api/followers')
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data?.displayNames?.length > 0) {
+            setFollowerWords(data.displayNames);
+          }
+        })
+        .catch(() => {}); // Silently fall back to default words
+    }, []);
 
     // Check if mobile view and device
     useEffect(() => {
@@ -710,6 +723,7 @@ export default function CyborgTemple() {
               showAnnotations={true}
               is80sMode={context80sMode}
               isMobile={isMobileView}
+              followerWords={followerWords}
               onAgentClick={(agentId) => {
                 if (agentId) {
                   setFocusedAgent(agentId);

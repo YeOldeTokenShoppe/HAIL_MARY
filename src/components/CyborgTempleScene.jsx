@@ -27,11 +27,16 @@ const WORD_GLOW_COLORS = [
 
 function createWordTexture(text, colorIndex = 0) {
   const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 128;
   const ctx = canvas.getContext('2d');
+  const fontSize = 60;
+  const padding = 80; // extra space for glow/shadow
+  ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+  const measured = ctx.measureText(text);
+  canvas.width = Math.max(512, Math.ceil(measured.width) + padding);
+  canvas.height = 128;
+  // Re-set font after canvas resize (resets context)
+  ctx.font = `bold ${fontSize}px Arial, sans-serif`;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.font = 'bold 60px Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#fff';
@@ -53,7 +58,7 @@ function FloatingWordCluster({ words = WORD_CLUSTER_WORDS, center = [0, 1.5, 0],
       const aspect = texture.userData?.aspect || 4;
       // Adapted for temple scene scale: orbit radius ~3-6 units
       const minR = 3;
-      const maxR = 6;
+      const maxR = 5;
       let r, phi, theta, y;
       do {
         r = minR + (maxR - minR) * Math.cbrt(Math.random());
@@ -119,6 +124,7 @@ const CyborgTempleScene = ({
   onAnnotationClick = null, // Callback when annotation is clicked
   onAgentClick = null, // Callback when an agent is clicked
   isMobile = false, // Pass this prop to determine device type
+  followerWords = [], // Display names from X followers
 }) => {
   const groupRef = useRef();
   const { scene, camera, gl } = useThree();
@@ -2154,7 +2160,7 @@ const CyborgTempleScene = ({
   return (
     <group ref={groupRef} visible={true} position={position} scale={scale} rotation={rotation}>
       {/* The 3D model is added dynamically in useEffect */}
-      <FloatingWordCluster center={[0, 2.8, 0]} clusterScale={0.22}/>
+      <FloatingWordCluster words={followerWords.length > 0 ? followerWords : WORD_CLUSTER_WORDS} center={[0, 2.8, 0]} clusterScale={0.22}/>
     </group>
   );
 };
