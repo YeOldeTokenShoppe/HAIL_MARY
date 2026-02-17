@@ -36,7 +36,7 @@ export default function CyborgTemple() {
   const [modelLoadStartTime] = useState(Date.now());
   const [isCandleModalOpen, setIsCandleModalOpen] = useState(false);
   const [focusedAgent, setFocusedAgent] = useState(null);
-  const [useAurora, setUseAurora] = useState(true);
+  const [useAurora, setUseAurora] = useState(false);
   const [userHasInteracted, setUserHasInteracted] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [showCyberNav, setShowCyberNav] = useState(false);
@@ -778,7 +778,7 @@ export default function CyborgTemple() {
                 dampingFactor={0.1}
                 minDistance={0.1}
                 maxDistance={10}
-                zoomToCursor={true}
+                // zoomToCursor={true}
                 autoRotate={true}
                 autoRotateSpeed={0.2}
                 target={[0, 0, 0]}
@@ -836,9 +836,60 @@ export default function CyborgTemple() {
                 />
               )}
             </div>
-            
+
+            {/* Telegram Feature Box - Desktop only */}
+            {!isMobileView && (
+              <a
+                href="https://t.me/rl80_chat"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  position: 'fixed',
+                  top: '7.5rem',
+                  right: '1rem',
+                  zIndex: 1001,
+                  width: '200px',
+                  background: 'rgba(0, 0, 0, 0.7)',
+                  border: '1px solid rgba(0, 255, 255, 0.3)',
+                  borderRadius: '8px',
+                  padding: '10px',
+                  textDecoration: 'none',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  backdropFilter: 'blur(8px)',
+                }}
+              >
+                <img
+                  src="/groupPhoto.webp"
+                  alt="RL80 Team"
+                  style={{
+                    width: '100%',
+                    borderRadius: '6px',
+                    objectFit: 'cover',
+                  }}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', }}>
+                  <img
+                    src="/telegram_blue.svg"
+                    alt="Telegram"
+                    style={{ width: '32px', height: '32px', flexShrink: 0, }}
+                  />
+                  <span style={{
+                    color: 'rgba(0, 255, 255, 0.8)',
+                    fontSize: '10px',
+                    fontFamily: 'monospace',
+                    lineHeight: '1.3',
+                    textAlign: 'center',
+                  }}>
+                    Interact with the RL80 team on the Telegram group
+                  </span>
+                </div>
+              </a>
+            )}
+
             {/* CyberNav Menu - Show when toggled */}
-            <CyberNav 
+            <CyberNav
               is80sMode={context80sMode} 
               position="fixed"
               isOpen={showCyberNav}

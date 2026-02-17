@@ -53,7 +53,7 @@ export default function CarouselPage() {
   
   // Prefetch illumin80 route on mount for smoother navigation
   useEffect(() => {
-    router.prefetch('/illumin80');
+    router.prefetch('/trade');
   }, [router]);
 
   // Set mounted state after hydration and handle loading

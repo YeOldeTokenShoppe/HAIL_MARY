@@ -922,7 +922,7 @@ async function fetchAndStoreXPosts(bearerToken) {
       replyAuthor: "Our Lady of Perpetual Profit",
       replyHandle: RL80_USERNAME,
       tweetUrl: `https://x.com/${RL80_USERNAME}/status/${tweet.id}`,
-      authorImageUrl: parentAuthor.profile_image_url || "",
+      authorImageUrl: (parentAuthor.profile_image_url || "").replace(/_normal\./, "_400x400."),
       screenshotUrl: "",
       tweetId: tweet.id,
       parentTweetId: parentTweet.id,
@@ -953,9 +953,9 @@ async function fetchAndStoreXPosts(bearerToken) {
   return { fetched: tweetsData.data.length, written };
 }
 
-// Scheduled: every 15 minutes
+// Scheduled: every 4 hours
 exports.fetchXPosts = onSchedule({
-  schedule: "*/15 * * * *",
+  schedule: "0 */4 * * *",
   timeZone: "UTC",
   memory: "256MiB",
   timeoutSeconds: 60,
@@ -1002,6 +1002,42 @@ exports.fetchXPostsManual = onRequest({
     res.json({ success: true, ...result });
   } catch (error) {
     logger.error("[XPosts] Manual trigger failed:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// One-time migration: upgrade existing xPost authorImageUrl to high-res
+exports.upgradeXPostImages = onRequest({
+  secrets: ["CRON_SECRET"],
+}, async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (!authHeader || authHeader !== "Bearer " + cronSecret) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  try {
+    const snapshot = await db.collection("xPost").get();
+    let updated = 0;
+
+    const batch = db.batch();
+    snapshot.docs.forEach(doc => {
+      if (doc.id === "_meta") return;
+      const data = doc.data();
+      if (data.authorImageUrl && data.authorImageUrl.includes("_normal.")) {
+        const highRes = data.authorImageUrl.replace(/_normal\./, "_400x400.");
+        batch.update(doc.ref, { authorImageUrl: highRes });
+        updated++;
+      }
+    });
+
+    await batch.commit();
+    logger.info(`[XPosts] Upgraded ${updated} docs to high-res images`);
+    res.json({ success: true, updated });
+  } catch (error) {
+    logger.error("[XPosts] Image upgrade failed:", error);
     res.status(500).json({ error: error.message });
   }
 });

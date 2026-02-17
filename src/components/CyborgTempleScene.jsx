@@ -4,6 +4,7 @@ import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader";
 import * as THREE from "three";
 import { useThree, useFrame } from "@react-three/fiber";
 import AnnotationSystem from "@/components/AnnotationSystem";
+import { db, collection, query, orderBy, limit, getDocs } from '@/lib/firebaseClient';
 
 // --- Word cluster configuration ---
 const WORD_CLUSTER_WORDS = [
@@ -53,19 +54,18 @@ function FloatingWordCluster({ words = WORD_CLUSTER_WORDS, center = [0, 1.5, 0],
   const groupRef = useRef();
 
   const wordData = useMemo(() => {
+    const n = words.length;
+    const goldenAngle = Math.PI * (3 - Math.sqrt(5)); // ~2.3999 radians
     return words.map((text, i) => {
       const texture = createWordTexture(text, i);
       const aspect = texture.userData?.aspect || 4;
-      // Adapted for temple scene scale: orbit radius ~3-6 units
+      // Fibonacci sphere for even distribution
+      const phi = Math.acos(1 - 2 * (i + 0.5) / n); // polar angle, evenly spaced
+      const theta = goldenAngle * i; // azimuthal angle, golden spiral
+      // Vary radius slightly per point for depth
       const minR = 3;
       const maxR = 5;
-      let r, phi, theta, y;
-      do {
-        r = minR + (maxR - minR) * Math.cbrt(Math.random());
-        phi = Math.acos(2 * Math.random() * 0.8 - 0.6);
-        theta = Math.random() * Math.PI * 2;
-        y = r * Math.cos(phi);
-      } while (Math.abs(y) < 1 && r < 4); // Exclude band near scene center
+      const r = minR + (maxR - minR) * ((i % 3) / 2.5 + Math.random() * 0.15);
       return {
         texture,
         aspect,
@@ -162,6 +162,12 @@ const CyborgTempleScene = ({
   const coin4OriginalScale = useRef(null);
   const coin4OriginalEmissive = useRef(null);
   
+  // Refs for CoinFace avatar meshes (desktop RL80_4anims.glb)
+  const coinFaceRefs = useRef([null, null, null, null]) // CoinFace1-4
+  const coinFaceTexturesRef = useRef([null, null, null, null])
+  const topEngagersRef = useRef([]) // Top 4 xPost authors
+  const topSupporterBannerRefs = useRef([]) // TopText and x_logo meshes
+
   // Click animation state for coins
   const [clickedCoin, setClickedCoin] = useState(null);
   const coinAnimationState = useRef({
@@ -181,6 +187,9 @@ const CyborgTempleScene = ({
     blinkProgress: 0
   });
   
+  // Flame shader material refs (multiple flames in scene)
+  const flameMaterialsRef = useRef([]);
+
   // Demon animation state (uses Root.001|* prefixed animations)
   const demonAnimStateRef = useRef({
     currentAnimation: 'Root.001|Typing',
@@ -231,7 +240,257 @@ const CyborgTempleScene = ({
   
   // Use prop or detected mobile state
   const isOnMobile = isMobile || detectedMobile;
-  
+
+  // ===========================================
+  // TOP ENGAGER AVATARS ON COIN FACES
+  // ===========================================
+
+  // Fetch top 4 xPost authors by frequency
+  useEffect(() => {
+    if (!db) return
+    const fetchTopEngagers = async () => {
+      try {
+        const xPostsQ = query(collection(db, 'xPost'), orderBy('createdAt', 'desc'), limit(50))
+        const snapshot = await getDocs(xPostsQ)
+        const authorCounts = {}
+
+        snapshot.docs.forEach(doc => {
+          if (doc.id === '_meta') return
+          const data = doc.data()
+          if (!data.author || data.author === 'Unknown') return
+          const key = data.author
+          if (!authorCounts[key]) {
+            authorCounts[key] = {
+              username: data.author,
+              handle: data.handle || '',
+              imageUrl: data.authorImageUrl || '',
+              count: 0,
+            }
+          }
+          authorCounts[key].count++
+        })
+
+        // Sort by count, take top 4
+        const sorted = Object.values(authorCounts)
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 4)
+
+        topEngagersRef.current = sorted
+        // Apply avatars now that data is ready (coin faces may already be found)
+        applyTopEngagerAvatars()
+      } catch (err) {
+        console.warn('[CyborgTempleScene] Failed to fetch top engagers:', err)
+      }
+    }
+    fetchTopEngagers()
+  }, [])
+
+  // Create a circular avatar CanvasTexture from an image URL
+  const createAvatarTexture = (imageUrl, index) => {
+    const size = 256
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')
+
+    // Dark placeholder while loading
+    ctx.fillStyle = '#1a1a1a'
+    ctx.beginPath()
+    ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2)
+    ctx.fill()
+
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.flipY = false
+    texture.colorSpace = THREE.SRGBColorSpace
+    // Rotate texture ~20 degrees CCW
+    texture.center.set(0.5, 0.5)
+    texture.rotation = -40 * (Math.PI / 180)
+
+    if (!imageUrl) return texture
+
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      // Clear and draw circular clipped avatar
+      ctx.clearRect(0, 0, size, size)
+
+      // Gold ring border
+      ctx.beginPath()
+      ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2)
+      ctx.fillStyle = '#ffd700'
+      ctx.fill()
+
+      // Clip to inner circle for avatar
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(size / 2, size / 2, size / 2 - 6, 0, Math.PI * 2)
+      ctx.clip()
+
+      // Draw avatar filling the circle
+      const imgAspect = img.width / img.height
+      let drawW, drawH, drawX, drawY
+      if (imgAspect > 1) {
+        drawH = size
+        drawW = size * imgAspect
+        drawX = (size - drawW) / 2
+        drawY = 0
+      } else {
+        drawW = size
+        drawH = size / imgAspect
+        drawX = 0
+        drawY = (size - drawH) / 2
+      }
+      ctx.drawImage(img, drawX, drawY, drawW, drawH)
+      ctx.restore()
+
+      texture.needsUpdate = true
+    }
+    img.onerror = () => {
+      // Draw initial letter as fallback
+      ctx.clearRect(0, 0, size, size)
+      ctx.fillStyle = '#2f3336'
+      ctx.beginPath()
+      ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2)
+      ctx.fill()
+
+      ctx.fillStyle = '#71767b'
+      ctx.font = `bold ${size * 0.4}px -apple-system, sans-serif`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      const initial = topEngagersRef.current[index]?.username?.charAt(0).toUpperCase() || '?'
+      ctx.fillText(initial, size / 2, size / 2)
+      texture.needsUpdate = true
+    }
+    img.src = imageUrl
+
+    return texture
+  }
+
+  // Apply avatar textures to CoinFace meshes
+  const applyTopEngagerAvatars = () => {
+    const engagers = topEngagersRef.current
+
+    coinFaceRefs.current.forEach((mesh, i) => {
+      if (!mesh) return
+
+      if (!engagers[i]) {
+        // No engager for this slot — hide the mesh
+        mesh.visible = false
+        return
+      }
+
+      mesh.visible = true
+
+      // Create texture for this engager
+      const tex = createAvatarTexture(engagers[i].imageUrl, i)
+      coinFaceTexturesRef.current[i] = tex
+
+      // Apply to mesh material
+      mesh.material = new THREE.MeshBasicMaterial({
+        map: tex,
+        side: THREE.FrontSide,
+        transparent: false,
+        toneMapped: false,
+      })
+      mesh.material.needsUpdate = true
+
+      // Add username label sprite below the coin face (in world space)
+      const worldPos = new THREE.Vector3()
+      mesh.updateWorldMatrix(true, false)
+      mesh.getWorldPosition(worldPos)
+
+      // Remove any existing label from the scene
+      if (mesh.userData.labelSprite) {
+        mesh.userData.labelSprite.parent?.remove(mesh.userData.labelSprite)
+      }
+
+      const label = createNameSprite(engagers[i].username, engagers[i].handle)
+      label.position.set(worldPos.x - 0.2, worldPos.y + 0.84, worldPos.z)
+      label.visible = false // Hidden until CoinFace is clicked
+      mesh.userData.labelSprite = label
+      mesh.userData.engagerIndex = i
+
+      // Add to the same parent group as the model
+      if (mesh.parent) {
+        let parent = mesh.parent
+        while (parent.parent && parent.parent.type !== 'Scene') {
+          parent = parent.parent
+        }
+        parent.add(label)
+      }
+    })
+  }
+
+  // Create a pill-shaped label sprite with username + @handle
+  const createNameSprite = (username, handle) => {
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    const nameFontSize = 28
+    const handleFontSize = 22
+    const padX = 30
+    const padY = 14
+    const lineGap = 6
+    const h = nameFontSize + handleFontSize + lineGap + padY * 2
+    canvas.height = h
+
+    // Measure both lines to determine width
+    ctx.font = `bold ${nameFontSize}px -apple-system, BlinkMacSystemFont, sans-serif`
+    const nameText = username || 'anon'
+    const nameW = ctx.measureText(nameText).width
+
+    ctx.font = `${handleFontSize}px -apple-system, BlinkMacSystemFont, sans-serif`
+    const handleText = handle ? `@${handle}` : ''
+    const handleW = handleText ? ctx.measureText(handleText).width : 0
+
+    canvas.width = Math.ceil(Math.max(nameW, handleW) + padX * 2)
+
+    // Dark rounded background
+    const r = 16
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'
+    ctx.beginPath()
+    ctx.roundRect(2, 2, canvas.width - 4, h - 4, r)
+    ctx.fill()
+
+    // Gold border
+    ctx.strokeStyle = 'rgba(255, 215, 0, 0.5)'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.roundRect(2, 2, canvas.width - 4, h - 4, r)
+    ctx.stroke()
+
+    // Username (bold white)
+    ctx.fillStyle = '#e7e9ea'
+    ctx.font = `bold ${nameFontSize}px -apple-system, BlinkMacSystemFont, sans-serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    const nameY = padY + nameFontSize / 2
+    ctx.fillText(nameText, canvas.width / 2, nameY)
+
+    // @handle (muted grey)
+    if (handleText) {
+      ctx.fillStyle = '#71767b'
+      ctx.font = `${handleFontSize}px -apple-system, BlinkMacSystemFont, sans-serif`
+      const handleY = nameY + nameFontSize / 2 + lineGap + handleFontSize / 2
+      ctx.fillText(handleText, canvas.width / 2, handleY)
+    }
+
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.needsUpdate = true
+
+    const spriteMat = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+      depthTest: true,
+    })
+    const sprite = new THREE.Sprite(spriteMat)
+
+    const aspect = canvas.width / canvas.height
+    sprite.scale.set(0.05 * aspect, 0.05, 1)
+
+    return sprite
+  }
+
   // Expose the loaded model and camera control functions through ref
   /* useImperativeHandle(ref, () => ({
     current: loadedModel,
@@ -701,7 +960,59 @@ const CyborgTempleScene = ({
         if (child.name === 'R_eye' || child.name === 'R_Eye' || child.name === 'RightEye' || child.name === 'right_eye') {
           rightEyeRef.current = child;
         }
-        
+
+        // Apply flickering flame shader to Flame mesh
+        if (child.isMesh && (child.name === 'Flame' || child.name.startsWith('Flame'))) {
+          const flameMat = new THREE.ShaderMaterial({
+            uniforms: { uTime: { value: 0 } },
+            vertexShader: `
+              uniform float uTime;
+              varying float vHeight;
+              void main() {
+                vec3 pos = position;
+                vHeight = clamp((pos.y + 0.1) / 0.6, 0.0, 1.0);
+                float flameTime = uTime * 3.0;
+                pos.x += sin(flameTime * 1.5) * 0.06 * vHeight * vHeight + sin(flameTime * 2.3) * 0.03 * vHeight;
+                pos.y += sin(flameTime * 2.0) * 0.04 * vHeight + sin(flameTime * 3.7) * 0.02 * vHeight * vHeight;
+                pos.z += cos(flameTime * 1.8) * 0.04 * vHeight * vHeight;
+                float taper = 1.0 - vHeight * 0.5;
+                pos.x *= taper;
+                pos.z *= taper;
+                pos.y *= 1.0 + sin(flameTime * 2.5) * 0.1 * vHeight;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+              }
+            `,
+            fragmentShader: `
+              uniform float uTime;
+              varying float vHeight;
+              void main() {
+                float time = uTime * 3.0;
+                vec3 innerColor = vec3(1.0, 0.95, 0.8);
+                vec3 midColor = vec3(1.0, 0.5, 0.0);
+                vec3 outerColor = vec3(1.0, 0.2, 0.0);
+                vec3 color;
+                if (vHeight < 0.3) {
+                  color = mix(innerColor, midColor, vHeight / 0.3);
+                } else if (vHeight < 0.7) {
+                  color = mix(midColor, outerColor, (vHeight - 0.3) / 0.4);
+                } else {
+                  color = mix(outerColor, vec3(1.0, 0.8, 0.0), (vHeight - 0.7) / 0.3);
+                }
+                float flicker = sin(time * 4.0) * 0.25 + sin(time * 9.0) * 0.15 + 1.0;
+                float intensity = 3.5 * flicker;
+                float alpha = (1.0 - vHeight * 0.5) * (0.8 + flicker * 0.2);
+                gl_FragColor = vec4(color * intensity, alpha);
+              }
+            `,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+          });
+          child.material = flameMat;
+          flameMaterialsRef.current.push(flameMat);
+        }
+
         // Find OurLady (RL80) and make it clickable
         if (child.name === 'OurLady' || child.name === 'Object_7' || child.name === 'RL80') {
           
@@ -852,8 +1163,43 @@ const CyborgTempleScene = ({
             setCoin4ClickableData(child);
           }
         }
+
+        // Hide TopText and x_logo banner until Angel is clicked
+        if (child.name === 'TopText' || child.name === 'x_logo') {
+          child.visible = false;
+          topSupporterBannerRefs.current.push(child);
+        }
+
+        // Find CoinFace avatar meshes (in RL80_4anims.glb)
+        if (child.name === 'CoinFace1') coinFaceRefs.current[0] = child;
+        if (child.name === 'CoinFace2') coinFaceRefs.current[1] = child;
+        if (child.name === 'CoinFace3') coinFaceRefs.current[2] = child;
+        if (child.name === 'CoinFace4') coinFaceRefs.current[3] = child;
+
+        // Make Angel and CoinFace meshes clickable for zoom
+        if (child.name === 'Angel' || child.name === 'angel' || child.name === 'Angel_Empty') {
+          const setAngelClickable = (obj) => {
+            obj.userData.clickable = true;
+            obj.userData.agentId = 'Angel';
+            obj.userData.agentName = 'Angel';
+            obj.userData.targetObject = child;
+            if (obj.children && obj.children.length > 0) {
+              obj.children.forEach(setAngelClickable);
+            }
+          };
+          setAngelClickable(child);
+        }
+        if (child.name && child.name.startsWith('CoinFace')) {
+          child.userData.clickable = true;
+          child.userData.agentId = 'Angel';
+          child.userData.agentName = 'Angel';
+          child.userData.targetObject = child;
+        }
       });
-      
+
+      // After traversal, apply top engager avatars to CoinFace meshes
+      applyTopEngagerAvatars();
+
       // Call onLoad callback if provided
       if (onLoad) {
         setTimeout(() => {
@@ -1301,6 +1647,27 @@ const CyborgTempleScene = ({
             break; // Exit early for coins
           }
           
+          // Show TopText/x_logo banner when clicking Angel area
+          if (object.userData.agentId === 'Angel') {
+            topSupporterBannerRefs.current.forEach(mesh => {
+              if (mesh) mesh.visible = true;
+            });
+          }
+
+          // CoinFace click — toggle label visibility
+          if (object.name && object.name.startsWith('CoinFace')) {
+            // Hide all coin face labels first
+            coinFaceRefs.current.forEach(cf => {
+              if (cf && cf.userData.labelSprite) {
+                cf.userData.labelSprite.visible = false
+              }
+            })
+            // Show the clicked one
+            if (object.userData.labelSprite) {
+              object.userData.labelSprite.visible = true
+            }
+          }
+
           // Store the current camera position BEFORE any animation
           // But only if we're not already focused on something
           if (!focusTarget) {
@@ -1343,6 +1710,11 @@ const CyborgTempleScene = ({
             // Screen3: (0.995, 0.614, -1.027)
             // Screen4: (0.770, 0.614, 0.552)
             
+            'Angel': {
+              // Angel at top of scene, above the screens
+              cameraPos: new THREE.Vector3(0, 1.8, 1.2),
+              lookAtPos: new THREE.Vector3(0, 1.9, 0)
+            },
             'Screen1': {
               // Screen1 at (-0.632, 0.593, -0.682)
               // Position camera in front of screen
@@ -1422,7 +1794,17 @@ const CyborgTempleScene = ({
       
       // If we didn't click on an agent and we're currently focused, reset the camera
       if (!clickedOnAgent && focusTarget) {
-        
+
+        // Hide all CoinFace labels and banner when clicking away
+        coinFaceRefs.current.forEach(cf => {
+          if (cf && cf.userData.labelSprite) {
+            cf.userData.labelSprite.visible = false;
+          }
+        });
+        topSupporterBannerRefs.current.forEach(mesh => {
+          if (mesh) mesh.visible = false;
+        });
+
         // Notify parent that focus is cleared
         if (onAgentClick) {
           onAgentClick(null);
@@ -1513,6 +1895,11 @@ const CyborgTempleScene = ({
 
   // Animation loop
   useFrame((state, delta) => {
+    // Update flame shader time for all flame meshes
+    flameMaterialsRef.current.forEach(mat => {
+      mat.uniforms.uTime.value = state.clock.elapsedTime;
+    });
+
     // Update all character mixers independently
     if (mixersRef.current) {
       Object.values(mixersRef.current).forEach(mixer => {
@@ -1638,7 +2025,7 @@ const CyborgTempleScene = ({
         const loopAnimations = availableAnimations.filter(anim => 
           anim === 'Typing' || anim === 'Idle' || anim === 'Clap');
         const specialAnimations = availableAnimations.filter(anim => 
-          anim === 'Disbelief' || anim === 'FistPump');
+          anim === '' || anim === 'FistPump');
         
         // If we don't have any animations, skip
         if (availableAnimations.length === 0) {

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useThree } from '@react-three/fiber';
-import MacroAgentScreen from './MacroAgentScreen';
-import SentimentScreen from './SentimentScreen';
-import TeknoScreen from './TeknoScreen';
+import TBDScreen from './TBDScreen';
+import RL80ChartScreen from './RL80ChartScreen';
+import ReservedScreen from './ReservedScreen';
 import RL80Screen from './RL80Screen';
 import AgentChatScreen from './AgentChatScreen';
 import DataCubeScreen from './DataCubeScreen';
@@ -222,7 +222,7 @@ function VideoScreens({ is80sMode = false }) {
           // });
         }
         
-        // Screen1 - Setup canvas texture for SentimentScreen OR video texture for 80s mode
+        // Screen1 - Setup canvas texture for RL80ChartScreen OR video texture for 80s mode
         if (child.isMesh && child.name === 'Screen1' && !screen1Found) {
           // console.log('[VideoScreens] Found Screen1, setting up texture');
           screen1Found = true;
@@ -260,7 +260,7 @@ function VideoScreens({ is80sMode = false }) {
             
             child.material = material;
             
-            // Store refs globally for SentimentScreen to use
+            // Store refs globally for RL80ChartScreen to use
             // @ts-ignore
             window['__screen1Canvas'] = canvas;
             // @ts-ignore
@@ -1040,9 +1040,9 @@ function VideoScreens({ is80sMode = false }) {
 
   return (
     <>
-      <SentimentScreen />
-      <MacroAgentScreen />
-      <TeknoScreen />
+      <RL80ChartScreen />
+      <TBDScreen />
+      <ReservedScreen />
       <RL80Screen />
       <AgentChatScreen />
       <DataCubeScreen />

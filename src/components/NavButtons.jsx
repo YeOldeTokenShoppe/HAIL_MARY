@@ -14,7 +14,7 @@ const NavButtons = () => {
   const navItems = [
     { label: t('palmTreeDrive.about'), icon: '/images/ROSE_TATTOO.webp', href: '/about' },
     { label: t('palmTreeDrive.tokenomics'), icon: '/images/DIAMOND_TATTOO.webp', href: '/tokenomics' },
-    { label: t('The Illumin80'), icon: '/images/ILLUMIN80_TATTOO.webp', href: '/illumin80' },
+    { label: t('The Illumin80'), icon: '/images/ILLUMIN80_TATTOO.webp', href: '/trade' },
     { label: t('palmTreeDrive.more'), icon: '/images/3ACES_TATTOO.webp', href: null, openCyberNav: true },
   ];
 

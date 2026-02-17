@@ -1342,7 +1342,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
 
             {/* HolyGrailChalice Canvas */}
             <div
-              onClick={() => router.push('/illumin80')}
+              onClick={() => router.push('/trade')}
               style={{
                 width: '100%',
                 maxWidth: isMobilePhone ? 'min(450px, 80vw)' : '650px',
@@ -1422,7 +1422,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                     cursor: 'pointer',
                   }}
                   viewBox="0 0 300 150"
-                  onClick={() => router.push('/illumin80')}
+                  onClick={() => router.push('/trade')}
                   onMouseEnter={(e) => {
                     const text = e.currentTarget.querySelector('text');
                     const arrow = e.currentTarget.querySelector('#arrowPathS3');
@@ -1478,7 +1478,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                 </svg>
                 <div
                   style={{ width: '60px', height: '60px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'transform 0.3s ease, filter 0.3s ease' }}
-                  onClick={() => router.push('/illumin80')}
+                  onClick={() => router.push('/trade')}
                   onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.15) rotate(-5deg)'; e.currentTarget.style.filter = 'drop-shadow(0 0 20px #ff9500)'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1) rotate(0deg)'; e.currentTarget.style.filter = 'none'; }}
                 >
@@ -2465,7 +2465,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                   cursor: 'pointer',
                 }}
                 viewBox="0 0 300 150"
-                onClick={() => router.push('/illumin80')}
+                onClick={() => router.push('/trade')}
                 onMouseEnter={(e) => {
                   const text = e.currentTarget.querySelector('text');
                   const arrow = e.currentTarget.querySelector('#arrowPath');
@@ -2637,7 +2637,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                   cursor: 'pointer',
                   transition: 'transform 0.3s ease, filter 0.3s ease',
                 }}
-                onClick={() => router.push('/illumin80')}
+                onClick={() => router.push('/trade')}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = 'scale(1.15) rotate(-5deg)';
                   e.currentTarget.style.filter = 'drop-shadow(0 0 20px #ff9500)';

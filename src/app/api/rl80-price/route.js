@@ -11,15 +11,18 @@ export async function GET() {
   }
 
   try {
-    // Fetch pool data and both daily + hourly OHLCV
-    const [poolRes, dailyRes, hourlyRes] = await Promise.all([
+    // Fetch pool data and OHLCV at multiple timeframes
+    const [poolRes, dailyRes, hourlyRes, minuteRes] = await Promise.all([
       fetch(`${GECKO_BASE}/${POOL_ADDRESS}`, {
         headers: { Accept: 'application/json' },
       }),
-      fetch(`${GECKO_BASE}/${POOL_ADDRESS}/ohlcv/day?aggregate=1&limit=30`, {
+      fetch(`${GECKO_BASE}/${POOL_ADDRESS}/ohlcv/day?aggregate=1&limit=90`, {
         headers: { Accept: 'application/json' },
       }),
-      fetch(`${GECKO_BASE}/${POOL_ADDRESS}/ohlcv/hour?aggregate=1&limit=48`, {
+      fetch(`${GECKO_BASE}/${POOL_ADDRESS}/ohlcv/hour?aggregate=1&limit=168`, {
+        headers: { Accept: 'application/json' },
+      }),
+      fetch(`${GECKO_BASE}/${POOL_ADDRESS}/ohlcv/minute?aggregate=15&limit=96`, {
         headers: { Accept: 'application/json' },
       }),
     ])
@@ -27,13 +30,17 @@ export async function GET() {
     const poolJson = await poolRes.json()
     const dailyJson = await dailyRes.json()
     const hourlyJson = await hourlyRes.json()
+    const minuteJson = await minuteRes.json()
 
     const pool = poolJson?.data?.attributes || {}
     const dailyList = dailyJson?.data?.attributes?.ohlcv_list || []
     const hourlyList = hourlyJson?.data?.attributes?.ohlcv_list || []
+    const minuteList = minuteJson?.data?.attributes?.ohlcv_list || []
 
-    // Use daily data when enough history exists, otherwise fall back to hourly
-    const ohlcvList = dailyList.length > 2 ? dailyList : hourlyList
+    // Pick the best timeframe: daily if 10+, hourly if 10+, else 15-min candles
+    const ohlcvList = dailyList.length >= 10 ? dailyList :
+                      hourlyList.length >= 10 ? hourlyList :
+                      minuteList.length > 0 ? minuteList : hourlyList
 
     const price = parseFloat(pool.base_token_price_usd) || null
     const priceChange24h = parseFloat(pool.price_change_percentage?.h24) || 0
@@ -46,13 +53,26 @@ export async function GET() {
       value: close,
     })).sort((a, b) => a.time - b.time)
 
+    // Full candle data for candlestick charts
+    const candles = ohlcvList.map(([ts, open, high, low, close, volume]) => ({
+      time: Math.floor(ts / 1000),
+      open,
+      high,
+      low,
+      close,
+      volume: volume || 0,
+    })).sort((a, b) => a.time - b.time)
+
     const result = {
       price,
       priceChange24h,
       fdv,
       liquidity,
       ohlcv,
-      timeframe: dailyList.length > 2 ? 'daily' : 'hourly',
+      candles,
+      timeframe: dailyList.length >= 10 ? 'daily' :
+                 hourlyList.length >= 10 ? 'hourly' :
+                 minuteList.length > 0 ? '15m' : 'hourly',
       timestamp: new Date().toISOString(),
     }
 
