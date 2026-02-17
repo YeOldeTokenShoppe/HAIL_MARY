@@ -152,6 +152,48 @@ if (!content.includes('PATCH: always fetch latest mentions without cursor')) {
   console.log('[patch] Mention handler patches already applied');
 }
 
+// =============================================================
+// PATCH 3: Increase tweet max length from 280 to 1000 (Premium+)
+// =============================================================
+if (!content.includes('PATCH: increased tweet max length')) {
+  // 3a: The main constant
+  const orig3a = 'var TWEET_MAX_LENGTH = 280;';
+  const patch3a = 'var TWEET_MAX_LENGTH = 1000; // PATCH: increased tweet max length';
+  if (content.includes(orig3a)) {
+    content = content.replace(orig3a, patch3a);
+    patchCount++;
+    console.log('[patch] Applied: TWEET_MAX_LENGTH 280 → 1000');
+  }
+
+  // 3b: Prompt length instructions
+  const promptPatches = [
+    ['- Length: 50-280 characters (keep it punchy)', '- Length: 200-700 characters'],
+    ['under 280 characters, without emojis, no questions', 'under 700 characters, without emojis, no questions'],
+    ['- Is under 280 characters', '- Is under 700 characters'],
+  ];
+  for (const [orig, patched] of promptPatches) {
+    const count = (content.match(new RegExp(orig.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+    if (count > 0) {
+      content = content.replaceAll(orig, patched);
+      patchCount++;
+      console.log(`[patch] Applied: prompt length "${orig.substring(0, 40)}..." → updated (${count} occurrences)`);
+    }
+  }
+
+  // 3c: All remaining hardcoded 280 limits in truncation logic
+  // Replace ".length > 280" and ".length <= 280" patterns
+  const before280 = content;
+  content = content.replace(/\.length > 280\)/g, '.length > 1000)');
+  content = content.replace(/\.length <= 280\)/g, '.length <= 1000)');
+  content = content.replace(/to 280 characters/g, 'to 1000 characters');
+  if (content !== before280) {
+    patchCount++;
+    console.log('[patch] Applied: all hardcoded 280 truncation limits → 1000');
+  }
+} else {
+  console.log('[patch] Tweet max length patch already applied');
+}
+
 if (patchCount > 0) {
   fs.writeFileSync(filePath, content, 'utf8');
   console.log(`[patch] All patches applied successfully (${patchCount} changes)`);
