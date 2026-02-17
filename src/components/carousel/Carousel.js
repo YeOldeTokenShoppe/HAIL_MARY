@@ -2375,7 +2375,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                 <StarfieldStatueScene
                   style={{ width: '100%', height: '100%' }}
                   statueProps={{ scale: [3, 3, 3] }}
-                  href="/illumin80"
+                  href="/trade"
                 />
               </div>
 

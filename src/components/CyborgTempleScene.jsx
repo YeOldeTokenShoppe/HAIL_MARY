@@ -619,7 +619,7 @@ const CyborgTempleScene = ({
     gltfLoader.setDRACOLoader(dracoLoader);
 
     // Determine which model to load based on device type
-    let modelPath = isOnMobile ? "/models/MOBILE.glb" : "/models/RL80_4anims.glb";
+    let modelPath = isOnMobile ? "/models/MOBILE2.glb" : "/models/RL80_4anims.glb";
     const fallbackModelPath = "/models/RL80_4anims.glb"; // Desktop model as fallback
     let usingFallback = false;
     const startTime = performance.now();
@@ -680,7 +680,7 @@ const CyborgTempleScene = ({
       // Apply different positioning for MOBILE.glb vs RL80_4anims.glb
       if (isOnMobile) {
         // Custom position for MOBILE.glb - adjust these values as needed
-        anchorGroup.position.set(0, 0.8, -1); // Lower the mobile model
+        anchorGroup.position.set(-0.1, -2.3, -1); // Lower the mobile model
         anchorGroup.rotation.set(0, 0, 0);
         anchorGroup.scale.set(1.2, 1.2, 1.2); // Slightly larger scale for mobile
       } else {
