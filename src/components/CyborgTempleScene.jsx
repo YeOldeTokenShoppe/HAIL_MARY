@@ -186,6 +186,15 @@ const CyborgTempleScene = ({
     isBlinking: false,
     blinkProgress: 0
   });
+
+  // Demon eye mesh ref and blink state
+  const demonEyesRef = useRef();
+  const demonBlinkStateRef = useRef({
+    lastBlinkTime: 0,
+    nextBlinkDelay: Math.random() * 4000 + 3000, // Random delay between 3-7 seconds
+    isBlinking: false,
+    blinkProgress: 0
+  });
   
   // Flame shader material refs (multiple flames in scene)
   const flameMaterialsRef = useRef([]);
@@ -959,6 +968,15 @@ const CyborgTempleScene = ({
         }
         if (child.name === 'R_eye' || child.name === 'R_Eye' || child.name === 'RightEye' || child.name === 'right_eye') {
           rightEyeRef.current = child;
+        }
+
+        // Find demon eyes mesh for blinking (opacity-based)
+        if (child.name === 'demon_eyes') {
+          demonEyesRef.current = child;
+          if (child.material) {
+            child.material.transparent = true;
+            child.material.needsUpdate = true;
+          }
         }
 
         // Apply flickering flame shader to Flame mesh
@@ -2338,16 +2356,11 @@ const CyborgTempleScene = ({
     }
     
     // Blinking animation for RL80's eyes
-    
-    if (!leftEyeRef.current || !rightEyeRef.current) {
-      return; // Exit early if no eyes
-    }
-    
-    // Remove mobile check - blinking should work on all devices
-    if (true) {
-      const currentTime = state.clock.getElapsedTime() * 1000; // Convert to milliseconds
+
+    if (leftEyeRef.current && rightEyeRef.current) {
+      const currentTime = state.clock.getElapsedTime() * 1000;
       const blinkState = blinkStateRef.current;
-      
+
       // Store original positions if not already stored
       if (!leftEyeRef.current.userData.originalPosition) {
         leftEyeRef.current.userData.originalPosition = leftEyeRef.current.position.clone();
@@ -2357,39 +2370,39 @@ const CyborgTempleScene = ({
         rightEyeRef.current.userData.originalPosition = rightEyeRef.current.position.clone();
         rightEyeRef.current.userData.originalScale = rightEyeRef.current.scale.clone();
       }
-      
+
       // Check if it's time to blink
       if (!blinkState.isBlinking && currentTime - blinkState.lastBlinkTime > blinkState.nextBlinkDelay) {
         blinkState.isBlinking = true;
         blinkState.blinkProgress = 0;
         blinkState.lastBlinkTime = currentTime;
-        // Set random delay for next blink (2-5 seconds)
         blinkState.nextBlinkDelay = Math.random() * 3000 + 2000;
       }
-      
-      // Animate the blink
+
+      // Animate the blink (close 100ms, hold 80ms, open 120ms)
       if (blinkState.isBlinking) {
-        const blinkDuration = 150; // Total blink duration in milliseconds
+        const closeTime = 100;
+        const holdTime = 80;
+        const openTime = 120;
+        const totalDuration = closeTime + holdTime + openTime;
         const timeSinceBlinkStart = currentTime - blinkState.lastBlinkTime;
-        
-        if (timeSinceBlinkStart < blinkDuration) {
-          // Calculate blink progress (0 to 1 and back to 0)
-          const halfDuration = blinkDuration / 2;
+
+        if (timeSinceBlinkStart < totalDuration) {
           let progress;
-          
-          if (timeSinceBlinkStart < halfDuration) {
-            // Closing eyes
-            progress = timeSinceBlinkStart / halfDuration;
+
+          if (timeSinceBlinkStart < closeTime) {
+            // Closing
+            progress = timeSinceBlinkStart / closeTime;
+          } else if (timeSinceBlinkStart < closeTime + holdTime) {
+            // Holding closed
+            progress = 1;
           } else {
-            // Opening eyes
-            progress = 1 - ((timeSinceBlinkStart - halfDuration) / halfDuration);
+            // Opening
+            progress = 1 - ((timeSinceBlinkStart - closeTime - holdTime) / openTime);
           }
-          
-          // Apply scale transformation to simulate closing eyes
-          // Since the origin is now at the geometry center, we just scale on Y
-          const eyeScale = 1 - (progress * 0.95); // Scale down to 0.05 (nearly closed)
-          
-          // Scale only on Y axis to create blink effect
+
+          const eyeScale = 1 - (progress * 0.95);
+
           leftEyeRef.current.scale.set(
             leftEyeRef.current.userData.originalScale.x,
             leftEyeRef.current.userData.originalScale.y * eyeScale,
@@ -2400,16 +2413,73 @@ const CyborgTempleScene = ({
             rightEyeRef.current.userData.originalScale.y * eyeScale,
             rightEyeRef.current.userData.originalScale.z
           );
-          
-          
-          // No position compensation needed since origin is at geometry center
-          
+
         } else {
-          // Blink complete, reset to original
           blinkState.isBlinking = false;
           leftEyeRef.current.scale.copy(leftEyeRef.current.userData.originalScale);
           rightEyeRef.current.scale.copy(rightEyeRef.current.userData.originalScale);
-          // Positions don't need to be reset since we're not modifying them
+        }
+      }
+    }
+
+    // Blinking animation for Demon's eyes (opacity-based for flat image plane)
+    if (demonEyesRef.current && demonEyesRef.current.material) {
+      const currentTime = state.clock.getElapsedTime() * 1000;
+      const demonBlink = demonBlinkStateRef.current;
+      const demonState = demonAnimStateRef.current;
+
+      // Check if playing disbelief — keep eyes closed for the duration
+      const isDisbelief = demonState.isPlayingSpecial &&
+        /disbelief/i.test(demonState.currentAnimation);
+
+      if (isDisbelief) {
+        // Smoothly close eyes during disbelief
+        const target = 0;
+        const current = demonEyesRef.current.material.opacity;
+        demonEyesRef.current.material.opacity = current + (target - current) * 0.15;
+        // Skip normal blinking while in disbelief
+      } else {
+        // If returning from disbelief, smoothly reopen
+        if (demonEyesRef.current.material.opacity < 0.95 && !demonBlink.isBlinking) {
+          const current = demonEyesRef.current.material.opacity;
+          demonEyesRef.current.material.opacity = current + (1 - current) * 0.1;
+          if (demonEyesRef.current.material.opacity > 0.99) {
+            demonEyesRef.current.material.opacity = 1;
+          }
+        }
+
+        // Normal blinking
+        // Check if it's time to blink
+        if (!demonBlink.isBlinking && currentTime - demonBlink.lastBlinkTime > demonBlink.nextBlinkDelay) {
+          demonBlink.isBlinking = true;
+          demonBlink.lastBlinkTime = currentTime;
+          demonBlink.nextBlinkDelay = Math.random() * 4000 + 3000;
+        }
+
+        // Animate the blink (fade out 100ms, hold 120ms, fade in 140ms)
+        if (demonBlink.isBlinking) {
+          const closeTime = 100;
+          const holdTime = 120;
+          const openTime = 140;
+          const totalDuration = closeTime + holdTime + openTime;
+          const timeSinceBlinkStart = currentTime - demonBlink.lastBlinkTime;
+
+          if (timeSinceBlinkStart < totalDuration) {
+            let opacity;
+
+            if (timeSinceBlinkStart < closeTime) {
+              opacity = 1 - (timeSinceBlinkStart / closeTime);
+            } else if (timeSinceBlinkStart < closeTime + holdTime) {
+              opacity = 0;
+            } else {
+              opacity = (timeSinceBlinkStart - closeTime - holdTime) / openTime;
+            }
+
+            demonEyesRef.current.material.opacity = opacity;
+          } else {
+            demonBlink.isBlinking = false;
+            demonEyesRef.current.material.opacity = 1;
+          }
         }
       }
     }

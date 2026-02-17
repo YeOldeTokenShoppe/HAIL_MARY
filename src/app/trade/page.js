@@ -882,7 +882,7 @@ export default function CyborgTemple() {
                     lineHeight: '1.3',
                     textAlign: 'center',
                   }}>
-                    Interact with the RL80 team on the Telegram group
+                    Hang out with the RL80 team in the Telegram group!
                   </span>
                 </div>
               </a>
