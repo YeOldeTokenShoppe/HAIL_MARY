@@ -2,8 +2,8 @@
  * Patches for @elizaos/plugin-twitter:
  *
  * 1. Discovery self-reply fix — skip own tweets in discovery results
- * 2. Mention handler — remove cursor, fetch fresh, process ALL mentions
- * 3. Mention handler — also search for $RL80 cashtag as a summon mechanism
+ * 2. Mention handler — use mentions timeline API (primary) + search fallback
+ * 3. Summon filter — respond to @rl80token mentions, $RL80 cashtag, "hey rl80"
  *
  * Applied via postinstall script in package.json.
  */
@@ -88,45 +88,98 @@ if (!content.includes('PATCH: always fetch latest mentions without cursor')) {
         await this.runtime.setCache(cursorKey, "");
       }`;
 
-  const patchedMentions = `      // PATCH: always fetch latest mentions without cursor
-      // Search for @mentions
-      const mentionResult = await this.client.fetchSearchTweets(
-        \`@\${twitterUsername}\`,
-        50,
-        1 /* Latest */
-      );
-      // Also search for $RL80 cashtag summons
-      let cashtagTweets = [];
-      try {
-        const cashtagResult = await this.client.fetchSearchTweets(
-          "$RL80",
-          50,
-          1 /* Latest */
-        );
-        cashtagTweets = cashtagResult.tweets || [];
-      } catch (e) {
-        // Cashtag search may fail on some API tiers — that's OK
-      }
-      // Summon whitelist — must contain BOTH @rl80token AND $RL80
-      function isSummon(t) {
-        const text = (t.text || "");
-        const lower = text.toLowerCase();
-        // Require both @rl80token AND $rl80 in the same tweet
-        if (lower.includes("@rl80token") && lower.includes("$rl80")) return true;
-        return false;
-      }
-      // Combine, deduplicate, and only keep summons (skip own tweets)
-      const ownUsername = twitterUsername?.toLowerCase();
-      const seenIds = new Set();
-      const mentionCandidates = [];
-      for (const tweet of [...(mentionResult.tweets || []), ...cashtagTweets]) {
-        if (seenIds.has(tweet.id)) continue;
-        if (tweet.username?.toLowerCase() === ownUsername) continue;
-        if (isSummon(tweet)) {
-          seenIds.add(tweet.id);
-          mentionCandidates.push(tweet);
-        }
-      }`;
+  // Build the patched code as an array of lines joined, to avoid template escaping hell
+  const patchedMentionsLines = [
+    '      // PATCH: always fetch latest mentions without cursor',
+    '      // Strategy: use mentions timeline API (reliable) + search fallback',
+    '      let mentionTweets = [];',
+    '      // Primary: use v2 mentions timeline (most reliable for @mentions)',
+    '      try {',
+    '        const userId = this.client.profile?.id;',
+    '        if (userId) {',
+    '          const v2Client = this.client.twitterClient.auth.getV2Client();',
+    '          const mentionsTimeline = await v2Client.v2.userMentionTimeline(userId, {',
+    '            max_results: 50,',
+    '            "tweet.fields": ["id", "text", "created_at", "author_id", "referenced_tweets", "entities", "public_metrics"],',
+    '            "user.fields": ["id", "name", "username", "profile_image_url"],',
+    '            expansions: ["author_id", "referenced_tweets.id"]',
+    '          });',
+    '          for await (const tweet of mentionsTimeline) {',
+    '            const author = mentionsTimeline.includes?.users?.find(u => u.id === tweet.author_id);',
+    '            mentionTweets.push({',
+    '              id: tweet.id,',
+    '              text: tweet.text || "",',
+    '              timestamp: tweet.created_at ? new Date(tweet.created_at).getTime() : Date.now(),',
+    '              userId: tweet.author_id || "",',
+    '              username: author?.username || "",',
+    '              name: author?.name || "",',
+    '              conversationId: tweet.id,',
+    '              hashtags: tweet.entities?.hashtags?.map(h => h.tag) || [],',
+    '              mentions: tweet.entities?.mentions?.map(m => ({ id: m.id || "", username: m.username || "", name: "" })) || [],',
+    '              photos: [],',
+    '              urls: tweet.entities?.urls?.map(u => u.url) || [],',
+    '              thread: [],',
+    '              permanentUrl: author?.username ? "https://x.com/" + author.username + "/status/" + tweet.id : ""',
+    '            });',
+    '          }',
+    '          logger5.info("Mentions timeline returned " + mentionTweets.length + " tweets");',
+    '        }',
+    '      } catch (e) {',
+    '        logger5.warn("Mentions timeline API failed, falling back to search:", e.message || e);',
+    '      }',
+    '      // Fallback: search for @mentions if timeline returned nothing',
+    '      if (mentionTweets.length === 0) {',
+    '        try {',
+    '          const mentionResult = await this.client.fetchSearchTweets(',
+    '            "@" + twitterUsername,',
+    '            50,',
+    '            1 /* Latest */',
+    '          );',
+    '          mentionTweets = mentionResult.tweets || [];',
+    '          logger5.info("Search fallback returned " + mentionTweets.length + " tweets");',
+    '        } catch (e) {',
+    '          logger5.warn("Search fallback also failed:", e.message || e);',
+    '        }',
+    '      }',
+    '      // Also search for $RL80 cashtag summons',
+    '      let cashtagTweets = [];',
+    '      try {',
+    '        const cashtagResult = await this.client.fetchSearchTweets(',
+    '          "$RL80",',
+    '          50,',
+    '          1 /* Latest */',
+    '        );',
+    '        cashtagTweets = cashtagResult.tweets || [];',
+    '      } catch (e) {',
+    '        // Cashtag search may fail on some API tiers',
+    '      }',
+    '      // Summon whitelist — respond to any @rl80token mention',
+    '      function isSummon(t) {',
+    '        var text = (t.text || "");',
+    '        var lower = text.toLowerCase();',
+    '        // Pattern 1: direct @rl80token mention',
+    '        if (lower.includes("@rl80token")) return true;',
+    '        // Pattern 2: "rl80" three times (Beetlejuice)',
+    '        var rl80Matches = lower.match(/(?:\\$rl80|#rl80|\\brl80\\b)/gi);',
+    '        if (rl80Matches && rl80Matches.length >= 3) return true;',
+    '        // Pattern 3: "hey rl80" pattern',
+    '        if (/hey\\s+(?:@rl80token|\\$rl80|#rl80|rl80)/i.test(text)) return true;',
+    '        return false;',
+    '      }',
+    '      // Combine, deduplicate, and only keep summons (skip own tweets)',
+    '      var ownUsername = twitterUsername?.toLowerCase();',
+    '      var seenIds = new Set();',
+    '      var mentionCandidates = [];',
+    '      for (var tweet of [...mentionTweets, ...cashtagTweets]) {',
+    '        if (seenIds.has(tweet.id)) continue;',
+    '        if (tweet.username?.toLowerCase() === ownUsername) continue;',
+    '        if (isSummon(tweet)) {',
+    '          seenIds.add(tweet.id);',
+    '          mentionCandidates.push(tweet);',
+    '        }',
+    '      }',
+  ];
+  const patchedMentions = patchedMentionsLines.join('\n');
 
   if (content.includes(originalMentions)) {
     content = content.replace(originalMentions, patchedMentions);
