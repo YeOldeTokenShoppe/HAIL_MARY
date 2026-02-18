@@ -195,7 +195,19 @@ if (!content.includes('PATCH: always fetch latest mentions without cursor')) {
     console.warn('[patch] WARNING: mention sort changed — sort patch skipped');
   }
 
-  // 2c: Increase max interactions per run from 10 to 50
+  // 2c: Bypass lastCheckedTweetId gate — rely on memory dedup instead
+  // The lastCheckedTweetId blocks tweets with lower IDs, which breaks descending sort
+  const originalGate = 'if (!this.client.lastCheckedTweetId || BigInt(tweet.id) > this.client.lastCheckedTweetId) {';
+  const patchedGate = 'if (true) { // PATCH: bypass lastCheckedTweetId, use memory dedup only';
+  if (content.includes(originalGate)) {
+    content = content.replace(originalGate, patchedGate);
+    patchCount++;
+    console.log('[patch] Applied: bypass lastCheckedTweetId gate');
+  } else {
+    console.warn('[patch] WARNING: lastCheckedTweetId gate changed — bypass patch skipped');
+  }
+
+  // 2d: Increase max interactions per run from 10 to 50
   const originalMax = `|| process.env.TWITTER_MAX_ENGAGEMENTS_PER_RUN || "10"`;
   const patchedMax = `|| process.env.TWITTER_MAX_ENGAGEMENTS_PER_RUN || "50"`;
 
