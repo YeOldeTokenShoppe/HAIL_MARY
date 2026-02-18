@@ -184,7 +184,18 @@ if (!content.includes('PATCH: always fetch latest mentions without cursor')) {
     console.warn('[patch] WARNING: handleMentions signature changed — mention cursor patch skipped');
   }
 
-  // 2b: Increase max interactions per run from 10 to 50
+  // 2b: Sort mentions DESCENDING (newest first) so new tweets get priority
+  const originalSort = '.sort((a, b) => a.id.localeCompare(b.id)).filter';
+  const patchedSort = '.sort((a, b) => b.id.localeCompare(a.id)).filter';  // PATCH: newest first
+  if (content.includes(originalSort)) {
+    content = content.replace(originalSort, patchedSort);
+    patchCount++;
+    console.log('[patch] Applied: sort mentions newest-first');
+  } else {
+    console.warn('[patch] WARNING: mention sort changed — sort patch skipped');
+  }
+
+  // 2c: Increase max interactions per run from 10 to 50
   const originalMax = `|| process.env.TWITTER_MAX_ENGAGEMENTS_PER_RUN || "10"`;
   const patchedMax = `|| process.env.TWITTER_MAX_ENGAGEMENTS_PER_RUN || "50"`;
 
