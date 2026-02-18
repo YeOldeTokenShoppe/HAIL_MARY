@@ -169,7 +169,15 @@
   },
   "buyModal": {
     "title": "BUY_RL80_",
-    "secureTransaction": "<SECURE_TRANSACTION_PROTOCOL_ACTIVE>"
+    "secureTransaction": "<SECURE_TRANSACTION_PROTOCOL_ACTIVE>",
+    "connectWallet": "CONNECT WALLET FIRST",
+    "connectWalletDescription": "Connect your wallet using the button in the header to purchase crypto via Coinbase.",
+    "coinbaseDescription": "Purchase ETH or USDC on Base via Coinbase. Funds are sent directly to your connected wallet.",
+    "buyWithCoinbase": "BUY WITH COINBASE",
+    "loading": "LOADING...",
+    "tradeOnUniswap": "TRADE ON UNISWAP",
+    "uniswapDescription": "Already have ETH? Swap directly for RL80 on Uniswap.",
+    "orDivider": "OR"
   },
   "chatRoom": {
     "placeholders": {

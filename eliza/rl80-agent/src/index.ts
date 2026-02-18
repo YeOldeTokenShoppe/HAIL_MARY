@@ -3,6 +3,7 @@ import debatePlugin from './debate-plugin.ts';
 import { saintGr80Character } from './saint-gr80.ts';
 import { h80zCharacter } from './h80z.ts';
 import { ourLadyCharacter } from './our-lady.ts';
+import agentkitWalletPlugin from './agentkit-wallet-plugin.ts';
 
 /**
  * HAIL MARY Debate Agents — Saint GR80 vs H80Z
@@ -65,10 +66,12 @@ const initOurLady = async ({ runtime }: { runtime: IAgentRuntime }) => {
 
   const hasTwitter = !!process.env.SAINT_GR80_TWITTER_API_KEY;
   const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
+  const hasCDP = !!process.env.CDP_API_KEY_NAME;
 
   logger.info({
     twitter: hasTwitter ? 'connected' : 'NOT CONFIGURED',
     anthropic: hasAnthropic ? 'available' : 'NOT CONFIGURED',
+    cdp: hasCDP ? 'connected' : 'NOT CONFIGURED',
   }, 'Our Lady service status:');
 
   if (!hasTwitter) {
@@ -93,6 +96,7 @@ const h80zAgent: ProjectAgent = {
 const ourLadyAgent: ProjectAgent = {
   character: ourLadyCharacter,
   init: async (runtime: IAgentRuntime) => await initOurLady({ runtime }),
+  plugins: [agentkitWalletPlugin],
 };
 
 const project: Project = {

@@ -1,6 +1,5 @@
 {
-  "home": {
-  },
+  "home": {},
   "palmTreeDrive": {
     "reality": "你的\n现实",
     "skip": "跳过",
@@ -40,8 +39,7 @@
       "line2": "现实"
     }
   },
-  "navigation": {
-  },
+  "navigation": {},
   "footer": {
     "allRightsReserved": "版权所有",
     "privacyPolicy": "隐私政策",
@@ -106,7 +104,6 @@
         "description": "前表情包时代的艺术赞助人"
       }
     ]
-
   },
   "illumin80": {
     "watchlistLine1": "进入她的",
@@ -152,24 +149,71 @@
     }
   },
   "cyberNav": {
-    "nav00": { "date": "I-80上的图标", "title": "路线图" },
-    "nav01": { "date": "DEFI引力", "title": "关于RL80" },
-    "nav02": { "date": "无限画廊", "title": "画廊之旅" },
-    "nav03": { "date": "数量与质量", "title": "代币经济与FAQ" },
-    "nav04": { "date": "光之效用", "title": "光明会" },
-    "nav05": { "date": "文明社会", "title": "聊天室" },
-    "nav06": { "date": "伦理与道德", "title": "圣GR80卷轴" },
-    "nav07": { "date": "希望与慈善", "title": "许愿池" },
-    "nav08": { "date": "哇!", "title": "奇迹小饰品" }
+    "nav00": {
+      "date": "I-80上的图标",
+      "title": "路线图"
+    },
+    "nav01": {
+      "date": "DEFI引力",
+      "title": "关于RL80"
+    },
+    "nav02": {
+      "date": "无限画廊",
+      "title": "画廊之旅"
+    },
+    "nav03": {
+      "date": "数量与质量",
+      "title": "代币经济与FAQ"
+    },
+    "nav04": {
+      "date": "光之效用",
+      "title": "光明会"
+    },
+    "nav05": {
+      "date": "文明社会",
+      "title": "聊天室"
+    },
+    "nav06": {
+      "date": "伦理与道德",
+      "title": "圣GR80卷轴"
+    },
+    "nav07": {
+      "date": "希望与慈善",
+      "title": "许愿池"
+    },
+    "nav08": {
+      "date": "哇!",
+      "title": "奇迹小饰品"
+    }
   },
   "about": {
-    "skewedHeading1": { "line1": "繁荣", "line2": "属于全", "line3": "人类!" },
-    "skewedHeading2": { "line1": "数字时代", "line2": "永恒的", "line3": "偶像" },
-    "skewedHeading3": { "line1": "进入", "line2": "阈限", "line3": "终端" }
+    "skewedHeading1": {
+      "line1": "繁荣",
+      "line2": "属于全",
+      "line3": "人类!"
+    },
+    "skewedHeading2": {
+      "line1": "数字时代",
+      "line2": "永恒的",
+      "line3": "偶像"
+    },
+    "skewedHeading3": {
+      "line1": "进入",
+      "line2": "阈限",
+      "line3": "终端"
+    }
   },
   "buyModal": {
     "title": "购买_RL80_",
-    "secureTransaction": "<安全交易协议激活>"
+    "secureTransaction": "<安全交易协议激活>",
+    "connectWallet": "请先连接钱包",
+    "connectWalletDescription": "使用页面顶部的按钮连接钱包，通过Coinbase购买加密货币。",
+    "coinbaseDescription": "通过Coinbase在Base上购买ETH或USDC。资金将直接发送到您连接的钱包。",
+    "buyWithCoinbase": "通过COINBASE购买",
+    "loading": "加载中...",
+    "tradeOnUniswap": "在UNISWAP交易",
+    "uniswapDescription": "已有ETH？在Uniswap上直接兑换RL80。",
+    "orDivider": "或"
   },
   "chatRoom": {
     "placeholders": {
@@ -273,15 +317,42 @@
   },
   "oldsCoolTunnel": {
     "images": [
-      { "year": "公元67年", "description": "击退熊市" },
-      { "year": "公元380年", "description": "前表情包时代的艺术赞助" },
-      { "year": "公元1100年", "description": "早期喀尔巴阡质押协议" },
-      { "year": "公元1350年", "description": "早期小丑遭遇变得丑陋" },
-      { "year": "1680年", "description": "年轻私掠船员的货币理论" },
-      { "year": "1790年", "description": "神话女英雄" },
-      { "year": "2010年", "description": "出现在热门漫画系列中" },
-      { "year": "2031年", "description": "奠定DeFi节拍" },
-      { "year": "2077年", "description": "前卫自动机器人中流行的美德信号" }
+      {
+        "year": "公元67年",
+        "description": "击退熊市"
+      },
+      {
+        "year": "公元380年",
+        "description": "前表情包时代的艺术赞助"
+      },
+      {
+        "year": "公元1100年",
+        "description": "早期喀尔巴阡质押协议"
+      },
+      {
+        "year": "公元1350年",
+        "description": "早期小丑遭遇变得丑陋"
+      },
+      {
+        "year": "1680年",
+        "description": "年轻私掠船员的货币理论"
+      },
+      {
+        "year": "1790年",
+        "description": "神话女英雄"
+      },
+      {
+        "year": "2010年",
+        "description": "出现在热门漫画系列中"
+      },
+      {
+        "year": "2031年",
+        "description": "奠定DeFi节拍"
+      },
+      {
+        "year": "2077年",
+        "description": "前卫自动机器人中流行的美德信号"
+      }
     ],
     "ui": {
       "paused": "已暂停",

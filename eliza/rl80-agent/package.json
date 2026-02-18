@@ -27,6 +27,8 @@
     "dist"
   ],
   "dependencies": {
+    "@coinbase/agentkit": "^0.10.4",
+    "@coinbase/cdp-sdk": "^1.44.1",
     "@elizaos/cli": "1.7.2",
     "@elizaos/client": "1.7.2",
     "@elizaos/core": "1.7.2",

@@ -1,6 +1,5 @@
 {
-  "home": {
-  },
+  "home": {},
   "palmTreeDrive": {
     "reality": "tua\nrealitas",
     "skip": "Omitte",
@@ -40,8 +39,7 @@
       "line2": "realitas"
     }
   },
-  "navigation": {
-  },
+  "navigation": {},
   "footer": {
     "allRightsReserved": "Omnia iura reservata",
     "privacyPolicy": "Ratio Secreti",
@@ -106,7 +104,6 @@
         "description": "Patrona artium aetatis ante-memae"
       }
     ]
-  
   },
   "illumin80": {
     "watchlistLine1": "In eius indicem",
@@ -152,24 +149,71 @@
     }
   },
   "cyberNav": {
-    "nav00": { "date": "ICON IN VIA I-80", "title": "ITER" },
-    "nav01": { "date": "GRAVITAS DEFI", "title": "DE RL80" },
-    "nav02": { "date": "INFINITA PINACOTHECA", "title": "ITER PINACOTHECAE" },
-    "nav03": { "date": "QUANTITAS ET QUALITAS", "title": "OECONOMIA ET FAQ" },
-    "nav04": { "date": "UTILITAS LUCIS", "title": "ILLUMINATI" },
-    "nav05": { "date": "SOCIETAS URBANA", "title": "CONCLAVE COLLOQUII" },
-    "nav06": { "date": "ETHICA ET MORALITAS", "title": "VOLUMINA S. GR80" },
-    "nav07": { "date": "SPES ET CARITAS", "title": "FONS NUMMORUM" },
-    "nav08": { "date": "mirum!", "title": "ORNAMENTA MIRACULA" }
+    "nav00": {
+      "date": "ICON IN VIA I-80",
+      "title": "ITER"
+    },
+    "nav01": {
+      "date": "GRAVITAS DEFI",
+      "title": "DE RL80"
+    },
+    "nav02": {
+      "date": "INFINITA PINACOTHECA",
+      "title": "ITER PINACOTHECAE"
+    },
+    "nav03": {
+      "date": "QUANTITAS ET QUALITAS",
+      "title": "OECONOMIA ET FAQ"
+    },
+    "nav04": {
+      "date": "UTILITAS LUCIS",
+      "title": "ILLUMINATI"
+    },
+    "nav05": {
+      "date": "SOCIETAS URBANA",
+      "title": "CONCLAVE COLLOQUII"
+    },
+    "nav06": {
+      "date": "ETHICA ET MORALITAS",
+      "title": "VOLUMINA S. GR80"
+    },
+    "nav07": {
+      "date": "SPES ET CARITAS",
+      "title": "FONS NUMMORUM"
+    },
+    "nav08": {
+      "date": "mirum!",
+      "title": "ORNAMENTA MIRACULA"
+    }
   },
   "about": {
-    "skewedHeading1": { "line1": "PROSPERITAS", "line2": "PRO OMNI", "line3": "HUMANITATE!" },
-    "skewedHeading2": { "line1": "IMAGO", "line2": "AETERNA PRO", "line3": "AETATE DIGITALI" },
-    "skewedHeading3": { "line1": "INTRA IN", "line2": "TERMINALEM", "line3": "LIMINALEM" }
+    "skewedHeading1": {
+      "line1": "PROSPERITAS",
+      "line2": "PRO OMNI",
+      "line3": "HUMANITATE!"
+    },
+    "skewedHeading2": {
+      "line1": "IMAGO",
+      "line2": "AETERNA PRO",
+      "line3": "AETATE DIGITALI"
+    },
+    "skewedHeading3": {
+      "line1": "INTRA IN",
+      "line2": "TERMINALEM",
+      "line3": "LIMINALEM"
+    }
   },
   "buyModal": {
     "title": "EMERE_RL80_",
-    "secureTransaction": "<PROTOCOLLVM_TRANSACTIONIS_SECVRAE_ACTIVVM>"
+    "secureTransaction": "<PROTOCOLLVM_TRANSACTIONIS_SECVRAE_ACTIVVM>",
+    "connectWallet": "MARSUPIUM PRIMUM CONIUNGE",
+    "connectWalletDescription": "Marsupium tuum coniunge utens puga in capite ad cryptomonetas emendas per Coinbase.",
+    "coinbaseDescription": "Eme ETH vel USDC in Base per Coinbase. Pecuniae directe ad marsupium coniunctum tuum mittuntur.",
+    "buyWithCoinbase": "EME CUM COINBASE",
+    "loading": "ONERANS...",
+    "tradeOnUniswap": "COMMERCIUM IN UNISWAP",
+    "uniswapDescription": "Iam ETH habes? Commuta directe pro RL80 in Uniswap.",
+    "orDivider": "VEL"
   },
   "chatRoom": {
     "placeholders": {
@@ -273,15 +317,42 @@
   },
   "oldsCoolTunnel": {
     "images": [
-      { "year": "LXVII p.C.n.", "description": "Mercatum ursi repellens" },
-      { "year": "CCCLXXX p.C.n.", "description": "Patronatus artium aetatis ante-memae" },
-      { "year": "MC p.C.n.", "description": "Protocollum primum staking Carpathicum" },
-      { "year": "MCCCL p.C.n.", "description": "Congressus primus cum scurra fit turpis" },
-      { "year": "MDCLXXX", "description": "Theoria monetaria pro iuvene pirata" },
-      { "year": "MDCCXC", "description": "Heroina Mythologiae" },
-      { "year": "MMX", "description": "In serie manga populari apparet" },
-      { "year": "MMXXXI", "description": "Rhythmos DeFi ponens" },
-      { "year": "MMLXXVII", "description": "Signum virtutis populare inter automata avant-garde" }
+      {
+        "year": "LXVII p.C.n.",
+        "description": "Mercatum ursi repellens"
+      },
+      {
+        "year": "CCCLXXX p.C.n.",
+        "description": "Patronatus artium aetatis ante-memae"
+      },
+      {
+        "year": "MC p.C.n.",
+        "description": "Protocollum primum staking Carpathicum"
+      },
+      {
+        "year": "MCCCL p.C.n.",
+        "description": "Congressus primus cum scurra fit turpis"
+      },
+      {
+        "year": "MDCLXXX",
+        "description": "Theoria monetaria pro iuvene pirata"
+      },
+      {
+        "year": "MDCCXC",
+        "description": "Heroina Mythologiae"
+      },
+      {
+        "year": "MMX",
+        "description": "In serie manga populari apparet"
+      },
+      {
+        "year": "MMXXXI",
+        "description": "Rhythmos DeFi ponens"
+      },
+      {
+        "year": "MMLXXVII",
+        "description": "Signum virtutis populare inter automata avant-garde"
+      }
     ],
     "ui": {
       "paused": "INTERMISSUM",

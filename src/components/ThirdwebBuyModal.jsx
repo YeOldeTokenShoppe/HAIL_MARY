@@ -1,18 +1,15 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { BuyWidget } from "thirdweb/react";
-import { defineChain } from "thirdweb/chains";
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useLanguage } from './LanguageProvider';
-import { client } from '@/lib/contract';
 
 const ThirdwebBuyModal = ({ isOpen, onClose }) => {
   const [glitchActive, setGlitchActive] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isSmallPhone, setIsSmallPhone] = useState(false);
+  const [onrampInstance, setOnrampInstance] = useState(null);
   const { t } = useLanguage();
-
-
+  const instanceRef = useRef(null);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -23,7 +20,7 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-  
+
   useEffect(() => {
     if (isOpen) {
       const interval = setInterval(() => {
@@ -33,7 +30,78 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
       return () => clearInterval(interval);
     }
   }, [isOpen]);
-  
+
+  // Initialize Coinbase Onramp when modal opens
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let destroyed = false;
+
+    const initCoinbaseOnramp = async () => {
+      try {
+        // Fetch session token from our API route
+        const placeholderAddress = '0x0000000000000000000000000000000000000001';
+        const tokenRes = await fetch('/api/onramp-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address: placeholderAddress }),
+        });
+        const tokenData = await tokenRes.json();
+
+        if (!tokenRes.ok || !tokenData.token) {
+          console.error('Failed to get session token:', tokenData.error);
+          return;
+        }
+
+        const { initOnRamp } = await import('@coinbase/cbpay-js');
+        initOnRamp({
+          appId: process.env.NEXT_PUBLIC_CDP_PROJECT_ID,
+          widgetParameters: {
+            sessionToken: tokenData.token,
+            addresses: { [placeholderAddress]: ['base'] },
+            assets: ['ETH', 'USDC'],
+            defaultNetwork: 'base',
+            defaultExperience: 'buy',
+          },
+          onSuccess: () => {
+            onClose();
+          },
+          onExit: () => {
+            onClose();
+          },
+          experienceLoggedIn: 'popup',
+          experienceLoggedOut: 'popup',
+          closeOnExit: true,
+          closeOnSuccess: true,
+        }, (error, instance) => {
+          if (!destroyed && instance) {
+            instanceRef.current = instance;
+            setOnrampInstance(instance);
+          }
+        });
+      } catch (err) {
+        console.error('Failed to initialize Coinbase Onramp:', err);
+      }
+    };
+
+    initCoinbaseOnramp();
+
+    return () => {
+      destroyed = true;
+      if (instanceRef.current) {
+        instanceRef.current.destroy();
+        instanceRef.current = null;
+        setOnrampInstance(null);
+      }
+    };
+  }, [isOpen, onClose]);
+
+  const handleBuy = useCallback(() => {
+    if (onrampInstance) {
+      onrampInstance.open();
+    }
+  }, [onrampInstance]);
+
   if (!isOpen) return null;
 
   return (
@@ -65,48 +133,48 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
             filter: hue-rotate(45deg);
           }
         }
-        
+
         @keyframes textGlitch {
           0%, 100% {
-            text-shadow: 
+            text-shadow:
               2px 2px #fded00,
               -2px -2px #00e572,
               0 0 20px rgba(255, 24, 76, 0.8);
           }
           25% {
-            text-shadow: 
+            text-shadow:
               -2px 2px #00e572,
               2px -2px #fded00,
               0 0 30px rgba(139, 0, 255, 0.8);
           }
           50% {
-            text-shadow: 
+            text-shadow:
               2px -2px #ff184c,
               -2px 2px #8B00FF,
               0 0 25px rgba(253, 237, 0, 0.8);
           }
           75% {
-            text-shadow: 
+            text-shadow:
               -2px -2px #00e572,
               2px 2px #ff184c,
               0 0 35px rgba(0, 229, 114, 0.8);
           }
         }
-        
+
         .modal-glitch {
           animation: modalGlitch 0.2s ease-out;
         }
-        
+
         .title-glitch {
           animation: textGlitch 3s infinite;
         }
-        
+
         .close-btn {
           --clip: polygon(25% 0%, 100% 0%, 75% 100%, 0% 100%);
           clip-path: var(--clip);
           position: relative;
         }
-        
+
         .close-btn::before {
           content: '';
           position: absolute;
@@ -119,7 +187,7 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
           clip-path: var(--clip);
           z-index: -1;
         }
-        
+
         .close-btn::after {
           content: '';
           position: absolute;
@@ -131,10 +199,19 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
           clip-path: var(--clip);
           z-index: -2;
         }
+
+        @keyframes pulse-glow {
+          0%, 100% {
+            box-shadow: 0 0 20px rgba(0, 229, 114, 0.3), inset 0 0 20px rgba(0, 229, 114, 0.1);
+          }
+          50% {
+            box-shadow: 0 0 40px rgba(0, 229, 114, 0.5), inset 0 0 30px rgba(0, 229, 114, 0.2);
+          }
+        }
       `}</style>
-      
+
       {/* Modal Backdrop */}
-      <div 
+      <div
         style={{
           position: 'fixed',
           top: 0,
@@ -168,10 +245,9 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
             rgba(255, 24, 76, 0.3) 4px
           )`,
         }} />
-        
+
         {/* Modal Content */}
         <div
-          // className={glitchActive ? 'modal-glitch' : ''}
           style={{
             position: 'relative',
             background: 'linear-gradient(135deg, #93276a, #3434a7)',
@@ -254,7 +330,7 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
               animation: 'scan 3s linear infinite reverse',
             }} />
           </div>
-          
+
 
           {/* Title with Glitch Effect */}
           <h2 className="title-glitch" style={{
@@ -299,17 +375,13 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
             )}
           </h2>
 
-          {/* Thirdweb Buy Widget Container */}
+          {/* Buy Content */}
           <div style={{
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',
             alignItems: 'center',
-            // minHeight: isMobile ? '300px' : '400px',
             padding: isMobile ? '2px' : '3px',
-            // background: 'rgba(15, 10, 20, 0.8)',
-            // border: '1px solid rgba(255, 24, 76, 0.3)',
-            // clipPath: 'polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px))',
             position: 'relative',
           }}>
             {/* Corner Accents */}
@@ -349,17 +421,161 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
               borderBottom: '2px solid #00e572',
               borderRight: '2px solid #00e572',
             }} />
-            
-            <div suppressHydrationWarning>
-<BuyWidget
-      client={client}
-      chain={defineChain(8453)}
-      tokenAddress="0x30D01555d88c76500a82754A1D53cAc082A6CB75"
-      amount="100"
-      theme="dark"
-      paymentMethods={["crypto", "card"]}
-      country="US"
-    />
+
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: isSmallPhone ? '12px' : '20px',
+              padding: isSmallPhone ? '20px 10px' : '30px 20px',
+              width: '100%',
+            }}>
+              {/* Description */}
+              <p style={{
+                fontFamily: 'monospace',
+                fontSize: isSmallPhone ? '11px' : '13px',
+                color: 'rgba(255, 255, 255, 0.7)',
+                textAlign: 'center',
+                lineHeight: '1.6',
+                letterSpacing: '0.5px',
+                maxWidth: '320px',
+              }}>
+                {t('buyModal.coinbaseDescription') || 'Purchase ETH or USDC on Base via Coinbase.'}
+              </p>
+
+              {/* Buy Button */}
+              <button
+                onClick={handleBuy}
+                disabled={!onrampInstance}
+                style={{
+                  fontFamily: 'monospace',
+                  fontSize: isSmallPhone ? '14px' : '16px',
+                  fontWeight: '900',
+                  textTransform: 'uppercase',
+                  letterSpacing: '3px',
+                  color: '#000',
+                  background: onrampInstance
+                    ? 'linear-gradient(135deg, #00e572, #00c85d)'
+                    : 'rgba(100, 100, 100, 0.5)',
+                  border: 'none',
+                  padding: isSmallPhone ? '14px 28px' : '16px 40px',
+                  cursor: onrampInstance ? 'pointer' : 'wait',
+                  clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))',
+                  transition: 'all 0.3s ease',
+                  animation: onrampInstance ? 'pulse-glow 2s infinite' : 'none',
+                  position: 'relative',
+                  minWidth: isSmallPhone ? '200px' : '240px',
+                }}
+                onMouseEnter={(e) => {
+                  if (onrampInstance) {
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                    e.currentTarget.style.boxShadow = '0 0 30px rgba(0, 229, 114, 0.6)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.boxShadow = '';
+                }}
+              >
+                {onrampInstance ? (t('buyModal.buyWithCoinbase') || 'BUY WITH COINBASE') : (t('buyModal.loading') || 'LOADING...')}
+              </button>
+
+              {/* Asset Info */}
+              <div style={{
+                display: 'flex',
+                gap: '12px',
+                justifyContent: 'center',
+              }}>
+                {['ETH', 'USDC'].map((asset) => (
+                  <span key={asset} style={{
+                    fontFamily: 'monospace',
+                    fontSize: '10px',
+                    color: '#fded00',
+                    padding: '4px 10px',
+                    border: '1px solid rgba(253, 237, 0, 0.3)',
+                    letterSpacing: '2px',
+                  }}>
+                    {asset}
+                  </span>
+                ))}
+                <span style={{
+                  fontFamily: 'monospace',
+                  fontSize: '10px',
+                  color: '#00e572',
+                  padding: '4px 10px',
+                  border: '1px solid rgba(0, 229, 114, 0.3)',
+                  letterSpacing: '2px',
+                }}>
+                  BASE
+                </span>
+              </div>
+
+              {/* Divider */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                width: '100%',
+                maxWidth: '320px',
+              }}>
+                <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(253, 237, 0, 0.4))' }} />
+                <span style={{
+                  fontFamily: 'monospace',
+                  fontSize: '10px',
+                  color: 'rgba(253, 237, 0, 0.6)',
+                  letterSpacing: '3px',
+                }}>
+                  {t('buyModal.orDivider') || 'OR'}
+                </span>
+                <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(253, 237, 0, 0.4), transparent)' }} />
+              </div>
+
+              {/* Uniswap Trade Section */}
+              <p style={{
+                fontFamily: 'monospace',
+                fontSize: isSmallPhone ? '11px' : '13px',
+                color: 'rgba(255, 255, 255, 0.7)',
+                textAlign: 'center',
+                lineHeight: '1.6',
+                letterSpacing: '0.5px',
+                maxWidth: '320px',
+              }}>
+                {t('buyModal.uniswapDescription') || 'Already have ETH? Swap directly for RL80 on Uniswap.'}
+              </p>
+
+              <a
+                href="https://app.uniswap.org/swap?outputCurrency=0x30D01555d88c76500a82754A1D53cAc082A6CB75&chain=base"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  fontFamily: 'monospace',
+                  fontSize: isSmallPhone ? '14px' : '16px',
+                  fontWeight: '900',
+                  textTransform: 'uppercase',
+                  letterSpacing: '3px',
+                  color: '#000',
+                  background: 'linear-gradient(135deg, #ff184c, #8B00FF)',
+                  border: 'none',
+                  padding: isSmallPhone ? '14px 28px' : '16px 40px',
+                  cursor: 'pointer',
+                  clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))',
+                  transition: 'all 0.3s ease',
+                  textDecoration: 'none',
+                  display: 'inline-block',
+                  textAlign: 'center',
+                  minWidth: isSmallPhone ? '200px' : '240px',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.05)';
+                  e.currentTarget.style.boxShadow = '0 0 30px rgba(255, 24, 76, 0.6)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.boxShadow = '';
+                }}
+              >
+                {t('buyModal.tradeOnUniswap') || 'TRADE ON UNISWAP'}
+              </a>
             </div>
           </div>
 
@@ -378,7 +594,7 @@ const ThirdwebBuyModal = ({ isOpen, onClose }) => {
           </p>
         </div>
       </div>
-      
+
       <style jsx global>{`
         @keyframes scan {
           0% {

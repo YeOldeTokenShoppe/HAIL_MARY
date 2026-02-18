@@ -1,6 +1,5 @@
 {
-  "home": {
-  },
+  "home": {},
   "palmTreeDrive": {
     "reality": "deine\nRealität",
     "skip": "Überspringen",
@@ -40,8 +39,7 @@
       "line2": "Realität"
     }
   },
-  "navigation": {
-  },
+  "navigation": {},
   "footer": {
     "allRightsReserved": "Alle Rechte vorbehalten",
     "privacyPolicy": "Datenschutzrichtlinie",
@@ -106,7 +104,6 @@
         "description": "Kunstmäzenin der Vor-Meme-Ära"
       }
     ]
-  
   },
   "illumin80": {
     "watchlistLine1": "Komm auf ihre",
@@ -152,24 +149,71 @@
     }
   },
   "cyberNav": {
-    "nav00": { "date": "IKONE AUF DER I-80", "title": "FAHRPLAN" },
-    "nav01": { "date": "DEFI-SCHWERKRAFT", "title": "ÜBER RL80" },
-    "nav02": { "date": "UNENDLICHE GALERIE", "title": "GALERIERUNDGANG" },
-    "nav03": { "date": "QUANTITÄT & QUALITÄT", "title": "TOKENOMICS & FAQ" },
-    "nav04": { "date": "LICHT-NUTZEN", "title": "DIE ILLUMINATEN" },
-    "nav05": { "date": "FEINE GESELLSCHAFT", "title": "CHATRAUM" },
-    "nav06": { "date": "ETHIK & MORAL", "title": "SCHRIFTROLLEN VON ST. GR80" },
-    "nav07": { "date": "HOFFNUNG & NÄCHSTENLIEBE", "title": "MÜNZBRUNNEN" },
-    "nav08": { "date": "wow!", "title": "WUNDER-NIPPES" }
+    "nav00": {
+      "date": "IKONE AUF DER I-80",
+      "title": "FAHRPLAN"
+    },
+    "nav01": {
+      "date": "DEFI-SCHWERKRAFT",
+      "title": "ÜBER RL80"
+    },
+    "nav02": {
+      "date": "UNENDLICHE GALERIE",
+      "title": "GALERIERUNDGANG"
+    },
+    "nav03": {
+      "date": "QUANTITÄT & QUALITÄT",
+      "title": "TOKENOMICS & FAQ"
+    },
+    "nav04": {
+      "date": "LICHT-NUTZEN",
+      "title": "DIE ILLUMINATEN"
+    },
+    "nav05": {
+      "date": "FEINE GESELLSCHAFT",
+      "title": "CHATRAUM"
+    },
+    "nav06": {
+      "date": "ETHIK & MORAL",
+      "title": "SCHRIFTROLLEN VON ST. GR80"
+    },
+    "nav07": {
+      "date": "HOFFNUNG & NÄCHSTENLIEBE",
+      "title": "MÜNZBRUNNEN"
+    },
+    "nav08": {
+      "date": "wow!",
+      "title": "WUNDER-NIPPES"
+    }
   },
   "about": {
-    "skewedHeading1": { "line1": "WOHLSTAND", "line2": "FÜR DIE GANZE", "line3": "MENSCHHEIT!" },
-    "skewedHeading2": { "line1": "EINE ZEITLOSE", "line2": "IKONE FÜR DAS", "line3": "DIGITALE ZEITALTER" },
-    "skewedHeading3": { "line1": "BETRETET DAS", "line2": "LIMINALE", "line3": "TERMINAL" }
+    "skewedHeading1": {
+      "line1": "WOHLSTAND",
+      "line2": "FÜR DIE GANZE",
+      "line3": "MENSCHHEIT!"
+    },
+    "skewedHeading2": {
+      "line1": "EINE ZEITLOSE",
+      "line2": "IKONE FÜR DAS",
+      "line3": "DIGITALE ZEITALTER"
+    },
+    "skewedHeading3": {
+      "line1": "BETRETET DAS",
+      "line2": "LIMINALE",
+      "line3": "TERMINAL"
+    }
   },
   "buyModal": {
     "title": "KAUFEN_RL80_",
-    "secureTransaction": "<SICHERES_TRANSAKTIONSPROTOKOLL_AKTIV>"
+    "secureTransaction": "<SICHERES_TRANSAKTIONSPROTOKOLL_AKTIV>",
+    "connectWallet": "WALLET ZUERST VERBINDEN",
+    "connectWalletDescription": "Verbinde dein Wallet über den Button im Header, um Krypto über Coinbase zu kaufen.",
+    "coinbaseDescription": "Kaufe ETH oder USDC auf Base über Coinbase. Die Mittel werden direkt an dein verbundenes Wallet gesendet.",
+    "buyWithCoinbase": "MIT COINBASE KAUFEN",
+    "loading": "LADEN...",
+    "tradeOnUniswap": "AUF UNISWAP HANDELN",
+    "uniswapDescription": "Bereits ETH? Tausche direkt gegen RL80 auf Uniswap.",
+    "orDivider": "ODER"
   },
   "chatRoom": {
     "placeholders": {
@@ -273,15 +317,42 @@
   },
   "oldsCoolTunnel": {
     "images": [
-      { "year": "67 n. Chr.", "description": "Den Bärenmarkt zurückdrängen" },
-      { "year": "380 n. Chr.", "description": "Kunstmäzenatentum der Vor-Meme-Ära" },
-      { "year": "1100 n. Chr.", "description": "Frühes Karpatisches Staking-Protokoll" },
-      { "year": "1350 n. Chr.", "description": "Frühe Clown-Begegnung wird hässlich" },
-      { "year": "1680", "description": "Geldtheorie für einen jungen Freibeuter" },
-      { "year": "1790", "description": "Heldin der Mythologie" },
-      { "year": "2010", "description": "In beliebter Manga-Serie vorgestellt" },
-      { "year": "2031", "description": "DeFi-Beats auflegen" },
-      { "year": "2077", "description": "Ein beliebtes Tugendsignal unter avantgardistischen Automaten" }
+      {
+        "year": "67 n. Chr.",
+        "description": "Den Bärenmarkt zurückdrängen"
+      },
+      {
+        "year": "380 n. Chr.",
+        "description": "Kunstmäzenatentum der Vor-Meme-Ära"
+      },
+      {
+        "year": "1100 n. Chr.",
+        "description": "Frühes Karpatisches Staking-Protokoll"
+      },
+      {
+        "year": "1350 n. Chr.",
+        "description": "Frühe Clown-Begegnung wird hässlich"
+      },
+      {
+        "year": "1680",
+        "description": "Geldtheorie für einen jungen Freibeuter"
+      },
+      {
+        "year": "1790",
+        "description": "Heldin der Mythologie"
+      },
+      {
+        "year": "2010",
+        "description": "In beliebter Manga-Serie vorgestellt"
+      },
+      {
+        "year": "2031",
+        "description": "DeFi-Beats auflegen"
+      },
+      {
+        "year": "2077",
+        "description": "Ein beliebtes Tugendsignal unter avantgardistischen Automaten"
+      }
     ],
     "ui": {
       "paused": "PAUSIERT",

@@ -1,6 +1,5 @@
 {
-  "home": {
-  },
+  "home": {},
   "palmTreeDrive": {
     "reality": "votre\nréalité",
     "skip": "Passer",
@@ -40,8 +39,7 @@
       "line2": "réalité"
     }
   },
-  "navigation": {
-  },
+  "navigation": {},
   "footer": {
     "allRightsReserved": "Tous droits réservés",
     "privacyPolicy": "Politique de Confidentialité",
@@ -151,24 +149,71 @@
     }
   },
   "cyberNav": {
-    "nav00": { "date": "ICÔNE SUR LA I-80", "title": "FEUILLE DE ROUTE" },
-    "nav01": { "date": "GRAVITÉ DEFI", "title": "À PROPOS DE RL80" },
-    "nav02": { "date": "GALERIE INFINIE", "title": "VISITE DE LA GALERIE" },
-    "nav03": { "date": "QUANTITÉ ET QUALITÉ", "title": "TOKENOMICS ET FAQ" },
-    "nav04": { "date": "UTILITÉ LUMINEUSE", "title": "LES ILLUMINATI" },
-    "nav05": { "date": "SOCIÉTÉ POLIE", "title": "SALON DE DISCUSSION" },
-    "nav06": { "date": "ÉTHIQUE ET MORALITÉ", "title": "PARCHEMINS DE ST. GR80" },
-    "nav07": { "date": "ESPOIR ET CHARITÉ", "title": "FONTAINE À PIÈCES" },
-    "nav08": { "date": "waouh!", "title": "BIBELOTS MIRACULEUX" }
+    "nav00": {
+      "date": "ICÔNE SUR LA I-80",
+      "title": "FEUILLE DE ROUTE"
+    },
+    "nav01": {
+      "date": "GRAVITÉ DEFI",
+      "title": "À PROPOS DE RL80"
+    },
+    "nav02": {
+      "date": "GALERIE INFINIE",
+      "title": "VISITE DE LA GALERIE"
+    },
+    "nav03": {
+      "date": "QUANTITÉ ET QUALITÉ",
+      "title": "TOKENOMICS ET FAQ"
+    },
+    "nav04": {
+      "date": "UTILITÉ LUMINEUSE",
+      "title": "LES ILLUMINATI"
+    },
+    "nav05": {
+      "date": "SOCIÉTÉ POLIE",
+      "title": "SALON DE DISCUSSION"
+    },
+    "nav06": {
+      "date": "ÉTHIQUE ET MORALITÉ",
+      "title": "PARCHEMINS DE ST. GR80"
+    },
+    "nav07": {
+      "date": "ESPOIR ET CHARITÉ",
+      "title": "FONTAINE À PIÈCES"
+    },
+    "nav08": {
+      "date": "waouh!",
+      "title": "BIBELOTS MIRACULEUX"
+    }
   },
   "about": {
-    "skewedHeading1": { "line1": "PROSPÉRITÉ", "line2": "POUR TOUTE", "line3": "L'HUMANITÉ!" },
-    "skewedHeading2": { "line1": "UNE ICÔNE", "line2": "INTEMPORELLE POUR", "line3": "L'ÈRE NUMÉRIQUE" },
-    "skewedHeading3": { "line1": "ENTREZ DANS", "line2": "LE TERMINAL", "line3": "LIMINAL" }
+    "skewedHeading1": {
+      "line1": "PROSPÉRITÉ",
+      "line2": "POUR TOUTE",
+      "line3": "L'HUMANITÉ!"
+    },
+    "skewedHeading2": {
+      "line1": "UNE ICÔNE",
+      "line2": "INTEMPORELLE POUR",
+      "line3": "L'ÈRE NUMÉRIQUE"
+    },
+    "skewedHeading3": {
+      "line1": "ENTREZ DANS",
+      "line2": "LE TERMINAL",
+      "line3": "LIMINAL"
+    }
   },
   "buyModal": {
     "title": "ACHETER_RL80_",
-    "secureTransaction": "<PROTOCOLE_TRANSACTION_SÉCURISÉE_ACTIF>"
+    "secureTransaction": "<PROTOCOLE_TRANSACTION_SÉCURISÉE_ACTIF>",
+    "connectWallet": "CONNECTEZ VOTRE WALLET D'ABORD",
+    "connectWalletDescription": "Connectez votre wallet en utilisant le bouton dans l'en-tête pour acheter des cryptos via Coinbase.",
+    "coinbaseDescription": "Achetez ETH ou USDC sur Base via Coinbase. Les fonds sont envoyés directement à votre wallet connecté.",
+    "buyWithCoinbase": "ACHETER AVEC COINBASE",
+    "loading": "CHARGEMENT...",
+    "tradeOnUniswap": "ÉCHANGER SUR UNISWAP",
+    "uniswapDescription": "Vous avez déjà de l'ETH ? Échangez directement contre RL80 sur Uniswap.",
+    "orDivider": "OU"
   },
   "chatRoom": {
     "placeholders": {
@@ -272,15 +317,42 @@
   },
   "oldsCoolTunnel": {
     "images": [
-      { "year": "67 apr. J.-C.", "description": "Repousser le marché baissier" },
-      { "year": "380 apr. J.-C.", "description": "Mécénat des arts à l'ère pré-mème" },
-      { "year": "1100 apr. J.-C.", "description": "Protocole de staking carpatique précoce" },
-      { "year": "1350 apr. J.-C.", "description": "Une rencontre précoce avec un clown tourne mal" },
-      { "year": "1680", "description": "Théorie monétaire pour un jeune corsaire" },
-      { "year": "1790", "description": "Héroïne de la Mythologie" },
-      { "year": "2010", "description": "Présentée dans une série manga populaire" },
-      { "year": "2031", "description": "Poser les beats DeFi" },
-      { "year": "2077", "description": "Un signal de vertu populaire parmi les automates avant-gardistes" }
+      {
+        "year": "67 apr. J.-C.",
+        "description": "Repousser le marché baissier"
+      },
+      {
+        "year": "380 apr. J.-C.",
+        "description": "Mécénat des arts à l'ère pré-mème"
+      },
+      {
+        "year": "1100 apr. J.-C.",
+        "description": "Protocole de staking carpatique précoce"
+      },
+      {
+        "year": "1350 apr. J.-C.",
+        "description": "Une rencontre précoce avec un clown tourne mal"
+      },
+      {
+        "year": "1680",
+        "description": "Théorie monétaire pour un jeune corsaire"
+      },
+      {
+        "year": "1790",
+        "description": "Héroïne de la Mythologie"
+      },
+      {
+        "year": "2010",
+        "description": "Présentée dans une série manga populaire"
+      },
+      {
+        "year": "2031",
+        "description": "Poser les beats DeFi"
+      },
+      {
+        "year": "2077",
+        "description": "Un signal de vertu populaire parmi les automates avant-gardistes"
+      }
     ],
     "ui": {
       "paused": "EN PAUSE",

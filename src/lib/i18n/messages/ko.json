@@ -1,6 +1,5 @@
 {
-  "home": {
-  },
+  "home": {},
   "palmTreeDrive": {
     "reality": "당신의\n현실",
     "skip": "건너뛰기",
@@ -40,8 +39,7 @@
       "line2": "현실"
     }
   },
-  "navigation": {
-  },
+  "navigation": {},
   "footer": {
     "allRightsReserved": "모든 권리 보유",
     "privacyPolicy": "개인정보 보호정책",
@@ -106,7 +104,6 @@
         "description": "밈 이전 시대의 예술 후원자"
       }
     ]
-  
   },
   "illumin80": {
     "watchlistLine1": "그녀의",
@@ -152,24 +149,71 @@
     }
   },
   "cyberNav": {
-    "nav00": { "date": "I-80의 아이콘", "title": "로드맵" },
-    "nav01": { "date": "DEFI 중력", "title": "RL80에 대해" },
-    "nav02": { "date": "무한 갤러리", "title": "갤러리 라이드" },
-    "nav03": { "date": "양과 질", "title": "토크노믹스 & FAQ" },
-    "nav04": { "date": "빛의 효용", "title": "일루미나티" },
-    "nav05": { "date": "예의 바른 사회", "title": "채팅방" },
-    "nav06": { "date": "윤리와 도덕", "title": "성 GR80의 두루마리" },
-    "nav07": { "date": "희망과 자선", "title": "코인 분수" },
-    "nav08": { "date": "와우!", "title": "기적의 소품" }
+    "nav00": {
+      "date": "I-80의 아이콘",
+      "title": "로드맵"
+    },
+    "nav01": {
+      "date": "DEFI 중력",
+      "title": "RL80에 대해"
+    },
+    "nav02": {
+      "date": "무한 갤러리",
+      "title": "갤러리 라이드"
+    },
+    "nav03": {
+      "date": "양과 질",
+      "title": "토크노믹스 & FAQ"
+    },
+    "nav04": {
+      "date": "빛의 효용",
+      "title": "일루미나티"
+    },
+    "nav05": {
+      "date": "예의 바른 사회",
+      "title": "채팅방"
+    },
+    "nav06": {
+      "date": "윤리와 도덕",
+      "title": "성 GR80의 두루마리"
+    },
+    "nav07": {
+      "date": "희망과 자선",
+      "title": "코인 분수"
+    },
+    "nav08": {
+      "date": "와우!",
+      "title": "기적의 소품"
+    }
   },
   "about": {
-    "skewedHeading1": { "line1": "번영을", "line2": "모든", "line3": "인류에게!" },
-    "skewedHeading2": { "line1": "디지털 시대의", "line2": "영원한", "line3": "아이콘" },
-    "skewedHeading3": { "line1": "들어서라", "line2": "리미널", "line3": "터미널" }
+    "skewedHeading1": {
+      "line1": "번영을",
+      "line2": "모든",
+      "line3": "인류에게!"
+    },
+    "skewedHeading2": {
+      "line1": "디지털 시대의",
+      "line2": "영원한",
+      "line3": "아이콘"
+    },
+    "skewedHeading3": {
+      "line1": "들어서라",
+      "line2": "리미널",
+      "line3": "터미널"
+    }
   },
   "buyModal": {
     "title": "구매_RL80_",
-    "secureTransaction": "<보안_거래_프로토콜_활성>"
+    "secureTransaction": "<보안_거래_프로토콜_활성>",
+    "connectWallet": "먼저 지갑을 연결하세요",
+    "connectWalletDescription": "헤더의 버튼을 사용하여 지갑을 연결하고 Coinbase를 통해 암호화폐를 구매하세요.",
+    "coinbaseDescription": "Coinbase를 통해 Base에서 ETH 또는 USDC를 구매하세요. 자금은 연결된 지갑으로 직접 전송됩니다.",
+    "buyWithCoinbase": "COINBASE로 구매",
+    "loading": "로딩 중...",
+    "tradeOnUniswap": "유니스왑에서 거래",
+    "uniswapDescription": "이미 ETH가 있으신가요? Uniswap에서 직접 RL80으로 교환하세요.",
+    "orDivider": "또는"
   },
   "chatRoom": {
     "placeholders": {
@@ -273,15 +317,42 @@
   },
   "oldsCoolTunnel": {
     "images": [
-      { "year": "서기 67년", "description": "약세 시장을 물리치다" },
-      { "year": "서기 380년", "description": "밈 이전 시대의 예술 후원" },
-      { "year": "서기 1100년", "description": "초기 카르파티아 스테이킹 프로토콜" },
-      { "year": "서기 1350년", "description": "초기 광대와의 만남이 험악해지다" },
-      { "year": "1680년", "description": "젊은 사략선원을 위한 화폐 이론" },
-      { "year": "1790년", "description": "신화의 여걸" },
-      { "year": "2010년", "description": "인기 만화 시리즈에 등장" },
-      { "year": "2031년", "description": "디파이 비트를 깔아놓다" },
-      { "year": "2077년", "description": "전위적 오토마톤 사이에서 인기 있는 미덕 신호" }
+      {
+        "year": "서기 67년",
+        "description": "약세 시장을 물리치다"
+      },
+      {
+        "year": "서기 380년",
+        "description": "밈 이전 시대의 예술 후원"
+      },
+      {
+        "year": "서기 1100년",
+        "description": "초기 카르파티아 스테이킹 프로토콜"
+      },
+      {
+        "year": "서기 1350년",
+        "description": "초기 광대와의 만남이 험악해지다"
+      },
+      {
+        "year": "1680년",
+        "description": "젊은 사략선원을 위한 화폐 이론"
+      },
+      {
+        "year": "1790년",
+        "description": "신화의 여걸"
+      },
+      {
+        "year": "2010년",
+        "description": "인기 만화 시리즈에 등장"
+      },
+      {
+        "year": "2031년",
+        "description": "디파이 비트를 깔아놓다"
+      },
+      {
+        "year": "2077년",
+        "description": "전위적 오토마톤 사이에서 인기 있는 미덕 신호"
+      }
     ],
     "ui": {
       "paused": "일시정지",

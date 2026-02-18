@@ -1,6 +1,5 @@
 {
-  "home": {
-  },
+  "home": {},
   "palmTreeDrive": {
     "reality": "あなたの\n現実",
     "skip": "スキップ",
@@ -40,8 +39,7 @@
       "line2": "現実"
     }
   },
-  "navigation": {
-  },
+  "navigation": {},
   "footer": {
     "allRightsReserved": "全著作権所有",
     "privacyPolicy": "プライバシーポリシー",
@@ -106,7 +104,6 @@
         "description": "ミーム以前の時代の芸術の後援者"
       }
     ]
-  
   },
   "illumin80": {
     "watchlistLine1": "彼女の",
@@ -152,24 +149,71 @@
     }
   },
   "cyberNav": {
-    "nav00": { "date": "I-80のアイコン", "title": "ロードマップ" },
-    "nav01": { "date": "DEFI重力", "title": "RL80について" },
-    "nav02": { "date": "無限ギャラリー", "title": "ギャラリーライド" },
-    "nav03": { "date": "量と質", "title": "トケノミクスとFAQ" },
-    "nav04": { "date": "光の効用", "title": "イルミナティ" },
-    "nav05": { "date": "上品な社会", "title": "チャットルーム" },
-    "nav06": { "date": "倫理と道徳", "title": "聖GR80の巻物" },
-    "nav07": { "date": "希望と慈善", "title": "コイン噴水" },
-    "nav08": { "date": "わぁ!", "title": "奇跡のトリンケット" }
+    "nav00": {
+      "date": "I-80のアイコン",
+      "title": "ロードマップ"
+    },
+    "nav01": {
+      "date": "DEFI重力",
+      "title": "RL80について"
+    },
+    "nav02": {
+      "date": "無限ギャラリー",
+      "title": "ギャラリーライド"
+    },
+    "nav03": {
+      "date": "量と質",
+      "title": "トケノミクスとFAQ"
+    },
+    "nav04": {
+      "date": "光の効用",
+      "title": "イルミナティ"
+    },
+    "nav05": {
+      "date": "上品な社会",
+      "title": "チャットルーム"
+    },
+    "nav06": {
+      "date": "倫理と道徳",
+      "title": "聖GR80の巻物"
+    },
+    "nav07": {
+      "date": "希望と慈善",
+      "title": "コイン噴水"
+    },
+    "nav08": {
+      "date": "わぁ!",
+      "title": "奇跡のトリンケット"
+    }
   },
   "about": {
-    "skewedHeading1": { "line1": "繁栄を", "line2": "すべての", "line3": "人類に!" },
-    "skewedHeading2": { "line1": "デジタル時代の", "line2": "不朽の", "line3": "アイコン" },
-    "skewedHeading3": { "line1": "入れ", "line2": "リミナル", "line3": "ターミナル" }
+    "skewedHeading1": {
+      "line1": "繁栄を",
+      "line2": "すべての",
+      "line3": "人類に!"
+    },
+    "skewedHeading2": {
+      "line1": "デジタル時代の",
+      "line2": "不朽の",
+      "line3": "アイコン"
+    },
+    "skewedHeading3": {
+      "line1": "入れ",
+      "line2": "リミナル",
+      "line3": "ターミナル"
+    }
   },
   "buyModal": {
     "title": "購入_RL80_",
-    "secureTransaction": "<安全な取引プロトコル有効>"
+    "secureTransaction": "<安全な取引プロトコル有効>",
+    "connectWallet": "まずウォレットを接続してください",
+    "connectWalletDescription": "ヘッダーのボタンを使ってウォレットを接続し、Coinbase経由で暗号通貨を購入してください。",
+    "coinbaseDescription": "Coinbase経由でBase上のETHまたはUSDCを購入。資金は接続されたウォレットに直接送信されます。",
+    "buyWithCoinbase": "COINBASEで購入",
+    "loading": "読み込み中...",
+    "tradeOnUniswap": "UNISWAPで取引",
+    "uniswapDescription": "ETHをお持ちですか？Uniswapで直接RL80に交換できます。",
+    "orDivider": "または"
   },
   "chatRoom": {
     "placeholders": {
@@ -273,15 +317,42 @@
   },
   "oldsCoolTunnel": {
     "images": [
-      { "year": "西暦67年", "description": "弱気相場を撃退" },
-      { "year": "西暦380年", "description": "ミーム以前の時代の芸術の後援" },
-      { "year": "西暦1100年", "description": "初期カルパチアのステーキングプロトコル" },
-      { "year": "西暦1350年", "description": "道化師との初期の遭遇が醜くなる" },
-      { "year": "1680年", "description": "若き私掠船員のための貨幣理論" },
-      { "year": "1790年", "description": "神話の女傑" },
-      { "year": "2010年", "description": "人気マンガシリーズに登場" },
-      { "year": "2031年", "description": "ディーファイ・ビートを刻む" },
-      { "year": "2077年", "description": "前衛的オートマトンの間で人気の美徳シグナル" }
+      {
+        "year": "西暦67年",
+        "description": "弱気相場を撃退"
+      },
+      {
+        "year": "西暦380年",
+        "description": "ミーム以前の時代の芸術の後援"
+      },
+      {
+        "year": "西暦1100年",
+        "description": "初期カルパチアのステーキングプロトコル"
+      },
+      {
+        "year": "西暦1350年",
+        "description": "道化師との初期の遭遇が醜くなる"
+      },
+      {
+        "year": "1680年",
+        "description": "若き私掠船員のための貨幣理論"
+      },
+      {
+        "year": "1790年",
+        "description": "神話の女傑"
+      },
+      {
+        "year": "2010年",
+        "description": "人気マンガシリーズに登場"
+      },
+      {
+        "year": "2031年",
+        "description": "ディーファイ・ビートを刻む"
+      },
+      {
+        "year": "2077年",
+        "description": "前衛的オートマトンの間で人気の美徳シグナル"
+      }
     ],
     "ui": {
       "paused": "一時停止",
