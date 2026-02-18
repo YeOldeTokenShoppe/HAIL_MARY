@@ -207,17 +207,33 @@ if (!content.includes('PATCH: always fetch latest mentions without cursor')) {
     console.warn('[patch] WARNING: lastCheckedTweetId gate changed — bypass patch skipped');
   }
 
-  // 2d: Increase max interactions per run from 10 to 50
+  // 2d: Set max interactions per run to 5 (prevent API rate limits)
   const originalMax = `|| process.env.TWITTER_MAX_ENGAGEMENTS_PER_RUN || "10"`;
-  const patchedMax = `|| process.env.TWITTER_MAX_ENGAGEMENTS_PER_RUN || "50"`;
+  const patchedMax = `|| process.env.TWITTER_MAX_ENGAGEMENTS_PER_RUN || "5"`;
 
   const maxOccurrences = (content.match(/\|\| process\.env\.TWITTER_MAX_ENGAGEMENTS_PER_RUN \|\| "10"/g) || []).length;
   if (maxOccurrences > 0) {
     content = content.replaceAll(originalMax, patchedMax);
     patchCount++;
-    console.log(`[patch] Applied: increased max engagements to 50 (${maxOccurrences} occurrences)`);
+    console.log(`[patch] Applied: set max engagements to 5 per run (${maxOccurrences} occurrences)`);
   } else {
     console.warn('[patch] WARNING: max engagements default changed — limit patch skipped');
+  }
+
+  // 2e: Skip tweets older than 24 hours — prevents backlog storm after volume clear
+  const originalNewTweet = "logger5.log(\"New Tweet found\", tweet.id);";
+  const patchedNewTweet = [
+    'var tweetAge = Date.now() - (tweet.timestamp || 0);',
+    '        if (tweetAge > 24 * 60 * 60 * 1000) {',
+    '          logger5.log("Skipping old tweet " + tweet.id + " (age: " + Math.round(tweetAge / 3600000) + "h)");',
+    '          continue;',
+    '        }',
+    '        logger5.log("New Tweet found", tweet.id);',
+  ].join('\n        ');
+  if (content.includes(originalNewTweet) && !content.includes('Skipping old tweet')) {
+    content = content.replace(originalNewTweet, patchedNewTweet);
+    patchCount++;
+    console.log('[patch] Applied: skip tweets older than 24 hours');
   }
 } else {
   console.log('[patch] Mention handler patches already applied');
