@@ -198,7 +198,7 @@ const getUserLanguage = () => {
 };
 
 
-const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
+const LightCandleModal = ({ isOpen, onClose, onLightCandle, skipFirestore = false }) => {
   const { user } = useUser();
   const { walletAddress, tokenBalance, activeAccount } = useWalletAuth();
   const { mutate: sendTransaction } = useSendTransaction();
@@ -407,10 +407,12 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
       // Wait for the "Prayer Received" animation to show (1.5 seconds)
       await new Promise(resolve => setTimeout(resolve, 2000));
 
+      // When skipFirestore is true, parent handles persistence (e.g. trade page writes to templeCandles)
+      if (!skipFirestore) {
       // NOW save to Firestore after the animation
       // First, check for existing active offering for this wallet
       const EXPIRATION_HOURS = 24;
-      
+
       let docRef = null;
       try {
         // First, verify Firebase is properly initialized
@@ -425,31 +427,31 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
         }
 
 
-        
+
         // User authenticated - proceeding with offering creation
-        
+
         // Query for existing offerings from this user (by userId, not wallet)
         const existingQuery = query(
           collection(db, 'offerings'),
           where('userId', '==', user?.id)
         );
-        
+
         const existingSnapshot = await getDocs(existingQuery);
-        
+
         // Delete ALL existing offerings for this wallet (expired and active)
         // New candle will replace any existing ones and restart the timer
         const now = new Date();
         const allOfferingsToDelete = [];
-        
+
         existingSnapshot.forEach((docSnapshot) => {
           const data = docSnapshot.data();
           const createdAt = data.createdAt?.toDate?.() || new Date(data.timestamp);
           const ageMs = now.getTime() - createdAt.getTime();
-          
-          
+
+
           allOfferingsToDelete.push(docSnapshot.id);
         });
-        
+
         // Clean up ALL existing offerings (replacement model)
         if (allOfferingsToDelete.length > 0) {
           for (const offeringId of allOfferingsToDelete) {
@@ -466,7 +468,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
             }
           }
         }
-        
+
         // Now create the new offering
         docRef = await addDoc(collection(db, 'offerings'), baseOffering);
         baseOffering.id = docRef.id;
@@ -503,12 +505,13 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle }) => {
         });
         // Log the offering data that failed to save
         console.error('❌ Failed offering data:', baseOffering);
-        
+
         // Show user-friendly error
         alert('Failed to save your candle to the shrine. Please try again or contact support if the issue persists.');
-        
+
         // Log error but continue - don't block the user experience
       }
+      } // end if (!skipFirestore)
 
       // The illumin80 page will handle snapshot capture independently
     } catch (error) {

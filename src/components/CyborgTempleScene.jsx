@@ -125,6 +125,9 @@ const CyborgTempleScene = ({
   onAgentClick = null, // Callback when an agent is clicked
   isMobile = false, // Pass this prop to determine device type
   followerWords = [], // Display names from X followers
+  onSwapCoinsReady = null, // Callback that receives a function to trigger coin swap
+  onCoinFaceTap = null, // Callback when a CoinFace is tapped in agents mode (coinIndex)
+  templeCandles = [], // Array of claimed candle objects from Firestore templeCandles collection
 }) => {
   const groupRef = useRef();
   const { scene, camera, gl } = useThree();
@@ -134,6 +137,7 @@ const CyborgTempleScene = ({
   const actionsRef = useRef({}); // { characterName: { animationName: action } }
   const [loadedModel, setLoadedModel] = useState(null);
   const [detectedMobile, setDetectedMobile] = useState(false);
+  const xCandleNodesRef = useRef([]); // Sorted array of XCandle01* root nodes
   const cylinderMeshRef = useRef(); // Ref for the specific cylinder mesh
   const object7MeshRef = useRef(); // Ref for Object_5 (was Object_7)
   const cube010MeshRef = useRef(); // Ref for Cube010
@@ -145,7 +149,8 @@ const CyborgTempleScene = ({
   const coin2Ref = useRef();
   const coin3Ref = useRef();
   const coin4Ref = useRef();
-  
+  const coinSpokeRef = useRef(); // Parent group of all coins — rotate this for carousel
+
   // Camera focus state
   const [focusTarget, setFocusTarget] = useState(null);
   const ourLadyRef = useRef(); // Reference to RL80 (OurLady) mesh
@@ -165,6 +170,28 @@ const CyborgTempleScene = ({
   // Refs for CoinFace avatar meshes (desktop RL80_4anims.glb)
   const coinFaceRefs = useRef([null, null, null, null]) // CoinFace1-4
   const coinFaceTexturesRef = useRef([null, null, null, null])
+  const coinBackTexturesRef = useRef([null, null, null, null]) // Character textures for flip back
+  const coinFaceNameTexturesRef = useRef([null, null, null, null]) // Supporter name textures for flip back
+  const coinAgentNameTexturesRef = useRef([null, null, null, null]) // Agent name textures for flip back
+  const coinFaceFlipState = useRef({
+    CoinFace1: { isFlipped: false, currentRotation: 0, targetRotation: 0, originalScale: null, lastFlipTime: 0 },
+    CoinFace2: { isFlipped: false, currentRotation: 0, targetRotation: 0, originalScale: null, lastFlipTime: 0 },
+    CoinFace3: { isFlipped: false, currentRotation: 0, targetRotation: 0, originalScale: null, lastFlipTime: 0 },
+    CoinFace4: { isFlipped: false, currentRotation: 0, targetRotation: 0, originalScale: null, lastFlipTime: 0 },
+  })
+  // Carousel animation state for angel-triggered swap
+  const carouselState = useRef({
+    isAnimating: false,
+    currentAngle: 0,
+    targetAngle: 0,
+    showingCharacters: true,
+    textureSwapped: false,
+    initialPositions: [], // Store each CoinFace's starting position
+    lastTriggerTime: 0,
+    // Per-coin staggered angles for elastic effect (coin 4 leads, coin 1 last)
+    coinAngles: [0, 0, 0, 0],
+    coinStartAngles: [0, 0, 0, 0],
+  })
   const topEngagersRef = useRef([]) // Top 4 xPost authors
   const topSupporterBannerRefs = useRef([]) // TopText and x_logo meshes
 
@@ -249,6 +276,23 @@ const CyborgTempleScene = ({
   
   // Use prop or detected mobile state
   const isOnMobile = isMobile || detectedMobile;
+
+  // Expose coin swap trigger to parent via callback
+  useEffect(() => {
+    if (onSwapCoinsReady) {
+      onSwapCoinsReady(() => {
+        const cs = carouselState.current
+        const now = Date.now()
+        if (!cs.isAnimating && now - cs.lastTriggerTime > 600) {
+          cs.isAnimating = true
+          cs.targetAngle = cs.currentAngle + Math.PI * 2
+          cs.textureSwapped = false
+          cs.lastTriggerTime = now
+          cs.coinStartAngles = [...cs.coinAngles]
+        }
+      })
+    }
+  }, [onSwapCoinsReady])
 
   // ===========================================
   // TOP ENGAGER AVATARS ON COIN FACES
@@ -394,110 +438,195 @@ const CyborgTempleScene = ({
       const tex = createAvatarTexture(engagers[i].imageUrl, i)
       coinFaceTexturesRef.current[i] = tex
 
-      // Apply to mesh material
+      // Apply to mesh material — use character texture if starting in agents mode
+      const backTex = coinBackTexturesRef.current[i]
+      const showTex = (carouselState.current.showingCharacters && backTex) ? backTex : tex
       mesh.material = new THREE.MeshBasicMaterial({
-        map: tex,
+        map: showTex,
         side: THREE.FrontSide,
         transparent: false,
         toneMapped: false,
       })
       mesh.material.needsUpdate = true
 
-      // Add username label sprite below the coin face (in world space)
-      const worldPos = new THREE.Vector3()
-      mesh.updateWorldMatrix(true, false)
-      mesh.getWorldPosition(worldPos)
-
-      // Remove any existing label from the scene
-      if (mesh.userData.labelSprite) {
-        mesh.userData.labelSprite.parent?.remove(mesh.userData.labelSprite)
-      }
-
-      const label = createNameSprite(engagers[i].username, engagers[i].handle)
-      label.position.set(worldPos.x - 0.2, worldPos.y + 0.84, worldPos.z)
-      label.visible = false // Hidden until CoinFace is clicked
-      mesh.userData.labelSprite = label
       mesh.userData.engagerIndex = i
 
-      // Add to the same parent group as the model
-      if (mesh.parent) {
-        let parent = mesh.parent
-        while (parent.parent && parent.parent.type !== 'Scene') {
-          parent = parent.parent
-        }
-        parent.add(label)
-      }
+      // Create name texture for back of coin (shown on individual flip)
+      coinFaceNameTexturesRef.current[i] = createNameBackTexture(engagers[i].username, engagers[i].handle)
     })
   }
 
-  // Create a pill-shaped label sprite with username + @handle
-  const createNameSprite = (username, handle) => {
+  // Create a circular coin-back texture with username + @handle
+  const createNameBackTexture = (username, handle) => {
+    const size = 512
     const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
     const ctx = canvas.getContext('2d')
-    const nameFontSize = 28
-    const handleFontSize = 22
-    const padX = 30
-    const padY = 14
-    const lineGap = 6
-    const h = nameFontSize + handleFontSize + lineGap + padY * 2
-    canvas.height = h
 
-    // Measure both lines to determine width
-    ctx.font = `bold ${nameFontSize}px -apple-system, BlinkMacSystemFont, sans-serif`
-    const nameText = username || 'anon'
-    const nameW = ctx.measureText(nameText).width
-
-    ctx.font = `${handleFontSize}px -apple-system, BlinkMacSystemFont, sans-serif`
-    const handleText = handle ? `@${handle}` : ''
-    const handleW = handleText ? ctx.measureText(handleText).width : 0
-
-    canvas.width = Math.ceil(Math.max(nameW, handleW) + padX * 2)
-
-    // Dark rounded background
-    const r = 16
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'
+    // Circular clip mask
     ctx.beginPath()
-    ctx.roundRect(2, 2, canvas.width - 4, h - 4, r)
-    ctx.fill()
+    ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2)
+    ctx.closePath()
+    ctx.clip()
 
-    // Gold border
-    ctx.strokeStyle = 'rgba(255, 215, 0, 0.5)'
-    ctx.lineWidth = 2
+    // Flip canvas so text reads correctly with flipY=false
+    ctx.translate(size / 2, size / 2)
+    ctx.scale(-1, -1)
+    ctx.translate(-size / 2, -size / 2)
+
+    // Dark radial gradient background
+    const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+    gradient.addColorStop(0, '#1a1a2e')
+    gradient.addColorStop(1, '#0a0a1a')
+    ctx.fillStyle = gradient
+    ctx.fillRect(0, 0, size, size)
+
+    // Gold ring border
     ctx.beginPath()
-    ctx.roundRect(2, 2, canvas.width - 4, h - 4, r)
+    ctx.arc(size / 2, size / 2, size / 2 - 3, 0, Math.PI * 2)
+    ctx.strokeStyle = 'rgba(255, 215, 0, 0.7)'
+    ctx.lineWidth = 6
     ctx.stroke()
 
     // Username (bold white)
+    const nameText = username || 'anon'
     ctx.fillStyle = '#e7e9ea'
-    ctx.font = `bold ${nameFontSize}px -apple-system, BlinkMacSystemFont, sans-serif`
+    ctx.font = `bold 42px -apple-system, BlinkMacSystemFont, sans-serif`
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    const nameY = padY + nameFontSize / 2
-    ctx.fillText(nameText, canvas.width / 2, nameY)
+    ctx.fillText(nameText, size / 2, handle ? size / 2 - 20 : size / 2)
 
-    // @handle (muted grey)
-    if (handleText) {
-      ctx.fillStyle = '#71767b'
-      ctx.font = `${handleFontSize}px -apple-system, BlinkMacSystemFont, sans-serif`
-      const handleY = nameY + nameFontSize / 2 + lineGap + handleFontSize / 2
-      ctx.fillText(handleText, canvas.width / 2, handleY)
+    // @handle (muted gold)
+    if (handle) {
+      ctx.fillStyle = 'rgba(255, 215, 0, 0.7)'
+      ctx.font = `32px -apple-system, BlinkMacSystemFont, sans-serif`
+      ctx.fillText(`@${handle}`, size / 2, size / 2 + 24)
     }
 
     const texture = new THREE.CanvasTexture(canvas)
+    texture.flipY = false
+    texture.colorSpace = THREE.SRGBColorSpace
+    texture.center.set(0.5, 0.5)
+    texture.rotation = -40 * (Math.PI / 180)
     texture.needsUpdate = true
 
-    const spriteMat = new THREE.SpriteMaterial({
-      map: texture,
-      transparent: true,
-      depthWrite: false,
-      depthTest: true,
+    return texture
+  }
+
+  // Create a back-face mesh for a CoinFace (shown when flipped on mobile)
+  // Character thumbnail paths for coin back-faces (index 0-2 = agents, index 3 = follower list)
+  const coinBackImages = ['/rl80_thumbnail.png', '/gr80_thumbnail.png', '/h80z_thumbnail.png']
+  const coinAgentNames = [
+    { username: 'Our Lady', handle: null },
+    { username: 'St. GR80', handle: null },
+    { username: 'H80Z', handle: null },
+    { username: 'TBD', handle: null },
+  ]
+
+  // Load character textures for coin back-faces on mobile
+  const loadCoinBackTextures = () => {
+    const size = 512
+
+    coinBackImages.forEach((src, i) => {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = size
+        canvas.height = size
+        const ctx = canvas.getContext('2d')
+
+        // Circular clip mask
+        ctx.beginPath()
+        ctx.arc(size/2, size/2, size/2, 0, Math.PI * 2)
+        ctx.closePath()
+        ctx.clip()
+
+        // Draw the thumbnail image to fill the circle
+        const imgAspect = img.width / img.height
+        let drawW, drawH, drawX, drawY
+        if (imgAspect > 1) {
+          drawH = size
+          drawW = size * imgAspect
+          drawX = (size - drawW) / 2
+          drawY = 0
+        } else {
+          drawW = size
+          drawH = size / imgAspect
+          drawX = 0
+          drawY = (size - drawH) / 2
+        }
+        ctx.drawImage(img, drawX, drawY, drawW, drawH)
+
+        // Gold ring border
+        ctx.beginPath()
+        ctx.arc(size/2, size/2, size/2 - 3, 0, Math.PI * 2)
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.7)'
+        ctx.lineWidth = 6
+        ctx.stroke()
+
+        const texture = new THREE.CanvasTexture(canvas)
+        texture.flipY = false
+        texture.colorSpace = THREE.SRGBColorSpace
+        texture.center.set(0.5, 0.5)
+        texture.rotation = -40 * (Math.PI / 180)
+        texture.needsUpdate = true
+        coinBackTexturesRef.current[i] = texture
+
+        // If starting in agents mode, apply this texture to the coin now that it's loaded
+        if (carouselState.current.showingCharacters) {
+          const mesh = coinFaceRefs.current[i]
+          if (mesh) {
+            mesh.material.map = texture
+            mesh.material.needsUpdate = true
+          }
+        }
+      }
+      img.src = src
     })
-    const sprite = new THREE.Sprite(spriteMat)
 
-    const aspect = canvas.width / canvas.height
-    sprite.scale.set(0.05 * aspect, 0.05, 1)
+    // Coin 4 — placeholder
+    const canvas = document.createElement('canvas')
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')
 
-    return sprite
+    const gradient = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2)
+    gradient.addColorStop(0, '#1a1a2e')
+    gradient.addColorStop(1, '#0a0a1a')
+    ctx.fillStyle = gradient
+    ctx.beginPath()
+    ctx.arc(size/2, size/2, size/2, 0, Math.PI * 2)
+    ctx.fill()
+
+    ctx.strokeStyle = 'rgba(255, 215, 0, 0.6)'
+    ctx.lineWidth = 4
+    ctx.beginPath()
+    ctx.arc(size/2, size/2, size/2 - 3, 0, Math.PI * 2)
+    ctx.stroke()
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'
+    ctx.font = 'bold 28px -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText('MORE', size/2, size/2 - 14)
+    ctx.font = '22px -apple-system, BlinkMacSystemFont, sans-serif'
+    ctx.fillStyle = 'rgba(255, 215, 0, 0.8)'
+    ctx.fillText('SUPPORTERS', size/2, size/2 + 18)
+
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.flipY = false
+    texture.colorSpace = THREE.SRGBColorSpace
+    texture.center.set(0.5, 0.5)
+    texture.rotation = -40 * (Math.PI / 180)
+    texture.needsUpdate = true
+    coinBackTexturesRef.current[3] = texture
+
+    // Generate agent name textures for coin flip backs
+    coinAgentNames.forEach((agent, i) => {
+      coinAgentNameTexturesRef.current[i] = createNameBackTexture(agent.username, agent.handle)
+    })
   }
 
   // Expose the loaded model and camera control functions through ref
@@ -1097,6 +1226,29 @@ const CyborgTempleScene = ({
           setScreenClickableData(child);
         }
         
+        // Collect and make XCandle objects clickable
+        if (child.name && child.name.startsWith('XCandle01')) {
+          // Store in collection array (will sort after traversal)
+          xCandleNodesRef.current.push(child);
+          const setCandleClickable = (obj) => {
+            obj.userData.clickable = true;
+            obj.userData.agentId = 'XCandle';
+            obj.userData.agentName = 'XCandle';
+            if (obj.children && obj.children.length > 0) {
+              obj.children.forEach(setCandleClickable);
+            }
+          };
+          setCandleClickable(child);
+          // Dim unclaimed candles (low opacity dark material) so they're visible but faded
+          child.traverse((descendant) => {
+            if (descendant.isMesh) {
+              descendant.material = descendant.material.clone();
+              descendant.material.transparent = true;
+              descendant.material.opacity = 0.15;
+            }
+          });
+        }
+
         // Find angel and coin objects for MOBILE.glb animations
         if (isOnMobile) {
           if (child.name === 'Angel_Empty') {
@@ -1106,6 +1258,10 @@ const CyborgTempleScene = ({
             angelRef.current = child;
           }
           
+          if (child.name === 'CoinSpoke') {
+            coinSpokeRef.current = child;
+          }
+
           // Coins only exist in MOBILE.glb, so only set them up on mobile
           if (child.name === 'Coin1') {
             coin1Ref.current = child;
@@ -1188,7 +1344,7 @@ const CyborgTempleScene = ({
           topSupporterBannerRefs.current.push(child);
         }
 
-        // Find CoinFace avatar meshes (in RL80_4anims.glb)
+        // Find CoinFace avatar meshes
         if (child.name === 'CoinFace1') coinFaceRefs.current[0] = child;
         if (child.name === 'CoinFace2') coinFaceRefs.current[1] = child;
         if (child.name === 'CoinFace3') coinFaceRefs.current[2] = child;
@@ -1218,13 +1374,59 @@ const CyborgTempleScene = ({
       // After traversal, apply top engager avatars to CoinFace meshes
       applyTopEngagerAvatars();
 
+      // Store local start positions for all coin meshes (needed for staggered carousel orbit around Z-axis)
+      const coinMeshRefs = [coin1Ref, coin2Ref, coin3Ref, coin4Ref]
+      coinFaceRefs.current.forEach((mesh, i) => {
+        if (!mesh) return
+        mesh.userData.localStartX = mesh.position.x
+        mesh.userData.localStartY = mesh.position.y
+      })
+      coinMeshRefs.forEach((ref, i) => {
+        if (!ref.current) return
+        ref.current.userData.localStartX = ref.current.position.x
+        ref.current.userData.localStartY = ref.current.position.y
+      })
+
+      // On mobile, load character textures, hide Coin meshes, and set up flip animation
+      if (isOnMobile) {
+        loadCoinBackTextures()
+        // Hide the Coin meshes behind CoinFaces
+        coinMeshRefs.forEach(ref => {
+          if (ref.current) ref.current.visible = false
+        })
+        coinFaceRefs.current.forEach((mesh, i) => {
+          if (!mesh) return
+          // Make the material double-sided so the back is visible when flipped
+          mesh.material.side = THREE.DoubleSide
+          // Store original scale for the scale pulse during flip
+          const flipState = coinFaceFlipState.current[`CoinFace${i + 1}`]
+          if (flipState) {
+            flipState.originalScale = mesh.scale.clone()
+          }
+          const worldPos = new THREE.Vector3()
+          mesh.getWorldPosition(worldPos)
+          carouselState.current.initialPositions[i] = worldPos.clone()
+        })
+      }
+
+      // Sort collected XCandle nodes by name for consistent indexing
+      xCandleNodesRef.current.sort((a, b) => a.name.localeCompare(b.name));
+      // Store candleIndex on each node's userData for click handler
+      xCandleNodesRef.current.forEach((node, idx) => {
+        const setIndex = (obj) => {
+          obj.userData.candleIndex = idx;
+          if (obj.children) obj.children.forEach(setIndex);
+        };
+        setIndex(node);
+      });
+
       // Call onLoad callback if provided
       if (onLoad) {
         setTimeout(() => {
           onLoad();
         }, 100);
       }
-    }, 
+    },
     // Progress callback
     () => {
       // Progress tracking available if needed
@@ -1355,6 +1557,51 @@ const CyborgTempleScene = ({
     }
   }, [is80sMode]);
 
+  // Apply claimed candle data: brighten node + swap senora texture with user image
+  useEffect(() => {
+    if (!xCandleNodesRef.current.length || !templeCandles.length) return;
+    const textureLoader = new THREE.TextureLoader();
+    templeCandles.forEach((candle) => {
+      const node = xCandleNodesRef.current[candle.candleIndex];
+      if (!node) return;
+      // Brighten the claimed candle back to full opacity
+      node.traverse((descendant) => {
+        if (descendant.isMesh) {
+          descendant.material.opacity = 1;
+          descendant.material.transparent = false;
+        }
+      });
+      // Swap senora mesh texture with user image
+      if (candle.userImageUrl) {
+        node.traverse((descendant) => {
+          if (!descendant.isMesh) return;
+          const isSenora = descendant.name === 'senora' || descendant.name === 'Senora' ||
+            (descendant.material && (
+              descendant.material.name === 'senora' || descendant.material.name === 'senora.001' ||
+              descendant.material.name === 'Senora' || descendant.material.name === 'Material.001'
+            )) ||
+            (descendant.parent && descendant.parent.name === 'senora');
+          if (!isSenora) return;
+          textureLoader.load(candle.userImageUrl, (texture) => {
+            texture.colorSpace = THREE.SRGBColorSpace;
+            texture.flipY = false;
+            texture.wrapS = THREE.ClampToEdgeWrapping;
+            texture.wrapT = THREE.ClampToEdgeWrapping;
+            if (!descendant.material.userData?.cloned) {
+              descendant.material = descendant.material.clone();
+              descendant.material.userData = { cloned: true };
+            }
+            descendant.material.map = texture;
+            descendant.material.transparent = true;
+            descendant.material.opacity = 1;
+            descendant.material.alphaTest = 0.1;
+            descendant.material.needsUpdate = true;
+          });
+        });
+      }
+    });
+  }, [templeCandles]);
+
   // Add raycaster for click detection and keyboard shortcuts
   useEffect(() => {
     if (!groupRef.current || !gl) return;
@@ -1443,26 +1690,79 @@ const CyborgTempleScene = ({
 
       raycaster.setFromCamera(mouse, camera);
       const intersects = raycaster.intersectObjects(groupRef.current.children, true);
-      
+
+      let touchedSomething = false;
+
       for (let i = 0; i < intersects.length; i++) {
         const object = intersects[i].object;
-        
+
         if (object.userData.isCoin) {
+          touchedSomething = true;
           // Prevent default only when we're actually interacting with a coin and it's cancelable
           if (event.cancelable) {
             event.preventDefault();
           }
-          
+
           // Trigger coin animation
           const coinName = object.userData.agentId;
           triggerCoinAnimation(coinName);
-          
+
           // Also trigger the card display
           if (onAgentClick) {
             onAgentClick(coinName);
           }
           break;
         }
+
+        // Handle CoinFace touch on mobile — flip the coin
+        if (isOnMobile && object.name && object.name.startsWith('CoinFace')) {
+          touchedSomething = true;
+          if (event.cancelable) {
+            event.preventDefault();
+          }
+          // In agents mode, fire callback instead of flipping
+          if (carouselState.current.showingCharacters && onCoinFaceTap) {
+            const coinIndex = parseInt(object.name.replace('CoinFace', '')) - 1;
+            onCoinFaceTap(coinIndex);
+            break;
+          }
+          const flipState = coinFaceFlipState.current[object.name];
+          if (flipState && Date.now() - flipState.lastFlipTime > 300) {
+            flipState.isFlipped = !flipState.isFlipped;
+            flipState.targetRotation = flipState.isFlipped ? Math.PI : 0;
+            flipState.lastFlipTime = Date.now();
+          }
+          break;
+        }
+
+        // Handle Angel touch on mobile — trigger carousel animation
+        if (isOnMobile && object.userData.clickable && object.userData.agentId === 'Angel' && !object.name?.startsWith('CoinFace')) {
+          touchedSomething = true;
+          if (event.cancelable) {
+            event.preventDefault();
+          }
+          const cs = carouselState.current;
+          const now = Date.now();
+          if (!cs.isAnimating && now - cs.lastTriggerTime > 600) {
+            cs.isAnimating = true;
+            cs.targetAngle = cs.currentAngle + Math.PI * 2;
+            cs.textureSwapped = false;
+            cs.lastTriggerTime = now;
+            cs.coinStartAngles = [...cs.coinAngles];
+          }
+          break;
+        }
+      }
+
+      // Reset flipped coins when tapping empty space on mobile
+      if (!touchedSomething && isOnMobile) {
+        coinFaceRefs.current.forEach((cf, i) => {
+          const flipState = coinFaceFlipState.current[`CoinFace${i + 1}`];
+          if (flipState && flipState.isFlipped) {
+            flipState.isFlipped = false;
+            flipState.targetRotation = 0;
+          }
+        });
       }
     };
     
@@ -1645,26 +1945,54 @@ const CyborgTempleScene = ({
       const intersects = raycaster.intersectObjects(groupRef.current.children, true);
       
       let clickedOnAgent = false;
-      
+
       for (let i = 0; i < intersects.length; i++) {
         const object = intersects[i].object;
-        
+
         if (object.userData.clickable) {
           clickedOnAgent = true;
 
           // Special handling for coins - trigger animation and show FocusedAgentCard
           if (object.userData.isCoin) {
-            
+
             // Trigger the coin animation
             triggerCoinAnimation(object.userData.agentId);
-            
+
             // Call the parent callback to show FocusedAgentCard
             if (onAgentClick) {
               onAgentClick(object.userData.agentId); // This will trigger the FocusedAgentCard to show
             }
             break; // Exit early for coins
           }
-          
+
+          // On mobile (MOBILE2.glb), CoinFace flips and Angel does nothing
+          if (isOnMobile) {
+            // CoinFace click — placeholder for showing info about this user/character (TBD)
+            if (object.name && object.name.startsWith('CoinFace')) {
+              const flipState = coinFaceFlipState.current[object.name];
+              if (flipState && Date.now() - flipState.lastFlipTime > 300) {
+                flipState.isFlipped = !flipState.isFlipped;
+                flipState.targetRotation = flipState.isFlipped ? Math.PI : 0;
+                flipState.lastFlipTime = Date.now();
+              }
+              break;
+            }
+
+            // Angel click — trigger carousel animation
+            if (object.userData.agentId === 'Angel' && !object.name?.startsWith('CoinFace')) {
+              const cs = carouselState.current
+              const now = Date.now()
+              if (!cs.isAnimating && now - cs.lastTriggerTime > 600) {
+                cs.isAnimating = true
+                cs.targetAngle = cs.currentAngle + Math.PI * 2
+                cs.textureSwapped = false
+                cs.lastTriggerTime = now
+                cs.coinStartAngles = [...cs.coinAngles]
+              }
+              break;
+            }
+          }
+
           // Show TopText/x_logo banner when clicking Angel area
           if (object.userData.agentId === 'Angel') {
             topSupporterBannerRefs.current.forEach(mesh => {
@@ -1672,18 +2000,32 @@ const CyborgTempleScene = ({
             });
           }
 
-          // CoinFace click — toggle label visibility
-          if (object.name && object.name.startsWith('CoinFace')) {
-            // Hide all coin face labels first
-            coinFaceRefs.current.forEach(cf => {
-              if (cf && cf.userData.labelSprite) {
-                cf.userData.labelSprite.visible = false
-              }
-            })
-            // Show the clicked one
-            if (object.userData.labelSprite) {
-              object.userData.labelSprite.visible = true
+          // XCandle click — dispatch event with candleIndex for inspection overlay
+          if (object.userData.agentId === 'XCandle') {
+            window.dispatchEvent(new CustomEvent('xCandleClicked', {
+              detail: { candleIndex: object.userData.candleIndex ?? -1 }
+            }));
+            break;
+          }
+
+          // If already focused on this screen, unfocus (toggle behavior)
+          if (focusTarget && focusTarget.agentId === object.userData.agentId) {
+            if (onAgentClick) onAgentClick(null);
+            if (originalCameraPosition.current) {
+              setFocusTarget({
+                position: originalCameraPosition.current.clone(),
+                lookAt: new THREE.Vector3(0, 0, 0),
+                agentId: null,
+                agentName: 'Reset'
+              });
+              setTimeout(() => {
+                setFocusTarget(null);
+                originalCameraPosition.current = null;
+              }, 1000);
+            } else {
+              setFocusTarget(null);
             }
+            break;
           }
 
           // Store the current camera position BEFORE any animation
@@ -1691,7 +2033,7 @@ const CyborgTempleScene = ({
           if (!focusTarget) {
             originalCameraPosition.current = camera.position.clone();
           }
-          
+
           // Get the target object's world position
           const targetObject = object.userData.targetObject || object;
           const objectWorldPos = new THREE.Vector3();
@@ -1810,15 +2152,21 @@ const CyborgTempleScene = ({
         }
       }
       
+      // On mobile, reset flipped coins when tapping on empty space
+      if (!clickedOnAgent && isOnMobile) {
+        coinFaceRefs.current.forEach((_, i) => {
+          const flipState = coinFaceFlipState.current[`CoinFace${i + 1}`];
+          if (flipState && flipState.isFlipped) {
+            flipState.isFlipped = false;
+            flipState.targetRotation = 0;
+          }
+        });
+      }
+
       // If we didn't click on an agent and we're currently focused, reset the camera
       if (!clickedOnAgent && focusTarget) {
 
-        // Hide all CoinFace labels and banner when clicking away
-        coinFaceRefs.current.forEach(cf => {
-          if (cf && cf.userData.labelSprite) {
-            cf.userData.labelSprite.visible = false;
-          }
-        });
+        // Hide banner when clicking away
         topSupporterBannerRefs.current.forEach(mesh => {
           if (mesh) mesh.visible = false;
         });
@@ -1851,6 +2199,31 @@ const CyborgTempleScene = ({
       }
     };
     
+    // Listen for screenGoBack event (from on-screen buttons)
+    const handleScreenGoBack = () => {
+      if (focusTarget) {
+        topSupporterBannerRefs.current.forEach(mesh => {
+          if (mesh) mesh.visible = false;
+        });
+        if (onAgentClick) onAgentClick(null);
+        if (originalCameraPosition.current) {
+          setFocusTarget({
+            position: originalCameraPosition.current.clone(),
+            lookAt: new THREE.Vector3(0, 0, 0),
+            agentId: null,
+            agentName: 'Reset'
+          });
+          setTimeout(() => {
+            setFocusTarget(null);
+            originalCameraPosition.current = null;
+          }, 1000);
+        } else {
+          setFocusTarget(null);
+        }
+      }
+    };
+    window.addEventListener('screenGoBack', handleScreenGoBack);
+
     gl.domElement.addEventListener('click', handleClick);
     gl.domElement.addEventListener('pointermove', handlePointerMove);
     gl.domElement.addEventListener('touchstart', handleTouchStart);
@@ -1873,20 +2246,69 @@ const CyborgTempleScene = ({
 
         raycaster.setFromCamera(mouse, camera);
         const intersects = raycaster.intersectObjects(groupRef.current.children, true);
-        
+
+        let touchedSomething = false;
+
         for (let i = 0; i < intersects.length; i++) {
           const object = intersects[i].object;
-          
+
           if (object.userData.isCoin) {
+            touchedSomething = true;
             event.preventDefault();
             const coinName = object.userData.agentId;
             triggerCoinAnimation(coinName);
-            
+
             if (onAgentClick) {
               onAgentClick(coinName);
             }
             break;
           }
+
+          // Handle CoinFace touch on mobile — flip the coin
+          if (isOnMobile && object.name && object.name.startsWith('CoinFace')) {
+            touchedSomething = true;
+            event.preventDefault();
+            // In agents mode, fire callback instead of flipping
+            if (carouselState.current.showingCharacters && onCoinFaceTap) {
+              const coinIndex = parseInt(object.name.replace('CoinFace', '')) - 1;
+              onCoinFaceTap(coinIndex);
+              break;
+            }
+            const flipState = coinFaceFlipState.current[object.name];
+            if (flipState && Date.now() - flipState.lastFlipTime > 300) {
+              flipState.isFlipped = !flipState.isFlipped;
+              flipState.targetRotation = flipState.isFlipped ? Math.PI : 0;
+              flipState.lastFlipTime = Date.now();
+            }
+            break;
+          }
+
+          // Handle Angel touch on mobile — trigger carousel animation
+          if (isOnMobile && object.userData.clickable && object.userData.agentId === 'Angel' && !object.name?.startsWith('CoinFace')) {
+            touchedSomething = true;
+            event.preventDefault();
+            const cs = carouselState.current;
+            const now = Date.now();
+            if (!cs.isAnimating && now - cs.lastTriggerTime > 600) {
+              cs.isAnimating = true;
+              cs.targetAngle = cs.currentAngle + Math.PI * 2;
+              cs.textureSwapped = false;
+              cs.lastTriggerTime = now;
+              cs.coinStartAngles = [...cs.coinAngles];
+            }
+            break;
+          }
+        }
+
+        // Reset flipped coins when tapping empty space on mobile
+        if (!touchedSomething && isOnMobile) {
+          coinFaceRefs.current.forEach((_, i) => {
+            const flipState = coinFaceFlipState.current[`CoinFace${i + 1}`];
+            if (flipState && flipState.isFlipped) {
+              flipState.isFlipped = false;
+              flipState.targetRotation = 0;
+            }
+          });
         }
       }
     };
@@ -1902,12 +2324,13 @@ const CyborgTempleScene = ({
       gl.domElement.removeEventListener('touchend', handleTouchStart);
       gl.domElement.removeEventListener('pointerdown', handlePointerDown);
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('screenGoBack', handleScreenGoBack);
       gl.domElement.style.cursor = 'default';
     };
   }, [gl, camera, onAgentClick, loadedModel, focusTarget, originalCameraPosition, hoveredCoin, 
       coin1OriginalScale, coin1OriginalEmissive, coin2OriginalScale, coin2OriginalEmissive,
       coin3OriginalScale, coin3OriginalEmissive, coin4OriginalScale, coin4OriginalEmissive, 
-      isOnMobile, clickedCoin]); // Added dependencies
+      isOnMobile, clickedCoin, onCoinFaceTap]); // Added dependencies
 
   
 
@@ -2605,11 +3028,163 @@ const CyborgTempleScene = ({
         }
       };
       
-      // Apply hovering to each coin with different phases and speeds
-      hoverCoin(coin1Ref, 'Coin1', 0, 1.2, 0.015);           // Base hover
-      hoverCoin(coin2Ref, 'Coin2', Math.PI * 0.5, 1.0, 0.012);  // Quarter phase offset, slower
-      hoverCoin(coin3Ref, 'Coin3', Math.PI * 1.5, 1.1, 0.01);        // Opposite phase, faster
-      hoverCoin(coin4Ref, 'Coin4', Math.PI * 1.5, 1.1, 0.01);   // Three-quarter phase, smallest amplitude
+      // Skip coin hover animations on mobile — Coin meshes are hidden, CoinFaces handle display
+
+      // === Carousel animation (angel tap) — staggered elastic orbit around CoinSpoke Z-axis ===
+      const cs = carouselState.current
+      if (cs.isAnimating && coinSpokeRef.current) {
+        // Staggered lerp speeds — coin 0 reacts fastest, coin 3 trails behind
+        const lerpSpeeds = [0.07, 0.055, 0.04, 0.03]
+        const coinMeshRefs = [coin1Ref, coin2Ref, coin3Ref, coin4Ref]
+        let allDone = true
+
+        for (let i = 0; i < 4; i++) {
+          const diff = cs.targetAngle - cs.coinAngles[i]
+          if (Math.abs(diff) > 0.005) {
+            allDone = false
+            cs.coinAngles[i] += diff * lerpSpeeds[i]
+          } else {
+            cs.coinAngles[i] = cs.targetAngle
+          }
+
+          // Orbit the angle difference from the start angle
+          const angleDelta = cs.coinAngles[i] - cs.coinStartAngles[i]
+
+          // Reposition CoinFace mesh by orbiting its start position around Z-axis (XY plane)
+          const cfMesh = coinFaceRefs.current[i]
+          if (cfMesh && cfMesh.userData.localStartX !== undefined) {
+            const startX = cfMesh.userData.localStartX
+            const startY = cfMesh.userData.localStartY
+            const cosA = Math.cos(angleDelta)
+            const sinA = Math.sin(angleDelta)
+            cfMesh.position.x = startX * cosA - startY * sinA
+            cfMesh.position.y = startX * sinA + startY * cosA
+          }
+
+          // Reposition Coin mesh (visible on desktop) the same way
+          const coinRef = coinMeshRefs[i]
+          if (coinRef && coinRef.current && coinRef.current.userData.localStartX !== undefined) {
+            const startX = coinRef.current.userData.localStartX
+            const startY = coinRef.current.userData.localStartY
+            const cosA = Math.cos(angleDelta)
+            const sinA = Math.sin(angleDelta)
+            coinRef.current.position.x = startX * cosA - startY * sinA
+            coinRef.current.position.y = startX * sinA + startY * cosA
+          }
+        }
+
+        // Track lead coin (fastest) for texture swap timing
+        const leadAngle = cs.coinAngles[0]
+        cs.currentAngle = leadAngle
+
+        // Swap textures when lead coin is ~25% through its rotation
+        const fullProgress = (leadAngle - (cs.targetAngle - Math.PI * 2)) / (Math.PI * 2)
+        if (fullProgress > 0.25 && !cs.textureSwapped) {
+          cs.textureSwapped = true
+          cs.showingCharacters = !cs.showingCharacters
+          coinFaceRefs.current.forEach((mesh, i) => {
+            if (!mesh) return
+            const backTex = coinBackTexturesRef.current[i]
+            const frontTex = coinFaceTexturesRef.current[i]
+            if (cs.showingCharacters && backTex) {
+              mesh.material.map = backTex
+              mesh.material.needsUpdate = true
+            } else if (!cs.showingCharacters && frontTex) {
+              mesh.material.map = frontTex
+              mesh.material.needsUpdate = true
+            }
+            // Reset individual flip state
+            const flipState = coinFaceFlipState.current[`CoinFace${i + 1}`]
+            if (flipState) {
+              flipState.isFlipped = false
+              flipState.showingBack = false
+              flipState.currentRotation = 0
+              flipState.targetRotation = 0
+            }
+          })
+        }
+
+        if (allDone) {
+          // Animation complete — all coins have reached target
+          cs.currentAngle = cs.targetAngle
+          cs.isAnimating = false
+          // Update stored start positions to current positions for next animation
+          coinFaceRefs.current.forEach((mesh, i) => {
+            if (!mesh) return
+            mesh.userData.localStartX = mesh.position.x
+            mesh.userData.localStartZ = mesh.position.z
+            const flipState = coinFaceFlipState.current[`CoinFace${i + 1}`]
+            if (flipState) {
+              flipState.currentRotation = 0
+              flipState.targetRotation = 0
+            }
+          })
+          coinMeshRefs.forEach((ref) => {
+            if (!ref.current) return
+            ref.current.userData.localStartX = ref.current.position.x
+            ref.current.userData.localStartZ = ref.current.position.z
+          })
+        }
+      }
+
+      // === Individual CoinFace flip animation (single coin tap) ===
+      if (!cs.isAnimating) {
+        coinFaceRefs.current.forEach((mesh, i) => {
+          if (!mesh) return
+          const name = `CoinFace${i + 1}`
+          const flipState = coinFaceFlipState.current[name]
+          if (!flipState) return
+
+          const lerpSpeed = 0.08
+          const diff = flipState.targetRotation - flipState.currentRotation
+          if (Math.abs(diff) > 0.001) {
+            flipState.currentRotation += diff * lerpSpeed
+            mesh.rotation.y = flipState.currentRotation
+
+            // Scale pulse at midpoint (90°)
+            const normalizedAngle = Math.abs(flipState.currentRotation % Math.PI)
+            const midpointProximity = 1 - Math.abs(normalizedAngle - Math.PI / 2) / (Math.PI / 2)
+            const scalePulse = 1 + midpointProximity * 0.15
+            if (flipState.originalScale) {
+              mesh.scale.set(
+                flipState.originalScale.x * scalePulse,
+                flipState.originalScale.y * scalePulse,
+                flipState.originalScale.z * scalePulse
+              )
+            }
+
+            // At 90° crossover, clear the texture to show blank back
+            const pastHalfway = Math.abs(flipState.currentRotation) > Math.PI / 2
+            if (pastHalfway !== flipState.showingBack) {
+              flipState.showingBack = pastHalfway
+              if (pastHalfway) {
+                // Flipping to back — show name texture (agents or supporters)
+                const showingChars = carouselState.current.showingCharacters
+                const nameTex = showingChars
+                  ? coinAgentNameTexturesRef.current[i]
+                  : coinFaceNameTexturesRef.current[i]
+                mesh.material.map = nameTex || null
+                mesh.material.needsUpdate = true
+              } else {
+                // Flipping back to front — restore the current image
+                const showingChars = carouselState.current.showingCharacters
+                const frontTex = showingChars ? coinBackTexturesRef.current[i] : coinFaceTexturesRef.current[i]
+                if (frontTex) {
+                  mesh.material.map = frontTex
+                  mesh.material.needsUpdate = true
+                }
+              }
+            }
+          } else {
+            // Snap to target
+            flipState.currentRotation = flipState.targetRotation
+            mesh.rotation.y = flipState.currentRotation
+            if (flipState.originalScale) {
+              mesh.scale.copy(flipState.originalScale)
+            }
+          }
+        })
+      }
     }
   });
 

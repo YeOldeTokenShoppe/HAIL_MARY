@@ -183,6 +183,17 @@
           && resource.data.userId == request.auth.uid;
       }
 
+      // Temple Candles - candles lit in the 3D temple scene (trade page)
+      match /templeCandles/{candleId} {
+        allow read: if true;
+        allow create: if request.auth != null
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.keys().hasAll(['candleIndex', 'userId', 'username', 'message', 'type', 'tokensBurned', 'walletAddress', 'litAt']);
+        allow update: if false;
+        allow delete: if request.auth != null
+          && resource.data.userId == request.auth.uid;
+      }
+
       // User Stats - leaderboard tracking
       match /userStats/{userId} {
         allow read: if true;

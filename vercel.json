@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/analyze-prayers",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/update-rl80-price",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

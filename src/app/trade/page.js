@@ -19,6 +19,9 @@ import NavControls from '@/components/NavControls';
 import NavControlsMobile from '@/components/NavControlsMobile';
 import SimpleTextLoader from '@/components/SimpleTextLoader';
 import SynthSunset from '@/components/SynthSunset';
+import CandleInspector from '@/components/CandleInspector';
+import LightCandleModal from '@/components/LightCandleModal';
+import { db, collection, getDocs, addDoc, query, orderBy } from '@/lib/firebaseClient';
 
 
 export default function CyborgTemple() {
@@ -37,10 +40,17 @@ export default function CyborgTemple() {
   const [isCandleModalOpen, setIsCandleModalOpen] = useState(false);
   const [focusedAgent, setFocusedAgent] = useState(null);
   const [useAurora, setUseAurora] = useState(false);
+  const swapCoinsRef = useRef(null);
+  const [coinMode, setCoinMode] = useState('agents'); // 'supporters' or 'agents'
+  const [coinVideo, setCoinVideo] = useState(null); // { src, label } when a coin video is playing
+  const [showCandleInspector, setShowCandleInspector] = useState(false);
   const [userHasInteracted, setUserHasInteracted] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [showCyberNav, setShowCyberNav] = useState(false);
   const [followerWords, setFollowerWords] = useState([]);
+  const [showLightModal, setShowLightModal] = useState(false);
+  const [templeCandles, setTempleCandles] = useState([]);
+  const [inspectedCandleData, setInspectedCandleData] = useState(null); // candle data for inspector
   
   // Get music context
   const { 
@@ -54,6 +64,25 @@ export default function CyborgTemple() {
   } = useMusic();
     
 
+    // Listen for XCandle click events
+    useEffect(() => {
+      const handler = (e) => {
+        const candleIndex = e.detail?.candleIndex ?? -1;
+        const claimed = templeCandles.find(c => c.candleIndex === candleIndex);
+        if (claimed) {
+          // Show inspector with personalized data
+          setInspectedCandleData(claimed);
+          setShowCandleInspector(true);
+        } else {
+          // Unclaimed candle — show preview with "Light this candle" button
+          setInspectedCandleData(null);
+          setShowCandleInspector(true);
+        }
+      };
+      window.addEventListener('xCandleClicked', handler);
+      return () => window.removeEventListener('xCandleClicked', handler);
+    }, [templeCandles]);
+
     // Fetch follower display names for word cluster
     useEffect(() => {
       fetch('/api/followers')
@@ -64,6 +93,22 @@ export default function CyborgTemple() {
           }
         })
         .catch(() => {}); // Silently fall back to default words
+    }, []);
+
+    // Fetch claimed temple candles from Firestore
+    useEffect(() => {
+      const fetchTempleCandles = async () => {
+        try {
+          const q = query(collection(db, 'templeCandles'), orderBy('candleIndex'));
+          const snapshot = await getDocs(q);
+          const candles = [];
+          snapshot.forEach(doc => candles.push({ id: doc.id, ...doc.data() }));
+          setTempleCandles(candles);
+        } catch (err) {
+          console.error('[Temple] Failed to fetch templeCandles:', err);
+        }
+      };
+      fetchTempleCandles();
     }, []);
 
     // Check if mobile view and device
@@ -310,7 +355,34 @@ export default function CyborgTemple() {
     return <SimpleTextLoader loading={true} progress={0} message="Loading" />;
   }
 
-  // Removed inline handler - using global listener instead
+  // Handle lighting a candle in the temple — save to templeCandles collection
+  const handleLightCandle = async (offering) => {
+    // Determine the next available candleIndex
+    const usedIndices = new Set(templeCandles.map(c => c.candleIndex));
+    let nextIndex = 0;
+    while (usedIndices.has(nextIndex)) nextIndex++;
+
+    const candleDoc = {
+      candleIndex: nextIndex,
+      userId: offering.userId,
+      username: offering.name || 'Anonymous',
+      userImageUrl: offering.userImageUrl || null,
+      message: offering.message || '',
+      type: offering.type || 'petition',
+      tokensBurned: offering.tokensBurned || 0,
+      walletAddress: offering.walletAddress || '',
+      litAt: Date.now(),
+    };
+
+    try {
+      const docRef = await addDoc(collection(db, 'templeCandles'), candleDoc);
+      setTempleCandles(prev => [...prev, { id: docRef.id, ...candleDoc }]);
+    } catch (err) {
+      console.error('[Temple] Failed to save temple candle:', err);
+    }
+
+    setShowLightModal(false);
+  };
 
   return (
     <>
@@ -410,12 +482,12 @@ export default function CyborgTemple() {
         {/* RL80 Title and Description */}
         <div style={{
           position: "fixed",
-          top: "20px", 
-         left: isMobileView ? "2rem" : "5rem",
+          top: "20px",
+          left: isMobileView ? "2rem" : "5rem",
           borderRadius: "8px",
           padding: "10px",
-          pointerEvents: "auto",
-          opacity: fontLoaded ? 1 : 0,
+          pointerEvents: focusedAgent?.startsWith('Screen') ? 'none' : 'auto',
+          opacity: focusedAgent?.startsWith('Screen') ? 0 : (fontLoaded ? 1 : 0),
           transition: "opacity 0.3s ease-in-out",
           zIndex: 10000,
         }}>
@@ -489,8 +561,8 @@ export default function CyborgTemple() {
           zIndex: 10,
           transition: "all 0.5s ease-in-out",
           cursor: userHasInteracted ? "default" : "pointer",
-          // Allow touch events to pass through when collapsed
-          pointerEvents: "auto",
+          // Pass through pointer events when collapsed on mobile (otherwise blocks 3D coin clicks)
+          pointerEvents: userHasInteracted ? "none" : "auto",
         }}>
         </div>
         {/* Aurora Background - Only render when Aurora is selected AND (not in 80s mode OR on mobile) */}
@@ -724,6 +796,18 @@ export default function CyborgTemple() {
               is80sMode={context80sMode}
               isMobile={isMobileView}
               followerWords={followerWords}
+              templeCandles={templeCandles}
+              onSwapCoinsReady={(fn) => { swapCoinsRef.current = fn }}
+              onCoinFaceTap={(coinIndex) => {
+                const coinVideos = [
+                  null, // CoinFace1 — Our Lady (no video yet)
+                  { src: '/videos/gr80_greetings.mp4', label: 'St. GR80' },
+                  null, // CoinFace3 — H80Z (no video yet)
+                  null, // CoinFace4 — TBD
+                ]
+                const video = coinVideos[coinIndex]
+                if (video) setCoinVideo(video)
+              }}
               onAgentClick={(agentId) => {
                 if (agentId) {
                   setFocusedAgent(agentId);
@@ -790,6 +874,171 @@ export default function CyborgTemple() {
         )}
         
 
+        {/* Coin Mode Buttons - Mobile only */}
+        {isMobileView && mounted && !isCandleModalOpen && (
+          <div style={{
+            position: 'fixed',
+            bottom: '5.5rem',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1000,
+            display: 'flex',
+            gap: 12,
+          }}>
+            <button
+              onClick={() => {
+                if (coinMode !== 'supporters') {
+                  swapCoinsRef.current?.()
+                  setCoinMode('supporters')
+                }
+              }}
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: '50%',
+                background: coinMode === 'supporters' ? 'rgba(255, 215, 0, 0.15)' : 'rgba(0, 0, 0, 0.6)',
+                border: `2px solid ${coinMode === 'supporters' ? 'rgba(255, 215, 0, 0.8)' : 'rgba(255, 255, 255, 0.2)'}`,
+                color: coinMode === 'supporters' ? 'rgba(255, 215, 0, 0.95)' : 'rgba(255, 255, 255, 0.5)',
+                fontSize: 10,
+                fontFamily: 'monospace',
+                fontWeight: coinMode === 'supporters' ? 700 : 400,
+                lineHeight: '1.1',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                cursor: 'pointer',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                transition: 'all 0.3s ease',
+                padding: 4,
+              }}
+              aria-label="Show top supporters"
+            >
+              Top<br/>Fans
+            </button>
+            <button
+              onClick={() => {
+                if (coinMode !== 'agents') {
+                  swapCoinsRef.current?.()
+                  setCoinMode('agents')
+                }
+              }}
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: '50%',
+                background: coinMode === 'agents' ? 'rgba(0, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.6)',
+                border: `2px solid ${coinMode === 'agents' ? 'rgba(0, 255, 255, 0.8)' : 'rgba(255, 255, 255, 0.2)'}`,
+                color: coinMode === 'agents' ? 'rgba(0, 255, 255, 0.95)' : 'rgba(255, 255, 255, 0.5)',
+                fontSize: 10,
+                fontFamily: 'monospace',
+                fontWeight: coinMode === 'agents' ? 700 : 400,
+                lineHeight: '1.1',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                cursor: 'pointer',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                transition: 'all 0.3s ease',
+                padding: 4,
+              }}
+              aria-label="Show project managers"
+            >
+              Project<br/>Mgrs
+            </button>
+          </div>
+        )}
+
+        {/* Coin Video Overlay — expands from coin position */}
+        {coinVideo && (
+          <div
+            onClick={() => setCoinVideo(null)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 2000,
+              background: 'rgba(0, 0, 0, 0.6)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: '85vw',
+                maxWidth: 360,
+                borderRadius: 16,
+                overflow: 'hidden',
+                border: '2px solid rgba(255, 215, 0, 0.6)',
+                background: '#0a0a1a',
+                boxShadow: '0 0 30px rgba(255, 215, 0, 0.15)',
+              }}
+            >
+              <video
+                src={coinVideo.src}
+                autoPlay
+                playsInline
+                controls
+                style={{
+                  width: '100%',
+                  display: 'block',
+                }}
+              />
+              <div style={{
+                padding: '10px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+                <span style={{
+                  color: 'rgba(255, 215, 0, 0.9)',
+                  fontFamily: 'monospace',
+                  fontSize: 14,
+                  fontWeight: 700,
+                }}>
+                  {coinVideo.label}
+                </span>
+                <button
+                  onClick={() => setCoinVideo(null)}
+                  style={{
+                    background: 'none',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    borderRadius: 8,
+                    color: 'rgba(255, 255, 255, 0.6)',
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                    padding: '4px 12px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* XCandle Inspector Overlay */}
+        {showCandleInspector && (
+          <CandleInspector
+            onClose={() => { setShowCandleInspector(false); setInspectedCandleData(null); }}
+            candleData={inspectedCandleData}
+            onLightCandle={() => { setShowCandleInspector(false); setShowLightModal(true); }}
+          />
+        )}
+
+        {/* Light a Candle Modal */}
+        <LightCandleModal
+          isOpen={showLightModal}
+          onClose={() => setShowLightModal(false)}
+          onLightCandle={handleLightCandle}
+          skipFirestore={true}
+        />
+
         {/* Top Controls Container - Music, User, and Nav */}
         {mounted && (
           <>
@@ -800,6 +1049,9 @@ export default function CyborgTemple() {
                 top: "1rem",
                 right: "1rem",
                 zIndex: 1001,
+                opacity: focusedAgent?.startsWith('Screen') ? 0 : 1,
+                pointerEvents: focusedAgent?.startsWith('Screen') ? 'none' : 'auto',
+                transition: 'opacity 0.3s ease',
               }}
             >
               {isMobileView ? (
@@ -838,7 +1090,7 @@ export default function CyborgTemple() {
             </div>
 
             {/* Telegram Feature Box - Desktop only */}
-            {!isMobileView && (
+            {!isMobileView && !focusedAgent?.startsWith('Screen') && (
               <a
                 href="https://t.me/rl80_chat"
                 target="_blank"
@@ -882,10 +1134,46 @@ export default function CyborgTemple() {
                     lineHeight: '1.3',
                     textAlign: 'center',
                   }}>
-                    Hang out with the RL80 team in the Telegram group!
+                    Hang out with us in the Telegram group!
                   </span>
                 </div>
               </a>
+            )}
+
+            {/* Light a Candle Button - Desktop only */}
+            {!isMobileView && !focusedAgent?.startsWith('Screen') && (
+              <button
+                onClick={() => setShowLightModal(true)}
+                style={{
+                  position: 'fixed',
+                  top: '18rem',
+                  right: '1rem',
+                  zIndex: 1001,
+                  width: '200px',
+                  background: 'rgba(0, 0, 0, 0.7)',
+                  border: '1px solid rgba(255, 215, 0, 0.4)',
+                  borderRadius: '8px',
+                  padding: '10px 14px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  backdropFilter: 'blur(8px)',
+                  transition: 'border-color 0.3s ease',
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.borderColor = 'rgba(255, 215, 0, 0.8)'}
+                onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(255, 215, 0, 0.4)'}
+              >
+                <span style={{ fontSize: '20px' }}>&#x1F56F;</span>
+                <span style={{
+                  color: 'rgba(255, 215, 0, 0.9)',
+                  fontSize: '12px',
+                  fontFamily: 'monospace',
+                  fontWeight: 700,
+                }}>
+                  Light a Candle
+                </span>
+              </button>
             )}
 
             {/* CyberNav Menu - Show when toggled */}
