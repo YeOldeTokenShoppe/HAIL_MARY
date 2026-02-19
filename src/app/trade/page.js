@@ -51,6 +51,7 @@ export default function CyborgTemple() {
   const [showLightModal, setShowLightModal] = useState(false);
   const [templeCandles, setTempleCandles] = useState([]);
   const [inspectedCandleData, setInspectedCandleData] = useState(null); // candle data for inspector
+  const pendingCandleRef = useRef(null); // tracks {candleIndex, isLargeCandle} for the candle being lit
   
   // Get music context
   const { 
@@ -68,16 +69,15 @@ export default function CyborgTemple() {
     useEffect(() => {
       const handler = (e) => {
         const candleIndex = e.detail?.candleIndex ?? -1;
+        const isLargeCandle = e.detail?.isLargeCandle ?? false;
         const claimed = templeCandles.find(c => c.candleIndex === candleIndex);
         if (claimed) {
-          // Show inspector with personalized data
           setInspectedCandleData(claimed);
-          setShowCandleInspector(true);
         } else {
-          // Unclaimed candle — show preview with "Light this candle" button
-          setInspectedCandleData(null);
-          setShowCandleInspector(true);
+          // Pass size info so inspector shows correct model
+          setInspectedCandleData({ isLargeCandle, _unclaimed: true });
         }
+        setShowCandleInspector(true);
       };
       window.addEventListener('xCandleClicked', handler);
       return () => window.removeEventListener('xCandleClicked', handler);
@@ -362,6 +362,9 @@ export default function CyborgTemple() {
     let nextIndex = 0;
     while (usedIndices.has(nextIndex)) nextIndex++;
 
+    const pending = pendingCandleRef.current;
+    const isLarge = pending?.isLargeCandle ?? false;
+
     const candleDoc = {
       candleIndex: nextIndex,
       userId: offering.userId,
@@ -371,6 +374,7 @@ export default function CyborgTemple() {
       type: offering.type || 'petition',
       tokensBurned: offering.tokensBurned || 0,
       walletAddress: offering.walletAddress || '',
+      isLargeCandle: isLarge,
       litAt: Date.now(),
     };
 
@@ -381,6 +385,7 @@ export default function CyborgTemple() {
       console.error('[Temple] Failed to save temple candle:', err);
     }
 
+    pendingCandleRef.current = null;
     setShowLightModal(false);
   };
 
@@ -1026,8 +1031,14 @@ export default function CyborgTemple() {
         {showCandleInspector && (
           <CandleInspector
             onClose={() => { setShowCandleInspector(false); setInspectedCandleData(null); }}
-            candleData={inspectedCandleData}
-            onLightCandle={() => { setShowCandleInspector(false); setShowLightModal(true); }}
+            candleData={inspectedCandleData?._unclaimed ? null : inspectedCandleData}
+            isLargeCandle={inspectedCandleData?.isLargeCandle ?? false}
+            onLightCandle={() => {
+              // Store which candle spot is being lit
+              pendingCandleRef.current = inspectedCandleData;
+              setShowCandleInspector(false);
+              setShowLightModal(true);
+            }}
           />
         )}
 

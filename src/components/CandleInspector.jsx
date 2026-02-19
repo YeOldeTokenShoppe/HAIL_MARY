@@ -4,8 +4,9 @@ import { OrbitControls, useGLTF, Environment } from '@react-three/drei'
 import { useRef, useEffect } from 'react'
 import * as THREE from 'three'
 
-function CandleModel({ userImageUrl }) {
-  const { scene, animations } = useGLTF('/models/tinyVotiveOnly.glb')
+function CandleModel({ userImageUrl, isLargeCandle = false }) {
+  const modelPath = isLargeCandle ? '/models/largeVotiveCandle.glb' : '/models/tinyVotiveOnly.glb'
+  const { scene, animations } = useGLTF(modelPath)
   const groupRef = useRef()
   const mixerRef = useRef()
 
@@ -71,7 +72,7 @@ function CandleModel({ userImageUrl }) {
   )
 }
 
-export default function CandleInspector({ onClose, candleData, onLightCandle }) {
+export default function CandleInspector({ onClose, candleData, onLightCandle, isLargeCandle = false }) {
   return (
     <div
       onClick={onClose}
@@ -111,7 +112,7 @@ export default function CandleInspector({ onClose, candleData, onLightCandle }) 
             <ambientLight intensity={0.4} />
             <directionalLight position={[3, 5, 7]} intensity={1} />
             <pointLight position={[-2, 2, -1]} intensity={0.5} color="#ffd700" />
-            <CandleModel userImageUrl={candleData?.userImageUrl} />
+            <CandleModel key={isLargeCandle ? 'large' : 'small'} userImageUrl={candleData?.userImageUrl} isLargeCandle={candleData?.isLargeCandle ?? isLargeCandle} />
             <OrbitControls
               enablePan={false}
               enableZoom={true}
@@ -204,7 +205,7 @@ export default function CandleInspector({ onClose, candleData, onLightCandle }) 
                   fontSize: 14,
                   fontWeight: 700,
                 }}>
-                  Empty Candle
+                  {isLargeCandle ? '3-Day Candle' : 'Votive Candle'}
                 </span>
                 {onLightCandle && (
                   <button

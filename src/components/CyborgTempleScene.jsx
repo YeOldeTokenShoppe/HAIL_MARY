@@ -1228,25 +1228,20 @@ const CyborgTempleScene = ({
         
         // Collect and make XCandle objects clickable
         if (child.name && child.name.startsWith('XCandle01')) {
+          // Large candles (XCandle01.009–013) have scale ~0.078 vs ~0.070 for small ones
+          const isLarge = child.scale && child.scale.x > 0.075;
           // Store in collection array (will sort after traversal)
           xCandleNodesRef.current.push(child);
           const setCandleClickable = (obj) => {
             obj.userData.clickable = true;
             obj.userData.agentId = 'XCandle';
             obj.userData.agentName = 'XCandle';
+            obj.userData.isLargeCandle = isLarge;
             if (obj.children && obj.children.length > 0) {
               obj.children.forEach(setCandleClickable);
             }
           };
           setCandleClickable(child);
-          // Dim unclaimed candles (low opacity dark material) so they're visible but faded
-          child.traverse((descendant) => {
-            if (descendant.isMesh) {
-              descendant.material = descendant.material.clone();
-              descendant.material.transparent = true;
-              descendant.material.opacity = 0.15;
-            }
-          });
         }
 
         // Find angel and coin objects for MOBILE.glb animations
@@ -1564,13 +1559,6 @@ const CyborgTempleScene = ({
     templeCandles.forEach((candle) => {
       const node = xCandleNodesRef.current[candle.candleIndex];
       if (!node) return;
-      // Brighten the claimed candle back to full opacity
-      node.traverse((descendant) => {
-        if (descendant.isMesh) {
-          descendant.material.opacity = 1;
-          descendant.material.transparent = false;
-        }
-      });
       // Swap senora mesh texture with user image
       if (candle.userImageUrl) {
         node.traverse((descendant) => {
@@ -2003,7 +1991,10 @@ const CyborgTempleScene = ({
           // XCandle click — dispatch event with candleIndex for inspection overlay
           if (object.userData.agentId === 'XCandle') {
             window.dispatchEvent(new CustomEvent('xCandleClicked', {
-              detail: { candleIndex: object.userData.candleIndex ?? -1 }
+              detail: {
+                candleIndex: object.userData.candleIndex ?? -1,
+                isLargeCandle: object.userData.isLargeCandle ?? false,
+              }
             }));
             break;
           }
