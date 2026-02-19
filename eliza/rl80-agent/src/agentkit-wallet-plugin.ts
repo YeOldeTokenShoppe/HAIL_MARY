@@ -73,12 +73,13 @@ const walletInfoProvider: Provider = {
       }
 
       const text = [
-        `Our Lady's wallet: rl80.base.eth (${walletAddress}) on Base`,
+        `Our Lady's PRIMARY wallet: RL80.eth (0x07363eac9c24Af6451EBA07ff16CbD687dA4508A) — works on Ethereum and all EVM chains.`,
+        `Our Lady's SECONDARY wallet (Base only): rl80.base.eth (${walletAddress}) on Base`,
         `ETH balance: ${ethBalance.toFixed(6)} ETH`,
         `RL80 balance: ${rl80Balance.toLocaleString()} RL80`,
         ``,
-        `When sharing your wallet address, always say rl80.base.eth as the primary name.`,
-        `Anyone can send tips or donations to rl80.base.eth on the Base network.`,
+        `When sharing your wallet address, ALWAYS say RL80.eth first. Mention rl80.base.eth as a secondary option for users on Base.`,
+        `Anyone can send tips or donations to RL80.eth on any network, or rl80.base.eth on Base.`,
       ].join('\n');
 
       return {
