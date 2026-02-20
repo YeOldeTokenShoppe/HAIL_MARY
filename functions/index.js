@@ -1041,3 +1041,121 @@ exports.upgradeXPostImages = onRequest({
     res.status(500).json({ error: error.message });
   }
 });
+
+// =========================================================================
+// RL80 PRICE UPDATE — Fetches from GeckoTerminal and writes to Firestore
+// =========================================================================
+
+const POOL_ADDRESS = "0x40d827aCDBEfd8Ef46953e2b1AC87b8697b82203";
+const GECKO_BASE = "https://api.geckoterminal.com/api/v2/networks/base/pools";
+
+// Scheduled: every 5 minutes
+exports.updateRL80Price = onSchedule({
+  schedule: "every 5 minutes",
+  timeZone: "UTC",
+  retryCount: 1,
+}, async () => {
+  try {
+    logger.info("[RL80Price] Fetching price from GeckoTerminal...");
+
+    const [poolRes, dailyRes, hourlyRes, minuteRes] = await Promise.all([
+      fetch(`${GECKO_BASE}/${POOL_ADDRESS}`, {
+        headers: { Accept: "application/json" },
+      }),
+      fetch(`${GECKO_BASE}/${POOL_ADDRESS}/ohlcv/day?aggregate=1&limit=90`, {
+        headers: { Accept: "application/json" },
+      }),
+      fetch(`${GECKO_BASE}/${POOL_ADDRESS}/ohlcv/hour?aggregate=1&limit=168`, {
+        headers: { Accept: "application/json" },
+      }),
+      fetch(`${GECKO_BASE}/${POOL_ADDRESS}/ohlcv/minute?aggregate=15&limit=96`, {
+        headers: { Accept: "application/json" },
+      }),
+    ]);
+
+    if (poolRes.status === 429) {
+      logger.warn("[RL80Price] GeckoTerminal rate limited, will retry next run");
+      return;
+    }
+
+    const poolJson = await poolRes.json();
+    const dailyJson = await dailyRes.json();
+    const hourlyJson = await hourlyRes.json();
+    const minuteJson = await minuteRes.json();
+
+    const pool = poolJson?.data?.attributes || {};
+    const dailyList = dailyJson?.data?.attributes?.ohlcv_list || [];
+    const hourlyList = hourlyJson?.data?.attributes?.ohlcv_list || [];
+    const minuteList = minuteJson?.data?.attributes?.ohlcv_list || [];
+
+    const ohlcvList = dailyList.length >= 10 ? dailyList :
+                      hourlyList.length >= 10 ? hourlyList :
+                      minuteList.length > 0 ? minuteList : hourlyList;
+
+    const price = parseFloat(pool.base_token_price_usd) || null;
+    const priceChange24h = parseFloat(pool.price_change_percentage?.h24) || 0;
+    const fdv = parseFloat(pool.fdv_usd) || null;
+    const liquidity = parseFloat(pool.reserve_in_usd) || null;
+
+    const ohlcv = ohlcvList.map(([ts, , , , close]) => ({
+      time: Math.floor(ts),
+      value: close,
+    })).sort((a, b) => a.time - b.time);
+
+    const candles = ohlcvList.map(([ts, open, high, low, close, volume]) => ({
+      time: Math.floor(ts / 1000),
+      open,
+      high,
+      low,
+      close,
+      volume: volume || 0,
+    })).sort((a, b) => a.time - b.time);
+
+    const result = {
+      price,
+      priceChange24h,
+      fdv,
+      liquidity,
+      ohlcv,
+      candles,
+      timeframe: dailyList.length >= 10 ? "daily" :
+                 hourlyList.length >= 10 ? "hourly" :
+                 minuteList.length > 0 ? "15m" : "hourly",
+      updatedAt: new Date().toISOString(),
+      success: true,
+    };
+
+    await db.collection("market").doc("rl80-price").set(result);
+    logger.info(`[RL80Price] Price updated: $${price}`);
+  } catch (error) {
+    logger.error("[RL80Price] Update failed:", error);
+    try {
+      await db.collection("market").doc("rl80-price").set({
+        error: error.message,
+        updatedAt: new Date().toISOString(),
+        success: false,
+      }, { merge: true });
+    } catch (fsErr) {
+      logger.error("[RL80Price] Failed to save error state:", fsErr);
+    }
+  }
+});
+
+// Manual trigger for testing
+exports.updateRL80PriceManual = onRequest({
+  secrets: ["CRON_SECRET"],
+}, async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const cronSecret = process.env.CRON_SECRET;
+  if (!authHeader || authHeader !== "Bearer " + cronSecret) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  try {
+    await exports.updateRL80Price.run({});
+    res.json({ success: true });
+  } catch (error) {
+    logger.error("[RL80Price] Manual trigger failed:", error);
+    res.status(500).json({ error: error.message });
+  }
+});

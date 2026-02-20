@@ -1242,6 +1242,8 @@ const CyborgTempleScene = ({
             }
           };
           setCandleClickable(child);
+          // Hide by default — claimed candles get shown by the templeCandles useEffect
+          child.visible = false;
         }
 
         // Find angel and coin objects for MOBILE.glb animations
@@ -1559,6 +1561,8 @@ const CyborgTempleScene = ({
     templeCandles.forEach((candle) => {
       const node = xCandleNodesRef.current[candle.candleIndex];
       if (!node) return;
+      // Show the claimed candle
+      node.visible = true;
       // Swap senora mesh texture with user image
       if (candle.userImageUrl) {
         node.traverse((descendant) => {
@@ -1988,14 +1992,38 @@ const CyborgTempleScene = ({
             });
           }
 
-          // XCandle click — dispatch event with candleIndex for inspection overlay
+          // XCandle click — first click zooms in, second click opens inspector
           if (object.userData.agentId === 'XCandle') {
-            window.dispatchEvent(new CustomEvent('xCandleClicked', {
-              detail: {
-                candleIndex: object.userData.candleIndex ?? -1,
-                isLargeCandle: object.userData.isLargeCandle ?? false,
+            const candleIndex = object.userData.candleIndex ?? -1;
+            const isAlreadyFocused = focusTarget && focusTarget.agentId === 'XCandle' && focusTarget.candleIndex === candleIndex;
+
+            if (isAlreadyFocused) {
+              // Second click — show info overlay (stay zoomed)
+              window.dispatchEvent(new CustomEvent('xCandleClicked', {
+                detail: {
+                  candleIndex,
+                  isLargeCandle: object.userData.isLargeCandle ?? false,
+                }
+              }));
+            } else {
+              // First click — zoom camera to candle
+              if (!focusTarget) {
+                originalCameraPosition.current = camera.position.clone();
               }
-            }));
+              const targetObj = object.userData.targetObject || object;
+              const candleWorldPos = new THREE.Vector3();
+              targetObj.getWorldPosition(candleWorldPos);
+              // Position camera slightly in front and above the candle
+              const cameraOffset = new THREE.Vector3(0, 0.3, 1.2);
+              const cameraPos = candleWorldPos.clone().add(cameraOffset);
+              setFocusTarget({
+                position: cameraPos,
+                lookAt: candleWorldPos,
+                agentId: 'XCandle',
+                agentName: 'XCandle',
+                candleIndex,
+              });
+            }
             break;
           }
 
@@ -2900,22 +2928,43 @@ const CyborgTempleScene = ({
     
     // Camera focus animation
     if (focusTarget) {
-      // Smoothly move camera to target position
-      camera.position.lerp(focusTarget.position, 0.05);
-      
-      // Look at the target
-      const lookAtVector = new THREE.Vector3();
-      lookAtVector.lerpVectors(
-        new THREE.Vector3(
-          camera.getWorldDirection(new THREE.Vector3()).x,
-          camera.getWorldDirection(new THREE.Vector3()).y,
-          camera.getWorldDirection(new THREE.Vector3()).z
-        ),
-        focusTarget.lookAt,
-        0.05
-      );
-      camera.lookAt(focusTarget.lookAt);
-      
+      // For XCandle focus: lerp to position then release control to OrbitControls
+      if (focusTarget.agentId === 'XCandle') {
+        if (!focusTarget._arrived) {
+          camera.position.lerp(focusTarget.position, 0.08);
+          camera.lookAt(focusTarget.lookAt);
+          const dist = camera.position.distanceTo(focusTarget.position);
+          if (dist < 0.1) {
+            focusTarget._arrived = true;
+            // Update OrbitControls target so it orbits around the candle, not the origin
+            if (state.controls && state.controls.target) {
+              state.controls.target.copy(focusTarget.lookAt);
+              state.controls.update();
+            }
+          }
+        }
+        // Once _arrived is set, do nothing — OrbitControls take over
+      } else {
+        // Smoothly move camera to target position
+        camera.position.lerp(focusTarget.position, 0.05);
+
+        // Look at the target
+        const lookAtVector = new THREE.Vector3();
+        lookAtVector.lerpVectors(
+          new THREE.Vector3(
+            camera.getWorldDirection(new THREE.Vector3()).x,
+            camera.getWorldDirection(new THREE.Vector3()).y,
+            camera.getWorldDirection(new THREE.Vector3()).z
+          ),
+          focusTarget.lookAt,
+          0.05
+        );
+        camera.lookAt(focusTarget.lookAt);
+        // Reset OrbitControls target when returning from candle focus
+        if (focusTarget.agentName === 'Reset' && state.controls && state.controls.target) {
+          state.controls.target.lerp(focusTarget.lookAt, 0.05);
+        }
+      }
     }
     
     // Add subtle animations for mobile objects

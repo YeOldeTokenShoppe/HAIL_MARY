@@ -19,7 +19,6 @@ import NavControls from '@/components/NavControls';
 import NavControlsMobile from '@/components/NavControlsMobile';
 import SimpleTextLoader from '@/components/SimpleTextLoader';
 import SynthSunset from '@/components/SynthSunset';
-import CandleInspector from '@/components/CandleInspector';
 import LightCandleModal from '@/components/LightCandleModal';
 import { db, collection, getDocs, addDoc, query, orderBy } from '@/lib/firebaseClient';
 
@@ -51,7 +50,6 @@ export default function CyborgTemple() {
   const [showLightModal, setShowLightModal] = useState(false);
   const [templeCandles, setTempleCandles] = useState([]);
   const [inspectedCandleData, setInspectedCandleData] = useState(null); // candle data for inspector
-  const pendingCandleRef = useRef(null); // tracks {candleIndex, isLargeCandle} for the candle being lit
   
   // Get music context
   const { 
@@ -65,17 +63,15 @@ export default function CyborgTemple() {
   } = useMusic();
     
 
-    // Listen for XCandle click events
+    // Listen for XCandle click events (second click while zoomed in)
     useEffect(() => {
       const handler = (e) => {
         const candleIndex = e.detail?.candleIndex ?? -1;
-        const isLargeCandle = e.detail?.isLargeCandle ?? false;
         const claimed = templeCandles.find(c => c.candleIndex === candleIndex);
         if (claimed) {
           setInspectedCandleData(claimed);
         } else {
-          // Pass size info so inspector shows correct model
-          setInspectedCandleData({ isLargeCandle, _unclaimed: true });
+          setInspectedCandleData({ _unclaimed: true });
         }
         setShowCandleInspector(true);
       };
@@ -95,14 +91,35 @@ export default function CyborgTemple() {
         .catch(() => {}); // Silently fall back to default words
     }, []);
 
-    // Fetch claimed temple candles from Firestore
+    // Fetch claimed temple candles from Firestore + always include developer candle
+    const DEV_CANDLE = {
+      id: '_dev',
+      candleIndex: 0,
+      userId: 'developer',
+      username: 'the developer',
+      userImageUrl: null,
+      message: 'First light in the temple. Build something worth believing in.',
+      type: 'appreciation',
+      tokensBurned: 0,
+      walletAddress: '',
+      litAt: 1739980800000, // Fixed timestamp
+    };
     useEffect(() => {
       const fetchTempleCandles = async () => {
         try {
           const q = query(collection(db, 'templeCandles'), orderBy('candleIndex'));
           const snapshot = await getDocs(q);
-          const candles = [];
-          snapshot.forEach(doc => candles.push({ id: doc.id, ...doc.data() }));
+          const candles = [DEV_CANDLE]; // Always start with the developer candle
+          snapshot.forEach(doc => {
+            const data = doc.data();
+            // Skip if someone claimed index 0 (replace the dev candle)
+            if (data.candleIndex === 0) {
+              candles[0] = { id: doc.id, ...data };
+            } else {
+              candles.push({ id: doc.id, ...data });
+            }
+          });
+
           setTempleCandles(candles);
         } catch (err) {
           console.error('[Temple] Failed to fetch templeCandles:', err);
@@ -362,9 +379,6 @@ export default function CyborgTemple() {
     let nextIndex = 0;
     while (usedIndices.has(nextIndex)) nextIndex++;
 
-    const pending = pendingCandleRef.current;
-    const isLarge = pending?.isLargeCandle ?? false;
-
     const candleDoc = {
       candleIndex: nextIndex,
       userId: offering.userId,
@@ -374,7 +388,6 @@ export default function CyborgTemple() {
       type: offering.type || 'petition',
       tokensBurned: offering.tokensBurned || 0,
       walletAddress: offering.walletAddress || '',
-      isLargeCandle: isLarge,
       litAt: Date.now(),
     };
 
@@ -385,7 +398,6 @@ export default function CyborgTemple() {
       console.error('[Temple] Failed to save temple candle:', err);
     }
 
-    pendingCandleRef.current = null;
     setShowLightModal(false);
   };
 
@@ -1027,19 +1039,118 @@ export default function CyborgTemple() {
           </div>
         )}
 
-        {/* XCandle Inspector Overlay */}
+        {/* XCandle Info Overlay — shown while zoomed in */}
         {showCandleInspector && (
-          <CandleInspector
-            onClose={() => { setShowCandleInspector(false); setInspectedCandleData(null); }}
-            candleData={inspectedCandleData?._unclaimed ? null : inspectedCandleData}
-            isLargeCandle={inspectedCandleData?.isLargeCandle ?? false}
-            onLightCandle={() => {
-              // Store which candle spot is being lit
-              pendingCandleRef.current = inspectedCandleData;
-              setShowCandleInspector(false);
-              setShowLightModal(true);
-            }}
-          />
+          <div style={{
+            position: 'fixed',
+            bottom: '2rem',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 2000,
+            background: 'rgba(0, 0, 0, 0.8)',
+            border: '1px solid rgba(255, 215, 0, 0.4)',
+            borderRadius: 12,
+            padding: '12px 20px',
+            backdropFilter: 'blur(12px)',
+            maxWidth: 340,
+            minWidth: 200,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+          }}>
+            {inspectedCandleData && !inspectedCandleData._unclaimed ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  {inspectedCandleData.userImageUrl && (
+                    <img
+                      src={inspectedCandleData.userImageUrl}
+                      alt=""
+                      style={{
+                        width: 32, height: 32, borderRadius: '50%',
+                        border: '1px solid rgba(255, 215, 0, 0.5)',
+                      }}
+                    />
+                  )}
+                  <span style={{
+                    color: 'rgba(255, 215, 0, 0.95)',
+                    fontFamily: 'monospace',
+                    fontSize: 14,
+                    fontWeight: 700,
+                  }}>
+                    {inspectedCandleData.username || 'Anonymous'}
+                  </span>
+                </div>
+                {inspectedCandleData.message && (
+                  <p style={{
+                    color: 'rgba(255, 255, 255, 0.75)',
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    margin: 0,
+                    fontStyle: 'italic',
+                    lineHeight: 1.4,
+                  }}>
+                    &ldquo;{inspectedCandleData.message}&rdquo;
+                  </p>
+                )}
+                {inspectedCandleData.tokensBurned > 0 && (
+                  <span style={{
+                    color: 'rgba(255, 165, 0, 0.7)',
+                    fontFamily: 'monospace',
+                    fontSize: 11,
+                  }}>
+                    {inspectedCandleData.tokensBurned.toLocaleString()} RL80 burned
+                  </span>
+                )}
+              </>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{
+                  color: 'rgba(255, 215, 0, 0.9)',
+                  fontFamily: 'monospace',
+                  fontSize: 13,
+                }}>
+                  This candle is available
+                </span>
+                <button
+                  onClick={() => {
+                    setShowCandleInspector(false);
+                    setShowLightModal(true);
+                  }}
+                  style={{
+                    background: 'rgba(255, 215, 0, 0.15)',
+                    border: '1px solid rgba(255, 215, 0, 0.5)',
+                    borderRadius: 8,
+                    color: 'rgba(255, 215, 0, 0.95)',
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                    fontWeight: 700,
+                    padding: '5px 14px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Light it
+                </button>
+              </div>
+            )}
+            <button
+              onClick={() => {
+                setShowCandleInspector(false);
+                setInspectedCandleData(null);
+              }}
+              style={{
+                alignSelf: 'flex-end',
+                background: 'none',
+                border: 'none',
+                color: 'rgba(255, 255, 255, 0.4)',
+                fontSize: 11,
+                fontFamily: 'monospace',
+                cursor: 'pointer',
+                padding: '2px 0',
+              }}
+            >
+              close
+            </button>
+          </div>
         )}
 
         {/* Light a Candle Modal */}
