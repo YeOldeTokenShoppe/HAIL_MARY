@@ -9,7 +9,7 @@ export const h80zCharacter: Character = {
     '@elizaos/plugin-bootstrap',
   ],
   settings: {
-    model: 'claude-haiku-3-5-20241022',
+    model: 'claude-haiku-4-5-20251001',
   },
   secrets: {
     TELEGRAM_BOT_TOKEN: process.env.H80Z_TELEGRAM_BOT_TOKEN || '',
