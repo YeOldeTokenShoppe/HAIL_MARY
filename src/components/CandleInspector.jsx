@@ -67,7 +67,7 @@ function CandleModel({ userImageUrl, isLargeCandle = false }) {
 
   return (
     <group ref={groupRef}>
-      <primitive object={scene} scale={2.1} position={[0, 0.2, 0]} />
+      <primitive object={scene} scale={1.7} position={[0, 0.3, 0]} />
     </group>
   )
 }
@@ -89,10 +89,10 @@ export default function CandleInspector({ onClose, candleData, onLightCandle, is
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: '80vw',
-          height: '70vh',
-          maxWidth: 600,
-          maxHeight: 500,
+          width: '70vw',
+          height: '80vh',
+          maxWidth: 500,
+          maxHeight: 600,
           borderRadius: 16,
           overflow: 'hidden',
           border: '2px solid rgba(255, 215, 0, 0.5)',
@@ -106,7 +106,7 @@ export default function CandleInspector({ onClose, candleData, onLightCandle, is
         {/* 3D candle view */}
         <div style={{ flex: 1, minHeight: 0 }}>
           <Canvas
-            camera={{ position: [0, 0, 5], fov: 45 }}
+            camera={{ position: [0, 1, 7], fov: 45 }}
             style={{ width: '100%', height: '100%' }}
           >
             <ambientLight intensity={0.4} />
@@ -116,10 +116,10 @@ export default function CandleInspector({ onClose, candleData, onLightCandle, is
             <OrbitControls
               enablePan={false}
               enableZoom={true}
-              minDistance={1.5}
-              maxDistance={6}
-              autoRotate
-              autoRotateSpeed={1.5}
+              minDistance={2}
+              maxDistance={8}
+              // autoRotate
+              // autoRotateSpeed={1.5}
             />
             <Environment preset="night" />
           </Canvas>
