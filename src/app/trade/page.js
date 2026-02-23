@@ -815,15 +815,22 @@ export default function CyborgTemple() {
               followerWords={followerWords}
               templeCandles={templeCandles}
               onSwapCoinsReady={(fn) => { swapCoinsRef.current = fn }}
-              onCoinFaceTap={(coinIndex) => {
-                const coinVideos = [
-                  null, // CoinFace1 — Our Lady (no video yet)
-                  { src: '/videos/gr80_greetings.mp4', label: 'St. GR80' },
-                  null, // CoinFace3 — H80Z (no video yet)
-                  null, // CoinFace4 — TBD
-                ]
-                const video = coinVideos[coinIndex]
-                if (video) setCoinVideo(video)
+              onCoinFaceTap={(coinIndex, isCharacters) => {
+                if (isCharacters) {
+                  // Agent/character coins
+                  const coinVideos = [
+                    null, // CoinFace1 — Our Lady (no video yet)
+                    { src: '/videos/gr80_greetings.mp4', label: 'St. GR80' },
+                    null, // CoinFace3 — H80Z (no video yet)
+                    null, // CoinFace4 — TBD
+                  ]
+                  const video = coinVideos[coinIndex]
+                  if (video) setCoinVideo(video)
+                } else {
+                  // Supporter/user coins — handle separately
+                  // TODO: show supporter info or profile
+                  console.log(`Supporter coin ${coinIndex} tapped`)
+                }
               }}
               onAgentClick={(agentId) => {
                 if (agentId) {
@@ -889,7 +896,52 @@ export default function CyborgTemple() {
           {/* <Stats className="stats-monitor" /> */}
         </CleanCanvas>
         )}
-        
+
+        {/* Floating Character Label on Focus */}
+        {(() => {
+          const agentInfo = {
+            RL80: { name: 'Our Lady', tagline: 'The oracle. She sees the chain.' },
+            Demon: { name: 'H80Z', tagline: 'The hype man. First to pump, last to dump.' },
+            Monk: { name: 'St. GR80', tagline: 'The philosopher. Patience is the path.' },
+          };
+          const info = focusedAgent && agentInfo[focusedAgent];
+          return (
+            <div style={{
+              position: 'fixed',
+              right: isMobileView ? '2rem' : '25%',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              opacity: info ? 1 : 0,
+              transition: 'opacity 0.4s ease',
+              pointerEvents: 'none',
+              zIndex: 20,
+              background: 'rgba(0, 0, 0, 0.7)',
+              border: '1px solid rgba(218, 165, 32, 0.5)',
+              borderRadius: '8px',
+              padding: '1rem 1.5rem',
+              maxWidth: '260px',
+              backdropFilter: 'blur(8px)',
+            }}>
+              <div style={{
+                fontFamily: "'UnifrakturMaguntia', cursive",
+                fontSize: '1.4rem',
+                color: '#daa520',
+                marginBottom: '0.35rem',
+                letterSpacing: '0.5px',
+              }}>
+                {info?.name}
+              </div>
+              <div style={{
+                fontSize: '0.85rem',
+                color: 'rgba(255, 255, 255, 0.7)',
+                fontStyle: 'italic',
+                lineHeight: 1.4,
+              }}>
+                {info?.tagline}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Coin Mode Buttons - Mobile only */}
         {isMobileView && mounted && !isCandleModalOpen && (
@@ -1256,7 +1308,7 @@ export default function CyborgTemple() {
                     lineHeight: '1.3',
                     textAlign: 'center',
                   }}>
-                    Hang out with us in the Telegram group!
+                    Join us for a chat in the Telegram group!
                   </span>
                 </div>
               </a>

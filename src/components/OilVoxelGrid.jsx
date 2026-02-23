@@ -1,0 +1,1174 @@
+"use client";
+
+import { useRef, useMemo, useEffect, useCallback, useState } from "react";
+import * as THREE from "three";
+import { useFrame, useThree } from "@react-three/fiber";
+import { Text, useGLTF, useTexture, useEnvironment } from "@react-three/drei";
+import { generateOilDistribution3D } from "@/lib/oilDistribution";
+import { PUMP_ZONES, MATERIAL_PRESETS } from "@/components/PimpMyPumpPanel";
+
+// ── Vertex shader (unchanged) ───────────────────────────────────────────────
+
+const volumeVert = /* glsl */ `
+  varying vec3 vOrigin;
+  varying vec3 vDirection;
+
+  void main() {
+    // Work in object (local) space so parent group transforms don't affect
+    // the baked deposit positions / bounds
+    mat4 invModel = inverse(modelMatrix);
+    vOrigin = (invModel * vec4(cameraPosition, 1.0)).xyz;
+    vDirection = position - vOrigin; // position is already in object space
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+// ── Build fragment shader with deposits baked in ────────────────────────────
+
+function buildFragShader({ deposits, gridX, gridY, depthZ, cellSize, depthCellSize, worldW, worldH, worldD }) {
+  const depthScale = (cellSize / depthCellSize).toFixed(4);
+
+  // Object-space bounds: box geometry centered at origin
+  const halfW = worldW / 2;
+  const halfH = worldH / 2;
+  const halfD = worldD / 2;
+
+  // Bake deposit positions in OBJECT SPACE (mesh-local, box centered at origin)
+  // Surface is at y=+halfH, deepest at y=-halfH
+  const depositLines = deposits.slice(0, 16).map((d, i) => {
+    const ox = ((d.cx / (gridX - 1)) - 0.5) * worldW;
+    const oy = halfH - (d.cz / (depthZ - 1)) * worldH;  // surface=+halfH, bottom=-halfH
+    const oz = (0.5 - d.cy / (gridY - 1)) * worldD;
+    const or = d.radius * cellSize;
+    return `  deposits[${i}] = vec4(${ox.toFixed(6)}, ${oy.toFixed(6)}, ${oz.toFixed(6)}, ${or.toFixed(6)});
+  richness[${i}] = ${d.richness.toFixed(6)};`;
+  }).join("\n");
+
+  const numDeposits = Math.min(deposits.length, 16);
+
+  return /* glsl */ `
+  precision highp float;
+
+  uniform float uReveal;
+
+  varying vec3 vOrigin;
+  varying vec3 vDirection;
+
+  const vec3 BOUNDS_MIN = vec3(${(-halfW).toFixed(4)}, ${(-halfH).toFixed(4)}, ${(-halfD).toFixed(4)});
+  const vec3 BOUNDS_MAX = vec3(${halfW.toFixed(4)}, ${halfH.toFixed(4)}, ${halfD.toFixed(4)});
+  const float DEPTH_SCALE = ${depthScale};
+  const int NUM_DEPOSITS = ${numDeposits};
+
+  vec2 intersectBox(vec3 orig, vec3 dir, vec3 bmin, vec3 bmax) {
+    vec3 invDir = 1.0 / dir;
+    vec3 t0 = (bmin - orig) * invDir;
+    vec3 t1 = (bmax - orig) * invDir;
+    vec3 tmin = min(t0, t1);
+    vec3 tmax = max(t0, t1);
+    float tNear = max(max(tmin.x, tmin.y), tmin.z);
+    float tFar  = min(min(tmax.x, tmax.y), tmax.z);
+    return vec2(tNear, tFar);
+  }
+
+  float density(vec3 p, vec4 deposits[${numDeposits}], float richness[${numDeposits}]) {
+    float d = 0.0;
+    for (int i = 0; i < NUM_DEPOSITS; i++) {
+      vec3 center = deposits[i].xyz;
+      float radius = deposits[i].w;
+
+      vec3 diff = p - center;
+      diff.y *= DEPTH_SCALE;
+      float dist = length(diff);
+
+      if (dist < radius) {
+        float falloff = 1.0 - dist / radius;
+        d += falloff * falloff * richness[i];
+      }
+    }
+    return d;
+  }
+
+  void main() {
+    vec3 rayDir = normalize(vDirection);
+
+    vec2 tHit = intersectBox(vOrigin, rayDir, BOUNDS_MIN, BOUNDS_MAX);
+    if (tHit.x > tHit.y) discard;
+    tHit.x = max(tHit.x, 0.0);
+
+    // Init baked deposit data
+    vec4 deposits[${numDeposits}];
+    float richness[${numDeposits}];
+${depositLines}
+
+    float stepSize = length(BOUNDS_MAX - BOUNDS_MIN) / 80.0;
+    vec3 color = vec3(0.0);
+    float alpha = 0.0;
+
+    vec3 colLow  = vec3(0.15, 0.08, 0.02);
+    vec3 colMid  = vec3(0.35, 0.18, 0.05);
+    vec3 colHigh = vec3(0.85, 0.55, 0.15);
+
+    for (float t = tHit.x; t < tHit.y; t += stepSize) {
+      vec3 worldPos = vOrigin + rayDir * t;
+      float d = density(worldPos, deposits, richness) * uReveal;
+
+      if (d > 0.05) {
+        float intensity = clamp(d / 2.0, 0.0, 1.0);
+        vec3 oilColor;
+        if (intensity < 0.5) {
+          oilColor = mix(colLow, colMid, intensity * 2.0);
+        } else {
+          oilColor = mix(colMid, colHigh, (intensity - 0.5) * 2.0);
+        }
+
+        float glow = 1.0 + intensity * 2.0;
+        oilColor *= glow;
+
+        float sampleAlpha = clamp(d * 0.35, 0.0, 1.0);
+        color += (1.0 - alpha) * sampleAlpha * oilColor;
+        alpha += (1.0 - alpha) * sampleAlpha;
+
+        if (alpha > 0.95) break;
+      }
+    }
+
+    if (alpha < 0.01) discard;
+    gl_FragColor = vec4(color, alpha * 0.9);
+  }
+`;
+}
+
+// ── Oil droplet texture (round soft circle) ─────────────────────────────────
+const _oilDropletTex = (() => {
+  if (typeof document === "undefined") return null;
+  const size = 32;
+  const c = document.createElement("canvas");
+  c.width = size; c.height = size;
+  const ctx = c.getContext("2d");
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  g.addColorStop(0, "rgba(30,16,8,1)");
+  g.addColorStop(0.5, "rgba(30,16,8,0.8)");
+  g.addColorStop(1, "rgba(30,16,8,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  const tex = new THREE.CanvasTexture(c);
+  return tex;
+})();
+
+// ── Tank liquid fill (animated, flat-topped) ────────────────────────────────
+
+const PUMPJACK_SCALE = 0.1;
+
+/**
+ * Build an ExtrudeGeometry representing liquid in a horizontal cylinder.
+ * The cross-section is a circular segment (arc below water line + chord on top).
+ * Extruded along the tank's length axis (Z in local space).
+ *
+ * @param {number} fill - 0→1 fill fraction
+ * @param {number} radius - cylinder radius
+ * @param {number} length - extrusion length (tank length)
+ * @param {number} segments - arc smoothness
+ */
+function buildFillGeometry(fill, radius, length, segments = 48) {
+  if (fill <= 0) return null;
+  const clampFill = Math.min(fill, 1);
+
+  // Water line Y in circle centered at origin: bottom = -R, top = +R
+  // waterY = -R + fill * 2R = R*(2*fill - 1)
+  const waterY = radius * (2 * clampFill - 1);
+
+  // Chord endpoints: where y = waterY intersects circle x²+y²=R²
+  // x = ±sqrt(R² - waterY²)
+  const halfChord = Math.sqrt(Math.max(0, radius * radius - waterY * waterY));
+
+  const shape = new THREE.Shape();
+
+  // If nearly full, just use a full circle
+  if (clampFill > 0.995) {
+    shape.absarc(0, 0, radius * 0.98, 0, Math.PI * 2, false);
+  } else {
+    // Right chord endpoint
+    const cx0 = halfChord;
+    const cy0 = waterY;
+    shape.moveTo(cx0, cy0);
+
+    // Arc from right chord endpoint, around the BOTTOM, to left chord endpoint
+    // Right endpoint angle: atan2(waterY, halfChord)
+    // Left endpoint angle: atan2(waterY, -halfChord)
+    const angleRight = Math.atan2(waterY, halfChord);
+    const angleLeft = Math.atan2(waterY, -halfChord);
+
+    // Trace clockwise from right endpoint through the bottom to left endpoint
+    const arcSpan = angleRight >= angleLeft
+      ? (angleRight - angleLeft)
+      : (angleRight - angleLeft + 2 * Math.PI);
+
+    for (let i = 1; i <= segments; i++) {
+      const t = i / segments;
+      const angle = angleRight - t * arcSpan;
+      shape.lineTo(radius * Math.cos(angle), radius * Math.sin(angle));
+    }
+
+    // Close with chord (flat liquid surface)
+    shape.lineTo(cx0, cy0);
+  }
+
+  const extrudeSettings = {
+    steps: 1,
+    depth: length,
+    bevelEnabled: false,
+  };
+
+  const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+  // Center the extrusion so it spans -length/2 to +length/2
+  geo.translate(0, 0, -length / 2);
+  return geo;
+}
+
+function TankLiquid({ tankBounds, tankFill }) {
+  const meshRef = useRef();
+  const displayFill = useRef(0);
+  const lastQuantizedFill = useRef(-1);
+
+  const oilMat = useMemo(() => new THREE.MeshStandardMaterial({
+    color: 0x1a0e05,
+    roughness: 0.3,
+    metalness: 0.1,
+    transparent: true,
+    opacity: 0.97,
+  }), []);
+
+  // Tank geometry params — the tank is a horizontal cylinder
+  // sizeX is the tank's cross-section width (diameter), sizeZ is the length
+  const config = useMemo(() => {
+    const tb = tankBounds;
+    const S = PUMPJACK_SCALE;
+    // Radius = half the smaller of sizeX and sizeY (the circular cross-section)
+    const radius = Math.min(tb.sizeX, tb.sizeY) / 2 * 0.85;
+    // Length along the tank's long axis
+    const tankLength = tb.sizeZ * 1.4;
+    return {
+      radius, tankLength,
+      cx: tb.cx, cy: tb.cy, cz: tb.cz,
+      minY: tb.minY, sizeY: tb.sizeY,
+      S,
+    };
+  }, [tankBounds]);
+
+  const targetFill = useRef(tankFill);
+  targetFill.current = tankFill;
+
+  useFrame((_, delta) => {
+    const target = Math.min(targetFill.current, 1);
+    const prev = displayFill.current;
+    if (Math.abs(target - prev) < 0.001) {
+      displayFill.current = target;
+    } else {
+      displayFill.current += (target - prev) * Math.min(delta * 0.8 / Math.max(Math.abs(target - prev), 0.01), 1);
+    }
+
+    const fill = displayFill.current;
+    const mesh = meshRef.current;
+    if (!mesh) return;
+
+    if (fill < 0.001) {
+      mesh.visible = false;
+      return;
+    }
+    mesh.visible = true;
+
+    // Quantize fill to reduce geometry rebuilds (every ~2%)
+    const quantized = Math.round(fill * 50) / 50;
+    if (quantized !== lastQuantizedFill.current && quantized > 0) {
+      lastQuantizedFill.current = quantized;
+      const { radius, tankLength } = config;
+      const newGeo = buildFillGeometry(quantized, radius, tankLength);
+      if (newGeo) {
+        if (mesh.geometry) mesh.geometry.dispose();
+        mesh.geometry = newGeo;
+      }
+    }
+
+    // Position: center of tank, rotated so extrusion runs along tank's Z axis
+    const { cx, cy, cz, S } = config;
+    mesh.position.set(cx * S, cy * S, cz * S);
+    mesh.rotation.y = Math.PI / 2;
+    mesh.scale.setScalar(S);
+  });
+
+  return (
+    <group>
+      <mesh ref={meshRef} material={oilMat} visible={false} renderOrder={-1}>
+        <boxGeometry args={[0.01, 0.01, 0.01]} />
+      </mesh>
+    </group>
+  );
+}
+
+// ── Pumpjack instances ──────────────────────────────────────────────────────
+
+// Build a mesh-name → zone-id lookup for fast traversal
+const MESH_TO_ZONE = {};
+PUMP_ZONES.forEach((zone) => {
+  zone.meshes.forEach((meshName) => { MESH_TO_ZONE[meshName] = zone.id; });
+});
+
+function applyPumpConfig(clonedScene, pumpConfig, originalMats, envMap) {
+  clonedScene.traverse((child) => {
+    if (!child.isMesh) return;
+    const zoneId = MESH_TO_ZONE[child.name];
+    if (!zoneId) return;
+
+    // Cache original material properties on first encounter
+    if (!originalMats[child.name]) {
+      const m = child.material;
+      originalMats[child.name] = {
+        color: m.color.clone(),
+        roughness: m.roughness,
+        metalness: m.metalness,
+        emissive: m.emissive ? m.emissive.clone() : new THREE.Color(0),
+        emissiveIntensity: m.emissiveIntensity || 0,
+        envMapIntensity: m.envMapIntensity ?? 0,
+      };
+    }
+
+    const orig = originalMats[child.name];
+
+    // Clone material so each instance stays independent
+    if (!child.userData._pmpCloned) {
+      child.material = child.material.clone();
+      child.userData._pmpCloned = true;
+    }
+
+    // If no config (deselected), restore originals
+    const zoneConf = pumpConfig ? pumpConfig[zoneId] : null;
+    if (!zoneConf || (!zoneConf.color && zoneConf.preset === "stock")) {
+      // Restore original material type if it was swapped
+      if (child.userData._originalMat) {
+        child.material = child.userData._originalMat;
+        child.userData._swappedStandard = false;
+      }
+      const m = child.material;
+      m.color.copy(orig.color);
+      m.roughness = orig.roughness;
+      m.metalness = orig.metalness;
+      m.emissive.copy(orig.emissive);
+      m.emissiveIntensity = orig.emissiveIntensity;
+      m.envMapIntensity = orig.envMapIntensity;
+      m.needsUpdate = true;
+      return;
+    }
+
+    const preset = MATERIAL_PRESETS[zoneConf.preset] || MATERIAL_PRESETS.stock;
+
+    // Swap to MeshStandardMaterial if preset requests it (for proper env map reflections)
+    if (preset.useStandard && !child.userData._swappedStandard) {
+      if (!child.userData._originalMat) {
+        child.userData._originalMat = child.material;
+      }
+      child.material = new THREE.MeshStandardMaterial({
+        roughness: preset.roughness,
+        metalness: preset.metalness,
+        envMap: envMap || null,
+        envMapIntensity: preset.envMapIntensity ?? 1,
+      });
+      child.userData._swappedStandard = true;
+      child.userData._pmpCloned = true;
+    } else if (!preset.useStandard && child.userData._swappedStandard) {
+      // Swap back from Standard to original type
+      child.material = child.userData._originalMat.clone();
+      child.userData._swappedStandard = false;
+      child.userData._pmpCloned = true;
+    }
+
+    const mat = child.material;
+
+    // Apply color
+    if (zoneConf.color) {
+      mat.color.set(zoneConf.color);
+    } else {
+      mat.color.copy(orig.color);
+    }
+
+    // Apply preset material properties
+    if (preset.roughness !== null) {
+      mat.roughness = preset.roughness;
+      mat.metalness = preset.metalness;
+      mat.envMapIntensity = preset.envMapIntensity ?? 0;
+      if (envMap && preset.envMapIntensity > 0) mat.envMap = envMap;
+      const ei = preset.emissiveIntensity ?? 0;
+      if (preset.emissive === "auto" || preset.emissive === "subtle") {
+        mat.emissive = mat.color.clone();
+        mat.emissiveIntensity = ei;
+      } else if (preset.emissive) {
+        mat.emissive.set(preset.emissive);
+        mat.emissiveIntensity = 0;
+      }
+    } else {
+      mat.roughness = orig.roughness;
+      mat.metalness = orig.metalness;
+      mat.emissive.copy(orig.emissive);
+      mat.emissiveIntensity = orig.emissiveIntensity;
+      mat.envMapIntensity = orig.envMapIntensity;
+    }
+
+    mat.needsUpdate = true;
+  });
+}
+
+function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, tankFill, onClick, onDoubleClick }) {
+  const lastClickTime = useRef(0);
+  const groupRef = useRef();
+  const strawRef = useRef();
+  const strawBaseScaleZ = useRef(null);
+  const strawBasePos = useRef(null);
+  const strawLengthZ = useRef(null);
+  const originalMatsRef = useRef({});
+
+  // Gauge needle + pressure labels
+  const gaugeNeedleRef = useRef();
+  const gaugeBaseRotX = useRef(0);
+  const textHighRef = useRef();
+  const textMedRef = useRef();
+  const textLowRef = useRef();
+  const clonedScene = useMemo(() => {
+    const s = scene.clone(true);
+    // Zero out envMapIntensity on all meshes so stock rigs ignore the scene environment
+    s.traverse((child) => {
+      if (child.isMesh && child.material) {
+        child.material = child.material.clone();
+        child.material.envMapIntensity = 0;
+        child.userData._pmpCloned = true;
+      }
+    });
+    return s;
+  }, [scene]);
+  const mixer = useMemo(() => new THREE.AnimationMixer(clonedScene), [clonedScene]);
+
+  // Gusher spawn position — model origin (center of rig)
+  const gusherOriginRef = useRef(new THREE.Vector3(0, 0.05, 0));
+
+  // Find the Straw mesh, GaugeNeedle, and pressure text meshes
+  useEffect(() => {
+    clonedScene.traverse((child) => {
+      if (child.name === "Straw") {
+        strawRef.current = child;
+        if (strawBaseScaleZ.current === null) {
+          strawBaseScaleZ.current = child.scale.z;
+          strawBasePos.current = child.position.clone();
+          child.geometry.computeBoundingBox();
+          const bb = child.geometry.boundingBox;
+          strawLengthZ.current = (bb.max.z - bb.min.z) * child.scale.z;
+        }
+      }
+      // Gauge needle
+      if (child.name === "GaugeNeedle") {
+        gaugeNeedleRef.current = child;
+        gaugeBaseRotX.current = child.rotation.x;
+      }
+      // Pressure panel text meshes — find children of PressurePanel
+      // Log names in dev to identify the correct mapping
+      if (child.name === "PressurePanel") {
+        child.traverse((sub) => {
+          if (sub === child) return;
+          if (process.env.NODE_ENV === "development") {
+            console.log("[PressurePanel child]", sub.name, sub.type);
+          }
+          if (sub.name === "Text_HIGH") { textHighRef.current = sub; sub.visible = false; }
+          else if (sub.name === "Text_MED") { textMedRef.current = sub; sub.visible = false; }
+          else if (sub.name === "Text_LOW") { textLowRef.current = sub; sub.visible = false; }
+          // Fallback: if names are generic (Text, Text.001, Text.002), map by order
+          // Text = LOW (bottom), Text.001 = MED (middle), Text.002 = HIGH (top)
+          else if (sub.name === "Text" && sub.isMesh && !textLowRef.current) { textLowRef.current = sub; sub.visible = false; }
+          else if (sub.name === "Text.002" && sub.isMesh && !textMedRef.current) { textMedRef.current = sub; sub.visible = false; }
+          else if (sub.name === "Text.001" && sub.isMesh && !textHighRef.current) { textHighRef.current = sub; sub.visible = false; }
+        });
+      }
+    });
+  }, [clonedScene]);
+
+  useEffect(() => {
+    animations.forEach((clip) => {
+      mixer.clipAction(clip).play();
+    });
+    return () => mixer.stopAllAction();
+  }, [mixer, animations]);
+
+  // Apply pump customization only to the selected (highlighted) rig
+  useEffect(() => {
+    if (highlighted && pumpConfig) {
+      applyPumpConfig(clonedScene, pumpConfig, originalMatsRef.current, envMap);
+    } else if (!highlighted && originalMatsRef.current && Object.keys(originalMatsRef.current).length > 0) {
+      // Restore originals when deselected
+      applyPumpConfig(clonedScene, null, originalMatsRef.current, envMap);
+    }
+  }, [clonedScene, pumpConfig, highlighted, envMap]);
+
+  // Highlight is now handled by a grid-square plane in the parent component
+
+  // ── Fuel Tank liquid fill ──────────────────────────────────────────────────
+  // Find the tank mesh and compute its group-local bounding box (after all GLB
+  // hierarchy transforms but before the PUMPJACK_SCALE). We store this once and
+  // render a cylinder in JSX that grows from the bottom up.
+  const [tankBounds, setTankBounds] = useState(null);
+
+  useEffect(() => {
+    let tankMesh = null;
+    clonedScene.traverse((child) => {
+      if (child.name === "Fuel_Tank" && child.isMesh) tankMesh = child;
+    });
+    if (!tankMesh) return;
+
+    // Compute bounding box in the clonedScene's local coordinate system
+    // (accounts for all intermediate parent transforms in the GLB hierarchy)
+    tankMesh.geometry.computeBoundingBox();
+    const bb = tankMesh.geometry.boundingBox;
+    const corners = [
+      new THREE.Vector3(bb.min.x, bb.min.y, bb.min.z),
+      new THREE.Vector3(bb.max.x, bb.min.y, bb.min.z),
+      new THREE.Vector3(bb.min.x, bb.max.y, bb.min.z),
+      new THREE.Vector3(bb.max.x, bb.max.y, bb.min.z),
+      new THREE.Vector3(bb.min.x, bb.min.y, bb.max.z),
+      new THREE.Vector3(bb.max.x, bb.min.y, bb.max.z),
+      new THREE.Vector3(bb.min.x, bb.max.y, bb.max.z),
+      new THREE.Vector3(bb.max.x, bb.max.y, bb.max.z),
+    ];
+
+    // Transform corners from mesh-local to clonedScene-local
+    // (clonedScene is the root that <primitive> renders at PUMPJACK_SCALE)
+    const meshToRoot = new THREE.Matrix4();
+    let node = tankMesh;
+    const chain = [];
+    while (node && node !== clonedScene) {
+      chain.push(node);
+      node = node.parent;
+    }
+    // Build matrix from root → mesh (multiply in reverse)
+    for (let i = chain.length - 1; i >= 0; i--) {
+      const n = chain[i];
+      const local = new THREE.Matrix4().compose(n.position, n.quaternion, n.scale);
+      meshToRoot.multiply(local);
+    }
+
+    const worldMin = new THREE.Vector3(Infinity, Infinity, Infinity);
+    const worldMax = new THREE.Vector3(-Infinity, -Infinity, -Infinity);
+    corners.forEach((c) => {
+      c.applyMatrix4(meshToRoot);
+      worldMin.min(c);
+      worldMax.max(c);
+    });
+
+    // Store bounds in clonedScene-local space (before PUMPJACK_SCALE)
+    const sizeX = worldMax.x - worldMin.x;
+    const sizeY = worldMax.y - worldMin.y;
+    const sizeZ = worldMax.z - worldMin.z;
+
+    // Determine which axis is the tank's long axis (the fill direction)
+    // The tank lies on its side — the longest dimension is the fill axis
+    let longAxis = "y";
+    if (sizeZ > sizeY && sizeZ > sizeX) longAxis = "z";
+    else if (sizeX > sizeY && sizeX > sizeZ) longAxis = "x";
+
+    setTankBounds({
+      cx: (worldMin.x + worldMax.x) / 2,
+      cy: (worldMin.y + worldMax.y) / 2,
+      cz: (worldMin.z + worldMax.z) / 2,
+      minX: worldMin.x, maxX: worldMax.x,
+      minY: worldMin.y, maxY: worldMax.y,
+      minZ: worldMin.z, maxZ: worldMax.z,
+      sizeX, sizeY, sizeZ,
+      longAxis,
+    });
+
+  }, [clonedScene]);
+
+  // Alert light ref for oil strike strobe
+  const alertLightRef = useRef();
+  const alertLightOrigColor = useRef(null);
+  const strikeTimerRef = useRef(0);
+  const strikingRef = useRef(false);
+  const strikeLightRef = useRef(); // dynamic point light
+
+  useEffect(() => {
+    clonedScene.traverse((child) => {
+      if (child.name === "Alert_Light_RED" && child.isMesh) {
+        alertLightRef.current = child;
+        if (!alertLightOrigColor.current) {
+          alertLightOrigColor.current = {
+            color: child.material.color.clone(),
+            emissive: child.material.emissive ? child.material.emissive.clone() : new THREE.Color(0),
+            emissiveIntensity: child.material.emissiveIntensity || 0,
+          };
+        }
+        // Ensure material is cloned so we can modify it independently
+        if (!child.userData._alertCloned) {
+          child.material = child.material.clone();
+          child.userData._alertCloned = true;
+        }
+      }
+    });
+  }, [clonedScene]);
+
+  // Oil gusher particles — only active on highlighted rig
+  const PARTICLE_COUNT = 600;
+  const gusherActiveRef = useRef(false);
+  const gusherTimerRef = useRef(0);
+  const particlePosRef = useRef(new Float32Array(PARTICLE_COUNT * 3));
+  const particleVelRef = useRef(new Float32Array(PARTICLE_COUNT * 3));
+  const particleLifeRef = useRef(new Float32Array(PARTICLE_COUNT));
+  const particleGeoRef = useRef();
+  const particleMatRef = useRef();
+
+  const initGusher = useCallback(() => {
+    const pos = particlePosRef.current;
+    const vel = particleVelRef.current;
+    const life = particleLifeRef.current;
+    const wp = gusherOriginRef.current;
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const i3 = i * 3;
+      // Start at the Well position
+      pos[i3]     = wp.x + (Math.random() - 0.5) * 0.08;
+      pos[i3 + 1] = wp.y;
+      pos[i3 + 2] = wp.z + (Math.random() - 0.5) * 0.08;
+      // Shoot upward with spread — stagger launch times via life
+      vel[i3]     = (Math.random() - 0.5) * 0.4;
+      vel[i3 + 1] = 1.5 + Math.random() * 2.0;
+      vel[i3 + 2] = (Math.random() - 0.5) * 0.4;
+      life[i] = -(i / PARTICLE_COUNT) * 0.4; // stagger spawns
+    }
+    gusherActiveRef.current = true;
+    gusherTimerRef.current = 0;
+    // Force geometry update immediately
+    if (particleGeoRef.current) {
+      particleGeoRef.current.attributes.position.needsUpdate = true;
+    }
+  }, []);
+
+  // Trigger strobe + gusher when oilStrike fires on the highlighted rig
+  useEffect(() => {
+    if (oilStrike > 0 && highlighted) {
+      strikingRef.current = true;
+      strikeTimerRef.current = 0;
+      initGusher();
+    }
+  }, [oilStrike, highlighted, initGusher]);
+
+  // Store drillDay and tankFill in refs so useFrame always has the latest values
+  const drillDayRef = useRef(drillDay);
+  drillDayRef.current = drillDay;
+  const depthCellRef = useRef(depthCellSize);
+  depthCellRef.current = depthCellSize;
+  const tankFillRef = useRef(tankFill);
+  tankFillRef.current = tankFill;
+  useFrame((_, delta) => {
+    mixer.update(delta);
+
+    // Gauge needle rotation — 0→225° based on tankFill, capped at 225°
+    const needle = gaugeNeedleRef.current;
+    const currentFill = tankFillRef.current;
+
+    const straw = strawRef.current;
+    if (straw && strawBaseScaleZ.current !== null) {
+      const day = drillDayRef.current;
+      const L0 = strawLengthZ.current;
+      const baseScale = strawBaseScaleZ.current;
+
+      // Pin straw position every frame so bone animation can't drift it
+      straw.position.copy(strawBasePos.current);
+
+      if (day > 0) {
+        const worldDepthPerDay = depthCellRef.current;
+        const modelDepthPerDay = worldDepthPerDay / PUMPJACK_SCALE;
+        const s = 1 + (day * modelDepthPerDay) / L0;
+        straw.scale.z = baseScale * s;
+      } else {
+        straw.scale.z = baseScale;
+      }
+    }
+    if (needle) {
+      const fill = Math.min(currentFill, 1.0);
+      const targetAngle = gaugeBaseRotX.current - fill * 225 * (Math.PI / 180);
+      needle.rotation.x += (targetAngle - needle.rotation.x) * Math.min(delta * 3, 1);
+
+      // Pressure label visibility — based on needle's actual lerped position, not raw fill
+      const displayAngleDeg = Math.abs(needle.rotation.x - gaugeBaseRotX.current) * (180 / Math.PI);
+      if (textLowRef.current) textLowRef.current.visible = displayAngleDeg < 85;
+      if (textMedRef.current) textMedRef.current.visible = displayAngleDeg >= 85 && displayAngleDeg < 210;
+      if (textHighRef.current) {
+        const highOn = displayAngleDeg >= 210;
+        // Flash when tank >= 90% capacity (angle >= 202.5°)
+        const flashing = displayAngleDeg >= 202.5;
+        textHighRef.current.visible = highOn && (!flashing || Math.sin(performance.now() * 0.012) > 0);
+      }
+    }
+
+    // Alert light strobe effect
+    const light = alertLightRef.current;
+    if (light && strikingRef.current) {
+      strikeTimerRef.current += delta;
+      const t = strikeTimerRef.current;
+      const STROBE_DURATION = 2.5;
+
+      if (t < STROBE_DURATION) {
+        // Fast pulse: on/off every ~0.12s, decaying
+        const pulse = Math.sin(t * 25) > 0 ? 1 : 0;
+        const decay = 1 - t / STROBE_DURATION;
+        const intensity = pulse * decay;
+
+        light.material.emissive.set(0xff0000);
+        light.material.emissiveIntensity = intensity * 5.0;
+        light.material.color.set(intensity > 0.1 ? 0xff2200 : 0x331111);
+        light.material.needsUpdate = true;
+
+        // Update point light for red glow
+        if (strikeLightRef.current) {
+          strikeLightRef.current.intensity = intensity * 4.0;
+        }
+      } else {
+        // Restore original
+        const orig = alertLightOrigColor.current;
+        if (orig) {
+          light.material.color.copy(orig.color);
+          light.material.emissive.copy(orig.emissive);
+          light.material.emissiveIntensity = orig.emissiveIntensity;
+          light.material.needsUpdate = true;
+        }
+        if (strikeLightRef.current) {
+          strikeLightRef.current.intensity = 0;
+        }
+        strikingRef.current = false;
+      }
+    }
+
+    // Oil gusher particle update
+    if (gusherActiveRef.current) {
+      gusherTimerRef.current += delta;
+      const GUSHER_DURATION = 3.0;
+      const GUSHER_RANGE = 1.5; // recycle when particle drifts this far from origin
+      const pos = particlePosRef.current;
+      const vel = particleVelRef.current;
+      const life = particleLifeRef.current;
+      const GRAVITY = -3.5;
+      let allDead = true;
+
+      const overflowing = tankFillRef.current >= 1.0 && highlighted;
+      const wp = gusherOriginRef.current;
+
+      const respawn = (i) => {
+        const i3 = i * 3;
+        pos[i3]     = wp.x + (Math.random() - 0.5) * 0.08;
+        pos[i3 + 1] = wp.y;
+        pos[i3 + 2] = wp.z + (Math.random() - 0.5) * 0.08;
+        vel[i3]     = (Math.random() - 0.5) * 0.4;
+        vel[i3 + 1] = 1.5 + Math.random() * 2.0;
+        vel[i3 + 2] = (Math.random() - 0.5) * 0.4;
+        life[i] = 0;
+      };
+
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        life[i] += delta;
+        if (life[i] < 0) { allDead = false; continue; } // not yet spawned
+
+        const i3 = i * 3;
+
+        // Bounds-based recycling (like the canvas gusher): respawn when
+        // particle falls below floor or drifts too far from origin
+        const outOfBounds = overflowing && (
+          pos[i3 + 1] < 0.02 ||
+          Math.abs(pos[i3] - wp.x) > GUSHER_RANGE ||
+          Math.abs(pos[i3 + 2] - wp.z) > GUSHER_RANGE
+        );
+
+        if (outOfBounds) {
+          respawn(i);
+          allDead = false;
+          continue;
+        }
+
+        // Time-based expiry for one-shot gushers (oil strike, not overflow)
+        if (!overflowing && life[i] > GUSHER_DURATION) continue;
+
+        allDead = false;
+        vel[i3 + 1] += GRAVITY * delta;
+        pos[i3]     += vel[i3] * delta;
+        pos[i3 + 1] += vel[i3 + 1] * delta;
+        pos[i3 + 2] += vel[i3 + 2] * delta;
+      }
+
+      if (particleGeoRef.current) {
+        particleGeoRef.current.attributes.position.needsUpdate = true;
+      }
+      if (particleMatRef.current) {
+        const fade = overflowing ? 1.0
+          : gusherTimerRef.current > GUSHER_DURATION - 1.0
+            ? Math.max(0, GUSHER_DURATION - gusherTimerRef.current)
+            : 1.0;
+        particleMatRef.current.opacity = fade * 0.85;
+      }
+
+      if (allDead || (gusherTimerRef.current > GUSHER_DURATION && !overflowing)) {
+        gusherActiveRef.current = false;
+      }
+    }
+  });
+
+  const handleClick = useCallback((e) => {
+    e.stopPropagation();
+    const now = Date.now();
+    if (now - lastClickTime.current < 400) {
+      onDoubleClick?.();
+    } else {
+      onClick?.();
+    }
+    lastClickTime.current = now;
+  }, [onClick, onDoubleClick]);
+
+  return (
+    <group position={position}>
+      <primitive
+        ref={groupRef}
+        object={clonedScene}
+        scale={PUMPJACK_SCALE}
+        onClick={handleClick}
+        onPointerOver={() => { document.body.style.cursor = "pointer"; }}
+        onPointerOut={() => { document.body.style.cursor = "auto"; }}
+      />
+      {/* Fuel tank liquid — animated fill inside the transparent tank */}
+      {tankBounds && <TankLiquid tankBounds={tankBounds} tankFill={tankFill} />}
+      {/* Red alert point light — only on selected rig, intensity driven by useFrame */}
+      {highlighted && (
+        <>
+          <pointLight
+            ref={strikeLightRef}
+            position={[0, 0.5, 0]}
+            color={0xff0000}
+            intensity={0}
+            distance={5}
+            decay={1.5}
+          />
+          {/* Oil gusher particles */}
+          <points>
+            <bufferGeometry ref={particleGeoRef}>
+              <bufferAttribute
+                attach="attributes-position"
+                args={[particlePosRef.current, 3]}
+                count={PARTICLE_COUNT}
+              />
+            </bufferGeometry>
+            <pointsMaterial
+              ref={particleMatRef}
+              color={0x1a0e05}
+              size={0.04}
+              map={_oilDropletTex}
+              transparent
+              opacity={0}
+              depthWrite={false}
+              sizeAttenuation
+            />
+          </points>
+        </>
+      )}
+    </group>
+  );
+}
+
+function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, pumpConfig, oilStrike, tankFill }) {
+  const { scene, animations } = useGLTF("/models/oilJack_fancy_allProps.glb");
+  const envMap = useEnvironment({ preset: "studio" });
+
+  const items = useMemo(() => {
+    const list = [];
+    for (let row = 0; row < gridY; row++) {
+      for (let col = 0; col < gridX; col++) {
+        const x = -worldW / 2 + col * cellSize + cellSize / 2;
+        const z = worldD / 2 - row * cellSize - cellSize / 2;
+        list.push({ key: `pj-${row}-${col}`, position: [x, 0, z], col, row });
+      }
+    }
+    return list;
+  }, [gridX, gridY, cellSize, worldW, worldD]);
+
+  // Compute selected cell world position for the highlight plane
+  const selectedPos = useMemo(() => {
+    if (selectedCol === null || selectedRow === null) return null;
+    const x = -worldW / 2 + selectedCol * cellSize + cellSize / 2;
+    const z = worldD / 2 - selectedRow * cellSize - cellSize / 2;
+    return [x, 0.01, z]; // slightly above surface to avoid z-fighting
+  }, [selectedCol, selectedRow, cellSize, worldW, worldD]);
+
+  return (
+    <>
+      {/* Green highlight plane on the selected grid square */}
+      {selectedPos && (
+        <mesh position={selectedPos} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[cellSize, cellSize]} />
+          <meshBasicMaterial color={0x000077} transparent opacity={0.45} depthWrite={false} />
+        </mesh>
+      )}
+      {items.map(({ key, position, col, row }) => {
+        // Drill all if no selection, otherwise only the selected cell
+        const active = selectedCol === null || (col === selectedCol && row === selectedRow);
+        const isSelected = selectedCol !== null && col === selectedCol && row === selectedRow;
+        return (
+          <Pumpjack
+            key={key}
+            position={position}
+            scene={scene}
+            animations={animations}
+            drillDay={active ? drillDay : 0}
+            maxDrillDay={maxDrillDay}
+            depthCellSize={depthCellSize}
+            highlighted={isSelected}
+            pumpConfig={pumpConfig}
+            envMap={envMap}
+            oilStrike={oilStrike}
+            tankFill={isSelected ? tankFill : 0}
+            onClick={() => { onSelectCell?.(col, row); onFlyTo?.(col, row); }}
+            onDoubleClick={() => onFlyTo?.(col, row)}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+useGLTF.preload("/models/oilJack_fancy_allProps.glb");
+
+// ── Component ───────────────────────────────────────────────────────────────
+
+export default function OilVoxelGrid({
+  blockHash = "0x8a3f7b2c91d4e6f5a0b3c8d7e2f1a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0",
+  gridX = 10,
+  gridY = 10,
+  depthZ = 20,
+  cellSize = 1,
+  numberOfDeposits = 8,
+  totalOilBudget = 500000,
+  revealProgress = 0,
+  animateReveal = false,
+  revealDuration = 2,
+  drillDay = 0,
+  selectedCol = null,
+  selectedRow = null,
+  onSelectCell,
+  onFlyTo,
+  pumpConfig,
+  oilStrike,
+  tankFill = 0,
+}) {
+  const matRef = useRef();
+  const groundMatsRef = useRef([]);
+  const revealRef = useRef(revealProgress);
+  const animatingRef = useRef(animateReveal);
+
+  // Load side texture for ground block
+  const sideTex = useTexture("/LandGradient2.webp");
+  sideTex.wrapS = sideTex.wrapT = THREE.ClampToEdgeWrapping;
+
+  // 6 materials for box faces: +x, -x, +y (top), -y (bottom), +z, -z
+  const groundMaterials = useMemo(() => {
+    const revealed = revealProgress > 0;
+    const op = revealed ? 0.15 : 1;
+    const shared = { transparent: true, depthWrite: !revealed, depthTest: !revealed, opacity: op };
+    const topMat = new THREE.MeshStandardMaterial({ color: "#8b7355", roughness: 0.9, metalness: 0.05, ...shared });
+    const bottomMat = new THREE.MeshStandardMaterial({ color: "#5a4030", roughness: 0.95, metalness: 0.02, ...shared });
+    const sideMat = new THREE.MeshStandardMaterial({ map: sideTex, roughness: 0.85, metalness: 0.05, ...shared });
+    const mats = [sideMat, sideMat, topMat, bottomMat, sideMat, sideMat];
+    groundMatsRef.current = mats;
+    return mats;
+  }, [sideTex, revealProgress]);
+
+  const depthCellSize = cellSize * 0.5;
+  const worldW = gridX * cellSize;
+  const worldH = depthZ * depthCellSize;
+  const worldD = gridY * cellSize;
+
+  const deposits = useMemo(() => {
+    const { deposits } = generateOilDistribution3D({
+      blockHash, gridX, gridY, depthZ, totalOilBudget, numberOfDeposits, depthBias: 0.35,
+    });
+    return deposits;
+  }, [blockHash, gridX, gridY, depthZ, numberOfDeposits, totalOilBudget]);
+
+  // Build fragment shader with deposit data baked in as constants
+  const fragmentShader = useMemo(() => {
+    return buildFragShader({
+      deposits, gridX, gridY, depthZ, cellSize, depthCellSize,
+      worldW, worldH, worldD,
+    });
+  }, [deposits, gridX, gridY, depthZ, cellSize, depthCellSize, worldW, worldH, worldD]);
+
+  const shaderUniforms = useMemo(() => ({
+    uReveal: { value: revealProgress },
+  }), [revealProgress]);
+
+  // Sync reveal
+  useEffect(() => {
+    revealRef.current = revealProgress;
+    if (matRef.current) matRef.current.uniforms.uReveal.value = revealProgress;
+    const gop = 1 - revealProgress * 0.85;
+    groundMatsRef.current.forEach(m => { m.opacity = gop; m.depthWrite = revealProgress < 0.01; m.depthTest = revealProgress < 0.01; });
+  }, [revealProgress]);
+
+  useEffect(() => {
+    animatingRef.current = animateReveal;
+    if (animateReveal) revealRef.current = 0;
+  }, [animateReveal]);
+
+  useFrame((_, delta) => {
+    if (!animatingRef.current) return;
+    revealRef.current = Math.min(1, revealRef.current + delta / revealDuration);
+    if (matRef.current) matRef.current.uniforms.uReveal.value = revealRef.current;
+    const r = revealRef.current;
+    const op = 1 - r * 0.85;
+    groundMatsRef.current.forEach(m => { m.opacity = op; m.depthWrite = r < 0.01; m.depthTest = r < 0.01; });
+    if (revealRef.current >= 1) animatingRef.current = false;
+  });
+
+  return (
+    <group>
+      {/* Volumetric oil deposits — only rendered after reveal */}
+      {(animateReveal || revealProgress > 0) && (
+        <mesh position={[0, -worldH / 2, 0]} renderOrder={0}>
+          <boxGeometry args={[worldW, worldH, worldD]} />
+          <shaderMaterial
+            ref={matRef}
+            key={fragmentShader}
+            vertexShader={volumeVert}
+            fragmentShader={fragmentShader}
+            uniforms={shaderUniforms}
+            transparent
+            depthWrite={false}
+            side={THREE.BackSide}
+          />
+        </mesh>
+      )}
+
+      {/* Opaque ground block — hidden once reveal starts */}
+      {!animateReveal && revealProgress === 0 && (
+        <mesh position={[0, -worldH / 2, 0]} material={groundMaterials}>
+          <boxGeometry args={[worldW, worldH, worldD]} />
+        </mesh>
+      )}
+
+      {/* Wireframe grid */}
+      <group position={[0, -worldH / 2, 0]}>
+        <lineSegments>
+          <edgesGeometry args={[new THREE.BoxGeometry(worldW, worldH, worldD)]} />
+          <lineBasicMaterial color={0x8b7355} transparent opacity={0.5} />
+        </lineSegments>
+
+        <group position={[0, worldH / 2, 0]}>
+          <PumpjackInstances
+            gridX={gridX}
+            gridY={gridY}
+            cellSize={cellSize}
+            worldW={worldW}
+            worldD={worldD}
+            drillDay={drillDay}
+            maxDrillDay={depthZ}
+            depthCellSize={depthCellSize}
+            selectedCol={selectedCol}
+            selectedRow={selectedRow}
+            onSelectCell={onSelectCell}
+            onFlyTo={onFlyTo}
+            pumpConfig={pumpConfig}
+            oilStrike={oilStrike}
+            tankFill={tankFill}
+          />
+          {Array.from({ length: gridX + 1 }, (_, i) => {
+            const x = -worldW / 2 + i * cellSize;
+            const points = [
+              new THREE.Vector3(x, 0, -worldD / 2),
+              new THREE.Vector3(x, 0, worldD / 2),
+            ];
+            return (
+              <line key={`gx${i}`}>
+                <bufferGeometry>
+                  <bufferAttribute
+                    attach="attributes-position"
+                    args={[new Float32Array(points.flatMap(p => [p.x, p.y, p.z])), 3]}
+                  />
+                </bufferGeometry>
+                <lineBasicMaterial color={0x9e8e78} transparent opacity={0.25} />
+              </line>
+            );
+          })}
+          {Array.from({ length: gridY + 1 }, (_, i) => {
+            const z = -worldD / 2 + i * cellSize;
+            const points = [
+              new THREE.Vector3(-worldW / 2, 0, z),
+              new THREE.Vector3(worldW / 2, 0, z),
+            ];
+            return (
+              <line key={`gz${i}`}>
+                <bufferGeometry>
+                  <bufferAttribute
+                    attach="attributes-position"
+                    args={[new Float32Array(points.flatMap(p => [p.x, p.y, p.z])), 3]}
+                  />
+                </bufferGeometry>
+                <lineBasicMaterial color={0x9e8e78} transparent opacity={0.25} />
+              </line>
+            );
+          })}
+        </group>
+
+        {[[-1, -1], [-1, 1], [1, -1], [1, 1]].map(([sx, sz], ci) => (
+          <group key={ci} position={[sx * worldW / 2, 0, sz * worldD / 2]}>
+            {Array.from({ length: 5 }, (_, i) => {
+              const y = worldH / 2 - (i * worldH) / 4;
+              return (
+                <line key={i}>
+                  <bufferGeometry>
+                    <bufferAttribute
+                      attach="attributes-position"
+                      args={[new Float32Array([0, y, 0, -sx * 0.3, y, -sz * 0.3]), 3]}
+                    />
+                  </bufferGeometry>
+                  <lineBasicMaterial color={0x8b7355} transparent opacity={0.3} />
+                </line>
+              );
+            })}
+          </group>
+        ))}
+      </group>
+
+      {/* X axis labels (along front edge of top surface) */}
+      {Array.from({ length: gridX }, (_, i) => {
+        const x = -worldW / 2 + i * cellSize + cellSize / 2;
+        return (
+          <Text
+            key={`xl${i}`}
+            position={[x, 0.3, worldD / 2 + 0.8]}
+            fontSize={0.35}
+            color="#6b5b47"
+            anchorX="center"
+            anchorY="middle"
+            font={undefined}
+          >
+            {`X${i}`}
+          </Text>
+        );
+      })}
+
+      {/* Y axis labels (along left edge of top surface) */}
+      {Array.from({ length: gridY }, (_, i) => {
+        const z = worldD / 2 - i * cellSize - cellSize / 2;
+        return (
+          <Text
+            key={`yl${i}`}
+            position={[-worldW / 2 - 0.8, 0.3, z]}
+            fontSize={0.35}
+            color="#6b5b47"
+            anchorX="center"
+            anchorY="middle"
+            font={undefined}
+          >
+            {`Y${i}`}
+          </Text>
+        );
+      })}
+    </group>
+  );
+}

@@ -173,6 +173,7 @@ const CyborgTempleScene = ({
   const coinBackTexturesRef = useRef([null, null, null, null]) // Character textures for flip back
   const coinFaceNameTexturesRef = useRef([null, null, null, null]) // Supporter name textures for flip back
   const coinAgentNameTexturesRef = useRef([null, null, null, null]) // Agent name textures for flip back
+  const coinColoredBackTexturesRef = useRef([null, null, null, null]) // Colored back textures for flip
   const coinFaceFlipState = useRef({
     CoinFace1: { isFlipped: false, currentRotation: 0, targetRotation: 0, originalScale: null, lastFlipTime: 0 },
     CoinFace2: { isFlipped: false, currentRotation: 0, targetRotation: 0, originalScale: null, lastFlipTime: 0 },
@@ -254,7 +255,11 @@ const CyborgTempleScene = ({
     lastSwitchTime: 0,
     nextSwitchDelay: Math.random() * 10000 + 20000, // Wait 20-30 seconds
   });
-  
+
+  // Price tracking for buy-triggered animations (H80Z/Tekno FistPump on buys)
+  const lastPriceRef = useRef(null);
+  const priceCheckIntervalRef = useRef(null);
+
   // Refs for PalmTree meshes - store multiple instances
   const palmTreeRefs = useRef([]);
   
@@ -273,7 +278,92 @@ const CyborgTempleScene = ({
     
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
-  
+
+  // Poll rl80 price to detect buys — trigger H80Z (Demon) FistPump on price increase
+  useEffect(() => {
+    const triggerH80ZFistPump = () => {
+      const demonActions = actionsRef.current['Demon'];
+      if (!demonActions) return;
+
+      // Find the FistPump animation (Demon uses Root.001|* prefix)
+      const fistPumpKey = Object.keys(demonActions).find(a => /fistpump/i.test(a));
+      if (!fistPumpKey) return;
+
+      const demonState = demonAnimStateRef.current;
+      // Don't interrupt if already playing a special animation
+      if (demonState.isPlayingSpecial) return;
+
+      // Fade out current animation
+      if (demonActions[demonState.currentAnimation]) {
+        demonActions[demonState.currentAnimation].fadeOut(0.5);
+      }
+
+      const fistPump = demonActions[fistPumpKey];
+      fistPump.reset();
+      fistPump.fadeIn(0.5);
+      fistPump.setLoop(THREE.LoopOnce, 1);
+      fistPump.clampWhenFinished = true;
+      fistPump.play();
+
+      demonState.currentAnimation = fistPumpKey;
+      demonState.isPlayingSpecial = true;
+      demonState.nextSwitchDelay = 999999;
+      demonState.lastSwitchTime = Date.now();
+
+      const animDuration = fistPump.getClip().duration * 1000;
+      setTimeout(() => {
+        const loopAnims = Object.keys(demonActions).filter(a =>
+          /typing|idle|laughing/i.test(a));
+        const returnAnim = loopAnims.length > 0
+          ? loopAnims[Math.floor(Math.random() * loopAnims.length)]
+          : Object.keys(demonActions)[0];
+        if (demonActions[returnAnim]) {
+          fistPump.fadeOut(0.5);
+          demonActions[returnAnim].stop();
+          demonActions[returnAnim].reset();
+          demonActions[returnAnim].setLoop(THREE.LoopRepeat);
+          demonActions[returnAnim].setEffectiveWeight(1);
+          demonActions[returnAnim].play();
+        }
+        demonState.currentAnimation = returnAnim;
+        demonState.isPlayingSpecial = false;
+        demonState.nextSwitchDelay = Math.random() * 8000 + 6000;
+        demonState.lastSwitchTime = Date.now();
+      }, Math.max(100, animDuration - 500));
+    };
+
+    const checkPrice = async () => {
+      try {
+        const res = await fetch('/api/rl80-price');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.price == null) return;
+
+        const currentPrice = parseFloat(data.price);
+        const prevPrice = lastPriceRef.current;
+        lastPriceRef.current = currentPrice;
+
+        // If we have a previous price and new price is higher → buy detected
+        if (prevPrice !== null && currentPrice > prevPrice) {
+          triggerH80ZFistPump();
+        }
+      } catch {
+        // Silently ignore fetch errors
+      }
+    };
+
+    // Initial fetch to seed the price (no animation on first load)
+    checkPrice();
+    // Poll every 15 seconds
+    priceCheckIntervalRef.current = setInterval(checkPrice, 15000);
+
+    return () => {
+      if (priceCheckIntervalRef.current) {
+        clearInterval(priceCheckIntervalRef.current);
+      }
+    };
+  }, []);
+
   // Use prop or detected mobile state
   const isOnMobile = isMobile || detectedMobile;
 
@@ -512,6 +602,78 @@ const CyborgTempleScene = ({
     texture.needsUpdate = true
 
     return texture
+  }
+
+  // Create colored back textures for coin flip — one per coin with distinct colors
+  const createCoinColoredBacks = () => {
+    const colors = [
+      { inner: '#2a0a3a', outer: '#0a0a1a', ring: 'rgba(180, 100, 255, 0.8)' },  // Purple
+      { inner: '#0a2a3a', outer: '#0a0a1a', ring: 'rgba(100, 200, 255, 0.8)' },  // Cyan
+      { inner: '#3a2a0a', outer: '#0a0a1a', ring: 'rgba(255, 180, 50, 0.8)' },   // Gold
+      { inner: '#0a3a1a', outer: '#0a0a1a', ring: 'rgba(100, 255, 150, 0.8)' },  // Green
+    ]
+    colors.forEach((color, i) => {
+      const size = 512
+      const canvas = document.createElement('canvas')
+      canvas.width = size
+      canvas.height = size
+      const ctx = canvas.getContext('2d')
+
+      // Circular clip
+      ctx.beginPath()
+      ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2)
+      ctx.closePath()
+      ctx.clip()
+
+      // Flip canvas so it reads correctly with flipY=false
+      ctx.translate(size / 2, size / 2)
+      ctx.scale(-1, -1)
+      ctx.translate(-size / 2, -size / 2)
+
+      // Radial gradient background
+      const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+      gradient.addColorStop(0, color.inner)
+      gradient.addColorStop(1, color.outer)
+      ctx.fillStyle = gradient
+      ctx.fillRect(0, 0, size, size)
+
+      // Decorative ring
+      ctx.beginPath()
+      ctx.arc(size / 2, size / 2, size / 2 - 8, 0, Math.PI * 2)
+      ctx.strokeStyle = color.ring
+      ctx.lineWidth = 4
+      ctx.stroke()
+
+      // Inner ring
+      ctx.beginPath()
+      ctx.arc(size / 2, size / 2, size / 3, 0, Math.PI * 2)
+      ctx.strokeStyle = color.ring
+      ctx.lineWidth = 2
+      ctx.globalAlpha = 0.4
+      ctx.stroke()
+      ctx.globalAlpha = 1.0
+
+      // Center cross/star pattern
+      ctx.strokeStyle = color.ring
+      ctx.lineWidth = 2
+      ctx.globalAlpha = 0.3
+      for (let a = 0; a < 8; a++) {
+        const angle = (a / 8) * Math.PI * 2
+        ctx.beginPath()
+        ctx.moveTo(size / 2, size / 2)
+        ctx.lineTo(size / 2 + Math.cos(angle) * size / 3, size / 2 + Math.sin(angle) * size / 3)
+        ctx.stroke()
+      }
+      ctx.globalAlpha = 1.0
+
+      const texture = new THREE.CanvasTexture(canvas)
+      texture.flipY = false
+      texture.colorSpace = THREE.SRGBColorSpace
+      texture.center.set(0.5, 0.5)
+      texture.rotation = -40 * (Math.PI / 180)
+      texture.needsUpdate = true
+      coinColoredBackTexturesRef.current[i] = texture
+    })
   }
 
   // Create a back-face mesh for a CoinFace (shown when flipped on mobile)
@@ -1387,6 +1549,7 @@ const CyborgTempleScene = ({
       // On mobile, load character textures, hide Coin meshes, and set up flip animation
       if (isOnMobile) {
         loadCoinBackTextures()
+        createCoinColoredBacks()
         // Hide the Coin meshes behind CoinFaces
         coinMeshRefs.forEach(ref => {
           if (ref.current) ref.current.visible = false
@@ -1706,23 +1869,15 @@ const CyborgTempleScene = ({
           break;
         }
 
-        // Handle CoinFace touch on mobile — flip the coin
+        // Handle CoinFace touch on mobile — fire callback
         if (isOnMobile && object.name && object.name.startsWith('CoinFace')) {
           touchedSomething = true;
           if (event.cancelable) {
             event.preventDefault();
           }
-          // In agents mode, fire callback instead of flipping
-          if (carouselState.current.showingCharacters && onCoinFaceTap) {
+          if (onCoinFaceTap) {
             const coinIndex = parseInt(object.name.replace('CoinFace', '')) - 1;
-            onCoinFaceTap(coinIndex);
-            break;
-          }
-          const flipState = coinFaceFlipState.current[object.name];
-          if (flipState && Date.now() - flipState.lastFlipTime > 300) {
-            flipState.isFlipped = !flipState.isFlipped;
-            flipState.targetRotation = flipState.isFlipped ? Math.PI : 0;
-            flipState.lastFlipTime = Date.now();
+            onCoinFaceTap(coinIndex, carouselState.current.showingCharacters);
           }
           break;
         }
@@ -1746,18 +1901,8 @@ const CyborgTempleScene = ({
         }
       }
 
-      // Reset flipped coins when tapping empty space on mobile
-      if (!touchedSomething && isOnMobile) {
-        coinFaceRefs.current.forEach((cf, i) => {
-          const flipState = coinFaceFlipState.current[`CoinFace${i + 1}`];
-          if (flipState && flipState.isFlipped) {
-            flipState.isFlipped = false;
-            flipState.targetRotation = 0;
-          }
-        });
-      }
     };
-    
+
     // Function to trigger coin click animation
     const triggerCoinAnimation = (coinName) => {
       const animState = coinAnimationState.current[coinName];
@@ -1959,13 +2104,11 @@ const CyborgTempleScene = ({
 
           // On mobile (MOBILE2.glb), CoinFace flips and Angel does nothing
           if (isOnMobile) {
-            // CoinFace click — placeholder for showing info about this user/character (TBD)
+            // CoinFace click — fire callback to show related info
             if (object.name && object.name.startsWith('CoinFace')) {
-              const flipState = coinFaceFlipState.current[object.name];
-              if (flipState && Date.now() - flipState.lastFlipTime > 300) {
-                flipState.isFlipped = !flipState.isFlipped;
-                flipState.targetRotation = flipState.isFlipped ? Math.PI : 0;
-                flipState.lastFlipTime = Date.now();
+              if (onCoinFaceTap) {
+                const coinIndex = parseInt(object.name.replace('CoinFace', '')) - 1;
+                onCoinFaceTap(coinIndex, carouselState.current.showingCharacters);
               }
               break;
             }
@@ -2171,17 +2314,6 @@ const CyborgTempleScene = ({
         }
       }
       
-      // On mobile, reset flipped coins when tapping on empty space
-      if (!clickedOnAgent && isOnMobile) {
-        coinFaceRefs.current.forEach((_, i) => {
-          const flipState = coinFaceFlipState.current[`CoinFace${i + 1}`];
-          if (flipState && flipState.isFlipped) {
-            flipState.isFlipped = false;
-            flipState.targetRotation = 0;
-          }
-        });
-      }
-
       // If we didn't click on an agent and we're currently focused, reset the camera
       if (!clickedOnAgent && focusTarget) {
 
@@ -2283,21 +2415,13 @@ const CyborgTempleScene = ({
             break;
           }
 
-          // Handle CoinFace touch on mobile — flip the coin
+          // Handle CoinFace touch on mobile — fire callback
           if (isOnMobile && object.name && object.name.startsWith('CoinFace')) {
             touchedSomething = true;
             event.preventDefault();
-            // In agents mode, fire callback instead of flipping
-            if (carouselState.current.showingCharacters && onCoinFaceTap) {
+            if (onCoinFaceTap) {
               const coinIndex = parseInt(object.name.replace('CoinFace', '')) - 1;
-              onCoinFaceTap(coinIndex);
-              break;
-            }
-            const flipState = coinFaceFlipState.current[object.name];
-            if (flipState && Date.now() - flipState.lastFlipTime > 300) {
-              flipState.isFlipped = !flipState.isFlipped;
-              flipState.targetRotation = flipState.isFlipped ? Math.PI : 0;
-              flipState.lastFlipTime = Date.now();
+              onCoinFaceTap(coinIndex, carouselState.current.showingCharacters);
             }
             break;
           }
@@ -2319,19 +2443,9 @@ const CyborgTempleScene = ({
           }
         }
 
-        // Reset flipped coins when tapping empty space on mobile
-        if (!touchedSomething && isOnMobile) {
-          coinFaceRefs.current.forEach((_, i) => {
-            const flipState = coinFaceFlipState.current[`CoinFace${i + 1}`];
-            if (flipState && flipState.isFlipped) {
-              flipState.isFlipped = false;
-              flipState.targetRotation = 0;
-            }
-          });
-        }
       }
     };
-    
+
     gl.domElement.addEventListener('pointerdown', handlePointerDown);
     
     window.addEventListener('keydown', handleKeyDown);
@@ -2629,10 +2743,13 @@ const CyborgTempleScene = ({
         const availableAnimations = Object.keys(monkActions);
 
         // Monk animations use *_monk suffix — classify by name
-        const loopAnimations = availableAnimations.filter(a =>
+        // Exclude disapproval from rotation for now
+        const filteredAnimations = availableAnimations.filter(a =>
+          !/disapproval/i.test(a));
+        const loopAnimations = filteredAnimations.filter(a =>
           /typing|idle|laughing/i.test(a));
-        const specialAnimations = availableAnimations.filter(a =>
-          /disbelief|disapproval|clap|fistpump/i.test(a));
+        const specialAnimations = filteredAnimations.filter(a =>
+          /disbelief|clap|fistpump/i.test(a));
 
         if (availableAnimations.length === 0) return;
 
@@ -2730,7 +2847,7 @@ const CyborgTempleScene = ({
         const loopAnimations = availableAnimations.filter(anim => 
           anim === 'Typing' || anim === 'Idle' || anim === 'Clap');
         const specialAnimations = availableAnimations.filter(anim => 
-          anim === 'Disbelief' || anim === 'FistPump');
+          anim === 'Disbelief' || anim === '');
         
         // If we don't have any animations, skip
         if (availableAnimations.length === 0) {
@@ -3167,64 +3284,6 @@ const CyborgTempleScene = ({
         }
       }
 
-      // === Individual CoinFace flip animation (single coin tap) ===
-      if (!cs.isAnimating) {
-        coinFaceRefs.current.forEach((mesh, i) => {
-          if (!mesh) return
-          const name = `CoinFace${i + 1}`
-          const flipState = coinFaceFlipState.current[name]
-          if (!flipState) return
-
-          const lerpSpeed = 0.08
-          const diff = flipState.targetRotation - flipState.currentRotation
-          if (Math.abs(diff) > 0.001) {
-            flipState.currentRotation += diff * lerpSpeed
-            mesh.rotation.y = flipState.currentRotation
-
-            // Scale pulse at midpoint (90°)
-            const normalizedAngle = Math.abs(flipState.currentRotation % Math.PI)
-            const midpointProximity = 1 - Math.abs(normalizedAngle - Math.PI / 2) / (Math.PI / 2)
-            const scalePulse = 1 + midpointProximity * 0.15
-            if (flipState.originalScale) {
-              mesh.scale.set(
-                flipState.originalScale.x * scalePulse,
-                flipState.originalScale.y * scalePulse,
-                flipState.originalScale.z * scalePulse
-              )
-            }
-
-            // At 90° crossover, clear the texture to show blank back
-            const pastHalfway = Math.abs(flipState.currentRotation) > Math.PI / 2
-            if (pastHalfway !== flipState.showingBack) {
-              flipState.showingBack = pastHalfway
-              if (pastHalfway) {
-                // Flipping to back — show name texture (agents or supporters)
-                const showingChars = carouselState.current.showingCharacters
-                const nameTex = showingChars
-                  ? coinAgentNameTexturesRef.current[i]
-                  : coinFaceNameTexturesRef.current[i]
-                mesh.material.map = nameTex || null
-                mesh.material.needsUpdate = true
-              } else {
-                // Flipping back to front — restore the current image
-                const showingChars = carouselState.current.showingCharacters
-                const frontTex = showingChars ? coinBackTexturesRef.current[i] : coinFaceTexturesRef.current[i]
-                if (frontTex) {
-                  mesh.material.map = frontTex
-                  mesh.material.needsUpdate = true
-                }
-              }
-            }
-          } else {
-            // Snap to target
-            flipState.currentRotation = flipState.targetRotation
-            mesh.rotation.y = flipState.currentRotation
-            if (flipState.originalScale) {
-              mesh.scale.copy(flipState.originalScale)
-            }
-          }
-        })
-      }
     }
   });
 
