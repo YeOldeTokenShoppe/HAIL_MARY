@@ -6,9 +6,12 @@ import { OrbitControls, Cloud, Clouds } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import CleanCanvas from "@/components/canvas/CleanCanvas";
-import OilVoxelGrid from "@/components/OilVoxelGrid";
+import OilVoxelGrid, { CctvRenderer } from "@/components/OilVoxelGrid";
 import { generateOilDistribution3D } from "@/lib/oilDistribution";
 import PimpMyPumpPanel, { getDefaultPumpConfig } from "@/components/PimpMyPumpPanel";
+import { useUser } from "@clerk/nextjs";
+import NavControlsHome from "@/components/NavControlsHome";
+import { db, storage, doc, getDoc, setDoc, serverTimestamp, ref, uploadBytes, getDownloadURL, onSnapshot } from "@/lib/firebaseClient";
 
 // ── Sky dome gradient ────────────────────────────────────────────────────────
 function SkyDome() {
@@ -255,6 +258,48 @@ function useIsMobile(breakpoint = 900) {
 
 export default function OilPage() {
   const isMobile = useIsMobile();
+
+  // Read mode from URL search params (avoids useSearchParams / Suspense issues)
+  const [mode, setMode] = useState("active");
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setMode(params.get("mode") || "active");
+  }, []);
+  const isAdmin = mode === "admin";
+  const isReport = mode === "report";
+  const { user } = useUser();
+
+  // Game state
+  const [gameEnded, setGameEnded] = useState(false);
+  const [gameDay, setGameDay] = useState(1);
+
+  // Admin password gate
+  const [adminAuthed, setAdminAuthed] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+
+  useEffect(() => {
+    if (isAdmin && localStorage.getItem("oil_admin_auth") === "true") {
+      setAdminAuthed(true);
+    }
+  }, [isAdmin]);
+
+  const handleAdminLogin = useCallback(() => {
+    const correct = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "admin123";
+    if (adminPassword === correct) {
+      setAdminAuthed(true);
+      localStorage.setItem("oil_admin_auth", "true");
+    } else {
+      alert("Incorrect password");
+    }
+  }, [adminPassword]);
+
+  // Redirect report mode to active if game hasn't ended
+  useEffect(() => {
+    if (isReport && !gameEnded) {
+      window.location.replace("/oil");
+    }
+  }, [isReport, gameEnded]);
+
   const [revealProgress, setRevealProgress] = useState(0);
   const [animateReveal, setAnimateReveal] = useState(false);
   const [blockHash, setBlockHash] = useState(DEFAULT_BLOCK_HASH);
@@ -263,6 +308,43 @@ export default function OilPage() {
   const [introComplete, setIntroComplete] = useState(false);
   const [numberOfDeposits, setNumberOfDeposits] = useState(8);
   const [totalOilBudget, setTotalOilBudget] = useState(100_000_000);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+
+  // ── Firestore game settings sync ──
+  // Subscribe to oilGame/settings — all modes get live updates
+  useEffect(() => {
+    if (!db) return;
+    const unsub = onSnapshot(doc(db, "oilGame", "settings"), (snap) => {
+      if (snap.exists()) {
+        const d = snap.data();
+        if (d.blockHash) setBlockHash(d.blockHash);
+        if (d.numberOfDeposits) setNumberOfDeposits(d.numberOfDeposits);
+        if (d.totalOilBudget) setTotalOilBudget(d.totalOilBudget);
+        if (typeof d.gameEnded === "boolean") setGameEnded(d.gameEnded);
+        if (typeof d.gameDay === "number") setGameDay(d.gameDay);
+      }
+      setSettingsLoaded(true);
+    });
+    return () => unsub();
+  }, []);
+
+  // Admin: save settings to Firestore when they change
+  const saveGameSettings = useCallback(async (overrides = {}) => {
+    if (!db || !isAdmin || !adminAuthed) return;
+    try {
+      await setDoc(doc(db, "oilGame", "settings"), {
+        blockHash,
+        numberOfDeposits,
+        totalOilBudget,
+        gameEnded,
+        gameDay,
+        updatedAt: serverTimestamp(),
+        ...overrides,
+      });
+    } catch (err) {
+      console.error("Failed to save game settings:", err);
+    }
+  }, [isAdmin, adminAuthed, blockHash, numberOfDeposits, totalOilBudget, gameEnded, gameDay]);
 
   // Mobile tab view
   const [mobileTab, setMobileTab] = useState("3d"); // "3d" | "surface" | "xsec"
@@ -277,11 +359,141 @@ export default function OilPage() {
   const [demoDay, setDemoDay] = useState(0);
   const [demoPlaying, setDemoPlaying] = useState(false);
 
+  // ── Daily Drill (player mode) ──
+  const [userDrill, setUserDrill] = useState(null); // { col, row, drillDay, lastDrillDate }
+  const [drillCountdown, setDrillCountdown] = useState("");
+
+  // Load user drill state from Firestore
+  useEffect(() => {
+    if (!user?.id || !db) return;
+    const unsub = onSnapshot(doc(db, "oilDrills", user.id), (snap) => {
+      if (snap.exists()) {
+        const d = snap.data();
+        setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate });
+      } else {
+        setUserDrill(null);
+      }
+    });
+    return () => unsub();
+  }, [user?.id]);
+
+  // Countdown timer to next 00:00 UTC
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+      const diff = tomorrow - now;
+      const h = String(Math.floor(diff / 3600000)).padStart(2, "0");
+      const mn = String(Math.floor((diff % 3600000) / 60000)).padStart(2, "0");
+      const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, "0");
+      setDrillCountdown(`${h}:${mn}:${s}`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const todayUTC = new Date().toISOString().slice(0, 10);
+
+  // Effective drill day: active mode uses userDrill, admin/report uses demoDay
+  const effectiveDrillDay = (isAdmin || isReport) ? demoDay : (userDrill?.drillDay || 0);
+
+  // Can the player drill right now?
+  const drillStatus = useMemo(() => {
+    if (!user) return "sign-in";
+    if (selectedX === null) return "no-claim";
+    if (userDrill && (userDrill.col !== selectedX || userDrill.row !== sliceY)) return "wrong-claim";
+    const currentDepth = userDrill?.drillDay || 0;
+    if (currentDepth >= DEPTH_Z) return "max-depth";
+    if (userDrill?.lastDrillDate === todayUTC) return "drilled-today";
+    return "ready";
+  }, [user, selectedX, sliceY, userDrill, todayUTC]);
+
   // Panel collapse for full 3D view
   const [panelsCollapsed, setPanelsCollapsed] = useState(false);
 
   // Pimp My Pump customization
   const [pumpConfig, setPumpConfig] = useState(() => getDefaultPumpConfig());
+  const [configSaving, setConfigSaving] = useState(false);
+  const [configDirty, setConfigDirty] = useState(false);
+  const cctvCanvasRef = useRef(null);
+  const [cctvOpen, setCctvOpen] = useState(true);
+
+  // Track unsaved changes
+  const handleConfigChange = useCallback((newConfig) => {
+    setPumpConfig(newConfig);
+    setConfigDirty(true);
+  }, []);
+
+  // Build Firestore doc ID from user + rig cell
+  const getConfigDocId = useCallback((col, row) => {
+    if (!user?.id) return null;
+    return `${user.id}_${col}_${row}`;
+  }, [user?.id]);
+
+  // Load pump config when a rig is selected
+  useEffect(() => {
+    if (!user?.id || !db || selectedX === null || sliceY === null) return;
+    const docId = getConfigDocId(selectedX, sliceY);
+    if (!docId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, "pumpConfigs", docId));
+        if (cancelled) return;
+        if (snap.exists()) {
+          const data = snap.data();
+          setPumpConfig({ ...getDefaultPumpConfig(), ...data.config });
+        } else {
+          setPumpConfig(getDefaultPumpConfig());
+        }
+        setConfigDirty(false);
+      } catch (err) {
+        console.error("Failed to load pump config:", err);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [user?.id, selectedX, sliceY, getConfigDocId]);
+
+  // Save pump config (called from SAVE button)
+  const handleConfigSave = useCallback(async () => {
+    if (!user?.id || !db || selectedX === null || sliceY === null) return;
+    const docId = getConfigDocId(selectedX, sliceY);
+    if (!docId) return;
+
+    setConfigSaving(true);
+    try {
+      let configToSave = { ...pumpConfig };
+
+      // If there's a sign image blob, upload to Storage first
+      if (configToSave.signImageUrl?.startsWith("blob:")) {
+        const resp = await fetch(configToSave.signImageUrl);
+        const blob = await resp.blob();
+        const ext = blob.type.split("/")[1] || "png";
+        const path = `signImages/${user.id}/${selectedX}_${sliceY}.${ext}`;
+        const storageRef = ref(storage, path);
+        await uploadBytes(storageRef, blob);
+        configToSave.signImageUrl = await getDownloadURL(storageRef);
+        // Update local state with the permanent URL
+        setPumpConfig(configToSave);
+      }
+
+      await setDoc(doc(db, "pumpConfigs", docId), {
+        userId: user.id,
+        col: selectedX,
+        row: sliceY,
+        config: configToSave,
+        updatedAt: serverTimestamp(),
+      });
+      setConfigDirty(false);
+    } catch (err) {
+      console.error("Failed to save pump config:", err);
+    } finally {
+      setConfigSaving(false);
+    }
+  }, [user?.id, selectedX, sliceY, pumpConfig, getConfigDocId]);
 
   // Camera fly-to
   const [flyTarget, setFlyTarget] = useState(null);
@@ -289,6 +501,25 @@ export default function OilPage() {
   const controlsRefMobile = useRef();
 
   const stats = useClaimStats(blockHash, numberOfDeposits, totalOilBudget);
+
+  // In active game mode, hide oil data from 2D views
+  const showOilData = isAdmin || isReport;
+
+  const blankClaimTotals = useMemo(() =>
+    stats.claimTotals.map((c) => ({ ...c, oil: 0, total: 0 })),
+    [stats.claimTotals]
+  );
+
+  const blankGrid3D = useMemo(() => {
+    const g = [];
+    for (let x = 0; x < GRID_X; x++) {
+      g[x] = [];
+      for (let y = 0; y < GRID_Y; y++) {
+        g[x][y] = new Array(DEPTH_Z).fill(0);
+      }
+    }
+    return g;
+  }, []);
 
   const hitRate = stats.claimTotals.length > 0
     ? Math.round(((GRID_X * GRID_Y - stats.dryClaims) / (GRID_X * GRID_Y)) * 100)
@@ -299,13 +530,13 @@ export default function OilPage() {
   // Tank fill: fraction of oil extracted relative to fixed tank capacity (100K tokens)
   // Can exceed 1.0 — gusher fires when it first crosses 1.0
   const tankFill = useMemo(() => {
-    if (selectedX === null || demoDay === 0) return 0;
+    if (selectedX === null || effectiveDrillDay === 0) return 0;
     let extracted = 0;
-    for (let z = 0; z < Math.min(demoDay, DEPTH_Z); z++) {
+    for (let z = 0; z < Math.min(effectiveDrillDay, DEPTH_Z); z++) {
       extracted += stats.grid3D[selectedX]?.[sliceY]?.[z] ?? 0;
     }
     return extracted / TANK_CAPACITY;
-  }, [selectedX, sliceY, demoDay, stats]);
+  }, [selectedX, sliceY, effectiveDrillDay, stats]);
 
   const selectedDepthData = useMemo(() => {
     if (selectedX === null) return null;
@@ -330,19 +561,19 @@ export default function OilPage() {
     setMounted(true);
   }, []);
 
-  // Detect oil strike: keyed by demoDay so each layer triggers independently
+  // Detect oil strike: keyed by effectiveDrillDay so each layer triggers independently
   const oilStrikeDay = useRef(-1);
   const oilStrike = useMemo(() => {
-    if (selectedX === null || demoDay === 0) return 0;
-    const depthIndex = demoDay - 1;
+    if (selectedX === null || effectiveDrillDay === 0) return 0;
+    const depthIndex = effectiveDrillDay - 1;
     if (depthIndex < 0 || depthIndex >= DEPTH_Z) return 0;
     const oilAtDepth = stats.grid3D[selectedX]?.[sliceY]?.[depthIndex] ?? 0;
-    if (oilAtDepth > 0 && demoDay !== oilStrikeDay.current) {
-      oilStrikeDay.current = demoDay;
-      return demoDay; // unique trigger value per strike
+    if (oilAtDepth > 0 && effectiveDrillDay !== oilStrikeDay.current) {
+      oilStrikeDay.current = effectiveDrillDay;
+      return effectiveDrillDay; // unique trigger value per strike
     }
     return 0;
-  }, [selectedX, sliceY, demoDay, stats.grid3D]);
+  }, [selectedX, sliceY, effectiveDrillDay, stats.grid3D]);
 
   // Tank overflow gusher — fires once when tankFill first crosses 1.0
   const tankOverflowed = useRef(false);
@@ -411,7 +642,8 @@ export default function OilPage() {
     setIsRevealed(false);
     setSelectedX(null);
     setDrillDepth(0);
-  }, []);
+    saveGameSettings({ blockHash: hash });
+  }, [saveGameSettings]);
 
   const handleRandomize = useCallback(() => {
     const hex = "0123456789abcdef";
@@ -425,7 +657,8 @@ export default function OilPage() {
     setIsRevealed(false);
     setSelectedX(null);
     setDrillDepth(0);
-  }, []);
+    saveGameSettings({ blockHash: hash });
+  }, [saveGameSettings]);
 
   const handleSelectX = useCallback((x) => {
     setSelectedX(x);
@@ -434,12 +667,6 @@ export default function OilPage() {
 
   const handleSliceY = useCallback((y) => {
     setSliceY(y);
-    setDrillDepth(0);
-  }, []);
-
-  const handleSelectClaim = useCallback((claim) => {
-    setSelectedX(claim.x);
-    setSliceY(claim.y);
     setDrillDepth(0);
   }, []);
 
@@ -456,6 +683,36 @@ export default function OilPage() {
     setDrillDepth(0);
   }, []);
 
+  const handleSelectClaim = useCallback((claim) => {
+    setSelectedX(claim.x);
+    setSliceY(claim.y);
+    setDrillDepth(0);
+    handleFlyTo(claim.x, claim.y);
+  }, [handleFlyTo]);
+
+  // Daily drill handler (player mode)
+  const handleDailyDrill = useCallback(async () => {
+    if (!user?.id || !db || selectedX === null || drillStatus !== "ready") return;
+    const nextDay = (userDrill?.drillDay || 0) + 1;
+    const col = userDrill?.col ?? selectedX;
+    const row = userDrill?.row ?? sliceY;
+    // Optimistic local update
+    setUserDrill({ col, row, drillDay: nextDay, lastDrillDate: todayUTC });
+    try {
+      await setDoc(doc(db, "oilDrills", user.id), {
+        userId: user.id,
+        col,
+        row,
+        drillDay: nextDay,
+        lastDrillDate: todayUTC,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error("Failed to save drill:", err);
+    }
+  }, [user?.id, selectedX, sliceY, userDrill, drillStatus, todayUTC]);
+
+  // Legacy demo drill (admin inspector)
   const handleDrill = useCallback(() => {
     if (selectedX === null || isDrilling) return;
     setIsDrilling(true);
@@ -481,7 +738,7 @@ export default function OilPage() {
           {[3, 5, 8, 12, 16].map((n) => (
             <button
               key={n}
-              onClick={() => { setNumberOfDeposits(n); handleReset(); }}
+              onClick={() => { setNumberOfDeposits(n); handleReset(); saveGameSettings({ numberOfDeposits: n }); }}
               style={{
                 ...styles.paramBtn,
                 ...(numberOfDeposits === n ? styles.paramBtnActive : {}),
@@ -498,7 +755,7 @@ export default function OilPage() {
           {[10_000_000, 50_000_000, 100_000_000, 500_000_000].map((n) => (
             <button
               key={n}
-              onClick={() => { setTotalOilBudget(n); handleReset(); }}
+              onClick={() => { setTotalOilBudget(n); handleReset(); saveGameSettings({ totalOilBudget: n }); }}
               style={{
                 ...styles.paramBtn,
                 ...(totalOilBudget === n ? styles.paramBtnActive : {}),
@@ -519,6 +776,33 @@ export default function OilPage() {
         }}>
           {hitRate}%
         </span>
+      </div>
+      <div style={{ ...styles.paramRow, marginTop: 6, paddingTop: 6, borderTop: "1px solid #d4c8b4" }}>
+        <span style={styles.paramLabel}>GAME DAY</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <button
+            onClick={() => { const d = Math.max(1, gameDay - 1); setGameDay(d); saveGameSettings({ gameDay: d }); }}
+            style={{ ...styles.paramBtn, padding: "2px 8px" }}
+          >
+            &minus;
+          </button>
+          <span style={{
+            fontFamily: "'Orbitron', monospace",
+            fontSize: 13,
+            fontWeight: 700,
+            color: "#7a5a1a",
+            minWidth: 30,
+            textAlign: "center",
+          }}>
+            {gameDay}
+          </span>
+          <button
+            onClick={() => { const d = gameDay + 1; setGameDay(d); saveGameSettings({ gameDay: d }); }}
+            style={{ ...styles.paramBtn, padding: "2px 8px" }}
+          >
+            +
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -589,8 +873,13 @@ export default function OilPage() {
         <StatBlock label="DEPOSITS" value={stats.deposits.length} />
         <StatBlock label="CLAIMS" value={GRID_X * GRID_Y} />
         <StatBlock label="DEPTH" value={DEPTH_Z} unit="LVL" />
-        <StatBlock label="PEAK CELL" value={<AnimNum value={stats.maxOil} />} unit="RL80" />
-        <StatBlock label="DRY CLAIMS" value={stats.dryClaims} />
+        {(isAdmin || isReport) && (
+          <>
+            <StatBlock label="PEAK CELL" value={<AnimNum value={stats.maxClaimTotal} />} unit="RL80" />
+            <StatBlock label="DRY CLAIMS" value={stats.dryClaims} />
+            <StatBlock label="HIT RATE" value={`${hitRate}%`} accent={hitRate > 60} />
+          </>
+        )}
       </div>
     </div>
   );
@@ -834,6 +1123,217 @@ export default function OilPage() {
     `}</style>
   );
 
+  // CCTV overlay — collapsible widget, top-left of canvas
+  const cctvOverlay = selectedX !== null && pumpConfig.showCamera && (
+    <div style={cctvStyles.wrap}>
+      <div
+        style={cctvStyles.header}
+        onClick={() => setCctvOpen((o) => !o)}
+      >
+        <span style={cctvStyles.rec}>&#9679; REC</span>
+        <span style={cctvStyles.camLabel}>CAM-{selectedX},{sliceY}</span>
+        <span style={cctvStyles.toggle}>{cctvOpen ? "\u25B2" : "\u25BC"}</span>
+      </div>
+      {cctvOpen && (
+        <>
+          <canvas
+            ref={cctvCanvasRef}
+            width={320}
+            height={240}
+            style={cctvStyles.canvas}
+          />
+          <div style={cctvStyles.scanlines} />
+          <div style={cctvStyles.footer}>
+            <span style={cctvStyles.timestamp}>
+              {new Date().toLocaleTimeString("en-US", { hour12: false })}
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  // ═══════════════════════════════════════════════════════════
+  // ADMIN PASSWORD GATE
+  // ═══════════════════════════════════════════════════════════
+  if (isAdmin && !adminAuthed) {
+    return (
+      <div style={{
+        width: "100vw",
+        height: "100vh",
+        background: "#f5efe6",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: "'Share Tech Mono', monospace",
+      }}>
+        <div style={{
+          background: "rgba(245,239,230,0.95)",
+          border: "1px solid #c8b080",
+          borderRadius: 6,
+          padding: 32,
+          maxWidth: 360,
+          width: "90%",
+          textAlign: "center",
+        }}>
+          <div style={{ fontSize: 9, letterSpacing: "0.2em", color: "#9e8e78", marginBottom: 8 }}>OIL PROSPECTOR</div>
+          <h2 style={{
+            fontFamily: "'Orbitron', monospace",
+            fontSize: 16,
+            color: "#7a5a1a",
+            letterSpacing: "0.15em",
+            margin: "0 0 20px",
+          }}>ADMIN ACCESS</h2>
+          <input
+            type="password"
+            value={adminPassword}
+            onChange={(e) => setAdminPassword(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAdminLogin()}
+            placeholder="Enter password"
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              background: "#f0e8dc",
+              border: "1px solid #c8bfb0",
+              borderRadius: 3,
+              color: "#5a4e3e",
+              fontFamily: "'Share Tech Mono', monospace",
+              fontSize: 12,
+              letterSpacing: "0.08em",
+              marginBottom: 12,
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+          />
+          <button
+            onClick={handleAdminLogin}
+            style={{
+              width: "100%",
+              padding: "10px 20px",
+              background: "linear-gradient(180deg, #d4a854, #b8922e)",
+              border: "1px solid #b8922e",
+              borderRadius: 3,
+              color: "#fff",
+              fontFamily: "'Share Tech Mono', monospace",
+              fontSize: 11,
+              letterSpacing: "0.12em",
+              cursor: "pointer",
+            }}
+          >
+            AUTHENTICATE
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // End Game button (admin only)
+  const endGameButton = isAdmin && !gameEnded && (
+    <button
+      onClick={() => { setGameEnded(true); saveGameSettings({ gameEnded: true }); }}
+      style={{
+        padding: "10px 20px",
+        background: "linear-gradient(180deg, #c04040, #a03030)",
+        border: "1px solid #a03030",
+        borderRadius: 3,
+        color: "#fff",
+        fontFamily: "'Share Tech Mono', monospace",
+        fontSize: 11,
+        letterSpacing: "0.12em",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+      }}
+    >
+      END GAME
+    </button>
+  );
+
+  const gameEndedBanner = isAdmin && gameEnded && (
+    <div style={{
+      padding: "6px 16px",
+      background: "rgba(160,48,48,0.1)",
+      border: "1px solid rgba(160,48,48,0.3)",
+      borderRadius: 3,
+      color: "#a03030",
+      fontFamily: "'Share Tech Mono', monospace",
+      fontSize: 10,
+      letterSpacing: "0.1em",
+    }}>
+      GAME ENDED — <a href="/oil?mode=report" style={{ color: "#7a5a1a", textDecoration: "underline" }}>VIEW REPORT</a>
+    </div>
+  );
+
+  // Mode badge for header
+  const modeBadge = (isAdmin || isReport) && (
+    <span style={{
+      padding: "2px 8px",
+      background: isAdmin ? "rgba(160,48,48,0.15)" : "rgba(90,138,58,0.15)",
+      border: `1px solid ${isAdmin ? "rgba(160,48,48,0.3)" : "rgba(90,138,58,0.3)"}`,
+      borderRadius: 3,
+      fontSize: 8,
+      letterSpacing: "0.15em",
+      color: isAdmin ? "#a03030" : "#5a8a3a",
+      marginLeft: 8,
+    }}>
+      {isAdmin ? "ADMIN" : "REPORT"}
+    </span>
+  );
+
+  // ── Daily Drill Button (active mode only) ──
+  const drillButton = !isAdmin && !isReport && (
+    <div style={{
+      padding: "10px 14px",
+      borderBottom: "1px solid #d4c8b4",
+      background: "rgba(180,160,130,0.06)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 12,
+    }}>
+      {drillStatus === "sign-in" && (
+        <div style={drillBtnStyles.wrap}>
+          <button disabled style={drillBtnStyles.disabled}>SIGN IN TO DRILL</button>
+        </div>
+      )}
+      {drillStatus === "no-claim" && (
+        <div style={drillBtnStyles.wrap}>
+          <button disabled style={drillBtnStyles.disabled}>SELECT A CLAIM</button>
+        </div>
+      )}
+      {drillStatus === "wrong-claim" && (
+        <div style={drillBtnStyles.wrap}>
+          <button disabled style={drillBtnStyles.disabled}>
+            YOUR CLAIM: ({userDrill?.col}, {userDrill?.row})
+          </button>
+          <div style={drillBtnStyles.hint}>Navigate to your claimed cell to drill</div>
+        </div>
+      )}
+      {drillStatus === "max-depth" && (
+        <div style={drillBtnStyles.wrap}>
+          <button disabled style={drillBtnStyles.disabled}>MAX DEPTH REACHED</button>
+          <div style={drillBtnStyles.depth}>DEPTH {DEPTH_Z}/{DEPTH_Z}</div>
+        </div>
+      )}
+      {drillStatus === "drilled-today" && (
+        <div style={drillBtnStyles.wrap}>
+          <button disabled style={drillBtnStyles.disabled}>DRILLED TODAY</button>
+          <div style={drillBtnStyles.countdown}>NEXT DRILL IN {drillCountdown}</div>
+          <div style={drillBtnStyles.depth}>DEPTH {userDrill?.drillDay || 0}/{DEPTH_Z}</div>
+        </div>
+      )}
+      {drillStatus === "ready" && (
+        <div style={drillBtnStyles.wrap}>
+          <button onClick={handleDailyDrill} style={drillBtnStyles.active}>
+            DRILL
+          </button>
+          <div style={drillBtnStyles.depth}>DEPTH {userDrill?.drillDay || 0}/{DEPTH_Z}</div>
+        </div>
+      )}
+    </div>
+  );
+
   // ═══════════════════════════════════════════════════════════
   // MOBILE LAYOUT — tabbed views + scrollable panel below
   // ═══════════════════════════════════════════════════════════
@@ -842,6 +1342,15 @@ export default function OilPage() {
       <div style={m.root}>
         <div style={styles.scanlines} />
         <div style={styles.grain} />
+
+        {/* Nav controls with sign-in */}
+        <NavControlsHome
+          isUserSignedIn={!!user}
+          userImage={user?.imageUrl}
+          isMobile
+          show80sButton={false}
+          hideMusicOnMobile
+        />
 
         {/* Header */}
         <header style={m.header}>
@@ -853,28 +1362,41 @@ export default function OilPage() {
               </svg>
             </div>
             <div>
-              <h1 style={{ ...styles.title, fontSize: 12 }}>GET RICH QUICK</h1>
+              <h1 style={{ ...styles.title, fontSize: 12 }}>GET RICH QUICK{modeBadge}</h1>
               <p style={styles.subtitle}>OIL PROSPECTOR</p>
             </div>
           </div>
           <div style={styles.headerRight}>
-            <div style={styles.statusDot} />
+            <span style={{
+              fontFamily: "'Orbitron', monospace",
+              fontSize: 13,
+              fontWeight: 700,
+              color: "#7a5a1a",
+              letterSpacing: "0.1em",
+            }}>
+              DAY {gameDay}
+            </span>
+            <div style={{ ...styles.statusDot, ...(gameEnded ? { background: "#a03030", boxShadow: "0 0 6px rgba(160,48,48,0.4)" } : {}) }} />
             <span style={styles.statusText}>
-              {isRevealed ? "REVEALED" : "ACTIVE"}
+              {gameEnded ? "ENDED" : "ACTIVE"}
             </span>
           </div>
         </header>
 
-        {/* Seed bar */}
-        <div style={m.seedBar}>
-          <span style={styles.seedLabel}>SEED</span>
-          <span style={styles.seedValue}>{blockHash}</span>
-        </div>
+        {/* Seed bar — admin/report only */}
+        {(isAdmin || isReport) && (
+          <div style={m.seedBar}>
+            <span style={styles.seedLabel}>SEED</span>
+            <span style={styles.seedValue}>{blockHash}</span>
+          </div>
+        )}
 
-        {/* Controls */}
-        <div style={m.inlineControls}>
-          {controlButtons}
-        </div>
+        {/* Controls — admin only */}
+        {isAdmin && (
+          <div style={m.inlineControls}>
+            {controlButtons}
+          </div>
+        )}
 
         {/* Tab bar */}
         <div style={m.tabBar}>
@@ -919,7 +1441,7 @@ export default function OilPage() {
                     revealProgress={revealProgress}
                     animateReveal={animateReveal}
                     revealDuration={2}
-                    drillDay={demoDay}
+                    drillDay={effectiveDrillDay}
                     selectedCol={selectedX}
                     selectedRow={selectedX !== null ? sliceY : null}
                     onSelectCell={(col, row) => { setSelectedX(col); setSliceY(row); setDrillDepth(0); }}
@@ -929,6 +1451,7 @@ export default function OilPage() {
                     tankFill={tankFill}
                   />
                 </group>
+                <CctvRenderer canvasRef={cctvCanvasRef} />
                 {introComplete ? (
                   <>
                     <OrbitControls
@@ -938,7 +1461,7 @@ export default function OilPage() {
                       minDistance={0.1}
                       maxDistance={15}
                       maxPolarAngle={Math.PI * 0.48}
-                      zoomToCursor={true}
+                      zoomToCursor
                       target={[0, 1, 0]}
                     />
                     <CameraFlyTo target={flyTarget} controlsRef={controlsRefMobile} />
@@ -948,6 +1471,7 @@ export default function OilPage() {
                 )}
                 <CameraShake shakeRef={shakeRef} />
               </CleanCanvas>
+              {cctvOverlay}
               <div style={{ ...styles.cornerBracket, top: 6, left: 6 }} />
               <div style={{ ...styles.cornerBracket, top: 6, right: 6, transform: "scaleX(-1)" }} />
               <div style={{ ...styles.cornerBracket, bottom: 6, left: 6, transform: "scaleY(-1)" }} />
@@ -962,8 +1486,8 @@ export default function OilPage() {
           {mobileTab === "surface" && (
             <div style={m.section}>
               <OilSurfaceMap
-                claimTotals={stats.claimTotals}
-                maxClaimTotal={stats.maxClaimTotal}
+                claimTotals={showOilData ? stats.claimTotals : blankClaimTotals}
+                maxClaimTotal={showOilData ? stats.maxClaimTotal : 0}
                 selectedClaimIndex={selectedClaimIndex}
                 onSelectClaim={handleSelectClaim}
               />
@@ -974,8 +1498,8 @@ export default function OilPage() {
           {mobileTab === "xsec" && (
             <div style={m.section}>
               <OilCrossSection
-                grid3D={stats.grid3D}
-                maxCellValue={stats.maxOil}
+                grid3D={showOilData ? stats.grid3D : blankGrid3D}
+                maxCellValue={showOilData ? stats.maxOil : 0}
                 sliceY={sliceY}
                 selectedX={selectedX}
                 drillDepth={drillDepth}
@@ -985,20 +1509,33 @@ export default function OilPage() {
             </div>
           )}
 
-          {/* Panels below active view — inspector+drill first */}
-          {inspectorPanel}
+          {/* Panels below active view */}
+          {drillButton}
+          {isAdmin && parametersPanel}
+          {(isAdmin || isReport) && demoDrillPanel}
+          {(isAdmin || isReport) && inspectorPanel}
           {statsPanel}
-          {parametersPanel}
-          {demoDrillPanel}
-          {topClaimsPanel}
-          {dryZonesPanel}
-          {depositsPanel}
-          <PimpMyPumpPanel config={pumpConfig} onChange={setPumpConfig} hasSelection={selectedX !== null} isMobile />
-          <OilVerifyPanel
-            numberOfDeposits={numberOfDeposits}
-            totalOilBudget={totalOilBudget}
-            onApplyHash={handleApplyHash}
-          />
+          {(isAdmin || isReport) && topClaimsPanel}
+          {(isAdmin || isReport) && dryZonesPanel}
+          {(isAdmin || isReport) && depositsPanel}
+          <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={!isAdmin && !isReport} />
+          {(isAdmin || isReport) && (
+            <OilVerifyPanel
+              numberOfDeposits={numberOfDeposits}
+              totalOilBudget={totalOilBudget}
+              onApplyHash={handleApplyHash}
+            />
+          )}
+          {endGameButton && (
+            <div style={{ ...m.section, display: "flex", justifyContent: "center" }}>
+              {endGameButton}
+            </div>
+          )}
+          {gameEndedBanner && (
+            <div style={{ ...m.section, display: "flex", justifyContent: "center" }}>
+              {gameEndedBanner}
+            </div>
+          )}
         </div>
 
         {cssAnimations}
@@ -1014,6 +1551,14 @@ export default function OilPage() {
       <div style={styles.scanlines} />
       <div style={styles.grain} />
 
+      {/* Nav controls with sign-in */}
+      <NavControlsHome
+        isUserSignedIn={!!user}
+        userImage={user?.imageUrl}
+        show80sButton={false}
+        hideMusicOnMobile
+      />
+
       <header style={styles.header}>
         <div style={styles.headerLeft}>
           <div style={styles.logoMark}>
@@ -1023,28 +1568,39 @@ export default function OilPage() {
             </svg>
           </div>
           <div>
-            <h1 style={styles.title}>GET RICH QUICK</h1>
+            <h1 style={styles.title}>HAIL MARY PROSPECTING CO.{modeBadge}</h1>
             <p style={styles.subtitle}>OIL PROSPECTOR</p>
           </div>
         </div>
         <div style={styles.headerRight}>
-          <div style={styles.statusDot} />
+          <span style={{
+            fontFamily: "'Orbitron', monospace",
+            fontSize: 14,
+            fontWeight: 700,
+            color: "#7a5a1a",
+            letterSpacing: "0.1em",
+          }}>
+            DAY {gameDay}
+          </span>
+          <div style={{ ...styles.statusDot, ...(gameEnded ? { background: "#a03030", boxShadow: "0 0 6px rgba(160,48,48,0.4)" } : {}) }} />
           <span style={styles.statusText}>
-            {isRevealed ? "DEPOSITS REVEALED" : "SURVEY ACTIVE"}
+            {gameEnded ? "GAME ENDED" : "SURVEY ACTIVE"}
           </span>
         </div>
       </header>
 
-      <div style={styles.seedBar}>
-        <span style={styles.seedLabel}>BLOCK HASH SEED</span>
-        <span style={styles.seedValue}>{blockHash}</span>
-        <div style={styles.seedVerified}>
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M2 6l3 3 5-6" stroke="#5a8a3a" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
-          DETERMINISTIC
+      {(isAdmin || isReport) && (
+        <div style={styles.seedBar}>
+          <span style={styles.seedLabel}>BLOCK HASH SEED</span>
+          <span style={styles.seedValue}>{blockHash}</span>
+          <div style={styles.seedVerified}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M2 6l3 3 5-6" stroke="#5a8a3a" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            DETERMINISTIC
+          </div>
         </div>
-      </div>
+      )}
 
       <div style={{
         ...styles.dashboard,
@@ -1061,7 +1617,7 @@ export default function OilPage() {
             gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
           >
             <SkyDome />
-            <ambientLight intensity={2.2} />
+            <ambientLight intensity={1.2} />
             <directionalLight position={[10, 15, 10]} intensity={15.5} />
             <directionalLight position={[-5, 10, -5]} intensity={15.6} />
             <pointLight position={[-8, 5, -8]} intensity={1.5} color="#4488ff" />
@@ -1083,6 +1639,7 @@ export default function OilPage() {
                 tankFill={tankFill}
               />
             </group>
+            <CctvRenderer canvasRef={cctvCanvasRef} />
             {introComplete ? (
               <>
                 <OrbitControls
@@ -1101,6 +1658,7 @@ export default function OilPage() {
             )}
             <CameraShake shakeRef={shakeRef} />
           </CleanCanvas>
+          {cctvOverlay}
           <div style={{ ...styles.cornerBracket, top: 8, left: 8 }} />
           <div style={{ ...styles.cornerBracket, top: 8, right: 8, transform: "scaleX(-1)" }} />
           <div style={{ ...styles.cornerBracket, bottom: 8, left: 8, transform: "scaleY(-1)" }} />
@@ -1138,16 +1696,16 @@ export default function OilPage() {
           <div style={styles.midColumn}>
             <div style={styles.midPanel}>
               <OilSurfaceMap
-                claimTotals={stats.claimTotals}
-                maxClaimTotal={stats.maxClaimTotal}
+                claimTotals={showOilData ? stats.claimTotals : blankClaimTotals}
+                maxClaimTotal={showOilData ? stats.maxClaimTotal : 0}
                 selectedClaimIndex={selectedClaimIndex}
                 onSelectClaim={handleSelectClaim}
               />
             </div>
             <div style={{ ...styles.midPanel, flex: 1, minHeight: 0 }}>
               <OilCrossSection
-                grid3D={stats.grid3D}
-                maxCellValue={stats.maxOil}
+                grid3D={showOilData ? stats.grid3D : blankGrid3D}
+                maxCellValue={showOilData ? stats.maxOil : 0}
                 sliceY={sliceY}
                 selectedX={selectedX}
                 drillDepth={drillDepth}
@@ -1165,77 +1723,48 @@ export default function OilPage() {
             opacity: mounted ? 1 : 0,
             transform: mounted ? "translateX(0)" : "translateX(20px)",
           }}>
-            {parametersPanel}
-            {demoDrillPanel}
+            {drillButton}
+            {isAdmin && parametersPanel}
+            {(isAdmin || isReport) && demoDrillPanel}
             {statsPanel}
-            {inspectorPanel}
-            {topClaimsPanel}
-            {dryZonesPanel}
-            {depositsPanel}
-            <PimpMyPumpPanel config={pumpConfig} onChange={setPumpConfig} hasSelection={selectedX !== null} />
-            <OilVerifyPanel
-              numberOfDeposits={numberOfDeposits}
-              totalOilBudget={totalOilBudget}
-              onApplyHash={handleApplyHash}
-            />
+            {(isAdmin || isReport) && inspectorPanel}
+            {(isAdmin || isReport) && topClaimsPanel}
+            {(isAdmin || isReport) && dryZonesPanel}
+            {(isAdmin || isReport) && depositsPanel}
+            <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={!isAdmin && !isReport} />
+            {(isAdmin || isReport) && (
+              <OilVerifyPanel
+                numberOfDeposits={numberOfDeposits}
+                totalOilBudget={totalOilBudget}
+                onApplyHash={handleApplyHash}
+              />
+            )}
+            {endGameButton && (
+              <div style={{ ...styles.panelSection, display: "flex", justifyContent: "center" }}>
+                {endGameButton}
+              </div>
+            )}
+            {gameEndedBanner && (
+              <div style={{ ...styles.panelSection, display: "flex", justifyContent: "center" }}>
+                {gameEndedBanner}
+              </div>
+            )}
           </aside>
         )}
       </div>
 
       <div style={styles.controlBar}>
-        {controlButtons}
-        <div style={{ width: 1, height: 28, background: "#d4c8b4", margin: "0 4px" }} />
-        <button
-          onClick={() => {
-            if (demoDay >= DEPTH_Z) setDemoDay(0);
-            setDemoPlaying((p) => !p);
-          }}
-          style={{
-            ...styles.btn,
-            ...styles.btnPrimary,
-            padding: "10px 16px",
-          }}
-        >
-          {demoPlaying ? "PAUSE" : "▶ DRILL"}
-        </button>
-        <span style={{
-          fontFamily: "'Orbitron', monospace",
-          fontSize: 11,
-          fontWeight: 700,
-          color: "#7a5a1a",
-          minWidth: 70,
-          textAlign: "center",
-        }}>
-          DAY {demoDay}/{DEPTH_Z}
-        </span>
-        <input
-          type="range"
-          min={0}
-          max={DEPTH_Z}
-          value={demoDay}
-          onChange={(e) => {
-            setDemoDay(Number(e.target.value));
-            setDemoPlaying(false);
-          }}
-          style={{
-            width: 120,
-            accentColor: "#b8922e",
-            cursor: "pointer",
-          }}
-        />
-        <button
-          onClick={() => { setDemoDay(0); setDemoPlaying(false); }}
-          style={styles.btn}
-        >
-          ↺ DAY 0
-        </button>
+        {isAdmin && controlButtons}
         {selectedX !== null && (
-          <button
-            onClick={() => { setSelectedX(null); setDrillDepth(0); }}
-            style={styles.btn}
-          >
-            ✕ DESELECT
-          </button>
+          <>
+            {isAdmin && <div style={{ width: 1, height: 28, background: "#d4c8b4", margin: "0 4px" }} />}
+            <button
+              onClick={() => { setSelectedX(null); setDrillDepth(0); }}
+              style={styles.btn}
+            >
+              ✕ DESELECT
+            </button>
+          </>
         )}
       </div>
 
@@ -1258,6 +1787,127 @@ function StatBlock({ label, value, unit, accent }) {
     </div>
   );
 }
+
+const drillBtnStyles = {
+  wrap: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 6,
+  },
+  active: {
+    padding: "10px 32px",
+    background: "linear-gradient(180deg, #d4a854, #b8922e)",
+    border: "2px solid #b8922e",
+    borderRadius: 4,
+    color: "#fff",
+    fontFamily: "'Share Tech Mono', monospace",
+    fontSize: 14,
+    fontWeight: "bold",
+    letterSpacing: "0.2em",
+    cursor: "pointer",
+    boxShadow: "0 2px 12px rgba(180,140,40,0.35)",
+    transition: "all 0.2s",
+  },
+  disabled: {
+    padding: "10px 24px",
+    background: "rgba(180,160,130,0.15)",
+    border: "1px solid #c8bfb0",
+    borderRadius: 4,
+    color: "#9e8e78",
+    fontFamily: "'Share Tech Mono', monospace",
+    fontSize: 11,
+    letterSpacing: "0.12em",
+    cursor: "not-allowed",
+  },
+  depth: {
+    fontSize: 9,
+    fontFamily: "'Orbitron', monospace",
+    color: "#7a5a1a",
+    letterSpacing: "0.15em",
+  },
+  countdown: {
+    fontSize: 10,
+    fontFamily: "'Share Tech Mono', monospace",
+    color: "#9e8e78",
+    letterSpacing: "0.08em",
+  },
+  hint: {
+    fontSize: 8,
+    color: "#9e8e78",
+    letterSpacing: "0.08em",
+  },
+};
+
+const cctvStyles = {
+  wrap: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: 220,
+    background: "#0a0a0a",
+    border: "1px solid #444",
+    borderRadius: 4,
+    overflow: "hidden",
+    zIndex: 100,
+    fontFamily: "'Share Tech Mono', monospace",
+    boxShadow: "0 4px 20px rgba(0,0,0,0.6)",
+  },
+  header: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "4px 8px",
+    background: "#111",
+    cursor: "pointer",
+    userSelect: "none",
+    gap: 8,
+  },
+  rec: {
+    fontSize: 9,
+    color: "#ff3333",
+    letterSpacing: "0.1em",
+    animation: "pulse 1.5s ease-in-out infinite",
+  },
+  camLabel: {
+    fontSize: 8,
+    color: "#888",
+    letterSpacing: "0.12em",
+    flex: 1,
+    textAlign: "center",
+  },
+  toggle: {
+    fontSize: 8,
+    color: "#666",
+  },
+  canvas: {
+    width: "100%",
+    height: "auto",
+    display: "block",
+    imageRendering: "pixelated",
+    filter: "contrast(1.1) brightness(0.9) saturate(0.6)",
+  },
+  scanlines: {
+    position: "absolute",
+    top: 22,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: "repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 3px)",
+    pointerEvents: "none",
+    zIndex: 1,
+  },
+  footer: {
+    padding: "3px 8px",
+    background: "#111",
+    textAlign: "right",
+  },
+  timestamp: {
+    fontSize: 8,
+    color: "#888",
+    letterSpacing: "0.08em",
+  },
+};
 
 const styles = {
   root: {

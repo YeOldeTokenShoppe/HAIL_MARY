@@ -13,5 +13,11 @@ service firebase.storage {
       allow read: if true;
       allow write: if false;
     }
+
+    // Sign images — scoped by userId folder
+    match /signImages/{userId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if true;
+    }
   }
 }

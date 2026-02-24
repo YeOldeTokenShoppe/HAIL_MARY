@@ -1,6 +1,18 @@
  rules_version = '2';
   service cloud.firestore {
     match /databases/{database}/documents {
+      // Pump customization configs — keyed by {userId}_{col}_{row}
+      match /pumpConfigs/{docId} {
+        allow read: if true;
+        allow create: if true
+          && request.resource.data.keys().hasAll(['userId', 'col', 'row', 'config', 'updatedAt'])
+          && request.resource.data.userId is string
+          && request.resource.data.userId.size() > 0;
+        allow update: if true
+          && request.resource.data.userId == resource.data.userId;
+        allow delete: if false;
+      }
+
       // Public read access to market data
       match /marketData/{document} {
         allow read: if true;
@@ -240,6 +252,24 @@
       match /tweets/{document} {
         allow read: if true;
         allow write: if true;
+      }
+
+      // Oil Drill progress — one doc per user tracking daily drill state
+      match /oilDrills/{docId} {
+        allow read: if true;
+        allow create: if true
+          && request.resource.data.keys().hasAll(['userId', 'col', 'row', 'drillDay', 'lastDrillDate', 'updatedAt'])
+          && request.resource.data.userId is string
+          && request.resource.data.userId.size() > 0;
+        allow update: if true
+          && request.resource.data.userId == resource.data.userId;
+        allow delete: if false;
+      }
+
+      // Oil Game settings — public read, admin-only write (password-gated in UI)
+      match /oilGame/{docId} {
+        allow read: if true;
+        allow write: if request.auth != null;
       }
 
       // Default rules - SECURE by default

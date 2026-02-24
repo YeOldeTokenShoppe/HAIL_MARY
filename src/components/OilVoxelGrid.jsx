@@ -5,7 +5,92 @@ import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Text, useGLTF, useTexture, useEnvironment } from "@react-three/drei";
 import { generateOilDistribution3D } from "@/lib/oilDistribution";
-import { PUMP_ZONES, MATERIAL_PRESETS } from "@/components/PimpMyPumpPanel";
+import { PUMP_ZONES, MATERIAL_PRESETS, ADDON_CATALOG, ADDON_SLOTS } from "@/components/PimpMyPumpPanel";
+// ── Shared CCTV state (module-level, Pumpjack writes → CctvRenderer reads) ──
+const _cctvState = {
+  active: false,
+  worldPos: new THREE.Vector3(),
+  worldQuat: new THREE.Quaternion(),
+  worldMatrix: new THREE.Matrix4(),
+};
+
+// ── CCTV Renderer — renders scene from security cam POV to low-res FBO ──────
+const CCTV_W = 320;
+const CCTV_H = 240;
+
+export function CctvRenderer({ canvasRef }) {
+  const { gl, scene } = useThree();
+  const cctvCam = useMemo(() => new THREE.PerspectiveCamera(90, CCTV_W / CCTV_H, 0.01, 100), []);
+  const fbo = useMemo(() => new THREE.WebGLRenderTarget(CCTV_W, CCTV_H, {
+    minFilter: THREE.LinearFilter,
+    magFilter: THREE.NearestFilter,
+  }), []);
+
+  useEffect(() => () => fbo.dispose(), [fbo]);
+
+  const pixelBuf = useMemo(() => new Uint8Array(CCTV_W * CCTV_H * 4), []);
+  const imgDataRef = useRef(null);
+
+  // CCTV camera tuning constants
+  const CCTV_OFFSET_X = 0.0;
+  const CCTV_OFFSET_Y = -0.05;
+  const CCTV_OFFSET_Z = -0.05;
+  const CCTV_TILT = 2.0;
+  const CCTV_FOV = 90;
+
+  useFrame(() => {
+    if (!_cctvState.active) return;
+
+    const cvs = canvasRef?.current;
+    if (!cvs) return;
+    const ctx = cvs.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return;
+
+    cctvCam.fov = CCTV_FOV;
+    cctvCam.updateProjectionMatrix();
+
+    // Position camera at the security camera + offsets
+    cctvCam.position.set(
+      _cctvState.worldPos.x + CCTV_OFFSET_X,
+      _cctvState.worldPos.y + CCTV_OFFSET_Y,
+      _cctvState.worldPos.z + CCTV_OFFSET_Z,
+    );
+
+    // Forward direction: +Z in the security camera's local space
+    const localFwd = new THREE.Vector3(0, 0, 1);
+    const normalMatrix = new THREE.Matrix3().getNormalMatrix(_cctvState.worldMatrix);
+    const worldFwd = localFwd.clone().applyMatrix3(normalMatrix).normalize();
+
+    const target = cctvCam.position.clone().add(worldFwd.multiplyScalar(5));
+    target.y -= CCTV_TILT;
+    cctvCam.lookAt(target);
+    cctvCam.updateMatrixWorld(true);
+
+    // Render to FBO
+    const prevTarget = gl.getRenderTarget();
+    gl.setRenderTarget(fbo);
+    gl.autoClear = true;
+    gl.render(scene, cctvCam);
+    gl.readRenderTargetPixels(fbo, 0, 0, CCTV_W, CCTV_H, pixelBuf);
+    gl.setRenderTarget(prevTarget);
+
+    // Write to the HTML canvas (flip vertically — WebGL reads bottom-up)
+    if (!imgDataRef.current) {
+      imgDataRef.current = ctx.createImageData(CCTV_W, CCTV_H);
+    }
+    const imgData = imgDataRef.current;
+    for (let y = 0; y < CCTV_H; y++) {
+      const srcOff = (CCTV_H - 1 - y) * CCTV_W * 4;
+      const dstOff = y * CCTV_W * 4;
+      for (let x = 0; x < CCTV_W * 4; x++) {
+        imgData.data[dstOff + x] = pixelBuf[srcOff + x];
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+  });
+
+  return null;
+}
 
 // ── Vertex shader (unchanged) ───────────────────────────────────────────────
 
@@ -416,9 +501,104 @@ function applyPumpConfig(clonedScene, pumpConfig, originalMats, envMap) {
   });
 }
 
+// ── Plot add-on meshes (GLB models or placeholder geometry) ─────────────────
+
+function AddonGLB({ item, slotPos, rotation = 0 }) {
+  const { scene } = useGLTF(item.model);
+  const cloned = useMemo(() => scene.clone(true), [scene]);
+  const rotY = rotation * Math.PI / 2;
+
+  return (
+    <group position={[slotPos.x, slotPos.y, slotPos.z]} rotation={[0, rotY, 0]}>
+      <primitive object={cloned} scale={PUMPJACK_SCALE} />
+    </group>
+  );
+}
+
+function AddonPlaceholder({ item, slotPos, rotation = 0 }) {
+  const scale = 0.08;
+  const y = slotPos.y + scale / 2;
+  const color = item.color;
+  const emissive = item.emissive ? item.color : "#000000";
+  const emissiveIntensity = item.emissive ? 0.6 : 0;
+  const rotY = rotation * Math.PI / 2;
+
+  const mat = <meshStandardMaterial color={color} emissive={emissive} emissiveIntensity={emissiveIntensity} roughness={0.6} metalness={0.1} />;
+
+  switch (item.shape) {
+    case "cone":
+      return (
+        <mesh position={[slotPos.x, y, slotPos.z]} rotation={[0, rotY, 0]}>
+          <coneGeometry args={[scale * 0.5, scale, 6]} />
+          {mat}
+        </mesh>
+      );
+    case "cylinder":
+      return (
+        <mesh position={[slotPos.x, y, slotPos.z]} rotation={[0, rotY, 0]}>
+          <cylinderGeometry args={[scale * 0.35, scale * 0.35, scale, 8]} />
+          {mat}
+        </mesh>
+      );
+    case "sphere":
+      return (
+        <mesh position={[slotPos.x, y, slotPos.z]} rotation={[0, rotY, 0]}>
+          <sphereGeometry args={[scale * 0.5, 8, 6]} />
+          {mat}
+        </mesh>
+      );
+    case "cross":
+      return (
+        <group position={[slotPos.x, y, slotPos.z]} rotation={[0, rotY, 0]}>
+          <mesh>
+            <boxGeometry args={[scale * 0.15, scale, scale * 0.15]} />
+            {mat}
+          </mesh>
+          <mesh position={[0, scale * 0.25, 0]}>
+            <boxGeometry args={[scale * 0.6, scale * 0.15, scale * 0.15]} />
+            {mat}
+          </mesh>
+        </group>
+      );
+    default: // "box"
+      return (
+        <mesh position={[slotPos.x, y, slotPos.z]} rotation={[0, rotY, 0]}>
+          <boxGeometry args={[scale, scale * 0.6, scale]} />
+          {mat}
+        </mesh>
+      );
+  }
+}
+
+function PlotAddons({ addons }) {
+  if (!addons || Object.keys(addons).length === 0) return null;
+
+  return (
+    <group>
+      {Object.entries(addons).map(([slotKey, value]) => {
+        const slotIdx = parseInt(slotKey, 10);
+        const slot = ADDON_SLOTS[slotIdx];
+        // Support both old string format and new { id, rot } format
+        const itemId = typeof value === "string" ? value : value?.id;
+        const rot = typeof value === "string" ? 0 : (value?.rot || 0);
+        const item = ADDON_CATALOG.find((c) => c.id === itemId);
+        if (!slot || !item) return null;
+        if (item.model) {
+          return <AddonGLB key={slotKey} item={item} slotPos={slot} rotation={rot} />;
+        }
+        return <AddonPlaceholder key={slotKey} item={item} slotPos={slot} rotation={rot} />;
+      })}
+    </group>
+  );
+}
+
+// Preload addon GLBs
+ADDON_CATALOG.forEach((item) => { if (item.model) useGLTF.preload(item.model); });
+
 function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, tankFill, onClick, onDoubleClick }) {
   const lastClickTime = useRef(0);
-  const groupRef = useRef();
+  const groupRef = useRef();   // primitive (clonedScene)
+  const shakeGroupRef = useRef(); // outer group for shake offset
   const strawRef = useRef();
   const strawBaseScaleZ = useRef(null);
   const strawBasePos = useRef(null);
@@ -504,7 +684,66 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     }
   }, [clonedScene, pumpConfig, highlighted, envMap]);
 
-  // Highlight is now handled by a grid-square plane in the parent component
+  // Security camera visibility — only when highlighted and config says so
+  useEffect(() => {
+    const show = highlighted && !!pumpConfig?.showCamera;
+    secCamPartsRef.current.forEach((part) => { part.visible = show; });
+  }, [highlighted, pumpConfig?.showCamera]);
+
+  // Sign frame visibility — only when highlighted and config says so
+  useEffect(() => {
+    const show = highlighted && !!pumpConfig?.showSign;
+    signFramePartsRef.current.forEach((part) => { part.visible = show; });
+  }, [highlighted, pumpConfig?.showSign]);
+
+  // Fence visibility — only when highlighted and config says so
+  useEffect(() => {
+    const show = highlighted && !!pumpConfig?.showFence;
+    fencePartsRef.current.forEach((part) => { part.visible = show; });
+  }, [highlighted, pumpConfig?.showFence]);
+
+  // Apply custom image to Sign mesh when URL changes
+  // Uses onBeforeCompile to flip UVs on back face so text is legible from both sides
+  const signImageUrl = highlighted ? pumpConfig?.signImageUrl : null;
+  useEffect(() => {
+    const sign = signRef.current;
+    if (!sign) return;
+
+    if (signImageUrl) {
+      const loader = new THREE.TextureLoader();
+      loader.crossOrigin = "anonymous";
+      loader.load(signImageUrl, (tex) => {
+        if (signRef.current !== sign) return;
+        tex.colorSpace = THREE.SRGBColorSpace;
+
+        // Create a new material with UV flip for back faces
+        const mat = sign.material.clone();
+        mat.map = tex;
+        mat.side = THREE.DoubleSide;
+        mat.onBeforeCompile = (shader) => {
+          // Flip UV.x on back face so the image reads correctly from both sides
+          shader.fragmentShader = shader.fragmentShader.replace(
+            '#include <map_fragment>',
+            `
+            #ifdef USE_MAP
+              vec2 signUv = vMapUv;
+              if (!gl_FrontFacing) signUv.x = 1.0 - signUv.x;
+              vec4 sampledDiffuseColor = texture2D(map, signUv);
+              diffuseColor *= sampledDiffuseColor;
+            #endif
+            `
+          );
+        };
+        mat.customProgramCacheKey = () => "sign_double_sided";
+        mat.needsUpdate = true;
+        sign.material = mat;
+      });
+    } else if (signOrigMat.current) {
+      sign.material = signOrigMat.current.clone();
+      sign.material.side = THREE.DoubleSide;
+      sign.material.needsUpdate = true;
+    }
+  }, [signImageUrl]);
 
   // ── Fuel Tank liquid fill ──────────────────────────────────────────────────
   // Find the tank mesh and compute its group-local bounding box (after all GLB
@@ -586,11 +825,94 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   const alertLightRef = useRef();
   const alertLightOrigColor = useRef(null);
   const strikeTimerRef = useRef(0);
-  const strikingRef = useRef(false);
+  const strikingRef = useRef(false);   // true during gusher overflow
+  const strikeFlashRef = useRef(false); // true during timed oil-strike flash
+  const strikeFlashTimer = useRef(0);
+  const STRIKE_FLASH_DURATION = 3.0;
   const strikeLightRef = useRef(); // dynamic point light
+
+  // Ground shake on oil strike
+  const shakeRef = useRef(false);
+  const shakeTimerRef = useRef(0);
+  const SHAKE_DURATION = 2.5;
+
+  // RedButton drain — local fill override while draining/drained
+  const drainingRef = useRef(false);  // actively animating down
+  const drainedRef = useRef(false);   // finished draining, stay at 0
+  const drainFillRef = useRef(0);
+  const redButtonRef = useRef();
+  const [tankDraining, setTankDraining] = useState(false);
+
+  // Gate slide
+  const gateRef = useRef();
+  const gateBasePos = useRef(null);
+  const gateOpenRef = useRef(false);
+  const gateTargetZ = useRef(0);
+
+  // Sign mesh — custom image texture
+  const signRef = useRef();
+  const signOrigMat = useRef(null);
+  const signFramePartsRef = useRef([]);
+  const fencePartsRef = useRef([]);
+
+  // Security camera sweep
+  const secCamRef = useRef();
+  const secCamPartsRef = useRef([]);
+  const secCamBaseRotY = useRef(null);
 
   useEffect(() => {
     clonedScene.traverse((child) => {
+      // RedButton — click to drain the tank
+      if (child.name === "RedButton" && child.isMesh) {
+        redButtonRef.current = child;
+      }
+      // Security camera — sweeping pivot + all camera parts
+      if (child.name === "Security_Camera") {
+        secCamRef.current = child;
+        if (secCamBaseRotY.current === null) {
+          secCamBaseRotY.current = child.rotation.y;
+        }
+      }
+      if (child.name.startsWith("Security_Camera")) {
+        if (!secCamPartsRef.current.includes(child)) {
+          secCamPartsRef.current.push(child);
+        }
+        child.visible = false; // hidden by default
+      }
+      // Sign — custom image texture
+      if (child.name === "Sign" && child.isMesh) {
+        signRef.current = child;
+        if (!signOrigMat.current) {
+          signOrigMat.current = child.material.clone();
+        }
+        if (!child.userData._signCloned) {
+          child.material = child.material.clone();
+          child.material.side = THREE.DoubleSide;
+          child.userData._signCloned = true;
+        }
+      }
+      // SignFrame and all children — hidden by default
+      if (child.name.startsWith("SignFrame")) {
+        if (!signFramePartsRef.current.includes(child)) {
+          signFramePartsRef.current.push(child);
+        }
+        child.visible = false;
+      }
+      // Fence_Package and all children — hidden by default
+      if (child.name.startsWith("Fence_Package")) {
+        if (!fencePartsRef.current.includes(child)) {
+          fencePartsRef.current.push(child);
+        }
+        child.visible = false;
+      }
+      // Gate — click to slide open/closed (may be a Mesh or Group)
+      if (child.name === "Gate") {
+        gateRef.current = child;
+        if (gateBasePos.current === null) {
+          gateBasePos.current = child.position.clone();
+          gateTargetZ.current = child.position.z;
+        }
+      }
       if (child.name === "Alert_Light_RED" && child.isMesh) {
         alertLightRef.current = child;
         if (!alertLightOrigColor.current) {
@@ -644,14 +966,32 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     }
   }, []);
 
-  // Trigger strobe + gusher when oilStrike fires on the highlighted rig
+  // Trigger timed strobe + shake when oilStrike fires on the highlighted rig
   useEffect(() => {
     if (oilStrike > 0 && highlighted) {
+      strikeFlashRef.current = true;
+      strikeFlashTimer.current = 0;
+      shakeRef.current = true;
+      shakeTimerRef.current = 0;
+      // Reset drained state so new oil cycle can fill normally
+      drainedRef.current = false;
+      drainingRef.current = false;
+      setTankDraining(false);
+    }
+  }, [oilStrike, highlighted]);
+
+  // Trigger gusher particles only when tank overflows (fill >= 1.0)
+  const wasOverflowing = useRef(false);
+  useEffect(() => {
+    if (tankFill >= 1.0 && highlighted && !wasOverflowing.current) {
+      wasOverflowing.current = true;
       strikingRef.current = true;
       strikeTimerRef.current = 0;
       initGusher();
+    } else if (tankFill < 1.0) {
+      wasOverflowing.current = false;
     }
-  }, [oilStrike, highlighted, initGusher]);
+  }, [tankFill, highlighted, initGusher]);
 
   // Store drillDay and tankFill in refs so useFrame always has the latest values
   const drillDayRef = useRef(drillDay);
@@ -663,9 +1003,18 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   useFrame((_, delta) => {
     mixer.update(delta);
 
+    // Drain logic — when draining, decrease local fill and stop gusher
+    if (drainingRef.current) {
+      drainFillRef.current = Math.max(0, drainFillRef.current - delta * 0.25);
+      if (drainFillRef.current <= 0) {
+        drainingRef.current = false;
+        drainedRef.current = true;  // lock at 0, keep tankDraining true
+      }
+    }
+
     // Gauge needle rotation — 0→225° based on tankFill, capped at 225°
     const needle = gaugeNeedleRef.current;
-    const currentFill = tankFillRef.current;
+    const currentFill = (drainingRef.current || drainedRef.current) ? drainFillRef.current : tankFillRef.current;
 
     const straw = strawRef.current;
     if (straw && strawBaseScaleZ.current !== null) {
@@ -702,30 +1051,50 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       }
     }
 
-    // Alert light strobe effect
+    // Alert light strobe — two modes:
+    // 1. Timed flash on oil strike (strikeFlashRef, decays over STRIKE_FLASH_DURATION)
+    // 2. Continuous flash during gusher overflow (strikingRef, tied to gusherActiveRef)
     const light = alertLightRef.current;
-    if (light && strikingRef.current) {
-      strikeTimerRef.current += delta;
-      const t = strikeTimerRef.current;
-      const STROBE_DURATION = 2.5;
+    const flashActive = strikeFlashRef.current || strikingRef.current;
 
-      if (t < STROBE_DURATION) {
-        // Fast pulse: on/off every ~0.12s, decaying
-        const pulse = Math.sin(t * 25) > 0 ? 1 : 0;
-        const decay = 1 - t / STROBE_DURATION;
-        const intensity = pulse * decay;
+    if (light && flashActive) {
+      let intensity = 0;
 
+      // Timed oil-strike flash
+      if (strikeFlashRef.current) {
+        strikeFlashTimer.current += delta;
+        const t = strikeFlashTimer.current;
+        if (t < STRIKE_FLASH_DURATION) {
+          const pulse = Math.sin(t * 25) > 0 ? 1 : 0;
+          const decay = 1 - t / STRIKE_FLASH_DURATION;
+          intensity = Math.max(intensity, pulse * decay);
+        } else {
+          strikeFlashRef.current = false;
+        }
+      }
+
+      // Continuous gusher overflow flash
+      if (strikingRef.current) {
+        strikeTimerRef.current += delta;
+        if (gusherActiveRef.current) {
+          const pulse = Math.sin(strikeTimerRef.current * 25) > 0 ? 1 : 0;
+          intensity = Math.max(intensity, pulse);
+        } else {
+          strikingRef.current = false;
+        }
+      }
+
+      // Apply to light material
+      if (strikeFlashRef.current || strikingRef.current) {
         light.material.emissive.set(0xff0000);
         light.material.emissiveIntensity = intensity * 5.0;
         light.material.color.set(intensity > 0.1 ? 0xff2200 : 0x331111);
         light.material.needsUpdate = true;
-
-        // Update point light for red glow
         if (strikeLightRef.current) {
           strikeLightRef.current.intensity = intensity * 4.0;
         }
       } else {
-        // Restore original
+        // Both modes done — restore original
         const orig = alertLightOrigColor.current;
         if (orig) {
           light.material.color.copy(orig.color);
@@ -736,7 +1105,61 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         if (strikeLightRef.current) {
           strikeLightRef.current.intensity = 0;
         }
-        strikingRef.current = false;
+      }
+    }
+
+    // Ground shake on oil strike — offset the outer group
+    const shakeGroup = shakeGroupRef.current;
+    if (shakeGroup && shakeRef.current) {
+      shakeTimerRef.current += delta;
+      const t = shakeTimerRef.current;
+      if (t < SHAKE_DURATION) {
+        const decay = 1 - t / SHAKE_DURATION;
+        const magnitude = decay * 0.004;
+        shakeGroup.position.x = position[0] + (Math.random() - 0.5) * 2 * magnitude;
+        shakeGroup.position.y = position[1] + (Math.random() - 0.5) * 2 * magnitude;
+        shakeGroup.position.z = position[2] + (Math.random() - 0.5) * 2 * magnitude;
+      } else {
+        shakeGroup.position.set(position[0], position[1], position[2]);
+        shakeRef.current = false;
+      }
+    }
+
+    // Gate slide animation
+    const gate = gateRef.current;
+    if (gate && gateBasePos.current) {
+      const target = gateTargetZ.current;
+      const diff = target - gate.position.z;
+      if (Math.abs(diff) > 0.01) {
+        gate.position.z += diff * Math.min(delta * 4, 1);
+      } else {
+        gate.position.z = target;
+      }
+    }
+
+    // Security camera sweep — slow loop from 0° to 155° CCW and back
+    const secCam = secCamRef.current;
+    const camVisible = highlighted && !!pumpConfig?.showCamera;
+    if (secCam && secCamBaseRotY.current !== null) {
+      if (camVisible && !(highlighted && _cctvState.pauseSweep)) {
+        const sweep = 155 * (Math.PI / 180); // 155° in radians
+        const period = 8; // seconds for a full back-and-forth cycle
+        const t = (Math.sin(performance.now() * 0.001 * (2 * Math.PI / period)) + 1) / 2; // 0→1→0
+        secCam.rotation.y = secCamBaseRotY.current + t * sweep;
+      }
+
+      // Feed world transform to CCTV renderer when this rig is highlighted and camera enabled
+      if (camVisible) {
+        secCam.updateWorldMatrix(true, false);
+        secCam.getWorldPosition(_cctvState.worldPos);
+        secCam.getWorldQuaternion(_cctvState.worldQuat);
+        _cctvState.worldMatrix.copy(secCam.matrixWorld);
+        _cctvState.active = true;
+        _cctvState.ownerId = secCam.uuid;
+      } else if (_cctvState.active && _cctvState.ownerId === secCam.uuid) {
+        // Only the rig that activated CCTV can deactivate it
+        _cctvState.active = false;
+        _cctvState.ownerId = null;
       }
     }
 
@@ -751,7 +1174,8 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       const GRAVITY = -3.5;
       let allDead = true;
 
-      const overflowing = tankFillRef.current >= 1.0 && highlighted;
+      const effectiveFill = (drainingRef.current || drainedRef.current) ? drainFillRef.current : tankFillRef.current;
+      const overflowing = effectiveFill >= 1.0 && highlighted;
       const wp = gusherOriginRef.current;
 
       const respawn = (i) => {
@@ -814,17 +1238,65 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
 
   const handleClick = useCallback((e) => {
     e.stopPropagation();
-    const now = Date.now();
-    if (now - lastClickTime.current < 400) {
-      onDoubleClick?.();
-    } else {
-      onClick?.();
+
+    // Gate click — toggle slide open/closed
+    // Check the full ancestor chain since the clicked object may be a child of Gate
+    let isGateClick = false;
+    let obj = e.object;
+    while (obj) {
+      if (obj.name === "Gate") { isGateClick = true; break; }
+      obj = obj.parent;
     }
-    lastClickTime.current = now;
-  }, [onClick, onDoubleClick]);
+    if (isGateClick && gateBasePos.current) {
+      gateOpenRef.current = !gateOpenRef.current;
+      gateTargetZ.current = gateOpenRef.current
+        ? gateBasePos.current.z + 2.5
+        : gateBasePos.current.z;
+      return;
+    }
+
+    // RedButton click — drain tank, stop gusher, reset gauge
+    if (e.object && e.object.name === "RedButton" && highlighted) {
+      if (!drainingRef.current && tankFillRef.current > 0) {
+        drainingRef.current = true;
+        drainFillRef.current = Math.min(tankFillRef.current, 1.0);
+        setTankDraining(true);
+
+        // Kill gusher particles immediately
+        gusherActiveRef.current = false;
+        strikingRef.current = false;
+        strikeFlashRef.current = false;
+
+        // Hide particles by zeroing opacity and moving them off-screen
+        if (particleMatRef.current) {
+          particleMatRef.current.opacity = 0;
+        }
+        const pos = particlePosRef.current;
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          pos[i * 3 + 1] = -10; // below ground
+        }
+        if (particleGeoRef.current) {
+          particleGeoRef.current.attributes.position.needsUpdate = true;
+        }
+      }
+      return;
+    }
+
+    // If rig is already selected, don't re-trigger camera flyTo
+    // Only select + flyTo on unselected rigs
+    if (!highlighted) {
+      const now = Date.now();
+      if (now - lastClickTime.current < 400) {
+        onDoubleClick?.();
+      } else {
+        onClick?.();
+      }
+      lastClickTime.current = now;
+    }
+  }, [onClick, onDoubleClick, highlighted]);
 
   return (
-    <group position={position}>
+    <group ref={shakeGroupRef} position={position}>
       <primitive
         ref={groupRef}
         object={clonedScene}
@@ -834,7 +1306,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         onPointerOut={() => { document.body.style.cursor = "auto"; }}
       />
       {/* Fuel tank liquid — animated fill inside the transparent tank */}
-      {tankBounds && <TankLiquid tankBounds={tankBounds} tankFill={tankFill} />}
+      {tankBounds && <TankLiquid tankBounds={tankBounds} tankFill={tankDraining ? 0 : tankFill} />}
       {/* Red alert point light — only on selected rig, intensity driven by useFrame */}
       {highlighted && (
         <>
@@ -868,13 +1340,36 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           </points>
         </>
       )}
+      {/* Plot add-ons — placeholder meshes at slot positions */}
+      {highlighted && pumpConfig?.addons && (
+        <PlotAddons addons={pumpConfig.addons} />
+      )}
     </group>
   );
 }
 
+function OilTower({ position }) {
+  const { scene } = useGLTF("/models/OilTower.glb");
+  const clonedScene = useMemo(() => scene.clone(true), [scene]);
+  return (
+    <primitive object={clonedScene} position={position} scale={0.1} />
+  );
+}
+
+useGLTF.preload("/models/OilTower.glb");
+
 function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, pumpConfig, oilStrike, tankFill }) {
   const { scene, animations } = useGLTF("/models/oilJack_fancy_allProps.glb");
   const envMap = useEnvironment({ preset: "studio" });
+
+  // OilTower position — centered on the 4 middle cells
+  const towerPos = useMemo(() => {
+    const midCol = Math.floor(gridX / 2);
+    const midRow = Math.floor(gridY / 2);
+    const x = -worldW / 2 + (midCol - 0.5) * cellSize + cellSize / 2;
+    const z = worldD / 2 - (midRow - 0.5) * cellSize - cellSize / 2;
+    return [x, 0, z];
+  }, [gridX, gridY, cellSize, worldW, worldD]);
 
   const items = useMemo(() => {
     const list = [];
@@ -898,11 +1393,13 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
 
   return (
     <>
+      {/* Oil Tower in the center 4 cells */}
+      <OilTower position={towerPos} />
       {/* Green highlight plane on the selected grid square */}
       {selectedPos && (
         <mesh position={selectedPos} rotation={[-Math.PI / 2, 0, 0]}>
           <planeGeometry args={[cellSize, cellSize]} />
-          <meshBasicMaterial color={0x000077} transparent opacity={0.45} depthWrite={false} />
+          <meshBasicMaterial color={0xb99230} transparent opacity={0.45} depthWrite={false} />
         </mesh>
       )}
       {items.map(({ key, position, col, row }) => {

@@ -99,12 +99,39 @@ export function generateOilDistribution3D({
   const scale = cleanTotal > 0 ? totalOilBudget / cleanTotal : 0;
   let maxOil = 0;
 
+  let roundedTotal = 0;
   for (let x = 0; x < gridX; x++) {
     for (let y = 0; y < gridY; y++) {
       for (let z = 0; z < depthZ; z++) {
         const v = Math.round(grid[x][y][z] * scale);
         grid[x][y][z] = v;
-        if (v > maxOil) maxOil = v;
+        roundedTotal += v;
+      }
+    }
+  }
+
+  // Fix rounding drift so total lands exactly on budget
+  let diff = totalOilBudget - roundedTotal;
+  if (diff !== 0) {
+    outer:
+    for (let x = 0; x < gridX; x++) {
+      for (let y = 0; y < gridY; y++) {
+        for (let z = 0; z < depthZ; z++) {
+          if (grid[x][y][z] > 0 && diff !== 0) {
+            const nudge = diff > 0 ? 1 : -1;
+            grid[x][y][z] += nudge;
+            diff -= nudge;
+            if (diff === 0) break outer;
+          }
+        }
+      }
+    }
+  }
+
+  for (let x = 0; x < gridX; x++) {
+    for (let y = 0; y < gridY; y++) {
+      for (let z = 0; z < depthZ; z++) {
+        if (grid[x][y][z] > maxOil) maxOil = grid[x][y][z];
       }
     }
   }
