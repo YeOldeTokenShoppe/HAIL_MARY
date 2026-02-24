@@ -27,6 +27,16 @@ Password-gated using `NEXT_PUBLIC_ADMIN_PASSWORD`. Credentials persist in localS
 
 All settings (blockHash, numberOfDeposits, totalOilBudget, gameDay, gameEnded) are persisted to Firestore at `oilGame/settings` and sync to player views in real time.
 
+### `/oil?mode=test` — Test Mode
+No sign-in or Firestore required. Lets you simulate the player drill experience for any cell.
+
+**How to use:**
+1. Visit `/oil?mode=test`
+2. Click any cell on the surface map or cross-section to select it
+3. Use the day stepper (−/+ buttons or slider) to scrub through depths 0–20
+
+**What it shows:** The same player-facing feedback as Active Game — cross-section reveals drilled cells, depth profile bars fill in with gold/values, and geological survey shows YOUR DEPTH and EXTRACTED stats. The selected cell acts as your "claim" without writing to Firestore.
+
 ### `/oil?mode=report` — Post-Game Report
 Available only after admin ends the game. Redirects to `/oil` if game is still active.
 

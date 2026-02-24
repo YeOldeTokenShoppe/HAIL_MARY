@@ -12,16 +12,20 @@ export const PUMP_ZONES = [
   { id: "counterweight", label: "COUNTERWEIGHTS", meshes: ["Cylinder_Pump", "Cylinder_Pump001"] },
   { id: "horseHead",     label: "HORSE HEAD",     meshes: ["Head_Pump"] },
   { id: "drillPipe",     label: "DRILL PIPE",     meshes: ["Straw", "Cylinder"] },
+  { id: "machinePanel",  label: "MACHINE PANEL",  meshes: ["MachinePanel"] },
+  { id: "tankScaffold",  label: "TANK SCAFFOLD",  meshes: ["Fuel_Tank_Scaffold"] },
+  { id: "signFrame",     label: "SIGN FRAME",     meshes: ["SignFrame", "SignFrame001"] },
+  { id: "pipes",          label: "PIPES",           meshes: ["Pipe_01", "Pipe_02", "Pipe_03", "Pipe_Refinery"] },
 ];
 
 export const MATERIAL_PRESETS = {
   stock:    { label: "STOCK",         roughness: null,  metalness: null, emissive: null,     emissiveIntensity: 0, envMapIntensity: 0 },
   matte:    { label: "MATTE",         roughness: 0.92,  metalness: 0.05, emissive: "#000000", emissiveIntensity: 0, envMapIntensity: 0.1 },
-  chrome:   { label: "CHROME",        roughness: 0.0,   metalness: 1.0,  emissive: "#8b8787ff", emissiveIntensity: 0, envMapIntensity: 3.0, useStandard: true },
+  chrome:   { label: "CHROME",        roughness: 0.0,   metalness: 1.0,  emissive: "#8b8787", emissiveIntensity: 0, envMapIntensity: 3.0, useStandard: true },
   brushed:  { label: "BRUSHED STEEL", roughness: 0.3,   metalness: 0.8,  emissive: "#000000", emissiveIntensity: 0, envMapIntensity: 2.0 },
   rust:     { label: "RUST",          roughness: 0.95,  metalness: 0.2,  emissive: "#000000", emissiveIntensity: 0, envMapIntensity: 0.3 },
   gold:     { label: "GOLD",          roughness: 0.15,  metalness: 0.9,  emissive: "#000000", emissiveIntensity: 0, envMapIntensity: 2.5 },
-  neon:     { label: "NEON GLOW",     roughness: 0.5,   metalness: 0.1,  emissive: "auto",   emissiveIntensity: 0.7, envMapIntensity: 0.3 },
+  neon:     { label: "NEON GLOW",     roughness: 0.5,   metalness: 0.1,  emissive: "auto",   emissiveIntensity: 1.5, envMapIntensity: 0.3 },
 };
 
 // ── Add-on catalog & slot positions ──────────────────────────────────────────
@@ -85,6 +89,10 @@ const THEME_PRESETS = {
       c.crankWheel    = { color: "#B8860B", preset: "brushed" };
       c.motorBox      = { color: "#8B7355", preset: "matte" };
       c.drillPipe     = { color: "#CD853F", preset: "brushed" };
+      c.machinePanel  = { color: "#8B7355", preset: "gold" };
+      c.tankScaffold  = { color: "#B8860B", preset: "brushed" };
+      c.signFrame     = { color: "#DAA520", preset: "gold" };
+      c.pipes         = { color: "#CD853F", preset: "gold" };
       return c;
     },
   },
@@ -92,8 +100,8 @@ const THEME_PRESETS = {
     label: "MURDERED OUT",
     build: () => {
       const c = getDefaultPumpConfig();
-      Object.keys(c).forEach((k) => {
-        c[k] = { color: "#1a1a1a", preset: "chrome" };
+      PUMP_ZONES.forEach((z) => {
+        c[z.id] = { color: "#1a1a1a", preset: "chrome" };
       });
       c.pad = { color: "#0a0a0a", preset: "matte" };
       return c;
@@ -103,14 +111,18 @@ const THEME_PRESETS = {
     label: "CYBERPUNK",
     build: () => {
       const c = getDefaultPumpConfig();
-      c.beam          = { color: "#00ffcc", preset: "neon" };
-      c.horseHead     = { color: "#ff00ff", preset: "neon" };
-      c.counterweight = { color: "#ff3300", preset: "neon" };
-      c.crankWheel    = { color: "#ffff00", preset: "neon" };
-      c.motorBox      = { color: "#111111", preset: "chrome" };
-      c.foundation    = { color: "#111111", preset: "matte" };
-      c.drillPipe     = { color: "#0088ff", preset: "neon" };
-      c.pad           = { color: "#0a0a12", preset: "matte" };
+      c.beam          = { color: "#ff00ff", preset: "neon" };
+      c.horseHead     = { color: "#00ffcc", preset: "neon" };
+      c.counterweight = { color: "#ff2266", preset: "neon" };
+      c.crankWheel    = { color: "#ffcc00", preset: "neon" };
+      c.motorBox      = { color: "#0a0a0a", preset: "matte" };
+      c.foundation    = { color: "#0a0a0a", preset: "matte" };
+      c.drillPipe     = { color: "#00aaff", preset: "neon" };
+      c.pad           = { color: "#08080e", preset: "matte" };
+      c.machinePanel  = { color: "#ff00ff", preset: "neon" };
+      c.tankScaffold  = { color: "#0a0a0a", preset: "matte" };
+      c.signFrame     = { color: "#00ffcc", preset: "neon" };
+      c.pipes         = { color: "#ff2266", preset: "neon" };
       return c;
     },
   },
@@ -126,6 +138,10 @@ const THEME_PRESETS = {
       c.foundation    = { color: "#4A3728", preset: "matte" };
       c.drillPipe     = { color: "#7A4A2A", preset: "rust" };
       c.pad           = { color: "#3E2723", preset: "matte" };
+      c.machinePanel  = { color: "#704214", preset: "rust" };
+      c.tankScaffold  = { color: "#5C3317", preset: "rust" };
+      c.signFrame     = { color: "#4A3728", preset: "rust" };
+      c.pipes         = { color: "#6B3410", preset: "rust" };
       return c;
     },
   },
@@ -133,8 +149,8 @@ const THEME_PRESETS = {
     label: "FULL CHROME",
     build: () => {
       const c = getDefaultPumpConfig();
-      Object.keys(c).forEach((k) => {
-        c[k] = { color: "#d8d8d8", preset: "chrome" };
+      PUMP_ZONES.forEach((z) => {
+        c[z.id] = { color: "#d8d8d8", preset: "chrome" };
       });
       c.pad = { color: "#b0b0b0", preset: "brushed" };
       c.counterweight = { color: "#e8e8e8", preset: "chrome" };
@@ -147,10 +163,35 @@ const THEME_PRESETS = {
 
 // ── Panel component ──────────────────────────────────────────────────────────
 
-export default function PimpMyPumpPanel({ config, onChange, isMobile, hasSelection, onSave, saving, dirty, isSignedIn, defaultExpanded = false }) {
+export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode = false, hasSelection, onSave, saving, dirty, isSignedIn, defaultExpanded = false }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [activeZone, setActiveZone] = useState(null);
   const [pickerSlot, setPickerSlot] = useState(null); // which slot is picking an addon
+
+  // Dark/light color tokens
+  const c = darkMode ? {
+    text: "#c8c0b4", textStrong: "#e8e0d4", accent: "#d4a854",
+    muted: "#8a8070", border: "#444", borderLight: "#333",
+    panelBg: "rgba(26,26,31,0.95)", inputBg: "#252530",
+    btnText: "#c8c0b4", btnBg: "rgba(100,90,70,0.2)",
+    btnBorder: "#555", activeBg: "#d4a854", activeText: "#1a1a1f",
+    activeBorder: "#b8922e", hintText: "#8a8070",
+    slotBg: "rgba(100,90,70,0.12)", slotBorder: "#444",
+    editorBg: "rgba(100,90,70,0.08)", pickerBg: "rgba(30,30,38,0.98)",
+    sectionBorder: "#444", swatchBorder: "rgba(212,168,84,0.4)",
+    plusColor: "#666", pumpCellBg: "rgba(212,168,84,0.15)", pumpCellBorder: "#555",
+  } : {
+    text: "#6b5b47", textStrong: "#3e2e10", accent: "#7a5a1a",
+    muted: "#9e8e78", border: "#c8bfb0", borderLight: "#d4c8b4",
+    panelBg: "rgba(245,239,230,0.95)", inputBg: "#f0e8dc",
+    btnText: "#6b5b47", btnBg: "rgba(180,160,130,0.1)",
+    btnBorder: "#c8bfb0", activeBg: "#d4a854", activeText: "#3e2e10",
+    activeBorder: "#b8922e", hintText: "#9e8e78",
+    slotBg: "rgba(180,160,130,0.06)", slotBorder: "#d4c8b4",
+    editorBg: "rgba(180,160,130,0.05)", pickerBg: "rgba(245,239,230,0.98)",
+    sectionBorder: "#d4c8b4", swatchBorder: "rgba(139,105,20,0.3)",
+    plusColor: "#c8bfb0", pumpCellBg: "rgba(184,146,46,0.1)", pumpCellBorder: "#c8b080",
+  };
 
   const rawAddons = config.addons || {};
   // Normalize: old format was string id, new format is { id, rot }
@@ -176,8 +217,10 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, hasSelecti
     setActiveZone(null);
   }, [onChange, config.signImageUrl]);
 
-  const sectionStyle = isMobile ? mStyles.section : styles.section;
-  const titleStyle = isMobile ? mStyles.title : styles.title;
+  const sectionStyle = { ...(isMobile ? mStyles.section : styles.section), borderBottomColor: c.sectionBorder };
+  const titleStyle = { ...(isMobile ? mStyles.title : styles.title), color: c.accent };
+  const mFs = isMobile ? 10 : 7;   // base font for labels/buttons
+  const mFsLg = isMobile ? 11 : 9; // larger font for zone names/hints
 
   return (
     <div style={sectionStyle}>
@@ -187,29 +230,29 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, hasSelecti
         style={styles.header}
       >
         <h3 style={titleStyle}>
-          <span style={styles.icon}>&#9881;</span>
+          <span style={{ ...styles.icon, color: c.activeBg }}>&#9881;</span>
           PIMP MY PUMP
         </h3>
-        <span style={styles.chevron}>{expanded ? "\u25B4" : "\u25BE"}</span>
+        <span style={{ ...styles.chevron, color: c.muted }}>{expanded ? "\u25B4" : "\u25BE"}</span>
       </div>
 
       {expanded && (
         <div style={styles.body}>
           {!hasSelection && (
-            <div style={styles.selectHint}>
+            <div style={{ ...styles.selectHint, fontSize: mFsLg, color: c.hintText }}>
               Click a rig on the grid to select it, then customize below
             </div>
           )}
 
           {/* Theme presets */}
           <div style={{ ...styles.themesRow, opacity: hasSelection ? 1 : 0.4, pointerEvents: hasSelection ? "auto" : "none" }}>
-            <span style={styles.presetLabel}>THEMES</span>
+            <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>THEMES</span>
             <div style={styles.themeButtons}>
               {Object.entries(THEME_PRESETS).map(([key, theme]) => (
                 <button
                   key={key}
                   onClick={() => applyTheme(key)}
-                  style={styles.themeBtn}
+                  style={{ ...styles.themeBtn, fontSize: mFs, padding: isMobile ? "5px 10px" : "3px 7px", color: c.btnText, borderColor: c.btnBorder, background: c.btnBg }}
                   title={theme.label}
                 >
                   {theme.label}
@@ -218,115 +261,125 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, hasSelecti
             </div>
           </div>
 
-          <div style={styles.divider} />
+          <div style={{ ...styles.divider, background: c.border }} />
 
-          {/* Sign image upload */}
-          <div style={{ ...styles.signSection, opacity: hasSelection ? 1 : 0.4, pointerEvents: hasSelection ? "auto" : "none" }}>
-            <span style={styles.presetLabel}>SIGN IMAGE</span>
-            <div style={styles.signInputWrap}>
-              <label style={styles.signUploadBtn}>
-                {config.signImageUrl ? "CHANGE" : "UPLOAD"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  style={{ display: "none" }}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    const url = URL.createObjectURL(file);
-                    onChange({ ...config, signImageUrl: url });
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-              {config.signImageUrl && (
-                <button
-                  onClick={() => {
-                    if (config.signImageUrl?.startsWith("blob:")) {
-                      URL.revokeObjectURL(config.signImageUrl);
-                    }
-                    onChange({ ...config, signImageUrl: null });
-                  }}
-                  style={styles.resetBtn}
-                >
-                  CLEAR
-                </button>
-              )}
+          {/* Accessories 2×2 grid: Sign Visibility + Sign Image | Security Cam + Fence */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: isMobile ? 10 : 6,
+            opacity: hasSelection ? 1 : 0.4,
+            pointerEvents: hasSelection ? "auto" : "none",
+            marginBottom: 8,
+          }}>
+            {/* Sign visibility toggle */}
+            <div>
+              <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>SIGN VISIBILITY</span>
+              <button
+                onClick={() => onChange({ ...config, showSign: !config.showSign })}
+                style={{
+                  padding: isMobile ? "5px 12px" : "3px 10px",
+                  background: config.showSign ? c.activeBg : c.btnBg,
+                  border: `1px solid ${config.showSign ? c.activeBorder : c.btnBorder}`,
+                  borderRadius: 2,
+                  color: config.showSign ? c.activeText : c.btnText,
+                  fontFamily: "'Share Tech Mono', monospace",
+                  fontSize: mFs,
+                  letterSpacing: "0.1em",
+                  cursor: "pointer",
+                }}
+              >
+                {config.showSign ? "ON" : "OFF"}
+              </button>
+            </div>
+
+            {/* Sign image upload — only enabled when sign is visible */}
+            <div style={{ opacity: config.showSign ? 1 : 0.35, pointerEvents: config.showSign ? "auto" : "none" }}>
+              <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>SIGN IMAGE</span>
+              <div style={styles.signInputWrap}>
+                <label style={{ ...styles.signUploadBtn, fontSize: mFs, padding: isMobile ? "5px 10px" : "3px 7px", color: c.btnText, borderColor: c.btnBorder, background: c.btnBg }}>
+                  {config.signImageUrl ? "CHANGE" : "UPLOAD"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const url = URL.createObjectURL(file);
+                      onChange({ ...config, signImageUrl: url });
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                {config.signImageUrl && (
+                  <button
+                    onClick={() => {
+                      if (config.signImageUrl?.startsWith("blob:")) {
+                        URL.revokeObjectURL(config.signImageUrl);
+                      }
+                      onChange({ ...config, signImageUrl: null });
+                    }}
+                    style={{ ...styles.resetBtn, fontSize: mFs, color: c.muted, borderColor: c.btnBorder }}
+                  >
+                    CLEAR
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Security camera toggle */}
+            <div>
+              <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>SECURITY CAM</span>
+              <button
+                onClick={() => onChange({ ...config, showCamera: !config.showCamera })}
+                style={{
+                  padding: isMobile ? "5px 12px" : "3px 10px",
+                  background: config.showCamera ? c.activeBg : c.btnBg,
+                  border: `1px solid ${config.showCamera ? c.activeBorder : c.btnBorder}`,
+                  borderRadius: 2,
+                  color: config.showCamera ? c.activeText : c.btnText,
+                  fontFamily: "'Share Tech Mono', monospace",
+                  fontSize: mFs,
+                  letterSpacing: "0.1em",
+                  cursor: "pointer",
+                }}
+              >
+                {config.showCamera ? "ON" : "OFF"}
+              </button>
+            </div>
+
+            {/* Fence toggle */}
+            <div>
+              <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>CHAIN FENCE</span>
+              <button
+                onClick={() => onChange({ ...config, showFence: !config.showFence })}
+                style={{
+                  padding: isMobile ? "5px 12px" : "3px 10px",
+                  background: config.showFence ? c.activeBg : c.btnBg,
+                  border: `1px solid ${config.showFence ? c.activeBorder : c.btnBorder}`,
+                  borderRadius: 2,
+                  color: config.showFence ? c.activeText : c.btnText,
+                  fontFamily: "'Share Tech Mono', monospace",
+                  fontSize: mFs,
+                  letterSpacing: "0.1em",
+                  cursor: "pointer",
+                }}
+              >
+                {config.showFence ? "ON" : "OFF"}
+              </button>
             </div>
           </div>
 
-          {/* Security camera toggle */}
-          <div style={{ ...styles.signSection, opacity: hasSelection ? 1 : 0.4, pointerEvents: hasSelection ? "auto" : "none" }}>
-            <span style={styles.presetLabel}>SECURITY CAM</span>
-            <button
-              onClick={() => onChange({ ...config, showCamera: !config.showCamera })}
-              style={{
-                padding: "3px 10px",
-                background: config.showCamera ? "#d4a854" : "rgba(180,160,130,0.1)",
-                border: `1px solid ${config.showCamera ? "#b8922e" : "#c8bfb0"}`,
-                borderRadius: 2,
-                color: config.showCamera ? "#3e2e10" : "#6b5b47",
-                fontFamily: "'Share Tech Mono', monospace",
-                fontSize: 8,
-                letterSpacing: "0.1em",
-                cursor: "pointer",
-              }}
-            >
-              {config.showCamera ? "ON" : "OFF"}
-            </button>
-          </div>
-
-          {/* Sign frame toggle */}
-          <div style={{ ...styles.signSection, opacity: hasSelection ? 1 : 0.4, pointerEvents: hasSelection ? "auto" : "none" }}>
-            <span style={styles.presetLabel}>SIGN FRAME</span>
-            <button
-              onClick={() => onChange({ ...config, showSign: !config.showSign })}
-              style={{
-                padding: "3px 10px",
-                background: config.showSign ? "#d4a854" : "rgba(180,160,130,0.1)",
-                border: `1px solid ${config.showSign ? "#b8922e" : "#c8bfb0"}`,
-                borderRadius: 2,
-                color: config.showSign ? "#3e2e10" : "#6b5b47",
-                fontFamily: "'Share Tech Mono', monospace",
-                fontSize: 8,
-                letterSpacing: "0.1em",
-                cursor: "pointer",
-              }}
-            >
-              {config.showSign ? "ON" : "OFF"}
-            </button>
-          </div>
-
-          {/* Fence toggle */}
-          <div style={{ ...styles.signSection, opacity: hasSelection ? 1 : 0.4, pointerEvents: hasSelection ? "auto" : "none" }}>
-            <span style={styles.presetLabel}>CHAIN FENCE</span>
-            <button
-              onClick={() => onChange({ ...config, showFence: !config.showFence })}
-              style={{
-                padding: "3px 10px",
-                background: config.showFence ? "#d4a854" : "rgba(180,160,130,0.1)",
-                border: `1px solid ${config.showFence ? "#b8922e" : "#c8bfb0"}`,
-                borderRadius: 2,
-                color: config.showFence ? "#3e2e10" : "#6b5b47",
-                fontFamily: "'Share Tech Mono', monospace",
-                fontSize: 8,
-                letterSpacing: "0.1em",
-                cursor: "pointer",
-              }}
-            >
-              {config.showFence ? "ON" : "OFF"}
-            </button>
-          </div>
-
-          <div style={styles.divider} />
+          <div style={{ ...styles.divider, background: c.border }} />
 
           {/* Plot add-ons */}
           <div style={{ opacity: hasSelection ? 1 : 0.4, pointerEvents: hasSelection ? "auto" : "none" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-              <span style={styles.presetLabel}>PLOT ADD-ONS</span>
+              <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>PLOT ADD-ONS</span>
               <span style={{
-                fontSize: 7,
-                color: isFull ? "#a05030" : "#9e8e78",
+                fontSize: mFs,
+                color: isFull ? "#a05030" : c.muted,
                 fontFamily: "'Share Tech Mono', monospace",
                 letterSpacing: "0.1em",
               }}>
@@ -345,8 +398,8 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, hasSelecti
                   {row.map((cell) => {
                     if (cell === "pump") {
                       return (
-                        <div key="pump" style={addonStyles.pumpCell}>
-                          <span style={{ fontSize: 6, letterSpacing: "0.1em" }}>PUMP</span>
+                        <div key="pump" style={{ ...addonStyles.pumpCell, width: isMobile ? 48 : 36, height: isMobile ? 36 : 28, background: c.pumpCellBg, borderColor: c.pumpCellBorder, color: c.muted }}>
+                          <span style={{ fontSize: isMobile ? 9 : 6, letterSpacing: "0.1em" }}>PUMP</span>
                         </div>
                       );
                     }
@@ -364,16 +417,18 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, hasSelecti
                         key={cell}
                         style={{
                           ...addonStyles.slotCell,
+                          width: isMobile ? 48 : 36,
+                          height: isMobile ? 36 : 28,
                           background: item
                             ? item.color + "22"
                             : isPicking
                               ? "rgba(212,168,84,0.15)"
-                              : "rgba(180,160,130,0.06)",
+                              : c.slotBg,
                           borderColor: item
                             ? item.color + "66"
                             : isPicking
-                              ? "#b8922e"
-                              : "#d4c8b4",
+                              ? c.activeBorder
+                              : c.slotBorder,
                           cursor: disabled ? "default" : "pointer",
                           opacity: disabled ? 0.35 : 1,
                           position: "relative",
@@ -395,7 +450,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, hasSelecti
                                 background: item.color,
                                 boxShadow: item.emissive ? `0 0 4px ${item.color}` : "none",
                               }} />
-                              <span style={{ fontSize: 5, color: "#6b5b47", lineHeight: 1 }}>
+                              <span style={{ fontSize: isMobile ? 7 : 5, color: c.text, lineHeight: 1 }}>
                                 {item.label.split(" ").pop()}
                               </span>
                             </div>
@@ -410,7 +465,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, hasSelecti
                                 bottom: 0,
                                 right: 0,
                                 fontSize: 6,
-                                color: "#9e8e78",
+                                color: c.muted,
                                 cursor: "pointer",
                                 padding: "0 2px",
                                 lineHeight: 1,
@@ -428,7 +483,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, hasSelecti
                             }}
                             style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", cursor: disabled ? "default" : "pointer" }}
                           >
-                            <span style={{ fontSize: 8, color: "#c8bfb0" }}>+</span>
+                            <span style={{ fontSize: isMobile ? 12 : 8, color: c.plusColor }}>+</span>
                           </div>
                         )}
                       </div>
@@ -440,8 +495,8 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, hasSelecti
 
             {/* Item picker dropdown */}
             {pickerSlot !== null && (
-              <div style={addonStyles.picker}>
-                <div style={{ fontSize: 7, color: "#9e8e78", letterSpacing: "0.1em", marginBottom: 4 }}>
+              <div style={{ ...addonStyles.picker, background: c.pickerBg, borderColor: c.pumpCellBorder }}>
+                <div style={{ fontSize: mFs, color: c.muted, letterSpacing: "0.1em", marginBottom: 4 }}>
                   SELECT ITEM FOR SLOT {pickerSlot}
                 </div>
                 <div style={addonStyles.pickerList}>
@@ -452,7 +507,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, hasSelecti
                         onChange({ ...config, addons: { ...addons, [pickerSlot]: { id: item.id, rot: 0 } } });
                         setPickerSlot(null);
                       }}
-                      style={addonStyles.pickerItem}
+                      style={{ ...addonStyles.pickerItem, fontSize: mFs, padding: isMobile ? "5px 8px" : "3px 6px", color: c.text }}
                     >
                       <div style={{
                         width: 10, height: 10, borderRadius: 2,
@@ -467,7 +522,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, hasSelecti
             )}
           </div>
 
-          <div style={styles.divider} />
+          <div style={{ ...styles.divider, background: c.border }} />
 
           {/* Zone list */}
           <div style={{ ...styles.zoneList, opacity: hasSelection ? 1 : 0.4, pointerEvents: hasSelection ? "auto" : "none" }}>
@@ -483,22 +538,23 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, hasSelecti
                     onClick={() => setActiveZone(isActive ? null : zone.id)}
                     style={{
                       ...styles.zoneRow,
-                      background: isActive ? "rgba(212,168,84,0.12)" : "transparent",
+                      background: isActive ? (darkMode ? "rgba(212,168,84,0.15)" : "rgba(212,168,84,0.12)") : "transparent",
                     }}
                   >
                     {/* Color swatch */}
                     <div
                       style={{
                         ...styles.swatch,
-                        background: zoneConfig.color || "#8b7d6b",
+                        background: zoneConfig.color || (darkMode ? "#666" : "#8b7d6b"),
+                        borderColor: c.swatchBorder,
                         boxShadow: hasCustom ? "0 0 4px rgba(184,146,46,0.5)" : "none",
                       }}
                     />
-                    <span style={styles.zoneName}>{zone.label}</span>
-                    <span style={styles.zonePreset}>
+                    <span style={{ ...styles.zoneName, fontSize: mFsLg, color: c.text }}>{zone.label}</span>
+                    <span style={{ ...styles.zonePreset, fontSize: mFs, color: c.muted }}>
                       {MATERIAL_PRESETS[zoneConfig.preset]?.label || "STOCK"}
                     </span>
-                    <span style={styles.zoneChevron}>{isActive ? "\u25B4" : "\u25BE"}</span>
+                    <span style={{ ...styles.zoneChevron, fontSize: mFs, color: c.muted }}>{isActive ? "\u25B4" : "\u25BE"}</span>
                   </div>
 
                   {/* Expanded zone editor */}
@@ -506,7 +562,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, hasSelecti
                     <div style={styles.zoneEditor}>
                       {/* Color picker */}
                       <div style={styles.editorRow}>
-                        <span style={styles.editorLabel}>COLOR</span>
+                        <span style={{ ...styles.editorLabel, fontSize: mFs, color: c.muted }}>COLOR</span>
                         <div style={styles.colorPickerWrap}>
                           <input
                             type="color"
@@ -530,7 +586,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, hasSelecti
 
                       {/* Material preset buttons */}
                       <div style={styles.editorRow}>
-                        <span style={styles.editorLabel}>FINISH</span>
+                        <span style={{ ...styles.editorLabel, fontSize: mFs, color: c.muted }}>FINISH</span>
                         <div style={styles.presetButtons}>
                           {Object.entries(MATERIAL_PRESETS).map(([key, preset]) => (
                             <button
@@ -538,7 +594,12 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, hasSelecti
                               onClick={() => updateZone(zone.id, { preset: key })}
                               style={{
                                 ...styles.presetBtn,
-                                ...(zoneConfig.preset === key ? styles.presetBtnActive : {}),
+                                fontSize: mFs,
+                                padding: isMobile ? "4px 8px" : "2px 5px",
+                                color: c.btnText,
+                                background: darkMode ? c.btnBg : "#f0e8dc",
+                                borderColor: c.btnBorder,
+                                ...(zoneConfig.preset === key ? { background: c.activeBg, borderColor: c.activeBorder, color: c.activeText } : {}),
                               }}
                             >
                               {preset.label}
@@ -556,12 +617,14 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, hasSelecti
           {/* Save button */}
           {isSignedIn && hasSelection && (
             <>
-              <div style={styles.divider} />
+              <div style={{ ...styles.divider, background: c.border }} />
               <button
                 onClick={onSave}
                 disabled={saving || !dirty}
                 style={{
                   ...styles.saveBtn,
+                  fontSize: mFsLg,
+                  padding: isMobile ? "8px 0" : "6px 0",
                   opacity: (saving || !dirty) ? 0.4 : 1,
                   cursor: (saving || !dirty) ? "default" : "pointer",
                 }}
@@ -572,8 +635,8 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, hasSelecti
           )}
           {!isSignedIn && hasSelection && (
             <>
-              <div style={styles.divider} />
-              <div style={styles.selectHint}>Sign in to save your customizations</div>
+              <div style={{ ...styles.divider, background: c.border }} />
+              <div style={{ ...styles.selectHint, fontSize: mFsLg, color: c.hintText }}>Sign in to save your customizations</div>
             </>
           )}
         </div>
@@ -915,5 +978,6 @@ const mStyles = {
   },
   title: {
     ...styles.title,
+    fontSize: 12,
   },
 };

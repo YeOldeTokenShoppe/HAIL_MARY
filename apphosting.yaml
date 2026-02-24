@@ -97,5 +97,9 @@ env:
     secret: ANTHROPIC_API_KEY
   - variable: OPENAI_API_KEY
     secret: OPENAI_API_KEY
+  - variable: ADMIN_PASSWORD
+    secret: ADMIN_PASSWORD
+    availability:
+      - RUNTIME
   - variable: CRON_SECRET
     secret: CRON_SECRET

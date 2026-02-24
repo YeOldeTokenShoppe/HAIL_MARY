@@ -414,6 +414,7 @@ function applyPumpConfig(clonedScene, pumpConfig, originalMats, envMap) {
         emissive: m.emissive ? m.emissive.clone() : new THREE.Color(0),
         emissiveIntensity: m.emissiveIntensity || 0,
         envMapIntensity: m.envMapIntensity ?? 0,
+        map: m.map || null,
       };
     }
 
@@ -440,6 +441,7 @@ function applyPumpConfig(clonedScene, pumpConfig, originalMats, envMap) {
       m.emissive.copy(orig.emissive);
       m.emissiveIntensity = orig.emissiveIntensity;
       m.envMapIntensity = orig.envMapIntensity;
+      m.map = orig.map;
       m.needsUpdate = true;
       return;
     }
@@ -468,11 +470,13 @@ function applyPumpConfig(clonedScene, pumpConfig, originalMats, envMap) {
 
     const mat = child.material;
 
-    // Apply color
+    // Apply color — detach texture map so flat color shows through
     if (zoneConf.color) {
       mat.color.set(zoneConf.color);
+      if (mat.map) mat.map = null;
     } else {
       mat.color.copy(orig.color);
+      mat.map = orig.map;
     }
 
     // Apply preset material properties
@@ -595,7 +599,7 @@ function PlotAddons({ addons }) {
 // Preload addon GLBs
 ADDON_CATALOG.forEach((item) => { if (item.model) useGLTF.preload(item.model); });
 
-function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, tankFill, onClick, onDoubleClick }) {
+function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, tankFill, onClick, onDoubleClick, onTankDrain }) {
   const lastClickTime = useRef(0);
   const groupRef = useRef();   // primitive (clonedScene)
   const shakeGroupRef = useRef(); // outer group for shake offset
@@ -604,6 +608,10 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   const strawBasePos = useRef(null);
   const strawLengthZ = useRef(null);
   const originalMatsRef = useRef({});
+
+  // Wheel — click to spin on y-axis
+  const wheelRef = useRef();
+  const wheelTargetRotY = useRef(0);
 
   // Gauge needle + pressure labels
   const gaugeNeedleRef = useRef();
@@ -641,6 +649,10 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           strawLengthZ.current = (bb.max.z - bb.min.z) * child.scale.z;
         }
       }
+      // Wheel
+      if (child.name === "Wheel") {
+        wheelRef.current = child;
+      }
       // Gauge needle
       if (child.name === "GaugeNeedle") {
         gaugeNeedleRef.current = child;
@@ -652,7 +664,6 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         child.traverse((sub) => {
           if (sub === child) return;
           if (process.env.NODE_ENV === "development") {
-            console.log("[PressurePanel child]", sub.name, sub.type);
           }
           if (sub.name === "Text_HIGH") { textHighRef.current = sub; sub.visible = false; }
           else if (sub.name === "Text_MED") { textMedRef.current = sub; sub.visible = false; }
@@ -842,6 +853,8 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   const drainFillRef = useRef(0);
   const redButtonRef = useRef();
   const [tankDraining, setTankDraining] = useState(false);
+  const onTankDrainRef = useRef(onTankDrain);
+  onTankDrainRef.current = onTankDrain;
 
   // Gate slide
   const gateRef = useRef();
@@ -1003,12 +1016,24 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   useFrame((_, delta) => {
     mixer.update(delta);
 
+    // Wheel — lerp toward target rotation on y-axis
+    const wheel = wheelRef.current;
+    if (wheel) {
+      const diff = wheelTargetRotY.current - wheel.rotation.y;
+      if (Math.abs(diff) > 0.001) {
+        wheel.rotation.y += diff * Math.min(delta * 5, 1);
+      } else {
+        wheel.rotation.y = wheelTargetRotY.current;
+      }
+    }
+
     // Drain logic — when draining, decrease local fill and stop gusher
     if (drainingRef.current) {
       drainFillRef.current = Math.max(0, drainFillRef.current - delta * 0.25);
       if (drainFillRef.current <= 0) {
         drainingRef.current = false;
         drainedRef.current = true;  // lock at 0, keep tankDraining true
+        onTankDrainRef.current?.();
       }
     }
 
@@ -1239,10 +1264,22 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   const handleClick = useCallback((e) => {
     e.stopPropagation();
 
+    // Wheel click — spin 360° on y-axis
+    let isWheelClick = false;
+    let obj = e.object;
+    while (obj) {
+      if (obj.name === "Wheel") { isWheelClick = true; break; }
+      obj = obj.parent;
+    }
+    if (isWheelClick) {
+      wheelTargetRotY.current += Math.PI * 2;
+      return;
+    }
+
     // Gate click — toggle slide open/closed
     // Check the full ancestor chain since the clicked object may be a child of Gate
     let isGateClick = false;
-    let obj = e.object;
+    obj = e.object;
     while (obj) {
       if (obj.name === "Gate") { isGateClick = true; break; }
       obj = obj.parent;
@@ -1348,17 +1385,119 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   );
 }
 
-function OilTower({ position }) {
+function TowerLiquid({ towerBounds, position, fill, scale }) {
+  const meshRef = useRef();
+  const displayFill = useRef(0);
+  const targetFill = useRef(fill);
+  targetFill.current = fill;
+  const lastQ = useRef(-1);
+
+  const oilMat = useMemo(() => new THREE.MeshStandardMaterial({
+    color: 0x1a0e05,
+    roughness: 0.3,
+    metalness: 0.1,
+    transparent: true,
+    opacity: 0.92,
+  }), []);
+
+  useFrame((_, delta) => {
+    const target = Math.min(targetFill.current, 1);
+    const prev = displayFill.current;
+    if (Math.abs(target - prev) < 0.0001) {
+      displayFill.current = target;
+    } else {
+      displayFill.current += (target - prev) * Math.min(delta * 0.5, 0.05);
+    }
+
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    const f = displayFill.current;
+
+    if (f <= 0) {
+      mesh.visible = false;
+      return;
+    }
+    mesh.visible = true;
+
+    const tb = towerBounds;
+    const S = scale;
+    // Radius slightly smaller than tank to avoid clipping through walls
+    const r = tb.radius * 0.78;
+    // Minimum visible fill height so even tiny amounts show a visible layer
+    const minH = tb.height * 0.03;
+    const h = Math.max(minH, tb.height * f);
+
+    // Rebuild geometry only when fill changes meaningfully (~2%)
+    const quantized = Math.round(f * 50) / 50;
+    if (lastQ.current !== quantized) {
+      lastQ.current = quantized;
+      if (mesh.geometry) mesh.geometry.dispose();
+      mesh.geometry = new THREE.CylinderGeometry(r, r, h, 32);
+    }
+
+    // Position: bottom of tank + half the liquid height
+    // All coordinates in model space, then scaled by S
+    mesh.position.set(
+      position[0] + tb.cx * S,
+      position[1] + (tb.minY + h / 2) * S,
+      position[2] + tb.cz * S,
+    );
+    mesh.scale.set(S, S, S);
+  });
+
+  return (
+    <mesh ref={meshRef} material={oilMat} visible={false} renderOrder={1} />
+  );
+}
+
+function OilTower({ position, communityOil = 0, totalOilBudget = 100000000 }) {
   const { scene } = useGLTF("/models/OilTower.glb");
   const clonedScene = useMemo(() => scene.clone(true), [scene]);
+
+  // Find the tower tank mesh and compute bounds
+  const towerBounds = useMemo(() => {
+    let tankMesh = null;
+    clonedScene.traverse((child) => {
+      if (child.name === "OilTower" && child.isMesh) {
+        tankMesh = child;
+      }
+    });
+    if (!tankMesh) return null;
+    tankMesh.geometry.computeBoundingBox();
+    const bb = tankMesh.geometry.boundingBox;
+    // Use geometry bounding box directly (model space)
+    // From GLB inspection: roughly X(-12.4 to 2), Y(-0.1 to 35.4), Z(-11.9 to 2.5)
+    const min = bb.min;
+    const max = bb.max;
+    return {
+      cx: (min.x + max.x) / 2,
+      cy: (min.y + max.y) / 2,
+      cz: (min.z + max.z) / 2,
+      minY: min.y,
+      maxY: max.y,
+      radius: Math.max(max.x - min.x, max.z - min.z) / 2,
+      height: max.y - min.y,
+    };
+  }, [clonedScene]);
+
   return (
-    <primitive object={clonedScene} position={position} scale={0.1} />
+    <group>
+      <primitive object={clonedScene} position={position} scale={0.1} />
+      {towerBounds && (
+        <TowerLiquid
+          towerBounds={towerBounds}
+          position={position}
+          fill={totalOilBudget > 0 ? communityOil / totalOilBudget : 0}
+          scale={0.1}
+        />
+      )}
+    </group>
   );
 }
 
 useGLTF.preload("/models/OilTower.glb");
 
-function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, pumpConfig, oilStrike, tankFill }) {
+function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, pumpConfig, oilStrike, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 100000000 }) {
   const { scene, animations } = useGLTF("/models/oilJack_fancy_allProps.glb");
   const envMap = useEnvironment({ preset: "studio" });
 
@@ -1394,7 +1533,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
   return (
     <>
       {/* Oil Tower in the center 4 cells */}
-      <OilTower position={towerPos} />
+      <OilTower position={towerPos} communityOil={communityOil} totalOilBudget={totalOilBudget} />
       {/* Green highlight plane on the selected grid square */}
       {selectedPos && (
         <mesh position={selectedPos} rotation={[-Math.PI / 2, 0, 0]}>
@@ -1420,6 +1559,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
             envMap={envMap}
             oilStrike={oilStrike}
             tankFill={isSelected ? tankFill : 0}
+            onTankDrain={isSelected ? onTankDrain : undefined}
             onClick={() => { onSelectCell?.(col, row); onFlyTo?.(col, row); }}
             onDoubleClick={() => onFlyTo?.(col, row)}
           />
@@ -1452,6 +1592,8 @@ export default function OilVoxelGrid({
   pumpConfig,
   oilStrike,
   tankFill = 0,
+  onTankDrain,
+  communityOil = 0,
 }) {
   const matRef = useRef();
   const groundMatsRef = useRef([]);
@@ -1572,6 +1714,9 @@ export default function OilVoxelGrid({
             pumpConfig={pumpConfig}
             oilStrike={oilStrike}
             tankFill={tankFill}
+            onTankDrain={onTankDrain}
+            communityOil={communityOil}
+            totalOilBudget={totalOilBudget}
           />
           {Array.from({ length: gridX + 1 }, (_, i) => {
             const x = -worldW / 2 + i * cellSize;

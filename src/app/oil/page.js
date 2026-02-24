@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef, memo } from "react";
 import dynamic from "next/dynamic";
 import { OrbitControls, Cloud, Clouds } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
@@ -10,29 +10,116 @@ import OilVoxelGrid, { CctvRenderer } from "@/components/OilVoxelGrid";
 import { generateOilDistribution3D } from "@/lib/oilDistribution";
 import PimpMyPumpPanel, { getDefaultPumpConfig } from "@/components/PimpMyPumpPanel";
 import { useUser } from "@clerk/nextjs";
+import { useMusic } from "@/components/MusicContext";
 import NavControlsHome from "@/components/NavControlsHome";
-import { db, storage, doc, getDoc, setDoc, serverTimestamp, ref, uploadBytes, getDownloadURL, onSnapshot } from "@/lib/firebaseClient";
+import CyberNav from "@/components/CyberNav";
+import { db, storage, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, ref, uploadBytes, getDownloadURL, onSnapshot } from "@/lib/firebaseClient";
+
+// ── Environment presets ──────────────────────────────────────────────────────
+const ENV_PRESETS = {
+  day:   { sky: "#7da4c9", skyBottom: null, ambient: 1.2, dirA: 15.5, dirB: 15.6, point: "#4488ff", cloudOpacity: 0.2, fog: null, hemi: null },
+  dusk:  { sky: "#8b7faa", skyBottom: "#d4b8a0", ambient: 0.7, dirA: 4.0,  dirB: 2.0,  point: "#cc9966", cloudOpacity: 0.25, fog: "#c4a88e", hemi: { sky: "#9088aa", ground: "#d4b8a0", intensity: 0.5 } },
+  night: { sky: "#0a0e1a", skyBottom: null, ambient: 0.15, dirA: 0.3, dirB: 0.2, point: "#2244aa", cloudOpacity: 0.08, fog: "#0a0e1a", hemi: null },
+};
+
+// ── Theme color maps (UI only — 3D canvas unaffected) ────────────────────────
+const THEMES = {
+  light: {
+    bg: "#f5efe6", text: "#5a4e3e", textStrong: "#3e2e10", accent: "#7a5a1a",
+    muted: "#9e8e78", border: "#d4c8b4", borderLight: "#c8bfb0",
+    panelBg: "rgba(245,239,230,0.95)", headerBg: "rgba(245,239,230,0.97)",
+    inputBg: "#f0e8dc", barBg: "#e8e0d4", tintBg: "rgba(180,160,130,0.08)",
+    green: "#5a8a3a", greenBg: "rgba(90,138,58,0.06)",
+    warn: "#a05030", red: "#c04040",
+    gold: "#d4a854", goldBorder: "#b8922e",
+    scanline: "rgba(0,0,0,0.02)",
+    statusText: "#7a8a6a", seedLabel: "#8b7355", seedValue: "#8b7d6b",
+    rankClaim: "#6b5b47", rankOil: "#5a4e3e", rankBarBg: "#e0d8cc",
+    inspectorKey: "#8b7d6b", depthUndrilled: "#b0a890",
+    btnText: "#6b5b47", btnBg: "rgba(180,160,130,0.1)",
+    cornerBorder: "rgba(139,105,20,0.3)",
+  },
+  dark: {
+    bg: "#1a1a1f", text: "#c8c0b4", textStrong: "#e8e0d4", accent: "#d4a854",
+    muted: "#8a8070", border: "#333038", borderLight: "#2a2830",
+    panelBg: "rgba(26,26,31,0.95)", headerBg: "rgba(26,26,31,0.97)",
+    inputBg: "#252530", barBg: "#2a2a34", tintBg: "rgba(100,90,70,0.1)",
+    green: "#7aaa5a", greenBg: "rgba(90,138,58,0.1)",
+    warn: "#cc7755", red: "#e06060",
+    gold: "#d4a854", goldBorder: "#b8922e",
+    scanline: "rgba(255,255,255,0.02)",
+    statusText: "#8aaa6a", seedLabel: "#8a8070", seedValue: "#9a9080",
+    rankClaim: "#a09888", rankOil: "#c8c0b4", rankBarBg: "#333038",
+    inspectorKey: "#9a9080", depthUndrilled: "#555050",
+    btnText: "#c8c0b4", btnBg: "rgba(100,90,70,0.15)",
+    cornerBorder: "rgba(212,168,84,0.2)",
+  },
+};
 
 // ── Sky dome gradient ────────────────────────────────────────────────────────
-function SkyDome() {
+const skyGradientShader = {
+  vertexShader: `
+    varying vec3 vWorldPosition;
+    void main() {
+      vec4 worldPos = modelMatrix * vec4(position, 1.0);
+      vWorldPosition = worldPos.xyz;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: `
+    uniform vec3 topColor;
+    uniform vec3 bottomColor;
+    varying vec3 vWorldPosition;
+    void main() {
+      float h = normalize(vWorldPosition).y;
+      float t = smoothstep(-0.1, 0.6, h);
+      gl_FragColor = vec4(mix(bottomColor, topColor, t), 1.0);
+    }
+  `,
+};
+
+const SkyDome = memo(function SkyDome({ skyColor = "#7da4c9", skyBottom = null, cloudOpacity = 0.2 }) {
+  const topCol = useMemo(() => new THREE.Color(skyColor), [skyColor]);
+  const bottomCol = useMemo(() => skyBottom ? new THREE.Color(skyBottom) : null, [skyBottom]);
+  const uniforms = useMemo(() => ({
+    topColor: { value: topCol },
+    bottomColor: { value: bottomCol ?? topCol },
+  }), []); // stable ref — update values below
+
+  // Update uniform values without recreating the object
+  useEffect(() => {
+    uniforms.topColor.value = topCol;
+    uniforms.bottomColor.value = bottomCol ?? topCol;
+  }, [topCol, bottomCol, uniforms]);
+
   return (
     <group>
       <mesh>
         <sphereGeometry args={[80, 24, 24]} />
-        <meshBasicMaterial color="#7da4c9" side={THREE.BackSide} depthWrite={false} />
+        {bottomCol ? (
+          <shaderMaterial
+            side={THREE.BackSide}
+            depthWrite={false}
+            vertexShader={skyGradientShader.vertexShader}
+            fragmentShader={skyGradientShader.fragmentShader}
+            uniforms={uniforms}
+          />
+        ) : (
+          <meshBasicMaterial color={skyColor} side={THREE.BackSide} depthWrite={false} />
+        )}
       </mesh>
       <Clouds material={THREE.MeshBasicMaterial}>
-        <Cloud position={[-8, 10, -12]} speed={0.02} opacity={0.25} width={1.2} depth={0.15} segments={4} />
-        <Cloud position={[14, 12, -6]} speed={0.03} opacity={0.2} width={1.5} depth={0.12} segments={4} />
-        <Cloud position={[3, 11, 16]} speed={0.015} opacity={0.22} width={1} depth={0.1} segments={3} />
-        <Cloud position={[-12, 13, 8]} speed={0.025} opacity={0.18} width={1.8} depth={0.15} segments={4} />
-        <Cloud position={[18, 9, 14]} speed={0.02} opacity={0.2} width={0.8} depth={0.1} segments={3} />
-        <Cloud position={[-4, 14, -18]} speed={0.01} opacity={0.15} width={1.3} depth={0.12} segments={3} />
-        <Cloud position={[10, 12, -16]} speed={0.02} opacity={0.18} width={1} depth={0.1} segments={3} />
+        <Cloud position={[-8, 10, -12]} speed={0.02} opacity={cloudOpacity * 1.25} width={1.2} depth={0.15} segments={4} />
+        <Cloud position={[14, 12, -6]} speed={0.03} opacity={cloudOpacity} width={1.5} depth={0.12} segments={4} />
+        <Cloud position={[3, 11, 16]} speed={0.015} opacity={cloudOpacity * 1.1} width={1} depth={0.1} segments={3} />
+        <Cloud position={[-12, 13, 8]} speed={0.025} opacity={cloudOpacity * 0.9} width={1.8} depth={0.15} segments={4} />
+        <Cloud position={[18, 9, 14]} speed={0.02} opacity={cloudOpacity} width={0.8} depth={0.1} segments={3} />
+        <Cloud position={[-4, 14, -18]} speed={0.01} opacity={cloudOpacity * 0.75} width={1.3} depth={0.12} segments={3} />
+        <Cloud position={[10, 12, -16]} speed={0.02} opacity={cloudOpacity * 0.9} width={1} depth={0.1} segments={3} />
       </Clouds>
     </group>
   );
-}
+});
 
 const OilSurfaceMap = dynamic(() => import("@/components/OilSurfaceMap"), { ssr: false });
 const OilCrossSection = dynamic(() => import("@/components/OilCrossSection"), { ssr: false });
@@ -114,11 +201,15 @@ function CameraFlyTo({ target, controlsRef }) {
         startPos.current.copy(camera.position);
         startTarget.current.copy(controls.target);
 
-        // Look-at point: pumpjack center, slightly above ground
-        endTarget.current.set(target.x, target.y - 0.05, target.z);
-
-        // Camera: standing next to the pump, ground-level
-        endPos.current.set(target.x + 0.5, target.y + 0.0, target.z + 0.5);
+        if (target.mobile) {
+          // Mobile: close ground-level view of the rig
+          endTarget.current.set(target.x, target.y, target.z);
+          endPos.current.set(target.x + 0.35, target.y + 0.15, target.z + 0.35);
+        } else {
+          // Desktop: elevated close-up
+          endTarget.current.set(target.x, target.y - 0.05, target.z);
+          endPos.current.set(target.x + 0.5, target.y + 0.0, target.z + 0.5);
+        }
 
         progressRef.current = 0;
         flyingRef.current = true;
@@ -267,7 +358,19 @@ export default function OilPage() {
   }, []);
   const isAdmin = mode === "admin";
   const isReport = mode === "report";
+
+  const [envPreset, setEnvPreset] = useState("day");
+  const env = ENV_PRESETS[envPreset];
+  const [darkMode, setDarkMode] = useState(false);
+  const theme = THEMES[darkMode ? "dark" : "light"];
+  const styles = useMemo(() => getStyles(theme), [theme]);
+  const m = useMemo(() => getMobileStyles(theme), [theme]);
+  const drillBtnStyles = useMemo(() => getDrillStyles(theme), [theme]);
+  const isTest = mode === "test";
+  const [testDay, setTestDay] = useState(0);
   const { user } = useUser();
+  const { play, pause, isPlaying: contextIsPlaying, nextTrack } = useMusic();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Game state
   const [gameEnded, setGameEnded] = useState(false);
@@ -283,13 +386,21 @@ export default function OilPage() {
     }
   }, [isAdmin]);
 
-  const handleAdminLogin = useCallback(() => {
-    const correct = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "admin123";
-    if (adminPassword === correct) {
-      setAdminAuthed(true);
-      localStorage.setItem("oil_admin_auth", "true");
-    } else {
-      alert("Incorrect password");
+  const handleAdminLogin = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin-auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: adminPassword }),
+      });
+      if (res.ok) {
+        setAdminAuthed(true);
+        localStorage.setItem("oil_admin_auth", "true");
+      } else {
+        alert("Incorrect password");
+      }
+    } catch {
+      alert("Failed to verify password");
     }
   }, [adminPassword]);
 
@@ -324,6 +435,18 @@ export default function OilPage() {
         if (typeof d.gameDay === "number") setGameDay(d.gameDay);
       }
       setSettingsLoaded(true);
+    });
+    return () => unsub();
+  }, []);
+
+  // Community oil storage — tracks total oil sent by all players
+  const [communityOil, setCommunityOil] = useState(0);
+  useEffect(() => {
+    if (!db) return;
+    const unsub = onSnapshot(doc(db, "oilGame", "communityStorage"), (snap) => {
+      if (snap.exists()) {
+        setCommunityOil(snap.data().totalOil || 0);
+      }
     });
     return () => unsub();
   }, []);
@@ -369,7 +492,7 @@ export default function OilPage() {
     const unsub = onSnapshot(doc(db, "oilDrills", user.id), (snap) => {
       if (snap.exists()) {
         const d = snap.data();
-        setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate });
+        setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate, totalCollected: d.totalCollected || 0, tankDrains: d.tankDrains || 0, lastDrainExtracted: d.lastDrainExtracted || 0 });
       } else {
         setUserDrill(null);
       }
@@ -395,8 +518,13 @@ export default function OilPage() {
 
   const todayUTC = new Date().toISOString().slice(0, 10);
 
-  // Effective drill day: active mode uses userDrill, admin/report uses demoDay
-  const effectiveDrillDay = (isAdmin || isReport) ? demoDay : (userDrill?.drillDay || 0);
+  // In test mode, synthesize a userDrill from the selected cell
+  const activeUserDrill = isTest && selectedX !== null
+    ? { col: selectedX, row: sliceY, drillDay: testDay, lastDrillDate: null, lastDrainExtracted: 0, totalCollected: 0, tankDrains: 0 }
+    : userDrill;
+
+  // Effective drill day: active mode uses userDrill, admin/report uses demoDay, test uses testDay
+  const effectiveDrillDay = (isAdmin || isReport) ? demoDay : isTest ? testDay : (userDrill?.drillDay || 0);
 
   // Can the player drill right now?
   const drillStatus = useMemo(() => {
@@ -521,22 +649,79 @@ export default function OilPage() {
     return g;
   }, []);
 
+  // Depth-limited grid: only reveals the player's drilled column up to effectiveDrillDay
+  const playerGrid3D = useMemo(() => {
+    if (showOilData || selectedX === null || !activeUserDrill) return blankGrid3D;
+    const g = blankGrid3D.map(col => col.map(row => [...row]));
+    const col = activeUserDrill.col;
+    const row = activeUserDrill.row;
+    for (let z = 0; z < Math.min(effectiveDrillDay, DEPTH_Z); z++) {
+      g[col][row][z] = stats.grid3D[col]?.[row]?.[z] ?? 0;
+    }
+    return g;
+  }, [showOilData, selectedX, activeUserDrill, effectiveDrillDay, stats.grid3D, blankGrid3D]);
+
+  const playerMaxOil = useMemo(() => {
+    if (showOilData || selectedX === null || !activeUserDrill) return 0;
+    let max = 0;
+    const col = activeUserDrill.col;
+    const row = activeUserDrill.row;
+    for (let z = 0; z < Math.min(effectiveDrillDay, DEPTH_Z); z++) {
+      const v = stats.grid3D[col]?.[row]?.[z] ?? 0;
+      if (v > max) max = v;
+    }
+    return max;
+  }, [showOilData, selectedX, activeUserDrill, effectiveDrillDay, stats.grid3D]);
+
+  // Player extracted oil total
+  const playerExtracted = useMemo(() => {
+    if (!activeUserDrill || effectiveDrillDay === 0) return 0;
+    let total = 0;
+    for (let z = 0; z < Math.min(effectiveDrillDay, DEPTH_Z); z++) {
+      total += stats.grid3D[activeUserDrill.col]?.[activeUserDrill.row]?.[z] ?? 0;
+    }
+    return total;
+  }, [activeUserDrill, effectiveDrillDay, stats.grid3D]);
+
   const hitRate = stats.claimTotals.length > 0
     ? Math.round(((GRID_X * GRID_Y - stats.dryClaims) / (GRID_X * GRID_Y)) * 100)
     : 0;
 
   const selectedClaimIndex = selectedX !== null ? sliceY * GRID_X + selectedX : null;
 
-  // Tank fill: fraction of oil extracted relative to fixed tank capacity (100K tokens)
+  // Session-local drain tracking
+  const [tankDrained, setTankDrained] = useState(false);
+  const [lastDrainSnapshot, setLastDrainSnapshot] = useState(0);
+
+  // Reset drained state when cell or drill depth changes
+  useEffect(() => {
+    setTankDrained(false);
+  }, [selectedX, sliceY, effectiveDrillDay]);
+
+  // Initialize drain snapshot from Firestore on load (only for real player mode)
+  useEffect(() => {
+    if (!isTest && userDrill?.lastDrainExtracted) {
+      setLastDrainSnapshot(userDrill.lastDrainExtracted);
+    }
+  }, [isTest, userDrill?.lastDrainExtracted]);
+
+  // Reset drain snapshot when switching cells
+  useEffect(() => {
+    if (isTest) setLastDrainSnapshot(0);
+  }, [isTest, selectedX, sliceY]);
+
+  // Oil currently in tank = total extracted minus snapshot at last drain
+  const oilInTank = useMemo(() => {
+    if (playerExtracted === 0) return 0;
+    return Math.max(0, playerExtracted - lastDrainSnapshot);
+  }, [playerExtracted, lastDrainSnapshot]);
+
+  // Tank fill: fraction of oil in tank relative to capacity (100K tokens)
   // Can exceed 1.0 — gusher fires when it first crosses 1.0
   const tankFill = useMemo(() => {
     if (selectedX === null || effectiveDrillDay === 0) return 0;
-    let extracted = 0;
-    for (let z = 0; z < Math.min(effectiveDrillDay, DEPTH_Z); z++) {
-      extracted += stats.grid3D[selectedX]?.[sliceY]?.[z] ?? 0;
-    }
-    return extracted / TANK_CAPACITY;
-  }, [selectedX, sliceY, effectiveDrillDay, stats]);
+    return oilInTank / TANK_CAPACITY;
+  }, [selectedX, effectiveDrillDay, oilInTank]);
 
   const selectedDepthData = useMemo(() => {
     if (selectedX === null) return null;
@@ -677,11 +862,11 @@ export default function OilPage() {
     const x = -worldW / 2 + col * CELL_SIZE + CELL_SIZE / 2;
     const z = worldD / 2 - row * CELL_SIZE - CELL_SIZE / 2;
     flyIdRef.current++;
-    setFlyTarget({ x, y: 5.3, z, id: flyIdRef.current });
+    setFlyTarget({ x, y: isMobile ? 1.3 : 5.3, z, id: flyIdRef.current, mobile: isMobile });
     setSelectedX(col);
     setSliceY(row);
     setDrillDepth(0);
-  }, []);
+  }, [isMobile]);
 
   const handleSelectClaim = useCallback((claim) => {
     setSelectedX(claim.x);
@@ -711,6 +896,46 @@ export default function OilPage() {
       console.error("Failed to save drill:", err);
     }
   }, [user?.id, selectedX, sliceY, userDrill, drillStatus, todayUTC]);
+
+  // Tank drain handler — always updates UI, persists to Firestore when possible
+  const handleTankDrain = useCallback(async () => {
+    if (playerExtracted === 0) return;
+    // Always update UI locally
+    const delta = Math.max(0, playerExtracted - lastDrainSnapshot);
+    if (delta === 0) return;
+    setTankDrained(true);
+    setLastDrainSnapshot(playerExtracted);
+    setCommunityOil(prev => prev + delta);
+    // Persist to Firestore if signed in
+    if (user?.id && db) {
+      try {
+        // Increment community storage atomically
+        await setDoc(doc(db, "oilGame", "communityStorage"), {
+          totalOil: increment(delta),
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+        // Update user drill record
+        if (userDrill) {
+          const newTotal = (userDrill.totalCollected || 0) + delta;
+          const newDrains = (userDrill.tankDrains || 0) + 1;
+          setUserDrill(prev => prev ? { ...prev, totalCollected: newTotal, tankDrains: newDrains, lastDrainExtracted: playerExtracted } : prev);
+          await setDoc(doc(db, "oilDrills", user.id), {
+            userId: user.id,
+            col: userDrill.col,
+            row: userDrill.row,
+            drillDay: userDrill.drillDay,
+            lastDrillDate: userDrill.lastDrillDate,
+            totalCollected: newTotal,
+            tankDrains: newDrains,
+            lastDrainExtracted: playerExtracted,
+            updatedAt: serverTimestamp(),
+          });
+        }
+      } catch (err) {
+        console.error("Failed to save tank drain:", err);
+      }
+    }
+  }, [user?.id, userDrill, playerExtracted, lastDrainSnapshot]);
 
   // Legacy demo drill (admin inspector)
   const handleDrill = useCallback(() => {
@@ -766,18 +991,18 @@ export default function OilPage() {
           ))}
         </div>
       </div>
-      <div style={{ ...styles.paramRow, marginTop: 6, paddingTop: 6, borderTop: "1px solid #d4c8b4" }}>
+      <div style={{ ...styles.paramRow, marginTop: 6, paddingTop: 6, borderTop: `1px solid ${theme.border}` }}>
         <span style={styles.paramLabel}>HIT RATE</span>
         <span style={{
           fontFamily: "'Orbitron', monospace",
           fontSize: 13,
           fontWeight: 700,
-          color: hitRate > 60 ? "#5a8a3a" : hitRate > 30 ? "#7a5a1a" : "#a05030",
+          color: hitRate > 60 ? theme.green : hitRate > 30 ? theme.accent : theme.warn,
         }}>
           {hitRate}%
         </span>
       </div>
-      <div style={{ ...styles.paramRow, marginTop: 6, paddingTop: 6, borderTop: "1px solid #d4c8b4" }}>
+      <div style={{ ...styles.paramRow, marginTop: 6, paddingTop: 6, borderTop: `1px solid ${theme.border}` }}>
         <span style={styles.paramLabel}>GAME DAY</span>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <button
@@ -790,7 +1015,7 @@ export default function OilPage() {
             fontFamily: "'Orbitron', monospace",
             fontSize: 13,
             fontWeight: 700,
-            color: "#7a5a1a",
+            color: theme.accent,
             minWidth: 30,
             textAlign: "center",
           }}>
@@ -830,7 +1055,7 @@ export default function OilPage() {
           fontFamily: "'Orbitron', monospace",
           fontSize: 11,
           fontWeight: 700,
-          color: "#7a5a1a",
+          color: theme.accent,
           minWidth: 80,
         }}>
           DAY {demoDay} / {DEPTH_Z}
@@ -853,12 +1078,12 @@ export default function OilPage() {
         }}
         style={{
           width: "100%",
-          accentColor: "#b8922e",
+          accentColor: theme.goldBorder,
           cursor: "pointer",
         }}
       />
       {selectedX !== null && (
-        <div style={{ fontSize: 9, color: "#7a5a1a", marginTop: 6 }}>
+        <div style={{ fontSize: 9, color: theme.accent, marginTop: 6 }}>
           SELECTED: ({selectedX}, {sliceY}) — click map to change
         </div>
       )}
@@ -869,15 +1094,21 @@ export default function OilPage() {
     <div style={isMobile ? m.section : styles.panelSection}>
       <h3 style={isMobile ? m.sectionTitle : styles.panelTitle}>GEOLOGICAL SURVEY</h3>
       <div style={isMobile ? m.statGrid : styles.statGrid}>
-        <StatBlock label="TOTAL OIL" value={<AnimNum value={stats.totalOil} />} unit="RL80" accent />
-        <StatBlock label="DEPOSITS" value={stats.deposits.length} />
-        <StatBlock label="CLAIMS" value={GRID_X * GRID_Y} />
-        <StatBlock label="DEPTH" value={DEPTH_Z} unit="LVL" />
+        <StatBlock s={styles} accentColor={theme.accent} label="TOTAL OIL" value={<AnimNum value={stats.totalOil} />} unit="RL80" accent />
+        <StatBlock s={styles} accentColor={theme.accent} label="DEPOSITS" value={stats.deposits.length} />
+        <StatBlock s={styles} accentColor={theme.accent} label="CLAIMS" value={GRID_X * GRID_Y} />
+        <StatBlock s={styles} accentColor={theme.accent} label="DEPTH" value={DEPTH_Z} unit="LVL" />
+        {!isAdmin && !isReport && effectiveDrillDay > 0 && (
+          <>
+            <StatBlock s={styles} accentColor={theme.accent} label="YOUR DEPTH" value={`${effectiveDrillDay}/${DEPTH_Z}`} unit="LVL" accent />
+            <StatBlock s={styles} accentColor={theme.accent} label="EXTRACTED" value={<AnimNum value={playerExtracted} />} unit="RL80" accent />
+          </>
+        )}
         {(isAdmin || isReport) && (
           <>
-            <StatBlock label="PEAK CELL" value={<AnimNum value={stats.maxClaimTotal} />} unit="RL80" />
-            <StatBlock label="DRY CLAIMS" value={stats.dryClaims} />
-            <StatBlock label="HIT RATE" value={`${hitRate}%`} accent={hitRate > 60} />
+            <StatBlock s={styles} accentColor={theme.accent} label="PEAK CELL" value={<AnimNum value={stats.maxClaimTotal} />} unit="RL80" />
+            <StatBlock s={styles} accentColor={theme.accent} label="DRY CLAIMS" value={stats.dryClaims} />
+            <StatBlock s={styles} accentColor={theme.accent} label="HIT RATE" value={`${hitRate}%`} accent={hitRate > 60} />
           </>
         )}
       </div>
@@ -933,15 +1164,15 @@ export default function OilPage() {
                 <span style={styles.inspectorVal}>Depth {drillDepth}</span>
               </div>
               <div style={styles.inspectorRow}>
-                <span style={{ ...styles.inspectorKey, color: "#5a8a3a" }}>Extracted:</span>
-                <span style={{ ...styles.inspectorVal, color: "#5a8a3a" }}>
+                <span style={{ ...styles.inspectorKey, color: theme.green }}>Extracted:</span>
+                <span style={{ ...styles.inspectorVal, color: theme.green }}>
                   {selectedData.extracted.toLocaleString()} RL80
                 </span>
               </div>
               {drillDepth < DEPTH_Z && selectedData.missed > 0 && (
                 <div style={styles.inspectorRow}>
-                  <span style={{ ...styles.inspectorKey, color: "#a05030" }}>Underground:</span>
-                  <span style={{ ...styles.inspectorVal, color: "#a05030" }}>
+                  <span style={{ ...styles.inspectorKey, color: theme.warn }}>Underground:</span>
+                  <span style={{ ...styles.inspectorVal, color: theme.warn }}>
                     {selectedData.missed.toLocaleString()} RL80
                   </span>
                 </div>
@@ -950,7 +1181,7 @@ export default function OilPage() {
           )}
 
           {/* Depth Chart */}
-          <div style={{ fontSize: 9, letterSpacing: "0.15em", color: "#7a5a1a", marginTop: 10, marginBottom: 6 }}>DEPTH PROFILE</div>
+          <div style={{ fontSize: 11, letterSpacing: "0.15em", color: theme.accent, marginTop: 10, marginBottom: 6 }}>DEPTH PROFILE</div>
           <div style={styles.depthChart}>
             {selectedData.depthData.map((oil, d) => {
               const barWidth = stats.maxOil > 0 ? (oil / stats.maxOil) * 100 : 0;
@@ -959,7 +1190,7 @@ export default function OilPage() {
                 <div key={d} style={styles.depthRow}>
                   <span style={{
                     ...styles.depthRowLabel,
-                    color: drilled ? "#7a5a1a" : "#9e8e78",
+                    color: drilled ? theme.accent : theme.muted,
                   }}>
                     D{d + 1}
                   </span>
@@ -968,14 +1199,14 @@ export default function OilPage() {
                       width: `${barWidth}%`,
                       height: "100%",
                       background: drilled
-                        ? "linear-gradient(90deg, #d4a854, #b8922e)"
-                        : "linear-gradient(90deg, #c8bfb0, #b0a890)",
+                        ? `linear-gradient(90deg, ${theme.gold}, ${theme.goldBorder})`
+                        : `linear-gradient(90deg, ${theme.borderLight}, ${theme.depthUndrilled})`,
                       transition: "all 0.3s",
                     }} />
                   </div>
                   <span style={{
                     ...styles.depthRowVal,
-                    color: drilled ? "#7a5a1a" : "#9e8e78",
+                    color: drilled ? theme.accent : theme.muted,
                   }}>
                     {oil > 0 ? oil.toLocaleString() : "\u2014"}
                   </span>
@@ -1010,7 +1241,7 @@ export default function OilPage() {
           >
             <span style={{
               ...styles.rankNumber,
-              color: i === 0 ? "#7a5a1a" : i === 1 ? "#8b7d6b" : i === 2 ? "#9e8a60" : "#9e8e78",
+              color: i === 0 ? theme.accent : i === 1 ? theme.inspectorKey : i === 2 ? theme.accent : theme.muted,
             }}>
               #{i + 1}
             </span>
@@ -1042,8 +1273,8 @@ export default function OilPage() {
             onClick={() => handleSelectClaim(c)}
             style={{ ...styles.rankRow, cursor: "pointer" }}
           >
-            <span style={{ ...styles.rankClaim, color: "#a08070" }}>CLAIM {c.claim}</span>
-            <span style={{ ...styles.rankOil, color: "#a08070" }}>{c.oil.toLocaleString()}</span>
+            <span style={{ ...styles.rankClaim, color: theme.muted }}>CLAIM {c.claim}</span>
+            <span style={{ ...styles.rankOil, color: theme.muted }}>{c.oil.toLocaleString()}</span>
           </div>
         ))}
       </div>
@@ -1120,6 +1351,10 @@ export default function OilPage() {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.4; }
       }
+      @keyframes tankPulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
     `}</style>
   );
 
@@ -1161,26 +1396,26 @@ export default function OilPage() {
       <div style={{
         width: "100vw",
         height: "100vh",
-        background: "#f5efe6",
+        background: theme.bg,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         fontFamily: "'Share Tech Mono', monospace",
       }}>
         <div style={{
-          background: "rgba(245,239,230,0.95)",
-          border: "1px solid #c8b080",
+          background: theme.panelBg,
+          border: `1px solid ${theme.goldBorder}`,
           borderRadius: 6,
           padding: 32,
           maxWidth: 360,
           width: "90%",
           textAlign: "center",
         }}>
-          <div style={{ fontSize: 9, letterSpacing: "0.2em", color: "#9e8e78", marginBottom: 8 }}>OIL PROSPECTOR</div>
+          <div style={{ fontSize: 9, letterSpacing: "0.2em", color: theme.muted, marginBottom: 8 }}>OIL PROSPECTOR</div>
           <h2 style={{
             fontFamily: "'Orbitron', monospace",
             fontSize: 16,
-            color: "#7a5a1a",
+            color: theme.accent,
             letterSpacing: "0.15em",
             margin: "0 0 20px",
           }}>ADMIN ACCESS</h2>
@@ -1193,10 +1428,10 @@ export default function OilPage() {
             style={{
               width: "100%",
               padding: "10px 12px",
-              background: "#f0e8dc",
-              border: "1px solid #c8bfb0",
+              background: theme.inputBg,
+              border: `1px solid ${theme.borderLight}`,
               borderRadius: 3,
-              color: "#5a4e3e",
+              color: theme.text,
               fontFamily: "'Share Tech Mono', monospace",
               fontSize: 12,
               letterSpacing: "0.08em",
@@ -1211,7 +1446,7 @@ export default function OilPage() {
               width: "100%",
               padding: "10px 20px",
               background: "linear-gradient(180deg, #d4a854, #b8922e)",
-              border: "1px solid #b8922e",
+              border: `1px solid ${theme.goldBorder}`,
               borderRadius: 3,
               color: "#fff",
               fontFamily: "'Share Tech Mono', monospace",
@@ -1233,8 +1468,8 @@ export default function OilPage() {
       onClick={() => { setGameEnded(true); saveGameSettings({ gameEnded: true }); }}
       style={{
         padding: "10px 20px",
-        background: "linear-gradient(180deg, #c04040, #a03030)",
-        border: "1px solid #a03030",
+        background: `linear-gradient(180deg, ${theme.red}, #a03030)`,
+        border: `1px solid ${theme.red}`,
         borderRadius: 3,
         color: "#fff",
         fontFamily: "'Share Tech Mono', monospace",
@@ -1256,12 +1491,12 @@ export default function OilPage() {
       background: "rgba(160,48,48,0.1)",
       border: "1px solid rgba(160,48,48,0.3)",
       borderRadius: 3,
-      color: "#a03030",
+      color: theme.red,
       fontFamily: "'Share Tech Mono', monospace",
       fontSize: 10,
       letterSpacing: "0.1em",
     }}>
-      GAME ENDED — <a href="/oil?mode=report" style={{ color: "#7a5a1a", textDecoration: "underline" }}>VIEW REPORT</a>
+      GAME ENDED — <a href="/oil?mode=report" style={{ color: theme.accent, textDecoration: "underline" }}>VIEW REPORT</a>
     </div>
   );
 
@@ -1274,7 +1509,7 @@ export default function OilPage() {
       borderRadius: 3,
       fontSize: 8,
       letterSpacing: "0.15em",
-      color: isAdmin ? "#a03030" : "#5a8a3a",
+      color: isAdmin ? theme.red : theme.green,
       marginLeft: 8,
     }}>
       {isAdmin ? "ADMIN" : "REPORT"}
@@ -1285,8 +1520,8 @@ export default function OilPage() {
   const drillButton = !isAdmin && !isReport && (
     <div style={{
       padding: "10px 14px",
-      borderBottom: "1px solid #d4c8b4",
-      background: "rgba(180,160,130,0.06)",
+      borderBottom: `1px solid ${theme.border}`,
+      background: theme.tintBg,
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -1295,19 +1530,24 @@ export default function OilPage() {
       {drillStatus === "sign-in" && (
         <div style={drillBtnStyles.wrap}>
           <button disabled style={drillBtnStyles.disabled}>SIGN IN TO DRILL</button>
+          <div style={drillBtnStyles.countdown}>NEXT DRILL IN {drillCountdown}</div>
         </div>
       )}
       {drillStatus === "no-claim" && (
         <div style={drillBtnStyles.wrap}>
           <button disabled style={drillBtnStyles.disabled}>SELECT A CLAIM</button>
+          <div style={drillBtnStyles.countdown}>NEXT DRILL IN {drillCountdown}</div>
         </div>
       )}
       {drillStatus === "wrong-claim" && (
         <div style={drillBtnStyles.wrap}>
-          <button disabled style={drillBtnStyles.disabled}>
-            YOUR CLAIM: ({userDrill?.col}, {userDrill?.row})
+          <button
+            onClick={() => handleSelectClaim({ x: userDrill.col, y: userDrill.row })}
+            style={drillBtnStyles.active}
+          >
+            GO TO YOUR CLAIM ({userDrill?.col}, {userDrill?.row})
           </button>
-          <div style={drillBtnStyles.hint}>Navigate to your claimed cell to drill</div>
+          <div style={drillBtnStyles.countdown}>NEXT DRILL IN {drillCountdown}</div>
         </div>
       )}
       {drillStatus === "max-depth" && (
@@ -1334,6 +1574,180 @@ export default function OilPage() {
     </div>
   );
 
+  // ── Test Mode Stepper ──
+  const testStepper = isTest && (
+    <div style={{
+      padding: "10px 14px",
+      borderBottom: `1px solid ${theme.border}`,
+      background: "rgba(90,138,58,0.06)",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+        <span style={{
+          fontSize: 9, letterSpacing: "0.15em", color: theme.green,
+          fontFamily: "'Share Tech Mono', monospace",
+        }}>
+          TEST MODE
+        </span>
+        <span style={{
+          fontSize: 11, color: theme.accent,
+          fontFamily: "'Share Tech Mono', monospace", fontWeight: 700,
+        }}>
+          DAY {testDay}/{DEPTH_Z}
+        </span>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <button
+          onClick={() => setTestDay(d => Math.max(0, d - 1))}
+          disabled={testDay === 0}
+          style={{
+            ...drillBtnStyles.active,
+            padding: "4px 10px",
+            fontSize: 12,
+            opacity: testDay === 0 ? 0.4 : 1,
+          }}
+        >
+          −
+        </button>
+        <input
+          type="range"
+          min={0}
+          max={DEPTH_Z}
+          value={testDay}
+          onChange={(e) => setTestDay(Number(e.target.value))}
+          style={{ flex: 1, accentColor: theme.green, cursor: "pointer" }}
+        />
+        <button
+          onClick={() => setTestDay(d => Math.min(DEPTH_Z, d + 1))}
+          disabled={testDay === DEPTH_Z}
+          style={{
+            ...drillBtnStyles.active,
+            padding: "4px 10px",
+            fontSize: 12,
+            opacity: testDay === DEPTH_Z ? 0.4 : 1,
+          }}
+        >
+          +
+        </button>
+      </div>
+      {selectedX === null && (
+        <div style={{ fontSize: 9, color: theme.accent, marginTop: 6, fontFamily: "'Share Tech Mono', monospace" }}>
+          Click a cell on the map to start testing
+        </div>
+      )}
+    </div>
+  );
+
+  // ── Player Drill Panel (depth profile for active players) ──
+  const playerDrillPanel = !isAdmin && !isReport && effectiveDrillDay > 0 && activeUserDrill && (
+    <div style={isMobile ? m.section : styles.panelSection}>
+      <h3 style={isMobile ? m.sectionTitle : styles.panelTitle}>
+        YOUR CLAIM ({activeUserDrill.col}, {activeUserDrill.row})
+      </h3>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+        <span style={{ fontSize: 10, letterSpacing: "0.1em", color: theme.green }}>
+          EXTRACTED: {playerExtracted.toLocaleString()} RL80
+        </span>
+        <span style={{ fontSize: 9, letterSpacing: "0.1em", color: theme.accent }}>
+          DEPTH {effectiveDrillDay}/{DEPTH_Z}
+        </span>
+      </div>
+      {/* Tank fill bar */}
+      <div style={{ marginBottom: 10 }}>
+        <div style={{
+          display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 3,
+        }}>
+          <span style={{ fontSize: 9, letterSpacing: "0.12em", color: theme.accent }}>TANK</span>
+          <span style={{ fontSize: 9, letterSpacing: "0.08em", color: tankFill >= 1.0 && !tankDrained ? theme.red : theme.muted }}>
+            {tankDrained ? 0 : oilInTank.toLocaleString()} / {TANK_CAPACITY.toLocaleString()}
+          </span>
+        </div>
+        <div style={{
+          width: "100%", height: 8, background: theme.barBg, borderRadius: 2, overflow: "hidden",
+          border: `1px solid ${tankFill >= 1.0 && !tankDrained ? theme.red : theme.border}`,
+          animation: tankFill >= 1.0 && !tankDrained ? "tankPulse 1.2s ease-in-out infinite" : "none",
+        }}>
+          <div style={{
+            width: tankDrained ? "0%" : `${Math.min((oilInTank / TANK_CAPACITY) * 100, 100)}%`,
+            height: "100%",
+            background: tankFill >= 1.0 && !tankDrained
+              ? `linear-gradient(90deg, ${theme.gold}, ${theme.red})`
+              : `linear-gradient(90deg, ${theme.green}, #7ab44a)`,
+            borderRadius: 2,
+            transition: "width 0.4s ease",
+          }} />
+        </div>
+        {tankFill >= 1.0 && !tankDrained && (
+          <div style={{
+            fontSize: 8, letterSpacing: "0.12em", color: theme.red, marginTop: 4, textAlign: "center",
+            animation: "tankPulse 1.2s ease-in-out infinite",
+            fontWeight: 700,
+          }}>
+            TANK FULL — HIT THE RED BUTTON ON YOUR PUMP!
+          </div>
+        )}
+        {tankDrained && (
+          <div style={{ fontSize: 8, letterSpacing: "0.15em", color: theme.green, marginTop: 2, textAlign: "right" }}>
+            SENT TO COMMUNITY STORAGE
+          </div>
+        )}
+      </div>
+      {/* Community storage accounting */}
+      {(activeUserDrill?.totalCollected > 0 || activeUserDrill?.tankDrains > 0) && (
+        <div style={{
+          display: "flex", justifyContent: "space-between", alignItems: "baseline",
+          padding: "6px 0", marginBottom: 6, borderTop: `1px solid ${theme.barBg}`,
+        }}>
+          <span style={{ fontSize: 9, letterSpacing: "0.1em", color: theme.accent }}>
+            SENT TO STORAGE
+          </span>
+          <span style={{ fontSize: 10, letterSpacing: "0.08em", color: theme.green, fontWeight: 700 }}>
+            {(activeUserDrill.totalCollected || 0).toLocaleString()} RL80
+          </span>
+        </div>
+      )}
+      <div style={{ fontSize: 11, letterSpacing: "0.15em", color: theme.accent, marginBottom: 6 }}>DEPTH PROFILE</div>
+      <div style={styles.depthChart}>
+        {Array.from({ length: DEPTH_Z }, (_, d) => {
+          const drilled = d < effectiveDrillDay;
+          const oil = drilled ? (stats.grid3D[activeUserDrill.col]?.[activeUserDrill.row]?.[d] ?? 0) : 0;
+          const barWidth = drilled && playerMaxOil > 0 ? (oil / playerMaxOil) * 100 : 0;
+          return (
+            <div key={d} style={styles.depthRow}>
+              <span style={{
+                ...styles.depthRowLabel,
+                color: drilled ? theme.accent : theme.depthUndrilled,
+              }}>
+                D{d + 1}
+              </span>
+              <div style={styles.depthBarWrap}>
+                {drilled ? (
+                  <div style={{
+                    width: `${barWidth}%`,
+                    height: "100%",
+                    background: `linear-gradient(90deg, ${theme.gold}, ${theme.goldBorder})`,
+                    transition: "all 0.3s",
+                  }} />
+                ) : (
+                  <div style={{
+                    width: "100%",
+                    height: "100%",
+                    background: `repeating-linear-gradient(90deg, ${theme.barBg} 0px, ${theme.barBg} 3px, transparent 3px, transparent 6px)`,
+                  }} />
+                )}
+              </div>
+              <span style={{
+                ...styles.depthRowVal,
+                color: drilled ? theme.accent : theme.depthUndrilled,
+              }}>
+                {drilled ? (oil > 0 ? oil.toLocaleString() : "0") : "\u2014"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   // ═══════════════════════════════════════════════════════════
   // MOBILE LAYOUT — tabbed views + scrollable panel below
   // ═══════════════════════════════════════════════════════════
@@ -1342,15 +1756,7 @@ export default function OilPage() {
       <div style={m.root}>
         <div style={styles.scanlines} />
         <div style={styles.grain} />
-
-        {/* Nav controls with sign-in */}
-        <NavControlsHome
-          isUserSignedIn={!!user}
-          userImage={user?.imageUrl}
-          isMobile
-          show80sButton={false}
-          hideMusicOnMobile
-        />
+        <style>{`.nav-mobile-home { background: transparent !important; border: none !important; box-shadow: none !important; }`}</style>
 
         {/* Header */}
         <header style={m.header}>
@@ -1362,7 +1768,7 @@ export default function OilPage() {
               </svg>
             </div>
             <div>
-              <h1 style={{ ...styles.title, fontSize: 12 }}>GET RICH QUICK{modeBadge}</h1>
+              <h1 style={{ ...styles.title, fontSize: 12 }}>HAIL MARY PROSPECTING CO.{modeBadge}</h1>
               <p style={styles.subtitle}>OIL PROSPECTOR</p>
             </div>
           </div>
@@ -1371,15 +1777,29 @@ export default function OilPage() {
               fontFamily: "'Orbitron', monospace",
               fontSize: 13,
               fontWeight: 700,
-              color: "#7a5a1a",
+              color: theme.accent,
               letterSpacing: "0.1em",
             }}>
               DAY {gameDay}
             </span>
-            <div style={{ ...styles.statusDot, ...(gameEnded ? { background: "#a03030", boxShadow: "0 0 6px rgba(160,48,48,0.4)" } : {}) }} />
+            <div style={{ ...styles.statusDot, ...(gameEnded ? { background: theme.red, boxShadow: "0 0 6px rgba(160,48,48,0.4)" } : {}) }} />
             <span style={styles.statusText}>
               {gameEnded ? "ENDED" : "ACTIVE"}
             </span>
+            <NavControlsHome
+              isPlaying={contextIsPlaying}
+              onPlayMusic={() => play()}
+              onStopMusic={() => pause()}
+              onSkipTrack={() => nextTrack()}
+              onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
+              onUserClick={() => {}}
+              isUserSignedIn={!!user}
+              isMenuOpen={isMenuOpen}
+              userImage={user?.imageUrl}
+              isMobile
+              show80sButton={false}
+              hideMusicOnMobile
+            />
           </div>
         </header>
 
@@ -1428,11 +1848,13 @@ export default function OilPage() {
                 style={{ width: "100%", height: "100%" }}
                 gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
               >
-                <SkyDome />
-                <ambientLight intensity={2.2} />
-                <directionalLight position={[10, 15, 10]} intensity={15.5} />
-                <directionalLight position={[-5, 10, -5]} intensity={15.6} />
-                <pointLight position={[-8, 5, -8]} intensity={1.5} color="#4488ff" />
+                <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} />
+                {env.fog && <fog attach="fog" args={[env.fog, 20, 80]} />}
+                <ambientLight intensity={env.ambient} />
+                {env.hemi && <hemisphereLight args={[env.hemi.sky, env.hemi.ground, env.hemi.intensity]} />}
+                <directionalLight position={[10, 15, 10]} intensity={env.dirA} />
+                <directionalLight position={[-5, 10, -5]} intensity={env.dirB} />
+                <pointLight position={[-8, 5, -8]} intensity={1.5} color={env.point} />
                 <group position={[0, 1, 0]}>
                   <OilVoxelGrid
                     blockHash={blockHash}
@@ -1449,6 +1871,9 @@ export default function OilPage() {
                     pumpConfig={pumpConfig}
                     oilStrike={combinedStrike}
                     tankFill={tankFill}
+                    onTankDrain={handleTankDrain}
+                    communityOil={communityOil}
+             
                   />
                 </group>
                 <CctvRenderer canvasRef={cctvCanvasRef} />
@@ -1479,6 +1904,44 @@ export default function OilPage() {
               <div style={styles.gridLabel}>
                 {GRID_X}&times;{GRID_Y}&times;{DEPTH_Z} VOXEL
               </div>
+              <div style={{ position: "absolute", top: 6, right: 6, zIndex: 10, display: "flex", gap: 3 }}>
+                {[["day", "☀"], ["dusk", "🌅"], ["night", "🌙"]].map(([key, icon]) => (
+                  <button
+                    key={key}
+                    onClick={() => setEnvPreset(key)}
+                    style={{
+                      width: 26, height: 26,
+                      background: envPreset === key ? "rgba(212,168,84,0.3)" : "rgba(212,168,84,0.1)",
+                      border: envPreset === key ? `1px solid ${theme.goldBorder}` : `1px solid ${theme.cornerBorder}`,
+                      borderRadius: 3,
+                      color: theme.accent,
+                      fontFamily: "'Share Tech Mono', monospace",
+                      fontSize: 13,
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: 0,
+                    }}
+                  >{icon}</button>
+                ))}
+                <button
+                  onClick={() => { setDarkMode((d) => !d); setEnvPreset(darkMode ? "day" : "night"); }}
+                  style={{
+                    width: 26, height: 26,
+                    background: darkMode ? "rgba(212,168,84,0.3)" : "rgba(212,168,84,0.1)",
+                    border: `1px solid ${darkMode ? theme.goldBorder : theme.cornerBorder}`,
+                    borderRadius: 3,
+                    color: theme.accent,
+                    fontSize: 13,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: 0,
+                  }}
+                >{darkMode ? "●" : "◐"}</button>
+              </div>
             </div>
           )}
 
@@ -1490,6 +1953,7 @@ export default function OilPage() {
                 maxClaimTotal={showOilData ? stats.maxClaimTotal : 0}
                 selectedClaimIndex={selectedClaimIndex}
                 onSelectClaim={handleSelectClaim}
+                theme={theme}
               />
             </div>
           )}
@@ -1498,19 +1962,22 @@ export default function OilPage() {
           {mobileTab === "xsec" && (
             <div style={m.section}>
               <OilCrossSection
-                grid3D={showOilData ? stats.grid3D : blankGrid3D}
-                maxCellValue={showOilData ? stats.maxOil : 0}
+                grid3D={showOilData ? stats.grid3D : playerGrid3D}
+                maxCellValue={showOilData ? stats.maxOil : playerMaxOil}
                 sliceY={sliceY}
                 selectedX={selectedX}
-                drillDepth={drillDepth}
+                drillDepth={showOilData ? drillDepth : effectiveDrillDay}
                 onSelectX={handleSelectX}
                 onSliceY={handleSliceY}
+                theme={theme}
               />
             </div>
           )}
 
           {/* Panels below active view */}
+          {testStepper}
           {drillButton}
+          {playerDrillPanel}
           {isAdmin && parametersPanel}
           {(isAdmin || isReport) && demoDrillPanel}
           {(isAdmin || isReport) && inspectorPanel}
@@ -1518,7 +1985,7 @@ export default function OilPage() {
           {(isAdmin || isReport) && topClaimsPanel}
           {(isAdmin || isReport) && dryZonesPanel}
           {(isAdmin || isReport) && depositsPanel}
-          <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={!isAdmin && !isReport} />
+          <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={!isAdmin && !isReport} />
           {(isAdmin || isReport) && (
             <OilVerifyPanel
               numberOfDeposits={numberOfDeposits}
@@ -1538,6 +2005,14 @@ export default function OilPage() {
           )}
         </div>
 
+        {/* CyberNav Menu Panel */}
+        <CyberNav
+          position="fixed"
+          isOpen={isMenuOpen}
+          onClose={() => setIsMenuOpen(false)}
+          showButton={false}
+        />
+
         {cssAnimations}
       </div>
     );
@@ -1550,14 +2025,7 @@ export default function OilPage() {
     <div style={styles.root}>
       <div style={styles.scanlines} />
       <div style={styles.grain} />
-
-      {/* Nav controls with sign-in */}
-      <NavControlsHome
-        isUserSignedIn={!!user}
-        userImage={user?.imageUrl}
-        show80sButton={false}
-        hideMusicOnMobile
-      />
+      <style>{`.nav-mobile-home { background: transparent !important; border: none !important; box-shadow: none !important; }`}</style>
 
       <header style={styles.header}>
         <div style={styles.headerLeft}>
@@ -1577,15 +2045,28 @@ export default function OilPage() {
             fontFamily: "'Orbitron', monospace",
             fontSize: 14,
             fontWeight: 700,
-            color: "#7a5a1a",
+            color: theme.accent,
             letterSpacing: "0.1em",
           }}>
             DAY {gameDay}
           </span>
-          <div style={{ ...styles.statusDot, ...(gameEnded ? { background: "#a03030", boxShadow: "0 0 6px rgba(160,48,48,0.4)" } : {}) }} />
+          <div style={{ ...styles.statusDot, ...(gameEnded ? { background: theme.red, boxShadow: "0 0 6px rgba(160,48,48,0.4)" } : {}) }} />
           <span style={styles.statusText}>
             {gameEnded ? "GAME ENDED" : "SURVEY ACTIVE"}
           </span>
+          <NavControlsHome
+            isPlaying={contextIsPlaying}
+            onPlayMusic={() => play()}
+            onStopMusic={() => pause()}
+            onSkipTrack={() => nextTrack()}
+            onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
+            onUserClick={() => {}}
+            isUserSignedIn={!!user}
+            isMenuOpen={isMenuOpen}
+            userImage={user?.imageUrl}
+            show80sButton={false}
+            hideMusicOnMobile
+          />
         </div>
       </header>
 
@@ -1609,18 +2090,20 @@ export default function OilPage() {
         {/* 3D Voxel View */}
         <div style={{
           ...styles.canvasWrap,
-          borderRight: panelsCollapsed ? "none" : "1px solid #d4c8b4",
+          borderRight: panelsCollapsed ? "none" : `1px solid ${theme.border}`,
         }}>
           <CleanCanvas
             camera={{ position: [0, 8, 8], fov: 50 }}
             style={{ width: "100%", height: "100%" }}
             gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
           >
-            <SkyDome />
-            <ambientLight intensity={1.2} />
-            <directionalLight position={[10, 15, 10]} intensity={15.5} />
-            <directionalLight position={[-5, 10, -5]} intensity={15.6} />
-            <pointLight position={[-8, 5, -8]} intensity={1.5} color="#4488ff" />
+            <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} />
+            {env.fog && <fog attach="fog" args={[env.fog, 20, 80]} />}
+            <ambientLight intensity={env.ambient} />
+            {env.hemi && <hemisphereLight args={[env.hemi.sky, env.hemi.ground, env.hemi.intensity]} />}
+            <directionalLight position={[10, 15, 10]} intensity={env.dirA} />
+            <directionalLight position={[-5, 10, -5]} intensity={env.dirB} />
+            <pointLight position={[-8, 5, -8]} intensity={1.5} color={env.point} />
             <group position={[0, 5, 0]}>
               <OilVoxelGrid
                 blockHash={blockHash}
@@ -1629,7 +2112,7 @@ export default function OilPage() {
                 revealProgress={revealProgress}
                 animateReveal={animateReveal}
                 revealDuration={2}
-                drillDay={demoDay}
+                drillDay={effectiveDrillDay}
                 selectedCol={selectedX}
                 selectedRow={selectedX !== null ? sliceY : null}
                 onSelectCell={(col, row) => { setSelectedX(col); setSliceY(row); setDrillDepth(0); }}
@@ -1637,6 +2120,9 @@ export default function OilPage() {
                 pumpConfig={pumpConfig}
                 oilStrike={combinedStrike}
                 tankFill={tankFill}
+                onTankDrain={handleTankDrain}
+                communityOil={communityOil}
+   
               />
             </group>
             <CctvRenderer canvasRef={cctvCanvasRef} />
@@ -1666,6 +2152,44 @@ export default function OilPage() {
           <div style={styles.gridLabel}>
             {GRID_X}&times;{GRID_Y}&times;{DEPTH_Z} VOXEL GRID
           </div>
+          <div style={{ position: "absolute", top: 10, right: panelsCollapsed ? 10 : 100, zIndex: 10, display: "flex", gap: 3 }}>
+            {[["day", "☀"], ["dusk", "🌅"], ["night", "🌙"]].map(([key, icon]) => (
+              <button
+                key={key}
+                onClick={() => setEnvPreset(key)}
+                style={{
+                  width: 28, height: 28,
+                  background: envPreset === key ? "rgba(212,168,84,0.3)" : "rgba(212,168,84,0.1)",
+                  border: envPreset === key ? `1px solid ${theme.goldBorder}` : `1px solid ${theme.cornerBorder}`,
+                  borderRadius: 3,
+                  color: theme.accent,
+                  fontFamily: "'Share Tech Mono', monospace",
+                  fontSize: 14,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: 0,
+                }}
+              >{icon}</button>
+            ))}
+            <button
+              onClick={() => { setDarkMode((d) => !d); setEnvPreset(darkMode ? "day" : "night"); }}
+              style={{
+                width: 28, height: 28,
+                background: darkMode ? "rgba(212,168,84,0.3)" : "rgba(212,168,84,0.1)",
+                border: `1px solid ${darkMode ? theme.goldBorder : theme.cornerBorder}`,
+                borderRadius: 3,
+                color: theme.accent,
+                fontSize: 14,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 0,
+              }}
+            >{darkMode ? "●" : "◐"}</button>
+          </div>
           <button
             onClick={() => setPanelsCollapsed((p) => !p)}
             style={{
@@ -1675,9 +2199,9 @@ export default function OilPage() {
               zIndex: 10,
               padding: "5px 10px",
               background: "rgba(212,168,84,0.15)",
-              border: "1px solid #c8b080",
+              border: `1px solid ${theme.goldBorder}`,
               borderRadius: 3,
-              color: "#7a5a1a",
+              color: theme.accent,
               fontFamily: "'Share Tech Mono', monospace",
               fontSize: 9,
               letterSpacing: "0.1em",
@@ -1700,17 +2224,19 @@ export default function OilPage() {
                 maxClaimTotal={showOilData ? stats.maxClaimTotal : 0}
                 selectedClaimIndex={selectedClaimIndex}
                 onSelectClaim={handleSelectClaim}
+                theme={theme}
               />
             </div>
             <div style={{ ...styles.midPanel, flex: 1, minHeight: 0 }}>
               <OilCrossSection
-                grid3D={showOilData ? stats.grid3D : blankGrid3D}
-                maxCellValue={showOilData ? stats.maxOil : 0}
+                grid3D={showOilData ? stats.grid3D : playerGrid3D}
+                maxCellValue={showOilData ? stats.maxOil : playerMaxOil}
                 sliceY={sliceY}
                 selectedX={selectedX}
-                drillDepth={drillDepth}
+                drillDepth={showOilData ? drillDepth : effectiveDrillDay}
                 onSelectX={handleSelectX}
                 onSliceY={handleSliceY}
+                theme={theme}
               />
             </div>
           </div>
@@ -1723,7 +2249,9 @@ export default function OilPage() {
             opacity: mounted ? 1 : 0,
             transform: mounted ? "translateX(0)" : "translateX(20px)",
           }}>
+            {testStepper}
             {drillButton}
+            {playerDrillPanel}
             {isAdmin && parametersPanel}
             {(isAdmin || isReport) && demoDrillPanel}
             {statsPanel}
@@ -1731,7 +2259,7 @@ export default function OilPage() {
             {(isAdmin || isReport) && topClaimsPanel}
             {(isAdmin || isReport) && dryZonesPanel}
             {(isAdmin || isReport) && depositsPanel}
-            <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={!isAdmin && !isReport} />
+            <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={!isAdmin && !isReport} />
             {(isAdmin || isReport) && (
               <OilVerifyPanel
                 numberOfDeposits={numberOfDeposits}
@@ -1757,7 +2285,7 @@ export default function OilPage() {
         {isAdmin && controlButtons}
         {selectedX !== null && (
           <>
-            {isAdmin && <div style={{ width: 1, height: 28, background: "#d4c8b4", margin: "0 4px" }} />}
+            {isAdmin && <div style={{ width: 1, height: 28, background: theme.border, margin: "0 4px" }} />}
             <button
               onClick={() => { setSelectedX(null); setDrillDepth(0); }}
               style={styles.btn}
@@ -1768,27 +2296,35 @@ export default function OilPage() {
         )}
       </div>
 
+      {/* CyberNav Menu Panel */}
+      <CyberNav
+        position="fixed"
+        isOpen={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
+        showButton={false}
+      />
+
       {cssAnimations}
     </div>
   );
 }
 
-function StatBlock({ label, value, unit, accent }) {
+function StatBlock({ label, value, unit, accent, s, accentColor }) {
   return (
-    <div style={styles.statBlock}>
-      <div style={styles.statLabel}>{label}</div>
+    <div style={s.statBlock}>
+      <div style={s.statLabel}>{label}</div>
       <div style={{
-        ...styles.statValue,
-        ...(accent ? { color: "#7a5a1a" } : {}),
+        ...s.statValue,
+        ...(accent ? { color: accentColor } : {}),
       }}>
         {value}
-        {unit && <span style={styles.statUnit}>{unit}</span>}
+        {unit && <span style={s.statUnit}>{unit}</span>}
       </div>
     </div>
   );
 }
 
-const drillBtnStyles = {
+function getDrillStyles(t) { return {
   wrap: {
     display: "flex",
     flexDirection: "column",
@@ -1797,8 +2333,8 @@ const drillBtnStyles = {
   },
   active: {
     padding: "10px 32px",
-    background: "linear-gradient(180deg, #d4a854, #b8922e)",
-    border: "2px solid #b8922e",
+    background: `linear-gradient(180deg, ${t.gold}, ${t.goldBorder})`,
+    border: `2px solid ${t.goldBorder}`,
     borderRadius: 4,
     color: "#fff",
     fontFamily: "'Share Tech Mono', monospace",
@@ -1811,10 +2347,10 @@ const drillBtnStyles = {
   },
   disabled: {
     padding: "10px 24px",
-    background: "rgba(180,160,130,0.15)",
-    border: "1px solid #c8bfb0",
+    background: t.btnBg,
+    border: `1px solid ${t.borderLight}`,
     borderRadius: 4,
-    color: "#9e8e78",
+    color: t.muted,
     fontFamily: "'Share Tech Mono', monospace",
     fontSize: 11,
     letterSpacing: "0.12em",
@@ -1823,21 +2359,21 @@ const drillBtnStyles = {
   depth: {
     fontSize: 9,
     fontFamily: "'Orbitron', monospace",
-    color: "#7a5a1a",
+    color: t.accent,
     letterSpacing: "0.15em",
   },
   countdown: {
     fontSize: 10,
     fontFamily: "'Share Tech Mono', monospace",
-    color: "#9e8e78",
+    color: t.muted,
     letterSpacing: "0.08em",
   },
   hint: {
     fontSize: 8,
-    color: "#9e8e78",
+    color: t.muted,
     letterSpacing: "0.08em",
   },
-};
+}; }
 
 const cctvStyles = {
   wrap: {
@@ -1909,15 +2445,15 @@ const cctvStyles = {
   },
 };
 
-const styles = {
+function getStyles(t) { return {
   root: {
     width: "100vw",
     height: "100vh",
-    background: "#f5efe6",
+    background: t.bg,
     position: "relative",
     overflow: "hidden",
     fontFamily: "'Share Tech Mono', 'Orbitron', monospace",
-    color: "#5a4e3e",
+    color: t.text,
     display: "flex",
     flexDirection: "column",
   },
@@ -1927,7 +2463,7 @@ const styles = {
     inset: 0,
     pointerEvents: "none",
     zIndex: 100,
-    background: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.02) 2px, rgba(0,0,0,0.02) 4px)",
+    background: `repeating-linear-gradient(0deg, transparent, transparent 2px, ${t.scanline} 2px, ${t.scanline} 4px)`,
     mixBlendMode: "multiply",
   },
 
@@ -1951,8 +2487,8 @@ const styles = {
     justifyContent: "space-between",
     padding: "0 20px",
     zIndex: 20,
-    borderBottom: "1px solid #d4c8b4",
-    background: "linear-gradient(180deg, rgba(245,239,230,0.97) 0%, rgba(245,239,230,0.9) 100%)",
+    borderBottom: `1px solid ${t.border}`,
+    background: `linear-gradient(180deg, ${t.headerBg} 0%, ${t.headerBg} 100%)`,
     backdropFilter: "blur(12px)",
   },
 
@@ -1968,7 +2504,7 @@ const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    border: "1px solid #b8922e",
+    border: `1px solid ${t.goldBorder}`,
     borderRadius: 4,
   },
 
@@ -1977,7 +2513,7 @@ const styles = {
     fontSize: 14,
     fontFamily: "'Orbitron', monospace",
     fontWeight: 800,
-    color: "#7a5a1a",
+    color: t.accent,
     letterSpacing: "0.15em",
     lineHeight: 1.1,
   },
@@ -1986,7 +2522,7 @@ const styles = {
     margin: 0,
     fontSize: 9,
     fontWeight: 400,
-    color: "#9e8e78",
+    color: t.muted,
     letterSpacing: "0.35em",
     textTransform: "uppercase",
   },
@@ -2001,14 +2537,14 @@ const styles = {
     width: 6,
     height: 6,
     borderRadius: "50%",
-    background: "#5a8a3a",
-    boxShadow: "0 0 6px rgba(90,138,58,0.4)",
+    background: t.green,
+    boxShadow: `0 0 6px rgba(90,138,58,0.4)`,
     animation: "pulse 2s ease-in-out infinite",
   },
 
   statusText: {
     fontSize: 10,
-    color: "#7a8a6a",
+    color: t.statusText,
     letterSpacing: "0.12em",
   },
 
@@ -2019,21 +2555,21 @@ const styles = {
     alignItems: "center",
     gap: 10,
     padding: "0 20px",
-    background: "rgba(180,160,130,0.1)",
-    borderBottom: "1px solid #d4c8b4",
+    background: t.tintBg,
+    borderBottom: `1px solid ${t.border}`,
     zIndex: 15,
   },
 
   seedLabel: {
     fontSize: 9,
-    color: "#8b7355",
+    color: t.seedLabel,
     letterSpacing: "0.12em",
     flexShrink: 0,
   },
 
   seedValue: {
     fontSize: 10,
-    color: "#8b7d6b",
+    color: t.seedValue,
     fontFamily: "'Share Tech Mono', monospace",
     overflow: "hidden",
     textOverflow: "ellipsis",
@@ -2046,7 +2582,7 @@ const styles = {
     alignItems: "center",
     gap: 4,
     fontSize: 9,
-    color: "#5a8a3a",
+    color: t.green,
     letterSpacing: "0.08em",
     flexShrink: 0,
     opacity: 0.8,
@@ -2064,7 +2600,7 @@ const styles = {
 
   canvasWrap: {
     position: "relative",
-    borderRight: "1px solid #d4c8b4",
+    borderRight: `1px solid ${t.border}`,
     overflow: "hidden",
   },
 
@@ -2072,8 +2608,8 @@ const styles = {
     position: "absolute",
     width: 20,
     height: 20,
-    borderLeft: "1px solid rgba(139,105,20,0.3)",
-    borderTop: "1px solid rgba(139,105,20,0.3)",
+    borderLeft: `1px solid ${t.cornerBorder}`,
+    borderTop: `1px solid ${t.cornerBorder}`,
     pointerEvents: "none",
     zIndex: 5,
   },
@@ -2083,7 +2619,7 @@ const styles = {
     bottom: 12,
     left: 16,
     fontSize: 10,
-    color: "#9e8e78",
+    color: t.muted,
     letterSpacing: "0.15em",
     zIndex: 5,
   },
@@ -2094,33 +2630,33 @@ const styles = {
     flexDirection: "column",
     gap: 0,
     overflow: "hidden",
-    borderRight: "1px solid #d4c8b4",
+    borderRight: `1px solid ${t.border}`,
   },
 
   midPanel: {
     padding: "10px 12px",
-    borderBottom: "1px solid #d4c8b4",
+    borderBottom: `1px solid ${t.border}`,
   },
 
   // Right side panel
   sidePanel: {
     overflowY: "auto",
     overflowX: "hidden",
-    background: "rgba(245,239,230,0.95)",
+    background: t.panelBg,
     backdropFilter: "blur(16px)",
     transition: "opacity 0.5s ease, transform 0.5s ease",
   },
 
   panelSection: {
     padding: "12px 14px",
-    borderBottom: "1px solid #d4c8b4",
+    borderBottom: `1px solid ${t.border}`,
   },
 
   panelTitle: {
     margin: "0 0 10px",
     fontSize: 9,
     fontWeight: 400,
-    color: "#7a5a1a",
+    color: t.accent,
     letterSpacing: "0.2em",
     textTransform: "uppercase",
     display: "flex",
@@ -2130,7 +2666,7 @@ const styles = {
 
   rankIcon: {
     fontSize: 8,
-    color: "#7a5a1a",
+    color: t.accent,
   },
 
   statGrid: {
@@ -2141,14 +2677,14 @@ const styles = {
 
   statBlock: {
     padding: "6px 8px",
-    background: "rgba(180,160,130,0.08)",
-    border: "1px solid #d4c8b4",
+    background: t.tintBg,
+    border: `1px solid ${t.border}`,
     borderRadius: 3,
   },
 
   statLabel: {
     fontSize: 7,
-    color: "#9e8e78",
+    color: t.muted,
     letterSpacing: "0.15em",
     marginBottom: 3,
   },
@@ -2157,13 +2693,13 @@ const styles = {
     fontSize: 14,
     fontFamily: "'Orbitron', monospace",
     fontWeight: 700,
-    color: "#3e2e10",
+    color: t.textStrong,
     lineHeight: 1,
   },
 
   statUnit: {
     fontSize: 8,
-    color: "#9e8e78",
+    color: t.muted,
     marginLeft: 3,
     fontWeight: 400,
   },
@@ -2181,11 +2717,11 @@ const styles = {
   },
 
   inspectorKey: {
-    color: "#8b7d6b",
+    color: t.inspectorKey,
   },
 
   inspectorVal: {
-    color: "#7a5a1a",
+    color: t.accent,
     fontFamily: "'Orbitron', monospace",
     fontSize: 10,
   },
@@ -2193,9 +2729,9 @@ const styles = {
   drillBtn: {
     width: "100%",
     padding: 8,
-    background: "linear-gradient(180deg, #d4a854, #b8922e)",
+    background: `linear-gradient(180deg, ${t.gold}, ${t.goldBorder})`,
     color: "#fff",
-    border: "1px solid #b8922e",
+    border: `1px solid ${t.goldBorder}`,
     fontSize: 10,
     fontWeight: "bold",
     letterSpacing: "0.12em",
@@ -2206,16 +2742,16 @@ const styles = {
   },
 
   drillBtnDisabled: {
-    background: "#d4c8b4",
-    color: "#9e8e78",
+    background: t.barBg,
+    color: t.muted,
     cursor: "not-allowed",
-    border: "1px solid #c8bfb0",
+    border: `1px solid ${t.borderLight}`,
   },
 
   drillResults: {
-    background: "rgba(180,160,130,0.08)",
+    background: t.tintBg,
     padding: 8,
-    border: "1px solid #d4c8b4",
+    border: `1px solid ${t.border}`,
     marginBottom: 8,
   },
 
@@ -2228,33 +2764,33 @@ const styles = {
   depthRow: {
     display: "flex",
     alignItems: "center",
-    gap: 3,
-    height: 11,
+    gap: 4,
+    height: 16,
   },
 
   depthRowLabel: {
-    width: 20,
-    fontSize: 7,
+    width: 26,
+    fontSize: 10,
     textAlign: "right",
   },
 
   depthBarWrap: {
     flex: 1,
-    height: 6,
-    background: "#e8e0d4",
+    height: 8,
+    background: t.barBg,
     position: "relative",
     overflow: "hidden",
   },
 
   depthRowVal: {
-    width: 34,
-    fontSize: 7,
+    width: 40,
+    fontSize: 10,
     textAlign: "right",
   },
 
   emptyState: {
     fontSize: 10,
-    color: "#9e8e78",
+    color: t.muted,
     textAlign: "center",
     padding: "16px 0",
   },
@@ -2281,13 +2817,13 @@ const styles = {
   },
 
   rankClaim: {
-    color: "#6b5b47",
+    color: t.rankClaim,
     fontSize: 9,
     letterSpacing: "0.06em",
   },
 
   rankOil: {
-    color: "#5a4e3e",
+    color: t.rankOil,
     fontFamily: "'Orbitron', monospace",
     fontSize: 9,
     textAlign: "right",
@@ -2296,14 +2832,14 @@ const styles = {
   rankBarWrap: {
     gridColumn: "1 / -1",
     height: 2,
-    background: "#e0d8cc",
+    background: t.rankBarBg,
     borderRadius: 1,
     overflow: "hidden",
   },
 
   rankBarFill: {
     height: "100%",
-    background: "linear-gradient(90deg, #b8922e, #d4a854)",
+    background: `linear-gradient(90deg, ${t.goldBorder}, ${t.gold})`,
     borderRadius: 1,
     transition: "width 0.8s ease",
   },
@@ -2323,7 +2859,7 @@ const styles = {
   },
 
   depositIndex: {
-    color: "#7a5a1a",
+    color: t.accent,
     fontFamily: "'Orbitron', monospace",
     fontSize: 8,
     opacity: 0.7,
@@ -2331,19 +2867,19 @@ const styles = {
   },
 
   depositCoord: {
-    color: "#6b5b47",
+    color: t.rankClaim,
     fontFamily: "'Share Tech Mono', monospace",
     flex: 1,
   },
 
   depositRadius: {
-    color: "#9e8e78",
+    color: t.muted,
     fontSize: 8,
   },
 
   depositHidden: {
     fontSize: 7,
-    color: "#a05030",
+    color: t.warn,
     letterSpacing: "0.1em",
     background: "rgba(160,80,48,0.1)",
     padding: "1px 4px",
@@ -2357,18 +2893,18 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     gap: 12,
-    borderTop: "1px solid #d4c8b4",
-    background: "linear-gradient(0deg, rgba(245,239,230,0.98) 0%, rgba(245,239,230,0.92) 100%)",
+    borderTop: `1px solid ${t.border}`,
+    background: `linear-gradient(0deg, ${t.headerBg} 0%, ${t.headerBg} 100%)`,
     backdropFilter: "blur(12px)",
     zIndex: 20,
   },
 
   btn: {
     padding: "10px 20px",
-    background: "rgba(180,160,130,0.1)",
-    border: "1px solid #c8bfb0",
+    background: t.btnBg,
+    border: `1px solid ${t.borderLight}`,
     borderRadius: 3,
-    color: "#6b5b47",
+    color: t.btnText,
     fontFamily: "'Share Tech Mono', monospace",
     fontSize: 11,
     letterSpacing: "0.12em",
@@ -2379,8 +2915,8 @@ const styles = {
   },
 
   btnPrimary: {
-    background: "#d4a854",
-    border: "1px solid #b8922e",
+    background: t.gold,
+    border: `1px solid ${t.goldBorder}`,
     color: "#fff",
     boxShadow: "0 1px 4px rgba(180,140,40,0.2)",
   },
@@ -2400,7 +2936,7 @@ const styles = {
 
   paramLabel: {
     fontSize: 7,
-    color: "#9e8e78",
+    color: t.muted,
     letterSpacing: "0.15em",
     flexShrink: 0,
     minWidth: 60,
@@ -2413,10 +2949,10 @@ const styles = {
 
   paramBtn: {
     padding: "2px 6px",
-    background: "#f0e8dc",
-    border: "1px solid #c8bfb0",
+    background: t.inputBg,
+    border: `1px solid ${t.borderLight}`,
     borderRadius: 2,
-    color: "#6b5b47",
+    color: t.btnText,
     fontFamily: "'Share Tech Mono', monospace",
     fontSize: 8,
     cursor: "pointer",
@@ -2424,22 +2960,22 @@ const styles = {
   },
 
   paramBtnActive: {
-    background: "#d4a854",
-    border: "1px solid #b8922e",
-    color: "#3e2e10",
+    background: t.gold,
+    border: `1px solid ${t.goldBorder}`,
+    color: t.textStrong,
   },
-};
+}; }
 
 // ── Mobile-specific styles ──────────────────────────────────
-const m = {
+function getMobileStyles(t) { return {
   root: {
     width: "100vw",
     height: "100dvh",
-    background: "#f5efe6",
+    background: t.bg,
     position: "relative",
     overflow: "hidden",
     fontFamily: "'Share Tech Mono', 'Orbitron', monospace",
-    color: "#5a4e3e",
+    color: t.text,
     display: "flex",
     flexDirection: "column",
   },
@@ -2452,8 +2988,8 @@ const m = {
     justifyContent: "space-between",
     padding: "0 12px",
     zIndex: 20,
-    borderBottom: "1px solid #d4c8b4",
-    background: "linear-gradient(180deg, rgba(245,239,230,0.97) 0%, rgba(245,239,230,0.9) 100%)",
+    borderBottom: `1px solid ${t.border}`,
+    background: `linear-gradient(180deg, ${t.headerBg} 0%, ${t.headerBg} 100%)`,
     backdropFilter: "blur(12px)",
   },
 
@@ -2469,28 +3005,28 @@ const m = {
     alignItems: "center",
     gap: 8,
     padding: "6px 12px",
-    background: "rgba(180,160,130,0.1)",
-    borderBottom: "1px solid #d4c8b4",
+    background: t.tintBg,
+    borderBottom: `1px solid ${t.border}`,
   },
 
   canvasWrap: {
     position: "relative",
-    height: "55vw",
-    minHeight: 220,
-    maxHeight: 360,
-    borderBottom: "1px solid #d4c8b4",
+    height: "75vw",
+    minHeight: 280,
+    maxHeight: 500,
+    borderBottom: `1px solid ${t.border}`,
   },
 
   section: {
     padding: "12px 12px",
-    borderBottom: "1px solid #d4c8b4",
+    borderBottom: `1px solid ${t.border}`,
   },
 
   sectionTitle: {
     margin: "0 0 10px",
     fontSize: 9,
     fontWeight: 400,
-    color: "#7a5a1a",
+    color: t.accent,
     letterSpacing: "0.2em",
     textTransform: "uppercase",
     display: "flex",
@@ -2517,15 +3053,15 @@ const m = {
     justifyContent: "center",
     gap: 8,
     padding: "8px 12px",
-    borderBottom: "1px solid #d4c8b4",
-    background: "rgba(180,160,130,0.06)",
+    borderBottom: `1px solid ${t.border}`,
+    background: t.tintBg,
   },
 
   tabBar: {
     flexShrink: 0,
     display: "flex",
-    borderBottom: "1px solid #d4c8b4",
-    background: "rgba(245,239,230,0.97)",
+    borderBottom: `1px solid ${t.border}`,
+    background: t.headerBg,
   },
 
   tab: {
@@ -2534,7 +3070,7 @@ const m = {
     background: "transparent",
     border: "none",
     borderBottom: "2px solid transparent",
-    color: "#9e8e78",
+    color: t.muted,
     fontFamily: "'Share Tech Mono', monospace",
     fontSize: 9,
     letterSpacing: "0.12em",
@@ -2543,8 +3079,8 @@ const m = {
   },
 
   tabActive: {
-    color: "#7a5a1a",
-    borderBottomColor: "#b8922e",
+    color: t.accent,
+    borderBottomColor: t.goldBorder,
     background: "rgba(212,168,84,0.1)",
   },
-};
+}; }
