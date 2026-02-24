@@ -550,7 +550,7 @@ export default function OilPage() {
 
   // Can the player drill right now?
   const drillStatus = useMemo(() => {
-    if (!user) return "sign-in";
+    if (!user && !isTest) return "sign-in";
     if (selectedX === null) return "no-claim";
     if (userDrill && (userDrill.col !== selectedX || userDrill.row !== sliceY)) return "wrong-claim";
     const currentDepth = userDrill?.drillDay || 0;
