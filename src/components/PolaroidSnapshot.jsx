@@ -21,10 +21,13 @@ const PolaroidSnapshot = ({
   const [isBlurred, setIsBlurred] = useState(true);
   const [polaroidImageUrl, setPolaroidImageUrl] = useState(null); // Cached polaroid capture
   const [polaroidBlob, setPolaroidBlob] = useState(null); // Cached polaroid blob
+  const [caption, setCaption] = useState(label);
+  const captionRef = useRef(null);
   const polaroidRef = useRef(null);
 
   useEffect(() => {
     if (trigger) {
+      setCaption(label);
       captureSnapshot();
     }
   }, [trigger]);
@@ -133,44 +136,21 @@ const PolaroidSnapshot = ({
           tempCtx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
           tempCtx.drawImage(characterCanvas, 0, 0);
           
-          // Add RL80 logo overlay
-          const logoImg = new Image();
-          logoImg.crossOrigin = 'anonymous';
-          logoImg.onload = () => {
-            // Draw logo in top left corner
-            const logoSize = 200; // Increased size to match
-            const logoMargin = 30; // Increased margin to match
-            tempCtx.drawImage(logoImg, logoMargin, logoMargin, logoSize, logoSize);
-            
-            // Convert to data URL with high quality after logo is added
-            const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
-            
-            if (dataUrl) {
-              setImageUrl(dataUrl);
-              setCompositedImageUrl(dataUrl); // Store the composited version
-              setIsVisible(true);
-              
-              setTimeout(() => {
-                setIsBlurred(false);
-              }, 300);
-            }
-          };
-          logoImg.onerror = (err) => {
-            console.error('[PolaroidSnapshot] Failed to load logo:', err);
-            // Still create image without logo
-            const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
-            
-            if (dataUrl) {
-              setImageUrl(dataUrl);
-              setCompositedImageUrl(dataUrl); // Store the composited version
-              setIsVisible(true);
-              
-              setTimeout(() => {
-                setIsBlurred(false);
-              }, 300);
-            }
-          };
-          logoImg.src = '/images/polaroidLogo.svg';
+          // Draw RL80.com text watermark
+          tempCtx.font = 'bold 48px system-ui, -apple-system, sans-serif';
+          tempCtx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+          tempCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+          tempCtx.shadowBlur = 6;
+          tempCtx.fillText('RL80.com', 30, 65);
+          tempCtx.shadowBlur = 0;
+
+          const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
+          if (dataUrl) {
+            setImageUrl(dataUrl);
+            setCompositedImageUrl(dataUrl);
+            setIsVisible(true);
+            setTimeout(() => { setIsBlurred(false); }, 300);
+          }
         };
         bgImg.onerror = (err) => {
           console.error('[PolaroidSnapshot] Failed to load background:', err);
@@ -191,48 +171,23 @@ const PolaroidSnapshot = ({
         // No background image, just draw the canvas
         tempCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height);
         
-        // Add RL80 logo overlay even without background
-        const logoImg = new Image();
-        logoImg.crossOrigin = 'anonymous';
-        logoImg.onload = () => {
-          // Draw logo in top left corner
-          const logoSize = 200; // Adjust size as needed
-          const logoMargin = 30; // Margin from edges
-          tempCtx.drawImage(logoImg, logoMargin, logoMargin, logoSize, logoSize);
-          
-          // Convert to data URL with high quality after logo is added
-          const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
-          
-          if (dataUrl) {
-            setImageUrl(dataUrl);
-            setIsVisible(true);
-            
-            setTimeout(() => {
-              setIsBlurred(false);
-            }, 300);
-          } else {
-            console.warn('Canvas capture was empty, trying alternate method');
-            captureWithDelay();
-          }
-        };
-        logoImg.onerror = (err) => {
-          console.error('[PolaroidSnapshot] Failed to load logo:', err);
-          // Still create image without logo
-          const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
-          
-          if (dataUrl) {
-            setImageUrl(dataUrl);
-            setIsVisible(true);
-            
-            setTimeout(() => {
-              setIsBlurred(false);
-            }, 300);
-          } else {
-            console.warn('Canvas capture was empty, trying alternate method');
-            captureWithDelay();
-          }
-        };
-        logoImg.src = '/images/polaroidLogo.svg';
+        // Draw RL80.com text watermark
+        tempCtx.font = 'bold 48px system-ui, -apple-system, sans-serif';
+        tempCtx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+        tempCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        tempCtx.shadowBlur = 6;
+        tempCtx.fillText('RL80.com', 30, 65);
+        tempCtx.shadowBlur = 0;
+
+        const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
+        if (dataUrl) {
+          setImageUrl(dataUrl);
+          setIsVisible(true);
+          setTimeout(() => { setIsBlurred(false); }, 300);
+        } else {
+          console.warn('Canvas capture was empty, trying alternate method');
+          captureWithDelay();
+        }
       }
     } catch (error) {
       console.error('Canvas capture failed:', error);
@@ -534,57 +489,46 @@ const PolaroidSnapshot = ({
 
   const handleShare = async (platform) => {
     // const shareText = `Check out my capture from RL80! ${label}`;
-        const shareText = `Get Lit With RL80! 🔥`;
-    const shareUrl = window.location.href;
+        const shareText = `Check out my oil rig! 🤑`;
+    const shareUrl = 'https://rl80.com/oil';
     
     switch(platform) {
       case 'twitter':
         // Ensure polaroid is captured first
-        if (!polaroidBlob) {
-          await capturePolaroid();
-        }
-        
-        // Use the cached polaroid blob
+        const capturedUrl = polaroidImageUrl || await capturePolaroid();
+        const imgSrc = capturedUrl || imageUrl;
+
+        // Copy image to clipboard as PNG so user can paste into tweet
+        let clipboardOk = false;
         try {
-          if (polaroidBlob && navigator.clipboard && window.ClipboardItem) {
-            const item = new ClipboardItem({ 'image/webp': polaroidBlob });
-            await navigator.clipboard.write([item]);
-            
-            // Show notification
-            showNotification('Polaroid copied! You can paste it in your tweet 📋');
-            
-            // Open Twitter with text
-            setTimeout(() => {
-              window.open(
-                `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`,
-                '_blank',
-                'width=550,height=420'
-              );
-            }, 1000);
+          showNotification('Copying image...');
+          const img = new Image();
+          img.src = imgSrc;
+          await new Promise(r => { img.onload = r; img.onerror = r; });
+          const c = document.createElement('canvas');
+          c.width = img.width; c.height = img.height;
+          c.getContext('2d').drawImage(img, 0, 0);
+          const pngBlob = await new Promise(r => c.toBlob(r, 'image/png'));
+          if (pngBlob && navigator.clipboard && window.ClipboardItem) {
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+            clipboardOk = true;
           }
-        } catch (err) {
-          console.error('Failed to capture polaroid:', err);
-          // Fallback: copy original image
-          try {
-            const response = await fetch(imageUrl);
-            const blob = await response.blob();
-            
-            if (navigator.clipboard && window.ClipboardItem) {
-              const item = new ClipboardItem({ 'image/webp': blob });
-              await navigator.clipboard.write([item]);
-              showNotification('Image copied! You can paste it in your tweet 📋');
-            }
-          } catch (fallbackErr) {
-            console.error('Fallback also failed:', fallbackErr);
-          }
-          
-          // Open Twitter anyway
-          window.open(
-            `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`,
-            '_blank',
-            'width=550,height=420'
-          );
+        } catch (clipErr) {
+          console.error('Clipboard copy failed:', clipErr);
         }
+
+        if (clipboardOk) {
+          // Show persistent paste instruction, then open Twitter after a short delay
+          showNotification('Image copied! Press Cmd+V (or Ctrl+V) to paste it into your tweet');
+          await new Promise(r => setTimeout(r, 1500));
+        }
+
+        // Open Twitter compose — no URL in text, user pastes image directly
+        window.open(
+          `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`,
+          '_blank',
+          'width=550,height=420'
+        );
         break;
         
       case 'copy':
@@ -658,17 +602,20 @@ const PolaroidSnapshot = ({
     const notification = document.createElement('div');
     notification.style.cssText = `
       position: fixed;
-      bottom: 20px;
+      bottom: 40px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.9);
+      background: rgba(0, 0, 0, 0.95);
       color: white;
-      padding: 12px 24px;
-      border-radius: 8px;
+      padding: 16px 28px;
+      border-radius: 12px;
       font-family: system-ui, -apple-system, sans-serif;
-      font-size: 14px;
-      z-index: 10000;
+      font-size: 16px;
+      font-weight: 600;
+      z-index: 999999;
       animation: slideUp 0.3s ease;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
     `;
     notification.textContent = message;
     
@@ -755,8 +702,26 @@ const PolaroidSnapshot = ({
               className={`${styles.photo} ${isBlurred ? styles.blurred : ''}`}
             />
           </div>
-          <div className={styles.polaroidBottom}>
-            <p className={styles.polaroidText}>{label}</p>
+          <div className={styles.polaroidBottom} onClick={(e) => e.stopPropagation()}>
+            <p
+              ref={captionRef}
+              className={styles.polaroidText}
+              contentEditable
+              suppressContentEditableWarning
+              onBlur={(e) => {
+                const text = e.currentTarget.textContent.trim();
+                setCaption(text || label);
+                // Invalidate cached polaroid so next share/download re-captures with new caption
+                setPolaroidImageUrl(null);
+                setPolaroidBlob(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); }
+              }}
+              style={{ cursor: 'text', outline: 'none' }}
+            >
+              {caption}
+            </p>
           </div>
           
           {/* Action Buttons */}

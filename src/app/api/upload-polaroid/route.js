@@ -2,6 +2,7 @@
 // Simple Node.js runtime version using Firebase REST APIs
 
 import { NextResponse } from 'next/server';
+import { db, doc, setDoc } from '@/lib/firebaseServer';
 
 // Remove edge runtime to use Node.js runtime
 // export const runtime = 'edge';
@@ -35,24 +36,29 @@ export async function POST(request) {
       );
     }
 
+    // Detect image type from data URL
+    const mimeMatch = imageData.match(/^data:(image\/\w+);base64,/);
+    const contentType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+    const ext = contentType === 'image/webp' ? 'webp' : contentType === 'image/png' ? 'png' : 'jpg';
+
     // Convert base64 to buffer
     const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
     const buffer = Buffer.from(base64Data, 'base64');
-    
+
     // Generate unique filename
     const timestamp = Date.now();
     const randomId = Math.random().toString(36).substring(2, 15);
-    const filename = `polaroids/${timestamp}-${randomId}.jpg`;
-    
+    const filename = `polaroids/${timestamp}-${randomId}.${ext}`;
+
     console.log('[Upload API] Attempting to upload to Firebase Storage:', filename);
 
     // Upload to Firebase Storage using REST API
     const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o?uploadType=media&name=${encodeURIComponent(filename)}`;
-    
+
     const uploadResponse = await fetch(uploadUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'image/jpeg',
+        'Content-Type': contentType,
       },
       body: buffer,
     });
@@ -72,16 +78,29 @@ export async function POST(request) {
     // Generate public URL
     const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${storageBucket}/o/${encodeURIComponent(filename)}?alt=media`;
     
-    // Skip creating a polaroids document - the client will update the offerings document
-    // This prevents duplicate data in two collections
-    console.log('[Upload API] Skipping polaroids collection - client will update offerings');
-    
-    // Just return the storage URL so the client can update the offering
-    
+    // Save metadata to Firestore for Twitter Card OG tags
+    let snapshotId = randomId;
+    try {
+      if (db) {
+        await setDoc(doc(db, 'polaroids', randomId), {
+          storageUrl: publicUrl,
+          storagePath: filename,
+          createdAt: new Date().toISOString(),
+        });
+        console.log('[Upload API] Saved polaroid doc:', randomId);
+      } else {
+        console.warn('[Upload API] Firestore not available, skipping doc creation');
+      }
+    } catch (firestoreErr) {
+      console.error('[Upload API] Failed to save polaroid doc:', firestoreErr.message);
+      // Non-fatal — still return the upload result
+    }
+
     return NextResponse.json({
       success: true,
       storageUrl: publicUrl,
       storagePath: filename,
+      snapshotId,
     });
 
   } catch (error) {

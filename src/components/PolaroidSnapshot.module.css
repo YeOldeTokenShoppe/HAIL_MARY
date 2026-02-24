@@ -96,6 +96,22 @@
   max-width: 90%; /* Prevent text from touching edges */
 }
 
+.polaroidText::after {
+  content: '|';
+  color: #333;
+  font-weight: 300;
+  animation: blink 1s step-end infinite;
+}
+
+.polaroidText:focus::after {
+  display: none;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
 .polaroidShadow {
   position: absolute;
   top: 20px;

@@ -769,6 +769,9 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     });
     if (!tankMesh) return;
 
+    // Render both sides so the tank stays visible at all camera angles
+    tankMesh.material.side = THREE.DoubleSide;
+
     // Compute bounding box in the clonedScene's local coordinate system
     // (accounts for all intermediate parent transforms in the GLB hierarchy)
     tankMesh.geometry.computeBoundingBox();
@@ -944,6 +947,51 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     });
   }, [clonedScene]);
 
+  // Steam vent particles — triggered by wheel click
+  const STEAM_COUNT = 200;
+  const steamActiveRef = useRef(false);
+  const steamTimerRef = useRef(0);
+  const steamPosRef = useRef(new Float32Array(STEAM_COUNT * 3));
+  const steamVelRef = useRef(new Float32Array(STEAM_COUNT * 3));
+  const steamLifeRef = useRef(new Float32Array(STEAM_COUNT));
+  const steamGeoRef = useRef();
+  const steamMatRef = useRef();
+  const steamOriginRef = useRef(new THREE.Vector3(0, 0, 0));
+  const gaugePressureOffset = useRef(0); // subtracted from fill for gauge display
+
+  const initSteam = useCallback(() => {
+    // Get chimney top in group-local coords by subtracting group world pos from wheel world pos
+    if (wheelRef.current && shakeGroupRef.current) {
+      const wheelWorld = new THREE.Vector3();
+      const groupWorld = new THREE.Vector3();
+      wheelRef.current.getWorldPosition(wheelWorld);
+      shakeGroupRef.current.getWorldPosition(groupWorld);
+      // Local-to-group position of wheel, then offset up for chimney top
+      const local = wheelWorld.sub(groupWorld);
+      steamOriginRef.current.set(local.x, local.y + 0.01, local.z);
+    }
+    const pos = steamPosRef.current;
+    const vel = steamVelRef.current;
+    const life = steamLifeRef.current;
+    const wp = steamOriginRef.current;
+    for (let i = 0; i < STEAM_COUNT; i++) {
+      const i3 = i * 3;
+      pos[i3]     = wp.x + (Math.random() - 0.5) * 0.02;
+      pos[i3 + 1] = wp.y;
+      pos[i3 + 2] = wp.z + (Math.random() - 0.5) * 0.02;
+      // Upward with slight drift
+      vel[i3]     = (Math.random() - 0.5) * 0.3;
+      vel[i3 + 1] = 0.8 + Math.random() * 1.2;
+      vel[i3 + 2] = (Math.random() - 0.5) * 0.3;
+      life[i] = -(i / STEAM_COUNT) * 0.3; // stagger spawns
+    }
+    steamActiveRef.current = true;
+    steamTimerRef.current = 0;
+    if (steamGeoRef.current) {
+      steamGeoRef.current.attributes.position.needsUpdate = true;
+    }
+  }, []);
+
   // Oil gusher particles — only active on highlighted rig
   const PARTICLE_COUNT = 600;
   const gusherActiveRef = useRef(false);
@@ -1060,7 +1108,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       }
     }
     if (needle) {
-      const fill = Math.min(currentFill, 1.0);
+      const fill = Math.max(0, Math.min(currentFill, 1.0) - gaugePressureOffset.current);
       const targetAngle = gaugeBaseRotX.current - fill * 225 * (Math.PI / 180);
       needle.rotation.x += (targetAngle - needle.rotation.x) * Math.min(delta * 3, 1);
 
@@ -1259,6 +1307,56 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         gusherActiveRef.current = false;
       }
     }
+
+    // Steam vent particle update
+    // Decay gauge pressure offset back toward 0
+    if (gaugePressureOffset.current > 0) {
+      gaugePressureOffset.current = Math.max(0, gaugePressureOffset.current - delta * 0.15);
+    }
+
+    if (steamActiveRef.current) {
+      steamTimerRef.current += delta;
+      const STEAM_DURATION = 2.5;
+      const pos = steamPosRef.current;
+      const vel = steamVelRef.current;
+      const life = steamLifeRef.current;
+      const STEAM_GRAVITY = -0.3; // very light — steam floats
+      let allDone = true;
+      const wp = steamOriginRef.current;
+
+      for (let i = 0; i < STEAM_COUNT; i++) {
+        life[i] += delta;
+        if (life[i] < 0) { allDone = false; continue; }
+
+        const i3 = i * 3;
+        if (life[i] > STEAM_DURATION) continue;
+
+        allDone = false;
+        vel[i3 + 1] += STEAM_GRAVITY * delta;
+        // Wind drift
+        vel[i3] += (Math.random() - 0.5) * 0.1 * delta;
+        vel[i3 + 2] += (Math.random() - 0.5) * 0.1 * delta;
+        pos[i3]     += vel[i3] * delta;
+        pos[i3 + 1] += vel[i3 + 1] * delta;
+        pos[i3 + 2] += vel[i3 + 2] * delta;
+      }
+
+      if (steamGeoRef.current) {
+        steamGeoRef.current.attributes.position.needsUpdate = true;
+      }
+      if (steamMatRef.current) {
+        const t = steamTimerRef.current;
+        const fade = t > STEAM_DURATION - 0.8
+          ? Math.max(0, (STEAM_DURATION - t) / 0.8)
+          : Math.min(1, t * 3); // quick fade in
+        steamMatRef.current.opacity = fade * 0.6;
+      }
+
+      if (allDone || steamTimerRef.current > STEAM_DURATION) {
+        steamActiveRef.current = false;
+        if (steamMatRef.current) steamMatRef.current.opacity = 0;
+      }
+    }
   });
 
   const handleClick = useCallback((e) => {
@@ -1273,6 +1371,11 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     }
     if (isWheelClick) {
       wheelTargetRotY.current += Math.PI * 2;
+      // Trigger steam vent from chimney + drop gauge pressure
+      if (!steamActiveRef.current) {
+        initSteam();
+        gaugePressureOffset.current = Math.min(gaugePressureOffset.current + 0.3, 0.8);
+      }
       return;
     }
 
@@ -1330,7 +1433,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       }
       lastClickTime.current = now;
     }
-  }, [onClick, onDoubleClick, highlighted]);
+  }, [onClick, onDoubleClick, highlighted, initSteam]);
 
   return (
     <group ref={shakeGroupRef} position={position}>
@@ -1369,6 +1472,25 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
               color={0x1a0e05}
               size={0.04}
               map={_oilDropletTex}
+              transparent
+              opacity={0}
+              depthWrite={false}
+              sizeAttenuation
+            />
+          </points>
+          {/* Steam vent particles */}
+          <points>
+            <bufferGeometry ref={steamGeoRef}>
+              <bufferAttribute
+                attach="attributes-position"
+                args={[steamPosRef.current, 3]}
+                count={STEAM_COUNT}
+              />
+            </bufferGeometry>
+            <pointsMaterial
+              ref={steamMatRef}
+              color={0xdddddd}
+              size={0.06}
               transparent
               opacity={0}
               depthWrite={false}
@@ -1534,12 +1656,30 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
     <>
       {/* Oil Tower in the center 4 cells */}
       <OilTower position={towerPos} communityOil={communityOil} totalOilBudget={totalOilBudget} />
-      {/* Green highlight plane on the selected grid square */}
+      {/* Highlight on the selected grid square */}
       {selectedPos && (
-        <mesh position={selectedPos} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[cellSize, cellSize]} />
-          <meshBasicMaterial color={0xb99230} transparent opacity={0.45} depthWrite={false} />
-        </mesh>
+        <group position={selectedPos}>
+          <mesh rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[cellSize, cellSize]} />
+            <meshBasicMaterial color={0xb99230} transparent opacity={0.45} depthWrite={false} polygonOffset polygonOffsetFactor={-4} polygonOffsetUnits={-4} />
+          </mesh>
+          <lineLoop>
+            <bufferGeometry>
+              <bufferAttribute
+                attach="attributes-position"
+                array={new Float32Array([
+                  -cellSize / 2, 0, -cellSize / 2,
+                   cellSize / 2, 0, -cellSize / 2,
+                   cellSize / 2, 0,  cellSize / 2,
+                  -cellSize / 2, 0,  cellSize / 2,
+                ])}
+                count={4}
+                itemSize={3}
+              />
+            </bufferGeometry>
+            <lineBasicMaterial color={0xd4a854} />
+          </lineLoop>
+        </group>
       )}
       {items.map(({ key, position, col, row }) => {
         // Drill all if no selection, otherwise only the selected cell

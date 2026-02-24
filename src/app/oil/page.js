@@ -13,6 +13,8 @@ import { useUser } from "@clerk/nextjs";
 import { useMusic } from "@/components/MusicContext";
 import NavControlsHome from "@/components/NavControlsHome";
 import CyberNav from "@/components/CyberNav";
+import PolaroidSnapshot from "@/components/PolaroidSnapshot";
+import Fireworks from "@/components/Fireworks";
 import { db, storage, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, ref, uploadBytes, getDownloadURL, onSnapshot } from "@/lib/firebaseClient";
 
 // ── Environment presets ──────────────────────────────────────────────────────
@@ -478,6 +480,21 @@ export default function OilPage() {
   const [drillDepth, setDrillDepth] = useState(0);
   const [isDrilling, setIsDrilling] = useState(false);
 
+  // Snapshot trigger for PolaroidSnapshot
+  const [snapshotTrigger, setSnapshotTrigger] = useState(false);
+  const [fireworksOn, setFireworksOn] = useState(false);
+
+  // Reset snapshot trigger after timeout (fallback if user dismisses without onComplete)
+  useEffect(() => {
+    if (snapshotTrigger) {
+      const t = setTimeout(() => setSnapshotTrigger(false), 5000);
+      return () => clearTimeout(t);
+    }
+  }, [snapshotTrigger]);
+
+  // Review day scrub (player mode only): null = live, number = reviewing history
+  const [reviewDay, setReviewDay] = useState(null);
+
   // Demo drill day
   const [demoDay, setDemoDay] = useState(0);
   const [demoPlaying, setDemoPlaying] = useState(false);
@@ -523,8 +540,13 @@ export default function OilPage() {
     ? { col: selectedX, row: sliceY, drillDay: testDay, lastDrillDate: null, lastDrainExtracted: 0, totalCollected: 0, tankDrains: 0 }
     : userDrill;
 
+  // Reset reviewDay when drill day advances (e.g. after a new drill)
+  useEffect(() => { setReviewDay(null); }, [userDrill?.drillDay]);
+
   // Effective drill day: active mode uses userDrill, admin/report uses demoDay, test uses testDay
-  const effectiveDrillDay = (isAdmin || isReport) ? demoDay : isTest ? testDay : (userDrill?.drillDay || 0);
+  const effectiveDrillDay = (isAdmin || isReport) ? demoDay
+    : isTest ? testDay
+    : (reviewDay !== null ? reviewDay : (userDrill?.drillDay || 0));
 
   // Can the player drill right now?
   const drillStatus = useMemo(() => {
@@ -1651,6 +1673,45 @@ export default function OilPage() {
           DEPTH {effectiveDrillDay}/{DEPTH_Z}
         </span>
       </div>
+      {/* Time scrub slider (player review) */}
+      {!isTest && userDrill?.drillDay > 1 && (
+        <div style={{ marginBottom: 8, padding: "6px 0" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+            <span style={{
+              fontSize: 8, letterSpacing: "0.15em", fontFamily: "'Share Tech Mono', monospace",
+              color: reviewDay !== null ? theme.gold : theme.muted,
+            }}>
+              {reviewDay !== null ? `REVIEWING DAY ${reviewDay}` : "LIVE"}
+            </span>
+            {reviewDay !== null && (
+              <button
+                onClick={() => setReviewDay(null)}
+                style={{
+                  background: theme.accent, color: "#000", border: "none", borderRadius: 2,
+                  fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 8px",
+                  cursor: "pointer", fontFamily: "'Share Tech Mono', monospace",
+                }}
+              >
+                LIVE
+              </button>
+            )}
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={userDrill.drillDay}
+            value={reviewDay ?? userDrill.drillDay}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              setReviewDay(v === userDrill.drillDay ? null : v);
+            }}
+            style={{
+              width: "100%", height: 4, cursor: "pointer",
+              accentColor: reviewDay !== null ? theme.gold : theme.accent,
+            }}
+          />
+        </div>
+      )}
       {/* Tank fill bar */}
       <div style={{ marginBottom: 10 }}>
         <div style={{
@@ -1762,30 +1823,19 @@ export default function OilPage() {
         <header style={m.header}>
           <div style={styles.headerLeft}>
             <div style={styles.logoMark}>
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <path d="M10 2L3 7v6l7 5 7-5V7l-7-5z" stroke="#b8922e" strokeWidth="1.5" fill="none" />
-                <circle cx="10" cy="10" r="2.5" fill="#b8922e" />
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b8922e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999"/>
+                <path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024"/>
+                <path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069"/>
+                <path d="M18.352 3.352a1.205 1.205 0 0 0-1.704 0l-5.296 5.296a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l5.296-5.296a1.205 1.205 0 0 0 0-1.704z"/>
               </svg>
             </div>
             <div>
-              <h1 style={{ ...styles.title, fontSize: 12 }}>HAIL MARY PROSPECTING CO.{modeBadge}</h1>
+              <h1 style={{ ...styles.title, fontSize: 12 }}>HAIL MARY <br/>PROSPECTING CO.{modeBadge}</h1>
               <p style={styles.subtitle}>OIL PROSPECTOR</p>
             </div>
           </div>
           <div style={styles.headerRight}>
-            <span style={{
-              fontFamily: "'Orbitron', monospace",
-              fontSize: 13,
-              fontWeight: 700,
-              color: theme.accent,
-              letterSpacing: "0.1em",
-            }}>
-              DAY {gameDay}
-            </span>
-            <div style={{ ...styles.statusDot, ...(gameEnded ? { background: theme.red, boxShadow: "0 0 6px rgba(160,48,48,0.4)" } : {}) }} />
-            <span style={styles.statusText}>
-              {gameEnded ? "ENDED" : "ACTIVE"}
-            </span>
             <NavControlsHome
               isPlaying={contextIsPlaying}
               onPlayMusic={() => play()}
@@ -1842,13 +1892,14 @@ export default function OilPage() {
         <div style={m.scroll}>
           {/* 3D Voxel */}
           {mobileTab === "3d" && (
-            <div style={m.canvasWrap}>
+            <div id="oil-canvas" style={m.canvasWrap}>
               <CleanCanvas
                 camera={{ position: [0, 8, 8], fov: 50 }}
                 style={{ width: "100%", height: "100%" }}
-                gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
+                gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
               >
                 <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} />
+                {fireworksOn && <Fireworks quality={1} shellSize={1} />}
                 {env.fog && <fog attach="fog" args={[env.fog, 20, 80]} />}
                 <ambientLight intensity={env.ambient} />
                 {env.hemi && <hemisphereLight args={[env.hemi.sky, env.hemi.ground, env.hemi.intensity]} />}
@@ -1883,6 +1934,7 @@ export default function OilPage() {
                       ref={controlsRefMobile}
                       enableDamping
                       dampingFactor={0.2}
+                      enablePan
                       minDistance={0.1}
                       maxDistance={15}
                       maxPolarAngle={Math.PI * 0.48}
@@ -1904,8 +1956,42 @@ export default function OilPage() {
               <div style={styles.gridLabel}>
                 {GRID_X}&times;{GRID_Y}&times;{DEPTH_Z} VOXEL
               </div>
+              <div style={{ position: "absolute", bottom: 10, right: 10, zIndex: 10, display: "flex", gap: 4 }}>
+                <button
+                  onClick={() => { if (!fireworksOn && envPreset !== "night") setEnvPreset("night"); setFireworksOn(f => !f); }}
+                  title={fireworksOn ? "Stop fireworks" : "Launch fireworks"}
+                  style={{
+                    width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
+                    background: fireworksOn ? "rgba(212,168,84,0.35)" : "rgba(212,168,84,0.15)",
+                    border: `1px solid ${fireworksOn ? theme.goldBorder : theme.cornerBorder}`,
+                    borderRadius: 3, cursor: "pointer", color: theme.accent, padding: 0,
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2 L14 8 L12 6 L10 8 Z" />
+                    <path d="M12 6 L12 12" />
+                    <path d="M8 14 L5 11" /><path d="M16 14 L19 11" />
+                    <path d="M6 18 L3 17" /><path d="M18 18 L21 17" />
+                    <path d="M9 20 L7 22" /><path d="M15 20 L17 22" />
+                    <circle cx="12" cy="16" r="3" fill={fireworksOn ? "currentColor" : "none"} opacity={fireworksOn ? 0.3 : 1} />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setSnapshotTrigger(true)}
+                  style={{
+                    width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
+                    background: "rgba(212,168,84,0.15)", border: `1px solid ${theme.cornerBorder}`,
+                    borderRadius: 3, cursor: "pointer", color: theme.accent, padding: 0,
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                    <circle cx="12" cy="13" r="4"/>
+                  </svg>
+                </button>
+              </div>
               <div style={{ position: "absolute", top: 6, right: 6, zIndex: 10, display: "flex", gap: 3 }}>
-                {[["day", "☀"], ["dusk", "🌅"], ["night", "🌙"]].map(([key, icon]) => (
+                {[["day", <svg key="day-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>], ["dusk", <svg key="dusk-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 10V2"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m16 6-4 4-4-4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>], ["night", <svg key="night-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>]].map(([key, icon]) => (
                   <button
                     key={key}
                     onClick={() => setEnvPreset(key)}
@@ -2030,9 +2116,11 @@ export default function OilPage() {
       <header style={styles.header}>
         <div style={styles.headerLeft}>
           <div style={styles.logoMark}>
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-              <path d="M10 2L3 7v6l7 5 7-5V7l-7-5z" stroke="#b8922e" strokeWidth="1.5" fill="none" />
-              <circle cx="10" cy="10" r="2.5" fill="#b8922e" />
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b8922e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999"/>
+              <path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024"/>
+              <path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069"/>
+              <path d="M18.352 3.352a1.205 1.205 0 0 0-1.704 0l-5.296 5.296a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l5.296-5.296a1.205 1.205 0 0 0 0-1.704z"/>
             </svg>
           </div>
           <div>
@@ -2088,16 +2176,17 @@ export default function OilPage() {
         gridTemplateColumns: panelsCollapsed ? "1fr" : "1fr 340px 280px",
       }}>
         {/* 3D Voxel View */}
-        <div style={{
+        <div id="oil-canvas" style={{
           ...styles.canvasWrap,
           borderRight: panelsCollapsed ? "none" : `1px solid ${theme.border}`,
         }}>
           <CleanCanvas
             camera={{ position: [0, 8, 8], fov: 50 }}
             style={{ width: "100%", height: "100%" }}
-            gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
+            gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
           >
             <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} />
+            {fireworksOn && <Fireworks quality={2} shellSize={2} />}
             {env.fog && <fog attach="fog" args={[env.fog, 20, 80]} />}
             <ambientLight intensity={env.ambient} />
             {env.hemi && <hemisphereLight args={[env.hemi.sky, env.hemi.ground, env.hemi.intensity]} />}
@@ -2132,6 +2221,7 @@ export default function OilPage() {
                   ref={controlsRef}
                   enableDamping
                   dampingFactor={0.08}
+                  enablePan
                   minDistance={5}
                   maxDistance={45}
                   maxPolarAngle={Math.PI * 0.48}
@@ -2152,8 +2242,42 @@ export default function OilPage() {
           <div style={styles.gridLabel}>
             {GRID_X}&times;{GRID_Y}&times;{DEPTH_Z} VOXEL GRID
           </div>
-          <div style={{ position: "absolute", top: 10, right: panelsCollapsed ? 10 : 100, zIndex: 10, display: "flex", gap: 3 }}>
-            {[["day", "☀"], ["dusk", "🌅"], ["night", "🌙"]].map(([key, icon]) => (
+          <div style={{ position: "absolute", bottom: 12, right: 12, zIndex: 10, display: "flex", gap: 4 }}>
+            <button
+              onClick={() => { if (!fireworksOn && envPreset !== "night") setEnvPreset("night"); setFireworksOn(f => !f); }}
+              title={fireworksOn ? "Stop fireworks" : "Launch fireworks"}
+              style={{
+                width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
+                background: fireworksOn ? "rgba(212,168,84,0.35)" : "rgba(212,168,84,0.15)",
+                border: `1px solid ${fireworksOn ? theme.goldBorder : theme.cornerBorder}`,
+                borderRadius: 3, cursor: "pointer", color: theme.accent, padding: 0,
+              }}
+            >
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2 L14 8 L12 6 L10 8 Z" />
+                <path d="M12 6 L12 12" />
+                <path d="M8 14 L5 11" /><path d="M16 14 L19 11" />
+                <path d="M6 18 L3 17" /><path d="M18 18 L21 17" />
+                <path d="M9 20 L7 22" /><path d="M15 20 L17 22" />
+                <circle cx="12" cy="16" r="3" fill={fireworksOn ? "currentColor" : "none"} opacity={fireworksOn ? 0.3 : 1} />
+              </svg>
+            </button>
+            <button
+              onClick={() => setSnapshotTrigger(true)}
+              style={{
+                width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center",
+                background: "rgba(212,168,84,0.15)", border: `1px solid ${theme.cornerBorder}`,
+                borderRadius: 3, cursor: "pointer", color: theme.accent, padding: 0,
+              }}
+            >
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+            </button>
+          </div>
+          <div style={{ position: "absolute", top: 10, right: 10, zIndex: 10, display: "flex", alignItems: "center", gap: 3 }}>
+            {[["day", <svg key="day-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>], ["dusk", <svg key="dusk-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 10V2"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m16 6-4 4-4-4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>], ["night", <svg key="night-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>]].map(([key, icon]) => (
               <button
                 key={key}
                 onClick={() => setEnvPreset(key)}
@@ -2189,30 +2313,26 @@ export default function OilPage() {
                 padding: 0,
               }}
             >{darkMode ? "●" : "◐"}</button>
+            <button
+              onClick={() => setPanelsCollapsed((p) => !p)}
+              style={{
+                padding: "5px 10px",
+                background: "rgba(212,168,84,0.15)",
+                border: `1px solid ${theme.goldBorder}`,
+                borderRadius: 3,
+                color: theme.accent,
+                fontFamily: "'Share Tech Mono', monospace",
+                fontSize: 9,
+                letterSpacing: "0.1em",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 5,
+              }}
+            >
+              {panelsCollapsed ? "◂ PANELS" : "EXPAND ▸"}
+            </button>
           </div>
-          <button
-            onClick={() => setPanelsCollapsed((p) => !p)}
-            style={{
-              position: "absolute",
-              top: 10,
-              right: 10,
-              zIndex: 10,
-              padding: "5px 10px",
-              background: "rgba(212,168,84,0.15)",
-              border: `1px solid ${theme.goldBorder}`,
-              borderRadius: 3,
-              color: theme.accent,
-              fontFamily: "'Share Tech Mono', monospace",
-              fontSize: 9,
-              letterSpacing: "0.1em",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-            }}
-          >
-            {panelsCollapsed ? "◂ PANELS" : "EXPAND ▸"}
-          </button>
         </div>
 
         {/* Middle column */}
@@ -2305,6 +2425,16 @@ export default function OilPage() {
       />
 
       {cssAnimations}
+
+      <PolaroidSnapshot
+        trigger={snapshotTrigger}
+        captureElementId="oil-canvas"
+        label="Just added this oil claim to my portfolio!"
+        backgroundImage="/LandGradient3.webp"
+        onComplete={() => {
+          setTimeout(() => setSnapshotTrigger(false), 100);
+        }}
+      />
     </div>
   );
 }

@@ -19,5 +19,13 @@ service firebase.storage {
       allow read: if true;
       allow write: if true;
     }
+
+    // Polaroid snapshots — public read, write limited to images under 5MB
+    match /polaroids/{fileName} {
+      allow read: if true;
+      allow write: if resource == null
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+    }
   }
 }
