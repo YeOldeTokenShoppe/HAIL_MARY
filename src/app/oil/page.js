@@ -694,9 +694,10 @@ export default function OilPage() {
   // Depth-limited grid: only reveals the player's drilled column up to effectiveDrillDay
   const playerGrid3D = useMemo(() => {
     if (showOilData || selectedX === null || !activeUserDrill) return blankGrid3D;
-    const g = blankGrid3D.map(col => col.map(row => [...row]));
     const col = activeUserDrill.col;
     const row = activeUserDrill.row;
+    if (col == null || row == null || col >= gridSize || row >= gridSize) return blankGrid3D;
+    const g = blankGrid3D.map(col => col.map(row => [...row]));
     for (let z = 0; z < Math.min(effectiveDrillDay, DEPTH_Z); z++) {
       g[col][row][z] = stats.grid3D[col]?.[row]?.[z] ?? 0;
     }
@@ -766,7 +767,7 @@ export default function OilPage() {
   }, [selectedX, effectiveDrillDay, oilInTank]);
 
   const selectedDepthData = useMemo(() => {
-    if (selectedX === null) return null;
+    if (selectedX === null || sliceY == null || !stats.grid3D[selectedX]?.[sliceY]) return null;
     const col = [];
     for (let z = 0; z < DEPTH_Z; z++) col.push(stats.grid3D[selectedX][sliceY][z]);
     return col;
@@ -913,11 +914,13 @@ export default function OilPage() {
 
 
   const handleSelectClaim = useCallback((claim) => {
-    setSelectedX(claim.x);
-    setSliceY(claim.y);
+    const x = Math.max(0, Math.min(claim.x, gridSize - 1));
+    const y = Math.max(0, Math.min(claim.y, gridSize - 1));
+    setSelectedX(x);
+    setSliceY(y);
     setDrillDepth(0);
-    handleFlyTo(claim.x, claim.y);
-  }, [handleFlyTo]);
+    handleFlyTo(x, y);
+  }, [handleFlyTo, gridSize]);
 
   // Daily drill handler (player mode)
   const handleDailyDrill = useCallback(async () => {
@@ -1661,7 +1664,7 @@ export default function OilPage() {
             onClick={() => handleSelectClaim({ x: userDrill.col, y: userDrill.row })}
             style={drillBtnStyles.active}
           >
-            GO TO YOUR CLAIM ({userDrill?.col}, {userDrill?.row})
+            GO TO YOUR CLAIM ({Math.min(userDrill?.col ?? 0, gridSize - 1)}, {Math.min(userDrill?.row ?? 0, gridSize - 1)})
           </button>
           <div style={drillBtnStyles.countdown}>NEXT DRILL IN {drillCountdown}</div>
         </div>

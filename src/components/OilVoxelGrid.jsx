@@ -1721,10 +1721,11 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
   // Compute selected cell world position for the highlight plane
   const selectedPos = useMemo(() => {
     if (selectedCol === null || selectedRow === null) return null;
+    if (selectedCol < 0 || selectedCol >= gridX || selectedRow < 0 || selectedRow >= gridY) return null;
     const x = -worldW / 2 + selectedCol * cellSize + cellSize / 2;
     const z = worldD / 2 - selectedRow * cellSize - cellSize / 2;
     return [x, 0.01, z]; // slightly above surface to avoid z-fighting
-  }, [selectedCol, selectedRow, cellSize, worldW, worldD]);
+  }, [selectedCol, selectedRow, cellSize, worldW, worldD, gridX, gridY]);
 
   return (
     <>
