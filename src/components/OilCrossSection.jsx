@@ -1,7 +1,5 @@
 "use client";
 
-const GRID_X = 10;
-const GRID_Y = 10;
 const DEPTH_Z = 20;
 
 function getOilColor(value, maxValue, dark) {
@@ -56,6 +54,8 @@ export default function OilCrossSection({
   onSelectX,
   onSliceY,
   theme,
+  gridX = 10,
+  gridY = 10,
 }) {
   const dark = theme?.bg === "#1a1a1f";
   const t = theme || { text: "#5a4e3e", muted: "#9e8e78", inputBg: "#f0e8dc", borderLight: "#c8bfb0", accent: "#7a5a1a", gold: "#d4a854", goldBorder: "#b8922e", textStrong: "#3e2e10", inspectorKey: "#8b7d6b", seedLabel: "#8b7355" };
@@ -73,7 +73,7 @@ export default function OilCrossSection({
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6, justifyContent: "center" }}>
         <span style={{ fontSize: 9, color: t.seedLabel || t.muted, letterSpacing: "0.15em", flexShrink: 0 }}>Y</span>
         <div style={{ display: "flex", gap: 2 }}>
-          {Array.from({ length: GRID_Y }, (_, y) => (
+          {Array.from({ length: gridY }, (_, y) => (
             <button
               key={y}
               onClick={() => onSliceY(y)}
@@ -113,7 +113,7 @@ export default function OilCrossSection({
         </div>
         <div style={{
           display: "grid",
-          gridTemplateColumns: `repeat(${GRID_X}, 1fr)`,
+          gridTemplateColumns: `repeat(${gridX}, 1fr)`,
           gridTemplateRows: `repeat(${DEPTH_Z}, 1fr)`,
           height: 280,
           cursor: "crosshair",
@@ -121,7 +121,7 @@ export default function OilCrossSection({
           background: dark ? "#333" : "transparent",
         }}>
           {Array.from({ length: DEPTH_Z }, (_, z) =>
-            Array.from({ length: GRID_X }, (_, x) => {
+            Array.from({ length: gridX }, (_, x) => {
               const value = grid3D[x][sliceY][z];
               const isSelected = x === selectedX;
               const isDrilledCell = isSelected && z < drillDepth;
@@ -170,10 +170,10 @@ export default function OilCrossSection({
         </div>
         <div style={{
           display: "grid",
-          gridTemplateColumns: `repeat(${GRID_X}, 1fr)`,
+          gridTemplateColumns: `repeat(${gridX}, 1fr)`,
           padding: "3px 0", fontSize: 7, color: t.muted, textAlign: "center",
         }}>
-          {Array.from({ length: GRID_X }, (_, x) => (
+          {Array.from({ length: gridX }, (_, x) => (
             <span key={x}>{x}</span>
           ))}
         </div>

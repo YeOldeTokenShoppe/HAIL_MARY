@@ -14,7 +14,7 @@ function getSurfaceColor(value, maxValue, dark) {
   return `rgb(${Math.round(160 - t * 40)}, ${Math.round(105 - t * 30)}, ${Math.round(50 - t * 10)})`;
 }
 
-export default function OilSurfaceMap({ claimTotals, maxClaimTotal, selectedClaimIndex, onSelectClaim, theme }) {
+export default function OilSurfaceMap({ claimTotals, maxClaimTotal, selectedClaimIndex, onSelectClaim, theme, gridX = 10, gridY = 10 }) {
   const dark = theme?.bg === "#1a1a1f";
   const t = theme || { muted: "#9e8e78", inputBg: "#f0e8dc", borderLight: "#c8bfb0", green: "#5a8a3a", accent: "#7a5a1a" };
 
@@ -28,11 +28,11 @@ export default function OilSurfaceMap({ claimTotals, maxClaimTotal, selectedClai
       </div>
       {/* X axis labels along top */}
       <div style={{
-        display: "grid", gridTemplateColumns: "14px repeat(10, 1fr)",
+        display: "grid", gridTemplateColumns: `14px repeat(${gridX}, 1fr)`,
         gap: 2, paddingRight: 8, marginBottom: 1,
       }}>
         <div style={{ width: 14 }} />
-        {Array.from({ length: 10 }, (_, x) => (
+        {Array.from({ length: gridX }, (_, x) => (
           <span key={x} style={{
             fontSize: 7, color: t.muted, textAlign: "center", lineHeight: 1,
             display: "flex", alignItems: "center", justifyContent: "center", flex: 1,
@@ -45,7 +45,7 @@ export default function OilSurfaceMap({ claimTotals, maxClaimTotal, selectedClai
           display: "flex", flexDirection: "column", gap: 2,
           paddingTop: 8, paddingBottom: 8, width: 14, flexShrink: 0,
         }}>
-          {Array.from({ length: 10 }, (_, y) => (
+          {Array.from({ length: gridY }, (_, y) => (
             <span key={y} style={{
               fontSize: 7, color: t.muted, textAlign: "center", lineHeight: 1,
               display: "flex", alignItems: "center", justifyContent: "center", flex: 1,
@@ -53,7 +53,7 @@ export default function OilSurfaceMap({ claimTotals, maxClaimTotal, selectedClai
           ))}
         </div>
         <div style={{
-          display: "grid", gridTemplateColumns: "repeat(10, 1fr)",
+          display: "grid", gridTemplateColumns: `repeat(${gridX}, 1fr)`,
           gap: 2, padding: 8,
           background: t.inputBg, border: `1px solid ${t.borderLight}`, flex: 1,
         }}>

@@ -213,7 +213,7 @@ export default function NavControlsHome({
           height: 40px;
           width: 40px;
           border-radius: 10px;
-          font-size: 2rem;
+          font-size: 1.5rem;
           color: rgba(212, 175, 55, 0.8);
         }
         
@@ -886,7 +886,7 @@ export default function NavControlsHome({
               style={{ cursor: 'pointer' }}
               onClick={() => clerk.openSignIn()}
             >
-              <span style={{ fontSize: '2rem' }}>{emoji}</span>
+              <span style={{ fontSize: '1.5rem' }}>{emoji}</span>
               <div  />
             </button>
           )}

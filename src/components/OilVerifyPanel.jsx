@@ -4,11 +4,9 @@ import { useState, useMemo, useCallback } from "react";
 import { fetchBlockHash, fetchLatestBlockNumber } from "@/lib/fetchBlockHash";
 import { generateOilDistribution3D } from "@/lib/oilDistribution";
 
-const GRID_X = 10;
-const GRID_Y = 10;
 const DEPTH_Z = 20;
 
-export default function OilVerifyPanel({ numberOfDeposits, totalOilBudget, onApplyHash }) {
+export default function OilVerifyPanel({ numberOfDeposits, totalOilBudget, onApplyHash, gridX = 10, gridY = 10 }) {
   const [collapsed, setCollapsed] = useState(true);
   const [blockInput, setBlockInput] = useState("");
   const [status, setStatus] = useState("idle"); // idle | loading | verified | error
@@ -18,7 +16,7 @@ export default function OilVerifyPanel({ numberOfDeposits, totalOilBudget, onApp
 
   const selectedOil = useMemo(() => {
     if (!result || !selectedCell) return null;
-    return result.claimTotals[selectedCell.y * GRID_X + selectedCell.x];
+    return result.claimTotals[selectedCell.y * gridX + selectedCell.x];
   }, [result, selectedCell]);
 
   const handleFetchLatest = useCallback(async () => {
@@ -49,16 +47,16 @@ export default function OilVerifyPanel({ numberOfDeposits, totalOilBudget, onApp
 
       const { grid } = generateOilDistribution3D({
         blockHash,
-        gridX: GRID_X,
-        gridY: GRID_Y,
+        gridX: gridX,
+        gridY: gridY,
         depthZ: DEPTH_Z,
         totalOilBudget,
         numberOfDeposits,
       });
 
       const claimTotals = [];
-      for (let y = 0; y < GRID_Y; y++) {
-        for (let x = 0; x < GRID_X; x++) {
+      for (let y = 0; y < gridY; y++) {
+        for (let x = 0; x < gridX; x++) {
           let sum = 0;
           for (let z = 0; z < DEPTH_Z; z++) sum += grid[x][y][z];
           claimTotals.push({ x, y, oil: sum });
@@ -152,10 +150,10 @@ export default function OilVerifyPanel({ numberOfDeposits, totalOilBudget, onApp
               {/* Mini-grid */}
               <div style={s.gridLabel}>SELECT CLAIM TO INSPECT</div>
               <div style={s.miniGrid}>
-                {Array.from({ length: GRID_Y }, (_, y) => (
+                {Array.from({ length: gridY }, (_, y) => (
                   <div key={y} style={s.gridRow}>
-                    {Array.from({ length: GRID_X }, (_, x) => {
-                      const claim = result.claimTotals[y * GRID_X + x];
+                    {Array.from({ length: gridX }, (_, x) => {
+                      const claim = result.claimTotals[y * gridX + x];
                       const intensity = claim.oil / maxOilInGrid;
                       const isSelected = selectedCell?.x === x && selectedCell?.y === y;
                       return (

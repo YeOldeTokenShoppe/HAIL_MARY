@@ -30,14 +30,15 @@ export const MATERIAL_PRESETS = {
 
 // ── Add-on catalog & slot positions ──────────────────────────────────────────
 export const ADDON_CATALOG = [
-  { id: "cemetery",      label: "CEMETERY",       color: "#555555", shape: "cross",    model: "/models/addons/cemetery.glb" },
+  { id: "gravestone",      label: "GRAVESTONE",       color: "#555555", shape: "cross",    model: "/models/addons/gravestone.glb" },
   { id: "skeleton",      label: "HOME DEPOT SKELETON",       color: "#e8dcc8", shape: "cylinder", model: "/models/addons/HDSkeleton.glb" },
   { id: "flamingo",      label: "PINK FLAMINGO",  color: "#ff69b4", shape: "cone",     model: "/models/addons/pinkFlamingo.glb" },
   { id: "bearTrap",      label: "BEAR TRAP",      color: "#888888", shape: "box",      model: "/models/addons/bearTrap.glb" },
-  { id: "dinosaur",      label: "DINOSAUR",       color: "#6b8e23", shape: "cone",     model: "/models/addons/dinosaur.glb" },
+  // { id: "dinosaur",      label: "DINOSAUR",       color: "#6b8e23", shape: "cone",     model: "/models/addons/dinosaur.glb" },
   { id: "goldRocks",     label: "GOLD ROCKS",     color: "#ffd700", shape: "sphere",   model: "/models/addons/goldRocks.glb" },
   { id: "palmTree",      label: "PALM TREE",      color: "#2d8a4e", shape: "cylinder", model: "/models/addons/palmTree.glb" },
   { id: "pumpkinPatch",  label: "PUMPKIN PATCH",  color: "#e87530", shape: "sphere",   model: "/models/addons/pumpkinPatch.glb" },
+  { id: "tubeMan",      label: "TUBE MAN",      color: "#e87530", shape: "sphere",   model: "/models/addons/tubeMan.glb" },
   { id: "neonSign",      label: "NEON SIGN",      color: "#ff00ff", shape: "box",      emissive: true },
   { id: "gnome",         label: "GARDEN GNOME",   color: "#cc3333", shape: "cone" },
   { id: "cactus",        label: "COOL CACTUS",    color: "#2d8a4e", shape: "cylinder" },
@@ -111,18 +112,18 @@ const THEME_PRESETS = {
     label: "CYBERPUNK",
     build: () => {
       const c = getDefaultPumpConfig();
-      c.beam          = { color: "#ff00ff", preset: "neon" };
-      c.horseHead     = { color: "#00ffcc", preset: "neon" };
-      c.counterweight = { color: "#ff2266", preset: "neon" };
-      c.crankWheel    = { color: "#ffcc00", preset: "neon" };
-      c.motorBox      = { color: "#0a0a0a", preset: "matte" };
-      c.foundation    = { color: "#0a0a0a", preset: "matte" };
-      c.drillPipe     = { color: "#00aaff", preset: "neon" };
-      c.pad           = { color: "#08080e", preset: "matte" };
-      c.machinePanel  = { color: "#ff00ff", preset: "neon" };
-      c.tankScaffold  = { color: "#0a0a0a", preset: "matte" };
-      c.signFrame     = { color: "#00ffcc", preset: "neon" };
-      c.pipes         = { color: "#ff2266", preset: "neon" };
+      c.beam          = { color: "#00e5ff", preset: "neon" };   // electric cyan — hero
+      c.horseHead     = { color: "#ff2a6d", preset: "neon" };   // hot pink accent
+      c.counterweight = { color: "#00e5ff", preset: "neon" };   // cyan to match beam
+      c.crankWheel    = { color: "#ff2a6d", preset: "neon" };   // hot pink
+      c.motorBox      = { color: "#1a1028", preset: "brushed" };// dark violet steel
+      c.foundation    = { color: "#1a1028", preset: "brushed" };// dark violet steel
+      c.drillPipe     = { color: "#b030ff", preset: "neon" };   // purple glow
+      c.pad           = { color: "#0c0814", preset: "matte" };  // near-black violet
+      c.machinePanel  = { color: "#ff2a6d", preset: "neon" };   // hot pink
+      c.tankScaffold  = { color: "#1a1028", preset: "brushed" };// dark violet steel
+      c.signFrame     = { color: "#00e5ff", preset: "neon" };   // cyan
+      c.pipes         = { color: "#b030ff", preset: "neon" };   // purple glow
       return c;
     },
   },
@@ -181,16 +182,16 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
     sectionBorder: "#444", swatchBorder: "rgba(212,168,84,0.4)",
     plusColor: "#666", pumpCellBg: "rgba(212,168,84,0.15)", pumpCellBorder: "#555",
   } : {
-    text: "#6b5b47", textStrong: "#3e2e10", accent: "#7a5a1a",
-    muted: "#9e8e78", border: "#c8bfb0", borderLight: "#d4c8b4",
+    text: "#504030", textStrong: "#2e2010", accent: "#5a4010",
+    muted: "#6e6050", border: "#c8bfb0", borderLight: "#d4c8b4",
     panelBg: "rgba(245,239,230,0.95)", inputBg: "#f0e8dc",
-    btnText: "#6b5b47", btnBg: "rgba(180,160,130,0.1)",
-    btnBorder: "#c8bfb0", activeBg: "#d4a854", activeText: "#3e2e10",
-    activeBorder: "#b8922e", hintText: "#9e8e78",
+    btnText: "#504030", btnBg: "rgba(180,160,130,0.1)",
+    btnBorder: "#c8bfb0", activeBg: "#d4a854", activeText: "#2e2010",
+    activeBorder: "#b8922e", hintText: "#6e6050",
     slotBg: "rgba(180,160,130,0.06)", slotBorder: "#d4c8b4",
     editorBg: "rgba(180,160,130,0.05)", pickerBg: "rgba(245,239,230,0.98)",
     sectionBorder: "#d4c8b4", swatchBorder: "rgba(139,105,20,0.3)",
-    plusColor: "#c8bfb0", pumpCellBg: "rgba(184,146,46,0.1)", pumpCellBorder: "#c8b080",
+    plusColor: "#a09080", pumpCellBg: "rgba(184,146,46,0.1)", pumpCellBorder: "#c8b080",
   };
 
   const rawAddons = config.addons || {};
@@ -212,15 +213,18 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
   const applyTheme = useCallback((themeKey) => {
     const newConfig = THEME_PRESETS[themeKey].build();
     newConfig.signImageUrl = config.signImageUrl;
+    newConfig.showSign = config.showSign;
+    newConfig.showCamera = config.showCamera;
+    newConfig.showFence = config.showFence;
     newConfig.addons = config.addons || {};
     onChange(newConfig);
     setActiveZone(null);
-  }, [onChange, config.signImageUrl]);
+  }, [onChange, config.signImageUrl, config.showSign, config.showCamera, config.showFence]);
 
   const sectionStyle = { ...(isMobile ? mStyles.section : styles.section), borderBottomColor: c.sectionBorder };
   const titleStyle = { ...(isMobile ? mStyles.title : styles.title), color: c.accent };
-  const mFs = isMobile ? 10 : 7;   // base font for labels/buttons
-  const mFsLg = isMobile ? 11 : 9; // larger font for zone names/hints
+  const mFs = isMobile ? 10 : 10;   // base font for labels/buttons
+  const mFsLg = isMobile ? 11 : 11; // larger font for zone names/hints
 
   return (
     <div style={sectionStyle}>
@@ -398,8 +402,8 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                   {row.map((cell) => {
                     if (cell === "pump") {
                       return (
-                        <div key="pump" style={{ ...addonStyles.pumpCell, width: isMobile ? 48 : 36, height: isMobile ? 36 : 28, background: c.pumpCellBg, borderColor: c.pumpCellBorder, color: c.muted }}>
-                          <span style={{ fontSize: isMobile ? 9 : 6, letterSpacing: "0.1em" }}>PUMP</span>
+                        <div key="pump" style={{ ...addonStyles.pumpCell, width: isMobile ? 48 : 44, height: isMobile ? 36 : 32, background: c.pumpCellBg, borderColor: c.pumpCellBorder, color: c.muted }}>
+                          <span style={{ fontSize: isMobile ? 10 : 8, letterSpacing: "0.1em" }}>PUMP</span>
                         </div>
                       );
                     }
@@ -417,8 +421,8 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                         key={cell}
                         style={{
                           ...addonStyles.slotCell,
-                          width: isMobile ? 48 : 36,
-                          height: isMobile ? 36 : 28,
+                          width: isMobile ? 48 : 44,
+                          height: isMobile ? 36 : 32,
                           background: item
                             ? item.color + "22"
                             : isPicking
@@ -450,7 +454,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                                 background: item.color,
                                 boxShadow: item.emissive ? `0 0 4px ${item.color}` : "none",
                               }} />
-                              <span style={{ fontSize: isMobile ? 7 : 5, color: c.text, lineHeight: 1 }}>
+                              <span style={{ fontSize: isMobile ? 8 : 7, color: c.text, lineHeight: 1 }}>
                                 {item.label.split(" ").pop()}
                               </span>
                             </div>
@@ -464,7 +468,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                                 position: "absolute",
                                 bottom: 0,
                                 right: 0,
-                                fontSize: 6,
+                                fontSize: 8,
                                 color: c.muted,
                                 cursor: "pointer",
                                 padding: "0 2px",
@@ -483,7 +487,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                             }}
                             style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", cursor: disabled ? "default" : "pointer" }}
                           >
-                            <span style={{ fontSize: isMobile ? 12 : 8, color: c.plusColor }}>+</span>
+                            <span style={{ fontSize: isMobile ? 14 : 12, color: c.plusColor }}>+</span>
                           </div>
                         )}
                       </div>
@@ -545,7 +549,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                     <div
                       style={{
                         ...styles.swatch,
-                        background: zoneConfig.color || (darkMode ? "#666" : "#8b7d6b"),
+                        background: zoneConfig.color || (darkMode ? "#666" : "#7888a0"),
                         borderColor: c.swatchBorder,
                         boxShadow: hasCustom ? "0 0 4px rgba(184,146,46,0.5)" : "none",
                       }}
@@ -566,7 +570,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                         <div style={styles.colorPickerWrap}>
                           <input
                             type="color"
-                            value={zoneConfig.color || "#8b7d6b"}
+                            value={zoneConfig.color || "#7888a0"}
                             onChange={(e) => updateZone(zone.id, { color: e.target.value })}
                             style={styles.colorInput}
                           />
@@ -597,7 +601,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                                 fontSize: mFs,
                                 padding: isMobile ? "4px 8px" : "2px 5px",
                                 color: c.btnText,
-                                background: darkMode ? c.btnBg : "#f0e8dc",
+                                background: darkMode ? c.btnBg : "#e8edf2",
                                 borderColor: c.btnBorder,
                                 ...(zoneConfig.preset === key ? { background: c.activeBg, borderColor: c.activeBorder, color: c.activeText } : {}),
                               }}
@@ -663,9 +667,9 @@ const styles = {
 
   title: {
     margin: 0,
-    fontSize: 9,
-    fontWeight: 400,
-    color: "#7a5a1a",
+    fontSize: 11,
+    fontWeight: 600,
+    color: "#5a4010",
     letterSpacing: "0.2em",
     textTransform: "uppercase",
     display: "flex",
@@ -689,8 +693,8 @@ const styles = {
   },
 
   selectHint: {
-    fontSize: 9,
-    color: "#9e8e78",
+    fontSize: 11,
+    color: "#6e6050",
     textAlign: "center",
     padding: "8px 0 4px",
     letterSpacing: "0.06em",
@@ -704,8 +708,8 @@ const styles = {
 
   presetLabel: {
     display: "block",
-    fontSize: 7,
-    color: "#9e8e78",
+    fontSize: 10,
+    color: "#6e6050",
     letterSpacing: "0.15em",
     marginBottom: 5,
     fontFamily: "'Share Tech Mono', monospace",
@@ -722,9 +726,9 @@ const styles = {
     background: "rgba(180,160,130,0.1)",
     border: "1px solid #c8bfb0",
     borderRadius: 2,
-    color: "#6b5b47",
+    color: "#504030",
     fontFamily: "'Share Tech Mono', monospace",
-    fontSize: 7,
+    fontSize: 10,
     letterSpacing: "0.08em",
     cursor: "pointer",
     transition: "all 0.15s",
@@ -763,22 +767,22 @@ const styles = {
 
   zoneName: {
     flex: 1,
-    fontSize: 9,
-    color: "#6b5b47",
+    fontSize: 11,
+    color: "#504030",
     letterSpacing: "0.06em",
     fontFamily: "'Share Tech Mono', monospace",
   },
 
   zonePreset: {
-    fontSize: 7,
-    color: "#9e8e78",
+    fontSize: 10,
+    color: "#6e6050",
     letterSpacing: "0.06em",
     fontFamily: "'Share Tech Mono', monospace",
   },
 
   zoneChevron: {
-    fontSize: 8,
-    color: "#9e8e78",
+    fontSize: 10,
+    color: "#6e6050",
     width: 10,
     textAlign: "center",
   },
@@ -797,8 +801,8 @@ const styles = {
 
   editorLabel: {
     display: "block",
-    fontSize: 7,
-    color: "#9e8e78",
+    fontSize: 10,
+    color: "#6e6050",
     letterSpacing: "0.15em",
     marginBottom: 3,
     fontFamily: "'Share Tech Mono', monospace",
@@ -821,9 +825,9 @@ const styles = {
   },
 
   colorHex: {
-    fontSize: 9,
+    fontSize: 11,
     fontFamily: "'Share Tech Mono', monospace",
-    color: "#6b5b47",
+    color: "#504030",
     letterSpacing: "0.04em",
   },
 
@@ -832,9 +836,9 @@ const styles = {
     background: "none",
     border: "1px solid #c8bfb0",
     borderRadius: 2,
-    color: "#9e8e78",
+    color: "#6e6050",
     fontFamily: "'Share Tech Mono', monospace",
-    fontSize: 7,
+    fontSize: 10,
     cursor: "pointer",
     letterSpacing: "0.08em",
   },
@@ -850,9 +854,9 @@ const styles = {
     background: "#f0e8dc",
     border: "1px solid #c8bfb0",
     borderRadius: 2,
-    color: "#6b5b47",
+    color: "#504030",
     fontFamily: "'Share Tech Mono', monospace",
-    fontSize: 7,
+    fontSize: 10,
     cursor: "pointer",
     transition: "all 0.15s",
     letterSpacing: "0.04em",
@@ -880,9 +884,9 @@ const styles = {
     background: "#d4a854",
     border: "1px solid #b8922e",
     borderRadius: 2,
-    color: "#3e2e10",
+    color: "#2e2010",
     fontFamily: "'Share Tech Mono', monospace",
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: 600,
     letterSpacing: "0.12em",
     textTransform: "uppercase",
@@ -892,11 +896,11 @@ const styles = {
   signUploadBtn: {
     padding: "3px 7px",
     background: "rgba(180,160,130,0.1)",
-    border: "1px solid #c8bfb0",
+    border: "1px solid #b8c4ce",
     borderRadius: 2,
-    color: "#6b5b47",
+    color: "#3a4a58",
     fontFamily: "'Share Tech Mono', monospace",
-    fontSize: 7,
+    fontSize: 10,
     letterSpacing: "0.08em",
     cursor: "pointer",
     transition: "all 0.15s",
@@ -924,7 +928,7 @@ const addonStyles = {
     background: "rgba(184,146,46,0.1)",
     border: "1px solid #c8b080",
     borderRadius: 2,
-    color: "#9e8e78",
+    color: "#5a6a78",
     fontFamily: "'Share Tech Mono', monospace",
   },
   slotCell: {
@@ -934,13 +938,13 @@ const addonStyles = {
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    border: "1px solid #d4c8b4",
+    border: "1px solid #c4cdd6",
     borderRadius: 2,
     transition: "all 0.15s",
     fontFamily: "'Share Tech Mono', monospace",
   },
   picker: {
-    background: "rgba(245,239,230,0.98)",
+    background: "rgba(240,243,246,0.98)",
     border: "1px solid #c8b080",
     borderRadius: 3,
     padding: "6px 8px",
@@ -961,9 +965,9 @@ const addonStyles = {
     background: "none",
     border: "1px solid transparent",
     borderRadius: 2,
-    color: "#6b5b47",
+    color: "#3a4a58",
     fontFamily: "'Share Tech Mono', monospace",
-    fontSize: 7,
+    fontSize: 10,
     letterSpacing: "0.06em",
     cursor: "pointer",
     textAlign: "left",
@@ -974,7 +978,7 @@ const addonStyles = {
 const mStyles = {
   section: {
     padding: "12px 12px",
-    borderBottom: "1px solid #d4c8b4",
+    borderBottom: "1px solid #c4cdd6",
   },
   title: {
     ...styles.title,

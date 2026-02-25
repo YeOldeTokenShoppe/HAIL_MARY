@@ -9,9 +9,12 @@ import CleanCanvas from "@/components/canvas/CleanCanvas";
 import OilVoxelGrid, { CctvRenderer } from "@/components/OilVoxelGrid";
 import { generateOilDistribution3D } from "@/lib/oilDistribution";
 import PimpMyPumpPanel, { getDefaultPumpConfig } from "@/components/PimpMyPumpPanel";
+import HowToPlayPanel from "@/components/HowToPlayPanel";
 import { useUser } from "@clerk/nextjs";
 import { useMusic } from "@/components/MusicContext";
 import NavControlsHome from "@/components/NavControlsHome";
+import MobileBottomNav from "@/components/MobileBottomNav";
+import ThirdwebBuyModal from "@/components/ThirdwebBuyModal";
 import CyberNav from "@/components/CyberNav";
 import PolaroidSnapshot from "@/components/PolaroidSnapshot";
 import Fireworks from "@/components/Fireworks";
@@ -27,33 +30,33 @@ const ENV_PRESETS = {
 // ── Theme color maps (UI only — 3D canvas unaffected) ────────────────────────
 const THEMES = {
   light: {
-    bg: "#f5efe6", text: "#5a4e3e", textStrong: "#3e2e10", accent: "#7a5a1a",
-    muted: "#9e8e78", border: "#d4c8b4", borderLight: "#c8bfb0",
+    bg: "#f5efe6", text: "#44392c", textStrong: "#2e2010", accent: "#5a4010",
+    muted: "#6e6050", border: "#d4c8b4", borderLight: "#c8bfb0",
     panelBg: "rgba(245,239,230,0.95)", headerBg: "rgba(245,239,230,0.97)",
     inputBg: "#f0e8dc", barBg: "#e8e0d4", tintBg: "rgba(180,160,130,0.08)",
-    green: "#5a8a3a", greenBg: "rgba(90,138,58,0.06)",
-    warn: "#a05030", red: "#c04040",
+    green: "#3a7a20", greenBg: "rgba(90,138,58,0.06)",
+    warn: "#903820", red: "#b03030",
     gold: "#d4a854", goldBorder: "#b8922e",
     scanline: "rgba(0,0,0,0.02)",
-    statusText: "#7a8a6a", seedLabel: "#8b7355", seedValue: "#8b7d6b",
-    rankClaim: "#6b5b47", rankOil: "#5a4e3e", rankBarBg: "#e0d8cc",
-    inspectorKey: "#8b7d6b", depthUndrilled: "#b0a890",
-    btnText: "#6b5b47", btnBg: "rgba(180,160,130,0.1)",
+    statusText: "#4a6a30", seedLabel: "#5e5040", seedValue: "#5e5040",
+    rankClaim: "#504030", rankOil: "#44392c", rankBarBg: "#e0d8cc",
+    inspectorKey: "#5e5040", depthUndrilled: "#7e7560",
+    btnText: "#504030", btnBg: "rgba(180,160,130,0.1)",
     cornerBorder: "rgba(139,105,20,0.3)",
   },
   dark: {
-    bg: "#1a1a1f", text: "#c8c0b4", textStrong: "#e8e0d4", accent: "#d4a854",
-    muted: "#8a8070", border: "#333038", borderLight: "#2a2830",
-    panelBg: "rgba(26,26,31,0.95)", headerBg: "rgba(26,26,31,0.97)",
-    inputBg: "#252530", barBg: "#2a2a34", tintBg: "rgba(100,90,70,0.1)",
-    green: "#7aaa5a", greenBg: "rgba(90,138,58,0.1)",
+    bg: "#12161c", text: "#b0bcc8", textStrong: "#d4dce4", accent: "#d4a854",
+    muted: "#6a7888", border: "#242c38", borderLight: "#1e2630",
+    panelBg: "rgba(18,22,28,0.95)", headerBg: "rgba(18,22,28,0.97)",
+    inputBg: "#1a2028", barBg: "#1e2630", tintBg: "rgba(80,120,160,0.06)",
+    green: "#6aaa6a", greenBg: "rgba(90,138,90,0.1)",
     warn: "#cc7755", red: "#e06060",
     gold: "#d4a854", goldBorder: "#b8922e",
     scanline: "rgba(255,255,255,0.02)",
-    statusText: "#8aaa6a", seedLabel: "#8a8070", seedValue: "#9a9080",
-    rankClaim: "#a09888", rankOil: "#c8c0b4", rankBarBg: "#333038",
-    inspectorKey: "#9a9080", depthUndrilled: "#555050",
-    btnText: "#c8c0b4", btnBg: "rgba(100,90,70,0.15)",
+    statusText: "#7aaa7a", seedLabel: "#6a7888", seedValue: "#7a8898",
+    rankClaim: "#8a98a8", rankOil: "#b0bcc8", rankBarBg: "#242c38",
+    inspectorKey: "#7a8898", depthUndrilled: "#404a58",
+    btnText: "#b0bcc8", btnBg: "rgba(80,120,160,0.12)",
     cornerBorder: "rgba(212,168,84,0.2)",
   },
 };
@@ -126,18 +129,18 @@ const SkyDome = memo(function SkyDome({ skyColor = "#7da4c9", skyBottom = null, 
 const OilSurfaceMap = dynamic(() => import("@/components/OilSurfaceMap"), { ssr: false });
 const OilCrossSection = dynamic(() => import("@/components/OilCrossSection"), { ssr: false });
 const OilVerifyPanel = dynamic(() => import("@/components/OilVerifyPanel"), { ssr: false });
+const OilTicketSale = dynamic(() => import("@/components/OilTicketSale"), { ssr: false });
+const OilPlotDraft = dynamic(() => import("@/components/OilPlotDraft"), { ssr: false });
 
 const DEFAULT_BLOCK_HASH =
   "0x8a3f7b2c91d4e6f5a0b3c8d7e2f1a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0";
 
-const GRID_X = 10;
-const GRID_Y = 10;
 const DEPTH_Z = 20;
 const CELL_SIZE = 1;
 const TANK_CAPACITY = 100_000;
 
 // Continuous orbit exactly like the Three.js horse example. Stops when user interacts.
-function CameraFlyIn({ onComplete }) {
+function CameraFlyIn({ onComplete, mobile = false }) {
   const { camera, gl } = useThree();
   const elapsed = useRef(0);
   const done = useRef(false);
@@ -165,15 +168,25 @@ function CameraFlyIn({ onComplete }) {
     elapsed.current += delta;
     const time = elapsed.current;
 
-    // Exactly like the Three.js example, scaled to this scene:
-    // Scene is a 10x10 grid centered at origin, surface at y≈5
-    const r = 8;
-    camera.position.set(
-      Math.sin(time / 10) * r,
-      7 + 1.5 * Math.cos(time / 5),
-      Math.cos(time / 10) * r,
-    );
-    camera.lookAt(0, 5, 0);
+    if (mobile) {
+      // Mobile: closer orbit among the rigs, like the Three.js horse example
+      const r = 4;
+      camera.position.set(
+        Math.sin(time / 10) * r,
+        3 + 0.8 * Math.cos(time / 5),
+        Math.cos(time / 10) * r,
+      );
+      camera.lookAt(0, 2, 0);
+    } else {
+      // Desktop: wider establishing shot
+      const r = 8;
+      camera.position.set(
+        Math.sin(time / 10) * r,
+        7 + 1.5 * Math.cos(time / 5),
+        Math.cos(time / 10) * r,
+      );
+      camera.lookAt(0, 5, 0);
+    }
   });
 
   return null;
@@ -205,8 +218,8 @@ function CameraFlyTo({ target, controlsRef }) {
 
         if (target.mobile) {
           // Mobile: close ground-level view of the rig
-          endTarget.current.set(target.x, target.y, target.z);
-          endPos.current.set(target.x + 0.35, target.y + 0.15, target.z + 0.35);
+          endTarget.current.set(target.x, target.y - 0.1, target.z);
+          endPos.current.set(target.x + 0.35, target.y - 0.05, target.z + 0.35);
         } else {
           // Desktop: elevated close-up
           endTarget.current.set(target.x, target.y - 0.05, target.z);
@@ -278,12 +291,12 @@ function CameraShake({ shakeRef }) {
   return null;
 }
 
-function useClaimStats(blockHash, numberOfDeposits, totalOilBudget) {
+function useClaimStats(blockHash, numberOfDeposits, totalOilBudget, gridX, gridY) {
   return useMemo(() => {
     const { grid, deposits, maxOil } = generateOilDistribution3D({
       blockHash,
-      gridX: GRID_X,
-      gridY: GRID_Y,
+      gridX,
+      gridY,
       depthZ: DEPTH_Z,
       totalOilBudget,
       numberOfDeposits,
@@ -293,13 +306,13 @@ function useClaimStats(blockHash, numberOfDeposits, totalOilBudget) {
     const claimTotals = [];
     let totalOil = 0;
     let maxClaimTotal = 0;
-    for (let y = 0; y < GRID_Y; y++) {
-      for (let x = 0; x < GRID_X; x++) {
+    for (let y = 0; y < gridY; y++) {
+      for (let x = 0; x < gridX; x++) {
         let sum = 0;
         for (let z = 0; z < DEPTH_Z; z++) {
           sum += grid[x][y][z];
         }
-        claimTotals.push({ x, y, index: y * GRID_X + x, claim: y * GRID_X + x + 1, oil: sum, total: sum });
+        claimTotals.push({ x, y, index: y * gridX + x, claim: y * gridX + x + 1, oil: sum, total: sum });
         totalOil += sum;
         if (sum > maxClaimTotal) maxClaimTotal = sum;
       }
@@ -309,7 +322,7 @@ function useClaimStats(blockHash, numberOfDeposits, totalOilBudget) {
     const dryClaims = claimTotals.filter((c) => c.oil === 0).length;
 
     return { grid3D: grid, claimTotals, sorted, deposits, maxOil, totalOil, dryClaims, maxClaimTotal };
-  }, [blockHash, numberOfDeposits, totalOilBudget]);
+  }, [blockHash, numberOfDeposits, totalOilBudget, gridX, gridY]);
 }
 
 // Animated number counter
@@ -373,8 +386,10 @@ export default function OilPage() {
   const { user } = useUser();
   const { play, pause, isPlaying: contextIsPlaying, nextTrack } = useMusic();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showBuyModal, setShowBuyModal] = useState(false);
 
   // Game state
+  const [gamePhase, setGamePhase] = useState("active");
   const [gameEnded, setGameEnded] = useState(false);
   const [gameDay, setGameDay] = useState(1);
 
@@ -421,6 +436,7 @@ export default function OilPage() {
   const [introComplete, setIntroComplete] = useState(false);
   const [numberOfDeposits, setNumberOfDeposits] = useState(8);
   const [totalOilBudget, setTotalOilBudget] = useState(100_000_000);
+  const [gridSize, setGridSize] = useState(10);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   // ── Firestore game settings sync ──
@@ -435,6 +451,8 @@ export default function OilPage() {
         if (d.totalOilBudget) setTotalOilBudget(d.totalOilBudget);
         if (typeof d.gameEnded === "boolean") setGameEnded(d.gameEnded);
         if (typeof d.gameDay === "number") setGameDay(d.gameDay);
+        if (typeof d.gridSize === "number") setGridSize(d.gridSize);
+        if (d.gamePhase) setGamePhase(d.gamePhase);
       }
       setSettingsLoaded(true);
     });
@@ -461,15 +479,17 @@ export default function OilPage() {
         blockHash,
         numberOfDeposits,
         totalOilBudget,
+        gridSize,
+        gamePhase,
         gameEnded,
         gameDay,
         updatedAt: serverTimestamp(),
         ...overrides,
-      });
+      }, { merge: true });
     } catch (err) {
       console.error("Failed to save game settings:", err);
     }
-  }, [isAdmin, adminAuthed, blockHash, numberOfDeposits, totalOilBudget, gameEnded, gameDay]);
+  }, [isAdmin, adminAuthed, blockHash, numberOfDeposits, totalOilBudget, gridSize, gamePhase, gameEnded, gameDay]);
 
   // Mobile tab view
   const [mobileTab, setMobileTab] = useState("3d"); // "3d" | "surface" | "xsec"
@@ -650,7 +670,7 @@ export default function OilPage() {
   const controlsRef = useRef();
   const controlsRefMobile = useRef();
 
-  const stats = useClaimStats(blockHash, numberOfDeposits, totalOilBudget);
+  const stats = useClaimStats(blockHash, numberOfDeposits, totalOilBudget, gridSize, gridSize);
 
   // In active game mode, hide oil data from 2D views
   const showOilData = isAdmin || isReport;
@@ -662,14 +682,14 @@ export default function OilPage() {
 
   const blankGrid3D = useMemo(() => {
     const g = [];
-    for (let x = 0; x < GRID_X; x++) {
+    for (let x = 0; x < gridSize; x++) {
       g[x] = [];
-      for (let y = 0; y < GRID_Y; y++) {
+      for (let y = 0; y < gridSize; y++) {
         g[x][y] = new Array(DEPTH_Z).fill(0);
       }
     }
     return g;
-  }, []);
+  }, [gridSize]);
 
   // Depth-limited grid: only reveals the player's drilled column up to effectiveDrillDay
   const playerGrid3D = useMemo(() => {
@@ -706,10 +726,10 @@ export default function OilPage() {
   }, [activeUserDrill, effectiveDrillDay, stats.grid3D]);
 
   const hitRate = stats.claimTotals.length > 0
-    ? Math.round(((GRID_X * GRID_Y - stats.dryClaims) / (GRID_X * GRID_Y)) * 100)
+    ? Math.round(((gridSize * gridSize - stats.dryClaims) / (gridSize * gridSize)) * 100)
     : 0;
 
-  const selectedClaimIndex = selectedX !== null ? sliceY * GRID_X + selectedX : null;
+  const selectedClaimIndex = selectedX !== null ? sliceY * gridSize + selectedX : null;
 
   // Session-local drain tracking
   const [tankDrained, setTankDrained] = useState(false);
@@ -879,8 +899,8 @@ export default function OilPage() {
 
   const flyIdRef = useRef(0);
   const handleFlyTo = useCallback((col, row) => {
-    const worldW = GRID_X * CELL_SIZE;
-    const worldD = GRID_Y * CELL_SIZE;
+    const worldW = gridSize * CELL_SIZE;
+    const worldD = gridSize * CELL_SIZE;
     const x = -worldW / 2 + col * CELL_SIZE + CELL_SIZE / 2;
     const z = worldD / 2 - row * CELL_SIZE - CELL_SIZE / 2;
     flyIdRef.current++;
@@ -888,7 +908,9 @@ export default function OilPage() {
     setSelectedX(col);
     setSliceY(row);
     setDrillDepth(0);
-  }, [isMobile]);
+  }, [isMobile, gridSize]);
+
+
 
   const handleSelectClaim = useCallback((claim) => {
     setSelectedX(claim.x);
@@ -982,7 +1004,7 @@ export default function OilPage() {
       <div style={styles.paramRow}>
         <span style={styles.paramLabel}>DEPOSITS</span>
         <div style={styles.paramButtons}>
-          {[3, 5, 8, 12, 16].map((n) => (
+          {[1, 2, 3, 5, 8, 12, 16].map((n) => (
             <button
               key={n}
               onClick={() => { setNumberOfDeposits(n); handleReset(); saveGameSettings({ numberOfDeposits: n }); }}
@@ -1009,6 +1031,23 @@ export default function OilPage() {
               }}
             >
               {`${n / 1_000_000}M`}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={styles.paramRow}>
+        <span style={styles.paramLabel}>GRID SIZE</span>
+        <div style={styles.paramButtons}>
+          {[6, 7, 8, 9, 10].map((n) => (
+            <button
+              key={n}
+              onClick={() => { setGridSize(n); handleReset(); saveGameSettings({ gridSize: n }); }}
+              style={{
+                ...styles.paramBtn,
+                ...(gridSize === n ? styles.paramBtnActive : {}),
+              }}
+            >
+              {n}
             </button>
           ))}
         </div>
@@ -1067,7 +1106,7 @@ export default function OilPage() {
             ...styles.paramBtn,
             ...styles.paramBtnActive,
             padding: "4px 10px",
-            fontSize: 9,
+            fontSize: 10,
             minWidth: 50,
           }}
         >
@@ -1084,7 +1123,7 @@ export default function OilPage() {
         </span>
         <button
           onClick={() => { setDemoDay(0); setDemoPlaying(false); }}
-          style={{ ...styles.paramBtn, padding: "4px 8px", fontSize: 8 }}
+          style={{ ...styles.paramBtn, padding: "4px 8px", fontSize: 10 }}
         >
           RESET
         </button>
@@ -1105,7 +1144,7 @@ export default function OilPage() {
         }}
       />
       {selectedX !== null && (
-        <div style={{ fontSize: 9, color: theme.accent, marginTop: 6 }}>
+        <div style={{ fontSize: 11, color: theme.accent, marginTop: 6 }}>
           SELECTED: ({selectedX}, {sliceY}) — click map to change
         </div>
       )}
@@ -1118,8 +1157,8 @@ export default function OilPage() {
       <div style={isMobile ? m.statGrid : styles.statGrid}>
         <StatBlock s={styles} accentColor={theme.accent} label="TOTAL OIL" value={<AnimNum value={stats.totalOil} />} unit="RL80" accent />
         <StatBlock s={styles} accentColor={theme.accent} label="DEPOSITS" value={stats.deposits.length} />
-        <StatBlock s={styles} accentColor={theme.accent} label="CLAIMS" value={GRID_X * GRID_Y} />
-        <StatBlock s={styles} accentColor={theme.accent} label="DEPTH" value={DEPTH_Z} unit="LVL" />
+        <StatBlock s={styles} accentColor={theme.accent} label="CLAIMS" value={gridSize * gridSize} />
+        <StatBlock s={styles} accentColor={theme.accent} label="% COLLECTED" value={stats.totalOil > 0 ? `${(playerExtracted / stats.totalOil * 100).toFixed(2)}%` : "0%"} accent={playerExtracted > 0} />
         {!isAdmin && !isReport && effectiveDrillDay > 0 && (
           <>
             <StatBlock s={styles} accentColor={theme.accent} label="YOUR DEPTH" value={`${effectiveDrillDay}/${DEPTH_Z}`} unit="LVL" accent />
@@ -1163,7 +1202,7 @@ export default function OilPage() {
             <div style={styles.inspectorRow}>
               <span style={styles.inspectorKey}>Rank:</span>
               <span style={styles.inspectorVal}>
-                #{stats.sorted.findIndex(r => r.index === selectedClaimIndex) + 1} of {GRID_X * GRID_Y}
+                #{stats.sorted.findIndex(r => r.index === selectedClaimIndex) + 1} of {gridSize * gridSize}
               </span>
             </div>
           </div>
@@ -1433,7 +1472,7 @@ export default function OilPage() {
           width: "90%",
           textAlign: "center",
         }}>
-          <div style={{ fontSize: 9, letterSpacing: "0.2em", color: theme.muted, marginBottom: 8 }}>OIL PROSPECTOR</div>
+          <div style={{ fontSize: 11, letterSpacing: "0.2em", color: theme.muted, marginBottom: 8 }}>OIL PROSPECTOR</div>
           <h2 style={{
             fontFamily: "'Orbitron', monospace",
             fontSize: 16,
@@ -1484,6 +1523,61 @@ export default function OilPage() {
     );
   }
 
+  // ── Pre-game phase gates ──
+  if (gamePhase === "ticket_sale") {
+    return (
+      <OilTicketSale
+        theme={theme}
+        darkMode={darkMode}
+        isMobile={isMobile}
+        user={user}
+        isAdmin={isAdmin && adminAuthed}
+        gridSize={gridSize}
+        saveGameSettings={saveGameSettings}
+        setGridSize={setGridSize}
+      />
+    );
+  }
+
+  if (gamePhase === "grid_locked") {
+    return (
+      <OilPlotDraft
+        theme={theme}
+        darkMode={darkMode}
+        isMobile={isMobile}
+        user={user}
+        isAdmin={isAdmin && adminAuthed}
+        gridSize={gridSize}
+        saveGameSettings={saveGameSettings}
+      />
+    );
+  }
+
+  // Phase override buttons (admin only, visible in active/ended phases)
+  const phaseOverrideButtons = isAdmin && (
+    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+      <span style={{ fontSize: 9, letterSpacing: "0.1em", color: theme.muted }}>PHASE:</span>
+      {["ticket_sale", "grid_locked", "active", "ended"].map((p) => (
+        <button
+          key={p}
+          onClick={() => saveGameSettings({ gamePhase: p })}
+          style={{
+            padding: "3px 8px",
+            border: `1px solid ${gamePhase === p ? theme.gold : theme.border}`,
+            borderRadius: 3,
+            fontFamily: "'Share Tech Mono', monospace",
+            fontSize: 9,
+            cursor: "pointer",
+            background: gamePhase === p ? `${theme.gold}22` : "transparent",
+            color: gamePhase === p ? theme.gold : theme.muted,
+          }}
+        >
+          {p.toUpperCase().replace("_", " ")}
+        </button>
+      ))}
+    </div>
+  );
+
   // End Game button (admin only)
   const endGameButton = isAdmin && !gameEnded && (
     <button
@@ -1515,7 +1609,7 @@ export default function OilPage() {
       borderRadius: 3,
       color: theme.red,
       fontFamily: "'Share Tech Mono', monospace",
-      fontSize: 10,
+      fontSize: 11,
       letterSpacing: "0.1em",
     }}>
       GAME ENDED — <a href="/oil?mode=report" style={{ color: theme.accent, textDecoration: "underline" }}>VIEW REPORT</a>
@@ -1529,7 +1623,7 @@ export default function OilPage() {
       background: isAdmin ? "rgba(160,48,48,0.15)" : "rgba(90,138,58,0.15)",
       border: `1px solid ${isAdmin ? "rgba(160,48,48,0.3)" : "rgba(90,138,58,0.3)"}`,
       borderRadius: 3,
-      fontSize: 8,
+      fontSize: 10,
       letterSpacing: "0.15em",
       color: isAdmin ? theme.red : theme.green,
       marginLeft: 8,
@@ -1538,8 +1632,8 @@ export default function OilPage() {
     </span>
   );
 
-  // ── Daily Drill Button (active mode only) ──
-  const drillButton = !isAdmin && !isReport && (
+  // ── Daily Drill Button (active mode only, not test mode) ──
+  const drillButton = !isAdmin && !isReport && !isTest && (
     <div style={{
       padding: "10px 14px",
       borderBottom: `1px solid ${theme.border}`,
@@ -1605,7 +1699,7 @@ export default function OilPage() {
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
         <span style={{
-          fontSize: 9, letterSpacing: "0.15em", color: theme.green,
+          fontSize: 11, letterSpacing: "0.15em", color: theme.green,
           fontFamily: "'Share Tech Mono', monospace",
         }}>
           TEST MODE
@@ -1652,7 +1746,7 @@ export default function OilPage() {
         </button>
       </div>
       {selectedX === null && (
-        <div style={{ fontSize: 9, color: theme.accent, marginTop: 6, fontFamily: "'Share Tech Mono', monospace" }}>
+        <div style={{ fontSize: 11, color: theme.accent, marginTop: 6, fontFamily: "'Share Tech Mono', monospace" }}>
           Click a cell on the map to start testing
         </div>
       )}
@@ -1666,10 +1760,10 @@ export default function OilPage() {
         YOUR CLAIM ({activeUserDrill.col}, {activeUserDrill.row})
       </h3>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-        <span style={{ fontSize: 10, letterSpacing: "0.1em", color: theme.green }}>
+        <span style={{ fontSize: 11, letterSpacing: "0.1em", color: theme.green }}>
           EXTRACTED: {playerExtracted.toLocaleString()} RL80
         </span>
-        <span style={{ fontSize: 9, letterSpacing: "0.1em", color: theme.accent }}>
+        <span style={{ fontSize: 11, letterSpacing: "0.1em", color: theme.accent }}>
           DEPTH {effectiveDrillDay}/{DEPTH_Z}
         </span>
       </div>
@@ -1678,7 +1772,7 @@ export default function OilPage() {
         <div style={{ marginBottom: 8, padding: "6px 0" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
             <span style={{
-              fontSize: 8, letterSpacing: "0.15em", fontFamily: "'Share Tech Mono', monospace",
+              fontSize: 10, letterSpacing: "0.15em", fontFamily: "'Share Tech Mono', monospace",
               color: reviewDay !== null ? theme.gold : theme.muted,
             }}>
               {reviewDay !== null ? `REVIEWING DAY ${reviewDay}` : "LIVE"}
@@ -1688,7 +1782,7 @@ export default function OilPage() {
                 onClick={() => setReviewDay(null)}
                 style={{
                   background: theme.accent, color: "#000", border: "none", borderRadius: 2,
-                  fontSize: 8, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 8px",
+                  fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", padding: "2px 8px",
                   cursor: "pointer", fontFamily: "'Share Tech Mono', monospace",
                 }}
               >
@@ -1717,8 +1811,8 @@ export default function OilPage() {
         <div style={{
           display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 3,
         }}>
-          <span style={{ fontSize: 9, letterSpacing: "0.12em", color: theme.accent }}>TANK</span>
-          <span style={{ fontSize: 9, letterSpacing: "0.08em", color: tankFill >= 1.0 && !tankDrained ? theme.red : theme.muted }}>
+          <span style={{ fontSize: 11, letterSpacing: "0.12em", color: theme.accent }}>TANK</span>
+          <span style={{ fontSize: 11, letterSpacing: "0.08em", color: tankFill >= 1.0 && !tankDrained ? theme.red : theme.muted }}>
             {tankDrained ? 0 : oilInTank.toLocaleString()} / {TANK_CAPACITY.toLocaleString()}
           </span>
         </div>
@@ -1739,7 +1833,7 @@ export default function OilPage() {
         </div>
         {tankFill >= 1.0 && !tankDrained && (
           <div style={{
-            fontSize: 8, letterSpacing: "0.12em", color: theme.red, marginTop: 4, textAlign: "center",
+            fontSize: 10, letterSpacing: "0.12em", color: theme.red, marginTop: 4, textAlign: "center",
             animation: "tankPulse 1.2s ease-in-out infinite",
             fontWeight: 700,
           }}>
@@ -1747,7 +1841,7 @@ export default function OilPage() {
           </div>
         )}
         {tankDrained && (
-          <div style={{ fontSize: 8, letterSpacing: "0.15em", color: theme.green, marginTop: 2, textAlign: "right" }}>
+          <div style={{ fontSize: 10, letterSpacing: "0.15em", color: theme.green, marginTop: 2, textAlign: "right" }}>
             SENT TO COMMUNITY STORAGE
           </div>
         )}
@@ -1758,10 +1852,10 @@ export default function OilPage() {
           display: "flex", justifyContent: "space-between", alignItems: "baseline",
           padding: "6px 0", marginBottom: 6, borderTop: `1px solid ${theme.barBg}`,
         }}>
-          <span style={{ fontSize: 9, letterSpacing: "0.1em", color: theme.accent }}>
+          <span style={{ fontSize: 11, letterSpacing: "0.1em", color: theme.accent }}>
             SENT TO STORAGE
           </span>
-          <span style={{ fontSize: 10, letterSpacing: "0.08em", color: theme.green, fontWeight: 700 }}>
+          <span style={{ fontSize: 11, letterSpacing: "0.08em", color: theme.green, fontWeight: 700 }}>
             {(activeUserDrill.totalCollected || 0).toLocaleString()} RL80
           </span>
         </div>
@@ -1835,22 +1929,7 @@ export default function OilPage() {
               <p style={styles.subtitle}>OIL PROSPECTOR</p>
             </div>
           </div>
-          <div style={styles.headerRight}>
-            <NavControlsHome
-              isPlaying={contextIsPlaying}
-              onPlayMusic={() => play()}
-              onStopMusic={() => pause()}
-              onSkipTrack={() => nextTrack()}
-              onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
-              onUserClick={() => {}}
-              isUserSignedIn={!!user}
-              isMenuOpen={isMenuOpen}
-              userImage={user?.imageUrl}
-              isMobile
-              show80sButton={false}
-              hideMusicOnMobile
-            />
-          </div>
+          <div style={styles.headerRight} />
         </header>
 
         {/* Seed bar — admin/report only */}
@@ -1892,9 +1971,9 @@ export default function OilPage() {
         <div style={m.scroll}>
           {/* 3D Voxel */}
           {mobileTab === "3d" && (
-            <div id="oil-canvas" style={m.canvasWrap}>
+            <div id="oil-canvas" style={{ ...m.canvasWrap, marginBottom: -60 }}>
               <CleanCanvas
-                camera={{ position: [0, 8, 8], fov: 50 }}
+                camera={{ position: [0, 3.5, 4], fov: 50 }}
                 style={{ width: "100%", height: "100%" }}
                 gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
               >
@@ -1911,6 +1990,8 @@ export default function OilPage() {
                     blockHash={blockHash}
                     numberOfDeposits={numberOfDeposits}
                     totalOilBudget={totalOilBudget}
+                    gridX={gridSize}
+                    gridY={gridSize}
                     revealProgress={revealProgress}
                     animateReveal={animateReveal}
                     revealDuration={2}
@@ -1944,7 +2025,7 @@ export default function OilPage() {
                     <CameraFlyTo target={flyTarget} controlsRef={controlsRefMobile} />
                   </>
                 ) : (
-                  <CameraFlyIn onComplete={() => setIntroComplete(true)} duration={5} />
+                  <CameraFlyIn onComplete={() => setIntroComplete(true)} mobile />
                 )}
                 <CameraShake shakeRef={shakeRef} />
               </CleanCanvas>
@@ -1954,7 +2035,7 @@ export default function OilPage() {
               <div style={{ ...styles.cornerBracket, bottom: 6, left: 6, transform: "scaleY(-1)" }} />
               <div style={{ ...styles.cornerBracket, bottom: 6, right: 6, transform: "scale(-1)" }} />
               <div style={styles.gridLabel}>
-                {GRID_X}&times;{GRID_Y}&times;{DEPTH_Z} VOXEL
+                {gridSize}&times;{gridSize}&times;{DEPTH_Z} VOXEL
               </div>
               <div style={{ position: "absolute", bottom: 10, right: 10, zIndex: 10, display: "flex", gap: 4 }}>
                 <button
@@ -2040,6 +2121,8 @@ export default function OilPage() {
                 selectedClaimIndex={selectedClaimIndex}
                 onSelectClaim={handleSelectClaim}
                 theme={theme}
+                gridX={gridSize}
+                gridY={gridSize}
               />
             </div>
           )}
@@ -2056,6 +2139,8 @@ export default function OilPage() {
                 onSelectX={handleSelectX}
                 onSliceY={handleSliceY}
                 theme={theme}
+                gridX={gridSize}
+                gridY={gridSize}
               />
             </div>
           )}
@@ -2071,7 +2156,8 @@ export default function OilPage() {
           {(isAdmin || isReport) && topClaimsPanel}
           {(isAdmin || isReport) && dryZonesPanel}
           {(isAdmin || isReport) && depositsPanel}
-          <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={!isAdmin && !isReport} />
+          <HowToPlayPanel isMobile darkMode={darkMode} />
+          <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} />
           {(isAdmin || isReport) && (
             <OilVerifyPanel
               numberOfDeposits={numberOfDeposits}
@@ -2084,12 +2170,40 @@ export default function OilPage() {
               {endGameButton}
             </div>
           )}
+          {phaseOverrideButtons && (
+            <div style={{ ...m.section, display: "flex", justifyContent: "center" }}>
+              {phaseOverrideButtons}
+            </div>
+          )}
           {gameEndedBanner && (
             <div style={{ ...m.section, display: "flex", justifyContent: "center" }}>
               {gameEndedBanner}
             </div>
           )}
         </div>
+
+        {/* Bottom Mobile Nav */}
+        <MobileBottomNav
+          isPlaying={contextIsPlaying}
+          onPlayMusic={() => play()}
+          onStopMusic={() => pause()}
+          onSkipTrack={() => nextTrack()}
+          onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
+          onUserClick={() => {}}
+          isUserSignedIn={!!user}
+          isMenuOpen={isMenuOpen}
+          userImage={user?.imageUrl}
+          onBuyClick={() => setShowBuyModal(true)}
+          isMobile
+          show80sButton={false}
+          darkMode={darkMode}
+        />
+
+        {/* Buy Modal */}
+        <ThirdwebBuyModal
+          isOpen={showBuyModal}
+          onClose={() => setShowBuyModal(false)}
+        />
 
         {/* CyberNav Menu Panel */}
         <CyberNav
@@ -2198,6 +2312,8 @@ export default function OilPage() {
                 blockHash={blockHash}
                 numberOfDeposits={numberOfDeposits}
                 totalOilBudget={totalOilBudget}
+                gridX={gridSize}
+                gridY={gridSize}
                 revealProgress={revealProgress}
                 animateReveal={animateReveal}
                 revealDuration={2}
@@ -2240,7 +2356,7 @@ export default function OilPage() {
           <div style={{ ...styles.cornerBracket, bottom: 8, left: 8, transform: "scaleY(-1)" }} />
           <div style={{ ...styles.cornerBracket, bottom: 8, right: 8, transform: "scale(-1)" }} />
           <div style={styles.gridLabel}>
-            {GRID_X}&times;{GRID_Y}&times;{DEPTH_Z} VOXEL GRID
+            {gridSize}&times;{gridSize}&times;{DEPTH_Z} VOXEL GRID
           </div>
           <div style={{ position: "absolute", bottom: 12, right: 12, zIndex: 10, display: "flex", gap: 4 }}>
             <button
@@ -2322,7 +2438,7 @@ export default function OilPage() {
                 borderRadius: 3,
                 color: theme.accent,
                 fontFamily: "'Share Tech Mono', monospace",
-                fontSize: 9,
+                fontSize: 11,
                 letterSpacing: "0.1em",
                 cursor: "pointer",
                 display: "flex",
@@ -2330,7 +2446,7 @@ export default function OilPage() {
                 gap: 5,
               }}
             >
-              {panelsCollapsed ? "◂ PANELS" : "EXPAND ▸"}
+              {panelsCollapsed ? "◂ PANELS" : "RETRACT ▸"}
             </button>
           </div>
         </div>
@@ -2345,6 +2461,8 @@ export default function OilPage() {
                 selectedClaimIndex={selectedClaimIndex}
                 onSelectClaim={handleSelectClaim}
                 theme={theme}
+                gridX={gridSize}
+                gridY={gridSize}
               />
             </div>
             <div style={{ ...styles.midPanel, flex: 1, minHeight: 0 }}>
@@ -2357,6 +2475,8 @@ export default function OilPage() {
                 onSelectX={handleSelectX}
                 onSliceY={handleSliceY}
                 theme={theme}
+                gridX={gridSize}
+                gridY={gridSize}
               />
             </div>
           </div>
@@ -2379,17 +2499,25 @@ export default function OilPage() {
             {(isAdmin || isReport) && topClaimsPanel}
             {(isAdmin || isReport) && dryZonesPanel}
             {(isAdmin || isReport) && depositsPanel}
-            <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={!isAdmin && !isReport} />
+            <HowToPlayPanel darkMode={darkMode} />
+            <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} />
             {(isAdmin || isReport) && (
               <OilVerifyPanel
                 numberOfDeposits={numberOfDeposits}
                 totalOilBudget={totalOilBudget}
                 onApplyHash={handleApplyHash}
+                gridX={gridSize}
+                gridY={gridSize}
               />
             )}
             {endGameButton && (
               <div style={{ ...styles.panelSection, display: "flex", justifyContent: "center" }}>
                 {endGameButton}
+              </div>
+            )}
+            {phaseOverrideButtons && (
+              <div style={{ ...styles.panelSection, display: "flex", justifyContent: "center" }}>
+                {phaseOverrideButtons}
               </div>
             )}
             {gameEndedBanner && (
@@ -2401,20 +2529,11 @@ export default function OilPage() {
         )}
       </div>
 
-      <div style={styles.controlBar}>
-        {isAdmin && controlButtons}
-        {selectedX !== null && (
-          <>
-            {isAdmin && <div style={{ width: 1, height: 28, background: theme.border, margin: "0 4px" }} />}
-            <button
-              onClick={() => { setSelectedX(null); setDrillDepth(0); }}
-              style={styles.btn}
-            >
-              ✕ DESELECT
-            </button>
-          </>
-        )}
-      </div>
+      {isAdmin && (
+        <div style={styles.controlBar}>
+          {controlButtons}
+        </div>
+      )}
 
       {/* CyberNav Menu Panel */}
       <CyberNav
@@ -2487,19 +2606,19 @@ function getDrillStyles(t) { return {
     cursor: "not-allowed",
   },
   depth: {
-    fontSize: 9,
+    fontSize: 11,
     fontFamily: "'Orbitron', monospace",
     color: t.accent,
     letterSpacing: "0.15em",
   },
   countdown: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: "'Share Tech Mono', monospace",
     color: t.muted,
     letterSpacing: "0.08em",
   },
   hint: {
-    fontSize: 8,
+    fontSize: 10,
     color: t.muted,
     letterSpacing: "0.08em",
   },
@@ -2650,7 +2769,7 @@ function getStyles(t) { return {
 
   subtitle: {
     margin: 0,
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: 400,
     color: t.muted,
     letterSpacing: "0.35em",
@@ -2691,7 +2810,7 @@ function getStyles(t) { return {
   },
 
   seedLabel: {
-    fontSize: 9,
+    fontSize: 11,
     color: t.seedLabel,
     letterSpacing: "0.12em",
     flexShrink: 0,
@@ -2711,7 +2830,7 @@ function getStyles(t) { return {
     display: "flex",
     alignItems: "center",
     gap: 4,
-    fontSize: 9,
+    fontSize: 11,
     color: t.green,
     letterSpacing: "0.08em",
     flexShrink: 0,
@@ -2784,8 +2903,8 @@ function getStyles(t) { return {
 
   panelTitle: {
     margin: "0 0 10px",
-    fontSize: 9,
-    fontWeight: 400,
+    fontSize: 11,
+    fontWeight: 600,
     color: t.accent,
     letterSpacing: "0.2em",
     textTransform: "uppercase",
@@ -2795,7 +2914,7 @@ function getStyles(t) { return {
   },
 
   rankIcon: {
-    fontSize: 8,
+    fontSize: 10,
     color: t.accent,
   },
 
@@ -2813,7 +2932,7 @@ function getStyles(t) { return {
   },
 
   statLabel: {
-    fontSize: 7,
+    fontSize: 10,
     color: t.muted,
     letterSpacing: "0.15em",
     marginBottom: 3,
@@ -2828,7 +2947,7 @@ function getStyles(t) { return {
   },
 
   statUnit: {
-    fontSize: 8,
+    fontSize: 10,
     color: t.muted,
     marginLeft: 3,
     fontWeight: 400,
@@ -2842,7 +2961,7 @@ function getStyles(t) { return {
   inspectorRow: {
     display: "flex",
     justifyContent: "space-between",
-    fontSize: 10,
+    fontSize: 11,
     marginBottom: 3,
   },
 
@@ -2853,7 +2972,7 @@ function getStyles(t) { return {
   inspectorVal: {
     color: t.accent,
     fontFamily: "'Orbitron', monospace",
-    fontSize: 10,
+    fontSize: 11,
   },
 
   drillBtn: {
@@ -2862,7 +2981,7 @@ function getStyles(t) { return {
     background: `linear-gradient(180deg, ${t.gold}, ${t.goldBorder})`,
     color: "#fff",
     border: `1px solid ${t.goldBorder}`,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: "bold",
     letterSpacing: "0.12em",
     cursor: "pointer",
@@ -2900,7 +3019,7 @@ function getStyles(t) { return {
 
   depthRowLabel: {
     width: 26,
-    fontSize: 10,
+    fontSize: 11,
     textAlign: "right",
   },
 
@@ -2914,12 +3033,12 @@ function getStyles(t) { return {
 
   depthRowVal: {
     width: 40,
-    fontSize: 10,
+    fontSize: 11,
     textAlign: "right",
   },
 
   emptyState: {
-    fontSize: 10,
+    fontSize: 11,
     color: t.muted,
     textAlign: "center",
     padding: "16px 0",
@@ -2936,26 +3055,26 @@ function getStyles(t) { return {
     gridTemplateColumns: "28px 1fr auto",
     alignItems: "center",
     gap: 6,
-    fontSize: 10,
+    fontSize: 11,
     padding: "3px 0",
   },
 
   rankNumber: {
     fontFamily: "'Orbitron', monospace",
     fontWeight: 700,
-    fontSize: 9,
+    fontSize: 11,
   },
 
   rankClaim: {
     color: t.rankClaim,
-    fontSize: 9,
+    fontSize: 11,
     letterSpacing: "0.06em",
   },
 
   rankOil: {
     color: t.rankOil,
     fontFamily: "'Orbitron', monospace",
-    fontSize: 9,
+    fontSize: 11,
     textAlign: "right",
   },
 
@@ -2984,15 +3103,15 @@ function getStyles(t) { return {
     display: "flex",
     alignItems: "center",
     gap: 6,
-    fontSize: 9,
+    fontSize: 11,
     padding: "2px 0",
   },
 
   depositIndex: {
     color: t.accent,
     fontFamily: "'Orbitron', monospace",
-    fontSize: 8,
-    opacity: 0.7,
+    fontSize: 10,
+    opacity: 0.85,
     width: 14,
   },
 
@@ -3004,11 +3123,11 @@ function getStyles(t) { return {
 
   depositRadius: {
     color: t.muted,
-    fontSize: 8,
+    fontSize: 10,
   },
 
   depositHidden: {
-    fontSize: 7,
+    fontSize: 10,
     color: t.warn,
     letterSpacing: "0.1em",
     background: "rgba(160,80,48,0.1)",
@@ -3065,7 +3184,7 @@ function getStyles(t) { return {
   },
 
   paramLabel: {
-    fontSize: 7,
+    fontSize: 10,
     color: t.muted,
     letterSpacing: "0.15em",
     flexShrink: 0,
@@ -3084,7 +3203,7 @@ function getStyles(t) { return {
     borderRadius: 2,
     color: t.btnText,
     fontFamily: "'Share Tech Mono', monospace",
-    fontSize: 8,
+    fontSize: 10,
     cursor: "pointer",
     transition: "all 0.15s",
   },
@@ -3141,7 +3260,7 @@ function getMobileStyles(t) { return {
 
   canvasWrap: {
     position: "relative",
-    height: "75vw",
+    height: "75vh",
     minHeight: 280,
     maxHeight: 500,
     borderBottom: `1px solid ${t.border}`,
@@ -3154,8 +3273,8 @@ function getMobileStyles(t) { return {
 
   sectionTitle: {
     margin: "0 0 10px",
-    fontSize: 9,
-    fontWeight: 400,
+    fontSize: 11,
+    fontWeight: 600,
     color: t.accent,
     letterSpacing: "0.2em",
     textTransform: "uppercase",
@@ -3202,7 +3321,7 @@ function getMobileStyles(t) { return {
     borderBottom: "2px solid transparent",
     color: t.muted,
     fontFamily: "'Share Tech Mono', monospace",
-    fontSize: 9,
+    fontSize: 11,
     letterSpacing: "0.12em",
     cursor: "pointer",
     transition: "all 0.2s",
@@ -3210,7 +3329,7 @@ function getMobileStyles(t) { return {
 
   tabActive: {
     color: t.accent,
-    borderBottomColor: t.goldBorder,
+    borderBottom: `2px solid ${t.goldBorder}`,
     background: "rgba(212,168,84,0.1)",
   },
 }; }

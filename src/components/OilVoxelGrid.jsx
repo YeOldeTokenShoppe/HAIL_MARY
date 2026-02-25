@@ -415,6 +415,13 @@ function applyPumpConfig(clonedScene, pumpConfig, originalMats, envMap) {
         emissiveIntensity: m.emissiveIntensity || 0,
         envMapIntensity: m.envMapIntensity ?? 0,
         map: m.map || null,
+        normalMap: m.normalMap || null,
+        roughnessMap: m.roughnessMap || null,
+        metalnessMap: m.metalnessMap || null,
+        aoMap: m.aoMap || null,
+        alphaMap: m.alphaMap || null,
+        emissiveMap: m.emissiveMap || null,
+        bumpMap: m.bumpMap || null,
       };
     }
 
@@ -429,20 +436,48 @@ function applyPumpConfig(clonedScene, pumpConfig, originalMats, envMap) {
     // If no config (deselected), restore originals
     const zoneConf = pumpConfig ? pumpConfig[zoneId] : null;
     if (!zoneConf || (!zoneConf.color && zoneConf.preset === "stock")) {
-      // Restore original material type if it was swapped
-      if (child.userData._originalMat) {
-        child.material = child.userData._originalMat;
-        child.userData._swappedStandard = false;
+      // Swap to MeshStandardMaterial for proper lighting/depth
+      if (!child.userData._swappedStandard) {
+        if (!child.userData._originalMat) {
+          child.userData._originalMat = child.material;
+        }
+        child.material = new THREE.MeshStandardMaterial({
+          color: orig.color.clone(),
+          map: orig.map || null,
+          normalMap: orig.normalMap || null,
+          roughnessMap: orig.roughnessMap || null,
+          metalnessMap: orig.metalnessMap || null,
+          aoMap: orig.aoMap || null,
+          alphaMap: orig.alphaMap || null,
+          emissiveMap: orig.emissiveMap || null,
+          bumpMap: orig.bumpMap || null,
+          roughness: 0.35,
+          metalness: 0.4,
+          emissive: orig.emissive ? orig.emissive.clone() : new THREE.Color(0),
+          emissiveIntensity: orig.emissiveIntensity || 0,
+          envMap: envMap || null,
+          envMapIntensity: 1.0,
+        });
+        child.userData._swappedStandard = true;
+        child.userData._pmpCloned = true;
+      } else {
+        const m = child.material;
+        m.color.copy(orig.color);
+        m.map = orig.map;
+        m.normalMap = orig.normalMap;
+        m.roughnessMap = orig.roughnessMap;
+        m.metalnessMap = orig.metalnessMap;
+        m.aoMap = orig.aoMap;
+        m.alphaMap = orig.alphaMap;
+        m.emissiveMap = orig.emissiveMap;
+        m.bumpMap = orig.bumpMap;
+        m.roughness = 0.35;
+        m.metalness = 0.4;
+        m.emissive.copy(orig.emissive || new THREE.Color(0));
+        m.emissiveIntensity = orig.emissiveIntensity || 0;
+        m.envMapIntensity = 1.0;
+        m.needsUpdate = true;
       }
-      const m = child.material;
-      m.color.copy(orig.color);
-      m.roughness = orig.roughness;
-      m.metalness = orig.metalness;
-      m.emissive.copy(orig.emissive);
-      m.emissiveIntensity = orig.emissiveIntensity;
-      m.envMapIntensity = orig.envMapIntensity;
-      m.map = orig.map;
-      m.needsUpdate = true;
       return;
     }
 
@@ -621,11 +656,30 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   const textLowRef = useRef();
   const clonedScene = useMemo(() => {
     const s = scene.clone(true);
-    // Zero out envMapIntensity on all meshes so stock rigs ignore the scene environment
+    // Swap all meshes to MeshStandardMaterial for proper lighting/depth
     s.traverse((child) => {
       if (child.isMesh && child.material) {
-        child.material = child.material.clone();
-        child.material.envMapIntensity = 0;
+        const old = child.material;
+        const std = new THREE.MeshStandardMaterial({
+          color: old.color ? old.color.clone() : new THREE.Color(0xffffff),
+          map: old.map || null,
+          normalMap: old.normalMap || null,
+          roughnessMap: old.roughnessMap || null,
+          metalnessMap: old.metalnessMap || null,
+          aoMap: old.aoMap || null,
+          alphaMap: old.alphaMap || null,
+          emissiveMap: old.emissiveMap || null,
+          bumpMap: old.bumpMap || null,
+          roughness: 0.35,
+          metalness: 0.4,
+          emissive: old.emissive ? old.emissive.clone() : new THREE.Color(0),
+          emissiveIntensity: old.emissiveIntensity || 0,
+          envMapIntensity: 1.0,
+          side: old.side,
+          transparent: old.transparent,
+          opacity: old.opacity,
+        });
+        child.material = std;
         child.userData._pmpCloned = true;
       }
     });
@@ -726,33 +780,37 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       loader.load(signImageUrl, (tex) => {
         if (signRef.current !== sign) return;
         tex.colorSpace = THREE.SRGBColorSpace;
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.repeat.x = -1;
+        tex.offset.x = 1;
 
-        // Create a new material with UV flip for back faces
+        // Apply to front sign
         const mat = sign.material.clone();
         mat.map = tex;
-        mat.side = THREE.DoubleSide;
-        mat.onBeforeCompile = (shader) => {
-          // Flip UV.x on back face so the image reads correctly from both sides
-          shader.fragmentShader = shader.fragmentShader.replace(
-            '#include <map_fragment>',
-            `
-            #ifdef USE_MAP
-              vec2 signUv = vMapUv;
-              if (!gl_FrontFacing) signUv.x = 1.0 - signUv.x;
-              vec4 sampledDiffuseColor = texture2D(map, signUv);
-              diffuseColor *= sampledDiffuseColor;
-            #endif
-            `
-          );
-        };
-        mat.customProgramCacheKey = () => "sign_double_sided";
+        mat.color = new THREE.Color(0xffffff);
+        mat.emissive = new THREE.Color(0xffffff);
+        mat.emissiveMap = tex;
+        mat.emissiveIntensity = 0.8;
+        mat.transparent = false;
+        mat.alphaTest = 0.5;
         mat.needsUpdate = true;
         sign.material = mat;
+
+        // Apply to back sign
+        const back = signBackRef.current;
+        if (back) {
+          back.material = mat.clone();
+          back.material.needsUpdate = true;
+        }
       });
     } else if (signOrigMat.current) {
       sign.material = signOrigMat.current.clone();
-      sign.material.side = THREE.DoubleSide;
       sign.material.needsUpdate = true;
+      const back = signBackRef.current;
+      if (back && signBackOrigMat.current) {
+        back.material = signBackOrigMat.current.clone();
+        back.material.needsUpdate = true;
+      }
     }
   }, [signImageUrl]);
 
@@ -867,7 +925,9 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
 
   // Sign mesh — custom image texture
   const signRef = useRef();
+  const signBackRef = useRef();
   const signOrigMat = useRef(null);
+  const signBackOrigMat = useRef(null);
   const signFramePartsRef = useRef([]);
   const fencePartsRef = useRef([]);
 
@@ -895,7 +955,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         }
         child.visible = false; // hidden by default
       }
-      // Sign — custom image texture
+      // Sign — custom image texture (front + back)
       if (child.name === "Sign" && child.isMesh) {
         signRef.current = child;
         if (!signOrigMat.current) {
@@ -903,14 +963,27 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         }
         if (!child.userData._signCloned) {
           child.material = child.material.clone();
-          child.material.side = THREE.DoubleSide;
           child.userData._signCloned = true;
         }
       }
-      // SignFrame and all children — hidden by default
+      if (child.name === "Sign_Back" && child.isMesh) {
+        signBackRef.current = child;
+        if (!signBackOrigMat.current) {
+          signBackOrigMat.current = child.material.clone();
+        }
+        if (!child.userData._signCloned) {
+          child.material = child.material.clone();
+          child.userData._signCloned = true;
+        }
+      }
+      // SignFrame and all children — hidden by default, double-sided
       if (child.name.startsWith("SignFrame")) {
         if (!signFramePartsRef.current.includes(child)) {
           signFramePartsRef.current.push(child);
+        }
+        if (child.isMesh && child.material) {
+          child.material = child.material.clone();
+          child.material.side = THREE.DoubleSide;
         }
         child.visible = false;
       }
@@ -993,7 +1066,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   }, []);
 
   // Oil gusher particles — only active on highlighted rig
-  const PARTICLE_COUNT = 600;
+  const PARTICLE_COUNT = 10000;
   const gusherActiveRef = useRef(false);
   const gusherTimerRef = useRef(0);
   const particlePosRef = useRef(new Float32Array(PARTICLE_COUNT * 3));
@@ -1459,7 +1532,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
             decay={1.5}
           />
           {/* Oil gusher particles */}
-          <points>
+          <points renderOrder={10}>
             <bufferGeometry ref={particleGeoRef}>
               <bufferAttribute
                 attach="attributes-position"
@@ -1470,11 +1543,12 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
             <pointsMaterial
               ref={particleMatRef}
               color={0x1a0e05}
-              size={0.04}
+              size={0.02}
               map={_oilDropletTex}
               transparent
-              opacity={0}
+              opacity={0.5}
               depthWrite={false}
+              depthTest={false}
               sizeAttenuation
             />
           </points>
