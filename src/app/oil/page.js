@@ -18,7 +18,8 @@ import ThirdwebBuyModal from "@/components/ThirdwebBuyModal";
 import CyberNav from "@/components/CyberNav";
 import PolaroidSnapshot from "@/components/PolaroidSnapshot";
 import Fireworks from "@/components/Fireworks";
-import { db, storage, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, ref, uploadBytes, getDownloadURL, onSnapshot } from "@/lib/firebaseClient";
+import { db, storage, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, ref, uploadBytes, getDownloadURL, onSnapshot, collection, query, where } from "@/lib/firebaseClient";
+import RogueAdminPanel from "@/components/RogueAdminPanel";
 
 // ── Environment presets ──────────────────────────────────────────────────────
 const ENV_PRESETS = {
@@ -400,6 +401,8 @@ export default function OilPage() {
   useEffect(() => {
     if (isAdmin && localStorage.getItem("oil_admin_auth") === "true") {
       setAdminAuthed(true);
+      const savedPw = localStorage.getItem("oil_admin_pw") || sessionStorage.getItem("oil_admin_pw");
+      if (savedPw) setAdminPassword(savedPw);
     }
   }, [isAdmin]);
 
@@ -413,6 +416,8 @@ export default function OilPage() {
       if (res.ok) {
         setAdminAuthed(true);
         localStorage.setItem("oil_admin_auth", "true");
+        localStorage.setItem("oil_admin_pw", adminPassword);
+        sessionStorage.setItem("oil_admin_pw", adminPassword);
       } else {
         alert("Incorrect password");
       }
@@ -470,6 +475,55 @@ export default function OilPage() {
     });
     return () => unsub();
   }, []);
+
+  // ── Leaderboard data — live listener on all oilDrills docs ──
+  const [allDrillers, setAllDrillers] = useState([]);
+  useEffect(() => {
+    if (!db) return;
+    const unsub = onSnapshot(collection(db, "oilDrills"), (snap) => {
+      setAllDrillers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, []);
+
+  const leaderboardData = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const totalDrillers = allDrillers.length;
+    const drilledTodayCount = allDrillers.filter((d) => d.lastDrillDate === today).length;
+    const topCollectors = [...allDrillers]
+      .sort((a, b) => (b.totalCollected || 0) - (a.totalCollected || 0))
+      .slice(0, 10);
+    const topToday = allDrillers
+      .filter((d) => d.lastDrillDate === today)
+      .sort((a, b) => (b.totalCollected || 0) - (a.totalCollected || 0))
+      .slice(0, 10);
+    return { totalDrillers, drilledTodayCount, topCollectors, topToday };
+  }, [allDrillers]);
+
+  // ── Username ──
+  const [username, setUsername] = useState("");
+  const [usernameSaving, setUsernameSaving] = useState(false);
+
+  // Rogue events — live listener for active rogue characters
+  const [rogueEvents, setRogueEvents] = useState([]);
+  useEffect(() => {
+    if (!db) return;
+    const q = query(collection(db, "rogueEvents"), where("status", "==", "active"));
+    const unsub = onSnapshot(q, (snap) => {
+      setRogueEvents(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, []);
+
+  // Auto-select the target cell when a rogue event appears so its addons are visible
+  useEffect(() => {
+    if (rogueEvents.length === 0) return;
+    const latest = rogueEvents[rogueEvents.length - 1];
+    if (latest.targetCol != null && latest.targetRow != null) {
+      setSelectedX(latest.targetCol);
+      setSliceY(latest.targetRow);
+    }
+  }, [rogueEvents]);
 
   // Admin: save settings to Firestore when they change
   const saveGameSettings = useCallback(async (overrides = {}) => {
@@ -530,12 +584,25 @@ export default function OilPage() {
       if (snap.exists()) {
         const d = snap.data();
         setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate, totalCollected: d.totalCollected || 0, tankDrains: d.tankDrains || 0, lastDrainExtracted: d.lastDrainExtracted || 0 });
+        if (d.username) setUsername(d.username);
       } else {
         setUserDrill(null);
       }
     });
     return () => unsub();
   }, [user?.id]);
+
+  const handleSaveUsername = useCallback(async () => {
+    if (!user?.id || !db || !username.trim() || !userDrill) return;
+    setUsernameSaving(true);
+    try {
+      await setDoc(doc(db, "oilDrills", user.id), { username: username.trim(), updatedAt: serverTimestamp() }, { merge: true });
+    } catch (err) {
+      console.error("Failed to save username:", err);
+    } finally {
+      setUsernameSaving(false);
+    }
+  }, [user?.id, username, userDrill]);
 
   // Countdown timer to next 00:00 UTC
   useEffect(() => {
@@ -601,30 +668,25 @@ export default function OilPage() {
     return `${user.id}_${col}_${row}`;
   }, [user?.id]);
 
-  // Load pump config when a rig is selected
+  // Load pump config when a rig is selected (live listener so rogue deletions show up)
   useEffect(() => {
     if (!user?.id || !db || selectedX === null || sliceY === null) return;
     const docId = getConfigDocId(selectedX, sliceY);
     if (!docId) return;
 
-    let cancelled = false;
-    (async () => {
-      try {
-        const snap = await getDoc(doc(db, "pumpConfigs", docId));
-        if (cancelled) return;
-        if (snap.exists()) {
-          const data = snap.data();
-          setPumpConfig({ ...getDefaultPumpConfig(), ...data.config });
-        } else {
-          setPumpConfig(getDefaultPumpConfig());
-        }
-        setConfigDirty(false);
-      } catch (err) {
-        console.error("Failed to load pump config:", err);
+    const unsub = onSnapshot(doc(db, "pumpConfigs", docId), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setPumpConfig({ ...getDefaultPumpConfig(), ...data.config });
+      } else {
+        setPumpConfig(getDefaultPumpConfig());
       }
-    })();
+      setConfigDirty(false);
+    }, (err) => {
+      console.error("Failed to load pump config:", err);
+    });
 
-    return () => { cancelled = true; };
+    return unsub;
   }, [user?.id, selectedX, sliceY, getConfigDocId]);
 
   // Save pump config (called from SAVE button)
@@ -937,12 +999,13 @@ export default function OilPage() {
         row,
         drillDay: nextDay,
         lastDrillDate: todayUTC,
+        ...(username.trim() ? { username: username.trim() } : {}),
         updatedAt: serverTimestamp(),
-      });
+      }, { merge: true });
     } catch (err) {
       console.error("Failed to save drill:", err);
     }
-  }, [user?.id, selectedX, sliceY, userDrill, drillStatus, todayUTC]);
+  }, [user?.id, selectedX, sliceY, userDrill, drillStatus, todayUTC, username]);
 
   // Tank drain handler — always updates UI, persists to Firestore when possible
   const handleTankDrain = useCallback(async () => {
@@ -975,6 +1038,7 @@ export default function OilPage() {
             totalCollected: newTotal,
             tankDrains: newDrains,
             lastDrainExtracted: playerExtracted,
+            ...(username.trim() ? { username: username.trim() } : {}),
             updatedAt: serverTimestamp(),
           });
         }
@@ -982,7 +1046,7 @@ export default function OilPage() {
         console.error("Failed to save tank drain:", err);
       }
     }
-  }, [user?.id, userDrill, playerExtracted, lastDrainSnapshot]);
+  }, [user?.id, userDrill, playerExtracted, lastDrainSnapshot, username]);
 
   // Legacy demo drill (admin inspector)
   const handleDrill = useCallback(() => {
@@ -1162,6 +1226,7 @@ export default function OilPage() {
         <StatBlock s={styles} accentColor={theme.accent} label="DEPOSITS" value={stats.deposits.length} />
         <StatBlock s={styles} accentColor={theme.accent} label="CLAIMS" value={gridSize * gridSize} />
         <StatBlock s={styles} accentColor={theme.accent} label="% COLLECTED" value={stats.totalOil > 0 ? `${(playerExtracted / stats.totalOil * 100).toFixed(2)}%` : "0%"} accent={playerExtracted > 0} />
+        <StatBlock s={styles} accentColor={theme.accent} label="HIT RATE" value={`${hitRate}%`} accent={hitRate > 60} />
         {!isAdmin && !isReport && effectiveDrillDay > 0 && (
           <>
             <StatBlock s={styles} accentColor={theme.accent} label="YOUR DEPTH" value={`${effectiveDrillDay}/${DEPTH_Z}`} unit="LVL" accent />
@@ -1172,10 +1237,113 @@ export default function OilPage() {
           <>
             <StatBlock s={styles} accentColor={theme.accent} label="PEAK CELL" value={<AnimNum value={stats.maxClaimTotal} />} unit="RL80" />
             <StatBlock s={styles} accentColor={theme.accent} label="DRY CLAIMS" value={stats.dryClaims} />
-            <StatBlock s={styles} accentColor={theme.accent} label="HIT RATE" value={`${hitRate}%`} accent={hitRate > 60} />
           </>
         )}
       </div>
+    </div>
+  );
+
+  const truncId = (id) => id.length > 10 ? `${id.slice(0, 5)}...${id.slice(-3)}` : id;
+
+  const leaderboardPanel = (
+    <div style={isMobile ? m.section : styles.panelSection}>
+      <h3 style={isMobile ? m.sectionTitle : styles.panelTitle}>LEADERBOARD</h3>
+      {/* Summary stats row */}
+      <div style={{
+        display: "flex", justifyContent: "space-between", padding: "8px 0", marginBottom: 8,
+        borderBottom: `1px solid ${theme.border}`,
+      }}>
+        <div style={{ textAlign: "center", flex: 1 }}>
+          <div style={{ fontSize: 10, letterSpacing: "0.12em", color: theme.muted, marginBottom: 2 }}>DRILLERS</div>
+          <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "'Orbitron', monospace", color: theme.accent }}>{leaderboardData.totalDrillers}</div>
+        </div>
+        <div style={{ width: 1, background: theme.border }} />
+        <div style={{ textAlign: "center", flex: 1 }}>
+          <div style={{ fontSize: 10, letterSpacing: "0.12em", color: theme.muted, marginBottom: 2 }}>TODAY</div>
+          <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "'Orbitron', monospace", color: theme.accent }}>{leaderboardData.drilledTodayCount}</div>
+        </div>
+        <div style={{ width: 1, background: theme.border }} />
+        <div style={{ textAlign: "center", flex: 1 }}>
+          <div style={{ fontSize: 10, letterSpacing: "0.12em", color: theme.muted, marginBottom: 2 }}>COMMUNITY OIL</div>
+          <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "'Orbitron', monospace", color: theme.green }}>{communityOil.toLocaleString()}</div>
+        </div>
+      </div>
+
+      {/* Top Collectors */}
+      {leaderboardData.topCollectors.length > 0 && (
+        <>
+          <div style={{ fontSize: 10, letterSpacing: "0.15em", color: theme.accent, marginBottom: 6 }}>TOP COLLECTORS</div>
+          {leaderboardData.topCollectors.map((d, i) => (
+            <div key={d.id} style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "3px 0", borderBottom: i < leaderboardData.topCollectors.length - 1 ? `1px solid ${theme.barBg}` : "none",
+              opacity: d.id === user?.id ? 1 : 0.8,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, flex: 1 }}>
+                <span style={{
+                  fontSize: 10, fontWeight: 700, color: i < 3 ? theme.gold : theme.muted,
+                  fontFamily: "'Orbitron', monospace", minWidth: 18, textAlign: "right",
+                }}>{i + 1}.</span>
+                <span style={{
+                  fontSize: 11, color: d.id === user?.id ? theme.accent : theme.text,
+                  fontFamily: "'Share Tech Mono', monospace",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  fontWeight: d.id === user?.id ? 700 : 400,
+                }}>
+                  {d.username || truncId(d.id)}
+                </span>
+              </div>
+              <span style={{
+                fontSize: 11, color: theme.accent, fontFamily: "'Share Tech Mono', monospace",
+                whiteSpace: "nowrap", marginLeft: 8,
+              }}>
+                {(d.totalCollected || 0).toLocaleString()} RL80
+              </span>
+            </div>
+          ))}
+        </>
+      )}
+
+      {/* Today's Top */}
+      {leaderboardData.topToday.length > 0 && (
+        <>
+          <div style={{ fontSize: 10, letterSpacing: "0.15em", color: theme.accent, marginTop: 10, marginBottom: 6 }}>TODAY&apos;S TOP</div>
+          {leaderboardData.topToday.map((d, i) => (
+            <div key={d.id} style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "3px 0", borderBottom: i < leaderboardData.topToday.length - 1 ? `1px solid ${theme.barBg}` : "none",
+              opacity: d.id === user?.id ? 1 : 0.8,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0, flex: 1 }}>
+                <span style={{
+                  fontSize: 10, fontWeight: 700, color: i < 3 ? theme.gold : theme.muted,
+                  fontFamily: "'Orbitron', monospace", minWidth: 18, textAlign: "right",
+                }}>{i + 1}.</span>
+                <span style={{
+                  fontSize: 11, color: d.id === user?.id ? theme.accent : theme.text,
+                  fontFamily: "'Share Tech Mono', monospace",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  fontWeight: d.id === user?.id ? 700 : 400,
+                }}>
+                  {d.username || truncId(d.id)}
+                </span>
+              </div>
+              <span style={{
+                fontSize: 11, color: theme.accent, fontFamily: "'Share Tech Mono', monospace",
+                whiteSpace: "nowrap", marginLeft: 8,
+              }}>
+                {(d.totalCollected || 0).toLocaleString()} RL80
+              </span>
+            </div>
+          ))}
+        </>
+      )}
+
+      {leaderboardData.topCollectors.length === 0 && (
+        <div style={{ fontSize: 11, color: theme.muted, fontFamily: "'Share Tech Mono', monospace", textAlign: "center", padding: "10px 0" }}>
+          No drillers yet — be the first!
+        </div>
+      )}
     </div>
   );
 
@@ -1762,6 +1930,48 @@ export default function OilPage() {
       <h3 style={isMobile ? m.sectionTitle : styles.panelTitle}>
         YOUR CLAIM ({activeUserDrill.col}, {activeUserDrill.row})
       </h3>
+      {user && (
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value.slice(0, 20))}
+            placeholder="Set username..."
+            maxLength={20}
+            style={{
+              flex: 1,
+              padding: "4px 8px",
+              background: theme.inputBg,
+              border: `1px solid ${theme.border}`,
+              borderRadius: 2,
+              color: theme.textStrong,
+              fontFamily: "'Share Tech Mono', monospace",
+              fontSize: 11,
+              letterSpacing: "0.05em",
+              outline: "none",
+            }}
+            onKeyDown={(e) => { if (e.key === "Enter") handleSaveUsername(); }}
+          />
+          <button
+            onClick={handleSaveUsername}
+            disabled={usernameSaving || !username.trim()}
+            style={{
+              padding: "4px 10px",
+              background: username.trim() ? "rgba(212,168,84,0.2)" : "transparent",
+              border: `1px solid ${theme.border}`,
+              borderRadius: 2,
+              color: username.trim() ? theme.accent : theme.muted,
+              fontFamily: "'Share Tech Mono', monospace",
+              fontSize: 10,
+              letterSpacing: "0.12em",
+              cursor: username.trim() ? "pointer" : "default",
+              opacity: usernameSaving ? 0.5 : 1,
+            }}
+          >
+            {usernameSaving ? "..." : "SAVE"}
+          </button>
+        </div>
+      )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
         <span style={{ fontSize: 11, letterSpacing: "0.1em", color: theme.green }}>
           EXTRACTED: {playerExtracted.toLocaleString()} RL80
@@ -2008,7 +2218,7 @@ export default function OilPage() {
                     tankFill={tankFill}
                     onTankDrain={handleTankDrain}
                     communityOil={communityOil}
-             
+                    rogueEvents={rogueEvents}
                   />
                 </group>
                 <CctvRenderer canvasRef={cctvCanvasRef} />
@@ -2153,14 +2363,16 @@ export default function OilPage() {
           {drillButton}
           {playerDrillPanel}
           {isAdmin && parametersPanel}
+          {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={darkMode} adminPassword={adminPassword} />}
           {(isAdmin || isReport) && demoDrillPanel}
           {(isAdmin || isReport) && inspectorPanel}
           {statsPanel}
+          {leaderboardPanel}
           {(isAdmin || isReport) && topClaimsPanel}
           {(isAdmin || isReport) && dryZonesPanel}
           {(isAdmin || isReport) && depositsPanel}
           <HowToPlayPanel isMobile darkMode={darkMode} />
-          <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} />
+          <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} />
           {(isAdmin || isReport) && (
             <OilVerifyPanel
               numberOfDeposits={numberOfDeposits}
@@ -2330,7 +2542,7 @@ export default function OilPage() {
                 tankFill={tankFill}
                 onTankDrain={handleTankDrain}
                 communityOil={communityOil}
-   
+                rogueEvents={rogueEvents}
               />
             </group>
             <CctvRenderer canvasRef={cctvCanvasRef} />
@@ -2496,14 +2708,16 @@ export default function OilPage() {
             {drillButton}
             {playerDrillPanel}
             {isAdmin && parametersPanel}
+            {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={darkMode} adminPassword={adminPassword} />}
             {(isAdmin || isReport) && demoDrillPanel}
             {statsPanel}
+            {leaderboardPanel}
             {(isAdmin || isReport) && inspectorPanel}
             {(isAdmin || isReport) && topClaimsPanel}
             {(isAdmin || isReport) && dryZonesPanel}
             {(isAdmin || isReport) && depositsPanel}
             <HowToPlayPanel darkMode={darkMode} />
-            <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} />
+            <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} />
             {(isAdmin || isReport) && (
               <OilVerifyPanel
                 numberOfDeposits={numberOfDeposits}

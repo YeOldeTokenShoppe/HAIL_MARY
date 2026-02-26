@@ -125,6 +125,84 @@ Admin-only. Assigns a random available plot to the current timed-out picker, adv
 | `pickedAt` | Timestamp \| null | When plot was picked |
 | `skipped` | boolean | True if admin skipped this picker |
 
+## Rogue Characters System
+
+Admin-deployed animated characters that roam the grid, cause mischief (eating add-ons, leaving graffiti), and trigger Telegram security alerts for camera-equipped plots.
+
+### How It Works
+
+1. Admin opens Rogue Deploy panel in `/oil?mode=admin`
+2. Picks a character type, target cell (col/row), hits DEPLOY
+3. `POST /api/oil-rogue` writes a `rogueEvents` doc, executes the consequence (removes addon or sets graffiti), and sends a Telegram alert if the plot owner has a linked account + security camera
+4. All clients receive the event via `onSnapshot` → a `RogueCharacter` component renders the animated GLB on the 3D grid
+5. Character lifecycle: Spawn at grid edge (0–2s) → Walk to target (2–5s) → Act (5–8s) → Leave (8–11s)
+6. Rogue characters appear in CCTV feeds automatically (rendered in the same scene as pumpjacks)
+
+### Rogue Catalog
+
+| ID | Model | Consequence | Description |
+|----|-------|-------------|-------------|
+| `dinosaur` | `/models/addons/dinosaur.glb` | `delete_addon` | Eats a random add-on from the target plot |
+| `troll` | `/models/rogues/troll.glb` | `graffiti` | Sets `config.graffiti = true` on the target plot |
+
+New characters: drop a GLB in `public/models/rogues/`, add an entry to `ROGUE_CATALOG` in `RogueCharacter.jsx`, and optionally add a consequence handler in `/api/oil-rogue`.
+
+### Telegram Integration
+
+**Linking flow:**
+1. Player enables Security Cam in Pimp My Pump, clicks "LINK TELEGRAM"
+2. Opens `t.me/BotName?start={clerkUserId}` → user taps Start
+3. Webhook at `/api/oil-telegram-webhook` saves `{ chatId, username }` to `oilTelegram/{clerkUserId}`
+
+**Alerts:** When a rogue is deployed to a camera-equipped plot with a linked TG account, the API sends a text alert with character type, plot coordinates, and consequence.
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/app/api/oil-rogue/route.js` | Admin deploy (POST) + mark done (PATCH) |
+| `src/app/api/oil-telegram-webhook/route.js` | Telegram bot webhook for account linking |
+| `src/components/RogueCharacter.jsx` | R3F animated character + `ROGUE_CATALOG` export |
+| `src/components/RogueAdminPanel.jsx` | Admin panel: character picker, target selector, deploy button, active list |
+
+### API Routes
+
+#### `POST /api/oil-rogue` — Deploy Rogue Character
+Admin-only. Deploys a rogue character, executes consequence, sends Telegram alert.
+
+**Body:** `{ password, characterType, targetCol, targetRow }`
+**Returns:** `{ ok, eventId, consequence, telegramSent }`
+
+#### `PATCH /api/oil-rogue` — Mark Event Done
+Admin-only. Sets event status to `"done"`.
+
+**Body:** `{ password, eventId }`
+
+#### `POST /api/oil-telegram-webhook` — Telegram Webhook
+Receives Telegram updates. On `/start {clerkUserId}`, links the Telegram chat to the Clerk user.
+
+### Firestore Collections
+
+#### `rogueEvents/{autoId}`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `characterType` | string | `"dinosaur"`, `"troll"`, etc. |
+| `targetCol` | number | Grid column |
+| `targetRow` | number | Grid row |
+| `targetUserId` | string\|null | Plot owner's Clerk ID |
+| `status` | string | `"active"` → `"done"` |
+| `consequence` | object | `{ type, addonSlot?, addonId? }` |
+| `createdAt` | timestamp | Server timestamp |
+
+#### `oilTelegram/{clerkUserId}`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `chatId` | number | Telegram chat ID |
+| `username` | string\|null | TG username |
+| `linkedAt` | timestamp | When linked |
+
 ## Environment Variables
 
 | Variable | Description |
@@ -132,5 +210,7 @@ Admin-only. Assigns a random available plot to the current timed-out picker, adv
 | `OIL_TICKET_WALLET` | Recipient wallet address for ticket payments (server-side) |
 | `NEXT_PUBLIC_OIL_TICKET_WALLET` | Same wallet address exposed to client for display |
 | `BASE_RPC_URL` | Base chain RPC endpoint for tx verification |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token from @BotFather (server-side) |
+| `NEXT_PUBLIC_TELEGRAM_BOT_NAME` | Telegram bot username for deeplinks (defaults to "OilRogueBot") |
 
 **Firestore rules:** Public read, authenticated write (access gated by admin password in UI).

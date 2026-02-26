@@ -34,13 +34,15 @@ export const ADDON_CATALOG = [
   { id: "skeleton",      label: "HOME DEPOT SKELETON",       color: "#e8dcc8", shape: "cylinder", model: "/models/addons/HDSkeleton.glb" },
   { id: "flamingo",      label: "PINK FLAMINGO",  color: "#ff69b4", shape: "cone",     model: "/models/addons/pinkFlamingo.glb" },
   { id: "bearTrap",      label: "BEAR TRAP",      color: "#888888", shape: "box",      model: "/models/addons/bearTrap.glb" },
-  { id: "dinosaur",      label: "DINOSAUR",       color: "#6b8e23", shape: "cone",     model: "/models/addons/dinosaur.glb" },
+  // { id: "dinosaur",      label: "DINOSAUR",       color: "#6b8e23", shape: "cone",     model: "/models/addons/dinosaur.glb" },
   { id: "goldRocks",     label: "GOLD ROCKS",     color: "#ffd700", shape: "sphere",   model: "/models/addons/goldRocks.glb" },
   { id: "palmTree",      label: "PALM TREE",      color: "#2d8a4e", shape: "cylinder", model: "/models/addons/palmTree.glb" },
   { id: "pumpkinPatch",  label: "PUMPKIN PATCH",  color: "#e87530", shape: "sphere",   model: "/models/addons/pumpkinPatch.glb" },
-  { id: "tubeMan",      label: "TUBE MAN",      color: "#e87530", shape: "sphere",   model: "/models/addons/tubeMan.glb" },
+  // { id: "tubeMan",      label: "TUBE MAN",      color: "#cc3333", shape: "sphere",   model: "/models/addons/tubeMan.glb", animated: "tubeMan" },
+  { id: "sunflowers",      label: "SUNFLOWERS",      color: "#ffd700", shape: "cone",   model: "/models/addons/Sunflowers.glb" },
+  { id: "gnome",      label: "GARDEN GNOME",      color: "#33c2ccff", shape: "cone",   model: "/models/addons/gnome.glb" },
   // { id: "neonSign",      label: "NEON SIGN",      color: "#ff00ff", shape: "box",      emissive: true },
-  // { id: "gnome",         label: "GARDEN GNOME",   color: "#cc3333", shape: "cone" },
+  // { id: "gnome",         label: "GARDEN GNOME",   color: "#33a1ccff", shape: "cone" },
   // { id: "cactus",        label: "COOL CACTUS",    color: "#2d8a4e", shape: "cylinder" },
   // { id: "flowers",       label: "POTTED FLOWERS", color: "#ff69b4", shape: "sphere" },
   // { id: "alienPlants",   label: "ALIEN PLANTS",   color: "#7b2ff7", shape: "cone",     emissive: true },
@@ -51,14 +53,21 @@ export const ADDON_CATALOG = [
 //  [3] PUMP [4]
 //  [5] [6] [7]
 export const ADDON_SLOTS = [
-  { x: -0.35, y: 0, z:  0.35 }, // 0 front-left
-  { x:  0.0,  y: 0, z:  0.35 }, // 1 front-center
-  { x:  0.35, y: 0, z:  0.35 }, // 2 front-right
-  { x: -0.35, y: 0, z:  0.0  }, // 3 mid-left
-  { x:  0.35, y: 0, z:  0.0  }, // 4 mid-right
-  { x: -0.35, y: 0, z: -0.35 }, // 5 back-left
-  { x:  0.0,  y: 0, z: -0.35 }, // 6 back-center
-  { x:  0.35, y: 0, z: -0.35 }, // 7 back-right
+  { x: -0.25, y: 0, z:  0.25 }, // 0 front-left
+  { x:  0.0,  y: 0, z:  0.25 }, // 1 front-center
+  { x:  0.25, y: 0, z:  0.25 }, // 2 front-right
+  { x: -0.25, y: 0, z:  0.0  }, // 3 mid-left
+  { x:  0.25, y: 0, z:  0.0  }, // 4 mid-right
+  { x: -0.25, y: 0, z: -0.25 }, // 5 back-left
+  { x:  0.0,  y: 0, z: -0.25 }, // 6 back-center
+  { x:  0.25, y: 0, z: -0.25 }, // 7 back-right
+];
+
+export const FENCE_CATALOG = [
+  { id: "chainlink",    label: "CHAIN LINK",    model: "/models/addons/Fence_Chainlink.glb",    scale: 0.1 },
+  { id: "iron",         label: "IRON",          model: "/models/addons/Fence_Iron.glb",         scale: 0.1 },
+  { id: "whitePicket",  label: "WHITE PICKET",  model: "/models/addons/Fence_WhitePicket.glb",  scale: 0.1 },
+  { id: "stone",        label: "STONE",         model: "/models/addons/Fence_Stone.glb",        scale: 0.1 },
 ];
 
 const MAX_ADDONS = 3;
@@ -72,7 +81,7 @@ export function getDefaultPumpConfig() {
   config.signImageUrl = null;
   config.showCamera = false;
   config.showSign = false;
-  config.showFence = false;
+  config.fenceType = null;
   config.addons = {};
   return config;
 }
@@ -164,7 +173,7 @@ const THEME_PRESETS = {
 
 // ── Panel component ──────────────────────────────────────────────────────────
 
-export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode = false, hasSelection, onSave, saving, dirty, isSignedIn, defaultExpanded = false }) {
+export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode = false, hasSelection, onSave, saving, dirty, isSignedIn, defaultExpanded = false, userId }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [activeZone, setActiveZone] = useState(null);
   const [pickerSlot, setPickerSlot] = useState(null); // which slot is picking an addon
@@ -215,11 +224,12 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
     newConfig.signImageUrl = config.signImageUrl;
     newConfig.showSign = config.showSign;
     newConfig.showCamera = config.showCamera;
-    newConfig.showFence = config.showFence;
+    newConfig.fenceType = config.fenceType;
     newConfig.addons = config.addons || {};
+    newConfig.poop = config.poop || false;
     onChange(newConfig);
     setActiveZone(null);
-  }, [onChange, config.signImageUrl, config.showSign, config.showCamera, config.showFence]);
+  }, [onChange, config.signImageUrl, config.showSign, config.showCamera, config.fenceType, config.addons]);
 
   const sectionStyle = { ...(isMobile ? mStyles.section : styles.section), borderBottomColor: c.sectionBorder };
   const titleStyle = { ...(isMobile ? mStyles.title : styles.title), color: c.accent };
@@ -351,28 +361,91 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
               >
                 {config.showCamera ? "ON" : "OFF"}
               </button>
+              {config.showCamera && userId && (
+                <button
+                  onClick={() => window.open(`https://t.me/${process.env.NEXT_PUBLIC_TELEGRAM_BOT_NAME || "OilRogueBot"}?start=${userId}`, "_blank")}
+                  style={{
+                    padding: isMobile ? "5px 12px" : "3px 10px",
+                    background: c.btnBg,
+                    border: `1px solid ${c.btnBorder}`,
+                    borderRadius: 2,
+                    color: c.btnText,
+                    fontFamily: "'Share Tech Mono', monospace",
+                    fontSize: mFs,
+                    letterSpacing: "0.1em",
+                    cursor: "pointer",
+                    marginLeft: 4,
+                  }}
+                >
+                  LINK TELEGRAM
+                </button>
+              )}
             </div>
 
-            {/* Fence toggle */}
+            {/* Fence selector */}
             <div>
-              <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>CHAIN FENCE</span>
-              <button
-                onClick={() => onChange({ ...config, showFence: !config.showFence })}
-                style={{
-                  padding: isMobile ? "5px 12px" : "3px 10px",
-                  background: config.showFence ? c.activeBg : c.btnBg,
-                  border: `1px solid ${config.showFence ? c.activeBorder : c.btnBorder}`,
-                  borderRadius: 2,
-                  color: config.showFence ? c.activeText : c.btnText,
-                  fontFamily: "'Share Tech Mono', monospace",
-                  fontSize: mFs,
-                  letterSpacing: "0.1em",
-                  cursor: "pointer",
-                }}
-              >
-                {config.showFence ? "ON" : "OFF"}
-              </button>
+              <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>FENCE</span>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                <button
+                  onClick={() => onChange({ ...config, fenceType: null })}
+                  style={{
+                    padding: isMobile ? "5px 8px" : "3px 8px",
+                    background: !config.fenceType ? c.activeBg : c.btnBg,
+                    border: `1px solid ${!config.fenceType ? c.activeBorder : c.btnBorder}`,
+                    borderRadius: 2,
+                    color: !config.fenceType ? c.activeText : c.btnText,
+                    fontFamily: "'Share Tech Mono', monospace",
+                    fontSize: mFs - 1,
+                    letterSpacing: "0.1em",
+                    cursor: "pointer",
+                  }}
+                >
+                  NONE
+                </button>
+                {FENCE_CATALOG.map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => onChange({ ...config, fenceType: f.id })}
+                    style={{
+                      padding: isMobile ? "5px 8px" : "3px 8px",
+                      background: config.fenceType === f.id ? c.activeBg : c.btnBg,
+                      border: `1px solid ${config.fenceType === f.id ? c.activeBorder : c.btnBorder}`,
+                      borderRadius: 2,
+                      color: config.fenceType === f.id ? c.activeText : c.btnText,
+                      fontFamily: "'Share Tech Mono', monospace",
+                      fontSize: mFs - 1,
+                      letterSpacing: "0.1em",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
             </div>
+
+            {/* Poop cleanup */}
+            {config.poop && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: mFs, color: "#a05030", fontFamily: "'Share Tech Mono', monospace", letterSpacing: "0.1em" }}>POOP DETECTED</span>
+                <button
+                  onClick={() => onChange({ ...config, poop: false })}
+                  style={{
+                    padding: isMobile ? "5px 12px" : "3px 10px",
+                    background: "#a05030",
+                    border: "1px solid #c06040",
+                    borderRadius: 2,
+                    color: "#fff",
+                    fontFamily: "'Share Tech Mono', monospace",
+                    fontSize: mFs,
+                    letterSpacing: "0.1em",
+                    cursor: "pointer",
+                  }}
+                >
+                  CLEAN UP
+                </button>
+              </div>
+            )}
           </div>
 
           <div style={{ ...styles.divider, background: c.border }} />

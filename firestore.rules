@@ -272,6 +272,20 @@
         allow write: if request.auth != null;
       }
 
+      // Rogue events — public read (onSnapshot for all clients), server writes (password-gated API)
+      match /rogueEvents/{docId} {
+        allow read: if true;
+        allow create, update: if true;
+        allow delete: if false;
+      }
+
+      // Telegram linking — server writes via webhook, read by API route
+      match /oilTelegram/{docId} {
+        allow read: if true;
+        allow create, update: if true;
+        allow delete: if false;
+      }
+
       // Default rules - SECURE by default
       match /{document=**} {
         allow read: if true;

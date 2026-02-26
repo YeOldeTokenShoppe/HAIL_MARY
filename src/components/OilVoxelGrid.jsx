@@ -5,7 +5,8 @@ import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Text, useGLTF, useTexture, useEnvironment } from "@react-three/drei";
 import { generateOilDistribution3D } from "@/lib/oilDistribution";
-import { PUMP_ZONES, MATERIAL_PRESETS, ADDON_CATALOG, ADDON_SLOTS } from "@/components/PimpMyPumpPanel";
+import { PUMP_ZONES, MATERIAL_PRESETS, ADDON_CATALOG, ADDON_SLOTS, FENCE_CATALOG } from "@/components/PimpMyPumpPanel";
+import RogueCharacter from "@/components/RogueCharacter";
 // ── Shared CCTV state (module-level, Pumpjack writes → CctvRenderer reads) ──
 const _cctvState = {
   active: false,
@@ -554,6 +555,106 @@ function AddonGLB({ item, slotPos, rotation = 0 }) {
   );
 }
 
+function AddonTubeMan({ item, slotPos, rotation = 0 }) {
+  const { scene } = useGLTF(item.model);
+  const cloned = useMemo(() => {
+    const c = scene.clone(true);
+    // Deep-clone bottom geometry for vertex sway
+    c.traverse((child) => {
+      if (child.name === "BottomTubeMan" && child.isMesh && child.geometry) {
+        child.geometry = child.geometry.clone();
+      }
+    });
+    return c;
+  }, [scene]);
+  const topRef = useRef();
+  const timeRef = useRef(0);
+
+  // Find TopTubeMan + BottomTubeMan and store bottom's original verts
+  const bottomData = useRef(null);
+  const topOrigPos = useRef(null);
+  useMemo(() => {
+    cloned.traverse((child) => {
+      if (child.name === "TopTubeMan") {
+        topRef.current = child;
+        topOrigPos.current = child.position.clone();
+      }
+      if (child.name === "BottomTubeMan" && child.isMesh && child.geometry) {
+        const pos = child.geometry.attributes.position;
+        if (pos) {
+          child.geometry.computeBoundingBox();
+          const bb = child.geometry.boundingBox;
+          bottomData.current = {
+            mesh: child,
+            origPos: new Float32Array(pos.array),
+            minZ: bb.min.z,
+            maxZ: bb.max.z,
+            height: (bb.max.z - bb.min.z) || 1,
+          };
+        }
+      }
+    });
+  }, [cloned]);
+
+  useFrame((_, delta) => {
+    if (!topRef.current) return;
+    timeRef.current += delta;
+    const t = timeRef.current;
+
+    // Snappy whip motion — sharp fold, snap back
+    const snapX = Math.sin(t * 2.2);
+    const snapZ = Math.cos(t * 1.7);
+    // Cubic root sharpening — spends time at extremes, snaps through center
+    const sharpX = Math.sign(snapX) * Math.pow(Math.abs(snapX), 0.3);
+    const sharpZ = Math.sign(snapZ) * Math.pow(Math.abs(snapZ), 0.3);
+
+    // Rotate the top half — full bend forward/back/sides (~120°)
+    topRef.current.rotation.x = sharpX * 2.0;
+    topRef.current.rotation.y = sharpZ * 1.5;
+
+    // Bottom half: delayed, dampened vertex sway — anchored at ground (maxZ)
+    if (bottomData.current) {
+      const bd = bottomData.current;
+      const pos = bd.mesh.geometry.attributes.position;
+      const arr = pos.array;
+      const orig = bd.origPos;
+      // Delayed version of top's motion (phase offset) — chain reaction feel
+      const delaySnapX = Math.sin((t - 0.3) * 2.2);
+      const delaySnapZ = Math.cos((t - 0.3) * 1.7);
+      const delayX = Math.sign(delaySnapX) * Math.pow(Math.abs(delaySnapX), 0.3) * 0.25;
+      const delayZ = Math.sign(delaySnapZ) * Math.pow(Math.abs(delaySnapZ), 0.3) * 0.18;
+      // Joint offset at heightFrac=1 (top of bottom mesh)
+      const jointOffX = delayX * bd.height;
+      const jointOffY = delayZ * bd.height;
+      for (let i = 0; i < arr.length; i += 3) {
+        const oz = orig[i + 2];
+        // heightFrac: 0 at ground (maxZ), 1 at joint (minZ)
+        const heightFrac = Math.max(0, Math.min(1, (bd.maxZ - oz) / bd.height));
+        // Quadratic ramp — ground stays put, joint sways most
+        const sway = heightFrac * heightFrac;
+        arr[i]     = orig[i]     + delayX * sway * bd.height;
+        arr[i + 1] = orig[i + 1] + delayZ * sway * bd.height;
+      }
+      pos.needsUpdate = true;
+
+      // Move top's position to follow the bottom's joint
+      // Vertex space is ~100x larger than object position space
+      if (topOrigPos.current && topRef.current) {
+        const scale = 0.01;
+        topRef.current.position.x = topOrigPos.current.x + jointOffX * scale;
+        topRef.current.position.z = topOrigPos.current.z + jointOffY * scale;
+      }
+    }
+  });
+
+  const rotY = rotation * Math.PI / 2;
+  return (
+    <group position={[slotPos.x, slotPos.y, slotPos.z]} rotation={[0, rotY, 0]}>
+      <primitive object={cloned} scale={PUMPJACK_SCALE} />
+    </group>
+  );
+}
+
 function AddonPlaceholder({ item, slotPos, rotation = 0 }) {
   const scale = 0.08;
   const y = slotPos.y + scale / 2;
@@ -622,6 +723,9 @@ function PlotAddons({ addons }) {
         const rot = typeof value === "string" ? 0 : (value?.rot || 0);
         const item = ADDON_CATALOG.find((c) => c.id === itemId);
         if (!slot || !item) return null;
+        if (item.animated === "tubeMan") {
+          return <AddonTubeMan key={slotKey} item={item} slotPos={slot} rotation={rot} />;
+        }
         if (item.model) {
           return <AddonGLB key={slotKey} item={item} slotPos={slot} rotation={rot} />;
         }
@@ -633,6 +737,34 @@ function PlotAddons({ addons }) {
 
 // Preload addon GLBs
 ADDON_CATALOG.forEach((item) => { if (item.model) useGLTF.preload(item.model); });
+
+// Preload fence GLBs
+FENCE_CATALOG.forEach((f) => { useGLTF.preload(f.model); });
+
+// Preload poop GLB
+useGLTF.preload("/models/poop.glb");
+
+function PlotFence({ fenceType }) {
+  const catalog = FENCE_CATALOG.find((f) => f.id === fenceType);
+  const { scene } = useGLTF(catalog?.model || FENCE_CATALOG[0].model);
+  const cloned = useMemo(() => scene.clone(true), [scene]);
+  if (!catalog) return null;
+  return (
+    <group scale={catalog.scale}>
+      <primitive object={cloned} />
+    </group>
+  );
+}
+
+function PlotPoop() {
+  const { scene } = useGLTF("/models/poop.glb");
+  const cloned = useMemo(() => scene.clone(true), [scene]);
+  return (
+    <group position={[0.35, 0.05, 0.15]} scale={[0.1, 0.1, 0.1]}>
+      <primitive object={cloned} />
+    </group>
+  );
+}
 
 function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, tankFill, onClick, onDoubleClick, onTankDrain }) {
   const lastClickTime = useRef(0);
@@ -761,11 +893,10 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     signFramePartsRef.current.forEach((part) => { part.visible = show; });
   }, [highlighted, pumpConfig?.showSign]);
 
-  // Fence visibility — only when highlighted and config says so
+  // Fence visibility — hide the old embedded fence parts (now separate models)
   useEffect(() => {
-    const show = highlighted && !!pumpConfig?.showFence;
-    fencePartsRef.current.forEach((part) => { part.visible = show; });
-  }, [highlighted, pumpConfig?.showFence]);
+    fencePartsRef.current.forEach((part) => { part.visible = false; });
+  }, []);
 
   // Apply custom image to Sign mesh when URL changes
   // Uses onBeforeCompile to flip UVs on back face so text is legible from both sides
@@ -1577,6 +1708,12 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       {highlighted && pumpConfig?.addons && (
         <PlotAddons addons={pumpConfig.addons} />
       )}
+      {/* Fence — separate GLB model */}
+      {highlighted && pumpConfig?.fenceType && (
+        <PlotFence fenceType={pumpConfig.fenceType} />
+      )}
+      {/* Poop — left by Crudingo rogue */}
+      {highlighted && pumpConfig?.poop && <PlotPoop />}
     </group>
   );
 }
@@ -1809,6 +1946,7 @@ export default function OilVoxelGrid({
   tankFill = 0,
   onTankDrain,
   communityOil = 0,
+  rogueEvents = [],
 }) {
   const matRef = useRef();
   const groundMatsRef = useRef([]);
@@ -1933,6 +2071,17 @@ export default function OilVoxelGrid({
             communityOil={communityOil}
             totalOilBudget={totalOilBudget}
           />
+          {rogueEvents.map((ev) => (
+            <RogueCharacter
+              key={ev.id}
+              event={ev}
+              cellSize={cellSize}
+              worldW={worldW}
+              worldD={worldD}
+              gridX={gridX}
+              gridY={gridY}
+            />
+          ))}
           {Array.from({ length: gridX + 1 }, (_, i) => {
             const x = -worldW / 2 + i * cellSize;
             const points = [
