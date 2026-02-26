@@ -8,9 +8,10 @@ import { clone as skeletonClone } from "three/examples/jsm/utils/SkeletonUtils.j
 import CleanCanvas from "@/components/canvas/CleanCanvas";
 
 /* ─── Model ──────────────────────────────────────────────────────────── */
-function OilModel({ animation }) {
+function OilModel({ animation, showSunglasses = true, paused = false, scrubTime = null, mixerRef }) {
   const gltf = useGLTF("/models/RL80_oil.glb");
   const mixer = useRef(null);
+  const activeAction = useRef(null);
   const groupRef = useRef();
   const clonedScene = useRef(null);
 
@@ -36,14 +37,44 @@ function OilModel({ animation }) {
   useEffect(() => {
     if (gltf.animations?.length && clonedScene.current) {
       mixer.current = new THREE.AnimationMixer(clonedScene.current);
+      if (mixerRef) mixerRef.current = { mixer: mixer.current, animations: gltf.animations };
       const idx = Math.min(animation, gltf.animations.length - 1);
       const action = mixer.current.clipAction(gltf.animations[idx]);
+      activeAction.current = action;
       action.play();
-      return () => { mixer.current?.stopAllAction(); mixer.current = null; };
+      return () => { mixer.current?.stopAllAction(); mixer.current = null; activeAction.current = null; };
     }
-  }, [gltf.animations, animation]);
+  }, [gltf.animations, animation, mixerRef]);
 
-  useFrame((_, delta) => mixer.current?.update(delta));
+  // Handle pause/play
+  useEffect(() => {
+    if (activeAction.current) {
+      activeAction.current.paused = paused;
+    }
+  }, [paused]);
+
+  // Handle scrub
+  useEffect(() => {
+    if (scrubTime !== null && activeAction.current && mixer.current) {
+      activeAction.current.paused = true;
+      activeAction.current.time = scrubTime;
+      mixer.current.update(0);
+    }
+  }, [scrubTime]);
+
+  // Toggle sunglasses visibility
+  useEffect(() => {
+    if (!clonedScene.current) return;
+    clonedScene.current.traverse((child) => {
+      if (child.name === "Sunglasses" || child.name === "sunglasses") {
+        child.visible = showSunglasses;
+      }
+    });
+  }, [showSunglasses]);
+
+  useFrame((_, delta) => {
+    if (!paused && scrubTime === null) mixer.current?.update(delta);
+  });
 
   return <group ref={groupRef} />;
 }
@@ -55,11 +86,11 @@ function LightingRig({ preset }) {
     dramatic: { ambientIntensity: 0.1, dirIntensity: 4, dirPos: [3, 10, 2], fillIntensity: 0.2, fillPos: [-6, 2, -2], rimIntensity: 2, rimPos: [-2, 6, -6] },
     soft: { ambientIntensity: 0.8, dirIntensity: 1.2, dirPos: [4, 6, 6], fillIntensity: 1.0, fillPos: [-4, 4, 4], rimIntensity: 0.4, rimPos: [0, 3, -5] },
     golden: { ambientIntensity: 0.3, dirIntensity: 3, dirPos: [8, 4, 2], fillIntensity: 0.5, fillPos: [-3, 6, 4], rimIntensity: 1.5, rimPos: [-4, 2, -6] },
-    neon: { ambientIntensity: 0.05, dirIntensity: 0.5, dirPos: [2, 8, 3], fillIntensity: 2.5, fillPos: [-5, 2, 3], rimIntensity: 3, rimPos: [0, 4, -5] },
+    neon: { ambientIntensity: 0.5, dirIntensity: 0.5, dirPos: [2, 8, 3], fillIntensity: 2.5, fillPos: [-5, 2, 3], rimIntensity: 3, rimPos: [0, 4, -5] },
   };
   const c = configs[preset] || configs.studio;
 
-  const fillColor = preset === "neon" ? "#00f5d4" : preset === "golden" ? "#ffcc66" : "#8899bb";
+  const fillColor = preset === "neon" ? "#1b51cdff" : preset === "golden" ? "#ffcc66" : "#8899bb";
   const rimColor = preset === "neon" ? "#ff006e" : preset === "golden" ? "#ff8833" : "#aabbdd";
 
   return (
@@ -80,7 +111,7 @@ function BackgroundPlane({ showBg }) {
 
   useEffect(() => {
     const loader = new THREE.TextureLoader();
-    loader.load("/oilBG.png", (tex) => {
+    loader.load("/oilBG8.webp", (tex) => {
       tex.colorSpace = THREE.SRGBColorSpace;
       texture.current = tex;
       setLoaded(true);
@@ -91,8 +122,8 @@ function BackgroundPlane({ showBg }) {
 
   const scale = Math.max(viewport.width, viewport.height) * 1.5;
   return (
-    <mesh position={[0, 0, -12]} renderOrder={-1}>
-      <planeGeometry args={[scale * 1.8, scale]} />
+    <mesh position={[0, 1.2, -3]} renderOrder={-1}>
+      <planeGeometry args={[scale * 1.6, scale]} />
       <meshBasicMaterial map={texture.current} toneMapped={false} depthWrite={false} />
     </mesh>
   );
@@ -158,6 +189,17 @@ export default function PhotoStudioPage() {
   const [showGallery, setShowGallery] = useState(false);
   const [bgColor, setBgColor] = useState("#1a1a2e");
   const [autoRotate, setAutoRotate] = useState(false);
+  const [showSunglasses, setShowSunglasses] = useState(true);
+  const [animPaused, setAnimPaused] = useState(false);
+  const [scrubTime, setScrubTime] = useState(null);
+  const [scrubbing, setScrubbing] = useState(false);
+  const mixerInfoRef = useRef(null);
+
+  const getClipDuration = useCallback(() => {
+    if (!mixerInfoRef.current?.animations?.length) return 1;
+    const idx = Math.min(animIdx, mixerInfoRef.current.animations.length - 1);
+    return mixerInfoRef.current.animations[idx]?.duration || 1;
+  }, [animIdx]);
 
   const takePhoto = useCallback(() => {
     const canvas = document.querySelector("#photo-studio-canvas canvas");
@@ -219,7 +261,7 @@ export default function PhotoStudioPage() {
           <Suspense fallback={null}>
             <BackgroundPlane showBg={showBg} />
             <LightingRig preset={lightPreset} />
-            <OilModel animation={animIdx} />
+            <OilModel animation={animIdx} showSunglasses={showSunglasses} paused={animPaused || scrubbing} scrubTime={scrubbing ? scrubTime : null} mixerRef={mixerInfoRef} />
             {showShadows && (
               <ContactShadows position={[0, -0.01, 0]} opacity={0.5} scale={12} blur={2.5} far={4} />
             )}
@@ -287,6 +329,7 @@ export default function PhotoStudioPage() {
           <ToggleRow label="Background" active={showBg} onToggle={() => setShowBg(!showBg)} />
           <ToggleRow label="Shadows" active={showShadows} onToggle={() => setShowShadows(!showShadows)} />
           <ToggleRow label="Auto-Rotate" active={autoRotate} onToggle={() => setAutoRotate(!autoRotate)} />
+          <ToggleRow label="Sunglasses" active={showSunglasses} onToggle={() => setShowSunglasses(!showSunglasses)} />
           {!showBg && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 0" }}>
               <span style={{ color: "#888", fontSize: 10 }}>Color</span>
@@ -304,10 +347,44 @@ export default function PhotoStudioPage() {
         <ControlGroup label="ANIMATION">
           <div style={{ display: "flex", gap: 4 }}>
             {[0, 1, 2, 3].map((i) => (
-              <PillBtn key={i} active={animIdx === i} onClick={() => setAnimIdx(i)} style={{ flex: 1, justifyContent: "center" }}>
+              <PillBtn key={i} active={animIdx === i} onClick={() => { setAnimIdx(i); setScrubbing(false); setScrubTime(null); setAnimPaused(false); }} style={{ flex: 1, justifyContent: "center" }}>
                 {i + 1}
               </PillBtn>
             ))}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 2 }}>
+            <button
+              onClick={() => { if (scrubbing) { setScrubbing(false); setScrubTime(null); } setAnimPaused(!animPaused); }}
+              style={{
+                background: animPaused ? "rgba(0,245,212,0.15)" : "rgba(255,255,255,0.05)",
+                border: `1px solid ${animPaused ? "rgba(0,245,212,0.3)" : "rgba(255,255,255,0.08)"}`,
+                color: animPaused ? "#00f5d4" : "#888",
+                fontSize: 10, padding: "3px 10px", borderRadius: 4, cursor: "pointer",
+                letterSpacing: "0.05em", transition: "all 0.15s", flex: "0 0 auto",
+              }}
+            >
+              {animPaused ? "PLAY" : "PAUSE"}
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={0.5}
+              value={scrubbing ? (scrubTime / getClipDuration() * 100) : 0}
+              onChange={(e) => {
+                const pct = parseFloat(e.target.value) / 100;
+                const dur = getClipDuration();
+                setScrubbing(true);
+                setScrubTime(pct * dur);
+              }}
+              onMouseUp={() => {
+                if (!animPaused) {
+                  setScrubbing(false);
+                  setScrubTime(null);
+                }
+              }}
+              style={{ flex: 1, accentColor: "#00f5d4", height: 4, cursor: "pointer" }}
+            />
           </div>
         </ControlGroup>
       </div>

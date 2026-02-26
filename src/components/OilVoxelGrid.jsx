@@ -1923,6 +1923,118 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
 
 useGLTF.preload("/models/oilJack_fancy_allProps.glb");
 
+// ── Remote Gusher (broadcast oil strikes) ────────────────────────────────────
+
+const REMOTE_PARTICLE_COUNT = 2000;
+
+function RemoteGusher({ position }) {
+  const posArr = useRef(new Float32Array(REMOTE_PARTICLE_COUNT * 3));
+  const velArr = useRef(new Float32Array(REMOTE_PARTICLE_COUNT * 3));
+  const lifeArr = useRef(new Float32Array(REMOTE_PARTICLE_COUNT));
+  const geoRef = useRef();
+  const matRef = useRef();
+  const lightRef = useRef();
+  const elapsed = useRef(0);
+
+  // Initialize particles — stagger across full lifetime for continuous flow
+  useEffect(() => {
+    const pos = posArr.current;
+    const vel = velArr.current;
+    const life = lifeArr.current;
+    for (let i = 0; i < REMOTE_PARTICLE_COUNT; i++) {
+      const i3 = i * 3;
+      // Stagger across full life so particles are evenly distributed at all times
+      const t = (i / REMOTE_PARTICLE_COUNT) * 1.2;
+      const angle = Math.random() * Math.PI * 2;
+      const spread = 0.05 + Math.random() * 0.12;
+      const vy = 3.0 + Math.random() * 2.5;
+      const vx = Math.cos(angle) * spread;
+      const vz = Math.sin(angle) * spread;
+      // Pre-simulate to starting position
+      pos[i3] = vx * t;
+      pos[i3 + 1] = 0.3 + vy * t - 3.0 * t * t; // half-gravity pre-sim
+      pos[i3 + 2] = vz * t;
+      vel[i3] = vx;
+      vel[i3 + 1] = vy - 6.0 * t;
+      vel[i3 + 2] = vz;
+      life[i] = t;
+    }
+  }, []);
+
+  useFrame((_, delta) => {
+    elapsed.current += delta;
+    const pos = posArr.current;
+    const vel = velArr.current;
+    const life = lifeArr.current;
+
+    for (let i = 0; i < REMOTE_PARTICLE_COUNT; i++) {
+      const i3 = i * 3;
+      life[i] += delta;
+      if (life[i] > 1.2) {
+        // respawn with tight spread for columnar stream
+        pos[i3] = 0;
+        pos[i3 + 1] = 0.3;
+        pos[i3 + 2] = 0;
+        const angle = Math.random() * Math.PI * 2;
+        const spread = 0.05 + Math.random() * 0.12;
+        vel[i3] = Math.cos(angle) * spread;
+        vel[i3 + 1] = 3.0 + Math.random() * 2.5;
+        vel[i3 + 2] = Math.sin(angle) * spread;
+        life[i] = 0;
+      }
+      vel[i3 + 1] -= 6.0 * delta; // gravity
+      pos[i3] += vel[i3] * delta;
+      pos[i3 + 1] += vel[i3 + 1] * delta;
+      pos[i3 + 2] += vel[i3 + 2] * delta;
+    }
+
+    if (geoRef.current) {
+      geoRef.current.attributes.position.needsUpdate = true;
+    }
+    if (matRef.current) {
+      matRef.current.opacity = 0.5;
+    }
+    // Flash point light on initial burst, then steady glow
+    if (lightRef.current) {
+      const flash = Math.max(0, 1 - elapsed.current * 2) * 3;
+      lightRef.current.intensity = flash + 0.5;
+    }
+  });
+
+  return (
+    <group position={position}>
+      <pointLight
+        ref={lightRef}
+        position={[0, 0.5, 0]}
+        color={0xff2200}
+        intensity={0}
+        distance={4}
+        decay={2}
+      />
+      <points renderOrder={10}>
+        <bufferGeometry ref={geoRef}>
+          <bufferAttribute
+            attach="attributes-position"
+            args={[posArr.current, 3]}
+            count={REMOTE_PARTICLE_COUNT}
+          />
+        </bufferGeometry>
+        <pointsMaterial
+          ref={matRef}
+          color={0x1a0e05}
+          size={0.02}
+          map={_oilDropletTex}
+          transparent
+          opacity={0.5}
+          depthWrite={false}
+          depthTest={false}
+          sizeAttenuation
+        />
+      </points>
+    </group>
+  );
+}
+
 // ── Component ───────────────────────────────────────────────────────────────
 
 export default function OilVoxelGrid({
@@ -1947,6 +2059,8 @@ export default function OilVoxelGrid({
   onTankDrain,
   communityOil = 0,
   rogueEvents = [],
+  gusherEvents = [],
+  currentUserId,
 }) {
   const matRef = useRef();
   const groundMatsRef = useRef([]);
@@ -2082,6 +2196,18 @@ export default function OilVoxelGrid({
               gridY={gridY}
             />
           ))}
+          {gusherEvents
+            .filter((ev) => ev.userId !== currentUserId)
+            .map((ev) => (
+              <RemoteGusher
+                key={ev.id}
+                position={[
+                  -worldW / 2 + ev.col * cellSize + cellSize / 2,
+                  0,
+                  worldD / 2 - ev.row * cellSize - cellSize / 2,
+                ]}
+              />
+            ))}
           {Array.from({ length: gridX + 1 }, (_, i) => {
             const x = -worldW / 2 + i * cellSize;
             const points = [

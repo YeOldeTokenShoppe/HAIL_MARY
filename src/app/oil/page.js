@@ -18,7 +18,7 @@ import ThirdwebBuyModal from "@/components/ThirdwebBuyModal";
 import CyberNav from "@/components/CyberNav";
 import PolaroidSnapshot from "@/components/PolaroidSnapshot";
 import Fireworks from "@/components/Fireworks";
-import { db, storage, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, ref, uploadBytes, getDownloadURL, onSnapshot, collection, query, where } from "@/lib/firebaseClient";
+import { db, storage, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, ref, uploadBytes, getDownloadURL, onSnapshot, collection, query, where, addDoc } from "@/lib/firebaseClient";
 import RogueAdminPanel from "@/components/RogueAdminPanel";
 
 // ── Environment presets ──────────────────────────────────────────────────────
@@ -515,6 +515,17 @@ export default function OilPage() {
     return () => unsub();
   }, []);
 
+  // Gusher events — live listener for active oil gushers across all players
+  const [gusherEvents, setGusherEvents] = useState([]);
+  useEffect(() => {
+    if (!db) return;
+    const q = query(collection(db, "gusherEvents"), where("status", "==", "active"));
+    const unsub = onSnapshot(q, (snap) => {
+      setGusherEvents(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, []);
+
   // Auto-select the target cell when a rogue event appears so its addons are visible
   useEffect(() => {
     if (rogueEvents.length === 0) return;
@@ -1002,10 +1013,27 @@ export default function OilPage() {
         ...(username.trim() ? { username: username.trim() } : {}),
         updatedAt: serverTimestamp(),
       }, { merge: true });
+      // Broadcast gusher event if oil exists at this depth
+      const oilAtDepth = stats.grid3D[col]?.[row]?.[nextDay - 1] ?? 0;
+      if (oilAtDepth > 0) {
+        try {
+          await addDoc(collection(db, "gusherEvents"), {
+            col,
+            row,
+            userId: user.id,
+            username: username.trim() || "Anonymous",
+            oilAmount: oilAtDepth,
+            createdAt: serverTimestamp(),
+            status: "active",
+          });
+        } catch (e) {
+          console.error("Failed to write gusher event:", e);
+        }
+      }
     } catch (err) {
       console.error("Failed to save drill:", err);
     }
-  }, [user?.id, selectedX, sliceY, userDrill, drillStatus, todayUTC, username]);
+  }, [user?.id, selectedX, sliceY, userDrill, drillStatus, todayUTC, username, stats.grid3D]);
 
   // Tank drain handler — always updates UI, persists to Firestore when possible
   const handleTankDrain = useCallback(async () => {
@@ -1045,8 +1073,17 @@ export default function OilPage() {
       } catch (err) {
         console.error("Failed to save tank drain:", err);
       }
+      // Mark this user's active gusher events as done
+      const myGushers = gusherEvents.filter((e) => e.userId === user.id);
+      for (const ev of myGushers) {
+        try {
+          await updateDoc(doc(db, "gusherEvents", ev.id), { status: "done" });
+        } catch (e) {
+          // ignore — may already be done
+        }
+      }
     }
-  }, [user?.id, userDrill, playerExtracted, lastDrainSnapshot, username]);
+  }, [user?.id, userDrill, playerExtracted, lastDrainSnapshot, username, gusherEvents]);
 
   // Legacy demo drill (admin inspector)
   const handleDrill = useCallback(() => {
@@ -1620,6 +1657,44 @@ export default function OilPage() {
     </div>
   );
 
+  // Test gusher toggle — spawns 1-3 fake gusher events, stays until stopped
+  const testGushersActive = gusherEvents.some((e) => e.userId?.startsWith("test-gusher-"));
+  const handleToggleTestGushers = useCallback(async () => {
+    if (!db) return;
+    if (testGushersActive) {
+      // Stop: mark all test gushers as done
+      try {
+        const { getDocs: gd } = await import("firebase/firestore");
+        const snap = await gd(query(collection(db, "gusherEvents"), where("status", "==", "active")));
+        await Promise.all(snap.docs.filter((d) => d.data().userId?.startsWith("test-gusher-")).map((d) =>
+          updateDoc(doc(db, "gusherEvents", d.id), { status: "done" })
+        ));
+      } catch (e) {
+        console.error("Failed to stop test gushers:", e);
+      }
+    } else {
+      // Start: spawn 1-3 test gushers
+      const count = Math.min(3, Math.floor(Math.random() * 3) + 1);
+      for (let i = 0; i < count; i++) {
+        const col = Math.floor(Math.random() * gridSize);
+        const row = Math.floor(Math.random() * gridSize);
+        try {
+          await addDoc(collection(db, "gusherEvents"), {
+            col,
+            row,
+            userId: `test-gusher-${Date.now()}-${i}`,
+            username: "ADMIN TEST",
+            oilAmount: 999,
+            createdAt: serverTimestamp(),
+            status: "active",
+          });
+        } catch (e) {
+          console.error("Failed to write test gusher:", e);
+        }
+      }
+    }
+  }, [gridSize, testGushersActive]);
+
   // ═══════════════════════════════════════════════════════════
   // ADMIN PASSWORD GATE
   // ═══════════════════════════════════════════════════════════
@@ -1785,6 +1860,28 @@ export default function OilPage() {
     }}>
       GAME ENDED — <a href="/oil?mode=report" style={{ color: theme.accent, textDecoration: "underline" }}>VIEW REPORT</a>
     </div>
+  );
+
+  const testGusherButton = isAdmin && adminAuthed && (
+    <button
+      onClick={handleToggleTestGushers}
+      style={{
+        padding: "10px 20px",
+        background: testGushersActive ? "linear-gradient(180deg, #5a2010, #8a3020)" : "linear-gradient(180deg, #1a0e05, #3a2010)",
+        border: `1px solid ${testGushersActive ? "#b04030" : "#5a4020"}`,
+        borderRadius: 3,
+        color: testGushersActive ? "#ff9966" : "#d4a854",
+        fontFamily: "'Share Tech Mono', monospace",
+        fontSize: 11,
+        letterSpacing: "0.12em",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+      }}
+    >
+      {testGushersActive ? "STOP GUSHERS" : "TEST GUSHERS (1-3)"}
+    </button>
   );
 
   // Mode badge for header
@@ -2219,6 +2316,8 @@ export default function OilPage() {
                     onTankDrain={handleTankDrain}
                     communityOil={communityOil}
                     rogueEvents={rogueEvents}
+                    gusherEvents={gusherEvents}
+                    currentUserId={user?.id}
                   />
                 </group>
                 <CctvRenderer canvasRef={cctvCanvasRef} />
@@ -2364,6 +2463,11 @@ export default function OilPage() {
           {playerDrillPanel}
           {isAdmin && parametersPanel}
           {isAdmin && <RogueAdminPanel rogueEvents={rogueEvents} gridSize={gridSize} darkMode={darkMode} adminPassword={adminPassword} />}
+          {testGusherButton && (
+            <div style={{ ...m.section, display: "flex", justifyContent: "center" }}>
+              {testGusherButton}
+            </div>
+          )}
           {(isAdmin || isReport) && demoDrillPanel}
           {(isAdmin || isReport) && inspectorPanel}
           {statsPanel}
@@ -2543,6 +2647,8 @@ export default function OilPage() {
                 onTankDrain={handleTankDrain}
                 communityOil={communityOil}
                 rogueEvents={rogueEvents}
+                gusherEvents={gusherEvents}
+                currentUserId={user?.id}
               />
             </group>
             <CctvRenderer canvasRef={cctvCanvasRef} />
@@ -2726,6 +2832,11 @@ export default function OilPage() {
                 gridX={gridSize}
                 gridY={gridSize}
               />
+            )}
+            {testGusherButton && (
+              <div style={{ ...styles.panelSection, display: "flex", justifyContent: "center" }}>
+                {testGusherButton}
+              </div>
             )}
             {endGameButton && (
               <div style={{ ...styles.panelSection, display: "flex", justifyContent: "center" }}>

@@ -279,6 +279,13 @@
         allow delete: if false;
       }
 
+      // Gusher events — broadcast oil strikes to all players
+      match /gusherEvents/{docId} {
+        allow read: if true;
+        allow create, update: if true;
+        allow delete: if false;
+      }
+
       // Telegram linking — server writes via webhook, read by API route
       match /oilTelegram/{docId} {
         allow read: if true;
