@@ -241,6 +241,129 @@ const _oilDropletTex = (() => {
   return tex;
 })();
 
+// ── Oil Geyser Shader (GPU-driven upward gusher) ────────────────────────────
+const _geyserVertexShader = `
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+const _geyserFragmentShader = `
+precision highp float;
+varying vec2 vUv;
+uniform float uTime;
+uniform float uOpacity;
+uniform vec2 uResolution;
+
+// Hash and noise
+vec2 hash(vec2 p) {
+  p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+  return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
+}
+
+float noise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(dot(hash(i), f),
+                 dot(hash(i + vec2(1.0, 0.0)), f - vec2(1.0, 0.0)), u.x),
+             mix(dot(hash(i + vec2(0.0, 1.0)), f - vec2(0.0, 1.0)),
+                 dot(hash(i + vec2(1.0, 1.0)), f - vec2(1.0, 1.0)), u.x), u.y);
+}
+
+float fbm(vec2 p) {
+  float v = 0.0, a = 0.5;
+  mat2 rot = mat2(cos(0.5), sin(0.5), -sin(0.5), cos(0.5));
+  for (int i = 0; i < 6; i++) {
+    v += a * noise(p);
+    p = rot * p * 2.0;
+    a *= 0.5;
+  }
+  return v;
+}
+
+void main() {
+  float x = vUv.x - 0.5;
+  float y = vUv.y;
+
+  float T = uTime;
+
+  // ── Fast scrolling noise layers that rush UPWARD ──
+  // Key: subtract time from y so the pattern moves up
+  float scroll1 = fbm(vec2(x * 8.0, y * 5.0 - T * 4.0));
+  float scroll2 = fbm(vec2(x * 12.0 + 3.7, y * 8.0 - T * 6.0 + 1.3));
+  float scroll3 = fbm(vec2(x * 20.0 - 1.1, y * 12.0 - T * 9.0 + 5.7));
+
+  // Combine into turbulent displacement
+  float turb = scroll1 * 0.5 + scroll2 * 0.3 + scroll3 * 0.2;
+
+  // ── Column shape: narrow jet at base, cresting cap that curls back down ──
+  float baseWidth = 0.06;
+  float spread = 0.35 * y * y; // quadratic spread up the jet
+  float wobble = scroll1 * 0.1 * y;
+
+  // Cap zone: oil mushrooms outward starting at y ~0.55
+  float capZone = smoothstep(0.55, 0.78, y);
+  float capBulge = capZone * 0.28;
+  // Lobes push outward from center
+  float capLobe = capZone * sign(x + 0.001) * (fbm(vec2(abs(x) * 6.0 - T * 1.5, y * 4.0 + T * 2.0)) * 0.12);
+
+  float columnWidth = baseWidth + spread + capBulge + abs(capLobe);
+  float xOff = x + wobble + capLobe;
+  // Soft inner edge: in the cap, the boundary becomes a wide gentle gradient
+  float innerEdge = mix(columnWidth * 0.3, columnWidth * 0.0, capZone);
+  float shape = smoothstep(columnWidth, innerEdge, abs(xOff));
+
+  // ── Vertical profile ──
+  float coreDensity = smoothstep(0.0, 0.08, y);
+
+  // Stay solid throughout — no smoke dissipation
+  float wispiness = mix(0.85, 0.4, y); // less wispy overall, stays denser
+  float density = mix(turb * 0.5 + 0.5, 1.0, wispiness) * coreDensity;
+
+  // Chaotic blobs rushing upward
+  float blobs = noise(vec2(x * 15.0, y * 10.0 - T * 7.0));
+  blobs = smoothstep(0.1, 0.5, blobs) * (1.0 - y * 0.3);
+  density = max(density, blobs * 0.8);
+
+  // Dense cap fill — stays opaque, not smoky
+  float capDensity = capZone * (fbm(vec2(sign(x + 0.001) * abs(x) * 2.0 - sign(x + 0.001) * T * 2.0, y * 5.0 - T * 0.8)) * 0.4 + 0.6);
+  density = mix(density, max(density, capDensity), capZone);
+
+  // ── Color: very dark oil with occasional slick highlights ──
+  vec3 darkOil = vec3(0.03, 0.015, 0.008);
+  vec3 midOil = vec3(0.08, 0.04, 0.02);
+  vec3 highlight = vec3(0.15, 0.10, 0.06);
+
+  float colorNoise = scroll2 * 0.5 + 0.5;
+  vec3 col = mix(darkOil, midOil, colorNoise);
+  col = mix(col, highlight, pow(max(density, 0.0), 4.0) * 0.6);
+
+  // ── Alpha compositing ──
+  float alpha = shape * density * uOpacity;
+  // Solid core boost
+  float coreBoost = smoothstep(columnWidth * 0.5, 0.0, abs(xOff)) * coreDensity * 0.5;
+  alpha = min(alpha + coreBoost * uOpacity, 1.0);
+
+  // Dome fade: radial distance from a point at top-center of the gusher
+  // This naturally rounds the top into a dome shape
+  float domeCenter = 0.65; // y-center of the dome
+  float dx = x * 1.8; // stretch x so dome is taller than wide
+  float dy = max(y - domeCenter, 0.0); // only fade above dome center
+  float domeDist = sqrt(dx * dx + dy * dy);
+  float domeFade = smoothstep(0.4, 0.05, domeDist);
+
+  // Edge fade — sides and bottom
+  float edgeFade = smoothstep(0.0, 0.03, vUv.x) * smoothstep(1.0, 0.97, vUv.x)
+                 * smoothstep(0.0, 0.02, y) * domeFade;
+  alpha *= edgeFade;
+
+  gl_FragColor = vec4(col, alpha);
+}
+`;
+
 // ── Tank liquid fill (animated, flat-topped) ────────────────────────────────
 
 const PUMPJACK_SCALE = 0.1;
@@ -1211,38 +1334,26 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     }
   }, []);
 
-  // Oil gusher particles — only active on highlighted rig
-  const PARTICLE_COUNT = 1000;
+  // Oil geyser shader — only active on highlighted rig
   const gusherActiveRef = useRef(false);
   const gusherTimerRef = useRef(0);
-  const particlePosRef = useRef(new Float32Array(PARTICLE_COUNT * 3));
-  const particleVelRef = useRef(new Float32Array(PARTICLE_COUNT * 3));
-  const particleLifeRef = useRef(new Float32Array(PARTICLE_COUNT));
-  const particleGeoRef = useRef();
-  const particleMatRef = useRef();
+  const geyserMeshRef = useRef();
+  const geyserMatRef = useRef();
+  const geyserUniforms = useRef({
+    uTime: { value: 0 },
+    uOpacity: { value: 1.0 },
+    uResolution: { value: new THREE.Vector2(256, 512) },
+  });
 
   const initGusher = useCallback(() => {
-    const pos = particlePosRef.current;
-    const vel = particleVelRef.current;
-    const life = particleLifeRef.current;
-    const wp = gusherOriginRef.current;
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      const i3 = i * 3;
-      // Start at the Well position
-      pos[i3]     = wp.x + (Math.random() - 0.5) * 0.08;
-      pos[i3 + 1] = wp.y;
-      pos[i3 + 2] = wp.z + (Math.random() - 0.5) * 0.08;
-      // Shoot upward with spread — stagger launch times via life
-      vel[i3]     = (Math.random() - 0.5) * 0.4;
-      vel[i3 + 1] = 1.5 + Math.random() * 2.0;
-      vel[i3 + 2] = (Math.random() - 0.5) * 0.4;
-      life[i] = -(i / PARTICLE_COUNT) * 0.4; // stagger spawns
-    }
     gusherActiveRef.current = true;
     gusherTimerRef.current = 0;
-    // Force geometry update immediately
-    if (particleGeoRef.current) {
-      particleGeoRef.current.attributes.position.needsUpdate = true;
+    if (geyserMatRef.current) {
+      geyserMatRef.current.uniforms.uTime.value = 0;
+      geyserMatRef.current.uniforms.uOpacity.value = 1.0;
+    }
+    if (geyserMeshRef.current) {
+      geyserMeshRef.current.visible = true;
     }
   }, []);
 
@@ -1472,75 +1583,31 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       }
     }
 
-    // Oil gusher particle update
+    // Oil geyser shader update
     if (gusherActiveRef.current) {
+      // Ensure mesh is visible (ref may not have been ready when initGusher fired)
+      if (geyserMeshRef.current && !geyserMeshRef.current.visible) {
+        geyserMeshRef.current.visible = true;
+      }
       gusherTimerRef.current += delta;
       const GUSHER_DURATION = 3.0;
-      const GUSHER_RANGE = 1.5; // recycle when particle drifts this far from origin
-      const pos = particlePosRef.current;
-      const vel = particleVelRef.current;
-      const life = particleLifeRef.current;
-      const GRAVITY = -3.5;
-      let allDead = true;
 
       const effectiveFill = (drainingRef.current || drainedRef.current) ? drainFillRef.current : tankFillRef.current;
       const overflowing = effectiveFill >= 1.0 && highlighted;
-      const wp = gusherOriginRef.current;
 
-      const respawn = (i) => {
-        const i3 = i * 3;
-        pos[i3]     = wp.x + (Math.random() - 0.5) * 0.08;
-        pos[i3 + 1] = wp.y;
-        pos[i3 + 2] = wp.z + (Math.random() - 0.5) * 0.08;
-        vel[i3]     = (Math.random() - 0.5) * 0.4;
-        vel[i3 + 1] = 1.5 + Math.random() * 2.0;
-        vel[i3 + 2] = (Math.random() - 0.5) * 0.4;
-        life[i] = 0;
-      };
-
-      for (let i = 0; i < PARTICLE_COUNT; i++) {
-        life[i] += delta;
-        if (life[i] < 0) { allDead = false; continue; } // not yet spawned
-
-        const i3 = i * 3;
-
-        // Bounds-based recycling (like the canvas gusher): respawn when
-        // particle falls below floor or drifts too far from origin
-        const outOfBounds = overflowing && (
-          pos[i3 + 1] < 0.02 ||
-          Math.abs(pos[i3] - wp.x) > GUSHER_RANGE ||
-          Math.abs(pos[i3 + 2] - wp.z) > GUSHER_RANGE
-        );
-
-        if (outOfBounds) {
-          respawn(i);
-          allDead = false;
-          continue;
-        }
-
-        // Time-based expiry for one-shot gushers (oil strike, not overflow)
-        if (!overflowing && life[i] > GUSHER_DURATION) continue;
-
-        allDead = false;
-        vel[i3 + 1] += GRAVITY * delta;
-        pos[i3]     += vel[i3] * delta;
-        pos[i3 + 1] += vel[i3 + 1] * delta;
-        pos[i3 + 2] += vel[i3 + 2] * delta;
-      }
-
-      if (particleGeoRef.current) {
-        particleGeoRef.current.attributes.position.needsUpdate = true;
-      }
-      if (particleMatRef.current) {
+      if (geyserMatRef.current) {
+        geyserMatRef.current.uniforms.uTime.value += delta;
+        // Fade out near end of one-shot gusher
         const fade = overflowing ? 1.0
           : gusherTimerRef.current > GUSHER_DURATION - 1.0
             ? Math.max(0, GUSHER_DURATION - gusherTimerRef.current)
             : 1.0;
-        particleMatRef.current.opacity = fade * 0.85;
+        geyserMatRef.current.uniforms.uOpacity.value = fade;
       }
 
-      if (allDead || (gusherTimerRef.current > GUSHER_DURATION && !overflowing)) {
+      if (gusherTimerRef.current > GUSHER_DURATION && !overflowing) {
         gusherActiveRef.current = false;
+        if (geyserMeshRef.current) geyserMeshRef.current.visible = false;
       }
     }
 
@@ -1638,22 +1705,12 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         drainFillRef.current = Math.min(tankFillRef.current, 1.0);
         setTankDraining(true);
 
-        // Kill gusher particles immediately
+        // Kill geyser immediately
         gusherActiveRef.current = false;
         strikingRef.current = false;
         strikeFlashRef.current = false;
-
-        // Hide particles by zeroing opacity and moving them off-screen
-        if (particleMatRef.current) {
-          particleMatRef.current.opacity = 0;
-        }
-        const pos = particlePosRef.current;
-        for (let i = 0; i < PARTICLE_COUNT; i++) {
-          pos[i * 3 + 1] = -10; // below ground
-        }
-        if (particleGeoRef.current) {
-          particleGeoRef.current.attributes.position.needsUpdate = true;
-        }
+        if (geyserMeshRef.current) geyserMeshRef.current.visible = false;
+        if (geyserMatRef.current) geyserMatRef.current.uniforms.uOpacity.value = 0;
       }
       return;
     }
@@ -1691,27 +1748,35 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
             distance={5}
             decay={1.5}
           />
-          {/* Oil gusher particles */}
-          <points renderOrder={10}>
-            <bufferGeometry ref={particleGeoRef}>
-              <bufferAttribute
-                attach="attributes-position"
-                args={[particlePosRef.current, 3]}
-                count={PARTICLE_COUNT}
-              />
-            </bufferGeometry>
-            <pointsMaterial
-              ref={particleMatRef}
-              color={0x1a0e05}
-              size={0.02}
-              map={_oilDropletTex}
+          {/* Oil geyser shader plane */}
+          <mesh
+            ref={geyserMeshRef}
+            visible={false}
+            renderOrder={10}
+            position={[
+              gusherOriginRef.current.x,
+              gusherOriginRef.current.y + 1.0,
+              gusherOriginRef.current.z
+            ]}
+            onBeforeRender={(renderer, scene, camera) => {
+              // Y-axis locked billboard: face camera horizontally only
+              const mesh = geyserMeshRef.current;
+              if (!mesh) return;
+              const camPos = camera.getWorldPosition(new THREE.Vector3());
+              const meshPos = mesh.getWorldPosition(new THREE.Vector3());
+              mesh.lookAt(camPos.x, meshPos.y, camPos.z);
+            }}
+          >
+            <planeGeometry args={[0.9, 2.0]} />
+            <shaderMaterial
+              ref={geyserMatRef}
+              vertexShader={_geyserVertexShader}
+              fragmentShader={_geyserFragmentShader}
               transparent
-              opacity={0.5}
               depthWrite={false}
-              depthTest={false}
-              sizeAttenuation
+              uniforms={geyserUniforms.current}
             />
-          </points>
+          </mesh>
           {/* Steam vent particles */}
           <points>
             <bufferGeometry ref={steamGeoRef}>
@@ -1812,7 +1877,7 @@ function TowerLiquid({ towerBounds, position, fill, scale }) {
   );
 }
 
-function OilTower({ position, communityOil = 0, totalOilBudget = 100000000 }) {
+function OilTower({ position, communityOil = 0, totalOilBudget = 500 }) {
   const { scene } = useGLTF("/models/OilTower.glb");
   const clonedScene = useMemo(() => scene.clone(true), [scene]);
 
@@ -1859,7 +1924,7 @@ function OilTower({ position, communityOil = 0, totalOilBudget = 100000000 }) {
 
 useGLTF.preload("/models/OilTower.glb");
 
-function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 100000000 }) {
+function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500 }) {
   const { scene, animations } = useGLTF("/models/oilJack_fancy_allProps.glb");
   const envMap = useEnvironment({ preset: "studio" });
 
@@ -2075,7 +2140,7 @@ export default function OilVoxelGrid({
   depthZ = 20,
   cellSize = 1,
   numberOfDeposits = 8,
-  totalOilBudget = 500000,
+  totalOilBudget = 500,
   revealProgress = 0,
   animateReveal = false,
   revealDuration = 2,

@@ -139,7 +139,7 @@ const DEFAULT_BLOCK_HASH =
 
 const DEPTH_Z = 20;
 const CELL_SIZE = 1;
-const TANK_CAPACITY = 100_000;
+const TANK_CAPACITY = 5;
 
 // Continuous orbit exactly like the Three.js horse example. Stops when user interacts.
 function CameraFlyIn({ onComplete, mobile = false }) {
@@ -450,9 +450,10 @@ export default function OilPage() {
   const [mounted, setMounted] = useState(false);
   const [introComplete, setIntroComplete] = useState(false);
   const [numberOfDeposits, setNumberOfDeposits] = useState(8);
-  const [totalOilBudget, setTotalOilBudget] = useState(100_000_000);
+  const [totalOilBudget, setTotalOilBudget] = useState(500);
   const [gridSize, setGridSize] = useState(10);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [showMainTankInfo, setShowMainTankInfo] = useState(false);
 
   // ── Firestore game settings sync ──
   // Subscribe to oilGame/settings — all modes get live updates
@@ -1230,7 +1231,7 @@ export default function OilPage() {
       <div style={styles.paramRow}>
         <span style={styles.paramLabel}>OIL BUDGET</span>
         <div style={styles.paramButtons}>
-          {[10_000_000, 50_000_000, 100_000_000, 500_000_000].map((n) => (
+          {[100, 250, 500, 1000].map((n) => (
             <button
               key={n}
               onClick={() => { setTotalOilBudget(n); handleReset(); saveGameSettings({ totalOilBudget: n }); }}
@@ -1364,7 +1365,7 @@ export default function OilPage() {
     <div style={isMobile ? m.section : styles.panelSection}>
       <h3 style={isMobile ? m.sectionTitle : styles.panelTitle}>GEOLOGICAL SURVEY</h3>
       <div style={isMobile ? m.statGrid : styles.statGrid}>
-        <StatBlock s={styles} accentColor={theme.accent} label="TOTAL OIL" value={<AnimNum value={stats.totalOil} />} unit="RL80" accent />
+        <StatBlock s={styles} accentColor={theme.accent} label="TOTAL OIL" value={<AnimNum value={stats.totalOil} />} unit="USDC" accent />
         <StatBlock s={styles} accentColor={theme.accent} label="DEPOSITS" value={stats.deposits.length} />
         <StatBlock s={styles} accentColor={theme.accent} label="CLAIMS" value={gridSize * gridSize} />
         <StatBlock s={styles} accentColor={theme.accent} label="% COLLECTED" value={stats.totalOil > 0 ? `${(playerExtracted / stats.totalOil * 100).toFixed(2)}%` : "0%"} accent={playerExtracted > 0} />
@@ -1372,12 +1373,12 @@ export default function OilPage() {
         {!isAdmin && !isReport && effectiveDrillDay > 0 && (
           <>
             <StatBlock s={styles} accentColor={theme.accent} label="YOUR DEPTH" value={`${effectiveDrillDay}/${DEPTH_Z}`} unit="LVL" accent />
-            <StatBlock s={styles} accentColor={theme.accent} label="EXTRACTED" value={<AnimNum value={playerExtracted} />} unit="RL80" accent />
+            <StatBlock s={styles} accentColor={theme.accent} label="EXTRACTED" value={<AnimNum value={playerExtracted} />} unit="USDC" accent />
           </>
         )}
         {(isAdmin || isReport) && (
           <>
-            <StatBlock s={styles} accentColor={theme.accent} label="PEAK CELL" value={<AnimNum value={stats.maxClaimTotal} />} unit="RL80" />
+            <StatBlock s={styles} accentColor={theme.accent} label="PEAK CELL" value={<AnimNum value={stats.maxClaimTotal} />} unit="USDC" />
             <StatBlock s={styles} accentColor={theme.accent} label="DRY CLAIMS" value={stats.dryClaims} />
           </>
         )}
@@ -1406,7 +1407,27 @@ export default function OilPage() {
         </div>
         <div style={{ width: 1, background: theme.border }} />
         <div style={{ textAlign: "center", flex: 1 }}>
-          <div style={{ fontSize: 10, letterSpacing: "0.12em", color: theme.muted, marginBottom: 2 }}>COMMUNITY OIL</div>
+          <div style={{ fontSize: 10, letterSpacing: "0.12em", color: theme.muted, marginBottom: 2, display: "flex", alignItems: "center", justifyContent: "center", gap: 4, position: "relative" }}>
+            MAIN TANK
+            <span
+              onClick={() => setShowMainTankInfo(p => !p)}
+              onMouseEnter={() => setShowMainTankInfo(true)}
+              onMouseLeave={() => setShowMainTankInfo(false)}
+              style={{ cursor: "pointer", fontSize: 11, color: theme.accent, lineHeight: 1, userSelect: "none" }}
+            >&#9432;</span>
+            {showMainTankInfo && (
+              <div style={{
+                position: "absolute", top: "100%", right: 0,
+                marginTop: 4, padding: "5px 10px", background: theme.panelBg,
+                border: `1px solid ${theme.border}`, borderRadius: 3,
+                fontSize: 9, color: theme.text, width: 180, textAlign: "left", zIndex: 10,
+                fontFamily: "'Share Tech Mono', monospace", letterSpacing: "0.04em",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+              }}>
+                Amt collected by users and sent to main holding tank
+              </div>
+            )}
+          </div>
           <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "'Orbitron', monospace", color: theme.green }}>{communityOil.toLocaleString()}</div>
         </div>
       </div>
@@ -1439,7 +1460,7 @@ export default function OilPage() {
                 fontSize: 11, color: theme.accent, fontFamily: "'Share Tech Mono', monospace",
                 whiteSpace: "nowrap", marginLeft: 8,
               }}>
-                {(d.totalCollected || 0).toLocaleString()} RL80
+                {(d.totalCollected || 0).toLocaleString()} USDC
               </span>
             </div>
           ))}
@@ -1474,7 +1495,7 @@ export default function OilPage() {
                 fontSize: 11, color: theme.accent, fontFamily: "'Share Tech Mono', monospace",
                 whiteSpace: "nowrap", marginLeft: 8,
               }}>
-                {(d.totalCollected || 0).toLocaleString()} RL80
+                {(d.totalCollected || 0).toLocaleString()} USDC
               </span>
             </div>
           ))}
@@ -1506,7 +1527,7 @@ export default function OilPage() {
             </div>
             <div style={styles.inspectorRow}>
               <span style={styles.inspectorKey}>Total Oil:</span>
-              <span style={styles.inspectorVal}>{selectedData.total.toLocaleString()} RL80</span>
+              <span style={styles.inspectorVal}>{selectedData.total.toLocaleString()} USDC</span>
             </div>
             <div style={styles.inspectorRow}>
               <span style={styles.inspectorKey}>Richest Depth:</span>
@@ -1540,14 +1561,14 @@ export default function OilPage() {
               <div style={styles.inspectorRow}>
                 <span style={{ ...styles.inspectorKey, color: theme.green }}>Extracted:</span>
                 <span style={{ ...styles.inspectorVal, color: theme.green }}>
-                  {selectedData.extracted.toLocaleString()} RL80
+                  {selectedData.extracted.toLocaleString()} USDC
                 </span>
               </div>
               {drillDepth < DEPTH_Z && selectedData.missed > 0 && (
                 <div style={styles.inspectorRow}>
                   <span style={{ ...styles.inspectorKey, color: theme.warn }}>Underground:</span>
                   <span style={{ ...styles.inspectorVal, color: theme.warn }}>
-                    {selectedData.missed.toLocaleString()} RL80
+                    {selectedData.missed.toLocaleString()} USDC
                   </span>
                 </div>
               )}
@@ -2281,7 +2302,7 @@ export default function OilPage() {
       )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
         <span style={{ fontSize: 11, letterSpacing: "0.1em", color: theme.green }}>
-          EXTRACTED: {playerExtracted.toLocaleString()} RL80
+          EXTRACTED: {playerExtracted.toLocaleString()} USDC
         </span>
         <span style={{ fontSize: 11, letterSpacing: "0.1em", color: theme.accent }}>
           DEPTH {effectiveDrillDay}/{DEPTH_Z}
@@ -2362,7 +2383,7 @@ export default function OilPage() {
         )}
         {tankDrained && (
           <div style={{ fontSize: 10, letterSpacing: "0.15em", color: theme.green, marginTop: 2, textAlign: "right" }}>
-            SENT TO COMMUNITY STORAGE
+            SENT TO MAIN TANK
           </div>
         )}
       </div>
@@ -2376,7 +2397,7 @@ export default function OilPage() {
             SENT TO STORAGE
           </span>
           <span style={{ fontSize: 11, letterSpacing: "0.08em", color: theme.green, fontWeight: 700 }}>
-            {(activeUserDrill.totalCollected || 0).toLocaleString()} RL80
+            {(activeUserDrill.totalCollected || 0).toLocaleString()} USDC
           </span>
         </div>
       )}
