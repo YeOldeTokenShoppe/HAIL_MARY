@@ -173,10 +173,13 @@ const THEME_PRESETS = {
 
 // ── Panel component ──────────────────────────────────────────────────────────
 
-export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode = false, hasSelection, onSave, saving, dirty, isSignedIn, defaultExpanded = false, userId }) {
+export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode = false, hasSelection, onSave, saving, dirty, isSignedIn, defaultExpanded = false, userId, readOnly = false }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [activeZone, setActiveZone] = useState(null);
   const [pickerSlot, setPickerSlot] = useState(null); // which slot is picking an addon
+
+  // Block all edits when viewing someone else's config
+  if (readOnly) onChange = () => {};
 
   // Dark/light color tokens
   const c = darkMode ? {
@@ -692,7 +695,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
           </div>
 
           {/* Save button */}
-          {isSignedIn && hasSelection && (
+          {isSignedIn && hasSelection && !readOnly && (
             <>
               <div style={{ ...styles.divider, background: c.border }} />
               <button

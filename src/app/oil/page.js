@@ -20,6 +20,7 @@ import PolaroidSnapshot from "@/components/PolaroidSnapshot";
 import Fireworks from "@/components/Fireworks";
 import { db, storage, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, ref, uploadBytes, getDownloadURL, onSnapshot, collection, query, where, addDoc } from "@/lib/firebaseClient";
 import RogueAdminPanel from "@/components/RogueAdminPanel";
+import useCctvRecorder from "@/hooks/useCctvRecorder";
 
 // ── Environment presets ──────────────────────────────────────────────────────
 const ENV_PRESETS = {
@@ -217,7 +218,11 @@ function CameraFlyTo({ target, controlsRef }) {
         startPos.current.copy(camera.position);
         startTarget.current.copy(controls.target);
 
-        if (target.mobile) {
+        if (target.overview) {
+          // Zoom out to overview
+          endTarget.current.set(0, target.mobile ? 2 : 5, 0);
+          endPos.current.set(target.x, target.y, target.z);
+        } else if (target.mobile) {
           // Mobile: close ground-level view of the rig
           endTarget.current.set(target.x, target.y - 0.1, target.z);
           endPos.current.set(target.x + 0.35, target.y - 0.05, target.z + 0.35);
@@ -245,6 +250,11 @@ function CameraFlyTo({ target, controlsRef }) {
 
     if (progressRef.current >= 1) {
       flyingRef.current = false;
+      // Restore minDistance after zoom-out
+      if (target?.overview && savedMinDist.current !== null) {
+        controls.minDistance = savedMinDist.current;
+        savedMinDist.current = null;
+      }
     }
   });
 
@@ -526,15 +536,23 @@ export default function OilPage() {
     return () => unsub();
   }, []);
 
-  // Auto-select the target cell when a rogue event appears so its addons are visible
+  // All pump configs — live listener so every player's customizations show in broad view
+  // Stores { config, userId } per cell for rendering + ownership lookup
+  const [allPumpConfigs, setAllPumpConfigs] = useState({});
   useEffect(() => {
-    if (rogueEvents.length === 0) return;
-    const latest = rogueEvents[rogueEvents.length - 1];
-    if (latest.targetCol != null && latest.targetRow != null) {
-      setSelectedX(latest.targetCol);
-      setSliceY(latest.targetRow);
-    }
-  }, [rogueEvents]);
+    if (!db) return;
+    const unsub = onSnapshot(collection(db, "pumpConfigs"), (snap) => {
+      const map = {};
+      snap.docs.forEach((d) => {
+        const data = d.data();
+        if (data.col != null && data.row != null && data.config) {
+          map[`${data.col}_${data.row}`] = { config: data.config, userId: data.userId || null };
+        }
+      });
+      setAllPumpConfigs(map);
+    });
+    return () => unsub();
+  }, []);
 
   // Admin: save settings to Firestore when they change
   const saveGameSettings = useCallback(async (overrides = {}) => {
@@ -666,6 +684,70 @@ export default function OilPage() {
   const [configDirty, setConfigDirty] = useState(false);
   const cctvCanvasRef = useRef(null);
   const [cctvOpen, setCctvOpen] = useState(true);
+  // Use the cell owner's ID for recording attribution (admin records on behalf of camera owner)
+  const cellOwnerId = selectedX !== null ? (allPumpConfigs[`${selectedX}_${sliceY}`]?.userId || user?.id) : user?.id;
+  const { isRecording, recordings, playbackUrl, setPlaybackUrl, startRecording, stopRecording } = useCctvRecorder(cctvCanvasRef, selectedX, sliceY, cellOwnerId);
+
+  // CCTV auto-record: triggered by rogue arrival callback + gusher effect
+  const recordedEventsRef = useRef(new Set());
+
+  // Rogue recording — fires when the rogue character actually arrives at the target cell
+  const handleRogueArrive = useCallback((ev) => {
+    // Check camera from allPumpConfigs (already loaded) — pumpConfig may still be loading
+    const cellKey = `${ev.targetCol}_${ev.targetRow}`;
+    const cellCfg = allPumpConfigs[cellKey]?.config;
+    if (!cellCfg?.showCamera) return;
+    if (recordedEventsRef.current.has(ev.id)) return;
+    recordedEventsRef.current.add(ev.id);
+    startRecording({ eventId: ev.id, eventType: "rogue", col: ev.targetCol, row: ev.targetRow });
+  }, [allPumpConfigs, startRecording]);
+
+  // Gusher recording — gushers appear instantly, so effect-based trigger is fine
+  useEffect(() => {
+    if (!pumpConfig.showCamera || gusherEvents.length === 0) return;
+    for (const ev of gusherEvents) {
+      if (recordedEventsRef.current.has(ev.id)) continue;
+      if (ev.col === selectedX && ev.row === sliceY) {
+        recordedEventsRef.current.add(ev.id);
+        startRecording({ eventId: ev.id, eventType: "gusher", col: ev.col, row: ev.row });
+        break;
+      }
+    }
+  }, [gusherEvents, selectedX, sliceY, pumpConfig.showCamera, startRecording]);
+
+  // Rogue consequence — apply addon deletion / graffiti / poop when rogue reaches target
+  const consequenceAppliedRef = useRef(new Set());
+  const handleRogueConsequence = useCallback((ev) => {
+    if (!ev.consequence || consequenceAppliedRef.current.has(ev.id)) return;
+    consequenceAppliedRef.current.add(ev.id);
+    const { type, plotDocId, addonSlot } = ev.consequence;
+    if (!plotDocId || !db) return;
+
+    // Delay so the attack animation plays before the item vanishes
+    setTimeout(async () => {
+    try {
+      if (type === "delete_addon" && addonSlot) {
+        const { deleteField } = await import("firebase/firestore");
+        await updateDoc(doc(db, "pumpConfigs", plotDocId), {
+          [`config.addons.${addonSlot}`]: deleteField(),
+          updatedAt: serverTimestamp(),
+        });
+      } else if (type === "graffiti") {
+        await updateDoc(doc(db, "pumpConfigs", plotDocId), {
+          "config.graffiti": true,
+          updatedAt: serverTimestamp(),
+        });
+      } else if (type === "poop") {
+        await updateDoc(doc(db, "pumpConfigs", plotDocId), {
+          "config.poop": true,
+          updatedAt: serverTimestamp(),
+        });
+      }
+    } catch (err) {
+      console.error("Failed to apply rogue consequence:", err);
+    }
+    }, 2000);
+  }, []);
 
   // Track unsaved changes
   const handleConfigChange = useCallback((newConfig) => {
@@ -679,18 +761,24 @@ export default function OilPage() {
     return `${user.id}_${col}_${row}`;
   }, [user?.id]);
 
-  // Load pump config when a rig is selected (live listener so rogue deletions show up)
+  // Load pump config for the selected cell (any player's config, not just yours)
+  const [configOwnerId, setConfigOwnerId] = useState(null);
   useEffect(() => {
-    if (!user?.id || !db || selectedX === null || sliceY === null) return;
-    const docId = getConfigDocId(selectedX, sliceY);
-    if (!docId) return;
+    if (!db || selectedX === null || sliceY === null) return;
 
-    const unsub = onSnapshot(doc(db, "pumpConfigs", docId), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
+    const q = query(
+      collection(db, "pumpConfigs"),
+      where("col", "==", selectedX),
+      where("row", "==", sliceY)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      if (!snap.empty) {
+        const data = snap.docs[0].data();
         setPumpConfig({ ...getDefaultPumpConfig(), ...data.config });
+        setConfigOwnerId(data.userId || null);
       } else {
         setPumpConfig(getDefaultPumpConfig());
+        setConfigOwnerId(null);
       }
       setConfigDirty(false);
     }, (err) => {
@@ -698,11 +786,14 @@ export default function OilPage() {
     });
 
     return unsub;
-  }, [user?.id, selectedX, sliceY, getConfigDocId]);
+  }, [selectedX, sliceY]);
+
+  // Can the current user edit this cell's config?
+  const isConfigOwner = !!user?.id && (configOwnerId === user.id || configOwnerId === null);
 
   // Save pump config (called from SAVE button)
   const handleConfigSave = useCallback(async () => {
-    if (!user?.id || !db || selectedX === null || sliceY === null) return;
+    if (!user?.id || !db || selectedX === null || sliceY === null || !isConfigOwner) return;
     const docId = getConfigDocId(selectedX, sliceY);
     if (!docId) return;
 
@@ -736,7 +827,7 @@ export default function OilPage() {
     } finally {
       setConfigSaving(false);
     }
-  }, [user?.id, selectedX, sliceY, pumpConfig, getConfigDocId]);
+  }, [user?.id, selectedX, sliceY, pumpConfig, getConfigDocId, isConfigOwner]);
 
   // Camera fly-to
   const [flyTarget, setFlyTarget] = useState(null);
@@ -984,7 +1075,21 @@ export default function OilPage() {
     setDrillDepth(0);
   }, [isMobile, gridSize]);
 
+  const handleZoomOut = useCallback(() => {
+    flyIdRef.current++;
+    setFlyTarget({ x: 0, y: isMobile ? 3.5 : 8, z: isMobile ? 4 : 8, id: flyIdRef.current, mobile: isMobile, overview: true });
+    setSelectedX(null);
+    setDrillDepth(0);
+  }, [isMobile]);
 
+  // Auto-select and fly to the target cell when a rogue event appears
+  useEffect(() => {
+    if (rogueEvents.length === 0) return;
+    const latest = rogueEvents[rogueEvents.length - 1];
+    if (latest.targetCol != null && latest.targetRow != null) {
+      handleFlyTo(latest.targetCol, latest.targetRow);
+    }
+  }, [rogueEvents, handleFlyTo]);
 
   const handleSelectClaim = useCallback((claim) => {
     const x = Math.max(0, Math.min(claim.x, gridSize - 1));
@@ -1627,31 +1732,136 @@ export default function OilPage() {
     `}</style>
   );
 
+  // Track viewed recordings — badge shows unwatched count
+  const [viewedRecIds, setViewedRecIds] = useState(new Set());
+  const unwatchedCount = recordings.filter((r) => !viewedRecIds.has(r.id)).length;
+
   // CCTV overlay — collapsible widget, top-left of canvas
-  const cctvOverlay = selectedX !== null && pumpConfig.showCamera && (
+  const cctvOverlay = selectedX !== null && flyTarget && pumpConfig.showCamera && (
     <div style={cctvStyles.wrap}>
       <div
         style={cctvStyles.header}
         onClick={() => setCctvOpen((o) => !o)}
       >
-        <span style={cctvStyles.rec}>&#9679; REC</span>
+        <span style={isRecording ? cctvStyles.rec : cctvStyles.recInactive}>
+          &#9679; {isRecording ? "REC" : "CAM"}
+        </span>
         <span style={cctvStyles.camLabel}>CAM-{selectedX},{sliceY}</span>
+        {unwatchedCount > 0 && (
+          <span style={cctvStyles.recCount}>{unwatchedCount}</span>
+        )}
         <span style={cctvStyles.toggle}>{cctvOpen ? "\u25B2" : "\u25BC"}</span>
       </div>
       {cctvOpen && (
         <>
-          <canvas
-            ref={cctvCanvasRef}
-            width={320}
-            height={240}
-            style={cctvStyles.canvas}
-          />
+          {playbackUrl ? (
+            <div style={{ position: "relative" }}>
+              <video
+                src={playbackUrl}
+                autoPlay
+                controls
+                style={cctvStyles.canvas}
+                onEnded={() => setPlaybackUrl(null)}
+              />
+              <div style={cctvStyles.playbackControls}>
+                <button
+                  style={cctvStyles.backToLive}
+                  onClick={() => setPlaybackUrl(null)}
+                >
+                  &#9654; LIVE
+                </button>
+                <a
+                  href={playbackUrl}
+                  download={`cctv_${selectedX}_${sliceY}.webm`}
+                  style={cctvStyles.clipAction}
+                  title="Download clip"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  &#8681;
+                </a>
+                <button
+                  style={cctvStyles.clipAction}
+                  title="Share clip"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (navigator.share) {
+                      navigator.share({
+                        title: `Security Cam ${selectedX},${sliceY}`,
+                        text: "Caught on camera! Oil Prospector security footage",
+                        url: playbackUrl,
+                      }).catch(() => {});
+                    } else {
+                      navigator.clipboard.writeText(playbackUrl).then(() => {
+                        alert("Link copied!");
+                      }).catch(() => {});
+                    }
+                  }}
+                >
+                  &#8599;
+                </button>
+              </div>
+            </div>
+          ) : (
+            <canvas
+              ref={cctvCanvasRef}
+              width={320}
+              height={240}
+              style={cctvStyles.canvas}
+            />
+          )}
           <div style={cctvStyles.scanlines} />
           <div style={cctvStyles.footer}>
             <span style={cctvStyles.timestamp}>
               {new Date().toLocaleTimeString("en-US", { hour12: false })}
             </span>
           </div>
+          {recordings.length > 0 && (
+            <div style={cctvStyles.recList}>
+              {recordings.slice(0, 5).map((r) => (
+                <div key={r.id} style={cctvStyles.recRow}>
+                  <button
+                    style={{
+                      ...cctvStyles.recBtn,
+                      ...(viewedRecIds.has(r.id) ? {} : { color: "#ff6655", border: "1px solid #ff4433" }),
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPlaybackUrl(r.downloadUrl);
+                      setViewedRecIds((prev) => new Set(prev).add(r.id));
+                    }}
+                    title={`${r.eventType} @ ${r.col},${r.row}`}
+                  >
+                    {r.eventType === "rogue" ? "R" : "G"} {new Date(r.createdAt).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                  </button>
+                  <a
+                    href={r.downloadUrl}
+                    download={`cctv_${r.eventType}_${r.col}_${r.row}.webm`}
+                    style={cctvStyles.recIcon}
+                    title="Download"
+                    onClick={(e) => e.stopPropagation()}
+                  >&#8681;</a>
+                  <button
+                    style={cctvStyles.recIcon}
+                    title="Share"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (navigator.share) {
+                        navigator.share({
+                          title: "Oil Prospector Security Cam",
+                          text: "Caught on camera!",
+                          url: r.downloadUrl,
+                        }).catch(() => {});
+                      } else {
+                        navigator.clipboard.writeText(r.downloadUrl).then(() => {
+                          alert("Link copied!");
+                        }).catch(() => {});
+                      }
+                    }}
+                  >&#8599;</button>
+                </div>
+              ))}
+            </div>
+          )}
         </>
       )}
     </div>
@@ -2310,7 +2520,9 @@ export default function OilPage() {
                     selectedRow={selectedX !== null ? sliceY : null}
                     onSelectCell={(col, row) => { setSelectedX(col); setSliceY(row); setDrillDepth(0); }}
                     onFlyTo={handleFlyTo}
+                    onZoomOut={handleZoomOut}
                     pumpConfig={pumpConfig}
+                    allPumpConfigs={allPumpConfigs}
                     oilStrike={combinedStrike}
                     tankFill={tankFill}
                     onTankDrain={handleTankDrain}
@@ -2318,6 +2530,8 @@ export default function OilPage() {
                     rogueEvents={rogueEvents}
                     gusherEvents={gusherEvents}
                     currentUserId={user?.id}
+                    onRogueArrive={handleRogueArrive}
+                    onRogueConsequence={handleRogueConsequence}
                   />
                 </group>
                 <CctvRenderer canvasRef={cctvCanvasRef} />
@@ -2476,7 +2690,7 @@ export default function OilPage() {
           {(isAdmin || isReport) && dryZonesPanel}
           {(isAdmin || isReport) && depositsPanel}
           <HowToPlayPanel isMobile darkMode={darkMode} />
-          <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} />
+          <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={!isConfigOwner} />
           {(isAdmin || isReport) && (
             <OilVerifyPanel
               numberOfDeposits={numberOfDeposits}
@@ -2641,7 +2855,9 @@ export default function OilPage() {
                 selectedRow={selectedX !== null ? sliceY : null}
                 onSelectCell={(col, row) => { setSelectedX(col); setSliceY(row); setDrillDepth(0); }}
                 onFlyTo={handleFlyTo}
+                onZoomOut={handleZoomOut}
                 pumpConfig={pumpConfig}
+                allPumpConfigs={allPumpConfigs}
                 oilStrike={combinedStrike}
                 tankFill={tankFill}
                 onTankDrain={handleTankDrain}
@@ -2649,6 +2865,8 @@ export default function OilPage() {
                 rogueEvents={rogueEvents}
                 gusherEvents={gusherEvents}
                 currentUserId={user?.id}
+                onRogueArrive={handleRogueArrive}
+                onRogueConsequence={handleRogueConsequence}
               />
             </group>
             <CctvRenderer canvasRef={cctvCanvasRef} />
@@ -2823,7 +3041,7 @@ export default function OilPage() {
             {(isAdmin || isReport) && dryZonesPanel}
             {(isAdmin || isReport) && depositsPanel}
             <HowToPlayPanel darkMode={darkMode} />
-            <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} />
+            <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={!isConfigOwner} />
             {(isAdmin || isReport) && (
               <OilVerifyPanel
                 numberOfDeposits={numberOfDeposits}
@@ -2982,6 +3200,21 @@ const cctvStyles = {
     letterSpacing: "0.1em",
     animation: "pulse 1.5s ease-in-out infinite",
   },
+  recInactive: {
+    fontSize: 9,
+    color: "#666",
+    letterSpacing: "0.1em",
+  },
+  recCount: {
+    fontSize: 8,
+    color: "#111",
+    background: "#ff3333",
+    borderRadius: 6,
+    padding: "0 4px",
+    minWidth: 14,
+    textAlign: "center",
+    lineHeight: "14px",
+  },
   camLabel: {
     fontSize: 8,
     color: "#888",
@@ -3019,6 +3252,72 @@ const cctvStyles = {
     fontSize: 8,
     color: "#888",
     letterSpacing: "0.08em",
+  },
+  playbackControls: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    display: "flex",
+    gap: 3,
+    zIndex: 2,
+  },
+  backToLive: {
+    fontSize: 8,
+    color: "#fff",
+    background: "rgba(255,50,50,0.8)",
+    border: "none",
+    borderRadius: 3,
+    padding: "2px 6px",
+    cursor: "pointer",
+    fontFamily: "'Share Tech Mono', monospace",
+    letterSpacing: "0.08em",
+  },
+  clipAction: {
+    fontSize: 10,
+    color: "#fff",
+    background: "rgba(0,0,0,0.6)",
+    border: "1px solid #555",
+    borderRadius: 3,
+    padding: "1px 5px",
+    cursor: "pointer",
+    fontFamily: "'Share Tech Mono', monospace",
+    textDecoration: "none",
+    lineHeight: "14px",
+  },
+  recList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 2,
+    padding: "4px 6px",
+    background: "#0e0e0e",
+    borderTop: "1px solid #333",
+  },
+  recRow: {
+    display: "flex",
+    gap: 3,
+    alignItems: "center",
+  },
+  recIcon: {
+    fontSize: 9,
+    color: "#888",
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    padding: 0,
+    fontFamily: "'Share Tech Mono', monospace",
+    textDecoration: "none",
+  },
+  recBtn: {
+    fontSize: 7,
+    color: "#aaa",
+    background: "#1a1a1a",
+    border: "1px solid #333",
+    borderRadius: 3,
+    padding: "2px 5px",
+    cursor: "pointer",
+    fontFamily: "'Share Tech Mono', monospace",
+    letterSpacing: "0.05em",
+    whiteSpace: "nowrap",
   },
 };
 

@@ -155,13 +155,10 @@ export async function POST(req) {
       const isFlyingRogue = (CONSEQUENCE_MAP[characterType] || "none") === "poop";
       const candidates = [];
       if (isFlyingRogue) {
-        // Flying rogues can target any cell (fences don't block them, addons not required)
-        for (let col = 0; col < gridSize; col++) {
-          for (let row = 0; row < gridSize; row++) {
-            const key = `${col}_${row}`;
-            const info = configMap.get(key);
-            candidates.push({ col, row, ...(info || {}) });
-          }
+        // Flying rogues bypass fences and don't need addons, but only target occupied pads
+        for (const [key, info] of configMap) {
+          const [col, row] = key.split("_").map(Number);
+          candidates.push({ col, row, ...info });
         }
       } else {
         for (const [key, info] of configMap) {
@@ -284,26 +281,16 @@ export async function POST(req) {
           type: "delete_addon",
           addonSlot: victimSlot,
           addonId: victimAddon.id,
+          plotDocId: plotDocId || null,
         };
-        if (plotDocId) {
-          await updateDoc(doc(db, "pumpConfigs", plotDocId), {
-            [`config.addons.${victimSlot}`]: deleteField(),
-            updatedAt: serverTimestamp(),
-          });
-        }
+        // Deletion deferred to client-side when rogue reaches target (weapon phase)
       }
     } else if (consequenceType === "graffiti" && plotDocId) {
-      consequence = { type: "graffiti" };
-      await updateDoc(doc(db, "pumpConfigs", plotDocId), {
-        "config.graffiti": true,
-        updatedAt: serverTimestamp(),
-      });
+      consequence = { type: "graffiti", plotDocId };
+      // Applied client-side when rogue reaches target
     } else if (consequenceType === "poop" && plotDocId) {
-      consequence = { type: "poop" };
-      await updateDoc(doc(db, "pumpConfigs", plotDocId), {
-        "config.poop": true,
-        updatedAt: serverTimestamp(),
-      });
+      consequence = { type: "poop", plotDocId };
+      // Applied client-side when rogue reaches target
     }
 
     // ── Write rogue event ───────────────────────────────────────────────────

@@ -279,6 +279,14 @@
         allow delete: if false;
       }
 
+      // CCTV recordings — camera owner can read their own, anyone can create
+      match /cctvRecordings/{docId} {
+        allow read: if true;
+        allow create: if true
+          && request.resource.data.keys().hasAll(['userId', 'eventType', 'col', 'row', 'downloadUrl', 'storagePath', 'durationMs', 'createdAt']);
+        allow update, delete: if false;
+      }
+
       // Gusher events — broadcast oil strikes to all players
       match /gusherEvents/{docId} {
         allow read: if true;

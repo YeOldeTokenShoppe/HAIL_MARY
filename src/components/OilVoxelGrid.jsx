@@ -33,7 +33,7 @@ export function CctvRenderer({ canvasRef }) {
   const imgDataRef = useRef(null);
 
   // CCTV camera tuning constants
-  const CCTV_OFFSET_X = 0.0;
+  const CCTV_OFFSET_X = 0.07;
   const CCTV_OFFSET_Y = -0.05;
   const CCTV_OFFSET_Z = -0.05;
   const CCTV_TILT = 2.0;
@@ -820,7 +820,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   const mixer = useMemo(() => new THREE.AnimationMixer(clonedScene), [clonedScene]);
 
   // Gusher spawn position — model origin (center of rig)
-  const gusherOriginRef = useRef(new THREE.Vector3(0, 0.05, 0));
+  const gusherOriginRef = useRef(new THREE.Vector3(0, 0.05, 0.2));
 
   // Find the Straw mesh, GaugeNeedle, and pressure text meshes
   useEffect(() => {
@@ -871,27 +871,26 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     return () => mixer.stopAllAction();
   }, [mixer, animations]);
 
-  // Apply pump customization only to the selected (highlighted) rig
+  // Apply pump customization (paint colors) — show for any cell with a config
   useEffect(() => {
-    if (highlighted && pumpConfig) {
+    if (pumpConfig) {
       applyPumpConfig(clonedScene, pumpConfig, originalMatsRef.current, envMap);
-    } else if (!highlighted && originalMatsRef.current && Object.keys(originalMatsRef.current).length > 0) {
-      // Restore originals when deselected
+    } else if (originalMatsRef.current && Object.keys(originalMatsRef.current).length > 0) {
       applyPumpConfig(clonedScene, null, originalMatsRef.current, envMap);
     }
-  }, [clonedScene, pumpConfig, highlighted, envMap]);
+  }, [clonedScene, pumpConfig, envMap]);
 
-  // Security camera visibility — only when highlighted and config says so
+  // Security camera visibility
   useEffect(() => {
-    const show = highlighted && !!pumpConfig?.showCamera;
+    const show = !!pumpConfig?.showCamera;
     secCamPartsRef.current.forEach((part) => { part.visible = show; });
-  }, [highlighted, pumpConfig?.showCamera]);
+  }, [pumpConfig?.showCamera]);
 
-  // Sign frame visibility — only when highlighted and config says so
+  // Sign frame visibility
   useEffect(() => {
-    const show = highlighted && !!pumpConfig?.showSign;
+    const show = !!pumpConfig?.showSign;
     signFramePartsRef.current.forEach((part) => { part.visible = show; });
-  }, [highlighted, pumpConfig?.showSign]);
+  }, [pumpConfig?.showSign]);
 
   // Fence visibility — hide the old embedded fence parts (now separate models)
   useEffect(() => {
@@ -900,7 +899,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
 
   // Apply custom image to Sign mesh when URL changes
   // Uses onBeforeCompile to flip UVs on back face so text is legible from both sides
-  const signImageUrl = highlighted ? pumpConfig?.signImageUrl : null;
+  const signImageUrl = pumpConfig?.signImageUrl || null;
   useEffect(() => {
     const sign = signRef.current;
     if (!sign) return;
@@ -1027,6 +1026,8 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   // Alert light ref for oil strike strobe
   const alertLightRef = useRef();
   const alertLightOrigColor = useRef(null);
+  const panelLightRef = useRef();
+  const panelLightOrigColor = useRef(null);
   const strikeTimerRef = useRef(0);
   const strikingRef = useRef(false);   // true during gusher overflow
   const strikeFlashRef = useRef(false); // true during timed oil-strike flash
@@ -1148,6 +1149,20 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           child.userData._alertCloned = true;
         }
       }
+      if (child.name === "Panel_Light" && child.isMesh) {
+        panelLightRef.current = child;
+        if (!panelLightOrigColor.current) {
+          panelLightOrigColor.current = {
+            color: child.material.color.clone(),
+            emissive: child.material.emissive ? child.material.emissive.clone() : new THREE.Color(0),
+            emissiveIntensity: child.material.emissiveIntensity || 0,
+          };
+        }
+        if (!child.userData._panelLightCloned) {
+          child.material = child.material.clone();
+          child.userData._panelLightCloned = true;
+        }
+      }
     });
   }, [clonedScene]);
 
@@ -1197,7 +1212,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   }, []);
 
   // Oil gusher particles — only active on highlighted rig
-  const PARTICLE_COUNT = 10000;
+  const PARTICLE_COUNT = 1000;
   const gusherActiveRef = useRef(false);
   const gusherTimerRef = useRef(0);
   const particlePosRef = useRef(new Float32Array(PARTICLE_COUNT * 3));
@@ -1370,6 +1385,14 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         if (strikeLightRef.current) {
           strikeLightRef.current.intensity = intensity * 4.0;
         }
+        // Panel_Light — same red strobe
+        const pl = panelLightRef.current;
+        if (pl) {
+          pl.material.emissive.set(0xff0000);
+          pl.material.emissiveIntensity = intensity * 5.0;
+          pl.material.color.set(intensity > 0.1 ? 0xff2200 : 0x331111);
+          pl.material.needsUpdate = true;
+        }
       } else {
         // Both modes done — restore original
         const orig = alertLightOrigColor.current;
@@ -1381,6 +1404,15 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         }
         if (strikeLightRef.current) {
           strikeLightRef.current.intensity = 0;
+        }
+        // Panel_Light — restore original
+        const plOrig = panelLightOrigColor.current;
+        const pl = panelLightRef.current;
+        if (pl && plOrig) {
+          pl.material.color.copy(plOrig.color);
+          pl.material.emissive.copy(plOrig.emissive);
+          pl.material.emissiveIntensity = plOrig.emissiveIntensity;
+          pl.material.needsUpdate = true;
         }
       }
     }
@@ -1626,17 +1658,14 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       return;
     }
 
-    // If rig is already selected, don't re-trigger camera flyTo
-    // Only select + flyTo on unselected rigs
-    if (!highlighted) {
-      const now = Date.now();
-      if (now - lastClickTime.current < 400) {
-        onDoubleClick?.();
-      } else {
-        onClick?.();
-      }
-      lastClickTime.current = now;
+    // Always allow flyTo — interactive elements (wheel, gate, button) return early above
+    const now = Date.now();
+    if (now - lastClickTime.current < 400) {
+      onDoubleClick?.();
+    } else {
+      onClick?.();
     }
+    lastClickTime.current = now;
   }, [onClick, onDoubleClick, highlighted, initSteam]);
 
   return (
@@ -1705,15 +1734,15 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         </>
       )}
       {/* Plot add-ons — placeholder meshes at slot positions */}
-      {highlighted && pumpConfig?.addons && (
+      {pumpConfig?.addons && (
         <PlotAddons addons={pumpConfig.addons} />
       )}
       {/* Fence — separate GLB model */}
-      {highlighted && pumpConfig?.fenceType && (
+      {pumpConfig?.fenceType && (
         <PlotFence fenceType={pumpConfig.fenceType} />
       )}
       {/* Poop — left by Crudingo rogue */}
-      {highlighted && pumpConfig?.poop && <PlotPoop />}
+      {pumpConfig?.poop && <PlotPoop />}
     </group>
   );
 }
@@ -1830,7 +1859,7 @@ function OilTower({ position, communityOil = 0, totalOilBudget = 100000000 }) {
 
 useGLTF.preload("/models/OilTower.glb");
 
-function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, pumpConfig, oilStrike, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 100000000 }) {
+function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 100000000 }) {
   const { scene, animations } = useGLTF("/models/oilJack_fancy_allProps.glb");
   const envMap = useEnvironment({ preset: "studio" });
 
@@ -1897,6 +1926,8 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
         // Drill all if no selection, otherwise only the selected cell
         const active = selectedCol === null || (col === selectedCol && row === selectedRow);
         const isSelected = selectedCol !== null && col === selectedCol && row === selectedRow;
+        const cellEntry = allPumpConfigs[`${col}_${row}`];
+        const cellConfig = isSelected ? pumpConfig : cellEntry?.config || null;
         return (
           <Pumpjack
             key={key}
@@ -1907,13 +1938,13 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
             maxDrillDay={maxDrillDay}
             depthCellSize={depthCellSize}
             highlighted={isSelected}
-            pumpConfig={pumpConfig}
+            pumpConfig={cellConfig}
             envMap={envMap}
             oilStrike={oilStrike}
             tankFill={isSelected ? tankFill : 0}
             onTankDrain={isSelected ? onTankDrain : undefined}
             onClick={() => { onSelectCell?.(col, row); onFlyTo?.(col, row); }}
-            onDoubleClick={() => onFlyTo?.(col, row)}
+            onDoubleClick={() => isSelected ? onZoomOut?.() : onFlyTo?.(col, row)}
           />
         );
       })}
@@ -2053,7 +2084,9 @@ export default function OilVoxelGrid({
   selectedRow = null,
   onSelectCell,
   onFlyTo,
+  onZoomOut,
   pumpConfig,
+  allPumpConfigs = {},
   oilStrike,
   tankFill = 0,
   onTankDrain,
@@ -2061,6 +2094,8 @@ export default function OilVoxelGrid({
   rogueEvents = [],
   gusherEvents = [],
   currentUserId,
+  onRogueArrive,
+  onRogueConsequence,
 }) {
   const matRef = useRef();
   const groundMatsRef = useRef([]);
@@ -2071,18 +2106,22 @@ export default function OilVoxelGrid({
   const sideTex = useTexture("/LandGradient2.webp");
   sideTex.wrapS = sideTex.wrapT = THREE.ClampToEdgeWrapping;
 
+  // Load topography texture for top surface
+  const topoTex = useTexture("/topography1.webp");
+  topoTex.wrapS = topoTex.wrapT = THREE.RepeatWrapping;
+
   // 6 materials for box faces: +x, -x, +y (top), -y (bottom), +z, -z
   const groundMaterials = useMemo(() => {
     const revealed = revealProgress > 0;
     const op = revealed ? 0.15 : 1;
     const shared = { transparent: true, depthWrite: !revealed, depthTest: !revealed, opacity: op };
-    const topMat = new THREE.MeshStandardMaterial({ color: "#8b7355", roughness: 0.9, metalness: 0.05, ...shared });
+    const topMat = new THREE.MeshStandardMaterial({ map: topoTex, color: "#8b7355", roughness: 0.9, metalness: 0.05, ...shared });
     const bottomMat = new THREE.MeshStandardMaterial({ color: "#5a4030", roughness: 0.95, metalness: 0.02, ...shared });
     const sideMat = new THREE.MeshStandardMaterial({ map: sideTex, roughness: 0.85, metalness: 0.05, ...shared });
     const mats = [sideMat, sideMat, topMat, bottomMat, sideMat, sideMat];
     groundMatsRef.current = mats;
     return mats;
-  }, [sideTex, revealProgress]);
+  }, [sideTex, topoTex, revealProgress]);
 
   const depthCellSize = cellSize * 0.5;
   const worldW = gridX * cellSize;
@@ -2178,7 +2217,9 @@ export default function OilVoxelGrid({
             selectedRow={selectedRow}
             onSelectCell={onSelectCell}
             onFlyTo={onFlyTo}
+            onZoomOut={onZoomOut}
             pumpConfig={pumpConfig}
+            allPumpConfigs={allPumpConfigs}
             oilStrike={oilStrike}
             tankFill={tankFill}
             onTankDrain={onTankDrain}
@@ -2194,6 +2235,8 @@ export default function OilVoxelGrid({
               worldD={worldD}
               gridX={gridX}
               gridY={gridY}
+              onArrive={onRogueArrive}
+              onConsequence={onRogueConsequence}
             />
           ))}
           {gusherEvents

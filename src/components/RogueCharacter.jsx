@@ -25,6 +25,7 @@ export const ROGUE_CATALOG = [
     description: "Devours a random add-on",
     scale: 0.05,
     animation: "CharacterArmature|Walk",
+    walkSpeed: 0.25,
   },
   {
     id: "crudingo",
@@ -32,9 +33,9 @@ export const ROGUE_CATALOG = [
     model: "/models/Crudingo.glb",
     consequence: "poop",
     description: "Leaves poop in your yard",
-    scale: 0.12,
+    scale: 0.05,
     movement: "fly",
-    flyHeight: 1.2,
+    flyHeight: 0.5,
   },
 ];
 
@@ -59,25 +60,29 @@ const PAUSE_WEAPON = 3;
 const PAUSE_TOTAL = PAUSE_IDLE + PAUSE_WEAPON;
 
 // ── Falling poop drop ────────────────────────────────────────────────────────
+// Poop landing offset — must match PlotPoop position in OilVoxelGrid
+const POOP_OFFSET = { x: 0.35, z: 0.15 };
+
 function PoopDrop({ position, flyHeight }) {
   const groupRef = useRef();
   const { scene } = useGLTF("/models/poop.glb");
   const cloned = useMemo(() => scene.clone(true), [scene]);
   const tRef = useRef(0);
   const fallDuration = 0.5;
+  const landX = position.x + POOP_OFFSET.x;
+  const landZ = position.z + POOP_OFFSET.z;
 
   useFrame((_, delta) => {
     if (!groupRef.current) return;
     tRef.current = Math.min(tRef.current + delta, fallDuration);
     const f = tRef.current / fallDuration;
-    // Ease-in (gravity-like)
     const ease = f * f;
-    const y = flyHeight * (1 - ease);
-    groupRef.current.position.set(position.x, y, position.z);
+    const y = flyHeight * (1 - ease) + 0.05;
+    groupRef.current.position.set(landX, y, landZ);
   });
 
   return (
-    <group ref={groupRef} scale={[0.15, 0.15, 0.15]}>
+    <group ref={groupRef} scale={[0.05, 0.05, 0.05]}>
       <primitive object={cloned} />
     </group>
   );
@@ -85,14 +90,17 @@ function PoopDrop({ position, flyHeight }) {
 
 // ── Flying rogue (Crudingo) ──────────────────────────────────────────────────
 const FLY_SPEED = 1.5;
-const CIRCLE_DURATION = 1.5;
-const HOVER_DURATION = 1.0;
-const CIRCLE_RADIUS = 0.8;
+const SWOOP_DURATION = 1.2;
+const CIRCLE_DURATION = 2.0;
+const HOVER_DURATION = 2.0;
+const CIRCLE_RADIUS = 0.6;
 
-function FlyingRogueCharacter({ event, cellSize = 1, worldW, worldD, catalog }) {
+function FlyingRogueCharacter({ event, cellSize = 1, worldW, worldD, catalog, onArrive, onConsequence }) {
   const groupRef = useRef();
   const phaseRef = useRef("fly_in");
+  const consequenceFiredRef = useRef(false);
   const tRef = useRef(0);
+  const arrivedRef = useRef(false);
   const [done, setDone] = useState(false);
   const [poopDropped, setPoopDropped] = useState(false);
 
@@ -143,48 +151,61 @@ function FlyingRogueCharacter({ event, cellSize = 1, worldW, worldD, catalog }) 
 
     const phase = phaseRef.current;
 
+    // Swoop altitude — low enough to be visible on CCTV
+    const swoopAlt = flyHeight * 0.35;
+    const dropAlt = flyHeight * 0.25;
+
     if (phase === "fly_in") {
       const f = Math.min(1, t / flyInTime);
       g.position.lerpVectors(spawnPos, hoverPos, f);
-      // Face movement direction
       const dir = hoverPos.clone().sub(spawnPos);
       g.rotation.y = Math.atan2(dir.x, dir.z);
+      if (f >= 1) {
+        phaseRef.current = "swoop";
+        tRef.current = 0;
+        if (!arrivedRef.current) { arrivedRef.current = true; onArrive?.(event); }
+      }
+    } else if (phase === "swoop") {
+      // Swoop down from flyHeight to swoopAlt with easing
+      const f = Math.min(1, t / SWOOP_DURATION);
+      const ease = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
+      g.position.set(hoverPos.x, flyHeight - (flyHeight - swoopAlt) * ease, hoverPos.z);
+      g.rotation.y = Math.PI;
       if (f >= 1) {
         phaseRef.current = "circle";
         tRef.current = 0;
       }
     } else if (phase === "circle") {
+      // Circle at low altitude
       const f = Math.min(1, t / CIRCLE_DURATION);
       const angle = f * Math.PI * 2;
       g.position.set(
         hoverPos.x + Math.sin(angle) * CIRCLE_RADIUS,
-        hoverPos.y + Math.sin(f * Math.PI) * 0.3,
+        swoopAlt + Math.sin(f * Math.PI) * 0.08,
         hoverPos.z + Math.cos(angle) * CIRCLE_RADIUS
       );
-      // Face tangent direction
       g.rotation.y = angle + Math.PI / 2;
       if (f >= 1) {
         phaseRef.current = "hover";
         tRef.current = 0;
       }
     } else if (phase === "hover") {
-      // Descend to drop altitude over the hover duration
-      const dropAlt = flyHeight * 0.4;
+      // Hover in place at low altitude, gentle bob
       const f = Math.min(1, t / HOVER_DURATION);
-      g.position.set(hoverPos.x, flyHeight - (flyHeight - dropAlt) * f, hoverPos.z);
-      g.position.y += Math.sin(t * 4) * 0.03;
+      g.position.set(hoverPos.x, swoopAlt + Math.sin(t * 3) * 0.02, hoverPos.z);
       g.rotation.y = Math.PI;
       if (f >= 1) {
         phaseRef.current = "drop";
         tRef.current = 0;
         setPoopDropped(true);
+        if (!consequenceFiredRef.current) { consequenceFiredRef.current = true; onConsequence?.(event); }
       }
     } else if (phase === "drop") {
-      // Stay at low altitude while poop falls
-      const dropAlt = flyHeight * 0.4;
-      g.position.set(hoverPos.x, dropAlt, hoverPos.z);
-      g.position.y += Math.sin(t * 4) * 0.03;
-      if (t >= 0.6) {
+      // Quick dip to drop altitude then hold
+      const f = Math.min(1, t / 0.3);
+      g.position.set(hoverPos.x, swoopAlt - (swoopAlt - dropAlt) * f, hoverPos.z);
+      g.position.y += Math.sin(t * 4) * 0.02;
+      if (t >= 0.8) {
         phaseRef.current = "fly_out";
         tRef.current = 0;
       }
@@ -207,16 +228,18 @@ function FlyingRogueCharacter({ event, cellSize = 1, worldW, worldD, catalog }) 
       <group ref={groupRef} scale={[catalog.scale, catalog.scale, catalog.scale]}>
         <primitive object={clonedScene} />
       </group>
-      {poopDropped && <PoopDrop position={targetPos} flyHeight={flyHeight * 0.4} />}
+      {poopDropped && <PoopDrop position={targetPos} flyHeight={flyHeight * 0.25} />}
     </>
   );
 }
 
 // ── Ground-walking rogue (default) ───────────────────────────────────────────
-function GroundRogueCharacter({ event, cellSize = 1, worldW, worldD }) {
+function GroundRogueCharacter({ event, cellSize = 1, worldW, worldD, onArrive, onConsequence }) {
   const groupRef = useRef();
   const timeRef = useRef(0);
   const startedRef = useRef(false);
+  const arrivedRef = useRef(false);
+  const consequenceFiredRef = useRef(false);
   const phaseRef = useRef("walk_in");
   const [done, setDone] = useState(false);
 
@@ -358,26 +381,30 @@ function GroundRogueCharacter({ event, cellSize = 1, worldW, worldD }) {
   const { waypoints, targetWpIdx, addonWorldPos } = routeData;
 
   // Precompute segment times with pause baked in after arrival at target
+  // Use per-character walkSpeed for approach, default WALK_SPEED for walk-out
+  const approachSpeed = catalog.walkSpeed || WALK_SPEED;
   const { segTimes, cumTime, totalTime } = useMemo(() => {
-    const secPerUnit = 1 / WALK_SPEED;
     const sTimes = [];
     const cTime = [];
     let acc = 0;
+    let pastTarget = false;
 
     for (let i = 0; i < waypoints.length - 1; i++) {
       const dist = waypoints[i + 1].distanceTo(waypoints[i]);
-      const t = dist * secPerUnit;
+      const speed = pastTarget ? WALK_SPEED : approachSpeed;
+      const t = dist / speed;
       sTimes.push(t);
       acc += t;
       // Insert pause after arriving at target waypoint
       if (i + 1 === targetWpIdx) {
         acc += PAUSE_TOTAL;
+        pastTarget = true;
       }
       cTime.push(acc);
     }
 
     return { segTimes: sTimes, cumTime: cTime, totalTime: acc };
-  }, [waypoints, targetWpIdx]);
+  }, [waypoints, targetWpIdx, approachSpeed]);
 
   // Helper: find an animation by keyword (fuzzy match on clip name)
   const findAnim = (keyword) => {
@@ -460,6 +487,7 @@ function GroundRogueCharacter({ event, cellSize = 1, worldW, worldD }) {
         if (phaseRef.current !== "idle") {
           phaseRef.current = "idle";
           playAnim("Idle");
+          if (!arrivedRef.current) { arrivedRef.current = true; onArrive?.(event); }
         }
         g.position.copy(standoffPos);
       } else {
@@ -467,6 +495,7 @@ function GroundRogueCharacter({ event, cellSize = 1, worldW, worldD }) {
         if (phaseRef.current !== "weapon") {
           phaseRef.current = "weapon";
           playAnim("Weapon");
+          if (!consequenceFiredRef.current) { consequenceFiredRef.current = true; onConsequence?.(event); }
         }
         // Lerp from standoff toward addon (stop at 80% to not overshoot)
         const weaponT = pauseT - PAUSE_IDLE;
@@ -502,6 +531,9 @@ function GroundRogueCharacter({ event, cellSize = 1, worldW, worldD }) {
   );
 }
 
+// Max rogue lifecycle ~30s (walk in + pause + walk out). Skip stale events.
+const ROGUE_MAX_AGE_MS = 45000;
+
 // ── Router: pick flying vs ground rogue ──────────────────────────────────────
 function RogueCharacter(props) {
   const catalog = useMemo(
@@ -509,10 +541,16 @@ function RogueCharacter(props) {
     [props.event.characterType]
   );
 
-  if (catalog.movement === "fly") {
-    return <FlyingRogueCharacter {...props} catalog={catalog} />;
+  // Skip stale events that are older than the max animation lifecycle
+  const createdAt = props.event.createdAt?.toMillis?.() ?? props.event.createdAt?.seconds * 1000;
+  if (createdAt && Date.now() - createdAt > ROGUE_MAX_AGE_MS) {
+    return null;
   }
-  return <GroundRogueCharacter {...props} />;
+
+  if (catalog.movement === "fly") {
+    return <FlyingRogueCharacter {...props} catalog={catalog} onArrive={props.onArrive} onConsequence={props.onConsequence} />;
+  }
+  return <GroundRogueCharacter {...props} onArrive={props.onArrive} onConsequence={props.onConsequence} />;
 }
 
 export default RogueCharacter;
