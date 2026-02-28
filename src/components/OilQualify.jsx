@@ -5,7 +5,7 @@ import { SignInButton } from "@clerk/nextjs";
 import { WalletConnectionModal } from "@/components/WalletConnectionModal";
 import NavControlsHome from "@/components/NavControlsHome";
 import MobileBottomNav from "@/components/MobileBottomNav";
-import ThirdwebBuyModal from "@/components/ThirdwebBuyModal";
+import BuyModal from "@/components/BuyModal";
 import { useMusic } from "@/components/MusicContext";
 import { db, collection, query, orderBy, onSnapshot, doc, setDoc, getDoc, updateDoc, serverTimestamp, arrayUnion, increment } from "@/lib/firebaseClient";
 
@@ -1835,7 +1835,7 @@ export default function OilQualify({
       </div>
 
       {/* Bottom Mobile Nav */}
-      <MobileBottomNav
+      {isMobile && <MobileBottomNav
         isPlaying={contextIsPlaying}
         onPlayMusic={() => play()}
         onStopMusic={() => pause()}
@@ -1849,10 +1849,10 @@ export default function OilQualify({
         isMobile={isMobile}
         show80sButton={false}
         darkMode={darkMode}
-      />
+      />}
 
       {/* Buy Modal */}
-      <ThirdwebBuyModal
+      <BuyModal
         isOpen={showBuyModal}
         onClose={() => setShowBuyModal(false)}
       />

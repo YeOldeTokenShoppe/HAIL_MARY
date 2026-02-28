@@ -15,7 +15,7 @@ import { useWalletAuth } from "@/components/WalletAuthProvider";
 import { useMusic } from "@/components/MusicContext";
 import NavControlsHome from "@/components/NavControlsHome";
 import MobileBottomNav from "@/components/MobileBottomNav";
-import ThirdwebBuyModal from "@/components/ThirdwebBuyModal";
+import BuyModal from "@/components/BuyModal";
 import CyberNav from "@/components/CyberNav";
 import PolaroidSnapshot from "@/components/PolaroidSnapshot";
 import StarField from "@/components/StarField";
@@ -3112,7 +3112,7 @@ export default function OilPage() {
         />
 
         {/* Buy Modal */}
-        <ThirdwebBuyModal
+        <BuyModal
           isOpen={showBuyModal}
           onClose={() => setShowBuyModal(false)}
         />
