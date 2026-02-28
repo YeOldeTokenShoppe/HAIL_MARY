@@ -294,6 +294,20 @@
         allow delete: if false;
       }
 
+      // Oil Qualified players — registration for the oil game
+      match /oilQualified/{docId} {
+        allow read: if true;
+        allow create, update: if true;
+        allow delete: if false;
+      }
+
+      // Oil Plots — claimed plots on the grid
+      match /oilPlots/{docId} {
+        allow read: if true;
+        allow create, update: if true;
+        allow delete: if false;
+      }
+
       // Telegram linking — server writes via webhook, read by API route
       match /oilTelegram/{docId} {
         allow read: if true;

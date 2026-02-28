@@ -14,17 +14,37 @@ function getSurfaceColor(value, maxValue, dark) {
   return `rgb(${Math.round(160 - t * 40)}, ${Math.round(105 - t * 30)}, ${Math.round(50 - t * 10)})`;
 }
 
-export default function OilSurfaceMap({ claimTotals, maxClaimTotal, selectedClaimIndex, onSelectClaim, theme, gridX = 10, gridY = 10 }) {
+export default function OilSurfaceMap({
+  claimTotals,
+  maxClaimTotal,
+  selectedClaimIndex,
+  onSelectClaim,
+  theme,
+  gridX = 10,
+  gridY = 10,
+  allPlotsMap = {},
+  claimJumpMode = false,
+  onClaimJump,
+  currentUserId,
+}) {
   const dark = theme?.bg === "#12161c";
   const t = theme || { muted: "#9e8e78", inputBg: "#f0e8dc", borderLight: "#c8bfb0", green: "#5a8a3a", accent: "#7a5a1a" };
 
   return (
     <div style={{ fontFamily: "'Share Tech Mono', 'Courier New', monospace", color: t.muted, position: "relative" }}>
+      {claimJumpMode && (
+        <style>{`
+          @keyframes claimJumpPulse {
+            0%, 100% { box-shadow: 0 0 4px rgba(212,168,84,0.3); }
+            50% { box-shadow: 0 0 10px rgba(212,168,84,0.6); }
+          }
+        `}</style>
+      )}
       <div style={{
         fontSize: 9, color: t.inspectorKey || t.muted, marginBottom: 8,
         textAlign: "center", letterSpacing: "0.08em",
       }}>
-        SURFACE VIEW &mdash; Total oil per claim
+        {claimJumpMode ? "CLAIM JUMP \u2014 Click an unclaimed cell" : "SURFACE VIEW \u2014 Total oil per claim"}
       </div>
       {/* X axis labels along top */}
       <div style={{
@@ -57,36 +77,88 @@ export default function OilSurfaceMap({ claimTotals, maxClaimTotal, selectedClai
           gap: 2, padding: 8,
           background: t.inputBg, border: `1px solid ${t.borderLight}`, flex: 1,
         }}>
-          {claimTotals.map((claim, i) => (
-            <div
-              key={i}
-              onClick={() => onSelectClaim(claim)}
-              style={{
-                aspectRatio: "1",
-                background: claim.index === selectedClaimIndex
-                  ? (dark ? "rgba(122,170,90,0.7)" : "rgba(90, 138, 58, 0.7)")
-                  : getSurfaceColor(claim.total, maxClaimTotal, dark),
-                border: claim.index === selectedClaimIndex ? `2px solid ${t.green}` : `1px solid ${t.borderLight}`,
-                boxShadow: claim.index === selectedClaimIndex ? `0 0 8px rgba(90, 138, 58, 0.4)` : "none",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                fontSize: "9px",
-                color: claim.total > 0 ? (dark ? "#e8e0d4" : "#f5efe6") : t.muted,
-                position: "relative",
-                transition: "transform 0.15s",
-              }}
-            >
-              <div style={{ fontWeight: "bold" }}>{claim.index + 1}</div>
-              {claim.total > 0 && (
-                <div style={{ fontSize: "7px", color: "rgba(255,255,255,0.7)", marginTop: "1px" }}>
-                  {(claim.total / 1000).toFixed(1)}k
-                </div>
-              )}
-            </div>
-          ))}
+          {claimTotals.map((claim, i) => {
+            const plotKey = `${claim.x}_${claim.y}`;
+            const plotData = allPlotsMap[plotKey];
+            const isOwned = plotData?.currentOwnerId != null;
+            const isMine = plotData?.currentOwnerId === currentUserId;
+            const isDQ = plotData?.disqualified && !isOwned;
+            const isUnclaimed = !isOwned;
+            const hasDrillHistory = plotData?.drillDay > 0;
+
+            // In claim jump mode, unclaimed cells are clickable targets
+            const isJumpTarget = claimJumpMode && isUnclaimed;
+
+            // Determine cell background
+            let bg;
+            if (claim.index === selectedClaimIndex) {
+              bg = dark ? "rgba(122,170,90,0.7)" : "rgba(90, 138, 58, 0.7)";
+            } else if (isMine) {
+              bg = dark ? "rgba(90,138,58,0.3)" : "rgba(90,138,58,0.2)";
+            } else if (isOwned) {
+              bg = dark ? "rgba(100,100,120,0.3)" : "rgba(130,130,140,0.2)";
+            } else if (isDQ && hasDrillHistory) {
+              bg = dark ? "rgba(180,140,60,0.2)" : "rgba(180,140,60,0.15)";
+            } else if (isJumpTarget) {
+              bg = dark ? "rgba(212,168,84,0.15)" : "rgba(212,168,84,0.12)";
+            } else {
+              bg = getSurfaceColor(claim.total, maxClaimTotal, dark);
+            }
+
+            return (
+              <div
+                key={i}
+                onClick={() => {
+                  if (isJumpTarget && onClaimJump) {
+                    onClaimJump(claim.x, claim.y);
+                  } else {
+                    onSelectClaim(claim);
+                  }
+                }}
+                style={{
+                  aspectRatio: "1",
+                  background: bg,
+                  border: claim.index === selectedClaimIndex
+                    ? `2px solid ${t.green}`
+                    : isMine
+                    ? `2px solid ${t.green}88`
+                    : isOwned
+                    ? `1px solid ${dark ? "#555" : "#aaa"}`
+                    : `1px solid ${t.borderLight}`,
+                  boxShadow: claim.index === selectedClaimIndex ? `0 0 8px rgba(90, 138, 58, 0.4)` : "none",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  fontSize: "9px",
+                  color: claim.total > 0 ? (dark ? "#e8e0d4" : "#f5efe6") : t.muted,
+                  position: "relative",
+                  transition: "transform 0.15s",
+                  animation: isJumpTarget ? "claimJumpPulse 1.5s ease-in-out infinite" : "none",
+                }}
+              >
+                {isMine ? (
+                  <div style={{ fontSize: 8, fontWeight: 700, color: t.green }}>YOU</div>
+                ) : isOwned ? (
+                  <div style={{ fontSize: 7, color: dark ? "#888" : "#999" }}>&#9632;</div>
+                ) : (
+                  <div style={{ fontWeight: "bold" }}>{claim.index + 1}</div>
+                )}
+                {isJumpTarget && (
+                  <div style={{ fontSize: "6px", color: t.gold || t.accent, marginTop: "1px" }}>JUMP</div>
+                )}
+                {!isJumpTarget && claim.total > 0 && !isOwned && (
+                  <div style={{ fontSize: "7px", color: "rgba(255,255,255,0.7)", marginTop: "1px" }}>
+                    {(claim.total / 1000).toFixed(1)}k
+                  </div>
+                )}
+                {isDQ && hasDrillHistory && (
+                  <div style={{ fontSize: "6px", color: t.warn || "#cc7755" }}>D{plotData.drillDay}</div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
       <div style={{

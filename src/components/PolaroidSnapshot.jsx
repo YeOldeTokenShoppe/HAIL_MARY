@@ -3,12 +3,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styles from './PolaroidSnapshot.module.css';
 
-const PolaroidSnapshot = ({ 
-  trigger = false, 
-  onComplete, 
+const PolaroidSnapshot = ({
+  trigger = false,
+  onComplete,
   captureElementId = 'canvas',
   label = 'Victory!',
-  backgroundImage = null
+  backgroundImage = null,
+  referralOverlay = null, // { code, link } — overlaid on polaroid bottom
 }) => {
   const instanceId = React.useRef(Math.random().toString(36).substring(7));
   React.useEffect(() => {
@@ -488,9 +489,11 @@ const PolaroidSnapshot = ({
   };
 
   const handleShare = async (platform) => {
-    // const shareText = `Check out my capture from RL80! ${label}`;
-        const shareText = `Check out my oil rig! 🤑`;
-    const shareUrl = 'https://rl80.com/oil';
+    const refSuffix = referralOverlay?.code ? `?ref=${referralOverlay.code}` : '';
+    const shareText = referralOverlay?.code
+      ? `Check out my oil rig! Join me on the grid 🤑`
+      : `Check out my oil rig! 🤑`;
+    const shareUrl = `https://rl80.xyz/oil${refSuffix}`;
     
     switch(platform) {
       case 'twitter':
@@ -722,6 +725,23 @@ const PolaroidSnapshot = ({
             >
               {caption}
             </p>
+            {referralOverlay && (
+              <div style={{
+                marginTop: 6,
+                padding: '4px 8px',
+                background: 'rgba(0,0,0,0.06)',
+                borderRadius: 3,
+                textAlign: 'center',
+                fontFamily: "'Share Tech Mono', monospace",
+              }}>
+                <div style={{ fontSize: 8, letterSpacing: '0.2em', color: '#666', marginBottom: 2 }}>
+                  JOIN ME ON THE GRID
+                </div>
+                <div style={{ fontSize: 10, color: '#333', fontWeight: 700, letterSpacing: '0.05em' }}>
+                  {referralOverlay.link || `rl80.xyz/oil?ref=${referralOverlay.code}`}
+                </div>
+              </div>
+            )}
           </div>
           
           {/* Action Buttons */}

@@ -19,7 +19,8 @@ import {
   writeBatch,
   increment,
   Timestamp,
-  runTransaction
+  runTransaction,
+  arrayUnion
 } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -75,5 +76,6 @@ export {
   writeBatch,
   increment,
   Timestamp,
-  runTransaction
+  runTransaction,
+  arrayUnion
 };

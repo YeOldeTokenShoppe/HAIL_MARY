@@ -8,7 +8,7 @@ const GET_RESERVES_SIG = "0x0902f1ac"; // getReserves()
 const TOKEN0_SIG = "0x0dfe1681";       // token0()
 
 async function baseRpc(method, params) {
-  const url = process.env.BASE_RPC_URL;
+  const url = process.env.NEXT_PUBLIC_BASE_RPC_URL || process.env.BASE_RPC_URL;
   if (!url) throw new Error("BASE_RPC_URL not configured");
   const res = await fetch(url, {
     method: "POST",
@@ -58,13 +58,25 @@ export async function getRL80Price() {
   const reserveRL80 = rl80IsToken0 ? reserve0 : reserve1;
   const reserveWETH = rl80IsToken0 ? reserve1 : reserve0;
 
-  // Both tokens are 18 decimals, so ratio is straightforward
-  // RL80 price in ETH = reserveWETH / reserveRL80
-  const rl80PerEth = Number(reserveWETH) / Number(reserveRL80);
+  // Both tokens are 18 decimals — use BigInt math to avoid precision loss
+  // Multiply WETH reserve by 1e18 before dividing to preserve decimal precision
+  const PRECISION = BigInt(10) ** BigInt(18);
+  const rl80PerEthScaled = (reserveWETH * PRECISION) / reserveRL80; // 18-decimal fixed point
+  const rl80PerEth = Number(rl80PerEthScaled) / 1e18;
 
   // 3. Get ETH/USD
   const ethPriceUsd = await getEthPriceUsd();
   const rl80PriceUsd = rl80PerEth * ethPriceUsd;
+
+  console.log("[oilPrice]", {
+    token0,
+    rl80IsToken0,
+    reserveRL80: reserveRL80.toString(),
+    reserveWETH: reserveWETH.toString(),
+    rl80PerEth,
+    ethPriceUsd,
+    rl80PriceUsd,
+  });
 
   return {
     rl80PriceUsd,
@@ -79,10 +91,11 @@ export async function getRL80Price() {
  * Returns balance as BigInt (raw, 18 decimals).
  */
 export async function getRL80Balance(walletAddress) {
-  const RL80_CONTRACT = process.env.NEXT_PUBLIC_RL80_CONTRACT || "0x8b6deA2eFE3043C44bA13090FBe3AD3eE0F1c644";
+  const RL80_CONTRACT = process.env.NEXT_PUBLIC_RL80_CONTRACT || "0x30d01555d88c76500a82754a1d53cac082a6cb75";
   // balanceOf(address) selector = 0x70a08231
   const paddedAddr = walletAddress.slice(2).toLowerCase().padStart(64, "0");
   const data = "0x70a08231" + paddedAddr;
   const result = await callContract(RL80_CONTRACT, data);
+  if (!result || result === "0x") return BigInt(0);
   return BigInt(result);
 }

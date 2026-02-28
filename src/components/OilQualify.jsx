@@ -2,17 +2,15 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { SignInButton } from "@clerk/nextjs";
-import { db, collection, query, orderBy, onSnapshot, doc, setDoc, getDoc, serverTimestamp } from "@/lib/firebaseClient";
+import { WalletConnectionModal } from "@/components/WalletConnectionModal";
+import NavControlsHome from "@/components/NavControlsHome";
+import { useMusic } from "@/components/MusicContext";
+import { db, collection, query, orderBy, onSnapshot, doc, setDoc, getDoc, updateDoc, serverTimestamp, arrayUnion, increment } from "@/lib/firebaseClient";
 
 const QUALIFICATION_THRESHOLD = 20; // $20 USD worth of RL80
-
-const GRID_TARGETS = [
-  { size: 6, plots: 36 },
-  { size: 7, plots: 49 },
-  { size: 8, plots: 64 },
-  { size: 9, plots: 81 },
-  { size: 10, plots: 100 },
-];
+const GRID_SIZE = 10; // Fixed 10x10 grid
+const MAX_BONUS_DRILLS = 10;
+const REFERRAL_BONUS = 3;
 
 export default function OilQualify({
   theme,
@@ -20,28 +18,50 @@ export default function OilQualify({
   isMobile,
   user,
   isAdmin,
-  gridSize,
   saveGameSettings,
-  setGridSize,
   walletAddress,
   tokenBalance,
   isWalletConnected,
-  connectWallet,
+  storedRef,
 }) {
+  const { play, pause, isPlaying: contextIsPlaying, nextTrack } = useMusic();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showWalletModal, setShowWalletModal] = useState(false);
   const [players, setPlayers] = useState([]);
   const [registering, setRegistering] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [adminGridSize, setAdminGridSize] = useState(gridSize);
   const [liveCheck, setLiveCheck] = useState(null);
   const [checkingLive, setCheckingLive] = useState(false);
   const [snapshotRunning, setSnapshotRunning] = useState(false);
   const [snapshotResult, setSnapshotResult] = useState(null);
   const [lastSnapshot, setLastSnapshot] = useState(null);
   const [xUsername, setXUsername] = useState("");
-  const [xFollowers, setXFollowers] = useState(null); // cached follower usernames
   const [xFollowVerified, setXFollowVerified] = useState(false);
   const [xCheckingFollow, setXCheckingFollow] = useState(false);
+  const [xIdentityVerified, setXIdentityVerified] = useState(false); // true when X username comes from Clerk OAuth
+  const [allPlots, setAllPlots] = useState({}); // oilPlots collection: { "col_row": { ... } }
+  const [claiming, setClaiming] = useState(false);
+
+  // Auto-detect X/Twitter username from Clerk OAuth (if user signed in via X)
+  useEffect(() => {
+    if (!user) return;
+    const xAccount = user.externalAccounts?.find(
+      (a) => a.provider === "x" || a.provider === "twitter" || a.provider === "oauth_x" || a.provider === "oauth_twitter"
+    );
+    if (xAccount?.username) {
+      const verified = xAccount.username.toLowerCase();
+      setXUsername(verified);
+      setXIdentityVerified(true);
+      // Auto-verify follow since we have a trusted identity
+      fetch(`/api/check-follow?username=${encodeURIComponent(verified)}`)
+        .then((r) => r.json())
+        .then((data) => {
+          setXFollowVerified(!!data.follows);
+        })
+        .catch(() => {});
+    }
+  }, [user]);
 
   // Subscribe to qualified players collection
   useEffect(() => {
@@ -64,27 +84,34 @@ export default function OilQualify({
     return () => unsub();
   }, []);
 
-  // Load X/Twitter followers list for follow verification
+  // Subscribe to oilPlots collection for live plot availability
   useEffect(() => {
     if (!db) return;
-    getDoc(doc(db, "followers", "latest")).then((snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        // usernames array (lowercase) added by cron
-        setXFollowers(data.usernames || []);
-      }
-    }).catch(() => {});
+    const unsub = onSnapshot(collection(db, "oilPlots"), (snap) => {
+      const map = {};
+      snap.forEach((d) => { map[d.id] = { id: d.id, ...d.data() }; });
+      setAllPlots(map);
+    });
+    return () => unsub();
   }, []);
 
-  // Check X follow when username changes
-  useEffect(() => {
-    if (!xUsername.trim() || !xFollowers) {
-      setXFollowVerified(false);
-      return;
-    }
+  // Check X follow via live API — triggered by button click
+  const handleCheckFollow = useCallback(() => {
     const clean = xUsername.trim().replace(/^@/, "").toLowerCase();
-    setXFollowVerified(xFollowers.includes(clean));
-  }, [xUsername, xFollowers]);
+    if (!clean) return;
+    setXCheckingFollow(true);
+    setXFollowVerified(false);
+    fetch(`/api/check-follow?username=${encodeURIComponent(clean)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        setXFollowVerified(!!data.follows);
+        setXCheckingFollow(false);
+      })
+      .catch(() => {
+        setXFollowVerified(false);
+        setXCheckingFollow(false);
+      });
+  }, [xUsername]);
 
   const qualifiedPlayers = useMemo(
     () => players.filter((p) => p.qualified),
@@ -101,10 +128,11 @@ export default function OilQualify({
     [user, players]
   );
 
-  const nearestTarget = useMemo(() => {
-    const count = qualifiedPlayers.length;
-    return GRID_TARGETS.find((g) => g.plots >= count) || GRID_TARGETS[GRID_TARGETS.length - 1];
-  }, [qualifiedPlayers.length]);
+  // Has this user already picked a plot?
+  const userHasPlot = useMemo(() => {
+    if (!user) return false;
+    return Object.values(allPlots).some((p) => p.currentOwnerId === user.id);
+  }, [user, allPlots]);
 
   // Live qualification check when wallet connects
   useEffect(() => {
@@ -139,6 +167,14 @@ export default function OilQualify({
     setError(null);
     setSuccess(null);
     try {
+      // Check if this X username is already claimed by another player
+      const clean = xUsername.trim().replace(/^@/, "").toLowerCase();
+      const taken = players.find((p) => p.xUsername === clean && p.id !== user.id);
+      if (taken) {
+        setError("This X username is already registered by another player.");
+        setRegistering(false);
+        return;
+      }
       await setDoc(doc(db, "oilQualified", user.id), {
         userId: user.id,
         clerkName: user.fullName || user.firstName || "Anonymous",
@@ -183,19 +219,99 @@ export default function OilQualify({
     }
   }, []);
 
-  const handleLockGrid = useCallback(async () => {
-    if (!isAdmin) return;
-    await saveGameSettings({
-      gamePhase: "grid_locked",
-      gridSize: adminGridSize,
-    });
-    setGridSize(adminGridSize);
-  }, [isAdmin, adminGridSize, saveGameSettings, setGridSize]);
+  // Claim a plot on the inline 10x10 grid (merged into registration flow)
+  const handleClaimPlot = useCallback(async (col, row) => {
+    if (!user || !db || claiming) return;
+    const key = `${col}_${row}`;
+    const existing = allPlots[key];
+    if (existing?.currentOwnerId) return; // already claimed
+    setClaiming(true);
+    setError(null);
+    try {
+      // Generate default referral code (first 8 chars of wallet address)
+      const defaultRefCode = walletAddress ? walletAddress.slice(2, 10).toLowerCase() : user.id.slice(0, 8);
+
+      // 1. Write oilPlots/{col_row}
+      await setDoc(doc(db, "oilPlots", key), {
+        col,
+        row,
+        drillDay: existing?.drillDay ?? 0,
+        currentOwnerId: user.id,
+        ownerHistory: arrayUnion({ userId: user.id, claimedAt: new Date().toISOString() }),
+        disqualified: false,
+      }, { merge: true });
+      // 2. Write oilDrills/{userId}
+      await setDoc(doc(db, "oilDrills", user.id), {
+        userId: user.id,
+        col,
+        row,
+        drillDay: 0,
+        lastDrillDate: null,
+        claimJumpsUsed: 0,
+        totalCollected: 0,
+        tankDrains: 0,
+        lastDrainExtracted: 0,
+        bonusDrills: 0,
+        confirmedReferrals: 0,
+        referralCode: defaultRefCode,
+        username: user.fullName || user.firstName || "",
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      // 3. Create oilReferrals/{code} for this player's referral code
+      await setDoc(doc(db, "oilReferrals", defaultRefCode), {
+        userId: user.id,
+        code: defaultRefCode,
+        createdAt: serverTimestamp(),
+      });
+      // 4. Update oilQualified/{userId} with referredBy
+      const refCode = storedRef || (typeof window !== "undefined" ? localStorage.getItem("oil_ref") : null);
+      await setDoc(doc(db, "oilQualified", user.id), {
+        plotCol: col,
+        plotRow: row,
+        pickedAt: serverTimestamp(),
+        referredBy: refCode || null,
+      }, { merge: true });
+      // 5. Credit the referrer if valid
+      if (refCode) {
+        try {
+          const refDocSnap = await getDoc(doc(db, "oilReferrals", refCode));
+          if (refDocSnap.exists()) {
+            const referrerId = refDocSnap.data().userId;
+            // Validate: not self-referral
+            if (referrerId && referrerId !== user.id) {
+              const referrerDrillSnap = await getDoc(doc(db, "oilDrills", referrerId));
+              if (referrerDrillSnap.exists()) {
+                const referrerData = referrerDrillSnap.data();
+                const currentBonus = referrerData.bonusDrills || 0;
+                const bonusToAdd = Math.min(REFERRAL_BONUS, MAX_BONUS_DRILLS - currentBonus);
+                if (bonusToAdd > 0) {
+                  await updateDoc(doc(db, "oilDrills", referrerId), {
+                    bonusDrills: increment(bonusToAdd),
+                    confirmedReferrals: increment(1),
+                    updatedAt: serverTimestamp(),
+                  });
+                }
+              }
+            }
+          }
+          // Clear localStorage after crediting
+          if (typeof window !== "undefined") localStorage.removeItem("oil_ref");
+        } catch (refErr) {
+          console.error("Failed to credit referrer:", refErr);
+        }
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setClaiming(false);
+    }
+  }, [user, allPlots, claiming, walletAddress, storedRef]);
 
   const mono = "'Share Tech Mono', monospace";
 
   // Format token balance for display
   const displayBalance = tokenBalance ? Number(tokenBalance).toLocaleString() : "0";
+  const liveCheckError = liveCheck?.error ?? null;
   const usdValue = liveCheck?.usdValue ?? null;
   const isQualified = liveCheck?.qualified ?? false;
   const rl80Price = liveCheck?.price ?? null;
@@ -209,7 +325,26 @@ export default function OilQualify({
       background: theme.bg,
       color: theme.text,
       fontFamily: mono,
+      position: "relative",
     }}>
+      {/* Nav Controls */}
+      <div style={{ position: "fixed", top: 12, right: 12, zIndex: 100 }}>
+        <NavControlsHome
+          isPlaying={contextIsPlaying}
+          onPlayMusic={() => play()}
+          onStopMusic={() => pause()}
+          onSkipTrack={() => nextTrack()}
+          onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
+          onUserClick={() => {}}
+          isUserSignedIn={!!user}
+          isMenuOpen={isMenuOpen}
+          userImage={user?.imageUrl}
+          show80sButton={false}
+          isMobile={isMobile}
+          hideMusicOnMobile
+        />
+      </div>
+
       {/* Hero Header */}
       <div style={{
         borderBottom: `1px solid ${theme.border}`,
@@ -366,52 +501,20 @@ export default function OilQualify({
             {players.length} registered total
           </div>
 
-          {/* Grid target progress */}
           <div style={{
-            display: "flex",
-            gap: isMobile ? 4 : 8,
-            justifyContent: "center",
-            flexWrap: "wrap",
+            display: "inline-block",
+            padding: "8px 20px",
+            border: `1px solid ${theme.gold}`,
+            borderRadius: 3,
+            background: `${theme.gold}18`,
             marginTop: 16,
           }}>
-            {GRID_TARGETS.map((g) => {
-              const reached = qualifiedPlayers.length >= g.plots;
-              const nearest = g.size === nearestTarget.size && !reached;
-              const pct = Math.min(100, Math.round((qualifiedPlayers.length / g.plots) * 100));
-              return (
-                <div
-                  key={g.size}
-                  style={{
-                    padding: isMobile ? "6px 8px" : "8px 14px",
-                    border: `1px solid ${reached ? theme.gold : nearest ? `${theme.gold}88` : theme.border}`,
-                    borderRadius: 3,
-                    textAlign: "center",
-                    fontFamily: mono,
-                    background: reached ? `${theme.gold}18` : "transparent",
-                    opacity: reached ? 1 : nearest ? 1 : 0.45,
-                    position: "relative",
-                    overflow: "hidden",
-                  }}
-                >
-                  {!reached && nearest && (
-                    <div style={{
-                      position: "absolute",
-                      bottom: 0,
-                      left: 0,
-                      width: `${pct}%`,
-                      height: 2,
-                      background: theme.gold,
-                    }} />
-                  )}
-                  <div style={{ fontSize: isMobile ? 12 : 14, fontWeight: 700, color: reached ? theme.gold : theme.textStrong }}>
-                    {g.size}x{g.size}
-                  </div>
-                  <div style={{ fontSize: 9, color: theme.muted }}>
-                    {reached ? "UNLOCKED" : `${g.plots} plots`}
-                  </div>
-                </div>
-              );
-            })}
+            <div style={{ fontSize: 14, fontWeight: 700, color: theme.gold }}>
+              {GRID_SIZE}x{GRID_SIZE} GRID
+            </div>
+            <div style={{ fontSize: 9, color: theme.muted }}>
+              {GRID_SIZE * GRID_SIZE} PLOTS &mdash; $500 USDC PRIZE POOL
+            </div>
           </div>
         </div>
 
@@ -436,9 +539,9 @@ export default function OilQualify({
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {[
               { step: "01", title: "HOLD RL80 & FOLLOW", desc: `Hold at least $${QUALIFICATION_THRESHOLD} USD worth of RL80 tokens and follow @rl80token on X.` },
-              { step: "02", title: "REGISTER & GET VERIFIED", desc: "Connect your wallet, enter your X username, and register. Admin runs snapshots to verify balances." },
-              { step: "03", title: "PICK YOUR PLOT", desc: "Once the grid is locked, qualified players pick their plot. First come, first served." },
-              { step: "04", title: "DRILL FOR OIL", desc: "Each day you drill one layer deeper. Oil deposits are hidden underground, seeded by a verifiable block hash." },
+              { step: "02", title: "REGISTER & PICK YOUR PLOT", desc: "Connect your wallet, verify your X follow, register, then pick a plot on the 10x10 grid. First come, first served." },
+              { step: "03", title: "DRILL FOR OIL", desc: "Each day 1 new layer unlocks to drill. Click to drill each layer. Refer friends for bonus depth (up to +10 layers). Max depth: 20." },
+              { step: "04", title: "CLAIM JUMP", desc: "Move to a different unclaimed plot. First 2 jumps are free, each jump after costs 1 bonus drill." },
             ].map((item) => (
               <div key={item.step} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
                 <div style={{
@@ -556,7 +659,7 @@ export default function OilQualify({
                 Connect your wallet to check RL80 balance
               </div>
               <button
-                onClick={() => connectWallet && connectWallet()}
+                onClick={() => setShowWalletModal(true)}
                 style={{
                   padding: "10px 28px",
                   background: `linear-gradient(180deg, ${theme.gold}, #b8922e)`,
@@ -571,6 +674,9 @@ export default function OilQualify({
               >
                 CONNECT WALLET
               </button>
+              {showWalletModal && (
+                <WalletConnectionModal onClose={() => setShowWalletModal(false)} />
+              )}
             </div>
           ) : userRegistered ? (
             <div style={{
@@ -699,62 +805,173 @@ export default function OilQualify({
                 }}>
                   X/TWITTER — FOLLOW @RL80TOKEN
                 </div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                  <div style={{
-                    display: "flex",
-                    alignItems: "center",
-                    flex: 1,
-                    padding: "0 12px",
-                    background: theme.inputBg,
-                    border: `1px solid ${xFollowVerified ? theme.green : theme.border}`,
-                    borderRadius: 3,
-                  }}>
-                    <span style={{ fontSize: 12, color: theme.muted, marginRight: 2 }}>@</span>
-                    <input
-                      type="text"
-                      placeholder="your_x_username"
-                      value={xUsername}
-                      onChange={(e) => setXUsername(e.target.value)}
-                      style={{
+
+                {xIdentityVerified ? (
+                  /* Clerk OAuth verified — show locked username + follow status */
+                  <div>
+                    <div style={{
+                      display: "flex", gap: 8, alignItems: "center",
+                    }}>
+                      <div style={{
+                        display: "flex",
+                        alignItems: "center",
                         flex: 1,
-                        padding: "10px 0",
-                        background: "transparent",
-                        border: "none",
-                        color: theme.text,
-                        fontFamily: mono,
-                        fontSize: 11,
-                        outline: "none",
-                      }}
-                    />
+                        border: `1px solid ${xFollowVerified ? theme.green : theme.border}`,
+                        borderRadius: 3,
+                        padding: "10px 12px",
+                        background: `${theme.green}08`,
+                      }}>
+                        <span style={{ fontSize: 12, color: theme.muted, marginRight: 2 }}>@</span>
+                        <span style={{ fontSize: 11, color: theme.textStrong, fontFamily: mono }}>{xUsername}</span>
+                        <span style={{
+                          marginLeft: 8, fontSize: 9, color: theme.green,
+                          padding: "1px 6px", background: `${theme.green}15`,
+                          border: `1px solid ${theme.green}30`, borderRadius: 2,
+                        }}>
+                          VERIFIED
+                        </span>
+                      </div>
+                      {!xFollowVerified && (
+                        <a
+                          href="https://x.com/rl80token"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            padding: "10px 14px",
+                            background: `${theme.gold}22`,
+                            border: `1px solid ${theme.gold}`,
+                            borderRadius: 3,
+                            color: theme.gold,
+                            fontFamily: mono,
+                            fontSize: 10,
+                            textDecoration: "none",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          FOLLOW
+                        </a>
+                      )}
+                    </div>
+                    {xFollowVerified ? (
+                      <div style={{ fontSize: 10, marginTop: 6, color: theme.green }}>
+                        Identity verified via X sign-in — you follow @rl80token
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 10, marginTop: 6, color: theme.warn }}>
+                        You signed in with X but don't follow @rl80token yet.{" "}
+                        <span
+                          onClick={() => {
+                            fetch(`/api/check-follow?username=${encodeURIComponent(xUsername)}`)
+                              .then((r) => r.json())
+                              .then((data) => setXFollowVerified(!!data.follows))
+                              .catch(() => {});
+                          }}
+                          style={{ color: theme.gold, cursor: "pointer", textDecoration: "underline" }}
+                        >
+                          Re-check
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  <a
-                    href="https://x.com/rl80token"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      padding: "10px 14px",
-                      background: "transparent",
-                      border: `1px solid ${theme.border}`,
-                      borderRadius: 3,
-                      color: theme.muted,
-                      fontFamily: mono,
-                      fontSize: 10,
-                      textDecoration: "none",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    FOLLOW
-                  </a>
-                </div>
-                {xUsername.trim() && (
-                  <div style={{
-                    fontSize: 10,
-                    marginTop: 6,
-                    color: xFollowVerified ? theme.green : theme.warn,
-                  }}>
-                    {xFollowVerified
-                      ? "Verified — you follow @rl80token"
-                      : "Not found in @rl80token followers. Follow first, then check back (followers list updates periodically)."}
+                ) : (
+                  /* Manual entry — user didn't sign in via X */
+                  <div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <div style={{
+                        display: "flex",
+                        alignItems: "center",
+                        flex: 1,
+                        border: `1px solid ${xFollowVerified ? theme.green : theme.border}`,
+                        borderRadius: 3,
+                        overflow: "hidden",
+                      }}>
+                        <span style={{ fontSize: 12, color: theme.muted, padding: "10px 0 10px 12px" }}>@</span>
+
+                        <style>{`.oil-qualify-input { background: transparent !important; border: none !important; border-radius: 0 !important; padding: 10px 12px 10px 4px !important; width: auto !important; font-size: 11px !important; }`}</style>
+                        <input
+                          className="oil-qualify-input"
+                          type="text"
+                          placeholder="your_x_username"
+                          value={xUsername}
+                          onChange={(e) => setXUsername(e.target.value)}
+                          style={{
+                            flex: 1,
+                            color: theme.text,
+                            fontFamily: mono,
+                            outline: "none",
+                          }}
+                        />
+                      </div>
+                      <a
+                        href="https://x.com/rl80token"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          padding: "10px 14px",
+                          background: "transparent",
+                          border: `1px solid ${theme.border}`,
+                          borderRadius: 3,
+                          color: theme.muted,
+                          fontFamily: mono,
+                          fontSize: 10,
+                          textDecoration: "none",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        FOLLOW
+                      </a>
+                      <button
+                        onClick={handleCheckFollow}
+                        disabled={!xUsername.trim() || xCheckingFollow}
+                        style={{
+                          padding: "10px 14px",
+                          background: xUsername.trim() && !xCheckingFollow ? `${theme.gold}22` : "transparent",
+                          border: `1px solid ${xUsername.trim() ? theme.gold : theme.border}`,
+                          borderRadius: 3,
+                          color: xUsername.trim() ? theme.gold : theme.muted,
+                          fontFamily: mono,
+                          fontSize: 10,
+                          cursor: xUsername.trim() && !xCheckingFollow ? "pointer" : "default",
+                          whiteSpace: "nowrap",
+                          opacity: xCheckingFollow ? 0.5 : 1,
+                        }}
+                      >
+                        {xCheckingFollow ? "..." : "VERIFY"}
+                      </button>
+                    </div>
+                    {xUsername.trim() && !xCheckingFollow && xFollowVerified && (
+                      <div style={{ fontSize: 10, marginTop: 6, color: theme.green }}>
+                        Verified — you follow @rl80token
+                      </div>
+                    )}
+                    {xUsername.trim() && !xCheckingFollow && !xFollowVerified && xUsername.length > 1 && (
+                      <div style={{ fontSize: 10, marginTop: 6, color: theme.muted }}>
+                        Enter your X username and click VERIFY
+                      </div>
+                    )}
+                    <div style={{ fontSize: 10, marginTop: 8, color: theme.muted }}>
+                      Tip:{" "}
+                      <span
+                        onClick={async () => {
+                          if (!user) return;
+                          try {
+                            const res = await user.createExternalAccount({
+                              strategy: "oauth_x",
+                              redirectUrl: window.location.href,
+                            });
+                            if (res?.verification?.externalVerificationRedirectURL) {
+                              window.location.href = res.verification.externalVerificationRedirectURL.href;
+                            }
+                          } catch (err) {
+                            console.error("Link X account error:", err);
+                            setError("Failed to link X account. Try again.");
+                          }
+                        }}
+                        style={{ color: theme.gold, cursor: "pointer", textDecoration: "underline" }}
+                      >
+                        Link your X account
+                      </span>{" "}to auto-verify your identity
+                    </div>
                   </div>
                 )}
               </div>
@@ -803,23 +1020,54 @@ export default function OilQualify({
                   borderRadius: 3,
                   background: `${theme.warn}08`,
                 }}>
-                  <div style={{ fontSize: 12, color: theme.warn, fontWeight: 700, marginBottom: 4 }}>
-                    NOT ENOUGH RL80
-                  </div>
-                  <div style={{ fontSize: 11, color: theme.muted }}>
-                    You need ~{neededMore.toLocaleString()} more RL80 to reach ${QUALIFICATION_THRESHOLD}
-                  </div>
-                  <div style={{ fontSize: 10, color: theme.muted, marginTop: 6 }}>
-                    Buy RL80 on{" "}
-                    <a
-                      href="https://app.uniswap.org/swap?outputCurrency=0x8b6deA2eFE3043C44bA13090FBe3AD3eE0F1c644&chain=base"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ color: theme.gold }}
-                    >
-                      Uniswap
-                    </a>
-                  </div>
+                  {liveCheckError ? (
+                    <>
+                      <div style={{ fontSize: 12, color: theme.warn, fontWeight: 700, marginBottom: 4 }}>
+                        BALANCE CHECK FAILED
+                      </div>
+                      <div style={{ fontSize: 11, color: theme.muted }}>
+                        {liveCheckError}
+                      </div>
+                      <button
+                        onClick={() => {
+                          setLiveCheck(null);
+                          setCheckingLive(true);
+                          fetch(`/api/oil-qualify?wallet=${walletAddress}`)
+                            .then((r) => r.json())
+                            .then((data) => { setLiveCheck(data); setCheckingLive(false); })
+                            .catch(() => setCheckingLive(false));
+                        }}
+                        style={{
+                          marginTop: 8, padding: "6px 16px",
+                          background: `${theme.gold}22`, border: `1px solid ${theme.gold}`,
+                          borderRadius: 3, color: theme.gold, fontFamily: mono,
+                          fontSize: 10, cursor: "pointer",
+                        }}
+                      >
+                        RETRY
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ fontSize: 12, color: theme.warn, fontWeight: 700, marginBottom: 4 }}>
+                        NOT ENOUGH RL80
+                      </div>
+                      <div style={{ fontSize: 11, color: theme.muted }}>
+                        You need ~{neededMore.toLocaleString()} more RL80 to reach ${QUALIFICATION_THRESHOLD}
+                      </div>
+                      <div style={{ fontSize: 10, color: theme.muted, marginTop: 6 }}>
+                        Buy RL80 on{" "}
+                        <a
+                          href="https://app.uniswap.org/swap?outputCurrency=0x30d01555d88c76500a82754a1d53cac082a6cb75&chain=base"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: theme.gold }}
+                        >
+                          Uniswap
+                        </a>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -843,6 +1091,160 @@ export default function OilQualify({
           )}
         </div>
 
+        {/* Inline Plot Grid — shown after registration, before plot is picked */}
+        {userRegistered && userPlayer?.qualified && !userHasPlot && (
+          <div style={{
+            marginBottom: 24,
+            padding: isMobile ? 16 : 20,
+            border: `1px solid ${theme.gold}44`,
+            borderRadius: 4,
+            background: `${theme.gold}06`,
+          }}>
+            <div style={{
+              fontSize: 12,
+              letterSpacing: "0.15em",
+              color: theme.green,
+              marginBottom: 4,
+              fontWeight: 700,
+              textAlign: "center",
+            }}>
+              YOU ARE QUALIFIED — PICK YOUR PLOT
+            </div>
+            <div style={{
+              fontSize: 10,
+              color: theme.muted,
+              marginBottom: 14,
+              textAlign: "center",
+            }}>
+              Click any available cell on the {GRID_SIZE}x{GRID_SIZE} grid to claim it
+            </div>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: `repeat(${GRID_SIZE}, 1fr)`,
+              gap: 2,
+              width: "100%",
+              maxWidth: isMobile ? "100%" : 500,
+              margin: "0 auto",
+            }}>
+              {Array.from({ length: GRID_SIZE * GRID_SIZE }, (_, i) => {
+                const col = i % GRID_SIZE;
+                const row = Math.floor(i / GRID_SIZE);
+                const key = `${col}_${row}`;
+                const plotData = allPlots[key];
+                const taken = plotData?.currentOwnerId != null;
+                const isDQ = plotData?.disqualified;
+                const canPick = !taken && !claiming;
+
+                return (
+                  <div
+                    key={key}
+                    onClick={() => canPick && handleClaimPlot(col, row)}
+                    style={{
+                      aspectRatio: "1",
+                      border: `1px solid ${taken ? theme.border : theme.gold}44`,
+                      borderRadius: 2,
+                      background: taken
+                        ? `${theme.muted}15`
+                        : isDQ
+                        ? `${theme.warn}15`
+                        : canPick
+                        ? `${theme.gold}12`
+                        : "transparent",
+                      cursor: canPick ? "pointer" : "default",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: isMobile ? 7 : 9,
+                      color: taken ? theme.muted : theme.borderLight,
+                      transition: "background 0.15s",
+                    }}
+                    title={taken ? "Claimed" : isDQ ? `Pre-drilled (depth ${plotData?.drillDay || 0})` : `(${col}, ${row})`}
+                  >
+                    {taken ? (
+                      <span style={{ fontSize: isMobile ? 8 : 10, color: theme.muted }}>&#9632;</span>
+                    ) : isDQ && plotData?.drillDay > 0 ? (
+                      <span style={{ fontSize: isMobile ? 6 : 8, color: theme.warn }}>D{plotData.drillDay}</span>
+                    ) : (
+                      <span>{col},{row}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{
+              display: "flex",
+              justifyContent: "center",
+              gap: 16,
+              fontSize: 10,
+              color: theme.muted,
+              marginTop: 10,
+            }}>
+              <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: `${theme.gold}30`, marginRight: 4, verticalAlign: "middle" }} /> Available</span>
+              <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: `${theme.muted}30`, marginRight: 4, verticalAlign: "middle" }} /> Taken</span>
+              <span><span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: `${theme.warn}30`, marginRight: 4, verticalAlign: "middle" }} /> Pre-drilled</span>
+            </div>
+            {error && (
+              <div style={{ color: theme.red, fontSize: 11, textAlign: "center", marginTop: 8 }}>
+                {error}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Plot picked confirmation + referral code */}
+        {userRegistered && userHasPlot && (
+          <div style={{
+            marginBottom: 24,
+            padding: 20,
+            border: `1px solid ${theme.green}44`,
+            borderRadius: 4,
+            background: `${theme.green}08`,
+            textAlign: "center",
+          }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: theme.green, marginBottom: 6 }}>
+              PLOT CLAIMED
+            </div>
+            <div style={{ fontSize: 11, color: theme.muted, marginBottom: 12 }}>
+              You have picked your plot. The game will start soon — check back when the drilling phase begins!
+            </div>
+            {/* Referral link section */}
+            <div style={{
+              padding: "12px 16px",
+              border: `1px solid ${theme.gold}44`,
+              borderRadius: 4,
+              background: `${theme.gold}08`,
+            }}>
+              <div style={{ fontSize: 10, letterSpacing: "0.2em", color: theme.gold, marginBottom: 8, fontWeight: 700 }}>
+                SHARE YOUR REFERRAL LINK
+              </div>
+              <div style={{ fontSize: 10, color: theme.muted, marginBottom: 8 }}>
+                Each referral earns you +{REFERRAL_BONUS} bonus drills (up to {MAX_BONUS_DRILLS} max). Deeper drills reach richer deposits!
+              </div>
+              <div style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "6px 10px", background: theme.inputBg, border: `1px solid ${theme.border}`, borderRadius: 3,
+              }}>
+                <span style={{ fontSize: 11, color: theme.textStrong, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  rl80.xyz/oil?ref={walletAddress ? walletAddress.slice(2, 10).toLowerCase() : user?.id?.slice(0, 8)}
+                </span>
+                <button
+                  onClick={() => {
+                    const code = walletAddress ? walletAddress.slice(2, 10).toLowerCase() : user?.id?.slice(0, 8);
+                    navigator.clipboard.writeText(`https://rl80.xyz/oil?ref=${code}`);
+                  }}
+                  style={{
+                    padding: "4px 12px", border: `1px solid ${theme.gold}`, borderRadius: 3,
+                    background: `${theme.gold}22`, color: theme.gold, fontFamily: mono,
+                    fontSize: 10, letterSpacing: "0.1em", cursor: "pointer", whiteSpace: "nowrap",
+                  }}
+                >
+                  COPY LINK
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Game Details */}
         <div style={{
           marginBottom: 24,
@@ -852,9 +1254,9 @@ export default function OilQualify({
         }}>
           {[
             { label: "ENTRY", value: `$${QUALIFICATION_THRESHOLD}+ RL80`, sub: "Token balance check" },
-            { label: "GRID SIZE", value: `UP TO ${GRID_TARGETS[GRID_TARGETS.length - 1].size}x${GRID_TARGETS[GRID_TARGETS.length - 1].size}`, sub: "Scaled to demand" },
-            { label: "DEPTH", value: "20 LAYERS", sub: "Drilled daily" },
-            { label: "PRIZE POOL", value: "RL80 TOKENS", sub: "Hidden underground" },
+            { label: "GRID SIZE", value: `${GRID_SIZE}x${GRID_SIZE} FIXED`, sub: `${GRID_SIZE * GRID_SIZE} plots` },
+            { label: "MAX DEPTH", value: "20 LAYERS", sub: "10 passive + 10 bonus" },
+            { label: "PRIZE POOL", value: "$500 USDC", sub: "Hidden underground" },
           ].map((item) => (
             <div
               key={item.label}
@@ -957,6 +1359,11 @@ export default function OilQualify({
                         </div>
                       )}
                     </div>
+                    {p.referredBy && (
+                      <div style={{ fontSize: 9, color: theme.gold, padding: "1px 4px", background: `${theme.gold}15`, borderRadius: 2, marginRight: 4 }}>
+                        ref:{p.referredBy}
+                      </div>
+                    )}
                     {p.lastSnapshotUsdValue != null && (
                       <div style={{ fontSize: 10, color: theme.muted }}>
                         ${p.lastSnapshotUsdValue.toFixed(2)}
@@ -1015,11 +1422,12 @@ export default function OilQualify({
             lineHeight: 1.8,
           }}>
             <li>Hold at least ${QUALIFICATION_THRESHOLD} USD worth of RL80 tokens and follow @rl80token on X to qualify.</li>
-            <li>Admin runs snapshots to verify token balances on-chain.</li>
-            <li>Grid size is set by the house based on qualified player count.</li>
-            <li>Qualified players pick plots first-come, first-served once the grid is locked.</li>
-            <li>Oil distribution is seeded by a verifiable on-chain block hash.</li>
-            <li>Each game day, every player drills one layer deeper (20 layers total).</li>
+            <li>Admin runs snapshots to verify token balances on-chain. Drop below threshold = disqualified, plot released.</li>
+            <li>Fixed {GRID_SIZE}x{GRID_SIZE} grid (100 plots). Pick your plot when you register. First come, first served.</li>
+            <li>Each day, 1 new layer unlocks to drill (10 passive over the contest). Click to drill each layer. Refer friends for up to 10 bonus layers (max depth: 20).</li>
+            <li>Claim jumping: move to an unclaimed plot. First 2 jumps free, then each jump costs 1 bonus drill.</li>
+            <li>Referrals: share your referral link. When a new player qualifies and claims a plot, you earn +3 bonus drills (capped at 10).</li>
+            <li>Oil distribution is seeded by a verifiable on-chain block hash. $500 USDC prize pool.</li>
           </ul>
         </div>
 
@@ -1111,60 +1519,39 @@ export default function OilQualify({
               )}
             </div>
 
-            {/* Grid size selector */}
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 10, color: theme.muted, marginBottom: 8 }}>
-                SET GRID SIZE FOR DRAFT
+            {/* Game Start Date */}
+            <div style={{ marginTop: 16, marginBottom: 16 }}>
+              <div style={{ fontSize: 10, color: theme.muted, marginBottom: 6 }}>
+                GAME START DATE
               </div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {[6, 7, 8, 9, 10].map((sz) => (
-                  <button
-                    key={sz}
-                    onClick={() => setAdminGridSize(sz)}
-                    style={{
-                      padding: "6px 14px",
-                      border: `1px solid ${adminGridSize === sz ? theme.gold : theme.border}`,
-                      borderRadius: 3,
-                      fontFamily: mono,
-                      fontSize: 11,
-                      cursor: "pointer",
-                      background: adminGridSize === sz ? `${theme.gold}22` : "transparent",
-                      color: adminGridSize === sz ? theme.gold : theme.text,
-                    }}
-                  >
-                    {sz}x{sz} ({sz * sz})
-                  </button>
-                ))}
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <input
+                  type="date"
+                  onChange={(e) => saveGameSettings({ gameStartDate: e.target.value })}
+                  style={{
+                    padding: "6px 10px", background: theme.inputBg, border: `1px solid ${theme.border}`,
+                    borderRadius: 3, color: theme.textStrong, fontFamily: mono, fontSize: 11, outline: "none",
+                  }}
+                />
+                <button
+                  onClick={() => saveGameSettings({ gameStartDate: new Date().toISOString().slice(0, 10) })}
+                  style={{
+                    padding: "6px 12px", border: `1px solid ${theme.border}`, borderRadius: 3,
+                    fontFamily: mono, fontSize: 9, cursor: "pointer", background: "rgba(160,48,48,0.15)",
+                    color: theme.textStrong,
+                  }}
+                >
+                  START NOW
+                </button>
               </div>
             </div>
-
-            <button
-              onClick={handleLockGrid}
-              disabled={qualifiedPlayers.length === 0}
-              style={{
-                width: "100%",
-                padding: "12px 20px",
-                background: qualifiedPlayers.length === 0
-                  ? theme.barBg
-                  : `linear-gradient(180deg, ${theme.gold}, #b8922e)`,
-                border: `1px solid ${qualifiedPlayers.length === 0 ? theme.border : theme.goldBorder}`,
-                borderRadius: 3,
-                color: qualifiedPlayers.length === 0 ? theme.muted : "#fff",
-                fontFamily: mono,
-                fontSize: 12,
-                letterSpacing: "0.12em",
-                cursor: qualifiedPlayers.length === 0 ? "default" : "pointer",
-              }}
-            >
-              LOCK GRID ({adminGridSize}x{adminGridSize}) & START DRAFT
-            </button>
 
             <div style={{ marginTop: 16 }}>
               <div style={{ fontSize: 10, color: theme.muted, marginBottom: 6 }}>
                 PHASE OVERRIDE
               </div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {["ticket_sale", "grid_locked", "active", "ended"].map((phase) => (
+                {["ticket_sale", "active", "ended"].map((phase) => (
                   <button
                     key={phase}
                     onClick={() => saveGameSettings({ gamePhase: phase })}

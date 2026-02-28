@@ -21,7 +21,7 @@ import PolaroidSnapshot from "@/components/PolaroidSnapshot";
 import StarField from "@/components/StarField";
 import ConstellationModel from '@/components/ConstellationModel';
 import Fireworks from "@/components/Fireworks";
-import { db, storage, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, ref, uploadBytes, getDownloadURL, onSnapshot, collection, query, where, addDoc } from "@/lib/firebaseClient";
+import { db, storage, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, ref, uploadBytes, getDownloadURL, onSnapshot, collection, query, where, addDoc, runTransaction, arrayUnion } from "@/lib/firebaseClient";
 import RogueAdminPanel from "@/components/RogueAdminPanel";
 import useCctvRecorder from "@/hooks/useCctvRecorder";
 
@@ -135,7 +135,7 @@ const OilSurfaceMap = dynamic(() => import("@/components/OilSurfaceMap"), { ssr:
 const OilCrossSection = dynamic(() => import("@/components/OilCrossSection"), { ssr: false });
 const OilVerifyPanel = dynamic(() => import("@/components/OilVerifyPanel"), { ssr: false });
 const OilQualify = dynamic(() => import("@/components/OilQualify"), { ssr: false });
-const OilPlotDraft = dynamic(() => import("@/components/OilPlotDraft"), { ssr: false });
+// OilPlotDraft removed — plot picking now merged into OilQualify
 
 const DEFAULT_BLOCK_HASH =
   "0x8a3f7b2c91d4e6f5a0b3c8d7e2f1a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0";
@@ -143,6 +143,10 @@ const DEFAULT_BLOCK_HASH =
 const DEPTH_Z = 20;
 const CELL_SIZE = 1;
 const TANK_CAPACITY = 5;
+const PASSIVE_DRILLS = 10;
+const MAX_BONUS_DRILLS = 10;
+const MAX_DEPTH = 20;
+const FREE_CLAIM_JUMPS = 2;
 
 // Continuous orbit exactly like the Three.js horse example. Stops when user interacts.
 function CameraFlyIn({ onComplete, mobile = false }) {
@@ -404,6 +408,11 @@ export default function OilPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     setMode(params.get("mode") || "active");
+    // Capture referral code from URL and store in localStorage
+    const refCode = params.get("ref");
+    if (refCode) {
+      localStorage.setItem("oil_ref", refCode);
+    }
   }, []);
   const isAdmin = mode === "admin";
   const isReport = mode === "report";
@@ -427,6 +436,7 @@ export default function OilPage() {
   const [gamePhase, setGamePhase] = useState("active");
   const [gameEnded, setGameEnded] = useState(false);
   const [gameDay, setGameDay] = useState(1);
+  const [gameStartDate, setGameStartDate] = useState(null);
 
   // Admin password gate
   const [adminAuthed, setAdminAuthed] = useState(false);
@@ -493,6 +503,7 @@ export default function OilPage() {
         if (typeof d.gameDay === "number") setGameDay(d.gameDay);
         if (typeof d.gridSize === "number") setGridSize(d.gridSize);
         if (d.gamePhase) setGamePhase(d.gamePhase);
+        if (d.gameStartDate) setGameStartDate(d.gameStartDate);
       }
       setSettingsLoaded(true);
     });
@@ -606,10 +617,31 @@ export default function OilPage() {
     return () => unsub();
   }, []);
 
+  // ── oilPlots subscription — per-cell ownership/state ──
+  const [allPlotsMap, setAllPlotsMap] = useState({});
+  useEffect(() => {
+    if (!db) return;
+    const unsub = onSnapshot(collection(db, "oilPlots"), (snap) => {
+      const map = {};
+      snap.docs.forEach((d) => { map[d.id] = { id: d.id, ...d.data() }; });
+      setAllPlotsMap(map);
+    });
+    return () => unsub();
+  }, []);
+
+  // User's active plot state (from oilPlots, not oilDrills)
+  const userPlotState = useMemo(() => {
+    if (!user?.id) return null;
+    return Object.values(allPlotsMap).find((p) => p.currentOwnerId === user.id) || null;
+  }, [user?.id, allPlotsMap]);
+
+  // Claim jump state
+  const [claimJumpMode, setClaimJumpMode] = useState(false);
+
   // Admin: save settings to Firestore when they change
   // Uses a ref for current values so the callback identity is stable (no dependency cascade)
-  const gameSettingsRef = useRef({ blockHash, numberOfDeposits, totalOilBudget, gridSize, gamePhase, gameEnded, gameDay });
-  gameSettingsRef.current = { blockHash, numberOfDeposits, totalOilBudget, gridSize, gamePhase, gameEnded, gameDay };
+  const gameSettingsRef = useRef({ blockHash, numberOfDeposits, totalOilBudget, gridSize, gamePhase, gameEnded, gameDay, gameStartDate });
+  gameSettingsRef.current = { blockHash, numberOfDeposits, totalOilBudget, gridSize, gamePhase, gameEnded, gameDay, gameStartDate };
   const saveGameSettings = useCallback(async (overrides = {}) => {
     if (!db || !isAdmin || !adminAuthed) return;
     try {
@@ -661,7 +693,7 @@ export default function OilPage() {
     const unsub = onSnapshot(doc(db, "oilDrills", user.id), (snap) => {
       if (snap.exists()) {
         const d = snap.data();
-        setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate, totalCollected: d.totalCollected || 0, tankDrains: d.tankDrains || 0, lastDrainExtracted: d.lastDrainExtracted || 0 });
+        setUserDrill({ col: d.col, row: d.row, drillDay: d.drillDay, lastDrillDate: d.lastDrillDate, totalCollected: d.totalCollected || 0, tankDrains: d.tankDrains || 0, lastDrainExtracted: d.lastDrainExtracted || 0, bonusDrills: d.bonusDrills || 0, referralCode: d.referralCode || null, confirmedReferrals: d.confirmedReferrals || 0, claimJumpsUsed: d.claimJumpsUsed || 0 });
         if (d.username) setUsername(d.username);
       } else {
         setUserDrill(null);
@@ -669,6 +701,16 @@ export default function OilPage() {
     });
     return () => unsub();
   }, [user?.id]);
+
+  // Auto-select the user's claim on load
+  const didAutoSelect = useRef(false);
+  useEffect(() => {
+    if (userDrill?.col != null && !didAutoSelect.current) {
+      didAutoSelect.current = true;
+      setSelectedX(userDrill.col);
+      setSliceY(userDrill.row);
+    }
+  }, [userDrill]);
 
   const handleSaveUsername = useCallback(async () => {
     if (!user?.id || !db || !username.trim() || !userDrill) return;
@@ -687,29 +729,46 @@ export default function OilPage() {
 
   const todayUTC = new Date().toISOString().slice(0, 10);
 
+  // ── Passive depth computation (time-based, no clicking) ──
+  const passiveDepth = useMemo(() => {
+    if (!gameStartDate) return 0;
+    const start = new Date(gameStartDate + "T00:00:00Z");
+    const now = new Date();
+    const days = Math.floor((now - start) / 86400000);
+    return Math.min(Math.max(days, 0), PASSIVE_DRILLS);
+  }, [gameStartDate, todayUTC]);
+
+  const bonusDrills = userDrill?.bonusDrills ?? 0;
+  const playerDepth = Math.min(passiveDepth + bonusDrills, MAX_DEPTH);
+
   // In test mode, synthesize a userDrill from the selected cell
   const activeUserDrill = isTest && selectedX !== null
     ? { col: selectedX, row: sliceY, drillDay: testDay, lastDrillDate: null, lastDrainExtracted: 0, totalCollected: 0, tankDrains: 0 }
     : userDrill;
 
-  // Reset reviewDay when drill day advances (e.g. after a new drill)
-  useEffect(() => { setReviewDay(null); }, [userDrill?.drillDay]);
+  // Cell depth from oilPlots (persists across owners) — or computed playerDepth for active players
+  const cellDepth = userPlotState?.drillDay ?? userDrill?.drillDay ?? 0;
 
-  // Effective drill day: active mode uses userDrill, admin/report uses demoDay, test uses testDay
+  // Reset reviewDay when drill depth advances
+  useEffect(() => { setReviewDay(null); }, [cellDepth]);
+
+  // Effective drill day: active mode uses actual cell depth (click-drilled), admin/report uses demoDay, test uses testDay
   const effectiveDrillDay = (isAdmin || isReport) ? demoDay
     : isTest ? testDay
-    : (reviewDay !== null ? reviewDay : (userDrill?.drillDay || 0));
+    : (reviewDay !== null ? reviewDay : cellDepth);
 
-  // Can the player drill right now?
+  // Drill status — click-to-drill, but ceiling is time-gated (passiveDepth + bonusDrills)
   const drillStatus = useMemo(() => {
     if (!user && !isTest) return "sign-in";
+    if (gamePhase === "ticket_sale") return "pre-game";
+    if (selectedX === null && userDrill?.col != null) return "wrong-claim";
     if (selectedX === null) return "no-claim";
     if (userDrill && (userDrill.col !== selectedX || userDrill.row !== sliceY)) return "wrong-claim";
-    const currentDepth = userDrill?.drillDay || 0;
-    if (currentDepth >= DEPTH_Z) return "max-depth";
-    if (userDrill?.lastDrillDate === todayUTC) return "drilled-today";
+    const currentDepth = userPlotState?.drillDay ?? userDrill?.drillDay ?? 0;
+    if (currentDepth >= MAX_DEPTH) return "max-depth";
+    if (currentDepth >= playerDepth) return "depth-ceiling"; // caught up to time-gated ceiling
     return "ready";
-  }, [user, selectedX, sliceY, userDrill, todayUTC]);
+  }, [user, gamePhase, selectedX, sliceY, userDrill, userPlotState, playerDepth]);
 
   // Panel collapse for full 3D view
   const [panelsCollapsed, setPanelsCollapsed] = useState(false);
@@ -824,8 +883,9 @@ export default function OilPage() {
     return unsub;
   }, [selectedX, sliceY]);
 
-  // Can the current user edit this cell's config?
-  const isConfigOwner = !!user?.id && (configOwnerId === user.id || configOwnerId === null);
+  // Can the current user edit this cell's config? Check oilPlots ownership first, fallback to pumpConfigs
+  const plotOwnerForCell = selectedX !== null ? allPlotsMap[`${selectedX}_${sliceY}`]?.currentOwnerId : null;
+  const isConfigOwner = !!user?.id && (plotOwnerForCell === user.id || (plotOwnerForCell == null && (configOwnerId === user.id || configOwnerId === null)));
 
   // Save pump config (called from SAVE button)
   const handleConfigSave = useCallback(async () => {
@@ -1141,26 +1201,31 @@ export default function OilPage() {
     handleFlyTo(x, y);
   }, [handleFlyTo, gridSize]);
 
-  // Daily drill handler (player mode)
+  // ── Click-to-drill handler — one layer per click, capped by playerDepth (time + bonus) ──
   const handleDailyDrill = useCallback(async () => {
     if (!user?.id || !db || selectedX === null || drillStatus !== "ready") return;
-    const nextDay = (userDrill?.drillDay || 0) + 1;
     const col = userDrill?.col ?? selectedX;
     const row = userDrill?.row ?? sliceY;
+    const plotKey = `${col}_${row}`;
+    const currentCellDepth = userPlotState?.drillDay ?? 0;
+    const nextCellDepth = currentCellDepth + 1;
     // Optimistic local update
-    setUserDrill({ col, row, drillDay: nextDay, lastDrillDate: todayUTC });
+    setUserDrill((prev) => prev ? { ...prev, drillDay: nextCellDepth } : prev);
     try {
+      // Update oilPlots (cell depth)
+      await setDoc(doc(db, "oilPlots", plotKey), {
+        drillDay: nextCellDepth,
+      }, { merge: true });
+      // Update oilDrills
       await setDoc(doc(db, "oilDrills", user.id), {
         userId: user.id,
         col,
         row,
-        drillDay: nextDay,
-        lastDrillDate: todayUTC,
         ...(username.trim() ? { username: username.trim() } : {}),
         updatedAt: serverTimestamp(),
       }, { merge: true });
       // Broadcast gusher event if oil exists at this depth
-      const oilAtDepth = stats.grid3D[col]?.[row]?.[nextDay - 1] ?? 0;
+      const oilAtDepth = stats.grid3D[col]?.[row]?.[nextCellDepth - 1] ?? 0;
       if (oilAtDepth > 0) {
         try {
           await addDoc(collection(db, "gusherEvents"), {
@@ -1179,7 +1244,71 @@ export default function OilPage() {
     } catch (err) {
       console.error("Failed to save drill:", err);
     }
-  }, [user?.id, selectedX, sliceY, userDrill, drillStatus, todayUTC, username, stats.grid3D]);
+  }, [user?.id, selectedX, sliceY, userDrill, userPlotState, drillStatus, username, stats.grid3D]);
+
+  // ── Claim Jump handler ──
+  const handleClaimJump = useCallback(async (newCol, newRow) => {
+    if (!user?.id || !db || !userDrill) return;
+    const targetKey = `${newCol}_${newRow}`;
+    const targetPlot = allPlotsMap[targetKey];
+    // Target must be unclaimed
+    if (targetPlot?.currentOwnerId != null) return;
+    const jumpsUsed = userDrill.claimJumpsUsed ?? 0;
+    const currentBonusDrills = userDrill.bonusDrills ?? 0;
+    const isFree = jumpsUsed < FREE_CLAIM_JUMPS;
+    // If not free, must have bonus drills available
+    if (!isFree && currentBonusDrills <= 0) return;
+    const oldCol = userDrill.col;
+    const oldRow = userDrill.row;
+    const oldKey = `${oldCol}_${oldRow}`;
+    try {
+      await runTransaction(db, async (transaction) => {
+        // Re-check target is still unclaimed
+        const targetRef = doc(db, "oilPlots", targetKey);
+        const targetSnap = await transaction.get(targetRef);
+        if (targetSnap.exists() && targetSnap.data().currentOwnerId != null) {
+          throw new Error("Plot already claimed");
+        }
+        // Release old plot
+        const oldRef = doc(db, "oilPlots", oldKey);
+        transaction.update(oldRef, {
+          currentOwnerId: null,
+          ownerHistory: arrayUnion({ userId: user.id, releasedAt: new Date().toISOString(), reason: "claim_jump" }),
+        });
+        // Claim new plot
+        transaction.set(targetRef, {
+          col: newCol,
+          row: newRow,
+          drillDay: targetSnap.exists() ? (targetSnap.data().drillDay ?? 0) : 0,
+          currentOwnerId: user.id,
+          ownerHistory: arrayUnion({ userId: user.id, claimedAt: new Date().toISOString() }),
+          disqualified: false,
+          lastDrillDate: targetSnap.exists() ? (targetSnap.data().lastDrillDate ?? null) : null,
+        }, { merge: true });
+        // Update oilDrills
+        const newJumps = jumpsUsed + 1;
+        const newBonus = isFree ? currentBonusDrills : Math.max(0, currentBonusDrills - 1);
+        const drillRef = doc(db, "oilDrills", user.id);
+        transaction.update(drillRef, {
+          col: newCol,
+          row: newRow,
+          claimJumpsUsed: newJumps,
+          bonusDrills: newBonus,
+          updatedAt: serverTimestamp(),
+        });
+        // Update oilQualified
+        const qualRef = doc(db, "oilQualified", user.id);
+        transaction.update(qualRef, {
+          plotCol: newCol,
+          plotRow: newRow,
+        });
+      });
+      setClaimJumpMode(false);
+      handleFlyTo(newCol, newRow);
+    } catch (err) {
+      console.error("Claim jump failed:", err);
+    }
+  }, [user?.id, userDrill, allPlotsMap, handleFlyTo]);
 
   // Tank drain handler — always updates UI, persists to Firestore when possible
   const handleTankDrain = useCallback(async () => {
@@ -1313,6 +1442,32 @@ export default function OilPage() {
           {hitRate}%
         </span>
       </div>
+      <div style={{ ...styles.paramRow, marginTop: 6, paddingTop: 6, borderTop: `1px solid ${theme.border}` }}>
+        <span style={styles.paramLabel}>START DATE</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <input
+            type="date"
+            value={gameStartDate || ""}
+            onChange={(e) => { setGameStartDate(e.target.value); saveGameSettings({ gameStartDate: e.target.value }); }}
+            style={{
+              padding: "2px 6px", background: theme.inputBg, border: `1px solid ${theme.border}`,
+              borderRadius: 2, color: theme.textStrong, fontFamily: "'Share Tech Mono', monospace",
+              fontSize: 10, outline: "none",
+            }}
+          />
+          <button
+            onClick={() => { const today = new Date().toISOString().slice(0, 10); setGameStartDate(today); saveGameSettings({ gameStartDate: today }); }}
+            style={{ ...styles.paramBtn, padding: "2px 8px", fontSize: 9 }}
+          >
+            TODAY
+          </button>
+        </div>
+      </div>
+      {gameStartDate && (
+        <div style={{ ...styles.paramRow, marginTop: 2, fontSize: 10, color: theme.muted }}>
+          <span>PASSIVE DEPTH NOW: {passiveDepth}/{PASSIVE_DRILLS}</span>
+        </div>
+      )}
       <div style={{ ...styles.paramRow, marginTop: 6, paddingTop: 6, borderTop: `1px solid ${theme.border}` }}>
         <span style={styles.paramLabel}>GAME DAY</span>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -1552,10 +1707,19 @@ export default function OilPage() {
 
   const inspectorPanel = (
     <div style={isMobile ? m.section : styles.panelSection}>
-      <h3 style={isMobile ? m.sectionTitle : styles.panelTitle}>
+      <h3
+        style={{ ...(isMobile ? m.sectionTitle : styles.panelTitle), cursor: selectedX === null && userDrill?.col != null ? 'pointer' : undefined }}
+        onClick={() => {
+          if (selectedX === null && userDrill?.col != null) {
+            handleSelectClaim({ x: userDrill.col, y: userDrill.row });
+          }
+        }}
+      >
         {selectedX !== null
           ? `CLAIM (${selectedX}, ${sliceY}) INSPECTOR`
-          : "SELECT A CLAIM"}
+          : userDrill?.col != null
+            ? `YOUR CLAIM (${userDrill.col}, ${userDrill.row}) — TAP TO VIEW`
+            : "SELECT A CLAIM"}
       </h3>
 
       {selectedData ? (
@@ -2041,7 +2205,8 @@ export default function OilPage() {
   }
 
   // ── Pre-game phase gates ──
-  if (gamePhase === "ticket_sale") {
+  const userHasPlot = userDrill?.col != null;
+  if (gamePhase === "ticket_sale" && !userHasPlot) {
     return (
       <OilQualify
         theme={theme}
@@ -2049,27 +2214,11 @@ export default function OilPage() {
         isMobile={isMobile}
         user={user}
         isAdmin={isAdmin && adminAuthed}
-        gridSize={gridSize}
         saveGameSettings={saveGameSettings}
-        setGridSize={setGridSize}
         walletAddress={walletAddress}
         tokenBalance={tokenBalance}
         isWalletConnected={isWalletConnected}
-        connectWallet={connectWallet}
-      />
-    );
-  }
-
-  if (gamePhase === "grid_locked") {
-    return (
-      <OilPlotDraft
-        theme={theme}
-        darkMode={darkMode}
-        isMobile={isMobile}
-        user={user}
-        isAdmin={isAdmin && adminAuthed}
-        gridSize={gridSize}
-        saveGameSettings={saveGameSettings}
+        storedRef={typeof window !== "undefined" ? localStorage.getItem("oil_ref") : null}
       />
     );
   }
@@ -2078,7 +2227,7 @@ export default function OilPage() {
   const phaseOverrideButtons = isAdmin && (
     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
       <span style={{ fontSize: 9, letterSpacing: "0.1em", color: theme.muted }}>PHASE:</span>
-      {["ticket_sale", "grid_locked", "active", "ended"].map((p) => (
+      {["ticket_sale", "active", "ended"].map((p) => (
         <button
           key={p}
           onClick={() => saveGameSettings({ gamePhase: p })}
@@ -2175,7 +2324,7 @@ export default function OilPage() {
     </span>
   );
 
-  // ── Daily Drill Button (active mode only, not test mode) ──
+  // ── Passive Depth Indicator (active mode only, not test mode) ──
   const drillButton = !isAdmin && !isReport && !isTest && (
     <div style={{
       padding: "10px 14px",
@@ -2186,16 +2335,28 @@ export default function OilPage() {
       justifyContent: "center",
       gap: 12,
     }}>
+      {drillStatus === "pre-game" && (
+        <div style={drillBtnStyles.wrap}>
+          <button disabled style={drillBtnStyles.disabled}>GAME STARTS SOON</button>
+        </div>
+      )}
       {drillStatus === "sign-in" && (
         <div style={drillBtnStyles.wrap}>
-          <button disabled style={drillBtnStyles.disabled}>SIGN IN TO DRILL</button>
-          <DrillCountdown style={drillBtnStyles.countdown} />
+          <button disabled style={drillBtnStyles.disabled}>SIGN IN TO PLAY</button>
         </div>
       )}
       {drillStatus === "no-claim" && (
         <div style={drillBtnStyles.wrap}>
-          <button disabled style={drillBtnStyles.disabled}>SELECT A CLAIM</button>
-          <DrillCountdown style={drillBtnStyles.countdown} />
+          {userDrill?.col != null ? (
+            <button
+              onClick={() => handleSelectClaim({ x: userDrill.col, y: userDrill.row })}
+              style={drillBtnStyles.active}
+            >
+              GO TO YOUR CLAIM ({Math.min(userDrill.col, gridSize - 1)}, {Math.min(userDrill.row, gridSize - 1)})
+            </button>
+          ) : (
+            <button disabled style={drillBtnStyles.disabled}>SELECT A CLAIM</button>
+          )}
         </div>
       )}
       {drillStatus === "wrong-claim" && (
@@ -2206,20 +2367,38 @@ export default function OilPage() {
           >
             GO TO YOUR CLAIM ({Math.min(userDrill?.col ?? 0, gridSize - 1)}, {Math.min(userDrill?.row ?? 0, gridSize - 1)})
           </button>
-          <DrillCountdown style={drillBtnStyles.countdown} />
         </div>
       )}
       {drillStatus === "max-depth" && (
         <div style={drillBtnStyles.wrap}>
           <button disabled style={drillBtnStyles.disabled}>MAX DEPTH REACHED</button>
-          <div style={drillBtnStyles.depth}>DEPTH {DEPTH_Z}/{DEPTH_Z}</div>
+          <div style={drillBtnStyles.depth}>DEPTH {MAX_DEPTH}/{MAX_DEPTH}</div>
         </div>
       )}
-      {drillStatus === "drilled-today" && (
+      {drillStatus === "depth-ceiling" && (
         <div style={drillBtnStyles.wrap}>
-          <button disabled style={drillBtnStyles.disabled}>DRILLED TODAY</button>
-          <DrillCountdown style={drillBtnStyles.countdown} />
-          <div style={drillBtnStyles.depth}>DEPTH {userDrill?.drillDay || 0}/{DEPTH_Z}</div>
+          <button disabled style={drillBtnStyles.disabled}>CAUGHT UP</button>
+          <div style={drillBtnStyles.depth}>DEPTH {cellDepth}/{playerDepth} (ceiling)</div>
+          {/* Depth progress bar */}
+          <div style={{ width: "100%", maxWidth: 220, height: 10, background: theme.barBg, borderRadius: 4, overflow: "hidden", border: `1px solid ${theme.border}`, position: "relative" }}>
+            <div style={{
+              width: `${(passiveDepth / MAX_DEPTH) * 100}%`,
+              height: "100%",
+              background: `linear-gradient(90deg, ${theme.green}, #7ab44a)`,
+              position: "absolute", left: 0, top: 0,
+            }} />
+            {bonusDrills > 0 && (
+              <div style={{
+                width: `${(bonusDrills / MAX_DEPTH) * 100}%`,
+                height: "100%",
+                background: `linear-gradient(90deg, ${theme.gold}, ${theme.goldBorder})`,
+                position: "absolute", left: `${(passiveDepth / MAX_DEPTH) * 100}%`, top: 0,
+              }} />
+            )}
+          </div>
+          <div style={drillBtnStyles.hint}>
+            {passiveDepth} passive{bonusDrills > 0 ? ` + ${bonusDrills} bonus` : ""} — next layer unlocks tomorrow
+          </div>
         </div>
       )}
       {drillStatus === "ready" && (
@@ -2227,7 +2406,30 @@ export default function OilPage() {
           <button onClick={handleDailyDrill} style={drillBtnStyles.active}>
             DRILL
           </button>
-          <div style={drillBtnStyles.depth}>DEPTH {userDrill?.drillDay || 0}/{DEPTH_Z}</div>
+          <div style={drillBtnStyles.depth}>DEPTH {cellDepth}/{playerDepth}</div>
+          {/* Depth progress bar */}
+          <div style={{ width: "100%", maxWidth: 220, height: 10, background: theme.barBg, borderRadius: 4, overflow: "hidden", border: `1px solid ${theme.border}`, position: "relative" }}>
+            <div style={{
+              width: `${(passiveDepth / MAX_DEPTH) * 100}%`,
+              height: "100%",
+              background: `linear-gradient(90deg, ${theme.green}, #7ab44a)`,
+              position: "absolute", left: 0, top: 0,
+            }} />
+            {bonusDrills > 0 && (
+              <div style={{
+                width: `${(bonusDrills / MAX_DEPTH) * 100}%`,
+                height: "100%",
+                background: `linear-gradient(90deg, ${theme.gold}, ${theme.goldBorder})`,
+                position: "absolute", left: `${(passiveDepth / MAX_DEPTH) * 100}%`, top: 0,
+              }} />
+            )}
+          </div>
+          <div style={drillBtnStyles.hint}>
+            {passiveDepth} passive{bonusDrills > 0 ? ` + ${bonusDrills} bonus` : ""} — {playerDepth - cellDepth} drill{playerDepth - cellDepth !== 1 ? "s" : ""} available
+          </div>
+          <div style={{ fontSize: 9, color: theme.muted, letterSpacing: "0.06em", fontStyle: "italic", textAlign: "center", maxWidth: 220 }}>
+            Geological surveys suggest denser deposits at greater depth
+          </div>
         </div>
       )}
     </div>
@@ -2352,6 +2554,76 @@ export default function OilPage() {
           DEPTH {effectiveDrillDay}/{DEPTH_Z}
         </span>
       </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+        <span style={{ fontSize: 10, letterSpacing: "0.1em", color: theme.muted }}>
+          {passiveDepth} PASSIVE + {bonusDrills} BONUS
+        </span>
+        <span style={{ fontSize: 10, letterSpacing: "0.1em", color: theme.muted }}>
+          JUMPS {userDrill?.claimJumpsUsed ?? 0} ({Math.max(0, FREE_CLAIM_JUMPS - (userDrill?.claimJumpsUsed ?? 0))} free)
+        </span>
+      </div>
+      {/* Referral stats */}
+      {userDrill?.referralCode && (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+          <span style={{ fontSize: 10, letterSpacing: "0.1em", color: theme.gold }}>
+            REFERRALS: {userDrill.confirmedReferrals || 0} confirmed
+          </span>
+          <span style={{ fontSize: 10, letterSpacing: "0.1em", color: theme.gold }}>
+            +{bonusDrills} bonus drills
+          </span>
+        </div>
+      )}
+      {/* Copyable referral link */}
+      {userDrill?.referralCode && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 6, marginBottom: 8,
+          padding: "4px 8px", background: theme.inputBg, border: `1px solid ${theme.border}`, borderRadius: 2,
+        }}>
+          <span style={{ fontSize: 10, color: theme.muted, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            rl80.xyz/oil?ref={userDrill.referralCode}
+          </span>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(`https://rl80.xyz/oil?ref=${userDrill.referralCode}`);
+            }}
+            style={{
+              padding: "2px 8px", border: `1px solid ${theme.border}`, borderRadius: 2,
+              background: "transparent", color: theme.accent, fontFamily: "'Share Tech Mono', monospace",
+              fontSize: 9, letterSpacing: "0.1em", cursor: "pointer",
+            }}
+          >
+            COPY
+          </button>
+        </div>
+      )}
+      {/* Claim Jump toggle */}
+      {gamePhase === "active" && (
+        <div style={{ marginBottom: 8 }}>
+          <button
+            onClick={() => setClaimJumpMode((m) => !m)}
+            style={{
+              width: "100%",
+              padding: "6px 12px",
+              border: `1px solid ${claimJumpMode ? theme.gold : theme.border}`,
+              borderRadius: 3,
+              fontFamily: "'Share Tech Mono', monospace",
+              fontSize: 10,
+              letterSpacing: "0.12em",
+              cursor: "pointer",
+              background: claimJumpMode ? `${theme.gold}22` : "transparent",
+              color: claimJumpMode ? theme.gold : theme.muted,
+            }}
+          >
+            {claimJumpMode ? "CANCEL CLAIM JUMP" : "CLAIM JUMP"}
+          </button>
+          {claimJumpMode && (
+            <div style={{ fontSize: 10, color: theme.gold, marginTop: 4, textAlign: "center" }}>
+              Click an unclaimed cell on the map to jump
+              {(userDrill?.claimJumpsUsed ?? 0) >= FREE_CLAIM_JUMPS && " (costs 1 bonus drill)"}
+            </div>
+          )}
+        </div>
+      )}
       {/* Time scrub slider (player review) */}
       {!isTest && userDrill?.drillDay > 1 && (
         <div style={{ marginBottom: 8, padding: "6px 0" }}>
@@ -2717,6 +2989,10 @@ export default function OilPage() {
                 theme={theme}
                 gridX={gridSize}
                 gridY={gridSize}
+                allPlotsMap={allPlotsMap}
+                claimJumpMode={claimJumpMode}
+                onClaimJump={handleClaimJump}
+                currentUserId={user?.id}
               />
             </div>
           )}
@@ -3073,6 +3349,10 @@ export default function OilPage() {
                 theme={theme}
                 gridX={gridSize}
                 gridY={gridSize}
+                allPlotsMap={allPlotsMap}
+                claimJumpMode={claimJumpMode}
+                onClaimJump={handleClaimJump}
+                currentUserId={user?.id}
               />
             </div>
             <div style={{ ...styles.midPanel, flex: 1, minHeight: 0 }}>
@@ -3167,6 +3447,7 @@ export default function OilPage() {
         captureElementId="oil-canvas"
         label="Just added this oil claim to my portfolio!"
         backgroundImage="/LandGradient3.webp"
+        referralOverlay={userDrill?.referralCode ? { code: userDrill.referralCode } : null}
         onComplete={() => {
           setTimeout(() => setSnapshotTrigger(false), 100);
         }}

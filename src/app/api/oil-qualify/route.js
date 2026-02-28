@@ -7,6 +7,7 @@ import {
   collection,
   getDocs,
   serverTimestamp,
+  arrayUnion,
 } from "@/lib/firebaseServer";
 import { getRL80Price, getRL80Balance } from "@/lib/oilPrice";
 
@@ -37,6 +38,11 @@ export async function GET(req) {
       usdValue: Math.round(usdValue * 100) / 100,
       price: price.rl80PriceUsd,
       threshold: QUALIFICATION_THRESHOLD_USD,
+      debug: {
+        rawBalance: balance.toString(),
+        rl80PerEth: price.rl80PerEth,
+        ethPriceUsd: price.ethPriceUsd,
+      },
     });
   } catch (err) {
     console.error("[oil-qualify GET]", err.message);
@@ -46,6 +52,7 @@ export async function GET(req) {
 
 // ── POST /api/oil-qualify ──
 // Admin-triggered snapshot: reads all registered players, checks balances, marks qualified
+// When a player becomes disqualified, their oilPlots cell is released
 export async function POST(req) {
   try {
     if (!db) {
@@ -80,6 +87,7 @@ export async function POST(req) {
         const balanceNum = Number(balance) / 1e18;
         const usdValue = balanceNum * price.rl80PriceUsd;
         const qualified = usdValue >= QUALIFICATION_THRESHOLD_USD;
+        const wasQualified = player.qualified !== false; // treat undefined as qualified
 
         if (qualified) qualifiedCount++;
 
@@ -90,6 +98,43 @@ export async function POST(req) {
           lastSnapshotUsdValue: Math.round(usdValue * 100) / 100,
           lastSnapshotAt: serverTimestamp(),
         }, { merge: true });
+
+        // If player just became disqualified, release their plot
+        if (!qualified && wasQualified) {
+          try {
+            // Read their oilDrills doc for col/row
+            const drillSnap = await getDoc(doc(db, "oilDrills", player.id));
+            if (drillSnap.exists()) {
+              const drillData = drillSnap.data();
+              if (drillData.col != null && drillData.row != null) {
+                const plotKey = `${drillData.col}_${drillData.row}`;
+                // Release the plot
+                await setDoc(doc(db, "oilPlots", plotKey), {
+                  currentOwnerId: null,
+                  disqualified: true,
+                  ownerHistory: arrayUnion({
+                    userId: player.id,
+                    releasedAt: new Date().toISOString(),
+                    reason: "disqualified",
+                  }),
+                }, { merge: true });
+                // Clear col/row in oilDrills
+                await setDoc(doc(db, "oilDrills", player.id), {
+                  col: null,
+                  row: null,
+                  updatedAt: serverTimestamp(),
+                }, { merge: true });
+                // Clear in oilQualified
+                await setDoc(doc(db, "oilQualified", player.id), {
+                  plotCol: null,
+                  plotRow: null,
+                }, { merge: true });
+              }
+            }
+          } catch (plotErr) {
+            console.error(`[oil-qualify] Error releasing plot for ${player.id}:`, plotErr.message);
+          }
+        }
 
         results.push({
           userId: player.id,

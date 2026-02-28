@@ -17,7 +17,8 @@ import {
   getDoc,
   setDoc,
   runTransaction,
-  increment
+  increment,
+  arrayUnion
 } from "firebase/firestore";
 import { getAuth, signInWithCustomToken } from "firebase/auth";
 import { getStorage, ref, getDownloadURL, uploadBytes } from "firebase/storage";
@@ -149,6 +150,7 @@ export {
   uploadBytes,
   signInWithCustomTokenWrapper as signInWithCustomToken,
   runTransaction,
+  arrayUnion,
   // Realtime Database exports
   dbRef,
   set,
