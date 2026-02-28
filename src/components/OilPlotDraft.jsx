@@ -1,18 +1,16 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   db,
   collection,
   query,
-  orderBy,
   where,
   onSnapshot,
   doc,
   updateDoc,
   serverTimestamp,
 } from "@/lib/firebaseClient";
-import { Timestamp } from "firebase/firestore";
 
 export default function OilPlotDraft({
   theme,
@@ -23,22 +21,19 @@ export default function OilPlotDraft({
   gridSize,
   saveGameSettings,
 }) {
-  const [tickets, setTickets] = useState([]);
+  const [players, setPlayers] = useState([]);
   const [settings, setSettings] = useState({});
-  const [countdown, setCountdown] = useState("");
   const [claiming, setClaiming] = useState(false);
   const [error, setError] = useState(null);
-  const [skipping, setSkipping] = useState(false);
-  const intervalRef = useRef(null);
 
-  // Subscribe to tickets
+  // Subscribe to qualified players
   useEffect(() => {
     if (!db) return;
-    const q = query(collection(db, "oilTickets"), orderBy("purchaseOrder", "asc"));
+    const q = query(collection(db, "oilQualified"), where("qualified", "==", true));
     const unsub = onSnapshot(q, (snap) => {
       const list = [];
       snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
-      setTickets(list);
+      setPlayers(list);
     });
     return () => unsub();
   }, []);
@@ -52,94 +47,52 @@ export default function OilPlotDraft({
     return () => unsub();
   }, []);
 
-  const currentPickOrder = settings.currentPickOrder || 1;
-  const pickDeadline = settings.pickDeadline;
-  const totalTickets = tickets.length;
+  const totalPlayers = players.length;
 
   // How many have already picked
   const pickedCount = useMemo(
-    () => tickets.filter((t) => t.plotCol != null).length,
-    [tickets]
-  );
-
-  // Current picker ticket
-  const currentPicker = useMemo(
-    () => tickets.find((t) => t.purchaseOrder === currentPickOrder),
-    [tickets, currentPickOrder]
-  );
-
-  // Is it current user's turn?
-  const isMyTurn = useMemo(
-    () => user && currentPicker?.userId === user.id,
-    [user, currentPicker]
+    () => players.filter((p) => p.plotCol != null).length,
+    [players]
   );
 
   // Taken plots set
   const takenPlots = useMemo(() => {
     const map = {};
-    tickets.forEach((t) => {
-      if (t.plotCol != null) {
-        map[`${t.plotCol},${t.plotRow}`] = t;
+    players.forEach((p) => {
+      if (p.plotCol != null) {
+        map[`${p.plotCol},${p.plotRow}`] = p;
       }
     });
     return map;
-  }, [tickets]);
+  }, [players]);
 
-  // My ticket
-  const myTicket = useMemo(
-    () => user && tickets.find((t) => t.userId === user.id),
-    [user, tickets]
+  // My player record
+  const myPlayer = useMemo(
+    () => user && players.find((p) => p.userId === user.id),
+    [user, players]
   );
 
-  // Countdown timer
-  useEffect(() => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    if (!pickDeadline) {
-      setCountdown("");
-      return;
-    }
+  // Can I pick? (first-come-first-served: any qualified player who hasn't picked yet)
+  const canPickPlot = useMemo(
+    () => user && myPlayer && myPlayer.plotCol == null,
+    [user, myPlayer]
+  );
 
-    const update = () => {
-      const deadline = pickDeadline.toDate ? pickDeadline.toDate() : new Date(pickDeadline);
-      const diff = deadline.getTime() - Date.now();
-      if (diff <= 0) {
-        setCountdown("TIME'S UP");
-        return;
-      }
-      const h = Math.floor(diff / 3600000);
-      const m = Math.floor((diff % 3600000) / 60000);
-      const s = Math.floor((diff % 60000) / 1000);
-      setCountdown(`${h}h ${m}m ${s}s`);
-    };
+  const allPicked = pickedCount >= totalPlayers;
 
-    update();
-    intervalRef.current = setInterval(update, 1000);
-    return () => clearInterval(intervalRef.current);
-  }, [pickDeadline]);
-
-  // Claim a plot
+  // Claim a plot (first-come-first-served)
   const handleClaimPlot = useCallback(
     async (col, row) => {
-      if (!user || !isMyTurn || !myTicket) return;
+      if (!user || !myPlayer || myPlayer.plotCol != null) return;
       setClaiming(true);
       setError(null);
       try {
-        // Update ticket with plot selection
-        const ticketRef = doc(db, "oilTickets", myTicket.id);
-        await updateDoc(ticketRef, {
+        // Update qualified player doc with plot selection
+        const playerRef = doc(db, "oilQualified", user.id);
+        await updateDoc(playerRef, {
           plotCol: col,
           plotRow: row,
           pickedAt: serverTimestamp(),
-        });
-
-        // Advance pick order + set new deadline
-        const pickWindowMinutes = settings.pickWindowMinutes || 120;
-        const newDeadline = Timestamp.fromDate(
-          new Date(Date.now() + pickWindowMinutes * 60 * 1000)
-        );
-        await saveGameSettings({
-          currentPickOrder: currentPickOrder + 1,
-          pickDeadline: newDeadline,
         });
       } catch (err) {
         setError(err.message);
@@ -147,35 +100,14 @@ export default function OilPlotDraft({
         setClaiming(false);
       }
     },
-    [user, isMyTurn, myTicket, currentPickOrder, settings.pickWindowMinutes, saveGameSettings]
+    [user, myPlayer]
   );
-
-  // Admin: skip current picker
-  const handleSkip = useCallback(async () => {
-    setSkipping(true);
-    setError(null);
-    try {
-      const adminPassword = localStorage.getItem("oil_admin_password") || "";
-      const res = await fetch("/api/oil-draft-skip", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ adminPassword }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSkipping(false);
-    }
-  }, []);
 
   // Admin: start game
   const handleStartGame = useCallback(async () => {
     await saveGameSettings({ gamePhase: "active" });
   }, [saveGameSettings]);
 
-  const allPicked = currentPickOrder > totalTickets;
   const s = draftStyles(theme, darkMode, isMobile);
 
   return (
@@ -192,61 +124,38 @@ export default function OilPlotDraft({
         {/* Progress */}
         <div style={s.progressCard}>
           <div style={s.progressNumber}>
-            {pickedCount} / {totalTickets}
+            {pickedCount} / {totalPlayers}
           </div>
           <div style={s.progressLabel}>PLOTS PICKED</div>
         </div>
 
-        {/* Current picker info */}
-        {!allPicked && currentPicker && (
+        {/* Player status */}
+        {!allPicked && (
           <div style={s.pickerCard}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-              {currentPicker.clerkAvatar && (
-                <img
-                  src={currentPicker.clerkAvatar}
-                  alt=""
-                  style={{ width: 32, height: 32, borderRadius: 16 }}
-                />
-              )}
-              <div>
-                <div style={{ fontSize: 14, color: theme.textStrong, fontWeight: 700 }}>
-                  {currentPicker.clerkName || "Anonymous"}
-                </div>
-                <div style={{ fontSize: 10, color: theme.muted }}>
-                  PICK #{currentPicker.purchaseOrder}
-                </div>
-              </div>
-              {countdown && (
-                <div
-                  style={{
-                    marginLeft: "auto",
-                    fontSize: 16,
-                    fontWeight: 700,
-                    color: countdown === "TIME'S UP" ? theme.red : theme.gold,
-                    letterSpacing: "0.05em",
-                  }}
-                >
-                  {countdown}
-                </div>
-              )}
-            </div>
-            {isMyTurn && (
+            {canPickPlot ? (
               <div style={{ fontSize: 12, color: theme.green, fontWeight: 700 }}>
-                IT&apos;S YOUR TURN — CLICK A PLOT BELOW
+                YOU ARE QUALIFIED — CLICK A PLOT BELOW TO CLAIM IT
               </div>
-            )}
-            {!isMyTurn && user && myTicket && !myTicket.plotCol && (
+            ) : myPlayer?.plotCol != null ? (
+              <div style={{ fontSize: 12, color: theme.green, fontWeight: 700 }}>
+                YOU PICKED PLOT ({myPlayer.plotCol}, {myPlayer.plotRow})
+              </div>
+            ) : !user ? (
               <div style={{ fontSize: 11, color: theme.muted }}>
-                Waiting for your turn (you are #{myTicket.purchaseOrder})
+                Sign in to pick your plot
               </div>
-            )}
+            ) : !myPlayer ? (
+              <div style={{ fontSize: 11, color: theme.muted }}>
+                You must be a qualified player to pick a plot
+              </div>
+            ) : null}
           </div>
         )}
 
         {allPicked && (
           <div style={{ ...s.pickerCard, textAlign: "center" }}>
             <div style={{ fontSize: 14, color: theme.green, fontWeight: 700 }}>
-              ALL TICKET HOLDERS HAVE PICKED
+              ALL PLAYERS HAVE PICKED
             </div>
             {isAdmin && (
               <div style={{ fontSize: 11, color: theme.muted, marginTop: 4 }}>
@@ -274,7 +183,7 @@ export default function OilPlotDraft({
               const key = `${col},${row}`;
               const taken = takenPlots[key];
               const isMine = taken && user && taken.userId === user.id;
-              const canPick = isMyTurn && !taken && !claiming;
+              const canPick = canPickPlot && !taken && !claiming;
 
               return (
                 <div
@@ -304,7 +213,7 @@ export default function OilPlotDraft({
                   }}
                   title={
                     taken
-                      ? `${taken.clerkName} (#${taken.purchaseOrder})`
+                      ? `${taken.clerkName}`
                       : `(${col}, ${row})`
                   }
                 >
@@ -322,7 +231,7 @@ export default function OilPlotDraft({
                       />
                     ) : (
                       <span style={{ fontSize: isMobile ? 6 : 8 }}>
-                        #{taken.purchaseOrder}
+                        {(taken.clerkName || "?").charAt(0)}
                       </span>
                     )
                   ) : (
@@ -360,16 +269,6 @@ export default function OilPlotDraft({
           <div style={s.adminSection}>
             <div style={s.sectionTitle}>ADMIN CONTROLS</div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button
-                onClick={handleSkip}
-                disabled={skipping || allPicked}
-                style={{
-                  ...s.adminBtn,
-                  opacity: skipping || allPicked ? 0.5 : 1,
-                }}
-              >
-                {skipping ? "SKIPPING..." : "SKIP CURRENT PICKER"}
-              </button>
               <button onClick={handleStartGame} style={{ ...s.adminBtn, ...s.startBtn }}>
                 START GAME
               </button>

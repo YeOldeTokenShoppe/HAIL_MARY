@@ -162,6 +162,14 @@ function ConstellationModel({
     // Ensure constellation renders behind other objects but in front of stars
     groupRef.current.renderOrder = -500;
 
+    // Exempt constellation from fog so it stays visible at distance
+    groupRef.current.traverse(child => {
+      if (child.isMesh && child.material) {
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        mats.forEach(m => { m.fog = false; });
+      }
+    });
+
     return () => {
       [marketClone, whaleClone, arrowClone].forEach(scene => {
         if (groupRef.current && groupRef.current.children.includes(scene)) {

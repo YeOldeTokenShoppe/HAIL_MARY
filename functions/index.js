@@ -1159,3 +1159,192 @@ exports.updateRL80PriceManual = onRequest({
     res.status(500).json({ error: error.message });
   }
 });
+
+// =========================================================================
+// UPDATE @rl80token FOLLOWERS — Fetches follower usernames for oil game
+// qualification check (X follow requirement)
+// =========================================================================
+
+const RL80_X_USERNAME = "rl80token";
+
+/**
+ * Refresh the OAuth access token stored in Firestore (config/x_oauth).
+ * Tokens last 2 hours; we refresh if older than 90 minutes.
+ */
+async function getXOAuthAccessToken() {
+  const oauthDoc = await db.collection("config").doc("x_oauth").get();
+  if (!oauthDoc.exists) {
+    throw new Error("No X OAuth tokens found. Visit /api/auth/x to authorize first.");
+  }
+
+  const { refreshToken, accessToken, updatedAt } = oauthDoc.data();
+
+  // Check if token was updated less than 90 minutes ago
+  const tokenAge = Date.now() - new Date(updatedAt).getTime();
+  if (tokenAge < 90 * 60 * 1000) {
+    return accessToken;
+  }
+
+  // Refresh the token
+  logger.info("[Followers] Refreshing X OAuth access token...");
+  const clientId = process.env.X_CLIENT_ID;
+  const clientSecret = process.env.X_CLIENT_SECRET;
+
+  const response = await fetch("https://api.x.com/2/oauth2/token", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: "Basic " + Buffer.from(clientId + ":" + clientSecret).toString("base64"),
+    },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+    }).toString(),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error("Token refresh failed: " + response.status + " - " + errorBody);
+  }
+
+  const tokens = await response.json();
+
+  await db.collection("config").doc("x_oauth").set({
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+    expiresIn: tokens.expires_in,
+    scope: tokens.scope,
+    updatedAt: new Date().toISOString(),
+  });
+
+  logger.info("[Followers] X OAuth tokens refreshed successfully");
+  return tokens.access_token;
+}
+
+/**
+ * Core logic: paginate through all @rl80token followers and store
+ * both display names and usernames (lowercase) in Firestore.
+ */
+async function fetchAndStoreFollowers() {
+  const accessToken = await getXOAuthAccessToken();
+
+  // Look up @rl80token user ID
+  const userRes = await fetch(
+    "https://api.x.com/2/users/by/username/" + RL80_X_USERNAME + "?user.fields=id",
+    { headers: { Authorization: "Bearer " + accessToken } }
+  );
+
+  if (!userRes.ok) {
+    if (userRes.status === 429) {
+      logger.warn("[Followers] Rate limited on user lookup, will retry next run");
+      return { success: false, rateLimited: true };
+    }
+    const errorBody = await userRes.text();
+    throw new Error("X API user lookup error: " + userRes.status + " - " + errorBody);
+  }
+
+  const userData = await userRes.json();
+  if (!userData.data) throw new Error("User @rl80token not found");
+  const userId = userData.data.id;
+
+  logger.info("[Followers] Fetching followers for user: " + userId);
+
+  const allDisplayNames = [];
+  const allUsernames = [];
+  let paginationToken = null;
+
+  do {
+    const url = new URL("https://api.x.com/2/users/" + userId + "/followers");
+    url.searchParams.set("user.fields", "name,username");
+    url.searchParams.set("max_results", "1000");
+    if (paginationToken) {
+      url.searchParams.set("pagination_token", paginationToken);
+    }
+
+    const followersRes = await fetch(url.toString(), {
+      headers: { Authorization: "Bearer " + accessToken },
+    });
+
+    if (!followersRes.ok) {
+      if (followersRes.status === 429) {
+        logger.warn("[Followers] Rate limited after " + allDisplayNames.length + " followers, saving partial results");
+        break;
+      }
+      const errorBody = await followersRes.text();
+      throw new Error("X API followers error: " + followersRes.status + " - " + errorBody);
+    }
+
+    const followersData = await followersRes.json();
+
+    if (followersData.data) {
+      for (const user of followersData.data) {
+        if (user.name) allDisplayNames.push(user.name);
+        if (user.username) allUsernames.push(user.username.toLowerCase());
+      }
+    }
+
+    paginationToken = followersData.meta?.next_token || null;
+    logger.info("[Followers] Collected " + allDisplayNames.length + " followers so far...");
+  } while (paginationToken);
+
+  logger.info("[Followers] Total followers collected: " + allDisplayNames.length);
+
+  // Store in Firestore
+  await db.collection("followers").doc("latest").set({
+    displayNames: allDisplayNames,
+    usernames: allUsernames,
+    totalCount: allDisplayNames.length,
+    updatedAt: new Date().toISOString(),
+    success: true,
+  });
+
+  return { success: true, totalCount: allDisplayNames.length };
+}
+
+// Scheduled: once daily at 7 AM UTC
+exports.updateFollowers = onSchedule({
+  schedule: "0 7 * * *",
+  timeZone: "UTC",
+  memory: "256MiB",
+  timeoutSeconds: 540,
+  secrets: ["X_CLIENT_ID", "X_CLIENT_SECRET"],
+}, async (event) => {
+  try {
+    logger.info("[Followers] Starting daily followers update...");
+    const result = await fetchAndStoreFollowers();
+    logger.info("[Followers] Daily update complete:", result);
+  } catch (error) {
+    logger.error("[Followers] Daily update failed:", error);
+
+    try {
+      await db.collection("followers").doc("latest").set({
+        error: error.message,
+        updatedAt: new Date().toISOString(),
+        success: false,
+      }, { merge: true });
+    } catch (fsErr) {
+      logger.error("[Followers] Failed to save error state:", fsErr);
+    }
+  }
+});
+
+// Manual trigger for testing
+exports.updateFollowersManual = onRequest({
+  secrets: ["X_CLIENT_ID", "X_CLIENT_SECRET", "CRON_SECRET"],
+}, async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const cronSecret = process.env.CRON_SECRET;
+  if (!authHeader || authHeader !== "Bearer " + cronSecret) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  try {
+    logger.info("[Followers] Manual trigger requested");
+    const result = await fetchAndStoreFollowers();
+    res.json(result);
+  } catch (error) {
+    logger.error("[Followers] Manual trigger failed:", error);
+    res.status(500).json({ error: error.message });
+  }
+});

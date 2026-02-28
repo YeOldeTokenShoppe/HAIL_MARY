@@ -6,8 +6,8 @@ A 3D oil exploration game where players claim land on a grid and drill for RL80 
 
 The game progresses through four phases, controlled by `gamePhase` in Firestore:
 
-1. **`ticket_sale`** — Players buy numbered tickets ($10 USDC on Base). Admin watches sales volume.
-2. **`grid_locked`** — Admin locks grid size based on demand. Ticket holders pick their plot in purchase order (async, ~2hr window each).
+1. **`ticket_sale`** (Qualification) — Players register by connecting a wallet that holds ≥$20 USD worth of RL80 tokens. Admin runs daily snapshots to verify balances on-chain.
+2. **`grid_locked`** — Admin locks grid size based on qualified player count. Qualified players pick plots first-come, first-served.
 3. **`active`** — Remaining plots become "wild". Game starts (daily drilling flow).
 4. **`ended`** — Game over. Report mode unlocked.
 
@@ -62,29 +62,41 @@ Available only after admin ends the game. Redirects to `/oil` if game is still a
 
 ## Pre-Game Screens
 
-### Ticket Sale (`gamePhase: "ticket_sale"`)
-Full-page screen rendered by `OilTicketSale.jsx`. Shows:
-- Large ticket counter and grid size targets (6×6 through 10×10)
-- Buy flow: user sends $10 USDC on Base to the ticket wallet, then submits the tx hash. The `/api/oil-ticket` endpoint verifies the transaction on-chain before recording the ticket.
-- Live ticket holder list (purchase order, name, avatar, timestamp) via Firestore `onSnapshot`
-- **Admin:** Grid size selector, "Lock Grid & Start Draft" button, phase override buttons
+### Qualification (`gamePhase: "ticket_sale"`)
+Full-page screen rendered by `OilQualify.jsx`. Shows:
+- Qualified player counter and grid size targets (6×6 through 10×10)
+- Qualification flow: user signs in via Clerk, connects wallet via `useWalletAuth()`, balance is checked against RL80/USD price from Uniswap V2. Users with ≥$20 USD of RL80 can register.
+- Live balance check via `GET /api/oil-qualify?wallet=0x...`
+- Registered player list (qualification status, name, avatar, wallet, USD value) via Firestore `onSnapshot`
+- **Admin:** "Run Snapshot" button (verifies all registered players' balances on-chain), grid size selector, "Lock Grid & Start Draft" button, phase override buttons
 
 ### Plot Draft (`gamePhase: "grid_locked"`)
 Full-page screen rendered by `OilPlotDraft.jsx`. Shows:
-- Pick progress and current picker info with countdown timer
-- Interactive CSS grid — click to claim when it's your turn
+- Pick progress (picked / total qualified)
+- Interactive CSS grid — any qualified player can click to claim (first-come, first-served)
 - Plots colored: available / taken / yours (with avatars)
-- **Admin:** Skip picker (assigns random plot), Start Game, phase override buttons
+- **Admin:** Start Game, phase override buttons
 
 ## API Routes
 
-### `POST /api/oil-ticket` — Buy Ticket
+### `GET /api/oil-qualify?wallet=0x...` — Live Qualification Check
+Reads RL80 balance + price in real-time for a single wallet. Used by frontend for instant feedback.
+
+**Returns:** `{ qualified, balance, usdValue, price, threshold: 20 }`
+
+### `POST /api/oil-qualify` — Admin Qualification Snapshot
+Admin-only. Reads all registered players from `oilQualified`, checks each wallet's RL80 balance on-chain, marks `qualified: true/false` based on $20 threshold.
+
+**Body:** `{ adminPassword }`
+**Returns:** `{ ok, price, qualifiedCount, totalChecked, timestamp }`
+
+### `POST /api/oil-ticket` — Buy Ticket (Legacy)
 Verifies a Base chain transaction (USDC or native ETH) then atomically creates a ticket using Firestore `runTransaction`. Prevents duplicate tickets and tx hash replay.
 
 **Body:** `{ userId, clerkName, clerkAvatar, txHash }`
 **Returns:** `{ ok: true, purchaseOrder: N }`
 
-### `POST /api/oil-draft-skip` — Admin Skip Picker
+### `POST /api/oil-draft-skip` — Admin Skip Picker (Legacy)
 Admin-only. Assigns a random available plot to the current timed-out picker, advances `currentPickOrder`, sets new `pickDeadline`.
 
 **Body:** `{ adminPassword }`
@@ -109,7 +121,36 @@ Admin-only. Assigns a random available plot to the current timed-out picker, adv
 | `pickWindowMinutes` | number | Minutes per pick (default 120) |
 | `updatedAt` | timestamp | Last modification time |
 
-### `oilTickets/{auto-id}`
+### `oilQualified/{clerkUserId}`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `userId` | string | Clerk user.id |
+| `clerkName` | string | Display name at registration time |
+| `clerkAvatar` | string | Avatar URL at registration time |
+| `walletAddress` | string | Connected wallet address |
+| `registeredAt` | Timestamp | When registered |
+| `qualified` | boolean | Set by admin snapshot |
+| `lastSnapshotBalance` | string | RL80 balance at last snapshot |
+| `lastSnapshotUsdValue` | number | USD value at last snapshot |
+| `lastSnapshotAt` | Timestamp | When last snapshot ran |
+| `plotCol` | number \| null | Grid column (set during draft) |
+| `plotRow` | number \| null | Grid row (set during draft) |
+| `pickedAt` | Timestamp \| null | When plot was picked |
+
+### `oilGame/lastSnapshot`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `price` | number | RL80/USD price at snapshot time |
+| `ethPrice` | number | ETH/USD price at snapshot time |
+| `qualifiedCount` | number | Players meeting $20 threshold |
+| `totalChecked` | number | Total registered players checked |
+| `threshold` | number | USD threshold (20) |
+| `timestamp` | Timestamp | When snapshot ran |
+| `results` | array | Per-player results |
+
+### `oilTickets/{auto-id}` (Legacy)
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -124,6 +165,25 @@ Admin-only. Assigns a random available plot to the current timed-out picker, adv
 | `plotRow` | number \| null | Grid row (set during draft) |
 | `pickedAt` | Timestamp \| null | When plot was picked |
 | `skipped` | boolean | True if admin skipped this picker |
+
+## RL80 Price Reading (On-Chain)
+
+The qualification system reads the RL80/USD price from the Uniswap V2 pool on Base, implemented in `src/lib/oilPrice.js`.
+
+- **Pool:** `0x40d827aCDBEfd8Ef46953e2b1AC87b8697b82203` (RL80/WETH on Base)
+- Calls `getReserves()` and `token0()` on the pair contract via Base RPC
+- Computes RL80/ETH price from reserve ratio (both tokens are 18 decimals)
+- Fetches ETH/USD from CoinGecko simple price API
+- RL80/USD = (RL80/ETH) × (ETH/USD)
+- Balance check: calls `balanceOf(address)` on the RL80 contract
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/lib/oilPrice.js` | Server-side RL80/USD price + balance reading |
+| `src/app/api/oil-qualify/route.js` | Qualification API (GET for live check, POST for admin snapshot) |
+| `src/components/OilQualify.jsx` | Qualification screen (replaces OilTicketSale) |
 
 ## Rogue Characters System
 

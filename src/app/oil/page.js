@@ -11,12 +11,15 @@ import { generateOilDistribution3D } from "@/lib/oilDistribution";
 import PimpMyPumpPanel, { getDefaultPumpConfig } from "@/components/PimpMyPumpPanel";
 import HowToPlayPanel from "@/components/HowToPlayPanel";
 import { useUser } from "@clerk/nextjs";
+import { useWalletAuth } from "@/components/WalletAuthProvider";
 import { useMusic } from "@/components/MusicContext";
 import NavControlsHome from "@/components/NavControlsHome";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import ThirdwebBuyModal from "@/components/ThirdwebBuyModal";
 import CyberNav from "@/components/CyberNav";
 import PolaroidSnapshot from "@/components/PolaroidSnapshot";
+import StarField from "@/components/StarField";
+import ConstellationModel from '@/components/ConstellationModel';
 import Fireworks from "@/components/Fireworks";
 import { db, storage, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, ref, uploadBytes, getDownloadURL, onSnapshot, collection, query, where, addDoc } from "@/lib/firebaseClient";
 import RogueAdminPanel from "@/components/RogueAdminPanel";
@@ -102,7 +105,7 @@ const SkyDome = memo(function SkyDome({ skyColor = "#7da4c9", skyBottom = null, 
   return (
     <group>
       <mesh>
-        <sphereGeometry args={[80, 24, 24]} />
+        <sphereGeometry args={[300, 24, 24]} />
         {bottomCol ? (
           <shaderMaterial
             side={THREE.BackSide}
@@ -131,7 +134,7 @@ const SkyDome = memo(function SkyDome({ skyColor = "#7da4c9", skyBottom = null, 
 const OilSurfaceMap = dynamic(() => import("@/components/OilSurfaceMap"), { ssr: false });
 const OilCrossSection = dynamic(() => import("@/components/OilCrossSection"), { ssr: false });
 const OilVerifyPanel = dynamic(() => import("@/components/OilVerifyPanel"), { ssr: false });
-const OilTicketSale = dynamic(() => import("@/components/OilTicketSale"), { ssr: false });
+const OilQualify = dynamic(() => import("@/components/OilQualify"), { ssr: false });
 const OilPlotDraft = dynamic(() => import("@/components/OilPlotDraft"), { ssr: false });
 
 const DEFAULT_BLOCK_HASH =
@@ -362,6 +365,26 @@ function AnimNum({ value, duration = 1200 }) {
   return <>{display.toLocaleString()}</>;
 }
 
+// Isolated countdown so the 1-second timer doesn't re-render the entire page
+const DrillCountdown = memo(function DrillCountdown({ style }) {
+  const [countdown, setCountdown] = useState("");
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+      const diff = tomorrow - now;
+      const h = String(Math.floor(diff / 3600000)).padStart(2, "0");
+      const mn = String(Math.floor((diff % 3600000) / 60000)).padStart(2, "0");
+      const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, "0");
+      setCountdown(`${h}:${mn}:${s}`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <div style={style}>NEXT DRILL IN {countdown}</div>;
+});
+
 function useIsMobile(breakpoint = 900) {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -395,6 +418,7 @@ export default function OilPage() {
   const isTest = mode === "test";
   const [testDay, setTestDay] = useState(0);
   const { user } = useUser();
+  const { walletAddress, tokenBalance, isWalletConnected, connectWallet } = useWalletAuth();
   const { play, pause, isPlaying: contextIsPlaying, nextTrack } = useMusic();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
@@ -488,11 +512,38 @@ export default function OilPage() {
   }, []);
 
   // ── Leaderboard data — live listener on all oilDrills docs ──
+  // Uses docChanges() for incremental updates instead of rebuilding the full array on every change
   const [allDrillers, setAllDrillers] = useState([]);
   useEffect(() => {
     if (!db) return;
     const unsub = onSnapshot(collection(db, "oilDrills"), (snap) => {
-      setAllDrillers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setAllDrillers((prev) => {
+        // First snapshot or empty — build from scratch
+        if (prev.length === 0) {
+          return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        }
+        // Incremental update — only process changed docs
+        const changes = snap.docChanges();
+        if (changes.length === 0) return prev;
+        const next = [...prev];
+        const idxMap = new Map(next.map((d, i) => [d.id, i]));
+        for (const change of changes) {
+          const entry = { id: change.doc.id, ...change.doc.data() };
+          if (change.type === "added" && !idxMap.has(entry.id)) {
+            next.push(entry);
+            idxMap.set(entry.id, next.length - 1);
+          } else if (change.type === "modified") {
+            const idx = idxMap.get(entry.id);
+            if (idx !== undefined) next[idx] = entry;
+          } else if (change.type === "removed") {
+            const idx = idxMap.get(entry.id);
+            if (idx !== undefined) {
+              next.splice(idx, 1);
+            }
+          }
+        }
+        return next;
+      });
     });
     return () => unsub();
   }, []);
@@ -556,24 +607,21 @@ export default function OilPage() {
   }, []);
 
   // Admin: save settings to Firestore when they change
+  // Uses a ref for current values so the callback identity is stable (no dependency cascade)
+  const gameSettingsRef = useRef({ blockHash, numberOfDeposits, totalOilBudget, gridSize, gamePhase, gameEnded, gameDay });
+  gameSettingsRef.current = { blockHash, numberOfDeposits, totalOilBudget, gridSize, gamePhase, gameEnded, gameDay };
   const saveGameSettings = useCallback(async (overrides = {}) => {
     if (!db || !isAdmin || !adminAuthed) return;
     try {
       await setDoc(doc(db, "oilGame", "settings"), {
-        blockHash,
-        numberOfDeposits,
-        totalOilBudget,
-        gridSize,
-        gamePhase,
-        gameEnded,
-        gameDay,
+        ...gameSettingsRef.current,
         updatedAt: serverTimestamp(),
         ...overrides,
       }, { merge: true });
     } catch (err) {
       console.error("Failed to save game settings:", err);
     }
-  }, [isAdmin, adminAuthed, blockHash, numberOfDeposits, totalOilBudget, gridSize, gamePhase, gameEnded, gameDay]);
+  }, [isAdmin, adminAuthed]);
 
   // Mobile tab view
   const [mobileTab, setMobileTab] = useState("3d"); // "3d" | "surface" | "xsec"
@@ -605,7 +653,7 @@ export default function OilPage() {
 
   // ── Daily Drill (player mode) ──
   const [userDrill, setUserDrill] = useState(null); // { col, row, drillDay, lastDrillDate }
-  const [drillCountdown, setDrillCountdown] = useState("");
+  // drillCountdown state removed — now handled by isolated DrillCountdown component
 
   // Load user drill state from Firestore
   useEffect(() => {
@@ -635,20 +683,7 @@ export default function OilPage() {
   }, [user?.id, username, userDrill]);
 
   // Countdown timer to next 00:00 UTC
-  useEffect(() => {
-    const tick = () => {
-      const now = new Date();
-      const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
-      const diff = tomorrow - now;
-      const h = String(Math.floor(diff / 3600000)).padStart(2, "0");
-      const mn = String(Math.floor((diff % 3600000) / 60000)).padStart(2, "0");
-      const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, "0");
-      setDrillCountdown(`${h}:${mn}:${s}`);
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, []);
+  // Countdown timer moved to isolated DrillCountdown component to avoid full-page re-renders
 
   const todayUTC = new Date().toISOString().slice(0, 10);
 
@@ -857,15 +892,20 @@ export default function OilPage() {
   }, [gridSize]);
 
   // Depth-limited grid: only reveals the player's drilled column up to effectiveDrillDay
+  // Shallow-copies only the outer array + the single affected column/row (was 2000 array clones)
   const playerGrid3D = useMemo(() => {
     if (showOilData || selectedX === null || !activeUserDrill) return blankGrid3D;
     const col = activeUserDrill.col;
     const row = activeUserDrill.row;
     if (col == null || row == null || col >= gridSize || row >= gridSize) return blankGrid3D;
-    const g = blankGrid3D.map(col => col.map(row => [...row]));
+    const g = [...blankGrid3D]; // shallow copy outer array (just references)
+    const newCol = [...g[col]]; // shallow copy the one column
+    const newRow = [...newCol[row]]; // clone the one depth array
     for (let z = 0; z < Math.min(effectiveDrillDay, DEPTH_Z); z++) {
-      g[col][row][z] = stats.grid3D[col]?.[row]?.[z] ?? 0;
+      newRow[z] = stats.grid3D[col]?.[row]?.[z] ?? 0;
     }
+    newCol[row] = newRow;
+    g[col] = newCol;
     return g;
   }, [showOilData, selectedX, activeUserDrill, effectiveDrillDay, stats.grid3D, blankGrid3D]);
 
@@ -2003,7 +2043,7 @@ export default function OilPage() {
   // ── Pre-game phase gates ──
   if (gamePhase === "ticket_sale") {
     return (
-      <OilTicketSale
+      <OilQualify
         theme={theme}
         darkMode={darkMode}
         isMobile={isMobile}
@@ -2012,6 +2052,10 @@ export default function OilPage() {
         gridSize={gridSize}
         saveGameSettings={saveGameSettings}
         setGridSize={setGridSize}
+        walletAddress={walletAddress}
+        tokenBalance={tokenBalance}
+        isWalletConnected={isWalletConnected}
+        connectWallet={connectWallet}
       />
     );
   }
@@ -2145,13 +2189,13 @@ export default function OilPage() {
       {drillStatus === "sign-in" && (
         <div style={drillBtnStyles.wrap}>
           <button disabled style={drillBtnStyles.disabled}>SIGN IN TO DRILL</button>
-          <div style={drillBtnStyles.countdown}>NEXT DRILL IN {drillCountdown}</div>
+          <DrillCountdown style={drillBtnStyles.countdown} />
         </div>
       )}
       {drillStatus === "no-claim" && (
         <div style={drillBtnStyles.wrap}>
           <button disabled style={drillBtnStyles.disabled}>SELECT A CLAIM</button>
-          <div style={drillBtnStyles.countdown}>NEXT DRILL IN {drillCountdown}</div>
+          <DrillCountdown style={drillBtnStyles.countdown} />
         </div>
       )}
       {drillStatus === "wrong-claim" && (
@@ -2162,7 +2206,7 @@ export default function OilPage() {
           >
             GO TO YOUR CLAIM ({Math.min(userDrill?.col ?? 0, gridSize - 1)}, {Math.min(userDrill?.row ?? 0, gridSize - 1)})
           </button>
-          <div style={drillBtnStyles.countdown}>NEXT DRILL IN {drillCountdown}</div>
+          <DrillCountdown style={drillBtnStyles.countdown} />
         </div>
       )}
       {drillStatus === "max-depth" && (
@@ -2174,7 +2218,7 @@ export default function OilPage() {
       {drillStatus === "drilled-today" && (
         <div style={drillBtnStyles.wrap}>
           <button disabled style={drillBtnStyles.disabled}>DRILLED TODAY</button>
-          <div style={drillBtnStyles.countdown}>NEXT DRILL IN {drillCountdown}</div>
+          <DrillCountdown style={drillBtnStyles.countdown} />
           <div style={drillBtnStyles.depth}>DEPTH {userDrill?.drillDay || 0}/{DEPTH_Z}</div>
         </div>
       )}
@@ -2519,8 +2563,10 @@ export default function OilPage() {
                 gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
               >
                 <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} />
+                {envPreset === "night" && <StarField radius={150} count1={500} count2={300} />}
+                {envPreset === "night" && <ConstellationModel groupScale={[15, 15, 15]} groupPosition={[0, 8, -60]} isVisible={true} />}
                 {fireworksOn && <Fireworks quality={1} shellSize={1} />}
-                {env.fog && <fog attach="fog" args={[env.fog, 20, 80]} />}
+                {env.fog && <fog attach="fog" args={[env.fog, 20, 200]} />}
                 <ambientLight intensity={env.ambient} />
                 {env.hemi && <hemisphereLight args={[env.hemi.sky, env.hemi.ground, env.hemi.intensity]} />}
                 <directionalLight position={[10, 15, 10]} intensity={env.dirA} />
@@ -2553,6 +2599,7 @@ export default function OilPage() {
                     currentUserId={user?.id}
                     onRogueArrive={handleRogueArrive}
                     onRogueConsequence={handleRogueConsequence}
+                    envPreset={envPreset}
                   />
                 </group>
                 <CctvRenderer canvasRef={cctvCanvasRef} />
@@ -2622,7 +2669,7 @@ export default function OilPage() {
                 {[["day", <svg key="day-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>], ["dusk", <svg key="dusk-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 10V2"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m16 6-4 4-4-4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>], ["night", <svg key="night-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>]].map(([key, icon]) => (
                   <button
                     key={key}
-                    onClick={() => setEnvPreset(key)}
+                    onClick={() => { setEnvPreset(key); if (key !== "night") setFireworksOn(false); }}
                     style={{
                       width: 26, height: 26,
                       background: envPreset === key ? "rgba(212,168,84,0.3)" : "rgba(212,168,84,0.1)",
@@ -2640,7 +2687,7 @@ export default function OilPage() {
                   >{icon}</button>
                 ))}
                 <button
-                  onClick={() => { setDarkMode((d) => !d); setEnvPreset(darkMode ? "day" : "night"); }}
+                  onClick={() => { setDarkMode((d) => !d); setEnvPreset(darkMode ? "day" : "night"); if (darkMode) setFireworksOn(false); }}
                   style={{
                     width: 26, height: 26,
                     background: darkMode ? "rgba(212,168,84,0.3)" : "rgba(212,168,84,0.1)",
@@ -2854,8 +2901,10 @@ export default function OilPage() {
             gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
           >
             <SkyDome skyColor={env.sky} skyBottom={env.skyBottom} cloudOpacity={env.cloudOpacity} />
+            {envPreset === "night" && <StarField radius={150} count1={500} count2={300} />}
+            {envPreset === "night" && <ConstellationModel groupScale={[15, 15, 15]} groupPosition={[0, 8, -60]} isVisible={true} />}
             {fireworksOn && <Fireworks quality={2} shellSize={2} />}
-            {env.fog && <fog attach="fog" args={[env.fog, 20, 80]} />}
+            {env.fog && <fog attach="fog" args={[env.fog, 20, 200]} />}
             <ambientLight intensity={env.ambient} />
             {env.hemi && <hemisphereLight args={[env.hemi.sky, env.hemi.ground, env.hemi.intensity]} />}
             <directionalLight position={[10, 15, 10]} intensity={env.dirA} />
@@ -2888,6 +2937,7 @@ export default function OilPage() {
                 currentUserId={user?.id}
                 onRogueArrive={handleRogueArrive}
                 onRogueConsequence={handleRogueConsequence}
+                envPreset={envPreset}
               />
             </group>
             <CctvRenderer canvasRef={cctvCanvasRef} />
@@ -2956,7 +3006,7 @@ export default function OilPage() {
             {[["day", <svg key="day-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>], ["dusk", <svg key="dusk-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 10V2"/><path d="m4.93 10.93 1.41 1.41"/><path d="M2 18h2"/><path d="M20 18h2"/><path d="m19.07 10.93-1.41 1.41"/><path d="M22 22H2"/><path d="m16 6-4 4-4-4"/><path d="M16 18a4 4 0 0 0-8 0"/></svg>], ["night", <svg key="night-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></svg>]].map(([key, icon]) => (
               <button
                 key={key}
-                onClick={() => setEnvPreset(key)}
+                onClick={() => { setEnvPreset(key); if (key !== "night") setFireworksOn(false); }}
                 style={{
                   width: 28, height: 28,
                   background: envPreset === key ? "rgba(212,168,84,0.3)" : "rgba(212,168,84,0.1)",
@@ -2974,7 +3024,7 @@ export default function OilPage() {
               >{icon}</button>
             ))}
             <button
-              onClick={() => { setDarkMode((d) => !d); setEnvPreset(darkMode ? "day" : "night"); }}
+              onClick={() => { setDarkMode((d) => !d); setEnvPreset(darkMode ? "day" : "night"); if (darkMode) setFireworksOn(false); }}
               style={{
                 width: 28, height: 28,
                 background: darkMode ? "rgba(212,168,84,0.3)" : "rgba(212,168,84,0.1)",
@@ -3006,7 +3056,7 @@ export default function OilPage() {
                 gap: 5,
               }}
             >
-              {panelsCollapsed ? "◂ PANELS" : "RETRACT ▸"}
+              {panelsCollapsed ? "◂ SHOW PANEL" : "HIDE PANEL ▸"}
             </button>
           </div>
         </div>

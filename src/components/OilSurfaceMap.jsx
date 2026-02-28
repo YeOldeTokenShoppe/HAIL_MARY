@@ -15,7 +15,7 @@ function getSurfaceColor(value, maxValue, dark) {
 }
 
 export default function OilSurfaceMap({ claimTotals, maxClaimTotal, selectedClaimIndex, onSelectClaim, theme, gridX = 10, gridY = 10 }) {
-  const dark = theme?.bg === "#1a1a1f";
+  const dark = theme?.bg === "#12161c";
   const t = theme || { muted: "#9e8e78", inputBg: "#f0e8dc", borderLight: "#c8bfb0", green: "#5a8a3a", accent: "#7a5a1a" };
 
   return (

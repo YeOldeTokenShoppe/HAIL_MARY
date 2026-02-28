@@ -7,6 +7,21 @@ import { Text, useGLTF, useTexture, useEnvironment } from "@react-three/drei";
 import { generateOilDistribution3D } from "@/lib/oilDistribution";
 import { PUMP_ZONES, MATERIAL_PRESETS, ADDON_CATALOG, ADDON_SLOTS, FENCE_CATALOG } from "@/components/PimpMyPumpPanel";
 import RogueCharacter from "@/components/RogueCharacter";
+// ── Dispose helper for cloned scenes ─────────────────────────────────────────
+// NOTE: Does NOT dispose textures (map, normalMap, etc.) because scene.clone(true)
+// shares texture references across clones. Disposing a shared texture would corrupt
+// all other instances still using it. Only geometries and materials are disposed.
+function disposeScene(obj) {
+  if (!obj) return;
+  obj.traverse((child) => {
+    if (child.geometry) child.geometry.dispose();
+    if (child.material) {
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      mats.forEach((m) => m.dispose());
+    }
+  });
+}
+
 // ── Shared CCTV state (module-level, Pumpjack writes → CctvRenderer reads) ──
 const _cctvState = {
   active: false,
@@ -31,6 +46,10 @@ export function CctvRenderer({ canvasRef }) {
 
   const pixelBuf = useMemo(() => new Uint8Array(CCTV_W * CCTV_H * 4), []);
   const imgDataRef = useRef(null);
+  const _localFwd = useRef(new THREE.Vector3());
+  const _normalMat = useRef(new THREE.Matrix3());
+  const _target = useRef(new THREE.Vector3());
+  const cctvFrameSkip = useRef(0);
 
   // CCTV camera tuning constants
   const CCTV_OFFSET_X = 0.07;
@@ -41,6 +60,10 @@ export function CctvRenderer({ canvasRef }) {
 
   useFrame(() => {
     if (!_cctvState.active) return;
+
+    // Throttle CCTV to every other frame — halves the GPU cost of the second render pass + readback
+    cctvFrameSkip.current = (cctvFrameSkip.current + 1) % 2;
+    if (cctvFrameSkip.current !== 0) return;
 
     const cvs = canvasRef?.current;
     if (!cvs) return;
@@ -57,12 +80,12 @@ export function CctvRenderer({ canvasRef }) {
       _cctvState.worldPos.z + CCTV_OFFSET_Z,
     );
 
-    // Forward direction: +Z in the security camera's local space
-    const localFwd = new THREE.Vector3(0, 0, 1);
-    const normalMatrix = new THREE.Matrix3().getNormalMatrix(_cctvState.worldMatrix);
-    const worldFwd = localFwd.clone().applyMatrix3(normalMatrix).normalize();
+    // Forward direction: +Z in the security camera's local space (reuse refs)
+    const localFwd = _localFwd.current.set(0, 0, 1);
+    const normalMatrix = _normalMat.current.getNormalMatrix(_cctvState.worldMatrix);
+    localFwd.applyMatrix3(normalMatrix).normalize();
 
-    const target = cctvCam.position.clone().add(worldFwd.multiplyScalar(5));
+    const target = _target.current.copy(cctvCam.position).add(localFwd.multiplyScalar(5));
     target.y -= CCTV_TILT;
     cctvCam.lookAt(target);
     cctvCam.updateMatrixWorld(true);
@@ -255,6 +278,7 @@ precision highp float;
 varying vec2 vUv;
 uniform float uTime;
 uniform float uOpacity;
+uniform float uNightMode;
 uniform vec2 uResolution;
 
 // Hash and noise
@@ -337,9 +361,21 @@ void main() {
   vec3 midOil = vec3(0.08, 0.04, 0.02);
   vec3 highlight = vec3(0.15, 0.10, 0.06);
 
+  // Night mode: shift palette toward emissive blue
+  vec3 darkOilNight = vec3(0.01, 0.02, 0.08);
+  vec3 midOilNight = vec3(0.03, 0.06, 0.18);
+  vec3 highlightNight = vec3(0.08, 0.15, 0.4);
+  darkOil = mix(darkOil, darkOilNight, uNightMode);
+  midOil = mix(midOil, midOilNight, uNightMode);
+  highlight = mix(highlight, highlightNight, uNightMode);
+
   float colorNoise = scroll2 * 0.5 + 0.5;
   vec3 col = mix(darkOil, midOil, colorNoise);
   col = mix(col, highlight, pow(max(density, 0.0), 4.0) * 0.6);
+
+  // Night emissive glow — adds a blue luminance boost along edges and core
+  float emissive = uNightMode * (0.3 + 0.4 * pow(max(density, 0.0), 2.0));
+  col += vec3(0.05, 0.1, 1.35) * emissive;
 
   // ── Alpha compositing ──
   float alpha = shape * density * uOpacity;
@@ -669,6 +705,7 @@ function applyPumpConfig(clonedScene, pumpConfig, originalMats, envMap) {
 function AddonGLB({ item, slotPos, rotation = 0 }) {
   const { scene } = useGLTF(item.model);
   const cloned = useMemo(() => scene.clone(true), [scene]);
+  useEffect(() => () => disposeScene(cloned), [cloned]);
   const rotY = rotation * Math.PI / 2;
 
   return (
@@ -690,6 +727,7 @@ function AddonTubeMan({ item, slotPos, rotation = 0 }) {
     });
     return c;
   }, [scene]);
+  useEffect(() => () => disposeScene(cloned), [cloned]);
   const topRef = useRef();
   const timeRef = useRef(0);
 
@@ -871,6 +909,7 @@ function PlotFence({ fenceType }) {
   const catalog = FENCE_CATALOG.find((f) => f.id === fenceType);
   const { scene } = useGLTF(catalog?.model || FENCE_CATALOG[0].model);
   const cloned = useMemo(() => scene.clone(true), [scene]);
+  useEffect(() => () => disposeScene(cloned), [cloned]);
   if (!catalog) return null;
   return (
     <group scale={catalog.scale}>
@@ -882,6 +921,7 @@ function PlotFence({ fenceType }) {
 function PlotPoop() {
   const { scene } = useGLTF("/models/poop.glb");
   const cloned = useMemo(() => scene.clone(true), [scene]);
+  useEffect(() => () => disposeScene(cloned), [cloned]);
   return (
     <group position={[0.35, 0.05, 0.15]} scale={[0.1, 0.1, 0.1]}>
       <primitive object={cloned} />
@@ -889,7 +929,7 @@ function PlotPoop() {
   );
 }
 
-function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, tankFill, onClick, onDoubleClick, onTankDrain }) {
+function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, tankFill, onClick, onDoubleClick, onTankDrain, envPreset }) {
   const lastClickTime = useRef(0);
   const groupRef = useRef();   // primitive (clonedScene)
   const shakeGroupRef = useRef(); // outer group for shake offset
@@ -941,6 +981,12 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     return s;
   }, [scene]);
   const mixer = useMemo(() => new THREE.AnimationMixer(clonedScene), [clonedScene]);
+
+  useEffect(() => () => {
+    mixer.stopAllAction();
+    mixer.uncacheRoot(clonedScene);
+    disposeScene(clonedScene);
+  }, [clonedScene, mixer]);
 
   // Gusher spawn position — model origin (center of rig)
   const gusherOriginRef = useRef(new THREE.Vector3(0, 0.05, 0.2));
@@ -1027,6 +1073,10 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     const sign = signRef.current;
     if (!sign) return;
 
+    // Dispose previous materials before replacing
+    const prevFront = sign.material;
+    const prevBack = signBackRef.current?.material;
+
     if (signImageUrl) {
       const loader = new THREE.TextureLoader();
       loader.crossOrigin = "anonymous";
@@ -1047,20 +1097,24 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         mat.transparent = false;
         mat.alphaTest = 0.5;
         mat.needsUpdate = true;
+        if (prevFront && prevFront !== signOrigMat.current) prevFront.dispose();
         sign.material = mat;
 
         // Apply to back sign
         const back = signBackRef.current;
         if (back) {
+          if (prevBack && prevBack !== signBackOrigMat.current) prevBack.dispose();
           back.material = mat.clone();
           back.material.needsUpdate = true;
         }
       });
     } else if (signOrigMat.current) {
+      if (prevFront && prevFront !== signOrigMat.current) prevFront.dispose();
       sign.material = signOrigMat.current.clone();
       sign.material.needsUpdate = true;
       const back = signBackRef.current;
       if (back && signBackOrigMat.current) {
+        if (prevBack && prevBack !== signBackOrigMat.current) prevBack.dispose();
         back.material = signBackOrigMat.current.clone();
         back.material.needsUpdate = true;
       }
@@ -1339,9 +1393,12 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   const gusherTimerRef = useRef(0);
   const geyserMeshRef = useRef();
   const geyserMatRef = useRef();
+  const _camPos = useRef(new THREE.Vector3());
+  const _meshPos = useRef(new THREE.Vector3());
   const geyserUniforms = useRef({
     uTime: { value: 0 },
     uOpacity: { value: 1.0 },
+    uNightMode: { value: 0.0 },
     uResolution: { value: new THREE.Vector2(256, 512) },
   });
 
@@ -1391,7 +1448,16 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   depthCellRef.current = depthCellSize;
   const tankFillRef = useRef(tankFill);
   tankFillRef.current = tankFill;
+  const highlightedRef = useRef(highlighted);
+  highlightedRef.current = highlighted;
+  const frameSkip = useRef(Math.floor(Math.random() * 3)); // stagger so not all idle rigs spike on same frame
   useFrame((_, delta) => {
+    // Non-highlighted pumpjacks: throttle animation to every 3rd frame, skip all interactive logic
+    if (!highlightedRef.current) {
+      frameSkip.current = (frameSkip.current + 1) % 3;
+      if (frameSkip.current === 0) mixer.update(delta * 3);
+      return;
+    }
     mixer.update(delta);
 
     // Wheel — lerp toward target rotation on y-axis
@@ -1487,12 +1553,11 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         }
       }
 
-      // Apply to light material
+      // Apply to light material (color/emissive are uniforms — no needsUpdate required)
       if (strikeFlashRef.current || strikingRef.current) {
         light.material.emissive.set(0xff0000);
         light.material.emissiveIntensity = intensity * 5.0;
         light.material.color.set(intensity > 0.1 ? 0xff2200 : 0x331111);
-        light.material.needsUpdate = true;
         if (strikeLightRef.current) {
           strikeLightRef.current.intensity = intensity * 4.0;
         }
@@ -1502,7 +1567,6 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           pl.material.emissive.set(0xff0000);
           pl.material.emissiveIntensity = intensity * 5.0;
           pl.material.color.set(intensity > 0.1 ? 0xff2200 : 0x331111);
-          pl.material.needsUpdate = true;
         }
       } else {
         // Both modes done — restore original
@@ -1511,7 +1575,6 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           light.material.color.copy(orig.color);
           light.material.emissive.copy(orig.emissive);
           light.material.emissiveIntensity = orig.emissiveIntensity;
-          light.material.needsUpdate = true;
         }
         if (strikeLightRef.current) {
           strikeLightRef.current.intensity = 0;
@@ -1523,7 +1586,6 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           pl.material.color.copy(plOrig.color);
           pl.material.emissive.copy(plOrig.emissive);
           pl.material.emissiveIntensity = plOrig.emissiveIntensity;
-          pl.material.needsUpdate = true;
         }
       }
     }
@@ -1596,6 +1658,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       const overflowing = effectiveFill >= 1.0 && highlighted;
 
       if (geyserMatRef.current) {
+        geyserMatRef.current.uniforms.uNightMode.value = envPreset === "night" ? 1.0 : 0.0;
         geyserMatRef.current.uniforms.uTime.value += delta;
         // Fade out near end of one-shot gusher
         const fade = overflowing ? 1.0
@@ -1759,15 +1822,15 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
               gusherOriginRef.current.z
             ]}
             onBeforeRender={(renderer, scene, camera) => {
-              // Y-axis locked billboard: face camera horizontally only
+              // Y-axis locked billboard: face camera horizontally only (reuse refs)
               const mesh = geyserMeshRef.current;
               if (!mesh) return;
-              const camPos = camera.getWorldPosition(new THREE.Vector3());
-              const meshPos = mesh.getWorldPosition(new THREE.Vector3());
+              const camPos = camera.getWorldPosition(_camPos.current);
+              const meshPos = mesh.getWorldPosition(_meshPos.current);
               mesh.lookAt(camPos.x, meshPos.y, camPos.z);
             }}
           >
-            <planeGeometry args={[0.9, 2.0]} />
+            <planeGeometry args={[0.9, 3.0]} />
             <shaderMaterial
               ref={geyserMatRef}
               vertexShader={_geyserVertexShader}
@@ -1880,6 +1943,7 @@ function TowerLiquid({ towerBounds, position, fill, scale }) {
 function OilTower({ position, communityOil = 0, totalOilBudget = 500 }) {
   const { scene } = useGLTF("/models/OilTower.glb");
   const clonedScene = useMemo(() => scene.clone(true), [scene]);
+  useEffect(() => () => disposeScene(clonedScene), [clonedScene]);
 
   // Find the tower tank mesh and compute bounds
   const towerBounds = useMemo(() => {
@@ -1924,7 +1988,7 @@ function OilTower({ position, communityOil = 0, totalOilBudget = 500 }) {
 
 useGLTF.preload("/models/OilTower.glb");
 
-function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500 }) {
+function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset }) {
   const { scene, animations } = useGLTF("/models/oilJack_fancy_allProps.glb");
   const envMap = useEnvironment({ preset: "studio" });
 
@@ -2008,6 +2072,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
             oilStrike={oilStrike}
             tankFill={isSelected ? tankFill : 0}
             onTankDrain={isSelected ? onTankDrain : undefined}
+            envPreset={envPreset}
             onClick={() => { onSelectCell?.(col, row); onFlyTo?.(col, row); }}
             onDoubleClick={() => isSelected ? onZoomOut?.() : onFlyTo?.(col, row)}
           />
@@ -2161,6 +2226,7 @@ export default function OilVoxelGrid({
   currentUserId,
   onRogueArrive,
   onRogueConsequence,
+  envPreset,
 }) {
   const matRef = useRef();
   const groundMatsRef = useRef([]);
@@ -2290,6 +2356,7 @@ export default function OilVoxelGrid({
             onTankDrain={onTankDrain}
             communityOil={communityOil}
             totalOilBudget={totalOilBudget}
+            envPreset={envPreset}
           />
           {rogueEvents.map((ev) => (
             <RogueCharacter

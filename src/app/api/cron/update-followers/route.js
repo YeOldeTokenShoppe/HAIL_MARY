@@ -98,11 +98,12 @@ export async function GET(request) {
 
     // Paginate through all followers
     const allDisplayNames = []
+    const allUsernames = []
     let paginationToken = null
 
     do {
       const url = new URL(`https://api.x.com/2/users/${userId}/followers`)
-      url.searchParams.set('user.fields', 'name')
+      url.searchParams.set('user.fields', 'name,username')
       url.searchParams.set('max_results', '1000')
       if (paginationToken) {
         url.searchParams.set('pagination_token', paginationToken)
@@ -131,6 +132,9 @@ export async function GET(request) {
           if (user.name) {
             allDisplayNames.push(user.name)
           }
+          if (user.username) {
+            allUsernames.push(user.username.toLowerCase())
+          }
         }
       }
 
@@ -143,6 +147,7 @@ export async function GET(request) {
     // Store in Firestore
     await setDoc(doc(db, 'followers', 'latest'), {
       displayNames: allDisplayNames,
+      usernames: allUsernames,
       totalCount: allDisplayNames.length,
       updatedAt: new Date().toISOString(),
       success: true

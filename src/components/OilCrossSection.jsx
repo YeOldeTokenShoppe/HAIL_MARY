@@ -57,7 +57,7 @@ export default function OilCrossSection({
   gridX = 10,
   gridY = 10,
 }) {
-  const dark = theme?.bg === "#1a1a1f";
+  const dark = theme?.bg === "#12161c";
   const t = theme || { text: "#5a4e3e", muted: "#9e8e78", inputBg: "#f0e8dc", borderLight: "#c8bfb0", accent: "#7a5a1a", gold: "#d4a854", goldBorder: "#b8922e", textStrong: "#3e2e10", inspectorKey: "#8b7d6b", seedLabel: "#8b7355" };
 
   return (
