@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { useMusic } from '@/components/MusicContext';
 import CyberNav from '@/components/CyberNav';
 import NavControlsHome from '@/components/NavControlsHome';
+import MobileBottomNav from '@/components/MobileBottomNav';
 import SkewedHeading from '@/components/SkewedHeading';
 import { useUser } from '@clerk/nextjs';
 import Link from "next/link";
@@ -247,14 +248,35 @@ export default function PortalPage() {
       )}
 
 
-      {/* Nav Controls - Top Right */}
-      <div style={{
-        position: "fixed",
-        top: isMobile ? "calc(1rem + env(safe-area-inset-top))" : "1rem",
-        right: "1rem",
-        zIndex: 300,
-      }}>
-        <NavControlsHome
+      {/* Nav Controls - Top Right (desktop only) */}
+      {!isMobileDevice && (
+        <div style={{
+          position: "fixed",
+          top: "1rem",
+          right: "1rem",
+          zIndex: 300,
+        }}>
+          <NavControlsHome
+            isPlaying={contextIsPlaying}
+            onPlayMusic={() => play()}
+            onStopMusic={() => pause()}
+            onSkipTrack={() => nextTrack()}
+            onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
+            onUserClick={() => {}}
+            isUserSignedIn={!!user}
+            isMenuOpen={isMenuOpen}
+            is80sMode={is80sMode}
+            onToggle80sMode={() => setContext80sMode(!is80sMode)}
+            userImage={user?.imageUrl}
+            onBuyClick={() => setShowBuyModal(true)}
+            show80sButton={false}
+          />
+        </div>
+      )}
+
+      {/* Mobile Bottom Nav */}
+      {isMobileDevice && (
+        <MobileBottomNav
           isPlaying={contextIsPlaying}
           onPlayMusic={() => play()}
           onStopMusic={() => pause()}
@@ -263,14 +285,13 @@ export default function PortalPage() {
           onUserClick={() => {}}
           isUserSignedIn={!!user}
           isMenuOpen={isMenuOpen}
-          is80sMode={is80sMode}
-          onToggle80sMode={() => setContext80sMode(!is80sMode)}
           userImage={user?.imageUrl}
           onBuyClick={() => setShowBuyModal(true)}
-          isMobile={isMobileDevice}
+          isMobile
           show80sButton={false}
+          darkMode
         />
-      </div>
+      )}
 
       {/* CyberNav Menu Panel */}
       <CyberNav

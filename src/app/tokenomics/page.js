@@ -10,6 +10,7 @@ import CoinLoader from '@/components/CoinLoader';
 import { useMusic } from '@/components/MusicContext';
 import { useUser, SignInButton, UserButton } from "@clerk/nextjs";
 import NavControlsHome from '@/components/NavControlsHome';
+import MobileBottomNav from '@/components/MobileBottomNav';
 import CyberNav from '@/components/CyberNav';
 import Link from 'next/link';
 import Footer from '@/components/Footer';
@@ -161,20 +162,6 @@ export default function TokenomicsPage() {
                 </div>
                 )}
                 
-          {/* CyberNav Menu Panel */}
-          <CyberNav
-            is80sMode={is80sMode}
-            position="fixed"
-            isOpen={isMenuOpen}
-            onClose={() => setIsMenuOpen(false)}
-            showButton={false}
-          />
-
-          {/* Thirdweb Buy Modal */}
-          <ThirdwebBuyModal
-            isOpen={showBuyModal}
-            onClose={() => setShowBuyModal(false)}
-          />
           <div style={{
             position: 'relative',
             display: 'flex',
@@ -238,46 +225,22 @@ export default function TokenomicsPage() {
       {/* RL80 Logo - Mobile Only */}
       {!isSceneLoading && isMobile && (
         <>
-          {/* NavControls for Mobile */}
-          <div
-            style={{
-              position: "absolute",
-              top: "20px",
-              right: "20px",
-              zIndex: 9,
-              pointerEvents: "auto"
-            }}
-          >
-            <NavControlsHome
-              isPlaying={contextIsPlaying}
-              onPlayMusic={() => play()}
-              onStopMusic={() => pause()}
-              onSkipTrack={() => nextTrack()}
-              onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
-              onUserClick={() => {}}
-              isUserSignedIn={!!user}
-              isMenuOpen={isMenuOpen}
-              is80sMode={is80sMode}
-              onToggle80sMode={() => setIs80sMode(!is80sMode)}
-              onBuyClick={() => setShowBuyModal(true)}
-              isMobile={isMobile}
-              show80sButton={false}
-            />
-          </div>
-
-          {/* CyberNav Menu Panel for Mobile */}
-          <CyberNav
+          {/* Mobile Bottom Nav */}
+          <MobileBottomNav
+            isPlaying={contextIsPlaying}
+            onPlayMusic={() => play()}
+            onStopMusic={() => pause()}
+            onSkipTrack={() => nextTrack()}
+            onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
+            onUserClick={() => {}}
+            isUserSignedIn={!!user}
+            isMenuOpen={isMenuOpen}
             is80sMode={is80sMode}
-            position="fixed"
-            isOpen={isMenuOpen}
-            onClose={() => setIsMenuOpen(false)}
-            showButton={false}
-          />
-
-          {/* Thirdweb Buy Modal */}
-          <ThirdwebBuyModal
-            isOpen={showBuyModal}
-            onClose={() => setShowBuyModal(false)}
+            userImage={user?.imageUrl}
+            onBuyClick={() => setShowBuyModal(true)}
+            isMobile
+            show80sButton={false}
+            darkMode
           />
 
           {/* RL80 Logo */}
@@ -881,6 +844,21 @@ export default function TokenomicsPage() {
           animation: spin 3s linear infinite;
         }
       `}</style>
+
+      {/* CyberNav Menu Panel */}
+      <CyberNav
+        is80sMode={is80sMode}
+        position="fixed"
+        isOpen={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
+        showButton={false}
+      />
+
+      {/* Thirdweb Buy Modal */}
+      <ThirdwebBuyModal
+        isOpen={showBuyModal}
+        onClose={() => setShowBuyModal(false)}
+      />
 
       <Footer is80sMode={is80sMode} />
     </div>

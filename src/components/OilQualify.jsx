@@ -6,6 +6,7 @@ import { WalletConnectionModal } from "@/components/WalletConnectionModal";
 import NavControlsHome from "@/components/NavControlsHome";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import BuyModal from "@/components/BuyModal";
+import CyberNav from "@/components/CyberNav";
 import { useMusic } from "@/components/MusicContext";
 import { db, collection, query, orderBy, onSnapshot, doc, setDoc, getDoc, updateDoc, serverTimestamp, arrayUnion, increment } from "@/lib/firebaseClient";
 
@@ -365,23 +366,23 @@ export default function OilQualify({
       fontFamily: mono,
       position: "relative",
     }}>
-      {/* Nav Controls */}
-      <div style={{ position: "fixed", top: 12, right: 12, zIndex: 100 }}>
-        <NavControlsHome
-          isPlaying={contextIsPlaying}
-          onPlayMusic={() => play()}
-          onStopMusic={() => pause()}
-          onSkipTrack={() => nextTrack()}
-          onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
-          onUserClick={() => {}}
-          isUserSignedIn={!!user}
-          isMenuOpen={isMenuOpen}
-          userImage={user?.imageUrl}
-          show80sButton={false}
-          isMobile={isMobile}
-          hideMusicOnMobile
-        />
-      </div>
+      {/* Nav Controls (desktop only — mobile uses MobileBottomNav) */}
+      {!isMobile && (
+        <div style={{ position: "fixed", top: 12, right: 12, zIndex: 100 }}>
+          <NavControlsHome
+            isPlaying={contextIsPlaying}
+            onPlayMusic={() => play()}
+            onStopMusic={() => pause()}
+            onSkipTrack={() => nextTrack()}
+            onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
+            onUserClick={() => {}}
+            isUserSignedIn={!!user}
+            isMenuOpen={isMenuOpen}
+            userImage={user?.imageUrl}
+            show80sButton={false}
+          />
+        </div>
+      )}
 
       {/* Hero Header */}
       <div style={{
@@ -1855,6 +1856,14 @@ export default function OilQualify({
       <BuyModal
         isOpen={showBuyModal}
         onClose={() => setShowBuyModal(false)}
+      />
+
+      {/* CyberNav Menu Panel */}
+      <CyberNav
+        position="fixed"
+        isOpen={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
+        showButton={false}
       />
     </div>
   );

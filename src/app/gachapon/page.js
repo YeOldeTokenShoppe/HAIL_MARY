@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import NavControlsHome from '@/components/NavControlsHome';
+import MobileBottomNav from '@/components/MobileBottomNav';
 import CyberNav from '@/components/CyberNav';
 import { UnifiedAccountModal } from '@/components/UnifiedAccountModal';
 import ThirdwebBuyModal from '@/components/ThirdwebBuyModal';
@@ -271,30 +272,51 @@ export default function GachaponPage() {
         </Link>
       </div>
 
-      {/* Nav Controls - Top Right */}
-      <div style={{
-        position: "fixed",
-        top: "20px",
-        right: "20px",
-        zIndex: 100,
-        pointerEvents: "auto",
-      }}>
-        <NavControlsHome
+      {/* Nav Controls - Top Right (desktop only) */}
+      {!isMobileDevice && (
+        <div style={{
+          position: "fixed",
+          top: "20px",
+          right: "20px",
+          zIndex: 100,
+          pointerEvents: "auto",
+        }}>
+          <NavControlsHome
+            isPlaying={contextIsPlaying}
+            onPlayMusic={() => play()}
+            onStopMusic={() => pause()}
+            onSkipTrack={() => nextTrack()}
+            onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
+            isUserSignedIn={!!user}
+            isMenuOpen={isMenuOpen}
+            is80sMode={context80sMode}
+            onToggle80sMode={() => setContext80sMode(!context80sMode)}
+            userImage={user?.imageUrl}
+            onBuyClick={() => setShowBuyModal(true)}
+            show80sButton={false}
+          />
+        </div>
+      )}
+
+      {/* Mobile Bottom Nav */}
+      {isMobileDevice && (
+        <MobileBottomNav
           isPlaying={contextIsPlaying}
           onPlayMusic={() => play()}
           onStopMusic={() => pause()}
           onSkipTrack={() => nextTrack()}
           onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
+          onUserClick={() => {}}
           isUserSignedIn={!!user}
           isMenuOpen={isMenuOpen}
           is80sMode={context80sMode}
-          onToggle80sMode={() => setContext80sMode(!context80sMode)}
           userImage={user?.imageUrl}
           onBuyClick={() => setShowBuyModal(true)}
-          isMobile={isMobileDevice}
+          isMobile
           show80sButton={false}
+          darkMode
         />
-      </div>
+      )}
 
       {/* New Collectible Call-out - Simple badge (shown when a prize is actively available) */}
       {showCallout && currentPrize && (claimStatus === 'available' || claimStatus === 'ineligible') && (
@@ -312,7 +334,7 @@ export default function GachaponPage() {
           <div
             style={{
               position: 'fixed',
-              bottom: '100px',
+              bottom: isMobileDevice ? '170px' : '100px',
               left: '50%',
               transform: 'translateX(-50%)',
               zIndex: 500,

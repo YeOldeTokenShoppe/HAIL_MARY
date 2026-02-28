@@ -468,11 +468,7 @@ export default function MobileBottomNav({
           <button
             className="btm-nav-item"
             onClick={() => {
-              if (isWalletConnected) {
-                setShowUnifiedModal(true);
-              } else {
-                connectWallet();
-              }
+              setShowUnifiedModal(true);
             }}
           >
             <div className="btm-nav-icon" style={{ position: 'relative' }}>

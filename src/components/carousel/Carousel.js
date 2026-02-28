@@ -24,7 +24,7 @@ import InteractiveScroll from '@/components/InteractiveScroll'
 import TranslatableDropInTitle from '@/components/TranslatableDropInTitle'
 import Footer from '@/components/Footer'
 
-export default function CarouselComponent({ onReady, disableScrollControls = false, buyButton, onBuyModalChange, onZoomChange }) {
+export default function CarouselComponent({ onReady, disableScrollControls = false, buyButton, onBuyModalChange, onZoomChange, hideNavGroup = false }) {
   const router = useRouter()
   const [hoveredCaption, setHoveredCaption] = useState(null)
   const [sceneReady, setSceneReady] = useState(false)
@@ -976,7 +976,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             background: 'linear-gradient(to left, transparent, rgba(212, 175, 55, 0.4))',
           }} />
         </div>
-         <div
+         {!hideNavGroup && <div
             className="navigation-group"
             style={{
               position: 'relative',
@@ -1066,7 +1066,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             >
               <img src="/images/ILLUMIN80_TATTOO.webp" alt="Navigate to Philosophy" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
-          </div>
+          </div>}
           {/* Buy Button for Mobile - at the bottom of Section 1 */}
           <div style={{ marginTop: '1.5rem', marginBottom: '1rem' }}>
             {buyButton}
@@ -1211,7 +1211,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             )} */}
 
             {/* Tokenomics Navigation - tablet portrait only */}
-            {isTabletPortrait || isMobile && (
+            {!hideNavGroup && (isTabletPortrait || isMobile) && (
               <div
                 className="navigation-group"
                 style={{
@@ -1400,7 +1400,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
             </p>
 
             {/* Illumin80 Navigation - tablet portrait only */}
-            {isTabletPortrait && (
+            {!hideNavGroup && isTabletPortrait && (
               <div
                 className="navigation-group"
                 style={{
@@ -1916,7 +1916,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
           }} />
         </div>
             {/* Navigation group */}
-            <div
+            {!hideNavGroup && <div
               className="navigation-group"
               style={{
                 position: 'relative',
@@ -2006,7 +2006,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               >
                 <img src="/images/ILLUMIN80_TATTOO.webp" alt="Navigate to Philosophy" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               </div>
-            </div>
+            </div>}
             {/* Buy Button for Desktop */}
             {buyButton}
 
@@ -2102,223 +2102,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
     The RL80 token is your safe-haven micro-asset, and name-sake token of 𝓞𝖚𝖗 𝕷𝖆𝖉𝖞 𝔬𝔣 𝕻𝖊𝖗𝖕𝖊𝖙𝖚𝖆𝖑 𝕻𝖗𝖔𝖋𝖎𝖙. Start with $5 and add the Patron Saint of Portfolios to your dashboard.
               </p>
               
-            <div
-              className="navigation-group"
-              style={{
-                position: 'relative',
-                // bottom: '30px',
-                // right: '30px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0',
-                transform: 'scale(1)',
-                transformOrigin: 'bottom right',
-                zIndex: 50,
-              }}
-            >
-              {/* Arrow with text */}
-              <svg
-                style={{
-                  width: '220px',
-                  height: '100px',
-                  marginRight: '-20%',
-                  pointerEvents: 'auto',
-                  cursor: 'pointer',
-                }}
-                viewBox="0 0 300 150"
-                onClick={() => router.push('/tokenomics')}
-                onMouseEnter={(e) => {
-                  const text = e.currentTarget.querySelector('text');
-                  const arrow = e.currentTarget.querySelector('#arrowPath');
-                  const arrowHead = e.currentTarget.querySelector('.arrow-head');
-                  if (text) {
-                    text.style.fontSize = '32';
-                    text.style.fill = '#ffffff';
-                    text.style.filter = 'url(#glow) drop-shadow(0 0 10px #ffcc00)';
-                  }
-                  if (arrow) {
-                    arrow.style.strokeWidth = '3.5';
-                    arrow.style.filter = 'url(#glow) drop-shadow(0 0 15px #ff9500)';
-                  }
-                  if (arrowHead) {
-                    arrowHead.style.strokeWidth = '3.5';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  const text = e.currentTarget.querySelector('text');
-                  const arrow = e.currentTarget.querySelector('#arrowPath');
-                  const arrowHead = e.currentTarget.querySelector('.arrow-head');
-                  if (text) {
-                    text.style.fontSize = '28';
-                    text.style.fill = '#ffcc00';
-                    text.style.filter = 'url(#candleGlow)';
-                  }
-                  if (arrow) {
-                    arrow.style.strokeWidth = '2.5';
-                    arrow.style.filter = 'url(#glow)';
-                  }
-                  if (arrowHead) {
-                    arrowHead.style.strokeWidth = '2.5';
-                  }
-                }}
-              >
-                {/* Define gradients and filters */}
-                <defs>
-                  <linearGradient id="arrowGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#ffffff" stopOpacity="0.3" />
-                    <stop offset="50%" stopColor="#ffcc00" stopOpacity="0.8" />
-                    <stop offset="100%" stopColor="#ff9500" stopOpacity="1" />
-                  </linearGradient>
-                  <filter id="glow">
-                    <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
-                    <feMerge>
-                      <feMergeNode in="coloredBlur"/>
-                      <feMergeNode in="SourceGraphic"/>
-                    </feMerge>
-                  </filter>
-                  <filter id="candleGlow">
-                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-                    <feFlood floodColor="#ff9500" floodOpacity="0.4"/>
-                    <feComposite in2="coloredBlur" operator="in"/>
-                    <feMerge>
-                      <feMergeNode/>
-                      <feMergeNode in="SourceGraphic"/>
-                    </feMerge>
-                  </filter>
-                </defs>
-
-                {/* Curved arrow path */}
-                <path
-                  id="arrowPath"
-                  d="M 20 100 Q 100 40, 200 60"
-                  stroke="url(#arrowGradient)"
-                  strokeWidth="2.5"
-                  fill="none"
-                  filter="url(#glow)"
-                  strokeLinecap="round"
-                  opacity="0.9"
-                >
-                  <animate
-                    attributeName="stroke-opacity"
-                    values="0.6;1;0.6"
-                    dur="2.5s"
-                    repeatCount="indefinite"
-                  />
-                </path>
-
-                {/* Invisible path for text (offset above the arrow) */}
-                <path
-                  id="textPath"
-                  d="M 20 85 Q 100 25, 200 45"
-                  fill="none"
-                  stroke="none"
-                />
-
-                {/* Arrow head */}
-                <path
-                  className="arrow-head"
-                  d="M 195 55 L 205 60 L 195 65"
-                  stroke="url(#arrowGradient)"
-                  strokeWidth="2.5"
-                  fill="none"
-                  filter="url(#glow)"
-                  strokeLinecap="round"
-                >
-                  <animate
-                    attributeName="stroke-opacity"
-                    values="0.6;1;0.6"
-                    dur="2.5s"
-                    repeatCount="indefinite"
-                  />
-                </path>
-
-                {/* Text along path */}
-                <text
-                  fill="#ffcc00"
-                  fontSize="28"
-                  fontFamily="'UnifrakturMaguntia', cursive"
-                  filter="url(#candleGlow)"
-                  style={{
-                    transition: "all 0.3s ease",
-                    textShadow: "2px 2px 8px rgba(0, 0, 0, 0.9), 4px 4px 12px rgba(0, 0, 0, 0.7)",
-                    filter: "url(#candleGlow) drop-shadow(3px 3px 6px rgba(0, 0, 0, 0.8))"
-                  }}
-                >
-                  <textPath href="#textPath" startOffset="0">
-                    Tokenomics
-                  </textPath>
-                  <animate
-                    attributeName="fill-opacity"
-                    values="0.7;1;0.7"
-                    dur="3s"
-                    repeatCount="indefinite"
-                  />
-                </text>
-
-                {/* Floating particles */}
-                {[...Array(6)].map((_, i) => (
-                  <circle
-                    key={i}
-                    r="1.5"
-                    fill="#ffcc00"
-                    filter="url(#glow)"
-                  >
-                    <animateMotion
-                      dur={`${4 + i}s`}
-                      repeatCount="indefinite"
-                      path="M 20 100 Q 100 40, 200 60"
-                    >
-                      <mpath href="#arrowPath" />
-                    </animateMotion>
-                    <animate
-                      attributeName="opacity"
-                      values="0;1;0"
-                      dur={`${4 + i}s`}
-                      repeatCount="indefinite"
-                    />
-                    <animate
-                      attributeName="r"
-                      values="0.5;2;0.5"
-                      dur={`${4 + i}s`}
-                      repeatCount="indefinite"
-                    />
-                  </circle>
-                ))}
-              </svg>
-
-              {/* Skull button */}
-              <div
-                style={{
-                  width: '60px',
-                  height: '60px',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  transition: 'transform 0.3s ease, filter 0.3s ease',
-                }}
-                onClick={() => router.push('/tokenomics')}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'scale(1.15) rotate(-5deg)';
-                  e.currentTarget.style.filter = 'drop-shadow(0 0 20px #ff9500)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'scale(1) rotate(0deg)';
-                  e.currentTarget.style.filter = 'none';
-                }}
-              >
-                <img
-                  src="/images/DIAMOND_TATTOO2.webp"
-                  alt="Navigate to Tokenomics"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'contain',
-                  }}
-                />
-              </div>
-            </div>
+          
             </div>
             </>
             )}
@@ -2441,7 +2225,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
               {/* Light a virtual green candle and join the Illumin80 — a circle of investors who paradoxically place their faith in having none at all. */}
               Light a candle for Our Lady and signal boost your conviction about $RL80 and enter the orbit of crypto's first AI patron saint. Plus, she'll light up your timeline if you ask.</p>
  {/* {!isMobilePhone && ( */}
-            <div
+            {!hideNavGroup && <div
               className="navigation-group"
               style={{
                 position: 'relative',
@@ -2657,7 +2441,7 @@ export default function CarouselComponent({ onReady, disableScrollControls = fal
                   }}
                 />
               </div>
-            </div>
+            </div>}
           {/* )} */}
               {/* Illumin80 Button */}
               {/* <Link href="/illumin80" style={{ textDecoration: 'none' }}>

@@ -667,7 +667,7 @@ export function PrizeStatusBar({ currentPrize, claimStatus, remainingClaims, eli
         alignItems: 'center',
         gap: '12px',
         padding: '20px 15px',
-        paddingBottom: 'max(25px, calc(env(safe-area-inset-bottom) + 15px))',
+        paddingBottom: 'max(90px, calc(env(safe-area-inset-bottom) + 80px))',
         boxSizing: 'border-box',
         flexShrink: 0,
       }}>
@@ -721,7 +721,7 @@ export function PrizeStatusBar({ currentPrize, claimStatus, remainingClaims, eli
       alignItems: 'center',
       gap: '5px',
       padding: '10px 10px',
-      paddingBottom: 'max(15px, calc(env(safe-area-inset-bottom) + 8px))',
+      paddingBottom: 'max(80px, calc(env(safe-area-inset-bottom) + 70px))',
       boxSizing: 'border-box',
       flexShrink: 0,
     }}>
