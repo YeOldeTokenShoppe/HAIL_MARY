@@ -929,7 +929,7 @@ function PlotPoop() {
   );
 }
 
-function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, tankFill, onClick, onDoubleClick, onTankDrain, envPreset }) {
+function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset }) {
   const lastClickTime = useRef(0);
   const groupRef = useRef();   // primitive (clonedScene)
   const shakeGroupRef = useRef(); // outer group for shake offset
@@ -1217,6 +1217,36 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   const shakeTimerRef = useRef(0);
   const SHAKE_DURATION = 2.5;
 
+  // ── Drill effects (every drill, not just oil strikes) ──────────────────────
+  // Drill rumble — lighter shake, separate from oil-strike shake
+  const drillShakeRef = useRef(false);
+  const drillShakeTimerRef = useRef(0);
+  const DRILL_SHAKE_DURATION = 7.0;
+  const DRILL_SHAKE_MAG = 0.002;
+
+  // Dust burst particles
+  const DUST_COUNT = 80;
+  const dustActiveRef = useRef(false);
+  const dustTimerRef = useRef(0);
+  const dustPosRef = useRef(new Float32Array(DUST_COUNT * 3));
+  const dustVelRef = useRef(new Float32Array(DUST_COUNT * 3));
+  const dustLifeRef = useRef(new Float32Array(DUST_COUNT));
+  const dustGeoRef = useRef();
+  const dustMatRef = useRef();
+  const DUST_DURATION = 5.0;
+
+  // Gauge needle twitch on dry drill
+  const drillGaugeTwitchRef = useRef(false);
+  const drillGaugeTwitchTimer = useRef(0);
+  const DRILL_GAUGE_TWITCH_DURATION = 5.0;
+
+  // Near-miss amber proximity pulse
+  const proximityFlashRef = useRef(false);
+  const proximityTimerRef = useRef(0);
+  const PROXIMITY_FLASH_DURATION = 8.0;
+  const drillProximityRef = useRef(0);
+  drillProximityRef.current = drillProximity;
+
   // RedButton drain — local fill override while draining/drained
   const drainingRef = useRef(false);  // actively animating down
   const drainedRef = useRef(false);   // finished draining, stay at 0
@@ -1441,6 +1471,54 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     }
   }, [tankFill, highlighted, initGusher]);
 
+  // Trigger drill effects on every drill event (highlighted rig only)
+  const initDust = useCallback(() => {
+    const pos = dustPosRef.current;
+    const vel = dustVelRef.current;
+    const life = dustLifeRef.current;
+    for (let i = 0; i < DUST_COUNT; i++) {
+      const i3 = i * 3;
+      // Spawn from rig base
+      pos[i3]     = (Math.random() - 0.5) * 0.1;
+      pos[i3 + 1] = 0.02;
+      pos[i3 + 2] = (Math.random() - 0.5) * 0.1;
+      // Burst outward + upward with random velocity
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 0.3 + Math.random() * 0.7;
+      vel[i3]     = Math.cos(angle) * speed;
+      vel[i3 + 1] = 0.5 + Math.random() * 1.0;
+      vel[i3 + 2] = Math.sin(angle) * speed;
+      life[i] = -(i / DUST_COUNT) * 0.15; // stagger spawns
+    }
+    dustActiveRef.current = true;
+    dustTimerRef.current = 0;
+    if (dustGeoRef.current) {
+      dustGeoRef.current.attributes.position.needsUpdate = true;
+    }
+  }, []);
+
+  const prevDrillEvent = useRef(0);
+  useEffect(() => {
+    if (drillEvent > 0 && drillEvent !== prevDrillEvent.current && highlighted) {
+      prevDrillEvent.current = drillEvent;
+      // 1. Drill rumble (every drill)
+      drillShakeRef.current = true;
+      drillShakeTimerRef.current = 0;
+      // 2. Dust burst (every drill)
+      initDust();
+      // 3. Gauge twitch (dry drills only — oilStrike === 0)
+      if (oilStrike === 0) {
+        drillGaugeTwitchRef.current = true;
+        drillGaugeTwitchTimer.current = 0;
+      }
+      // 4. Amber proximity pulse (near-miss)
+      if (drillProximity > 0 && oilStrike === 0) {
+        proximityFlashRef.current = true;
+        proximityTimerRef.current = 0;
+      }
+    }
+  }, [drillEvent, highlighted, oilStrike, drillProximity, initDust]);
+
   // Store drillDay and tankFill in refs so useFrame always has the latest values
   const drillDayRef = useRef(drillDay);
   drillDayRef.current = drillDay;
@@ -1604,6 +1682,131 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       } else {
         shakeGroup.position.set(position[0], position[1], position[2]);
         shakeRef.current = false;
+      }
+    }
+
+    // ── Drill rumble — lighter shake, coexists with oil-strike shake ──
+    if (shakeGroup && drillShakeRef.current) {
+      drillShakeTimerRef.current += delta;
+      const dt = drillShakeTimerRef.current;
+      if (dt < DRILL_SHAKE_DURATION) {
+        const decay = 1 - dt / DRILL_SHAKE_DURATION;
+        const mag = decay * DRILL_SHAKE_MAG;
+        // Only apply if oil-strike shake isn't active (it's stronger)
+        if (!shakeRef.current) {
+          shakeGroup.position.x = position[0] + (Math.random() - 0.5) * 2 * mag;
+          shakeGroup.position.y = position[1] + (Math.random() - 0.5) * 2 * mag;
+          shakeGroup.position.z = position[2] + (Math.random() - 0.5) * 2 * mag;
+        }
+      } else {
+        drillShakeRef.current = false;
+        if (!shakeRef.current) {
+          shakeGroup.position.set(position[0], position[1], position[2]);
+        }
+      }
+    }
+
+    // ── Dust burst particles ──
+    if (dustActiveRef.current) {
+      dustTimerRef.current += delta;
+      const pos = dustPosRef.current;
+      const vel = dustVelRef.current;
+      const life = dustLifeRef.current;
+      const DUST_GRAVITY = -2.0;
+      let allDone = true;
+
+      for (let i = 0; i < DUST_COUNT; i++) {
+        life[i] += delta;
+        if (life[i] < 0) { allDone = false; continue; }
+        const i3 = i * 3;
+        if (life[i] > DUST_DURATION) continue;
+        allDone = false;
+        vel[i3 + 1] += DUST_GRAVITY * delta; // gravity
+        pos[i3]     += vel[i3] * delta;
+        pos[i3 + 1] += vel[i3 + 1] * delta;
+        pos[i3 + 2] += vel[i3 + 2] * delta;
+        // Clamp to ground
+        if (pos[i3 + 1] < 0) { pos[i3 + 1] = 0; vel[i3 + 1] = 0; vel[i3] *= 0.9; vel[i3 + 2] *= 0.9; }
+      }
+
+      if (dustGeoRef.current) {
+        dustGeoRef.current.attributes.position.needsUpdate = true;
+      }
+      if (dustMatRef.current) {
+        const dt = dustTimerRef.current;
+        const fade = dt > DUST_DURATION - 1.0
+          ? Math.max(0, (DUST_DURATION - dt) / 1.0)
+          : Math.min(1, dt * 4);
+        dustMatRef.current.opacity = fade * 0.7;
+      }
+      if (allDone || dustTimerRef.current > DUST_DURATION) {
+        dustActiveRef.current = false;
+        if (dustMatRef.current) dustMatRef.current.opacity = 0;
+      }
+    }
+
+    // ── Gauge needle twitch on dry drill ──
+    if (drillGaugeTwitchRef.current) {
+      drillGaugeTwitchTimer.current += delta;
+      const gt = drillGaugeTwitchTimer.current;
+      if (gt < DRILL_GAUGE_TWITCH_DURATION) {
+        // Damped sine wave — seismograph-like twitch
+        const amplitude = 0.35; // ~30° worth of fill offset
+        gaugePressureOffset.current = amplitude * Math.exp(-gt * 1.5) * Math.sin(gt * 8);
+      } else {
+        drillGaugeTwitchRef.current = false;
+        gaugePressureOffset.current = 0;
+      }
+    }
+
+    // ── Near-miss amber proximity pulse ──
+    if (proximityFlashRef.current) {
+      proximityTimerRef.current += delta;
+      const pt = proximityTimerRef.current;
+      if (pt < PROXIMITY_FLASH_DURATION) {
+        const light = alertLightRef.current;
+        if (light && !strikeFlashRef.current && !strikingRef.current) {
+          const fadeOut = pt > PROXIMITY_FLASH_DURATION - 2.0
+            ? Math.max(0, (PROXIMITY_FLASH_DURATION - pt) / 2.0)
+            : 1.0;
+          const proxStrength = Math.min(drillProximityRef.current / 50, 1.0);
+          const pulse = (Math.sin(pt * 3) * 0.5 + 0.5) * fadeOut * proxStrength;
+          light.material.emissive.setHex(0xffaa00);
+          light.material.emissiveIntensity = pulse * 3.0;
+          light.material.color.setHex(pulse > 0.1 ? 0xffaa00 : 0x332200);
+          if (strikeLightRef.current) {
+            strikeLightRef.current.color.setHex(0xffaa00);
+            strikeLightRef.current.intensity = pulse * 2.0;
+          }
+          // Panel light amber
+          const pl = panelLightRef.current;
+          if (pl) {
+            pl.material.emissive.setHex(0xffaa00);
+            pl.material.emissiveIntensity = pulse * 3.0;
+            pl.material.color.setHex(pulse > 0.1 ? 0xffaa00 : 0x332200);
+          }
+        }
+      } else {
+        proximityFlashRef.current = false;
+        // Restore original colors
+        const light = alertLightRef.current;
+        const orig = alertLightOrigColor.current;
+        if (light && orig && !strikeFlashRef.current && !strikingRef.current) {
+          light.material.color.copy(orig.color);
+          light.material.emissive.copy(orig.emissive);
+          light.material.emissiveIntensity = orig.emissiveIntensity;
+        }
+        if (strikeLightRef.current) {
+          strikeLightRef.current.color.setHex(0xff0000);
+          strikeLightRef.current.intensity = 0;
+        }
+        const plOrig = panelLightOrigColor.current;
+        const pl = panelLightRef.current;
+        if (pl && plOrig) {
+          pl.material.color.copy(plOrig.color);
+          pl.material.emissive.copy(plOrig.emissive);
+          pl.material.emissiveIntensity = plOrig.emissiveIntensity;
+        }
       }
     }
 
@@ -1859,6 +2062,25 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
               sizeAttenuation
             />
           </points>
+          {/* Dust burst particles — triggered by every drill */}
+          <points>
+            <bufferGeometry ref={dustGeoRef}>
+              <bufferAttribute
+                attach="attributes-position"
+                args={[dustPosRef.current, 3]}
+                count={DUST_COUNT}
+              />
+            </bufferGeometry>
+            <pointsMaterial
+              ref={dustMatRef}
+              color={drillDay <= 5 ? "#c4a56e" : drillDay <= 12 ? "#888888" : "#4a3728"}
+              size={0.04}
+              transparent
+              opacity={0}
+              depthWrite={false}
+              sizeAttenuation
+            />
+          </points>
         </>
       )}
       {/* Plot add-ons — placeholder meshes at slot positions */}
@@ -1988,7 +2210,7 @@ function OilTower({ position, communityOil = 0, totalOilBudget = 500 }) {
 
 useGLTF.preload("/models/OilTower.glb");
 
-function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset }) {
+function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset }) {
   const { scene, animations } = useGLTF("/models/oilJack_fancy_allProps.glb");
   const envMap = useEnvironment({ preset: "studio" });
 
@@ -2070,6 +2292,8 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
             pumpConfig={cellConfig}
             envMap={envMap}
             oilStrike={oilStrike}
+            drillEvent={isSelected ? drillEvent : 0}
+            drillProximity={isSelected ? drillProximity : 0}
             tankFill={isSelected ? tankFill : 0}
             onTankDrain={isSelected ? onTankDrain : undefined}
             envPreset={envPreset}
@@ -2218,6 +2442,8 @@ export default function OilVoxelGrid({
   pumpConfig,
   allPumpConfigs = {},
   oilStrike,
+  drillEvent = 0,
+  drillProximity = 0,
   tankFill = 0,
   onTankDrain,
   communityOil = 0,
@@ -2352,6 +2578,8 @@ export default function OilVoxelGrid({
             pumpConfig={pumpConfig}
             allPumpConfigs={allPumpConfigs}
             oilStrike={oilStrike}
+            drillEvent={drillEvent}
+            drillProximity={drillProximity}
             tankFill={tankFill}
             onTankDrain={onTankDrain}
             communityOil={communityOil}

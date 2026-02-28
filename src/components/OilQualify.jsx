@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { SignInButton } from "@clerk/nextjs";
 import { WalletConnectionModal } from "@/components/WalletConnectionModal";
 import NavControlsHome from "@/components/NavControlsHome";
+import MobileBottomNav from "@/components/MobileBottomNav";
+import ThirdwebBuyModal from "@/components/ThirdwebBuyModal";
 import { useMusic } from "@/components/MusicContext";
 import { db, collection, query, orderBy, onSnapshot, doc, setDoc, getDoc, updateDoc, serverTimestamp, arrayUnion, increment } from "@/lib/firebaseClient";
 
@@ -42,6 +44,9 @@ export default function OilQualify({
   const [xIdentityVerified, setXIdentityVerified] = useState(false); // true when X username comes from Clerk OAuth
   const [allPlots, setAllPlots] = useState({}); // oilPlots collection: { "col_row": { ... } }
   const [claiming, setClaiming] = useState(false);
+  const [shareNote, setShareNote] = useState(null);
+  const [showBuyModal, setShowBuyModal] = useState(false);
+  const certRef = useRef(null);
 
   // Auto-detect X/Twitter username from Clerk OAuth (if user signed in via X)
   useEffect(() => {
@@ -129,10 +134,11 @@ export default function OilQualify({
   );
 
   // Has this user already picked a plot?
-  const userHasPlot = useMemo(() => {
-    if (!user) return false;
-    return Object.values(allPlots).some((p) => p.currentOwnerId === user.id);
+  const userPlotEntry = useMemo(() => {
+    if (!user) return null;
+    return Object.values(allPlots).find((p) => p.currentOwnerId === user.id) || null;
   }, [user, allPlots]);
+  const userHasPlot = !!userPlotEntry;
 
   // Live qualification check when wallet connects
   useEffect(() => {
@@ -307,6 +313,38 @@ export default function OilQualify({
     }
   }, [user, allPlots, claiming, walletAddress, storedRef]);
 
+  // Release current plot so user can pick a different one
+  const [releasing, setReleasing] = useState(false);
+  const handleReleasePlot = useCallback(async () => {
+    if (!user || !db || !userPlotEntry) return;
+    setReleasing(true);
+    setError(null);
+    try {
+      const plotKey = `${userPlotEntry.col}_${userPlotEntry.row}`;
+      // Release the plot
+      await setDoc(doc(db, "oilPlots", plotKey), {
+        currentOwnerId: null,
+        ownerHistory: arrayUnion({ userId: user.id, releasedAt: new Date().toISOString(), reason: "voluntary" }),
+      }, { merge: true });
+      // Clear col/row in oilDrills
+      await setDoc(doc(db, "oilDrills", user.id), {
+        col: null,
+        row: null,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      // Clear in oilQualified
+      await setDoc(doc(db, "oilQualified", user.id), {
+        plotCol: null,
+        plotRow: null,
+        pickedAt: null,
+      }, { merge: true });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setReleasing(false);
+    }
+  }, [user, userPlotEntry]);
+
   const mono = "'Share Tech Mono', monospace";
 
   // Format token balance for display
@@ -390,26 +428,217 @@ export default function OilQualify({
           HOLD ${QUALIFICATION_THRESHOLD}+ USD OF RL80 & FOLLOW @RL80TOKEN
         </div>
 
-        {/* Hero image */}
-        <div style={{
+        {/* Hero image — Claim Certificate with dynamic fields */}
+        <div ref={certRef} style={{
           margin: "20px auto 0",
           maxWidth: 480,
-          aspectRatio: "7 / 8",
+          position: "relative",
           borderRadius: 4,
-          border: `1px dashed ${theme.gold}44`,
-          background: `linear-gradient(135deg, ${theme.gold}08, ${theme.gold}03)`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
           overflow: "hidden",
         }}>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 22, opacity: 0.2 }}>&#9881;</div>
-            <div style={{ fontSize: 8, letterSpacing: "0.2em", color: theme.muted, marginTop: 4 }}>
-              <img src="/ClaimCertificate.webp" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-            </div>
-          </div>
+          <img src="/ClaimCertificate.webp" alt="Claim Certificate" style={{ width: "100%", display: "block" }} />
+          {/* Dynamic field overlays — positioned over the blank lines on the certificate */}
+          {userPlayer && userHasPlot && (() => {
+            const certFont = "'Share Tech Mono', monospace";
+            const inkColor = "#3a2a18";
+            const rot = "rotate(-5.5deg)";
+            const fieldStyle = {
+              position: "absolute",
+              fontFamily: certFont,
+              color: inkColor,
+              whiteSpace: "nowrap",
+              pointerEvents: "none",
+              transform: rot,
+            };
+            const plotCol = userPlotEntry?.col ?? userPlayer.plotCol;
+            const plotRow = userPlotEntry?.row ?? userPlayer.plotRow;
+            const claimDate = userPlayer.pickedAt?.toDate?.()
+              ? userPlayer.pickedAt.toDate()
+              : userPlayer.pickedAt?.seconds
+              ? new Date(userPlayer.pickedAt.seconds * 1000)
+              : new Date();
+            const dateStr = claimDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+            return (
+              <>
+                {/* CLAIM ID */}
+                <div style={{ ...fieldStyle, top: "52%", left: "50%", fontSize: isMobile ? "2.8vw" : 14, fontWeight: 700 }}>
+                  {walletAddress ? walletAddress.slice(0, 10).toUpperCase() : user?.id?.slice(0, 10).toUpperCase()}
+                </div>
+                {/* PLOT COORDS */}
+                <div style={{ ...fieldStyle, top: "60%", left: "60%", fontSize: isMobile ? "2.8vw" : 14, fontWeight: 700 }}>
+                  ({plotCol}, {plotRow})
+                </div>
+                {/* Granted to */}
+                <div style={{ ...fieldStyle, top: "69%", left: "60%", fontSize: isMobile ? "2.8vw" : 14, fontWeight: 700 }}>
+                  {user?.fullName || user?.firstName || "Anonymous"}
+                </div>
+                {/* DATE */}
+                <div style={{ ...fieldStyle, top: "83%", left: "40%", fontSize: isMobile ? "2.4vw" : 12, fontWeight: 700 }}>
+                  {dateStr}
+                </div>
+              </>
+            );
+          })()}
         </div>
+
+        {/* Share buttons — only when certificate has data */}
+        {userPlayer && userHasPlot && (
+          <div style={{ margin: "12px auto 0", maxWidth: 480, display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+            {/* Share on X — copies PNG to clipboard, then opens Twitter compose */}
+            <button
+              onClick={async () => {
+                try {
+                  setShareNote("Capturing image...");
+                  const { default: html2canvas } = await import("html2canvas");
+                  const canvas = await html2canvas(certRef.current, { scale: 2, backgroundColor: null, useCORS: true });
+
+                  // Re-draw onto a fresh canvas to get a clean PNG blob (same pattern as PolaroidSnapshot)
+                  const img = new Image();
+                  img.src = canvas.toDataURL("image/png");
+                  await new Promise((r) => { img.onload = r; img.onerror = r; });
+                  const c = document.createElement("canvas");
+                  c.width = img.width; c.height = img.height;
+                  c.getContext("2d").drawImage(img, 0, 0);
+                  const pngBlob = await new Promise((r) => c.toBlob(r, "image/png"));
+
+                  let clipboardOk = false;
+                  if (pngBlob && navigator.clipboard && window.ClipboardItem) {
+                    try {
+                      await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
+                      clipboardOk = true;
+                    } catch (clipErr) {
+                      console.error("Clipboard copy failed:", clipErr);
+                    }
+                  }
+
+                  if (clipboardOk) {
+                    setShareNote("Image copied! Press Cmd+V (or Ctrl+V) to paste it into your tweet");
+                    await new Promise((r) => setTimeout(r, 1500));
+                  }
+
+                  const refCode = walletAddress ? walletAddress.slice(2, 10).toLowerCase() : user?.id?.slice(0, 8);
+                  const text = `I just staked my claim at Hail Mary Prospecting Co.\n\nrl80.xyz/oil?ref=${refCode}`;
+                  window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, "_blank", "width=550,height=420");
+                  setTimeout(() => setShareNote(null), 5000);
+                } catch (err) { console.error("Share failed:", err); }
+              }}
+              style={{
+                padding: "8px 16px",
+                background: `${theme.gold}22`,
+                border: `1px solid ${theme.gold}`,
+                borderRadius: 3,
+                color: theme.gold,
+                fontFamily: mono,
+                fontSize: 10,
+                letterSpacing: "0.1em",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+              SHARE ON X
+            </button>
+            {/* Copy image as PNG */}
+            <button
+              onClick={async () => {
+                try {
+                  setShareNote("Copying...");
+                  const { default: html2canvas } = await import("html2canvas");
+                  const canvas = await html2canvas(certRef.current, { scale: 2, backgroundColor: null, useCORS: true });
+                  const pngBlob = await new Promise((r) => canvas.toBlob(r, "image/png"));
+                  if (pngBlob && navigator.clipboard && window.ClipboardItem) {
+                    await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
+                    setShareNote("Copied to clipboard!");
+                  }
+                  setTimeout(() => setShareNote(null), 3000);
+                } catch (err) { console.error("Copy failed:", err); }
+              }}
+              style={{
+                padding: "8px 16px",
+                background: "transparent",
+                border: `1px solid ${theme.border}`,
+                borderRadius: 3,
+                color: theme.muted,
+                fontFamily: mono,
+                fontSize: 10,
+                letterSpacing: "0.1em",
+                cursor: "pointer",
+              }}
+            >
+              COPY IMAGE
+            </button>
+            {/* Download */}
+            <button
+              onClick={async () => {
+                try {
+                  const { default: html2canvas } = await import("html2canvas");
+                  const canvas = await html2canvas(certRef.current, { scale: 2, backgroundColor: null, useCORS: true });
+                  const link = document.createElement("a");
+                  link.download = "hail-mary-claim.png";
+                  link.href = canvas.toDataURL("image/png");
+                  link.click();
+                  setShareNote("Downloaded!");
+                  setTimeout(() => setShareNote(null), 3000);
+                } catch (err) { console.error("Download failed:", err); }
+              }}
+              style={{
+                padding: "8px 16px",
+                background: "transparent",
+                border: `1px solid ${theme.border}`,
+                borderRadius: 3,
+                color: theme.muted,
+                fontFamily: mono,
+                fontSize: 10,
+                letterSpacing: "0.1em",
+                cursor: "pointer",
+              }}
+            >
+              DOWNLOAD
+            </button>
+            {/* Mobile native share */}
+            {typeof navigator !== "undefined" && navigator.share && (
+              <button
+                onClick={async () => {
+                  try {
+                    const { default: html2canvas } = await import("html2canvas");
+                    const canvas = await html2canvas(certRef.current, { scale: 2, backgroundColor: null, useCORS: true });
+                    const pngBlob = await new Promise((r) => canvas.toBlob(r, "image/png"));
+                    if (!pngBlob) return;
+                    const file = new File([pngBlob], "hail-mary-claim.png", { type: "image/png" });
+                    const refCode = walletAddress ? walletAddress.slice(2, 10).toLowerCase() : user?.id?.slice(0, 8);
+                    await navigator.share({
+                      title: "Hail Mary Prospecting Co.",
+                      text: `I just staked my claim! Join me: rl80.xyz/oil?ref=${refCode}`,
+                      files: [file],
+                    });
+                  } catch (err) {
+                    if (err.name !== "AbortError") console.error("Share failed:", err);
+                  }
+                }}
+                style={{
+                  padding: "8px 16px",
+                  background: "transparent",
+                  border: `1px solid ${theme.border}`,
+                  borderRadius: 3,
+                  color: theme.muted,
+                  fontFamily: mono,
+                  fontSize: 10,
+                  letterSpacing: "0.1em",
+                  cursor: "pointer",
+                }}
+              >
+                SHARE
+              </button>
+            )}
+            {shareNote && (
+              <div style={{ width: "100%", textAlign: "center", fontSize: 10, color: theme.green, marginTop: 4 }}>
+                {shareNote}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Sign-in / user badge */}
         <div style={{ marginTop: 20 }}>
@@ -1202,11 +1431,30 @@ export default function OilQualify({
             textAlign: "center",
           }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: theme.green, marginBottom: 6 }}>
-              PLOT CLAIMED
+              PLOT CLAIMED — ({userPlotEntry?.col}, {userPlotEntry?.row})
             </div>
             <div style={{ fontSize: 11, color: theme.muted, marginBottom: 12 }}>
               You have picked your plot. The game will start soon — check back when the drilling phase begins!
             </div>
+            <button
+              onClick={handleReleasePlot}
+              disabled={releasing}
+              style={{
+                padding: "6px 16px",
+                background: "transparent",
+                border: `1px solid ${theme.border}`,
+                borderRadius: 3,
+                color: theme.muted,
+                fontFamily: mono,
+                fontSize: 10,
+                letterSpacing: "0.1em",
+                cursor: releasing ? "default" : "pointer",
+                marginBottom: 12,
+                opacity: releasing ? 0.5 : 1,
+              }}
+            >
+              {releasing ? "..." : "CHANGE PLOT"}
+            </button>
             {/* Referral link section */}
             <div style={{
               padding: "12px 16px",
@@ -1253,7 +1501,7 @@ export default function OilQualify({
           gap: 12,
         }}>
           {[
-            { label: "ENTRY", value: `$${QUALIFICATION_THRESHOLD}+ RL80`, sub: "Token balance check" },
+            { label: "ENTRY", value: "HOLD " + `$${QUALIFICATION_THRESHOLD}+ RL80`, sub: "Token balance check" },
             { label: "GRID SIZE", value: `${GRID_SIZE}x${GRID_SIZE} FIXED`, sub: `${GRID_SIZE * GRID_SIZE} plots` },
             { label: "MAX DEPTH", value: "20 LAYERS", sub: "10 passive + 10 bonus" },
             { label: "PRIZE POOL", value: "$500 USDC", sub: "Hidden underground" },
@@ -1391,7 +1639,7 @@ export default function OilQualify({
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 32, opacity: 0.12 }}>&#127956;</div>
             <div style={{ fontSize: 8, letterSpacing: "0.15em", color: theme.muted, marginTop: 4 }}>
-              <img src="/plotPic3.webp" alt="Oil rig at sunset" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+              <img src="/moneyShot.png" alt="Oil rig at sunset" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
             </div>
           </div>
         </div>
@@ -1577,7 +1825,7 @@ export default function OilQualify({
         {/* Footer */}
         <div style={{
           textAlign: "center",
-          padding: "24px 0 16px",
+          padding: "24px 0 60px",
           fontSize: 9,
           letterSpacing: "0.15em",
           color: theme.muted,
@@ -1585,6 +1833,29 @@ export default function OilQualify({
           HAIL MARY PROSPECTING CO. — ALL RIGHTS RESERVED
         </div>
       </div>
+
+      {/* Bottom Mobile Nav */}
+      <MobileBottomNav
+        isPlaying={contextIsPlaying}
+        onPlayMusic={() => play()}
+        onStopMusic={() => pause()}
+        onSkipTrack={() => nextTrack()}
+        onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
+        onUserClick={() => {}}
+        isUserSignedIn={!!user}
+        isMenuOpen={isMenuOpen}
+        userImage={user?.imageUrl}
+        onBuyClick={() => setShowBuyModal(true)}
+        isMobile={isMobile}
+        show80sButton={false}
+        darkMode={darkMode}
+      />
+
+      {/* Buy Modal */}
+      <ThirdwebBuyModal
+        isOpen={showBuyModal}
+        onClose={() => setShowBuyModal(false)}
+      />
     </div>
   );
 }

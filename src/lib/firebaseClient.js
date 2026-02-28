@@ -1,6 +1,7 @@
 import { initializeApp, getApps } from "firebase/app";
 import {
   getFirestore,
+  setLogLevel,
   collection,
   query,
   where,
@@ -85,6 +86,7 @@ try {
   
   // Connect to Firebase services
   db = getFirestore(app);
+  setLogLevel("error"); // Suppress BloomFilter warnings
   auth = getAuth(app);
   storage = getStorage(app);
   rtdb = getDatabase(app);

@@ -433,7 +433,7 @@ export default function OilPage() {
   const [showBuyModal, setShowBuyModal] = useState(false);
 
   // Game state
-  const [gamePhase, setGamePhase] = useState("active");
+  const [gamePhase, setGamePhase] = useState("ticket_sale");
   const [gameEnded, setGameEnded] = useState(false);
   const [gameDay, setGameDay] = useState(1);
   const [gameStartDate, setGameStartDate] = useState(null);
@@ -1084,6 +1084,39 @@ export default function OilPage() {
 
   // Combine oilStrike and tankGusher into a single trigger for gusher effects
   const combinedStrike = oilStrike || tankGusher;
+
+  // Drill event counter — increments on every drill (oil or dry), triggers visual effects
+  const [drillEvent, setDrillEvent] = useState(0);
+  const prevDrillDay = useRef(effectiveDrillDay);
+  useEffect(() => {
+    if (effectiveDrillDay > prevDrillDay.current && effectiveDrillDay > 0) {
+      setDrillEvent((prev) => prev + 1);
+    }
+    prevDrillDay.current = effectiveDrillDay;
+  }, [effectiveDrillDay]);
+
+  // Drill proximity — max oil value in the 26 neighboring cells (3x3x3 cube minus self)
+  const drillProximity = useMemo(() => {
+    if (selectedX === null || sliceY === null || effectiveDrillDay === 0) return 0;
+    const depthIndex = effectiveDrillDay - 1;
+    if (depthIndex < 0 || depthIndex >= DEPTH_Z) return 0;
+    const grid = stats.grid3D;
+    let maxNeighbor = 0;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          if (dx === 0 && dy === 0 && dz === 0) continue;
+          const nx = selectedX + dx;
+          const ny = sliceY + dy;
+          const nz = depthIndex + dz;
+          if (nx < 0 || nx >= gridSize || ny < 0 || ny >= gridSize || nz < 0 || nz >= DEPTH_Z) continue;
+          const val = grid[nx]?.[ny]?.[nz] ?? 0;
+          if (val > maxNeighbor) maxNeighbor = val;
+        }
+      }
+    }
+    return maxNeighbor;
+  }, [selectedX, sliceY, effectiveDrillDay, stats.grid3D, gridSize]);
 
   // Camera shake — ref-driven, no state re-renders
   const shakeRef = useRef(0);
@@ -2206,7 +2239,7 @@ export default function OilPage() {
 
   // ── Pre-game phase gates ──
   const userHasPlot = userDrill?.col != null;
-  if (gamePhase === "ticket_sale" && !userHasPlot) {
+  if (gamePhase === "ticket_sale") {
     return (
       <OilQualify
         theme={theme}
@@ -2863,6 +2896,8 @@ export default function OilPage() {
                     pumpConfig={pumpConfig}
                     allPumpConfigs={allPumpConfigs}
                     oilStrike={combinedStrike}
+                    drillEvent={drillEvent}
+                    drillProximity={drillProximity}
                     tankFill={tankFill}
                     onTankDrain={handleTankDrain}
                     communityOil={communityOil}
@@ -3205,6 +3240,8 @@ export default function OilPage() {
                 pumpConfig={pumpConfig}
                 allPumpConfigs={allPumpConfigs}
                 oilStrike={combinedStrike}
+                drillEvent={drillEvent}
+                drillProximity={drillProximity}
                 tankFill={tankFill}
                 onTankDrain={handleTankDrain}
                 communityOil={communityOil}

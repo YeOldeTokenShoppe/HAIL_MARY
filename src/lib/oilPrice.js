@@ -68,16 +68,6 @@ export async function getRL80Price() {
   const ethPriceUsd = await getEthPriceUsd();
   const rl80PriceUsd = rl80PerEth * ethPriceUsd;
 
-  console.log("[oilPrice]", {
-    token0,
-    rl80IsToken0,
-    reserveRL80: reserveRL80.toString(),
-    reserveWETH: reserveWETH.toString(),
-    rl80PerEth,
-    ethPriceUsd,
-    rl80PriceUsd,
-  });
-
   return {
     rl80PriceUsd,
     ethPriceUsd,

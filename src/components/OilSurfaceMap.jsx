@@ -81,7 +81,7 @@ export default function OilSurfaceMap({
             const plotKey = `${claim.x}_${claim.y}`;
             const plotData = allPlotsMap[plotKey];
             const isOwned = plotData?.currentOwnerId != null;
-            const isMine = plotData?.currentOwnerId === currentUserId;
+            const isMine = !!currentUserId && plotData?.currentOwnerId === currentUserId;
             const isDQ = plotData?.disqualified && !isOwned;
             const isUnclaimed = !isOwned;
             const hasDrillHistory = plotData?.drillDay > 0;
