@@ -9,14 +9,16 @@ import { ADDON_SLOTS } from "@/components/PimpMyPumpPanel";
 
 // ── Rogue Catalog ─────────────────────────────────────────────────────────────
 export const ROGUE_CATALOG = [
-  // {
-  //   id: "dinosaur",
-  //   label: "DINOSAUR",
-  //   model: "/models/t-rex.glb",
-  //   consequence: "delete_addon",
-  //   description: "Eats a random add-on",
-  //   scale: 0.15,
-  // },
+  {
+    id: "ufo",
+    label: "FLYING SAUCER",
+    model: "/models/ufo.glb",
+    consequence: "delete_addon",
+    description: "Siphons off some oil from the user's tank",
+    scale: 0.15,
+    movement: "ufo",
+    flyHeight: 0.6,
+  },
   {
     id: "blueDemon",
     label: "BLUE DEMON",
@@ -85,6 +87,467 @@ function PoopDrop({ position, flyHeight }) {
     <group ref={groupRef} scale={[0.05, 0.05, 0.05]}>
       <primitive object={cloned} />
     </group>
+  );
+}
+
+// ── Tractor beam (cone + spotlight for UFO) ─────────────────────────────────
+// offsetX/offsetZ shift the beam toward the holding tank
+function TractorBeam({ height, opacity }) {
+  const beamRef = useRef();
+  const lightRef = useRef();
+
+  useFrame((_, delta) => {
+    if (!beamRef.current) return;
+    // Gentle pulsing
+    const t = performance.now() * 0.003;
+    const pulse = 0.6 + 0.4 * Math.sin(t);
+    beamRef.current.material.opacity = opacity * pulse * 0.45;
+    if (lightRef.current) lightRef.current.intensity = opacity * pulse * 4;
+  });
+
+  return (
+    <group position={[0, 0.75, 0]}>
+      {/* Cone beam */}
+      <mesh ref={beamRef} position={[0, -height / 2, 0]}>
+        <coneGeometry args={[0.9, height, 16, 1, true]} />
+        <meshBasicMaterial
+          color="#88ffcc"
+          transparent
+          opacity={0.3}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+      {/* Ground glow disc */}
+      <mesh position={[0, -height + 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.9, 24]} />
+        <meshBasicMaterial
+          color="#66ffaa"
+          transparent
+          opacity={opacity * 0.35}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+      {/* Spotlight shining down */}
+      <spotLight
+        ref={lightRef}
+        position={[0, 0, 0]}
+        target-position={[0, -height, 0]}
+        angle={0.5}
+        penumbra={0.8}
+        intensity={3}
+        color="#88ffcc"
+        distance={height + 1}
+        decay={1.5}
+      />
+    </group>
+  );
+}
+
+// ── Alien drop (step-sequence patrol) ─────────────────────────────────────────
+const ALIEN_SCALE = 0.08;
+const ALIEN_BEAM_UP_TIME = 1.2;
+const TURN_DURATION = 0.4;
+// Walk speed — tune to match visual stride of StartWalk/Walk2 animations
+const ALIEN_WALK_SPEED = 0.025
+function buildAlienSequence() {
+  return [
+    // ── Intro anims ──
+
+         { type: "anim", anim: "Idle", loops: 0.5 },
+    { type: "anim", anim: "LookAround", loops: 2 },
+          { type: "anim", anim: "Idle", loops: 0.5 },
+                  { type: "anim", anim: "taunt", loops: 1 },
+                          { type: "anim", anim: "Insult", loops: 1 },
+                                      { type: "anim", anim: "ShakeFist", loops: 1 },
+    // { type: "anim", anim: "Booty", loops: 1 },
+      // { type: "anim", anim: "Idle", loops: 0.2 },
+        // { type: "anim", anim: "Waving", loops: 4 },
+                        { type: "anim", anim: "Idle", loops: 1 },
+    // ── Outbound patrol ──
+    // { type: "walk", anim: "StartWalk", loops: 1 },
+    // { type: "walk", anim: "Walk2", loops: 1 },
+    //    { type: "walk", anim: "Walk2", loops: 1 },
+    //       { type: "walk", anim: "Walk2", loops: 1 },
+    
+    // { type: "turn", angle: -Math.PI / 2 },
+    // // { type: "walk", anim: "StartWalk", loops: 1 },
+    // { type: "walk", anim: "Walk2", loops: 1 },
+    // { type: "turn", angle: -Math.PI / 2 },
+    // // { type: "walk", anim: "StartWalk", loops: 1 },
+    // { type: "walk", anim: "Walk2", loops: 1 },
+    // { type: "turn", angle: Math.PI / 2 },
+    // // ── Pause + Wave ──
+    // { type: "anim", anim: "Idle", loops: 0.5 },
+    // { type: "anim", anim: "Waving", loops: 3 },
+    //   { type: "anim", anim: "Idle", loops: 0.5 },
+    // // ── Return patrol (reverse) ──
+    // { type: "turn", angle: Math.PI / 2 },
+    // { type: "walk", anim: "StartWalk", loops: 1 },
+    // { type: "walk", anim: "Walk2", loops: 1 },
+    // { type: "turn", angle: Math.PI / 2 },
+    // // { type: "walk", anim: "StartWalk", loops: 1 },
+    // { type: "walk", anim: "Walk2", loops: 1 },
+    // { type: "turn", angle: Math.PI / 2 },
+    // // { type: "walk", anim: "StartWalk", loops: 1 },
+    // { type: "walk", anim: "Walk2", loops: 1 },
+    // ── Signal ready for beam-up (alien idles until UFO activates beam) ──
+    { type: "ready" },
+  ];
+}
+
+function AlienDrop({ landPos, ufoPos, beamUp, onReady, onGone }) {
+  const groupRef = useRef();
+  const stepIdxRef = useRef(0);
+  const tRef = useRef(0);
+  const stepInitRef = useRef(false);
+  const [done, setDone] = useState(false);
+  const readyFiredRef = useRef(false);
+  const beamUpStartedRef = useRef(false);
+
+  const headingRef = useRef(0);
+  const turnStartRef = useRef(0);
+  const beamUpOriginRef = useRef(new THREE.Vector3());
+
+  const { scene, animations } = useGLTF("/models/alien2.glb");
+  const clonedScene = useMemo(() => SkeletonUtils.clone(scene), [scene]);
+
+  // Strip position tracks from animation clips to prevent root motion sliding.
+  // Keep position tracks for animations that need them (e.g. Samba hip movement).
+  const KEEP_POSITION = ["Twerk", "Idle", "LookAround", "taunt", "Insult", "Booty", "Waving", "ShakeFist"];
+  const cleanedAnims = useMemo(() => {
+    return animations.map((clip) => {
+      if (KEEP_POSITION.includes(clip.name)) return clip;
+      const filtered = clip.tracks.filter(
+        (track) => !track.name.endsWith(".position")
+      );
+      return new THREE.AnimationClip(clip.name, clip.duration, filtered);
+    });
+  }, [animations]);
+
+  const { actions } = useAnimations(cleanedAnims, clonedScene);
+
+  const sequence = useMemo(() => buildAlienSequence(), []);
+
+  const clipDuration = (name) => {
+    const a = actions[name];
+    return a ? a.getClip().duration : 2.0;
+  };
+
+  const playAnim = (name, repeats = 1) => {
+    const a = actions[name];
+    if (!a) return;
+    Object.values(actions).forEach((act) => act.fadeOut(0.3));
+    if (repeats <= 1) {
+      a.setLoop(THREE.LoopOnce, 1);
+      a.clampWhenFinished = true;
+    } else {
+      a.setLoop(THREE.LoopRepeat, Math.ceil(repeats));
+      a.clampWhenFinished = false;
+    }
+    a.reset().fadeIn(0.3).play();
+  };
+
+  useEffect(() => {
+    if (actions["Idle"]) actions["Idle"].reset().fadeIn(0.2).play();
+  }, [actions]);
+
+  useFrame((_, delta) => {
+    if (done || !groupRef.current) return;
+    const g = groupRef.current;
+    const idx = stepIdxRef.current;
+
+    if (idx >= sequence.length) {
+      // Shouldn't happen — sequence ends with "ready" which parks here
+      return;
+    }
+
+    const step = sequence[idx];
+
+    // Initialize step on first frame
+    if (!stepInitRef.current) {
+      stepInitRef.current = true;
+      tRef.current = 0;
+
+      if (step.type === "anim" || step.type === "walk") {
+        playAnim(step.anim, step.loops || 1);
+      } else if (step.type === "turn") {
+        turnStartRef.current = headingRef.current;
+      } else if (step.type === "ready") {
+        // Signal UFO that alien is ready for beam-up
+        if (!readyFiredRef.current) {
+          readyFiredRef.current = true;
+          onReady?.();
+        }
+        playAnim("Idle", 1);
+      }
+    }
+
+    tRef.current += delta;
+    const t = tRef.current;
+
+    const advanceStep = () => {
+      stepIdxRef.current += 1;
+      stepInitRef.current = false;
+    };
+
+    if (step.type === "anim") {
+      const dur = clipDuration(step.anim) * (step.loops || 1);
+      g.scale.setScalar(ALIEN_SCALE);
+      if (t >= dur) advanceStep();
+
+    } else if (step.type === "walk") {
+      // Play walk animation + move group forward at constant speed
+      const dur = clipDuration(step.anim) * (step.loops || 1);
+      const dx = Math.sin(headingRef.current) * ALIEN_WALK_SPEED * delta;
+      const dz = Math.cos(headingRef.current) * ALIEN_WALK_SPEED * delta;
+      g.position.x += dx;
+      g.position.z += dz;
+      g.rotation.y = headingRef.current;
+      g.scale.setScalar(ALIEN_SCALE);
+      if (t >= dur) advanceStep();
+
+    } else if (step.type === "turn") {
+      const f = Math.min(1, t / TURN_DURATION);
+      const ease = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
+      g.rotation.y = turnStartRef.current + step.angle * ease;
+      g.scale.setScalar(ALIEN_SCALE);
+      if (f >= 1) {
+        headingRef.current = turnStartRef.current + step.angle;
+        g.rotation.y = headingRef.current;
+        advanceStep();
+      }
+
+    } else if (step.type === "ready") {
+      // Idle on the ground until the UFO beam activates
+      g.scale.setScalar(ALIEN_SCALE);
+      if (beamUp && !beamUpStartedRef.current) {
+        beamUpStartedRef.current = true;
+        g.getWorldPosition(beamUpOriginRef.current);
+        tRef.current = 0;
+      }
+      if (beamUpStartedRef.current) {
+        const f = Math.min(1, tRef.current / ALIEN_BEAM_UP_TIME);
+        const ease = f * f;
+        const ox = beamUpOriginRef.current.x;
+        const oy = beamUpOriginRef.current.y;
+        const oz = beamUpOriginRef.current.z;
+        g.position.set(
+          ox + (ufoPos.x - ox) * ease,
+          oy + (ufoPos.y - oy) * ease,
+          oz + (ufoPos.z - oz) * ease
+        );
+        g.scale.setScalar(ALIEN_SCALE * (1 - ease));
+        g.rotation.y += delta * 4;
+        if (f >= 1) {
+          setDone(true);
+          onGone?.();
+        }
+      }
+    }
+  });
+
+  if (done) return null;
+
+  return (
+    <group ref={groupRef} position={[landPos.x, 0.02, landPos.z]} scale={[ALIEN_SCALE, ALIEN_SCALE, ALIEN_SCALE]}>
+      <primitive object={clonedScene} />
+    </group>
+  );
+}
+
+// ── UFO rogue (fly in → hover → beam → fly out) ─────────────────────────────
+const UFO_FLY_SPEED = 1.2;
+const UFO_HOVER_DURATION = 10.0;
+const UFO_BEAM_FADEIN = 0.8;
+const UFO_BEAM_HOLD = 7.5;
+const UFO_BEAM_FADEOUT = 0.7;
+const UFO_BEAM_TOTAL = UFO_BEAM_FADEIN + UFO_BEAM_HOLD + UFO_BEAM_FADEOUT;
+
+function UfoRogueCharacter({ event, cellSize = 1, worldW, worldD, catalog, onArrive, onConsequence }) {
+  const groupRef = useRef();
+  const phaseRef = useRef("fly_in");
+  const consequenceFiredRef = useRef(false);
+  const arrivedRef = useRef(false);
+  const tRef = useRef(0);
+  const [done, setDone] = useState(false);
+  const [beamOpacity, setBeamOpacity] = useState(0);
+  const [alienDropped, setAlienDropped] = useState(false);
+  const [alienReady, setAlienReady] = useState(false);
+  const [alienGone, setAlienGone] = useState(false);
+
+  const { scene, animations } = useGLTF(catalog.model);
+  const clonedScene = useMemo(() => SkeletonUtils.clone(scene), [scene]);
+  const { actions } = useAnimations(animations, clonedScene);
+
+  const flyHeight = catalog.flyHeight || 1.8;
+
+  // Target cell center
+  const targetPos = useMemo(() => {
+    const x = -worldW / 2 + event.targetCol * cellSize + cellSize / 2;
+    const z = worldD / 2 - event.targetRow * cellSize - cellSize / 2;
+    return new THREE.Vector3(x, 0, z);
+  }, [event.targetCol, event.targetRow, cellSize, worldW, worldD]);
+
+  // Spawn from far off-screen right, high up
+  const spawnPos = useMemo(() => {
+    return new THREE.Vector3(worldW / 2 + cellSize * 4, flyHeight + 2, targetPos.z - 2);
+  }, [worldW, cellSize, flyHeight, targetPos]);
+
+  // Hover directly above the holding tank (offset from cell center)
+  const TANK_OFFSET_X = 0.25;
+  const TANK_OFFSET_Z = 0.05;
+  const hoverPos = useMemo(() => {
+    return new THREE.Vector3(targetPos.x + TANK_OFFSET_X, flyHeight, targetPos.z + TANK_OFFSET_Z);
+  }, [targetPos, flyHeight]);
+
+  // Exit off-screen left
+  const exitPos = useMemo(() => {
+    return new THREE.Vector3(-worldW / 2 - cellSize * 4, flyHeight + 3, targetPos.z + 2);
+  }, [worldW, cellSize, flyHeight, targetPos]);
+
+  // Start any animations in the GLB
+  useEffect(() => {
+    const first = Object.values(actions)[0];
+    if (first) first.reset().fadeIn(0.2).play();
+  }, [actions]);
+
+  const flyInDist = useMemo(() => spawnPos.distanceTo(hoverPos), [spawnPos, hoverPos]);
+  const flyOutDist = useMemo(() => hoverPos.distanceTo(exitPos), [hoverPos, exitPos]);
+  const flyInTime = flyInDist / UFO_FLY_SPEED;
+  const flyOutTime = flyOutDist / UFO_FLY_SPEED;
+
+  const spinRef = useRef(0);
+
+  useFrame((_, delta) => {
+    if (done || !groupRef.current) return;
+    const g = groupRef.current;
+    g.scale.setScalar(catalog.scale);
+    tRef.current += delta;
+    spinRef.current += delta * 1.8;
+    const t = tRef.current;
+    const phase = phaseRef.current;
+
+    // Continuous y-axis spin in all phases
+    g.rotation.y = spinRef.current;
+
+    if (phase === "fly_in") {
+      const f = Math.min(1, t / flyInTime);
+      // Ease-out for a decelerating arrival
+      const ease = 1 - Math.pow(1 - f, 2);
+      g.position.lerpVectors(spawnPos, hoverPos, ease);
+      if (f >= 1) {
+        phaseRef.current = "hover";
+        tRef.current = 0;
+        if (!arrivedRef.current) { arrivedRef.current = true; onArrive?.(event); }
+      }
+    } else if (phase === "hover") {
+      // Gentle hovering bob
+      g.position.set(
+        hoverPos.x + Math.sin(t * 0.8) * 0.03,
+        hoverPos.y + Math.sin(t * 2) * 0.04,
+        hoverPos.z + Math.cos(t * 0.8) * 0.03
+      );
+      if (t >= UFO_HOVER_DURATION * 0.3) {
+        phaseRef.current = "beam_down";
+        tRef.current = 0;
+      }
+    } else if (phase === "beam_down") {
+      // Beam down — drop the alien
+      g.position.set(
+        hoverPos.x + Math.sin(t * 0.8) * 0.02,
+        hoverPos.y + Math.sin(t * 2.5) * 0.03,
+        hoverPos.z + Math.cos(t * 0.8) * 0.02
+      );
+      let bOpacity = 0;
+      if (t < UFO_BEAM_FADEIN) {
+        bOpacity = t / UFO_BEAM_FADEIN;
+      } else if (t < UFO_BEAM_FADEIN + UFO_BEAM_HOLD) {
+        bOpacity = 1;
+        // Spawn alien partway through beam
+        if (t > UFO_BEAM_FADEIN + 0.5 && !alienDropped) {
+          setAlienDropped(true);
+        }
+        if (!consequenceFiredRef.current) {
+          consequenceFiredRef.current = true;
+          onConsequence?.(event);
+        }
+      } else if (t < UFO_BEAM_TOTAL) {
+        bOpacity = 1 - (t - UFO_BEAM_FADEIN - UFO_BEAM_HOLD) / UFO_BEAM_FADEOUT;
+      } else {
+        bOpacity = 0;
+        phaseRef.current = "wait_for_alien";
+        tRef.current = 0;
+      }
+      setBeamOpacity(Math.max(0, Math.min(1, bOpacity)));
+    } else if (phase === "wait_for_alien") {
+      // Hover in place while alien does its thing
+      g.position.set(
+        hoverPos.x + Math.sin(t * 0.6) * 0.02,
+        hoverPos.y + Math.sin(t * 2) * 0.03,
+        hoverPos.z + Math.cos(t * 0.6) * 0.02
+      );
+      if (alienReady) {
+        phaseRef.current = "beam_up";
+        tRef.current = 0;
+      }
+    } else if (phase === "beam_up") {
+      // Second beam to pull alien back up, then fly away
+      g.position.set(
+        hoverPos.x + Math.sin(t * 0.8) * 0.02,
+        hoverPos.y + Math.sin(t * 2.5) * 0.03,
+        hoverPos.z + Math.cos(t * 0.8) * 0.02
+      );
+      const beamUpDur = 1.5;
+      let bOpacity = 0;
+      if (t < 0.4) {
+        bOpacity = t / 0.4;
+      } else if (t < beamUpDur - 0.4) {
+        bOpacity = 1;
+      } else if (t < beamUpDur) {
+        bOpacity = 1 - (t - (beamUpDur - 0.4)) / 0.4;
+      } else {
+        bOpacity = 0;
+        phaseRef.current = "fly_out";
+        tRef.current = 0;
+      }
+      setBeamOpacity(Math.max(0, Math.min(1, bOpacity)));
+    } else if (phase === "fly_out") {
+      const f = Math.min(1, t / flyOutTime);
+      // Ease-in for accelerating departure
+      const ease = f * f;
+      g.position.lerpVectors(hoverPos, exitPos, ease);
+      setBeamOpacity(0);
+      if (f >= 1) {
+        setDone(true);
+        markEventDone(event.id);
+      }
+    }
+  });
+
+  // Alien lands at the hover position (under the UFO)
+  const alienLandPos = useMemo(() => ({ x: hoverPos.x, z: hoverPos.z }), [hoverPos]);
+
+  if (done) return null;
+
+  return (
+    <>
+      <group ref={groupRef} scale={[catalog.scale, catalog.scale, catalog.scale]}>
+        <primitive object={clonedScene} />
+        {beamOpacity > 0 && <TractorBeam height={flyHeight * 8} opacity={beamOpacity} />}
+      </group>
+      {alienDropped && !alienGone && (
+        <AlienDrop
+          landPos={alienLandPos}
+          ufoPos={hoverPos}
+          beamUp={phaseRef.current === "beam_up"}
+          onReady={() => setAlienReady(true)}
+          onGone={() => setAlienGone(true)}
+        />
+      )}
+    </>
   );
 }
 
@@ -547,6 +1010,9 @@ function RogueCharacter(props) {
     return null;
   }
 
+  if (catalog.movement === "ufo") {
+    return <UfoRogueCharacter {...props} catalog={catalog} onArrive={props.onArrive} onConsequence={props.onConsequence} />;
+  }
   if (catalog.movement === "fly") {
     return <FlyingRogueCharacter {...props} catalog={catalog} onArrive={props.onArrive} onConsequence={props.onConsequence} />;
   }

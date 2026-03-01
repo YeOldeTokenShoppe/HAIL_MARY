@@ -65,12 +65,15 @@ export default function OilSurfaceMap({
           display: "flex", flexDirection: "column", gap: 2,
           paddingTop: 8, paddingBottom: 8, width: 14, flexShrink: 0,
         }}>
-          {Array.from({ length: gridY }, (_, y) => (
-            <span key={y} style={{
-              fontSize: 7, color: t.muted, textAlign: "center", lineHeight: 1,
-              display: "flex", alignItems: "center", justifyContent: "center", flex: 1,
-            }}>{y}</span>
-          ))}
+          {Array.from({ length: gridY }, (_, i) => {
+            const y = gridY - 1 - i;
+            return (
+              <span key={y} style={{
+                fontSize: 7, color: t.muted, textAlign: "center", lineHeight: 1,
+                display: "flex", alignItems: "center", justifyContent: "center", flex: 1,
+              }}>{y}</span>
+            );
+          })}
         </div>
         <div style={{
           display: "grid", gridTemplateColumns: `repeat(${gridX}, 1fr)`,

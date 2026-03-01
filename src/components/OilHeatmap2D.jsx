@@ -60,7 +60,7 @@ export default function OilHeatmap2D({ blockHash, numberOfDeposits = 8, totalOil
     // Compute per-claim totals (claim = surface position x,y)
     const claimTotals = [];
     let maxClaimTotal = 0;
-    for (let y = 0; y < GRID_Y; y++) {
+    for (let y = GRID_Y - 1; y >= 0; y--) {
       for (let x = 0; x < GRID_X; x++) {
         let sum = 0;
         for (let z = 0; z < DEPTH_Z; z++) sum += grid[x][y][z];

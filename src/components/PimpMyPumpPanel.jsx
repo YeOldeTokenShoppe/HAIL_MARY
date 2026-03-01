@@ -49,9 +49,9 @@ export const ADDON_CATALOG = [
   // { id: "fountain",      label: "FOUNTAIN",       color: "#4488cc", shape: "cylinder" },
 ];
 
-//  [0] [1] [2]
+//  [5] [6] [7]   ← back (far from camera)
 //  [3] PUMP [4]
-//  [5] [6] [7]
+//  [0] [1] [2]   ← front (close to camera)
 export const ADDON_SLOTS = [
   { x: -0.25, y: 0, z:  0.25 }, // 0 front-left
   { x:  0.0,  y: 0, z:  0.25 }, // 1 front-center
@@ -293,7 +293,13 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
             <div>
               <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>SIGN VISIBILITY</span>
               <button
-                onClick={() => onChange({ ...config, showSign: !config.showSign })}
+                onClick={() => {
+                  const newShowSign = !config.showSign;
+                  const updates = { ...config, showSign: newShowSign };
+                  // Camera requires the sign — turn it off when sign is hidden
+                  if (!newShowSign) updates.showCamera = false;
+                  onChange(updates);
+                }}
                 style={{
                   padding: isMobile ? "5px 12px" : "3px 10px",
                   background: config.showSign ? c.activeBg : c.btnBg,
@@ -345,8 +351,8 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
               </div>
             </div>
 
-            {/* Security camera toggle */}
-            <div>
+            {/* Security camera toggle — requires sign to be visible */}
+            <div style={{ opacity: config.showSign ? 1 : 0.35, pointerEvents: config.showSign ? "auto" : "none" }}>
               <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>SECURITY CAM</span>
               <button
                 onClick={() => onChange({ ...config, showCamera: !config.showCamera })}
@@ -470,9 +476,9 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
             {/* 3x3 slot grid */}
             <div style={addonStyles.grid}>
               {[
-                [0, 1, 2],
-                [3, "pump", 4],
                 [5, 6, 7],
+                [3, "pump", 4],
+                [0, 1, 2],
               ].map((row, ri) => (
                 <div key={ri} style={addonStyles.gridRow}>
                   {row.map((cell) => {

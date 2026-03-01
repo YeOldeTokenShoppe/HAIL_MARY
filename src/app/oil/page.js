@@ -324,7 +324,7 @@ function useClaimStats(blockHash, numberOfDeposits, totalOilBudget, gridX, gridY
     const claimTotals = [];
     let totalOil = 0;
     let maxClaimTotal = 0;
-    for (let y = 0; y < gridY; y++) {
+    for (let y = gridY - 1; y >= 0; y--) {
       for (let x = 0; x < gridX; x++) {
         let sum = 0;
         for (let z = 0; z < DEPTH_Z; z++) {

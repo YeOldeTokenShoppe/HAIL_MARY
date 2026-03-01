@@ -52,10 +52,10 @@ export function CctvRenderer({ canvasRef }) {
   const cctvFrameSkip = useRef(0);
 
   // CCTV camera tuning constants
-  const CCTV_OFFSET_X = 0.07;
-  const CCTV_OFFSET_Y = -0.05;
-  const CCTV_OFFSET_Z = -0.05;
-  const CCTV_TILT = 2.0;
+  const CCTV_OFFSET_X = 0.01;
+  const CCTV_OFFSET_Y = 0.00;
+  const CCTV_OFFSET_Z = -0.03;
+  const CCTV_TILT = 3.0;
   const CCTV_FOV = 90;
 
   useFrame(() => {
@@ -80,8 +80,8 @@ export function CctvRenderer({ canvasRef }) {
       _cctvState.worldPos.z + CCTV_OFFSET_Z,
     );
 
-    // Forward direction: +Z in the security camera's local space (reuse refs)
-    const localFwd = _localFwd.current.set(0, 0, 1);
+    // Forward direction in the security camera's local space (reuse refs)
+    const localFwd = _localFwd.current.set(1, 0, 0);
     const normalMatrix = _normalMat.current.getNormalMatrix(_cctvState.worldMatrix);
     localFwd.applyMatrix3(normalMatrix).normalize();
 
@@ -310,6 +310,8 @@ float fbm(vec2 p) {
 
 void main() {
   float x = vUv.x - 0.5;
+  // When viewing the back face, flip x so the flow pattern stays consistent
+  if (!gl_FrontFacing) x = -x;
   float y = vUv.y;
 
   float T = uTime;
@@ -317,11 +319,11 @@ void main() {
   // ── Fast scrolling noise layers that rush UPWARD ──
   // Key: subtract time from y so the pattern moves up
   float scroll1 = fbm(vec2(x * 8.0, y * 5.0 - T * 4.0));
-  float scroll2 = fbm(vec2(x * 12.0 + 3.7, y * 8.0 - T * 6.0 + 1.3));
-  float scroll3 = fbm(vec2(x * 20.0 - 1.1, y * 12.0 - T * 9.0 + 5.7));
+  float scroll2 = fbm(vec2(x * 10.0 + 3.7, y * 6.0 - T * 5.0 + 1.3));
+  float scroll3 = fbm(vec2(x * 14.0 - 1.1, y * 8.0 - T * 6.0 + 5.7));
 
   // Combine into turbulent displacement
-  float turb = scroll1 * 0.5 + scroll2 * 0.3 + scroll3 * 0.2;
+  float turb = scroll1 * 0.55 + scroll2 * 0.3 + scroll3 * 0.15;
 
   // ── Column shape: narrow jet at base, cresting cap that curls back down ──
   float baseWidth = 0.06;
@@ -348,7 +350,7 @@ void main() {
   float density = mix(turb * 0.5 + 0.5, 1.0, wispiness) * coreDensity;
 
   // Chaotic blobs rushing upward
-  float blobs = noise(vec2(x * 15.0, y * 10.0 - T * 7.0));
+  float blobs = noise(vec2(x * 10.0, y * 8.0 - T * 5.0));
   blobs = smoothstep(0.1, 0.5, blobs) * (1.0 - y * 0.3);
   density = max(density, blobs * 0.8);
 
@@ -923,7 +925,7 @@ function PlotPoop() {
   const cloned = useMemo(() => scene.clone(true), [scene]);
   useEffect(() => () => disposeScene(cloned), [cloned]);
   return (
-    <group position={[0.35, 0.05, 0.15]} scale={[0.1, 0.1, 0.1]}>
+    <group position={[0.35, 0.01, 0.15]} scale={[0.1, 0.1, 0.1]}>
       <primitive object={cloned} />
     </group>
   );
@@ -1004,6 +1006,15 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           strawLengthZ.current = (bb.max.z - bb.min.z) * child.scale.z;
         }
       }
+      // Head_Pump mesh — flip during gusher
+      if (child.name === "Head_Pump") {
+        headPumpRef.current = child;
+      }
+      if (child.name.startsWith("Cylinder_Pump")) {
+        if (!cylPumpRefs.current.includes(child)) {
+          cylPumpRefs.current.push(child);
+        }
+      }
       // Wheel
       if (child.name === "Wheel") {
         wheelRef.current = child;
@@ -1034,9 +1045,16 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   }, [clonedScene]);
 
   useEffect(() => {
+    const pumpActions = [];
     animations.forEach((clip) => {
-      mixer.clipAction(clip).play();
+      const action = mixer.clipAction(clip);
+      action.play();
+      // Track the two armature animations that drive the pump head
+      if (clip.name === "Armature|spin.001" || clip.name === "Armature.001|spin.001") {
+        pumpActions.push(action);
+      }
     });
+    pumpActionsRef.current = pumpActions;
     return () => mixer.stopAllAction();
   }, [mixer, animations]);
 
@@ -1049,11 +1067,11 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     }
   }, [clonedScene, pumpConfig, envMap]);
 
-  // Security camera visibility
+  // Security camera visibility — requires sign to be visible
   useEffect(() => {
-    const show = !!pumpConfig?.showCamera;
+    const show = !!pumpConfig?.showCamera && !!pumpConfig?.showSign;
     secCamPartsRef.current.forEach((part) => { part.visible = show; });
-  }, [pumpConfig?.showCamera]);
+  }, [pumpConfig?.showCamera, pumpConfig?.showSign]);
 
   // Sign frame visibility
   useEffect(() => {
@@ -1292,7 +1310,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         if (!secCamPartsRef.current.includes(child)) {
           secCamPartsRef.current.push(child);
         }
-        child.visible = false; // hidden by default
+        child.visible = !!pumpConfigRef.current?.showCamera && !!pumpConfigRef.current?.showSign;
       }
       // Sign — custom image texture (front + back)
       if (child.name === "Sign" && child.isMesh) {
@@ -1324,7 +1342,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
           child.material = child.material.clone();
           child.material.side = THREE.DoubleSide;
         }
-        child.visible = false;
+        child.visible = !!pumpConfigRef.current?.showSign;
       }
       // Fence_Package and all children — hidden by default
       if (child.name.startsWith("Fence_Package")) {
@@ -1418,6 +1436,15 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     }
   }, []);
 
+  // Pump head pause during gusher — tilt the horsehead up and out of the blast
+  const pumpActionsRef = useRef([]);  // animation actions for the pump armatures
+  const pumpPausedRef = useRef(false);
+  const headPumpRef = useRef(null);       // Head_Pump mesh
+  const headPumpBaseRotX = useRef(null);
+  const headPumpOrigMat = useRef(null);  // original material before oil stain
+  const cylPumpRefs = useRef([]);        // Cylinder_Pump meshes
+  const oilStainedParts = useRef([]);    // all parts to stain/restore
+
   // Oil geyser shader — only active on highlighted rig
   const gusherActiveRef = useRef(false);
   const gusherTimerRef = useRef(0);
@@ -1441,6 +1468,30 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     }
     if (geyserMeshRef.current) {
       geyserMeshRef.current.visible = true;
+    }
+    // Pause pump animation and tilt horsehead up out of the gusher blast
+    if (!pumpPausedRef.current) {
+      // Seek all actions to frame 103/110 (pump head at highest) and pause
+      pumpActionsRef.current.forEach((action) => {
+        const clip = action.getClip();
+        action.time = clip.duration * (103 / 110);
+        action.paused = true;
+      });
+      // Force one mixer update to apply the seek position
+      mixer.update(0);
+      // Flip Head_Pump upward and save original colors for all stained parts
+      if (headPumpRef.current) {
+        headPumpBaseRotX.current = headPumpRef.current.rotation.x;
+        headPumpRef.current.rotation.x -= Math.PI;
+      }
+      // Save original colors for restore
+      oilStainedParts.current = [headPumpRef.current, strawRef.current, ...cylPumpRefs.current].filter(Boolean);
+      oilStainedParts.current.forEach((m) => {
+        if (m.material && !m.userData._origColor) {
+          m.userData._origColor = m.material.color.clone();
+        }
+      });
+      pumpPausedRef.current = true;
     }
   }, []);
 
@@ -1526,6 +1577,8 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   depthCellRef.current = depthCellSize;
   const tankFillRef = useRef(tankFill);
   tankFillRef.current = tankFill;
+  const pumpConfigRef = useRef(pumpConfig);
+  pumpConfigRef.current = pumpConfig;
   const highlightedRef = useRef(highlighted);
   highlightedRef.current = highlighted;
   const frameSkip = useRef(Math.floor(Math.random() * 3)); // stagger so not all idle rigs spike on same frame
@@ -1536,7 +1589,9 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       if (frameSkip.current === 0) mixer.update(delta * 3);
       return;
     }
-    mixer.update(delta);
+    if (!pumpPausedRef.current) {
+      mixer.update(delta);
+    }
 
     // Wheel — lerp toward target rotation on y-axis
     const wheel = wheelRef.current;
@@ -1827,10 +1882,11 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
     const camVisible = highlighted && !!pumpConfig?.showCamera;
     if (secCam && secCamBaseRotY.current !== null) {
       if (camVisible && !(highlighted && _cctvState.pauseSweep)) {
-        const sweep = 155 * (Math.PI / 180); // 155° in radians
-        const period = 8; // seconds for a full back-and-forth cycle
+        const sweep = 90 * (Math.PI / 180);
+        const baseOffset = 45 * (Math.PI / 180); // rotate base leftward to face the rig
+        const period = 12; // seconds for a full back-and-forth cycle
         const t = (Math.sin(performance.now() * 0.001 * (2 * Math.PI / period)) + 1) / 2; // 0→1→0
-        secCam.rotation.y = secCamBaseRotY.current + t * sweep;
+        secCam.rotation.y = secCamBaseRotY.current + baseOffset + t * sweep;
       }
 
       // Feed world transform to CCTV renderer when this rig is highlighted and camera enabled
@@ -1854,6 +1910,11 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       if (geyserMeshRef.current && !geyserMeshRef.current.visible) {
         geyserMeshRef.current.visible = true;
       }
+      // Keep pump head parts oil-stained while gusher is active
+      const stainColor = 0x1a0e05;
+      if (headPumpRef.current?.material) headPumpRef.current.material.color.set(stainColor);
+      if (strawRef.current?.material) strawRef.current.material.color.set(stainColor);
+      cylPumpRefs.current.forEach((m) => { if (m.material) m.material.color.set(stainColor); });
       gusherTimerRef.current += delta;
       const GUSHER_DURATION = 3.0;
 
@@ -1874,6 +1935,20 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       if (gusherTimerRef.current > GUSHER_DURATION && !overflowing) {
         gusherActiveRef.current = false;
         if (geyserMeshRef.current) geyserMeshRef.current.visible = false;
+        // Resume pump animation, restore Head_Pump rotation and all stained colors
+        if (pumpPausedRef.current) {
+          if (headPumpRef.current && headPumpBaseRotX.current !== null) {
+            headPumpRef.current.rotation.x = headPumpBaseRotX.current;
+          }
+          oilStainedParts.current.forEach((m) => {
+            if (m.material && m.userData._origColor) {
+              m.material.color.copy(m.userData._origColor);
+              delete m.userData._origColor;
+            }
+          });
+          pumpActionsRef.current.forEach((action) => { action.paused = false; });
+          pumpPausedRef.current = false;
+        }
       }
     }
 
@@ -1977,6 +2052,20 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         strikeFlashRef.current = false;
         if (geyserMeshRef.current) geyserMeshRef.current.visible = false;
         if (geyserMatRef.current) geyserMatRef.current.uniforms.uOpacity.value = 0;
+        // Resume pump animation, restore Head_Pump rotation and all stained colors
+        if (pumpPausedRef.current) {
+          if (headPumpRef.current && headPumpBaseRotX.current !== null) {
+            headPumpRef.current.rotation.x = headPumpBaseRotX.current;
+          }
+          oilStainedParts.current.forEach((m) => {
+            if (m.material && m.userData._origColor) {
+              m.material.color.copy(m.userData._origColor);
+              delete m.userData._origColor;
+            }
+          });
+          pumpActionsRef.current.forEach((action) => { action.paused = false; });
+          pumpPausedRef.current = false;
+        }
       }
       return;
     }
@@ -2040,6 +2129,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
               fragmentShader={_geyserFragmentShader}
               transparent
               depthWrite={false}
+              side={THREE.DoubleSide}
               uniforms={geyserUniforms.current}
             />
           </mesh>
@@ -2420,6 +2510,170 @@ function RemoteGusher({ position }) {
   );
 }
 
+// ── Neutral soft-circle texture (white RGB, alpha-only falloff) ──────────────
+const _neutralDropletTex = (() => {
+  if (typeof document === "undefined") return null;
+  const size = 32;
+  const c = document.createElement("canvas");
+  c.width = size; c.height = size;
+  const ctx = c.getContext("2d");
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  g.addColorStop(0, "rgba(255,255,255,1)");
+  g.addColorStop(0.5, "rgba(255,255,255,0.8)");
+  g.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(c);
+})();
+
+// ── Shader Gusher (test gushers use the GPU geyser shader) ──────────────────
+
+const SHADER_GUSHER_PARTICLES = 300;
+
+function ShaderGusher({ position, envPreset }) {
+  const meshRef = useRef();
+  const shaderMatRef = useRef();
+  const camPosRef = useRef(new THREE.Vector3());
+  const meshPosRef = useRef(new THREE.Vector3());
+  const uniformsRef = useRef({
+    uTime: { value: 0 },
+    uOpacity: { value: 1.0 },
+    uNightMode: { value: 0.0 },
+    uResolution: { value: new THREE.Vector2(256, 512) },
+  });
+
+  const posArr = useRef(new Float32Array(SHADER_GUSHER_PARTICLES * 3));
+  const velArr = useRef(new Float32Array(SHADER_GUSHER_PARTICLES * 3));
+  const lifeArr = useRef(new Float32Array(SHADER_GUSHER_PARTICLES));
+  const geoRef = useRef();
+  const ptMatRef = useRef();
+  const lightRef = useRef();
+  const elapsed = useRef(0);
+
+  const { camera } = useThree();
+
+  useEffect(() => {
+    const pos = posArr.current;
+    const vel = velArr.current;
+    const life = lifeArr.current;
+    for (let i = 0; i < SHADER_GUSHER_PARTICLES; i++) {
+      const i3 = i * 3;
+      const t = (i / SHADER_GUSHER_PARTICLES) * 1.2;
+      const angle = Math.random() * Math.PI * 2;
+      const spread = 0.05 + Math.random() * 0.12;
+      const vy = 3.0 + Math.random() * 2.5;
+      const vx = Math.cos(angle) * spread;
+      const vz = Math.sin(angle) * spread;
+      pos[i3] = vx * t;
+      pos[i3 + 1] = 0.3 + vy * t - 3.0 * t * t;
+      pos[i3 + 2] = vz * t;
+      vel[i3] = vx;
+      vel[i3 + 1] = vy - 6.0 * t;
+      vel[i3 + 2] = vz;
+      life[i] = t;
+    }
+  }, []);
+
+  useFrame((_, delta) => {
+    if (shaderMatRef.current) {
+      shaderMatRef.current.uniforms.uTime.value += delta;
+      shaderMatRef.current.uniforms.uNightMode.value = envPreset === "night" ? 1.0 : 0.0;
+    }
+    const mesh = meshRef.current;
+    if (mesh) {
+      const camPos = camera.getWorldPosition(camPosRef.current);
+      const meshPos = mesh.getWorldPosition(meshPosRef.current);
+      mesh.lookAt(camPos.x, meshPos.y, camPos.z);
+    }
+
+    elapsed.current += delta;
+    const pos = posArr.current;
+    const vel = velArr.current;
+    const life = lifeArr.current;
+    for (let i = 0; i < SHADER_GUSHER_PARTICLES; i++) {
+      const i3 = i * 3;
+      life[i] += delta;
+      if (life[i] > 1.2) {
+        pos[i3] = 0;
+        pos[i3 + 1] = 0.3;
+        pos[i3 + 2] = 0;
+        const angle = Math.random() * Math.PI * 2;
+        const spread = 0.05 + Math.random() * 0.12;
+        vel[i3] = Math.cos(angle) * spread;
+        vel[i3 + 1] = 3.0 + Math.random() * 2.5;
+        vel[i3 + 2] = Math.sin(angle) * spread;
+        life[i] = 0;
+      }
+      vel[i3 + 1] -= 6.0 * delta;
+      pos[i3] += vel[i3] * delta;
+      pos[i3 + 1] += vel[i3 + 1] * delta;
+      pos[i3 + 2] += vel[i3 + 2] * delta;
+    }
+    if (geoRef.current) geoRef.current.attributes.position.needsUpdate = true;
+    if (ptMatRef.current) {
+      ptMatRef.current.opacity = 0.5;
+      if (envPreset === "night") {
+        ptMatRef.current.color.setRGB(0.08, 0.15, 0.45);
+      } else {
+        ptMatRef.current.color.setRGB(0.1, 0.055, 0.02);
+      }
+    }
+    if (lightRef.current) {
+      const flash = Math.max(0, 1 - elapsed.current * 2) * 3;
+      lightRef.current.intensity = flash + 0.5;
+    }
+  });
+
+  return (
+    <group position={position}>
+      <pointLight
+        ref={lightRef}
+        position={[0, 0.5, 0]}
+        color={0xff2200}
+        intensity={1.5}
+        distance={4}
+        decay={2}
+      />
+      <mesh
+        ref={meshRef}
+        renderOrder={10}
+        position={[0, 1.0, 0]}
+      >
+        <planeGeometry args={[0.9, 3.0]} />
+        <shaderMaterial
+          ref={shaderMatRef}
+          vertexShader={_geyserVertexShader}
+          fragmentShader={_geyserFragmentShader}
+          transparent
+          depthWrite={false}
+          side={THREE.DoubleSide}
+          uniforms={uniformsRef.current}
+        />
+      </mesh>
+      <points renderOrder={11}>
+        <bufferGeometry ref={geoRef}>
+          <bufferAttribute
+            attach="attributes-position"
+            args={[posArr.current, 3]}
+            count={SHADER_GUSHER_PARTICLES}
+          />
+        </bufferGeometry>
+        <pointsMaterial
+          ref={ptMatRef}
+          color={0x1a0e05}
+          size={0.02}
+          map={_neutralDropletTex}
+          transparent
+          opacity={0.5}
+          depthWrite={false}
+          depthTest
+          sizeAttenuation
+        />
+      </points>
+    </group>
+  );
+}
+
 // ── Component ───────────────────────────────────────────────────────────────
 
 export default function OilVoxelGrid({
@@ -2602,13 +2856,14 @@ export default function OilVoxelGrid({
           {gusherEvents
             .filter((ev) => ev.userId !== currentUserId)
             .map((ev) => (
-              <RemoteGusher
+              <ShaderGusher
                 key={ev.id}
                 position={[
                   -worldW / 2 + ev.col * cellSize + cellSize / 2,
                   0,
                   worldD / 2 - ev.row * cellSize - cellSize / 2,
                 ]}
+                envPreset={envPreset}
               />
             ))}
           {Array.from({ length: gridX + 1 }, (_, i) => {
