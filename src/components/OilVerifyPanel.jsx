@@ -6,7 +6,7 @@ import { generateOilDistribution3D } from "@/lib/oilDistribution";
 
 const DEPTH_Z = 20;
 
-export default function OilVerifyPanel({ numberOfDeposits, totalOilBudget, onApplyHash, gridX = 10, gridY = 10 }) {
+export default function OilVerifyPanel({ numberOfDeposits, totalOilBudget, onApplyHash, gridX = 10, gridY = 10, depthBias = 0.35 }) {
   const [collapsed, setCollapsed] = useState(true);
   const [blockInput, setBlockInput] = useState("");
   const [status, setStatus] = useState("idle"); // idle | loading | verified | error
@@ -52,6 +52,7 @@ export default function OilVerifyPanel({ numberOfDeposits, totalOilBudget, onApp
         depthZ: DEPTH_Z,
         totalOilBudget,
         numberOfDeposits,
+        depthBias,
       });
 
       const claimTotals = [];

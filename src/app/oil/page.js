@@ -134,6 +134,7 @@ const SkyDome = memo(function SkyDome({ skyColor = "#7da4c9", skyBottom = null, 
 const OilSurfaceMap = dynamic(() => import("@/components/OilSurfaceMap"), { ssr: false });
 const OilCrossSection = dynamic(() => import("@/components/OilCrossSection"), { ssr: false });
 const OilVerifyPanel = dynamic(() => import("@/components/OilVerifyPanel"), { ssr: false });
+const OilVerifyExplainer = dynamic(() => import("@/components/OilVerifyExplainer"), { ssr: false });
 const OilQualify = dynamic(() => import("@/components/OilQualify"), { ssr: false });
 // OilPlotDraft removed — plot picking now merged into OilQualify
 
@@ -1611,6 +1612,33 @@ export default function OilPage() {
           </>
         )}
       </div>
+      {blockHash && (
+        <div style={{
+          marginTop: 6, padding: "5px 8px",
+          background: darkMode ? "rgba(180,160,130,0.06)" : "rgba(180,160,130,0.08)",
+          border: `1px solid ${darkMode ? "#444" : "#d4c8b4"}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6,
+        }}>
+          <span style={{
+            fontFamily: "'Share Tech Mono', monospace", fontSize: 8,
+            color: darkMode ? "#8a8070" : "#8b7d6b", letterSpacing: "0.12em",
+          }}>
+            SEED HASH
+          </span>
+          <span
+            title={blockHash}
+            style={{
+              fontFamily: "'Share Tech Mono', monospace", fontSize: 8,
+              color: darkMode ? "#8a8070" : "#8b7d6b",
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              maxWidth: "65%", textAlign: "right", cursor: "pointer",
+            }}
+            onClick={() => navigator.clipboard?.writeText(blockHash)}
+          >
+            {blockHash.slice(0, 10)}...{blockHash.slice(-8)}
+          </span>
+        </div>
+      )}
     </div>
   );
 
@@ -3069,6 +3097,7 @@ export default function OilPage() {
           {(isAdmin || isReport) && dryZonesPanel}
           {(isAdmin || isReport) && depositsPanel}
           <HowToPlayPanel isMobile darkMode={darkMode} />
+          <OilVerifyExplainer isMobile darkMode={darkMode} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} depthBias={0.35} />
           <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={!isConfigOwner} />
           {(isAdmin || isReport) && (
             <OilVerifyPanel
@@ -3265,6 +3294,7 @@ export default function OilPage() {
                   maxDistance={45}
                   maxPolarAngle={Math.PI * 0.48}
                   target={[0, 3, 0]}
+                  zoomToCursor
                 />
                 <CameraFlyTo target={flyTarget} controlsRef={controlsRef} />
               </>
@@ -3429,6 +3459,7 @@ export default function OilPage() {
             {(isAdmin || isReport) && dryZonesPanel}
             {(isAdmin || isReport) && depositsPanel}
             <HowToPlayPanel darkMode={darkMode} />
+            <OilVerifyExplainer darkMode={darkMode} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} depthBias={0.35} />
             <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={!isConfigOwner} />
             {(isAdmin || isReport) && (
               <OilVerifyPanel
