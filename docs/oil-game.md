@@ -146,3 +146,4 @@ Admin-deployed animated characters that roam the grid, cause mischief (eating ad
 | `BASE_RPC_URL` | Base chain RPC endpoint |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token from @BotFather |
 | `NEXT_PUBLIC_TELEGRAM_BOT_NAME` | Telegram bot username for deeplinks |
+*
