@@ -137,6 +137,31 @@ Admin-deployed animated characters that roam the grid, cause mischief (eating ad
 5. Character lifecycle: Spawn at grid edge → Walk to target → Act → Leave
 6. Rogue characters appear in CCTV feeds automatically
 
+## Post-Game Payout
+
+After the game ends (`gamePhase = "ended"`), players are paid out in USDC on Base using the batch payout script.
+
+### Script: `scripts/oil-payout.js`
+
+Reads `oilDrills` (for `totalCollected`) and `oilQualified` (for `walletAddress`), joins on userId, and sends USDC transfers sequentially.
+
+```bash
+# Preview payout manifest (no transfers sent)
+node scripts/oil-payout.js --dry-run
+
+# Execute payouts
+node scripts/oil-payout.js
+```
+
+**Features:**
+- Displays a full manifest table (wallet, username, amount) before prompting for confirmation
+- Checks payout wallet USDC balance before starting
+- Resume support: writes results to `scripts/payout-results.json` after each tx — re-running skips already-paid wallets
+- USDC on Base: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` (6 decimals)
+- `totalCollected` is in USDC units (e.g. 12.5 = $12.50)
+
+**Required env vars:** `BASE_RPC_URL`, `PAYOUT_PRIVATE_KEY`
+
 ## Environment Variables
 
 | Variable | Description |
@@ -144,6 +169,7 @@ Admin-deployed animated characters that roam the grid, cause mischief (eating ad
 | `OIL_TICKET_WALLET` | Recipient wallet address for ticket payments (server-side) |
 | `NEXT_PUBLIC_OIL_TICKET_WALLET` | Same wallet address exposed to client |
 | `BASE_RPC_URL` | Base chain RPC endpoint |
+| `PAYOUT_PRIVATE_KEY` | Private key of wallet holding USDC (for post-game payouts) |
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token from @BotFather |
 | `NEXT_PUBLIC_TELEGRAM_BOT_NAME` | Telegram bot username for deeplinks |
 *

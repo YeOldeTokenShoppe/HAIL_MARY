@@ -16,12 +16,13 @@ export default function HowToPlayPanel({ isMobile, darkMode = false, defaultExpa
   };
 
   const steps = [
-    { num: "1", title: "CLAIM YOUR PLOT", desc: "Pick any unclaimed pumpjack on the 10x10 grid. This is your drill site for the game." },
-    { num: "2", title: "DRILL DEEPER", desc: "Each day a new layer unlocks (up to 10 passive). Click DRILL to dig each unlocked layer. Refer friends for up to 10 bonus layers — max depth: 20." },
-    { num: "3", title: "STRIKE OIL", desc: "When your drill hits an oil deposit, your tank fills up. Geological surveys suggest denser deposits at greater depth." },
-    { num: "4", title: "DRAIN YOUR TANK", desc: "Once your tank has oil, drain it to lock in your haul. The more you collect, the higher you climb on the leaderboard." },
-    { num: "5", title: "CLAIM JUMP", desc: "Move to a different unclaimed plot. First 2 jumps are free — each jump after costs 1 bonus drill." },
-    { num: "6", title: "PIMP YOUR PUMP", desc: "Customize your rig with colors, materials, and add-ons. Make it yours." },
+    { num: "1", title: "GET YOUR KEY", desc: "Hold around $20 worth of Our Lady tokens and follow our Our Lady account. Holding the token is your key — no spending required. If you decide to leave, you're always free to sell." },
+    { num: "2", title: "CLAIM YOUR PLOT", desc: "Pick any unclaimed pumpjack on the 10x10 grid. This is your drill site for the game." },
+    { num: "3", title: "DRILL DEEPER", desc: "Each day a new layer unlocks (up to 10 passive). Click DRILL to dig each unlocked layer. Refer friends for up to 10 bonus layers — max depth: 20." },
+    { num: "4", title: "DEPTH = RICHES", desc: "Just like real geology, the deeper you go the richer the earth tends to be. You'll still find deposits at shallower layers — just less frequently. Everyone starts with the potential to reach about halfway down, and in-game achievements let you go deeper. It's not about luck — it's about strategy and commitment." },
+    { num: "5", title: "DRAIN YOUR TANK", desc: "Once your tank has oil, drain it to lock in your haul. The more you collect, the higher you climb on the leaderboard." },
+    { num: "6", title: "CLAIM JUMP", desc: "Move to a different unclaimed plot. First 2 jumps are free — each jump after costs 1 bonus drill." },
+    { num: "7", title: "PIMP YOUR PUMP", desc: "Customize your rig with colors, materials, and add-ons. Make it yours." },
   ];
 
   return (

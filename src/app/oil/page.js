@@ -21,7 +21,7 @@ import PolaroidSnapshot from "@/components/PolaroidSnapshot";
 import StarField from "@/components/StarField";
 import ConstellationModel from '@/components/ConstellationModel';
 import Fireworks from "@/components/Fireworks";
-import { db, storage, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, ref, uploadBytes, getDownloadURL, onSnapshot, collection, query, where, addDoc, runTransaction, arrayUnion } from "@/lib/firebaseClient";
+import { db, storage, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, ref, uploadBytes, getDownloadURL, onSnapshot, collection, query, where, orderBy, limit, addDoc, runTransaction, arrayUnion, getDocs } from "@/lib/firebaseClient";
 import RogueAdminPanel from "@/components/RogueAdminPanel";
 import useCctvRecorder from "@/hooks/useCctvRecorder";
 
@@ -135,6 +135,8 @@ const OilSurfaceMap = dynamic(() => import("@/components/OilSurfaceMap"), { ssr:
 const OilCrossSection = dynamic(() => import("@/components/OilCrossSection"), { ssr: false });
 const OilVerifyPanel = dynamic(() => import("@/components/OilVerifyPanel"), { ssr: false });
 const OilVerifyExplainer = dynamic(() => import("@/components/OilVerifyExplainer"), { ssr: false });
+const OilPlotChat = dynamic(() => import("@/components/OilPlotChat"), { ssr: false });
+const OilChatModal = dynamic(() => import("@/components/OilChatModal"), { ssr: false });
 const OilQualify = dynamic(() => import("@/components/OilQualify"), { ssr: false });
 // OilPlotDraft removed — plot picking now merged into OilQualify
 
@@ -630,6 +632,35 @@ export default function OilPage() {
     return () => unsub();
   }, []);
 
+  // ── plotsWithMessages — tracks which plots have unread DMs for the current user ──
+  const [plotsWithMessages, setPlotsWithMessages] = useState({});
+  const dismissedPlotsRef = useRef({}); // plotKey → latest dismissed timestamp (seconds)
+  useEffect(() => {
+    if (!db || !user?.id) { setPlotsWithMessages({}); return; }
+    const q = query(
+      collection(db, "oilPlotMessages"),
+      where("threadUserId", "==", user.id),
+      orderBy("timestamp", "desc"),
+      limit(50),
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const map = {};
+      const dismissed = dismissedPlotsRef.current;
+      snap.docs.forEach((d) => {
+        const data = d.data();
+        if (data.fromUserId !== user.id) {
+          const msgTime = data.timestamp?.seconds || 0;
+          const dismissedTime = dismissed[data.plotKey] || 0;
+          if (msgTime > dismissedTime) {
+            map[data.plotKey] = true;
+          }
+        }
+      });
+      setPlotsWithMessages(map);
+    });
+    return () => unsub();
+  }, [user?.id]);
+
   // User's active plot state (from oilPlots, not oilDrills)
   const userPlotState = useMemo(() => {
     if (!user?.id) return null;
@@ -638,6 +669,7 @@ export default function OilPage() {
 
   // Claim jump state
   const [claimJumpMode, setClaimJumpMode] = useState(false);
+  const [chatModalPlotKey, setChatModalPlotKey] = useState(null);
 
   // Admin: save settings to Firestore when they change
   // Uses a ref for current values so the callback identity is stable (no dependency cascade)
@@ -1343,6 +1375,112 @@ export default function OilPage() {
       console.error("Claim jump failed:", err);
     }
   }, [user?.id, userDrill, allPlotsMap, handleFlyTo]);
+
+  // ── Transfer Plot handler ──
+  const handleTransferPlot = useCallback(async (recipientUsername) => {
+    if (!user?.id || !db || !userDrill || userDrill.col == null) {
+      return { error: "You don't own a plot to transfer" };
+    }
+    const trimmed = recipientUsername?.trim();
+    if (!trimmed) return { error: "Enter a username" };
+
+    // Find recipient by username in oilDrills
+    const drillsQ = query(collection(db, "oilDrills"), where("username", "==", trimmed));
+    const drillsSnap = await getDocs(drillsQ);
+    if (drillsSnap.empty) return { error: "User not found" };
+
+    const recipientDrillDoc = drillsSnap.docs[0];
+    const recipientId = recipientDrillDoc.data().userId || recipientDrillDoc.id;
+
+    if (recipientId === user.id) return { error: "Cannot transfer to yourself" };
+
+    // Check qualification
+    const qualSnap = await getDoc(doc(db, "oilQualified", recipientId));
+    if (!qualSnap.exists() || !qualSnap.data().qualified) {
+      return { error: "User not qualified" };
+    }
+
+    const senderCol = userDrill.col;
+    const senderRow = userDrill.row;
+    const senderKey = `${senderCol}_${senderRow}`;
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        // Re-verify qualification inside transaction
+        const qualRef = doc(db, "oilQualified", recipientId);
+        const qualCheck = await transaction.get(qualRef);
+        if (!qualCheck.exists() || !qualCheck.data().qualified) {
+          throw new Error("User not qualified");
+        }
+
+        // Check if recipient already has a plot
+        const recipientDrillRef = doc(db, "oilDrills", recipientId);
+        const recipientDrill = await transaction.get(recipientDrillRef);
+        const recipientData = recipientDrill.exists() ? recipientDrill.data() : null;
+
+        // If recipient owns a different plot, release it
+        if (recipientData?.col != null && recipientData?.row != null) {
+          const recipientOldKey = `${recipientData.col}_${recipientData.row}`;
+          if (recipientOldKey !== senderKey) {
+            const recipientOldPlotRef = doc(db, "oilPlots", recipientOldKey);
+            transaction.update(recipientOldPlotRef, {
+              currentOwnerId: null,
+              ownerHistory: arrayUnion({ userId: recipientId, releasedAt: new Date().toISOString(), reason: "transfer_received_new" }),
+            });
+          }
+        }
+
+        // Release sender's plot ownership
+        const senderPlotRef = doc(db, "oilPlots", senderKey);
+        transaction.update(senderPlotRef, {
+          currentOwnerId: null,
+          ownerHistory: arrayUnion({ userId: user.id, releasedAt: new Date().toISOString(), reason: "transfer_out" }),
+        });
+
+        // Assign plot to recipient
+        transaction.set(senderPlotRef, {
+          col: senderCol,
+          row: senderRow,
+          currentOwnerId: recipientId,
+          ownerHistory: arrayUnion({ userId: recipientId, claimedAt: new Date().toISOString(), reason: "transfer_in" }),
+          disqualified: false,
+        }, { merge: true });
+
+        // Update recipient's oilDrills
+        transaction.update(recipientDrillRef, {
+          col: senderCol,
+          row: senderRow,
+          updatedAt: serverTimestamp(),
+        });
+
+        // Update recipient's oilQualified
+        transaction.update(qualRef, {
+          plotCol: senderCol,
+          plotRow: senderRow,
+        });
+
+        // Clear sender's oilDrills
+        const senderDrillRef = doc(db, "oilDrills", user.id);
+        transaction.update(senderDrillRef, {
+          col: null,
+          row: null,
+          updatedAt: serverTimestamp(),
+        });
+
+        // Clear sender's oilQualified
+        const senderQualRef = doc(db, "oilQualified", user.id);
+        transaction.update(senderQualRef, {
+          plotCol: null,
+          plotRow: null,
+        });
+      });
+
+      return { success: true };
+    } catch (err) {
+      console.error("Transfer failed:", err);
+      return { error: err.message || "Transfer failed" };
+    }
+  }, [user?.id, userDrill]);
 
   // Tank drain handler — always updates UI, persists to Firestore when possible
   const handleTankDrain = useCallback(async () => {
@@ -2919,6 +3057,7 @@ export default function OilPage() {
                     selectedCol={selectedX}
                     selectedRow={selectedX !== null ? sliceY : null}
                     onSelectCell={(col, row) => { setSelectedX(col); setSliceY(row); setDrillDepth(0); }}
+                    onEnvelopeClick={(col, row) => setChatModalPlotKey(`${col}_${row}`)}
                     onFlyTo={handleFlyTo}
                     onZoomOut={handleZoomOut}
                     pumpConfig={pumpConfig}
@@ -2935,6 +3074,7 @@ export default function OilPage() {
                     onRogueArrive={handleRogueArrive}
                     onRogueConsequence={handleRogueConsequence}
                     envPreset={envPreset}
+                    plotsWithMessages={plotsWithMessages}
                   />
                 </group>
                 <CctvRenderer canvasRef={cctvCanvasRef} />
@@ -3093,6 +3233,7 @@ export default function OilPage() {
           {(isAdmin || isReport) && inspectorPanel}
           {statsPanel}
           {leaderboardPanel}
+          <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={darkMode} isMobile hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} />
           {(isAdmin || isReport) && topClaimsPanel}
           {(isAdmin || isReport) && dryZonesPanel}
           {(isAdmin || isReport) && depositsPanel}
@@ -3155,6 +3296,16 @@ export default function OilPage() {
         />
 
         {cssAnimations}
+
+        {chatModalPlotKey && (
+          <OilChatModal
+            plotKey={chatModalPlotKey}
+            plotOwnerId={allPlotsMap[chatModalPlotKey]?.currentOwnerId}
+            currentUserId={user?.id}
+            username={user?.username || user?.firstName || "anon"}
+            onClose={() => { dismissedPlotsRef.current[chatModalPlotKey] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[chatModalPlotKey]; return next; }); setChatModalPlotKey(null); }}
+          />
+        )}
       </div>
     );
   }
@@ -3264,6 +3415,7 @@ export default function OilPage() {
                 selectedCol={selectedX}
                 selectedRow={selectedX !== null ? sliceY : null}
                 onSelectCell={(col, row) => { setSelectedX(col); setSliceY(row); setDrillDepth(0); }}
+                    onEnvelopeClick={(col, row) => setChatModalPlotKey(`${col}_${row}`)}
                 onFlyTo={handleFlyTo}
                 onZoomOut={handleZoomOut}
                 pumpConfig={pumpConfig}
@@ -3280,6 +3432,7 @@ export default function OilPage() {
                 onRogueArrive={handleRogueArrive}
                 onRogueConsequence={handleRogueConsequence}
                 envPreset={envPreset}
+                plotsWithMessages={plotsWithMessages}
               />
             </group>
             <CctvRenderer canvasRef={cctvCanvasRef} />
@@ -3454,6 +3607,7 @@ export default function OilPage() {
             {(isAdmin || isReport) && demoDrillPanel}
             {statsPanel}
             {leaderboardPanel}
+            <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={darkMode} hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} />
             {(isAdmin || isReport) && inspectorPanel}
             {(isAdmin || isReport) && topClaimsPanel}
             {(isAdmin || isReport) && dryZonesPanel}
@@ -3520,6 +3674,16 @@ export default function OilPage() {
           setTimeout(() => setSnapshotTrigger(false), 100);
         }}
       />
+
+      {chatModalPlotKey && (
+        <OilChatModal
+          plotKey={chatModalPlotKey}
+          plotOwnerId={allPlotsMap[chatModalPlotKey]?.currentOwnerId}
+          currentUserId={user?.id}
+          username={user?.username || user?.firstName || "anon"}
+          onClose={() => { dismissedPlotsRef.current[chatModalPlotKey] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[chatModalPlotKey]; return next; }); setChatModalPlotKey(null); }}
+        />
+      )}
     </div>
   );
 }

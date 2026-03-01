@@ -931,7 +931,7 @@ function PlotPoop() {
   );
 }
 
-function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset }) {
+function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCellSize, highlighted, pumpConfig, envMap, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onClick, onDoubleClick, onTankDrain, envPreset, hasMessages = false, onEnvelopeClick }) {
   const lastClickTime = useRef(0);
   const groupRef = useRef();   // primitive (clonedScene)
   const shakeGroupRef = useRef(); // outer group for shake offset
@@ -1292,6 +1292,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   const secCamRef = useRef();
   const secCamPartsRef = useRef([]);
   const secCamBaseRotY = useRef(null);
+  const envelopeRef = useRef();
 
   useEffect(() => {
     clonedScene.traverse((child) => {
@@ -1386,6 +1387,15 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         if (!child.userData._panelLightCloned) {
           child.material = child.material.clone();
           child.userData._panelLightCloned = true;
+        }
+      }
+      // Envelope mesh — message indicator
+      if (child.name === "Envelope") {
+        envelopeRef.current = child;
+        child.visible = false;
+        if (!child.userData._envelopeCloned) {
+          child.material = child.material.clone();
+          child.userData._envelopeCloned = true;
         }
       }
     });
@@ -1581,8 +1591,22 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
   pumpConfigRef.current = pumpConfig;
   const highlightedRef = useRef(highlighted);
   highlightedRef.current = highlighted;
+  const hasMessagesRef = useRef(hasMessages);
+  hasMessagesRef.current = hasMessages;
   const frameSkip = useRef(Math.floor(Math.random() * 3)); // stagger so not all idle rigs spike on same frame
-  useFrame((_, delta) => {
+  useFrame(({ clock }, delta) => {
+    // Envelope message indicator — gentle green pulse (runs for all pumpjacks)
+    const env = envelopeRef.current;
+    if (env) {
+      env.visible = hasMessagesRef.current;
+      if (hasMessagesRef.current) {
+        const pulse = (Math.sin(clock.elapsedTime * 3) + 1) / 2;
+        env.material.emissive.setHex(0x00ff44);
+        env.material.emissiveIntensity = 0.5 + pulse * 2.5;
+        env.material.color.setHex(0x22cc44);
+      }
+    }
+
     // Non-highlighted pumpjacks: throttle animation to every 3rd frame, skip all interactive logic
     if (!highlightedRef.current) {
       frameSkip.current = (frameSkip.current + 1) % 3;
@@ -2070,6 +2094,18 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       return;
     }
 
+    // Envelope click — open chat modal
+    let isEnvelopeClick = false;
+    obj = e.object;
+    while (obj) {
+      if (obj.name === "Envelope") { isEnvelopeClick = true; break; }
+      obj = obj.parent;
+    }
+    if (isEnvelopeClick) {
+      onEnvelopeClick?.();
+      return;
+    }
+
     // Always allow flyTo — interactive elements (wheel, gate, button) return early above
     const now = Date.now();
     if (now - lastClickTime.current < 400) {
@@ -2078,7 +2114,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
       onClick?.();
     }
     lastClickTime.current = now;
-  }, [onClick, onDoubleClick, highlighted, initSteam]);
+  }, [onClick, onDoubleClick, highlighted, initSteam, onEnvelopeClick]);
 
   return (
     <group ref={shakeGroupRef} position={position}>
@@ -2300,7 +2336,7 @@ function OilTower({ position, communityOil = 0, totalOilBudget = 500 }) {
 
 useGLTF.preload("/models/OilTower.glb");
 
-function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset }) {
+function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, maxDrillDay, depthCellSize, selectedCol, selectedRow, onSelectCell, onFlyTo, onZoomOut, pumpConfig, allPumpConfigs = {}, oilStrike, drillEvent = 0, drillProximity = 0, tankFill, onTankDrain, communityOil = 0, totalOilBudget = 500, envPreset, plotsWithMessages = {}, onEnvelopeClick }) {
   const { scene, animations } = useGLTF("/models/oilJack_fancy_allProps.glb");
   const envMap = useEnvironment({ preset: "studio" });
 
@@ -2387,6 +2423,8 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
             tankFill={isSelected ? tankFill : 0}
             onTankDrain={isSelected ? onTankDrain : undefined}
             envPreset={envPreset}
+            hasMessages={!!plotsWithMessages[`${col}_${row}`]}
+            onEnvelopeClick={() => onEnvelopeClick?.(col, row)}
             onClick={() => { onSelectCell?.(col, row); onFlyTo?.(col, row); }}
             onDoubleClick={() => isSelected ? onZoomOut?.() : onFlyTo?.(col, row)}
           />
@@ -2707,6 +2745,8 @@ export default function OilVoxelGrid({
   onRogueArrive,
   onRogueConsequence,
   envPreset,
+  plotsWithMessages = {},
+  onEnvelopeClick,
 }) {
   const matRef = useRef();
   const groundMatsRef = useRef([]);
@@ -2839,6 +2879,8 @@ export default function OilVoxelGrid({
             communityOil={communityOil}
             totalOilBudget={totalOilBudget}
             envPreset={envPreset}
+            plotsWithMessages={plotsWithMessages}
+            onEnvelopeClick={onEnvelopeClick}
           />
           {rogueEvents.map((ev) => (
             <RogueCharacter

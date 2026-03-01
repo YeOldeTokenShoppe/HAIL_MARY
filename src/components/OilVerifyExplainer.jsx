@@ -15,20 +15,25 @@ const STEPS = [
   {
     num: "2",
     title: "DETERMINISTIC DISTRIBUTION",
-    desc: "The hash feeds a deterministic algorithm that places oil deposits across the 3D grid. Same hash = same oil map, every time.",
+    desc: "The hash feeds a deterministic algorithm that places oil deposits across the 3D grid. Same hash = same oil map, every time. The map is set in advance so everyone plays on equal footing.",
   },
   {
     num: "3",
-    title: "THE ALGORITHM",
-    desc: "The hash seeds a PRNG. It places N deposit blobs at random positions/depths with varying radius and richness. Oil density falls off with distance² from each center.",
+    title: "DEPTH BIAS",
+    desc: "Just like real geology, the deeper you go the richer the earth tends to be. You'll still find deposits at shallower layers — just less frequently. Deeper drilling is earned through in-game achievements, not luck.",
   },
   {
     num: "4",
+    title: "THE ALGORITHM",
+    desc: "The hash seeds a PRNG. It places N deposit blobs at random positions/depths with a natural bias toward deeper layers. Oil density falls off with distance² from each center.",
+  },
+  {
+    num: "5",
     title: "BUDGET SCALING",
     desc: "Raw density values are normalized so the entire grid sums to the exact oil budget. Every barrel is accounted for.",
   },
   {
-    num: "5",
+    num: "6",
     title: "VERIFY IT YOURSELF",
     desc: "Use the tool below. Enter the game's block number, and the algorithm runs client-side in your browser — no server involved.",
   },
@@ -108,8 +113,8 @@ export default function OilVerifyExplainer({
 
   const selectedOil = useMemo(() => {
     if (!result || !selectedCell) return null;
-    return result.claimTotals[selectedCell.y * gridX + selectedCell.x];
-  }, [result, selectedCell, gridX]);
+    return result.claimTotals.find((c) => c.x === selectedCell.x && c.y === selectedCell.y) || null;
+  }, [result, selectedCell]);
 
   const maxOilInGrid = useMemo(() => {
     if (!result) return 1;
@@ -153,7 +158,7 @@ export default function OilVerifyExplainer({
       });
 
       const claimTotals = [];
-      for (let y = 0; y < gridY; y++) {
+      for (let y = gridY - 1; y >= 0; y--) {
         for (let x = 0; x < gridX; x++) {
           let sum = 0;
           for (let z = 0; z < DEPTH_Z; z++) sum += grid[x][y][z];
@@ -325,16 +330,16 @@ export default function OilVerifyExplainer({
                 SELECT CLAIM TO INSPECT
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 2, marginBottom: 8 }}>
-                {Array.from({ length: gridY }, (_, y) => (
-                  <div key={y} style={{ display: "flex", gap: 2 }}>
+                {Array.from({ length: gridY }, (_, rowIdx) => (
+                  <div key={rowIdx} style={{ display: "flex", gap: 2 }}>
                     {Array.from({ length: gridX }, (_, x) => {
-                      const claim = result.claimTotals[y * gridX + x];
+                      const claim = result.claimTotals[rowIdx * gridX + x];
                       const intensity = claim.oil / maxOilInGrid;
-                      const isSelected = selectedCell?.x === x && selectedCell?.y === y;
+                      const isSelected = selectedCell?.x === claim.x && selectedCell?.y === claim.y;
                       return (
                         <button
                           key={x}
-                          onClick={() => setSelectedCell({ x, y })}
+                          onClick={() => setSelectedCell({ x: claim.x, y: claim.y })}
                           style={{
                             flex: 1, aspectRatio: "1", padding: 0, borderRadius: 1,
                             cursor: "pointer", minWidth: 0,
@@ -344,7 +349,7 @@ export default function OilVerifyExplainer({
                               : `1px solid ${c.cellBorder}`,
                             boxShadow: isSelected ? `0 0 6px rgba(122,90,26,0.3)` : "none",
                           }}
-                          title={`(${x},${y}) — ${claim.oil.toLocaleString()} RL80`}
+                          title={`(${claim.x},${claim.y}) — ${claim.oil.toLocaleString()} USDC`}
                         />
                       );
                     })}
@@ -368,7 +373,7 @@ export default function OilVerifyExplainer({
                       color: selectedOil.oil > 0 ? c.oilHighlight : c.oilMuted,
                       fontWeight: 700, fontFamily: orbitron, fontSize: 9,
                     }}>
-                      {selectedOil.oil.toLocaleString()} RL80
+                      {selectedOil.oil.toLocaleString()} USDC
                     </span>
                   </div>
                 </div>
