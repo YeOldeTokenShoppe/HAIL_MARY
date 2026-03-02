@@ -476,18 +476,21 @@ function buildFillGeometry(fill, radius, length, segments = 48) {
   return geo;
 }
 
-function TankLiquid({ tankBounds, tankFill }) {
+function TankLiquid({ tankBounds, tankFill, envPreset }) {
   const meshRef = useRef();
   const displayFill = useRef(0);
   const lastQuantizedFill = useRef(-1);
+  const isNight = envPreset === "night";
 
   const oilMat = useMemo(() => new THREE.MeshStandardMaterial({
-    color: 0x1a0e05,
+    color: isNight ? 0x0d1aff : 0x1a0e05,
     roughness: 0.3,
     metalness: 0.1,
     transparent: true,
     opacity: 0.97,
-  }), []);
+    emissive: isNight ? 0x0510aa : 0x000000,
+    emissiveIntensity: isNight ? 0.4 : 0,
+  }), [isNight]);
 
   // Tank geometry params — the tank is a horizontal cylinder
   // sizeX is the tank's cross-section width (diameter), sizeZ is the length
@@ -2274,7 +2277,7 @@ function Pumpjack({ position, scene, animations, drillDay, maxDrillDay, depthCel
         onPointerOut={() => { document.body.style.cursor = "auto"; }}
       />
       {/* Fuel tank liquid — animated fill inside the transparent tank */}
-      {tankBounds && <TankLiquid tankBounds={tankBounds} tankFill={tankDraining ? 0 : tankFill} />}
+      {tankBounds && <TankLiquid tankBounds={tankBounds} tankFill={tankDraining ? 0 : tankFill} envPreset={envPreset} />}
       {/* Red alert point light — only on selected rig, intensity driven by useFrame */}
       {highlighted && (
         <>
@@ -2378,11 +2381,13 @@ function TowerLiquid({ towerBounds, position, fill, scale }) {
   const lastQ = useRef(-1);
 
   const oilMat = useMemo(() => new THREE.MeshStandardMaterial({
-    color: 0x1a0e05,
+    color: 0x0d1aff,
     roughness: 0.3,
     metalness: 0.1,
     transparent: true,
     opacity: 0.92,
+    emissive: 0x0510aa,
+    emissiveIntensity: 0.4,
   }), []);
 
   useFrame((_, delta) => {
@@ -2408,9 +2413,15 @@ function TowerLiquid({ towerBounds, position, fill, scale }) {
     const S = scale;
     // Radius slightly smaller than tank to avoid clipping through walls
     const r = tb.radius * 0.78;
-    // Minimum visible fill height so even tiny amounts show a visible layer
-    const minH = tb.height * 0.03;
-    const h = Math.max(minH, tb.height * f);
+    // Gauge range: the markings don't start at the very bottom of the mesh.
+    // gaugeBottom = fraction of total height where the "0" mark sits
+    // gaugeTop   = fraction of total height where the "500" mark sits
+    const gaugeBottom = 0.2;
+    const gaugeTop = 0.82;
+    const gaugeSpan = gaugeTop - gaugeBottom;
+    // Map fill (0-1) into the gauge range of the tank height
+    const minH = tb.height * 0.02;
+    const h = Math.max(minH, tb.height * (gaugeBottom + gaugeSpan * f));
 
     // Rebuild geometry only when fill changes meaningfully (~2%)
     const quantized = Math.round(f * 50) / 50;
@@ -2444,7 +2455,7 @@ function OilTower({ position, communityOil = 0, totalOilBudget = 500 }) {
   const towerBounds = useMemo(() => {
     let tankMesh = null;
     clonedScene.traverse((child) => {
-      if (child.name === "OilTower" && child.isMesh) {
+      if (child.name === "GasTower" && child.isMesh) {
         tankMesh = child;
       }
     });

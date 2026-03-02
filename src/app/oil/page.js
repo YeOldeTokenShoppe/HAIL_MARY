@@ -422,9 +422,22 @@ export default function OilPage() {
   const isAdmin = mode === "admin";
   const isReport = mode === "report";
 
-  const [envPreset, setEnvPreset] = useState("day");
+  const [envPreset, setEnvPreset] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("oil_envPreset");
+      if (saved && ENV_PRESETS[saved]) return saved;
+    }
+    return "day";
+  });
   const env = ENV_PRESETS[envPreset];
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("oil_darkMode") === "true";
+    }
+    return false;
+  });
+  useEffect(() => { localStorage.setItem("oil_envPreset", envPreset); }, [envPreset]);
+  useEffect(() => { localStorage.setItem("oil_darkMode", String(darkMode)); }, [darkMode]);
   const theme = THEMES[darkMode ? "dark" : "light"];
   const styles = useMemo(() => getStyles(theme), [theme]);
   const m = useMemo(() => getMobileStyles(theme), [theme]);
@@ -3118,7 +3131,7 @@ export default function OilPage() {
                       enablePan
                       minDistance={0.1}
                       maxDistance={15}
-                      maxPolarAngle={Math.PI * 0.48}
+                      maxPolarAngle={Math.PI}
                       zoomToCursor
                       target={[0, 1, 0]}
                     />
@@ -3490,9 +3503,10 @@ export default function OilPage() {
                   enableDamping
                   dampingFactor={0.08}
                   enablePan
+                  panSpeed={2}
                   minDistance={5}
                   maxDistance={45}
-                  maxPolarAngle={Math.PI * 0.48}
+                  maxPolarAngle={Math.PI}
                   target={[0, 3, 0]}
                   zoomToCursor
                 />
