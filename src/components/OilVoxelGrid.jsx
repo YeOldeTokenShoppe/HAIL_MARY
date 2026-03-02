@@ -40,7 +40,7 @@ const CCTV_H = 240;
 
 export function CctvRenderer({ canvasRef }) {
   const { gl, scene } = useThree();
-  const cctvCam = useMemo(() => new THREE.PerspectiveCamera(90, CCTV_W / CCTV_H, 0.01, 100), []);
+  const cctvCam = useMemo(() => new THREE.PerspectiveCamera(90, CCTV_W / CCTV_H, 0.01, 500), []);
   const fbo = useMemo(() => new THREE.WebGLRenderTarget(CCTV_W, CCTV_H, {
     minFilter: THREE.LinearFilter,
     magFilter: THREE.NearestFilter,
@@ -570,7 +570,8 @@ PUMP_ZONES.forEach((zone) => {
 function applyPumpConfig(clonedScene, pumpConfig, originalMats, envMap) {
   clonedScene.traverse((child) => {
     if (!child.isMesh) return;
-    const zoneId = MESH_TO_ZONE[child.name];
+    let zoneId = MESH_TO_ZONE[child.name];
+    if (!zoneId && child.name.startsWith("SignFrame")) zoneId = "signFrame";
     if (!zoneId) return;
 
     // Cache original material properties on first encounter
@@ -2537,7 +2538,7 @@ function PumpjackInstances({ gridX, gridY, cellSize, worldW, worldD, drillDay, m
         <group position={selectedPos}>
           <mesh rotation={[-Math.PI / 2, 0, 0]}>
             <planeGeometry args={[cellSize, cellSize]} />
-            <meshBasicMaterial color={0xb99230} transparent opacity={0.45} depthWrite={false} polygonOffset polygonOffsetFactor={-4} polygonOffsetUnits={-4} />
+            <meshBasicMaterial color={0x2fb74f} transparent opacity={0.45} depthWrite={false} polygonOffset polygonOffsetFactor={-4} polygonOffsetUnits={-4} />
           </mesh>
           <lineLoop>
             <bufferGeometry>

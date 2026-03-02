@@ -8,8 +8,8 @@ useGLTF.preload("/models/whale.glb");
 useGLTF.preload("/models/arrow.glb");
 // useGLTF.preload("/InfinityStars.glb");
 
-function ConstellationModel({ 
-  isVisible = true, 
+function ConstellationModel({
+  isVisible = true,
   groupScale = [1, 1, 1], // Default scale if not provided
   groupPosition = [0, 0, 0], // Default position if not provided
   groupRotation = [0, 0, 0] // Default rotation if not provided
@@ -201,13 +201,13 @@ function ConstellationModel({
             child.material.transparent = true;
             // Reduce star opacity when lines are hidden
             if (child.userData.isWhaleStar) {
-              child.material.opacity = isVisible ? 0.06 : 0.02; // Dim whale stars when lines off
+              child.material.opacity = (isVisible ? 0.06 : 0.02);
             } else if (child.userData.isBearStar) {
-              child.material.opacity = isVisible ? 0.06 : 0.02; // Dim bear stars when lines off
+              child.material.opacity = (isVisible ? 0.06 : 0.02);
             } else if (child.userData.isArrowStar) {
-              child.material.opacity = isVisible ? 0.06 : 0.02; // Dim arrow stars when lines off
+              child.material.opacity = (isVisible ? 0.06 : 0.02);
             } else {
-              child.material.opacity = isVisible ? 0.1 : 0.05; // Dim other stars when lines off
+              child.material.opacity = (isVisible ? 0.1 : 0.05);
             }
           }
         } else { // For all other meshes (parts of constellations)
@@ -217,9 +217,9 @@ function ConstellationModel({
             if (child.material) {
               child.material.transparent = true;
               if (child.userData.isArrowLine) {
-                child.material.opacity = isVisible ? 0.05 : 0; // Control via opacity for arrow lines
+                child.material.opacity = (isVisible ? 0.05 : 0);
               } else {
-                child.material.opacity = isVisible ? 0.1 : 0; // Control via opacity for whale lines  
+                child.material.opacity = (isVisible ? 0.1 : 0);
               }
             }
           } else {
@@ -228,15 +228,15 @@ function ConstellationModel({
               child.material.transparent = true;
               // Set opacity based on isVisible for non-star/non-line meshes
               if (child.name.startsWith("Bear")) {
-                child.material.opacity = isVisible ? 0.09 : 0;
+                child.material.opacity = (isVisible ? 0.09 : 0);
               // } else if (child.parent?.name.includes("StarCandles")) { // Check parent for StarCandles context
               //   child.material.opacity = isVisible ? 0.03 : 0;
               } else if (child.parent?.name.includes("Whale") || child.userData.isWhaleModel) { // Check parent for Whale context
-                child.material.opacity = isVisible ? 0.07 : 0; // was 0.1
+                child.material.opacity = (isVisible ? 0.07 : 0);
               } else if (child.parent?.name.includes("ArrowStar") || child.userData.isArrowModel) { // Check parent for Arrow context
-                child.material.opacity = isVisible ? 0.05 : 0;
+                child.material.opacity = (isVisible ? 0.05 : 0);
               } else {
-                child.material.opacity = isVisible ? 0.03 : 0; // was 0.1
+                child.material.opacity = (isVisible ? 0.03 : 0);
               }
             }
           }
