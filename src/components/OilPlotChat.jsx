@@ -213,7 +213,7 @@ export default function OilPlotChat({
     return (
       <div style={{ padding: isMobile ? "12px 12px" : "12px 14px", borderBottom: `1px solid ${c.sectionBorder}` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 12, color: c.activeBg }}>&#9993;</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={c.activeBg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"/><rect x="2" y="4" width="20" height="16" rx="2"/></svg>
           <span style={{ fontFamily: mono, fontSize: isMobile ? 12 : 11, fontWeight: 600, color: c.accent, letterSpacing: "0.2em" }}>
             MESSAGES
           </span>
@@ -268,7 +268,7 @@ export default function OilPlotChat({
           display: "flex", alignItems: "center", gap: 6,
           fontFamily: mono,
         }}>
-          <span style={{ fontSize: 12, color: (hasMessages || hasUnread) ? "#22cc44" : c.activeBg }}>&#9993;</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={(hasMessages || hasUnread) ? "#22cc44" : c.activeBg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"/><rect x="2" y="4" width="20" height="16" rx="2"/></svg>
           MESSAGES
           {(hasMessages || (hasUnread && !expanded)) && (
             <span style={{

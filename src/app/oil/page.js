@@ -3714,8 +3714,7 @@ export default function OilPage() {
       <PolaroidSnapshot
         trigger={snapshotTrigger}
         captureElementId="oil-canvas"
-        label="Just added this oil claim to my portfolio!"
-        backgroundImage="/LandGradient3.webp"
+        label="Diversifying my investment portfolio!"
         referralOverlay={userDrill?.referralCode ? { code: userDrill.referralCode } : null}
         onComplete={() => {
           setTimeout(() => setSnapshotTrigger(false), 100);

@@ -142,7 +142,7 @@ const PolaroidSnapshot = ({
           tempCtx.fillStyle = 'rgba(255, 255, 255, 0.85)';
           tempCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
           tempCtx.shadowBlur = 6;
-          tempCtx.fillText('RL80.com', 30, 65);
+          tempCtx.fillText('RL80.com', 60, 65);
           tempCtx.shadowBlur = 0;
 
           const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.6);
