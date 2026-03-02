@@ -7,6 +7,10 @@ import { Text, useGLTF, useTexture, useEnvironment } from "@react-three/drei";
 import { generateOilDistribution3D } from "@/lib/oilDistribution";
 import { PUMP_ZONES, MATERIAL_PRESETS, ADDON_CATALOG, ADDON_SLOTS, FENCE_CATALOG } from "@/components/PimpMyPumpPanel";
 import RogueCharacter from "@/components/RogueCharacter";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+
+// Configure Draco decoder for compressed GLB models (e.g. t-rex)
+useGLTF.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.6/");
 // ── Dispose helper for cloned scenes ─────────────────────────────────────────
 // NOTE: Does NOT dispose textures (map, normalMap, etc.) because scene.clone(true)
 // shares texture references across clones. Disposing a shared texture would corrupt
@@ -717,96 +721,236 @@ function AddonGLB({ item, slotPos, rotation = 0 }) {
   );
 }
 
-function AddonTubeMan({ item, slotPos, rotation = 0 }) {
-  const { scene } = useGLTF(item.model);
-  const cloned = useMemo(() => {
-    const c = scene.clone(true);
-    // Deep-clone bottom geometry for vertex sway
-    c.traverse((child) => {
-      if (child.name === "BottomTubeMan" && child.isMesh && child.geometry) {
-        child.geometry = child.geometry.clone();
+function AddonAnimatedGLB({ item, slotPos, rotation = 0 }) {
+  const { scene, animations } = useGLTF(item.model);
+  const cloned = useMemo(() => SkeletonUtils.clone(scene), [scene]);
+  useEffect(() => () => disposeScene(cloned), [cloned]);
+  const mixerRef = useRef();
+  const idleActionRef = useRef();
+  const extrasRef = useRef([]); // non-idle, non-walk actions
+  const walkActionRef = useRef();
+  const nextTriggerTime = useRef(0);
+  const groupRef = useRef();
+
+  // Pacing state
+  const paceRef = useRef({
+    active: false,
+    phase: "out",  // "out" = walking away, "turn" = rotating, "back" = walking home
+    progress: 0,
+    turnProgress: 0,
+    distance: 0.16, // how far to pace from origin
+    speed: 0.06,    // units per second
+  });
+
+  useEffect(() => {
+    if (!animations || animations.length === 0) return;
+    const mixer = new THREE.AnimationMixer(cloned);
+    mixerRef.current = mixer;
+
+    const idleClip = animations.find((c) => c.name === "Idle")
+      || animations.find((c) => /^idle$/i.test(c.name))
+      || animations[0];
+    const walkClip = animations.find((c) => /^walk$/i.test(c.name));
+
+    const idleAction = mixer.clipAction(idleClip);
+    idleAction.play();
+    idleActionRef.current = idleAction;
+
+    // Walk gets its own ref for pacing behavior
+    if (walkClip) {
+      const walkAction = mixer.clipAction(walkClip);
+      walkAction.loop = THREE.LoopRepeat; // loops while pacing
+      walkActionRef.current = walkAction;
+    }
+
+    // Everything else (not idle, not walk) are one-shot extras
+    const extras = animations
+      .filter((c) => c !== idleClip && c !== walkClip)
+      .map((clip) => {
+        const action = mixer.clipAction(clip);
+        action.loop = THREE.LoopOnce;
+        action.clampWhenFinished = false;
+        return action;
+      });
+    extrasRef.current = extras;
+
+    // When a one-shot extra finishes, snap back to idle
+    // (extra is already done so nothing to crossfade from — just restore idle)
+    mixer.addEventListener("finished", (e) => {
+      if (extras.includes(e.action)) {
+        e.action.stop();
+        idleAction.enabled = true;
+        idleAction.setEffectiveWeight(1);
+        idleAction.play();
       }
     });
-    return c;
-  }, [scene]);
+
+    nextTriggerTime.current = performance.now() + 3000 + Math.random() * 3000;
+    return () => mixer.stopAllAction();
+  }, [cloned, animations]);
+
+  useFrame((_, delta) => {
+    const mixer = mixerRef.current;
+    if (!mixer) return;
+    mixer.update(delta);
+
+    const idle = idleActionRef.current;
+    const walk = walkActionRef.current;
+    const extras = extrasRef.current;
+    const pace = paceRef.current;
+    const group = groupRef.current;
+
+    // Handle active pacing
+    if (pace.active && group) {
+      const step = pace.speed * delta;
+      if (pace.phase === "out") {
+        pace.progress += step;
+        group.position.z = pace.progress;
+        if (pace.progress >= pace.distance) {
+          pace.phase = "turn";
+          pace.turnProgress = 0;
+        }
+      } else if (pace.phase === "turn") {
+        // Quick 180° turn
+        pace.turnProgress += delta * 4; // ~0.25s turn
+        group.rotation.y = Math.min(pace.turnProgress, 1) * Math.PI;
+        if (pace.turnProgress >= 1) {
+          group.rotation.y = Math.PI;
+          pace.phase = "back";
+        }
+      } else if (pace.phase === "back") {
+        pace.progress -= step;
+        group.position.z = pace.progress;
+        if (pace.progress <= 0) {
+          // Done pacing — turn back to original facing and fade to idle
+          pace.active = false;
+          group.position.z = 0;
+          group.rotation.y = 0;
+          if (walk) {
+            walk.fadeOut(0.5);
+            idle.enabled = true;
+            idle.setEffectiveWeight(1);
+            idle.play();
+          }
+          // Schedule next trigger
+          nextTriggerTime.current = performance.now() + 4000 + Math.random() * 5000;
+        }
+      }
+      return;
+    }
+
+    // Trigger random action
+    if (idle && performance.now() > nextTriggerTime.current) {
+      // Build pool: walk (if available) + extras
+      const pool = [];
+      if (walk) pool.push("walk");
+      extras.forEach((_, i) => pool.push(i));
+
+      if (pool.length > 0) {
+        const pick = pool[Math.floor(Math.random() * pool.length)];
+        if (pick === "walk" && walk) {
+          // Start pacing
+          idle.stop();
+          walk.reset();
+          walk.setEffectiveWeight(1);
+          walk.play();
+          pace.active = true;
+          pace.phase = "out";
+          pace.progress = 0;
+          pace.turnProgress = 0;
+        } else {
+          // One-shot extra
+          const action = extras[pick];
+          idle.stop();
+          action.reset();
+          action.setEffectiveWeight(1);
+          action.play();
+          nextTriggerTime.current = performance.now() + 4000 + Math.random() * 5000;
+        }
+      }
+    }
+  });
+
+  const rotY = rotation * Math.PI / 2;
+  return (
+    <group position={[slotPos.x, slotPos.y, slotPos.z]} rotation={[0, rotY, 0]}>
+      <group ref={groupRef}>
+        <primitive object={cloned} scale={PUMPJACK_SCALE} />
+      </group>
+    </group>
+  );
+}
+
+function AddonTubeMan({ item, slotPos, rotation = 0 }) {
+  const { scene } = useGLTF(item.model);
+  const cloned = useMemo(() => scene.clone(true), [scene]);
   useEffect(() => () => disposeScene(cloned), [cloned]);
-  const topRef = useRef();
+
+  const bodyRef = useRef();      // "Tubeman" mesh — rotates from waist origin
+  const streamersRef = useRef();  // "Streamers" mesh — vertex flutter
+  const streamersData = useRef(null);
   const timeRef = useRef(0);
 
-  // Find TopTubeMan + BottomTubeMan and store bottom's original verts
-  const bottomData = useRef(null);
-  const topOrigPos = useRef(null);
+  // Find meshes by name and prepare streamers for vertex animation
   useMemo(() => {
     cloned.traverse((child) => {
-      if (child.name === "TopTubeMan") {
-        topRef.current = child;
-        topOrigPos.current = child.position.clone();
+      const n = child.name?.toLowerCase();
+      if (n === "tubeman") {
+        bodyRef.current = child;
       }
-      if (child.name === "BottomTubeMan" && child.isMesh && child.geometry) {
-        const pos = child.geometry.attributes.position;
-        if (pos) {
-          child.geometry.computeBoundingBox();
-          const bb = child.geometry.boundingBox;
-          bottomData.current = {
-            mesh: child,
-            origPos: new Float32Array(pos.array),
-            minZ: bb.min.z,
-            maxZ: bb.max.z,
-            height: (bb.max.z - bb.min.z) || 1,
-          };
+      if (n === "streamers" || n?.startsWith("streamers")) {
+        // Could be the Object3D wrapper or the Mesh itself — find the actual mesh
+        const mesh = child.isMesh ? child : child.children?.find((c) => c.isMesh);
+        if (mesh && mesh.geometry) {
+          streamersRef.current = mesh;
+          mesh.geometry = mesh.geometry.clone();
+          const pos = mesh.geometry.attributes.position;
+          streamersData.current = new Float32Array(pos.array);
         }
       }
     });
   }, [cloned]);
 
   useFrame((_, delta) => {
-    if (!topRef.current) return;
     timeRef.current += delta;
     const t = timeRef.current;
 
-    // Snappy whip motion — sharp fold, snap back
-    const snapX = Math.sin(t * 2.2);
-    const snapZ = Math.cos(t * 1.7);
-    // Cubic root sharpening — spends time at extremes, snaps through center
-    const sharpX = Math.sign(snapX) * Math.pow(Math.abs(snapX), 0.3);
-    const sharpZ = Math.sign(snapZ) * Math.pow(Math.abs(snapZ), 0.3);
+    // === Body: snappy whip rotation from waist ===
+    if (bodyRef.current) {
+      // Smooth, organic sway — layered sines at irrational ratios for non-repeating feel
+      const swayX = Math.sin(t * 1.1) * 0.15
+                   + Math.sin(t * 0.7 + 1.3) * 0.08
+                   + Math.sin(t * 1.9 + 0.7) * 0.05;
+      const swayZ = Math.sin(t * 0.9 + 2.1) * 0.12
+                   + Math.sin(t * 1.4 + 0.5) * 0.06
+                   + Math.cos(t * 0.5 + 1.8) * 0.04;
 
-    // Rotate the top half — full bend forward/back/sides (~120°)
-    topRef.current.rotation.x = sharpX * 2.0;
-    topRef.current.rotation.y = sharpZ * 1.5;
+      bodyRef.current.rotation.x = swayX;
+      bodyRef.current.rotation.z = swayZ;
+    }
 
-    // Bottom half: delayed, dampened vertex sway — anchored at ground (maxZ)
-    if (bottomData.current) {
-      const bd = bottomData.current;
-      const pos = bd.mesh.geometry.attributes.position;
+    // === Streamers: per-vertex chaotic flutter ===
+    if (streamersData.current && streamersRef.current) {
+      const pos = streamersRef.current.geometry.attributes.position;
       const arr = pos.array;
-      const orig = bd.origPos;
-      // Delayed version of top's motion (phase offset) — chain reaction feel
-      const delaySnapX = Math.sin((t - 0.3) * 2.2);
-      const delaySnapZ = Math.cos((t - 0.3) * 1.7);
-      const delayX = Math.sign(delaySnapX) * Math.pow(Math.abs(delaySnapX), 0.3) * 0.25;
-      const delayZ = Math.sign(delaySnapZ) * Math.pow(Math.abs(delaySnapZ), 0.3) * 0.18;
-      // Joint offset at heightFrac=1 (top of bottom mesh)
-      const jointOffX = delayX * bd.height;
-      const jointOffY = delayZ * bd.height;
+      const orig = streamersData.current;
+
       for (let i = 0; i < arr.length; i += 3) {
-        const oz = orig[i + 2];
-        // heightFrac: 0 at ground (maxZ), 1 at joint (minZ)
-        const heightFrac = Math.max(0, Math.min(1, (bd.maxZ - oz) / bd.height));
-        // Quadratic ramp — ground stays put, joint sways most
-        const sway = heightFrac * heightFrac;
-        arr[i]     = orig[i]     + delayX * sway * bd.height;
-        arr[i + 1] = orig[i + 1] + delayZ * sway * bd.height;
+        const ox = orig[i], oy = orig[i + 1], oz = orig[i + 2];
+        // Each vertex gets unique phase from its position
+        const phase = ox * 7.0 + oy * 5.0 + oz * 3.0;
+        // Frenetic flutter — big amplitudes, fast frequencies, 3 layers each
+        arr[i]     = ox + Math.sin(t * 18.0 + phase) * 0.8
+                        + Math.sin(t * 11.0 + phase * 1.3) * 0.5
+                        + Math.cos(t * 25.0 + phase * 2.1) * 0.3;
+        arr[i + 1] = oy + Math.cos(t * 20.0 + phase * 0.8) * 0.7
+                        + Math.sin(t * 13.0 + phase * 1.7) * 0.4
+                        + Math.sin(t * 28.0 + phase * 0.5) * 0.25;
+        arr[i + 2] = oz + Math.sin(t * 15.0 + phase * 1.1) * 0.6
+                        + Math.cos(t * 22.0 + phase * 0.6) * 0.4
+                        + Math.sin(t * 30.0 + phase * 1.9) * 0.2;
       }
       pos.needsUpdate = true;
-
-      // Move top's position to follow the bottom's joint
-      // Vertex space is ~100x larger than object position space
-      if (topOrigPos.current && topRef.current) {
-        const scale = 0.01;
-        topRef.current.position.x = topOrigPos.current.x + jointOffX * scale;
-        topRef.current.position.z = topOrigPos.current.z + jointOffY * scale;
-      }
     }
   });
 
@@ -888,6 +1032,9 @@ function PlotAddons({ addons }) {
         if (!slot || !item) return null;
         if (item.animated === "tubeMan") {
           return <AddonTubeMan key={slotKey} item={item} slotPos={slot} rotation={rot} />;
+        }
+        if (item.animated && item.model) {
+          return <AddonAnimatedGLB key={slotKey} item={item} slotPos={slot} rotation={rot} />;
         }
         if (item.model) {
           return <AddonGLB key={slotKey} item={item} slotPos={slot} rotation={rot} />;

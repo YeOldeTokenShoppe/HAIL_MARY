@@ -24,6 +24,8 @@ import Fireworks from "@/components/Fireworks";
 import { db, storage, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, ref, uploadBytes, getDownloadURL, onSnapshot, collection, query, where, orderBy, limit, addDoc, runTransaction, arrayUnion, getDocs } from "@/lib/firebaseClient";
 import RogueAdminPanel from "@/components/RogueAdminPanel";
 import useCctvRecorder from "@/hooks/useCctvRecorder";
+import PumpPurchaseModal from "@/components/PumpPurchaseModal";
+import { UnifiedAccountModal } from "@/components/UnifiedAccountModal";
 
 // ── Environment presets ──────────────────────────────────────────────────────
 const ENV_PRESETS = {
@@ -430,10 +432,15 @@ export default function OilPage() {
   const isTest = mode === "test";
   const [testDay, setTestDay] = useState(0);
   const { user } = useUser();
-  const { walletAddress, tokenBalance, isWalletConnected, connectWallet } = useWalletAuth();
+  const { walletAddress, tokenBalance, isWalletConnected, activeAccount } = useWalletAuth();
   const { play, pause, isPlaying: contextIsPlaying, nextTrack } = useMusic();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+
+  // Premium purchases
+  const [unlockedItems, setUnlockedItems] = useState(new Set());
+  const [purchaseModalItem, setPurchaseModalItem] = useState(null);
 
   // Game state
   const [gamePhase, setGamePhase] = useState("ticket_sale");
@@ -734,6 +741,30 @@ export default function OilPage() {
     });
     return () => unsub();
   }, [user?.id]);
+
+  // Listen to premium purchases
+  useEffect(() => {
+    if (!user?.id || !db) return;
+    const unsub = onSnapshot(doc(db, "oilPurchases", user.id), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        const items = new Set(Object.keys(data.unlocked || {}));
+        setUnlockedItems(items);
+      } else {
+        setUnlockedItems(new Set());
+      }
+    });
+    return () => unsub();
+  }, [user?.id]);
+
+  const handlePurchaseRequest = useCallback((items) => {
+    // Accept single item or array
+    setPurchaseModalItem(Array.isArray(items) ? items : [items]);
+  }, []);
+
+  const handlePurchaseComplete = useCallback(() => {
+    setPurchaseModalItem(null);
+  }, []);
 
   // Auto-select the user's claim on load
   const didAutoSelect = useRef(false);
@@ -3239,7 +3270,7 @@ export default function OilPage() {
           {(isAdmin || isReport) && depositsPanel}
           <HowToPlayPanel isMobile darkMode={darkMode} />
           <OilVerifyExplainer isMobile darkMode={darkMode} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} depthBias={0.35} />
-          <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={!isConfigOwner} />
+          <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} isMobile darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={!isConfigOwner} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
           {(isAdmin || isReport) && (
             <OilVerifyPanel
               numberOfDeposits={numberOfDeposits}
@@ -3285,6 +3316,22 @@ export default function OilPage() {
         <BuyModal
           isOpen={showBuyModal}
           onClose={() => setShowBuyModal(false)}
+        />
+
+        {purchaseModalItem && (
+          <PumpPurchaseModal
+            items={purchaseModalItem}
+            activeAccount={activeAccount}
+            userId={user?.id}
+            onComplete={handlePurchaseComplete}
+            onClose={() => setPurchaseModalItem(null)}
+            onConnectWallet={() => setShowAccountModal(true)}
+          />
+        )}
+
+        <UnifiedAccountModal
+          isOpen={showAccountModal}
+          onClose={() => setShowAccountModal(false)}
         />
 
         {/* CyberNav Menu Panel */}
@@ -3614,7 +3661,7 @@ export default function OilPage() {
             {(isAdmin || isReport) && depositsPanel}
             <HowToPlayPanel darkMode={darkMode} />
             <OilVerifyExplainer darkMode={darkMode} numberOfDeposits={numberOfDeposits} totalOilBudget={totalOilBudget} gridX={gridSize} gridY={gridSize} depthBias={0.35} />
-            <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={!isConfigOwner} />
+            <PimpMyPumpPanel config={pumpConfig} onChange={handleConfigChange} hasSelection={selectedX !== null} darkMode={darkMode} onSave={handleConfigSave} saving={configSaving} dirty={configDirty} isSignedIn={!!user} defaultExpanded={false} userId={user?.id} readOnly={!isConfigOwner} unlockedItems={unlockedItems} onPurchaseRequest={handlePurchaseRequest} />
             {(isAdmin || isReport) && (
               <OilVerifyPanel
                 numberOfDeposits={numberOfDeposits}
@@ -3684,6 +3731,24 @@ export default function OilPage() {
           onClose={() => { dismissedPlotsRef.current[chatModalPlotKey] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[chatModalPlotKey]; return next; }); setChatModalPlotKey(null); }}
         />
       )}
+
+      {purchaseModalItem && (
+        <PumpPurchaseModal
+          items={purchaseModalItem}
+          activeAccount={activeAccount}
+          userId={user?.id}
+          onComplete={handlePurchaseComplete}
+          onClose={() => setPurchaseModalItem(null)}
+          onConnectWallet={() => setShowAccountModal(true)}
+        />
+      )}
+
+      <UnifiedAccountModal
+        isOpen={showAccountModal}
+        onClose={() => setShowAccountModal(false)}
+        theme="industrial"
+        initialTab="wallet"
+      />
     </div>
   );
 }

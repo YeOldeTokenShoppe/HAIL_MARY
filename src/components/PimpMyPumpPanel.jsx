@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo } from "react";
+import { isPremiumTheme, isPremiumFence, isPremiumAddon, makePurchaseId } from "@/lib/oilPremium";
 
 // ── Zone definitions ─────────────────────────────────────────────────────────
 export const PUMP_ZONES = [
@@ -16,6 +17,7 @@ export const PUMP_ZONES = [
   { id: "tankScaffold",  label: "TANK SCAFFOLD",  meshes: ["Fuel_Tank_Scaffold"] },
   { id: "signFrame",     label: "SIGN FRAME",     meshes: ["SignFrame", "SignFrame001"] },
   { id: "pipes",          label: "PIPES",           meshes: ["Pipe_01", "Pipe_02", "Pipe_03", "Pipe_Refinery"] },
+  { id: "valve",          label: "VALVE WHEEL",     meshes: ["Wheel"] },
 ];
 
 export const MATERIAL_PRESETS = {
@@ -26,6 +28,7 @@ export const MATERIAL_PRESETS = {
   rust:     { label: "RUST",          roughness: 0.95,  metalness: 0.2,  emissive: "#000000", emissiveIntensity: 0, envMapIntensity: 0.3 },
   gold:     { label: "GOLD",          roughness: 0.15,  metalness: 0.9,  emissive: "#000000", emissiveIntensity: 0, envMapIntensity: 2.5 },
   neon:     { label: "NEON GLOW",     roughness: 0.5,   metalness: 0.1,  emissive: "auto",   emissiveIntensity: 1.5, envMapIntensity: 0.5 },
+  neonDeep: { label: "DEEP NEON",     roughness: 0.4,   metalness: 0.15, emissive: "auto",   emissiveIntensity: 0.6, envMapIntensity: 0.8 },
 };
 
 // ── Add-on catalog & slot positions ──────────────────────────────────────────
@@ -34,11 +37,13 @@ export const ADDON_CATALOG = [
   { id: "skeleton",      label: "HOME DEPOT SKELETON",       color: "#e8dcc8", shape: "cylinder", model: "/models/addons/HDSkeleton.glb" },
   { id: "flamingo",      label: "PINK FLAMINGO",  color: "#ff69b4", shape: "cone",     model: "/models/addons/pinkFlamingo.glb" },
   { id: "bearTrap",      label: "BEAR TRAP",      color: "#888888", shape: "box",      model: "/models/addons/bearTrap.glb" },
-  // { id: "dinosaur",      label: "DINOSAUR",       color: "#6b8e23", shape: "cone",     model: "/models/addons/dinosaur.glb" },
+  { id: "dinosaur",      label: "T-REX",       color: "#6b8e23", shape: "cone",     model: "/models/addons/t-rex.glb", animated: true, premium: true, allowedSlots: [3, 4], allowedRotations: [0, 2] },
   { id: "goldRocks",     label: "GOLD ROCKS",     color: "#ffd700", shape: "sphere",   model: "/models/addons/goldRocks.glb" },
   { id: "palmTree",      label: "PALM TREE",      color: "#2d8a4e", shape: "cylinder", model: "/models/addons/palmTree.glb" },
   { id: "pumpkinPatch",  label: "PUMPKIN PATCH",  color: "#e87530", shape: "sphere",   model: "/models/addons/pumpkinPatch.glb" },
-  // { id: "tubeMan",      label: "TUBE MAN",      color: "#cc3333", shape: "sphere",   model: "/models/addons/tubeMan.glb", animated: "tubeMan" },
+  { id: "zombie",      label: "PET ZOMBIE",      color: "#cc3333", shape: "sphere",   model: "/models/addons/zombie.glb", animated: true, premium: true },
+  { id: "tubeMan",      label: "TUBEMAN",      color: "#cc3333", shape: "sphere",   model: "/models/addons/tubeMan.glb", animated: "tubeMan", premium: true },
+
   { id: "sunflowers",      label: "SUNFLOWERS",      color: "#ffd700", shape: "cone",   model: "/models/addons/Sunflowers.glb" },
   { id: "gnome",      label: "GARDEN GNOME",      color: "#33c2ccff", shape: "cone",   model: "/models/addons/gnome.glb" },
   // { id: "neonSign",      label: "NEON SIGN",      color: "#ff00ff", shape: "box",      emissive: true },
@@ -70,7 +75,7 @@ export const FENCE_CATALOG = [
   { id: "stone",        label: "STONE",         model: "/models/addons/Fence_Stone.glb",        scale: 0.1 },
 ];
 
-const MAX_ADDONS = 3;
+const BASE_MAX_ADDONS = 3;
 
 // Default config: all zones use stock (original model materials)
 export function getDefaultPumpConfig() {
@@ -93,6 +98,9 @@ const THEME_PRESETS = {
     label: "GOLD RUSH",
     build: () => {
       const c = getDefaultPumpConfig();
+      c.pad           = { color: "#3d2b1a", preset: "matte" };   // dark earth
+      c.foundation    = { color: "#8B6914", preset: "brushed" }; // bronze
+
       c.beam          = { color: "#FFD700", preset: "gold" };
       c.horseHead     = { color: "#FFD700", preset: "gold" };
       c.counterweight = { color: "#DAA520", preset: "gold" };
@@ -121,18 +129,23 @@ const THEME_PRESETS = {
     label: "CYBERPUNK",
     build: () => {
       const c = getDefaultPumpConfig();
-      c.beam          = { color: "#00e5ff", preset: "neon" };   // electric cyan — hero
-      c.horseHead     = { color: "#ff2a6d", preset: "neon" };   // hot pink accent
-      c.counterweight = { color: "#00e5ff", preset: "neon" };   // cyan to match beam
-      c.crankWheel    = { color: "#ff2a6d", preset: "neon" };   // hot pink
-      c.motorBox      = { color: "#1a1028", preset: "brushed" };// dark violet steel
-      c.foundation    = { color: "#1a1028", preset: "brushed" };// dark violet steel
-      c.drillPipe     = { color: "#b030ff", preset: "neon" };   // purple glow
-      c.pad           = { color: "#0c0814", preset: "matte" };  // near-black violet
-      c.machinePanel  = { color: "#ff2a6d", preset: "neon" };   // hot pink
-      c.tankScaffold  = { color: "#1a1028", preset: "brushed" };// dark violet steel
-      c.signFrame     = { color: "#00e5ff", preset: "neon" };   // cyan
-      c.pipes         = { color: "#b030ff", preset: "neon" };   // purple glow
+      c.pad           = { color: "#0c0814", preset: "matte" };   // near-black violet
+      c.foundation    = { color: "#1a1028", preset: "brushed" }; // dark violet steel
+
+      c.beam          = { color: "#008fa8", preset: "neonDeep" };// electric cyan — hero
+      c.horseHead     = { color: "#1a1028", preset: "brushed" }; // dark violet
+
+      c.counterweight = { color: "#c4154f", preset: "neonDeep" };// hot magenta
+      c.machinePanel  = { color: "#c4154f", preset: "neonDeep" };// hot magenta
+
+      c.crankWheel    = { color: "#1a1028", preset: "brushed" }; // dark violet steel
+      c.motorBox      = { color: "#1a1028", preset: "brushed" }; // dark violet steel
+
+      c.drillPipe     = { color: "#7a1fcc", preset: "neonDeep" };// purple glow
+      c.signFrame     = { color: "#1a1028", preset: "neonDeep" };// cyan
+      c.pipes         = { color: "#1a1028", preset: "brushed" }; // dark violet steel
+      c.tankScaffold  = { color: "#1a1028", preset: "brushed" }; // dark violet steel
+      c.valve         = { color: "#c4154f", preset: "neonDeep" };// hot magenta
       return c;
     },
   },
@@ -140,52 +153,49 @@ const THEME_PRESETS = {
     label: "ABANDONED FIELD",
     build: () => {
       const c = getDefaultPumpConfig();
-      c.beam          = { color: "#8B4513", preset: "rust" };
-      c.horseHead     = { color: "#A0522D", preset: "rust" };
-      c.counterweight = { color: "#6B3410", preset: "rust" };
-      c.motorBox      = { color: "#704214", preset: "rust" };
-      c.crankWheel    = { color: "#5C3317", preset: "rust" };
-      c.foundation    = { color: "#4A3728", preset: "matte" };
-      c.drillPipe     = { color: "#7A4A2A", preset: "rust" };
-      c.pad           = { color: "#3E2723", preset: "matte" };
+      c.pad           = { color: "#3E2723", preset: "matte" };   // dirt
+      c.foundation    = { color: "#6a6a60", preset: "brushed" }; // weathered steel
+
+      c.beam          = { color: "#8B4513", preset: "rust" };    // heavy rust
+      c.horseHead     = { color: "#6a6a60", preset: "brushed" }; // worn bare metal
+
+      c.counterweight = { color: "#8B4513", preset: "rust" };    // rusted through
       c.machinePanel  = { color: "#704214", preset: "rust" };
-      c.tankScaffold  = { color: "#5C3317", preset: "rust" };
-      c.signFrame     = { color: "#4A3728", preset: "rust" };
-      c.pipes         = { color: "#6B3410", preset: "rust" };
+
+      c.crankWheel    = { color: "#5C3317", preset: "rust" };
+      c.motorBox      = { color: "#6a6a60", preset: "brushed" }; // faded steel
+
+      c.drillPipe     = { color: "#7A4A2A", preset: "rust" };
+      c.signFrame     = { color: "#6a6a60", preset: "brushed" }; // bare metal
+      c.pipes         = { color: "#8B4513", preset: "rust" };    // corroded pipes
+      c.tankScaffold  = { color: "#6a6a60", preset: "brushed" }; // weathered
+      c.valve         = { color: "#5C3317", preset: "rust" };
       return c;
     },
   },
-  chrome: {
-    label: "FULL CHROME",
-    build: () => {
-      const c = getDefaultPumpConfig();
-      PUMP_ZONES.forEach((z) => {
-        c[z.id] = { color: "#d8d8d8", preset: "chrome" };
-      });
-      c.pad = { color: "#b0b0b0", preset: "brushed" };
-      c.counterweight = { color: "#e8e8e8", preset: "chrome" };
-      c.horseHead = { color: "#e8e8e8", preset: "chrome" };
-      c.crankWheel = { color: "#c8c8c8", preset: "chrome" };
-      return c;
-    },
-  },
+ 
   toxic: {
-  label: "TOXIC MINIMAL",
+  label: "BIOHAZARD",
   build: () => {
     const c = getDefaultPumpConfig();
 
-    c.beam          = { color: "#39FF14", preset: "neon" };   // acid green
-    c.horseHead     = { color: "#39FF14", preset: "neon" };
-    c.counterweight = { color: "#00ff88", preset: "neon" };
-    c.crankWheel    = { color: "#1c1c1c", preset: "matte" };
-    c.motorBox      = { color: "#111111", preset: "brushed" };
-    c.foundation    = { color: "#0d0d0d", preset: "matte" };
-    c.drillPipe     = { color: "#00ff88", preset: "neon" };
-    c.pad           = { color: "#050505", preset: "matte" };
-    c.machinePanel  = { color: "#39FF14", preset: "neon" };
-    c.tankScaffold  = { color: "#1a1a1a", preset: "brushed" };
-    c.signFrame     = { color: "#00ff88", preset: "neon" };
-    c.pipes         = { color: "#39FF14", preset: "neon" };
+    c.pad           = { color: "#1a1a0a", preset: "matte" };   // dark grime
+    c.foundation    = { color: "#2a2a10", preset: "matte" };  // dirty dark olive
+
+    c.beam          = { color: "#c4b800", preset: "neonDeep" }; // caution yellow
+    c.horseHead     = { color: "#1a1a0a", preset: "brushed" };  // dark industrial
+
+    c.counterweight = { color: "#6b8c00", preset: "neonDeep" }; // toxic sludge green
+    c.machinePanel  = { color: "#c4b800", preset: "neonDeep" }; // caution yellow
+
+    c.crankWheel    = { color: "#1a1a0a", preset: "brushed" };  // dark industrial
+    c.motorBox      = { color: "#1a1a0a", preset: "brushed" };
+
+    c.drillPipe     = { color: "#6b8c00", preset: "neonDeep" }; // toxic sludge green
+    c.signFrame     = { color: "#c4b800", preset: "neonDeep" }; // caution yellow
+    c.pipes         = { color: "#2a2a10", preset: "brushed" };  // grimy dark
+    c.tankScaffold  = { color: "#2a2a10", preset: "brushed" };
+    c.valve         = { color: "#c4b800", preset: "neonDeep" }; // caution yellow
 
     return c;
   },
@@ -211,23 +221,29 @@ hellforged: {
     return c;
   },
 },
+
 sanctified: {
   label: "SANCTIFIED EXTRACTION",
   build: () => {
     const c = getDefaultPumpConfig();
 
-    c.beam          = { color: "#D4AF37", preset: "gold" };
-    c.horseHead     = { color: "#F5F1E6", preset: "chrome" };
-    c.counterweight = { color: "#C5A028", preset: "gold" };
-    c.crankWheel    = { color: "#A67C00", preset: "brushed" };
-    c.motorBox      = { color: "#EDE6D6", preset: "matte" };
-    c.foundation    = { color: "#8B7355", preset: "matte" };
-    c.drillPipe     = { color: "#2ECC71", preset: "neon" }; // votive green
-    c.pad           = { color: "#4E3B28", preset: "matte" };
-    c.machinePanel  = { color: "#D4AF37", preset: "gold" };
-    c.tankScaffold  = { color: "#A67C00", preset: "brushed" };
-    c.signFrame     = { color: "#F5F1E6", preset: "chrome" };
-    c.pipes         = { color: "#2ECC71", preset: "neon" };
+    c.pad           = { color: "#1a1008", preset: "matte" };   // dark church floor
+    c.foundation    = { color: "#3b2210", preset: "matte" };  // dark wood pew
+
+    c.beam          = { color: "#b8960c", preset: "gold" };   // altar gold
+    c.horseHead     = { color: "#f0e8d0", preset: "chrome" }; // ivory
+
+    c.counterweight = { color: "#6b1030", preset: "brushed" };   // burgundy altar cloth
+    c.machinePanel  = { color: "#6b1030", preset: "brushed" };   // burgundy
+
+    c.crankWheel    = { color: "#3b2210", preset: "brushed" }; // dark wood
+    c.motorBox      = { color: "#f0e8d0", preset: "chrome" };  // ivory
+
+    c.drillPipe     = { color: "#b8960c", preset: "gold" };    // gold
+    c.signFrame     = { color: "#b8960c", preset: "gold" };    // gold
+    c.pipes         = { color: "#3b2210", preset: "brushed" }; // dark wood
+    c.tankScaffold  = { color: "#3b2210", preset: "brushed" }; // dark wood
+    c.valve         = { color: "#6b1030", preset: "brushed" };   // burgundy
 
     return c;
   },
@@ -254,22 +270,78 @@ arctic: {
   },
 },
 desert: {
-  label: "DESERT WARLORD",
+  label: "MAD MAX",
   build: () => {
     const c = getDefaultPumpConfig();
 
-    c.beam          = { color: "#C2A36B", preset: "matte" };
-    c.horseHead     = { color: "#B08952", preset: "matte" };
-    c.counterweight = { color: "#8C6A3E", preset: "brushed" };
-    c.crankWheel    = { color: "#6F4E2C", preset: "brushed" };
-    c.motorBox      = { color: "#5B4325", preset: "matte" };
-    c.foundation    = { color: "#4A3822", preset: "matte" };
-    c.drillPipe     = { color: "#8C6A3E", preset: "brushed" };
-    c.pad           = { color: "#3D2E1C", preset: "matte" };
-    c.machinePanel  = { color: "#B08952", preset: "matte" };
-    c.tankScaffold  = { color: "#6F4E2C", preset: "brushed" };
-    c.signFrame     = { color: "#C2A36B", preset: "matte" };
-    c.pipes         = { color: "#8C6A3E", preset: "brushed" };
+    c.pad           = { color: "#2a2018", preset: "matte" };    // scorched earth
+    c.foundation    = { color: "#3a3530", preset: "brushed" };  // dark scrap metal
+
+    c.beam          = { color: "#c4a96a", preset: "matte" };    // sun-bleached sand
+    c.horseHead     = { color: "#3a3530", preset: "brushed" };  // dark gunmetal
+
+    c.counterweight = { color: "#b83a0a", preset: "neonDeep" }; // war-paint burnt orange
+    c.machinePanel  = { color: "#b83a0a", preset: "neonDeep" }; // war-paint
+
+    c.crankWheel    = { color: "#3a3530", preset: "brushed" };  // scrap metal
+    c.motorBox      = { color: "#3a3530", preset: "brushed" };  // scrap metal
+
+    c.drillPipe     = { color: "#c4a96a", preset: "matte" };    // sand
+    c.signFrame     = { color: "#b83a0a", preset: "neonDeep" }; // war-paint
+    c.pipes         = { color: "#3a3530", preset: "brushed" };  // dark scrap
+    c.tankScaffold  = { color: "#3a3530", preset: "brushed" };  // dark scrap
+    c.valve         = { color: "#b83a0a", preset: "neonDeep" }; // war-paint
+
+    return c;
+  },
+},
+crimsonCharge: {
+  label: "RED BULL",
+  build: () => {
+    const c = getDefaultPumpConfig();
+
+    c.foundation    = { color: "#050920", preset: "neonDeep" };  // aluminum can body
+    c.pad           = { color: "#a0a8b4", preset: "brushed" };
+
+    c.beam          = { color: "#050920", preset: "neonDeep" }; // deep blue band
+    c.horseHead     = { color: "#c1121f", preset: "brushed" };  // red bull head
+
+    c.counterweight = { color: "#c1121f", preset: "brushed" };  // racing red
+    c.machinePanel  = { color: "#d4a017", preset: "brushed" };  // gold sun accent
+
+    c.crankWheel    = { color: "#050920", preset: "neonDeep" };  
+    c.motorBox      = { color: "#c1121f", preset: "brushed"};
+
+    c.drillPipe     = { color: "#050920", preset: "neonDeep" }; // deep blue
+    c.signFrame     = { color: "#050920", preset: "neonDeep" };  // red
+    c.pipes         = { color: "#898e97", preset: "brushed" };  // aluminum
+    c.valve         = { color: "#c1121f", preset: "brushed" };  // red
+
+    return c;
+  },
+  
+},
+atomicSurge: {
+  label: "MONSTER ENERGY",
+  build: () => {
+    const c = getDefaultPumpConfig();
+
+    c.foundation    = { color: "#1a1a1a", preset: "matte" };  // charcoal, preserves detail
+    c.pad           = { color: "#141414", preset: "matte" };
+
+    c.beam          = { color: "#0d9e00", preset: "brushed" };  // hero green
+    c.horseHead     = { color: "#0d9e00", preset: "brushed" };  // green head
+
+    c.counterweight = { color: "#0d9e00", preset: "brushed" };
+    c.machinePanel  = { color: "#0d9e00", preset: "brushed" };
+
+    c.crankWheel    = { color: "#2a2a2a", preset: "brushed" };  // dark charcoal
+    c.motorBox      = { color: "#2a2a2a", preset: "brushed" };
+
+    c.drillPipe     = { color: "#0d9e00", preset: "brushed" };
+    c.signFrame     = { color: "#0d9e00", preset: "brushed" };
+    c.pipes         = { color: "#2a2a2a", preset: "brushed" };  // dark charcoal
+    c.valve         = { color: "#0d9e00", preset: "brushed" };
 
     return c;
   },
@@ -280,23 +352,25 @@ tokyoNoir: {
     const c = getDefaultPumpConfig();
 
     // Base night steel
-    c.foundation    = { color: "#0e141f", preset: "matte" };
     c.pad           = { color: "#0a0f17", preset: "matte" };
-    c.motorBox      = { color: "#1b2433", preset: "brushed" };
-    c.tankScaffold  = { color: "#1b2433", preset: "brushed" };
+    c.foundation    = { color: "#1b2433", preset: "brushed" };
 
     // Sodium vapor hero (amber)
-    c.beam          = { color: "#ffb347", preset: "neon" };  // warm streetlight
-    c.counterweight = { color: "#ffb347", preset: "neon" };
+    c.beam          = { color: "#cc8a10", preset: "neonDeep" }; // warm streetlight
+    c.counterweight = { color: "#cc8a10", preset: "neonDeep" };
 
     // Deep lacquer red accent
     c.horseHead     = { color: "#7a1e1e", preset: "brushed" };
-    c.machinePanel  = { color: "#b33a3a", preset: "neon" };
+    c.machinePanel  = { color: "#8a1515", preset: "neonDeep" }; // red lantern
 
     // Mechanical depth
-    c.crankWheel    = { color: "#2b3548", preset: "brushed" };
-    c.drillPipe     = { color: "#ff7a00", preset: "neon" };  // faint orange pulse
-    c.pipes         = { color: "#2b3548", preset: "brushed" };
+    c.crankWheel    = { color: "#1b2433", preset: "brushed" };
+    c.motorBox      = { color: "#1b2433", preset: "brushed" };
+    c.drillPipe     = { color: "#cc6600", preset: "neonDeep" }; // orange pulse
+    c.signFrame     = { color: "#cc8a10", preset: "neonDeep" }; // amber
+    c.pipes         = { color: "#1b2433", preset: "brushed" };
+    c.tankScaffold  = { color: "#1b2433", preset: "brushed" };
+    c.valve         = { color: "#8a1515", preset: "neonDeep" }; // red lantern
 
     return c;
   },
@@ -307,8 +381,8 @@ texas: {
     const c = getDefaultPumpConfig();
 
     // === DAY STRUCTURE ===
-    c.beam          = { color: "#f4f4f4", preset: "matte" };
-    c.horseHead     = { color: "#f4f4f4", preset: "matte" };
+    c.beam          = { color: "#1c2a44", preset: "brushed" };  // navy blue
+    c.horseHead     = { color: "#c49a3a", preset: "brushed" }; // brass
 
     c.counterweight = { color: "#b22234", preset: "brushed" }; // Texas red
     c.machinePanel  = { color: "#1c2a44", preset: "matte" };   // navy badge base
@@ -323,12 +397,38 @@ texas: {
     c.drillPipe     = { color: "#c49a3a", preset: "brushed" }; // brass
     c.signFrame     = { color: "#c49a3a", preset: "brushed" };
     c.pipes         = { color: "#6b6b6b", preset: "brushed" };
+    c.valve         = { color: "#b22234", preset: "brushed" }; // Texas red
 
-    // === NIGHT ACCENT GLOW ===
-    // (assumes your "neon" preset emits)
-    c.starEmblem    = { color: "#ffffff", preset: "neon" };   // glowing Lone Star
-    c.beamGlow      = { color: "#fff2cc", preset: "neon" };   // warm soft white
-    c.structureGlow = { color: "#3b5cff", preset: "neon" };   // subtle blue edge
+    return c;
+  },
+},
+vaporwave: {
+  label: "VAPORWAVE",
+  build: () => {
+    const c = getDefaultPumpConfig();
+
+    // Dark horizon base — just the ground
+    c.pad           = { color: "#1a1028", preset: "brushed" };    // dark purple-blue
+    c.foundation    = { color: "#1a1028", preset: "brushed"  };  // dark purple-blue
+
+    // Hot pink grid structure
+    c.beam          = { color: "#c04878", preset: "brushed" };  // synthwave pink
+    c.horseHead     = { color: "#c04878", preset: "brushed" };
+
+    // Sunset peach accents
+    c.counterweight = { color: "#d4906a", preset: "brushed" };  // peach sunset
+    c.machinePanel  = { color: "#d4906a", preset: "brushed" };
+
+    // Purple mechanicals
+    c.crankWheel    = { color: "#d4906a", preset: "brushed" };  // soft purple
+    c.motorBox      = { color: "#8868a0", preset: "brushed" };
+
+    // Sunset seams
+    c.drillPipe     = { color: "#d4906a", preset: "brushed" };  // peach
+    c.signFrame     = { color: "#d4906a", preset: "brushed" };  // peach
+    c.pipes         = { color: "#c04878", preset: "brushed" };  // pink grid
+    c.tankScaffold  = { color: "#8868a0", preset: "brushed" };  // soft purple
+    c.valve         = { color: "#d4906a", preset: "brushed" };  // peach sunset
 
     return c;
   },
@@ -338,48 +438,73 @@ solarFlare: {
   build: () => {
     const c = getDefaultPumpConfig();
 
-    // Core structure
-    c.foundation    = { color: "#1a1a1a", preset: "matte" };
+    // Dark structural cage
     c.pad           = { color: "#0d0d0d", preset: "matte" };
-    c.motorBox      = { color: "#2b2b2b", preset: "brushed" };
-    c.tankScaffold  = { color: "#2b2b2b", preset: "brushed" };
+    c.foundation    = { color: "#1a1a1a", preset: "matte" };
 
-    // Star-core body
-    c.beam          = { color: "#fff4d6", preset: "chrome" }; // hot white
-    c.horseHead     = { color: "#fff4d6", preset: "chrome" };
+    // Star-core hero
+    c.beam          = { color: "#cc8800", preset: "neonDeep" }; // blazing amber
+    c.horseHead     = { color: "#cc6600", preset: "neonDeep" }; // deep orange
 
     // Molten accents
-    c.counterweight = { color: "#ff6a00", preset: "neon" };
-    c.machinePanel  = { color: "#ff8c00", preset: "neon" };
-    c.drillPipe     = { color: "#ff4500", preset: "neon" };
+    c.counterweight = { color: "#b83500", preset: "neonDeep" }; // molten orange
+    c.machinePanel  = { color: "#b83500", preset: "neonDeep" };
 
-    c.crankWheel    = { color: "#444444", preset: "brushed" };
-    c.signFrame     = { color: "#ff6a00", preset: "neon" };
-    c.pipes         = { color: "#ff4500", preset: "neon" };
+    // Dark frame
+    c.crankWheel    = { color: "#1a1a1a", preset: "brushed" };
+    c.motorBox      = { color: "#1a1a1a", preset: "brushed" };
+
+    // Fire seams
+    c.drillPipe     = { color: "#a82a00", preset: "neonDeep" }; // deep red-orange
+    c.signFrame     = { color: "#cc8800", preset: "neonDeep" }; // amber
+    c.pipes         = { color: "#a82a00", preset: "neonDeep" }; // lava
+    c.tankScaffold  = { color: "#1a1a1a", preset: "brushed" };
+    c.valve         = { color: "#b83500", preset: "neonDeep" }; // molten
 
     return c;
   },
 },
+ chrome: {
+    label: "FULL CHROME",
+    build: () => {
+      const c = getDefaultPumpConfig();
+      PUMP_ZONES.forEach((z) => {
+        c[z.id] = { color: "#d8d8d8", preset: "chrome" };
+      });
+      c.pad = { color: "#b0b0b0", preset: "brushed" };
+      c.counterweight = { color: "#e8e8e8", preset: "chrome" };
+      c.horseHead = { color: "#e8e8e8", preset: "chrome" };
+      c.crankWheel = { color: "#c8c8c8", preset: "chrome" };
+      return c;
+    },
+  },
 dragonforge: {
   label: "DRAGONFORGE",
   build: () => {
     const c = getDefaultPumpConfig();
 
-    c.foundation    = { color: "#120c0c", preset: "matte" };
+    // Obsidian base
     c.pad           = { color: "#0a0505", preset: "matte" };
-    c.motorBox      = { color: "#2a1b1b", preset: "brushed" };
-    c.tankScaffold  = { color: "#2a1b1b", preset: "brushed" };
+    c.foundation    = { color: "#120c0c", preset: "matte" };
 
-    c.beam          = { color: "#1c1c1c", preset: "chrome" }; // obsidian steel
-    c.horseHead     = { color: "#1c1c1c", preset: "chrome" };
+    // Dragon bone structure
+    c.beam          = { color: "#6b5a3d", preset: "brushed" };  // aged bronze
+    c.horseHead     = { color: "#6b5a3d", preset: "brushed" };  // aged bronze
 
-    c.counterweight = { color: "#8b0000", preset: "neon" };
-    c.machinePanel  = { color: "#a11212", preset: "neon" };
-    c.drillPipe     = { color: "#b22222", preset: "neon" };
+    // Furnace ember glow
+    c.counterweight = { color: "#6b0a0a", preset: "neonDeep" }; // deep furnace red
+    c.machinePanel  = { color: "#6b0a0a", preset: "neonDeep" }; // ember
 
-    c.crankWheel    = { color: "#8b6b3d", preset: "brushed" }; // bronze
-    c.signFrame     = { color: "#8b6b3d", preset: "brushed" };
-    c.pipes         = { color: "#5c4033", preset: "brushed" };
+    // Aged bronze mechanicals
+    c.crankWheel    = { color: "#7a6840", preset: "brushed" };  // bronze
+    c.motorBox      = { color: "#2a1b1b", preset: "brushed" };  // dark forge iron
+
+    // Fire seams
+    c.drillPipe     = { color: "#6b0a0a", preset: "neonDeep" }; // crimson
+    c.signFrame     = { color: "#7a6840", preset: "brushed" };  // bronze
+    c.pipes         = { color: "#2a1b1b", preset: "brushed" };  // forge iron
+    c.tankScaffold  = { color: "#2a1b1b", preset: "brushed" };  // forge iron
+    c.valve         = { color: "#6b0a0a", preset: "neonDeep" }; // ember
 
     return c;
   },
@@ -389,155 +514,146 @@ celestial: {
   build: () => {
     const c = getDefaultPumpConfig();
 
-    c.foundation    = { color: "#0c1220", preset: "matte" };
+    // Midnight blue base
     c.pad           = { color: "#0a0f1a", preset: "matte" };
-    c.motorBox      = { color: "#1b2538", preset: "brushed" };
-    c.tankScaffold  = { color: "#1b2538", preset: "brushed" };
-
-    c.beam          = { color: "#f5f5f0", preset: "chrome" }; // pearl white
-    c.horseHead     = { color: "#f5f5f0", preset: "chrome" };
-
-    c.counterweight = { color: "#0f5132", preset: "neon" }; // emerald glow
-    c.machinePanel  = { color: "#2ecc71", preset: "neon" };
-    c.drillPipe     = { color: "#2ecc71", preset: "neon" };
-
-    c.crankWheel    = { color: "#c9a227", preset: "brushed" }; // gold trim
-    c.signFrame     = { color: "#c9a227", preset: "brushed" };
-    c.pipes         = { color: "#1b2538", preset: "brushed" };
-
-    return c;
-  },
-},
-obsidianReserve: {
-  label: "OBSIDIAN RESERVE",
-  build: () => {
-    const c = getDefaultPumpConfig();
-
-    c.foundation    = { color: "#0a0a0d", preset: "chrome" };
-    c.pad           = { color: "#050508", preset: "matte" };
-    c.motorBox      = { color: "#1c1f26", preset: "brushed" };
-    c.tankScaffold  = { color: "#1c1f26", preset: "brushed" };
-
-    c.beam          = { color: "#0f1117", preset: "chrome" };
-    c.horseHead     = { color: "#0f1117", preset: "chrome" };
-
-    c.counterweight = { color: "#c9a227", preset: "brushed" }; // subtle gold
-    c.crankWheel    = { color: "#2a2f3a", preset: "brushed" };
-
-    c.machinePanel  = { color: "#1db954", preset: "neon" }; // emerald seam
-    c.drillPipe     = { color: "#1db954", preset: "neon" };
-    c.signFrame     = { color: "#c9a227", preset: "brushed" };
-    c.pipes         = { color: "#2a2f3a", preset: "brushed" };
-
-    return c;
-  },
-},
-ivoryDominion: {
-  label: "IVORY DOMINION",
-  build: () => {
-    const c = getDefaultPumpConfig();
-
-    c.foundation    = { color: "#121820", preset: "matte" };
-    c.pad           = { color: "#0e141b", preset: "matte" };
-
-    c.beam          = { color: "#f5f2ea", preset: "chrome" };
-    c.horseHead     = { color: "#f5f2ea", preset: "chrome" };
-
-    c.counterweight = { color: "#d9d9d9", preset: "brushed" };
-    c.crankWheel    = { color: "#c0c0c0", preset: "brushed" };
-    c.motorBox      = { color: "#b8b8b8", preset: "brushed" };
-
-    c.machinePanel  = { color: "#ffffff", preset: "neon" }; // soft white seam
-    c.drillPipe     = { color: "#dfe9f3", preset: "neon" };
-    c.signFrame     = { color: "#c0c0c0", preset: "brushed" };
-    c.pipes         = { color: "#c0c0c0", preset: "brushed" };
-
-    return c;
-  },
-},
-midnightSovereign: {
-  label: "MIDNIGHT SOVEREIGN",
-  build: () => {
-    const c = getDefaultPumpConfig();
-
     c.foundation    = { color: "#0c1220", preset: "matte" };
-    c.pad           = { color: "#080d18", preset: "matte" };
 
-    c.beam          = { color: "#1b2233", preset: "chrome" };
-    c.horseHead     = { color: "#1b2233", preset: "chrome" };
+    // Midnight blue structure
+    c.beam          = { color: "#0f1a30", preset: "brushed" };  // deep midnight
+    c.horseHead     = { color: "#c9a227", preset: "gold" };     // gold crown
 
-    c.counterweight = { color: "#2b2f44", preset: "brushed" };
-    c.crankWheel    = { color: "#3a3f5c", preset: "brushed" };
-    c.motorBox      = { color: "#2b2f44", preset: "brushed" };
+    // Emerald seams
+    c.counterweight = { color: "#0a6630", preset: "brushed" };  // deep emerald
+    c.machinePanel  = { color: "#0a6630", preset: "brushed" };
 
-    c.machinePanel  = { color: "#7c4dff", preset: "neon" }; // violet seam
-    c.drillPipe     = { color: "#7c4dff", preset: "neon" };
-    c.signFrame     = { color: "#3a3f5c", preset: "brushed" };
-    c.pipes         = { color: "#3a3f5c", preset: "brushed" };
+    // Gold trim
+    c.crankWheel    = { color: "#c9a227", preset: "gold" };
+    c.motorBox      = { color: "#0f1a30", preset: "brushed" };  // midnight
+
+    // Holy seams
+    c.drillPipe     = { color: "#0a6630", preset: "brushed" };  // emerald
+    c.signFrame     = { color: "#c9a227", preset: "gold" };     // gold
+    c.pipes         = { color: "#0f1a30", preset: "brushed" };  // midnight
+    c.tankScaffold  = { color: "#0f1a30", preset: "brushed" };  // midnight
+    c.valve         = { color: "#0a6630", preset: "brushed" };  // emerald
 
     return c;
   },
 },
-crimsonCharge: {
-  label: "RED BULL EDITION",
+
+
+midnightSovereign: {
+  label: "DARK CROWN",
   build: () => {
     const c = getDefaultPumpConfig();
 
-    c.foundation    = { color: "#0d1326", preset: "matte" };   // deep navy
-    c.pad           = { color: "#0a0f1f", preset: "matte" };
+    // Dark throne
+    c.pad           = { color: "#080810", preset: "matte" };
+    c.foundation    = { color: "#10101a", preset: "matte" };
 
-    c.beam          = { color: "#f5f5f5", preset: "chrome" };  // performance white
-    c.horseHead     = { color: "#f5f5f5", preset: "chrome" };
+    // Royal violet body
+    c.beam          = { color: "#1a1030", preset: "brushed" };  // dark purple steel
+    c.horseHead     = { color: "#1a1030", preset: "brushed" };
 
-    c.counterweight = { color: "#c1121f", preset: "brushed" }; // racing red
-    c.machinePanel  = { color: "#1e90ff", preset: "neon" };    // electric blue
+    // Crown silver
+    c.counterweight = { color: "#8888a0", preset: "chrome" };   // platinum
+    c.crankWheel    = { color: "#8888a0", preset: "chrome" };
 
-    c.crankWheel    = { color: "#9aa0a6", preset: "brushed" }; // aluminum
-    c.motorBox      = { color: "#9aa0a6", preset: "brushed" };
+    c.motorBox      = { color: "#10101a", preset: "brushed" };
+    c.machinePanel  = { color: "#3a1a60", preset: "brushed" };  // deep violet
 
-    c.drillPipe     = { color: "#1e90ff", preset: "neon" };
-    c.signFrame     = { color: "#c1121f", preset: "brushed" };
-    c.pipes         = { color: "#9aa0a6", preset: "brushed" };
+    // Violet seams
+    c.drillPipe     = { color: "#3a1a60", preset: "brushed" };  // deep violet
+    c.signFrame     = { color: "#8888a0", preset: "chrome" };   // platinum
+    c.pipes         = { color: "#10101a", preset: "brushed" };
+    c.tankScaffold  = { color: "#10101a", preset: "brushed" };
+    c.valve         = { color: "#3a1a60", preset: "brushed" };  // deep violet
 
     return c;
   },
-  
 },
-atomicSurge: {
-  label: "MONSTER ENERGY EDITION",
+
+metalAF: {
+  label: "METAL AF",
   build: () => {
     const c = getDefaultPumpConfig();
 
-    c.foundation    = { color: "#050805", preset: "matte" };
-    c.pad           = { color: "#030503", preset: "matte" };
+    // Gunmetal base
+    c.pad           = { color: "#2a2a2e", preset: "matte" };
+    c.foundation    = { color: "#606068", preset: "chrome" };   // polished steel
 
-    c.beam          = { color: "#0f0f0f", preset: "chrome" };
-    c.horseHead     = { color: "#0f0f0f", preset: "chrome" };
+    // Chrome body
+    c.beam          = { color: "#8a8a90", preset: "chrome" };   // bright chrome
+    c.horseHead     = { color: "#8a8a90", preset: "chrome" };
 
-    c.counterweight = { color: "#00ff41", preset: "neon" }; // upgraded neon
-    c.machinePanel  = { color: "#00ff41", preset: "neon" };
+    // Gold accents
+    c.counterweight = { color: "#b8960c", preset: "gold" };
+    c.machinePanel  = { color: "#b8960c", preset: "gold" };
 
-    c.crankWheel    = { color: "#1a1a1a", preset: "brushed" };
-    c.motorBox      = { color: "#1a1a1a", preset: "brushed" };
+    // Brushed steel mechanicals
+    c.crankWheel    = { color: "#606068", preset: "brushed" };  // brushed steel
+    c.motorBox      = { color: "#606068", preset: "brushed" };
 
-    c.drillPipe     = { color: "#00ff2a", preset: "neon" }; // slight variation
-    c.signFrame     = { color: "#00ff41", preset: "neon" };
-    c.pipes         = { color: "#1a1a1a", preset: "brushed" };
+    // Gold + steel seams
+    c.drillPipe     = { color: "#b8960c", preset: "gold" };
+    c.signFrame     = { color: "#b8960c", preset: "gold" };
+    c.pipes         = { color: "#606068", preset: "chrome" };   // polished steel
+    c.tankScaffold  = { color: "#606068", preset: "chrome" };
+    c.valve         = { color: "#b8960c", preset: "gold" };
 
     return c;
   },
 },
+
 };
 
 // ── Panel component ──────────────────────────────────────────────────────────
 
-export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode = false, hasSelection, onSave, saving, dirty, isSignedIn, defaultExpanded = false, userId, readOnly = false }) {
+export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode = false, hasSelection, onSave, saving, dirty, isSignedIn, defaultExpanded = false, userId, readOnly = false, unlockedItems = new Set(), onPurchaseRequest }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [activeZone, setActiveZone] = useState(null);
   const [pickerSlot, setPickerSlot] = useState(null); // which slot is picking an addon
+  const [partsExpanded, setPartsExpanded] = useState(false);
+  const [previewThemeKey, setPreviewThemeKey] = useState(null); // tracks last-applied theme for lock detection
 
   // Block all edits when viewing someone else's config
   if (readOnly) onChange = () => {};
+
+  // Compute max addon slots based on unlocks
+  const maxAddons = BASE_MAX_ADDONS
+    + (unlockedItems.has("slotUnlock_4") ? 1 : 0)
+    + (unlockedItems.has("slotUnlock_5") ? 1 : 0);
+
+  // Detect locked premium items currently in the config (blocks save)
+  const lockedInConfig = useMemo(() => {
+    const items = [];
+    // Check theme
+    if (previewThemeKey && isPremiumTheme(previewThemeKey) && !unlockedItems.has(makePurchaseId("theme", previewThemeKey))) {
+      const theme = THEME_PRESETS[previewThemeKey];
+      items.push({ id: makePurchaseId("theme", previewThemeKey), label: theme?.label || previewThemeKey, category: "theme" });
+    }
+    // Check fence
+    if (config.fenceType && isPremiumFence(config.fenceType) && !unlockedItems.has(makePurchaseId("fence", config.fenceType))) {
+      const fence = FENCE_CATALOG.find(f => f.id === config.fenceType);
+      items.push({ id: makePurchaseId("fence", config.fenceType), label: fence?.label || config.fenceType, category: "fence" });
+    }
+    // Check camera
+    if (config.showCamera && !unlockedItems.has("camera")) {
+      items.push({ id: "camera", label: "SECURITY CAMERA", category: "accessory" });
+    }
+    // Check addons (deduplicate — same addon can be in multiple slots)
+    const addonsObj = config.addons || {};
+    const seenAddons = new Set();
+    for (const v of Object.values(addonsObj)) {
+      const addonId = typeof v === "string" ? v : v?.id;
+      if (addonId && !seenAddons.has(addonId) && isPremiumAddon(addonId) && !unlockedItems.has(makePurchaseId("addon", addonId))) {
+        seenAddons.add(addonId);
+        const addon = ADDON_CATALOG.find(a => a.id === addonId);
+        items.push({ id: makePurchaseId("addon", addonId), label: addon?.label || addonId, category: "addon" });
+      }
+    }
+    return items;
+  }, [previewThemeKey, config.fenceType, config.showCamera, config.addons, unlockedItems]);
 
   // Dark/light color tokens
   const c = darkMode ? {
@@ -574,7 +690,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
     return out;
   }, [rawAddons]);
   const addonCount = Object.keys(addons).length;
-  const isFull = addonCount >= MAX_ADDONS;
+  const isFull = addonCount >= maxAddons;
 
   const updateZone = useCallback((zoneId, updates) => {
     onChange({ ...config, [zoneId]: { ...config[zoneId], ...updates } });
@@ -590,6 +706,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
     newConfig.poop = config.poop || false;
     onChange(newConfig);
     setActiveZone(null);
+    setPreviewThemeKey(themeKey);
   }, [onChange, config.signImageUrl, config.showSign, config.showCamera, config.fenceType, config.addons]);
 
   const sectionStyle = { ...(isMobile ? mStyles.section : styles.section), borderBottomColor: c.sectionBorder };
@@ -623,17 +740,133 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
           <div style={{ ...styles.themesRow, opacity: hasSelection ? 1 : 0.4, pointerEvents: hasSelection ? "auto" : "none" }}>
             <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>THEMES</span>
             <div style={styles.themeButtons}>
-              {Object.entries(THEME_PRESETS).map(([key, theme]) => (
-                <button
-                  key={key}
-                  onClick={() => applyTheme(key)}
-                  style={{ ...styles.themeBtn, fontSize: mFs, padding: isMobile ? "5px 10px" : "3px 7px", color: c.btnText, borderColor: c.btnBorder, background: c.btnBg }}
-                  title={theme.label}
-                >
-                  {theme.label}
-                </button>
-              ))}
+              {Object.entries(THEME_PRESETS).map(([key, theme]) => {
+                const locked = isPremiumTheme(key) && !unlockedItems.has(makePurchaseId("theme", key));
+                return (
+                  <button
+                    key={key}
+                    onClick={() => applyTheme(key)}
+                    style={{
+                      ...styles.themeBtn,
+                      fontSize: mFs,
+                      padding: isMobile ? "5px 10px" : "3px 7px",
+                      color: locked ? c.muted : c.btnText,
+                      border: locked ? `1px dashed ${c.btnBorder}` : `1px solid ${c.btnBorder}`,
+                      background: locked ? "transparent" : c.btnBg,
+                      opacity: locked ? 0.7 : 1,
+                    }}
+                    title={locked ? `${theme.label} (Premium — click to preview)` : theme.label}
+                  >
+                    {locked && <span style={{ marginRight: 3, fontSize: mFs - 1 }}>&#128274;</span>}
+                    {theme.label}
+                  </button>
+                );
+              })}
             </div>
+
+            {/* Collapsible custom parts */}
+            <div
+              onClick={() => setPartsExpanded(!partsExpanded)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                cursor: "pointer",
+                marginTop: 8,
+                padding: "4px 0",
+              }}
+            >
+              <span style={{ fontSize: mFs, color: c.muted, fontFamily: "'Share Tech Mono', monospace", letterSpacing: "0.1em" }}>
+                CUSTOM PARTS
+              </span>
+              <div style={{ flex: 1, height: 1, background: c.border }} />
+              <span style={{ fontSize: mFs, color: c.muted }}>{partsExpanded ? "\u25B4" : "\u25BE"}</span>
+            </div>
+
+            {partsExpanded && (
+              <div style={{ marginTop: 4 }}>
+                {PUMP_ZONES.map((zone) => {
+                  const zoneConfig = config[zone.id] || {};
+                  const isActive = activeZone === zone.id;
+                  const hasCustom = zoneConfig.color || zoneConfig.preset !== "stock";
+
+                  return (
+                    <div key={zone.id}>
+                      <div
+                        onClick={() => setActiveZone(isActive ? null : zone.id)}
+                        style={{
+                          ...styles.zoneRow,
+                          background: isActive ? (darkMode ? "rgba(212,168,84,0.15)" : "rgba(212,168,84,0.12)") : "transparent",
+                        }}
+                      >
+                        <div
+                          style={{
+                            ...styles.swatch,
+                            background: zoneConfig.color || (darkMode ? "#666" : "#7888a0"),
+                            borderColor: c.swatchBorder,
+                            boxShadow: hasCustom ? "0 0 4px rgba(184,146,46,0.5)" : "none",
+                          }}
+                        />
+                        <span style={{ ...styles.zoneName, fontSize: mFsLg, color: c.text }}>{zone.label}</span>
+                        <span style={{ ...styles.zonePreset, fontSize: mFs, color: c.muted }}>
+                          {MATERIAL_PRESETS[zoneConfig.preset]?.label || "STOCK"}
+                        </span>
+                        <span style={{ ...styles.zoneChevron, fontSize: mFs, color: c.muted }}>{isActive ? "\u25B4" : "\u25BE"}</span>
+                      </div>
+
+                      {isActive && (
+                        <div style={styles.zoneEditor}>
+                          <div style={styles.editorRow}>
+                            <span style={{ ...styles.editorLabel, fontSize: mFs, color: c.muted }}>COLOR</span>
+                            <div style={styles.colorPickerWrap}>
+                              <input
+                                type="color"
+                                value={zoneConfig.color || "#7888a0"}
+                                onChange={(e) => updateZone(zone.id, { color: e.target.value })}
+                                style={styles.colorInput}
+                              />
+                              <span style={styles.colorHex}>
+                                {(zoneConfig.color || "STOCK").toUpperCase()}
+                              </span>
+                              {zoneConfig.color && (
+                                <button
+                                  onClick={() => updateZone(zone.id, { color: null })}
+                                  style={styles.resetBtn}
+                                >
+                                  RESET
+                                </button>
+                              )}
+                            </div>
+                          </div>
+
+                          <div style={styles.editorRow}>
+                            <span style={{ ...styles.editorLabel, fontSize: mFs, color: c.muted }}>FINISH</span>
+                            <div style={styles.presetButtons}>
+                              {Object.entries(MATERIAL_PRESETS).map(([key, preset]) => (
+                                <button
+                                  key={key}
+                                  onClick={() => updateZone(zone.id, { preset: key })}
+                                  style={{
+                                    ...styles.presetBtn,
+                                    fontSize: mFs,
+                                    padding: isMobile ? "4px 8px" : "2px 5px",
+                                    background: (zoneConfig.preset || "stock") === key ? c.activeBg : c.btnBg,
+                                    border: `1px solid ${(zoneConfig.preset || "stock") === key ? c.activeBorder : c.btnBorder}`,
+                                    color: (zoneConfig.preset || "stock") === key ? c.activeText : c.btnText,
+                                  }}
+                                >
+                                  {preset.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div style={{ ...styles.divider, background: c.border }} />
@@ -711,7 +944,9 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
 
             {/* Security camera toggle — requires sign to be visible */}
             <div style={{ opacity: config.showSign ? 1 : 0.35, pointerEvents: config.showSign ? "auto" : "none" }}>
-              <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>SECURITY CAM</span>
+              <span style={{ ...styles.presetLabel, fontSize: mFs, color: c.muted }}>
+                SECURITY CAM {!unlockedItems.has("camera") && <span style={{ fontSize: mFs - 1 }}>&#128274;</span>}
+              </span>
               <button
                 onClick={() => onChange({ ...config, showCamera: !config.showCamera })}
                 style={{
@@ -769,25 +1004,30 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                 >
                   NONE
                 </button>
-                {FENCE_CATALOG.map((f) => (
-                  <button
-                    key={f.id}
-                    onClick={() => onChange({ ...config, fenceType: f.id })}
-                    style={{
-                      padding: isMobile ? "5px 8px" : "3px 8px",
-                      background: config.fenceType === f.id ? c.activeBg : c.btnBg,
-                      border: `1px solid ${config.fenceType === f.id ? c.activeBorder : c.btnBorder}`,
-                      borderRadius: 2,
-                      color: config.fenceType === f.id ? c.activeText : c.btnText,
-                      fontFamily: "'Share Tech Mono', monospace",
-                      fontSize: mFs - 1,
-                      letterSpacing: "0.1em",
-                      cursor: "pointer",
-                    }}
-                  >
-                    {f.label}
-                  </button>
-                ))}
+                {FENCE_CATALOG.map((f) => {
+                  const fenceLocked = isPremiumFence(f.id) && !unlockedItems.has(makePurchaseId("fence", f.id));
+                  const isActive = config.fenceType === f.id;
+                  return (
+                    <button
+                      key={f.id}
+                      onClick={() => onChange({ ...config, fenceType: f.id })}
+                      style={{
+                        padding: isMobile ? "5px 8px" : "3px 8px",
+                        background: isActive ? c.activeBg : c.btnBg,
+                        border: `1px solid ${isActive ? c.activeBorder : c.btnBorder}`,
+                        borderRadius: 2,
+                        color: isActive ? c.activeText : c.btnText,
+                        fontFamily: "'Share Tech Mono', monospace",
+                        fontSize: mFs - 1,
+                        letterSpacing: "0.1em",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {fenceLocked && <span style={{ marginRight: 3, fontSize: mFs - 2 }}>&#128274;</span>}
+                      {f.label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -827,7 +1067,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                 fontFamily: "'Share Tech Mono', monospace",
                 letterSpacing: "0.1em",
               }}>
-                {addonCount}/{MAX_ADDONS}
+                {addonCount}/{maxAddons}
               </span>
             </div>
 
@@ -877,7 +1117,7 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                           opacity: disabled ? 0.35 : 1,
                           position: "relative",
                         }}
-                        title={item ? `${item.label} (click to remove)` : disabled ? "Max 3 add-ons" : "Click to add"}
+                        title={item ? `${item.label} (click to remove)` : disabled ? `Max ${maxAddons} add-ons` : "Click to add"}
                       >
                         {item ? (
                           <>
@@ -901,7 +1141,9 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                             <div
                               onClick={(e) => {
                                 e.stopPropagation();
-                                const nextRot = (rot + 1) % 4;
+                                const allowed = item.allowedRotations || [0, 1, 2, 3];
+                                const curIdx = allowed.indexOf(rot);
+                                const nextRot = allowed[(curIdx + 1) % allowed.length];
                                 onChange({ ...config, addons: { ...addons, [slotKey]: { ...addonEntry, rot: nextRot } } });
                               }}
                               style={{
@@ -944,137 +1186,125 @@ export default function PimpMyPumpPanel({ config, onChange, isMobile, darkMode =
                   SELECT ITEM FOR SLOT {pickerSlot}
                 </div>
                 <div style={addonStyles.pickerList}>
-                  {ADDON_CATALOG.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => {
-                        onChange({ ...config, addons: { ...addons, [pickerSlot]: { id: item.id, rot: 0 } } });
-                        setPickerSlot(null);
-                      }}
-                      style={{ ...addonStyles.pickerItem, fontSize: mFs, padding: isMobile ? "5px 8px" : "3px 6px", color: c.text }}
-                    >
-                      <div style={{
-                        width: 10, height: 10, borderRadius: 2,
-                        background: item.color, flexShrink: 0,
-                        boxShadow: item.emissive ? `0 0 4px ${item.color}` : "none",
-                      }} />
-                      <span>{item.label}</span>
-                    </button>
-                  ))}
+                  {ADDON_CATALOG.map((item) => {
+                    const addonLocked = isPremiumAddon(item.id) && !unlockedItems.has(makePurchaseId("addon", item.id));
+                    const defaultRot = item.allowedRotations ? item.allowedRotations[0] : 0;
+                    // Auto-snap to nearest allowed slot if current slot isn't valid
+                    const slotNum = parseInt(pickerSlot, 10);
+                    const targetSlot = (item.allowedSlots && !item.allowedSlots.includes(slotNum))
+                      ? String(item.allowedSlots.reduce((best, s) => Math.abs(s - slotNum) < Math.abs(best - slotNum) ? s : best))
+                      : pickerSlot;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          onChange({ ...config, addons: { ...addons, [targetSlot]: { id: item.id, rot: defaultRot } } });
+                          setPickerSlot(null);
+                        }}
+                        style={{
+                          ...addonStyles.pickerItem,
+                          fontSize: mFs,
+                          padding: isMobile ? "5px 8px" : "3px 6px",
+                          color: c.text,
+                        }}
+                      >
+                        <div style={{
+                          width: 10, height: 10, borderRadius: 2,
+                          background: item.color, flexShrink: 0,
+                          boxShadow: item.emissive ? `0 0 4px ${item.color}` : "none",
+                        }} />
+                        <span>{addonLocked ? `\u{1F512} ${item.label}` : item.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
-          </div>
 
-          <div style={{ ...styles.divider, background: c.border }} />
-
-          {/* Zone list */}
-          <div style={{ ...styles.zoneList, opacity: hasSelection ? 1 : 0.4, pointerEvents: hasSelection ? "auto" : "none" }}>
-            {PUMP_ZONES.map((zone) => {
-              const zoneConfig = config[zone.id] || {};
-              const isActive = activeZone === zone.id;
-              const hasCustom = zoneConfig.color || zoneConfig.preset !== "stock";
-
-              return (
-                <div key={zone.id}>
-                  {/* Zone row */}
-                  <div
-                    onClick={() => setActiveZone(isActive ? null : zone.id)}
-                    style={{
-                      ...styles.zoneRow,
-                      background: isActive ? (darkMode ? "rgba(212,168,84,0.15)" : "rgba(212,168,84,0.12)") : "transparent",
-                    }}
-                  >
-                    {/* Color swatch */}
-                    <div
-                      style={{
-                        ...styles.swatch,
-                        background: zoneConfig.color || (darkMode ? "#666" : "#7888a0"),
-                        borderColor: c.swatchBorder,
-                        boxShadow: hasCustom ? "0 0 4px rgba(184,146,46,0.5)" : "none",
+            {/* Slot unlock buttons */}
+            {onPurchaseRequest && (
+              <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
+                {[4, 5].map((slotNum) => {
+                  const slotId = `slotUnlock_${slotNum}`;
+                  const owned = unlockedItems.has(slotId);
+                  return (
+                    <button
+                      key={slotId}
+                      onClick={() => {
+                        if (!owned) onPurchaseRequest([{ id: slotId, label: `SLOT ${slotNum}`, category: "slotUnlock" }]);
                       }}
-                    />
-                    <span style={{ ...styles.zoneName, fontSize: mFsLg, color: c.text }}>{zone.label}</span>
-                    <span style={{ ...styles.zonePreset, fontSize: mFs, color: c.muted }}>
-                      {MATERIAL_PRESETS[zoneConfig.preset]?.label || "STOCK"}
-                    </span>
-                    <span style={{ ...styles.zoneChevron, fontSize: mFs, color: c.muted }}>{isActive ? "\u25B4" : "\u25BE"}</span>
-                  </div>
-
-                  {/* Expanded zone editor */}
-                  {isActive && (
-                    <div style={styles.zoneEditor}>
-                      {/* Color picker */}
-                      <div style={styles.editorRow}>
-                        <span style={{ ...styles.editorLabel, fontSize: mFs, color: c.muted }}>COLOR</span>
-                        <div style={styles.colorPickerWrap}>
-                          <input
-                            type="color"
-                            value={zoneConfig.color || "#7888a0"}
-                            onChange={(e) => updateZone(zone.id, { color: e.target.value })}
-                            style={styles.colorInput}
-                          />
-                          <span style={styles.colorHex}>
-                            {(zoneConfig.color || "STOCK").toUpperCase()}
-                          </span>
-                          {zoneConfig.color && (
-                            <button
-                              onClick={() => updateZone(zone.id, { color: null })}
-                              style={styles.resetBtn}
-                            >
-                              RESET
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Material preset buttons */}
-                      <div style={styles.editorRow}>
-                        <span style={{ ...styles.editorLabel, fontSize: mFs, color: c.muted }}>FINISH</span>
-                        <div style={styles.presetButtons}>
-                          {Object.entries(MATERIAL_PRESETS).map(([key, preset]) => (
-                            <button
-                              key={key}
-                              onClick={() => updateZone(zone.id, { preset: key })}
-                              style={{
-                                ...styles.presetBtn,
-                                fontSize: mFs,
-                                padding: isMobile ? "4px 8px" : "2px 5px",
-                                color: c.btnText,
-                                background: darkMode ? c.btnBg : "#e8edf2",
-                                borderColor: c.btnBorder,
-                                ...(zoneConfig.preset === key ? { background: c.activeBg, borderColor: c.activeBorder, color: c.activeText } : {}),
-                              }}
-                            >
-                              {preset.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                      disabled={owned}
+                      style={{
+                        padding: isMobile ? "4px 8px" : "3px 7px",
+                        background: owned ? "rgba(74,222,128,0.1)" : "transparent",
+                        border: owned ? `1px solid rgba(74,222,128,0.3)` : `1px dashed ${c.btnBorder}`,
+                        borderRadius: 2,
+                        color: owned ? "#4ade80" : c.muted,
+                        fontFamily: "'Share Tech Mono', monospace",
+                        fontSize: mFs - 1,
+                        letterSpacing: "0.08em",
+                        cursor: owned ? "default" : "pointer",
+                        opacity: owned ? 0.6 : 0.7,
+                      }}
+                    >
+                      {owned ? `SLOT ${slotNum} \u2713` : `\u{1F512} SLOT ${slotNum}`}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Save button */}
           {isSignedIn && hasSelection && !readOnly && (
             <>
               <div style={{ ...styles.divider, background: c.border }} />
-              <button
-                onClick={onSave}
-                disabled={saving || !dirty}
-                style={{
-                  ...styles.saveBtn,
-                  fontSize: mFsLg,
-                  padding: isMobile ? "8px 0" : "6px 0",
-                  opacity: (saving || !dirty) ? 0.4 : 1,
-                  cursor: (saving || !dirty) ? "default" : "pointer",
-                }}
-              >
-                {saving ? "SAVING..." : dirty ? "SAVE SETTINGS" : "SAVED"}
-              </button>
+              {lockedInConfig.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{
+                    fontSize: mFs,
+                    color: "#d4a854",
+                    textAlign: "center",
+                    letterSpacing: "0.06em",
+                    fontFamily: "'Share Tech Mono', monospace",
+                    padding: "4px 0 2px",
+                  }}>
+                    UNLOCK TO SAVE: {lockedInConfig.map(i => i.label).join(", ")}
+                  </div>
+                  <button
+                    onClick={() => onPurchaseRequest?.(lockedInConfig)}
+                    style={{
+                      padding: isMobile ? "8px 12px" : "7px 10px",
+                      background: "rgba(212,168,84,0.15)",
+                      border: "1px solid #d4a854",
+                      borderRadius: 2,
+                      color: "#d4a854",
+                      fontFamily: "'Share Tech Mono', monospace",
+                      fontSize: mFs,
+                      fontWeight: 600,
+                      letterSpacing: "0.08em",
+                      cursor: "pointer",
+                      width: "100%",
+                    }}
+                  >
+                    &#128274; UNLOCK {lockedInConfig.length === 1 ? lockedInConfig[0].label : `ALL ${lockedInConfig.length} ITEMS`}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={onSave}
+                  disabled={saving || !dirty}
+                  style={{
+                    ...styles.saveBtn,
+                    fontSize: mFsLg,
+                    padding: isMobile ? "8px 0" : "6px 0",
+                    opacity: (saving || !dirty) ? 0.4 : 1,
+                    cursor: (saving || !dirty) ? "default" : "pointer",
+                  }}
+                >
+                  {saving ? "SAVING..." : dirty ? "SAVE SETTINGS" : "SAVED"}
+                </button>
+              )}
             </>
           )}
           {!isSignedIn && hasSelection && (

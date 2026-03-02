@@ -39,7 +39,7 @@ const providerLabels = {
 };
 
 // Custom wallet connect UI — bypasses thirdweb's UI components which have React 19 click issues
-function WalletConnectOptions({ connectSocial, connectExternal, connectingMethod, isMobile, clerkUser }) {
+function WalletConnectOptions({ connectSocial, connectExternal, connectingMethod, isMobile, clerkUser, theme = 'cyber' }) {
   // Detect how user signed into Clerk to offer a matching wallet-creation option
   const clerkProvider = clerkUser?.externalAccounts?.[0]?.provider;
   const primaryStrategy = clerkToThirdweb[clerkProvider] || null;
@@ -57,14 +57,17 @@ function WalletConnectOptions({ connectSocial, connectExternal, connectingMethod
         { id: 'walletConnect', label: 'WalletConnect' },
       ];
 
+  const ind = theme === 'industrial';
+  const accent = ind ? '212, 168, 84' : '0, 245, 212';
   const btnBase = {
-    background: 'rgba(0, 0, 0, 0.4)',
-    border: '1px solid rgba(0, 245, 212, 0.25)',
-    borderRadius: '10px',
+    background: ind ? 'rgba(60, 60, 70, 0.4)' : 'rgba(0, 0, 0, 0.4)',
+    border: `1px solid rgba(${accent}, 0.25)`,
+    borderRadius: ind ? '3px' : '10px',
     padding: '12px 14px',
-    color: '#fff',
-    fontSize: '13px',
-    fontFamily: "'Orbitron', monospace",
+    color: ind ? '#c8c0b4' : '#fff',
+    fontSize: ind ? '11px' : '13px',
+    fontFamily: ind ? "'Share Tech Mono', monospace" : "'Orbitron', monospace",
+    letterSpacing: ind ? '0.1em' : 'normal',
     cursor: 'pointer',
     transition: 'all 0.2s',
     display: 'flex',
@@ -85,8 +88,8 @@ function WalletConnectOptions({ connectSocial, connectExternal, connectingMethod
             padding: '14px 16px',
             opacity: connectingMethod && connectingMethod !== id ? 0.5 : 1,
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 245, 212, 0.5)'; e.currentTarget.style.background = 'rgba(0, 245, 212, 0.08)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'rgba(0, 245, 212, 0.25)'; e.currentTarget.style.background = 'rgba(0, 0, 0, 0.4)'; }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = `rgba(${accent}, 0.5)`; e.currentTarget.style.background = `rgba(${accent}, 0.08)`; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = `rgba(${accent}, 0.25)`; e.currentTarget.style.background = ind ? 'rgba(60, 60, 70, 0.4)' : 'rgba(0, 0, 0, 0.4)'; }}
           onClick={() => connectExternal(id)}
           disabled={!!connectingMethod}
         >
@@ -103,7 +106,7 @@ function WalletConnectOptions({ connectSocial, connectExternal, connectingMethod
         fontSize: '10px',
       }}>
         <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
-        <span style={{ padding: '0 10px', fontFamily: "'Orbitron', monospace", letterSpacing: '1px' }}>
+        <span style={{ padding: '0 10px', fontFamily: ind ? "'Share Tech Mono', monospace" : "'Orbitron', monospace", letterSpacing: ind ? '0.12em' : '1px', color: ind ? '#8a8070' : undefined }}>
           NEW TO WALLETS?
         </span>
         <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.1)' }} />
@@ -124,14 +127,14 @@ function WalletConnectOptions({ connectSocial, connectExternal, connectingMethod
       {/* Primary create-wallet button matching their Clerk auth */}
       <button
         style={{
-          background: 'linear-gradient(135deg, #00f5d4, #00bbff)',
-          border: 'none',
-          borderRadius: '10px',
+          background: ind ? '#d4a854' : 'linear-gradient(135deg, #00f5d4, #00bbff)',
+          border: ind ? '1px solid #b8922e' : 'none',
+          borderRadius: ind ? '3px' : '10px',
           padding: '13px 16px',
-          color: '#000',
-          fontSize: '13px',
-          fontWeight: '600',
-          fontFamily: "'Orbitron', monospace",
+          color: ind ? '#1a1a1f' : '#000',
+          fontSize: ind ? '11px' : '13px',
+          fontWeight: ind ? '700' : '600',
+          fontFamily: ind ? "'Share Tech Mono', monospace" : "'Orbitron', monospace",
           cursor: 'pointer',
           transition: 'all 0.2s',
           display: 'flex',
@@ -139,11 +142,11 @@ function WalletConnectOptions({ connectSocial, connectExternal, connectingMethod
           justifyContent: 'center',
           gap: '8px',
           width: '100%',
-          letterSpacing: '0.5px',
+          letterSpacing: ind ? '0.12em' : '0.5px',
           textTransform: 'uppercase',
           opacity: connectingMethod && connectingMethod !== (primaryStrategy || 'google') ? 0.5 : 1,
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 245, 212, 0.3)'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = ind ? '0 6px 20px rgba(212, 168, 84, 0.3)' : '0 8px 24px rgba(0, 245, 212, 0.3)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
         onClick={() => connectSocial(primaryStrategy || 'google')}
         disabled={!!connectingMethod}
@@ -156,7 +159,7 @@ function WalletConnectOptions({ connectSocial, connectExternal, connectingMethod
   );
 }
 
-export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' }) {
+export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', theme = 'cyber' }) {
   const { user } = useUser();
   const { signOut } = useClerk();
   const pathname = usePathname();
@@ -413,7 +416,7 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' })
 
   return (
     <>
-      <div className="modal-overlay" onClick={onClose}>
+      <div className={`modal-overlay${theme === 'industrial' ? ' theme-industrial' : ''}`} onClick={onClose}>
         <div className="unified-modal" onClick={(e) => e.stopPropagation()}>
           <button className="modal-close-btn" onClick={onClose}>×</button>
           
@@ -556,6 +559,7 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' })
                     connectingMethod={connectingMethod}
                     isMobile={isMobile}
                     clerkUser={user}
+                    theme={theme}
                   />
                 )}
               </div>
@@ -568,6 +572,7 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' })
                     connectingMethod={connectingMethod}
                     isMobile={isMobile}
                     clerkUser={user}
+                    theme={theme}
                   />
                 ) : loadingPrizes ? (
                   <div className="collection-loading">
@@ -709,7 +714,7 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' })
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 1001;
+          z-index: 9500;
           pointer-events: auto;
         }
 
@@ -1334,6 +1339,137 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account' })
             width: 95%;
             padding: 1.5rem;
           }
+        }
+
+        /* ── Industrial / Oil theme ─────────────────────────── */
+        .theme-industrial .unified-modal {
+          background: rgba(20, 20, 28, 0.97);
+          border: 1px solid #444;
+          background-image: none;
+          border-radius: 6px;
+          box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+          font-family: 'Share Tech Mono', monospace;
+        }
+
+        .theme-industrial .modal-close-btn {
+          color: #888;
+        }
+        .theme-industrial .modal-close-btn:hover {
+          color: #d4a854;
+        }
+
+        .theme-industrial .modal-tabs {
+          border-bottom-color: rgba(212, 168, 84, 0.25);
+        }
+
+        .theme-industrial .modal-tab {
+          font-family: 'Share Tech Mono', monospace;
+          color: #8a8070;
+          letter-spacing: 0.12em;
+          font-size: 0.7rem;
+        }
+        .theme-industrial .modal-tab.active {
+          color: #d4a854;
+          border-bottom-color: #d4a854;
+          text-shadow: none;
+        }
+        .theme-industrial .modal-tab:hover:not(.active) {
+          color: #c8c0b4;
+        }
+
+        .theme-industrial .user-avatar {
+          background: rgba(212, 168, 84, 0.1);
+          border-color: rgba(212, 168, 84, 0.3);
+          border-radius: 6px;
+        }
+
+        .theme-industrial .user-details h3 {
+          color: #e8e0d4;
+          font-family: 'Share Tech Mono', monospace;
+        }
+        .theme-industrial .user-details p {
+          color: #8a8070;
+        }
+
+        .theme-industrial .action-button {
+          background: #d4a854;
+          color: #1a1a1f;
+          border-radius: 3px;
+          font-family: 'Share Tech Mono', monospace;
+          font-size: 0.75rem;
+          letter-spacing: 0.12em;
+        }
+        .theme-industrial .action-button:hover {
+          box-shadow: 0 6px 20px rgba(212, 168, 84, 0.3);
+        }
+        .theme-industrial .action-button.signout,
+        .theme-industrial .action-button.disconnect {
+          background: rgba(60, 60, 70, 0.5);
+          border: 1px solid #555;
+          color: #c8c0b4;
+        }
+        .theme-industrial .action-button.signout:hover,
+        .theme-industrial .action-button.disconnect:hover {
+          border-color: #f87171;
+          color: #f87171;
+          box-shadow: none;
+        }
+        .theme-industrial .action-button.connect {
+          background: #d4a854;
+          border: 1px solid #b8922e;
+          color: #1a1a1f;
+        }
+        .theme-industrial .action-button.connect:hover {
+          box-shadow: 0 6px 20px rgba(212, 168, 84, 0.3);
+        }
+
+        .theme-industrial .wallet-info {
+          background: rgba(212, 168, 84, 0.08) !important;
+          border: 1px solid rgba(212, 168, 84, 0.25) !important;
+          border-radius: 4px;
+        }
+        .theme-industrial .wallet-label {
+          color: #8a8070;
+          font-family: 'Share Tech Mono', monospace;
+        }
+        .theme-industrial .wallet-address code {
+          background: rgba(212, 168, 84, 0.05);
+          border-color: rgba(212, 168, 84, 0.2);
+          color: #d4a854;
+          border-radius: 3px;
+          font-family: 'Share Tech Mono', monospace;
+        }
+        .theme-industrial .copy-btn:hover {
+          background: rgba(212, 168, 84, 0.1);
+          border-color: rgba(212, 168, 84, 0.3);
+          color: #d4a854;
+        }
+        .theme-industrial .balance-amount {
+          color: #d4a854 !important;
+          font-family: 'Share Tech Mono', monospace;
+          text-shadow: none;
+        }
+
+        .theme-industrial .loading-spinner {
+          border-color: rgba(212, 168, 84, 0.2);
+          border-top-color: #d4a854;
+        }
+
+        .theme-industrial .wallet-connect p {
+          color: #8a8070;
+        }
+
+        .theme-industrial .modal-content::-webkit-scrollbar-thumb {
+          background: rgba(212, 168, 84, 0.3);
+        }
+        .theme-industrial .modal-content::-webkit-scrollbar-thumb:hover {
+          background: rgba(212, 168, 84, 0.5);
+        }
+
+        /* WalletConnectOptions buttons inside industrial theme */
+        .theme-industrial .wallet-connect-options button {
+          font-family: 'Share Tech Mono', monospace;
+          border-radius: 3px;
         }
       `}</style>
     </>
