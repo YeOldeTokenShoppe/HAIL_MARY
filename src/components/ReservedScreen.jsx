@@ -217,7 +217,8 @@ const ReservedScreen = () => {
       if (videoRef.current) {
         videoRef.current.removeEventListener('ended', stopVideo)
         videoRef.current.pause()
-        videoRef.current.src = ''
+        videoRef.current.removeAttribute('src')
+        videoRef.current.load()
         videoRef.current = null
       }
     }

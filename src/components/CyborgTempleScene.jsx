@@ -385,48 +385,8 @@ const CyborgTempleScene = ({
   }, [onSwapCoinsReady])
 
   // ===========================================
-  // TOP ENGAGER AVATARS ON COIN FACES
+  // TOP ENGAGER AVATARS ON COIN FACES — disabled, using original GLB materials
   // ===========================================
-
-  // Fetch top 4 xPost authors by frequency
-  useEffect(() => {
-    if (!db) return
-    const fetchTopEngagers = async () => {
-      try {
-        const xPostsQ = query(collection(db, 'xPost'), orderBy('createdAt', 'desc'), limit(50))
-        const snapshot = await getDocs(xPostsQ)
-        const authorCounts = {}
-
-        snapshot.docs.forEach(doc => {
-          if (doc.id === '_meta') return
-          const data = doc.data()
-          if (!data.author || data.author === 'Unknown') return
-          const key = data.author
-          if (!authorCounts[key]) {
-            authorCounts[key] = {
-              username: data.author,
-              handle: data.handle || '',
-              imageUrl: data.authorImageUrl || '',
-              count: 0,
-            }
-          }
-          authorCounts[key].count++
-        })
-
-        // Sort by count, take top 4
-        const sorted = Object.values(authorCounts)
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 4)
-
-        topEngagersRef.current = sorted
-        // Apply avatars now that data is ready (coin faces may already be found)
-        applyTopEngagerAvatars()
-      } catch (err) {
-        console.warn('[CyborgTempleScene] Failed to fetch top engagers:', err)
-      }
-    }
-    fetchTopEngagers()
-  }, [])
 
   // Create a circular avatar CanvasTexture from an image URL
   const createAvatarTexture = (imageUrl, index) => {
@@ -1529,9 +1489,6 @@ const CyborgTempleScene = ({
           child.userData.targetObject = child;
         }
       });
-
-      // After traversal, apply top engager avatars to CoinFace meshes
-      applyTopEngagerAvatars();
 
       // Store local start positions for all coin meshes (needed for staggered carousel orbit around Z-axis)
       const coinMeshRefs = [coin1Ref, coin2Ref, coin3Ref, coin4Ref]
@@ -3291,7 +3248,7 @@ const CyborgTempleScene = ({
   return (
     <group ref={groupRef} visible={true} position={position} scale={scale} rotation={rotation}>
       {/* The 3D model is added dynamically in useEffect */}
-      <FloatingWordCluster words={followerWords.length > 0 ? followerWords : WORD_CLUSTER_WORDS} center={[0, 2.8, 0]} clusterScale={0.22}/>
+      {/* <FloatingWordCluster words={followerWords.length > 0 ? followerWords : WORD_CLUSTER_WORDS} center={[0, 2.8, 0]} clusterScale={0.22}/> */}
     </group>
   );
 };

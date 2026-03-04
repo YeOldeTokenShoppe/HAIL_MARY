@@ -18,6 +18,7 @@ export default function OilPlotChat({
   hasMessages = false,
   onRead,
   onTransferPlot,
+  unlockedItems,
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [messages, setMessages] = useState([]);
@@ -42,6 +43,7 @@ export default function OilPlotChat({
   const [transferring, setTransferring] = useState(false);
   const [transferError, setTransferError] = useState("");
   const [transferSuccess, setTransferSuccess] = useState(false);
+  const [transferUpgrades, setTransferUpgrades] = useState(false);
 
   const isOwner = !!currentUserId && currentUserId === plotOwnerId;
 
@@ -193,7 +195,7 @@ export default function OilPlotChat({
     setTransferError("");
     setTransferSuccess(false);
     try {
-      const result = await onTransferPlot(transferUsername.trim());
+      const result = await onTransferPlot(transferUsername.trim(), transferUpgrades);
       if (result?.error) {
         setTransferError(result.error);
       } else {
@@ -206,7 +208,7 @@ export default function OilPlotChat({
     } finally {
       setTransferring(false);
     }
-  }, [onTransferPlot, transferUsername]);
+  }, [onTransferPlot, transferUsername, transferUpgrades]);
 
   // ── No plot selected ──────────────────────────────────────────────────────
   if (!plotKey) {
@@ -382,6 +384,18 @@ export default function OilPlotChat({
                 maxLength={40}
                 disabled={transferring}
               />
+              {unlockedItems && unlockedItems.size > 0 && (
+                <label style={{ display: "flex", alignItems: "center", gap: 5, fontFamily: mono, fontSize: 9, color: c.text, marginBottom: 6, cursor: "pointer", userSelect: "none" }}>
+                  <input
+                    type="checkbox"
+                    checked={transferUpgrades}
+                    onChange={(e) => setTransferUpgrades(e.target.checked)}
+                    disabled={transferring}
+                    style={{ margin: 0, cursor: "pointer" }}
+                  />
+                  Include purchased upgrades
+                </label>
+              )}
               {transferUsername.trim() && !transferSuccess && (
                 <p style={{ fontFamily: mono, fontSize: 9, color: "#c44", margin: "0 0 6px", lineHeight: 1.3 }}>
                   This will transfer your plot to <strong>{transferUsername.trim()}</strong>. You will lose ownership.

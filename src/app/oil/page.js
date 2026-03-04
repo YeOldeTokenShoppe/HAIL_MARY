@@ -1421,7 +1421,7 @@ export default function OilPage() {
   }, [user?.id, userDrill, allPlotsMap, handleFlyTo]);
 
   // ── Transfer Plot handler ──
-  const handleTransferPlot = useCallback(async (recipientUsername) => {
+  const handleTransferPlot = useCallback(async (recipientUsername, transferUpgrades) => {
     if (!user?.id || !db || !userDrill || userDrill.col == null) {
       return { error: "You don't own a plot to transfer" };
     }
@@ -1502,6 +1502,27 @@ export default function OilPage() {
           plotCol: senderCol,
           plotRow: senderRow,
         });
+
+        // Transfer premium upgrades if opted in
+        if (transferUpgrades) {
+          const senderPurchRef = doc(db, "oilPurchases", user.id);
+          const recipientPurchRef = doc(db, "oilPurchases", recipientId);
+          const senderPurchSnap = await transaction.get(senderPurchRef);
+          const recipientPurchSnap = await transaction.get(recipientPurchRef);
+
+          const senderUnlocked = senderPurchSnap.exists() ? (senderPurchSnap.data().unlocked || {}) : {};
+          const recipientUnlocked = recipientPurchSnap.exists() ? (recipientPurchSnap.data().unlocked || {}) : {};
+
+          if (Object.keys(senderUnlocked).length > 0) {
+            const mergedUnlocked = { ...recipientUnlocked, ...senderUnlocked };
+            transaction.set(recipientPurchRef, { unlocked: mergedUnlocked }, { merge: true });
+            // Clear all unlocked keys from sender
+            const clearedUnlocked = {};
+            const { deleteField } = await import("firebase/firestore");
+            for (const key of Object.keys(senderUnlocked)) clearedUnlocked[`unlocked.${key}`] = deleteField();
+            transaction.update(senderPurchRef, clearedUnlocked);
+          }
+        }
 
         // Clear sender's oilDrills
         const senderDrillRef = doc(db, "oilDrills", user.id);
@@ -3132,6 +3153,7 @@ export default function OilPage() {
                       minDistance={0.1}
                       maxDistance={15}
                       maxPolarAngle={Math.PI}
+                      minPolarAngle={0}
                       zoomToCursor
                       target={[0, 1, 0]}
                     />
@@ -3277,7 +3299,7 @@ export default function OilPage() {
           {(isAdmin || isReport) && inspectorPanel}
           {statsPanel}
           {leaderboardPanel}
-          <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={darkMode} isMobile hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} />
+          <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={darkMode} isMobile hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} />
           {(isAdmin || isReport) && topClaimsPanel}
           {(isAdmin || isReport) && dryZonesPanel}
           {(isAdmin || isReport) && depositsPanel}
@@ -3507,6 +3529,7 @@ export default function OilPage() {
                   minDistance={5}
                   maxDistance={45}
                   maxPolarAngle={Math.PI}
+                  minPolarAngle={0}
                   target={[0, 3, 0]}
                   zoomToCursor
                 />
@@ -3668,7 +3691,7 @@ export default function OilPage() {
             {(isAdmin || isReport) && demoDrillPanel}
             {statsPanel}
             {leaderboardPanel}
-            <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={darkMode} hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} />
+            <OilPlotChat plotKey={selectedX !== null ? `${selectedX}_${sliceY}` : null} plotOwnerId={plotOwnerForCell} currentUserId={user?.id} username={user?.username || user?.firstName || "anon"} darkMode={darkMode} hasMessages={selectedX !== null && !!plotsWithMessages[`${selectedX}_${sliceY}`]} onRead={(pk) => { dismissedPlotsRef.current[pk] = Math.floor(Date.now() / 1000); setPlotsWithMessages((prev) => { const next = { ...prev }; delete next[pk]; return next; }); }} onTransferPlot={handleTransferPlot} unlockedItems={unlockedItems} />
             {(isAdmin || isReport) && inspectorPanel}
             {(isAdmin || isReport) && topClaimsPanel}
             {(isAdmin || isReport) && dryZonesPanel}

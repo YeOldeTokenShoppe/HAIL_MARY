@@ -388,57 +388,10 @@ function VideoScreens({ is80sMode = false }) {
           // console.log('[VideoScreens] Screen1_RScreen canvas setup complete');
         }
         
-        // Screen2 - Setup canvas texture for MacroAgentScreen OR video texture for 80s mode
+        // Screen2 - Keep original GLB image texture
         if (child.isMesh && child.name === 'Screen2' && !screen2Found) {
-          // console.log('[VideoScreens] Found Screen2');
           screen2Found = true;
-          
-          // Show video if in 80s mode AND not toggled to regular content
-          if (is80sMode && !showRegularContent.Screen2) {
-            // Apply video texture in 80s mode
-            const material = new THREE.MeshBasicMaterial({
-              map: texture3,
-              side: THREE.FrontSide,
-              toneMapped: false,
-            });
-            child.material = material;
-            video3.play().catch(() => {});
-          } else {
-            // Create canvas for drawing
-            const canvas2 = document.createElement('canvas');
-            canvas2.width = 512;
-            canvas2.height = 320;
-            
-            // Create texture from canvas
-            const canvasTexture2 = new THREE.CanvasTexture(canvas2);
-            canvasTexture2.minFilter = THREE.LinearFilter;
-            canvasTexture2.magFilter = THREE.LinearFilter;
-            canvasTexture2.flipY = false;
-            canvasTexture2.repeat.x = 1;
-            canvasTexture2.center.set(0.5, 0.5);
-            
-            // Apply to Screen2
-            const material2 = new THREE.MeshBasicMaterial({
-              map: canvasTexture2,
-              side: THREE.FrontSide,
-              toneMapped: false,
-            });
-            
-            child.material = material2;
-            
-            // Store refs globally for MacroAgentScreen to use
-            // @ts-ignore
-            window['__screen2Canvas'] = canvas2;
-            // @ts-ignore
-            window['__screen2Texture'] = canvasTexture2;
-            // @ts-ignore
-            window['__screen2Mesh'] = child;
-          }
-          
-          // console.log('[VideoScreens] Screen2 canvas setup complete', {
-          //   canvas: !!window['__screen2Canvas'],
-          //   texture: !!window['__screen2Texture']
-          // });
+          // Using the image texture already applied in the GLB
         }
         
         // Screen2_small - Apply video texture
@@ -683,54 +636,10 @@ function VideoScreens({ is80sMode = false }) {
           }
         }
         
-        // Screen4 - Setup canvas texture for RL80Screen OR video texture for 80s mode
+        // Screen4 - Keep original GLB image texture
         if (child.isMesh && child.name === 'Screen4' && !screen4Found) {
-          // console.log('[VideoScreens] Found Screen4');
           screen4Found = true;
-          
-          // Show video if in 80s mode AND not toggled to regular content
-          if (is80sMode && !showRegularContent.Screen4) {
-            // Apply video texture in 80s mode
-            const material = new THREE.MeshBasicMaterial({
-              map: texture5,
-              side: THREE.FrontSide,
-              toneMapped: false,
-            });
-            child.material = material;
-            video5.play().catch(() => {});
-          } else {
-            // Create canvas for drawing
-            const canvas4 = document.createElement('canvas');
-            canvas4.width = 512;
-            canvas4.height = 320;
-            
-            // Create texture from canvas
-            const canvasTexture4 = new THREE.CanvasTexture(canvas4);
-            canvasTexture4.minFilter = THREE.LinearFilter;
-            canvasTexture4.magFilter = THREE.LinearFilter;
-            canvasTexture4.flipY = false;
-            canvasTexture4.repeat.x = 1;
-            canvasTexture4.center.set(0.5, 0.5);
-            
-            // Apply to Screen4
-            const material4 = new THREE.MeshBasicMaterial({
-              map: canvasTexture4,
-              side: THREE.FrontSide,
-              toneMapped: false,
-            });
-            
-            child.material = material4;
-            
-            // Store refs globally for RL80Screen to use
-            // @ts-ignore
-            window['__screen4Canvas'] = canvas4;
-            // @ts-ignore
-            window['__screen4Texture'] = canvasTexture4;
-            // @ts-ignore
-            window['__screen4Mesh'] = child;
-          }
-          
-          // console.log('[VideoScreens] Screen4 canvas setup complete for RL80Screen');
+          // Using the image texture already applied in the GLB
         }
         
         // Screen4_small - Apply video texture

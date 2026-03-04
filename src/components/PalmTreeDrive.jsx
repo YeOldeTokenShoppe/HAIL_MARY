@@ -2170,7 +2170,7 @@ const PalmsScene = ({ onLoadingChange }) => {
         
         if (intersects.length > 0) {
           const isMobile = detectMobileDevice();
-          const destination = isMobile ? '/about' : '/about';
+          const destination = isMobile ? '/about' : '/arcade';
           
           // Add fade out transition before navigating
           gsap.to(mountRef.current, {
@@ -2196,7 +2196,7 @@ const PalmsScene = ({ onLoadingChange }) => {
             const distance = intersect.point.distanceTo(maryPos);
             if (distance < 2) { // Within 2 units of Mary's position
               const isMobile = detectMobileDevice();
-              const destination = isMobile ? '/about' : '/about';
+              const destination = isMobile ? '/about' : '/arcade';
 
               // Add fade out transition before navigating
               gsap.to(mountRef.current, {
@@ -2670,7 +2670,7 @@ const PalmsScene = ({ onLoadingChange }) => {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                router.push('/about');
+                router.push('/arcade');
               }}
               style={{
                 padding: isMobile ? '10px 25px' : '15px 40px',

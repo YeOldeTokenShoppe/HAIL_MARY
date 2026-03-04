@@ -17,6 +17,7 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import CyberNav from '@/components/CyberNav';
 import NavControls from '@/components/NavControls';
 import NavControlsMobile from '@/components/NavControlsMobile';
+import MobileBottomNav from '@/components/MobileBottomNav';
 import SimpleTextLoader from '@/components/SimpleTextLoader';
 import SynthSunset from '@/components/SynthSunset';
 import LightCandleModal from '@/components/LightCandleModal';
@@ -497,7 +498,7 @@ export default function CyborgTemple() {
         overflow: "hidden"
       }}>
         {/* RL80 Title and Description */}
-        <div style={{
+        {/* <div style={{
           position: "fixed",
           top: "20px",
           left: isMobileView ? "2rem" : "5rem",
@@ -547,7 +548,35 @@ export default function CyborgTemple() {
               );
             })}
           </div>
-        </div>
+        </div> */}
+         <h1
+              className="custom-title"
+              style={{
+                position: "relative",
+                left: "2rem",
+                top: "-1.5rem",
+                color: "#f6f5f1ff",
+                fontFamily: "UnifrakturCook, serif",
+                animation:  
+                  "torchFlicker 3s ease-in-out infinite",
+                fontSize: "3rem",
+                fontWeight: 900,
+                lineHeight: 0.85,
+                transform: "rotate(-8deg) skew(-15deg)",
+                zIndex: 1000,
+                whiteSpace: "nowrap",
+                cursor: "pointer",
+                marginTop: "1rem",
+                pointerEvents: "auto",
+              }}
+            >
+            <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
+            <span className="title-line" style={{ display: 'block', position: 'relative' }}>
+              <span style={{ fontSize: "2rem" }}>of    </span>
+              Perpetual
+            </span>
+            <span className="title-line" style={{ display: 'block', marginLeft: "4rem", position: 'relative' }}>Profit</span>
+          </h1>
         
         {/* Temple Description Panel - Separate from RL80 logo */}
         <div 
@@ -944,7 +973,7 @@ export default function CyborgTemple() {
         })()}
 
         {/* Coin Mode Buttons - Mobile only */}
-        {isMobileView && mounted && !isCandleModalOpen && (
+        {/* {isMobileView && mounted && !isCandleModalOpen && (
           <div style={{
             position: 'fixed',
             bottom: '5.5rem',
@@ -1019,7 +1048,7 @@ export default function CyborgTemple() {
               Project<br/>Mgrs
             </button>
           </div>
-        )}
+        )} */}
 
         {/* Coin Video Overlay — expands from coin position */}
         {coinVideo && (
@@ -1216,38 +1245,20 @@ export default function CyborgTemple() {
         {/* Top Controls Container - Music, User, and Nav */}
         {mounted && (
           <>
-            {/* Nav Controls - Desktop vs Mobile */}
-            <div
-              style={{
-                position: "fixed",
-                top: "1rem",
-                right: "1rem",
-                zIndex: 1001,
-                opacity: focusedAgent?.startsWith('Screen') ? 0 : 1,
-                pointerEvents: focusedAgent?.startsWith('Screen') ? 'none' : 'auto',
-                transition: 'opacity 0.3s ease',
-              }}
-            >
-              {isMobileView ? (
-                <NavControlsMobile 
-                  isPlaying={contextIsPlaying}
-                  onPlayMusic={() => play()}
-                  onStopMusic={() => pause()}
-                  onSkipTrack={() => nextTrack()}
-                  onUserClick={() => {
-                    if (isSignedIn) {
-                      openUserProfile();
-                    } else {
-                      openSignIn({ forceRedirectUrl: "/trade" });
-                    }
-                  }}
-                  onMenuClick={() => setShowCyberNav(!showCyberNav)}
-                  isUserSignedIn={isSignedIn}
-                  isMenuOpen={showCyberNav}
-                  userImage={user?.imageUrl}
-                />
-              ) : (
-                <NavControls 
+            {/* Nav Controls - Desktop only */}
+            {!isMobileView && (
+              <div
+                style={{
+                  position: "fixed",
+                  top: "1rem",
+                  right: "1rem",
+                  zIndex: 1001,
+                  opacity: focusedAgent?.startsWith('Screen') ? 0 : 1,
+                  pointerEvents: focusedAgent?.startsWith('Screen') ? 'none' : 'auto',
+                  transition: 'opacity 0.3s ease',
+                }}
+              >
+                <NavControls
                   auroraOn={useAurora}
                   setAuroraOn={setUseAurora}
                   is80s={context80sMode}
@@ -1260,8 +1271,28 @@ export default function CyborgTemple() {
                   isUserSignedIn={isSignedIn}
                   isMenuOpen={showCyberNav}
                 />
-              )}
-            </div>
+              </div>
+            )}
+
+            {/* Mobile Bottom Nav */}
+            {isMobileView && (
+              <MobileBottomNav
+                isPlaying={contextIsPlaying}
+                onPlayMusic={() => play()}
+                onStopMusic={() => pause()}
+                onSkipTrack={() => nextTrack()}
+                onMenuClick={() => setShowCyberNav(!showCyberNav)}
+                onUserClick={() => {}}
+                isUserSignedIn={isSignedIn}
+                isMenuOpen={showCyberNav}
+                is80sMode={context80sMode}
+                userImage={user?.imageUrl}
+                onBuyClick={() => {}}
+                isMobile
+                show80sButton={false}
+                darkMode
+              />
+            )}
 
             {/* Telegram Feature Box - Desktop only */}
             {!isMobileView && !focusedAgent?.startsWith('Screen') && (
@@ -1315,7 +1346,7 @@ export default function CyborgTemple() {
             )}
 
             {/* Light a Candle Button - Desktop only */}
-            {!isMobileView && !focusedAgent?.startsWith('Screen') && (
+            {/* {!isMobileView && !focusedAgent?.startsWith('Screen') && (
               <button
                 onClick={() => setShowLightModal(true)}
                 style={{
@@ -1348,7 +1379,7 @@ export default function CyborgTemple() {
                   Light a Candle
                 </span>
               </button>
-            )}
+            )} */}
 
             {/* CyberNav Menu - Show when toggled */}
             <CyberNav
