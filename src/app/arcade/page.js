@@ -236,7 +236,7 @@ export default function ArcadePage() {
                 zIndex: 1000,
                 whiteSpace: "nowrap",
                 cursor: "pointer",
-                marginTop: "1rem",
+                marginTop: "0rem",
                 pointerEvents: "auto",
               }}
             >

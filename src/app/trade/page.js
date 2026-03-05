@@ -565,7 +565,7 @@ export default function CyborgTemple() {
                 zIndex: 1000,
                 whiteSpace: "nowrap",
                 cursor: "pointer",
-                marginTop: "1rem",
+                marginTop: "0",
                 pointerEvents: "auto",
               }}
             >
