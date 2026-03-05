@@ -557,8 +557,7 @@ export default function CyborgTemple() {
                 top: "-1.5rem",
                 color: "#f6f5f1ff",
                 fontFamily: "UnifrakturCook, serif",
-                animation:  
-                  "torchFlicker 3s ease-in-out infinite",
+                textShadow: "0 0 10px rgba(212, 175, 55, 0.8), 0 0 20px rgba(212, 175, 55, 0.6), 0 0 30px rgba(212, 175, 55, 0.8), 6px 6px 16px rgba(0, 0, 0, 1), -2px -2px 8px rgba(255, 192, 203, 0.7), 0 0 100px rgba(212, 175, 55, 0.1)",
                 fontSize: "3rem",
                 fontWeight: 900,
                 lineHeight: 0.85,
@@ -932,6 +931,7 @@ export default function CyborgTemple() {
             RL80: { name: 'Our Lady', tagline: 'The oracle. She sees the chain.' },
             Demon: { name: 'H80Z', tagline: 'The hype man. First to pump, last to dump.' },
             Monk: { name: 'St. GR80', tagline: 'The philosopher. Patience is the path.' },
+            Fluffy: { name: 'FR80 Cat', tagline: 'The guardian. Nine lives, one mission.' },
           };
           const info = focusedAgent && agentInfo[focusedAgent];
           return (
@@ -1339,7 +1339,7 @@ export default function CyborgTemple() {
                     lineHeight: '1.3',
                     textAlign: 'center',
                   }}>
-                    Join us for a chat in the Telegram group!
+                    Join us in Telegram!
                   </span>
                 </div>
               </a>

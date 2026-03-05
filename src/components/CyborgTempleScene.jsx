@@ -961,6 +961,9 @@ const CyborgTempleScene = ({
         else if (child.name === 'Tekno_Empty') {
           animatedCharacters['Tekno'] = child;
         }
+        else if (child.name === 'Fluffy_Empty') {
+          animatedCharacters['Fluffy'] = child;
+        }
       });
       
       // Create separate mixers for each character
@@ -1054,6 +1057,10 @@ const CyborgTempleScene = ({
           }
           // Standard Root-based animations for RL80 and Tekno only
           // (Demon uses Root.001|* / Pelvis animations, Monk uses *_monk animations)
+          // Fluffy animations (sit_idle, or any _fluffy suffixed)
+          else if (animName === 'sit_idle' || animName.endsWith('_fluffy')) {
+            targetCharacters = ['Fluffy'];
+          }
           else if (firstTrackBone === 'Root' ||
                    animName === 'Typing' || animName === 'Idle' ||
                    animName === 'Disbelief' || animName === 'FistPump' ||
@@ -1126,13 +1133,19 @@ const CyborgTempleScene = ({
             } else {
               defaultAnimName = availableAnims[0];
             }
+          } else if (charName === 'Fluffy') {
+            if (charActions['sit_idle']) {
+              defaultAnimName = 'sit_idle';
+            } else {
+              defaultAnimName = availableAnims[0];
+            }
           }
           
           if (defaultAnimName && charActions[defaultAnimName]) {
             defaultAnim = charActions[defaultAnimName];
             
             // Add some timing variation for visual interest
-            if (charName === 'Monk' || charName === 'Tekno' || charName === 'Demon') {
+            if (charName === 'Monk' || charName === 'Tekno' || charName === 'Demon' || charName === 'Fluffy') {
               defaultAnim.time = Math.random() * defaultAnim.getClip().duration * 0.5;
             }
             defaultAnim.setLoop(THREE.LoopRepeat);
@@ -1308,13 +1321,15 @@ const CyborgTempleScene = ({
         // Make the council characters clickable
         if (child.name === 'Demon' || child.name === 'Demon_empty' ||
             child.name === 'Monk_empty' || child.name === 'SK_Chr_Monk_01' ||
-            child.name === 'Tekno' || child.name === 'Tekno_Empty') {
+            child.name === 'Tekno' || child.name === 'Tekno_Empty' ||
+            child.name === 'Fluffy_Empty') {
 
           // Normalize agentId to consistent names
           let agentId = child.name;
           if (child.name === 'Demon' || child.name === 'Demon_empty') agentId = 'Demon';
           else if (child.name === 'Monk_empty' || child.name === 'SK_Chr_Monk_01') agentId = 'Monk';
           else if (child.name === 'Tekno' || child.name === 'Tekno_Empty') agentId = 'Tekno';
+          else if (child.name === 'Fluffy_Empty') agentId = 'Fluffy';
 
           const setMechClickableData = (obj) => {
             obj.userData.clickable = true;
@@ -1736,7 +1751,7 @@ const CyborgTempleScene = ({
               child.getWorldPosition(pos);
             }
             
-            if (child.name === 'Demon' || child.name === 'Monk_empty' || child.name === 'Tekno') {
+            if (child.name === 'Demon' || child.name === 'Monk_empty' || child.name === 'Tekno' || child.name === 'Fluffy_Empty') {
               const pos = new THREE.Vector3();
               child.getWorldPosition(pos);
             }
@@ -2189,6 +2204,11 @@ const CyborgTempleScene = ({
             // Screen3: (0.995, 0.614, -1.027)
             // Screen4: (0.770, 0.614, 0.552)
             
+            'Fluffy': {
+              // Fluffy - opposite side of Monk
+              cameraPos: new THREE.Vector3(0.55, -0.6, -1.65),
+              lookAtPos: new THREE.Vector3(1.615, -0.7, -1.736)
+            },
             'Angel': {
               // Angel at top of scene, above the screens
               cameraPos: new THREE.Vector3(0, 1.8, 1.2),
