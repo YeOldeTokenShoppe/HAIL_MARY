@@ -132,8 +132,10 @@ const CyberNav = ({
   const navItems = [
     { id: '00', date: t('cyberNav.nav00.date'), title: t('cyberNav.nav00.title'), path: '/', thumbnail: '/images/I-80.webp' },
     // { id: '01', date: t('cyberNav.nav01.date'), title: t('cyberNav.nav01.title'), path: '/about', thumbnail: '/images/ROSE_TATTOO.webp' },
-    { id: '02', date: t('cyberNav.nav03.date'), title: t('cyberNav.nav03.title'), path: '/arcade', thumbnail: '/images/DIAMOND_TATTOO2.webp' },
+    // { id: '02', date: t('cyberNav.nav03.date'), title: t('cyberNav.nav03.title'), path: '/arcade', thumbnail: '/images/DIAMOND_TATTOO2.webp' },
     { id: '03', date: t('cyberNav.nav04.date'), title: t('cyberNav.nav04.title'), path: '/trade', thumbnail: '/images/sacreCoeur.webp' },
+        { id: '02', date: t('cyberNav.nav03.date'), title: t('cyberNav.nav03.title'), path: '/arcade', thumbnail: '/images/DIAMOND_TATTOO2.webp' },
+
     // { id: '04', date: t('cyberNav.nav05.date'), title: t('cyberNav.nav05.title'), path: '/ride', thumbnail: '/images/beast.webp' },
     // { id: '03', date: 'PRAYER & PROBABIL80', title: 'TRADE SCHOOL', path: '/trade', thumbnail: '/images/3ACES_TATTOO.webp' },
     { id: '05', date: t('cyberNav.nav06.date'), title: t('cyberNav.nav06.title'), path: '/exlibris', thumbnail: '/images/ILLUMIN80_TATTOO.webp' },

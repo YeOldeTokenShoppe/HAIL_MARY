@@ -36,6 +36,8 @@ export default function ArcadePage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [screenTransition, setScreenTransition] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
   const is80sMode = context80sMode;
 
   // Mobile detection
@@ -75,6 +77,22 @@ export default function ArcadePage() {
 
   const handleSceneReady = useCallback(() => {
     setIsLoading(false);
+  }, []);
+
+  const handleZoomReady = useCallback(() => {
+    setShowConfirm(true);
+  }, []);
+
+  const handleConfirmEnter = useCallback(() => {
+    setShowConfirm(false);
+    setConfirmAction("enter");
+  }, []);
+
+  const handleCancelEnter = useCallback(() => {
+    setShowConfirm(false);
+    setConfirmAction("back");
+    // Reset so the action can be triggered again on next click
+    setTimeout(() => setConfirmAction(null), 200);
   }, []);
 
   const handleEnterScreen = useCallback(() => {
@@ -189,7 +207,7 @@ export default function ArcadePage() {
           zIndex: 1,
         }}
       >
-        <ArcadeScene is80sMode={is80sMode} onLoaded={handleSceneReady} onEnterScreen={handleEnterScreen} />
+        <ArcadeScene is80sMode={is80sMode} onLoaded={handleSceneReady} onEnterScreen={handleEnterScreen} onZoomReady={handleZoomReady} confirmAction={confirmAction} />
       </div>
 
       {/* Title — Desktop */}
@@ -433,6 +451,123 @@ export default function ArcadePage() {
         onClose={() => setShowBuyModal(false)}
       />
 
+      {/* Confirm popup — shown when zoomed into Screen1 */}
+      {showConfirm && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            zIndex: 90000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            pointerEvents: "auto",
+          }}
+        >
+          <div
+            style={{
+              background: is80sMode
+                ? "linear-gradient(135deg, rgba(20, 0, 40, 0.95), rgba(40, 0, 60, 0.9))"
+                : "linear-gradient(135deg, rgba(10, 8, 5, 0.95), rgba(30, 25, 15, 0.9))",
+              border: is80sMode
+                ? "1px solid rgba(201, 55, 255, 0.6)"
+                : "1px solid rgba(212, 175, 55, 0.4)",
+              borderRadius: 12,
+              padding: "2rem 2.5rem",
+              textAlign: "center",
+              maxWidth: 340,
+              boxShadow: is80sMode
+                ? "0 0 40px rgba(201, 55, 255, 0.3), inset 0 0 20px rgba(201, 55, 255, 0.05)"
+                : "0 0 40px rgba(212, 175, 55, 0.2), inset 0 0 20px rgba(212, 175, 55, 0.03)",
+              animation: "confirmFadeIn 0.3s ease-out",
+            }}
+          >
+            <p
+              style={{
+                color: is80sMode ? "#e0b0ff" : "#f6f5f1",
+                fontFamily: "'UnifrakturMaguntia', serif",
+                fontSize: "1.4rem",
+                margin: "0 0 0.5rem 0",
+                textShadow: is80sMode
+                  ? "0 0 10px rgba(201, 55, 255, 0.5)"
+                  : "0 0 10px rgba(212, 175, 55, 0.3)",
+              }}
+            >
+              Enter the Oil Fields?
+            </p>
+            <p
+              style={{
+                color: is80sMode ? "rgba(200, 180, 255, 0.6)" : "rgba(246, 245, 241, 0.5)",
+                fontSize: "0.8rem",
+                margin: "0 0 1.5rem 0",
+                fontFamily: "monospace",
+              }}
+            >
+              You will be redirected to /oil
+            </p>
+            <div style={{ display: "flex", gap: "1rem", justifyContent: "center" }}>
+              <button
+                onClick={handleCancelEnter}
+                style={{
+                  padding: "0.6rem 1.5rem",
+                  borderRadius: 8,
+                  border: is80sMode
+                    ? "1px solid rgba(201, 55, 255, 0.3)"
+                    : "1px solid rgba(212, 175, 55, 0.2)",
+                  background: "transparent",
+                  color: is80sMode ? "#c080ff" : "#d4af37",
+                  fontFamily: "monospace",
+                  fontSize: "0.9rem",
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = is80sMode
+                    ? "rgba(201, 55, 255, 0.1)"
+                    : "rgba(212, 175, 55, 0.1)";
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = "transparent";
+                }}
+              >
+                Go Back
+              </button>
+              <button
+                onClick={handleConfirmEnter}
+                style={{
+                  padding: "0.6rem 1.5rem",
+                  borderRadius: 8,
+                  border: "none",
+                  background: is80sMode
+                    ? "linear-gradient(135deg, rgba(201, 55, 255, 0.8), rgba(150, 0, 200, 0.8))"
+                    : "linear-gradient(135deg, rgba(212, 175, 55, 0.8), rgba(180, 140, 30, 0.8))",
+                  color: "#fff",
+                  fontFamily: "monospace",
+                  fontSize: "0.9rem",
+                  fontWeight: "bold",
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                  boxShadow: is80sMode
+                    ? "0 0 15px rgba(201, 55, 255, 0.3)"
+                    : "0 0 15px rgba(212, 175, 55, 0.2)",
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = "scale(1.05)";
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = "scale(1)";
+                }}
+              >
+                Enter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Screen enter transition — white flash that fills the viewport */}
       {screenTransition && (
         <div
@@ -450,6 +585,16 @@ export default function ArcadePage() {
         />
       )}
       <style jsx>{`
+        @keyframes confirmFadeIn {
+          0% {
+            opacity: 0;
+            transform: scale(0.9);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
         @keyframes screenEnter {
           0% {
             opacity: 0;
