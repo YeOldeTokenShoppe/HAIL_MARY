@@ -276,6 +276,8 @@ function DuckHuntGame({ scene }) {
       if (isZoomingToGun.current) return;
 
       if (aimMode) {
+        // Stop other click handlers (ScreenZoomPortal) from firing during aim mode
+        event.stopImmediatePropagation();
         // In aim mode — shoot from crosshair position (converted from CSS % to NDC)
         const chPos = CROSSHAIR_POS[activeShotgunName.current] || { top: 50, left: 50 };
         const ndcX = (chPos.left / 50) - 1;   // 50% → 0, 0% → -1, 100% → 1
@@ -356,7 +358,7 @@ function DuckHuntGame({ scene }) {
         const aimDir = baseBarrelDir.current.clone().applyQuaternion(yawQ).applyQuaternion(pitchQ);
         const barrelTip = pivotWorld.clone().add(aimDir.clone().multiplyScalar(0.5));
 
-        // Collect target meshes and ensure they're double-sided for raycasting
+        // Collect target meshes for raycasting (original world size ~0.048 units)
         const targets = [];
         scene.traverse((child) => {
           if (TARGET_MESHES.has(child.name)) {
@@ -368,39 +370,28 @@ function DuckHuntGame({ scene }) {
           }
         });
 
-        // Use bounding-sphere proximity test for flat target planes
-        // (flat meshes are nearly impossible to hit with a ray)
-        const ray = raycaster.ray;
-        const HIT_RADIUS = 0.15; // world-space radius around target center that counts as a hit
-        let closestTarget = null;
-        let closestDist = Infinity;
-        const _wp = new THREE.Vector3();
-        const _proj = new THREE.Vector3();
-        for (const t of targets) {
-          t.getWorldPosition(_wp);
-          // Find closest point on ray to target center
-          _proj.copy(_wp).sub(ray.origin);
-          const along = _proj.dot(ray.direction);
-          if (along < 0) continue; // behind the gun
-          const pointOnRay = ray.origin.clone().add(ray.direction.clone().multiplyScalar(along));
-          const dist = pointOnRay.distanceTo(_wp);
-          if (dist < HIT_RADIUS && dist < closestDist) {
-            closestDist = dist;
-            closestTarget = t;
-          }
-        }
+        // Actual mesh raycasting with double-sided targets
+        const hits = raycaster.intersectObjects(targets, true);
 
-        // Get the actual world position of the closest target (not _wp which is the last iterated)
-        const closestPoint = new THREE.Vector3();
-        if (closestTarget) closestTarget.getWorldPosition(closestPoint);
-        const hits = closestTarget ? [{ object: closestTarget, point: closestPoint }] : [];
-        // --- Projectile ball (flies along raycaster ray) ---
+        // Also check for duck body hits (sound only, no knockdown)
+        const duckMeshes = [];
+        scene.traverse((child) => {
+          if (DUCK_MESHES.has(child.name) && child.isMesh) {
+            duckMeshes.push(child);
+          }
+        });
+        const duckHits = raycaster.intersectObjects(duckMeshes, true);
+        const hitDuckBody = hits.length === 0 && duckHits.length > 0;
+
+        // Ball flies along the ray
         const rayOrigin = raycaster.ray.origin.clone();
         const rayDir = raycaster.ray.direction.clone();
         const ballStart = rayOrigin.clone().add(rayDir.clone().multiplyScalar(0.3));
         const ballEnd = hits.length > 0
           ? hits[0].point.clone()
-          : rayOrigin.clone().add(rayDir.clone().multiplyScalar(10));
+          : duckHits.length > 0
+            ? duckHits[0].point.clone()
+            : rayOrigin.clone().add(rayDir.clone().multiplyScalar(10));
         const flightDist = ballStart.distanceTo(ballEnd);
         const BALL_SPEED = 14;
         const ballGeo = new THREE.SphereGeometry(0.06, 10, 10);
@@ -429,6 +420,7 @@ function DuckHuntGame({ scene }) {
           totalTime: flightDist / BALL_SPEED,
           age: 0,
           pendingPivot, // knock down duck when ball arrives
+          hitDuckBody, // duck body hit — sound only
         });
 
         // --- Muzzle flash (bright point light + small glowing sphere) ---
@@ -613,6 +605,13 @@ function DuckHuntGame({ scene }) {
           }
         });
       }
+      // Play sound on duck body hit (no knockdown)
+      if (t >= 0.75 && tr.hitDuckBody) {
+        const sfx = new Audio("/duckHunt.mp3");
+        sfx.volume = 0.4;
+        sfx.play().catch(() => {});
+        tr.hitDuckBody = false; // only play once
+      }
       // Remove ball when it arrives
       if (t >= 1) {
         rootScene.remove(tr.line);
@@ -706,6 +705,7 @@ function DuckHuntGame({ scene }) {
       };
     }
   }, [aimMode, gl]);
+
 
   return null;
 }
