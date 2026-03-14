@@ -1,0 +1,556 @@
+/* Cyber Button + Modal — ported from Jhey Tompkins' Codepen cyberpopover */
+
+@font-face {
+  font-family: 'Cyber';
+  src: url('/fonts/Geo-Regular.ttf') format('truetype');
+  font-display: swap;
+}
+
+/* ═══════════════════════════════════════
+   Variables
+   ═══════════════════════════════════════ */
+.cyber-popover-root {
+  --accent: hsl(183 38% 57%);
+  --shadow: hsl(10 100% 60%);
+  --corner: 12px;
+  --border: 2px;
+  --clip: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - var(--corner)),
+    calc(100% - var(--corner)) 100%,
+    0% 100%
+  );
+  --flicker: linear(
+    0 0%, 0.1864 6.17%, 0.0001 14.41%, 0.5244 20.97%, 0.3927 37.91%,
+    0.8115 60.62%, 0.9416 61.92%, 0.9928 67.98%, 0.5032 70.42%,
+    0.9077 96.96%, 0.6736 98.74%, 1 100%
+  );
+  font-family: 'Cyber', sans-serif;
+}
+
+/* ═══════════════════════════════════════
+   Button base
+   ═══════════════════════════════════════ */
+.cyber-btn {
+  --corner: 12px;
+  --border: 1px;
+  --clip: polygon(
+    0 0, 100% 0,
+    100% calc(100% - var(--corner)),
+    calc(100% - var(--corner)) 100%,
+    0% 100%
+  );
+  font-family: 'Cyber', sans-serif;
+  min-width: 140px;
+  text-align: left;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border: 0;
+  background: transparent;
+  position: relative;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 1rem;
+  letter-spacing: 0.05em;
+}
+
+.cyber-btn * { pointer-events: none; }
+
+.cyber-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.cyber-btn-icon svg {
+  width: 1.3em;
+  height: 1.3em;
+}
+
+/* Backdrop (shared between button & modal panels) */
+.cyber-backdrop {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: hsl(0 0% 0% / 0.4);
+  clip-path: var(--clip);
+  pointer-events: none;
+}
+
+.cyber-backdrop::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  border: var(--border) solid transparent;
+  clip-path: var(--clip);
+  mask:
+    linear-gradient(transparent 0% 100%),
+    linear-gradient(#fff 0% 100%);
+  mask-clip: padding-box, border-box;
+  mask-repeat: no-repeat;
+  mask-composite: intersect;
+  z-index: 2;
+}
+
+.cyber-corner {
+  display: block;
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  height: var(--corner);
+  width: var(--corner);
+  pointer-events: none;
+  background: linear-gradient(
+    to top left,
+    transparent calc(50% - 1px),
+    var(--accent) calc(50% - 1px),
+    var(--accent) calc(50% + 1px),
+    transparent calc(50% + 1px)
+  );
+}
+
+.cyber-btn .cyber-backdrop {
+  backdrop-filter: saturate(180%) blur(6px);
+}
+
+.cyber-btn kbd {
+  color: #000;
+  font-weight: bold;
+  width: 20px;
+  display: inline-grid;
+  aspect-ratio: 1;
+  font-size: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  place-items: center;
+  font-family: inherit;
+}
+
+.cyber-btn kbd svg { width: 65%; }
+
+/* Hover / Focus */
+.cyber-btn:hover,
+.cyber-btn:focus-visible {
+  color: #000;
+  outline: none;
+}
+.cyber-btn:hover kbd,
+.cyber-btn:focus-visible kbd {
+  color: var(--accent);
+}
+.cyber-btn:hover .cyber-backdrop,
+.cyber-btn:focus-visible .cyber-backdrop {
+  background: var(--accent);
+}
+
+/* ═══════════════════════════════════════
+   Button glitch on hover
+   ═══════════════════════════════════════ */
+.cyber-btn .cyber-glitch {
+  display: none;
+  position: absolute;
+  inset: 0;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  pointer-events: none;
+  color: var(--accent);
+  text-shadow: 0 1px var(--shadow);
+}
+
+.cyber-btn .cyber-glitch kbd { opacity: 0; }
+.cyber-btn .cyber-glitch .cyber-backdrop { background: #000; }
+
+.cyber-letters { display: flex; }
+.cyber-letters span:nth-of-type(2),
+.cyber-letters span:nth-of-type(5) { transform: scaleY(-1); }
+.cyber-letters span:nth-of-type(3),
+.cyber-letters span:nth-of-type(6),
+.cyber-letters span:nth-of-type(7) { transform: scale(-1, -1); }
+
+.cyber-btn:hover .cyber-glitch,
+.cyber-btn:focus-visible .cyber-glitch {
+  display: flex;
+  animation: cyber-glitch 2s infinite;
+}
+
+/* ═══════════════════════════════════════
+   Modal overlay
+   ═══════════════════════════════════════ */
+.cyber-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: hsl(0 0% 0% / 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.cyber-modal-overlay.cyber-modal--open {
+  animation: cyber-overlay-in 0.3s ease-out both;
+}
+.cyber-modal-overlay.cyber-modal--closing {
+  animation: cyber-overlay-out 0.5s ease-in 0.1s both;
+}
+
+@keyframes cyber-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes cyber-overlay-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* ═══════════════════════════════════════
+   Modal panel
+   ═══════════════════════════════════════ */
+.cyber-modal {
+  --corner: 12px;
+  --border: 2px;
+  position: relative;
+  color: var(--accent);
+  width: clamp(420px, 55vw, 720px);
+  font-family: 'Cyber', sans-serif;
+}
+
+.cyber-modal ::selection {
+  background: var(--accent);
+  color: #000;
+}
+
+/* Left sidebar bars */
+.cyber-modal__bar {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  right: 100%;
+  width: 1rem;
+  border: var(--border) solid var(--accent);
+  translate: var(--border) 0;
+  backdrop-filter: saturate(180%) blur(6px);
+}
+
+.cyber-modal__bar--fg {
+  background: var(--accent);
+  mask: linear-gradient(#fff, hsl(0 0% 100% / 0.6) 15% 95%, #fff);
+}
+
+/* Animate bars in */
+.cyber-modal--open .cyber-modal__bar {
+  animation: cyber-bar-in 0.2s ease-out 0.2s both;
+}
+.cyber-modal--open .cyber-modal__bar--fg {
+  animation: cyber-bar-in 0.2s ease-out 0.2s both,
+             cyber-flicker 0.625s var(--flicker) 0.2s none;
+}
+.cyber-modal--closing .cyber-modal__bar {
+  animation: cyber-bar-out 0.2s ease-in 0.325s both;
+}
+
+@keyframes cyber-bar-in {
+  from { opacity: 0; translate: -25% 0; }
+  to   { opacity: 1; translate: var(--border) 0; }
+}
+@keyframes cyber-bar-out {
+  from { opacity: 1; translate: var(--border) 0; }
+  to   { opacity: 0; translate: -25% 0; }
+}
+@keyframes cyber-flicker {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Body section */
+.cyber-modal__body {
+  position: relative;
+  backdrop-filter: saturate(180%) blur(6px);
+  clip-path: inset(0 -100% 0 0);
+}
+
+.cyber-modal__body-backdrop {
+  position: absolute;
+  inset: 0;
+}
+
+.cyber-modal__body-backdrop::after {
+  content: '';
+  position: absolute;
+  left: 100%;
+  top: 2rem;
+  width: calc(2 * var(--border));
+  height: 40%;
+  background: var(--accent);
+  opacity: 0.7;
+  clip-path: polygon(0 0, 0 100%, 100% calc(100% - 6px), 100% 6px);
+}
+
+.cyber-modal__body-content {
+  padding: 1rem;
+  position: relative;
+}
+
+.cyber-modal__version {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  font-size: 8px;
+  opacity: 0.5;
+}
+
+/* Heading */
+.cyber-modal h2 {
+  padding-bottom: 0.5rem;
+  margin: 0;
+  text-transform: uppercase;
+  position: relative;
+  font-size: 1.25rem;
+}
+
+.cyber-modal h2::after {
+  content: '';
+  height: var(--border);
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--accent);
+  position: absolute;
+  transform-origin: 0 50%;
+  scale: 0 1;
+}
+
+/* Body text */
+.cyber-modal__text {
+  opacity: 0;
+  translate: 0 -1.5em;
+}
+
+.cyber-modal__text p {
+  margin: 0.75em 0;
+  line-height: 1.5;
+}
+
+/* Actions row */
+.cyber-modal__actions {
+  position: absolute;
+  top: 100%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-block: 1rem;
+  opacity: 0;
+  translate: -24px 0;
+}
+
+.cyber-modal__actions .cyber-btn {
+  min-width: 180px;
+  font-size: 1.1rem;
+  padding: 0.65rem 0.75rem;
+}
+
+/* Body / content slide-in animations */
+.cyber-modal--open .cyber-modal__body-backdrop {
+  animation: cyber-backdrop-slide-in 0.26s ease-out 0.22s both;
+}
+.cyber-modal--open .cyber-modal__body,
+.cyber-modal--open .cyber-modal__body-content {
+  animation: cyber-clip-in 0.26s ease-out 0.22s both;
+}
+.cyber-modal--open h2 span {
+  animation: cyber-fade-in 0.26s ease-out 0.325s both;
+}
+.cyber-modal--open h2::after {
+  animation: cyber-underline-in 0.26s ease-out 0.325s both;
+}
+.cyber-modal--open .cyber-modal__text {
+  animation: cyber-text-in 0.26s ease-out 0.325s both;
+}
+.cyber-modal--open .cyber-modal__actions {
+  animation: cyber-actions-in 0.1s ease-out 0.5s both;
+}
+
+/* Close animations */
+.cyber-modal--closing .cyber-modal__body-backdrop {
+  animation: cyber-backdrop-slide-out 0.26s ease-in 0.075s both;
+}
+.cyber-modal--closing .cyber-modal__body,
+.cyber-modal--closing .cyber-modal__body-content {
+  animation: cyber-clip-out 0.26s ease-in 0.075s both;
+}
+.cyber-modal--closing h2 span {
+  animation: cyber-fade-out 0.26s ease-in 0s both;
+}
+.cyber-modal--closing h2::after {
+  animation: cyber-underline-out 0.26s ease-in 0s both;
+}
+.cyber-modal--closing .cyber-modal__text {
+  animation: cyber-text-out 0.26s ease-in 0s both;
+}
+.cyber-modal--closing .cyber-modal__actions {
+  animation: cyber-actions-out 0.1s ease-in 0s both;
+}
+
+/* Button flash on chosen action */
+.cyber-modal--closing[data-action="Cancel"] [data-action="Cancel"] .cyber-backdrop,
+.cyber-modal--closing[data-action="Proceed"] [data-action="Proceed"] .cyber-backdrop {
+  animation: cyber-bg-flicker 0.25s var(--flicker) backwards;
+}
+.cyber-modal--closing[data-action="Cancel"] [data-action="Cancel"] kbd,
+.cyber-modal--closing[data-action="Proceed"] [data-action="Proceed"] kbd {
+  opacity: 0;
+}
+
+/* Backdrop slide */
+@keyframes cyber-backdrop-slide-in {
+  from { translate: calc(-100% - 4px) 0; }
+  to   { translate: 0 0; }
+}
+@keyframes cyber-backdrop-slide-out {
+  from { translate: 0 0; }
+  to   { translate: calc(-100% - 4px) 0; }
+}
+
+/* Clip reveal */
+@keyframes cyber-clip-in {
+  from { clip-path: inset(0 calc(100% + 4px) 0 0); }
+  to   { clip-path: inset(0 -2px 0 0); }
+}
+@keyframes cyber-clip-out {
+  from { clip-path: inset(0 -2px 0 0); }
+  to   { clip-path: inset(0 calc(100% + 4px) 0 0); }
+}
+
+/* Fade */
+@keyframes cyber-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes cyber-fade-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* Underline draw */
+@keyframes cyber-underline-in {
+  from { scale: 0 1; }
+  to   { scale: 1 1; }
+}
+@keyframes cyber-underline-out {
+  from { scale: 1 1; }
+  to   { scale: 0 1; }
+}
+
+/* Text translate + fade */
+@keyframes cyber-text-in {
+  from { opacity: 0; translate: 0 -1.5em; }
+  to   { opacity: 1; translate: 0 0; }
+}
+@keyframes cyber-text-out {
+  from { opacity: 1; translate: 0 0; }
+  to   { opacity: 0; translate: 0 -1.5em; }
+}
+
+/* Actions slide */
+@keyframes cyber-actions-in {
+  from { opacity: 0; translate: -24px 0; }
+  to   { opacity: 1; translate: 0 0; }
+}
+@keyframes cyber-actions-out {
+  from { opacity: 1; translate: 0 0; }
+  to   { opacity: 0; translate: -24px 0; }
+}
+
+/* ═══════════════════════════════════════
+   Content glitch overlay (periodic)
+   ═══════════════════════════════════════ */
+.cyber-modal__content-glitch {
+  position: absolute;
+  inset: 0;
+  padding: 1rem;
+  color: var(--shadow);
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.cyber-modal__content-glitch--active {
+  opacity: 1;
+  animation: cyber-glitch 2s ease both;
+}
+
+/* ═══════════════════════════════════════
+   Button glitch keyframes
+   ═══════════════════════════════════════ */
+@keyframes cyber-glitch {
+  0% {
+    clip-path: polygon(0 2%, 100% 2%, 100% 95%, 95% 95%, 95% 90%, 85% 90%, 85% 95%, 8% 95%, 0 70%);
+  }
+  2%, 8% {
+    clip-path: polygon(0 78%, 100% 78%, 100% 100%, 95% 100%, 95% 90%, 85% 90%, 85% 100%, 8% 100%, 0 78%);
+    transform: translate(-5%, 0);
+  }
+  6% {
+    clip-path: polygon(0 78%, 100% 78%, 100% 100%, 95% 100%, 95% 90%, 85% 90%, 85% 100%, 8% 100%, 0 78%);
+    transform: translate(5%, 0);
+  }
+  9% {
+    clip-path: polygon(0 78%, 100% 78%, 100% 100%, 95% 100%, 95% 90%, 85% 90%, 85% 100%, 8% 100%, 0 78%);
+    transform: translate(0, 0);
+  }
+  10% {
+    clip-path: polygon(0 44%, 100% 44%, 100% 54%, 95% 54%, 95% 54%, 85% 54%, 85% 54%, 8% 54%, 0 54%);
+    transform: translate(5%, 0);
+  }
+  13% {
+    clip-path: polygon(0 44%, 100% 44%, 100% 54%, 95% 54%, 95% 54%, 85% 54%, 85% 54%, 8% 54%, 0 54%);
+    transform: translate(0, 0);
+  }
+  14%, 21% {
+    clip-path: polygon(0 0, 100% 0, 100% 0, 95% 0, 95% 0, 85% 0, 85% 0, 8% 0, 0 0);
+    transform: translate(5%, 0);
+  }
+  25% {
+    clip-path: polygon(0 0, 100% 0, 100% 0, 95% 0, 95% 0, 85% 0, 85% 0, 8% 0, 0 0);
+    transform: translate(5%, 0);
+  }
+  30% {
+    clip-path: polygon(0 0, 100% 0, 100% 0, 95% 0, 95% 0, 85% 0, 85% 0, 8% 0, 0 0);
+    transform: translate(-5%, 0);
+  }
+  35%, 45% {
+    clip-path: polygon(0 40%, 100% 40%, 100% 85%, 95% 85%, 95% 85%, 85% 85%, 85% 85%, 8% 85%, 0 70%);
+    transform: translate(-5%);
+  }
+  40% {
+    clip-path: polygon(0 40%, 100% 40%, 100% 85%, 95% 85%, 95% 85%, 85% 85%, 85% 85%, 8% 85%, 0 70%);
+    transform: translate(5%);
+  }
+  50% {
+    clip-path: polygon(0 40%, 100% 40%, 100% 85%, 95% 85%, 95% 85%, 85% 85%, 85% 85%, 8% 85%, 0 70%);
+    transform: translate(0, 0);
+  }
+  55% {
+    clip-path: polygon(0 63%, 100% 63%, 100% 80%, 95% 80%, 95% 80%, 85% 80%, 85% 80%, 8% 80%, 0 70%);
+    transform: translate(5%, 0);
+  }
+  60% {
+    clip-path: polygon(0 63%, 100% 63%, 100% 80%, 95% 80%, 95% 80%, 85% 80%, 85% 80%, 8% 80%, 0 70%);
+    transform: translate(0, 0);
+  }
+  31%, 61%, 100% {
+    clip-path: polygon(0 0, 100% 0, 100% 0, 95% 0, 95% 0, 85% 0, 85% 0, 8% 0, 0 0);
+  }
+}
+
+@keyframes cyber-bg-flicker {
+  0% { background: hsl(0 0% 0% / 0.65); }
+  100% { background: var(--accent); }
+}

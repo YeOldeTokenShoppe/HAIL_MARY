@@ -870,7 +870,7 @@ const CyborgTempleScene = ({
     gltfLoader.setDRACOLoader(dracoLoader);
 
     // Determine which model to load based on device type
-    let modelPath = isOnMobile ? "/models/MOBILE2.glb" : "/models/RL80_4anims.glb";
+    let modelPath = isOnMobile ? "/models/MOBILE3.glb" : "/models/RL80_4anims.glb";
     const fallbackModelPath = "/models/RL80_4anims.glb"; // Desktop model as fallback
     let usingFallback = false;
     const startTime = performance.now();

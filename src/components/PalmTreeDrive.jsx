@@ -5,6 +5,11 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass';
+import { GammaCorrectionShader } from 'three/examples/jsm/shaders/GammaCorrectionShader';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useLanguage } from './LanguageProvider';
@@ -12,7 +17,7 @@ import { useRouter } from 'next/navigation';
 // import SynthwaveText from './SynthwaveText';
 import MorphingWebGLText from './MorphingWebGLText';
 import WebGLStandaloneText from '@/components/WebGLStandaloneText';
-import ThirdwebBuyModal from './ThirdwebBuyModal';
+import BuyModal from './BuyModal';
 import CyberNav from './CyberNav';
 import HorizontalRoadmap from './HorizontalRoadmap';
 
@@ -31,6 +36,8 @@ const PalmsScene = ({ onLoadingChange }) => {
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
   const rendererRef = useRef(null);
+  const composerRef = useRef(null);
+  const bloomComposerRef = useRef(null);
   const materialShadersRef = useRef([]);
   const clockRef = useRef(null);
   // Cinematic states removed for production
@@ -106,7 +113,7 @@ const PalmsScene = ({ onLoadingChange }) => {
   const [showEnterButton, setShowEnterButton] = useState(true); // Show "Take me there" button immediately
   const [hideLastText, setHideLastText] = useState(false); // Hide the last text block after delay
   const [shouldMorph, setShouldMorph] = useState(false); // Trigger morph animation
-  const [showBuyModal, setShowBuyModal] = useState(false); // Control ThirdwebBuyModal visibility
+  const [showBuyModal, setShowBuyModal] = useState(false); // Control BuyModal visibility
   const [isCyberNavOpen, setIsCyberNavOpen] = useState(false); // Control CyberNav menu visibility
   const [hasScrolled, setHasScrolled] = useState(false); // Track if user has started scrolling
   // Music player states
@@ -425,7 +432,7 @@ const PalmsScene = ({ onLoadingChange }) => {
   const lightSettings = {
     carSpotlight: {
       color: '#ff00ff',
-      intensity: 5,
+      intensity: 3,
       distance: 50,
       angle: Math.PI,
       penumbra: 0.225,
@@ -659,6 +666,85 @@ const PalmsScene = ({ onLoadingChange }) => {
     }
     mountRef.current.appendChild(renderer.domElement);
 
+    // --- Selective Bloom Setup ---
+    const BLOOM_LAYER = 1;
+    const bloomLayer = new THREE.Layers();
+    bloomLayer.set(BLOOM_LAYER);
+
+    const renderWidth = mountRef.current.clientWidth;
+    const renderHeight = mountRef.current.clientHeight;
+
+    // Bloom composer — renders only bloom-layer objects
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(renderWidth, renderHeight),
+      1.0,   // strength
+      0.1,   // radius
+      0.8    // threshold
+    );
+
+    // Store bloom layer index for later use
+    renderer.userData = { BLOOM_LAYER, bloomLayer };
+
+    // Dark material to hide non-bloom objects during bloom pass
+    const darkMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    const storedMaterials = {};
+
+    function darkenNonBloomed(obj) {
+      if (obj.isMesh && !bloomLayer.test(obj.layers)) {
+        storedMaterials[obj.uuid] = obj.material;
+        obj.material = darkMaterial;
+      }
+    }
+    function restoreMaterials(obj) {
+      if (storedMaterials[obj.uuid]) {
+        obj.material = storedMaterials[obj.uuid];
+        delete storedMaterials[obj.uuid];
+      }
+    }
+
+    // Bloom-only composer
+    const bloomComposer = new EffectComposer(renderer);
+    bloomComposer.renderToScreen = false;
+    bloomComposer.addPass(new RenderPass(scene, camera));
+    bloomComposer.addPass(bloomPass);
+    bloomComposerRef.current = bloomComposer;
+
+    // Final composite shader — blends bloom on top of base render
+    const compositeShader = {
+      uniforms: {
+        baseTexture: { value: null },
+        bloomTexture: { value: bloomComposer.renderTarget2.texture },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D baseTexture;
+        uniform sampler2D bloomTexture;
+        varying vec2 vUv;
+        void main() {
+          gl_FragColor = texture2D(baseTexture, vUv) + texture2D(bloomTexture, vUv);
+        }
+      `,
+    };
+
+    const finalComposer = new EffectComposer(renderer);
+    finalComposer.addPass(new RenderPass(scene, camera));
+    const compositePass = new ShaderPass(new THREE.ShaderMaterial(compositeShader), 'baseTexture');
+    compositePass.needsSwap = true;
+    finalComposer.addPass(compositePass);
+    finalComposer.addPass(new ShaderPass(GammaCorrectionShader));
+    composerRef.current = finalComposer;
+
+    // Store helpers on renderer for use in render loop
+    renderer.userData.darkenNonBloomed = darkenNonBloomed;
+    renderer.userData.restoreMaterials = restoreMaterials;
+    renderer.userData.bloomComposer = bloomComposer;
+    renderer.userData.finalComposer = finalComposer;
 
     // Create sunset gradient background
     const gradientCanvas = document.createElement('canvas');
@@ -670,7 +756,7 @@ const PalmsScene = ({ onLoadingChange }) => {
     const gradient = gradientCtx.createLinearGradient(0, 0, 0, 512);
     gradient.addColorStop(0, '#001a33');      // Dark blue at top
     gradient.addColorStop(0.3, '#ff6b35');    // Orange
-    gradient.addColorStop(0.6, '#ff8c42');    // Bright orange
+    gradient.addColorStop(0.4, '#ff8c42');    // Bright orange
     gradient.addColorStop(1, '#ffa500');      // Golden orange at bottom
     
     gradientCtx.fillStyle = gradient;
@@ -686,7 +772,7 @@ const PalmsScene = ({ onLoadingChange }) => {
     
     // Sunset environment lighting
     // Warm ambient light with orange/pink tones
-    const ambientLight = new THREE.AmbientLight(0xffa07a, 0.6); // Light salmon color - increased for more even lighting
+    const ambientLight = new THREE.AmbientLight(0xffa07a, 0.9); // Light salmon color - increased for more even lighting
     scene.add(ambientLight);
     
     // Main sun light - strong directional light from the horizon
@@ -1247,7 +1333,7 @@ const PalmsScene = ({ onLoadingChange }) => {
     }, 'sun');
     
     // Load car model (now includes UFO) with retry
-    const carPath = '/models/lambo5k3.glb';
+    const carPath = '/models/lambo5k5.glb';
     loadModelWithRetry(carPath, (gltf) => {
       const carScene = gltf.scene;
       
@@ -1280,24 +1366,59 @@ const PalmsScene = ({ onLoadingChange }) => {
             // Store reference to Mary mesh
             maryMeshRef.current = child;
             
-            // Clone the material to avoid affecting other meshes
-            child.material = child.material.clone();
-            child.material.transparent = true;
-            child.material.opacity = 1;
-            child.material.needsUpdate = true;
-            
-            // Store original emissive properties
-            child.userData.originalEmissive = child.material.emissive ? child.material.emissive.clone() : new THREE.Color(0x000000);
-            child.userData.originalEmissiveIntensity = child.material.emissiveIntensity || 0;
+            // Generate a marble/stone matcap texture procedurally
+            const matcapSize = 256;
+            const matcapCanvas = document.createElement('canvas');
+            matcapCanvas.width = matcapSize;
+            matcapCanvas.height = matcapSize;
+            const ctx = matcapCanvas.getContext('2d');
 
-            // TEMPORARY: Strong emissive glow for video capture
-            child.material.emissive = new THREE.Color(0x88ccff);
-            child.material.emissiveIntensity = 1.5;
-            child.material.needsUpdate = true;
+            // Radial gradient mimicking a lit marble sphere
+            const cx = matcapSize / 2;
+            const cy = matcapSize / 2;
+            const r = matcapSize / 2;
+
+            // Base sphere gradient — highlight top-left, shadow bottom-right
+            const grad = ctx.createRadialGradient(cx * 0.7, cy * 0.6, 0, cx, cy, r);
+            grad.addColorStop(0, '#f5f0eb');   // bright highlight
+            grad.addColorStop(0.2, '#e0d8cf'); // warm ivory mid
+            grad.addColorStop(0.1, '#b8a89a'); // stone shadow
+            grad.addColorStop(1.0, '#6b5b50'); // deep shadow edge
+
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, matcapSize, matcapSize);
+
+            // Clip to circle
+            ctx.globalCompositeOperation = 'destination-in';
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.fill();
+
+            const matcapTexture = new THREE.CanvasTexture(matcapCanvas);
+
+            // MeshMatcapMaterial — scene-light independent with realistic shading
+            child.material = new THREE.MeshMatcapMaterial({
+              matcap: matcapTexture,
+              color: new THREE.Color(0xf0e8dc),
+            });
+          }
+
+          // Dedicated light for Mary — positioned above to cast shadows in eye sockets
+          if (maryMeshRef.current) {
+            const maryLight = new THREE.SpotLight(0xcce0ff, 1.5, 10, Math.PI / 6, 0.5);
+            maryLight.position.copy(maryMeshRef.current.position);
+            maryLight.position.y += 3.0;  // high above — creates downward light
+            maryLight.position.z += 0.3;  // barely in front
+            // Aim at mid-body, not face
+            maryLight.target.position.copy(maryMeshRef.current.position);
+            maryLight.target.position.y += 0.5;
+            carScene.add(maryLight);
+            carScene.add(maryLight.target);
+            maryLightRef.current = maryLight;
           }
         }
       });
-      
+
       if (unknownObjects.length > 0) {
         unknownObjects.forEach(obj => {
         });
@@ -1405,9 +1526,18 @@ const PalmsScene = ({ onLoadingChange }) => {
           child.receiveShadow = true;
           
           
-          // Add emissive to halo objects
-        
-          
+          // Add emissive to Halo mesh only and put it on bloom layer
+          if (child.name === 'Halo') {
+            child.material = child.material.clone();
+            child.material.emissive = new THREE.Color(0xaaff88);
+            child.material.emissiveIntensity = 1.0;
+            child.material.transparent = true;
+            child.material.opacity = 0.9;
+            child.material.needsUpdate = true;
+            // Add to bloom layer so selective bloom picks it up
+            child.layers.enable(renderer.userData.BLOOM_LAYER);
+          }
+
           // Add video texture to Display mesh
           if (child.name === 'Display') { // Exact match
             child.material = new THREE.MeshBasicMaterial({
@@ -2084,8 +2214,23 @@ const PalmsScene = ({ onLoadingChange }) => {
         }
       }
       
-      // Render the scene
-      renderer.render(scene, camera);
+      // Render with selective bloom
+      if (renderer.userData.bloomComposer && renderer.userData.finalComposer) {
+        // 1. Darken non-bloom objects, hide background+fog for bloom pass
+        const savedBackground = scene.background;
+        const savedFog = scene.fog;
+        scene.background = null;
+        scene.fog = null;
+        scene.traverse(renderer.userData.darkenNonBloomed);
+        renderer.userData.bloomComposer.render();
+        // 2. Restore materials, background, and fog, render final composite
+        scene.traverse(renderer.userData.restoreMaterials);
+        scene.background = savedBackground;
+        scene.fog = savedFog;
+        renderer.userData.finalComposer.render();
+      } else {
+        renderer.render(scene, camera);
+      }
     };
 
     // Handle resize
@@ -2096,6 +2241,8 @@ const PalmsScene = ({ onLoadingChange }) => {
         camera.aspect = width / height;
         camera.updateProjectionMatrix();
         rendererRef.current.setSize(width, height, false);
+        if (bloomComposerRef.current) bloomComposerRef.current.setSize(width, height);
+        if (composerRef.current) composerRef.current.setSize(width, height);
       }
     };
 
@@ -2265,6 +2412,14 @@ const PalmsScene = ({ onLoadingChange }) => {
         }
         rendererRef.current.dispose();
         rendererRef.current = null;
+      }
+      if (bloomComposerRef.current) {
+        bloomComposerRef.current.dispose();
+        bloomComposerRef.current = null;
+      }
+      if (composerRef.current) {
+        composerRef.current.dispose();
+        composerRef.current = null;
       }
       
       // Dispose of scene objects
@@ -2698,11 +2853,8 @@ const PalmsScene = ({ onLoadingChange }) => {
         </div>
       )}
 
-      {/* Thirdweb Buy Modal */}
-      <ThirdwebBuyModal
-        isOpen={showBuyModal}
-        onClose={() => setShowBuyModal(false)}
-      />
+   
+
 
       {/* CyberNav Menu */}
       <CyberNav
@@ -2715,6 +2867,7 @@ const PalmsScene = ({ onLoadingChange }) => {
         }}
         showButton={false}
       />
+      <BuyModal isOpen={showBuyModal} onClose={() => setShowBuyModal(false)} />
     </div>
   );
 };

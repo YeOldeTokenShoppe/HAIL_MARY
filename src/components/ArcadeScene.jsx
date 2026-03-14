@@ -920,16 +920,16 @@ const ARCADE_ANNOTATIONS = [
       distance: 1.0,
     },
   },
-  {
-    position: [-3.3, -0.6, 2.0],
-    text: "Click a gun to aim - click again to shoot",
-    textOffset: [-0.4, 0.1, 0],
-    customCamera: {
-      position: [-2.5, -0.2, 0.9],
-      lookAt: [-2.0, -0.2, 0.5],
-      distance: 3.5,
-    },
-  },
+  // {
+  //   position: [-3.3, -0.6, 2.0],
+  //   text: "Click a gun to aim - click again to shoot",
+  //   textOffset: [-0.4, 0.1, 0],
+  //   customCamera: {
+  //     position: [-2.5, -0.2, 0.9],
+  //     lookAt: [-2.0, -0.2, 0.5],
+  //     distance: 3.5,
+  //   },
+  // },
   {
     position: [-1.3, 2.0, 0.3],
     text: "The Regulars",
