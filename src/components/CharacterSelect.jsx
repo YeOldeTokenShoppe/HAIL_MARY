@@ -54,7 +54,7 @@ function CharacterPortrait({ image, onClick }) {
       onClick={onClick}
       style={{
         position: "absolute",
-        inset: "22%",
+        inset: "23%",
         borderRadius: "60%",
         overflow: "hidden",
         cursor: "pointer",

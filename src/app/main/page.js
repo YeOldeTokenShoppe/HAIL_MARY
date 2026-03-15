@@ -8,10 +8,10 @@ import CharacterSelect from "@/components/CharacterSelect";
 import GlitchTransition from "@/components/GlitchTransition";
 
 const CHARACTERS = [
-  { name: "Oracle", image: "/cameo_rl80.webp", model: "/models/fortuneTeller_not3.glb" },
-  { name: "H80Z", image: "/cameo_h80z.webp", model: "/models/H80Z.glb" },
-  { name: "Character 3", image: null, model: "/models/fortuneTeller_not3.glb" },
-  { name: "Character 4", image: null, model: "/models/fortuneTeller_not3.glb" },
+  { name: "Oracle", image: "/cameo_rl80.webp", model: "/models/fortuneTeller_not3.glb", defaultAnim: "textWalk" },
+  { name: "H80Z", image: "/cameo_h80z.webp", model: "/models/H80Z.glb", defaultAnim: "walkText" },
+  { name: "GR80", image: "/cameo_GR80.webp", model: "/models/GR80.glb", defaultAnim: "walk" },
+  { name: "Kitty", image: "/cameo_kitty.webp", model: "/models/fluffyCat.glb", defaultAnim: "walk" },
 ];
 
 const MainScene = dynamic(
@@ -268,6 +268,7 @@ export default function MainPage() {
         useSitePal={USE_SITEPAL}
         onAnimChange={setActiveAnim}
         characterModel={displayedModel}
+        defaultAnim={CHARACTERS[activeCharIndex].defaultAnim}
         glitchIntensity={glitchIntensity}
       />
 

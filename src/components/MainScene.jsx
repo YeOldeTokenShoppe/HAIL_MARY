@@ -132,6 +132,68 @@ function DriftingParticles({ count = 120, speed = 1.5, isWalking = true }) {
   );
 }
 
+/* ── Dusky sky dome ── */
+function DuskySky() {
+  const materialRef = useRef();
+
+  const uniforms = useMemo(() => ({
+    uTopColor: { value: new THREE.Color("#050510") },       // near-black at zenith
+    uMidColor: { value: new THREE.Color("#140c24") },       // deep dusky purple
+    uHorizonColor: { value: new THREE.Color("#4a2028") },   // warm dusky glow at horizon
+    uLowColor: { value: new THREE.Color("#1a0a10") },       // dark below horizon
+  }), []);
+
+  const vertexShader = `
+    varying vec3 vWorldPosition;
+    void main() {
+      vec4 worldPos = modelMatrix * vec4(position, 1.0);
+      vWorldPosition = worldPos.xyz;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `;
+
+  const fragmentShader = `
+    uniform vec3 uTopColor;
+    uniform vec3 uMidColor;
+    uniform vec3 uHorizonColor;
+    uniform vec3 uLowColor;
+
+    varying vec3 vWorldPosition;
+
+    void main() {
+      vec3 dir = normalize(vWorldPosition);
+      float y = dir.y;
+
+      // 4-stop gradient: low -> thin horizon -> purple -> dark top
+      vec3 color;
+      if (y < -0.02) {
+        color = mix(uLowColor, uHorizonColor, smoothstep(-0.15, -0.02, y));
+      } else if (y < 0.1) {
+        color = mix(uHorizonColor, uMidColor, smoothstep(-0.02, 0.1, y));
+      } else {
+        color = mix(uMidColor, uTopColor, smoothstep(0.1, 0.4, y));
+      }
+
+      gl_FragColor = vec4(color, 1.0);
+    }
+  `;
+
+  return (
+    <mesh scale={[-1, 1, 1]}>
+      <sphereGeometry args={[50, 32, 32]} />
+      <shaderMaterial
+        ref={materialRef}
+        uniforms={uniforms}
+        vertexShader={vertexShader}
+        fragmentShader={fragmentShader}
+        side={THREE.BackSide}
+        depthWrite={false}
+        fog={false}
+      />
+    </mesh>
+  );
+}
+
 /* ── Synthwave sun backdrop ── */
 function SynthwaveSun({ position = [20, 8, -20], scale = 1 }) {
   const groupRef = useRef();
@@ -282,7 +344,7 @@ function waitForSitePalElement(container, timeout = 15000) {
 }
 
 
-function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContainerId = "sitepal-container", activeAnim, onClipsLoaded, modelRef, modelUrl = "/models/fortuneTeller_not3.glb" }) {
+function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContainerId = "sitepal-container", activeAnim, defaultAnim, onClipsLoaded, modelRef, modelUrl = "/models/fortuneTeller_not3.glb" }) {
   const groupRef = useRef();
   const videoRef = useRef(null);
   const mixerRef = useRef(null);
@@ -457,11 +519,13 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
             clipNames.push(clip.name);
           });
           if (onClipsLoaded) onClipsLoaded(clipNames);
-          // Play the first clip by default
+          // Play the default walk animation, or fall back to first clip
           if (clipNames.length > 0) {
-            const first = activeAnim || clipNames[0];
+            const first = defaultAnim || activeAnim || clipNames[0];
             if (actionsRef.current[first]) {
               actionsRef.current[first].play();
+            } else {
+              actionsRef.current[clipNames[0]].play();
             }
           }
         }
@@ -683,7 +747,7 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
   return <group ref={groupRef} />;
 }
 
-export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, characterModel, glitchIntensity = 0 }) {
+export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, characterModel, defaultAnim, glitchIntensity = 0 }) {
   const [clipNames, setClipNames] = useState([]);
   const [activeAnim, setActiveAnim] = useState(null);
   const characterModelRef = useRef(null);
@@ -691,8 +755,11 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
 
   const handleClipsLoaded = useCallback((names) => {
     setClipNames(names);
-    if (names.length > 0) setActiveAnim(names[0]);
-  }, []);
+    if (names.length > 0) {
+      const initial = defaultAnim && names.includes(defaultAnim) ? defaultAnim : names[0];
+      setActiveAnim(initial);
+    }
+  }, [defaultAnim]);
 
   const handleCreated = () => {
     if (onLoaded) onLoaded();
@@ -770,17 +837,18 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
       style={{ width: "100%", height: "100%" }}
       gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
     >
+      <DuskySky />
       <ambientLight intensity={0.5} />
       <directionalLight position={[5, 5, 5]} intensity={1} />
       <pointLight position={[0, 2, 2]} intensity={0.8} color="#ffd36b" />
-      <FortuneTellerModel useSitePal={useSitePal} activeAnim={activeAnim} onClipsLoaded={handleClipsLoaded} modelRef={characterModelRef} modelUrl={characterModel} />
+      <FortuneTellerModel useSitePal={useSitePal} activeAnim={activeAnim} defaultAnim={defaultAnim} onClipsLoaded={handleClipsLoaded} modelRef={characterModelRef} modelUrl={characterModel} />
       {/* Transition effect handled by page-level GlitchTransition overlay */}
       <SynthwaveSun position={[10, 3, -15]} scale={1} />
       {/* Scrolling environment — always mounted, stops when not walking */}
-      <ScrollingGround speed={0.3} isWalking={activeAnim === "textWalk" || activeAnim === "Walk" || activeAnim === "walk"} />
-      <DriftingParticles count={120} speed={1.5} isWalking={activeAnim === "textWalk" || activeAnim === "Walk" || activeAnim === "walk"} />
-      <ScrollingTrees speed={1.5} isWalking={activeAnim === "textWalk" || activeAnim === "Walk" || activeAnim === "walk"} spacing={4} count={8} xOffset={3} />
-      <fog attach="fog" args={["#0a0a0f", 5, 25]} />
+      <ScrollingGround speed={0.3} isWalking={activeAnim === "textWalk" || activeAnim === "walkText" || activeAnim === "Walk" || activeAnim === "walk"} />
+      <DriftingParticles count={120} speed={1.5} isWalking={activeAnim === "textWalk" || activeAnim === "walkText" || activeAnim === "Walk" || activeAnim === "walk"} />
+      <ScrollingTrees speed={1.5} isWalking={activeAnim === "textWalk" || activeAnim === "walkText" || activeAnim === "Walk" || activeAnim === "walk"} spacing={4} count={8} xOffset={3} />
+      <fog attach="fog" args={["#1a0e14", 8, 28]} />
       {/* <Godray
         debug={true}
         settings={{
