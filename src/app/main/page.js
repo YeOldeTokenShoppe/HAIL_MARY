@@ -9,8 +9,9 @@ import GlitchTransition from "@/components/GlitchTransition";
 
 const CHARACTERS = [
   { name: "Oracle", image: "/cameo_rl80.webp", model: "/models/fortuneTeller_not3.glb", defaultAnim: "textWalk" },
-  { name: "H80Z", image: "/cameo_h80z.webp", model: "/models/H80Z.glb", defaultAnim: "walkText" },
-  { name: "GR80", image: "/cameo_GR80.webp", model: "/models/GR80.glb", defaultAnim: "walk" },
+
+  { name: "Saint GR80", image: "/cameo_GR80.webp", model: "/models/GR80.glb", defaultAnim: "walk" },
+  { name: "H80Z", image: "/cameo_h80z.webp", model: "/models/H80Z.glb", defaultAnim: "skateSequence" },
   { name: "Kitty", image: "/cameo_kitty.webp", model: "/models/fluffyCat.glb", defaultAnim: "walk" },
 ];
 
@@ -349,7 +350,7 @@ export default function MainPage() {
               style={{ fontSize: "1.1rem" }}
             />
             <CyberButton
-              label="TG Crusaders"
+              label="Party Rentals"
               icon={
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M10 11h.01" />

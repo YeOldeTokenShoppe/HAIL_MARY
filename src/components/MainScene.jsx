@@ -82,55 +82,6 @@ function ScrollingGround({ speed = 0.8, isWalking = true }) {
 }
 
 /* ── Drifting environment particles ── */
-function DriftingParticles({ count = 120, speed = 1.5, isWalking = true }) {
-  const pointsRef = useRef();
-  const positionsRef = useRef();
-
-  useEffect(() => {
-    const positions = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * 16;       // x spread
-      positions[i * 3 + 1] = Math.random() * 5 + 0.1;      // y height
-      positions[i * 3 + 2] = (Math.random() - 0.5) * 20;   // z spread
-    }
-    positionsRef.current = positions;
-    if (pointsRef.current) {
-      pointsRef.current.geometry.setAttribute(
-        "position",
-        new THREE.BufferAttribute(positions, 3)
-      );
-    }
-  }, [count]);
-
-  useFrame((_, delta) => {
-    if (!positionsRef.current || !pointsRef.current || !isWalking) return;
-    const pos = positionsRef.current;
-    for (let i = 0; i < count; i++) {
-      pos[i * 3 + 2] += speed * delta;
-      // Wrap around when past camera
-      if (pos[i * 3 + 2] > 10) {
-        pos[i * 3 + 2] = -10;
-        pos[i * 3] = (Math.random() - 0.5) * 16;
-        pos[i * 3 + 1] = Math.random() * 5 + 0.1;
-      }
-    }
-    pointsRef.current.geometry.attributes.position.needsUpdate = true;
-  });
-
-  return (
-    <points ref={pointsRef}>
-      <bufferGeometry />
-      <pointsMaterial
-        size={0.03}
-        color="#8ab4f8"
-        transparent
-        opacity={0.4}
-        sizeAttenuation
-        depthWrite={false}
-      />
-    </points>
-  );
-}
 
 /* ── Dusky sky dome ── */
 function DuskySky() {
@@ -242,7 +193,7 @@ function SynthwaveSun({ position = [20, 8, -20], scale = 1 }) {
 }
 
 /* ── Scrolling palm trees along both sides ── */
-function ScrollingTrees({ speed = 0.8, isWalking = true, spacing = 4, count = 8, xOffset = 3 }) {
+function ScrollingTrees({ speed = 0.8, isWalking = true, spacing = 6, count = 8, xOffset = 3 }) {
   const groupRef = useRef();
   const treesRef = useRef([]); // array of { mesh, startZ }
   const modelRef = useRef(null);
@@ -291,7 +242,7 @@ function ScrollingTrees({ speed = 0.8, isWalking = true, spacing = 4, count = 8,
 
   useFrame((_, delta) => {
     if (!isWalking || treesRef.current.length === 0) return;
-    const halfStrip = stripLen / 2;
+    const halfStrip = stripLen / 1.2;
     for (const tree of treesRef.current) {
       tree.mesh.position.z -= speed * delta;
       // Wrap around when tree passes behind
@@ -557,11 +508,67 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
     };
   }, [videoSrc, useSitePal, sitePalContainerId, modelUrl]);
 
+  // Skate sequence ref for cleanup
+  const skateListenerRef = useRef(null);
+
   // Switch animation when activeAnim changes
   useEffect(() => {
     if (!activeAnim || !mixerRef.current) return;
     const actions = actionsRef.current;
-    // Fade out all, fade in selected
+    const mixer = mixerRef.current;
+
+    // Clean up any previous skate sequence listener
+    if (skateListenerRef.current) {
+      mixer.removeEventListener("loop", skateListenerRef.current);
+      skateListenerRef.current = null;
+    }
+
+    // Skate sequence: 1x skate1 → 5x skate2 → repeat
+    if (activeAnim === "skateSequence" && actions["skate1"] && actions["skate2"]) {
+      // Fade out all other actions
+      Object.entries(actions).forEach(([name, action]) => {
+        if (name !== "skate1") action.fadeOut(0.3);
+      });
+
+      const skate1 = actions["skate1"];
+      const skate2 = actions["skate2"];
+      let phase = "skate1"; // "skate1" or "skate2"
+      let skate2LoopCount = 0;
+
+      // Start skate1 — play once then stop
+      skate1.reset().setLoop(THREE.LoopRepeat, 1).clampWhenFinished = false;
+      skate1.fadeIn(0.3).play();
+
+      const onLoop = (e) => {
+        if (phase === "skate1" && e.action === skate1) {
+          // skate1 finished its loop, switch to skate2
+          phase = "skate2";
+          skate2LoopCount = 0;
+          skate1.fadeOut(0.3);
+          skate2.reset().setLoop(THREE.LoopRepeat, 1).clampWhenFinished = false;
+          skate2.fadeIn(0.3).play();
+        } else if (phase === "skate2" && e.action === skate2) {
+          skate2LoopCount++;
+          if (skate2LoopCount >= 5) {
+            // 5 loops done, restart with skate1
+            phase = "skate1";
+            skate2.fadeOut(0.3);
+            skate1.reset().setLoop(THREE.LoopRepeat, 1).clampWhenFinished = false;
+            skate1.fadeIn(0.3).play();
+          } else {
+            // Continue looping skate2
+            skate2.reset().setLoop(THREE.LoopRepeat, 1).clampWhenFinished = false;
+            skate2.play();
+          }
+        }
+      };
+
+      mixer.addEventListener("loop", onLoop);
+      skateListenerRef.current = onLoop;
+      return;
+    }
+
+    // Default: fade out all, fade in selected
     Object.entries(actions).forEach(([name, action]) => {
       if (name === activeAnim) {
         action.reset().fadeIn(0.3).play();
@@ -832,7 +839,7 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
         </button>
       )}
     <Canvas
-      camera={{ position: [-1.5, 1.5, 3], fov: 50 }}
+      camera={{ position: [-1.5, 1.0, 3], fov: 50 }}
       onCreated={handleCreated}
       style={{ width: "100%", height: "100%" }}
       gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
@@ -846,7 +853,6 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
       <SynthwaveSun position={[10, 3, -15]} scale={1} />
       {/* Scrolling environment — always mounted, stops when not walking */}
       <ScrollingGround speed={0.3} isWalking={activeAnim === "textWalk" || activeAnim === "walkText" || activeAnim === "Walk" || activeAnim === "walk"} />
-      <DriftingParticles count={120} speed={1.5} isWalking={activeAnim === "textWalk" || activeAnim === "walkText" || activeAnim === "Walk" || activeAnim === "walk"} />
       <ScrollingTrees speed={1.5} isWalking={activeAnim === "textWalk" || activeAnim === "walkText" || activeAnim === "Walk" || activeAnim === "walk"} spacing={4} count={8} xOffset={3} />
       <fog attach="fog" args={["#1a0e14", 8, 28]} />
       {/* <Godray
@@ -876,7 +882,7 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
         castShadow={false}
       />
       <OrbitControls
-        target={[0, 1.2, 0]}
+        target={[1, 1.2, 0]}
         minDistance={1.5}
         maxDistance={4}
         enablePan={false}
