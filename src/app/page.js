@@ -700,7 +700,7 @@ export default function MainPage() {
             {/* Prospecting Co — LIVE */}
             <div style={{ position: "relative" }}>
               <CyberButton
-                label="Prospecting Co"
+                label="Hail Mary Prospecting Co"
                 icon={
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
@@ -711,7 +711,7 @@ export default function MainPage() {
                 }
                 modalTitle="Hail Mary Prospecting Co"
                 modalBody={<p>Strike gold in the digital frontier. Our Lady&apos;s miners never rest.</p>}
-                onProceed={() => console.log("Prospecting")}
+                onProceed={() => { window.location.href = "/oil?mode=test"; }}
                 style={{ fontSize: "1rem" }}
               />
               {/* Live indicator dot */}
@@ -833,9 +833,9 @@ export default function MainPage() {
           onStakeClick={() => { window.location.href = "/"; }}
           businesses={[
             {
-              label: "Prospecting Co",
+              label: "Hail Mary Prospecting Co",
               live: true,
-              onProceed: () => console.log("Prospecting"),
+              onProceed: () => { window.location.href = "/oil?mode=test"; },
               icon: (
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />

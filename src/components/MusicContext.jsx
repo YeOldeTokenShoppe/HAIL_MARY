@@ -33,15 +33,15 @@ const non80sTracks = [
 export const gangstasParadiseTrack = { name: "Gangsta's Paradise - Coolio", path: "/audio/gangstas_paradise.mp3", bpm: 80 };
 const eightyTracks = [
   { name: "Walking in L.A. - Missing Persons", path: "audio/walking_in_LA.m4a", bpm: 85 },
-  { name: "Girls on Film - Duran Duran", path: "audio/Girls On Film.mp3", bpm: 100 },
+  // { name: "Girls on Film - Duran Duran", path: "audio/Girls On Film.mp3", bpm: 100 },
     { name: "Lifetimes", path: "audio/07 Lifetimes.m4a", bpm: 105 },
 
   { name: "For Those About To Rock - AC/DC", path: "audio/for-those-about-to-rock-ac-dc.m4a", bpm: 75 },
   { name: "Dirty Cash - The Adventures of Stevie V", path: "audio/Dirty Cash.m4a", bpm: 100 },
   { name: "Intergalactic - Beastie Boys", path: "audio/Intergalactic.mp3", bpm: 108 },
-  { name: "Good Life - Inner City", path: "audio/good-life-inner-city.m4a", bpm: 120 },
+  // { name: "Good Life - Inner City", path: "audio/good-life-inner-city.m4a", bpm: 120 },
   { name: "Like A Prayer - Madonna", path: "audio/like-a-prayer-madonna.m4a", bpm: 85 },
-  { name: "99 Luftballoons - Nena", path: "audio/99 Luftballoons Nena.m4a", bpm: 85 },
+  // { name: "99 Luftballoons - Nena", path: "audio/99 Luftballoons Nena.m4a", bpm: 85 },
   { name: "Gangsta's Paradise - Coolio", path: "/audio/gangstas_paradise.mp3", bpm: 80 },
   { name: "Sweet Dreams - Eurythmics", path: "audio/Sweet Dreams Eurythmics.m4a", bpm: 85 },
   { name: "Every Little Thing She Does (Is Magic) - The Police", path: "audio/EveryLittleThing.mp3", bpm: 85 },
