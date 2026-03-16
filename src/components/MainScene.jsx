@@ -29,15 +29,32 @@ function disposeObject(obj) {
 /* ── Camera zoom for small characters (e.g. cat idle) ── */
 const _v3A = new THREE.Vector3();
 const _v3B = new THREE.Vector3();
+const SETTLED_THRESHOLD = 0.01;
 function CameraZoom({ active, targetPos, cameraPos, lerpSpeed = 2, controlsRef }) {
   const defaultCam = useRef(null);
   const defaultTarget = useRef(null);
+  const prevActive = useRef(active);
+  const transitioning = useRef(false);
+
+  // Kick off a transition whenever `active` changes
+  useEffect(() => {
+    if (active !== prevActive.current) {
+      // Snapshot current orbit position as the "default" to return to
+      if (active && controlsRef?.current) {
+        defaultCam.current = controlsRef.current.object.position.clone();
+        defaultTarget.current = controlsRef.current.target.clone();
+      }
+      transitioning.current = true;
+      prevActive.current = active;
+    }
+  }, [active, controlsRef]);
 
   useFrame((state, delta) => {
+    if (!transitioning.current) return;
     const controls = controlsRef?.current;
     if (!controls) return;
 
-    // Capture defaults on first frame
+    // Capture defaults on very first frame if not yet set
     if (!defaultCam.current) {
       defaultCam.current = state.camera.position.clone();
       defaultTarget.current = controls.target.clone();
@@ -50,6 +67,13 @@ function CameraZoom({ active, targetPos, cameraPos, lerpSpeed = 2, controlsRef }
     state.camera.position.lerp(goalCam, t);
     controls.target.lerp(goalTarget, t);
     controls.update();
+
+    // Stop transitioning once we're close enough
+    const camDist = state.camera.position.distanceTo(goalCam);
+    const tgtDist = controls.target.distanceTo(goalTarget);
+    if (camDist < SETTLED_THRESHOLD && tgtDist < SETTLED_THRESHOLD) {
+      transitioning.current = false;
+    }
   });
 
   return null;
