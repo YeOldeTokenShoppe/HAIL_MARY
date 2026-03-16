@@ -747,8 +747,8 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
 
     // Smoothly rotate character to face camera when talking
     if (groupRef.current) {
-      const isTalkingNow = activeAnim === "Talking";
-      if (isTalkingNow) {
+      const shouldFaceCamera = activeAnim === "Talking" || activeAnim === "Idle" || activeAnim === "idle";
+      if (shouldFaceCamera) {
         // Calculate angle from model to camera
         const cam = state.camera.position;
         const targetY = Math.atan2(cam.x - groupRef.current.position.x, cam.z - groupRef.current.position.z);
