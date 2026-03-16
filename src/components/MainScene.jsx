@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { OrbitControls, useHelper } from "@react-three/drei";
 import { EffectComposer, Bloom, ChromaticAberration } from "@react-three/postprocessing";
 import { BlendFunction } from "postprocessing";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
@@ -24,6 +24,59 @@ function disposeObject(obj) {
       });
     }
   });
+}
+
+/* ── Camera zoom for small characters (e.g. cat idle) ── */
+const _v3A = new THREE.Vector3();
+const _v3B = new THREE.Vector3();
+function CameraZoom({ active, targetPos, cameraPos, lerpSpeed = 2, controlsRef }) {
+  const defaultCam = useRef(null);
+  const defaultTarget = useRef(null);
+
+  useFrame((state, delta) => {
+    const controls = controlsRef?.current;
+    if (!controls) return;
+
+    // Capture defaults on first frame
+    if (!defaultCam.current) {
+      defaultCam.current = state.camera.position.clone();
+      defaultTarget.current = controls.target.clone();
+    }
+
+    const goalCam = active ? _v3A.set(...cameraPos) : defaultCam.current;
+    const goalTarget = active ? _v3B.set(...targetPos) : defaultTarget.current;
+    const t = 1 - Math.exp(-lerpSpeed * delta);
+
+    state.camera.position.lerp(goalCam, t);
+    controls.target.lerp(goalTarget, t);
+    controls.update();
+  });
+
+  return null;
+}
+
+/* ── Debug spotlight with helper + proper target ── */
+function DebugSpotLight({ position, targetPosition = [0, 0, 0], color = "#ffffff", intensity = 2, angle = 0.4, penumbra = 0.5, distance = 15, debug = true }) {
+  const lightRef = useRef();
+  useHelper(debug && lightRef, THREE.SpotLightHelper, color);
+  useEffect(() => {
+    if (lightRef.current) {
+      lightRef.current.target.position.set(...targetPosition);
+      lightRef.current.target.updateMatrixWorld();
+    }
+  }, [targetPosition]);
+  return (
+    <spotLight
+      ref={lightRef}
+      position={position}
+      angle={angle}
+      penumbra={penumbra}
+      intensity={intensity}
+      color={color}
+      distance={distance}
+      castShadow={false}
+    />
+  );
 }
 
 /* ── Scrolling ground plane ── */
@@ -881,7 +934,11 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
   const [clipNames, setClipNames] = useState([]);
   const [activeAnim, setActiveAnim] = useState(null);
   const characterModelRef = useRef(null);
+  const controlsRef = useRef(null);
 
+  // Detect if current character is the cat (small/low to ground)
+  const isCat = characterModel?.includes("fluffyCat");
+  const isCatIdle = isCat && (activeAnim === "idle" || activeAnim === "Idle");
 
   const handleClipsLoaded = useCallback((names) => {
     // Add virtual "skateSequence" if this model has both skate clips
@@ -966,7 +1023,7 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
         </button>
       )}
     <Canvas
-      camera={{ position: isMobile ? [-0.8, 1.0, 3] : [-1.5, 1.0, 3], fov: isMobile ? 55 : 50 }}
+      camera={{ position: isMobile ? [-0.5, 0.8, 3.2] : [-1.5, 1.0, 3], fov: isMobile ? 55 : 50 }}
       onCreated={(state) => {
         // Recover from WebGL context loss (e.g. SitePal stealing context)
         const canvas = state.gl.domElement;
@@ -982,9 +1039,20 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
       gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
     >
       <DuskySky />
-      <ambientLight intensity={0.5} />
+      <ambientLight intensity={0.6} />
       <directionalLight position={[5, 5, 5]} intensity={1} />
       <pointLight position={[0, 2, 2]} intensity={0.8} color="#ffd36b" />
+      {/* Front spotlight on character */}
+      <DebugSpotLight
+        position={[0, 3, 4]}
+        targetPosition={[0, 1, 0]}
+        angle={0.4}
+        penumbra={0.6}
+        intensity={3}
+        color="#ffe0c0"
+        distance={12}
+        debug={false}
+      />
       <FortuneTellerModel useSitePal={useSitePal} activeAnim={activeAnim} defaultAnim={defaultAnim} onClipsLoaded={handleClipsLoaded} modelRef={characterModelRef} modelUrl={characterModel} zOffset={characterZOffset} />
       {/* Transition effect handled by page-level GlitchTransition overlay */}
       <SynthwaveSun position={[10, 3, -15]} scale={1} />
@@ -1018,22 +1086,30 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
           fresnelPower: 1,
         }}
       /> */}
-      <spotLight
+      <DebugSpotLight
         position={[-0.6, 4.6, 1.3]}
-        target-position={[0, 0.5, 0]}
-        angle={0.3}
-        penumbra={0.8}
-        intensity={2}
+        targetPosition={[0, 0.5, 0]}
+        angle={0.35}
+        penumbra={0.7}
+        intensity={100.5}
         color="#c4bdae"
         distance={15}
-        castShadow={false}
+        debug={false}
       />
       <OrbitControls
-        target={isMobile ? [0.1, 1.2, 0] : [1, 1.2, 0]}
+        ref={controlsRef}
+        target={isMobile ? [0.1, 0.8, 0] : [1, 1.2, 0]}
         minDistance={1.5}
         maxDistance={4}
         enablePan={false}
         // zoomToCursor
+      />
+      <CameraZoom
+        active={isCatIdle}
+        cameraPos={isMobile ? [0, 0.4, 2.0] : [0, 0.5, 2.2]}
+        targetPos={[0, 0.3, 0]}
+        lerpSpeed={2}
+        controlsRef={controlsRef}
       />
       <EffectComposer>
         <Bloom
