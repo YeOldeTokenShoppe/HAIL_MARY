@@ -11,6 +11,21 @@ import * as THREE from "three";
 import { Godray } from "./GodRay";
 // import GPGPUParticleTransition from "./GPGPUParticleTransition";
 
+/** Recursively dispose all geometries, materials, and textures in a scene graph */
+function disposeObject(obj) {
+  obj.traverse((child) => {
+    if (child.isMesh) {
+      child.geometry?.dispose();
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      mats.forEach((m) => {
+        if (!m) return;
+        Object.values(m).forEach((v) => { if (v instanceof THREE.Texture) v.dispose(); });
+        m.dispose();
+      });
+    }
+  });
+}
+
 /* ── Scrolling ground plane ── */
 function ScrollingGround({ speed = 0.8, isWalking = true }) {
   const meshRef = useRef();
@@ -175,7 +190,9 @@ function SynthwaveSun({ position = [20, 8, -20], scale = 1 }) {
     return () => {
       if (groupRef.current) {
         while (groupRef.current.children.length) {
-          groupRef.current.remove(groupRef.current.children[0]);
+          const child = groupRef.current.children[0];
+          groupRef.current.remove(child);
+          disposeObject(child);
         }
       }
     };
@@ -234,9 +251,12 @@ function ScrollingTrees({ speed = 0.8, isWalking = true, spacing = 6, count = 8,
       // cleanup clones
       if (groupRef.current) {
         while (groupRef.current.children.length) {
-          groupRef.current.remove(groupRef.current.children[0]);
+          const child = groupRef.current.children[0];
+          groupRef.current.remove(child);
+          disposeObject(child);
         }
       }
+      treesRef.current = [];
     };
   }, [count, spacing, xOffset, stripLen]);
 
@@ -322,6 +342,7 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
   const rootBoneRef = useRef(null);
   const skateboardBasePos = useRef(null);
   const skateboardReparented = useRef(false);
+  const _boneWorldVec = useMemo(() => new THREE.Vector3(), []);
 
   // Eye mesh refs for blinking animation
   const leftEyeRef = useRef();
@@ -567,17 +588,31 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
 
     return () => {
       cleanupFns.forEach((fn) => fn());
-      if (textureRef.current) textureRef.current.dispose();
-      if (mixerRef.current) mixerRef.current.stopAllAction();
+      if (textureRef.current) { textureRef.current.dispose(); textureRef.current = null; }
+      if (mixerRef.current) { mixerRef.current.stopAllAction(); mixerRef.current.uncacheRoot(mixerRef.current.getRoot()); }
+      actionsRef.current = {};
       skateboardRef.current = null;
       rootBoneRef.current = null;
       skateboardReparented.current = false;
-      // Clear old model from group on reload
+      faceMeshRef.current = null;
+      face2MeshRef.current = null;
+      leftEyeRef.current = null;
+      rightEyeRef.current = null;
+      leftEyeTextRef.current = null;
+      rightEyeTextRef.current = null;
+      smartPhoneRef.current = null;
+      cropCanvasRef.current = null;
+      cropCtxRef.current = null;
+      sitePalSourceRef.current = null;
+      // Dispose and remove old models from group
       if (groupRef.current) {
         while (groupRef.current.children.length) {
-          groupRef.current.remove(groupRef.current.children[0]);
+          const child = groupRef.current.children[0];
+          groupRef.current.remove(child);
+          disposeObject(child);
         }
       }
+      dracoLoader.dispose();
     };
   }, [videoSrc, useSitePal, sitePalContainerId, modelUrl]);
 
@@ -697,7 +732,7 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
 
     // Sync skateboard XZ to Pelvis bone, keeping Y and rotation fixed
     if (skateboardRef.current && rootBoneRef.current && skateboardBasePos.current) {
-      const boneWorld = new THREE.Vector3();
+      const boneWorld = _boneWorldVec;
       rootBoneRef.current.getWorldPosition(boneWorld);
       // Convert to skateboard's parent local space
       if (skateboardRef.current.parent) {

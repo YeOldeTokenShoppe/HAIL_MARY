@@ -38,9 +38,18 @@ function NeonFrame() {
     return () => {
       if (groupRef.current) {
         while (groupRef.current.children.length) {
-          groupRef.current.remove(groupRef.current.children[0]);
+          const child = groupRef.current.children[0];
+          groupRef.current.remove(child);
+          child.traverse((node) => {
+            if (node.isMesh) {
+              node.geometry?.dispose();
+              const mats = Array.isArray(node.material) ? node.material : [node.material];
+              mats.forEach((m) => m?.dispose());
+            }
+          });
         }
       }
+      dracoLoader.dispose();
     };
   }, []);
 

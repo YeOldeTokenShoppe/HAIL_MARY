@@ -51,7 +51,18 @@ function preloadGLBParsed(url) {
         : "/draco/";
     draco.setDecoderPath(dracoPath);
     loader.setDRACOLoader(draco);
-    loader.load(url, () => resolve(), undefined, () => resolve());
+    loader.load(url, (gltf) => {
+      // Dispose parsed scene — we only wanted to warm the cache
+      gltf.scene.traverse((child) => {
+        if (child.isMesh) {
+          child.geometry?.dispose();
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          mats.forEach((m) => m?.dispose());
+        }
+      });
+      draco.dispose();
+      resolve();
+    }, undefined, () => { draco.dispose(); resolve(); });
   });
 }
 
@@ -156,6 +167,11 @@ function SitePalEmbed() {
       if (script1.parentNode) script1.parentNode.removeChild(script1);
       window.removeEventListener("click", resumeAudio);
       window.removeEventListener("touchstart", resumeAudio);
+      delete window.vh_sceneLoaded;
+      // Clean up SitePal DOM contents
+      if (containerRef.current) {
+        containerRef.current.innerHTML = "";
+      }
     };
   }, []);
 
