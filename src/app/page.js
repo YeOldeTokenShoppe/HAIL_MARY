@@ -304,20 +304,29 @@ export default function MainPage() {
     if (glitchAnimRef.current) cancelAnimationFrame(glitchAnimRef.current);
   };
 
-  // Auto-advance character every 10 seconds
+  // Auto-advance character every 10 seconds — paused when user interacts
   const charIndexRef = useRef(activeCharIndex);
   charIndexRef.current = activeCharIndex;
   const glitchActiveRef = useRef(glitchActive);
   glitchActiveRef.current = glitchActive;
   const handleCharacterSelectRef = useRef(handleCharacterSelect);
   handleCharacterSelectRef.current = handleCharacterSelect;
+  const lastInteractionRef = useRef(0);
   useEffect(() => {
+    const onInteract = () => { lastInteractionRef.current = Date.now(); };
+    window.addEventListener("pointerdown", onInteract, true);
+    window.addEventListener("touchstart", onInteract, true);
     const timer = setInterval(() => {
+      if (Date.now() - lastInteractionRef.current < 10000) return;
       if (glitchActiveRef.current) return;
       const next = (charIndexRef.current + 1) % CHARACTERS.length;
       handleCharacterSelectRef.current(next);
     }, 10000);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("pointerdown", onInteract, true);
+      window.removeEventListener("touchstart", onInteract, true);
+    };
   }, []);
 
   // Fallback timeout — don't wait forever if something fails to load

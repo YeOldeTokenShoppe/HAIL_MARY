@@ -503,7 +503,7 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
             rightEyeTextRef.current = child;
             if (child.material) { child.material = child.material.clone(); child.material.transparent = true; child.material.needsUpdate = true; }
             child.visible = false;
-          } else if (child.name === "SmartPhone") {
+          } else if (child.name === "SmartPhone" || child.name === "phone") {
             smartPhoneRef.current = child;
           }
 
@@ -546,16 +546,6 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
             const action = mixer.clipAction(clip);
             actionsRef.current[clip.name] = action;
             clipNames.push(clip.name);
-            console.log(`[Anim] "${clip.name}" — ${clip.tracks.length} tracks, duration: ${clip.duration.toFixed(2)}s`);
-            if (clip.name === "skate2") {
-              clip.tracks.forEach(t => {
-                if (t.times.length <= 2) {
-                  console.log(`[skate2] LOW: "${t.name}" — ${t.times.length} keyframes`);
-                }
-              });
-              const sample = clip.tracks[10];
-              console.log(`[skate2] sample track "${sample.name}" — ${sample.times.length} keyframes, range: ${sample.times[0].toFixed(3)} → ${sample.times[sample.times.length-1].toFixed(3)}`);
-            }
           });
           if (onClipsLoaded) onClipsLoaded(clipNames);
           // Play the default walk animation, or fall back to first clip
@@ -749,6 +739,12 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
       );
     }
 
+    // Only show skateboard during skate animations
+    if (skateboardRef.current) {
+      const isSkating = activeAnim === "skateSequence" || activeAnim === "skate1" || activeAnim === "skate2" || activeAnim === "skate3";
+      skateboardRef.current.visible = isSkating;
+    }
+
     // Smoothly rotate character to face camera when talking
     if (groupRef.current) {
       const isTalkingNow = activeAnim === "Talking";
@@ -815,12 +811,13 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
     if (rightEye) rightEye.visible = useDefaultEyes;
     if (leftEyeText) leftEyeText.visible = useTextEyes;
     if (rightEyeText) rightEyeText.visible = useTextEyes;
-    // Talking mode: show Face2 (SitePal target), hide Face
-    if (face2MeshRef.current) face2MeshRef.current.visible = isTalking;
-    if (faceMeshRef.current) faceMeshRef.current.visible = !isTalking;
+    // Talking mode: show Face2 (SitePal target), hide Face — but only if texture is ready
+    const face2Ready = isTalking && face2MeshRef.current?.userData?.faceMaterial?.map;
+    if (face2MeshRef.current) face2MeshRef.current.visible = !!face2Ready;
+    if (faceMeshRef.current) faceMeshRef.current.visible = !face2Ready;
 
-    // Hide SmartPhone during Praying and Talking
-    if (smartPhoneRef.current) smartPhoneRef.current.visible = activeAnim !== "Praying" && activeAnim !== "Talking";
+    // SmartPhone only visible during texting-walk animations
+    if (smartPhoneRef.current) smartPhoneRef.current.visible = activeAnim === "textWalk" || activeAnim === "walkText";
 
     // Pick active eye materials for blink
     const activeMats = [];
@@ -915,9 +912,9 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
           onChange={(e) => { setActiveAnim(e.target.value); if (onAnimChange) onAnimChange(e.target.value); }}
           style={{
             position: "absolute",
-            bottom: 12,
+            bottom: isMobile ? 80 : 30,
             left: 12,
-            zIndex: 10,
+            zIndex: 200,
             padding: "6px 10px",
             background: "rgba(0,0,0,0.7)",
             color: "#fff",

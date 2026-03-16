@@ -118,7 +118,7 @@ export default function MainMobileNav({
         }
 
         .mn-label {
-          font-size: 7px;
+          font-size: 10px;
           font-weight: 700;
           letter-spacing: 0.5px;
           text-transform: uppercase;
@@ -200,7 +200,7 @@ export default function MainMobileNav({
 
         .mn-buy-text {
           font-family: 'Cyber', 'Geo', sans-serif;
-          font-size: 13px;
+          font-size: 1rem;
           font-weight: 900;
           letter-spacing: 2px;
           color: #fff;
@@ -519,7 +519,7 @@ export default function MainMobileNav({
             >
               <span className="mn-buy-text">BUY</span>
             </button>
-            <span className="mn-buy-label">RL80</span>
+            {/* <span className="mn-buy-label">RL80</span> */}
           </div>
 
           {/* 4 — Stake */}
