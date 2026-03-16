@@ -76,7 +76,7 @@ function ScrollingGround({ speed = 0.8, isWalking = true }) {
   return (
     <mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
       <planeGeometry args={[60, 60]} />
-      <meshStandardMaterial transparent opacity={0.9} />
+      <meshStandardMaterial transparent opacity={0.99} />
     </mesh>
   );
 }
@@ -260,12 +260,17 @@ function waitForSitePalElement(container, timeout = 15000) {
   return new Promise((resolve, reject) => {
     const start = Date.now();
     const check = () => {
-      // SitePal renders into a canvas or video inside the container
-      const el =
-        container.querySelector("canvas") ||
-        container.querySelector("video");
-      if (el) {
-        resolve(el);
+      // SitePal creates multiple canvases — the animated one is the last.
+      // Wait until at least 2 appear, then grab the last one.
+      const canvases = container.querySelectorAll("canvas");
+      if (canvases.length >= 2) {
+        resolve(canvases[canvases.length - 1]);
+        return;
+      }
+      // Fallback: single video element
+      const video = container.querySelector("video");
+      if (video) {
+        resolve(video);
         return;
       }
       // Also check iframes — SitePal may use one
@@ -273,11 +278,14 @@ function waitForSitePalElement(container, timeout = 15000) {
       if (iframe) {
         try {
           const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-          const iframeEl =
-            iframeDoc.querySelector("canvas") ||
-            iframeDoc.querySelector("video");
-          if (iframeEl) {
-            resolve(iframeEl);
+          const iframeCanvases = iframeDoc.querySelectorAll("canvas");
+          if (iframeCanvases.length >= 2) {
+            resolve(iframeCanvases[iframeCanvases.length - 1]);
+            return;
+          }
+          const iframeVideo = iframeDoc.querySelector("video");
+          if (iframeVideo) {
+            resolve(iframeVideo);
             return;
           }
         } catch (e) {
@@ -285,6 +293,11 @@ function waitForSitePalElement(container, timeout = 15000) {
         }
       }
       if (Date.now() - start > timeout) {
+        // Fall back to whatever canvas exists
+        if (canvases.length > 0) {
+          resolve(canvases[canvases.length - 1]);
+          return;
+        }
         reject(new Error("SitePal render element not found"));
         return;
       }
@@ -295,7 +308,7 @@ function waitForSitePalElement(container, timeout = 15000) {
 }
 
 
-function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContainerId = "sitepal-container", activeAnim, defaultAnim, onClipsLoaded, modelRef, modelUrl = "/models/fortuneTeller_not3.glb" }) {
+function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContainerId = "sitepal-container", activeAnim, defaultAnim, onClipsLoaded, modelRef, modelUrl = "/models/fortuneTeller_not3.glb", zOffset = 0 }) {
   const groupRef = useRef();
   const videoRef = useRef(null);
   const mixerRef = useRef(null);
@@ -303,6 +316,12 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
   const actionsRef = useRef({});
   const pendingModelRef = useRef(null); // model hidden until mixer ticks
   const pendingFrameCount = useRef(0);
+
+  // Skateboard + root bone refs for programmatic sync
+  const skateboardRef = useRef(null);
+  const rootBoneRef = useRef(null);
+  const skateboardBasePos = useRef(null);
+  const skateboardReparented = useRef(false);
 
   // Eye mesh refs for blinking animation
   const leftEyeRef = useRef();
@@ -324,37 +343,46 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
     let cleanupFns = [];
 
     if (useSitePal) {
-      // --- SitePal mode: find the render element and use as texture ---
-      const container = document.getElementById(sitePalContainerId);
-      if (!container) return;
+      // --- SitePal mode: poll for container (may mount after scene is ready) ---
+      let cancelled = false;
+      const pollForContainer = () => {
+        if (cancelled) return;
+        const container = document.getElementById(sitePalContainerId);
+        if (!container) {
+          setTimeout(pollForContainer, 200);
+          return;
+        }
 
-      // Create an intermediary canvas to crop the SitePal face
-      const cropCanvas = document.createElement("canvas");
-      cropCanvas.width = 512;
-      cropCanvas.height = 512;
-      const cropCtx = cropCanvas.getContext("2d");
+        // Create an intermediary canvas to crop the SitePal face
+        const cropCanvas = document.createElement("canvas");
+        cropCanvas.width = 512;
+        cropCanvas.height = 512;
+        const cropCtx = cropCanvas.getContext("2d");
 
-      waitForSitePalElement(container).then((el) => {
-        // Store source element for per-frame cropping
-        videoRef.current = el;
+        waitForSitePalElement(container).then((el) => {
+          if (cancelled) return;
+          // Store source element for per-frame cropping
+          videoRef.current = el;
 
-        videoTexture = new THREE.CanvasTexture(cropCanvas);
-        videoTexture.minFilter = THREE.LinearFilter;
-        videoTexture.magFilter = THREE.LinearFilter;
-        videoTexture.colorSpace = THREE.SRGBColorSpace;
-        videoTexture.flipY = false;
-        videoTexture.wrapS = THREE.ClampToEdgeWrapping;
-        videoTexture.wrapT = THREE.ClampToEdgeWrapping;
-        textureRef.current = videoTexture;
+          videoTexture = new THREE.CanvasTexture(cropCanvas);
+          videoTexture.minFilter = THREE.LinearFilter;
+          videoTexture.magFilter = THREE.LinearFilter;
+          videoTexture.colorSpace = THREE.SRGBColorSpace;
+          videoTexture.flipY = false;
+          videoTexture.wrapS = THREE.ClampToEdgeWrapping;
+          videoTexture.wrapT = THREE.ClampToEdgeWrapping;
+          textureRef.current = videoTexture;
 
-        // Store crop context for useFrame
-        cropCanvas._ctx = cropCtx;
-        cropCanvas._source = el;
-        textureRef.current._cropCanvas = cropCanvas;
-
-      }).catch(() => {});
-    } else {
-      // --- Video file mode ---
+          // Store crop context for useFrame
+          cropCanvas._ctx = cropCtx;
+          cropCanvas._source = el;
+          textureRef.current._cropCanvas = cropCanvas;
+        }).catch(() => {});
+      };
+      pollForContainer();
+      cleanupFns.push(() => { cancelled = true; });
+    } else if (videoSrc) {
+      // --- Video file mode (only when a valid source is provided) ---
       const video = document.createElement("video");
       video.src = videoSrc;
       video.loop = true;
@@ -457,7 +485,19 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
           } else if (child.name === "SmartPhone") {
             smartPhoneRef.current = child;
           }
+
+          // Skateboard and root bone for programmatic sync
+          if (child.name === "SM_Prop_Skateboard_01") {
+            skateboardRef.current = child;
+            const basePos = child.position.clone();
+            basePos._origRot = child.rotation.clone();
+            skateboardBasePos.current = basePos;
+          }
+          if (child.isBone && child.name === "Foot_L" && !rootBoneRef.current) {
+            rootBoneRef.current = child;
+          }
         });
+
 
         // Set up animations
         if (gltf.animations && gltf.animations.length > 0) {
@@ -465,14 +505,44 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
           mixerRef.current = mixer;
           const clipNames = [];
           gltf.animations.forEach((clip) => {
+            // Strip any tracks targeting Face/Face2 meshes so animations
+            // don't override programmatic visibility/scale control
+            clip.tracks = clip.tracks.filter(
+              (t) => !t.name.startsWith("Face.") && !t.name.startsWith("Face2.")
+            );
+            // Strip root motion (X/Z) from Pelvis position track so character stays in place
+            const pelvisTrack = clip.tracks.find(t => t.name === "Pelvis.position");
+            if (pelvisTrack) {
+              const values = pelvisTrack.values;
+              const initX = values[0];
+              const initZ = values[2];
+              for (let i = 0; i < values.length; i += 3) {
+                values[i] = initX;       // lock X
+                values[i + 2] = initZ;   // lock Z
+                // values[i+1] (Y) stays for vertical bobbing
+              }
+            }
             const action = mixer.clipAction(clip);
             actionsRef.current[clip.name] = action;
             clipNames.push(clip.name);
+            console.log(`[Anim] "${clip.name}" — ${clip.tracks.length} tracks, duration: ${clip.duration.toFixed(2)}s`);
+            if (clip.name === "skate2") {
+              clip.tracks.forEach(t => {
+                if (t.times.length <= 2) {
+                  console.log(`[skate2] LOW: "${t.name}" — ${t.times.length} keyframes`);
+                }
+              });
+              const sample = clip.tracks[10];
+              console.log(`[skate2] sample track "${sample.name}" — ${sample.times.length} keyframes, range: ${sample.times[0].toFixed(3)} → ${sample.times[sample.times.length-1].toFixed(3)}`);
+            }
           });
           if (onClipsLoaded) onClipsLoaded(clipNames);
           // Play the default walk animation, or fall back to first clip
           if (clipNames.length > 0) {
-            const first = defaultAnim || activeAnim || clipNames[0];
+            let first = defaultAnim || activeAnim || clipNames[0];
+            if (first === "skateSequence" && actionsRef.current["skate2"]) {
+              first = "skate2";
+            }
             if (actionsRef.current[first]) {
               actionsRef.current[first].play();
             } else {
@@ -499,6 +569,9 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
       cleanupFns.forEach((fn) => fn());
       if (textureRef.current) textureRef.current.dispose();
       if (mixerRef.current) mixerRef.current.stopAllAction();
+      skateboardRef.current = null;
+      rootBoneRef.current = null;
+      skateboardReparented.current = false;
       // Clear old model from group on reload
       if (groupRef.current) {
         while (groupRef.current.children.length) {
@@ -508,7 +581,7 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
     };
   }, [videoSrc, useSitePal, sitePalContainerId, modelUrl]);
 
-  // Skate sequence ref for cleanup
+  // Skate sequence refs
   const skateListenerRef = useRef(null);
 
   // Switch animation when activeAnim changes
@@ -523,42 +596,40 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
       skateListenerRef.current = null;
     }
 
-    // Skate sequence: 1x skate1 → 5x skate2 → repeat
-    if (activeAnim === "skateSequence" && actions["skate1"] && actions["skate2"]) {
-      // Fade out all other actions
+    // Skate sequence: alternate 2x skate2 → 3x skate3 with crossfade blending
+    if (activeAnim === "skateSequence" && actions["skate2"] && actions["skate3"]) {
+      const FADE = 1.2;
+      // Stop everything except skate2
       Object.entries(actions).forEach(([name, action]) => {
-        if (name !== "skate1") action.fadeOut(0.3);
+        if (name !== "skate2") action.stop();
       });
 
-      const skate1 = actions["skate1"];
       const skate2 = actions["skate2"];
-      let phase = "skate1"; // "skate1" or "skate2"
-      let skate2LoopCount = 0;
+      const skate3 = actions["skate3"];
+      let phase = "skate2";
+      let loopCount = 0;
 
-      // Start skate1 — play once then stop
-      skate1.reset().setLoop(THREE.LoopRepeat, 1).clampWhenFinished = false;
-      skate1.fadeIn(0.3).play();
+      // Let clips loop naturally — no manual restarting
+      skate2.reset().setLoop(THREE.LoopRepeat, Infinity).play();
 
       const onLoop = (e) => {
-        if (phase === "skate1" && e.action === skate1) {
-          // skate1 finished its loop, switch to skate2
-          phase = "skate2";
-          skate2LoopCount = 0;
-          skate1.fadeOut(0.3);
-          skate2.reset().setLoop(THREE.LoopRepeat, 1).clampWhenFinished = false;
-          skate2.fadeIn(0.3).play();
-        } else if (phase === "skate2" && e.action === skate2) {
-          skate2LoopCount++;
-          if (skate2LoopCount >= 5) {
-            // 5 loops done, restart with skate1
-            phase = "skate1";
-            skate2.fadeOut(0.3);
-            skate1.reset().setLoop(THREE.LoopRepeat, 1).clampWhenFinished = false;
-            skate1.fadeIn(0.3).play();
-          } else {
-            // Continue looping skate2
-            skate2.reset().setLoop(THREE.LoopRepeat, 1).clampWhenFinished = false;
-            skate2.play();
+        if (phase === "skate2" && e.action === skate2) {
+          loopCount++;
+          if (loopCount >= 2) {
+            // Crossfade to skate3
+            phase = "skate3";
+            loopCount = 0;
+            skate3.reset().setLoop(THREE.LoopRepeat, Infinity).play();
+            skate2.crossFadeTo(skate3, FADE, false);
+          }
+        } else if (phase === "skate3" && e.action === skate3) {
+          loopCount++;
+          if (loopCount >= 3) {
+            // Crossfade back to skate2
+            phase = "skate2";
+            loopCount = 0;
+            skate2.reset().setLoop(THREE.LoopRepeat, Infinity).play();
+            skate3.crossFadeTo(skate2, FADE, false);
           }
         }
       };
@@ -620,7 +691,27 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
       if (pendingFrameCount.current >= 8) {
         pendingModelRef.current.scale.set(1, 1, 1);
         pendingModelRef.current = null;
+
       }
+    }
+
+    // Sync skateboard XZ to Pelvis bone, keeping Y and rotation fixed
+    if (skateboardRef.current && rootBoneRef.current && skateboardBasePos.current) {
+      const boneWorld = new THREE.Vector3();
+      rootBoneRef.current.getWorldPosition(boneWorld);
+      // Convert to skateboard's parent local space
+      if (skateboardRef.current.parent) {
+        skateboardRef.current.parent.worldToLocal(boneWorld);
+      }
+      skateboardRef.current.position.x = boneWorld.x;
+      skateboardRef.current.position.z = boneWorld.z;
+      skateboardRef.current.position.y = skateboardBasePos.current.y;
+      // Keep original rotation so it stays flat
+      skateboardRef.current.rotation.set(
+        skateboardBasePos.current._origRot?.x ?? 0,
+        skateboardBasePos.current._origRot?.y ?? 0,
+        skateboardBasePos.current._origRot?.z ?? 0,
+      );
     }
 
     // Smoothly rotate character to face camera when talking
@@ -751,19 +842,23 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
     }
   });
 
-  return <group ref={groupRef} />;
+  return <group ref={groupRef} position={[0, 0, zOffset]} />;
 }
 
-export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, characterModel, defaultAnim, glitchIntensity = 0 }) {
+export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, characterModel, defaultAnim, characterZOffset = 0, glitchIntensity = 0, isMobile = false }) {
   const [clipNames, setClipNames] = useState([]);
   const [activeAnim, setActiveAnim] = useState(null);
   const characterModelRef = useRef(null);
 
 
   const handleClipsLoaded = useCallback((names) => {
-    setClipNames(names);
-    if (names.length > 0) {
-      const initial = defaultAnim && names.includes(defaultAnim) ? defaultAnim : names[0];
+    // Add virtual "skateSequence" if this model has both skate clips
+    const allNames = names.includes("skate2") && names.includes("skate3") && !names.includes("skateSequence")
+      ? ["skateSequence", ...names]
+      : names;
+    setClipNames(allNames);
+    if (allNames.length > 0) {
+      const initial = defaultAnim && allNames.includes(defaultAnim) ? defaultAnim : allNames[0];
       setActiveAnim(initial);
     }
   }, [defaultAnim]);
@@ -839,8 +934,18 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
         </button>
       )}
     <Canvas
-      camera={{ position: [-1.5, 1.0, 3], fov: 50 }}
-      onCreated={handleCreated}
+      camera={{ position: isMobile ? [-0.8, 1.0, 3] : [-1.5, 1.0, 3], fov: isMobile ? 55 : 50 }}
+      onCreated={(state) => {
+        // Recover from WebGL context loss (e.g. SitePal stealing context)
+        const canvas = state.gl.domElement;
+        canvas.addEventListener("webglcontextlost", (e) => {
+          e.preventDefault();
+        });
+        canvas.addEventListener("webglcontextrestored", () => {
+          state.gl.forceContextRestore?.();
+        });
+        handleCreated();
+      }}
       style={{ width: "100%", height: "100%" }}
       gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
     >
@@ -848,12 +953,22 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
       <ambientLight intensity={0.5} />
       <directionalLight position={[5, 5, 5]} intensity={1} />
       <pointLight position={[0, 2, 2]} intensity={0.8} color="#ffd36b" />
-      <FortuneTellerModel useSitePal={useSitePal} activeAnim={activeAnim} defaultAnim={defaultAnim} onClipsLoaded={handleClipsLoaded} modelRef={characterModelRef} modelUrl={characterModel} />
+      <FortuneTellerModel useSitePal={useSitePal} activeAnim={activeAnim} defaultAnim={defaultAnim} onClipsLoaded={handleClipsLoaded} modelRef={characterModelRef} modelUrl={characterModel} zOffset={characterZOffset} />
       {/* Transition effect handled by page-level GlitchTransition overlay */}
       <SynthwaveSun position={[10, 3, -15]} scale={1} />
       {/* Scrolling environment — always mounted, stops when not walking */}
-      <ScrollingGround speed={0.3} isWalking={activeAnim === "textWalk" || activeAnim === "walkText" || activeAnim === "Walk" || activeAnim === "walk"} />
-      <ScrollingTrees speed={1.5} isWalking={activeAnim === "textWalk" || activeAnim === "walkText" || activeAnim === "Walk" || activeAnim === "walk"} spacing={4} count={8} xOffset={3} />
+      {(() => {
+        const isSkate = activeAnim === "skateSequence" || activeAnim === "sequence" || activeAnim === "skate1" || activeAnim === "skate2" || activeAnim === "skate3";
+        const isMoving = activeAnim === "textWalk" || activeAnim === "walkText" || activeAnim === "Walk" || activeAnim === "walk" || isSkate;
+        const groundSpeed = isSkate ? 0.9 : 0.3;
+        const treeSpeed = isSkate ? 4.5 : 1.5;
+        return (
+          <>
+            <ScrollingGround speed={groundSpeed} isWalking={isMoving} />
+            <ScrollingTrees speed={treeSpeed} isWalking={isMoving} spacing={4} count={8} xOffset={3} />
+          </>
+        );
+      })()}
       <fog attach="fog" args={["#1a0e14", 8, 28]} />
       {/* <Godray
         debug={true}
@@ -882,7 +997,7 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
         castShadow={false}
       />
       <OrbitControls
-        target={[1, 1.2, 0]}
+        target={isMobile ? [0.1, 1.2, 0] : [1, 1.2, 0]}
         minDistance={1.5}
         maxDistance={4}
         enablePan={false}

@@ -101,6 +101,11 @@ export default function CharacterSelect({
 }) {
   const [index, setIndex] = useState(activeIndex);
 
+  // Sync internal index when parent changes it (e.g. auto-advance)
+  useEffect(() => {
+    setIndex(activeIndex);
+  }, [activeIndex]);
+
   const current = characters[index] || { name: "Unknown", image: null };
 
   const prev = () => {
@@ -188,7 +193,7 @@ export default function CharacterSelect({
         )}
         <span
           style={{
-            fontSize: "0.7rem",
+            fontSize: "0.9rem",
             letterSpacing: "0.15em",
             textTransform: "uppercase",
             color: "hsl(183 38% 57%)",
