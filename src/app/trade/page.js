@@ -904,9 +904,8 @@ export default function CyborgTemple() {
             
             {/* OrbitControls - Disabled on mobile */}
             {!isMobileView && (
-              <OrbitControls 
+              <OrbitControls
                 makeDefault
-                enabled={!focusedAgent}  // Disable when focusing on an agent
                 enablePan={true}
                 enableZoom={true}
                 zoomSpeed={0.2}
@@ -915,9 +914,8 @@ export default function CyborgTemple() {
                 minDistance={0.1}
                 maxDistance={10}
                 // zoomToCursor={true}
-                autoRotate={true}
+                autoRotate={!focusedAgent}
                 autoRotateSpeed={0.2}
-                target={[0, 0, 0]}
               />
             )}
           </Suspense>
@@ -931,7 +929,7 @@ export default function CyborgTemple() {
             RL80: { name: 'Our Lady', tagline: 'The oracle. She sees the chain.' },
             Demon: { name: 'H80Z', tagline: 'The hype man. First to pump, last to dump.' },
             Monk: { name: 'St. GR80', tagline: 'The philosopher. Patience is the path.' },
-            Fluffy: { name: 'FR80 Cat', tagline: 'The guardian. Nine lives, one mission.' },
+          Fluffy: { name: 'Virgil~~', tagline: 'The guardian. Nine lives, one mission.' },
           };
           const info = focusedAgent && agentInfo[focusedAgent];
           return (

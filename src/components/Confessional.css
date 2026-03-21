@@ -1,0 +1,364 @@
+/* ═══════════════════════════════════════
+   Confessional — cyber-gothic chat drawer
+   ═══════════════════════════════════════ */
+
+/* ─── Speech bubble CTA (collapsed state) ─── */
+.confessional-bubble-cta {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  z-index: 400;
+  max-width: min(300px, calc(100vw - 3rem));
+  padding: 12px 16px 8px;
+  border-radius: 12px 12px 12px 2px;
+  cursor: pointer;
+  user-select: none;
+
+  background: rgba(6, 6, 14, 0.85);
+  backdrop-filter: saturate(180%) blur(14px);
+  border: 1px solid rgba(255, 211, 107, 0.2);
+  box-shadow:
+    0 4px 30px rgba(0, 0, 0, 0.5),
+    0 0 20px rgba(255, 211, 107, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+  animation: confessional-bubble-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.confessional-bubble-cta:hover {
+  border-color: rgba(255, 211, 107, 0.4);
+  box-shadow:
+    0 4px 30px rgba(0, 0, 0, 0.5),
+    0 0 28px rgba(255, 211, 107, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.confessional-bubble-sender {
+  font-family: 'UnifrakturCook', serif;
+  font-size: 0.75rem;
+  color: #ffd36b;
+  margin-bottom: 4px;
+  text-shadow: 0 0 8px rgba(255, 211, 107, 0.25);
+}
+
+.confessional-bubble-text {
+  font-family: 'Cyber', 'Geo', sans-serif;
+  font-size: 0.88rem;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: 0.03em;
+  line-height: 1.45;
+  min-height: 1.3em;
+}
+
+.confessional-bubble-reply {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid rgba(0, 255, 255, 0.08);
+  font-family: 'Cyber', 'Geo', sans-serif;
+  font-size: 0.6rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: hsl(183, 38%, 57%);
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.confessional-bubble-cta:hover .confessional-bubble-reply {
+  opacity: 1;
+}
+
+@keyframes confessional-bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ─── Drawer container ─── */
+.confessional-drawer {
+  position: fixed;
+  bottom: 0.75rem;
+  left: 1rem;
+  z-index: 500;
+  width: min(340px, calc(100vw - 2rem));
+  max-height: 280px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  overflow: hidden;
+
+  background: rgba(6, 6, 14, 0.78);
+  backdrop-filter: saturate(180%) blur(14px);
+  border: 1px solid rgba(255, 211, 107, 0.12);
+  box-shadow:
+    0 4px 30px rgba(0, 0, 0, 0.45),
+    0 0 1px rgba(255, 211, 107, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+/* Slide-up entrance */
+.confessional-drawer--entering {
+  animation: confessional-slide-up 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* Slide-down exit */
+.confessional-drawer--exiting {
+  animation: confessional-slide-down 0.3s cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes confessional-slide-up {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes confessional-slide-down {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(20px) scale(0.95); }
+}
+
+/* ─── Header bar ─── */
+.confessional-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 12px;
+  border-bottom: 1px solid rgba(255, 211, 107, 0.08);
+  flex-shrink: 0;
+  cursor: default;
+  user-select: none;
+}
+
+.confessional-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.confessional-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffd36b;
+  box-shadow: 0 0 6px rgba(255, 211, 107, 0.6);
+  animation: confessional-status-blink 3s ease-in-out infinite;
+}
+
+@keyframes confessional-status-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.confessional-title {
+  font-family: 'UnifrakturCook', serif;
+  font-size: 0.95rem;
+  color: #ffd36b;
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 8px rgba(255, 211, 107, 0.3);
+}
+
+.confessional-close-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.confessional-close-btn:hover {
+  color: #ffd36b;
+  border-color: rgba(255, 211, 107, 0.25);
+  background: rgba(255, 211, 107, 0.05);
+}
+
+/* ─── Messages area ─── */
+.confessional-messages {
+  flex: 1;
+  min-height: 80px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scroll-behavior: smooth;
+}
+
+/* Scrollbar */
+.confessional-messages::-webkit-scrollbar {
+  width: 4px;
+}
+.confessional-messages::-webkit-scrollbar-track {
+  background: transparent;
+}
+.confessional-messages::-webkit-scrollbar-thumb {
+  background: rgba(255, 211, 107, 0.15);
+  border-radius: 2px;
+}
+
+/* ─── Message bubbles ─── */
+.confessional-msg {
+  max-width: 85%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-family: 'Cyber', 'Geo', sans-serif;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  letter-spacing: 0.03em;
+  animation: confessional-msg-in 0.3s ease-out both;
+}
+
+@keyframes confessional-msg-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Character (left) */
+.confessional-msg--character {
+  align-self: flex-start;
+  background: rgba(255, 211, 107, 0.06);
+  border: 1px solid rgba(255, 211, 107, 0.1);
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.confessional-msg-sender {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: rgba(255, 211, 107, 0.5);
+  margin-bottom: 3px;
+}
+
+/* Typewriter cursor */
+.confessional-cursor {
+  display: inline-block;
+  width: 1px;
+  height: 0.9em;
+  background: #ffd36b;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: confessional-blink-cursor 0.7s step-end infinite;
+}
+
+@keyframes confessional-blink-cursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* User (right) */
+.confessional-msg--user {
+  align-self: flex-end;
+  background: rgba(0, 255, 255, 0.06);
+  border: 1px solid rgba(0, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.88);
+}
+
+/* ─── Input area ─── */
+.confessional-input-area {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  border-top: 1px solid rgba(255, 211, 107, 0.06);
+  flex-shrink: 0;
+}
+
+.confessional-input {
+  flex: 1;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+  font-family: 'Cyber', 'Geo', sans-serif;
+  font-size: 0.82rem;
+  letter-spacing: 0.03em;
+  outline: none;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.confessional-input::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+  font-style: italic;
+}
+
+.confessional-input:focus {
+  border-color: rgba(0, 255, 255, 0.35);
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.08), inset 0 0 6px rgba(0, 255, 255, 0.03);
+}
+
+.confessional-send-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 255, 255, 0.15);
+  background: rgba(0, 255, 255, 0.05);
+  color: hsl(183, 38%, 57%);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.confessional-send-btn:hover:not(:disabled) {
+  background: rgba(0, 255, 255, 0.12);
+  border-color: rgba(0, 255, 255, 0.35);
+  box-shadow: 0 0 10px rgba(0, 255, 255, 0.1);
+}
+
+.confessional-send-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.confessional-send-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ─── "Coming soon" overlay inside the input ─── */
+.confessional-coming-soon {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Cyber', 'Geo', sans-serif;
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 211, 107, 0.4);
+  background: rgba(6, 6, 14, 0.9);
+  border-top: 1px solid rgba(255, 211, 107, 0.06);
+}
+
+/* ─── Mobile adjustments ─── */
+@media (max-width: 767px) {
+  .confessional-bubble-cta {
+    bottom: 5.5rem; /* above mobile nav */
+  }
+
+  .confessional-drawer {
+    width: 100vw;
+    max-height: 55vh;
+    border-radius: 14px 14px 0 0;
+  }
+}

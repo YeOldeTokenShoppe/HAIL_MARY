@@ -286,8 +286,49 @@ function SynthwaveSun({ position = [20, 8, -20], scale = 1 }) {
   return <group ref={groupRef} position={position} scale={s} />;
 }
 
+/* ── Skyline backdrop ── */
+function Skyline({ position = [0, 0, 30], scale = 0.5 }) {
+  const groupRef = useRef();
+
+  useEffect(() => {
+    const gltfLoader = new GLTFLoader();
+    const dracoLoader = new DRACOLoader();
+    const dracoPath =
+      typeof window !== "undefined" && window.location.hostname !== "localhost"
+        ? `${window.location.origin}/draco/`
+        : "/draco/";
+    dracoLoader.setDecoderPath(dracoPath);
+    gltfLoader.setDRACOLoader(dracoLoader);
+
+    gltfLoader.load("/models/skyline2.glb", (gltf) => {
+      const model = gltf.scene;
+      model.traverse((child) => {
+        if (child.isMesh && child.material) {
+          child.material.fog = false;
+        }
+      });
+      if (groupRef.current) {
+        groupRef.current.add(model);
+      }
+    });
+
+    return () => {
+      if (groupRef.current) {
+        while (groupRef.current.children.length) {
+          const child = groupRef.current.children[0];
+          groupRef.current.remove(child);
+          disposeObject(child);
+        }
+      }
+    };
+  }, []);
+
+  const s = typeof scale === "number" ? [scale, scale, scale] : scale;
+  return <group ref={groupRef} position={position} scale={s} />;
+}
+
 /* ── Scrolling palm trees along both sides ── */
-function ScrollingTrees({ speed = 0.8, isWalking = true, spacing = 6, count = 8, xOffset = 3 }) {
+function ScrollingTrees({ speed = 0.8, isWalking = true, spacing = 6, count = 8, xOffset = 3, zOffset = 0 }) {
   const groupRef = useRef();
   const treesRef = useRef([]); // array of { mesh, startZ }
   const modelRef = useRef(null);
@@ -313,7 +354,7 @@ function ScrollingTrees({ speed = 0.8, isWalking = true, spacing = 6, count = 8,
       for (let side = -1; side <= 1; side += 2) {
         for (let i = 0; i < count; i++) {
           const clone = gltf.scene.clone();
-          const z = -stripLen / 2 + i * spacing;
+          const z = -stripLen / 2 + i * spacing + zOffset;
           clone.position.set(side * xOffset, 0, z);
           // Slight random rotation for variety
           clone.rotation.y = Math.random() * Math.PI * 2;
@@ -335,15 +376,15 @@ function ScrollingTrees({ speed = 0.8, isWalking = true, spacing = 6, count = 8,
       }
       treesRef.current = [];
     };
-  }, [count, spacing, xOffset, stripLen]);
+  }, [count, spacing, xOffset, zOffset, stripLen]);
 
   useFrame((_, delta) => {
     if (!isWalking || treesRef.current.length === 0) return;
     const halfStrip = stripLen / 1.2;
     for (const tree of treesRef.current) {
       tree.mesh.position.z -= speed * delta;
-      // Wrap around when tree passes behind
-      if (tree.mesh.position.z < -halfStrip) {
+      // Wrap around when tree passes behind, accounting for zOffset
+      if (tree.mesh.position.z < -halfStrip + zOffset) {
         tree.mesh.position.z += stripLen;
       }
     }
@@ -413,6 +454,8 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
   const actionsRef = useRef({});
   const pendingModelRef = useRef(null); // model hidden until mixer ticks
   const pendingFrameCount = useRef(0);
+  const defaultAnimRef = useRef(defaultAnim);
+  defaultAnimRef.current = defaultAnim;
 
   // Skateboard + root bone refs for programmatic sync
   const skateboardRef = useRef(null);
@@ -426,6 +469,7 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
   const rightEyeRef = useRef();
   const leftEyeTextRef = useRef();
   const rightEyeTextRef = useRef();
+  const eyesCombinedRef = useRef(); // H80Z single "Eyes" mesh
   const smartPhoneRef = useRef();
   const faceMeshRef = useRef();
   const face2MeshRef = useRef();
@@ -580,6 +624,9 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
             rightEyeTextRef.current = child;
             if (child.material) { child.material = child.material.clone(); child.material.transparent = true; child.material.needsUpdate = true; }
             child.visible = false;
+          } else if (child.name === "Eyes") {
+            eyesCombinedRef.current = child;
+            if (child.material) { child.material.transparent = true; child.material.needsUpdate = true; }
           } else if (child.name === "SmartPhone" || child.name === "phone") {
             smartPhoneRef.current = child;
           }
@@ -627,7 +674,7 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
           if (onClipsLoaded) onClipsLoaded(clipNames);
           // Play the default walk animation, or fall back to first clip
           if (clipNames.length > 0) {
-            let first = defaultAnim || activeAnim || clipNames[0];
+            let first = defaultAnimRef.current || activeAnim || clipNames[0];
             if (first === "skateSequence" && actionsRef.current["skate2"]) {
               first = "skate2";
             }
@@ -667,6 +714,7 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
       rightEyeRef.current = null;
       leftEyeTextRef.current = null;
       rightEyeTextRef.current = null;
+      eyesCombinedRef.current = null;
       smartPhoneRef.current = null;
       cropCanvasRef.current = null;
       cropCtxRef.current = null;
@@ -775,7 +823,7 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
     }
   }, [activeAnim, useSitePal]);
 
-  const cropControls = { cropX: 230, cropY: 110, cropW: 200, cropH: 230, rotateZ: 0, rotateX: 0 };
+  const cropControls = { cropX: 215, cropY: 60, cropW: 170, cropH: 210, rotateZ: 0, rotateX: 0 };
   const videoControls = { repeatX: 0.75, repeatY: 0.5, offsetX: 0.185, offsetY: 0.165 };
 
   const cropCanvasRef = useRef(null);
@@ -797,7 +845,8 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
       }
     }
 
-    // Sync skateboard XZ to Pelvis bone, keeping Y and rotation fixed
+    // Sync skateboard to foot bone — XZ tracks laterally, Y follows bone so
+    // the board stays under the foot even when animations have different heights
     if (skateboardRef.current && rootBoneRef.current && skateboardBasePos.current) {
       const boneWorld = _boneWorldVec;
       rootBoneRef.current.getWorldPosition(boneWorld);
@@ -807,18 +856,28 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
       }
       skateboardRef.current.position.x = boneWorld.x;
       skateboardRef.current.position.z = boneWorld.z;
-      skateboardRef.current.position.y = skateboardBasePos.current.y;
+      skateboardRef.current.position.y = boneWorld.y - 0.18;
       // Keep original rotation so it stays flat
       skateboardRef.current.rotation.set(
         skateboardBasePos.current._origRot?.x ?? 0,
         skateboardBasePos.current._origRot?.y ?? 0,
         skateboardBasePos.current._origRot?.z ?? 0,
+   
       );
     }
 
     // Only show skateboard during skate animations
+    // Check activeAnim prop, plus what the mixer is actually playing (covers
+    // the frames before React state propagates after model load)
     if (skateboardRef.current) {
-      const isSkating = activeAnim === "skateSequence" || activeAnim === "skate1" || activeAnim === "skate2" || activeAnim === "skate3";
+      const skateAnims = ["skateSequence", "skate1", "skate2", "skate3"];
+      let mixerPlaying = false;
+      if (mixerRef.current && actionsRef.current) {
+        mixerPlaying = ["skate2", "skate3"].some(
+          (name) => actionsRef.current[name]?.isRunning()
+        );
+      }
+      const isSkating = skateAnims.includes(activeAnim) || mixerPlaying;
       skateboardRef.current.visible = isSkating;
     }
 
@@ -898,7 +957,10 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
 
     // Pick active eye materials for blink
     const activeMats = [];
-    if (useTextEyes) {
+    if (eyesCombinedRef.current?.material) {
+      // H80Z: single "Eyes" mesh
+      activeMats.push(eyesCombinedRef.current.material);
+    } else if (useTextEyes) {
       if (leftEyeText?.material) activeMats.push(leftEyeText.material);
       if (rightEyeText?.material) activeMats.push(rightEyeText.material);
     } else {
@@ -906,7 +968,7 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
       if (rightEye?.material) activeMats.push(rightEye.material);
     }
 
-    if (activeMats.length === 2) {
+    if (activeMats.length > 0) {
       if (activeAnim === "Pose" || isTalking) {
         // No blink in Pose
         activeMats.forEach(m => m.opacity = 1);
@@ -954,15 +1016,75 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
   return <group ref={groupRef} position={[0, 0, zOffset]} />;
 }
 
-export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, characterModel, defaultAnim, characterZOffset = 0, glitchIntensity = 0, isMobile = false }) {
+/* ── Per-character speech config ── */
+const CHARACTER_SPEECH = {
+  // Our Lady — walks in texting, then notices the viewer
+  "fortuneTeller": {
+    delay: 3000,           // ms after clips load before switching to Talking
+    text: "Oh, hello!",
+    voice: 3,
+    lang: 1,
+    engine: 3,
+    linger: 3000,          // ms to stay in Talking after speech ends
+  },
+  // Add more characters here as needed:
+  // "GR80": { delay: 4000, text: "...", voice: 3, lang: 1, engine: 3 },
+};
+
+/** Match a model URL to its speech config key */
+function getSpeechConfig(modelUrl) {
+  if (!modelUrl) return null;
+  for (const key of Object.keys(CHARACTER_SPEECH)) {
+    if (modelUrl.includes(key)) return CHARACTER_SPEECH[key];
+  }
+  return null;
+}
+
+export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, characterModel, defaultAnim, characterZOffset = 0, glitchIntensity = 0, isMobile = false, holdTalking = false }) {
   const [clipNames, setClipNames] = useState([]);
   const [activeAnim, setActiveAnim] = useState(null);
   const characterModelRef = useRef(null);
   const controlsRef = useRef(null);
+  const speechTimerRef = useRef(null);
+  const hasSpokeRef = useRef(false);
 
   // Detect if current character is the cat (small/low to ground)
   const isCat = characterModel?.includes("fluffyCat");
   const isCatIdle = isCat && (activeAnim === "idle" || activeAnim === "Idle");
+
+  // H80Z alternates between skateSequence and walkText each appearance
+  const isH80Z = characterModel?.includes("H80Z");
+  const h80zVisitCount = useRef(0);
+  // GR80 alternates between walk, walkText, and pray each appearance
+  const isGR80 = characterModel?.includes("GR80");
+  const gr80VisitCount = useRef(0);
+  const GR80_ANIMS = ["walk", "walkText", "pray"];
+
+  const resolvedAnimRef = useRef(defaultAnim);
+
+  // Track character visits and resolve the actual animation to use
+  useEffect(() => {
+    if (isH80Z) {
+      h80zVisitCount.current++;
+      const anim = h80zVisitCount.current % 2 === 0 ? "walkText" : "skateSequence";
+      console.log("[MainScene] H80Z visit:", h80zVisitCount.current, "→", anim);
+      resolvedAnimRef.current = anim;
+    } else if (isGR80) {
+      gr80VisitCount.current++;
+      const anim = GR80_ANIMS[gr80VisitCount.current % GR80_ANIMS.length];
+      console.log("[MainScene] GR80 visit:", gr80VisitCount.current, "→", anim);
+      resolvedAnimRef.current = anim;
+    } else {
+      resolvedAnimRef.current = defaultAnim;
+    }
+  }, [characterModel]);
+
+  // When defaultAnim changes, apply it (for non-alternating characters)
+  useEffect(() => {
+    if (!isH80Z && !isGR80 && defaultAnim && clipNames.includes(defaultAnim)) {
+      setActiveAnim(defaultAnim);
+    }
+  }, [defaultAnim]);
 
   const handleClipsLoaded = useCallback((names) => {
     // Add virtual "skateSequence" if this model has both skate clips
@@ -970,11 +1092,114 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
       ? ["skateSequence", ...names]
       : names;
     setClipNames(allNames);
+    const anim = resolvedAnimRef.current;
     if (allNames.length > 0) {
-      const initial = defaultAnim && allNames.includes(defaultAnim) ? defaultAnim : allNames[0];
+      const initial = anim && allNames.includes(anim) ? anim : allNames[0];
+      console.log("[MainScene] clipsLoaded, resolvedAnim:", anim, "→ initial:", initial);
       setActiveAnim(initial);
     }
-  }, [defaultAnim]);
+  }, []);
+
+  // Keep parent in sync with animation state
+  useEffect(() => {
+    if (onAnimChange) onAnimChange(activeAnim);
+  }, [activeAnim, onAnimChange]);
+
+  // ── Speech trigger: after clips load, delay then switch to Talking + sayText ──
+  useEffect(() => {
+    // Clear any pending timers when character changes
+    if (speechTimerRef.current) {
+      clearTimeout(speechTimerRef.current);
+      speechTimerRef.current = null;
+    }
+    if (lingerTimerRef.current) {
+      clearTimeout(lingerTimerRef.current);
+      lingerTimerRef.current = null;
+    }
+    hasSpokeRef.current = false;
+  }, [characterModel]);
+
+  useEffect(() => {
+    if (clipNames.length === 0) return;
+    const speech = getSpeechConfig(characterModel);
+    if (!speech || hasSpokeRef.current) return;
+    if (!clipNames.includes("Talking")) return;
+
+    speechTimerRef.current = setTimeout(() => {
+      hasSpokeRef.current = true;
+      setActiveAnim("Talking");
+
+      // Wait a beat for SitePal face to swap in, then speak
+      setTimeout(() => {
+        if (typeof window.sayText === "function") {
+          window.sayText(speech.text, speech.voice, speech.lang, speech.engine);
+        }
+      }, 300);
+    }, speech.delay);
+
+    return () => {
+      if (speechTimerRef.current) {
+        clearTimeout(speechTimerRef.current);
+        speechTimerRef.current = null;
+      }
+    };
+  }, [clipNames, characterModel]);
+
+  // ── vh_talkEnded: when SitePal finishes speaking, linger then return to walk ──
+  const lingerTimerRef = useRef(null);
+  const holdTalkingRef = useRef(holdTalking);
+  holdTalkingRef.current = holdTalking;
+
+  useEffect(() => {
+    const revert = () => {
+      // Don't revert if chat drawer is open
+      if (holdTalkingRef.current) return;
+      const fallback = resolvedAnimRef.current || defaultAnim || clipNames[0];
+      if (fallback && clipNames.includes(fallback)) {
+        setActiveAnim(fallback);
+      }
+    };
+
+    const onTalkEnded = () => {
+      if (!hasSpokeRef.current || activeAnim !== "Talking") return;
+
+      const speech = getSpeechConfig(characterModel);
+      const lingerMs = speech?.linger ?? 0;
+
+      if (holdTalkingRef.current) return; // chat is open, stay in Talking
+
+      if (lingerMs > 0) {
+        lingerTimerRef.current = setTimeout(revert, lingerMs);
+      } else {
+        revert();
+      }
+    };
+
+    window.vh_talkEnded = onTalkEnded;
+    return () => {
+      if (window.vh_talkEnded === onTalkEnded) {
+        window.vh_talkEnded = undefined;
+      }
+      if (lingerTimerRef.current) {
+        clearTimeout(lingerTimerRef.current);
+        lingerTimerRef.current = null;
+      }
+    };
+  }, [activeAnim, clipNames, defaultAnim, characterModel]);
+
+  // holdTalking: keep character in Talking while chat is active, revert when released
+  useEffect(() => {
+    if (holdTalking && hasSpokeRef.current && activeAnim !== "Talking" && clipNames.includes("Talking")) {
+      // Chat is active but she drifted away — snap back to Talking
+      setActiveAnim("Talking");
+    } else if (!holdTalking && hasSpokeRef.current && activeAnim === "Talking") {
+      // Chat dismissed — revert to walk
+      const fallback = resolvedAnimRef.current || defaultAnim || clipNames[0];
+      if (fallback && clipNames.includes(fallback)) {
+        setActiveAnim(fallback);
+      }
+    }
+  }, [holdTalking, activeAnim]);
 
   const handleCreated = () => {
     if (onLoaded) onLoaded();
@@ -986,66 +1211,6 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      {/* Temp animation selector */}
-      {clipNames.length > 0 && (
-        <select
-          value={activeAnim || ""}
-          onChange={(e) => { setActiveAnim(e.target.value); if (onAnimChange) onAnimChange(e.target.value); }}
-          style={{
-            position: "absolute",
-            bottom: isMobile ? 80 : 30,
-            left: 12,
-            zIndex: 200,
-            padding: "6px 10px",
-            background: "rgba(0,0,0,0.7)",
-            color: "#fff",
-            border: "1px solid rgba(255,255,255,0.3)",
-            borderRadius: 6,
-            fontSize: 14,
-            cursor: "pointer",
-          }}
-        >
-          {clipNames.map((name) => (
-            <option key={name} value={name}>{name}</option>
-          ))}
-        </select>
-      )}
-      {activeAnim === "Talking" && (
-        <button
-          onClick={() => {
-            try {
-              // Get the scene's assigned audio and play it
-              if (typeof window.getSceneAttributes === "function") {
-                const attr = window.getSceneAttributes();
-                if (attr?.audioName && typeof window.sayAudio === "function") {
-                  window.sayAudio(attr.audioName);
-                  return;
-                }
-              }
-              if (typeof window.sayAudio === "function") {
-                window.sayAudio("");
-              }
-            } catch (e) {
-              // SitePal speak error
-            }
-          }}
-          style={{
-            position: "absolute",
-            top: 12,
-            left: 200,
-            zIndex: 10,
-            padding: "8px 16px",
-            background: "rgba(0,0,0,0.7)",
-            color: "#ffd36b",
-            border: "1px solid rgba(255,215,0,0.4)",
-            borderRadius: 6,
-            fontSize: 14,
-            cursor: "pointer",
-          }}
-        >
-          Speak
-        </button>
-      )}
     <Canvas
       camera={{ position: isMobile ? [-0.5, 0.8, 3.2] : [-1.5, 1.0, 3], fov: isMobile ? 55 : 50 }}
       onCreated={(state) => {
@@ -1080,6 +1245,7 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
       <FortuneTellerModel useSitePal={useSitePal} activeAnim={activeAnim} defaultAnim={defaultAnim} onClipsLoaded={handleClipsLoaded} modelRef={characterModelRef} modelUrl={characterModel} zOffset={characterZOffset} />
       {/* Transition effect handled by page-level GlitchTransition overlay */}
       <SynthwaveSun position={[10, 3, -15]} scale={1} />
+      <Skyline position={[0, -0.5, 30]} rotation={[0, 0, 0]} scale={0.25} />
       {/* Scrolling environment — always mounted, stops when not walking */}
       {(() => {
         const isSkate = activeAnim === "skateSequence" || activeAnim === "sequence" || activeAnim === "skate1" || activeAnim === "skate2" || activeAnim === "skate3";
@@ -1089,7 +1255,7 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
         return (
           <>
             <ScrollingGround speed={groundSpeed} isWalking={isMoving} />
-            <ScrollingTrees speed={treeSpeed} isWalking={isMoving} spacing={4} count={8} xOffset={3} />
+            <ScrollingTrees speed={treeSpeed} isWalking={isMoving} spacing={4} count={16} xOffset={3} zOffset={20} />
           </>
         );
       })()}
@@ -1126,7 +1292,7 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
         minDistance={1.5}
         maxDistance={4}
         enablePan={false}
-        // zoomToCursor
+        zoomToCursor
       />
       <CameraZoom
         active={isCatIdle}

@@ -10,6 +10,7 @@ import CharacterSelect from "@/components/CharacterSelect";
 import GlitchTransition from "@/components/GlitchTransition";
 import BuyModal from "@/components/BuyModal";
 import MainMobileNav from "@/components/MainMobileNav";
+import Confessional from "@/components/Confessional";
 import { useMusic } from "@/components/MusicContext";
 
 const CHARACTERS = [
@@ -79,7 +80,7 @@ const USE_SITEPAL = true;
 
 // SitePal embed config
 const SITEPAL_ACCOUNT = "9308752";
-const SITEPAL_EMBED_PARAMS = "9308752,600,800,\"\",1,1,2774644,0,1,1,\"Wis5vrj8IqhSAWDsZMw2mVtkUIjwPzMc\",0,1";
+const SITEPAL_EMBED_PARAMS = "9308752,600,800,\"\",1,1,2774675,0,1,1,\"KNB3GdOhtWudqvlDS8OB3EwsKcsbP12A\",0,1";
 
 function SitePalEmbed() {
   const containerRef = useRef(null);
@@ -262,6 +263,27 @@ export default function MainPage() {
   const pendingCharRef = useRef(null);
   const glitchAnimRef = useRef(null);
   const isTalking = activeAnim === "Talking";
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessage, setChatMessage] = useState("");
+
+  // Show Confessional FAB when a character speaks (Talking anim triggered)
+  const hasOfferedChatRef = useRef(false);
+  useEffect(() => {
+    if (isTalking && !hasOfferedChatRef.current) {
+      hasOfferedChatRef.current = true;
+      const model = CHARACTERS[activeCharIndex]?.model || "";
+      if (model.includes("fortuneTeller")) {
+        setChatMessage("Oh, hello!");
+      }
+    }
+  }, [isTalking, activeCharIndex]);
+
+  // Reset chat offer when character changes
+  useEffect(() => {
+    hasOfferedChatRef.current = false;
+    setChatOpen(false);
+    setChatMessage("");
+  }, [activeCharIndex]);
 
   const handleCharacterSelect = (i) => {
     if (i === activeCharIndex || glitchActive) return;
@@ -558,6 +580,7 @@ export default function MainPage() {
         characterZOffset={CHARACTERS[activeCharIndex].zOffset || 0}
         glitchIntensity={glitchIntensity}
         isMobile={isMobile}
+        holdTalking={!!chatMessage}
       />
 
       {/* Glitch transition overlay */}
@@ -658,7 +681,7 @@ export default function MainPage() {
           />
 
           {/* Stake button — gold accent to differentiate */}
-          <CyberButton
+          {/* <CyberButton
             label="Stake"
             accent="hsl(45, 90%, 55%)"
             shadow="hsl(30, 100%, 50%)"
@@ -675,7 +698,7 @@ export default function MainPage() {
             modalBody={<p>Stake your faith and reap the rewards. Perpetual profit awaits the devoted.</p>}
             onProceed={() => window.location.href = "/"}
             style={{ fontSize: "1.05rem" }}
-          />
+          /> */}
         </div>
 
         {/* ── Divider ── */}
@@ -729,38 +752,31 @@ export default function MainPage() {
             </div>
 
             {/* Party Rentals — COMING SOON */}
-            <div style={{ position: "relative", opacity: 0.38, pointerEvents: "none" }}>
+            <div style={{ position: "relative",  pointerEvents: "none" }}>
               <CyberButton
-                label="Party Rentals"
+                label="The Liminal Terminal"
                 icon={
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M10 11h.01" />
-                    <path d="M14 6h.01" />
-                    <path d="M18 6h.01" />
-                    <path d="M6.5 13.1h.01" />
-                    <path d="M22 5c0 9-4 12-6 12s-6-3-6-12c0-2 2-3 6-3s6 1 6 3" />
-                    <path d="M17.4 9.9c-.8.8-2 .8-2.8 0" />
-                    <path d="M10.1 7.1C9 7.2 7.7 7.7 6 8.6c-3.5 2-4.7 3.9-3.7 5.6 4.5 7.8 9.5 8.4 11.2 7.4.9-.5 1.9-2.1 1.9-4.7" />
-                    <path d="M9.1 16.5c.3-1.1 1.4-1.7 2.4-1.4" />
+               <path d="M12 19h8"/><path d="m4 17 6-6-6-6"/>
                   </svg>
                 }
-                modalTitle="Telegram Crusaders"
-                modalBody={<p>Join the faithful in the digital crusade. Spread the word across all channels.</p>}
-                onProceed={() => console.log("Telegram")}
+                modalTitle="The Liminal Terminal"
+                modalBody={<p></p>}
+                 onProceed={() => { window.location.href = "/trade"; }}
                 style={{ fontSize: "1rem" }}
               />
-              {/* Coming soon badge */}
+              {/* Live indicator dot */}
               <span style={{
                 position: "absolute",
                 top: "50%",
-                right: 4,
+                right: 6,
                 transform: "translateY(-50%)",
-                fontSize: "0.4rem",
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                color: "hsl(40, 100%, 60%)",
-                fontFamily: "'Cyber', 'Geo', sans-serif",
-              }}>soon</span>
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: "#00e572",
+                boxShadow: "0 0 6px rgba(0, 229, 114, 0.8)",
+              }} />
             </div>
 
             {/* Interventions — COMING SOON */}
@@ -844,7 +860,7 @@ export default function MainPage() {
               ),
             },
             {
-              label: "Party Rentals",
+              label: "The Liminal Terminal",
               live: false,
               icon: (
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -868,6 +884,16 @@ export default function MainPage() {
               ),
             },
           ]}
+        />
+      )}
+
+      {/* Confessional chat drawer — appears after character speaks */}
+      {chatMessage && (
+        <Confessional
+          isOpen={chatOpen}
+          onToggle={() => setChatOpen((o) => !o)}
+          characterName={CHARACTERS[activeCharIndex]?.name || "Our Lady"}
+          initialMessage={chatMessage}
         />
       )}
 

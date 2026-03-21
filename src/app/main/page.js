@@ -10,6 +10,7 @@ import CharacterSelect from "@/components/CharacterSelect";
 import GlitchTransition from "@/components/GlitchTransition";
 import BuyModal from "@/components/BuyModal";
 import MainMobileNav from "@/components/MainMobileNav";
+import Confessional from "@/components/Confessional";
 import { useMusic } from "@/components/MusicContext";
 
 const CHARACTERS = [
@@ -240,16 +241,51 @@ export default function MainPage() {
   const [buyModalOpen, setBuyModalOpen] = useState(false);
   const [activeCharIndex, setActiveCharIndex] = useState(0);
   const [displayedModel, setDisplayedModel] = useState(CHARACTERS[0].model);
+  const [displayedDefaultAnim, setDisplayedDefaultAnim] = useState(CHARACTERS[0].defaultAnim);
   const [glitchActive, setGlitchActive] = useState(false);
   const [glitchIntensity, setGlitchIntensity] = useState(0);
   const [glitchKey, setGlitchKey] = useState(0);
   const pendingCharRef = useRef(null);
+  const h80zVisitRef = useRef(0);
   const glitchAnimRef = useRef(null);
   const isTalking = activeAnim === "Talking";
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessage, setChatMessage] = useState("");
+
+  // Show Confessional FAB when a character speaks (Talking anim triggered)
+  // and set the initial message for the chat
+  const hasOfferedChatRef = useRef(false);
+  useEffect(() => {
+    if (isTalking && !hasOfferedChatRef.current) {
+      hasOfferedChatRef.current = true;
+      // Match the character speech text from MainScene's config
+      const model = CHARACTERS[activeCharIndex]?.model || "";
+      if (model.includes("fortuneTeller")) {
+        setChatMessage("Oh, hello!");
+      }
+    }
+  }, [isTalking, activeCharIndex]);
+
+  // Reset chat offer when character changes
+  useEffect(() => {
+    hasOfferedChatRef.current = false;
+    setChatOpen(false);
+    setChatMessage("");
+  }, [activeCharIndex]);
 
   const handleCharacterSelect = (i) => {
     if (i === activeCharIndex || glitchActive) return;
+    // Track H80Z appearances to alternate animations
+    if (CHARACTERS[i].name === "H80Z") {
+      h80zVisitRef.current++;
+      const anim = h80zVisitRef.current % 2 === 0 ? "walkText" : "skateSequence";
+      console.log("[handleCharacterSelect] H80Z visit:", h80zVisitRef.current, "→", anim);
+      setDisplayedDefaultAnim(anim);
+    } else {
+      setDisplayedDefaultAnim(CHARACTERS[i].defaultAnim);
+    }
     pendingCharRef.current = i;
+    setDisplayedModel(CHARACTERS[i].model);
     setActiveCharIndex(i);
     setGlitchKey((k) => k + 1);
     setGlitchActive(true);
@@ -276,8 +312,19 @@ export default function MainPage() {
   };
 
   const handleGlitchMidpoint = () => {
+    console.log("[GlitchMidpoint] pendingChar:", pendingCharRef.current, "h80zVisits:", h80zVisitRef.current);
     if (pendingCharRef.current !== null) {
-      setDisplayedModel(CHARACTERS[pendingCharRef.current].model);
+      const char = CHARACTERS[pendingCharRef.current];
+      console.log("[GlitchMidpoint] char:", char.name, "defaultAnim:", char.defaultAnim);
+      setDisplayedModel(char.model);
+      // Resolve animation — H80Z alternates between skateSequence and walkText
+      if (char.name === "H80Z") {
+        const anim = h80zVisitRef.current % 2 === 0 ? "walkText" : "skateSequence";
+        console.log("[H80Z] visit:", h80zVisitRef.current, "→", anim);
+        setDisplayedDefaultAnim(anim);
+      } else {
+        setDisplayedDefaultAnim(char.defaultAnim);
+      }
     }
   };
 
@@ -540,10 +587,11 @@ export default function MainPage() {
         useSitePal={USE_SITEPAL}
         onAnimChange={setActiveAnim}
         characterModel={displayedModel}
-        defaultAnim={CHARACTERS[activeCharIndex].defaultAnim}
+        defaultAnim={displayedDefaultAnim}
         characterZOffset={CHARACTERS[activeCharIndex].zOffset || 0}
         glitchIntensity={glitchIntensity}
         isMobile={isMobile}
+        holdTalking={!!chatMessage}
       />
 
       {/* Glitch transition overlay */}
@@ -717,7 +765,7 @@ export default function MainPage() {
             {/* Party Rentals — COMING SOON */}
             <div style={{ position: "relative", opacity: 0.38, pointerEvents: "none" }}>
               <CyberButton
-                label="Party Rentals"
+                label="The Liminal Terminal"
                 icon={
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M10 11h.01" />
@@ -830,7 +878,7 @@ export default function MainPage() {
               ),
             },
             {
-              label: "Party Rentals",
+              label: "The Liminal Terminal",
               live: false,
               icon: (
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -854,6 +902,16 @@ export default function MainPage() {
               ),
             },
           ]}
+        />
+      )}
+
+      {/* Confessional chat drawer — appears after character speaks */}
+      {chatMessage && (
+        <Confessional
+          isOpen={chatOpen}
+          onToggle={() => setChatOpen((o) => !o)}
+          characterName={CHARACTERS[activeCharIndex]?.name || "Our Lady"}
+          initialMessage={chatMessage}
         />
       )}
 

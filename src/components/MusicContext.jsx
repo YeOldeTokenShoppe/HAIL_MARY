@@ -394,12 +394,7 @@ export const MusicProvider = ({ children }) => {
           setPreloadedUrl(url);
           setPreloadedIndex(index);
         } catch (error) {
-          console.error('[MusicContext] Failed to preload track:', error.message);
-          console.error('[MusicContext] Preload error details:', {
-            code: error.code,
-            message: error.message,
-            stack: error.stack
-          });
+          console.warn('[MusicContext] Failed to preload track:', error.message);
         }
       }
     };

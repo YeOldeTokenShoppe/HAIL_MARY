@@ -215,6 +215,16 @@ const CyborgTempleScene = ({
     blinkProgress: 0
   });
 
+  // Head bone refs for look-at-camera override
+  const demonHeadBoneRef = useRef();
+  const demonFocusedRef = useRef(false); // true when camera is zoomed in on Demon
+  const monkHeadBoneRef = useRef();
+  const monkFocusedRef = useRef(false); // true when camera is zoomed in on Monk
+  const rl80HeadBoneRef = useRef();
+  const rl80FocusedRef = useRef(false); // true when camera is zoomed in on RL80
+  const fluffyHeadBoneRef = useRef();
+  const fluffyFocusedRef = useRef(false); // true when camera is zoomed in on Fluffy
+
   // Demon eye mesh ref and blink state
   const demonEyesRef = useRef();
   const demonBlinkStateRef = useRef({
@@ -240,6 +250,7 @@ const CyborgTempleScene = ({
     lastSwitchTime: 0,
     nextSwitchDelay: Math.random() * 8000 + 12000,
     recentAnimations: [],
+    isPlayingSpecial: false,
   });
 
   // Monk animation state (uses *_monk suffixed animations)
@@ -865,7 +876,7 @@ const CyborgTempleScene = ({
     const dracoPath = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
       ? `${window.location.origin}/draco/`
       : "/draco/";
-    console.log(`[CyborgTempleScene] Using Draco decoder path: ${dracoPath}`);
+   
     dracoLoader.setDecoderPath(dracoPath);
     gltfLoader.setDRACOLoader(dracoLoader);
 
@@ -951,18 +962,42 @@ const CyborgTempleScene = ({
       templeScene.traverse((child) => {
         if (child.name === 'RL80_Empty') {
           animatedCharacters['RL80'] = child;
+          // Find head bone in RL80 skeleton for look-at-camera
+          child.traverse((bone) => {
+            if (bone.isBone && /head/i.test(bone.name) && !rl80HeadBoneRef.current) {
+              rl80HeadBoneRef.current = bone;
+            }
+          });
         }
         else if (child.name === 'Demon_empty') {
           animatedCharacters['Demon'] = child;
+          // Find head bone in Demon skeleton for look-at-camera
+          child.traverse((bone) => {
+            if (bone.isBone && /head/i.test(bone.name)) {
+              demonHeadBoneRef.current = bone;
+            }
+          });
         }
         else if (child.name === 'Monk_empty') {
           animatedCharacters['Monk'] = child;
+          // Find head bone in Monk skeleton for look-at-camera
+          child.traverse((bone) => {
+            if (bone.isBone && /head/i.test(bone.name) && !monkHeadBoneRef.current) {
+              monkHeadBoneRef.current = bone;
+            }
+          });
         }
         else if (child.name === 'Tekno_Empty') {
           animatedCharacters['Tekno'] = child;
         }
         else if (child.name === 'Fluffy_Empty') {
           animatedCharacters['Fluffy'] = child;
+          // Find head bone in Fluffy skeleton for look-at-camera
+          child.traverse((obj) => {
+            if (obj.isBone && obj.name === 'head_1' && !fluffyHeadBoneRef.current) {
+              fluffyHeadBoneRef.current = obj;
+            }
+          });
         }
       });
       
@@ -1087,6 +1122,8 @@ const CyborgTempleScene = ({
             }
           });
         });
+
+
 
         // Play initial animations for each character
         Object.entries(actionsRef.current).forEach(([charName, charActions]) => {
@@ -1737,6 +1774,105 @@ const CyborgTempleScene = ({
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
     
+    // Helper: restore demon to normal animation rotation when leaving focus
+    const restoreDemonFromFocus = () => {
+      if (!demonFocusedRef.current) return;
+      demonFocusedRef.current = false;
+      const demonActions = actionsRef.current['Demon'];
+      if (!demonActions) return;
+      const demonState = demonAnimStateRef.current;
+      const loopAnims = Object.keys(demonActions).filter(a => /typing|idle|laughing/i.test(a) && !/sit_idle/i.test(a));
+      const returnAnim = loopAnims.length > 0 ? loopAnims[0] : Object.keys(demonActions)[0];
+      if (demonActions[demonState.currentAnimation]) {
+        demonActions[demonState.currentAnimation].fadeOut(0.5);
+      }
+      if (demonActions[returnAnim]) {
+        const returnAction = demonActions[returnAnim];
+        returnAction.reset();
+        returnAction.setLoop(THREE.LoopRepeat);
+        returnAction.setEffectiveWeight(1);
+        returnAction.fadeIn(0.5);
+        returnAction.play();
+        demonState.currentAnimation = returnAnim;
+      }
+      demonState.isPlayingSpecial = false;
+      demonState.nextSwitchDelay = Math.random() * 8000 + 6000;
+      demonState.lastSwitchTime = Date.now();
+    };
+
+    // Helper: restore monk to normal animation rotation when leaving focus
+    const restoreMonkFromFocus = () => {
+      if (!monkFocusedRef.current) return;
+      monkFocusedRef.current = false;
+      const monkActions = actionsRef.current['Monk'];
+      if (!monkActions) return;
+      const monkState = monkAnimStateRef.current;
+      const loopAnims = Object.keys(monkActions).filter(a => /typing|idle|laughing/i.test(a) && !/idle_monk/i.test(a));
+      const returnAnim = loopAnims.length > 0 ? loopAnims[0] : Object.keys(monkActions)[0];
+      if (monkActions[monkState.currentAnimation]) {
+        monkActions[monkState.currentAnimation].fadeOut(0.5);
+      }
+      if (monkActions[returnAnim]) {
+        const returnAction = monkActions[returnAnim];
+        returnAction.reset();
+        returnAction.setLoop(THREE.LoopRepeat);
+        returnAction.setEffectiveWeight(1);
+        returnAction.fadeIn(0.5);
+        returnAction.play();
+        monkState.currentAnimation = returnAnim;
+      }
+      monkState.isPlayingSpecial = false;
+      monkState.nextSwitchDelay = Math.random() * 8000 + 6000;
+      monkState.lastSwitchTime = Date.now();
+    };
+
+    // Helper: restore RL80 to normal animation rotation when leaving focus
+    const restoreRL80FromFocus = () => {
+      if (!rl80FocusedRef.current) return;
+      rl80FocusedRef.current = false;
+      const rl80Actions = actionsRef.current['RL80'];
+      if (!rl80Actions) return;
+      const rl80State = rl80AnimStateRef.current;
+      const loopAnims = Object.keys(rl80Actions).filter(a => /typing|idle/i.test(a) && a !== 'sit_idle');
+      const returnAnim = loopAnims.length > 0 ? loopAnims[0] : Object.keys(rl80Actions)[0];
+      if (rl80Actions[rl80State.currentAnimation]) {
+        rl80Actions[rl80State.currentAnimation].fadeOut(0.5);
+      }
+      if (rl80Actions[returnAnim]) {
+        const returnAction = rl80Actions[returnAnim];
+        returnAction.reset();
+        returnAction.setLoop(THREE.LoopRepeat);
+        returnAction.setEffectiveWeight(1);
+        returnAction.fadeIn(0.5);
+        returnAction.play();
+        rl80State.currentAnimation = returnAnim;
+      }
+      rl80State.isPlayingSpecial = false;
+      rl80State.nextSwitchDelay = Math.random() * 8000 + 6000;
+      rl80State.lastSwitchTime = Date.now();
+    };
+
+    // Helper: restore Fluffy to normal when leaving focus
+    const restoreFluffyFromFocus = () => {
+      if (!fluffyFocusedRef.current) return;
+      fluffyFocusedRef.current = false;
+      // Unpause the animation
+      const fluffyActions = actionsRef.current['Fluffy'];
+      if (fluffyActions) {
+        Object.values(fluffyActions).forEach(action => {
+          action.paused = false;
+        });
+      }
+    };
+
+    // Helper: restore all characters from focus
+    const restoreAllFromFocus = () => {
+      restoreDemonFromFocus();
+      restoreMonkFromFocus();
+      restoreRL80FromFocus();
+      restoreFluffyFromFocus();
+    };
+
     // Handle escape key to reset camera
     const handleKeyDown = (event) => {
       // Debug: Press 'P' to log all character positions
@@ -1773,7 +1909,9 @@ const CyborgTempleScene = ({
       
       
       if (event.key === 'Escape' && focusTarget) {
-        
+
+        restoreAllFromFocus();
+
         // Notify parent that focus is cleared
         if (onAgentClick) {
           onAgentClick(null);
@@ -2144,6 +2282,7 @@ const CyborgTempleScene = ({
 
           // If already focused on this screen, unfocus (toggle behavior)
           if (focusTarget && focusTarget.agentId === object.userData.agentId) {
+            restoreAllFromFocus();
             if (onAgentClick) onAgentClick(null);
             if (originalCameraPosition.current) {
               setFocusTarget({
@@ -2268,11 +2407,96 @@ const CyborgTempleScene = ({
             });
           }
           
+          // When focusing on a character, switch to idle animation and enable head tracking
+          if (object.userData.agentId === 'Demon') {
+            demonFocusedRef.current = true;
+            const demonActions = actionsRef.current['Demon'];
+            if (demonActions) {
+              const idleKey = Object.keys(demonActions).find(a => /sit_idle_demon/i.test(a));
+              if (idleKey) {
+                const demonState = demonAnimStateRef.current;
+                if (demonActions[demonState.currentAnimation]) {
+                  demonActions[demonState.currentAnimation].fadeOut(0.5);
+                }
+                const idleAction = demonActions[idleKey];
+                idleAction.reset();
+                idleAction.setLoop(THREE.LoopRepeat);
+                idleAction.setEffectiveWeight(1);
+                idleAction.fadeIn(0.5);
+                idleAction.play();
+                demonState.currentAnimation = idleKey;
+                demonState.isPlayingSpecial = true;
+                demonState.nextSwitchDelay = 999999;
+                demonState.lastSwitchTime = Date.now();
+              } else {
+                console.warn('[Demon] sit_idle_demon animation not found. Available:', Object.keys(demonActions));
+              }
+            }
+          } else if (object.userData.agentId === 'Monk') {
+            monkFocusedRef.current = true;
+            const monkActions = actionsRef.current['Monk'];
+            if (monkActions) {
+              const idleKey = Object.keys(monkActions).find(a => /idle_monk/i.test(a));
+              if (idleKey) {
+                const monkState = monkAnimStateRef.current;
+                if (monkActions[monkState.currentAnimation]) {
+                  monkActions[monkState.currentAnimation].fadeOut(0.5);
+                }
+                const idleAction = monkActions[idleKey];
+                idleAction.reset();
+                idleAction.setLoop(THREE.LoopRepeat);
+                idleAction.setEffectiveWeight(1);
+                idleAction.fadeIn(0.5);
+                idleAction.play();
+                monkState.currentAnimation = idleKey;
+                monkState.isPlayingSpecial = true;
+                monkState.nextSwitchDelay = 999999;
+                monkState.lastSwitchTime = Date.now();
+              } else {
+                console.warn('[Monk] idle_monk animation not found. Available:', Object.keys(monkActions));
+              }
+            }
+          } else if (object.userData.agentId === 'RL80') {
+            rl80FocusedRef.current = true;
+            const rl80Actions = actionsRef.current['RL80'];
+            if (rl80Actions) {
+              // Use 'Idle' animation for RL80 focus (sit_idle belongs to Fluffy's skeleton)
+              const idleKey = Object.keys(rl80Actions).find(a => a === 'Idle');
+              if (idleKey) {
+                const rl80State = rl80AnimStateRef.current;
+                if (rl80Actions[rl80State.currentAnimation]) {
+                  rl80Actions[rl80State.currentAnimation].fadeOut(0.5);
+                }
+                const idleAction = rl80Actions[idleKey];
+                idleAction.reset();
+                idleAction.setLoop(THREE.LoopRepeat);
+                idleAction.setEffectiveWeight(1);
+                idleAction.fadeIn(0.5);
+                idleAction.play();
+                rl80State.currentAnimation = idleKey;
+                rl80State.isPlayingSpecial = true;
+                rl80State.nextSwitchDelay = 999999;
+                rl80State.lastSwitchTime = Date.now();
+              } else {
+                console.warn('[RL80] Idle animation not found. Available:', Object.keys(rl80Actions));
+              }
+            }
+          } else if (object.userData.agentId === 'Fluffy') {
+            fluffyFocusedRef.current = true;
+            // Pause the animation so the cat sits still — eliminates loop seam glitch
+            const fluffyActions = actionsRef.current['Fluffy'];
+            if (fluffyActions) {
+              Object.values(fluffyActions).forEach(action => {
+                action.paused = true;
+              });
+            }
+          }
+
           // Call the parent callback if provided
           if (onAgentClick) {
             onAgentClick(object.userData.agentId);
           }
-          
+
           // Dispatch custom event for screens to handle video toggle
           if (object.userData.agentId && object.userData.agentId.startsWith('Screen')) {
             window.dispatchEvent(new CustomEvent('screenClicked', {
@@ -2291,40 +2515,7 @@ const CyborgTempleScene = ({
         }
       }
       
-      // If we didn't click on an agent and we're currently focused, reset the camera
-      if (!clickedOnAgent && focusTarget) {
-
-        // Hide banner when clicking away
-        topSupporterBannerRefs.current.forEach(mesh => {
-          if (mesh) mesh.visible = false;
-        });
-
-        // Notify parent that focus is cleared
-        if (onAgentClick) {
-          onAgentClick(null);
-        }
-        
-        // Smoothly return to the position before we focused
-        if (originalCameraPosition.current) {
-          const resetTarget = {
-            position: originalCameraPosition.current.clone(),
-            lookAt: new THREE.Vector3(0, 0, 0),
-            agentId: null,
-            agentName: 'Reset'
-          };
-          setFocusTarget(resetTarget);
-          
-          // Clear the focus target after animation completes
-          setTimeout(() => {
-            setFocusTarget(null);
-            // Clear the stored position after reset to avoid conflicts
-            originalCameraPosition.current = null;
-          }, 1000);
-        } else {
-          // If no stored position, just clear focus
-          setFocusTarget(null);
-        }
-      }
+      // Single click away no longer unfocuses — use double-click or Escape instead
     };
     
     // Listen for screenGoBack event (from on-screen buttons)
@@ -2423,16 +2614,47 @@ const CyborgTempleScene = ({
       }
     };
 
+    // Double-click to unfocus and return to default view
+    const handleDblClick = () => {
+      if (!focusTarget) return;
+
+      restoreDemonFromFocus();
+
+      // Hide banner
+      topSupporterBannerRefs.current.forEach(mesh => {
+        if (mesh) mesh.visible = false;
+      });
+
+      if (onAgentClick) onAgentClick(null);
+
+      if (originalCameraPosition.current) {
+        setFocusTarget({
+          position: originalCameraPosition.current.clone(),
+          lookAt: new THREE.Vector3(0, 0, 0),
+          agentId: null,
+          agentName: 'Reset'
+        });
+        setTimeout(() => {
+          setFocusTarget(null);
+          originalCameraPosition.current = null;
+        }, 1000);
+      } else {
+        setFocusTarget(null);
+      }
+    };
+
     gl.domElement.addEventListener('pointerdown', handlePointerDown);
-    
+    gl.domElement.addEventListener('dblclick', handleDblClick);
+
     window.addEventListener('keydown', handleKeyDown);
-    
+
     return () => {
       gl.domElement.removeEventListener('click', handleClick);
       gl.domElement.removeEventListener('pointermove', handlePointerMove);
       gl.domElement.removeEventListener('touchstart', handleTouchStart);
       gl.domElement.removeEventListener('touchend', handleTouchStart);
       gl.domElement.removeEventListener('pointerdown', handlePointerDown);
+      gl.domElement.removeEventListener('dblclick', handleDblClick);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('screenGoBack', handleScreenGoBack);
       gl.domElement.style.cursor = 'default';
@@ -2565,9 +2787,9 @@ const CyborgTempleScene = ({
         rl80State.lastSwitchTime = currentTime;
       }
       
-      if (currentTime - rl80State.lastSwitchTime > rl80State.nextSwitchDelay) {
+      if (!rl80State.isPlayingSpecial && currentTime - rl80State.lastSwitchTime > rl80State.nextSwitchDelay) {
         const rl80Actions = actionsRef.current['RL80'];
-        
+
         // Get available animations for RL80
         const availableAnimations = Object.keys(rl80Actions);
         
@@ -3020,6 +3242,212 @@ const CyborgTempleScene = ({
       }
     }
     
+    // Demon head look-at-camera override (only when focused on Demon)
+    if (demonFocusedRef.current && demonHeadBoneRef.current) {
+      const head = demonHeadBoneRef.current;
+
+      // Capture the animation's base head rotation once (avoids loop seam flick)
+      if (!demonHeadBoneRef._baseQuat) {
+        demonHeadBoneRef._baseQuat = head.quaternion.clone();
+        // Also capture the world quaternion of the head in rest pose for reference
+        head.updateWorldMatrix(true, false);
+        demonHeadBoneRef._baseWorldQuat = new THREE.Quaternion();
+        head.getWorldQuaternion(demonHeadBoneRef._baseWorldQuat);
+      }
+
+      // Get head world position
+      head.updateWorldMatrix(true, false);
+      const headWorldPos = new THREE.Vector3();
+      head.getWorldPosition(headWorldPos);
+
+      // Compute desired world quaternion: face the camera
+      // Use a dummy to do lookAt in world space
+      if (!demonHeadBoneRef._dummy) {
+        demonHeadBoneRef._dummy = new THREE.Object3D();
+      }
+      const dummy = demonHeadBoneRef._dummy;
+      dummy.position.copy(headWorldPos);
+      dummy.lookAt(camera.position);
+      // lookAt aligns -Z with target. The face likely points a different direction.
+      // Apply 180° Y correction so face (+Z) points at camera instead of back of head
+      // Correction angle: adjust to make head face camera (tune this value)
+      // 0 = looks left, PI = looks right, PI/2 = should be straight at camera
+      const flip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 1.8);
+      dummy.quaternion.multiply(flip);
+
+      // Clamp the angle between base pose and lookAt to prevent unnatural rotation
+      const maxHeadAngle = 1.2; // radians, ~70 degrees
+      const angleBetween = demonHeadBoneRef._baseWorldQuat.angleTo(dummy.quaternion);
+      const clampedBlend = angleBetween > 0 ? Math.min(maxHeadAngle / angleBetween, 0.8) : 0;
+      const blendedWorldQuat = demonHeadBoneRef._baseWorldQuat.clone().slerp(dummy.quaternion, clampedBlend);
+
+      // Convert blended world quaternion to bone-local space
+      const parentWorldQuat = new THREE.Quaternion();
+      head.parent.getWorldQuaternion(parentWorldQuat);
+      const targetQuat = parentWorldQuat.clone().invert().multiply(blendedWorldQuat);
+
+      // Smooth transition
+      if (!demonHeadBoneRef._smoothedQuat) {
+        demonHeadBoneRef._smoothedQuat = head.quaternion.clone();
+      }
+      demonHeadBoneRef._smoothedQuat.slerp(targetQuat, 0.08);
+
+      head.quaternion.copy(demonHeadBoneRef._smoothedQuat);
+    } else if (demonHeadBoneRef._smoothedQuat) {
+      demonHeadBoneRef._smoothedQuat = null;
+      demonHeadBoneRef._baseQuat = null;
+      demonHeadBoneRef._baseWorldQuat = null;
+      demonHeadBoneRef._dummy = null;
+    }
+
+    // Monk head look-at-camera override (only when focused on Monk)
+    if (monkFocusedRef.current && monkHeadBoneRef.current) {
+      const head = monkHeadBoneRef.current;
+
+      if (!monkHeadBoneRef._baseQuat) {
+        monkHeadBoneRef._baseQuat = head.quaternion.clone();
+        head.updateWorldMatrix(true, false);
+        monkHeadBoneRef._baseWorldQuat = new THREE.Quaternion();
+        head.getWorldQuaternion(monkHeadBoneRef._baseWorldQuat);
+      }
+
+      head.updateWorldMatrix(true, false);
+      const headWorldPos = new THREE.Vector3();
+      head.getWorldPosition(headWorldPos);
+
+      if (!monkHeadBoneRef._dummy) {
+        monkHeadBoneRef._dummy = new THREE.Object3D();
+      }
+      const dummy = monkHeadBoneRef._dummy;
+      dummy.position.copy(headWorldPos);
+      dummy.lookAt(camera.position);
+      // Correction rotation — tuned for Monk skeleton orientation
+      const flip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 0.5);
+      dummy.quaternion.multiply(flip);
+
+      const maxHeadAngle = 1.2;
+      const angleBetween = monkHeadBoneRef._baseWorldQuat.angleTo(dummy.quaternion);
+      const clampedBlend = angleBetween > 0 ? Math.min(maxHeadAngle / angleBetween, 0.8) : 0;
+      const blendedWorldQuat = monkHeadBoneRef._baseWorldQuat.clone().slerp(dummy.quaternion, clampedBlend);
+
+      const parentWorldQuat = new THREE.Quaternion();
+      head.parent.getWorldQuaternion(parentWorldQuat);
+      const targetQuat = parentWorldQuat.clone().invert().multiply(blendedWorldQuat);
+
+      if (!monkHeadBoneRef._smoothedQuat) {
+        monkHeadBoneRef._smoothedQuat = head.quaternion.clone();
+      }
+      monkHeadBoneRef._smoothedQuat.slerp(targetQuat, 0.08);
+
+      head.quaternion.copy(monkHeadBoneRef._smoothedQuat);
+    } else if (monkHeadBoneRef._smoothedQuat) {
+      monkHeadBoneRef._smoothedQuat = null;
+      monkHeadBoneRef._baseQuat = null;
+      monkHeadBoneRef._baseWorldQuat = null;
+      monkHeadBoneRef._dummy = null;
+    }
+
+    // RL80 head look-at-camera override (only when focused on RL80)
+    if (rl80FocusedRef.current && rl80HeadBoneRef.current) {
+      const head = rl80HeadBoneRef.current;
+
+      if (!rl80HeadBoneRef._baseQuat) {
+        rl80HeadBoneRef._baseQuat = head.quaternion.clone();
+        head.updateWorldMatrix(true, false);
+        rl80HeadBoneRef._baseWorldQuat = new THREE.Quaternion();
+        head.getWorldQuaternion(rl80HeadBoneRef._baseWorldQuat);
+      }
+
+      head.updateWorldMatrix(true, false);
+      const headWorldPos = new THREE.Vector3();
+      head.getWorldPosition(headWorldPos);
+
+      if (!rl80HeadBoneRef._dummy) {
+        rl80HeadBoneRef._dummy = new THREE.Object3D();
+      }
+      const dummy = rl80HeadBoneRef._dummy;
+      dummy.position.copy(headWorldPos);
+      dummy.lookAt(camera.position);
+      // Same skeleton as Monk — start with same correction, tune if needed
+      const flip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 0.5);
+      dummy.quaternion.multiply(flip);
+
+      const maxHeadAngle = 1.2;
+      const angleBetween = rl80HeadBoneRef._baseWorldQuat.angleTo(dummy.quaternion);
+      const clampedBlend = angleBetween > 0 ? Math.min(maxHeadAngle / angleBetween, 0.8) : 0;
+      const blendedWorldQuat = rl80HeadBoneRef._baseWorldQuat.clone().slerp(dummy.quaternion, clampedBlend);
+
+      const parentWorldQuat = new THREE.Quaternion();
+      head.parent.getWorldQuaternion(parentWorldQuat);
+      const targetQuat = parentWorldQuat.clone().invert().multiply(blendedWorldQuat);
+
+      if (!rl80HeadBoneRef._smoothedQuat) {
+        rl80HeadBoneRef._smoothedQuat = head.quaternion.clone();
+      }
+      rl80HeadBoneRef._smoothedQuat.slerp(targetQuat, 0.08);
+
+      head.quaternion.copy(rl80HeadBoneRef._smoothedQuat);
+    } else if (rl80HeadBoneRef._smoothedQuat) {
+      rl80HeadBoneRef._smoothedQuat = null;
+      rl80HeadBoneRef._baseQuat = null;
+      rl80HeadBoneRef._baseWorldQuat = null;
+      rl80HeadBoneRef._dummy = null;
+    }
+
+    // Fluffy (cat) head look-at-camera override
+    // Animation is paused, so we use world-space lookAt with no loop-seam concerns
+    if (fluffyFocusedRef.current && fluffyHeadBoneRef.current) {
+      const head = fluffyHeadBoneRef.current;
+
+      // Capture the base local quaternion once
+      if (!fluffyHeadBoneRef._baseQuat) {
+        fluffyHeadBoneRef._baseQuat = head.quaternion.clone();
+      }
+
+      // Restore base quat before computing world matrices to avoid feedback loop
+      head.quaternion.copy(fluffyHeadBoneRef._baseQuat);
+      head.updateWorldMatrix(true, false);
+
+      const headWorldPos = new THREE.Vector3();
+      head.getWorldPosition(headWorldPos);
+      const baseWorldQuat = new THREE.Quaternion();
+      head.getWorldQuaternion(baseWorldQuat);
+
+      // Compute desired world quaternion facing camera
+      if (!fluffyHeadBoneRef._dummy) {
+        fluffyHeadBoneRef._dummy = new THREE.Object3D();
+      }
+      const dummy = fluffyHeadBoneRef._dummy;
+      dummy.position.copy(headWorldPos);
+      dummy.lookAt(camera.position);
+      // Cat face forward correction — X-axis rotation to tilt from "up" to "forward"
+      const flip = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2.5);
+      dummy.quaternion.multiply(flip);
+
+      // Clamp rotation range
+      const maxHeadAngle = 2.0;
+      const angleBetween = baseWorldQuat.angleTo(dummy.quaternion);
+      const clampedBlend = angleBetween > 0 ? Math.min(maxHeadAngle / angleBetween, 0.95) : 0;
+      const blendedWorldQuat = baseWorldQuat.clone().slerp(dummy.quaternion, clampedBlend);
+
+      // Convert to bone-local space
+      const parentWorldQuat = new THREE.Quaternion();
+      head.parent.getWorldQuaternion(parentWorldQuat);
+      const targetQuat = parentWorldQuat.clone().invert().multiply(blendedWorldQuat);
+
+      // Smooth transition
+      if (!fluffyHeadBoneRef._smoothedQuat) {
+        fluffyHeadBoneRef._smoothedQuat = targetQuat.clone();
+      }
+      fluffyHeadBoneRef._smoothedQuat.slerp(targetQuat, 0.1);
+
+      head.quaternion.copy(fluffyHeadBoneRef._smoothedQuat);
+    } else if (fluffyHeadBoneRef._smoothedQuat) {
+      fluffyHeadBoneRef._smoothedQuat = null;
+      fluffyHeadBoneRef._baseQuat = null;
+      fluffyHeadBoneRef._dummy = null;
+    }
+
     // Camera focus animation
     if (focusTarget) {
       // For XCandle focus: lerp to position then release control to OrbitControls
@@ -3038,26 +3466,30 @@ const CyborgTempleScene = ({
           }
         }
         // Once _arrived is set, do nothing — OrbitControls take over
-      } else {
-        // Smoothly move camera to target position
+      } else if (focusTarget.agentName === 'Reset') {
+        // Reset: smoothly return camera, keep forcing lookAt
         camera.position.lerp(focusTarget.position, 0.05);
-
-        // Look at the target
-        const lookAtVector = new THREE.Vector3();
-        lookAtVector.lerpVectors(
-          new THREE.Vector3(
-            camera.getWorldDirection(new THREE.Vector3()).x,
-            camera.getWorldDirection(new THREE.Vector3()).y,
-            camera.getWorldDirection(new THREE.Vector3()).z
-          ),
-          focusTarget.lookAt,
-          0.05
-        );
         camera.lookAt(focusTarget.lookAt);
-        // Reset OrbitControls target when returning from candle focus
-        if (focusTarget.agentName === 'Reset' && state.controls && state.controls.target) {
+        if (state.controls && state.controls.target) {
           state.controls.target.lerp(focusTarget.lookAt, 0.05);
         }
+      } else {
+        // Character/screen focus: lerp to position, then hand off to OrbitControls
+        if (!focusTarget._arrived) {
+          camera.position.lerp(focusTarget.position, 0.05);
+          camera.lookAt(focusTarget.lookAt);
+
+          const dist = camera.position.distanceTo(focusTarget.position);
+          if (dist < 0.1) {
+            focusTarget._arrived = true;
+            // Set orbit target once, then OrbitControls owns it
+            if (state.controls && state.controls.target) {
+              state.controls.target.copy(focusTarget.lookAt);
+              state.controls.update();
+            }
+          }
+        }
+        // Once _arrived, do nothing — OrbitControls take over
       }
     }
     
