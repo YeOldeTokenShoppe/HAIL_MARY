@@ -469,7 +469,15 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
   const rightEyeRef = useRef();
   const leftEyeTextRef = useRef();
   const rightEyeTextRef = useRef();
-  const eyesCombinedRef = useRef(); // H80Z single "Eyes" mesh
+  const demonEyesRef = useRef(); // H80Z single "demon_eyes" mesh
+  const demonEyesDefaultTexRef = useRef(null);  // original base color texture
+  const demonEyesDefaultEmissiveRef = useRef(null); // original emissive texture
+  const demonEyesHalfTexRef = useRef(null);    // half-lidded texture for walkText
+  const demonBlinkStateRef = useRef({
+    lastBlinkTime: 0,
+    nextBlinkDelay: Math.random() * 4000 + 3000,
+    isBlinking: false,
+  });
   const smartPhoneRef = useRef();
   const faceMeshRef = useRef();
   const face2MeshRef = useRef();
@@ -624,9 +632,20 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
             rightEyeTextRef.current = child;
             if (child.material) { child.material = child.material.clone(); child.material.transparent = true; child.material.needsUpdate = true; }
             child.visible = false;
-          } else if (child.name === "Eyes") {
-            eyesCombinedRef.current = child;
-            if (child.material) { child.material.transparent = true; child.material.needsUpdate = true; }
+          } else if (child.name === "demon_eyes") {
+            demonEyesRef.current = child;
+            if (child.material) {
+              child.material.transparent = true;
+              child.material.needsUpdate = true;
+              // Store original textures and preload half-lidded variant
+              demonEyesDefaultTexRef.current = child.material.map;
+              demonEyesDefaultEmissiveRef.current = child.material.emissiveMap;
+              new THREE.TextureLoader().load("/images/demonEyes_half.webp", (tex) => {
+                tex.flipY = child.material.map ? child.material.map.flipY : false;
+                tex.colorSpace = THREE.SRGBColorSpace;
+                demonEyesHalfTexRef.current = tex;
+              });
+            }
           } else if (child.name === "SmartPhone" || child.name === "phone") {
             smartPhoneRef.current = child;
           }
@@ -714,7 +733,10 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
       rightEyeRef.current = null;
       leftEyeTextRef.current = null;
       rightEyeTextRef.current = null;
-      eyesCombinedRef.current = null;
+      demonEyesRef.current = null;
+      if (demonEyesHalfTexRef.current) { demonEyesHalfTexRef.current.dispose(); demonEyesHalfTexRef.current = null; }
+      demonEyesDefaultTexRef.current = null;
+      demonEyesDefaultEmissiveRef.current = null;
       smartPhoneRef.current = null;
       cropCanvasRef.current = null;
       cropCtxRef.current = null;
@@ -955,46 +977,84 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
     // SmartPhone only visible during texting-walk animations
     if (smartPhoneRef.current) smartPhoneRef.current.visible = activeAnim === "textWalk" || activeAnim === "walkText";
 
-    // Pick active eye materials for blink
-    const activeMats = [];
-    if (eyesCombinedRef.current?.material) {
-      // H80Z: single "Eyes" mesh
-      activeMats.push(eyesCombinedRef.current.material);
-    } else if (useTextEyes) {
-      if (leftEyeText?.material) activeMats.push(leftEyeText.material);
-      if (rightEyeText?.material) activeMats.push(rightEyeText.material);
-    } else {
-      if (leftEye?.material) activeMats.push(leftEye.material);
-      if (rightEye?.material) activeMats.push(rightEye.material);
+    // Swap demon_eyes texture: half-lidded during walkText, default otherwise
+    // Image is connected to both BaseColor (map) and Emission (emissiveMap) in Blender
+    if (demonEyesRef.current?.material && demonEyesHalfTexRef.current) {
+      const wantHalf = activeAnim === "walkText";
+      const targetTex = wantHalf ? demonEyesHalfTexRef.current : demonEyesDefaultTexRef.current;
+      const targetEmissive = wantHalf ? demonEyesHalfTexRef.current : demonEyesDefaultEmissiveRef.current;
+      if (demonEyesRef.current.material.map !== targetTex) {
+        demonEyesRef.current.material.map = targetTex;
+        demonEyesRef.current.material.emissiveMap = targetEmissive;
+        demonEyesRef.current.material.needsUpdate = true;
+      }
     }
 
-    if (activeMats.length > 0) {
-      if (activeAnim === "Pose" || isTalking) {
-        // No blink in Pose
-        activeMats.forEach(m => m.opacity = 1);
-        blinkStateRef.current.isBlinking = false;
-      } else {
-        // Blink animation
-        const currentTime = state.clock.getElapsedTime() * 1000;
-        const blinkState = blinkStateRef.current;
-        if (!blinkState.isBlinking && currentTime - blinkState.lastBlinkTime > blinkState.nextBlinkDelay) {
-          blinkState.isBlinking = true;
-          blinkState.lastBlinkTime = currentTime;
-          blinkState.nextBlinkDelay = Math.random() * 3000 + 2000;
+    // Demon eyes blink (H80Z — opacity-based, slower cadence matching CyborgTempleScene)
+    if (demonEyesRef.current?.material) {
+      const currentTime = state.clock.getElapsedTime() * 1000;
+      const demonBlink = demonBlinkStateRef.current;
+
+      if (!demonBlink.isBlinking && currentTime - demonBlink.lastBlinkTime > demonBlink.nextBlinkDelay) {
+        demonBlink.isBlinking = true;
+        demonBlink.lastBlinkTime = currentTime;
+        demonBlink.nextBlinkDelay = Math.random() * 4000 + 3000;
+      }
+
+      if (demonBlink.isBlinking) {
+        const closeTime = 100, holdTime = 120, openTime = 140;
+        const totalDuration = closeTime + holdTime + openTime;
+        const t = currentTime - demonBlink.lastBlinkTime;
+        if (t < totalDuration) {
+          let opacity;
+          if (t < closeTime) opacity = 1 - (t / closeTime);
+          else if (t < closeTime + holdTime) opacity = 0;
+          else opacity = (t - closeTime - holdTime) / openTime;
+          demonEyesRef.current.material.opacity = opacity;
+        } else {
+          demonBlink.isBlinking = false;
+          demonEyesRef.current.material.opacity = 1;
         }
-        if (blinkState.isBlinking) {
-          const closeTime = 100, holdTime = 80, openTime = 120;
-          const totalDuration = closeTime + holdTime + openTime;
-          const t = currentTime - blinkState.lastBlinkTime;
-          if (t < totalDuration) {
-            let opacity;
-            if (t < closeTime) opacity = 1 - (t / closeTime);
-            else if (t < closeTime + holdTime) opacity = 0;
-            else opacity = (t - closeTime - holdTime) / openTime;
-            activeMats.forEach(m => m.opacity = opacity);
-          } else {
-            blinkState.isBlinking = false;
-            activeMats.forEach(m => m.opacity = 1);
+      }
+    }
+
+    // RL80 eye blink (separate L/R eyes, opacity-based)
+    if (!demonEyesRef.current) {
+      const activeMats = [];
+      if (useTextEyes) {
+        if (leftEyeText?.material) activeMats.push(leftEyeText.material);
+        if (rightEyeText?.material) activeMats.push(rightEyeText.material);
+      } else {
+        if (leftEye?.material) activeMats.push(leftEye.material);
+        if (rightEye?.material) activeMats.push(rightEye.material);
+      }
+
+      if (activeMats.length > 0) {
+        if (activeAnim === "Pose" || isTalking) {
+          activeMats.forEach(m => m.opacity = 1);
+          blinkStateRef.current.isBlinking = false;
+        } else {
+          const currentTime = state.clock.getElapsedTime() * 1000;
+          const blinkState = blinkStateRef.current;
+          if (!blinkState.isBlinking && currentTime - blinkState.lastBlinkTime > blinkState.nextBlinkDelay) {
+            blinkState.isBlinking = true;
+            blinkState.lastBlinkTime = currentTime;
+            blinkState.nextBlinkDelay = Math.random() * 3000 + 2000;
+          }
+          if (blinkState.isBlinking) {
+            const closeTime = 100, holdTime = 80, openTime = 120;
+            const totalDuration = closeTime + holdTime + openTime;
+            const t = currentTime - blinkState.lastBlinkTime;
+            if (t < totalDuration) {
+              let opacity;
+              if (t < closeTime) opacity = 1 - (t / closeTime);
+              else if (t < closeTime + holdTime) opacity = 0;
+              else opacity = (t - closeTime - holdTime) / openTime;
+              activeMats.forEach(m => m.opacity = opacity);
+            } else {
+              blinkState.isBlinking = false;
+              activeMats.forEach(m => m.opacity = 1);
+            }
           }
         }
       }

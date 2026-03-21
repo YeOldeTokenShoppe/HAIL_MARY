@@ -752,7 +752,7 @@ export default function MainPage() {
             </div>
 
             {/* Party Rentals — COMING SOON */}
-            <div style={{ position: "relative",  pointerEvents: "none" }}>
+            <div style={{ position: "relative" }}>
               <CyberButton
                 label="The Liminal Terminal"
                 icon={
