@@ -780,9 +780,9 @@ export default function MainPage() {
             </div>
 
             {/* Interventions — COMING SOON */}
-            <div style={{ position: "relative", opacity: 0.38, pointerEvents: "none" }}>
+            <div style={{ position: "relative" }}>
               <CyberButton
-                label="Interventions"
+                label="Market Rally Race Game"
                 icon={
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M15 4V2" />
@@ -796,9 +796,9 @@ export default function MainPage() {
                     <path d="M12.2 6.2 11 5" />
                   </svg>
                 }
-                modalTitle="Divine Interventions"
-                modalBody={<p>When all else fails, call upon the divine. Miracles available on demand.</p>}
-                onProceed={() => console.log("Interventions")}
+                modalTitle="Market Rally Race Game"
+                modalBody={<p>Get ready to race in the market! Compete with others and come out on top.</p>}
+           onProceed={() => { window.location.href = "/game/index.html"; }}
                 style={{ fontSize: "1rem" }}
               />
               {/* Coming soon badge */}
