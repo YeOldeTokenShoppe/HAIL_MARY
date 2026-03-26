@@ -928,7 +928,7 @@ export default function CyborgTemple() {
           const agentInfo = {
             RL80: { name: 'Our Lady', tagline: 'The Mother of Mercy. She sees the chain.' },
             Demon: { name: 'H80Z', tagline: 'Devil\'s advocate. Short-seller. Cynic.' },
-            Monk: { name: 'St. GR80', tagline: 'The philosopher. Patience is the path.' },
+            Monk: { name: 'St. GR80', tagline: 'The philosopher and moral author80.' },
           Fluffy: { name: 'Virgil~~', tagline: 'The guardian. Nine lives, one mission.' },
           };
           const info = focusedAgent && agentInfo[focusedAgent];
