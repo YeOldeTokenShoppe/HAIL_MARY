@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from "react";
 /**
  * MainMobileNav — bottom dock navigation for the /main page (mobile only).
  *
- * Slots: Music | Character | BUY (center FAB) | Stake | Portfolio
+ * Slots: Music | Character | BUY (center FAB) | Game | Portfolio
  *
  * Props:
  *  - isPlaying, onPlay, onPause, onSkip  — music controls
@@ -13,7 +13,6 @@ import React, { useState, useEffect, useCallback } from "react";
  *  - activeCharIndex   — currently displayed character index
  *  - onCharSelect(i)   — callback when user picks a character
  *  - onBuyClick        — opens BuyModal
- *  - onStakeClick      — navigate to staking
  *  - businesses        — array of { label, icon, live, onProceed }
  */
 export default function MainMobileNav({
@@ -25,7 +24,6 @@ export default function MainMobileNav({
   activeCharIndex = 0,
   onCharSelect,
   onBuyClick,
-  onStakeClick,
   businesses = [],
 }) {
   const [buyPulse, setBuyPulse] = useState(false);
@@ -226,8 +224,8 @@ export default function MainMobileNav({
           animation: mnFabPulse 0.6s ease;
         }
 
-        /* ---- STAKE ICON ---- */
-        .mn-stake-svg {
+        /* ---- GAME ICON ---- */
+        .mn-game-svg {
           width: 22px;
           height: 22px;
           color: hsl(45, 90%, 55%);
@@ -522,18 +520,17 @@ export default function MainMobileNav({
             {/* <span className="mn-buy-label">RL80</span> */}
           </div>
 
-          {/* 4 — Stake */}
-          <button className="mn-item" onClick={onStakeClick}>
+          {/* 4 — Game */}
+          <button className="mn-item" onClick={() => { window.location.href = "/race"; }}>
             <div className="mn-icon">
-              <svg className="mn-stake-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17" />
-                <path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9" />
-                <path d="m2 16 6 6" />
-                <circle cx="16" cy="9" r="2.9" />
-                <circle cx="6" cy="5" r="3" />
+              <svg className="mn-game-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11.146 15.854a1.207 1.207 0 0 1 1.708 0l1.56 1.56A2 2 0 0 1 15 18.828V21a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1v-2.172a2 2 0 0 1 .586-1.414z" />
+                <path d="M18.828 15a2 2 0 0 1-1.414-.586l-1.56-1.56a1.207 1.207 0 0 1 0-1.708l1.56-1.56A2 2 0 0 1 18.828 9H21a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1z" />
+                <path d="M6.586 14.414A2 2 0 0 1 5.172 15H3a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1h2.172a2 2 0 0 1 1.414.586l1.56 1.56a1.207 1.207 0 0 1 0 1.708z" />
+                <path d="M9 3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2.172a2 2 0 0 1-.586 1.414l-1.56 1.56a1.207 1.207 0 0 1-1.708 0l-1.56-1.56A2 2 0 0 1 9 5.172z" />
               </svg>
             </div>
-            <span className="mn-label">STAKE</span>
+            <span className="mn-label">GAME</span>
           </button>
 
           {/* 5 — Portfolio */}

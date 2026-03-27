@@ -846,7 +846,6 @@ export default function MainPage() {
           activeCharIndex={activeCharIndex}
           onCharSelect={handleCharacterSelect}
           onBuyClick={() => setBuyModalOpen(true)}
-          onStakeClick={() => { window.location.href = "/"; }}
           businesses={[
             {
               label: "Hail Mary Prospecting Co",

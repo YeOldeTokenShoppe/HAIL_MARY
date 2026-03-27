@@ -47,6 +47,18 @@ const nextConfig = {
     
     return config;
   },
+  async rewrites() {
+    return [
+      {
+        source: '/game/index.wasm',
+        destination: '/game/index.wasm.gz',
+      },
+      {
+        source: '/game/index.pck',
+        destination: '/game/index.pck.gz',
+      },
+    ];
+  },
   async redirects() {
     return [
       {
@@ -111,6 +123,32 @@ const nextConfig = {
           {
             key: 'Content-Type',
             value: 'application/wasm',
+          },
+        ],
+      },
+      {
+        source: '/game/index.wasm.gz',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'application/wasm',
+          },
+          {
+            key: 'Content-Encoding',
+            value: 'gzip',
+          },
+        ],
+      },
+      {
+        source: '/game/index.pck.gz',
+        headers: [
+          {
+            key: 'Content-Type',
+            value: 'application/octet-stream',
+          },
+          {
+            key: 'Content-Encoding',
+            value: 'gzip',
           },
         ],
       },
