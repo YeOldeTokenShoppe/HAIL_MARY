@@ -927,7 +927,7 @@ export default function CyborgTemple() {
         {(() => {
           const agentInfo = {
             RL80: { name: 'Our Lady', tagline: 'The Mother of Mercy and Markets.' },
-            Demon: { name: 'H80Z', tagline: 'Devil\'s advocate. Short-seller. Cynic.' },
+            Demon: { name: 'H80Z', tagline: 'Devil\'s advocate. Short-seller.' },
             Monk: { name: 'St. GR80', tagline: 'The philosopher and ethical adviser.' },
           Fluffy: { name: 'Virgil', tagline: 'The guardian and guide. Nine lives, one mission.' },
           };
