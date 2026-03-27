@@ -1,17 +1,18 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import PolaroidSnapshot from '@/components/PolaroidSnapshot';
+import Script from 'next/script';
 
 export default function RacePage() {
   const [raceResult, setRaceResult] = useState(null);
   const [triggerSnapshot, setTriggerSnapshot] = useState(false);
   const [canvasReady, setCanvasReady] = useState(false);
-  const iframeRef = useRef(null);
   const canvasRef = useRef(null);
 
   useEffect(() => {
     const handleMessage = (event) => {
+      // Accept messages from both iframe postMessage and direct window postMessage
       if (event.data?.type === 'raceFinished' && event.data.screenshot) {
         console.log('[Race] Received race result:', event.data.positionText, event.data.time);
         setRaceResult(event.data);
@@ -26,9 +27,12 @@ export default function RacePage() {
             canvas.height = img.height;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0);
-            console.log('[Race] Canvas drawn, triggering polaroid');
+            console.log('[Race] Canvas drawn, size:', img.width, 'x', img.height);
             setCanvasReady(true);
           }
+        };
+        img.onerror = () => {
+          console.error('[Race] Failed to load screenshot image');
         };
         img.src = event.data.screenshot;
       }
@@ -41,10 +45,10 @@ export default function RacePage() {
   // Only trigger PolaroidSnapshot after canvas is drawn
   useEffect(() => {
     if (canvasReady && raceResult) {
-      // Small delay to ensure canvas is fully rendered
       const timer = setTimeout(() => {
+        console.log('[Race] Triggering polaroid snapshot');
         setTriggerSnapshot(true);
-      }, 100);
+      }, 200);
       return () => clearTimeout(timer);
     }
   }, [canvasReady, raceResult]);
@@ -56,7 +60,6 @@ export default function RacePage() {
   return (
     <div style={{ width: '100vw', height: '100dvh', overflow: 'hidden', background: '#000' }}>
       <iframe
-        ref={iframeRef}
         src="/game/index.html"
         style={{
           width: '100%',
@@ -71,7 +74,7 @@ export default function RacePage() {
       <canvas
         ref={canvasRef}
         id="race-capture-canvas"
-        style={{ position: 'fixed', top: 0, left: 0, pointerEvents: 'none', opacity: 0, zIndex: -1 }}
+        style={{ position: 'fixed', top: 0, left: 0, width: 1, height: 1, pointerEvents: 'none', opacity: 0, zIndex: -1 }}
       />
 
       <PolaroidSnapshot

@@ -870,7 +870,7 @@ export default function MainPage() {
               ),
             },
             {
-              label: "Market Rally Race Game",
+              label: "Market Rally Race",
               live: true,
               onProceed: () => { window.location.href = "/race"; },
               icon: (
