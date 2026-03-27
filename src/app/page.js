@@ -798,7 +798,7 @@ export default function MainPage() {
                 }
                 modalTitle="Market Rally Race Game"
                 modalBody={<p>Get ready to race in the market! Compete with others and come out on top.</p>}
-           onProceed={() => { window.location.href = "/game/index.html"; }}
+           onProceed={() => { window.location.href = "/race"; }}
                 style={{ fontSize: "1rem" }}
               />
               {/* Coming soon badge */}
