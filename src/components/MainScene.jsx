@@ -1165,9 +1165,9 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
     if (onAnimChange) onAnimChange(activeAnim);
   }, [activeAnim, onAnimChange]);
 
-  // ── Speech trigger: after clips load, delay then switch to Talking + sayText ──
+  // ── Speech trigger: disabled for now — characters continue their default anim.
+  //    Re-enable when UI-driven interaction is added. ──
   useEffect(() => {
-    // Clear any pending timers when character changes
     if (speechTimerRef.current) {
       clearTimeout(speechTimerRef.current);
       speechTimerRef.current = null;
@@ -1180,23 +1180,7 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
   }, [characterModel]);
 
   useEffect(() => {
-    if (clipNames.length === 0) return;
-    const speech = getSpeechConfig(characterModel);
-    if (!speech || hasSpokeRef.current) return;
-    if (!clipNames.includes("Talking")) return;
-
-    speechTimerRef.current = setTimeout(() => {
-      hasSpokeRef.current = true;
-      setActiveAnim("Talking");
-
-      // Wait a beat for SitePal face to swap in, then speak
-      setTimeout(() => {
-        if (typeof window.sayText === "function") {
-          window.sayText(speech.text, speech.voice, speech.lang, speech.engine);
-        }
-      }, 300);
-    }, speech.delay);
-
+    // Speech trigger intentionally disabled — will be re-enabled with interaction UI
     return () => {
       if (speechTimerRef.current) {
         clearTimeout(speechTimerRef.current);
