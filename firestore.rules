@@ -327,6 +327,22 @@
         allow delete: if false;
       }
 
+      // =========================================================================
+      // RACE LEADERBOARD
+      // =========================================================================
+
+      // Race times — public read, public create (anonymous players allowed)
+      match /race_times/{docId} {
+        allow read: if true;
+        allow create: if true
+          && request.resource.data.keys().hasAll(['time', 'position', 'track', 'userId', 'userName', 'createdAt'])
+          && request.resource.data.time is number
+          && request.resource.data.time > 0
+          && request.resource.data.position is int
+          && request.resource.data.position >= 1;
+        allow update, delete: if false;
+      }
+
       // Default rules - SECURE by default
       match /{document=**} {
         allow read: if true;

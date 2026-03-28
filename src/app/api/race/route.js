@@ -2,6 +2,11 @@ import { db, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp
 
 export async function POST(request) {
   try {
+    if (!db) {
+      console.error('[Race API] Firestore not initialized');
+      return Response.json({ error: 'Database unavailable' }, { status: 503 });
+    }
+
     const body = await request.json();
     const { time, position, track, userId, userName, userImage } = body;
 
@@ -21,13 +26,17 @@ export async function POST(request) {
 
     return Response.json({ id: docRef.id, success: true });
   } catch (error) {
-    console.error('Failed to save race time:', error);
-    return Response.json({ error: 'Failed to save' }, { status: 500 });
+    console.error('[Race API] Failed to save race time:', error.message, error.code);
+    return Response.json({ error: error.message || 'Failed to save' }, { status: 500 });
   }
 }
 
 export async function GET(request) {
   try {
+    if (!db) {
+      return Response.json({ error: 'Database unavailable' }, { status: 503 });
+    }
+
     const { searchParams } = new URL(request.url);
     const track = searchParams.get('track') || 'loop_track';
     const count = Math.min(parseInt(searchParams.get('limit') || '20'), 50);
@@ -50,7 +59,7 @@ export async function GET(request) {
 
     return Response.json({ times });
   } catch (error) {
-    console.error('Failed to fetch leaderboard:', error);
-    return Response.json({ error: 'Failed to fetch' }, { status: 500 });
+    console.error('[Race API] Failed to fetch leaderboard:', error.message, error.code);
+    return Response.json({ error: error.message || 'Failed to fetch' }, { status: 500 });
   }
 }

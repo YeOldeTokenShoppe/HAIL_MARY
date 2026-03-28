@@ -148,8 +148,9 @@ export default function RacePage() {
           }}
           style={{
             position: 'fixed',
-            bottom: 20,
-            left: 20,
+            top: 20,
+            left: '50%',
+            transform: 'translateX(-50%)',
             padding: '12px 20px',
             background: 'rgba(0,0,0,0.85)',
             color: '#FFD700',
