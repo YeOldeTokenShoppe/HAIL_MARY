@@ -19,6 +19,7 @@ export default function RacePage() {
     const handleMessage = (event) => {
       if (event.data?.type === 'raceFinished' && event.data.screenshot) {
         console.log('[Race] Received race result:', event.data.positionText, event.data.time);
+        setTriggerSnapshot(false);
         setRaceResult(event.data);
         setCanvasReady(false);
         setSaved(false);
