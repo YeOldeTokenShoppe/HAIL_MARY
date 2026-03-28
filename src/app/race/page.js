@@ -37,6 +37,12 @@ export default function RacePage() {
         };
         img.src = event.data.screenshot;
       }
+      if (event.data?.type === 'toggleLeaderboard') {
+        setShowLeaderboard(prev => {
+          if (!prev && !leaderboard.length) fetchLeaderboard();
+          return !prev;
+        });
+      }
     };
 
     window.addEventListener('message', handleMessage);
@@ -139,32 +145,7 @@ export default function RacePage() {
         label={raceResult ? `${raceResult.positionText} Place! ${raceResult.time}` : 'Race Finish!'}
       />
 
-      {/* Leaderboard toggle button - appears after race */}
-      {raceResult && (
-        <button
-          onClick={() => {
-            setShowLeaderboard(!showLeaderboard);
-            if (!leaderboard.length) fetchLeaderboard();
-          }}
-          style={{
-            position: 'fixed',
-            top: 180,
-            right: 15,
-            padding: '12px 20px',
-            background: 'rgba(0,0,0,0.85)',
-            color: '#FFD700',
-            border: '2px solid #FFD700',
-            borderRadius: 10,
-            fontSize: 16,
-            fontWeight: 700,
-            cursor: 'pointer',
-            zIndex: 100,
-            backdropFilter: 'blur(8px)',
-          }}
-        >
-          {showLeaderboard ? 'Close' : 'Leaderboard'}
-        </button>
-      )}
+      {/* Leaderboard is toggled via trophy icon in the game HUD */}
 
       {/* Leaderboard panel */}
       {showLeaderboard && (

@@ -926,7 +926,7 @@ export default function CyborgTemple() {
         {/* Floating Character Label on Focus */}
         {(() => {
           const agentInfo = {
-            RL80: { name: 'Our Lady', tagline: 'The Patron Saint of Portfolios' },
+            RL80: { name: 'Our Lady', tagline: 'Patron Saint of Portfolios' },
             Demon: { name: 'H80Z', tagline: 'Devil\'s advocate. Short-seller.' },
             Monk: { name: 'St. GR80', tagline: 'The philosopher and ethical adviser.' },
           Fluffy: { name: 'Virgil', tagline: 'The guardian and guide. Nine lives, one mission.' },
