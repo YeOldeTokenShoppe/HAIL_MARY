@@ -869,7 +869,7 @@ export default function MainPage() {
               ),
             },
             {
-              label: "Market Rally Race",
+              label: "Market Rally",
               live: true,
               onProceed: () => { window.location.href = "/race"; },
               icon: (
