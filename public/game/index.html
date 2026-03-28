@@ -89,7 +89,7 @@ body {
 	text-align: center;
 	z-index: 1;
 }
-		#status-progress-wrap { position: absolute; bottom: 20%; left: 25%; width: 50%; } #status-percent { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center; font-family: sans-serif; font-size: 0.9rem; font-weight: bold; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.7); pointer-events: none; }
+		#status-progress-wrap { position: absolute; bottom: 20%; left: 25%; width: 50%; } #status-progress-wrap #status-progress { display: block; width: 100%; height: 18px; } #status-percent { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center; font-family: sans-serif; font-size: 0.9rem; font-weight: bold; color: #fff; text-shadow: 1px 1px 2px rgba(0,0,0,0.7); pointer-events: none; }
 </style>
 		<link id="-gd-engine-icon" rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
@@ -113,7 +113,7 @@ body {
 		<script>const origGetContext=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,attrs){if(type==="webgl"||type==="webgl2"){attrs=Object.assign({},attrs,{preserveDrawingBuffer:true});}return origGetContext.call(this,type,attrs);};</script>
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":21806888,"index.wasm":35739700},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":21818696,"index.wasm":35739700},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
