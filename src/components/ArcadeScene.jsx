@@ -11,7 +11,7 @@ import AnnotationSystem from "./AnnotationSystem";
 useGLTF.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.6/");
 
 // Clickable mesh names that trigger the screen zoom
-const CLICKABLE_MESHES = new Set(["Screen1", "Joystick1", "Joystick2"]);
+const CLICKABLE_MESHES = new Set(["Screen1", "Screen2", "Joystick1", "Joystick2"]);
 
 // Shotgun mesh names for Duck Hunt
 const SHOTGUN_MESHES = new Set(["Shotgun1", "Shotgun2"]);
@@ -53,19 +53,26 @@ function ScreenZoomPortal({ scene, onEnterScreen, onZoomReady, confirmAction }) 
   const pausedPos = useRef(new THREE.Vector3());
   const pausedTarget = useRef(new THREE.Vector3());
   const pausedFov = useRef(15);
+  // Track which screen was clicked
+  const activeScreen = useRef(null);
+  const screenCenters = useRef({});
 
-  // Compute Screen1 world center once
+  // Compute screen world centers once
   useEffect(() => {
     scene.traverse((child) => {
-      if (child.isMesh && child.name === "Screen1") {
+      if (child.isMesh && (child.name === "Screen1" || child.name === "Screen2")) {
         child.updateWorldMatrix(true, false);
         if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
         const center = new THREE.Vector3();
         child.geometry.boundingBox.getCenter(center);
         center.applyMatrix4(child.matrixWorld);
-        screenCenter.current.copy(center);
+        screenCenters.current[child.name] = center.clone();
       }
     });
+    // Default to Screen1 for backward compat
+    if (screenCenters.current.Screen1) {
+      screenCenter.current.copy(screenCenters.current.Screen1);
+    }
   }, [scene]);
 
   // React to confirmAction prop changes
@@ -106,6 +113,16 @@ function ScreenZoomPortal({ scene, onEnterScreen, onZoomReady, confirmAction }) 
 
       const hits = raycaster.intersectObjects(clickables, false);
       if (hits.length > 0) {
+        // Determine which screen to zoom into based on what was clicked
+        const hitName = hits[0].object.name;
+        const targetScreen = hitName === "Screen2" ? "Screen2" : "Screen1";
+        activeScreen.current = targetScreen;
+
+        // Set screen center for the target screen
+        if (screenCenters.current[targetScreen]) {
+          screenCenter.current.copy(screenCenters.current[targetScreen]);
+        }
+
         isZooming.current = true;
         isPaused.current = false;
         hasFired.current = false;
@@ -187,14 +204,14 @@ function ScreenZoomPortal({ scene, onEnterScreen, onZoomReady, confirmAction }) 
       hasNotifiedReady.current = true;
       isZooming.current = false;
       isPaused.current = true;
-      if (onZoomReady) onZoomReady();
+      if (onZoomReady) onZoomReady(activeScreen.current);
       return;
     }
 
     // Fire transition after confirm resumes zoom past 95%
     if (eased > 0.95 && !hasFired.current && onEnterScreen) {
       hasFired.current = true;
-      onEnterScreen();
+      onEnterScreen(activeScreen.current);
     }
   });
 
@@ -772,6 +789,8 @@ function ArcadeModel({ is80sMode, onLoaded, onEnterScreen, onZoomReady, confirmA
   const { actions } = useAnimations(animations, groupRef);
   const videoRef = useRef(null);
   const textureRef = useRef(null);
+  const videoRef2 = useRef(null);
+  const textureRef2 = useRef(null);
 
   useEffect(() => {
     scene.traverse((child) => {
@@ -822,6 +841,35 @@ function ArcadeModel({ is80sMode, onLoaded, onEnterScreen, onZoomReady, confirmA
 
     video.play().catch(() => {});
 
+    // Apply video texture to Screen2 mesh
+    const video2 = document.createElement("video");
+    video2.src = "/videos/rallyGameVideo.mp4";
+    video2.loop = true;
+    video2.muted = true;
+    video2.playsInline = true;
+    video2.crossOrigin = "anonymous";
+    videoRef2.current = video2;
+
+    const texture2 = new THREE.VideoTexture(video2);
+    texture2.minFilter = THREE.LinearFilter;
+    texture2.magFilter = THREE.LinearFilter;
+    texture2.format = THREE.RGBAFormat;
+    texture2.colorSpace = THREE.SRGBColorSpace;
+    texture2.repeat.y = -1;
+    texture2.offset.y = 1;
+    textureRef2.current = texture2;
+
+    scene.traverse((child) => {
+      if (child.isMesh && child.name === "Screen2") {
+        child.material = new THREE.MeshBasicMaterial({
+          map: texture2,
+          toneMapped: false,
+        });
+      }
+    });
+
+    video2.play().catch(() => {});
+
     return () => {
       video.pause();
       video.removeAttribute("src");
@@ -829,6 +877,13 @@ function ArcadeModel({ is80sMode, onLoaded, onEnterScreen, onZoomReady, confirmA
       texture.dispose();
       videoRef.current = null;
       textureRef.current = null;
+
+      video2.pause();
+      video2.removeAttribute("src");
+      video2.load();
+      texture2.dispose();
+      videoRef2.current = null;
+      textureRef2.current = null;
     };
   }, [scene]);
 

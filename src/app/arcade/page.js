@@ -38,6 +38,7 @@ export default function ArcadePage() {
   const [screenTransition, setScreenTransition] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
+  const [activeScreen, setActiveScreen] = useState(null);
   const is80sMode = context80sMode;
 
   // Mobile detection
@@ -79,7 +80,8 @@ export default function ArcadePage() {
     setIsLoading(false);
   }, []);
 
-  const handleZoomReady = useCallback(() => {
+  const handleZoomReady = useCallback((screenName) => {
+    setActiveScreen(screenName);
     setShowConfirm(true);
   }, []);
 
@@ -95,11 +97,12 @@ export default function ArcadePage() {
     setTimeout(() => setConfirmAction(null), 200);
   }, []);
 
-  const handleEnterScreen = useCallback(() => {
+  const handleEnterScreen = useCallback((screenName) => {
     setScreenTransition(true);
+    const destination = screenName === "Screen2" ? "/race" : "/oil";
     // Navigate after the white flash fills the screen
     setTimeout(() => {
-      router.push("/oil");
+      router.push(destination);
     }, 600);
   }, [router]);
 
@@ -496,7 +499,7 @@ export default function ArcadePage() {
                   : "0 0 10px rgba(212, 175, 55, 0.3)",
               }}
             >
-              Enter the Oil Fields?
+              {activeScreen === "Screen2" ? "Enter the Rally?" : "Enter the Oil Fields?"}
             </p>
             <p
               style={{
@@ -506,7 +509,7 @@ export default function ArcadePage() {
                 fontFamily: "monospace",
               }}
             >
-              You will be redirected to /oil
+              You will be redirected to {activeScreen === "Screen2" ? "/race" : "/oil"}
             </p>
             <div style={{ display: "flex", gap: "1rem", justifyContent: "center" }}>
               <button
