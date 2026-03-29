@@ -848,10 +848,6 @@ export default function MainPage() {
       {/* Mobile bottom nav */}
       {isMobile && (
         <MainMobileNav
-          isPlaying={contextIsPlaying}
-          onPlay={play}
-          onPause={pause}
-          onSkip={nextTrack}
           characters={CHARACTERS}
           activeCharIndex={activeCharIndex}
           onCharSelect={handleCharacterSelect}

@@ -5,36 +5,35 @@ import React, { useState, useEffect, useCallback } from "react";
 /**
  * MainMobileNav — bottom dock navigation for the /main page (mobile only).
  *
- * Slots: Music | Character | BUY (center FAB) | Game | Portfolio
+ * Slots: Buy | Character | SAY HI (center FAB) | Game | Portfolio
  *
  * Props:
- *  - isPlaying, onPlay, onPause, onSkip  — music controls
  *  - characters        — array of { name, image }
  *  - activeCharIndex   — currently displayed character index
  *  - onCharSelect(i)   — callback when user picks a character
  *  - onBuyClick        — opens BuyModal
+ *  - onSayHi(message)  — callback when user sends a chat message
  *  - businesses        — array of { label, icon, live, onProceed }
  */
 export default function MainMobileNav({
-  isPlaying = false,
-  onPlay,
-  onPause,
-  onSkip,
   characters = [],
   activeCharIndex = 0,
   onCharSelect,
   onBuyClick,
+  onSayHi,
   businesses = [],
 }) {
-  const [buyPulse, setBuyPulse] = useState(false);
+  const [sayHiPulse, setSayHiPulse] = useState(false);
   const [showPortfolio, setShowPortfolio] = useState(false);
   const [showCharPicker, setShowCharPicker] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [chatInput, setChatInput] = useState("");
 
-  // Subtle pulse on buy FAB every 8s
+  // Subtle pulse on SAY HI FAB every 8s
   useEffect(() => {
     const interval = setInterval(() => {
-      setBuyPulse(true);
-      setTimeout(() => setBuyPulse(false), 600);
+      setSayHiPulse(true);
+      setTimeout(() => setSayHiPulse(false), 600);
     }, 8000);
     return () => clearInterval(interval);
   }, []);
@@ -43,6 +42,7 @@ export default function MainMobileNav({
   const closeOverlays = useCallback(() => {
     setShowPortfolio(false);
     setShowCharPicker(false);
+    setShowChat(false);
   }, []);
 
   const current = characters[activeCharIndex] || { name: "?", image: null };
@@ -129,31 +129,11 @@ export default function MainMobileNav({
           color: hsl(183, 38%, 57%);
         }
 
-        /* ---- MUSIC SPLIT ---- */
-        .mn-music-split {
-          display: flex;
-          gap: 3px;
-          width: 36px;
-          height: 32px;
-        }
-
-        .mn-music-half {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 13px;
-          border-radius: 8px;
-          background: rgba(0, 255, 255, 0.08);
-          border: none;
-          color: hsl(183, 38%, 57%);
-          cursor: pointer;
-          transition: all 0.12s ease;
-        }
-
-        .mn-music-half:active {
-          background: rgba(0, 255, 255, 0.2);
-          transform: scale(0.92);
+        /* ---- BUY ICON ---- */
+        .mn-buy-svg {
+          width: 22px;
+          height: 22px;
+          color: hsl(152, 80%, 45%);
         }
 
         /* ---- CHARACTER CAMEO ---- */
@@ -166,8 +146,8 @@ export default function MainMobileNav({
           transition: border-color 0.2s;
         }
 
-        /* ---- CENTER BUY FAB ---- */
-        .mn-buy-wrapper {
+        /* ---- CENTER SAY HI FAB ---- */
+        .mn-sayhi-wrapper {
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -176,7 +156,7 @@ export default function MainMobileNav({
           z-index: 2;
         }
 
-        .mn-buy-fab {
+        .mn-sayhi-fab {
           width: 58px;
           height: 58px;
           border-radius: 50%;
@@ -184,44 +164,84 @@ export default function MainMobileNav({
           align-items: center;
           justify-content: center;
           cursor: pointer;
-          border: 3px solid rgba(0, 229, 114, 0.3);
-          background: linear-gradient(145deg, hsl(152, 100%, 40%), hsl(152, 80%, 30%));
-          box-shadow: 0 4px 16px rgba(0, 229, 114, 0.4), 0 2px 6px rgba(0, 0, 0, 0.4);
+          border: 3px solid rgba(0, 255, 255, 0.3);
+          background: linear-gradient(145deg, hsl(183, 80%, 35%), hsl(183, 60%, 25%));
+          box-shadow: 0 4px 16px rgba(0, 255, 255, 0.3), 0 2px 6px rgba(0, 0, 0, 0.4);
           transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
           -webkit-tap-highlight-color: transparent;
         }
 
-        .mn-buy-fab:active {
+        .mn-sayhi-fab:active {
           transform: scale(0.93);
-          box-shadow: 0 2px 8px rgba(0, 229, 114, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+          box-shadow: 0 2px 8px rgba(0, 255, 255, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
         }
 
-        .mn-buy-text {
+        .mn-sayhi-text {
           font-family: 'Cyber', 'Geo', sans-serif;
-          font-size: 1rem;
+          font-size: 0.65rem;
           font-weight: 900;
-          letter-spacing: 2px;
+          letter-spacing: 1.5px;
           color: #fff;
           text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
         }
 
-        .mn-buy-label {
-          font-size: 7px;
-          font-weight: 700;
-          letter-spacing: 0.5px;
-          text-transform: uppercase;
-          color: rgba(0, 229, 114, 0.5);
-          margin-top: 3px;
-          line-height: 1;
-        }
-
         @keyframes mnFabPulse {
-          0%, 100% { box-shadow: 0 4px 16px rgba(0, 229, 114, 0.4), 0 2px 6px rgba(0, 0, 0, 0.4); }
-          50% { box-shadow: 0 4px 24px rgba(0, 229, 114, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4), 0 0 40px rgba(0, 229, 114, 0.15); }
+          0%, 100% { box-shadow: 0 4px 16px rgba(0, 255, 255, 0.3), 0 2px 6px rgba(0, 0, 0, 0.4); }
+          50% { box-shadow: 0 4px 24px rgba(0, 255, 255, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4), 0 0 40px rgba(0, 255, 255, 0.12); }
         }
 
-        .mn-buy-fab.mn-pulse {
+        .mn-sayhi-fab.mn-pulse {
           animation: mnFabPulse 0.6s ease;
+        }
+
+        /* ---- CHAT SHEET ---- */
+        .mn-chat-input-row {
+          display: flex;
+          gap: 8px;
+          align-items: center;
+        }
+
+        .mn-chat-input {
+          flex: 1;
+          padding: 10px 14px;
+          border-radius: 8px;
+          border: 1px solid rgba(0, 255, 255, 0.15);
+          background: rgba(0, 255, 255, 0.03);
+          color: hsl(183, 38%, 57%);
+          font-family: 'Cyber', 'Geo', sans-serif;
+          font-size: 0.85rem;
+          letter-spacing: 0.03em;
+          outline: none;
+          transition: border-color 0.2s;
+        }
+
+        .mn-chat-input::placeholder {
+          color: rgba(0, 255, 255, 0.25);
+        }
+
+        .mn-chat-input:focus {
+          border-color: rgba(0, 255, 255, 0.4);
+        }
+
+        .mn-chat-send {
+          padding: 10px 16px;
+          border-radius: 8px;
+          border: 1px solid rgba(0, 255, 255, 0.2);
+          background: rgba(0, 255, 255, 0.08);
+          color: hsl(183, 38%, 57%);
+          font-family: 'Cyber', 'Geo', sans-serif;
+          font-size: 0.75rem;
+          font-weight: 700;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        .mn-chat-send:active {
+          background: rgba(0, 255, 255, 0.15);
+          transform: scale(0.95);
         }
 
         /* ---- GAME ICON ---- */
@@ -439,6 +459,46 @@ export default function MainMobileNav({
         </>
       )}
 
+      {/* Chat sheet */}
+      {showChat && (
+        <>
+          <div className="mn-sheet-backdrop" onClick={closeOverlays} />
+          <div className="mn-sheet">
+            <div className="mn-sheet-handle" />
+            <div className="mn-sheet-title">// Say Hi to {current.name}</div>
+            <div className="mn-chat-input-row">
+              <input
+                className="mn-chat-input"
+                type="text"
+                placeholder="Type a message..."
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && chatInput.trim()) {
+                    if (onSayHi) onSayHi(chatInput.trim());
+                    setChatInput("");
+                    setShowChat(false);
+                  }
+                }}
+                autoFocus
+              />
+              <button
+                className="mn-chat-send"
+                onClick={() => {
+                  if (chatInput.trim()) {
+                    if (onSayHi) onSayHi(chatInput.trim());
+                    setChatInput("");
+                    setShowChat(false);
+                  }
+                }}
+              >
+                SEND
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Character picker sheet */}
       {showCharPicker && (
         <>
@@ -477,28 +537,19 @@ export default function MainMobileNav({
       <div className="mn-dock">
         <div className="mn-bar">
 
-          {/* 1 — Music */}
-          {isPlaying ? (
-            <div className="mn-item">
-              <div className="mn-icon mn-active">
-                <div className="mn-music-split">
-                  <button className="mn-music-half" onClick={onPause}>⏹</button>
-                  <button className="mn-music-half" onClick={onSkip}>⏭</button>
-                </div>
-              </div>
-              <span className="mn-label mn-label-active">MUSIC</span>
+          {/* 1 — Buy */}
+          <button className="mn-item" onClick={onBuyClick}>
+            <div className="mn-icon">
+              <svg className="mn-buy-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="1" x2="12" y2="23" />
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+              </svg>
             </div>
-          ) : (
-            <button className="mn-item" onClick={onPlay}>
-              <div className="mn-icon">
-                <span style={{ color: "hsl(183, 38%, 57%)", fontSize: 22 }}>♫</span>
-              </div>
-              <span className="mn-label">MUSIC</span>
-            </button>
-          )}
+            <span className="mn-label">BUY</span>
+          </button>
 
           {/* 2 — Character */}
-          <button className="mn-item" onClick={() => { setShowCharPicker(true); setShowPortfolio(false); }}>
+          <button className="mn-item" onClick={() => { setShowCharPicker(true); setShowPortfolio(false); setShowChat(false); }}>
             <div className="mn-icon">
               {current.image ? (
                 <img className="mn-char-cameo" src={current.image} alt={current.name} />
@@ -509,15 +560,14 @@ export default function MainMobileNav({
             <span className="mn-label">TEAM</span>
           </button>
 
-          {/* 3 — CENTER BUY FAB */}
-          <div className="mn-buy-wrapper">
+          {/* 3 — CENTER SAY HI FAB */}
+          <div className="mn-sayhi-wrapper">
             <button
-              className={`mn-buy-fab ${buyPulse ? "mn-pulse" : ""}`}
-              onClick={onBuyClick}
+              className={`mn-sayhi-fab ${sayHiPulse ? "mn-pulse" : ""}`}
+              onClick={() => { setShowChat(true); setShowPortfolio(false); setShowCharPicker(false); }}
             >
-              <span className="mn-buy-text">BUY</span>
+              <span className="mn-sayhi-text">SAY HI</span>
             </button>
-            {/* <span className="mn-buy-label">RL80</span> */}
           </div>
 
           {/* 4 — Game */}
@@ -534,7 +584,7 @@ export default function MainMobileNav({
           </button>
 
           {/* 5 — Portfolio */}
-          <button className="mn-item" onClick={() => { setShowPortfolio(true); setShowCharPicker(false); }}>
+          <button className="mn-item" onClick={() => { setShowPortfolio(true); setShowCharPicker(false); setShowChat(false); }}>
             <div className="mn-icon" style={{ position: "relative" }}>
               <svg className="mn-portfolio-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
