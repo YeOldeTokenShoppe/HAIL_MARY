@@ -640,7 +640,7 @@ function FortuneTellerModel({ videoSrc = "", useSitePal = false, sitePalContaine
               // Store original textures and preload half-lidded variant
               demonEyesDefaultTexRef.current = child.material.map;
               demonEyesDefaultEmissiveRef.current = child.material.emissiveMap;
-              new THREE.TextureLoader().load("/images/demonEyes_half.webp", (tex) => {
+              new THREE.TextureLoader().load("/images/demonEyes_half2.webp", (tex) => {
                 tex.flipY = child.material.map ? child.material.map.flipY : false;
                 tex.colorSpace = THREE.SRGBColorSpace;
                 demonEyesHalfTexRef.current = tex;
@@ -1339,7 +1339,7 @@ export default function MainScene({ onLoaded, useSitePal = false, onAnimChange, 
         zoomToCursor
       />
       <CameraZoom
-        active={isCatIdle}
+        active={isCat}
         cameraPos={isMobile ? [0, 0.4, 2.0] : [0, 0.5, 2.2]}
         targetPos={[0, 0.3, 0]}
         lerpSpeed={2}
