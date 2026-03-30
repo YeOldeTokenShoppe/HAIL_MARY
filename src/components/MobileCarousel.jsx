@@ -22,6 +22,9 @@ export default function MobileCarousel({
   const trackRef = useRef(null)
   const [activeIndex, setActiveIndex] = useState(0)
   const [isUserScrolling, setIsUserScrolling] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
+  const [showPauseIcon, setShowPauseIcon] = useState(false)
+  const pauseIconTimeout = useRef(null)
   const scrollTimeout = useRef(null)
   const autoPlayRef = useRef(null)
 
@@ -70,7 +73,7 @@ export default function MobileCarousel({
 
   // Auto-play
   useEffect(() => {
-    if (!autoPlay || isUserScrolling) {
+    if (!autoPlay || isUserScrolling || isPaused) {
       clearInterval(autoPlayRef.current)
       return
     }
@@ -81,7 +84,7 @@ export default function MobileCarousel({
     }, autoPlayInterval)
 
     return () => clearInterval(autoPlayRef.current)
-  }, [autoPlay, autoPlayInterval, activeIndex, isUserScrolling, slides.length])
+  }, [autoPlay, autoPlayInterval, activeIndex, isUserScrolling, isPaused, slides.length])
 
   const scrollToIndex = (index) => {
     const track = trackRef.current
@@ -100,6 +103,13 @@ export default function MobileCarousel({
     scrollToIndex(index)
   }
 
+  const togglePause = () => {
+    setIsPaused(p => !p)
+    setShowPauseIcon(true)
+    clearTimeout(pauseIconTimeout.current)
+    pauseIconTimeout.current = setTimeout(() => setShowPauseIcon(false), 800)
+  }
+
   return (
     <div className="mobile-carousel">
       {/* Scroll track */}
@@ -108,7 +118,7 @@ export default function MobileCarousel({
           <div
             key={i}
             className={`mobile-carousel__card ${i === activeIndex ? 'active' : ''}`}
-            onClick={() => onCardClick?.(i)}
+            onClick={() => { onCardClick?.(i); if (i === activeIndex) togglePause() }}
           >
             {slide.component ? (
               <slide.component />
@@ -145,7 +155,7 @@ export default function MobileCarousel({
         <span>{activeIndex + 1}</span> / {slides.length}
       </div>
 
-      {/* Dots */}
+      {/* Dots + pause */}
       <div className="mobile-carousel__dots">
         {slides.map((_, i) => (
           <button
@@ -157,8 +167,15 @@ export default function MobileCarousel({
         ))}
       </div>
 
+      {/* Pause/play overlay icon */}
+      {showPauseIcon && (
+        <div className="mobile-carousel__pause-overlay" key={isPaused ? 'paused' : 'playing'}>
+          {isPaused ? '❚❚' : '▶'}
+        </div>
+      )}
+
       {/* Autoplay progress */}
-      {autoPlay && !isUserScrolling && (
+      {autoPlay && !isUserScrolling && !isPaused && (
         <div className="mobile-carousel__progress">
           <div
             key={activeIndex}

@@ -215,6 +215,33 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+.mobile-carousel__pause-overlay {
+  position: absolute;
+  top: 38%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 16px;
+  letter-spacing: -1px;
+  z-index: 10;
+  pointer-events: none;
+  animation: pauseFade 0.8s ease forwards;
+}
+
+@keyframes pauseFade {
+  0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  70% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.2); }
+}
+
 .mobile-carousel__dot.active {
   width: 24px;
   border-radius: 3px;
