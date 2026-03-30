@@ -18,7 +18,7 @@ const CHARACTERS = [
 
   { name: "Saint GR80", image: "/cameo_GR80.webp", model: "/models/GR80.glb", defaultAnim: "walk" },
   { name: "H80Z", image: "/cameo_h80z.webp", model: "/models/H80Z.glb", defaultAnim: "skateSequence" },
-  { name: "VIRGIL", image: "/cameo_kitty.webp", model: "/models/fluffyCat.glb", defaultAnim: "walk" },
+  { name: "Virgil", image: "/cameo_kitty.webp", model: "/models/fluffyCat.glb", defaultAnim: "walk" },
 ];
 
 // Scene GLBs that aren't character models
@@ -52,7 +52,18 @@ function preloadGLBParsed(url) {
         : "/draco/";
     draco.setDecoderPath(dracoPath);
     loader.setDRACOLoader(draco);
-    loader.load(url, () => resolve(), undefined, () => resolve());
+    loader.load(url, (gltf) => {
+      // Dispose parsed scene — we only wanted to warm the cache
+      gltf.scene.traverse((child) => {
+        if (child.isMesh) {
+          child.geometry?.dispose();
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          mats.forEach((m) => m?.dispose());
+        }
+      });
+      draco.dispose();
+      resolve();
+    }, undefined, () => { draco.dispose(); resolve(); });
   });
 }
 
@@ -69,7 +80,7 @@ const USE_SITEPAL = true;
 
 // SitePal embed config
 const SITEPAL_ACCOUNT = "9308752";
-const SITEPAL_EMBED_PARAMS = "9308752,600,800,\"\",1,1,2774644,0,1,1,\"Wis5vrj8IqhSAWDsZMw2mVtkUIjwPzMc\",0,1";
+const SITEPAL_EMBED_PARAMS = "9308752,600,800,\"\",1,1,2774675,0,1,1,\"KNB3GdOhtWudqvlDS8OB3EwsKcsbP12A\",0,1";
 
 function SitePalEmbed() {
   const containerRef = useRef(null);
@@ -157,6 +168,11 @@ function SitePalEmbed() {
       if (script1.parentNode) script1.parentNode.removeChild(script1);
       window.removeEventListener("click", resumeAudio);
       window.removeEventListener("touchstart", resumeAudio);
+      delete window.vh_sceneLoaded;
+      // Clean up SitePal DOM contents
+      if (containerRef.current) {
+        containerRef.current.innerHTML = "";
+      }
     };
   }, []);
 
@@ -239,26 +255,36 @@ export default function MainPage() {
     if (show && !contextIsPlaying) play();
   }, [contextIsPlaying, play]);
   const [buyModalOpen, setBuyModalOpen] = useState(false);
-  const [activeCharIndex, setActiveCharIndex] = useState(0);
-  const [displayedModel, setDisplayedModel] = useState(CHARACTERS[0].model);
-  const [displayedDefaultAnim, setDisplayedDefaultAnim] = useState(CHARACTERS[0].defaultAnim);
+  const [activeCharIndex, setActiveCharIndex] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const char = parseInt(params.get('char'), 10);
+      if (!isNaN(char) && char >= 0 && char < CHARACTERS.length) return char;
+    }
+    return 0;
+  });
+  const [displayedModel, setDisplayedModel] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const char = parseInt(params.get('char'), 10);
+      if (!isNaN(char) && char >= 0 && char < CHARACTERS.length) return CHARACTERS[char].model;
+    }
+    return CHARACTERS[0].model;
+  });
   const [glitchActive, setGlitchActive] = useState(false);
   const [glitchIntensity, setGlitchIntensity] = useState(0);
   const [glitchKey, setGlitchKey] = useState(0);
   const pendingCharRef = useRef(null);
-  const h80zVisitRef = useRef(0);
   const glitchAnimRef = useRef(null);
   const isTalking = activeAnim === "Talking";
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessage, setChatMessage] = useState("");
 
   // Show Confessional FAB when a character speaks (Talking anim triggered)
-  // and set the initial message for the chat
   const hasOfferedChatRef = useRef(false);
   useEffect(() => {
     if (isTalking && !hasOfferedChatRef.current) {
       hasOfferedChatRef.current = true;
-      // Match the character speech text from MainScene's config
       const model = CHARACTERS[activeCharIndex]?.model || "";
       if (model.includes("fortuneTeller")) {
         setChatMessage("Oh, hello!");
@@ -275,17 +301,7 @@ export default function MainPage() {
 
   const handleCharacterSelect = (i) => {
     if (i === activeCharIndex || glitchActive) return;
-    // Track H80Z appearances to alternate animations
-    if (CHARACTERS[i].name === "H80Z") {
-      h80zVisitRef.current++;
-      const anim = h80zVisitRef.current % 2 === 0 ? "walkText" : "skateSequence";
-      console.log("[handleCharacterSelect] H80Z visit:", h80zVisitRef.current, "→", anim);
-      setDisplayedDefaultAnim(anim);
-    } else {
-      setDisplayedDefaultAnim(CHARACTERS[i].defaultAnim);
-    }
     pendingCharRef.current = i;
-    setDisplayedModel(CHARACTERS[i].model);
     setActiveCharIndex(i);
     setGlitchKey((k) => k + 1);
     setGlitchActive(true);
@@ -312,19 +328,8 @@ export default function MainPage() {
   };
 
   const handleGlitchMidpoint = () => {
-    console.log("[GlitchMidpoint] pendingChar:", pendingCharRef.current, "h80zVisits:", h80zVisitRef.current);
     if (pendingCharRef.current !== null) {
-      const char = CHARACTERS[pendingCharRef.current];
-      console.log("[GlitchMidpoint] char:", char.name, "defaultAnim:", char.defaultAnim);
-      setDisplayedModel(char.model);
-      // Resolve animation — H80Z alternates between skateSequence and walkText
-      if (char.name === "H80Z") {
-        const anim = h80zVisitRef.current % 2 === 0 ? "walkText" : "skateSequence";
-        console.log("[H80Z] visit:", h80zVisitRef.current, "→", anim);
-        setDisplayedDefaultAnim(anim);
-      } else {
-        setDisplayedDefaultAnim(char.defaultAnim);
-      }
+      setDisplayedModel(CHARACTERS[pendingCharRef.current].model);
     }
   };
 
@@ -343,7 +348,6 @@ export default function MainPage() {
   const handleCharacterSelectRef = useRef(handleCharacterSelect);
   handleCharacterSelectRef.current = handleCharacterSelect;
   const lastInteractionRef = useRef(0);
-
   useEffect(() => {
     const onInteract = () => { lastInteractionRef.current = Date.now(); };
     window.addEventListener("pointerdown", onInteract, true);
@@ -354,7 +358,6 @@ export default function MainPage() {
       const next = (charIndexRef.current + 1) % CHARACTERS.length;
       handleCharacterSelectRef.current(next);
     }, 10000);
-
     return () => {
       clearInterval(timer);
       window.removeEventListener("pointerdown", onInteract, true);
@@ -587,7 +590,7 @@ export default function MainPage() {
         useSitePal={USE_SITEPAL}
         onAnimChange={setActiveAnim}
         characterModel={displayedModel}
-        defaultAnim={displayedDefaultAnim}
+        defaultAnim={CHARACTERS[activeCharIndex].defaultAnim}
         characterZOffset={CHARACTERS[activeCharIndex].zOffset || 0}
         glitchIntensity={glitchIntensity}
         isMobile={isMobile}
@@ -692,7 +695,7 @@ export default function MainPage() {
           />
 
           {/* Stake button — gold accent to differentiate */}
-          <CyberButton
+          {/* <CyberButton
             label="Stake"
             accent="hsl(45, 90%, 55%)"
             shadow="hsl(30, 100%, 50%)"
@@ -709,7 +712,7 @@ export default function MainPage() {
             modalBody={<p>Stake your faith and reap the rewards. Perpetual profit awaits the devoted.</p>}
             onProceed={() => window.location.href = "/"}
             style={{ fontSize: "1.05rem" }}
-          />
+          /> */}
         </div>
 
         {/* ── Divider ── */}
@@ -734,7 +737,7 @@ export default function MainPage() {
             {/* Prospecting Co — LIVE */}
             <div style={{ position: "relative" }}>
               <CyberButton
-                label="Prospecting Co"
+                label="Hail Mary Prospecting Co"
                 icon={
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
@@ -745,7 +748,7 @@ export default function MainPage() {
                 }
                 modalTitle="Hail Mary Prospecting Co"
                 modalBody={<p>Strike gold in the digital frontier. Our Lady&apos;s miners never rest.</p>}
-                onProceed={() => console.log("Prospecting")}
+                onProceed={() => { window.location.href = "/oil?mode=test"; }}
                 style={{ fontSize: "1rem" }}
               />
               {/* Live indicator dot */}
@@ -763,36 +766,37 @@ export default function MainPage() {
             </div>
 
             {/* Party Rentals — COMING SOON */}
-            <div style={{ position: "relative", pointerEvents: "none" }}>
+            <div style={{ position: "relative" }}>
               <CyberButton
                 label="The Liminal Terminal"
                 icon={
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-<path d="M12 19h8"/><path d="m4 17 6-6-6-6"/>                  </svg>
+               <path d="M12 19h8"/><path d="m4 17 6-6-6-6"/>
+                  </svg>
                 }
                 modalTitle="The Liminal Terminal"
                 modalBody={<p></p>}
-                onProceed={() => console.log("Telegram")}
+                 onProceed={() => { window.location.href = "/trade"; }}
                 style={{ fontSize: "1rem" }}
               />
-              {/* Coming soon badge */}
+              {/* Live indicator dot */}
               <span style={{
                 position: "absolute",
                 top: "50%",
-                right: 4,
+                right: 6,
                 transform: "translateY(-50%)",
-                fontSize: "0.4rem",
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                color: "hsl(40, 100%, 60%)",
-                fontFamily: "'Cyber', 'Geo', sans-serif",
-              }}>soon</span>
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: "#00e572",
+                boxShadow: "0 0 6px rgba(0, 229, 114, 0.8)",
+              }} />
             </div>
 
             {/* Interventions — COMING SOON */}
-            <div style={{ position: "relative", opacity: 0.38, pointerEvents: "none" }}>
+            <div style={{ position: "relative" }}>
               <CyberButton
-                label="Interventions"
+                label="Market Rally Race Game"
                 icon={
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M15 4V2" />
@@ -806,9 +810,9 @@ export default function MainPage() {
                     <path d="M12.2 6.2 11 5" />
                   </svg>
                 }
-                modalTitle="Divine Interventions"
-                modalBody={<p>When all else fails, call upon the divine. Miracles available on demand.</p>}
-                onProceed={() => console.log("Interventions")}
+                modalTitle="Market Rally Race Game"
+                modalBody={<p>Get ready to race in the market! Compete with others and come out on top.</p>}
+           onProceed={() => { window.location.href = "/race"; }}
                 style={{ fontSize: "1rem" }}
               />
               {/* Coming soon badge */}
@@ -854,12 +858,14 @@ export default function MainPage() {
           onBuyClick={() => setBuyModalOpen(true)}
           businesses={[
             {
-              label: "Prospecting Co",
+              label: "Hail Mary Prospecting Co",
               live: true,
-              onProceed: () => console.log("Prospecting"),
+              onProceed: () => { window.location.href = "/oil?mode=test"; },
               icon: (
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m14 13-8.381 8.38a1 1 0 0 1-3.001-3L11 9.999" />
+                  <path d="M15.973 4.027A13 13 0 0 0 5.902 2.373c-1.398.342-1.092 2.158.277 2.601a19.9 19.9 0 0 1 5.822 3.024" />
+                  <path d="M16.001 11.999a19.9 19.9 0 0 1 3.024 5.824c.444 1.369 2.26 1.676 2.603.278A13 13 0 0 0 20 8.069" />
                   <path d="M18.352 3.352a1.205 1.205 0 0 0-1.704 0l-5.296 5.296a1.205 1.205 0 0 0 0 1.704l2.296 2.296a1.205 1.205 0 0 0 1.704 0l5.296-5.296a1.205 1.205 0 0 0 0-1.704z" />
                 </svg>
               ),
@@ -875,7 +881,7 @@ export default function MainPage() {
               ),
             },
             {
-              label: "Market Rally",
+              label: "Market Rally Race Game",
               live: true,
               onProceed: () => { window.location.href = "/race"; },
               icon: (
@@ -886,7 +892,7 @@ export default function MainPage() {
               ),
             },
             {
-              label: "Intercessions",
+              label: "Interventions",
               live: false,
               icon: (
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

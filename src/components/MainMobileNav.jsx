@@ -22,6 +22,9 @@ export default function MainMobileNav({
   onBuyClick,
   onSayHi,
   businesses = [],
+  variant = "default", // "home" = root page, "default" = main page
+  onToggle80sMode,
+  is80sMode = false,
 }) {
   const [sayHiPulse, setSayHiPulse] = useState(false);
   const [showPortfolio, setShowPortfolio] = useState(false);
@@ -537,18 +540,29 @@ export default function MainMobileNav({
       <div className="mn-dock">
         <div className="mn-bar">
 
-          {/* 1 — Buy */}
-          <button className="mn-item" onClick={onBuyClick}>
-            <div className="mn-icon">
-              <svg className="mn-buy-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="1" x2="12" y2="23" />
-                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-              </svg>
-            </div>
-            <span className="mn-label">BUY</span>
-          </button>
+          {/* 1 — Buy or 80s Mode (depending on variant) */}
+          {variant === "home" ? (
+            <button className="mn-item" onClick={onToggle80sMode}>
+              <div className="mn-icon">
+                <span style={{ fontSize: 18, filter: is80sMode ? "drop-shadow(0 0 6px #ff00ff)" : "none" }}>
+                  {is80sMode ? "🌆" : "🕶️"}
+                </span>
+              </div>
+              <span className="mn-label" style={is80sMode ? { color: "#ff00ff" } : {}}>80s</span>
+            </button>
+          ) : (
+            <button className="mn-item" onClick={onBuyClick}>
+              <div className="mn-icon">
+                <svg className="mn-buy-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="1" x2="12" y2="23" />
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                </svg>
+              </div>
+              <span className="mn-label">BUY</span>
+            </button>
+          )}
 
-          {/* 2 — Character */}
+          {/* 2 — Character / Team */}
           <button className="mn-item" onClick={() => { setShowCharPicker(true); setShowPortfolio(false); setShowChat(false); }}>
             <div className="mn-icon">
               {current.image ? (
@@ -560,14 +574,24 @@ export default function MainMobileNav({
             <span className="mn-label">TEAM</span>
           </button>
 
-          {/* 3 — CENTER SAY HI FAB */}
+          {/* 3 — CENTER FAB (BUY on home, SAY HI on main) */}
           <div className="mn-sayhi-wrapper">
-            <button
-              className={`mn-sayhi-fab ${sayHiPulse ? "mn-pulse" : ""}`}
-              onClick={() => { setShowChat(true); setShowPortfolio(false); setShowCharPicker(false); }}
-            >
-              <span className="mn-sayhi-text">SAY HI</span>
-            </button>
+            {variant === "home" ? (
+              <button
+                className={`mn-sayhi-fab ${sayHiPulse ? "mn-pulse" : ""}`}
+                onClick={onBuyClick}
+                style={variant === "home" ? { background: "linear-gradient(135deg, #00ffc8, #00cc66)" } : {}}
+              >
+                <span className="mn-sayhi-text">BUY</span>
+              </button>
+            ) : (
+              <button
+                className={`mn-sayhi-fab ${sayHiPulse ? "mn-pulse" : ""}`}
+                onClick={() => { setShowChat(true); setShowPortfolio(false); setShowCharPicker(false); }}
+              >
+                <span className="mn-sayhi-text">SAY HI</span>
+              </button>
+            )}
           </div>
 
           {/* 4 — Game */}
