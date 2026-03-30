@@ -115,32 +115,39 @@
   pointer-events: none;
 }
 
-/* --- bottom edge vignette on each card --- */
+.mobile-carousel__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  -webkit-user-drag: none;
+  user-select: none;
+  cursor: pointer;
+}
+
+/* --- bottom edge vignette on each card (subtle) --- */
 .mobile-carousel__card::before {
   content: '';
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  height: 40%;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.6) 0%, transparent 100%);
+  height: 20%;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.3) 0%, transparent 100%);
   z-index: 1;
   pointer-events: none;
   border-radius: 0 0 16px 16px;
 }
 
-/* --- card text label --- */
+/* --- card text label (below card) --- */
 .mobile-carousel__label {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 20px 16px;
-  z-index: 2;
+  text-align: center;
+  padding: 14px 20px 0;
   opacity: 0;
   transform: translateY(6px);
   transition: opacity 0.4s ease 0.1s, transform 0.4s ease 0.1s;
-  pointer-events: none;
+  position: relative;
+  z-index: 2;
 }
 
 .mobile-carousel__label.visible {

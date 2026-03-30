@@ -3,19 +3,19 @@
 import * as THREE from 'three'
 import { useRef, useState } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
-import { Image, Environment, ScrollControls, useScroll, useTexture } from '@react-three/drei'
+import { Image, Environment, ScrollControls, useScroll, useTexture, useVideoTexture } from '@react-three/drei'
 import { easing } from 'maath'
 import './util'
 
-const cardImages = [
-  '/carousel_images/img1.jpg',
-  '/carousel_images/img2.jpg',
-  '/carousel_images/img3.jpg',
-  '/carousel_images/img4.jpg',
-  '/carousel_images/img5.jpg',
-  '/carousel_images/img6.jpg',
-  '/carousel_images/img7.jpg',
-  '/carousel_images/img8.jpg',
+const cardSlides = [
+  { type: 'image', url: '/carousel_images/img1.jpg' },
+  { type: 'image', url: '/carousel_images/img2.jpg' },
+  { type: 'image', url: '/carousel_images/img3.jpg' },
+  { type: 'image', url: '/carousel_images/img4.jpg' },
+  { type: 'image', url: '/carousel_images/img5.jpg' },
+  { type: 'video', url: '/videos/gr80_greetings.mp4' },
+  { type: 'image', url: '/carousel_images/img7.jpg' },
+  { type: 'image', url: '/carousel_images/img8.jpg' },
 ]
 
 export const App = () => (
@@ -44,14 +44,16 @@ function Rig(props) {
 }
 
 function Carousel({ radius = 1.4, count = 8 }) {
-  return Array.from({ length: count }, (_, i) => (
-    <Card
-      key={i}
-      url={cardImages[i % cardImages.length]}
-      position={[Math.sin((i / count) * Math.PI * 2) * radius, 0, Math.cos((i / count) * Math.PI * 2) * radius]}
-      rotation={[0, (i / count) * Math.PI * 2, 0]}
-    />
-  ))
+  return Array.from({ length: count }, (_, i) => {
+    const slide = cardSlides[i % cardSlides.length]
+    const position = [Math.sin((i / count) * Math.PI * 2) * radius, 0, Math.cos((i / count) * Math.PI * 2) * radius]
+    const rotation = [0, (i / count) * Math.PI * 2, 0]
+
+    if (slide.type === 'video') {
+      return <VideoCard key={i} url={slide.url} position={position} rotation={rotation} />
+    }
+    return <Card key={i} url={slide.url} position={position} rotation={rotation} />
+  })
 }
 
 function Card({ url, ...props }) {
@@ -68,6 +70,29 @@ function Card({ url, ...props }) {
     <Image ref={ref} url={url} transparent side={THREE.DoubleSide} onPointerOver={pointerOver} onPointerOut={pointerOut} {...props}>
       <bentPlaneGeometry args={[0.001, 1, 1, 20, 20]} />
     </Image>
+  )
+}
+
+function VideoCard({ url, ...props }) {
+  const ref = useRef()
+  const [hovered, hover] = useState(false)
+  const texture = useVideoTexture(url, { muted: true, loop: true, playsInline: true })
+  const pointerOver = (e) => (e.stopPropagation(), hover(true))
+  const pointerOut = () => hover(false)
+  const handleClick = () => {
+    const video = texture.image
+    if (video) {
+      video.muted = !video.muted
+    }
+  }
+  useFrame((state, delta) => {
+    easing.damp3(ref.current.scale, hovered ? 1.15 : 1, 0.1, delta)
+  })
+  return (
+    <mesh ref={ref} onPointerOver={pointerOver} onPointerOut={pointerOut} onClick={handleClick} {...props}>
+      <bentPlaneGeometry args={[0.001, 1, 1, 20, 20]} />
+      <meshBasicMaterial map={texture} side={THREE.DoubleSide} toneMapped={false} />
+    </mesh>
   )
 }
 

@@ -8,7 +8,7 @@ const defaultSlides = [
   { image: '/carousel_images/img3.jpg', title: 'Sacred Battle', desc: 'Light vs. chaos, eternal' },
   { component: TickerCard, title: 'RL80 Live', desc: 'Real-time token data' },
   { image: '/carousel_images/img5.jpg', title: 'DJ Mary', desc: 'Drop the beat, raise the spirit' },
-  { image: '/carousel_images/img6.jpg', title: 'The Shrine', desc: 'Light a candle for the chain' },
+  { video: '/videos/gr80_greetings.mp4', title: 'Saint GR80', desc: 'A holy introduction' },
   { image: '/carousel_images/img7.jpg', title: 'HODL Madonna', desc: 'Diamond hands, sacred bonds' },
   { image: '/carousel_images/img8.jpg', title: 'Illumin80', desc: 'The truth glows in the dark' },
 ]
@@ -112,18 +112,33 @@ export default function MobileCarousel({
           >
             {slide.component ? (
               <slide.component />
+            ) : slide.video ? (
+              <video
+                src={slide.video}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="mobile-carousel__video"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  e.target.muted = !e.target.muted
+                }}
+              />
             ) : (
-              <>
-                <img src={slide.image} alt={slide.title} loading={i < 3 ? 'eager' : 'lazy'} draggable={false} />
-                <div className={`mobile-carousel__label ${i === activeIndex ? 'visible' : ''}`}>
-                  <h3 className="mobile-carousel__title">{slide.title}</h3>
-                  <p className="mobile-carousel__desc">{slide.desc}</p>
-                </div>
-              </>
+              <img src={slide.image} alt={slide.title} loading={i < 3 ? 'eager' : 'lazy'} draggable={false} />
             )}
           </div>
         ))}
       </div>
+
+      {/* Title & description below card */}
+      {slides[activeIndex]?.title && (
+        <div className="mobile-carousel__label visible" key={activeIndex}>
+          <h3 className="mobile-carousel__title">{slides[activeIndex].title}</h3>
+          <p className="mobile-carousel__desc">{slides[activeIndex].desc}</p>
+        </div>
+      )}
 
       {/* Counter */}
       <div className="mobile-carousel__counter">

@@ -1,10 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import './TickerCard.css'
 
-const CONTRACT = '0x30D01555d88c76500a82754A1D53cAc082A6CB75'.toLowerCase()
-const UNISWAP_BASE_SUBGRAPH = 'https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v3-base'
-// Fallback: Uniswap's hosted gateway
-const UNISWAP_GATEWAY = 'https://gateway.thegraph.com/api/subgraphs/id/GqzP4Xaehti8KSfQMv2GDGqA8hS3gcP5F4NHVJf5w8vW'
+const PRICE_API = '/api/rl80-price'
 
 function formatPrice(n) {
   if (n == null) return '—'
@@ -66,66 +63,43 @@ export default function TickerCard() {
   const wrapRef = useRef(null)
 
   const fetchData = useCallback(async () => {
-    const query = `{
-      token(id: "${CONTRACT}") {
-        symbol
-        name
-        derivedETH
-        totalValueLockedUSD
-        volumeUSD
-        tokenDayData(first: 2, orderBy: date, orderDirection: desc) {
-          date
-          priceUSD
-          high
-          low
-          volumeUSD
+    try {
+      const res = await fetch(PRICE_API)
+      const json = await res.json()
+
+      if (json.price != null) {
+        const price = parseFloat(json.price)
+        const change24h = parseFloat(json.priceChange24h || 0)
+        const candles = json.candles || json.ohlcv || []
+
+        // Extract high/low from candle data if available
+        let high24h = price
+        let low24h = price
+        if (candles.length > 0) {
+          high24h = Math.max(...candles.map(c => parseFloat(c.high || c[2] || price)))
+          low24h = Math.min(...candles.map(c => parseFloat(c.low || c[3] || price)))
         }
-      }
-      bundle(id: "1") {
-        ethPriceUSD
-      }
-    }`
 
-    // Try multiple endpoints
-    const endpoints = [UNISWAP_BASE_SUBGRAPH, UNISWAP_GATEWAY]
-
-    for (const url of endpoints) {
-      try {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query }),
+        setData({
+          price,
+          change24h,
+          volume: 0,
+          tvl: parseFloat(json.liquidity || 0),
+          high24h,
+          low24h,
+          fdv: parseFloat(json.fdv || 0),
+          name: 'Our Lady of Perpetual Profit',
+          symbol: 'RL80',
+          candles,
         })
-        const json = await res.json()
-        const token = json.data?.token
-        const ethPrice = parseFloat(json.data?.bundle?.ethPriceUSD || 0)
-
-        if (token) {
-          const price = parseFloat(token.derivedETH) * ethPrice
-          const today = token.tokenDayData?.[0]
-          const yesterday = token.tokenDayData?.[1]
-          const prevPrice = yesterday ? parseFloat(yesterday.priceUSD) : price
-          const change24h = prevPrice > 0 ? ((price - prevPrice) / prevPrice) * 100 : 0
-
-          setData({
-            price,
-            change24h,
-            volume: parseFloat(today?.volumeUSD || token.volumeUSD || 0),
-            tvl: parseFloat(token.totalValueLockedUSD || 0),
-            high24h: parseFloat(today?.high || price),
-            low24h: parseFloat(today?.low || price),
-            name: token.name || 'RL80',
-            symbol: token.symbol || 'RL80',
-          })
-          setError(false)
-          return
-        }
-      } catch {
-        // try next endpoint
+        setError(false)
+        return
       }
+    } catch {
+      // API unavailable
     }
 
-    // If all endpoints fail, show fallback with on-chain price from screenshot
+    // Fallback with last known price
     setData({
       price: 0.0000000321,
       change24h: 0.08,
