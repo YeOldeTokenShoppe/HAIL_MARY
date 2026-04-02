@@ -1,0 +1,598 @@
+/* ─── Scene ─────────────────────────────────────────────────────────── */
+
+.scene {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  background: hsl(230, 8%, 12%);
+  background-image:
+    radial-gradient(ellipse at 50% 35%, hsl(230, 14%, 20%) 0%, transparent 65%),
+    radial-gradient(ellipse at 75% 75%, hsl(280, 10%, 16%) 0%, transparent 45%);
+  overflow: hidden;
+  user-select: none;
+}
+
+.hint {
+  margin-top: 2.5rem;
+  font-family: "SF Mono", "Fira Code", "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: hsl(220, 10%, 42%);
+}
+
+/* ─── Card shell ────────────────────────────────────────────────────── */
+
+.card {
+  --card-aspect: 0.718;
+  --card-radius: 4.55% / 3.5%;
+
+  --sp1: hsl(2, 100%, 65%);
+  --sp2: hsl(38, 100%, 60%);
+  --sp3: hsl(90, 100%, 55%);
+  --sp4: hsl(170, 100%, 60%);
+  --sp5: hsl(230, 100%, 68%);
+  --sp6: hsl(295, 100%, 65%);
+
+  transform: translate3d(0, 0, 0.01px);
+  perspective: 600px;
+  will-change: transform;
+}
+
+.translater {
+  display: grid;
+  perspective: 600px;
+  transform-origin: center;
+  transform-style: preserve-3d;
+}
+
+.rotator {
+  display: grid;
+  aspect-ratio: var(--card-aspect);
+  width: 380px;
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  appearance: none;
+  border-radius: var(--card-radius);
+  transform-style: preserve-3d;
+  transform: rotateY(var(--rotate-x)) rotateX(var(--rotate-y));
+  transition: box-shadow 0.4s ease;
+  outline: 1px solid transparent;
+  box-shadow:
+    0 0 3px -1px transparent,
+    0 0 2px 1px transparent,
+    0px 10px 20px -5px rgba(0, 0, 0, 0.6),
+    0 2px 15px -5px rgba(0, 0, 0, 0.4);
+}
+
+.rotator:hover {
+  box-shadow:
+    0 0 5px 0px white,
+    0 0 5px 2px var(--card-edge),
+    0 0 18px 4px var(--card-glow),
+    0px 10px 30px -5px black,
+    0 0 60px -20px var(--card-glow),
+    0 0 80px -30px var(--card-glow);
+}
+
+/* holo layers stack in the same grid cell */
+.rotator > .shine,
+.rotator > .rainbowFlood,
+.rotator > .glare {
+  grid-area: 1 / 1;
+  width: 100%;
+  aspect-ratio: var(--card-aspect);
+  border-radius: var(--card-radius);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* ─── Mask ──────────────────────────────────────────────────────────── */
+
+.masked .shine,
+.masked .shine::before,
+.masked .shine::after,
+.masked .rainbowFlood {
+  -webkit-mask-image: var(--mask);
+  mask-image: var(--mask);
+  -webkit-mask-size: cover;
+  mask-size: cover;
+  -webkit-mask-position: center center;
+  mask-position: center center;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+
+   CARD FACE — Pokemon TCG layout
+   All text/labels are placeholder — replace content in page.tsx
+
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.cardFace {
+  grid-area: 1 / 1;
+  width: 100%;
+  aspect-ratio: var(--card-aspect);
+  border-radius: var(--card-radius);
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+
+  display: flex;
+  flex-direction: column;
+  background: var(--card-frame, hsl(47, 85%, 65%));
+  padding: 3.5% 4.5% 2.5%;
+  box-sizing: border-box;
+
+  font-family: "Gill Sans", "Gill Sans MT", Calibri, "Trebuchet MS", sans-serif;
+  color: hsl(0, 0%, 10%);
+}
+
+/* ── Top bar: BASIC | Name | HP 160 type ──────────────────────────── */
+
+.topBar {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35em;
+  padding: 0 0 0.3em;
+  min-height: 1.6em;
+}
+
+.stage {
+  font-size: 0.55rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: hsl(0, 0%, 92%);
+  color: hsl(0, 0%, 20%);
+  padding: 0.15em 0.45em;
+  border-radius: 2px;
+  line-height: 1;
+  align-self: center;
+}
+
+.cardName {
+  flex: 1;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: hsl(0, 0%, 8%);
+}
+
+.hp {
+  display: flex;
+  align-items: baseline;
+  gap: 0.15em;
+  white-space: nowrap;
+}
+
+.hpLabel {
+  font-size: 0.5rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: hsl(0, 0%, 35%);
+}
+
+.hpValue {
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.typeIcon {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+/* ── Art window ───────────────────────────────────────────────────── */
+
+.artWindow {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1.55;
+  border-radius: 3px;
+  overflow: hidden;
+  border: 2.5px solid hsl(47, 50%, 50%);
+  background: hsl(220, 15%, 15%);
+  flex-shrink: 0;
+}
+
+.artImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ── Rule box ─────────────────────────────────────────────────────── */
+
+.ruleBox {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4em;
+  padding: 0.3em 0.2em;
+  border-bottom: 1px solid hsl(47, 40%, 55%);
+}
+
+.ruleLabel {
+  font-size: 0.42rem;
+  font-weight: 700;
+  font-style: italic;
+  color: hsl(0, 70%, 45%);
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+.ruleText {
+  font-size: 0.42rem;
+  line-height: 1.3;
+  margin: 0;
+  color: hsl(0, 0%, 20%);
+}
+
+/* ── Ability section ──────────────────────────────────────────────── */
+
+.abilitySection {
+  padding: 0.35em 0.2em 0.25em;
+}
+
+.abilityHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  margin-bottom: 0.15em;
+}
+
+.abilityBadge {
+  font-size: 0.5rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: white;
+  background: linear-gradient(135deg, hsl(350, 80%, 50%), hsl(20, 90%, 50%));
+  padding: 0.1em 0.5em;
+  border-radius: 2px;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+}
+
+.abilityName {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: hsl(0, 0%, 8%);
+}
+
+.abilityText {
+  font-size: 0.48rem;
+  line-height: 1.4;
+  margin: 0;
+  color: hsl(0, 0%, 15%);
+}
+
+/* ── Attack section ───────────────────────────────────────────────── */
+
+.attackSection {
+  padding: 0.3em 0.2em 0.2em;
+  border-top: 1px solid hsl(47, 40%, 55%);
+  flex: 1;
+}
+
+.attackHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  margin-bottom: 0.15em;
+}
+
+.energyCost {
+  display: flex;
+  gap: 0.12em;
+}
+
+.energyOrb {
+  width: 0.65em;
+  height: 0.65em;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, hsl(5, 80%, 60%), hsl(5, 70%, 35%));
+  border: 1px solid hsl(0, 0%, 30%);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.attackName {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: hsl(0, 0%, 8%);
+  flex: 1;
+}
+
+.attackDamage {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: hsl(0, 0%, 8%);
+}
+
+.attackText {
+  font-size: 0.48rem;
+  line-height: 1.4;
+  margin: 0;
+  color: hsl(0, 0%, 15%);
+}
+
+/* ── Stats bar: weakness / resistance / retreat ───────────────────── */
+
+.statsBar {
+  display: flex;
+  border-top: 1px solid hsl(47, 40%, 55%);
+  border-bottom: 1px solid hsl(47, 40%, 55%);
+  padding: 0.25em 0;
+  margin-top: auto;
+}
+
+.statBlock {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.05em;
+}
+
+.statBlock + .statBlock {
+  border-left: 1px solid hsl(47, 40%, 55%);
+}
+
+.statLabel {
+  font-size: 0.35rem;
+  text-transform: lowercase;
+  color: hsl(0, 0%, 35%);
+  font-weight: 600;
+}
+
+.statValue {
+  font-size: 0.5rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.15em;
+  color: hsl(0, 0%, 15%);
+}
+
+/* ── Footer: illustrator / set info / flavor text ─────────────────── */
+
+.footer {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5em;
+  padding-top: 0.2em;
+}
+
+.footerLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05em;
+  flex-shrink: 0;
+}
+
+.illustrator {
+  font-size: 0.33rem;
+  color: hsl(0, 0%, 30%);
+}
+
+.setInfo {
+  font-size: 0.38rem;
+  font-weight: 700;
+  color: hsl(0, 0%, 20%);
+}
+
+.flavorText {
+  font-size: 0.33rem;
+  line-height: 1.3;
+  margin: 0;
+  color: hsl(0, 0%, 30%);
+  font-style: italic;
+  text-align: right;
+  flex: 1;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+
+   HOLO LAYERS — same as before, stacked on top of cardFace
+
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.shine,
+.rainbowFlood,
+.glare {
+  grid-area: 1 / 1;
+  width: 100%;
+  aspect-ratio: var(--card-aspect);
+  border-radius: var(--card-radius);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.shine {
+  --space: 5%;
+  --angle: 133deg;
+  --barwidth: 1.4%;
+
+  display: grid;
+  transform: translateZ(1px);
+  z-index: 3;
+  opacity: var(--card-opacity);
+  mix-blend-mode: color-dodge;
+
+  background-image:
+    radial-gradient(
+      farthest-corner ellipse at calc(var(--pointer-x) * 0.5 + 25%) calc(var(--pointer-y) * 0.5 + 25%),
+      hsl(0, 0%, 100%) 10%,
+      var(--card-glow) 80%,
+      transparent 140%
+    ),
+    repeating-linear-gradient(
+      0deg,
+      var(--sp1) calc(var(--space) * 1),
+      var(--sp2) calc(var(--space) * 2),
+      var(--sp3) calc(var(--space) * 3),
+      var(--sp4) calc(var(--space) * 4),
+      var(--sp5) calc(var(--space) * 5),
+      var(--sp6) calc(var(--space) * 6),
+      var(--sp1) calc(var(--space) * 7)
+    ),
+    repeating-linear-gradient(
+      var(--angle),
+      #0e152e 0%,
+      hsl(180, 15%, 62%) 3.8%,
+      hsl(180, 35%, 72%) 4.5%,
+      hsl(180, 15%, 62%) 5.2%,
+      #0e152e 10%,
+      #0e152e 12%
+    ),
+    repeating-linear-gradient(
+      45deg,
+      hsl(0, 0%, 8%) 0%,
+      hsl(0, 0%, 8%) var(--barwidth),
+      hsl(0, 0%, 22%) calc(var(--barwidth) + 0.01%),
+      hsl(0, 0%, 22%) calc(var(--barwidth) * 2),
+      hsl(0, 0%, 40%) calc(var(--barwidth) * 2 + 0.01%),
+      hsl(0, 0%, 40%) calc(var(--barwidth) * 3),
+      hsl(0, 0%, 55%) calc(var(--barwidth) * 3 + 0.01%),
+      hsl(0, 0%, 55%) calc(var(--barwidth) * 4),
+      hsl(0, 0%, 40%) calc(var(--barwidth) * 4 + 0.01%),
+      hsl(0, 0%, 40%) calc(var(--barwidth) * 5),
+      hsl(0, 0%, 22%) calc(var(--barwidth) * 5 + 0.01%),
+      hsl(0, 0%, 22%) calc(var(--barwidth) * 6),
+      hsl(0, 0%, 8%) calc(var(--barwidth) * 6 + 0.01%),
+      hsl(0, 0%, 8%) calc(var(--barwidth) * 7)
+    );
+
+  background-size: cover, 200% 700%, 300% 100%, 220% 220%;
+  background-position:
+    center,
+    0% var(--background-y),
+    calc(var(--background-x) + var(--background-y) * 0.2) var(--background-y),
+    calc(((var(--background-x)) - 50%) * 1.5 + 50%) calc(((var(--background-y)) - 50%) * 1.5 + 50%);
+
+  background-blend-mode: screen, hue, hard-light, color-dodge;
+  filter: brightness(0.65) contrast(3) saturate(3);
+}
+
+.shine::after {
+  content: "";
+  grid-area: 1 / 1;
+  border-radius: var(--card-radius);
+
+  background-image:
+    repeating-linear-gradient(
+      55deg,
+      hsl(320, 100%, 75%) calc(var(--space) * 1),
+      hsl(200, 100%, 70%) calc(var(--space) * 2),
+      hsl(50, 100%, 72%) calc(var(--space) * 3),
+      hsl(140, 100%, 68%) calc(var(--space) * 4),
+      hsl(280, 100%, 75%) calc(var(--space) * 5),
+      hsl(180, 100%, 70%) calc(var(--space) * 6),
+      hsl(320, 100%, 75%) calc(var(--space) * 7)
+    ),
+    repeating-linear-gradient(
+      0deg,
+      var(--sp5) calc(var(--space) * 1),
+      var(--sp6) calc(var(--space) * 2),
+      var(--sp1) calc(var(--space) * 3),
+      var(--sp2) calc(var(--space) * 4),
+      var(--sp3) calc(var(--space) * 5),
+      var(--sp4) calc(var(--space) * 6),
+      var(--sp5) calc(var(--space) * 7)
+    ),
+    repeating-linear-gradient(
+      var(--angle),
+      #0e152e 0%,
+      hsl(180, 10%, 60%) 3.8%,
+      hsl(180, 29%, 66%) 4.5%,
+      hsl(180, 10%, 60%) 5.2%,
+      #0e152e 10%,
+      #0e152e 12%
+    );
+
+  background-size: 400% 100%, 200% 400%, 195% 100%;
+  background-position:
+    calc(((var(--background-x)) - 50%) * -2.5 + 50%) calc(((var(--background-y)) - 50%) * -2.5 + 50%),
+    0% var(--background-y),
+    calc(var(--background-x) * -1) calc(var(--background-y) * -1);
+
+  background-blend-mode: hard-light, hue, hard-light;
+  filter: brightness(0.8) contrast(3.5) saturate(4);
+  mix-blend-mode: color-dodge;
+}
+
+.shine::before {
+  content: "";
+  z-index: 2;
+  grid-area: 1 / 1;
+  border-radius: var(--card-radius);
+
+  background-image:
+    var(--glitter),
+    radial-gradient(
+      farthest-corner ellipse at calc(var(--pointer-x) * 0.5 + 25%) calc(var(--pointer-y) * 0.5 + 25%),
+      hsla(0, 0%, 80%, 0.9) 5%,
+      hsla(0, 0%, 40%, 0.7) 20%,
+      hsla(0, 0%, 10%, 0.4) 60%
+    );
+
+  background-position: center;
+  background-size: 12% 12%, 350% 350%;
+  background-blend-mode: color-dodge;
+  mix-blend-mode: overlay;
+  filter: brightness(0.8) contrast(2.5) saturate(0.6);
+}
+
+.rainbowFlood {
+  transform: translateZ(1.1px);
+  z-index: 4;
+  opacity: var(--card-opacity);
+
+  background-image:
+    repeating-linear-gradient(
+      -30deg,
+      hsl(300, 100%, 65%) 0%,
+      hsl(360, 100%, 65%) 8%,
+      hsl(40, 100%, 60%) 16%,
+      hsl(100, 100%, 55%) 24%,
+      hsl(180, 100%, 55%) 33%,
+      hsl(220, 100%, 65%) 42%,
+      hsl(280, 100%, 65%) 50%,
+      hsl(300, 100%, 65%) 58%
+    ),
+    radial-gradient(
+      farthest-corner circle at var(--pointer-x) var(--pointer-y),
+      hsla(0, 0%, 100%, 0.5) 0%,
+      hsla(0, 0%, 50%, 0.2) 50%,
+      transparent 100%
+    );
+
+  background-size: 300% 300%, cover;
+  background-position:
+    calc(((var(--background-x)) - 50%) * 3 + 50%) calc(((var(--background-y)) - 50%) * 3 + 50%),
+    center;
+
+  background-blend-mode: screen;
+  mix-blend-mode: color-dodge;
+  filter: brightness(0.35) contrast(2.5) saturate(5);
+}
+
+.glare {
+  transform: translateZ(1.41px);
+  z-index: 5;
+  opacity: var(--card-opacity);
+  mix-blend-mode: hard-light;
+
+  background-image: radial-gradient(
+    farthest-corner circle at var(--pointer-x) var(--pointer-y),
+    hsla(0, 0%, 100%, 0.6) 0%,
+    hsla(210, 3%, 54%, 0.33) 40%,
+    hsla(0, 0%, 15%, 0.9) 130%
+  );
+
+  filter: brightness(1.1) contrast(1.75);
+}

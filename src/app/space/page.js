@@ -33,7 +33,7 @@ const CREW = [
   { id: "comms", name: "Virgil", role: "Comms Officer", image: "/cameo_kitty.webp" },
 ];
 
-export default function HomePage() {
+export default function SpacePage() {
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [showComms, setShowComms] = useState(false);
   const [showMission, setShowMission] = useState(false);

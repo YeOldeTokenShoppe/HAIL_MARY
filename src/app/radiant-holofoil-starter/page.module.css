@@ -1,0 +1,236 @@
+/* ─── Scene ─────────────────────────────────────────────────────────── */
+
+.scene {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  background: hsl(220, 7%, 14%);
+  background-image:
+    radial-gradient(ellipse at 50% 40%, hsl(220, 12%, 22%) 0%, transparent 70%),
+    radial-gradient(ellipse at 80% 80%, hsl(260, 8%, 18%) 0%, transparent 50%);
+  overflow: hidden;
+  user-select: none;
+}
+
+.hint {
+  margin-top: 2.5rem;
+  font-family: "SF Mono", "Fira Code", "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: hsl(220, 10%, 42%);
+}
+
+/* ─── Card shell ────────────────────────────────────────────────────── */
+
+.card {
+  --card-aspect: 0.718;
+  --card-radius: 4.55% / 3.5%;
+  transform: translate3d(0, 0, 0.01px);
+  perspective: 600px;
+  will-change: transform;
+}
+
+.translater {
+  display: grid;
+  perspective: 600px;
+  transform-origin: center;
+  transform-style: preserve-3d;
+}
+
+.rotator {
+  display: grid;
+  aspect-ratio: var(--card-aspect);
+  width: 320px;
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  appearance: none;
+  border-radius: var(--card-radius);
+  transform-style: preserve-3d;
+  transform: rotateY(var(--rotate-x)) rotateX(var(--rotate-y));
+  transition: box-shadow 0.4s ease;
+  box-shadow:
+    0 0 3px -1px transparent,
+    0 0 2px 1px transparent,
+    0 0 5px 0px transparent,
+    0px 10px 20px -5px rgba(0, 0, 0, 0.6),
+    0 2px 15px -5px rgba(0, 0, 0, 0.4),
+    0 0 20px 0px transparent;
+  outline: 1px solid transparent;
+}
+
+.rotator:hover {
+  box-shadow:
+    0 0 3px -1px white,
+    0 0 3px 1px var(--card-edge),
+    0 0 12px 2px var(--card-glow),
+    0px 10px 20px -5px black,
+    0 0 40px -30px var(--card-glow),
+    0 0 50px -20px var(--card-glow);
+}
+
+/* all direct children stack in the same grid cell */
+.rotator > * {
+  grid-area: 1 / 1;
+  width: 100%;
+  aspect-ratio: var(--card-aspect);
+  border-radius: var(--card-radius);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* ─── Card image ────────────────────────────────────────────────────── */
+
+.cardImage {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  transform: translate3d(0, 0, 0.01px);
+  image-rendering: optimizeQuality;
+}
+
+/* ─── Shine (crosshatch + radial) ───────────────────────────────────── */
+
+.shine {
+  --barwidth: 1.2%;
+  --space: 200px;
+
+  display: grid;
+  transform: translateZ(1px);
+  z-index: 3;
+  opacity: var(--card-opacity);
+  mix-blend-mode: color-dodge;
+
+  background-image:
+    radial-gradient(
+      farthest-corner ellipse at calc((var(--pointer-x)) * 0.5 + 25%) calc((var(--pointer-y)) * 0.5 + 25%),
+      hsl(0, 0%, 95%) 20%,
+      var(--card-glow) 130%
+    ),
+    repeating-linear-gradient(
+      45deg,
+      hsl(0, 0%, 10%) 0%,
+      hsl(0, 0%, 10%) 1%,
+      hsl(0, 0%, 10%) var(--barwidth),
+      hsl(0, 0%, 20%) calc(var(--barwidth) + 0.01%),
+      hsl(0, 0%, 20%) calc(var(--barwidth) * 2),
+      hsl(0, 0%, 35%) calc(var(--barwidth) * 2 + 0.01%),
+      hsl(0, 0%, 35%) calc(var(--barwidth) * 3),
+      hsl(0, 0%, 42.5%) calc(var(--barwidth) * 3 + 0.01%),
+      hsl(0, 0%, 42.5%) calc(var(--barwidth) * 4),
+      hsl(0, 0%, 50%) calc(var(--barwidth) * 4 + 0.01%),
+      hsl(0, 0%, 50%) calc(var(--barwidth) * 5),
+      hsl(0, 0%, 42.5%) calc(var(--barwidth) * 5 + 0.01%),
+      hsl(0, 0%, 42.5%) calc(var(--barwidth) * 6),
+      hsl(0, 0%, 35%) calc(var(--barwidth) * 6 + 0.01%),
+      hsl(0, 0%, 35%) calc(var(--barwidth) * 7),
+      hsl(0, 0%, 20%) calc(var(--barwidth) * 7 + 0.01%),
+      hsl(0, 0%, 20%) calc(var(--barwidth) * 8),
+      hsl(0, 0%, 10%) calc(var(--barwidth) * 8 + 0.01%),
+      hsl(0, 0%, 10%) calc(var(--barwidth) * 9),
+      hsl(0, 0%, 0%) calc(var(--barwidth) * 9 + 0.01%),
+      hsl(0, 0%, 0%) calc(var(--barwidth) * 10)
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      hsl(0, 0%, 10%) 0%,
+      hsl(0, 0%, 10%) 1%,
+      hsl(0, 0%, 10%) var(--barwidth),
+      hsl(0, 0%, 20%) calc(var(--barwidth) + 0.01%),
+      hsl(0, 0%, 20%) calc(var(--barwidth) * 2),
+      hsl(0, 0%, 35%) calc(var(--barwidth) * 2 + 0.01%),
+      hsl(0, 0%, 35%) calc(var(--barwidth) * 3),
+      hsl(0, 0%, 42.5%) calc(var(--barwidth) * 3 + 0.01%),
+      hsl(0, 0%, 42.5%) calc(var(--barwidth) * 4),
+      hsl(0, 0%, 50%) calc(var(--barwidth) * 4 + 0.01%),
+      hsl(0, 0%, 50%) calc(var(--barwidth) * 5),
+      hsl(0, 0%, 42.5%) calc(var(--barwidth) * 5 + 0.01%),
+      hsl(0, 0%, 42.5%) calc(var(--barwidth) * 6),
+      hsl(0, 0%, 35%) calc(var(--barwidth) * 6 + 0.01%),
+      hsl(0, 0%, 35%) calc(var(--barwidth) * 7),
+      hsl(0, 0%, 20%) calc(var(--barwidth) * 7 + 0.01%),
+      hsl(0, 0%, 20%) calc(var(--barwidth) * 8),
+      hsl(0, 0%, 10%) calc(var(--barwidth) * 8 + 0.01%),
+      hsl(0, 0%, 10%) calc(var(--barwidth) * 9),
+      hsl(0, 0%, 0%) calc(var(--barwidth) * 9 + 0.01%),
+      hsl(0, 0%, 0%) calc(var(--barwidth) * 10)
+    );
+
+  background-size: cover, 210% 210%, 210% 210%;
+  background-position:
+    center,
+    calc(((var(--background-x)) - 50%) * 1.5 + 50%) calc(((var(--background-y)) - 50%) * 1.5 + 50%),
+    calc(((var(--background-x)) - 50%) * 1.5 + 50%) calc(((var(--background-y)) - 50%) * 1.5 + 50%);
+
+  background-blend-mode: exclusion, darken, color-dodge;
+  filter: brightness(0.5) contrast(2) saturate(1.75);
+}
+
+/* rainbow foil layer */
+.shine::after {
+  content: "";
+  grid-area: 1 / 1;
+  border-radius: var(--card-radius);
+
+  background-image: repeating-linear-gradient(
+    55deg,
+    hsl(3, 95%, 85%) calc(var(--space) * 1),
+    hsl(207, 100%, 84%) calc(var(--space) * 2),
+    hsl(29, 100%, 85%) calc(var(--space) * 3),
+    hsl(160, 100%, 86%) calc(var(--space) * 4),
+    hsl(309, 94%, 87%) calc(var(--space) * 5),
+    hsl(188, 95%, 85%) calc(var(--space) * 6),
+    hsl(3, 95%, 85%) calc(var(--space) * 7)
+  );
+
+  background-size: 400% 100%;
+  background-position: calc(((var(--background-x)) - 50%) * -2.5 + 50%) calc(((var(--background-y)) - 50%) * -2.5 + 50%);
+
+  filter: brightness(0.6) contrast(3) saturate(2);
+  mix-blend-mode: color-dodge;
+  background-blend-mode: hard-light;
+}
+
+/* glitter / sparkle layer */
+.shine::before {
+  content: "";
+  z-index: 2;
+  grid-area: 1 / 1;
+  border-radius: var(--card-radius);
+
+  background-image:
+    var(--glitter),
+    radial-gradient(
+      farthest-corner ellipse at calc((var(--pointer-x)) * 0.5 + 25%) calc((var(--pointer-y)) * 0.5 + 25%),
+      hsla(0, 0%, 58%, 0.8) 10%,
+      hsla(0, 0%, 20%, 0.9) 20%,
+      hsla(0, 0%, 20%, 0.5) 50%
+    );
+
+  background-position: center;
+  background-size: 15% 15%, 350% 350%;
+  background-blend-mode: color-dodge;
+  mix-blend-mode: overlay;
+  filter: brightness(0.66) contrast(2) saturate(0.5);
+}
+
+/* ─── Glare (cursor-tracking highlight) ─────────────────────────────── */
+
+.glare {
+  transform: translateZ(1.41px);
+  opacity: var(--card-opacity);
+  mix-blend-mode: hard-light;
+
+  background-image: radial-gradient(
+    farthest-corner circle at var(--pointer-x) var(--pointer-y),
+    hsla(0, 0%, 100%, 0.33) 0%,
+    hsl(0, 0%, 25%) 110%
+  );
+
+  filter: brightness(1) contrast(1.5);
+}

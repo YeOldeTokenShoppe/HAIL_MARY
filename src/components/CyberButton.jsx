@@ -57,6 +57,9 @@ function CyberBtn({ label, shortcut, shortcutIcon, icon, onClick, className = ""
  *  - onProceed:    called when user clicks Proceed
  *  - onCancel:     called when user clicks Cancel
  *  - accent / shadow: CSS color overrides
+ *  - externalOpen:    if provided, controls modal visibility externally
+ *  - onExternalClose: called when modal closes (use with externalOpen)
+ *  - hideTrigger:     if true, no trigger button is rendered (use with externalOpen)
  */
 export default function CyberButton({
   label = "Upgrade",
@@ -69,8 +72,16 @@ export default function CyberButton({
   accent,
   shadow,
   style = {},
+  externalOpen,
+  onExternalClose,
+  hideTrigger = false,
 }) {
-  const [open, setOpen] = useState(false);
+  const isControlled = externalOpen !== undefined;
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = isControlled ? externalOpen : internalOpen;
+  const setOpen = isControlled
+    ? (v) => { if (!v && onExternalClose) onExternalClose(); }
+    : setInternalOpen;
   const [closing, setClosing] = useState(false);
   const [closingAction, setClosingAction] = useState(null);
   const [glitchActive, setGlitchActive] = useState(false);
@@ -111,7 +122,7 @@ export default function CyberButton({
   }, []);
 
   const handleOpen = () => {
-    setOpen(true);
+    if (!isControlled) setOpen(true);
     setClosing(false);
     setClosingAction(null);
     setTimeout(() => playSound("slide"), 200);
@@ -123,7 +134,8 @@ export default function CyberButton({
     playSound(action === "Proceed" ? "accept" : "reject");
     if (glitchTimer.current) clearTimeout(glitchTimer.current);
     setTimeout(() => {
-      setOpen(false);
+      if (!isControlled) setInternalOpen(false);
+      if (onExternalClose) onExternalClose();
       setClosing(false);
       setClosingAction(null);
       if (action === "Proceed" && onProceed) onProceed();
@@ -139,6 +151,15 @@ export default function CyberButton({
       if (glitchTimer.current) clearTimeout(glitchTimer.current);
     };
   }, [open, closing, kickOffGlitch]);
+
+  /* Play slide sound when externally opened */
+  useEffect(() => {
+    if (isControlled && externalOpen && !closing) {
+      setClosing(false);
+      setClosingAction(null);
+      setTimeout(() => playSound("slide"), 200);
+    }
+  }, [externalOpen]);
 
   /* Keyboard: Escape → cancel, Enter → proceed */
   useEffect(() => {
@@ -164,8 +185,8 @@ export default function CyberButton({
 
   return (
     <div className="cyber-popover-root" style={{ ...cssVars, ...style }}>
-      {/* Trigger button */}
-      <CyberBtn label={label} shortcut={shortcut} icon={icon} onClick={handleOpen} />
+      {/* Trigger button (hidden when controlled externally) */}
+      {!hideTrigger && <CyberBtn label={label} shortcut={shortcut} icon={icon} onClick={handleOpen} />}
 
       {/* Modal overlay — portaled to body so parent positioning can't constrain it */}
       {open && createPortal(
