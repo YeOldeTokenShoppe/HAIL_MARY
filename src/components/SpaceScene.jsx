@@ -25,6 +25,12 @@ const SITEPAL_CHARACTERS = {
     hash: "I648K1uFf0emrXlmak9YhnqEztpPhJl2",
     placeholder: "/cameo_GR80.webp",
   },
+  window3: {
+    containerId: "space-sitepal-iframe-w3",
+    sceneId: 2774779,
+    hash: "yu12qQuwKxZnb6wl8AoA0lB7YpF6sPD9",
+    placeholder: "",
+  },
   window4: {
     containerId: "space-sitepal-iframe-w4",
     sceneId: 2774434,
@@ -62,13 +68,42 @@ function SitePalIframe({ containerId, sceneId, hash, delay = 0 }) {
     return orig.call(this, type, attrs);
   };
 })();
+
+// Suppress all audio from the start — intercept AudioContext so nothing plays
+(function(){
+  var OrigAC = window.AudioContext || window.webkitAudioContext;
+  if(OrigAC){
+    var PatchedAC = function(){
+      var ctx = new OrigAC();
+      ctx.suspend();
+      return ctx;
+    };
+    PatchedAC.prototype = OrigAC.prototype;
+    window.AudioContext = PatchedAC;
+    window.webkitAudioContext = PatchedAC;
+  }
+  // Mute any audio/video elements as soon as they're created
+  var origAppend = Element.prototype.appendChild;
+  Element.prototype.appendChild = function(child){
+    var result = origAppend.call(this, child);
+    if(child.tagName === 'AUDIO' || child.tagName === 'VIDEO'){
+      child.muted = true;
+      child.volume = 0;
+    }
+    return result;
+  };
+})();
 </script>
 </head><body>
 <div id="sitepal-container"></div>
 <script type="text/javascript" src="https://vhss-d.oddcast.com/vhost_embed_functions_v4.php?acc=${SITEPAL_ACCOUNT}&js=0"></script>
 <script type="text/javascript">
   AC_VHost_Embed(${SITEPAL_ACCOUNT},600,800,"",1,0,${sceneId},0,1,0,"${hash}",0,0);
-  function vh_sceneLoaded(){ stopSpeech(); setTimeout(function(){ stopSpeech(); }, 500); }
+  function vh_sceneLoaded(){
+    try{ stopSpeech(); }catch(e){}
+    try{ setPlayerVolume(0); }catch(e){}
+    setTimeout(function(){ try{ stopSpeech(); }catch(e){} }, 500);
+  }
 </script>
 </body></html>`;
 
@@ -138,23 +173,34 @@ function useSitePalTexture(containerId, placeholderSrc) {
   const [isLive, setIsLive] = useState(false);
   const CHROMA_TOLERANCE = 60;
 
-  // Create emissive material with static placeholder
+  // Create emissive material with glow gradient (no placeholder image)
   const material = React.useMemo(() => {
-    const loader = new THREE.TextureLoader();
-    const placeholderTex = loader.load(placeholderSrc);
-    placeholderTex.flipY = false;
-    placeholderTex.colorSpace = THREE.SRGBColorSpace;
+    const c = document.createElement("canvas");
+    c.width = 512; c.height = 512;
+    const ctx = c.getContext("2d");
+    const cx = c.width / 2;
+    const cy = c.height / 2;
+    const grad = ctx.createRadialGradient(cx, cy * 0.9, 0, cx, cy, cx * 1.4);
+    grad.addColorStop(0, "rgba(160, 200, 255, 0.9)");
+    grad.addColorStop(0.25, "rgba(100, 160, 255, 0.7)");
+    grad.addColorStop(0.55, "rgba(60, 100, 200, 0.5)");
+    grad.addColorStop(0.8, "rgba(30, 50, 120, 0.4)");
+    grad.addColorStop(1, "rgba(15, 20, 60, 0.6)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, c.width, c.height);
+    const glowTex = new THREE.CanvasTexture(c);
+    glowTex.flipY = false;
+    glowTex.colorSpace = THREE.SRGBColorSpace;
 
     const mat = new THREE.MeshStandardMaterial({
-      map: placeholderTex,
-      emissiveMap: placeholderTex,
+      map: glowTex,
+      emissiveMap: glowTex,
       emissive: new THREE.Color(0.8, 0.6, 1.0),
       emissiveIntensity: 1.5,
-      transparent: true,
     });
     materialRef.current = mat;
     return mat;
-  }, [placeholderSrc]);
+  }, []);
 
   // Poll for iframe and its SitePal canvas, then create live texture
   useEffect(() => {
@@ -212,7 +258,17 @@ function useSitePalTexture(containerId, placeholderSrc) {
     const src = sitePalSourceRef.current;
     const canvas = cropCanvasRef.current;
     try {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Draw a radial glow backdrop so keyed-out areas look like cockpit lighting
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
+      const grad = ctx.createRadialGradient(cx, cy * 0.9, 0, cx, cy, cx * 1.4);
+      grad.addColorStop(0, "rgba(160, 200, 255, 0.9)");   // bright white-blue center
+      grad.addColorStop(0.25, "rgba(100, 160, 255, 0.7)"); // soft blue
+      grad.addColorStop(0.55, "rgba(60, 100, 200, 0.5)");  // mid glow
+      grad.addColorStop(0.8, "rgba(30, 50, 120, 0.4)");    // gentle fade
+      grad.addColorStop(1, "rgba(15, 20, 60, 0.6)");       // soft edge
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(src, 0, 0, src.width || 600, src.height || 800, 0, 0, canvas.width, canvas.height);
 
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -225,15 +281,22 @@ function useSitePalTexture(containerId, placeholderSrc) {
       if (bgColorRef.current) {
         const [bgR, bgG, bgB] = bgColorRef.current;
         const tol = CHROMA_TOLERANCE;
+        // Replace keyed pixels with dark backdrop color instead of transparency
         for (let i = 0; i < d.length; i += 4) {
           const dr = d[i] - bgR;
           const dg = d[i + 1] - bgG;
           const db = d[i + 2] - bgB;
           const dist = Math.sqrt(dr * dr + dg * dg + db * db);
           if (dist < tol) {
-            d[i + 3] = 0;
+            d[i] = 26; d[i + 1] = 26; d[i + 2] = 46; // #1a1a2e
+            d[i + 3] = 255;
           } else if (dist < tol * 1.5) {
-            d[i + 3] = Math.round(255 * ((dist - tol) / (tol * 0.5)));
+            // Blend toward backdrop at the edges
+            const blend = (dist - tol) / (tol * 0.5);
+            d[i] = Math.round(26 + (d[i] - 26) * blend);
+            d[i + 1] = Math.round(26 + (d[i + 1] - 26) * blend);
+            d[i + 2] = Math.round(46 + (d[i + 2] - 46) * blend);
+            d[i + 3] = 255;
           }
         }
         ctx.putImageData(imageData, 0, 0);
@@ -314,24 +377,27 @@ function CameraController({ controlsRef }) {
   return null;
 }
 
-/* ── 3D Model with live SitePal textures on Window1, Window2, Window4 ── */
+/* ── 3D Model with live SitePal textures on all windows ── */
 function Model({ url }) {
   const { scene } = useGLTF(url);
   const { setZoomed, setTargetPos, setTargetLookAt } = useContext(ZoomContext);
 
   const w1 = SITEPAL_CHARACTERS.window1;
   const w2 = SITEPAL_CHARACTERS.window2;
+  const w3 = SITEPAL_CHARACTERS.window3;
   const w4 = SITEPAL_CHARACTERS.window4;
 
   const { material: window1Material, updateTexture: updateW1, isLive: w1Live } = useSitePalTexture(w1.containerId, w1.placeholder);
   const { material: window2Material, updateTexture: updateW2, isLive: w2Live } = useSitePalTexture(w2.containerId, w2.placeholder);
+  const { material: window3Material, updateTexture: updateW3, isLive: w3Live } = useSitePalTexture(w3.containerId, w3.placeholder);
   const { material: window4Material, updateTexture: updateW4, isLive: w4Live } = useSitePalTexture(w4.containerId, w4.placeholder);
 
-  const allLive = w1Live && w2Live && w4Live;
+  const allLive = w1Live && w2Live && w3Live && w4Live;
 
   useFrame(() => {
     updateW1();
     updateW2();
+    updateW3();
     updateW4();
   });
 
@@ -351,11 +417,12 @@ function Model({ url }) {
       if (!child.isMesh) return;
       if (child.name === "Window1") child.material = window1Material;
       if (child.name === "Window2") child.material = window2Material;
+      if (child.name === "Window3") child.material = window3Material;
       if (child.name === "Window4") child.material = window4Material;
     });
-  }, [scene, window1Material, window2Material, window4Material]);
+  }, [scene, window1Material, window2Material, window3Material, window4Material]);
 
-  const clickableWindows = ["Window1", "Window2", "Window4"];
+  const clickableWindows = ["Window1", "Window2", "Window3", "Window4"];
 
   return <primitive object={scene} onClick={(e) => {
     if (allLive && clickableWindows.includes(e.object.name)) handleWindowClick(e);
@@ -381,6 +448,7 @@ export default function SpaceScene() {
 
   const w1 = SITEPAL_CHARACTERS.window1;
   const w2 = SITEPAL_CHARACTERS.window2;
+  const w3 = SITEPAL_CHARACTERS.window3;
   const w4 = SITEPAL_CHARACTERS.window4;
 
   return (
@@ -388,15 +456,16 @@ export default function SpaceScene() {
       {/* Each SitePal character runs in its own isolated iframe */}
       <SitePalIframe containerId={w1.containerId} sceneId={w1.sceneId} hash={w1.hash} />
       <SitePalIframe containerId={w2.containerId} sceneId={w2.sceneId} hash={w2.hash} delay={2000} />
-      <SitePalIframe containerId={w4.containerId} sceneId={w4.sceneId} hash={w4.hash} delay={4000} />
+      <SitePalIframe containerId={w3.containerId} sceneId={w3.sceneId} hash={w3.hash} delay={4000} />
+      <SitePalIframe containerId={w4.containerId} sceneId={w4.sceneId} hash={w4.hash} delay={6000} />
       <div className="bg" />
 
       <h1
         className="custom-title"
         style={{
-          position: "fixed",
-          top: "1rem",
-          left: "1rem",
+          position: "absolute",
+          top: "2rem",
+          left: "2rem",
           zIndex: 290,
           color: "#f6f5f1ff",
           fontFamily: "UnifrakturCook, serif",
