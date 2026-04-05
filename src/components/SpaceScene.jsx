@@ -162,7 +162,7 @@ function waitForIframeCanvas(iframe, timeout = 20000) {
 }
 
 /* ── Reusable hook: SitePal iframe canvas → chroma-keyed CanvasTexture ── */
-function useSitePalTexture(containerId, placeholderSrc) {
+function useSitePalTexture(containerId, placeholderSrc, { rotation = 0 } = {}) {
   const textureRef = useRef(null);
   const cropCanvasRef = useRef(null);
   const cropCtxRef = useRef(null);
@@ -269,7 +269,15 @@ function useSitePalTexture(containerId, placeholderSrc) {
       grad.addColorStop(1, "rgba(15, 20, 60, 0.6)");       // soft edge
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(src, 0, 0, src.width || 600, src.height || 800, 0, 0, canvas.width, canvas.height);
+      if (rotation) {
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate((rotation * Math.PI) / 180);
+        ctx.drawImage(src, 0, 0, src.width || 600, src.height || 800, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+        ctx.restore();
+      } else {
+        ctx.drawImage(src, 0, 0, src.width || 600, src.height || 800, 0, 0, canvas.width, canvas.height);
+      }
 
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const d = imageData.data;
@@ -389,7 +397,7 @@ function Model({ url }) {
 
   const { material: window1Material, updateTexture: updateW1, isLive: w1Live } = useSitePalTexture(w1.containerId, w1.placeholder);
   const { material: window2Material, updateTexture: updateW2, isLive: w2Live } = useSitePalTexture(w2.containerId, w2.placeholder);
-  const { material: window3Material, updateTexture: updateW3, isLive: w3Live } = useSitePalTexture(w3.containerId, w3.placeholder);
+  const { material: window3Material, updateTexture: updateW3, isLive: w3Live } = useSitePalTexture(w3.containerId, w3.placeholder, { rotation: 10 });
   const { material: window4Material, updateTexture: updateW4, isLive: w4Live } = useSitePalTexture(w4.containerId, w4.placeholder);
 
   const allLive = w1Live && w2Live && w3Live && w4Live;
