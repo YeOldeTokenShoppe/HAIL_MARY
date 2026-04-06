@@ -150,20 +150,15 @@ function Model({ url }) {
         const eyeScale = 1 - progress * 0.95;
         bone.scale.set(orig.x, orig.y * eyeScale, orig.z);
 
-        // Scale pupil meshes to match
-        const eL = leftEyeRef.current;
-        const eR = rightEyeRef.current;
-        if (eL && eL.userData.originalScale) {
-          eL.scale.set(eL.userData.originalScale.x, eL.userData.originalScale.y * eyeScale, eL.userData.originalScale.z);
-        }
-        if (eR && eR.userData.originalScale) {
-          eR.scale.set(eR.userData.originalScale.x, eR.userData.originalScale.y * eyeScale, eR.userData.originalScale.z);
-        }
+        // Hide pupils when eyelid is mostly closed
+        const pupilsVisible = progress < 0.5;
+        if (leftEyeRef.current) leftEyeRef.current.visible = pupilsVisible;
+        if (rightEyeRef.current) rightEyeRef.current.visible = pupilsVisible;
       } else {
         bs.isBlinking = false;
         bone.scale.copy(orig);
-        if (leftEyeRef.current?.userData.originalScale) leftEyeRef.current.scale.copy(leftEyeRef.current.userData.originalScale);
-        if (rightEyeRef.current?.userData.originalScale) rightEyeRef.current.scale.copy(rightEyeRef.current.userData.originalScale);
+        if (leftEyeRef.current) leftEyeRef.current.visible = true;
+        if (rightEyeRef.current) rightEyeRef.current.visible = true;
       }
     }
   });
@@ -226,18 +221,18 @@ function Model({ url }) {
     const target = windowRef.current;
     if (!target) return;
 
-    // Use bounding box center as look-at target (not object origin)
-    const box = new THREE.Box3().setFromObject(target);
+    // Target the Head bone for face-level framing
+    const headBone = scene.getObjectByName("Head");
     const lookAt = new THREE.Vector3();
-    box.getCenter(lookAt);
+    if (headBone) {
+      headBone.getWorldPosition(lookAt);
+    } else {
+      const box = new THREE.Box3().setFromObject(target);
+      box.getCenter(lookAt);
+    }
 
-    const size = new THREE.Vector3();
-    box.getSize(size);
-    const maxDim = Math.max(size.x, size.y, size.z);
-
-    // Place camera level with the center, close in front
-    const camOffset = new THREE.Vector3(0, -0.2, maxDim * 0.6 + 0.2);
-    const zoomPos = lookAt.clone().add(camOffset);
+    // Camera at same height as lookAt, offset forward on Z
+    const zoomPos = lookAt.clone().add(new THREE.Vector3(0, 0, 0.5));
 
     setTargetLookAt(lookAt);
     setTargetPos(zoomPos);
