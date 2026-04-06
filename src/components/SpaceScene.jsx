@@ -1,9 +1,10 @@
-import React, { Suspense, useRef, useState, useCallback, createContext, useContext } from "react";
+import React, { Suspense, useRef, useState, useCallback, useEffect, createContext, useContext } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
   Loader,
   useGLTF,
+  useAnimations,
   PerspectiveCamera,
   OrbitControls,
   Stars,
@@ -17,7 +18,7 @@ const ZoomContext = createContext();
 function CameraController({ controlsRef }) {
   const { camera } = useThree();
   const { zoomed, targetPos, targetLookAt, defaultPos, defaultLookAt } = useContext(ZoomContext);
-  const lerpSpeed = 2.5;
+  const lerpSpeed = 1.2; // slower for cinematic feel
   const phase = useRef("idle");
   const currentLookAt = useRef(new THREE.Vector3(0, 0, 0));
 
@@ -79,21 +80,171 @@ function CameraController({ controlsRef }) {
 
 /* ── 3D Model ── */
 function Model({ url }) {
-  const { scene } = useGLTF(url);
+  const group = useRef();
+  const { scene, animations } = useGLTF(url);
+  const { actions } = useAnimations(animations, group);
   const { setZoomed, setTargetPos, setTargetLookAt } = useContext(ZoomContext);
+  const lookingTimer = useRef(null);
+
+  // Eye blink refs
+  const leftEyeRef = useRef();
+  const rightEyeRef = useRef();
+  const blinkState = useRef({
+    isBlinking: false,
+    lastBlinkTime: 0,
+    nextBlinkDelay: Math.random() * 3000 + 2000,
+  });
+
+  // Find eye meshes and the Eyes bone
+  const eyesBoneRef = useRef();
+  useEffect(() => {
+    const eyeL = scene.getObjectByName("Eye_L");
+    const eyeR = scene.getObjectByName("Eye_R");
+    const eyesBone = scene.getObjectByName("Eyes");
+    if (eyeL) {
+      leftEyeRef.current = eyeL;
+      eyeL.userData.originalScale = eyeL.scale.clone();
+    }
+    if (eyeR) {
+      rightEyeRef.current = eyeR;
+      eyeR.userData.originalScale = eyeR.scale.clone();
+    }
+    if (eyesBone) {
+      eyesBoneRef.current = eyesBone;
+      eyesBone.userData.originalScale = eyesBone.scale.clone();
+    }
+  }, [scene]);
+
+  // Blink animation loop — scale the Eyes bone so skeleton doesn't override
+  useFrame((state) => {
+    const bone = eyesBoneRef.current;
+    if (!bone) return;
+    const currentTime = state.clock.getElapsedTime() * 1000;
+    const bs = blinkState.current;
+    const orig = bone.userData.originalScale;
+
+    // Trigger blink
+    if (!bs.isBlinking && currentTime - bs.lastBlinkTime > bs.nextBlinkDelay) {
+      bs.isBlinking = true;
+      bs.lastBlinkTime = currentTime;
+      bs.nextBlinkDelay = Math.random() * 3000 + 2000;
+    }
+
+    // Animate blink (close 100ms, hold 80ms, open 120ms)
+    if (bs.isBlinking) {
+      const closeTime = 100;
+      const holdTime = 80;
+      const openTime = 120;
+      const totalDuration = closeTime + holdTime + openTime;
+      const elapsed = currentTime - bs.lastBlinkTime;
+
+      if (elapsed < totalDuration) {
+        let progress;
+        if (elapsed < closeTime) {
+          progress = elapsed / closeTime;
+        } else if (elapsed < closeTime + holdTime) {
+          progress = 1;
+        } else {
+          progress = 1 - ((elapsed - closeTime - holdTime) / openTime);
+        }
+        const eyeScale = 1 - progress * 0.95;
+        bone.scale.set(orig.x, orig.y * eyeScale, orig.z);
+
+        // Scale pupil meshes to match
+        const eL = leftEyeRef.current;
+        const eR = rightEyeRef.current;
+        if (eL && eL.userData.originalScale) {
+          eL.scale.set(eL.userData.originalScale.x, eL.userData.originalScale.y * eyeScale, eL.userData.originalScale.z);
+        }
+        if (eR && eR.userData.originalScale) {
+          eR.scale.set(eR.userData.originalScale.x, eR.userData.originalScale.y * eyeScale, eR.userData.originalScale.z);
+        }
+      } else {
+        bs.isBlinking = false;
+        bone.scale.copy(orig);
+        if (leftEyeRef.current?.userData.originalScale) leftEyeRef.current.scale.copy(leftEyeRef.current.userData.originalScale);
+        if (rightEyeRef.current?.userData.originalScale) rightEyeRef.current.scale.copy(rightEyeRef.current.userData.originalScale);
+      }
+    }
+  });
+
+  useEffect(() => {
+    const standing = actions["standing"];
+    const looking = actions["looking"];
+    if (!standing) return;
+
+    // Play standing on infinite loop
+    standing.reset().fadeIn(0.5).play();
+    standing.setLoop(THREE.LoopRepeat, Infinity);
+
+    if (looking) {
+      looking.setLoop(THREE.LoopOnce, 1);
+      looking.clampWhenFinished = true;
+
+      const scheduleLooking = () => {
+        // Random interval between 5–12 seconds
+        const delay = 5000 + Math.random() * 7000;
+        lookingTimer.current = setTimeout(() => {
+          // Crossfade from standing to looking
+          looking.reset().fadeIn(0.4).play();
+          standing.fadeOut(0.4);
+
+          // When looking finishes, crossfade back to standing
+          const onFinished = (e) => {
+            if (e.action === looking) {
+              looking.getMixer().removeEventListener("finished", onFinished);
+              standing.reset().fadeIn(0.4).play();
+              looking.fadeOut(0.4);
+              scheduleLooking();
+            }
+          };
+          looking.getMixer().addEventListener("finished", onFinished);
+        }, delay);
+      };
+
+      scheduleLooking();
+    }
+
+    return () => {
+      clearTimeout(lookingTimer.current);
+      standing.stop();
+      looking?.stop();
+    };
+  }, [actions]);
+
+  // Find the Window2 object once the scene is loaded
+  const windowRef = useRef(null);
+  useEffect(() => {
+    const window2 = scene.getObjectByName("Window2");
+    if (window2) {
+      windowRef.current = window2;
+    }
+  }, [scene]);
 
   const handleClick = useCallback((e) => {
     e.stopPropagation();
-    const hitPoint = e.point.clone();
-    const camPos = e.camera.position.clone();
-    const dir = hitPoint.clone().sub(camPos).normalize();
-    const zoomPos = hitPoint.clone().sub(dir.multiplyScalar(3));
-    setTargetLookAt(hitPoint);
+    const target = windowRef.current;
+    if (!target) return;
+
+    // Use bounding box center as look-at target (not object origin)
+    const box = new THREE.Box3().setFromObject(target);
+    const lookAt = new THREE.Vector3();
+    box.getCenter(lookAt);
+
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z);
+
+    // Place camera level with the center, close in front
+    const camOffset = new THREE.Vector3(0, -0.2, maxDim * 0.6 + 0.2);
+    const zoomPos = lookAt.clone().add(camOffset);
+
+    setTargetLookAt(lookAt);
     setTargetPos(zoomPos);
     setZoomed(true);
-  }, [setZoomed, setTargetPos, setTargetLookAt]);
+  }, [scene, setZoomed, setTargetPos, setTargetLookAt]);
 
-  return <primitive object={scene} onClick={handleClick} />;
+  return <primitive ref={group} object={scene} onClick={handleClick} />;
 }
 
 export default function SpaceScene() {
@@ -141,7 +292,7 @@ export default function SpaceScene() {
           <span style={{ fontSize: "1rem" }}>    of    </span>
           Perpetual
         </span>
-        <span className="title-line" style={{ display: "block", marginLeft: "2rem" }}>Profit</span>
+        <span className="title-line" style={{ display: "block", marginLeft: "2.7rem" }}>Profit</span>
       </h1>
 
       <Canvas

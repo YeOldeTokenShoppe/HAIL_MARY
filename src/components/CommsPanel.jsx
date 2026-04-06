@@ -246,7 +246,7 @@ export default function CommsPanel({
         .comms-crew-bar {
           display: flex;
           gap: 2px;
-          padding: 6px 8px;
+          padding: 4px 6px;
           overflow-x: auto;
           scrollbar-width: none;
           border-bottom: 1px solid rgba(0, 255, 255, 0.06);
@@ -255,11 +255,12 @@ export default function CommsPanel({
         .comms-crew-bar::-webkit-scrollbar { display: none; }
 
         .comms-crew-btn {
-          flex-shrink: 0;
+          flex: 1 1 0;
+          min-width: 0;
           display: flex;
           align-items: center;
-          gap: 6px;
-          padding: 5px 10px;
+          gap: 4px;
+          padding: 4px 6px;
           border-radius: 8px;
           border: 1px solid transparent;
           background: transparent;
@@ -278,8 +279,9 @@ export default function CommsPanel({
         }
 
         .comms-crew-avatar {
-          width: 28px;
-          height: 28px;
+          width: 22px;
+          height: 22px;
+          flex-shrink: 0;
           border-radius: 50%;
           object-fit: cover;
           border: 1.5px solid rgba(0, 255, 255, 0.15);
@@ -295,15 +297,20 @@ export default function CommsPanel({
           display: flex;
           flex-direction: column;
           align-items: flex-start;
+          min-width: 0;
         }
 
         .comms-crew-name {
-          font-size: 0.65rem;
+          font-size: 0.55rem;
           font-weight: 700;
-          letter-spacing: 0.08em;
+          letter-spacing: 0.05em;
           text-transform: uppercase;
           color: rgba(0, 255, 255, 0.4);
           line-height: 1.2;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 100%;
         }
 
         .comms-crew-btn.active .comms-crew-name {
@@ -311,11 +318,7 @@ export default function CommsPanel({
         }
 
         .comms-crew-role {
-          font-size: 0.5rem;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          color: rgba(0, 255, 255, 0.2);
-          line-height: 1.2;
+          display: none;
         }
 
         /* ── SCREEN AREA ── */
