@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 
 /**
  * CommsPanel — retro CRT comms terminal for crew interaction.
@@ -15,6 +15,82 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
  *  - responseText      — current response text to display
  *  - isTalking         — whether the character is currently speaking
  */
+/* ── SitePal embed rendered directly in the comms screen ── */
+function SitePalEmbed({ sitepal }) {
+  const iframeRef = useRef(null);
+
+  const blobUrl = useMemo(() => {
+    if (!sitepal) return null;
+    const { account, sceneId, hash } = sitepal;
+    const html = `<!DOCTYPE html>
+<html><head><style>
+  html,body{margin:0;padding:0;overflow:hidden;background:transparent;}
+</style>
+<script>
+(function(){
+  var OrigAC = window.AudioContext || window.webkitAudioContext;
+  if(OrigAC){
+    var PatchedAC = function(){ var ctx = new OrigAC(); ctx.suspend(); return ctx; };
+    PatchedAC.prototype = OrigAC.prototype;
+    window.AudioContext = PatchedAC;
+    window.webkitAudioContext = PatchedAC;
+  }
+  var origAppend = Element.prototype.appendChild;
+  Element.prototype.appendChild = function(child){
+    var result = origAppend.call(this, child);
+    if(child.tagName === 'AUDIO' || child.tagName === 'VIDEO'){ child.muted = true; child.volume = 0; }
+    return result;
+  };
+})();
+</script>
+</head><body>
+<div id="sitepal-container"></div>
+<script type="text/javascript" src="https://vhss-d.oddcast.com/vhost_embed_functions_v4.php?acc=${account}&js=0"></script>
+<script type="text/javascript">
+  AC_VHost_Embed(${account},600,800,"",1,0,${sceneId},0,1,0,"${hash}",0,1);
+  function vh_sceneLoaded(){ try{stopSpeech();}catch(e){} try{setPlayerVolume(0);}catch(e){} }
+</script>
+</body></html>`;
+    return URL.createObjectURL(new Blob([html], { type: "text/html" }));
+  }, [sitepal]);
+
+  useEffect(() => {
+    return () => { if (blobUrl) URL.revokeObjectURL(blobUrl); };
+  }, [blobUrl]);
+
+  if (!blobUrl) return null;
+
+  return (
+    <div style={{
+      position: "absolute",
+      inset: 0,
+      zIndex: 1,
+      overflow: "hidden",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+    }}>
+      <iframe
+        ref={iframeRef}
+        src={blobUrl}
+        title="sitepal-comms"
+        style={{
+          position: "absolute",
+          left: "50%",
+          top: "50%",
+          width: 600,
+          height: 800,
+          border: "none",
+          background: "transparent",
+          transform: `translate(calc(-50% + ${sitepal.offsetX || 0}px), -38%) scale(0.5)`,
+          transformOrigin: "center center",
+          pointerEvents: "none",
+        }}
+      />
+    </div>
+  );
+}
+
 export default function CommsPanel({
   open = false,
   onClose,
@@ -594,7 +670,9 @@ export default function CommsPanel({
               </div>
 
               <div className="comms-char-display">
-                {current.image ? (
+                {current.sitepal ? (
+                  <SitePalEmbed sitepal={current.sitepal} />
+                ) : current.image ? (
                   <img className="comms-char-image" src={current.image} alt={current.name} />
                 ) : (
                   <span className="comms-char-placeholder">No Signal</span>

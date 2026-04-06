@@ -27,10 +27,17 @@ const SpaceScene = dynamic(() => import("@/components/SpaceScene"), {
   ),
 });
 
+const SITEPAL_ACCOUNT = "9308752";
+
 const CREW = [
-  { id: "captain", name: "Captain", role: "Commanding Officer", image: "/cameo_h80z.webp" },
-  { id: "engineer", name: "Saint GR80", role: "Chief Engineer", image: "/cameo_GR80.webp" },
-  { id: "comms", name: "Virgil", role: "Comms Officer", image: "/cameo_kitty.webp" },
+  {
+    id: "engineer", name: "Saint GR80", role: "Chief Engineer", image: "/cameo_GR80.webp",
+    sitepal: { account: SITEPAL_ACCOUNT, sceneId: 2774449, hash: "KrTdLqh7A17B80n7535kO17Hae1HurqD", offsetX: 0},
+  },
+  {
+    id: "captain", name: "H80Z", role: "Devil's Advocate", image: "/cameo_h80z.webp",
+    sitepal: { account: SITEPAL_ACCOUNT, sceneId: 2774433, hash: "9XtgV3Ko3oxgH0LEHPcDQPrwuyz7zjTZ" },
+  },
 ];
 
 export default function HomePage() {

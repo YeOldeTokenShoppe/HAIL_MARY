@@ -148,7 +148,6 @@ export default function MainMobileNav({
           right: 0;
           z-index: 10000;
           pointer-events: none;
-          padding-bottom: env(safe-area-inset-bottom, 0px);
           font-family: 'Cyber', 'Geo', sans-serif;
         }
 
@@ -157,7 +156,7 @@ export default function MainMobileNav({
           display: flex;
           align-items: flex-end;
           justify-content: space-around;
-          padding: 6px 4px 8px;
+          padding: 6px 4px calc(8px + env(safe-area-inset-bottom, 0px));
           background: rgba(5, 5, 15, 0.95);
           backdrop-filter: blur(20px);
           -webkit-backdrop-filter: blur(20px);

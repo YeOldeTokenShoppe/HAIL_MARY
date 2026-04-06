@@ -28,9 +28,10 @@ const SpaceScene = dynamic(() => import("@/components/SpaceScene"), {
 });
 
 const CREW = [
-  { id: "captain", name: "Captain", role: "Commanding Officer", image: "/cameo_h80z.webp" },
   { id: "engineer", name: "Saint GR80", role: "Chief Engineer", image: "/cameo_GR80.webp" },
-  { id: "comms", name: "Virgil", role: "Comms Officer", image: "/cameo_kitty.webp" },
+    { id: "captain", name: "H80Z", role: "Devil's Advocate", image: "/cameo_h80z.webp" },
+
+  // { id: "comms", name: "Virgil", role: "Comms Officer", image: "/cameo_kitty.webp" },
 ];
 
 export default function SpacePage() {

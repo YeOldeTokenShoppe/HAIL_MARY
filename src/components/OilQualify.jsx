@@ -8,6 +8,7 @@ import MobileBottomNav from "@/components/MobileBottomNav";
 import BuyModal from "@/components/BuyModal";
 import CyberNav from "@/components/CyberNav";
 import { useMusic } from "@/components/MusicContext";
+import ShaderText from "@/components/ShaderText";
 import { db, collection, query, orderBy, onSnapshot, doc, setDoc, getDoc, updateDoc, serverTimestamp, arrayUnion, increment } from "@/lib/firebaseClient";
 
 const QUALIFICATION_THRESHOLD = 20; // $20 USD worth of RL80
@@ -403,14 +404,29 @@ export default function OilQualify({
           EST. 2026
         </div>
         <h1 style={{
-          fontSize: isMobile ? 20 : 28,
-          letterSpacing: "0.18em",
-          color: theme.textStrong,
           margin: 0,
-          fontWeight: 700,
           lineHeight: 1.2,
+          color: theme.textStrong,
         }}>
-          HAIL MARY<br />PROSPECTING CO.
+          <ShaderText
+            text="HAIL MARY"
+            font="'Blackletter', serif"
+            fontWeight={900}
+            height={isMobile ? 40 : 90}
+            colorBg={darkMode ? "#12161c" : "#f5efe6"}
+            colorFill={theme.gold}
+            density={12}
+            speed={0.08}
+            turbulence={0.45}
+            outlineWidth={3.5}
+            colorOutline={"#00000048"}
+          />
+          <span style={{
+            fontFamily: "'Bebas Neue', sans-serif",
+            fontSize: isMobile ? 18 : 48,
+            letterSpacing: "0.25em",
+            display: "block",
+          }}>PROSPECTING CO.</span>
         </h1>
         <div style={{ width: 40, height: 1, background: theme.gold, margin: "12px auto" }} />
         <div style={{
