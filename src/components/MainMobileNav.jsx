@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 
 /**
  * MainMobileNav — bottom dock navigation.
@@ -27,6 +27,7 @@ export default function MainMobileNav({
   overrideSlots = {},
 }) {
   const [fabPulse, setFabPulse] = useState(false);
+  const barRef = useRef(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -34,6 +35,15 @@ export default function MainMobileNav({
       setTimeout(() => setFabPulse(false), 600);
     }, 8000);
     return () => clearInterval(interval);
+  }, []);
+
+  const triggerGlow = useCallback((color) => {
+    const bar = barRef.current;
+    if (!bar) return;
+    bar.style.setProperty('--mn-glow-color', color);
+    bar.classList.remove('mn-glow');
+    void bar.offsetWidth; // force reflow to restart animation
+    bar.classList.add('mn-glow');
   }, []);
 
   /* ── Icon SVGs ── */
@@ -127,8 +137,22 @@ export default function MainMobileNav({
     right: overrideSlots.right || defaults.right,
   };
 
+  const glowColors = {
+    'mn-buy': 'hsl(152, 80%, 45%)',
+    'mn-comms': 'hsl(200, 80%, 55%)',
+    'mn-rank': 'hsl(45, 90%, 55%)',
+    'mn-lounge': 'hsl(280, 60%, 60%)',
+  };
+
   const renderItem = (slot, key) => (
-    <button key={key} className="mn-item" onClick={slot.onClick}>
+    <button
+      key={key}
+      className="mn-item"
+      onClick={(e) => {
+        triggerGlow(glowColors[slot.colorClass] || 'rgba(0, 255, 255, 0.6)');
+        slot.onClick?.(e);
+      }}
+    >
       <div className={`mn-icon ${slot.active ? "mn-active" : ""}`}>
         {slot.icon}
       </div>
@@ -163,6 +187,32 @@ export default function MainMobileNav({
           border-top: 1px solid rgba(0, 255, 255, 0.15);
           box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.5);
           position: relative;
+          overflow: visible;
+        }
+
+        /* Glow bleed — colored light that bleeds up through bar top edge on tap */
+        .mn-bar::before {
+          content: '';
+          position: absolute;
+          top: -6px;
+          left: 0;
+          right: 0;
+          height: 12px;
+          background: var(--mn-glow-color, transparent);
+          filter: blur(10px);
+          opacity: 0;
+          transition: opacity 0.15s ease;
+          pointer-events: none;
+          z-index: -1;
+        }
+
+        .mn-bar.mn-glow::before {
+          animation: mnGlowBleed 0.4s ease-out forwards;
+        }
+
+        @keyframes mnGlowBleed {
+          0% { opacity: 0.8; filter: blur(8px); }
+          100% { opacity: 0; filter: blur(16px); }
         }
 
         .mn-item {
@@ -183,8 +233,37 @@ export default function MainMobileNav({
           color: inherit;
         }
 
+        /* Spring bounce on tap */
+        @keyframes mnSpringBounce {
+          0%   { transform: scale(1); }
+          30%  { transform: scale(1.22); }
+          55%  { transform: scale(0.94); }
+          75%  { transform: scale(1.06); }
+          100% { transform: scale(1); }
+        }
+
         .mn-item:active {
-          transform: scale(0.93);
+          animation: mnSpringBounce 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        .mn-item:active .mn-icon {
+          box-shadow: 0 0 16px rgba(0, 255, 255, 0.5);
+        }
+
+        .mn-item:has(.mn-buy):active .mn-icon {
+          box-shadow: 0 0 18px hsla(152, 80%, 45%, 0.6);
+        }
+
+        .mn-item:has(.mn-comms):active .mn-icon {
+          box-shadow: 0 0 18px hsla(200, 80%, 55%, 0.6);
+        }
+
+        .mn-item:has(.mn-rank):active .mn-icon {
+          box-shadow: 0 0 18px hsla(45, 90%, 55%, 0.6);
+        }
+
+        .mn-item:has(.mn-lounge):active .mn-icon {
+          box-shadow: 0 0 18px hsla(280, 60%, 60%, 0.6);
         }
 
         .mn-icon {
@@ -269,9 +348,17 @@ export default function MainMobileNav({
           gap: 1px;
         }
 
+        @keyframes mnFabSpring {
+          0%   { transform: scale(1); }
+          30%  { transform: scale(1.18); }
+          55%  { transform: scale(0.95); }
+          75%  { transform: scale(1.05); }
+          100% { transform: scale(1); }
+        }
+
         .mn-fab:active {
-          transform: scale(0.93);
-          box-shadow: 0 2px 8px rgba(255, 100, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+          animation: mnFabSpring 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+          box-shadow: 0 0 24px rgba(255, 100, 0, 0.7), 0 0 10px rgba(255, 140, 0, 0.5);
         }
 
         .mn-fab .mn-mission-svg {
@@ -301,7 +388,7 @@ export default function MainMobileNav({
       `}</style>
 
       <div className="mn-dock">
-        <div className="mn-bar">
+        <div className="mn-bar" ref={barRef}>
           {renderItem(slots.left, "left")}
           {renderItem(slots.leftCenter, "leftCenter")}
 
@@ -309,7 +396,10 @@ export default function MainMobileNav({
           <div className="mn-fab-wrapper">
             <button
               className={`mn-fab ${fabPulse ? "mn-pulse" : ""}`}
-              onClick={slots.center.onClick}
+              onClick={(e) => {
+                triggerGlow('hsl(25, 90%, 50%)');
+                slots.center.onClick?.(e);
+              }}
             >
               {slots.center.icon}
               <span className="mn-fab-label">{slots.center.label}</span>

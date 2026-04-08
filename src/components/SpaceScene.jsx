@@ -9,6 +9,7 @@ import {
   OrbitControls,
   Stars,
 } from "@react-three/drei";
+import HoloProjector from "./HoloProjector";
 import "../app/space/space.css";
 
 /* ── Zoom context shared between Model and CameraController ── */
@@ -81,6 +82,11 @@ function CameraController({ controlsRef }) {
           controlsRef.current.enabled = true;
           controlsRef.current.autoRotate = false;
           controlsRef.current.update();
+        }
+        // Notify arrival (used for chaining fly-to stages)
+        if (onArrivedRef?.current) {
+          onArrivedRef.current();
+          onArrivedRef.current = null;
         }
       }
     }
@@ -199,7 +205,7 @@ function H80ZSpotlight() {
 
   useEffect(() => {
     if (spotRef.current) {
-      spotRef.current.target.position.set(-0.40, 1.20, -0.35);
+      spotRef.current.target.position.set(-0.4, 1.2, -0.35);
       scene.add(spotRef.current.target);
       return () => scene.remove(spotRef.current.target);
     }
@@ -214,11 +220,114 @@ function H80ZSpotlight() {
       distance={8}
       angle={0.29}
       penumbra={1}
-      position={[-0.02, 1.60, -0.28]}
+      position={[-0.02, 1.6, -0.28]}
       shadow-mapSize={[1024, 1024]}
       shadow-bias={-0.0001}
     />
   );
+}
+
+/* ── Scrolling LED screen for VendingMachine_Screen1 ── */
+function VendingMachineLED({ scene }) {
+  const canvasRef = useRef(null);
+  const textureRef = useRef(null);
+  const meshRef = useRef(null);
+  const scrollRef = useRef(0);
+  const LED_TEXT = "  RL80 TOKEN  ***  STAKE NOW  ***  TO THE MOON  ***  ";
+  const PIXEL_SIZE = 3;
+  const CANVAS_W = 256;
+  const CANVAS_H = 32;
+  const SCROLL_SPEED = 40; // pixels per second
+
+  // 5x7 dot-matrix font for uppercase + digits + symbols
+  const FONT_MAP = {
+    A: [0x1f,0x24,0x44,0x24,0x1f], B: [0x7f,0x49,0x49,0x49,0x36],
+    C: [0x3e,0x41,0x41,0x41,0x22], D: [0x7f,0x41,0x41,0x22,0x1c],
+    E: [0x7f,0x49,0x49,0x49,0x41], F: [0x7f,0x48,0x48,0x48,0x40],
+    G: [0x3e,0x41,0x49,0x49,0x2e], H: [0x7f,0x08,0x08,0x08,0x7f],
+    I: [0x41,0x41,0x7f,0x41,0x41], J: [0x02,0x01,0x41,0x7e,0x40],
+    K: [0x7f,0x08,0x14,0x22,0x41], L: [0x7f,0x01,0x01,0x01,0x01],
+    M: [0x7f,0x20,0x10,0x20,0x7f], N: [0x7f,0x10,0x08,0x04,0x7f],
+    O: [0x3e,0x41,0x41,0x41,0x3e], P: [0x7f,0x48,0x48,0x48,0x30],
+    Q: [0x3e,0x41,0x45,0x42,0x3d], R: [0x7f,0x48,0x4c,0x4a,0x31],
+    S: [0x32,0x49,0x49,0x49,0x26], T: [0x40,0x40,0x7f,0x40,0x40],
+    U: [0x7e,0x01,0x01,0x01,0x7e], V: [0x7c,0x02,0x01,0x02,0x7c],
+    W: [0x7f,0x02,0x04,0x02,0x7f], X: [0x63,0x14,0x08,0x14,0x63],
+    Y: [0x60,0x10,0x0f,0x10,0x60], Z: [0x43,0x45,0x49,0x51,0x61],
+    "0": [0x3e,0x45,0x49,0x51,0x3e], "1": [0x00,0x21,0x7f,0x01,0x00],
+    "2": [0x23,0x45,0x49,0x49,0x31], "3": [0x22,0x41,0x49,0x49,0x36],
+    "4": [0x0c,0x14,0x24,0x7f,0x04], "5": [0x72,0x51,0x51,0x51,0x4e],
+    "6": [0x1e,0x29,0x49,0x49,0x06], "7": [0x40,0x47,0x48,0x50,0x60],
+    "8": [0x36,0x49,0x49,0x49,0x36], "9": [0x30,0x49,0x49,0x4a,0x3c],
+    "*": [0x14,0x08,0x3e,0x08,0x14], " ": [0x00,0x00,0x00,0x00,0x00],
+  };
+
+  useEffect(() => {
+    const mesh = scene.getObjectByName("VendMachine_Screen1");
+    if (!mesh) return;
+    meshRef.current = mesh;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = CANVAS_W;
+    canvas.height = CANVAS_H;
+    canvasRef.current = canvas;
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.minFilter = THREE.NearestFilter;
+    tex.magFilter = THREE.NearestFilter;
+    textureRef.current = tex;
+
+    mesh.material = new THREE.MeshBasicMaterial({ map: tex });
+  }, [scene]);
+
+  useFrame((_, delta) => {
+    const canvas = canvasRef.current;
+    const tex = textureRef.current;
+    if (!canvas || !tex) return;
+
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+    scrollRef.current += SCROLL_SPEED * delta;
+
+    // Render each character as dot-matrix
+    const charWidth = 6 * PIXEL_SIZE; // 5 cols + 1 gap
+    const totalWidth = LED_TEXT.length * charWidth;
+    if (scrollRef.current >= totalWidth) scrollRef.current -= totalWidth;
+
+    for (let ci = 0; ci < LED_TEXT.length; ci++) {
+      const ch = LED_TEXT[ci].toUpperCase();
+      const cols = FONT_MAP[ch];
+      if (!cols) continue;
+      const xBase = ci * charWidth - scrollRef.current;
+      // Wrap for seamless scrolling
+      const drawX = ((xBase % totalWidth) + totalWidth) % totalWidth;
+      // Also draw a second copy for seamless wrap
+      for (const offsetX of [drawX, drawX - totalWidth]) {
+        if (offsetX > CANVAS_W || offsetX + charWidth < 0) continue;
+        for (let col = 0; col < 5; col++) {
+          for (let row = 0; row < 7; row++) {
+            if (cols[col] & (1 << row)) {
+              // Green LED glow with slight brightness variation
+              const brightness = 180 + Math.random() * 75;
+              ctx.fillStyle = `rgb(0, ${brightness}, ${Math.floor(brightness * 0.3)})`;
+              ctx.fillRect(
+                offsetX + col * PIXEL_SIZE,
+                1 + row * PIXEL_SIZE,
+                PIXEL_SIZE - 1,
+                PIXEL_SIZE - 1
+              );
+            }
+          }
+        }
+      }
+    }
+
+    tex.needsUpdate = true;
+  });
+
+  return null;
 }
 
 /* ── 3D Model ── */
@@ -231,6 +340,8 @@ function Model({ url }) {
 
   // Pin Hips bones to prevent foot sliding during crossfades
   const hipsPinRef = useRef([]); // array of { bone, pos } to pin
+  const gr80HipsRef = useRef(null); // GR80's Hips bone for rotation pinning
+  const gr80HipsRotRef = useRef(null); // stored quaternion
   const { zoomed, setZoomed, setTargetPos, setTargetLookAt, onArrivedRef, flyToRef, spotTargetRef, captainFadeRef } = useContext(ZoomContext);
   const lookingTimer = useRef(null);
   const gr80Timer = useRef(null);
@@ -279,13 +390,7 @@ function Model({ url }) {
   // Find and pin Hips bones to prevent crossfade sliding
   // Also find GR80's Head bone for camera flythrough
   useEffect(() => {
-    const pins = [];
-    scene.traverse((node) => {
-      if (node.isBone && node.name === "Hips") {
-        pins.push({ bone: node, pos: node.position.clone() });
-      }
-    });
-    hipsPinRef.current = pins;
+
 
     // Find captain's parent mesh for hiding during fly-through
     const captainEmpty = scene.getObjectByName("Empty_Character");
@@ -296,6 +401,10 @@ function Model({ url }) {
       gr80Empty.traverse((node) => {
         if (node.name === "Head" && !gr80HeadRef.current) {
           gr80HeadRef.current = node;
+        }
+        if (node.isBone && node.name === "Hips" && !gr80HipsRef.current) {
+          gr80HipsRef.current = node;
+          gr80HipsRotRef.current = node.quaternion.clone();
         }
       });
     }
@@ -422,13 +531,7 @@ function Model({ url }) {
     }
   });
 
-  // After animation mixer updates, re-pin Hips X/Z to prevent sliding
-  useFrame(() => {
-    for (const pin of hipsPinRef.current) {
-      pin.bone.position.x = pin.pos.x;
-      pin.bone.position.z = pin.pos.z;
-    }
-  });
+
 
   useEffect(() => {
     const standing = actions["standing"];
@@ -449,14 +552,14 @@ function Model({ url }) {
         const scheduleButtonPush = () => {
           const delay = 5000 + Math.random() * 10000;
           gr80Timer.current = setTimeout(() => {
-            buttonPushing.reset().fadeIn(0.4).play();
-            idle.fadeOut(0.4);
+            buttonPushing.reset().fadeIn(1.5).play();
+            idle.fadeOut(1.5);
 
             const onFinished = (e) => {
               if (e.action === buttonPushing) {
                 buttonPushing.getMixer().removeEventListener("finished", onFinished);
-                idle.reset().fadeIn(0.4).play();
-                buttonPushing.fadeOut(0.4);
+                idle.reset().fadeIn(1.5).play();
+                buttonPushing.fadeOut(1.5);
                 scheduleButtonPush();
               }
             };
@@ -471,7 +574,7 @@ function Model({ url }) {
     // H80Z: play sit_pose animation
     const sitPose = actions["sit_pose"];
     if (sitPose) {
-      sitPose.reset().fadeIn(0.5).play();
+      sitPose.reset().fadeIn(0.1).play();
       sitPose.setLoop(THREE.LoopRepeat, Infinity);
     }
 
@@ -566,6 +669,15 @@ function Model({ url }) {
                   flyToRef.current = { pos: gr80Pos, lookAt: gr80LookAt };
                   // Move spotlight to GR80
                   spotTargetRef.current = { pos: gr80World.clone().add(new THREE.Vector3(0, 2, 0.5)), lookAt: gr80World.clone() };
+
+                  // After arriving at GR80, slowly orbit left to settle with H80Z in view
+                  onArrivedRef.current = () => {
+                    // Midpoint between GR80 and H80Z for the lookAt
+                    const settleLookAt = new THREE.Vector3(-0.2, 1.1, -0.22);
+                    // Camera to GR80's left, pulled back to frame both characters
+                    const settlePos = new THREE.Vector3(0.4, 1.35, 0.1);
+                    flyToRef.current = { pos: settlePos, lookAt: settleLookAt };
+                  };
                 }
               }
               }, 2000);
@@ -641,7 +753,12 @@ function Model({ url }) {
     };
   }, [scene, setZoomed, setTargetPos, setTargetLookAt, onArrivedRef]);
 
-  return <primitive ref={group} object={scene} onClick={handleClick} />;
+  return (
+    <>
+      <primitive ref={group} object={scene} onClick={handleClick} />
+      <VendingMachineLED scene={scene} />
+    </>
+  );
 }
 
 export default function SpaceScene() {
@@ -727,6 +844,7 @@ export default function SpaceScene() {
           <H80ZSpotlight />
           <Suspense fallback={null}>
             <Model url="/models/Scene3.glb" />
+            <HoloProjector />
           </Suspense>
           <OrbitControls
             ref={controlsRef}
