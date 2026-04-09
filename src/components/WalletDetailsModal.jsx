@@ -4,12 +4,11 @@ import { useState, useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useWalletAuth } from './WalletAuthProvider';
 import { useStaking } from '@/hooks/useStaking';
-import { TransactionButton, useSendAndConfirmTransaction, useActiveAccount } from "thirdweb/react";
-import { stakingTransactions, stakingContract } from '@/lib/stakingContract';
-import { toWei } from "thirdweb/utils";
-import { tokenFunctions, erc20Contract } from '@/lib/contract';
-import { sendTransaction } from "thirdweb";
-import { approve } from "thirdweb/extensions/erc20";
+import { useWriteContract } from 'wagmi';
+import { erc20Abi, parseEther } from 'viem';
+import { RL80_ADDRESS, STAKING_ADDRESS } from '@/lib/contracts';
+import { stakingAbi } from '@/lib/abis/stakingAbi';
+import { publicClient } from '@/lib/viemClient';
 import { db, collection, addDoc, serverTimestamp } from '@/lib/firebaseClient';
 
 
@@ -44,8 +43,7 @@ export function WalletDetailsModal({ onClose }) {
   const [isUpdatingBalance, setIsUpdatingBalance] = useState(false);
   const [isUpdatingStaking, setIsUpdatingStaking] = useState(false);
   
-  const { mutate: sendTransactionHook } = useSendAndConfirmTransaction();
-  const activeAccount = useActiveAccount();
+  const { writeContractAsync, isPending: isWritePending } = useWriteContract();
 
   const handleCopyAddress = () => {
     navigator.clipboard.writeText(walletAddress);
@@ -60,55 +58,65 @@ export function WalletDetailsModal({ onClose }) {
   
   // Manual approval function for testing
   const handleManualApprove = async () => {
-    if (!stakeAmount || isApproving || !activeAccount) return;
-    
+    if (!stakeAmount || isApproving || !walletAddress) return;
+
     try {
       setIsApproving(true);
-      const amount = toWei(stakeAmount);
-      
-      // Check actual balance first
-      const balance = await tokenFunctions.getBalance(walletAddress);
+      const amount = parseEther(stakeAmount);
 
-      
-      if (BigInt(balance) < BigInt(amount)) {
+      // Check actual balance first
+      const balance = await publicClient.readContract({
+        address: RL80_ADDRESS,
+        abi: erc20Abi,
+        functionName: 'balanceOf',
+        args: [walletAddress],
+      });
+
+
+      if (balance < amount) {
         alert(`Insufficient RL80 balance. You have ${balance} but need ${amount}`);
         setIsApproving(false);
         return;
       }
-      
-      const transaction = tokenFunctions.approve(stakingContract.address, amount);
-      
+
       setTransactionStatus('approving');
-      
-      // Send transaction directly using the imported sendTransaction
-      const result = await sendTransaction({
-        transaction,
-        account: activeAccount
+
+      // Send approval transaction using wagmi writeContractAsync
+      await writeContractAsync({
+        address: RL80_ADDRESS,
+        abi: erc20Abi,
+        functionName: 'approve',
+        args: [STAKING_ADDRESS, amount],
       });
-      
+
       setTransactionStatus('waiting');
-      
+
       // Wait a bit for the transaction to be mined
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      
+
+
       // Re-check allowance
-      const newAllowance = await tokenFunctions.getAllowance(walletAddress, stakingContract.address);
-      
-      if (BigInt(newAllowance) >= BigInt(amount)) {
+      const newAllowance = await publicClient.readContract({
+        address: RL80_ADDRESS,
+        abi: erc20Abi,
+        functionName: 'allowance',
+        args: [walletAddress, STAKING_ADDRESS],
+      });
+
+      if (newAllowance >= amount) {
         setNeedsApproval(false);
         setTransactionStatus('confirmed');
-        
+
         // Wait 2 seconds showing confirmed, then update balances
         await new Promise(resolve => setTimeout(resolve, 2000));
-        
+
         setTransactionStatus('updating');
         setIsUpdatingBalance(true);
-        
+
         // Refresh balances
         await refreshStaking();
         await refreshBalance();
-        
+
         setIsUpdatingBalance(false);
         setTransactionStatus('');
       } else {
@@ -138,35 +146,32 @@ export function WalletDetailsModal({ onClose }) {
         setNeedsApproval(false);
         return;
       }
-      
+
       try {
         setIsCheckingApproval(true);
-        const amountInWei = toWei(stakeAmount);
-        
-        // Get the RL80 token address from staking contract
-        const { stakingFunctions } = await import('@/lib/stakingContract');
-        const rl80TokenAddress = await stakingFunctions.getRl80TokenAddress();
-        
-        // Check ETH balance for gas
-        try {
-          const { client, chain } = await import('@/lib/contract');
-          const { getWalletBalance } = await import('thirdweb/wallets');
-          // We'll just log this for debugging
-        } catch (e) {
-          console.error('Error checking ETH balance:', e);
-        }
-        
-        // The staking contract expects RL80 tokens, but we need to check/approve our HAIL (ERC20) token
-        const currentAllowance = await tokenFunctions.getAllowance(walletAddress, stakingContract.address);
-        
-        const userBalance = await tokenFunctions.getBalance(walletAddress);
-        
+        const amountInWei = parseEther(stakeAmount);
+
+        // Check current allowance via publicClient
+        const currentAllowance = await publicClient.readContract({
+          address: RL80_ADDRESS,
+          abi: erc20Abi,
+          functionName: 'allowance',
+          args: [walletAddress, STAKING_ADDRESS],
+        });
+
+        const userBalance = await publicClient.readContract({
+          address: RL80_ADDRESS,
+          abi: erc20Abi,
+          functionName: 'balanceOf',
+          args: [walletAddress],
+        });
+
         // Check if user has enough balance
-        if (BigInt(userBalance) < BigInt(amountInWei)) {
+        if (userBalance < amountInWei) {
           console.error('Insufficient balance:', userBalance.toString(), 'needed:', amountInWei.toString());
         }
-        
-        setNeedsApproval(BigInt(currentAllowance) < BigInt(amountInWei));
+
+        setNeedsApproval(currentAllowance < amountInWei);
       } catch (error) {
         console.error('Error checking approval:', error);
         setNeedsApproval(true); // Default to needing approval on error
@@ -174,7 +179,7 @@ export function WalletDetailsModal({ onClose }) {
         setIsCheckingApproval(false);
       }
     };
-    
+
     if (showStakeModal) {
       checkApproval();
     }
@@ -296,65 +301,70 @@ export function WalletDetailsModal({ onClose }) {
           
           {stakedBalance && parseFloat(stakedBalance) > 0 && (
             canWithdraw ? (
-              <TransactionButton
-                transaction={() => stakingTransactions.prepareWithdrawAll()}
-                onTransactionSent={() => {
-                  setTransactionStatus('waiting');
-                }}
-                onTransactionConfirmed={async (result) => {
-            
-                  setTransactionStatus('confirmed');
-
-                  // Save unstake to Firebase for activity feed
-                  try {
-                    const unstakeData = {
-                      action: 'unstake',
-                      amount: stakedBalance,
-                      userId: user?.id,
-                      walletAddress: walletAddress,
-                      userImageUrl: user?.imageUrl || null,
-                      name: user?.username || user?.firstName || 'Anonymous',
-                      createdAt: serverTimestamp(),
-                      timestamp: new Date().toISOString(),
-                      txHash: result?.transactionHash || null
-                    };
-                    await addDoc(collection(db, 'stakes'), unstakeData);
-                  } catch (firestoreError) {
-                    console.error('Error saving unstake to Firestore:', firestoreError);
-                  }
-
-                  // Wait 2 seconds showing confirmed
-                  await new Promise(resolve => setTimeout(resolve, 2000));
-
-                  setTransactionStatus('updating');
-                  setIsUpdatingBalance(true);
-                  setIsUpdatingStaking(true);
-
-                  // Show updating message for a bit
-                  await new Promise(resolve => setTimeout(resolve, 1000));
-
-                  await refreshStaking();
-                  await refreshBalance();
-
-                  // Keep showing update message to ensure data propagates
-                  await new Promise(resolve => setTimeout(resolve, 2000));
-
-                  setIsUpdatingBalance(false);
-                  setIsUpdatingStaking(false);
-                  setTransactionStatus('');
-                }}
-                onError={(error) => {
-                  console.error("Withdraw failed:", error);
-                  alert("Failed to withdraw: " + error.message);
-                }}
+              <button
                 className="action-button unstake"
                 style={{ backgroundColor: '#ff6b6b' }}
+                onClick={async () => {
+                  try {
+                    setTransactionStatus('waiting');
+                    const txHash = await writeContractAsync({
+                      address: STAKING_ADDRESS,
+                      abi: stakingAbi,
+                      functionName: 'withdrawAll',
+                      args: [],
+                    });
+
+                    setTransactionStatus('confirmed');
+
+                    // Save unstake to Firebase for activity feed
+                    try {
+                      const unstakeData = {
+                        action: 'unstake',
+                        amount: stakedBalance,
+                        userId: user?.id,
+                        walletAddress: walletAddress,
+                        userImageUrl: user?.imageUrl || null,
+                        name: user?.username || user?.firstName || 'Anonymous',
+                        createdAt: serverTimestamp(),
+                        timestamp: new Date().toISOString(),
+                        txHash: txHash || null
+                      };
+                      await addDoc(collection(db, 'stakes'), unstakeData);
+                    } catch (firestoreError) {
+                      console.error('Error saving unstake to Firestore:', firestoreError);
+                    }
+
+                    // Wait 2 seconds showing confirmed
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+
+                    setTransactionStatus('updating');
+                    setIsUpdatingBalance(true);
+                    setIsUpdatingStaking(true);
+
+                    // Show updating message for a bit
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    await refreshStaking();
+                    await refreshBalance();
+
+                    // Keep showing update message to ensure data propagates
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+
+                    setIsUpdatingBalance(false);
+                    setIsUpdatingStaking(false);
+                    setTransactionStatus('');
+                  } catch (error) {
+                    console.error("Withdraw failed:", error);
+                    alert("Failed to withdraw: " + error.message);
+                    setTransactionStatus('');
+                  }
+                }}
               >
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
                   <span>Withdraw All</span>
                   <span style={{ fontSize: '9px', opacity: 0.8 }}>({stakedBalance} RL80)</span>
                 </div>
-              </TransactionButton>
+              </button>
             ) : (
               <button 
                 className="action-button unstake" 
@@ -375,38 +385,45 @@ export function WalletDetailsModal({ onClose }) {
           
           {earnedRewards && parseFloat(earnedRewards) > 0 ? (
             canWithdraw ? (
-              <TransactionButton
-                transaction={() => stakingTransactions.prepareClaimRewards()}
-                onTransactionConfirmed={async (result) => {
-                  // Save claim to Firebase for activity feed
-                  try {
-                    const claimData = {
-                      action: 'claim',
-                      amount: earnedRewards,
-                      userId: user?.id,
-                      walletAddress: walletAddress,
-                      userImageUrl: user?.imageUrl || null,
-                      name: user?.username || user?.firstName || 'Anonymous',
-                      createdAt: serverTimestamp(),
-                      timestamp: new Date().toISOString(),
-                      txHash: result?.transactionHash || null
-                    };
-                    await addDoc(collection(db, 'stakes'), claimData);
-                  } catch (firestoreError) {
-                    console.error('Error saving claim to Firestore:', firestoreError);
-                  }
-
-                  await refreshStaking();
-                  await refreshBalance();
-                }}
-                onError={(error) => {
-                  console.error("Claim failed:", error);
-                  alert("Failed to claim rewards: " + error.message);
-                }}
+              <button
                 className="action-button claim"
+                onClick={async () => {
+                  try {
+                    const txHash = await writeContractAsync({
+                      address: STAKING_ADDRESS,
+                      abi: stakingAbi,
+                      functionName: 'claimRewards',
+                      args: [],
+                    });
+
+                    // Save claim to Firebase for activity feed
+                    try {
+                      const claimData = {
+                        action: 'claim',
+                        amount: earnedRewards,
+                        userId: user?.id,
+                        walletAddress: walletAddress,
+                        userImageUrl: user?.imageUrl || null,
+                        name: user?.username || user?.firstName || 'Anonymous',
+                        createdAt: serverTimestamp(),
+                        timestamp: new Date().toISOString(),
+                        txHash: txHash || null
+                      };
+                      await addDoc(collection(db, 'stakes'), claimData);
+                    } catch (firestoreError) {
+                      console.error('Error saving claim to Firestore:', firestoreError);
+                    }
+
+                    await refreshStaking();
+                    await refreshBalance();
+                  } catch (error) {
+                    console.error("Claim failed:", error);
+                    alert("Failed to claim rewards: " + error.message);
+                  }
+                }}
               >
                 Claim {parseFloat(earnedRewards).toFixed(6)} ETH
-              </TransactionButton>
+              </button>
             ) : (
               <button className="action-button claim" disabled style={{ opacity: 0.5 }}>
                 🔒 Claim Locked
@@ -495,105 +512,108 @@ export function WalletDetailsModal({ onClose }) {
               
               <div className="stake-actions">
                 {needsApproval ? (
-                  <TransactionButton
-                    transaction={() => {
-                      const amount = toWei(stakeAmount || '0');
-                      // Use prepareApprove which returns the prepared transaction
-                      return tokenFunctions.prepareApprove(stakingContract.address, amount);
-                    }}
-                    onTransactionSent={() => {
-                      setTransactionStatus('waiting');
-                    }}
-                    onTransactionConfirmed={async (receipt) => {
-                
-                      setTransactionStatus('confirmed');
-                      // Re-check the allowance after approval
-                      try {
-                        const newAllowance = await tokenFunctions.getAllowance(walletAddress, stakingContract.address);
-
-                        if (BigInt(newAllowance) >= BigInt(toWei(stakeAmount || '0'))) {
-                          setNeedsApproval(false);
-                        } else {
-                          console.error("Approval didn't set expected allowance");
-                        }
-                      } catch (error) {
-                        console.error("Error checking new allowance:", error);
-                      }
-                      setTimeout(() => setTransactionStatus(''), 3000);
-                    }}
-                    onError={(error) => {
-                      console.error("Approval failed - Full error object:", error);
-                      console.error("Error name:", error.name);
-                      console.error("Error message:", error.message);
-                      console.error("Error cause:", error.cause);
-                      console.error("Error details:", error.details);
-                      console.error("Error data:", error.data);
-                      
-                      // Check if it's a user rejection
-                      if (error.message?.includes('rejected') || error.message?.includes('denied')) {
-                        alert("Transaction was rejected by user");
-                      } else if (error.message?.includes('insufficient')) {
-                        alert("Insufficient funds for gas. Please add more ETH to your wallet.");
-                      } else {
-                        alert("Failed to approve: " + (error.shortMessage || error.message));
-                      }
-                    }}
+                  <button
                     disabled={!stakeAmount || parseFloat(stakeAmount) <= 0 || isCheckingApproval}
                     className="action-button stake"
+                    onClick={async () => {
+                      try {
+                        const amount = parseEther(stakeAmount || '0');
+                        setTransactionStatus('waiting');
+
+                        await writeContractAsync({
+                          address: RL80_ADDRESS,
+                          abi: erc20Abi,
+                          functionName: 'approve',
+                          args: [STAKING_ADDRESS, amount],
+                        });
+
+                        setTransactionStatus('confirmed');
+                        // Re-check the allowance after approval
+                        try {
+                          const newAllowance = await publicClient.readContract({
+                            address: RL80_ADDRESS,
+                            abi: erc20Abi,
+                            functionName: 'allowance',
+                            args: [walletAddress, STAKING_ADDRESS],
+                          });
+
+                          if (newAllowance >= amount) {
+                            setNeedsApproval(false);
+                          } else {
+                            console.error("Approval didn't set expected allowance");
+                          }
+                        } catch (error) {
+                          console.error("Error checking new allowance:", error);
+                        }
+                        setTimeout(() => setTransactionStatus(''), 3000);
+                      } catch (error) {
+                        console.error("Approval failed:", error);
+                        if (error.message?.includes('rejected') || error.message?.includes('denied')) {
+                          alert("Transaction was rejected by user");
+                        } else if (error.message?.includes('insufficient')) {
+                          alert("Insufficient funds for gas. Please add more ETH to your wallet.");
+                        } else {
+                          alert("Failed to approve: " + (error.shortMessage || error.message));
+                        }
+                      }
+                    }}
                   >
                     {isCheckingApproval ? 'Checking...' : `Approve ${stakeAmount || '0'} RL80`}
-                  </TransactionButton>
+                  </button>
                 ) : (
-                  <TransactionButton
-                    transaction={() => {
-                      const amount = toWei(stakeAmount || '0');
-                      return stakingTransactions.prepareStake(amount);
-                    }}
-                    onTransactionSent={(result) => {
-                    }}
-                    onTransactionConfirmed={async (receipt) => {
-                      setTransactionStatus('confirmed');
-                      
-                      // Wait 2 seconds showing confirmed
-                      await new Promise(resolve => setTimeout(resolve, 2000));
-                      
-                      setTransactionStatus('updating');
-                      setIsUpdatingBalance(true);
-                      setIsUpdatingStaking(true);
-                      setShowStakeModal(false);
-                      setStakeAmount('');
-                      
-                      // Show updating message for a bit before refreshing
-                      await new Promise(resolve => setTimeout(resolve, 1000));
-                      
-                      // Refresh data (this takes time due to blockchain reads)
-                      await refreshStaking();
-                      await refreshBalance();
-                      
-                      // Keep showing update message for a bit longer to ensure data propagates
-                      await new Promise(resolve => setTimeout(resolve, 2000));
-                      
-                      setIsUpdatingBalance(false);
-                      setIsUpdatingStaking(false);
-                      setTransactionStatus('');
-                    }}
-                    onError={(error) => {
-                      console.error("Stake failed - Full error:", error);
-                      // Check for specific error types
-                      if (error.message?.includes('insufficient')) {
-                        alert("Insufficient tokens. Please check your balance.");
-                      } else if (error.message?.includes('allowance')) {
-                        alert("Insufficient allowance. Please approve tokens first.");
-                        setNeedsApproval(true);
-                      } else {
-                        alert("Failed to stake: " + (error.shortMessage || error.message));
-                      }
-                    }}
+                  <button
                     disabled={!stakeAmount || parseFloat(stakeAmount) <= 0 || isCheckingApproval}
                     className="action-button stake"
+                    onClick={async () => {
+                      try {
+                        const amount = parseEther(stakeAmount || '0');
+
+                        await writeContractAsync({
+                          address: STAKING_ADDRESS,
+                          abi: stakingAbi,
+                          functionName: 'stake',
+                          args: [amount],
+                        });
+
+                        setTransactionStatus('confirmed');
+
+                        // Wait 2 seconds showing confirmed
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+
+                        setTransactionStatus('updating');
+                        setIsUpdatingBalance(true);
+                        setIsUpdatingStaking(true);
+                        setShowStakeModal(false);
+                        setStakeAmount('');
+
+                        // Show updating message for a bit before refreshing
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+
+                        // Refresh data (this takes time due to blockchain reads)
+                        await refreshStaking();
+                        await refreshBalance();
+
+                        // Keep showing update message for a bit longer to ensure data propagates
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+
+                        setIsUpdatingBalance(false);
+                        setIsUpdatingStaking(false);
+                        setTransactionStatus('');
+                      } catch (error) {
+                        console.error("Stake failed:", error);
+                        if (error.message?.includes('insufficient')) {
+                          alert("Insufficient tokens. Please check your balance.");
+                        } else if (error.message?.includes('allowance')) {
+                          alert("Insufficient allowance. Please approve tokens first.");
+                          setNeedsApproval(true);
+                        } else {
+                          alert("Failed to stake: " + (error.shortMessage || error.message));
+                        }
+                      }
+                    }}
                   >
                     {isCheckingApproval ? 'Checking...' : `Stake ${stakeAmount || '0'} RL80`}
-                  </TransactionButton>
+                  </button>
                 )}
                 
                 <button 

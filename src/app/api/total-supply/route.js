@@ -1,4 +1,6 @@
-import { tokenFunctions } from '@/lib/contract'
+import { erc20Abi } from 'viem'
+import { publicClient } from '@/lib/viemClient'
+import { RL80_ADDRESS } from '@/lib/contracts'
 
 let cache = { value: null, ts: 0 }
 const CACHE_TTL = 5 * 60_000 // 5 minutes
@@ -12,8 +14,11 @@ export async function GET() {
   }
 
   try {
-    const raw = await tokenFunctions.getTotalSupply()
-    // raw is BigInt in wei (18 decimals) — convert to whole tokens
+    const raw = await publicClient.readContract({
+      address: RL80_ADDRESS,
+      abi: erc20Abi,
+      functionName: 'totalSupply',
+    })
     const supply = (raw / BigInt(10 ** 18)).toString()
     cache = { value: supply, ts: now }
     return new Response(supply, {
@@ -21,7 +26,6 @@ export async function GET() {
     })
   } catch (err) {
     console.error('total-supply error:', err)
-    // Fallback to cached or initial supply
     return new Response(cache.value || '80000000000', {
       headers: { 'Content-Type': 'text/plain' },
     })

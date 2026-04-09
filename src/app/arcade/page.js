@@ -9,6 +9,7 @@ import CoinLoader from "@/components/CoinLoader";
 import CyberNav from "@/components/CyberNav";
 import NavControlsHome from "@/components/NavControlsHome";
 import MobileBottomNav from "@/components/MobileBottomNav";
+import MainMobileNav from "@/components/MainMobileNav";
 import BuyModal from "@/components/BuyModal";
 import { useUser } from "@clerk/nextjs";
 
@@ -336,8 +337,8 @@ export default function ArcadePage() {
         </div>
       )}
 
-      {/* Nav Controls — Desktop */}
-      {!isMobileDevice && (
+      {/* Nav Controls — Desktop (hidden, using MainMobileNav instead) */}
+      {/* {!isMobileDevice && (
         <div
           style={{
             position: "absolute",
@@ -361,83 +362,42 @@ export default function ArcadePage() {
             onBuyClick={() => setShowBuyModal(true)}
           />
         </div>
-      )}
+      )} */}
 
-      {/* Mobile: 80s button + bottom nav */}
-      {isMobileDevice && (
-        <>
-          <button
-            onClick={() => setContext80sMode(!is80sMode)}
-            title={is80sMode ? "Disable 80s Mode" : "Enable 80s Mode"}
-            style={{
-              position: "absolute",
-              top: "calc(1rem + env(safe-area-inset-top))",
-              right: "1rem",
-              zIndex: 30000,
-              width: "auto",
-              height: 40,
-              minWidth: 40,
-              minHeight: 40,
-              padding: "0 8px",
-              borderRadius: 10,
-              background: is80sMode
-                ? "rgba(255, 0, 255, 0.1)"
-                : "rgba(212, 175, 55, 0.05)",
-              border: `1.5px solid ${is80sMode ? "rgba(255, 0, 255, 0.4)" : "rgba(212, 175, 55, 0.2)"}`,
-              backdropFilter: "blur(20px)",
-              WebkitBackdropFilter: "blur(20px)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              boxShadow: is80sMode
-                ? "0 0 15px rgba(255, 0, 255, 0.3)"
-                : "none",
-            }}
-          >
-            <span
-              style={{
-                fontSize: 12,
-                fontWeight: "bold",
-                color: is80sMode ? "#00ff41" : "#67e8f9",
-                textShadow: is80sMode ? "0 0 10px #00ff41" : "none",
-                fontFamily: "'Orbitron', monospace",
-                lineHeight: 0.9,
-              }}
-            >
-              80s
-            </span>
-            <span
-              style={{
-                fontSize: "0.5rem",
-                fontWeight: "bold",
-                color: is80sMode ? "#00ff41" : "#67e8f9",
-                textShadow: is80sMode ? "0 0 10px #00ff41" : "none",
-                fontFamily: "'Orbitron', monospace",
-              }}
-            >
-              MODE
-            </span>
-          </button>
+      {/* Mobile: 80s button (hidden, using MainMobileNav instead) */}
 
-          <MobileBottomNav
-            isPlaying={contextIsPlaying}
-            onPlayMusic={() => play()}
-            onStopMusic={() => pause()}
-            onSkipTrack={() => nextTrack()}
-            onMenuClick={() => setIsMenuOpen(!isMenuOpen)}
-            onUserClick={() => {}}
-            isUserSignedIn={!!user}
-            isMenuOpen={isMenuOpen}
-            is80sMode={is80sMode}
-            userImage={user?.imageUrl}
-            onBuyClick={() => setShowBuyModal(true)}
-            isMobile
-            show80sButton={false}
-          />
-        </>
-      )}
+      {/* Bottom nav — all screen sizes */}
+      <MainMobileNav
+        onBuyClick={() => setShowBuyModal(true)}
+        onCommsClick={() => {}}
+        overrideSlots={{
+          leftCenter: {
+            icon: (
+              <svg className="mn-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.3 }}>
+                <path d="M12 18h.01" />
+                <path d="M7 14a5 5 0 0 1 10 0" />
+                <path d="M4 10a9 9 0 0 1 16 0" />
+                <rect x="5" y="18" width="14" height="4" rx="1" />
+              </svg>
+            ),
+            label: "COMMS",
+            onClick: () => {},
+            colorClass: "mn-comms",
+            disabled: true,
+          },
+          right: {
+            icon: (
+              <svg className="mn-nav-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
+              </svg>
+            ),
+            label: "BASE",
+            onClick: () => router.push('/'),
+            colorClass: "mn-lounge",
+          },
+        }}
+      />
 
       {/* CyberNav Menu */}
       <CyberNav

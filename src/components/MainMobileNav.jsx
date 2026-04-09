@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 
 /**
  * MainMobileNav — bottom dock navigation.
@@ -26,6 +27,7 @@ export default function MainMobileNav({
   variant = "default",
   overrideSlots = {},
 }) {
+  const router = useRouter();
   const [fabPulse, setFabPulse] = useState(false);
   const barRef = useRef(null);
 
@@ -124,7 +126,7 @@ export default function MainMobileNav({
     right: {
       icon: <LoungeIcon />,
       label: "LOUNGE",
-      onClick: onLoungeClick,
+      onClick: onLoungeClick || (() => router.push('/arcade')),
       colorClass: "mn-lounge",
     },
   };
@@ -147,8 +149,9 @@ export default function MainMobileNav({
   const renderItem = (slot, key) => (
     <button
       key={key}
-      className="mn-item"
+      className={`mn-item ${slot.disabled ? "mn-disabled" : ""}`}
       onClick={(e) => {
+        if (slot.disabled) return;
         triggerGlow(glowColors[slot.colorClass] || 'rgba(0, 255, 255, 0.6)');
         slot.onClick?.(e);
       }}
@@ -231,6 +234,11 @@ export default function MainMobileNav({
           min-width: 52px;
           position: relative;
           color: inherit;
+        }
+
+        .mn-item.mn-disabled {
+          opacity: 0.35;
+          pointer-events: none;
         }
 
         /* Spring bounce on tap */

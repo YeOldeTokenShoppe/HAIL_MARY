@@ -92,9 +92,9 @@ import { CandleCloud, GradientBackground, SceneSetup } from './CandleShrine'
 import { NewCandleEffectManager } from './NewCandleEffect'
 import PostProcessingEffects from './PostProcessingEffects'
 import { useStaking } from '@/hooks/useStaking'
-import { useReadContract } from 'thirdweb/react'
-import { totalSupply } from 'thirdweb/extensions/erc20'
-import { erc20Contract } from '@/lib/contract'
+import { useReadContract } from 'wagmi'
+import { erc20Abi } from 'viem'
+import { RL80_ADDRESS } from '@/lib/contracts'
 import CongregationSentiment from './SentimentData'
 import { db, collection, query, orderBy, limit, getDocs } from '@/lib/firebaseClient'
 
@@ -1845,13 +1845,12 @@ useEffect(() => {
     const offeringsCount = totalOfferingsCount > 0 ? totalOfferingsCount : offerings.length
     return offeringsCount
   }, [totalOfferingsCount, offerings.length])
-  // Read total supply from the contract using the proper thirdweb extension
-  const { data: totalSupplyData, isLoading: isLoadingSupply } = useReadContract(
-    totalSupply,
-    { 
-      contract: erc20Contract 
-    }
-  )
+  // Read total supply from the contract
+  const { data: totalSupplyData, isLoading: isLoadingSupply } = useReadContract({
+    address: RL80_ADDRESS,
+    abi: erc20Abi,
+    functionName: 'totalSupply',
+  })
 
   // Calculate real burn total from contract data
   const INITIAL_SUPPLY = 80_000_000_000 // 80 billion initial supply

@@ -1,17 +1,86 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ClaimButton } from 'thirdweb/react';
-import { base } from 'thirdweb/chains';
-import { client } from '@/lib/constants';
-import { useActiveAccount } from 'thirdweb/react';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+
+const CLAIM_CONTRACT_ADDRESS = '0x71e90d43a3f00b02d140d5c714422e8eb78459fa';
+
+// Minimal ABI for the claim function (ERC20 drop/claim)
+const claimAbi = [
+  {
+    inputs: [
+      { name: '_receiver', type: 'address' },
+      { name: '_quantity', type: 'uint256' },
+      { name: '_currency', type: 'address' },
+      { name: '_pricePerToken', type: 'uint256' },
+      { name: '_allowlistProof', type: 'tuple', components: [
+        { name: 'proof', type: 'bytes32[]' },
+        { name: 'quantityLimitPerWallet', type: 'uint256' },
+        { name: 'pricePerToken', type: 'uint256' },
+        { name: 'currency', type: 'address' },
+      ]},
+      { name: '_data', type: 'bytes' },
+    ],
+    name: 'claim',
+    outputs: [],
+    stateMutability: 'payable',
+    type: 'function',
+  },
+];
 
 const ClaimTokensModal = ({ isOpen, onClose, walletAddress }) => {
   const [claimError, setClaimError] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const activeAccount = useActiveAccount();
-  
+  const { address: connectedAddress } = useAccount();
+  const { writeContractAsync } = useWriteContract();
+
   if (!isOpen) return null;
+
+  const effectiveAddress = connectedAddress || walletAddress;
+
+  const handleClaim = async () => {
+    if (!effectiveAddress) return;
+
+    setIsProcessing(true);
+    setClaimError(null);
+
+    try {
+      const tx = await writeContractAsync({
+        address: CLAIM_CONTRACT_ADDRESS,
+        abi: claimAbi,
+        functionName: 'claim',
+        args: [
+          effectiveAddress,
+          BigInt(100) * BigInt(10 ** 18), // 100 tokens in wei
+          '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE', // Native token (free claim)
+          BigInt(0), // price per token (free)
+          {
+            proof: [],
+            quantityLimitPerWallet: BigInt(0),
+            pricePerToken: BigInt(0),
+            currency: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
+          },
+          '0x', // empty data
+        ],
+      });
+
+      setIsProcessing(false);
+      setTimeout(() => {
+        onClose();
+        window.location.reload(); // Refresh to update balance
+      }, 2000);
+    } catch (error) {
+      console.error('Claim error:', error);
+      setIsProcessing(false);
+      if (error.message?.includes('COOP') || error.message?.includes('Cross-Origin')) {
+        setClaimError('Pop-up blocked. Please allow pop-ups for this site and try again.');
+      } else if (error.message?.includes('user rejected') || error.message?.includes('denied')) {
+        setClaimError('Transaction cancelled.');
+      } else {
+        setClaimError('Failed to claim tokens. Please try again.');
+      }
+    }
+  };
 
   return (
     <>
@@ -163,22 +232,22 @@ const ClaimTokensModal = ({ isOpen, onClose, walletAddress }) => {
       <div className="modal-overlay" onClick={onClose}>
         <div className="modal-content" onClick={(e) => e.stopPropagation()}>
           <button className="close-button" onClick={onClose}>✕</button>
-          
+
           <div className="modal-icon">🪙</div>
-          
+
           <h2 className="modal-title">Claim Test Tokens</h2>
-          
+
           <p className="modal-subtitle">
             Get 100 FREE RL80 tokens to light your candle!
           </p>
-          
+
           <p className="modal-description">
-            These test tokens allow you to participate in the shrine by lighting candles. 
+            These test tokens allow you to participate in the shrine by lighting candles.
             Each claim gives you 100 RL80 tokens on Base.
           </p>
 
           <div className="claim-button-wrapper">
-            {!activeAccount && !walletAddress ? (
+            {!effectiveAddress ? (
               <div style={{
                 background: 'rgba(255, 100, 100, 0.1)',
                 border: '1px solid rgba(255, 100, 100, 0.3)',
@@ -213,14 +282,9 @@ const ClaimTokensModal = ({ isOpen, onClose, walletAddress }) => {
                     </p>
                   </div>
                 )}
-                <ClaimButton
-                  contractAddress="0x71e90d43a3f00b02d140d5c714422e8eb78459fa"
-                  chain={base}
-                  client={client}
-                  claimParams={{
-                    type: "ERC20",
-                    quantity: "100",
-                  }}
+                <button
+                  onClick={handleClaim}
+                  disabled={isProcessing}
                   style={{
                     background: isProcessing ? 'rgba(139, 92, 246, 0.5)' : 'linear-gradient(135deg, #8b5cf6, #ec4899)',
                     border: 'none',
@@ -236,38 +300,16 @@ const ClaimTokensModal = ({ isOpen, onClose, walletAddress }) => {
                     letterSpacing: '1px',
                     textTransform: 'uppercase'
                   }}
-                  onClick={() => {
-                    setIsProcessing(true);
-                    setClaimError(null);
-                  }}
-                  onError={(error) => {
-                    console.error('Claim error:', error);
-                    setIsProcessing(false);
-                    if (error.message?.includes('COOP') || error.message?.includes('Cross-Origin')) {
-                      setClaimError('Pop-up blocked. Please allow pop-ups for this site and try again.');
-                    } else if (error.message?.includes('user rejected') || error.message?.includes('denied')) {
-                      setClaimError('Transaction cancelled.');
-                    } else {
-                      setClaimError('Failed to claim tokens. Please try again.');
-                    }
-                  }}
-                  onTransactionConfirmed={() => {
-                    setIsProcessing(false);
-                    setTimeout(() => {
-                      onClose();
-                      window.location.reload(); // Refresh to update balance
-                    }, 2000);
-                  }}
                 >
                   {isProcessing ? 'Processing...' : 'Claim 100 RL80 Tokens'}
-                </ClaimButton>
+                </button>
               </>
             )}
           </div>
 
           <div className="info-box">
             <p className="info-text">
-              ℹ️ Make sure you're connected to Base network. 
+              ℹ️ Make sure you're connected to Base network.
               The transaction will require a small amount of ETH for gas fees.
               <br /><br />
               ⚠️ If you see a popup blocker warning, please allow popups for this site to connect your wallet.

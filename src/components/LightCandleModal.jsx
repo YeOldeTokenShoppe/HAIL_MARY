@@ -8,10 +8,9 @@ import { db, collection, addDoc, doc, serverTimestamp, query, where, getDocs, de
 import { generateCandlePosition, generateCandleRotation, generateCandleScale } from '@/utils/candlePositions';
 import ThirdwebBuyModal from './ThirdwebBuyModal';
 import NoTokensPrompt from './NoTokensPrompt';
-import { erc20Contract } from '@/lib/contract';
-import { useSendTransaction } from 'thirdweb/react';
-import { burn } from 'thirdweb/extensions/erc20';
-import { sendAndConfirmTransaction } from 'thirdweb';
+import { useWriteContract } from 'wagmi';
+import { erc20Abi } from 'viem';
+import { RL80_ADDRESS, BURN_ADDRESS } from '@/lib/contracts';
 import { validateAmount, validateMessage, validateName, validateTransaction, checkRateLimit, formatSafeErrorMessage, sanitizeText } from '@/utils/security';
 import { useLanguage } from './LanguageProvider';
 
@@ -200,8 +199,8 @@ const getUserLanguage = () => {
 
 const LightCandleModal = ({ isOpen, onClose, onLightCandle, skipFirestore = false }) => {
   const { user } = useUser();
-  const { walletAddress, tokenBalance, activeAccount } = useWalletAuth();
-  const { mutate: sendTransaction } = useSendTransaction();
+  const { walletAddress, tokenBalance } = useWalletAuth();
+  const { writeContractAsync } = useWriteContract();
   const { t } = useLanguage();
 
   // Multi-step wizard state
@@ -526,7 +525,7 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle, skipFirestore = fals
   const prayerTemplates = PRAYERS_BY_LANGUAGE[selectedLanguage]?.prayers || PRAYERS_BY_LANGUAGE.en.prayers;
 
 
-  // This is now only used for the form onSubmit - actual transaction is handled by TransactionButton
+  // This is now only used for the form onSubmit - actual transaction is handled by writeContractAsync
   const handleSubmit = async (e) => {
     e.preventDefault();
     // Validation is now handled by validateCandleForm
@@ -1966,10 +1965,9 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle, skipFirestore = fals
                   await new Promise(resolve => setTimeout(resolve, 500));
                   
                   try {
-                    // Check if we have an active account
-                    
-                    if (!activeAccount) {
-                      console.error('[LightCandleModal] No active account available');
+                    // Check if we have a connected wallet
+                    if (!walletAddress) {
+                      console.error('[LightCandleModal] No wallet connected');
                       alert('Please connect your wallet first');
                       setIsSubmitting(false);
                       setIsBurnInProgress(false);
@@ -1978,119 +1976,64 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle, skipFirestore = fals
                       setShowWalletLoading(false);
                       return;
                     }
-                    
-                    const transaction = burn({
-                      contract: erc20Contract,
-                      amount: amountInWei,
-                    });
 
-                    // Keep showWalletLoading visible while user signs in their wallet
-
-                    // Check if this is a test wallet account (has sendTransaction method)
-                    if (activeAccount.sendTransaction) {
-                      
-                      try {
-                        // For test wallets, use the account's sendTransaction directly
-                        const result = await sendAndConfirmTransaction({
-                          transaction,
-                          account: activeAccount
-                        });
-                        
-
-                        // Hide wallet loading after successful signing
-                        setShowWalletLoading(false);
-
-                        // Clear progress indicator
-                        setTransactionStatus('');
-
-                        // Now save to Firebase after actual blockchain confirmation
-                        await handlePostBurnActions();
-
-                        setIsSubmitting(false);
-                        // Permanently hide the modal after burn completes
-                        setHasCompletedBurn(true);
-
-                        // Call onClose after a delay
-                        setTimeout(() => {
-                          onClose();
-                        }, 100);
-                      } catch (error) {
-                        console.error('[LightCandleModal] Test wallet transaction error');
-                        setTransactionStatus('');
-                        setIsBurnInProgress(false);
-                        showError(formatSafeErrorMessage(error));
-                        setIsSubmitting(false);
-                        setShowWalletLoading(false);
-                        setForceHidden(false);
-                        setModalHidden(false);
-                      }
-                    } else {
-                      // For regular wallets, use the sendTransaction hook
-                      sendTransaction(transaction, {
-                        onSuccess: async (result) => {
-                          // Hide wallet loading immediately after signing
-                          setShowWalletLoading(false);
-                          // NOW show the progress indicator for blockchain confirmation
-                          setTransactionStatus('processing');
-                          
-                          // Wait for transaction to be actually mined/confirmed
-                          if (result?.transactionHash || result?.hash) {
-                            // Transaction takes ~10 seconds to confirm
-                            
-                            // Check if we have a wait method or need to poll
-                            if (result.wait) {
-                              // If there's a wait method, use it
-                              await result.wait();
-                            } else {
-                              // Otherwise wait for a reasonable time for confirmation
-                              await new Promise(resolve => setTimeout(resolve, 10000));
-                            }
-                          }
-                          
-                          // Clear progress indicator
-                          setTransactionStatus('');
-                          
-                          // Now save to Firebase after actual blockchain confirmation
-                          await handlePostBurnActions();
-                          
-                          setIsSubmitting(false);
-                          // Permanently hide the modal after burn completes
-                          setHasCompletedBurn(true);
-                          // Keep forceHidden as true to prevent modal from reappearing
-                          
-                          // Call onClose after a delay to notify parent component
-                          // This ensures the modal is properly closed in the parent's state
-                          setTimeout(() => {
-                            onClose();
-                          }, 100);
-                        },
-                        onError: (error) => {
-                          console.error('[LightCandleModal] Transaction error:', error);
-                          console.error('[LightCandleModal] Error details:', {
-                            message: error?.message,
-                            code: error?.code,
-                            cause: error?.cause,
-                            stack: error?.stack
-                          });
-                          
-                          // Clear all loading states
-                          setTransactionStatus('');
-                          setShowWalletLoading(false);
-                          setIsBurnInProgress(false);
-                          setForceHidden(false);
-                          setModalHidden(false);
-                          
-                          // Check if user rejected the transaction
-                          if (!error?.message?.includes('User rejected') && 
-                              !error?.message?.includes('User denied') &&
-                              !error?.message?.includes('rejected') &&
-                              error?.code !== 4001) {
-                            showError(formatSafeErrorMessage(error));
-                          }
-                          
-                          setIsSubmitting(false);
-                        }
+                    // Burn tokens by transferring to dead address via wagmi
+                    try {
+                      const txHash = await writeContractAsync({
+                        address: RL80_ADDRESS,
+                        abi: erc20Abi,
+                        functionName: 'transfer',
+                        args: [BURN_ADDRESS, amountInWei],
                       });
+
+                      // Hide wallet loading after successful signing
+                      setShowWalletLoading(false);
+
+                      // Show the progress indicator for blockchain confirmation
+                      setTransactionStatus('processing');
+
+                      // Wait for confirmation
+                      await new Promise(resolve => setTimeout(resolve, 10000));
+
+                      // Clear progress indicator
+                      setTransactionStatus('');
+
+                      // Now save to Firebase after actual blockchain confirmation
+                      await handlePostBurnActions();
+
+                      setIsSubmitting(false);
+                      // Permanently hide the modal after burn completes
+                      setHasCompletedBurn(true);
+
+                      // Call onClose after a delay
+                      setTimeout(() => {
+                        onClose();
+                      }, 100);
+                    } catch (error) {
+                      console.error('[LightCandleModal] Transaction error:', error);
+                      console.error('[LightCandleModal] Error details:', {
+                        message: error?.message,
+                        code: error?.code,
+                        cause: error?.cause,
+                        stack: error?.stack
+                      });
+
+                      // Clear all loading states
+                      setTransactionStatus('');
+                      setShowWalletLoading(false);
+                      setIsBurnInProgress(false);
+                      setForceHidden(false);
+                      setModalHidden(false);
+
+                      // Check if user rejected the transaction
+                      if (!error?.message?.includes('User rejected') &&
+                          !error?.message?.includes('User denied') &&
+                          !error?.message?.includes('rejected') &&
+                          error?.code !== 4001) {
+                        showError(formatSafeErrorMessage(error));
+                      }
+
+                      setIsSubmitting(false);
                     }
                   } catch (error) {
                   console.error('Failed to create burn transaction');

@@ -35,7 +35,7 @@ import {
 // import { Input } from "./ui/input";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-// import { useActiveAccount } from "thirdweb/react";
+
 import { signInWithCustomToken } from "firebase/auth";
 import { useAuth } from "@clerk/nextjs"; // Add this line if it's missing
 import EmojiPicker from "emoji-picker-react";

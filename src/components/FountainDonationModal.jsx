@@ -3,44 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useWalletAuth } from './WalletAuthProvider';
-import { CHARITY_WALLETS, tokenFunctions, client } from '@/lib/contract';
-import { ConnectButton } from "thirdweb/react";
-import { sendAndConfirmTransaction } from "thirdweb";
-import { darkTheme } from "thirdweb/react";
-import { defineChain } from "thirdweb/chains";
-import { inAppWallet } from "thirdweb/wallets/in-app";
-import { createWallet } from "thirdweb/wallets";
+import { CHARITY_WALLETS } from '@/lib/contracts';
+import { useWriteContract } from 'wagmi';
+import { erc20Abi, parseEther } from 'viem';
+import { RL80_ADDRESS } from '@/lib/contracts';
 import { db, collection, addDoc, serverTimestamp } from '@/lib/firebaseClient';
-
-const chain = defineChain(8453); // Base
-
-// Custom theme matching the donation modal style
-const donationWalletTheme = darkTheme({
-  colors: {
-    primaryButtonBg: "linear-gradient(135deg, #FFD700, #FFA500)",
-    primaryButtonText: "#000",
-    modalBg: "rgba(20, 20, 30, 0.98)",
-    borderColor: "rgba(255, 215, 0, 0.3)",
-    accentText: "#FFD700",
-    primaryText: "#ffffff",
-    secondaryText: "rgba(255, 255, 255, 0.6)",
-    connectedButtonBg: "rgba(255, 215, 0, 0.1)",
-    connectedButtonBgHover: "rgba(255, 215, 0, 0.2)",
-  },
-  fontFamily: "'Orbitron', monospace",
-});
-
-// Wallet options
-const donationWallets = [
-  createWallet("io.metamask"),
-  createWallet("com.coinbase.wallet"),
-  createWallet("walletConnect"),
-  inAppWallet({
-    auth: {
-      options: ["google", "discord", "telegram", "farcaster", "email", "x", "passkey"],
-    },
-  }),
-];
 
 const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselectedCharity = null }) => {
   const [selectedCharity, setSelectedCharity] = useState(null);
@@ -56,9 +23,12 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
     walletAddress,
     tokenBalance,
     isWalletConnected,
-    activeAccount,
-    refreshBalance
+    refreshBalance,
+    connectWallet,
+    connectors,
   } = useWalletAuth();
+
+  const { writeContractAsync, isPending: isWritePending } = useWriteContract();
 
   // Get user display info for donation feed
   const getUserDisplayName = () => {
@@ -133,7 +103,7 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
   };
 
   const handleDonate = async () => {
-    if (!activeAccount || !selectedCharity || !amount) return;
+    if (!walletAddress || !selectedCharity || !amount) return;
 
     setStep('processing');
     setError(null);
@@ -141,26 +111,21 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
 
     try {
       const charity = CHARITY_WALLETS[selectedCharity];
-      const decimals = await tokenFunctions.getDecimals();
 
       // Parse amount properly to avoid floating-point precision issues
       // Split into integer and decimal parts
+      const decimals = 18;
       const [intPart, decPart = ''] = amount.split('.');
       const paddedDecimal = decPart.padEnd(decimals, '0').slice(0, decimals);
       const amountInWei = BigInt(intPart + paddedDecimal);
 
-
-      // Prepare the transfer transaction
-      const transaction = tokenFunctions.transfer(charity.address, amountInWei);
-
-      // Send the transaction using sendAndConfirmTransaction with the active account
-      const result = await sendAndConfirmTransaction({
-        transaction,
-        account: activeAccount
+      // Send the transfer transaction using wagmi writeContractAsync
+      const txHashValue = await writeContractAsync({
+        address: RL80_ADDRESS,
+        abi: erc20Abi,
+        functionName: 'transfer',
+        args: [charity.address, amountInWei],
       });
-
-      // Get transaction hash from result
-      const txHashValue = result?.transactionHash || result?.hash || '';
       setTxHash(txHashValue);
 
       // Log to Firestore
@@ -421,31 +386,25 @@ const FountainDonationModal = ({ isOpen, onClose, onDonationComplete, preselecte
                 Connect your wallet to toss a coin for charity
               </p>
               <div style={{ display: 'flex', justifyContent: 'center' }}>
-                <ConnectButton
-                  client={client}
-                  chain={chain}
-                  wallets={donationWallets}
-                  theme={donationWalletTheme}
-                  connectButton={{
-                    label: "Connect Wallet",
-                    style: {
-                      background: 'linear-gradient(135deg, #FFD700, #FFA500)',
-                      color: '#000',
-                      fontFamily: "'Orbitron', monospace",
-                      fontWeight: 'bold',
-                      fontSize: '1rem',
-                      padding: '1rem 2rem',
-                      borderRadius: '8px',
-                      textTransform: 'uppercase',
-                      letterSpacing: '2px',
-                    }
+                <button
+                  onClick={() => connectWallet()}
+                  style={{
+                    background: 'linear-gradient(135deg, #FFD700, #FFA500)',
+                    color: '#000',
+                    fontFamily: "'Orbitron', monospace",
+                    fontWeight: 'bold',
+                    fontSize: '1rem',
+                    padding: '1rem 2rem',
+                    borderRadius: '8px',
+                    textTransform: 'uppercase',
+                    letterSpacing: '2px',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
                   }}
-                  connectModal={{
-                    size: "compact",
-                    showThirdwebBranding: false,
-                    title: "Connect to Donate",
-                  }}
-                />
+                >
+                  Connect Wallet
+                </button>
               </div>
             </div>
           )}

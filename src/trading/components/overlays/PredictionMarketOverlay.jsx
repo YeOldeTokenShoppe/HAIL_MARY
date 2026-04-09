@@ -1,50 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { TransactionButton, useReadContract, ConnectButton, useWalletBalance, useActiveAccount } from "thirdweb/react";
-import { sendAndConfirmTransaction } from "thirdweb";
-import { toWei, toEther } from "thirdweb/utils";
-import { darkTheme } from "thirdweb/react";
-import { defineChain } from "thirdweb/chains";
-import { createWallet } from "thirdweb/wallets";
-import { inAppWallet } from "thirdweb/wallets/in-app";
-import {
-  predictionMarketFunctions,
-  predictionMarketContract,
-  approveForPredictionMarket,
-  getPredictionMarketAllowance,
-  PREDICTION_MARKET_ADDRESS,
-  tokenFunctions,
-  client
-} from '@/lib/contract';
-
-// Chain config for wallet connection
-const chain = defineChain(8453); // Base
-
-// Wallet options for prediction market
-const predictionWallets = [
-  createWallet("io.metamask"),
-  createWallet("com.coinbase.wallet"),
-  createWallet("walletConnect"),
-  inAppWallet({
-    auth: {
-      options: ["google", "discord", "email", "passkey"],
-    },
-  }),
-];
-
-// Custom theme for connect button
-const predictionWalletTheme = darkTheme({
-  colors: {
-    primaryButtonBg: "linear-gradient(135deg, #ff8800, #cc6600)",
-    primaryButtonText: "#000",
-    modalBg: "rgba(20, 20, 30, 0.98)",
-    borderColor: "rgba(255, 136, 0, 0.3)",
-    accentText: "#ff8800",
-    primaryText: "#ffffff",
-    secondaryText: "rgba(255, 255, 255, 0.6)",
-  },
-});
+import { useReadContract, useWriteContract, useBalance } from 'wagmi';
+import { parseEther, formatEther, erc20Abi } from 'viem';
+import { RL80_ADDRESS, PREDICTION_MARKET_ADDRESS } from '@/lib/contracts';
+import { predictionMarketAbi } from '@/lib/abis/predictionMarketAbi';
+import { publicClient } from '@/lib/viemClient';
 import { useWalletAuth } from '@/components/WalletAuthProvider';
 import { validateTransaction } from '@/utils/security';
 import {
@@ -153,28 +114,33 @@ const getMarketStatus = (resolved, winningOption, endTime) => {
 
 // Hook to read on-chain market data
 const useOnChainMarketData = (marketId, enabled = true) => {
+  const queryEnabled = enabled && marketId !== undefined && marketId !== null;
+
   // Read market info
   const { data: marketInfo, isLoading: loadingInfo } = useReadContract({
-    contract: predictionMarketContract,
-    method: "function getMarketInfo(uint256 _marketId) view returns (string question, uint256 endTime, uint8 winningOption, uint8 optionCount, bool resolved)",
-    params: [BigInt(marketId || 0)],
-    enabled: enabled && marketId !== undefined && marketId !== null
+    address: PREDICTION_MARKET_ADDRESS,
+    abi: predictionMarketAbi,
+    functionName: 'getMarketInfo',
+    args: [BigInt(marketId || 0)],
+    query: { enabled: queryEnabled },
   });
 
   // Read all options
   const { data: options, isLoading: loadingOptions } = useReadContract({
-    contract: predictionMarketContract,
-    method: "function getAllOptions(uint256 _marketId) view returns (string[] options)",
-    params: [BigInt(marketId || 0)],
-    enabled: enabled && marketId !== undefined && marketId !== null
+    address: PREDICTION_MARKET_ADDRESS,
+    abi: predictionMarketAbi,
+    functionName: 'getAllOptions',
+    args: [BigInt(marketId || 0)],
+    query: { enabled: queryEnabled },
   });
 
   // Read all option shares (pool sizes)
   const { data: shares, isLoading: loadingShares } = useReadContract({
-    contract: predictionMarketContract,
-    method: "function getAllOptionShares(uint256 _marketId) view returns (uint256[] shares)",
-    params: [BigInt(marketId || 0)],
-    enabled: enabled && marketId !== undefined && marketId !== null
+    address: PREDICTION_MARKET_ADDRESS,
+    abi: predictionMarketAbi,
+    functionName: 'getAllOptionShares',
+    args: [BigInt(marketId || 0)],
+    query: { enabled: queryEnabled },
   });
 
   const isLoading = loadingInfo || loadingOptions || loadingShares;
@@ -189,7 +155,7 @@ const useOnChainMarketData = (marketId, enabled = true) => {
     options: options.map((name, idx) => ({
       id: name,
       name: name,
-      pool: Number(toEther(shares[idx] || BigInt(0))),
+      pool: Number(formatEther(shares[idx] || BigInt(0))),
       color: ORACLE_COLORS[name] || '#888888'
     }))
   } : null;
@@ -199,15 +165,18 @@ const useOnChainMarketData = (marketId, enabled = true) => {
 
 // Hook to read user's shares for a market
 const useUserShares = (marketId, userAddress, optionCount, enabled = true) => {
+  const queryEnabled = enabled && marketId !== undefined && !!userAddress && optionCount > 0;
+
   const { data: userShares, isLoading } = useReadContract({
-    contract: predictionMarketContract,
-    method: "function getAllUserShares(uint256 _marketId, address _user) view returns (uint256[] shares)",
-    params: [BigInt(marketId || 0), userAddress || '0x0000000000000000000000000000000000000000'],
-    enabled: enabled && marketId !== undefined && userAddress && optionCount > 0
+    address: PREDICTION_MARKET_ADDRESS,
+    abi: predictionMarketAbi,
+    functionName: 'getAllUserShares',
+    args: [BigInt(marketId || 0), userAddress || '0x0000000000000000000000000000000000000000'],
+    query: { enabled: queryEnabled },
   });
 
   return {
-    shares: userShares ? userShares.map(s => Number(toEther(s))) : [],
+    shares: userShares ? userShares.map(s => Number(formatEther(s))) : [],
     isLoading
   };
 };
@@ -663,26 +632,19 @@ const MarketCard = ({ market, onSelect, isSelected, walletAddress }) => {
   );
 };
 
-// RL80 Token address on Base
-const RL80_TOKEN_ADDRESS = "0x30D01555d88c76500a82754A1D53cAc082A6CB75";
-
 // Bet panel component - handles both binary and multi-option
 const BetPanel = ({ market, onClose, userId = 'anonymous', onBetPlaced }) => {
-  // Use activeAccount from Thirdweb directly - this is the actually connected wallet
-  const thirdwebAccount = useActiveAccount();
-  // Get wallet context for additional info
+  // Get wallet context
   const { walletAddress, isWalletConnected } = useWalletAuth();
+  const { writeContractAsync } = useWriteContract();
 
-  // Use the Thirdweb account or fallback to walletAddress from useWalletAuth
-  const activeAccount = thirdwebAccount;
-  const effectiveWalletAddress = thirdwebAccount?.address || walletAddress;
+  const effectiveWalletAddress = walletAddress;
 
-  // Use Thirdweb's useWalletBalance hook to get token balance for the connected account
-  const { data: balanceData, isLoading: isLoadingBalance } = useWalletBalance({
-    chain,
+  // Use wagmi useBalance with token address to get RL80 balance
+  const { data: balanceData, isLoading: isLoadingBalance } = useBalance({
     address: effectiveWalletAddress,
-    tokenAddress: RL80_TOKEN_ADDRESS, // RL80 token address
-    client,
+    token: RL80_ADDRESS,
+    query: { enabled: !!effectiveWalletAddress },
   });
   const [selectedOption, setSelectedOption] = useState(
     market.type === 'binary' ? 'YES' : market.options[0]?.id
@@ -709,17 +671,17 @@ const BetPanel = ({ market, onClose, userId = 'anonymous', onBetPlaced }) => {
   const liveMarket = { ...market, options: liveOptions };
 
   const betAmount = parseFloat(amount) || 0;
-  const betAmountWei = betAmount > 0 ? toWei(betAmount.toString()) : BigInt(0);
+  const betAmountWei = betAmount > 0 ? parseEther(betAmount.toString()) : BigInt(0);
   const totalPool = getTotalPool(liveMarket);
 
-  // Human-readable balance from useWalletBalance hook
-  // balanceData.displayValue is the human-readable format (e.g., "1000.0")
+  // Human-readable balance from wagmi useBalance hook
+  // balanceData.formatted is the human-readable format (e.g., "1000.0")
   // balanceData.value is the raw BigInt in wei
-  const userBalanceNum = balanceData?.displayValue ? parseFloat(balanceData.displayValue) : 0;
+  const userBalanceNum = balanceData?.formatted ? parseFloat(balanceData.formatted) : 0;
   const insufficientBalance = betAmount > 0 && betAmount > userBalanceNum;
 
-  // Check if wallet is actually connected (either via Thirdweb or WalletAuth)
-  const isActuallyConnected = !!thirdwebAccount || isWalletConnected;
+  // Check if wallet is actually connected
+  const isActuallyConnected = isWalletConnected;
 
   // Sync selectedOption with liveOptions when they load
   useEffect(() => {
@@ -743,13 +705,12 @@ const BetPanel = ({ market, onClose, userId = 'anonymous', onBetPlaced }) => {
   useEffect(() => {
     console.log('[PredictionMarket] Balance check:', {
       effectiveWalletAddress,
-      thirdwebAccountAddress: thirdwebAccount?.address,
       walletAuthAddress: walletAddress,
       balanceData,
       userBalanceNum,
       isLoadingBalance
     });
-  }, [effectiveWalletAddress, thirdwebAccount, walletAddress, balanceData, userBalanceNum, isLoadingBalance]);
+  }, [effectiveWalletAddress, walletAddress, balanceData, userBalanceNum, isLoadingBalance]);
 
   // Check allowance when amount changes
   useEffect(() => {
@@ -762,8 +723,13 @@ const BetPanel = ({ market, onClose, userId = 'anonymous', onBetPlaced }) => {
 
       setCheckingAllowance(true);
       try {
-        // Check allowance
-        const currentAllowance = await getPredictionMarketAllowance(effectiveWalletAddress);
+        // Check allowance via publicClient
+        const currentAllowance = await publicClient.readContract({
+          address: RL80_ADDRESS,
+          abi: erc20Abi,
+          functionName: 'allowance',
+          args: [effectiveWalletAddress, PREDICTION_MARKET_ADDRESS],
+        });
         setNeedsApproval(currentAllowance < betAmountWei);
         console.log('[PredictionMarket] Allowance check:', {
           currentAllowance: currentAllowance.toString(),
@@ -1089,18 +1055,18 @@ const BetPanel = ({ market, onClose, userId = 'anonymous', onBetPlaced }) => {
 
       {/* Submit button - Wallet connection check */}
       {!isWalletConnected ? (
-        <div style={{ width: '100%' }}>
-          <ConnectButton
-            client={client}
-            chain={chain}
-            wallets={predictionWallets}
-            theme={predictionWalletTheme}
-            connectModal={{
-              size: "compact",
-              title: "Connect to Place Bets",
-              showThirdwebBranding: false
-            }}
-          />
+        <div style={{
+          width: '100%',
+          padding: '14px',
+          borderRadius: '8px',
+          border: '1px solid rgba(255, 136, 0, 0.4)',
+          background: 'rgba(255, 136, 0, 0.1)',
+          color: '#ff8800',
+          fontWeight: 'bold',
+          fontSize: '14px',
+          textAlign: 'center'
+        }}>
+          Please connect your wallet to place bets
         </div>
       ) : (checkingAllowance || isLoadingBalance) ? (
         <div style={{
@@ -1139,8 +1105,8 @@ const BetPanel = ({ market, onClose, userId = 'anonymous', onBetPlaced }) => {
           onClick={async () => {
             if (isSubmitting) return;
 
-            // Check for active account first
-            if (!activeAccount) {
+            // Check for connected wallet first
+            if (!effectiveWalletAddress) {
               setErrorMessage('Please connect your wallet to place a bet.');
               return;
             }
@@ -1173,7 +1139,12 @@ const BetPanel = ({ market, onClose, userId = 'anonymous', onBetPlaced }) => {
 
               // FRESH allowance check
               console.log('[PredictionMarket] Checking allowance...');
-              const freshAllowance = await getPredictionMarketAllowance(effectiveWalletAddress);
+              const freshAllowance = await publicClient.readContract({
+                address: RL80_ADDRESS,
+                abi: erc20Abi,
+                functionName: 'allowance',
+                args: [effectiveWalletAddress, PREDICTION_MARKET_ADDRESS],
+              });
               const needsApprovalNow = freshAllowance < betAmountWei;
               console.log('[PredictionMarket] Allowance:', {
                 allowance: freshAllowance.toString(),
@@ -1218,11 +1189,11 @@ const BetPanel = ({ market, onClose, userId = 'anonymous', onBetPlaced }) => {
                 setTransactionStatus('approving');
                 console.log('[PredictionMarket] Starting approval...');
 
-                const approveTx = approveForPredictionMarket(betAmountWei);
-                // Use direct sendAndConfirmTransaction with activeAccount (same as StakeModal)
-                await sendAndConfirmTransaction({
-                  transaction: approveTx,
-                  account: activeAccount
+                await writeContractAsync({
+                  address: RL80_ADDRESS,
+                  abi: erc20Abi,
+                  functionName: 'approve',
+                  args: [PREDICTION_MARKET_ADDRESS, betAmountWei],
                 });
                 console.log('[PredictionMarket] Approval confirmed');
 
@@ -1267,18 +1238,12 @@ const BetPanel = ({ market, onClose, userId = 'anonymous', onBetPlaced }) => {
                 return;
               }
 
-              const betTx = predictionMarketFunctions.buyShares(
-                marketIdForContract,
-                optionIdForContract,
-                betAmountWei
-              );
-
-              // Use direct sendAndConfirmTransaction with activeAccount (same as StakeModal)
-              const result = await sendAndConfirmTransaction({
-                transaction: betTx,
-                account: activeAccount
+              const txHash = await writeContractAsync({
+                address: PREDICTION_MARKET_ADDRESS,
+                abi: predictionMarketAbi,
+                functionName: 'buyShares',
+                args: [marketIdForContract, optionIdForContract, betAmountWei],
               });
-              const txHash = result?.transactionHash;
 
               console.log('[PredictionMarket] Bet confirmed:', txHash);
 
@@ -1406,6 +1371,7 @@ const BetPanel = ({ market, onClose, userId = 'anonymous', onBetPlaced }) => {
 // Position card component - handles both types and cancelled markets
 const PositionCard = ({ position, onClaim }) => {
   const [isClaiming, setIsClaiming] = useState(false);
+  const { writeContractAsync: writePositionContract } = useWriteContract();
 
   // Check market status
   // cancelled = resolved but winningOption is 0
@@ -1471,17 +1437,24 @@ const PositionCard = ({ position, onClaim }) => {
         </div>
         {/* Claim Refund button */}
         {!hasClaimed && (
-          <TransactionButton
-            transaction={() => predictionMarketFunctions.claimRefund(position.onChainMarketId || position.marketId)}
-            onTransactionSent={() => setIsClaiming(true)}
-            onTransactionConfirmed={() => {
-              setIsClaiming(false);
-              if (onClaim) onClaim(position.marketId);
+          <button
+            onClick={async () => {
+              try {
+                setIsClaiming(true);
+                await writePositionContract({
+                  address: PREDICTION_MARKET_ADDRESS,
+                  abi: predictionMarketAbi,
+                  functionName: 'claimRefund',
+                  args: [BigInt(position.onChainMarketId || position.marketId)],
+                });
+                setIsClaiming(false);
+                if (onClaim) onClaim(position.marketId);
+              } catch (err) {
+                setIsClaiming(false);
+                console.error('[PredictionMarket] Refund claim error:', err);
+              }
             }}
-            onError={(err) => {
-              setIsClaiming(false);
-              console.error('[PredictionMarket] Refund claim error:', err);
-            }}
+            disabled={isClaiming}
             style={{
               width: '100%',
               marginTop: '10px',
@@ -1492,11 +1465,11 @@ const PositionCard = ({ position, onClaim }) => {
               color: '#000',
               fontWeight: 'bold',
               fontSize: '12px',
-              cursor: 'pointer'
+              cursor: isClaiming ? 'wait' : 'pointer'
             }}
           >
             {isClaiming ? 'Claiming Refund...' : 'Claim Refund'}
-          </TransactionButton>
+          </button>
         )}
       </div>
     );
@@ -1603,17 +1576,24 @@ const PositionCard = ({ position, onClaim }) => {
         </div>
         {/* Claim button for won positions */}
         {isResolved && didWin && !hasClaimed && (
-          <TransactionButton
-            transaction={() => predictionMarketFunctions.claimWinnings(position.onChainMarketId || position.marketId)}
-            onTransactionSent={() => setIsClaiming(true)}
-            onTransactionConfirmed={() => {
-              setIsClaiming(false);
-              if (onClaim) onClaim(position.marketId);
+          <button
+            onClick={async () => {
+              try {
+                setIsClaiming(true);
+                await writePositionContract({
+                  address: PREDICTION_MARKET_ADDRESS,
+                  abi: predictionMarketAbi,
+                  functionName: 'claimWinnings',
+                  args: [BigInt(position.onChainMarketId || position.marketId)],
+                });
+                setIsClaiming(false);
+                if (onClaim) onClaim(position.marketId);
+              } catch (err) {
+                setIsClaiming(false);
+                console.error('[PredictionMarket] Claim error:', err);
+              }
             }}
-            onError={(err) => {
-              setIsClaiming(false);
-              console.error('[PredictionMarket] Claim error:', err);
-            }}
+            disabled={isClaiming}
             style={{
               width: '100%',
               marginTop: '10px',
@@ -1624,11 +1604,11 @@ const PositionCard = ({ position, onClaim }) => {
               color: '#000',
               fontWeight: 'bold',
               fontSize: '12px',
-              cursor: 'pointer'
+              cursor: isClaiming ? 'wait' : 'pointer'
             }}
           >
             {isClaiming ? 'Claiming...' : 'Claim Winnings'}
-          </TransactionButton>
+          </button>
         )}
       </div>
     );
@@ -1746,17 +1726,24 @@ const PositionCard = ({ position, onClaim }) => {
       </div>
       {/* Claim button for won positions */}
       {isResolved && didWin && !hasClaimed && (
-        <TransactionButton
-          transaction={() => predictionMarketFunctions.claimWinnings(position.onChainMarketId || position.marketId)}
-          onTransactionSent={() => setIsClaiming(true)}
-          onTransactionConfirmed={() => {
-            setIsClaiming(false);
-            if (onClaim) onClaim(position.marketId);
+        <button
+          onClick={async () => {
+            try {
+              setIsClaiming(true);
+              await writePositionContract({
+                address: PREDICTION_MARKET_ADDRESS,
+                abi: predictionMarketAbi,
+                functionName: 'claimWinnings',
+                args: [BigInt(position.onChainMarketId || position.marketId)],
+              });
+              setIsClaiming(false);
+              if (onClaim) onClaim(position.marketId);
+            } catch (err) {
+              setIsClaiming(false);
+              console.error('[PredictionMarket] Claim error:', err);
+            }
           }}
-          onError={(err) => {
-            setIsClaiming(false);
-            console.error('[PredictionMarket] Claim error:', err);
-          }}
+          disabled={isClaiming}
           style={{
             width: '100%',
             marginTop: '10px',
@@ -1767,11 +1754,11 @@ const PositionCard = ({ position, onClaim }) => {
             color: '#000',
             fontWeight: 'bold',
             fontSize: '12px',
-            cursor: 'pointer'
+            cursor: isClaiming ? 'wait' : 'pointer'
           }}
         >
           {isClaiming ? 'Claiming...' : 'Claim Winnings'}
-        </TransactionButton>
+        </button>
       )}
     </div>
   );
@@ -1828,14 +1815,33 @@ export default function PredictionMarketOverlay({ show, onClose, userId = 'anony
         // Fallback: Read directly from on-chain contract
         console.log('[PredictionMarket] No Firebase markets, reading from chain...');
         try {
-          const marketCount = await predictionMarketFunctions.getMarketCount();
+          const marketCount = await publicClient.readContract({
+            address: PREDICTION_MARKET_ADDRESS,
+            abi: predictionMarketAbi,
+            functionName: 'marketCount',
+          });
           const onChainMarkets = [];
 
           for (let i = 0; i < Number(marketCount); i++) {
             const [marketInfo, options, shares] = await Promise.all([
-              predictionMarketFunctions.getMarketInfo(i),
-              predictionMarketFunctions.getAllOptions(i),
-              predictionMarketFunctions.getAllOptionShares(i)
+              publicClient.readContract({
+                address: PREDICTION_MARKET_ADDRESS,
+                abi: predictionMarketAbi,
+                functionName: 'getMarketInfo',
+                args: [BigInt(i)],
+              }),
+              publicClient.readContract({
+                address: PREDICTION_MARKET_ADDRESS,
+                abi: predictionMarketAbi,
+                functionName: 'getAllOptions',
+                args: [BigInt(i)],
+              }),
+              publicClient.readContract({
+                address: PREDICTION_MARKET_ADDRESS,
+                abi: predictionMarketAbi,
+                functionName: 'getAllOptionShares',
+                args: [BigInt(i)],
+              }),
             ]);
 
             const [question, endTime, winningOption, optionCount, resolved] = marketInfo;
@@ -1851,7 +1857,7 @@ export default function PredictionMarketOverlay({ show, onClose, userId = 'anony
                 options: options.map((name, idx) => ({
                   id: name,
                   name: name,
-                  pool: Number(toEther(shares[idx] || BigInt(0))),
+                  pool: Number(formatEther(shares[idx] || BigInt(0))),
                   color: ORACLE_COLORS[name] || '#888888'
                 })),
                 endTime: new Date(Number(endTime) * 1000),

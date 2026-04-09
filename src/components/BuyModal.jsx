@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useLanguage } from './LanguageProvider';
+import { useWalletAuth } from '@/components/WalletAuthProvider';
 
 const BuyModal = ({ isOpen, onClose }) => {
   const [glitchActive, setGlitchActive] = useState(false);
@@ -9,6 +10,7 @@ const BuyModal = ({ isOpen, onClose }) => {
   const [isSmallPhone, setIsSmallPhone] = useState(false);
   const [onrampInstance, setOnrampInstance] = useState(null);
   const { t } = useLanguage();
+  const { walletAddress } = useWalletAuth();
   const instanceRef = useRef(null);
 
   useEffect(() => {
@@ -39,12 +41,12 @@ const BuyModal = ({ isOpen, onClose }) => {
 
     const initCoinbaseOnramp = async () => {
       try {
-        // Fetch session token from our API route
-        const placeholderAddress = '0x0000000000000000000000000000000000000001';
+        // Use connected wallet address or fallback placeholder (Coinbase handles it)
+        const userAddress = walletAddress || '0x0000000000000000000000000000000000000001';
         const tokenRes = await fetch('/api/onramp-session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ address: placeholderAddress }),
+          body: JSON.stringify({ address: userAddress }),
         });
         const tokenData = await tokenRes.json();
 
@@ -58,7 +60,7 @@ const BuyModal = ({ isOpen, onClose }) => {
           appId: process.env.NEXT_PUBLIC_CDP_PROJECT_ID,
           widgetParameters: {
             sessionToken: tokenData.token,
-            addresses: { [placeholderAddress]: ['base'] },
+            addresses: { [userAddress]: ['base'] },
             assets: ['ETH', 'USDC'],
             defaultNetwork: 'base',
             defaultExperience: 'buy',

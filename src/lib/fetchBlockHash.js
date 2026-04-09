@@ -1,7 +1,4 @@
-import { getRpcClient, eth_getBlockByNumber, eth_blockNumber } from "thirdweb/rpc";
-import { client, chain } from "@/lib/contract";
-
-const rpc = getRpcClient({ client, chain });
+import { publicClient } from './viemClient';
 
 /**
  * Fetch block hash + timestamp for a given block number on Base.
@@ -9,10 +6,7 @@ const rpc = getRpcClient({ client, chain });
  * @returns {Promise<{blockNumber: number, blockHash: string, timestamp: number}>}
  */
 export async function fetchBlockHash(blockNumber) {
-  const block = await eth_getBlockByNumber(rpc, {
-    blockNumber: BigInt(blockNumber),
-    includeTransactions: false,
-  });
+  const block = await publicClient.getBlock({ blockNumber: BigInt(blockNumber) });
   if (!block) throw new Error(`Block ${blockNumber} not found`);
   return {
     blockNumber: Number(block.number),
@@ -26,6 +20,5 @@ export async function fetchBlockHash(blockNumber) {
  * @returns {Promise<number>}
  */
 export async function fetchLatestBlockNumber() {
-  const num = await eth_blockNumber(rpc);
-  return Number(num);
+  return Number(await publicClient.getBlockNumber());
 }

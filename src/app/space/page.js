@@ -83,7 +83,6 @@ export default function SpacePage() {
         onCommsClick={() => setShowComms(true)}
         onMissionClick={() => setShowMission(true)}
         onLeaderboardClick={() => console.log("Leaderboard")}
-        onLoungeClick={() => console.log("Lounge")}
       />
 
       <BuyModal isOpen={showBuyModal} onClose={() => setShowBuyModal(false)} />

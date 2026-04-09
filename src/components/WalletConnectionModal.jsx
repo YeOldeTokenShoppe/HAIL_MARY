@@ -2,30 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
-import { useConnect } from "thirdweb/react";
-import { client } from '@/lib/contract';
-import { defineChain } from "thirdweb/chains";
-import { inAppWallet } from "thirdweb/wallets/in-app";
-import { createWallet } from "thirdweb/wallets";
-
-const chain = defineChain(8453); // Base
-
-// Clerk provider → thirdweb strategy mapping
-const clerkToThirdweb = {
-  google: 'google', oauth_google: 'google',
-  discord: 'discord', oauth_discord: 'discord',
-  oauth_x: 'x', x: 'x',
-  oauth_farcaster: 'farcaster', farcaster: 'farcaster',
-  oauth_telegram: 'telegram', telegram: 'telegram',
-};
-const providerLabels = {
-  google: 'Google', discord: 'Discord', x: 'X',
-  farcaster: 'Farcaster', telegram: 'Telegram',
-};
+import { useWalletAuth } from './WalletAuthProvider';
 
 export function WalletConnectionModal({ onClose }) {
   const { user } = useUser();
-  const { connect } = useConnect();
+  const { connectWallet, connectors } = useWalletAuth();
   const [isMobile, setIsMobile] = useState(false);
   const [connectingMethod, setConnectingMethod] = useState(null);
 
@@ -38,42 +19,25 @@ export function WalletConnectionModal({ onClose }) {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const connectSocial = useCallback(async (strategy) => {
-    setConnectingMethod(strategy);
-    try {
-      const wallet = inAppWallet();
-      await connect(async () => {
-        await wallet.connect({ client, chain, strategy });
-        return wallet;
-      });
-      onClose();
-    } catch (e) {
-      if (e?.message) console.warn('Social connect cancelled:', e.message);
-    } finally {
-      setConnectingMethod(null);
-    }
-  }, [connect, onClose]);
+  // Map wallet option ids to wagmi connector ids
+  const walletIdToConnectorId = {
+    'io.metamask': 'metaMask',
+    'com.coinbase.wallet': 'coinbaseWallet',
+    'walletConnect': 'walletConnect',
+  };
 
   const connectExternal = useCallback(async (walletId) => {
     setConnectingMethod(walletId);
     try {
-      const wallet = createWallet(walletId);
-      await connect(async () => {
-        await wallet.connect({ client, chain });
-        return wallet;
-      });
+      const connectorId = walletIdToConnectorId[walletId] || walletId;
+      await connectWallet(connectorId);
       onClose();
     } catch (e) {
       if (e?.message) console.warn('Wallet connect cancelled:', e.message);
     } finally {
       setConnectingMethod(null);
     }
-  }, [connect, onClose]);
-
-  // Detect Clerk provider for smart wallet-creation suggestion
-  const clerkProvider = user?.externalAccounts?.[0]?.provider;
-  const primaryStrategy = clerkToThirdweb[clerkProvider] || null;
-  const primaryLabel = primaryStrategy ? providerLabels[primaryStrategy] : null;
+  }, [connectWallet, onClose]);
 
   const walletOptions = isMobile
     ? [
@@ -209,12 +173,10 @@ export function WalletConnectionModal({ onClose }) {
             margin: 0,
             textAlign: 'center',
           }}>
-            {primaryLabel
-              ? `A wallet will be created for you using your ${primaryLabel} sign-in.`
-              : 'A wallet will be created for you automatically.'}
+            Connect with Coinbase Wallet for an easy start.
           </p>
 
-          {/* Primary create-wallet button matching their Clerk auth */}
+          {/* Primary create-wallet button — Coinbase for easy onboarding */}
           <button
             style={{
               background: 'linear-gradient(135deg, #00f5d4, #00bbff)',
@@ -234,16 +196,16 @@ export function WalletConnectionModal({ onClose }) {
               width: '100%',
               letterSpacing: '0.5px',
               textTransform: 'uppercase',
-              opacity: connectingMethod && connectingMethod !== (primaryStrategy || 'google') ? 0.5 : 1,
+              opacity: connectingMethod && connectingMethod !== 'com.coinbase.wallet' ? 0.5 : 1,
             }}
             onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 245, 212, 0.3)'; }}
             onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}
-            onClick={() => connectSocial(primaryStrategy || 'google')}
+            onClick={() => connectExternal('com.coinbase.wallet')}
             disabled={!!connectingMethod}
           >
-            {connectingMethod === (primaryStrategy || 'google')
-              ? 'Creating wallet...'
-              : `Create Wallet${primaryLabel ? ` with ${primaryLabel}` : ''}`}
+            {connectingMethod === 'com.coinbase.wallet'
+              ? 'Connecting...'
+              : 'Get Started with Coinbase'}
           </button>
         </div>
       </div>

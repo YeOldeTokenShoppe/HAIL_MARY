@@ -1,17 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useActiveAccount } from "thirdweb/react";
-import { tokenFunctions } from '@/lib/contract';
+import { useState, useEffect, useCallback } from 'react';
+import { useAccount, useWriteContract } from 'wagmi';
+import { erc20Abi } from 'viem';
+import { publicClient } from '@/lib/viemClient';
+import { RL80_ADDRESS } from '@/lib/contracts';
 
 export function useERC20() {
-  const account = useActiveAccount();
+  const { address } = useAccount();
+  const { writeContractAsync, isPending: isWriting } = useWriteContract();
   const [balance, setBalance] = useState(null);
   const [tokenInfo, setTokenInfo] = useState({
     name: '',
     symbol: '',
     decimals: 18,
-    totalSupply: null
+    totalSupply: null,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -22,17 +25,17 @@ export function useERC20() {
       try {
         setLoading(true);
         const [name, symbol, decimals, totalSupply] = await Promise.all([
-          tokenFunctions.getName(),
-          tokenFunctions.getSymbol(),
-          tokenFunctions.getDecimals(),
-          tokenFunctions.getTotalSupply()
+          publicClient.readContract({ address: RL80_ADDRESS, abi: erc20Abi, functionName: 'name' }),
+          publicClient.readContract({ address: RL80_ADDRESS, abi: erc20Abi, functionName: 'symbol' }),
+          publicClient.readContract({ address: RL80_ADDRESS, abi: erc20Abi, functionName: 'decimals' }),
+          publicClient.readContract({ address: RL80_ADDRESS, abi: erc20Abi, functionName: 'totalSupply' }),
         ]);
-        
+
         setTokenInfo({
           name,
           symbol,
           decimals: Number(decimals),
-          totalSupply: totalSupply.toString()
+          totalSupply: totalSupply.toString(),
         });
       } catch (err) {
         console.error('Error fetching token info:', err);
@@ -46,46 +49,49 @@ export function useERC20() {
   }, []);
 
   // Fetch balance when account changes
+  const fetchBalance = useCallback(async () => {
+    if (!address) {
+      setBalance(null);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const userBalance = await publicClient.readContract({
+        address: RL80_ADDRESS,
+        abi: erc20Abi,
+        functionName: 'balanceOf',
+        args: [address],
+      });
+      setBalance(userBalance.toString());
+    } catch (err) {
+      console.error('Error fetching balance:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [address]);
+
   useEffect(() => {
-    const fetchBalance = async () => {
-      if (!account?.address) {
-        setBalance(null);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        const userBalance = await tokenFunctions.getBalance(account.address);
-        setBalance(userBalance.toString());
-      } catch (err) {
-        console.error('Error fetching balance:', err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchBalance();
-  }, [account?.address]);
+  }, [fetchBalance]);
 
   const sendTokens = async (to, amount) => {
-    if (!account) throw new Error('No wallet connected');
-    
+    if (!address) throw new Error('No wallet connected');
+
     try {
       setLoading(true);
       setError(null);
-      
-      // Amount should be in wei (smallest unit)
-      const transaction = await tokenFunctions.transfer(to, amount);
-      
-      // Send transaction with the connected wallet
-      const result = await account.sendTransaction(transaction);
-      
-      // Refresh balance after transfer
-      const newBalance = await tokenFunctions.getBalance(account.address);
-      setBalance(newBalance.toString());
-      
-      return result;
+
+      const hash = await writeContractAsync({
+        address: RL80_ADDRESS,
+        abi: erc20Abi,
+        functionName: 'transfer',
+        args: [to, BigInt(amount)],
+      });
+
+      await fetchBalance();
+      return hash;
     } catch (err) {
       console.error('Error sending tokens:', err);
       setError(err.message);
@@ -96,16 +102,20 @@ export function useERC20() {
   };
 
   const approveSpender = async (spender, amount) => {
-    if (!account) throw new Error('No wallet connected');
-    
+    if (!address) throw new Error('No wallet connected');
+
     try {
       setLoading(true);
       setError(null);
-      
-      const transaction = await tokenFunctions.approve(spender, amount);
-      const result = await account.sendTransaction(transaction);
-      
-      return result;
+
+      const hash = await writeContractAsync({
+        address: RL80_ADDRESS,
+        abi: erc20Abi,
+        functionName: 'approve',
+        args: [spender, BigInt(amount)],
+      });
+
+      return hash;
     } catch (err) {
       console.error('Error approving spender:', err);
       setError(err.message);
@@ -116,18 +126,13 @@ export function useERC20() {
   };
 
   return {
-    account: account?.address,
+    account: address,
     balance,
     tokenInfo,
-    loading,
+    loading: loading || isWriting,
     error,
     sendTokens,
     approveSpender,
-    refetchBalance: async () => {
-      if (account?.address) {
-        const newBalance = await tokenFunctions.getBalance(account.address);
-        setBalance(newBalance.toString());
-      }
-    }
+    refetchBalance: fetchBalance,
   };
 }

@@ -1,5 +1,7 @@
-import { tokenFunctions } from '@/lib/contract'
-import { stakingFunctions } from '@/lib/stakingContract'
+import { erc20Abi } from 'viem'
+import { publicClient } from '@/lib/viemClient'
+import { RL80_ADDRESS, STAKING_ADDRESS } from '@/lib/contracts'
+import { stakingAbi } from '@/lib/abis/stakingAbi'
 
 let cache = { value: null, ts: 0 }
 const CACHE_TTL = 5 * 60_000 // 5 minutes
@@ -14,12 +16,20 @@ export async function GET() {
 
   try {
     const [totalSupplyRaw, totalStakedRaw] = await Promise.all([
-      tokenFunctions.getTotalSupply(),
-      stakingFunctions.getTotalStaked(),
+      publicClient.readContract({
+        address: RL80_ADDRESS,
+        abi: erc20Abi,
+        functionName: 'totalSupply',
+      }),
+      publicClient.readContract({
+        address: STAKING_ADDRESS,
+        abi: stakingAbi,
+        functionName: 'totalStaked',
+      }),
     ])
 
     const totalSupply = totalSupplyRaw / BigInt(10 ** 18)
-    const totalStaked = BigInt(totalStakedRaw) / BigInt(10 ** 18)
+    const totalStaked = totalStakedRaw / BigInt(10 ** 18)
     const circulating = (totalSupply - totalStaked).toString()
 
     cache = { value: circulating, ts: now }

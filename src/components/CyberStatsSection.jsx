@@ -2,9 +2,9 @@
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { motion, useInView } from 'framer-motion';
 import AnimatedCounter from './AnimatedCounter';
-import { useReadContract } from 'thirdweb/react';
-import { totalSupply } from 'thirdweb/extensions/erc20';
-import { erc20Contract } from '@/lib/contract';
+import { useReadContract } from 'wagmi';
+import { erc20Abi } from 'viem';
+import { RL80_ADDRESS } from '@/lib/contracts';
 
 const INITIAL_SUPPLY = 80_000_000_000; // 80 billion
 
@@ -21,10 +21,11 @@ export default function CyberStatsSection({ isMobile }) {
   const isInView = useInView(statsRef, { threshold: 0.3 });
 
   // Read total supply from ERC20 contract
-  const { data: totalSupplyData } = useReadContract(
-    totalSupply,
-    { contract: erc20Contract }
-  );
+  const { data: totalSupplyData } = useReadContract({
+    address: RL80_ADDRESS,
+    abi: erc20Abi,
+    functionName: 'totalSupply',
+  });
 
   // Fetch holder count from our API route (BaseScan)
   const [holderCount, setHolderCount] = useState(null);

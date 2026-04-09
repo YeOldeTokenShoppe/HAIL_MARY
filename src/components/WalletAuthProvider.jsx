@@ -2,49 +2,52 @@
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useUser } from '@clerk/nextjs';
-import { useConnect, useActiveAccount, useDisconnect, useActiveWallet } from "thirdweb/react";
-import { inAppWallet } from "thirdweb/wallets/in-app";
-import { createWallet, privateKeyToAccount } from "thirdweb/wallets";
-import { client, tokenFunctions } from '@/lib/contract';
-import { getTestWalletForEmail, isAuthorizedTestUser } from '@/lib/testWallets';
-
-// Enable test mode for simplified wallet experience
-const TEST_MODE = false; // Set to false for production
+import { useAccount, useConnect, useDisconnect } from 'wagmi';
+import { erc20Abi, formatUnits } from 'viem';
+import { publicClient } from '@/lib/viemClient';
+import { RL80_ADDRESS } from '@/lib/contracts';
 
 const WalletAuthContext = createContext({});
 
 export function WalletAuthProvider({ children }) {
   const { user, isLoaded: clerkLoaded } = useUser();
-  const { connect, isConnecting } = useConnect();
+  const { address, isConnected } = useAccount();
+  const { connect, connectors, isPending: isConnecting } = useConnect();
   const { disconnect } = useDisconnect();
-  const activeAccount = useActiveAccount();
-  const activeWallet = useActiveWallet();
-  
-  const [walletAddress, setWalletAddress] = useState(null);
+
   const [tokenBalance, setTokenBalance] = useState(null);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [testWallet, setTestWallet] = useState(null);
-  const [testWalletAccount, setTestWalletAccount] = useState(null); // Store the ThirdWeb account object for test wallets
-  const [manuallyDisconnected, setManuallyDisconnected] = useState(false); // Track manual disconnections
+  const [manuallyDisconnected, setManuallyDisconnected] = useState(false);
 
   // Fetch token balance when wallet is connected
-  const fetchTokenBalance = useCallback(async (address) => {
-    if (!address) {
+  const fetchTokenBalance = useCallback(async (addr) => {
+    if (!addr) {
       setTokenBalance(null);
       return;
     }
-    
+
     try {
       setIsLoadingBalance(true);
-      const balance = await tokenFunctions.getBalance(address);
-      const decimals = await tokenFunctions.getDecimals();
-      
-      // Convert from wei to token units
-      const formattedBalance = (BigInt(balance) / BigInt(10 ** decimals)).toString();
-      setTokenBalance(formattedBalance);
-      
-      return formattedBalance;
+      const [balance, decimals] = await Promise.all([
+        publicClient.readContract({
+          address: RL80_ADDRESS,
+          abi: erc20Abi,
+          functionName: 'balanceOf',
+          args: [addr],
+        }),
+        publicClient.readContract({
+          address: RL80_ADDRESS,
+          abi: erc20Abi,
+          functionName: 'decimals',
+        }),
+      ]);
+
+      const formattedBalance = formatUnits(balance, decimals);
+      // Truncate to integer like the old code
+      const intBalance = formattedBalance.split('.')[0];
+      setTokenBalance(intBalance);
+      return intBalance;
     } catch (error) {
       console.error('Error fetching token balance:', error);
       setTokenBalance(null);
@@ -54,28 +57,23 @@ export function WalletAuthProvider({ children }) {
   }, []);
 
   // Store wallet address locally (Clerk frontend doesn't allow metadata updates)
-  const syncWalletWithClerk = useCallback(async (address) => {
-    if (!user || !address) return;
-    
+  const syncWalletWithClerk = useCallback(async (addr) => {
+    if (!user || !addr) return;
+
     try {
       setIsSyncing(true);
-      
-      // Store wallet data in localStorage linked to user ID
       const walletData = {
-        walletAddress: address,
+        walletAddress: addr,
         lastWalletSync: new Date().toISOString(),
-        userId: user.id
+        userId: user.id,
       };
-      
       localStorage.setItem(`wallet_${user.id}`, JSON.stringify(walletData));
-      
-      // Also fetch and store the balance
-      const balance = await fetchTokenBalance(address);
+
+      const balance = await fetchTokenBalance(addr);
       if (balance !== null) {
         walletData.tokenBalance = balance;
         localStorage.setItem(`wallet_${user.id}`, JSON.stringify(walletData));
       }
-      
     } catch (error) {
       console.error('Error syncing wallet:', error);
     } finally {
@@ -83,344 +81,95 @@ export function WalletAuthProvider({ children }) {
     }
   }, [user, fetchTokenBalance]);
 
-  // Handle wallet connection - auto-creates wallet using Clerk email
-  const connectWallet = useCallback(async (walletType = 'inApp', autoConnect = false) => {
+  // Connect wallet by connector id
+  const connectWallet = useCallback(async (connectorId = 'coinbaseWallet') => {
     try {
-      // Reset manual disconnect flag when user wants to connect
       setManuallyDisconnected(false);
-      // Create wallet instance based on type
-      let wallet;
-      if (walletType === 'inApp') {
-        // Use Clerk user's email for in-app wallet
-        const userEmail = user?.primaryEmailAddress?.emailAddress;
-        
-        if (autoConnect && userEmail) {
-          // Auto-connect with Clerk email
-          wallet = inAppWallet({
-            auth: {
-              options: ["email"],
-              email: {
-                mode: "auto" // Automatically handle email verification
-              }
-            },
-          });
-        } else {
-          // Manual connection with multiple options
-          wallet = inAppWallet({
-            auth: {
-              options: ["email", "google", "apple", "facebook"],
-            },
-          });
-        }
-      } else {
-        wallet = createWallet(walletType);
+      const connector = connectors.find((c) => c.id === connectorId || c.name === connectorId);
+      if (!connector) {
+        console.error('Connector not found:', connectorId, 'Available:', connectors.map(c => c.id));
+        throw new Error(`Connector ${connectorId} not found`);
       }
-      
-      // Connect the wallet
-      const account = await connect(async () => {
-        const connectedAccount = await wallet.connect({ client });
-        return connectedAccount;
-      });
-      
-      if (account?.address) {
-        setWalletAddress(account.address);
-        await syncWalletWithClerk(account.address);
-        await fetchTokenBalance(account.address);
-        
-      }
-      
-      return account;
+      connect({ connector });
     } catch (error) {
       console.error('Error connecting wallet:', error);
       throw error;
     }
-  }, [connect, syncWalletWithClerk, fetchTokenBalance]);
+  }, [connect, connectors]);
 
-  // Handle wallet disconnection
+  // Disconnect wallet
   const disconnectWallet = useCallback(async () => {
-    const currentAddress = walletAddress; // Store before clearing
-    
-
-    
     try {
-      // Mark as manually disconnected to prevent auto-reconnect
       setManuallyDisconnected(true);
-      
-      // Special handling for test wallets - no need to call ThirdWeb disconnect
-      if (testWallet || testWalletAccount) {
-        setWalletAddress(null);
-        setTokenBalance(null);
-        setTestWallet(null);
-        setTestWalletAccount(null);
-      } else if (activeWallet) {
-        disconnect(activeWallet);
-        setWalletAddress(null);
-        setTokenBalance(null);
-      } else {
-        setWalletAddress(null);
-        setTokenBalance(null);
-        setTestWallet(null);
-        setTestWalletAccount(null);
-      }
-      
-      // Clear wallet from localStorage
+      disconnect();
+      setTokenBalance(null);
+
       if (user) {
         localStorage.removeItem(`wallet_${user.id}`);
-        // Don't clear preference on disconnect - user may want to reconnect same type
-        
       }
-      
-      
-      // Force a small delay to ensure state updates are processed
-      setTimeout(() => {
-
-      }, 100);
-      
     } catch (error) {
-      console.error('❌ Error disconnecting wallet:', error);
+      console.error('Error disconnecting wallet:', error);
     }
-  }, [disconnect, user, walletAddress, activeWallet, testWallet, testWalletAccount, activeAccount]);
+  }, [disconnect, user]);
 
-  // Switch to test wallet (for users with both options)
-  const switchToTestWallet = useCallback(() => {
-    if (!user) return;
-    
-    const userEmail = user.primaryEmailAddress?.emailAddress;
-    if (!userEmail || !isAuthorizedTestUser(userEmail)) {
-      return;
-    }
-    
-    // Reset manual disconnect flag - user wants to connect test wallet
-    setManuallyDisconnected(false);
-    
-    // Disconnect current wallet if connected
-    if (activeWallet || walletAddress) {
-      disconnectWallet();
-    }
-    
-    // Set preference to test wallet
-    localStorage.setItem(`wallet_preference_${user.id}`, 'test_wallet');
-    
-    // Assign test wallet
-    const assignedWallet = getTestWalletForEmail(userEmail);
-    if (assignedWallet && assignedWallet.privateKey) {
-      // Create a ThirdWeb account from the private key
-      const account = privateKeyToAccount({
-        privateKey: assignedWallet.privateKey,
-        client
-      });
-      
-      setTestWallet(assignedWallet);
-      setTestWalletAccount(account);
-      setWalletAddress(account.address);
-      
-      const walletData = {
-        walletAddress: account.address,
-        lastWalletSync: new Date().toISOString(),
-        userId: user.id,
-        isTestWallet: true
-      };
-      localStorage.setItem(`wallet_${user.id}`, JSON.stringify(walletData));
-      
-      fetchTokenBalance(account.address);
-    } else if (assignedWallet) {
-      // Fallback for wallets without private key (shouldn't happen in production)
-      console.error('Test wallet missing private key:', assignedWallet.id);
-      setTestWallet(assignedWallet);
-      setWalletAddress(assignedWallet.address);
-      fetchTokenBalance(assignedWallet.address);
-    }
-  }, [user, activeWallet, walletAddress, disconnectWallet, fetchTokenBalance]);
-
-  // Switch to own wallet (MetaMask, etc.)
-  const switchToOwnWallet = useCallback(async () => {
-    if (!user) return;
-    
-    // Disconnect test wallet if connected
-    if (testWallet) {
-      setTestWallet(null);
-      setTestWalletAccount(null);
-      setWalletAddress(null);
-      setTokenBalance(null);
-      localStorage.removeItem(`wallet_${user.id}`);
-    }
-    
-    // Set preference to own wallet
-    localStorage.setItem(`wallet_preference_${user.id}`, 'own_wallet');
-    
-    // Open wallet connection modal
-    return connectWallet('metamask'); // or could show a selection modal
-  }, [user, testWallet, connectWallet]);
-
-  // Auto-connect test wallet in test mode for authorized users only
+  // Sync state when wagmi account changes
   useEffect(() => {
-
-    
-    // Don't auto-connect if user manually disconnected
-    if (manuallyDisconnected) {
-      return;
-    }
-    
-    if (TEST_MODE && clerkLoaded && user && !activeAccount && !isConnecting && !walletAddress) {
-      const userEmail = user.primaryEmailAddress?.emailAddress;
-      
-      
-      // Check if user is authorized for test wallet
-      if (!userEmail || !isAuthorizedTestUser(userEmail)) {
-        return;
-      }
-      
-      // Check if user prefers to use their own wallet
-      const walletPreference = localStorage.getItem(`wallet_preference_${user.id}`);
-      if (walletPreference === 'own_wallet') {
-        return;
-      }
-      
-      const assignedWallet = getTestWalletForEmail(userEmail);
-      
-      
-      if (assignedWallet && assignedWallet.privateKey) {
-        // Only auto-assign if user hasn't explicitly chosen to use their own wallet
-        
-        // Create a ThirdWeb account from the private key
-        const account = privateKeyToAccount({
-          privateKey: assignedWallet.privateKey,
-          client
-        });
-        
-        
-        setTestWallet(assignedWallet);
-        setTestWalletAccount(account);
-        setWalletAddress(account.address);
-        
-        // Sync with localStorage for persistence
-        const walletData = {
-          walletAddress: account.address,
-          lastWalletSync: new Date().toISOString(),
-          userId: user.id,
-          isTestWallet: true
-        };
-        localStorage.setItem(`wallet_${user.id}`, JSON.stringify(walletData));
-        localStorage.setItem(`wallet_preference_${user.id}`, 'test_wallet');
-        
-        // Fetch balance for test wallet
-        fetchTokenBalance(account.address);
-        
-        // Log connection (optional)
-      } else if (assignedWallet) {
-      } else {
-      }
-    } else if (TEST_MODE && clerkLoaded && user && !activeAccount && !isConnecting && !walletAddress && !manuallyDisconnected) {
-      // Check if we have a stored test wallet for this user
-      const storedData = localStorage.getItem(`wallet_${user.id}`);
-      
-      if (storedData) {
-        try {
-          const walletData = JSON.parse(storedData);
-          if (walletData.isTestWallet && walletData.walletAddress) {
-            
-            // Verify this user is still authorized for test wallet
-            const userEmail = user.primaryEmailAddress?.emailAddress;
-            if (userEmail && isAuthorizedTestUser(userEmail)) {
-              const assignedWallet = getTestWalletForEmail(userEmail);
-              if (assignedWallet && assignedWallet.address === walletData.walletAddress && assignedWallet.privateKey) {
-                // Create a ThirdWeb account from the private key
-                const account = privateKeyToAccount({
-                  privateKey: assignedWallet.privateKey,
-                  client
-                });
-                
-                setTestWallet(assignedWallet);
-                setTestWalletAccount(account);
-                setWalletAddress(account.address);
-                fetchTokenBalance(account.address);
-              }
-            }
-          }
-        } catch (error) {
-          console.error('Error parsing stored wallet data:', error);
-        }
-      }
-    } else if (!TEST_MODE && clerkLoaded && user && !activeAccount && !isConnecting) {
-      // Original auto-reconnect logic for production
-      const storedData = localStorage.getItem(`wallet_${user.id}`);
-      
-      if (storedData) {
-        try {
-          const walletData = JSON.parse(storedData);
-          if (walletData.walletAddress) {
-            // Note: Auto-reconnect would require storing wallet type
-            // For now, user needs to manually reconnect
-          }
-        } catch (error) {
-          console.error('Error parsing stored wallet data:', error);
-        }
-      }
-    }
-  }, [clerkLoaded, user, activeAccount, isConnecting, walletAddress, fetchTokenBalance, manuallyDisconnected]);
-
-  // Update wallet address when active account changes
-  useEffect(() => {
-    if (activeAccount?.address) {
-      setWalletAddress(activeAccount.address);
-      syncWalletWithClerk(activeAccount.address);
-      fetchTokenBalance(activeAccount.address);
+    if (address && isConnected) {
+      syncWalletWithClerk(address);
+      fetchTokenBalance(address);
     } else {
-      setWalletAddress(null);
       setTokenBalance(null);
     }
-  }, [activeAccount, syncWalletWithClerk, fetchTokenBalance]);
+  }, [address, isConnected, syncWalletWithClerk, fetchTokenBalance]);
 
   // Refresh balance periodically (every 30 seconds)
   useEffect(() => {
-    if (!walletAddress) return;
-    
+    if (!address) return;
+
     const interval = setInterval(() => {
-      fetchTokenBalance(walletAddress);
+      fetchTokenBalance(address);
     }, 30000);
-    
+
     return () => clearInterval(interval);
-  }, [walletAddress, fetchTokenBalance]);
-
-  // Check if current user is authorized for test wallets
-  const userEmail = user?.primaryEmailAddress?.emailAddress;
-  const isTestUser = TEST_MODE && userEmail && isAuthorizedTestUser(userEmail);
-  
-
+  }, [address, fetchTokenBalance]);
 
   const value = {
     // Clerk user data
     user,
     isSignedIn: !!user,
     clerkLoaded,
-    
+
     // Wallet data
-    walletAddress,
+    walletAddress: address || null,
     tokenBalance,
-    isWalletConnected: isTestUser ? !!walletAddress : !!(activeAccount && walletAddress),
-    activeAccount: testWalletAccount || activeAccount, // Use test wallet account if available, otherwise regular account
-    
-    // Test mode
-    isTestMode: TEST_MODE,
-    isTestUser, // Whether this specific user gets test wallet
-    testWallet,
-    testWalletAccount, // Expose test wallet account
-    
+    isWalletConnected: isConnected,
+    activeAccount: null, // Deprecated - components should use walletAddress
+
+    // Test mode (removed)
+    isTestMode: false,
+    isTestUser: false,
+    testWallet: null,
+    testWalletAccount: null,
+
     // Loading states
     isConnecting,
     isLoadingBalance,
     isSyncing,
-    
+
     // Actions
     connectWallet,
     disconnectWallet,
-    switchToTestWallet,
-    switchToOwnWallet,
-    refreshBalance: () => fetchTokenBalance(walletAddress),
-    
+    switchToTestWallet: () => {},
+    switchToOwnWallet: () => {},
+    refreshBalance: () => fetchTokenBalance(address),
+
+    // Wagmi-specific: expose connectors for wallet selection UIs
+    connectors,
+
     // Combined status
-    isFullyAuthenticated: !!user && (isTestUser ? !!walletAddress : !!activeAccount),
-    displayName: user?.firstName || user?.username || walletAddress?.slice(0, 6) + '...' + walletAddress?.slice(-4) || 'Anonymous'
+    isFullyAuthenticated: !!user && isConnected,
+    displayName: user?.firstName || user?.username ||
+      (address ? address.slice(0, 6) + '...' + address.slice(-4) : 'Anonymous'),
   };
 
   return (

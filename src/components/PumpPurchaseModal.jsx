@@ -3,24 +3,9 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { getItemPrice, getItemCategory } from "@/lib/oilPremium";
-
-// Lazy-load thirdweb to prevent import errors from blocking render
-let _transfer, _sendAndConfirmTransaction, _erc20Contract, _usdcContract;
-async function loadThirdweb() {
-  if (!_transfer) {
-    const [erc20Mod, twMod, contractMod] = await Promise.all([
-      import("thirdweb/extensions/erc20"),
-      import("thirdweb"),
-      import("@/lib/contract"),
-    ]);
-    _transfer = erc20Mod.transfer;
-    _sendAndConfirmTransaction = twMod.sendAndConfirmTransaction;
-    _erc20Contract = contractMod.erc20Contract;
-    _usdcContract = contractMod.usdcContract;
-  }
-}
-
-const BURN_ADDRESS = "0x000000000000000000000000000000000000dEaD";
+import { useWriteContract } from 'wagmi';
+import { erc20Abi } from 'viem';
+import { RL80_ADDRESS, USDC_ADDRESS, BURN_ADDRESS } from '@/lib/contracts';
 const TREASURY_ADDRESS = process.env.NEXT_PUBLIC_OIL_PURCHASE_TREASURY;
 
 // Format large numbers: 155000000 → "~155M", 1200000 → "~1.2M", 850000 → "~850K"
@@ -38,6 +23,8 @@ export default function PumpPurchaseModal({ items, activeAccount, userId, onComp
   const [errorMsg, setErrorMsg] = useState("");
   const [rl80Price, setRl80Price] = useState(null);
   const [priceLoading, setPriceLoading] = useState(true);
+
+  const { writeContractAsync } = useWriteContract();
 
   // Calculate total USD price across all items
   const totalUsdc = useMemo(() => {
@@ -77,32 +64,28 @@ export default function PumpPurchaseModal({ items, activeAccount, userId, onComp
     setErrorMsg("");
 
     try {
-      await loadThirdweb();
-      let transaction;
+      let txHash;
       if (currency === "rl80") {
         if (!rl80Amount) throw new Error("RL80 price unavailable");
-        transaction = _transfer({
-          contract: _erc20Contract,
-          to: BURN_ADDRESS,
-          amount: BigInt(rl80Amount) * BigInt(10 ** 18),
+        txHash = await writeContractAsync({
+          address: RL80_ADDRESS,
+          abi: erc20Abi,
+          functionName: 'transfer',
+          args: [BURN_ADDRESS, BigInt(rl80Amount) * BigInt(10 ** 18)],
         });
       } else {
         if (!TREASURY_ADDRESS) {
           throw new Error("Treasury address not configured");
         }
-        transaction = _transfer({
-          contract: _usdcContract,
-          to: TREASURY_ADDRESS,
-          amount: BigInt(totalUsdc) * BigInt(10 ** 6),
+        txHash = await writeContractAsync({
+          address: USDC_ADDRESS,
+          abi: erc20Abi,
+          functionName: 'transfer',
+          args: [TREASURY_ADDRESS, BigInt(totalUsdc) * BigInt(10 ** 6)],
         });
       }
 
-      const result = await _sendAndConfirmTransaction({
-        transaction,
-        account: activeAccount,
-      });
       setStatus("confirming");
-      const txHash = result?.transactionHash || result?.hash;
       await submitToServer(txHash);
     } catch (err) {
       const msg = err?.message || "Transaction failed";
@@ -113,7 +96,7 @@ export default function PumpPurchaseModal({ items, activeAccount, userId, onComp
         setErrorMsg(msg.slice(0, 120));
       }
     }
-  }, [activeAccount, currency, totalUsdc, rl80Amount, items]);
+  }, [activeAccount, currency, totalUsdc, rl80Amount, items, writeContractAsync]);
 
   const submitToServer = useCallback(async (txHash) => {
     if (!txHash) {
