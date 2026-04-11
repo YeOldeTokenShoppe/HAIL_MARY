@@ -18,10 +18,10 @@ const ZoomContext = createContext();
 
 /* ── Smooth camera zoom controller ── */
 const ZOOM_IN_WORLD_UP = new THREE.Vector3(0, 1, 0);
-const ZOOM_IN_DURATION = 1.8; // seconds — total length of the arc-path zoom
+const ZOOM_IN_DURATION = 3.3; // seconds — total length of the arc-path zoom
 function CameraController({ controlsRef }) {
   const { camera } = useThree();
-  const { zoomed, targetPos, targetLookAt, defaultPos, defaultLookAt, onArrivedRef, flyToRef, captainFadeRef } = useContext(ZoomContext);
+  const { zoomed, targetPos, targetLookAt, defaultPos, defaultLookAt, onArrivedRef, flyToRef, orbitTableRef, captainFadeRef } = useContext(ZoomContext);
   const lerpSpeed = 1.2; // slower for cinematic feel
   const phase = useRef("idle");
   const currentLookAt = useRef(new THREE.Vector3(0, 0, 0));
@@ -40,6 +40,25 @@ function CameraController({ controlsRef }) {
   const zoomStartRadius = useRef(0);
   const zoomEndRadius = useRef(0);
   const zoomStartLookAt = useRef(new THREE.Vector3());
+  // For the orbit-around-table phase (camera sweeps the hologram horizontally).
+  // Radius and height are interpolated from the camera's starting values to
+  // the request's target values across the full orbit, so the camera can
+  // nudge back and up throughout the sweep instead of snapping at entry.
+  const orbitProgress = useRef(0);
+  const orbitDuration = useRef(12);
+  const orbitPivot = useRef(new THREE.Vector3());
+  const orbitStartRadius = useRef(0);
+  const orbitEndRadius = useRef(0);
+  const orbitStartHeight = useRef(0);
+  const orbitEndHeight = useRef(0);
+  const orbitStartAngle = useRef(0);
+  const orbitTotalAngle = useRef(0);
+  // Snapshot of the camera's lookAt at orbit entry. The orbit update lerps
+  // `currentLookAt` from this to `orbitPivot` over the first fraction of
+  // the sweep so the camera's rotation is continuous with the preceding
+  // phase (otherwise the lookAt snaps from e.g. gr80LookAt to the pivot
+  // in a single frame — visible as a "blink").
+  const orbitStartLookAt = useRef(new THREE.Vector3());
   // Scratch objects reused every frame to avoid per-frame allocations
   const tmpQuatStart = useRef(new THREE.Quaternion());
   const tmpQuatEnd = useRef(new THREE.Quaternion());
@@ -88,19 +107,125 @@ function CameraController({ controlsRef }) {
       }
     }
 
-    // Ease-in-out fly-through to second target
+    // Check for a queued orbit-table request. Sweeps the camera in a
+    // horizontal circle around a pivot (the hologram table) for a given
+    // number of laps, then hands control back to OrbitControls.
+    if (phase.current === "zoomed" && orbitTableRef && orbitTableRef.current) {
+      const req = orbitTableRef.current;
+      orbitPivot.current.copy(req.pivot);
+
+      // Snapshot the camera's current radius/height relative to the pivot
+      // as the orbit START values. The END values come from the request;
+      // if omitted they default to the start values (no nudge). We lerp
+      // between start and end across the full orbit each frame so the
+      // camera smoothly pulls back and/or rises throughout the sweep.
+      const dx = camera.position.x - req.pivot.x;
+      const dz = camera.position.z - req.pivot.z;
+      const startR = Math.max(0.1, Math.sqrt(dx * dx + dz * dz));
+      const startH = camera.position.y - req.pivot.y;
+      orbitStartRadius.current = startR;
+      orbitStartHeight.current = startH;
+      orbitEndRadius.current = (req.radius != null) ? req.radius : startR;
+      orbitEndHeight.current = (req.heightOffset != null) ? req.heightOffset : startH;
+
+      orbitStartAngle.current = Math.atan2(dz, dx);
+      // Total sweep = (laps * 2π) + endAngleOffset. Integer laps land the
+      // endpoint at the same direction from pivot as the start; endAngleOffset
+      // rotates the endpoint by an extra angle past that.
+      const lapsAngle = (req.laps != null ? req.laps : 1.5) * Math.PI * 2;
+      const endOffset = (req.endAngleOffset != null) ? req.endAngleOffset : 0;
+      orbitTotalAngle.current = lapsAngle + endOffset;
+      // Direction: positive = counter-clockwise (viewed from above).
+      if (req.direction != null) orbitTotalAngle.current *= Math.sign(req.direction);
+      orbitDuration.current = (req.duration != null) ? req.duration : 12;
+      orbitProgress.current = 0;
+      // Capture whatever the camera was previously looking at so we can
+      // smoothly rotate toward the orbit pivot (otherwise the lookAt snaps
+      // in a single frame — visible as a "blink").
+      orbitStartLookAt.current.copy(currentLookAt.current);
+      orbitTableRef.current = null;
+      phase.current = "orbiting-table";
+      if (controlsRef.current) {
+        controlsRef.current.enabled = false;
+        controlsRef.current.autoRotate = false;
+      }
+    }
+
+    // Orbit-around-table phase. Horizontal sweep around the pivot with
+    // radius, height, and lookAt interpolated.
+    //   Angle / radius: quadratic EASE-OUT across the whole orbit. Starts
+    //     at max velocity (2) so it picks up seamlessly from the fly-to's
+    //     quadratic ease-in (which ends at velocity 2), and decelerates
+    //     smoothly to a stop.
+    //   Height: cubic ease-in — stays near the starting height for most of
+    //     the sweep and only pulls up in the last stretch, so the camera
+    //     lifts "at the very end" rather than throughout.
+    //   LookAt: smoothstep over the first LOOKAT_BLEND_FRACTION of the
+    //     orbit, so the camera rotates continuously from the previous
+    //     phase's target to the pivot instead of snapping in one frame.
+    if (phase.current === "orbiting-table") {
+      orbitProgress.current += delta / orbitDuration.current;
+      const p = Math.min(orbitProgress.current, 1);
+      const inv = 1 - p;
+      const eased = 1 - inv * inv;   // quadratic ease-out (v=2 at p=0, v=0 at p=1)
+      const heightEased = p * p * p; // cubic ease-in (back-loaded)
+
+      const angle = orbitStartAngle.current + orbitTotalAngle.current * eased;
+      const radius = orbitStartRadius.current * (1 - eased) + orbitEndRadius.current * eased;
+      const height = orbitStartHeight.current * (1 - heightEased) + orbitEndHeight.current * heightEased;
+      camera.position.set(
+        orbitPivot.current.x + radius * Math.cos(angle),
+        orbitPivot.current.y + height,
+        orbitPivot.current.z + radius * Math.sin(angle),
+      );
+
+      // LookAt blend — rotate from the incoming lookAt (e.g. gr80LookAt
+      // after the fly-to) to the pivot over the first 30% of the orbit.
+      // After that, currentLookAt stays pinned to the pivot.
+      const LOOKAT_BLEND_FRACTION = 0.3;
+      const rawLookAtBlend = Math.min(p / LOOKAT_BLEND_FRACTION, 1);
+      const lookAtEased = rawLookAtBlend * rawLookAtBlend * (3 - 2 * rawLookAtBlend);
+      currentLookAt.current.lerpVectors(orbitStartLookAt.current, orbitPivot.current, lookAtEased);
+      camera.lookAt(currentLookAt.current);
+
+      if (p >= 1) {
+        phase.current = "zoomed";
+        if (controlsRef.current) {
+          controlsRef.current.target.copy(orbitPivot.current);
+          controlsRef.current.enabled = true;
+          controlsRef.current.autoRotate = false;
+          controlsRef.current.update();
+        }
+        if (onArrivedRef?.current) {
+          onArrivedRef.current();
+          onArrivedRef.current = null;
+        }
+      }
+    }
+
+    // Fly-through to second target.
+    // Uses quadratic EASE-IN (starts slow from rest after the captain pause,
+    // ends at max velocity 2). Paired with the orbit phase's quadratic
+    // ease-out (which starts at velocity 2), so velocity is continuous across
+    // the handoff and the camera doesn't visibly pause at GR80 before the
+    // orbit begins.
     if (phase.current === "flying-to") {
-      flyProgress.current += delta * 0.1; // controls overall speed (~2.5s travel)
+      flyProgress.current += delta * 0.1; // controls overall speed
       const p = Math.min(flyProgress.current, 1);
-      // Smoothstep ease-in-out
-      const eased = p * p * (3 - 2 * p);
+      const eased = p * p; // quadratic ease-in
 
       camera.position.lerpVectors(flyStartPos.current, activePos.current, eased);
       currentLookAt.current.lerpVectors(flyStartLookAt.current, activeLookAt.current, eased);
       camera.lookAt(currentLookAt.current);
 
-      // Restore captain visibility once camera has moved past
-      if (p > 0.5 && captainFadeRef.current.target === 0) {
+      // Restore captain visibility once the camera has actually moved past
+      // the captain's position. Check against `eased` (the real visual
+      // progress) rather than raw `p` — under quadratic ease-in, `p > 0.5`
+      // only corresponds to 25% of the visual distance, so we were fading
+      // the captain back in while the camera was still near it. Using
+      // `eased` makes this correct regardless of which easing curve the
+      // fly-to uses.
+      if (eased > 0.5 && captainFadeRef.current.target === 0) {
         captainFadeRef.current.target = 1;
       }
 
@@ -129,7 +254,11 @@ function CameraController({ controlsRef }) {
       // straight-line lerp did when the user clicked from behind).
       zoomProgress.current += delta / ZOOM_IN_DURATION;
       const p = Math.min(zoomProgress.current, 1);
-      const eased = p * p * (3 - 2 * p); // smoothstep
+      // Cubic ease-out — starts fast and decelerates all the way to a stop.
+      // Previous smoothstep (ease-in-out) felt like a snap because it still
+      // had a chunk of velocity near the end; cubic ease-out's derivative
+      // drops smoothly from 3 at p=0 to 0 at p=1.
+      const eased = 1 - Math.pow(1 - p, 3);
 
       // Slerp direction using quaternions (handles any start/end angle).
       tmpQuatStart.current.setFromUnitVectors(ZOOM_IN_WORLD_UP, zoomStartDir.current);
@@ -233,11 +362,11 @@ function CaptainSpotlight() {
     <spotLight
       ref={spotRef}
       castShadow
-      intensity={5}
+      intensity={1}
       decay={2}
       distance={10}
-      angle={0.3}
-      penumbra={1}
+      angle={0.35}
+      penumbra={0.4}
       position={[0, -3.2, 3.9]}
       shadow-mapSize={[1024, 1024]}
       shadow-bias={-0.0001}
@@ -262,7 +391,7 @@ function H80ZSpotlight() {
     <spotLight
       ref={spotRef}
       castShadow
-      intensity={1.7}
+      intensity={1}
       decay={2}
       distance={8}
       angle={0.29}
@@ -280,7 +409,7 @@ function VendingMachineLED({ scene }) {
   const textureRef = useRef(null);
   const meshRef = useRef(null);
   const scrollRef = useRef(0);
-  const LED_TEXT = "  RL80 TOKEN  ***  STAKE NOW  ***  TO THE MOON  ***  ";
+  const LED_TEXT = "  RL80 TOKEN  ***  REFRESHING  ***  TO THE MOON  ***  ";
   const PIXEL_SIZE = 3;
   const CANVAS_W = 256;
   const CANVAS_H = 32;
@@ -381,15 +510,12 @@ function VendingMachineLED({ scene }) {
 function Model({ url }) {
   const group = useRef();
   const { scene, animations } = useGLTF(url);
-  const { camera } = useThree();
 
   const { actions } = useAnimations(animations, group);
 
-  // Pin Hips bones to prevent foot sliding during crossfades
-  const hipsPinRef = useRef([]); // array of { bone, pos } to pin
   const gr80HipsRef = useRef(null); // GR80's Hips bone for rotation pinning
   const gr80HipsRotRef = useRef(null); // stored quaternion
-  const { zoomed, setZoomed, setTargetPos, setTargetLookAt, onArrivedRef, flyToRef, spotTargetRef, captainFadeRef } = useContext(ZoomContext);
+  const { zoomed, setZoomed, setTargetPos, setTargetLookAt, onArrivedRef, flyToRef, orbitTableRef, spotTargetRef, captainFadeRef } = useContext(ZoomContext);
   const lookingTimer = useRef(null);
   const gr80Timer = useRef(null);
   const gr80HeadRef = useRef(null);
@@ -440,8 +566,20 @@ function Model({ url }) {
 
 
     // Find captain's parent mesh for hiding during fly-through
-    const captainEmpty = scene.getObjectByName("Empty_Character");
-    if (captainEmpty) captainMeshRef.current = captainEmpty;
+    const captainEmpty = scene.getObjectByName("Empty_Captain");
+    if (captainEmpty) {
+      captainMeshRef.current = captainEmpty;
+      // One-time diagnostic: log every mesh + material under Captain
+      captainEmpty.traverse((child) => {
+        if (child.isMesh && child.material) {
+          const m = child.material;
+          console.log(
+            `[Captain mesh] ${child.name} → material: ${m.type}`,
+            { metalness: m.metalness, roughness: m.roughness, color: m.color?.getHexString?.() }
+          );
+        }
+      });
+    }
 
     const gr80Empty = scene.getObjectByName("EMPTY_GR80");
     if (gr80Empty) {
@@ -692,8 +830,61 @@ function Model({ url }) {
             if (zoomedRef.current) {
               setTimeout(() => {
               // Fade out captain slightly after camera starts moving
-              setTimeout(() => { captainFadeRef.current.target = 0; }, 500);
+              setTimeout(() => { captainFadeRef.current.target = 0; }, 2300);
               console.log("GR80 head ref:", gr80HeadRef.current);
+
+              // Helper: build the orbit-table request that triggers the
+              // CameraController's "orbiting-table" phase. Used by both
+              // the primary (gr80HeadRef) and fallback (EMPTY_GR80)
+              // paths so the orbit always runs regardless of which path
+              // the GR80 fly-to took. If the GLTF doesn't contain a
+              // "Table" mesh, falls back to a manual pivot near GR80 so
+              // the orbit still happens — just around the character
+              // instead of around the hologram.
+              const buildOrbitRequest = (fallbackPivot) => {
+                // ── Orbit tunables — adjust these to tweak the motion ──
+                // Radius is interpolated smoothly (smoothstep) from the
+                // camera's current distance to ORBIT_END_RADIUS across the
+                // whole orbit, so the camera gradually pulls back the
+                // entire time.
+                // Height uses a cubic ease-in, so it stays near the starting
+                // height for most of the sweep and only lifts to
+                // ORBIT_END_HEIGHT in the final stretch (per your note:
+                // "the camera can pull up just at the very end").
+                // End-angle = laps * 360° + ORBIT_END_ANGLE_DEG. Integer
+                // `laps` lands at the starting direction from the pivot;
+                // the degree offset rotates it past that to the framing
+                // you want to land on.
+                const ORBIT_END_RADIUS    = 0.4;   // final horizontal distance from pivot
+                const ORBIT_END_HEIGHT    = 0.2;  // final Y above pivot (hit only at the very end)
+                const ORBIT_END_ANGLE_DEG = -110;     // degrees past n laps — tune to land the framing
+                const ORBIT_LAPS          = 1.0;   // full rotations
+                const ORBIT_DURATION_SEC  = 25;    // total sweep time (seconds)
+                const ORBIT_DIRECTION     = 1;     // +1 CCW from above, -1 CW
+
+                const table = scene.getObjectByName("Table");
+                const pivot = new THREE.Vector3();
+                if (table) {
+                  scene.updateMatrixWorld(true);
+                  const tableBox = new THREE.Box3().setFromObject(table);
+                  tableBox.getCenter(pivot);
+                  pivot.y = tableBox.max.y + 0.12;
+                  console.log("[orbit-table] pivot = Table top +0.12:", pivot.toArray());
+                } else {
+                  console.warn("[orbit-table] 'Table' mesh not found — falling back to pivot near GR80");
+                  pivot.copy(fallbackPivot);
+                }
+                return {
+                  pivot,
+                  radius: ORBIT_END_RADIUS,
+                  heightOffset: ORBIT_END_HEIGHT,
+                  endAngleOffset: THREE.MathUtils.degToRad(ORBIT_END_ANGLE_DEG),
+                  laps: ORBIT_LAPS,
+                  duration: ORBIT_DURATION_SEC,
+                  direction: ORBIT_DIRECTION,
+                };
+              };
+
               if (gr80HeadRef.current) {
                 const gr80LookAt = new THREE.Vector3();
                 gr80HeadRef.current.getWorldPosition(gr80LookAt);
@@ -702,22 +893,14 @@ function Model({ url }) {
                 const gr80Pos = gr80LookAt.clone().add(new THREE.Vector3(0, 0, 0.8));
                 flyToRef.current = { pos: gr80Pos, lookAt: gr80LookAt };
 
-                // After arriving at GR80, turn the camera left to centre
-                // on the hologram table. Camera stays put — only the
-                // lookAt changes — so this reads as a pure head-turn.
-                // The hologram auto-positions on top of the mesh named
-                // "Table" (see HoloProjector.jsx:724-735).
+                // After arriving at GR80, enter the orbit-table phase
+                // instead of snapping to a fixed lookAt. The camera will
+                // sweep horizontally around the hologram for ~1.5 laps,
+                // then hand control back to OrbitControls. See the
+                // "orbiting-table" phase in CameraController.
                 onArrivedRef.current = () => {
-                  const table = scene.getObjectByName("Table");
-                  if (!table) return;
-                  scene.updateMatrixWorld(true);
-                  const tableBox = new THREE.Box3().setFromObject(table);
-                  const holoLookAt = new THREE.Vector3();
-                  tableBox.getCenter(holoLookAt);
-                  // Aim slightly above the table's top surface where the
-                  // hologram actually floats.
-                  holoLookAt.y = tableBox.max.y + 0.12;
-                  flyToRef.current = { pos: gr80Pos.clone(), lookAt: holoLookAt };
+                  console.log("[orbit-table] GR80 primary path arrived — requesting orbit");
+                  orbitTableRef.current = buildOrbitRequest(gr80LookAt);
                 };
               } else {
                 // Fallback: fly to EMPTY_GR80 position directly
@@ -728,22 +911,21 @@ function Model({ url }) {
                   const gr80World = new THREE.Vector3();
                   gr80Empty.getWorldPosition(gr80World);
                   // Look at chest/face height
-                  const gr80LookAt = gr80World.clone();
-                  gr80LookAt.y += 0.15;
+                  const gr80LookAtFallback = gr80World.clone();
+                  gr80LookAtFallback.y += 0.15;
                   // Camera in front of GR80 (positive Z = toward viewer).
                   // Backed up from 0.4 → 0.7 to keep clear of the mesh.
                   const gr80Pos = new THREE.Vector3(gr80World.x, gr80World.y + 0.21, gr80World.z + 0.7);
-                  flyToRef.current = { pos: gr80Pos, lookAt: gr80LookAt };
+                  flyToRef.current = { pos: gr80Pos, lookAt: gr80LookAtFallback };
                   // Move spotlight to GR80
                   spotTargetRef.current = { pos: gr80World.clone().add(new THREE.Vector3(0, 2, 0.5)), lookAt: gr80World.clone() };
 
-                  // After arriving at GR80, slowly orbit left to settle with H80Z in view
+                  // After arriving at GR80, enter the orbit-table phase
+                  // (same as primary path). If Table mesh is missing, the
+                  // helper falls back to orbiting around gr80LookAtFallback.
                   onArrivedRef.current = () => {
-                    // Midpoint between GR80 and H80Z for the lookAt
-                    const settleLookAt = new THREE.Vector3(-0.2, 1.1, -0.22);
-                    // Camera to GR80's left, pulled back to frame both characters
-                    const settlePos = new THREE.Vector3(0.4, 1.35, 0.1);
-                    flyToRef.current = { pos: settlePos, lookAt: settleLookAt };
+                    console.log("[orbit-table] GR80 fallback path arrived — requesting orbit");
+                    orbitTableRef.current = buildOrbitRequest(gr80LookAtFallback);
                   };
                 }
               }
@@ -838,6 +1020,7 @@ export default function SpaceScene({ onZoomChange } = {}) {
   const [targetLookAt, setTargetLookAt] = useState(() => new THREE.Vector3(0, 0, 0));
   const onArrivedRef = useRef(null);
   const flyToRef = useRef(null);
+  const orbitTableRef = useRef(null); // { pivot, radius?, heightOffset?, laps?, duration?, direction? }
   const spotTargetRef = useRef(null); // { pos, lookAt } for spotlight to lerp toward
   const captainFadeRef = useRef({ target: 1, current: 1 });
 
@@ -858,6 +1041,7 @@ export default function SpaceScene({ onZoomChange } = {}) {
     defaultPos, defaultLookAt,
     onArrivedRef,
     flyToRef,
+    orbitTableRef,
     spotTargetRef,
     captainFadeRef,
   }), [zoomed, targetPos, targetLookAt, defaultPos, defaultLookAt]);
@@ -896,8 +1080,8 @@ export default function SpaceScene({ onZoomChange } = {}) {
       <Canvas
         onPointerMissed={() => { if (zoomed) setZoomed(false); }}
         dpr={[1.5, 2]}
-        linear
         shadows
+        gl={{ toneMappingExposure: 0.6 }}
         camera={{ position: [0, 0, 16], fov: 75 }}
       >
         <ZoomContext.Provider value={zoomCtx}>
@@ -906,11 +1090,11 @@ export default function SpaceScene({ onZoomChange } = {}) {
               space.css (stats.js defaults to top-left). */}
           <Stats className="stats-top-right" />
           <fog attach="fog" args={["#272730", 16, 30]} />
-          <ambientLight intensity={0.5 * Math.PI} />
+          <ambientLight intensity={0.15 * Math.PI} />
           <PerspectiveCamera makeDefault position={[0, 0, 16]} fov={75}>
             <spotLight
               castShadow
-              intensity={1.25 * Math.PI}
+              intensity={0.5 * Math.PI}
               decay={0}
               angle={0.2}
               penumbra={1}
