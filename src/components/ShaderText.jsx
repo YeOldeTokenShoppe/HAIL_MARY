@@ -185,6 +185,12 @@ export default function ShaderText({
     maskCtx.fillStyle = "#000";
     maskCtx.fillRect(0, 0, W, H);
 
+    // Split on explicit newlines — caller controls line breaks via "\n" or an array.
+    const lines = (Array.isArray(str) ? str : String(str).split("\n"))
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    if (lines.length === 0) return maskTex.current;
+
     // Probe to measure ink bounds
     const probeSize = 300;
     const probeW = 2000;
@@ -195,39 +201,65 @@ export default function ShaderText({
     const pc = probeCanvas.getContext("2d");
     pc.fillStyle = "#000";
     pc.fillRect(0, 0, probeW, probeH);
-    pc.fillStyle = "#fff";
     pc.font = `${fontStr.replace(/\d+px/, `${probeSize}px`)}`;
     pc.textAlign = "center";
     pc.textBaseline = "middle";
-    pc.fillText(str, probeW / 2, probeH / 2);
+
+    // Widest line drives the width fit. measureText is independent of canvas
+    // bounds, so very long text is handled correctly.
+    let widestInk = 0;
+    for (const line of lines) {
+      const w = pc.measureText(line).width;
+      if (w > widestInk) widestInk = w;
+    }
+    widestInk = Math.max(1, widestInk);
+
+    // Draw the widest line once to probe vertical ink bounds (ascender/descender).
+    pc.fillStyle = "#fff";
+    pc.fillText(lines.reduce((a, b) => (a.length >= b.length ? a : b)), probeW / 2, probeH / 2);
 
     const pd = pc.getImageData(0, 0, probeW, probeH).data;
-    let minX = probeW, maxX = 0, minY = probeH, maxY = 0;
+    let minY = probeH, maxY = 0;
     for (let y = 0; y < probeH; y++) {
       for (let x = 0; x < probeW; x++) {
         if (pd[(y * probeW + x) * 4] > 64) {
-          if (x < minX) minX = x;
-          if (x > maxX) maxX = x;
           if (y < minY) minY = y;
           if (y > maxY) maxY = y;
+          break;
         }
       }
     }
+    const probeInkH = Math.max(1, maxY - minY);
 
-    const inkW = Math.max(1, maxX - minX);
-    const fullWidthFontSize = probeSize * (W / inkW);
-    // Fill ~92% of width for some padding
-    const finalFontSize = Math.min(fullWidthFontSize * 0.92, H * 0.95);
+    // Font size such that the widest line fills 92% of W.
+    const widthFitSize = probeSize * (W / widestInk) * 0.92;
+
+    // Font size such that all lines stacked fill 95% of H.
+    // lineHeight factor is derived from the ink-height ratio at probe size
+    // so descenders/ascenders are respected, with a 15% gap between lines.
+    const inkToFontRatio = probeInkH / probeSize; // e.g. ~0.72 for most fonts
+    const lineHeightFactor = inkToFontRatio * 1.15;
+    const heightFitSize = (H * 0.95) / (lines.length * lineHeightFactor);
+
+    const finalFontSize = Math.min(widthFitSize, heightFitSize);
+    const lineStep = finalFontSize * lineHeightFactor;
 
     maskCtx.fillStyle = "#fff";
     maskCtx.font = fontStr.replace(/\d+px/, `${finalFontSize}px`);
     maskCtx.textAlign = "center";
     maskCtx.textBaseline = "middle";
 
+    // Baseline offset so a single line is ink-centred (compensates for any
+    // imbalance between the font's ascender and descender heights).
     const probeInkCentreY = (minY + maxY) / 2;
     const probeCanvaCentreY = probeH / 2;
     const inkCentreOffset = (probeInkCentreY - probeCanvaCentreY) * (finalFontSize / probeSize);
-    maskCtx.fillText(str, W / 2, H / 2 - inkCentreOffset);
+
+    const totalHeight = lineStep * (lines.length - 1);
+    const startY = H / 2 - totalHeight / 2 - inkCentreOffset;
+    for (let i = 0; i < lines.length; i++) {
+      maskCtx.fillText(lines[i], W / 2, startY + i * lineStep);
+    }
 
     if (maskTex.current) {
       maskTex.current.image = maskCanvas;
@@ -264,7 +296,10 @@ export default function ShaderText({
     const maskTexRef = { current: null };
     const fontStr = `${fontWeight} 300px ${font}`;
 
-    const tex = buildMask(renderer, maskCanvas, maskCtx, maskTexRef, W, H, text.toUpperCase(), fontStr);
+    const upper = Array.isArray(text)
+      ? text.map((s) => String(s).toUpperCase())
+      : String(text).toUpperCase();
+    const tex = buildMask(renderer, maskCanvas, maskCtx, maskTexRef, W, H, upper, fontStr);
 
     const bgRGB = hexToRGB(colorBg);
     const fillRGB = hexToRGB(colorFill);

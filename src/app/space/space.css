@@ -105,3 +105,14 @@
   bottom: 60px;
   right: 60px;
 }
+
+/* r3f perf monitor — drei's <Stats> renders a stats.js panel with inline
+   position: fixed; top: 0; left: 0. Override to top-right. The !important
+   flags are because stats.js writes styles directly to the element style
+   attribute (inline), which would otherwise win the cascade. */
+.stats-top-right {
+  left: auto !important;
+  right: 0 !important;
+  top: 0 !important;
+  z-index: 10001 !important;
+}

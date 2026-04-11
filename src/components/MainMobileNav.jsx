@@ -139,11 +139,15 @@ export default function MainMobileNav({
     right: overrideSlots.right || defaults.right,
   };
 
+  // Aligned to the HUD panel palette: labels stay uniform muted gold so
+  // the nav reads as cohesive, but each icon gets a desaturated character
+  // tint so the row doesn't feel monotone. Every tint is pulled toward the
+  // panel's muted/vintage lightness so none of them pop above the others.
   const glowColors = {
-    'mn-buy': 'hsl(152, 80%, 45%)',
-    'mn-comms': 'hsl(200, 80%, 55%)',
-    'mn-rank': 'hsl(45, 90%, 55%)',
-    'mn-lounge': 'hsl(280, 60%, 60%)',
+    'mn-buy': '#7fb87a',    // sage green — money
+    'mn-comms': '#6bc7d1',  // panel cyan — data/comms
+    'mn-rank': '#d4a854',   // panel gold — brand/status
+    'mn-lounge': '#c478a0', // muted rose — social/lounge
   };
 
   const renderItem = (slot, key) => (
@@ -184,10 +188,10 @@ export default function MainMobileNav({
           align-items: flex-end;
           justify-content: space-around;
           padding: 6px 4px calc(8px + env(safe-area-inset-bottom, 0px));
-          background: rgba(5, 5, 15, 0.95);
+          background: rgba(18, 10, 22, 0.92);
           backdrop-filter: blur(20px);
           -webkit-backdrop-filter: blur(20px);
-          border-top: 1px solid rgba(0, 255, 255, 0.15);
+          border-top: 1px solid rgba(212, 168, 84, 0.2);
           box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.5);
           position: relative;
           overflow: visible;
@@ -255,23 +259,23 @@ export default function MainMobileNav({
         }
 
         .mn-item:active .mn-icon {
-          box-shadow: 0 0 16px rgba(0, 255, 255, 0.5);
+          box-shadow: 0 0 16px rgba(212, 168, 84, 0.5);
         }
 
         .mn-item:has(.mn-buy):active .mn-icon {
-          box-shadow: 0 0 18px hsla(152, 80%, 45%, 0.6);
+          box-shadow: 0 0 18px rgba(127, 184, 122, 0.6);
         }
 
         .mn-item:has(.mn-comms):active .mn-icon {
-          box-shadow: 0 0 18px hsla(200, 80%, 55%, 0.6);
+          box-shadow: 0 0 18px rgba(107, 199, 209, 0.6);
         }
 
         .mn-item:has(.mn-rank):active .mn-icon {
-          box-shadow: 0 0 18px hsla(45, 90%, 55%, 0.6);
+          box-shadow: 0 0 18px rgba(212, 168, 84, 0.6);
         }
 
         .mn-item:has(.mn-lounge):active .mn-icon {
-          box-shadow: 0 0 18px hsla(280, 60%, 60%, 0.6);
+          box-shadow: 0 0 18px rgba(196, 120, 160, 0.6);
         }
 
         .mn-icon {
@@ -288,7 +292,7 @@ export default function MainMobileNav({
         }
 
         .mn-icon.mn-active {
-          background: rgba(0, 255, 255, 0.1);
+          background: rgba(212, 168, 84, 0.1);
         }
 
         .mn-nav-svg {
@@ -301,27 +305,30 @@ export default function MainMobileNav({
           font-weight: 700;
           letter-spacing: 0.5px;
           text-transform: uppercase;
-          color: rgba(0, 255, 255, 0.4);
+          color: rgba(212, 168, 84, 0.5);
           line-height: 1;
           white-space: nowrap;
         }
 
         .mn-label.mn-label-active {
-          color: hsl(183, 38%, 57%);
+          color: #d4a854;
         }
 
-        /* ---- Slot color accents ---- */
+        /* ---- Slot icon tints — characterful but desaturated ----
+           Labels are uniform muted gold above; the icons carry the per-slot
+           character via desaturated tints that sit at roughly the same
+           perceived lightness as the HUD panel's gold/cyan. */
         .mn-buy .mn-nav-svg,
-        .mn-item:has(.mn-buy) .mn-nav-svg { color: hsl(152, 80%, 45%); }
+        .mn-item:has(.mn-buy) .mn-nav-svg { color: #7fb87a; }     /* sage green — money */
 
         .mn-comms .mn-nav-svg,
-        .mn-item:has(.mn-comms) .mn-nav-svg { color: hsl(200, 80%, 55%); }
+        .mn-item:has(.mn-comms) .mn-nav-svg { color: #6bc7d1; }   /* panel cyan — data */
 
         .mn-rank .mn-nav-svg,
-        .mn-item:has(.mn-rank) .mn-nav-svg { color: hsl(45, 90%, 55%); }
+        .mn-item:has(.mn-rank) .mn-nav-svg { color: #d4a854; }    /* panel gold — brand */
 
         .mn-lounge .mn-nav-svg,
-        .mn-item:has(.mn-lounge) .mn-nav-svg { color: hsl(280, 60%, 60%); }
+        .mn-item:has(.mn-lounge) .mn-nav-svg { color: #c478a0; }  /* muted rose — social */
 
         /* Use parent to color the svg */
         .mn-item .mn-buy { }
@@ -347,9 +354,10 @@ export default function MainMobileNav({
           align-items: center;
           justify-content: center;
           cursor: pointer;
-          border: 3px solid rgba(255, 140, 0, 0.4);
-          background: linear-gradient(145deg, hsl(25, 90%, 35%), hsl(15, 80%, 22%));
-          box-shadow: 0 4px 16px rgba(255, 100, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.4);
+          /* Orange retuned to share DNA with the panel's LED red (#e85c2b). */
+          border: 3px solid rgba(232, 92, 43, 0.45);
+          background: linear-gradient(145deg, #c0421a 0%, #802010 100%);
+          box-shadow: 0 4px 16px rgba(232, 92, 43, 0.3), 0 2px 6px rgba(0, 0, 0, 0.4);
           transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
           -webkit-tap-highlight-color: transparent;
           flex-direction: column;
@@ -366,13 +374,13 @@ export default function MainMobileNav({
 
         .mn-fab:active {
           animation: mnFabSpring 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-          box-shadow: 0 0 24px rgba(255, 100, 0, 0.7), 0 0 10px rgba(255, 140, 0, 0.5);
+          box-shadow: 0 0 24px rgba(232, 92, 43, 0.7), 0 0 10px rgba(240, 112, 48, 0.5);
         }
 
         .mn-fab .mn-mission-svg {
           width: 24px;
           height: 24px;
-          color: rgba(255, 220, 180, 0.9);
+          color: #e8d9b8; /* panel cream */
         }
 
         .mn-fab-label {
@@ -380,14 +388,14 @@ export default function MainMobileNav({
           font-size: 0.5rem;
           font-weight: 900;
           letter-spacing: 1px;
-          color: rgba(255, 220, 180, 0.9);
+          color: #e8d9b8;
           text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
           line-height: 1;
         }
 
         @keyframes mnFabPulse {
-          0%, 100% { box-shadow: 0 4px 16px rgba(255, 100, 0, 0.3), 0 2px 6px rgba(0, 0, 0, 0.4); }
-          50% { box-shadow: 0 4px 24px rgba(255, 100, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4), 0 0 40px rgba(255, 100, 0, 0.12); }
+          0%, 100% { box-shadow: 0 4px 16px rgba(232, 92, 43, 0.3), 0 2px 6px rgba(0, 0, 0, 0.4); }
+          50%      { box-shadow: 0 4px 24px rgba(232, 92, 43, 0.5), 0 2px 6px rgba(0, 0, 0, 0.4), 0 0 40px rgba(232, 92, 43, 0.12); }
         }
 
         .mn-fab.mn-pulse {
@@ -405,7 +413,7 @@ export default function MainMobileNav({
             <button
               className={`mn-fab ${fabPulse ? "mn-pulse" : ""}`}
               onClick={(e) => {
-                triggerGlow('hsl(25, 90%, 50%)');
+                triggerGlow('#e85c2b');
                 slots.center.onClick?.(e);
               }}
             >

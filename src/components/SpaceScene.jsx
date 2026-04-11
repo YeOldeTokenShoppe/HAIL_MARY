@@ -8,6 +8,7 @@ import {
   PerspectiveCamera,
   OrbitControls,
   Stars,
+  Stats,
 } from "@react-three/drei";
 import HoloProjector from "./HoloProjector";
 import "../app/space/space.css";
@@ -16,6 +17,8 @@ import "../app/space/space.css";
 const ZoomContext = createContext();
 
 /* ── Smooth camera zoom controller ── */
+const ZOOM_IN_WORLD_UP = new THREE.Vector3(0, 1, 0);
+const ZOOM_IN_DURATION = 1.8; // seconds — total length of the arc-path zoom
 function CameraController({ controlsRef }) {
   const { camera } = useThree();
   const { zoomed, targetPos, targetLookAt, defaultPos, defaultLookAt, onArrivedRef, flyToRef, captainFadeRef } = useContext(ZoomContext);
@@ -30,6 +33,18 @@ function CameraController({ controlsRef }) {
   const flyStartLookAt = useRef(new THREE.Vector3());
   const flyTotalDist = useRef(1);
   const flyProgress = useRef(0);
+  // For the arc-path zoom-in (slerp direction, lerp radius)
+  const zoomProgress = useRef(0);
+  const zoomStartDir = useRef(new THREE.Vector3());
+  const zoomEndDir = useRef(new THREE.Vector3());
+  const zoomStartRadius = useRef(0);
+  const zoomEndRadius = useRef(0);
+  const zoomStartLookAt = useRef(new THREE.Vector3());
+  // Scratch objects reused every frame to avoid per-frame allocations
+  const tmpQuatStart = useRef(new THREE.Quaternion());
+  const tmpQuatEnd = useRef(new THREE.Quaternion());
+  const tmpQuat = useRef(new THREE.Quaternion());
+  const tmpDir = useRef(new THREE.Vector3());
 
   useFrame((_, delta) => {
     const t = 1 - Math.exp(-lerpSpeed * delta);
@@ -38,6 +53,20 @@ function CameraController({ controlsRef }) {
       phase.current = "zooming-in";
       activePos.current.copy(targetPos);
       activeLookAt.current.copy(targetLookAt);
+
+      // Snapshot the arc-path parameters. zoom-in slerps the camera's
+      // direction-from-head from its current angle to the target angle
+      // while lerping the radius inward, so the motion arcs around the
+      // model instead of cutting a straight line through it.
+      const startVec = new THREE.Vector3().subVectors(camera.position, targetLookAt);
+      const endVec = new THREE.Vector3().subVectors(targetPos, targetLookAt);
+      zoomStartRadius.current = Math.max(startVec.length(), 1e-4);
+      zoomEndRadius.current = Math.max(endVec.length(), 1e-4);
+      zoomStartDir.current.copy(startVec).normalize();
+      zoomEndDir.current.copy(endVec).normalize();
+      zoomStartLookAt.current.copy(currentLookAt.current);
+      zoomProgress.current = 0;
+
       if (controlsRef.current) {
         controlsRef.current.enabled = false;
         controlsRef.current.autoRotate = false;
@@ -92,12 +121,30 @@ function CameraController({ controlsRef }) {
     }
 
     if (phase.current === "zooming-in") {
-      camera.position.lerp(activePos.current, t);
-      currentLookAt.current.lerp(activeLookAt.current, t);
+      // Arc-path: slerp the direction-from-head from the start angle to the
+      // front-of-face angle, while lerping the radius from the user's
+      // current distance down to the close-up distance. This means the
+      // camera always ends up facing the character from the front, and
+      // never cuts through the head geometry en route (which is what the
+      // straight-line lerp did when the user clicked from behind).
+      zoomProgress.current += delta / ZOOM_IN_DURATION;
+      const p = Math.min(zoomProgress.current, 1);
+      const eased = p * p * (3 - 2 * p); // smoothstep
+
+      // Slerp direction using quaternions (handles any start/end angle).
+      tmpQuatStart.current.setFromUnitVectors(ZOOM_IN_WORLD_UP, zoomStartDir.current);
+      tmpQuatEnd.current.setFromUnitVectors(ZOOM_IN_WORLD_UP, zoomEndDir.current);
+      tmpQuat.current.copy(tmpQuatStart.current).slerp(tmpQuatEnd.current, eased);
+      tmpDir.current.copy(ZOOM_IN_WORLD_UP).applyQuaternion(tmpQuat.current);
+
+      // Lerp radius.
+      const radius = zoomStartRadius.current * (1 - eased) + zoomEndRadius.current * eased;
+
+      camera.position.copy(activeLookAt.current).add(tmpDir.current.multiplyScalar(radius));
+      currentLookAt.current.lerpVectors(zoomStartLookAt.current, activeLookAt.current, eased);
       camera.lookAt(currentLookAt.current);
 
-      const dist = camera.position.distanceTo(activePos.current);
-      if (dist < 0.025) {
+      if (p >= 1) {
         phase.current = "zoomed";
         if (controlsRef.current) {
           controlsRef.current.target.copy(activeLookAt.current);
@@ -651,8 +698,27 @@ function Model({ url }) {
                 const gr80LookAt = new THREE.Vector3();
                 gr80HeadRef.current.getWorldPosition(gr80LookAt);
                 console.log("Flying to GR80 at:", gr80LookAt.toArray());
-                const gr80Pos = gr80LookAt.clone().add(new THREE.Vector3(0, 0, 0.5));
+                // Backed up from 0.5 → 0.8 to keep the camera clear of GR80's mesh.
+                const gr80Pos = gr80LookAt.clone().add(new THREE.Vector3(0, 0, 0.8));
                 flyToRef.current = { pos: gr80Pos, lookAt: gr80LookAt };
+
+                // After arriving at GR80, turn the camera left to centre
+                // on the hologram table. Camera stays put — only the
+                // lookAt changes — so this reads as a pure head-turn.
+                // The hologram auto-positions on top of the mesh named
+                // "Table" (see HoloProjector.jsx:724-735).
+                onArrivedRef.current = () => {
+                  const table = scene.getObjectByName("Table");
+                  if (!table) return;
+                  scene.updateMatrixWorld(true);
+                  const tableBox = new THREE.Box3().setFromObject(table);
+                  const holoLookAt = new THREE.Vector3();
+                  tableBox.getCenter(holoLookAt);
+                  // Aim slightly above the table's top surface where the
+                  // hologram actually floats.
+                  holoLookAt.y = tableBox.max.y + 0.12;
+                  flyToRef.current = { pos: gr80Pos.clone(), lookAt: holoLookAt };
+                };
               } else {
                 // Fallback: fly to EMPTY_GR80 position directly
                 const gr80Empty = scene.getObjectByName("EMPTY_GR80");
@@ -664,8 +730,9 @@ function Model({ url }) {
                   // Look at chest/face height
                   const gr80LookAt = gr80World.clone();
                   gr80LookAt.y += 0.15;
-                  // Camera in front of GR80 (positive Z = toward viewer)
-                  const gr80Pos = new THREE.Vector3(gr80World.x, gr80World.y + 0.21, gr80World.z + 0.4);
+                  // Camera in front of GR80 (positive Z = toward viewer).
+                  // Backed up from 0.4 → 0.7 to keep clear of the mesh.
+                  const gr80Pos = new THREE.Vector3(gr80World.x, gr80World.y + 0.21, gr80World.z + 0.7);
                   flyToRef.current = { pos: gr80Pos, lookAt: gr80LookAt };
                   // Move spotlight to GR80
                   spotTargetRef.current = { pos: gr80World.clone().add(new THREE.Vector3(0, 2, 0.5)), lookAt: gr80World.clone() };
@@ -737,8 +804,12 @@ function Model({ url }) {
       box.getCenter(lookAt);
     }
 
-    // Camera at same height as lookAt, offset forward on Z
-    const zoomPos = lookAt.clone().add(new THREE.Vector3(0, 0, 0.15));
+    // Fixed front-of-face destination — the character faces world +Z.
+    // CameraController arcs the camera around to this position via slerp
+    // (see its zooming-in phase) instead of lerping in a straight line,
+    // so starting the zoom from behind the model won't clip through the
+    // head geometry.
+    const zoomPos = lookAt.clone().add(new THREE.Vector3(0, 0, 0.22));
 
     setTargetLookAt(lookAt);
     setTargetPos(zoomPos);
@@ -761,7 +832,7 @@ function Model({ url }) {
   );
 }
 
-export default function SpaceScene() {
+export default function SpaceScene({ onZoomChange } = {}) {
   const [zoomed, setZoomed] = useState(false);
   const [targetPos, setTargetPos] = useState(() => new THREE.Vector3(0, 0, 6));
   const [targetLookAt, setTargetLookAt] = useState(() => new THREE.Vector3(0, 0, 0));
@@ -769,6 +840,11 @@ export default function SpaceScene() {
   const flyToRef = useRef(null);
   const spotTargetRef = useRef(null); // { pos, lookAt } for spotlight to lerp toward
   const captainFadeRef = useRef({ target: 1, current: 1 });
+
+  // Notify the parent when the zoom state flips so it can fade HUD overlays.
+  useEffect(() => {
+    onZoomChange?.(zoomed);
+  }, [zoomed, onZoomChange]);
 
   const defaultPos = React.useMemo(() => new THREE.Vector3(0, 0, 16), []);
   const defaultLookAt = React.useMemo(() => new THREE.Vector3(0, 0, 0), []);
@@ -825,6 +901,10 @@ export default function SpaceScene() {
         camera={{ position: [0, 0, 16], fov: 75 }}
       >
         <ZoomContext.Provider value={zoomCtx}>
+          {/* Perf monitor — drei's <Stats> wraps stats.js. Position is
+              overridden to top-right via the `.stats-top-right` rule in
+              space.css (stats.js defaults to top-left). */}
+          <Stats className="stats-top-right" />
           <fog attach="fog" args={["#272730", 16, 30]} />
           <ambientLight intensity={0.5 * Math.PI} />
           <PerspectiveCamera makeDefault position={[0, 0, 16]} fov={75}>

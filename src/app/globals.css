@@ -183,27 +183,12 @@ canvas {
 
 
 
-/* Custom Font - Orbitron */
+/* Custom Font - Orbitron (local file is Orbitron-Regular only;
+   weights 700/800/900 come from the Google Fonts link in layout.js) */
 @font-face {
   font-family: 'Orbitron';
   src: url('/fonts/Orbitron.ttf') format('truetype');
   font-weight: 400;
-  font-style: normal;
-  font-display: block;
-}
-
-@font-face {
-  font-family: 'Orbitron';
-  src: url('/fonts/Orbitron.ttf') format('truetype');
-  font-weight: 700;
-  font-style: normal;
-  font-display: block;
-}
-
-@font-face {
-  font-family: 'Orbitron';
-  src: url('/fonts/Orbitron.ttf') format('truetype');
-  font-weight: 800;
   font-style: normal;
   font-display: block;
 }
@@ -7151,6 +7136,433 @@ body .cl-profileSection__security .cl-profileSectionPrimaryButton {
   body .cl-signUp-root .cl-cardBox {
     border-radius: 0 !important;
     max-height: 100dvh !important;
+  }
+}
+
+/* ═══════════════════════════════════════
+   Prospecting Banner
+   ═══════════════════════════════════════ */
+.prospecting-banner {
+  --hud-gold: #d4a854;
+  --hud-gold-bright: #e8c070;
+  --hud-gold-dim: rgba(212, 168, 84, 0.55);
+  --hud-gold-faint: rgba(212, 168, 84, 0.18);
+  --hud-cream: #e8d9b8;
+  --hud-muted: #9a8878;
+  --hud-panel-bg: rgba(18, 10, 22, 0.82);
+  /* Warm orange — matches the FAB (MainMobileNav) hue family. Used for
+     the live LED indicator and anywhere else we want the "hero action"
+     warm-accent. */
+  --hud-orange: #e87a2b;
+  /* Cyan is the "data voice" — reserved for live, machine-generated values
+     (counters, depth, swipes). Gold stays the brand. */
+  --hud-cyan: #6bc7d1;
+  --hud-cyan-dim: rgba(107, 199, 209, 0.7);
+
+  position: fixed;
+  bottom: 5.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+  width: min(92vw, 320px);
+  pointer-events: none;
+  /* Fade transition for the --faded modifier that fires during the
+     SpaceScene zoom-in animation. */
+  opacity: 1;
+  transition: opacity 0.5s ease-out;
+}
+
+/* Applied from JS when SpaceScene enters its zoom-in animation so the HUD
+   gets out of the way of the character cameo. Re-removing the class on
+   zoom-out triggers the same transition in reverse. */
+.prospecting-banner--faded {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── Main HUD panel ── */
+.prospecting-banner__panel {
+  position: relative;
+  padding: 0.95rem 1.1rem 0.85rem;
+  background: var(--hud-panel-bg);
+  border: 1px solid var(--hud-gold-faint);
+  backdrop-filter: blur(6px) saturate(140%);
+  -webkit-backdrop-filter: blur(6px) saturate(140%);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 20px 40px -10px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(212, 168, 84, 0.08);
+}
+
+/* Gold corner brackets */
+.prospecting-banner__bracket {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+}
+.prospecting-banner__bracket::before,
+.prospecting-banner__bracket::after {
+  content: "";
+  position: absolute;
+  background: var(--hud-gold);
+}
+.prospecting-banner__bracket--tl { top: -1px; left: -1px; }
+.prospecting-banner__bracket--tl::before { top: 0; left: 0; width: 12px; height: 2px; }
+.prospecting-banner__bracket--tl::after  { top: 0; left: 0; width: 2px; height: 12px; }
+
+.prospecting-banner__bracket--tr { top: -1px; right: -1px; }
+.prospecting-banner__bracket--tr::before { top: 0; right: 0; width: 12px; height: 2px; }
+.prospecting-banner__bracket--tr::after  { top: 0; right: 0; width: 2px; height: 12px; }
+
+.prospecting-banner__bracket--bl { bottom: -1px; left: -1px; }
+.prospecting-banner__bracket--bl::before { bottom: 0; left: 0; width: 12px; height: 2px; }
+.prospecting-banner__bracket--bl::after  { bottom: 0; left: 0; width: 2px; height: 12px; }
+
+.prospecting-banner__bracket--br { bottom: -1px; right: -1px; }
+.prospecting-banner__bracket--br::before { bottom: 0; right: 0; width: 12px; height: 2px; }
+.prospecting-banner__bracket--br::after  { bottom: 0; right: 0; width: 2px; height: 12px; }
+
+/* Top meta row */
+.prospecting-banner__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.52rem;
+  letter-spacing: 0.18em;
+  color: var(--hud-gold-dim);
+  text-transform: uppercase;
+  padding-bottom: 0.55rem;
+  margin-bottom: 0.7rem;
+  border-bottom: 1px solid var(--hud-gold-faint);
+}
+
+.prospecting-banner__live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--hud-gold);
+}
+
+/* Live machine-generated values — the "data voice" of the panel. Any text
+   the rig is actively measuring (counters, readouts) uses this. Static
+   labels and brand copy stay gold. */
+.prospecting-banner__data {
+  color: var(--hud-cyan);
+  text-shadow: 0 0 6px rgba(107, 199, 209, 0.35);
+}
+
+.prospecting-banner__led {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--hud-orange);
+  box-shadow:
+    0 0 4px var(--hud-orange),
+    0 0 8px rgba(232, 122, 43, 0.5);
+  animation: prospecting-led-pulse 1.6s ease-in-out infinite;
+}
+@keyframes prospecting-led-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+
+/* Heading */
+.prospecting-banner__title {
+  margin: 0 0 0.7rem;
+  font-family: "Orbitron", sans-serif;
+  font-weight: 800;
+  font-size: 1.05rem;
+  line-height: 1.15;
+  letter-spacing: 0.08em;
+  color: var(--hud-cream);
+  text-shadow: 0 0 14px rgba(212, 168, 84, 0.2);
+}
+
+/* Body */
+.prospecting-banner__body {
+  margin: 0 0 0.6rem;
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.64rem;
+  line-height: 1.55;
+  letter-spacing: 0.05em;
+  color: var(--hud-muted);
+}
+.prospecting-banner__token {
+  color: var(--hud-gold);
+  font-weight: 700;
+}
+
+/* Divider */
+.prospecting-banner__divider {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--hud-gold-faint) 15%,
+    var(--hud-gold-faint) 85%,
+    transparent
+  );
+  margin: 0.55rem 0 0.5rem;
+}
+
+/* Rig ID */
+.prospecting-banner__rig {
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.54rem;
+  letter-spacing: 0.2em;
+  color: var(--hud-gold-dim);
+  text-transform: uppercase;
+  margin-bottom: 0.65rem;
+}
+
+/* Stats row */
+.prospecting-banner__stats {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+.prospecting-banner__stat { flex: 1; }
+.prospecting-banner__stat-value {
+  font-family: "Orbitron", sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--hud-cyan);
+  letter-spacing: 0.03em;
+  line-height: 1;
+  text-shadow: 0 0 8px rgba(107, 199, 209, 0.4);
+}
+.prospecting-banner__stat-label {
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.5rem;
+  letter-spacing: 0.22em;
+  color: var(--hud-muted);
+  text-transform: uppercase;
+  margin-top: 0.2rem;
+}
+.prospecting-banner__stat-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--hud-gold-faint);
+  flex-shrink: 0;
+}
+
+/* Signal beam — hidden on mobile */
+.prospecting-banner__beam { display: none; }
+
+/* Desktop / full-screen */
+@media screen and (min-width: 769px) {
+  .prospecting-banner {
+    bottom: auto;
+    top: 50%;
+    left: auto;
+    right: 2.5rem;
+    transform: translateY(-50%);
+    width: 320px;
+  }
+
+  /* ── Beam from the drill rig on the asteroid direct to the HUD panel ──
+     Position / width / rotation are set inline from JS (see HomePage()
+     in src/app/page.js), so the endpoints track the rig and the capsule
+     across viewport sizes. This rule only carries the visual styling. */
+  .prospecting-banner__beam {
+    display: block;
+    position: fixed;
+    height: 1px;
+    background: repeating-linear-gradient(
+      to right,
+      rgba(212, 168, 84, 0.42) 0 5px,
+      transparent 5px 11px
+    );
+    transform-origin: left center;
+    pointer-events: none;
+    z-index: 299; /* just below .prospecting-banner */
+    opacity: 1;
+    transition: opacity 0.5s ease-out;
+  }
+
+  /* Faded state — mirrors .prospecting-banner--faded; fires during the
+     SpaceScene zoom-in animation. */
+  .prospecting-banner__beam--faded {
+    opacity: 0;
+  }
+
+  /* Antenna node at the rig end of the beam. The solid gold dot is the
+     transmitter; the two pseudo-elements are concentric rings that radiate
+     outward on a stagger, selling "radio broadcast" rather than "light beam."
+     Gold colour is hardcoded — this element lives outside .prospecting-banner
+     (see note in page.js) so it can't inherit --hud-gold. */
+  .prospecting-banner__beam-origin {
+    position: absolute;
+    top: -3px;
+    left: -3px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #d4a854;
+    box-shadow: 0 0 6px #d4a854, 0 0 12px rgba(212, 168, 84, 0.5);
+  }
+  .prospecting-banner__beam-origin::before,
+  .prospecting-banner__beam-origin::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: 50%;
+    border: 1px solid #d4a854;
+    opacity: 0;
+    animation: prospecting-beam-broadcast 2.4s ease-out infinite;
+    pointer-events: none;
+  }
+  .prospecting-banner__beam-origin::after {
+    animation-delay: 1.2s;
+  }
+  @keyframes prospecting-beam-broadcast {
+    0%   { transform: scale(1);   opacity: 0.85; }
+    80%  {                        opacity: 0.05; }
+    100% { transform: scale(4.2); opacity: 0;    }
+  }
+
+  /* Pulse traveling from rig → capsule along the beam */
+  .prospecting-banner__beam-pulse {
+    position: absolute;
+    top: -1px;
+    left: 0;
+    width: 34px;
+    height: 3px;
+    background: linear-gradient(to right, transparent, #d4a854);
+    animation: prospecting-beam-flow 3.2s linear infinite;
+  }
+  @keyframes prospecting-beam-flow {
+    0%   { transform: translateX(0);                 opacity: 0; }
+    12%  { opacity: 1; }
+    88%  { opacity: 1; }
+    100% { transform: translateX(calc(100% - 34px)); opacity: 0; }
+  }
+}
+
+/* Wide desktop */
+@media screen and (min-width: 1280px) {
+  .prospecting-banner {
+    right: 4rem;
+    width: 340px;
+  }
+}
+
+/* ═══════════════════════════════════════
+   Left-side Network Panel — subordinate variant
+   Narrower (~68% of telemetry panel width) so the telemetry panel stays
+   the primary focal point. Same CSS vars, same bracket/border treatment,
+   same contrast — width alone carries the hierarchy.
+   ═══════════════════════════════════════ */
+.prospecting-banner--network { display: none; }
+
+/* Header stratification override — the network variant has no big title
+   underneath the meta row, so the meta needs to carry the header weight
+   itself. Bigger, brighter, bolder than the stat labels beneath. */
+.prospecting-banner--network .prospecting-banner__meta {
+  font-size: 0.6rem;
+  letter-spacing: 0.22em;
+  color: var(--hud-gold);
+  font-weight: 700;
+  padding-bottom: 0.6rem;
+  margin-bottom: 0.8rem;
+}
+
+/* Stat rows: label (gold) left, value (cyan) right */
+.prospecting-banner__netstats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.15rem;
+}
+
+.prospecting-banner__netstat {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px dashed var(--hud-gold-faint);
+}
+.prospecting-banner__netstat:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.prospecting-banner__netstat-label {
+  flex: 1 1 auto;
+  font-family: "Share Tech Mono", monospace;
+  font-size: 0.5rem;
+  letter-spacing: 0.14em;
+  color: var(--hud-gold-dim);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.prospecting-banner__netstat-value {
+  /* Fixed-width column so values right-align to a shared axis — reads as
+     instrumentation instead of a ragged list. tabular-nums keeps digits on
+     the same grid regardless of content. */
+  flex: 0 0 72px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: "Orbitron", sans-serif;
+  font-weight: 700;
+  font-size: 0.74rem;
+  color: var(--hud-cyan);
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 6px rgba(107, 199, 209, 0.35);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Floating flavor line under the network panel — no wrapping box, just
+   italic muted-gold mono. Remounts on each rotation (via React key prop)
+   so the fade-in animation re-runs. */
+.prospecting-banner__flavor {
+  margin: 1.6rem 0 0;
+  padding: 0 0.2rem;
+  font-family: "Share Tech Mono", monospace;
+  font-style: italic;
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  line-height: 1.45;
+  color: var(--hud-gold-dim);
+  opacity: 0;
+  animation: prospecting-flavor-fade 0.9s ease-out forwards;
+}
+
+/* Leading `//` prompt mark — rhymes with the "03/47 // TELEMETRY" header
+   on the right panel, and signals "this isn't panel copy, it's a feed." */
+.prospecting-banner__flavor-mark {
+  color: var(--hud-gold);
+  font-style: normal;
+  margin-right: 0.3em;
+}
+@keyframes prospecting-flavor-fade {
+  0%   { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0);   }
+}
+
+/* Desktop / full-screen — show & position the network panel on the left.
+   Shifted up ~48px so the panel sits against the calmer dark sky instead
+   of floating over the debris field, and so its top-edge lines up more
+   closely with the taller telemetry panel's top-edge on the right. */
+@media screen and (min-width: 769px) {
+  .prospecting-banner.prospecting-banner--network {
+    display: block;
+    left: 2.5rem;
+    right: auto;
+    width: 218px; /* ~68% of the 320px telemetry panel */
+    top: calc(50% - 48px);
+  }
+}
+
+/* Wide desktop — keep the ratio against the 340px telemetry panel */
+@media screen and (min-width: 1280px) {
+  .prospecting-banner.prospecting-banner--network {
+    left: 4rem;
+    width: 232px;
   }
 }
 
