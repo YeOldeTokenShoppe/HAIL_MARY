@@ -11,6 +11,7 @@ import {
   Stats,
 } from "@react-three/drei";
 import HoloProjector from "./HoloProjector";
+import HologooR3F from "./HologooR3F";
 import "../app/space/space.css";
 
 /* ── Zoom context shared between Model and CameraController ── */
@@ -21,7 +22,7 @@ const ZOOM_IN_WORLD_UP = new THREE.Vector3(0, 1, 0);
 const ZOOM_IN_DURATION = 3.3; // seconds — total length of the arc-path zoom
 function CameraController({ controlsRef }) {
   const { camera } = useThree();
-  const { zoomed, targetPos, targetLookAt, defaultPos, defaultLookAt, onArrivedRef, flyToRef, orbitTableRef, captainFadeRef } = useContext(ZoomContext);
+  const { zoomed, targetPos, targetLookAt, defaultPos, defaultLookAt, onArrivedRef, flyToRef, orbitTableRef, captainFadeRef, sequenceRunningRef, breakOutRef, inSpaceshipRef } = useContext(ZoomContext);
   const lerpSpeed = 1.2; // slower for cinematic feel
   const phase = useRef("idle");
   const currentLookAt = useRef(new THREE.Vector3(0, 0, 0));
@@ -53,6 +54,11 @@ function CameraController({ controlsRef }) {
   const orbitEndHeight = useRef(0);
   const orbitStartAngle = useRef(0);
   const orbitTotalAngle = useRef(0);
+  // Constant offset added to the orbit's radius for the whole sweep
+  // (not just the end), so the camera stays farther from the pivot
+  // throughout. Ramped in over the first ~10% of the orbit to avoid
+  // a visible step-out at entry.
+  const orbitRadiusPadding = useRef(0);
   // Snapshot of the camera's lookAt at orbit entry. The orbit update lerps
   // `currentLookAt` from this to `orbitPivot` over the first fraction of
   // the sweep so the camera's rotation is continuous with the preceding
@@ -67,6 +73,29 @@ function CameraController({ controlsRef }) {
 
   useFrame((_, delta) => {
     const t = 1 - Math.exp(-lerpSpeed * delta);
+
+    // Break-out: once the camera has made its first stop at the captain,
+    // `sequenceRunningRef` is true. Any click on the scene sets
+    // `breakOutRef`; here we cancel any pending/in-flight animation phases
+    // and hand control to OrbitControls at the camera's current pose so
+    // the user can explore from wherever the camera happened to be.
+    if (breakOutRef.current) {
+      if (sequenceRunningRef.current) {
+        flyToRef.current = null;
+        orbitTableRef.current = null;
+        onArrivedRef.current = null;
+        captainFadeRef.current.target = 1;
+        sequenceRunningRef.current = false;
+        phase.current = "zoomed";
+        if (controlsRef.current) {
+          controlsRef.current.target.copy(currentLookAt.current);
+          controlsRef.current.enabled = true;
+          controlsRef.current.autoRotate = false;
+          controlsRef.current.update();
+        }
+      }
+      breakOutRef.current = false;
+    }
 
     if (zoomed && phase.current === "idle") {
       phase.current = "zooming-in";
@@ -138,6 +167,7 @@ function CameraController({ controlsRef }) {
       // Direction: positive = counter-clockwise (viewed from above).
       if (req.direction != null) orbitTotalAngle.current *= Math.sign(req.direction);
       orbitDuration.current = (req.duration != null) ? req.duration : 12;
+      orbitRadiusPadding.current = (req.radiusPadding != null) ? req.radiusPadding : 0;
       orbitProgress.current = 0;
       // Capture whatever the camera was previously looking at so we can
       // smoothly rotate toward the orbit pivot (otherwise the lookAt snaps
@@ -171,7 +201,14 @@ function CameraController({ controlsRef }) {
       const heightEased = p * p * p; // cubic ease-in (back-loaded)
 
       const angle = orbitStartAngle.current + orbitTotalAngle.current * eased;
-      const radius = orbitStartRadius.current * (1 - eased) + orbitEndRadius.current * eased;
+      const baseRadius = orbitStartRadius.current * (1 - eased) + orbitEndRadius.current * eased;
+      // Constant radius padding ramped in over the first 10% of the orbit
+      // (smoothstep) so the camera smoothly bumps out from its starting
+      // position instead of teleporting on frame 1.
+      const PADDING_RAMP_FRACTION = 0.1;
+      const rawPaddingRamp = Math.min(orbitProgress.current / PADDING_RAMP_FRACTION, 1);
+      const paddingRamp = rawPaddingRamp * rawPaddingRamp * (3 - 2 * rawPaddingRamp);
+      const radius = baseRadius + orbitRadiusPadding.current * paddingRamp;
       const height = orbitStartHeight.current * (1 - heightEased) + orbitEndHeight.current * heightEased;
       camera.position.set(
         orbitPivot.current.x + radius * Math.cos(angle),
@@ -190,6 +227,7 @@ function CameraController({ controlsRef }) {
 
       if (p >= 1) {
         phase.current = "zoomed";
+        sequenceRunningRef.current = false;
         if (controlsRef.current) {
           controlsRef.current.target.copy(orbitPivot.current);
           controlsRef.current.enabled = true;
@@ -302,6 +340,7 @@ function CameraController({ controlsRef }) {
       const dist = camera.position.distanceTo(defaultPos);
       if (dist < 0.05) {
         phase.current = "idle";
+        inSpaceshipRef.current = false;
         camera.position.copy(defaultPos);
         currentLookAt.current.copy(defaultLookAt);
         if (controlsRef.current) {
@@ -362,7 +401,7 @@ function CaptainSpotlight() {
     <spotLight
       ref={spotRef}
       castShadow
-      intensity={1}
+      intensity={10}
       decay={2}
       distance={10}
       angle={0.35}
@@ -515,7 +554,7 @@ function Model({ url }) {
 
   const gr80HipsRef = useRef(null); // GR80's Hips bone for rotation pinning
   const gr80HipsRotRef = useRef(null); // stored quaternion
-  const { zoomed, setZoomed, setTargetPos, setTargetLookAt, onArrivedRef, flyToRef, orbitTableRef, spotTargetRef, captainFadeRef } = useContext(ZoomContext);
+  const { zoomed, setZoomed, setTargetPos, setTargetLookAt, onArrivedRef, flyToRef, orbitTableRef, spotTargetRef, captainFadeRef, sequenceRunningRef, breakOutRef, inSpaceshipRef } = useContext(ZoomContext);
   const lookingTimer = useRef(null);
   const gr80Timer = useRef(null);
   const gr80HeadRef = useRef(null);
@@ -559,6 +598,11 @@ function Model({ url }) {
     lastBlinkTime: 0,
     nextBlinkDelay: Math.random() * 4000 + 3000,
   });
+
+  // Drone_Empty ref — the parent of all drone parts. Rotated every frame to
+  // face the viewer once the camera has entered the ship (see the drone
+  // tracking useFrame below).
+  const droneEmptyRef = useRef(null);
 
   // Find and pin Hips bones to prevent crossfade sliding
   // Also find GR80's Head bone for camera flythrough
@@ -716,7 +760,38 @@ function Model({ url }) {
     }
   });
 
+  // ── Drone tracker ──
+  // Once the camera has entered the ship (i.e. stopped at the captain at
+  // least once), rotate Drone_Empty every frame so it "looks at" the camera.
+  //
+  // Axis note: the drone's authored forward — i.e. the local axis that should
+  // point *at* the viewer — matches the captain's forward, which faces world
+  // +Z. Three's Object3D.lookAt(target) orients the object's local −Z toward
+  // `target`, so calling it with `camera.position` directly would make the
+  // drone face *away* from the viewer. To get local +Z pointing at the
+  // camera we aim lookAt at the camera position mirrored through the drone
+  // (`2 * dronePos - cameraPos`), which makes local −Z point away from the
+  // camera and therefore local +Z point at it.
+  //
+  // If the drone ever ends up tilted or backward after swapping models, the
+  // simplest fix is to change the single axis assumption here — either call
+  // `drone.lookAt(camera.position)` directly (if the new model's forward is
+  // −Z) or build a small quaternion correction for whichever local axis is
+  // forward.
+  const droneTmpDronePos = useRef(new THREE.Vector3());
+  const droneTmpAim = useRef(new THREE.Vector3());
+  useFrame(({ camera }) => {
+    if (!inSpaceshipRef.current) return;
+    const drone = droneEmptyRef.current;
+    if (!drone) return;
 
+    drone.getWorldPosition(droneTmpDronePos.current);
+    droneTmpAim.current
+      .copy(droneTmpDronePos.current)
+      .multiplyScalar(2)
+      .sub(camera.position);
+    drone.lookAt(droneTmpAim.current);
+  });
 
   useEffect(() => {
     const standing = actions["standing"];
@@ -725,30 +800,30 @@ function Model({ url }) {
     if (!standing) return;
 
     // GR80: alternate between idle and button_pushing
-    const buttonPushing = actions["neckTilt"];
+    const neckTilt = actions["neckTilt"];
     if (idle) {
       idle.setLoop(THREE.LoopRepeat, Infinity);
-      idle.reset().fadeIn(0.5).play();
+      idle.reset().fadeIn(0.3).play();
 
-      if (buttonPushing) {
-        buttonPushing.setLoop(THREE.LoopOnce, 1);
-        buttonPushing.clampWhenFinished = true;
+      if (neckTilt) {
+        neckTilt.setLoop(THREE.LoopOnce, 1);
+        neckTilt.clampWhenFinished = true;
 
         const scheduleButtonPush = () => {
           const delay = 5000 + Math.random() * 10000;
           gr80Timer.current = setTimeout(() => {
-            buttonPushing.reset().fadeIn(1.5).play();
-            idle.fadeOut(1.5);
+            neckTilt.reset().fadeIn(0.3).play();
+            idle.fadeOut(0.3);
 
             const onFinished = (e) => {
-              if (e.action === buttonPushing) {
-                buttonPushing.getMixer().removeEventListener("finished", onFinished);
-                idle.reset().fadeIn(1.5).play();
-                buttonPushing.fadeOut(1.5);
+              if (e.action === neckTilt) {
+                neckTilt.getMixer().removeEventListener("finished", onFinished);
+                idle.reset().fadeIn(0.5).play();
+                neckTilt.fadeOut(0.5);
                 scheduleButtonPush();
               }
             };
-            buttonPushing.getMixer().addEventListener("finished", onFinished);
+            neckTilt.getMixer().addEventListener("finished", onFinished);
           }, delay);
         };
 
@@ -799,9 +874,11 @@ function Model({ url }) {
       droneAnim.setLoop(THREE.LoopRepeat, Infinity);
     }
 
-    // Log Drone positioning info for camera/spotlight setup
+    // Log Drone positioning info for camera/spotlight setup + stash the
+    // node so the drone-tracking useFrame can rotate it each frame.
     const droneEmpty = scene.getObjectByName("Drone_Empty");
     if (droneEmpty) {
+      droneEmptyRef.current = droneEmpty;
       scene.updateMatrixWorld(true);
       const droneWorld = new THREE.Vector3();
       droneEmpty.getWorldPosition(droneWorld);
@@ -829,8 +906,14 @@ function Model({ url }) {
             // If zoomed in, pause then fly camera to GR80 character
             if (zoomedRef.current) {
               setTimeout(() => {
+              // Bail out if the user clicked during the 2s pause to break
+              // out of the sequence — we no longer want to fly to GR80.
+              if (!sequenceRunningRef.current) return;
               // Fade out captain slightly after camera starts moving
-              setTimeout(() => { captainFadeRef.current.target = 0; }, 2300);
+              setTimeout(() => {
+                if (!sequenceRunningRef.current) return;
+                captainFadeRef.current.target = 0;
+              }, 2300);
               console.log("GR80 head ref:", gr80HeadRef.current);
 
               // Helper: build the orbit-table request that triggers the
@@ -855,12 +938,18 @@ function Model({ url }) {
                 // `laps` lands at the starting direction from the pivot;
                 // the degree offset rotates it past that to the framing
                 // you want to land on.
-                const ORBIT_END_RADIUS    = 0.4;   // final horizontal distance from pivot
-                const ORBIT_END_HEIGHT    = 0.2;  // final Y above pivot (hit only at the very end)
-                const ORBIT_END_ANGLE_DEG = -110;     // degrees past n laps — tune to land the framing
-                const ORBIT_LAPS          = 1.0;   // full rotations
-                const ORBIT_DURATION_SEC  = 25;    // total sweep time (seconds)
-                const ORBIT_DIRECTION     = 1;     // +1 CCW from above, -1 CW
+                const ORBIT_END_RADIUS     = 0.55;   // final horizontal distance from pivot
+                const ORBIT_END_HEIGHT     = 0.0;   // final Y above pivot (hit only at the very end)
+                const ORBIT_END_ANGLE_DEG  = -110;  // degrees past n laps — tune to land the framing
+                const ORBIT_LAPS           = 1.0;   // full rotations
+                const ORBIT_DURATION_SEC   = 25;    // total sweep time (seconds)
+                const ORBIT_DIRECTION      = 1;     // +1 CCW from above, -1 CW
+                // Constant added to the orbit's radius throughout the
+                // sweep, so the camera stays farther from the pivot for
+                // the whole orbit (not just at the end). Ramped in over
+                // the first ~10% of the orbit to avoid a visible "step
+                // out" at the start.
+                const ORBIT_RADIUS_PADDING = 0.03;
 
                 const table = scene.getObjectByName("Table");
                 const pivot = new THREE.Vector3();
@@ -882,6 +971,7 @@ function Model({ url }) {
                   laps: ORBIT_LAPS,
                   duration: ORBIT_DURATION_SEC,
                   direction: ORBIT_DIRECTION,
+                  radiusPadding: ORBIT_RADIUS_PADDING,
                 };
               };
 
@@ -956,7 +1046,7 @@ function Model({ url }) {
       standing.stop();
       looking?.stop();
       idle?.stop();
-      buttonPushing?.stop();
+      neckTilt?.stop();
       sitPose?.stop();
       droneAnim?.stop();
     };
@@ -973,6 +1063,21 @@ function Model({ url }) {
 
   const handleClick = useCallback((e) => {
     e.stopPropagation();
+
+    // If the intro sequence is running (i.e. we've already stopped at the
+    // captain once and the scripted fly-to / orbit-table is playing), any
+    // click on the model breaks out of the animation instead of
+    // restarting it. The break is processed by CameraController next frame.
+    if (sequenceRunningRef.current) {
+      breakOutRef.current = true;
+      return;
+    }
+    // Already zoomed but no sequence running: either zooming-in is still
+    // in progress or we're in the post-break-out steady state. Don't
+    // retrigger the zoom-in logic — let OrbitControls (or the ongoing
+    // zoom-in) handle it.
+    if (zoomedRef.current) return;
+
     const target = windowRef.current;
     if (!target) return;
 
@@ -997,9 +1102,16 @@ function Model({ url }) {
     setTargetPos(zoomPos);
     setZoomed(true);
 
-    // When camera arrives, trigger looking animation → then fly to GR80
+    // When camera arrives at the captain (the "first stop"), mark the
+    // scripted sequence as running. From this point on, any click on the
+    // scene breaks out of the remaining animation (see CameraController's
+    // break-out handler and Model/handleClick + Canvas/onPointerMissed).
     clearTimeout(lookingTimer.current);
     onArrivedRef.current = () => {
+      sequenceRunningRef.current = true;
+      // "Entered the spaceship" — from here until the camera fully zooms
+      // back out, the drone will actively track the viewer.
+      inSpaceshipRef.current = true;
       if (lookingPlayRef.current) {
         lookingPlayRef.current();
       }
@@ -1023,6 +1135,20 @@ export default function SpaceScene({ onZoomChange } = {}) {
   const orbitTableRef = useRef(null); // { pivot, radius?, heightOffset?, laps?, duration?, direction? }
   const spotTargetRef = useRef(null); // { pos, lookAt } for spotlight to lerp toward
   const captainFadeRef = useRef({ target: 1, current: 1 });
+  // True from the moment the camera first arrives at the captain through
+  // the end of the orbit-table sweep. During this window any click on the
+  // scene cancels the remaining animation and hands control to OrbitControls.
+  const sequenceRunningRef = useRef(false);
+  // Set to true by a click during the scripted sequence; consumed by
+  // CameraController on the next frame to perform the break-out.
+  const breakOutRef = useRef(false);
+  // True once the camera has "entered the spaceship" — i.e. reached the
+  // captain for the first time — and stays true until the camera fully
+  // zooms back out to the default starfield. Used by the drone to decide
+  // whether to actively track (lookAt) the viewer. Lives longer than
+  // `sequenceRunningRef` (which ends at orbit-table completion / break-out)
+  // so the drone keeps tracking after the scripted sequence ends.
+  const inSpaceshipRef = useRef(false);
 
   // Notify the parent when the zoom state flips so it can fade HUD overlays.
   useEffect(() => {
@@ -1044,6 +1170,9 @@ export default function SpaceScene({ onZoomChange } = {}) {
     orbitTableRef,
     spotTargetRef,
     captainFadeRef,
+    sequenceRunningRef,
+    breakOutRef,
+    inSpaceshipRef,
   }), [zoomed, targetPos, targetLookAt, defaultPos, defaultLookAt]);
 
   return (
@@ -1078,7 +1207,15 @@ export default function SpaceScene({ onZoomChange } = {}) {
       </h1>
 
       <Canvas
-        onPointerMissed={() => { if (zoomed) setZoomed(false); }}
+        onPointerMissed={() => {
+          // Clicks on empty space break out of the scripted sequence if
+          // it's running; otherwise fall back to the existing zoom-out.
+          if (sequenceRunningRef.current) {
+            breakOutRef.current = true;
+          } else if (zoomed) {
+            setZoomed(false);
+          }
+        }}
         dpr={[1.5, 2]}
         shadows
         gl={{ toneMappingExposure: 0.6 }}
@@ -1089,26 +1226,33 @@ export default function SpaceScene({ onZoomChange } = {}) {
               overridden to top-right via the `.stats-top-right` rule in
               space.css (stats.js defaults to top-left). */}
           <Stats className="stats-top-right" />
-          <fog attach="fog" args={["#272730", 16, 30]} />
-          <ambientLight intensity={0.15 * Math.PI} />
+        <fog attach="fog" args={['#272730', 16, 30]} />
+        {/* <ambientLight intensity={0.75 * Math.PI} /> */}
+        <ambientLight intensity={0.8 } />
           <PerspectiveCamera makeDefault position={[0, 0, 16]} fov={75}>
             <spotLight
-              castShadow
-              intensity={0.5 * Math.PI}
-              decay={0}
-              angle={0.2}
-              penumbra={1}
-              position={[-25, 20, -15]}
-              shadow-mapSize={[1024, 1024]}
-              shadow-bias={-0.0001}
+            castShadow
+            intensity={2.25 * Math.PI}
+            decay={0}
+            angle={0.2}
+            penumbra={1}
+            position={[-25, 20, -15]}
+            shadow-mapSize={[1024, 1024]}
+            shadow-bias={-0.0001}
             />
           </PerspectiveCamera>
           <CameraController controlsRef={controlsRef} />
-          <CaptainSpotlight />
-          <H80ZSpotlight />
+          {/* <CaptainSpotlight /> */}
+          {/* <H80ZSpotlight /> */}
           <Suspense fallback={null}>
             <Model url="/models/Scene3.glb" />
-            <HoloProjector />
+            {/* HoloProjector: existing 3D hologram (tesseract / penrose / etc.) */}
+            {/* <HoloProjector /> */}
+            {/* HologooR3F: in-scene port of the Hologoo metaball shader,
+                billboarded above the Table. Additive blending — delete the
+                HoloProjector line above if you want this to replace it
+                rather than sit alongside. */}
+            <HologooR3F />
           </Suspense>
           <OrbitControls
             ref={controlsRef}
