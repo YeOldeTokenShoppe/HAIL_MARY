@@ -34,6 +34,7 @@ function CameraController({ controlsRef }) {
   const flyStartLookAt = useRef(new THREE.Vector3());
   const flyTotalDist = useRef(1);
   const flyProgress = useRef(0);
+  const flySpeed = useRef(0.1);
   // For the arc-path zoom-in (slerp direction, lerp radius)
   const zoomProgress = useRef(0);
   const zoomStartDir = useRef(new THREE.Vector3());
@@ -125,6 +126,7 @@ function CameraController({ controlsRef }) {
     if (phase.current === "zoomed" && flyToRef.current) {
       activePos.current.copy(flyToRef.current.pos);
       activeLookAt.current.copy(flyToRef.current.lookAt);
+      flySpeed.current = flyToRef.current.speed || 0.1;
       flyToRef.current = null;
       phase.current = "flying-to";
       flyStartPos.current.copy(camera.position);
@@ -248,7 +250,7 @@ function CameraController({ controlsRef }) {
     // the handoff and the camera doesn't visibly pause at GR80 before the
     // orbit begins.
     if (phase.current === "flying-to") {
-      flyProgress.current += delta * 0.1; // controls overall speed
+      flyProgress.current += delta * flySpeed.current;
       const p = Math.min(flyProgress.current, 1);
       const eased = p * p; // quadratic ease-in
 
@@ -442,6 +444,76 @@ function H80ZSpotlight() {
   );
 }
 
+/* ── Interior lighting ──
+   Fades ambient/exposure down and warm + cool interior fills up whenever
+   the camera is "inside" the spaceship (inSpaceshipRef, set true when the
+   camera first arrives at the captain and false when the user zooms back
+   out). Everything lerps per frame, so transitions are smooth and there
+   are no React re-renders. Exterior preset matches the pre-existing
+   ambient (0.8) and toneMappingExposure (0.6) so the asteroid scene is
+   visually unchanged.
+
+   Tuning:
+     - PRESETS.interior.ambient — raise if the interior reads too dark
+     - PRESETS.interior.exposure — global multiplier, mostly affects
+       non-emissive surfaces
+     - warmFill / coolRim position + color — adjust to match the actual
+       ship interior geometry. Current positions assume the captain / table
+       is roughly at world origin. */
+function InteriorLighting() {
+  const { inSpaceshipRef } = useContext(ZoomContext);
+  const ambientRef = useRef();
+  const warmFillRef = useRef();
+  const coolRimRef = useRef();
+  const { gl } = useThree();
+
+  const PRESETS = {
+    exterior: { ambient: 0.8,  warm: 0,  cool: 0,   exposure: 0.6  },
+    interior: { ambient: 0.96, warm: 10, cool: 0.9, exposure: 0.37 },
+  };
+  const LERP_SPEED = 2.5;
+
+  useFrame((_, delta) => {
+    const target = inSpaceshipRef.current ? PRESETS.interior : PRESETS.exterior;
+    const k = Math.min(1, delta * LERP_SPEED);
+    if (ambientRef.current) {
+      ambientRef.current.intensity +=
+        (target.ambient - ambientRef.current.intensity) * k;
+    }
+    if (warmFillRef.current) {
+      warmFillRef.current.intensity +=
+        (target.warm - warmFillRef.current.intensity) * k;
+    }
+    if (coolRimRef.current) {
+      coolRimRef.current.intensity +=
+        (target.cool - coolRimRef.current.intensity) * k;
+    }
+    gl.toneMappingExposure += (target.exposure - gl.toneMappingExposure) * k;
+  });
+
+  return (
+    <>
+      <ambientLight ref={ambientRef} intensity={0.8} />
+      <pointLight
+        ref={warmFillRef}
+        color="#a2947b"
+        intensity={0}
+        distance={22.5}
+        decay={2}
+        position={[0.05, 2.35, 0.8]}
+      />
+      <pointLight
+        ref={coolRimRef}
+        color="#6aa7ff"
+        intensity={0}
+        distance={10}
+        decay={2}
+        position={[-2.5, 1.2, -2.5]}
+      />
+    </>
+  );
+}
+
 /* ── Scrolling LED screen for VendingMachine_Screen1 ── */
 function VendingMachineLED({ scene }) {
   const canvasRef = useRef(null);
@@ -545,6 +617,226 @@ function VendingMachineLED({ scene }) {
   return null;
 }
 
+/* ── Rover data on TableScreen1–4 ── */
+// Each screen gets its own data set with a staggered typing effect.
+// The screens are small in-world meshes attached to the table, so we
+// use a compact layout with a CRT-green palette.
+
+const TABLE_SCREEN_DATA = [
+  {
+    title: "GEO SURVEY",
+    lines: [
+      "Density  3.41 g/cm³",
+      "Depth    42.7 km",
+      "Silicate 68%",
+      "Fe-Oxide 19%",
+      "Unknown  13%",
+      "",
+      "SEISMIC: MODERATE",
+      "P-Wave   6.12 km/s",
+    ],
+  },
+  {
+    title: "CORE DATA",
+    lines: [
+      "Temp     5,430 K",
+      "Pressure 364 GPa",
+      "State    SOLID",
+      "",
+      "OUTER CORE",
+      "Flow     0.04 cm/s",
+      "Dynamo   ACTIVE",
+    ],
+  },
+  {
+    title: "MINERALS",
+    lines: [
+      "Olivine  34.2%",
+      "Pyroxene 28.7%",
+      "Plagio   18.1%",
+      "Ilmenite  6.4%",
+      "",
+      "Ir 8.3ppb Os 4.1ppb",
+      "!! ANOMALY !!",
+    ],
+  },
+  {
+    title: "DRILL LOG",
+    lines: [
+      "Depth    18.4 m",
+      "Bit Temp 412°C",
+      "Torque   87% MAX",
+      "",
+      "RPM      1,240",
+      "Coolant  OK",
+      "STATUS: NOMINAL",
+    ],
+  },
+];
+
+const TS_CANVAS_W = 256;
+const TS_CANVAS_H = 256;
+const TS_CHARS_PER_SEC = 22;
+const TS_PAUSE_SEC = 5;
+const TS_FONT = 18;
+const TS_LINE_H = 24;
+const TS_HEADER_FONT = 20;
+const TS_MARGIN = 12;
+const TS_TOP = 34;
+// Stagger: each screen starts typing this many seconds after the previous
+const TS_STAGGER = 1.5;
+
+function TableScreens({ scene }) {
+  const screensRef = useRef([]);
+
+  useEffect(() => {
+    const screens = [];
+    for (let i = 0; i < 4; i++) {
+      const mesh = scene.getObjectByName(`TableScreen${i + 1}`);
+      if (!mesh) continue;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = TS_CANVAS_W;
+      canvas.height = TS_CANVAS_H;
+      const ctx = canvas.getContext("2d");
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.minFilter = THREE.LinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      // Flip texture vertically — GLB UVs are often inverted relative to
+      // canvas 2D's top-left origin.
+      tex.flipY = false;
+      mesh.material = new THREE.MeshBasicMaterial({ map: tex });
+
+      const data = TABLE_SCREEN_DATA[i];
+      const totalChars = data.lines.reduce((s, l) => s + l.length, 0);
+
+      screens.push({
+        mesh, canvas, ctx, tex, data, totalChars,
+        charCount: 0,
+        pauseUntil: 0,
+        scanIndex: 0,
+        // Each screen starts after a stagger delay
+        startAt: TS_STAGGER * i,
+        started: false,
+      });
+    }
+    screensRef.current = screens;
+    console.log(`[TableScreens] found ${screens.length}/4`);
+  }, [scene]);
+
+  useFrame((state, delta) => {
+    const t = state.clock.getElapsedTime();
+    const dt = delta;
+
+    for (const scr of screensRef.current) {
+      // Stagger start
+      if (!scr.started) {
+        if (t < scr.startAt) continue;
+        scr.started = true;
+      }
+
+      // Pause between cycles
+      if (scr.pauseUntil > 0) {
+        // Keep redrawing during pause so the cursor blinks off
+        drawScreen(scr, t);
+        if (t < scr.pauseUntil) continue;
+        // Cycle to the next data set
+        scr.scanIndex = (scr.scanIndex + 1) % TABLE_SCREEN_DATA.length;
+        scr.data = TABLE_SCREEN_DATA[scr.scanIndex];
+        scr.totalChars = scr.data.lines.reduce((s, l) => s + l.length, 0);
+        scr.charCount = 0;
+        scr.pauseUntil = 0;
+      }
+
+      // Advance typing
+      scr.charCount = Math.min(scr.totalChars, scr.charCount + TS_CHARS_PER_SEC * dt);
+
+      // Check if done
+      if (scr.charCount >= scr.totalChars && scr.pauseUntil === 0) {
+        scr.pauseUntil = t + TS_PAUSE_SEC;
+      }
+
+      drawScreen(scr, t);
+    }
+  });
+
+  return null;
+}
+
+function drawScreen(scr, t) {
+  const { ctx, tex, data } = scr;
+  const w = TS_CANVAS_W;
+  const h = TS_CANVAS_H;
+
+  // Background
+  ctx.fillStyle = "#010a06";
+  ctx.fillRect(0, 0, w, h);
+
+  // Scanlines
+  ctx.strokeStyle = "rgba(0, 255, 80, 0.03)";
+  ctx.lineWidth = 1;
+  for (let y = 0; y < h; y += 3) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+    ctx.stroke();
+  }
+
+  // Title
+  ctx.font = `bold ${TS_HEADER_FONT}px "Courier New", monospace`;
+  ctx.fillStyle = "#00ff55";
+  ctx.shadowColor = "#00ff55";
+  ctx.shadowBlur = 6;
+  ctx.fillText(data.title, TS_MARGIN, TS_TOP);
+  ctx.shadowBlur = 0;
+
+  // Divider
+  ctx.strokeStyle = "#00aa33";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(TS_MARGIN, TS_TOP + 8);
+  ctx.lineTo(w - TS_MARGIN, TS_TOP + 8);
+  ctx.stroke();
+
+  // Data lines with typing
+  ctx.font = `${TS_FONT}px "Courier New", monospace`;
+  let charsLeft = Math.floor(scr.charCount);
+  let y = TS_TOP + 14 + TS_LINE_H;
+
+  for (let i = 0; i < data.lines.length; i++) {
+    const line = data.lines[i];
+    if (charsLeft <= 0) break;
+
+    const visible = line.slice(0, charsLeft);
+    charsLeft -= line.length;
+
+    if (line.includes("!!") || line.startsWith("STATUS")) {
+      ctx.fillStyle = "#ffcc00";
+      ctx.shadowColor = "#ffcc00";
+      ctx.shadowBlur = 4;
+    } else {
+      ctx.fillStyle = "#00dd44";
+      ctx.shadowBlur = 0;
+    }
+
+    ctx.fillText(visible, TS_MARGIN, y);
+    ctx.shadowBlur = 0;
+
+    // Blinking cursor
+    if (charsLeft <= 0 && scr.charCount < scr.totalChars) {
+      const cx = TS_MARGIN + ctx.measureText(visible).width + 2;
+      if (Math.floor(t * 3) % 2 === 0) {
+        ctx.fillStyle = "#00ff55";
+        ctx.fillRect(cx, y - TS_FONT + 3, 10, TS_FONT);
+      }
+    }
+
+    y += TS_LINE_H;
+  }
+
+  tex.needsUpdate = true;
+}
+
 /* ── 3D Model ── */
 function Model({ url }) {
   const group = useRef();
@@ -604,6 +896,11 @@ function Model({ url }) {
   // tracking useFrame below).
   const droneEmptyRef = useRef(null);
 
+  // Control panel button refs — Button01..Button20 blink independently so the
+  // shared panel mesh feels alive. Materials are cloned per-button in the
+  // setup effect below so emissiveIntensity can vary per mesh.
+  const buttonsRef = useRef([]);
+
   // Find and pin Hips bones to prevent crossfade sliding
   // Also find GR80's Head bone for camera flythrough
   useEffect(() => {
@@ -652,6 +949,57 @@ function Model({ url }) {
       });
       console.log("H80Z demon_eyes found:", !!h80zEyesRef.current);
     }
+
+    // Find Button01..Button20, clone their materials so emissiveIntensity is
+    // independent per button, and assign a random blink style + phase so they
+    // never sync. baseEmissive captures whatever intensity was baked in the GLB.
+    const buttons = [];
+    const styles = ['pulse', 'blink', 'steady', 'flicker'];
+    for (let i = 1; i <= 20; i++) {
+      const name = `Button${String(i).padStart(2, '0')}`;
+      const mesh = scene.getObjectByName(name);
+      if (!mesh || !mesh.material) continue;
+      mesh.material = mesh.material.clone();
+      const base = mesh.material.emissiveIntensity ?? 1;
+      mesh.userData.baseEmissive = base;
+      mesh.userData.blinkStyle = styles[Math.floor(Math.random() * styles.length)];
+      mesh.userData.blinkFreq = 0.5 + Math.random() * 3.5;
+      mesh.userData.blinkPhase = Math.random() * Math.PI * 2;
+      mesh.userData.nextFlickerAt = 0;
+      mesh.userData.flickerUntil = 0;
+      buttons.push(mesh);
+    }
+    buttonsRef.current = buttons;
+    console.log(`Control panel buttons found: ${buttons.length}/20`);
+
+    // Windows — swap each porthole (outer + inner glass) to MeshBasicMaterial
+    // so it's fully unlit. The interior lighting preset drops ambient to
+    // ~0.12 to make the button blinks pop, which would otherwise turn the
+    // glass black since it has nothing to reflect. MeshBasicMaterial
+    // bypasses lighting entirely and just draws the texture as-is, so the
+    // starfield / skybox baked into the window texture stays bright
+    // regardless of what the rest of the scene is doing.
+    let windowsFound = 0;
+    for (let i = 1; i <= 5; i++) {
+      for (const suffix of ['', '_Inner']) {
+        const name = `Window${i}${suffix}`;
+        const mesh = scene.getObjectByName(name);
+        if (!mesh || !mesh.material) continue;
+        const old = mesh.material;
+        mesh.material = new THREE.MeshBasicMaterial({
+          map: old.map,
+          color: old.color,
+          transparent: old.transparent,
+          opacity: old.opacity,
+          side: old.side,
+          alphaMap: old.alphaMap,
+          alphaTest: old.alphaTest,
+          toneMapped: false, // don't let toneMappingExposure dim it either
+        });
+        windowsFound++;
+      }
+    }
+    console.log(`Windows converted to unlit: ${windowsFound}/8`);
   }, [scene]);
 
   // Find eye meshes and the Eyes bone
@@ -756,6 +1104,52 @@ function Model({ url }) {
       } else {
         bs.isBlinking = false;
         eyes.material.opacity = 1;
+      }
+    }
+  });
+
+  // Control panel button blink loop — modulates emissiveIntensity per-button
+  // based on the style picked in the setup effect. All buttons share the same
+  // diffuse + emission textures; only the intensity scalar varies.
+  useFrame(({ clock }) => {
+    const buttons = buttonsRef.current;
+    if (!buttons.length) return;
+    const t = clock.getElapsedTime();
+
+    for (const mesh of buttons) {
+      const mat = mesh.material;
+      if (!mat) continue;
+      const base = mesh.userData.baseEmissive;
+      const freq = mesh.userData.blinkFreq;
+      const phase = mesh.userData.blinkPhase;
+
+      switch (mesh.userData.blinkStyle) {
+        case 'pulse': {
+          // Soft sine pulse between 0.3× and 1.7× base
+          const k = 0.5 + 0.5 * Math.sin(t * freq + phase);
+          mat.emissiveIntensity = base * (0.3 + k * 1.4);
+          break;
+        }
+        case 'blink': {
+          // Hard on/off square wave
+          const on = ((t * freq + phase) % (Math.PI * 2)) < Math.PI;
+          mat.emissiveIntensity = base * (on ? 2.0 : 0.15);
+          break;
+        }
+        case 'flicker': {
+          // Mostly steady, occasional brief dropout
+          if (t > mesh.userData.nextFlickerAt) {
+            mesh.userData.flickerUntil = t + 0.05 + Math.random() * 0.12;
+            mesh.userData.nextFlickerAt = t + 1 + Math.random() * 4;
+          }
+          const flickering = t < mesh.userData.flickerUntil;
+          mat.emissiveIntensity = base * (flickering ? 0.2 : 1.3);
+          break;
+        }
+        case 'steady':
+        default:
+          mat.emissiveIntensity = base;
+          break;
       }
     }
   });
@@ -1019,7 +1413,7 @@ function Model({ url }) {
                   };
                 }
               }
-              }, 2000);
+              }, 1000);
             } else {
               scheduleLooking();
             }
@@ -1072,6 +1466,41 @@ function Model({ url }) {
       breakOutRef.current = true;
       return;
     }
+    // TableScreen click — if the user clicked one of the 4 table screens,
+    // fly the camera to frame it regardless of zoom state.
+    if (e.object && e.object.name && e.object.name.startsWith("TableScreen")) {
+      scene.updateMatrixWorld(true);
+      const screenCenter = new THREE.Vector3();
+      const box = new THREE.Box3().setFromObject(e.object);
+      box.getCenter(screenCenter);
+      // Direction from the table center outward through the screen —
+      // reliable regardless of how the mesh's local axes are oriented.
+      const table = scene.getObjectByName("Table");
+      const tableCenter = new THREE.Vector3();
+      if (table) {
+        const tBox = new THREE.Box3().setFromObject(table);
+        tBox.getCenter(tableCenter);
+      }
+      const outward = new THREE.Vector3()
+        .subVectors(screenCenter, tableCenter);
+      outward.y = 0; // keep it horizontal
+      outward.normalize();
+      // Position the camera just in front of the screen (a short hop
+      // outward from the surface) so clicking pulls the camera *toward*
+      // the screen rather than backing away.
+      const camPos = screenCenter.clone().add(outward.multiplyScalar(0.05));
+      camPos.y = screenCenter.y + 0.1;
+
+      if (zoomedRef.current) {
+        flyToRef.current = { pos: camPos, lookAt: screenCenter, speed: 0.5 };
+      } else {
+        setTargetLookAt(screenCenter);
+        setTargetPos(camPos);
+        setZoomed(true);
+      }
+      return;
+    }
+
     // Already zoomed but no sequence running: either zooming-in is still
     // in progress or we're in the post-break-out steady state. Don't
     // retrigger the zoom-in logic — let OrbitControls (or the ongoing
@@ -1122,6 +1551,7 @@ function Model({ url }) {
     <>
       <primitive ref={group} object={scene} onClick={handleClick} />
       <VendingMachineLED scene={scene} />
+      <TableScreens scene={scene} />
     </>
   );
 }
@@ -1227,8 +1657,12 @@ export default function SpaceScene({ onZoomChange } = {}) {
               space.css (stats.js defaults to top-left). */}
           <Stats className="stats-top-right" />
         <fog attach="fog" args={['#272730', 16, 30]} />
-        {/* <ambientLight intensity={0.75 * Math.PI} /> */}
-        <ambientLight intensity={0.8 } />
+        {/* Ambient + interior fills — see InteriorLighting. Lerps between an
+            "exterior" preset (ambient 0.8, exposure 0.6 — matches the old
+            flat look) and an "interior" preset that darkens ambient and
+            fades in warm/cool fills so the monitor glow and button blinks
+            pop once the camera is inside the ship. */}
+        <InteriorLighting />
           <PerspectiveCamera makeDefault position={[0, 0, 16]} fov={75}>
             <spotLight
             castShadow

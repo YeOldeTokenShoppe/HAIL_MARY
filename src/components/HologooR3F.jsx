@@ -46,8 +46,8 @@ const goopyCos = (t, f, p) =>
 // values = bigger hologram surface AND more of the raymarched scene
 // visible on it, which is what gives the blobs more room to roam
 // without changing their shader-world radii.
-const PLANE_WIDTH = 2.8;
-const PLANE_HEIGHT = 3.4;
+const PLANE_WIDTH = 3.8;
+const PLANE_HEIGHT = 5.4;
 const PLANE_HALF_WIDTH = PLANE_WIDTH * 0.5;
 const PLANE_HALF_HEIGHT = PLANE_HEIGHT * 0.5;
 
@@ -293,7 +293,7 @@ export default function HologooR3F({
   // Y offset above the detected table top, measured in table-radii. The
   // plane is billboarded, so its center lands at tableTop + tableRadius *
   // heightOffset. 0.55 puts it roughly where HoloProjector's shapes live.
-  heightOffset = 0.25,
+  heightOffset = 0.35,
   // Multiplier on the blobs' autonomous motion amplitudes AND on the
   // hover-driven blob 0's reach. 1.0 matches Hologoo.jsx's original
   // range; higher values give blobs more room to roam inside the
@@ -504,6 +504,21 @@ export default function HologooR3F({
     audio.pad.set({ harmonicity: Math.min(6, 3 + totalDepth * 2) });
   };
 
+  // Start audio on the first click anywhere in the scene (not just on the
+  // hologram mesh). Web Audio requires a user gesture, so we attach a
+  // one-shot listener on the canvas DOM element.
+  const { gl } = useThree();
+  useEffect(() => {
+    const canvas = gl.domElement;
+    const handler = () => {
+      initAudio();
+      canvas.removeEventListener("click", handler);
+    };
+    canvas.addEventListener("click", handler);
+    return () => canvas.removeEventListener("click", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gl]);
+
   // Dispose the audio chain when the component unmounts so we don't leak
   // Tone nodes between navigations.
   useEffect(() => {
@@ -609,11 +624,9 @@ export default function HologooR3F({
           onPointerMove={handlePointerMove}
           onPointerOut={handlePointerOut}
           onClick={(e) => {
-            // Lazy-init the audio chain on first click (Web Audio requires
-            // a user gesture). Stop propagation so the click doesn't also
+            // Stop propagation so clicking the hologram doesn't also
             // hit the Model's handleClick and trigger a break-out / zoom.
             e.stopPropagation();
-            initAudio();
           }}
         >
           <planeGeometry args={[PLANE_WIDTH, PLANE_HEIGHT]} />
