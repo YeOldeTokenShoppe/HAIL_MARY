@@ -1,31 +1,17 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import MainMobileNav from "@/components/MainMobileNav";
 import CommsPanel from "@/components/CommsPanel";
 import CyberButton from "@/components/CyberButton";
 import BuyModal from "@/components/BuyModal";
+import CoinLoader from "@/components/CoinLoader";
 
 
 const SpaceScene = dynamic(() => import("@/components/SpaceScene"), {
   ssr: false,
-  loading: () => (
-    <div
-      style={{
-        width: "100vw",
-        height: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "#fff",
-        background: "#272730",
-        fontFamily: "monospace",
-      }}
-    >
-      Loading...
-    </div>
-  ),
+  loading: () => <CoinLoader loading={true} />,
 });
 
 const SITEPAL_ACCOUNT = "9308752";
@@ -74,55 +60,100 @@ export default function HomePage() {
     return () => clearInterval(id);
   }, []);
 
-  // Geometry for the dashed signal beam from the drill rig (on the asteroid)
-  // to the capsule relay on the left of the HUD panel. Recomputed on resize
-  // so the endpoints stay glued to the rig / capsule regardless of viewport
-  // dimensions. We approximate the rig's screen position — the asteroid
-  // autorotates slowly so exact projection isn't worth the plumbing.
-  const [beamGeom, setBeamGeom] = useState(null);
+  // Shared ref written by AntennaProjector inside the R3F canvas with the
+  // Antenna's screen-space position each frame. The beam overlay reads from
+  // this via a rAF loop — no React state, no re-renders.
+  const antennaScreenRef = useRef({ x: 0, y: 0 });
+  const beamRef = useRef(null);
+
+  // ── Signal entrance sequence ──
+  // Phases: 0 = hidden, 1 = broadcast rings, 2 = beam extends,
+  //         3 = panels receive, 4 = steady state (pulse loops)
+  const [signalPhase, setSignalPhase] = useState(0);
+  const signalStarted = useRef(false);
+  // Beam extension: tracks when phase 2 starts so the rAF can interpolate width
+  const extendStartRef = useRef(0);   // timestamp when extension begins
+  const EXTEND_DURATION = 1600;       // ms for the beam to fully extend
+
   useEffect(() => {
-    const computeBeam = () => {
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
+    let raf;
+    const update = () => {
+      const el = beamRef.current;
+      if (el) {
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
 
-      // Mobile doesn't show the beam at all — see the media query in globals.css
-      if (vw < 769) {
-        setBeamGeom(null);
-        return;
+        // Hide on mobile
+        if (vw < 769) {
+          el.style.display = "none";
+          raf = requestAnimationFrame(update);
+          return;
+        }
+        el.style.display = "";
+
+        const remPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+        const isWide = vw >= 1280;
+        const panelRight = (isWide ? 4 : 2.5) * remPx;
+        const panelWidth = isWide ? 340 : 320;
+
+        // Beam terminates just outside the panel's left edge at vertical centre.
+        const panelEdgeX = vw - panelRight - panelWidth - 2;
+        const panelEdgeY = vh / 2;
+
+        // Beam origin tracks the Antenna's projected screen position
+        const rigX = antennaScreenRef.current.x;
+        const rigY = antennaScreenRef.current.y;
+
+        if (rigX > 0 || rigY > 0) {
+          const dx = panelEdgeX - rigX;
+          const dy = panelEdgeY - rigY;
+          const fullLength = Math.sqrt(dx * dx + dy * dy);
+          const angleDeg = Math.atan2(dy, dx) * (180 / Math.PI);
+
+          // Beam extension: interpolate width from 0 → full during phase 2
+          let length = fullLength;
+          if (extendStartRef.current > 0) {
+            const elapsed = performance.now() - extendStartRef.current;
+            // Ease-out cubic: fast start, gentle arrival
+            const t = Math.min(elapsed / EXTEND_DURATION, 1);
+            const eased = 1 - Math.pow(1 - t, 3);
+            length = fullLength * eased;
+          } else if (!signalStarted.current || extendStartRef.current === 0) {
+            // Before extension starts, width is 0 (beam hidden via background:none anyway)
+            length = 0;
+          }
+
+          el.style.top = `${rigY}px`;
+          el.style.left = `${rigX}px`;
+          el.style.width = `${length}px`;
+          el.style.transform = `rotate(${angleDeg}deg)`;
+
+          // Kick off the entrance sequence once we have a valid position
+          if (!signalStarted.current) {
+            signalStarted.current = true;
+            // Phase 1: broadcast rings
+            setSignalPhase(1);
+            // Phase 2: beam extends (after broadcast pulses twice)
+            setTimeout(() => {
+              extendStartRef.current = performance.now();
+              setSignalPhase(2);
+            }, 1400);
+            // Phase 3: panels receive (after beam fully extends)
+            setTimeout(() => setSignalPhase(3), 1400 + EXTEND_DURATION + 200);
+            // Phase 4: steady state (pulse loop starts)
+            setTimeout(() => setSignalPhase(4), 1400 + EXTEND_DURATION + 1000);
+          }
+        }
       }
-
-      const remPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-      const isWide = vw >= 1280;
-      const panelRight = (isWide ? 4 : 2.5) * remPx;
-      const panelWidth = isWide ? 340 : 320;
-
-      // Beam terminates just outside the panel's left edge at vertical centre.
-      const panelEdgeX = vw - panelRight - panelWidth - 2;
-      const panelEdgeY = vh / 2;
-
-      // Approximate drill rig position on the asteroid — roughly centred
-      // horizontally. rigY targets the TOP of the rig (where an antenna
-      // would sit) rather than the front lamp, so the beam reads as a
-      // radio/telemetry broadcast instead of a light capture.
-      const rigX = vw * 0.50;
-      const rigY = vh * 0.38;
-
-      const dx = panelEdgeX - rigX;
-      const dy = panelEdgeY - rigY;
-      const length = Math.sqrt(dx * dx + dy * dy);
-      const angleDeg = Math.atan2(dy, dx) * (180 / Math.PI);
-
-      setBeamGeom({ rigX, rigY, length, angleDeg });
+      raf = requestAnimationFrame(update);
     };
-
-    computeBeam();
-    window.addEventListener("resize", computeBeam);
-    return () => window.removeEventListener("resize", computeBeam);
+    raf = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   return (
     <>
-      <SpaceScene onZoomChange={setSceneZoomed} />
+      <SpaceScene onZoomChange={setSceneZoomed} antennaScreenRef={antennaScreenRef} />
 
       <CommsPanel
         open={showComms}
@@ -158,32 +189,35 @@ export default function HomePage() {
         }}
       />
 
-      {/* Beam from the drill rig on the asteroid to the capsule relay.
-          Position/length/rotation is JS-driven so the endpoints track the
-          rig and the capsule across viewport sizes. Rendered OUTSIDE
-          .prospecting-banner on purpose — the banner has a `transform` on it
-          which would make `position: fixed` children relative to the banner
-          box instead of the viewport. */}
-      {beamGeom && (
-        <div
-          className={`prospecting-banner__beam${sceneZoomed ? " prospecting-banner__beam--faded" : ""}`}
-          aria-hidden="true"
-          style={{
-            top: `${beamGeom.rigY}px`,
-            left: `${beamGeom.rigX}px`,
-            width: `${beamGeom.length}px`,
-            transform: `rotate(${beamGeom.angleDeg}deg)`,
-          }}
-        >
+      {/* Beam from the Antenna on the spaceship to the HUD panel.
+          Position/length/rotation are updated each frame via rAF reading
+          the Antenna's projected screen position from antennaScreenRef.
+          Rendered OUTSIDE .prospecting-banner on purpose — the banner has
+          a `transform` on it which would make `position: fixed` children
+          relative to the banner box instead of the viewport. */}
+      <div
+        ref={beamRef}
+        className={[
+          "prospecting-banner__beam",
+          sceneZoomed && "prospecting-banner__beam--faded",
+          signalPhase >= 1 && "signal-phase-broadcast",
+          signalPhase >= 2 && "signal-phase-extend",
+          signalPhase >= 4 && "signal-phase-live",
+        ].filter(Boolean).join(" ")}
+        aria-hidden="true"
+      >
           <div className="prospecting-banner__beam-pulse" />
           <div className="prospecting-banner__beam-origin" />
-        </div>
-      )}
+      </div>
 
       {/* ── Left-side network panel (subordinate to the telemetry panel) ──
           Narrower variant of .prospecting-banner. Desktop-only; hidden on
           mobile via the --network modifier to keep the small screen clean. */}
-      <div className={`prospecting-banner prospecting-banner--network${sceneZoomed ? " prospecting-banner--faded" : ""}`}>
+      <div className={[
+        "prospecting-banner prospecting-banner--network",
+        sceneZoomed && "prospecting-banner--faded",
+        signalPhase >= 3 ? "signal-phase-receive" : "signal-phase-hidden",
+      ].filter(Boolean).join(" ")}>
         <div className="prospecting-banner__panel">
           <span className="prospecting-banner__bracket prospecting-banner__bracket--tl" />
           <span className="prospecting-banner__bracket prospecting-banner__bracket--tr" />
@@ -217,7 +251,11 @@ export default function HomePage() {
       </div>
 
       {/* ── Prospecting HUD readout ── */}
-      <div className={`prospecting-banner${sceneZoomed ? " prospecting-banner--faded" : ""}`}>
+      <div className={[
+        "prospecting-banner",
+        sceneZoomed && "prospecting-banner--faded",
+        signalPhase >= 3 ? "signal-phase-receive" : "signal-phase-hidden",
+      ].filter(Boolean).join(" ")}>
         <div className="prospecting-banner__panel">
           <span className="prospecting-banner__bracket prospecting-banner__bracket--tl" />
           <span className="prospecting-banner__bracket prospecting-banner__bracket--tr" />

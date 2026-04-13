@@ -49,8 +49,11 @@ export function WalletAuthProvider({ children }) {
       setTokenBalance(intBalance);
       return intBalance;
     } catch (error) {
-      console.error('Error fetching token balance:', error);
-      setTokenBalance(null);
+      // Suppress noisy rate-limit errors from public RPC
+      if (!String(error?.details || error?.message || '').includes('rate limit')) {
+        console.error('Error fetching token balance:', error);
+      }
+      // Keep existing balance on transient errors instead of clearing it
     } finally {
       setIsLoadingBalance(false);
     }
@@ -116,19 +119,18 @@ export function WalletAuthProvider({ children }) {
   useEffect(() => {
     if (address && isConnected) {
       syncWalletWithClerk(address);
-      fetchTokenBalance(address);
     } else {
       setTokenBalance(null);
     }
-  }, [address, isConnected, syncWalletWithClerk, fetchTokenBalance]);
+  }, [address, isConnected, syncWalletWithClerk]);
 
-  // Refresh balance periodically (every 30 seconds)
+  // Refresh balance periodically (every 60 seconds)
   useEffect(() => {
     if (!address) return;
 
     const interval = setInterval(() => {
       fetchTokenBalance(address);
-    }, 30000);
+    }, 60000);
 
     return () => clearInterval(interval);
   }, [address, fetchTokenBalance]);

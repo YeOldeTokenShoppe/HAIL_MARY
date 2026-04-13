@@ -153,7 +153,7 @@ export default function MainMobileNav({
   const renderItem = (slot, key) => (
     <button
       key={key}
-      className={`mn-item ${slot.disabled ? "mn-disabled" : ""}`}
+      className={`mn-item ${slot.disabled ? "mn-disabled" : ""} ${slot.active ? "mn-item-active" : ""} ${slot.colorClass || ""}`}
       onClick={(e) => {
         if (slot.disabled) return;
         triggerGlow(glowColors[slot.colorClass] || 'rgba(0, 255, 255, 0.6)');
@@ -166,6 +166,7 @@ export default function MainMobileNav({
       <span className={`mn-label ${slot.active ? "mn-label-active" : ""} ${slot.colorClass || ""}`}>
         {slot.label}
       </span>
+      {slot.active && <div className={`mn-active-indicator ${slot.colorClass || ""}`} />}
     </button>
   );
 
@@ -231,7 +232,7 @@ export default function MainMobileNav({
           cursor: pointer;
           padding: 6px 2px 2px;
           border-radius: 12px;
-          transition: all 0.15s ease;
+          transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.15s ease;
           -webkit-tap-highlight-color: transparent;
           background: transparent;
           border: none;
@@ -243,6 +244,31 @@ export default function MainMobileNav({
         .mn-item.mn-disabled {
           opacity: 0.35;
           pointer-events: none;
+        }
+
+        /* ---- Desktop hover effects ---- */
+        @media (hover: hover) {
+          .mn-item:hover {
+            transform: translateY(-2px) scale(1.08);
+          }
+
+          .mn-item:hover .mn-icon {
+            box-shadow: 0 0 12px rgba(212, 168, 84, 0.3);
+          }
+
+          .mn-item:hover .mn-label {
+            color: rgba(212, 168, 84, 0.8);
+          }
+
+          .mn-item.mn-buy:hover .mn-icon { box-shadow: 0 0 14px rgba(127, 184, 122, 0.35); }
+          .mn-item.mn-comms:hover .mn-icon { box-shadow: 0 0 14px rgba(107, 199, 209, 0.35); }
+          .mn-item.mn-rank:hover .mn-icon { box-shadow: 0 0 14px rgba(212, 168, 84, 0.35); }
+          .mn-item.mn-lounge:hover .mn-icon { box-shadow: 0 0 14px rgba(196, 120, 160, 0.35); }
+
+          .mn-item.mn-buy:hover .mn-label { color: rgba(127, 184, 122, 0.8); }
+          .mn-item.mn-comms:hover .mn-label { color: rgba(107, 199, 209, 0.8); }
+          .mn-item.mn-rank:hover .mn-label { color: rgba(212, 168, 84, 0.8); }
+          .mn-item.mn-lounge:hover .mn-label { color: rgba(196, 120, 160, 0.8); }
         }
 
         /* Spring bounce on tap */
@@ -278,6 +304,107 @@ export default function MainMobileNav({
           box-shadow: 0 0 18px rgba(196, 120, 160, 0.6);
         }
 
+        /* ---- Active item indicator bar ---- */
+        .mn-active-indicator {
+          position: absolute;
+          bottom: -4px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 20px;
+          height: 3px;
+          border-radius: 2px;
+          background: #d4a854;
+          box-shadow: 0 0 8px rgba(212, 168, 84, 0.6), 0 0 16px rgba(212, 168, 84, 0.3);
+          animation: mnIndicatorIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        .mn-active-indicator.mn-buy {
+          background: #7fb87a;
+          box-shadow: 0 0 8px rgba(127, 184, 122, 0.6), 0 0 16px rgba(127, 184, 122, 0.3);
+        }
+
+        .mn-active-indicator.mn-comms {
+          background: #6bc7d1;
+          box-shadow: 0 0 8px rgba(107, 199, 209, 0.6), 0 0 16px rgba(107, 199, 209, 0.3);
+        }
+
+        .mn-active-indicator.mn-rank {
+          background: #d4a854;
+          box-shadow: 0 0 8px rgba(212, 168, 84, 0.6), 0 0 16px rgba(212, 168, 84, 0.3);
+        }
+
+        .mn-active-indicator.mn-lounge {
+          background: #c478a0;
+          box-shadow: 0 0 8px rgba(196, 120, 160, 0.6), 0 0 16px rgba(196, 120, 160, 0.3);
+        }
+
+        @keyframes mnIndicatorIn {
+          0%   { width: 0; opacity: 0; }
+          60%  { width: 24px; opacity: 1; }
+          100% { width: 20px; opacity: 1; }
+        }
+
+        /* ---- Active item — breathing glow on icon ---- */
+        .mn-item-active .mn-icon {
+          animation: mnBreathGlow 2.5s ease-in-out infinite;
+        }
+
+        .mn-item-active.mn-buy .mn-icon {
+          animation-name: mnBreathGlowGreen;
+        }
+
+        .mn-item-active.mn-comms .mn-icon {
+          animation-name: mnBreathGlowCyan;
+        }
+
+        .mn-item-active.mn-rank .mn-icon {
+          animation-name: mnBreathGlowGold;
+        }
+
+        .mn-item-active.mn-lounge .mn-icon {
+          animation-name: mnBreathGlowRose;
+        }
+
+        @keyframes mnBreathGlow {
+          0%, 100% { box-shadow: 0 0 6px rgba(212, 168, 84, 0.15); }
+          50%      { box-shadow: 0 0 14px rgba(212, 168, 84, 0.4), 0 0 24px rgba(212, 168, 84, 0.15); }
+        }
+
+        @keyframes mnBreathGlowGreen {
+          0%, 100% { box-shadow: 0 0 6px rgba(127, 184, 122, 0.15); }
+          50%      { box-shadow: 0 0 14px rgba(127, 184, 122, 0.4), 0 0 24px rgba(127, 184, 122, 0.15); }
+        }
+
+        @keyframes mnBreathGlowCyan {
+          0%, 100% { box-shadow: 0 0 6px rgba(107, 199, 209, 0.15); }
+          50%      { box-shadow: 0 0 14px rgba(107, 199, 209, 0.4), 0 0 24px rgba(107, 199, 209, 0.15); }
+        }
+
+        @keyframes mnBreathGlowGold {
+          0%, 100% { box-shadow: 0 0 6px rgba(212, 168, 84, 0.15); }
+          50%      { box-shadow: 0 0 14px rgba(212, 168, 84, 0.4), 0 0 24px rgba(212, 168, 84, 0.15); }
+        }
+
+        @keyframes mnBreathGlowRose {
+          0%, 100% { box-shadow: 0 0 6px rgba(196, 120, 160, 0.15); }
+          50%      { box-shadow: 0 0 14px rgba(196, 120, 160, 0.4), 0 0 24px rgba(196, 120, 160, 0.15); }
+        }
+
+        /* ---- Active item — boosted icon brightness + label color ---- */
+        .mn-item-active .mn-nav-svg {
+          filter: brightness(1.3);
+          transition: filter 0.3s ease;
+        }
+
+        .mn-item-active .mn-label {
+          transition: color 0.3s ease;
+        }
+
+        .mn-item-active.mn-buy .mn-label { color: #7fb87a; }
+        .mn-item-active.mn-comms .mn-label { color: #6bc7d1; }
+        .mn-item-active.mn-rank .mn-label { color: #d4a854; }
+        .mn-item-active.mn-lounge .mn-label { color: #c478a0; }
+
         .mn-icon {
           width: 32px;
           height: 32px;
@@ -286,7 +413,7 @@ export default function MainMobileNav({
           align-items: center;
           justify-content: center;
           font-size: 18px;
-          transition: all 0.15s ease;
+          transition: all 0.2s ease, box-shadow 0.3s ease;
           position: relative;
           background: transparent;
         }
@@ -298,6 +425,7 @@ export default function MainMobileNav({
         .mn-nav-svg {
           width: 22px;
           height: 22px;
+          transition: filter 0.2s ease, transform 0.2s ease;
         }
 
         .mn-label {
@@ -308,6 +436,7 @@ export default function MainMobileNav({
           color: rgba(212, 168, 84, 0.5);
           line-height: 1;
           white-space: nowrap;
+          transition: color 0.2s ease;
         }
 
         .mn-label.mn-label-active {
@@ -400,6 +529,15 @@ export default function MainMobileNav({
 
         .mn-fab.mn-pulse {
           animation: mnFabPulse 0.6s ease;
+        }
+
+        /* Desktop hover on FAB */
+        @media (hover: hover) {
+          .mn-fab:hover {
+            transform: translateY(-3px) scale(1.06);
+            box-shadow: 0 6px 24px rgba(232, 92, 43, 0.5), 0 2px 8px rgba(0, 0, 0, 0.4);
+            border-color: rgba(232, 92, 43, 0.7);
+          }
         }
       `}</style>
 

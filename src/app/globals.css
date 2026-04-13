@@ -7450,6 +7450,101 @@ body .cl-profileSection__security .cl-profileSectionPrimaryButton {
 }
 
 /* ═══════════════════════════════════════
+   Signal entrance sequence
+   Phases driven by JS classes: signal-phase-broadcast → extend → receive → live
+   ═══════════════════════════════════════ */
+
+/* ── Phase 0: everything hidden until antenna position is ready ── */
+.prospecting-banner.signal-phase-hidden {
+  opacity: 0 !important;
+  pointer-events: none;
+}
+
+/* Beam: hide dashes + pulse until the right phase. Origin dot is
+   controlled separately so it can appear during phase 1 (broadcast). */
+
+.prospecting-banner__beam .prospecting-banner__beam-origin {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+/* Hide the dashed line before phase 2 */
+.prospecting-banner__beam:not(.signal-phase-extend) {
+  background: none !important;
+}
+
+/* Hide the pulse before phase 4 — use animation-name:none so the
+   existing prospecting-beam-flow animation doesn't fight us */
+.prospecting-banner__beam:not(.signal-phase-live) .prospecting-banner__beam-pulse {
+  animation-name: none !important;
+  opacity: 0 !important;
+}
+
+/* ── Phase 1: broadcast rings pulse from origin dot ── */
+.prospecting-banner__beam.signal-phase-broadcast .prospecting-banner__beam-origin {
+  opacity: 1;
+}
+
+/* ── Phase 2: dashed line extends (width animated by JS rAF loop) ── */
+
+/* ── Phase 3: panels materialize (receive) ── */
+.prospecting-banner.signal-phase-receive {
+  opacity: 1 !important;
+  animation: signalReceive 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes signalReceive {
+  0% {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.92);
+    filter: brightness(2.5) saturate(0);
+  }
+  40% {
+    opacity: 1;
+    filter: brightness(1.8) saturate(0.5);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+    filter: brightness(1) saturate(1);
+  }
+}
+
+/* Mobile panels use translateX(-50%) not translateY(-50%) */
+@media screen and (max-width: 768px) {
+  .prospecting-banner.signal-phase-receive {
+    animation-name: signalReceiveMobile;
+  }
+
+  @keyframes signalReceiveMobile {
+    0% {
+      opacity: 0;
+      transform: translateX(-50%) scale(0.92);
+      filter: brightness(2.5) saturate(0);
+    }
+    40% {
+      opacity: 1;
+      filter: brightness(1.8) saturate(0.5);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(-50%) scale(1);
+      filter: brightness(1) saturate(1);
+    }
+  }
+}
+
+/* Network panel — same animation but needs translateX(-50%) base on mobile */
+.prospecting-banner.prospecting-banner--network.signal-phase-receive {
+  animation-name: signalReceive;
+}
+
+/* ── Phase 4: steady state — pulse travels along beam ── */
+.prospecting-banner__beam.signal-phase-live .prospecting-banner__beam-pulse {
+  visibility: visible;
+}
+
+/* ═══════════════════════════════════════
    Left-side Network Panel — subordinate variant
    Narrower (~68% of telemetry panel width) so the telemetry panel stays
    the primary focal point. Same CSS vars, same bracket/border treatment,

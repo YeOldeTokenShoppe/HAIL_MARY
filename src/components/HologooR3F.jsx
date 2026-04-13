@@ -4,9 +4,9 @@ import * as Tone from "tone";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Billboard } from "@react-three/drei";
 
-// Note pool used for the pluck chime that fires on blob merges
-// (matches Hologoo.jsx:5).
-const NOTES = ["C3","D3","E3","G3","A3","C4","D4","E4","G4","A4","C5","D5"];
+// Note pool for merge "blorp" sounds — pitched low and pentatonic
+// so they feel deep and heavy, like bubbles surfacing in thick liquid.
+const NOTES = ["C1","D1","E1","G1","A1","C2","D2","E2","G2","A2","C3","D3"];
 
 // Quasi-periodic "goopy" oscillators. Pure sin() gives each blob a
 // pendulum feel at high viscosity — you can see the position hit a peak,
@@ -111,11 +111,11 @@ vec3 calcNormal(vec3 p) {
 }
 
 const float HOFF0 = 0.0;
-const float HOFF1 = 0.11;
-const float HOFF2 = -0.09;
-const float HOFF3 = 0.14;
-const float HOFF4 = -0.06;
-const float HOFF5 = 0.19;
+const float HOFF1 = 0.0;
+const float HOFF2 = 0.0;
+const float HOFF3 = 0.0;
+const float HOFF4 = 0.0;
+const float HOFF5 = 0.0;
 
 vec3 blobColor(vec3 p) {
   float d0 = length(p - uB0) - uR0;
@@ -132,12 +132,12 @@ vec3 blobColor(vec3 p) {
   float w4 = exp(-d4 * k);
   float w5 = exp(-d5 * k);
   float total = w0 + w1 + w2 + w3 + w4 + w5 + 0.001;
-  vec3 c0 = hsl2rgb(uHue + HOFF0, 0.85, 0.6);
-  vec3 c1 = hsl2rgb(uHue + HOFF1, 0.88, 0.58);
-  vec3 c2 = hsl2rgb(uHue + HOFF2, 0.82, 0.55);
-  vec3 c3 = hsl2rgb(uHue + HOFF3, 0.86, 0.6);
-  vec3 c4 = hsl2rgb(uHue + HOFF4, 0.80, 0.57);
-  vec3 c5 = hsl2rgb(uHue + HOFF5, 0.84, 0.62);
+  vec3 c0 = hsl2rgb(uHue + HOFF0, 0.95, 0.50);
+  vec3 c1 = hsl2rgb(uHue + HOFF1, 0.98, 0.48);
+  vec3 c2 = hsl2rgb(uHue + HOFF2, 0.92, 0.45);
+  vec3 c3 = hsl2rgb(uHue + HOFF3, 0.96, 0.50);
+  vec3 c4 = hsl2rgb(uHue + HOFF4, 0.90, 0.47);
+  vec3 c5 = hsl2rgb(uHue + HOFF5, 0.94, 0.52);
   return (c0*w0 + c1*w1 + c2*w2 + c3*w3 + c4*w4 + c5*w5) / total;
 }
 
@@ -152,12 +152,12 @@ vec3 blobHighlight(vec3 p) {
   float w0=exp(-d0*k), w1=exp(-d1*k), w2=exp(-d2*k);
   float w3=exp(-d3*k), w4=exp(-d4*k), w5=exp(-d5*k);
   float total = w0+w1+w2+w3+w4+w5+0.001;
-  vec3 c0 = hsl2rgb(uHue + HOFF0, 0.45, 0.85);
-  vec3 c1 = hsl2rgb(uHue + HOFF1, 0.48, 0.83);
-  vec3 c2 = hsl2rgb(uHue + HOFF2, 0.42, 0.82);
-  vec3 c3 = hsl2rgb(uHue + HOFF3, 0.46, 0.85);
-  vec3 c4 = hsl2rgb(uHue + HOFF4, 0.40, 0.84);
-  vec3 c5 = hsl2rgb(uHue + HOFF5, 0.44, 0.86);
+  vec3 c0 = hsl2rgb(uHue + HOFF0, 0.65, 0.78);
+  vec3 c1 = hsl2rgb(uHue + HOFF1, 0.68, 0.76);
+  vec3 c2 = hsl2rgb(uHue + HOFF2, 0.62, 0.75);
+  vec3 c3 = hsl2rgb(uHue + HOFF3, 0.66, 0.78);
+  vec3 c4 = hsl2rgb(uHue + HOFF4, 0.60, 0.77);
+  vec3 c5 = hsl2rgb(uHue + HOFF5, 0.64, 0.80);
   return (c0*w0 + c1*w1 + c2*w2 + c3*w3 + c4*w4 + c5*w5) / total;
 }
 
@@ -195,8 +195,8 @@ void main() {
 
   // Projector ambient glow — tinted by hue
   vec2 center = uv - vec2(0.0, -0.15);
-  vec3 glowCol = hsl2rgb(uHue, 0.6, 0.3);
-  col += glowCol * 0.12 * exp(-length(center) * 2.0);
+  vec3 glowCol = hsl2rgb(uHue, 0.85, 0.35);
+  col += glowCol * 0.18 * exp(-length(center) * 1.8);
 
   // Volumetric outer glow halo — sample the blob field along the ray
   {
@@ -206,7 +206,7 @@ void main() {
       float gd = mapBlobs(gp);
       if (gd < 2.0 && gd > 0.01) {
         vec3 gCol = blobColor(gp);
-        float gIntensity = exp(-gd * 1.8) * 0.018;
+        float gIntensity = exp(-gd * 1.5) * 0.028;
         gIntensity *= smoothstep(-1.0, 0.2, gp.y);
         col += gCol * gIntensity;
       }
@@ -239,12 +239,12 @@ void main() {
   float beam = smoothstep(1.0, 0.0, beamR) * 0.018;
   float beamY = smoothstep(-0.5, 0.6, uv.y);
   beam *= (1.0 - beamY * 0.7);
-  vec3 beamCol = hsl2rgb(uHue, 0.5, 0.3);
+  vec3 beamCol = hsl2rgb(uHue, 0.75, 0.35);
   col += beamCol * beam;
 
   // Bloom (linear HDR) — stronger to sell the glow
   float brightness = dot(col, vec3(0.299, 0.587, 0.114));
-  col += col * smoothstep(0.35, 0.9, brightness) * 0.25;
+  col += col * smoothstep(0.30, 0.85, brightness) * 0.35;
 
   // Gamma correction to display space BEFORE applying the edge mask.
   // This order matters: if we masked in linear HDR and then applied
@@ -293,19 +293,19 @@ export default function HologooR3F({
   // Y offset above the detected table top, measured in table-radii. The
   // plane is billboarded, so its center lands at tableTop + tableRadius *
   // heightOffset. 0.55 puts it roughly where HoloProjector's shapes live.
-  heightOffset = 0.35,
+  heightOffset = 0.45,
   // Multiplier on the blobs' autonomous motion amplitudes AND on the
   // hover-driven blob 0's reach. 1.0 matches Hologoo.jsx's original
   // range; higher values give blobs more room to roam inside the
   // hologram without changing their visual size (radii are unchanged).
-  motionScale = 2.5,
+  motionScale = 3.0,
   // "Goopiness" knob — higher = thicker / slower / more sluggish fluid
   // feel. Scales three things together: (a) slows the blobs' sinusoidal
   // motion (time divided by viscosity), (b) moderately bumps uSmooth so
   // neighbors connect a bit more without fully melting, (c) slows blob
   // 0's hover chase so it lags behind the cursor like it's being
   // dragged through honey. 1.0 = Hologoo.jsx original feel.
-  viscosity = 2.5,
+  viscosity = 3.5,
 }) {
   const { scene } = useThree();
   const groupRef = useRef();
@@ -444,38 +444,58 @@ export default function HologooR3F({
     if (audioRef.current) return;
     try {
       await Tone.start();
-      const reverb = new Tone.Freeverb({ roomSize: 0.9, dampening: 1000 });
-      reverb.wet.value = 0.7;
-      const delay = new Tone.PingPongDelay("8n", 0.5);
-      delay.wet.value = 0.35;
-      const filter = new Tone.Filter(2000, "lowpass");
-      const lfo = new Tone.LFO(0.06, 200, 2600);
+      // Heavy, dark reverb — large room, heavily dampened so high freqs
+      // get swallowed like sound travelling through thick liquid.
+      const reverb = new Tone.Freeverb({ roomSize: 0.95, dampening: 400 });
+      reverb.wet.value = 0.8;
+      // Slow feedback delay instead of ping-pong — less "bouncy", more
+      // like sound sinking into layers of dense fluid.
+      const delay = new Tone.FeedbackDelay("4n", 0.45);
+      delay.wet.value = 0.2;
+      // Low-pass filter with slow, deep LFO — undulates like something
+      // breathing underwater. Range 120–1200 Hz keeps everything muffled.
+      const filter = new Tone.Filter(800, "lowpass", -24);
+      const lfo = new Tone.LFO(0.03, 120, 1200);
       lfo.connect(filter.frequency);
       lfo.start();
 
+      // Pad: low harmonicity + sine modulation for a warm, droning hum
+      // that shifts slowly. Feels submerged, not sparkly.
       const pad = new Tone.PolySynth(Tone.FMSynth, {
-        harmonicity: 3,
-        modulationIndex: 6,
+        harmonicity: 1.5,
+        modulationIndex: 4,
         oscillator: { type: "sine" },
-        envelope: { attack: 0.3, decay: 0.5, sustain: 0.6, release: 3 },
-        modulation: { type: "triangle" },
-        modulationEnvelope: { attack: 0.2, decay: 0.4, sustain: 0.7, release: 0.8 },
+        envelope: { attack: 1.2, decay: 1.0, sustain: 0.7, release: 4 },
+        modulation: { type: "sine" },
+        modulationEnvelope: { attack: 0.8, decay: 0.6, sustain: 0.8, release: 1.5 },
       });
       pad.chain(filter, delay, reverb, Tone.Destination);
-      pad.volume.value = -16;
+      pad.volume.value = -14;
 
-      const pluck = new Tone.PolySynth(Tone.MembraneSynth, {
-        pitchDecay: 0.07,
-        octaves: 3.5,
-        oscillator: { type: "sine" },
-        envelope: { attack: 0.003, decay: 0.7, sustain: 0.01, release: 3 },
+      // Blorp synth: MonoSynth with a filter envelope that sweeps DOWN
+      // on each note — gives a squelchy, wet "blorp" when blobs merge.
+      // Slow attack + long decay = thick, heavy bubble surfacing.
+      const blorp = new Tone.MonoSynth({
+        oscillator: { type: "sawtooth" },
+        envelope: { attack: 0.04, decay: 0.8, sustain: 0.05, release: 1.5 },
+        filterEnvelope: {
+          attack: 0.02,
+          decay: 0.6,
+          sustain: 0.05,
+          release: 1.0,
+          baseFrequency: 80,
+          octaves: 3.5,
+          exponent: 2,
+        },
+        filter: { Q: 4, type: "lowpass", rolloff: -24 },
       });
-      pluck.chain(filter, reverb, Tone.Destination);
-      pluck.volume.value = -6;
+      blorp.chain(filter, reverb, Tone.Destination);
+      blorp.volume.value = -8;
 
-      pad.triggerAttack(["A2", "E3", "G3"], Tone.now(), 0.06);
-      Tone.Transport.start();
-      audioRef.current = { pad, pluck, filter, reverb, delay, lfo };
+      // Drone chord pitched low — A1/E2/A2 for a deep, submerged hum
+      pad.triggerAttack(["A1", "E2", "A2"], Tone.now(), 0.05);
+      Tone.getTransport().start();
+      audioRef.current = { pad, blorp, filter, reverb, delay, lfo };
     } catch (err) {
       console.error("[HologooR3F] audio init failed:", err);
     }
@@ -484,14 +504,16 @@ export default function HologooR3F({
   const triggerMerge = (depth) => {
     const audio = audioRef.current;
     if (!audio) return;
-    const i1 = Math.floor(Math.random() * NOTES.length);
-    const i2 = Math.min(NOTES.length - 1, i1 + 1 + Math.floor(Math.random() * 3));
+    // Pick a single low note — MonoSynth is monophonic so we get one
+    // thick blorp per merge rather than a chord. Longer duration lets
+    // the filter envelope sweep fully for that satisfying squelch.
+    const note = NOTES[Math.floor(Math.random() * NOTES.length)];
     try {
-      audio.pluck.triggerAttackRelease(
-        [NOTES[i1], NOTES[i2]],
-        "8n",
+      audio.blorp.triggerAttackRelease(
+        note,
+        "4n",
         "+0",
-        Math.max(0.05, Math.min(0.45, depth * 0.8))
+        Math.max(0.08, Math.min(0.6, depth * 0.9))
       );
     } catch (e) {}
   };
@@ -499,9 +521,10 @@ export default function HologooR3F({
   const updateMergeAudio = (totalDepth) => {
     const audio = audioRef.current;
     if (!audio) return;
-    audio.reverb.wet.value = Math.min(0.95, 0.55 + totalDepth * 0.4);
-    audio.delay.wet.value = Math.min(0.65, 0.25 + totalDepth * 0.35);
-    audio.pad.set({ harmonicity: Math.min(6, 3 + totalDepth * 2) });
+    // More merging = heavier, wetter, more submerged
+    audio.reverb.wet.value = Math.min(0.95, 0.7 + totalDepth * 0.25);
+    audio.delay.wet.value = Math.min(0.45, 0.15 + totalDepth * 0.3);
+    audio.pad.set({ harmonicity: Math.min(3, 1.5 + totalDepth * 1.0) });
   };
 
   // Start audio on the first click anywhere in the scene (not just on the
@@ -528,7 +551,7 @@ export default function HologooR3F({
       try {
         audio.pad.releaseAll();
         audio.pad.dispose();
-        audio.pluck.dispose();
+        audio.blorp.dispose();
         audio.filter.dispose();
         audio.reverb.dispose();
         audio.delay.dispose();
@@ -542,7 +565,8 @@ export default function HologooR3F({
     if (!enabled || !matRef.current) return;
     const t = state.clock.getElapsedTime();
     uniforms.uTime.value = t;
-    uniforms.uHue.value = hue / 360;
+    // Cycle hue over time so all blobs shift color together (full loop every ~20s)
+    uniforms.uHue.value = (t * 0.05) % 1.0;
 
     const blobs = blobsRef.current;
     const mw = mouseWorldRef.current;
@@ -555,26 +579,59 @@ export default function HologooR3F({
     // factor, so everything feels like it's moving through a thick fluid.
     const effT = t / viscosity;
     const hoverEase = 0.06 / viscosity;
-    const hoverEaseZ = 0.08 / viscosity;
+
     for (let i = 0; i < 6; i++) {
       const b = blobs[i];
-      if (i === 0 && mouseActiveRef.current) {
-        // Interactive blob: ease toward the hover position. At viscosity
-        // = 1.8 this ease is ~0.033, which gives a noticeable lag — blob
-        // 0 feels like it's being dragged through honey.
-        b.pos.x += (mw.x - b.pos.x) * hoverEase;
-        b.pos.y += (Math.max(-0.5, mw.y) - b.pos.y) * hoverEase;
-        b.pos.z += (0 - b.pos.z) * hoverEaseZ;
-      } else if (i === 0) {
-        // Blob 0 idle drift — ease toward the goopy path rather than
-        // snapping, so it returns smoothly after the pointer leaves.
-        b.pos.x += (b.baseX + goopySin(effT, b.speedX, b.phaseX) * b.ampX * ms - b.pos.x) * 0.015;
-        b.pos.y += (b.baseY + goopyCos(effT, b.speedY, b.phaseY) * b.ampY * ms - b.pos.y) * 0.015;
-        b.pos.z += (b.baseZ + goopySin(effT, b.speedZ, b.phaseZ) * b.ampZ * ms - b.pos.z) * 0.015;
+
+      // Compute each blob's natural "home" position from its sinusoidal path
+      const homeX = b.baseX + goopySin(effT, b.speedX, b.phaseX) * b.ampX * ms;
+      const homeY = b.baseY + goopyCos(effT, b.speedY, b.phaseY) * b.ampY * ms;
+      const homeZ = b.baseZ + goopySin(effT, b.speedZ, b.phaseZ) * b.ampZ * ms;
+
+      if (mouseActiveRef.current) {
+        // ── Mouse-interactive mode for ALL blobs ──
+        // Distance from this blob to the cursor (XY plane, Z=0 for cursor)
+        const dx = mw.x - b.pos.x;
+        const dy = mw.y - b.pos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) + 0.01;
+
+        // Attraction: falls off with distance, stronger for closer blobs.
+        // Blob 0 gets extra-strong pull (the "leader" blob).
+        const attractRadius = 4.0 * ms;
+        const attractStrength = (i === 0 ? 1.0 : 0.4) * Math.max(0, 1 - dist / attractRadius);
+        const pullX = (dx / dist) * attractStrength * hoverEase * 3.0;
+        const pullY = (dy / dist) * attractStrength * hoverEase * 3.0;
+
+        // Repulsion: kicks in when very close to prevent all blobs collapsing
+        // onto the cursor. Creates a "parting" effect like pushing through fluid.
+        const repulseRadius = 0.8;
+        const repulseStrength = Math.max(0, 1 - dist / repulseRadius) * 0.12 / viscosity;
+        const pushX = -(dx / dist) * repulseStrength;
+        const pushY = -(dy / dist) * repulseStrength;
+
+        // Swirl: perpendicular force so blobs orbit around the cursor
+        // instead of beelining straight at it. Gives a "stirring" feel.
+        // Alternating direction per blob index so they don't all spin
+        // the same way — creates more complex, interesting motion.
+        const swirlDir = (i % 2 === 0) ? 1 : -1;
+        const swirlStrength = attractStrength * hoverEase * 1.5 * swirlDir;
+        const swirlX = -(dy / dist) * swirlStrength;
+        const swirlY =  (dx / dist) * swirlStrength;
+
+        // Blend: ease toward home position (keeps blobs from flying off
+        // forever) plus the mouse forces layered on top
+        const homeEase = 0.008;
+        b.pos.x += (homeX - b.pos.x) * homeEase + pullX + pushX + swirlX;
+        b.pos.y += (homeY - b.pos.y) * homeEase + pullY + pushY + swirlY;
+        b.pos.z += (homeZ - b.pos.z) * (hoverEase * 0.5);
       } else {
-        b.pos.x = b.baseX + goopySin(effT, b.speedX, b.phaseX) * b.ampX * ms;
-        b.pos.y = b.baseY + goopyCos(effT, b.speedY, b.phaseY) * b.ampY * ms;
-        b.pos.z = b.baseZ + goopySin(effT, b.speedZ, b.phaseZ) * b.ampZ * ms;
+        // ── No mouse: drift toward natural path ──
+        // All blobs ease back smoothly (not snap) so the transition from
+        // interactive → idle is fluid, not jarring.
+        const easeBack = i === 0 ? 0.015 : 0.04;
+        b.pos.x += (homeX - b.pos.x) * easeBack;
+        b.pos.y += (homeY - b.pos.y) * easeBack;
+        b.pos.z += (homeZ - b.pos.z) * easeBack;
       }
       uniforms[uKeys[i]].value.copy(b.pos);
     }

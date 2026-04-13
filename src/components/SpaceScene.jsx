@@ -2,7 +2,6 @@ import React, { Suspense, useRef, useState, useCallback, useEffect, createContex
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
-  Loader,
   useGLTF,
   useAnimations,
   PerspectiveCamera,
@@ -12,6 +11,7 @@ import {
 } from "@react-three/drei";
 import HoloProjector from "./HoloProjector";
 import HologooR3F from "./HologooR3F";
+import { EffectComposer, Bloom } from "@react-three/postprocessing";
 import "../app/space/space.css";
 
 /* ── Zoom context shared between Model and CameraController ── */
@@ -81,15 +81,26 @@ function CameraController({ controlsRef }) {
     // and hand control to OrbitControls at the camera's current pose so
     // the user can explore from wherever the camera happened to be.
     if (breakOutRef.current) {
-      if (sequenceRunningRef.current) {
+      const isAnimating = sequenceRunningRef.current
+        || phase.current === "zooming-in";
+      if (isAnimating) {
         flyToRef.current = null;
         orbitTableRef.current = null;
         onArrivedRef.current = null;
         captainFadeRef.current.target = 1;
         sequenceRunningRef.current = false;
         phase.current = "zoomed";
+        // Place the camera just past the first character along -Z, inside
+        // the capsule, looking toward the scene center.
+        const breakOutY = targetLookAt.y - 0.1;
+        camera.position.set(targetLookAt.x, breakOutY, targetLookAt.z - 0.3);
+        // Look toward the scene center at the camera's height
+        // so we face straight ahead rather than down at the floor.
+        const breakOutTarget = new THREE.Vector3(defaultLookAt.x, breakOutY, defaultLookAt.z);
+        currentLookAt.current.copy(breakOutTarget);
+        camera.lookAt(currentLookAt.current);
         if (controlsRef.current) {
-          controlsRef.current.target.copy(currentLookAt.current);
+          controlsRef.current.target.copy(breakOutTarget);
           controlsRef.current.enabled = true;
           controlsRef.current.autoRotate = false;
           controlsRef.current.update();
@@ -721,7 +732,7 @@ function TableScreens({ scene }) {
       });
     }
     screensRef.current = screens;
-    console.log(`[TableScreens] found ${screens.length}/4`);
+
   }, [scene]);
 
   useFrame((state, delta) => {
@@ -914,10 +925,7 @@ function Model({ url }) {
       captainEmpty.traverse((child) => {
         if (child.isMesh && child.material) {
           const m = child.material;
-          console.log(
-            `[Captain mesh] ${child.name} → material: ${m.type}`,
-            { metalness: m.metalness, roughness: m.roughness, color: m.color?.getHexString?.() }
-          );
+   
         }
       });
     }
@@ -947,7 +955,7 @@ function Model({ url }) {
           }
         }
       });
-      console.log("H80Z demon_eyes found:", !!h80zEyesRef.current);
+
     }
 
     // Find Button01..Button20, clone their materials so emissiveIntensity is
@@ -970,7 +978,7 @@ function Model({ url }) {
       buttons.push(mesh);
     }
     buttonsRef.current = buttons;
-    console.log(`Control panel buttons found: ${buttons.length}/20`);
+
 
     // Windows — swap each porthole (outer + inner glass) to MeshBasicMaterial
     // so it's fully unlit. The interior lighting preset drops ambient to
@@ -999,7 +1007,97 @@ function Model({ url }) {
         windowsFound++;
       }
     }
-    console.log(`Windows converted to unlit: ${windowsFound}/8`);
+ 
+
+    // Halo — boost emissive + fake bloom sprite
+    const halo = scene.getObjectByName("Halo");
+    if (halo) {
+      halo.traverse((child) => {
+        if (child.isMesh && child.material) {
+          child.material = child.material.clone();
+          child.material.emissive = new THREE.Color("#dccb30ff");
+          child.material.emissiveIntensity = 3.0;
+          child.material.toneMapped = true;
+          child.material.needsUpdate = true;
+        }
+      });
+
+      // Fake bloom disc — a flat plane with a radial glow texture, oriented
+      // to match the halo's ring. Uses a PlaneGeometry rotated to lie in the
+      // XZ plane (like the halo) instead of a Sprite (which billboards and
+      // looks spherical). One extra quad, zero postprocessing.
+      const size = 128;
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      const grad = ctx.createRadialGradient(
+        size / 2, size / 2, 0,
+        size / 2, size / 2, size / 2
+      );
+      grad.addColorStop(0, "rgba(255, 235, 80, 0.8)");
+      grad.addColorStop(0.2, "rgba(255, 225, 60, 0.45)");
+      grad.addColorStop(0.5, "rgba(255, 210, 50, 0.12)");
+      grad.addColorStop(0.75, "rgba(255, 200, 40, 0.03)");
+      grad.addColorStop(1, "rgba(255, 200, 40, 0)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, size, size);
+      const glowTex = new THREE.CanvasTexture(canvas);
+
+      const haloBox = new THREE.Box3().setFromObject(halo);
+      const haloSize = new THREE.Vector3();
+      haloBox.getSize(haloSize);
+      const haloCenter = new THREE.Vector3();
+      haloBox.getCenter(haloCenter);
+      const discScale = Math.max(haloSize.x, haloSize.z) * 6.8;
+
+      const glowGeo = new THREE.PlaneGeometry(1, 1);
+      const glowMat = new THREE.MeshBasicMaterial({
+        map: glowTex,
+        blending: THREE.AdditiveBlending,
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        toneMapped: false,
+      });
+      const glowMesh = new THREE.Mesh(glowGeo, glowMat);
+      // Compute orientation from halo geometry vertices in LOCAL space
+      // (since we'll parent glowMesh to halo, everything is relative to
+      // the halo's own coordinate system).
+      let haloMesh = null;
+      halo.traverse((child) => {
+        if (!haloMesh && child.isMesh) haloMesh = child;
+      });
+      if (haloMesh) {
+        const pos = haloMesh.geometry.attributes.position;
+        const a = new THREE.Vector3().fromBufferAttribute(pos, 0);
+        const iB = Math.floor(pos.count / 3);
+        const iC = Math.floor((pos.count * 2) / 3);
+        const b = new THREE.Vector3().fromBufferAttribute(pos, iB);
+        const c = new THREE.Vector3().fromBufferAttribute(pos, iC);
+        const localNormal = new THREE.Vector3()
+          .crossVectors(
+            new THREE.Vector3().subVectors(b, a),
+            new THREE.Vector3().subVectors(c, a)
+          ).normalize();
+        // PlaneGeometry faces +Z by default — rotate so +Z aligns with the
+        // halo geometry's local face normal
+        const q = new THREE.Quaternion().setFromUnitVectors(
+          new THREE.Vector3(0, 0, 1), localNormal
+        );
+        glowMesh.quaternion.copy(q);
+      }
+      // Position at halo's local-space center and scale to match
+      const localCenter = new THREE.Vector3();
+      const localBox = new THREE.Box3();
+      if (haloMesh) {
+        haloMesh.geometry.computeBoundingBox();
+        haloMesh.geometry.boundingBox.getCenter(localCenter);
+      }
+      glowMesh.position.copy(localCenter);
+      glowMesh.scale.set(discScale, discScale, 1);
+      halo.add(glowMesh);
+    }
   }, [scene]);
 
   // Find eye meshes and the Eyes bone
@@ -1238,7 +1336,7 @@ function Model({ url }) {
       scene.updateMatrixWorld(true);
       const h80zWorld = new THREE.Vector3();
       h80zEmpty.getWorldPosition(h80zWorld);
-      console.log("H80Z Empty world pos:", h80zWorld.toArray());
+
 
       let h80zHips = null;
       h80zEmpty.traverse((n) => {
@@ -1247,7 +1345,7 @@ function Model({ url }) {
       if (h80zHips) {
         const hipsWorld = new THREE.Vector3();
         h80zHips.getWorldPosition(hipsWorld);
-        console.log("H80Z Hips world pos:", hipsWorld.toArray());
+   
       }
 
       let h80zHead = null;
@@ -1257,7 +1355,7 @@ function Model({ url }) {
       if (h80zHead) {
         const headWorld = new THREE.Vector3();
         h80zHead.getWorldPosition(headWorld);
-        console.log("H80Z Head world pos:", headWorld.toArray());
+
       }
     }
 
@@ -1268,6 +1366,13 @@ function Model({ url }) {
       droneAnim.setLoop(THREE.LoopRepeat, Infinity);
     }
 
+    // Flag: play KeyAction animation on loop
+    const flagAnim = actions["KeyAction"];
+    if (flagAnim) {
+      flagAnim.reset().fadeIn(0.5).play();
+      flagAnim.setLoop(THREE.LoopRepeat, Infinity);
+    }
+
     // Log Drone positioning info for camera/spotlight setup + stash the
     // node so the drone-tracking useFrame can rotate it each frame.
     const droneEmpty = scene.getObjectByName("Drone_Empty");
@@ -1276,7 +1381,7 @@ function Model({ url }) {
       scene.updateMatrixWorld(true);
       const droneWorld = new THREE.Vector3();
       droneEmpty.getWorldPosition(droneWorld);
-      console.log("Drone_Empty world pos:", droneWorld.toArray());
+
     }
 
     // Play standing on infinite loop
@@ -1308,7 +1413,7 @@ function Model({ url }) {
                 if (!sequenceRunningRef.current) return;
                 captainFadeRef.current.target = 0;
               }, 2300);
-              console.log("GR80 head ref:", gr80HeadRef.current);
+          
 
               // Helper: build the orbit-table request that triggers the
               // CameraController's "orbiting-table" phase. Used by both
@@ -1352,7 +1457,7 @@ function Model({ url }) {
                   const tableBox = new THREE.Box3().setFromObject(table);
                   tableBox.getCenter(pivot);
                   pivot.y = tableBox.max.y + 0.12;
-                  console.log("[orbit-table] pivot = Table top +0.12:", pivot.toArray());
+          
                 } else {
                   console.warn("[orbit-table] 'Table' mesh not found — falling back to pivot near GR80");
                   pivot.copy(fallbackPivot);
@@ -1372,7 +1477,7 @@ function Model({ url }) {
               if (gr80HeadRef.current) {
                 const gr80LookAt = new THREE.Vector3();
                 gr80HeadRef.current.getWorldPosition(gr80LookAt);
-                console.log("Flying to GR80 at:", gr80LookAt.toArray());
+        
                 // Backed up from 0.5 → 0.8 to keep the camera clear of GR80's mesh.
                 const gr80Pos = gr80LookAt.clone().add(new THREE.Vector3(0, 0, 0.8));
                 flyToRef.current = { pos: gr80Pos, lookAt: gr80LookAt };
@@ -1383,13 +1488,13 @@ function Model({ url }) {
                 // then hand control back to OrbitControls. See the
                 // "orbiting-table" phase in CameraController.
                 onArrivedRef.current = () => {
-                  console.log("[orbit-table] GR80 primary path arrived — requesting orbit");
+
                   orbitTableRef.current = buildOrbitRequest(gr80LookAt);
                 };
               } else {
                 // Fallback: fly to EMPTY_GR80 position directly
                 const gr80Empty = scene.getObjectByName("EMPTY_GR80");
-                console.log("EMPTY_GR80 node:", gr80Empty);
+      
                 if (gr80Empty) {
                   scene.updateMatrixWorld(true);
                   const gr80World = new THREE.Vector3();
@@ -1408,7 +1513,7 @@ function Model({ url }) {
                   // (same as primary path). If Table mesh is missing, the
                   // helper falls back to orbiting around gr80LookAtFallback.
                   onArrivedRef.current = () => {
-                    console.log("[orbit-table] GR80 fallback path arrived — requesting orbit");
+               
                     orbitTableRef.current = buildOrbitRequest(gr80LookAtFallback);
                   };
                 }
@@ -1501,11 +1606,14 @@ function Model({ url }) {
       return;
     }
 
-    // Already zoomed but no sequence running: either zooming-in is still
-    // in progress or we're in the post-break-out steady state. Don't
-    // retrigger the zoom-in logic — let OrbitControls (or the ongoing
-    // zoom-in) handle it.
-    if (zoomedRef.current) return;
+    // Already zoomed — if we're mid zoom-in, treat as a break-out;
+    // otherwise we're in the post-break-out steady state, just ignore.
+    if (zoomedRef.current) {
+      if (!sequenceRunningRef.current) {
+        breakOutRef.current = true;
+      }
+      return;
+    }
 
     const target = windowRef.current;
     if (!target) return;
@@ -1556,7 +1664,31 @@ function Model({ url }) {
   );
 }
 
-export default function SpaceScene({ onZoomChange } = {}) {
+/* ── Project Antenna world position to screen coords for beam overlay ── */
+function AntennaProjector({ antennaScreenRef }) {
+  const { scene } = useGLTF("/models/Scene3.glb");
+  const antennaRef = useRef(null);
+  const tmpVec = useRef(new THREE.Vector3());
+
+  useEffect(() => {
+    const antenna = scene.getObjectByName("Antenna");
+    if (antenna) antennaRef.current = antenna;
+  }, [scene]);
+
+  useFrame(({ camera, gl }) => {
+    if (!antennaRef.current) return;
+    antennaRef.current.getWorldPosition(tmpVec.current);
+    tmpVec.current.y += 0.35; // offset to antenna tip
+    tmpVec.current.project(camera);
+    const canvas = gl.domElement;
+    antennaScreenRef.current.x = (tmpVec.current.x * 0.5 + 0.5) * canvas.clientWidth;
+    antennaScreenRef.current.y = (-tmpVec.current.y * 0.5 + 0.5) * canvas.clientHeight;
+  });
+
+  return null;
+}
+
+export default function SpaceScene({ onZoomChange, antennaScreenRef } = {}) {
   const [zoomed, setZoomed] = useState(false);
   const [targetPos, setTargetPos] = useState(() => new THREE.Vector3(0, 0, 6));
   const [targetLookAt, setTargetLookAt] = useState(() => new THREE.Vector3(0, 0, 0));
@@ -1638,12 +1770,12 @@ export default function SpaceScene({ onZoomChange } = {}) {
 
       <Canvas
         onPointerMissed={() => {
-          // Clicks on empty space break out of the scripted sequence if
-          // it's running; otherwise fall back to the existing zoom-out.
+          // Clicks on empty space break out of any in-progress animation
+          // (scripted sequence or initial zoom-in); otherwise zoom out.
           if (sequenceRunningRef.current) {
             breakOutRef.current = true;
           } else if (zoomed) {
-            setZoomed(false);
+            breakOutRef.current = true;
           }
         }}
         dpr={[1.5, 2]}
@@ -1656,29 +1788,25 @@ export default function SpaceScene({ onZoomChange } = {}) {
               overridden to top-right via the `.stats-top-right` rule in
               space.css (stats.js defaults to top-left). */}
           <Stats className="stats-top-right" />
-        <fog attach="fog" args={['#272730', 16, 30]} />
-        {/* Ambient + interior fills — see InteriorLighting. Lerps between an
-            "exterior" preset (ambient 0.8, exposure 0.6 — matches the old
-            flat look) and an "interior" preset that darkens ambient and
-            fades in warm/cool fills so the monitor glow and button blinks
-            pop once the camera is inside the ship. */}
-        <InteriorLighting />
-          <PerspectiveCamera makeDefault position={[0, 0, 16]} fov={75}>
-            <spotLight
-            castShadow
-            intensity={2.25 * Math.PI}
-            decay={0}
-            angle={0.2}
-            penumbra={1}
-            position={[-25, 20, -15]}
-            shadow-mapSize={[1024, 1024]}
-            shadow-bias={-0.0001}
-            />
-          </PerspectiveCamera>
+          <PerspectiveCamera makeDefault position={[0, 0, 16]} fov={75} />
           <CameraController controlsRef={controlsRef} />
           {/* <CaptainSpotlight /> */}
           {/* <H80ZSpotlight /> */}
           <Suspense fallback={null}>
+            <fog attach="fog" args={['#272730', 16, 30]} />
+            {/* Lights deferred until model loads so the starfield stays
+                clean during the loading phase. */}
+            <InteriorLighting />
+            <spotLight
+              castShadow
+              intensity={2.25 * Math.PI}
+              decay={0}
+              angle={0.2}
+              penumbra={1}
+              position={[-25, 20, -15]}
+              shadow-mapSize={[1024, 1024]}
+              shadow-bias={-0.0001}
+            />
             <Model url="/models/Scene3.glb" />
             {/* HoloProjector: existing 3D hologram (tesseract / penrose / etc.) */}
             {/* <HoloProjector /> */}
@@ -1698,11 +1826,19 @@ export default function SpaceScene({ onZoomChange } = {}) {
             minPolarAngle={zoomed ? 0 : Math.PI / 2}
           />
           <Stars radius={500} depth={50} count={1000} factor={10} />
+          {antennaScreenRef && <AntennaProjector antennaScreenRef={antennaScreenRef} />}
+          {/* <EffectComposer>
+            <Bloom
+              luminanceThreshold={1.0}
+              luminanceSmoothing={0.3}
+              intensity={0.5}
+              mipmapBlur
+            />
+          </EffectComposer> */}
         </ZoomContext.Provider>
       </Canvas>
 
       <div className="layer" />
-      <Loader />
     </div>
   );
 }
