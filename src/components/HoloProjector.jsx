@@ -1390,7 +1390,7 @@ export default function HoloProjector({ enabled = true }) {
 
   /* ── Tuning knobs ── */
   const CONE_Y = HOLO_HEIGHT * -0.4;
-  const CONE_SCALE = 0.35;
+  const CONE_SCALE = 0.45;
   const SHAPES_Y = HOLO_HEIGHT * 0.3;
   const LADY_Y = -HOLO_HEIGHT * 0.5;
 
@@ -1419,18 +1419,18 @@ export default function HoloProjector({ enabled = true }) {
       </mesh> */}
 
       {/* Shapes group — raised independently from cone */}
-      <group position={[0, SHAPES_Y, 0]}>
+      {/* <group position={[0, SHAPES_Y, 0]}> */}
         {/* Tesseract wireframe */}
-        <group ref={tessGroupRef} />
+        {/* <group ref={tessGroupRef} /> */}
 
         {/* Penrose portal */}
-        <group ref={torusGroupRef} />
+        {/* <group ref={torusGroupRef} /> */}
 
         {/* Singularity (black hole + accretion disk) */}
-        <group ref={singularityGroupRef} />
+        {/* <group ref={singularityGroupRef} /> */}
 
         {/* Neural network crystalline sphere */}
-        <group ref={neuralGroupRef}>
+        {/* <group ref={neuralGroupRef}>
           <NeuralNetworkR3F
             theme={2}
             formation={0}
@@ -1443,14 +1443,14 @@ export default function HoloProjector({ enabled = true }) {
             autoFireMinInterval={1.8}
             autoFireMaxInterval={3.5}
           />
-        </group>
+        </group> */}
 
         {/* Animated geometry GLB */}
-        <group ref={geometryGroupRef} />
+        {/* <group ref={geometryGroupRef} /> */}
 
         {/* Our Lady holographic statue */}
-        <group ref={ladyGroupRef} position={[0, LADY_Y, 0]} />
-      </group>
+        {/* <group ref={ladyGroupRef} position={[0, LADY_Y, 0]} /> */}
+      {/* </group> */}
     </group>
   );
 }

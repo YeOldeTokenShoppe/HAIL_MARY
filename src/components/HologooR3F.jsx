@@ -51,6 +51,36 @@ const PLANE_HEIGHT = 5.4;
 const PLANE_HALF_WIDTH = PLANE_WIDTH * 0.5;
 const PLANE_HALF_HEIGHT = PLANE_HEIGHT * 0.5;
 
+/* ── Beam cone shaders (ported from HoloProjector) ── */
+const beamVert = /* glsl */ `
+  varying vec2 vUv;
+  varying float vY;
+  void main() {
+    vUv = uv;
+    vY = position.y;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const beamFrag = /* glsl */ `
+  uniform float uTime;
+  uniform vec3 uColor;
+  uniform float uBeamOpacity;
+  varying vec2 vUv;
+  varying float vY;
+
+  void main() {
+    float heightFade = 1.0 - smoothstep(0.0, 0.9, vUv.y);
+    heightFade = pow(heightFade, 1.5);
+    float scan = sin((vY - uTime * 0.4) * 60.0) * 0.5 + 0.5;
+    scan = pow(scan, 4.0) * 0.3 + 0.7;
+    float edgeFade = 1.0 - abs(vUv.x - 0.5) * 2.0;
+    edgeFade = pow(edgeFade, 0.5);
+    float alpha = heightFade * scan * edgeFade * uBeamOpacity;
+    gl_FragColor = vec4(uColor, alpha * 0.35);
+  }
+`;
+
 /* Vertex shader — standard R3F transform + pass-through UV. */
 const VERT = `
 varying vec2 vUv;
@@ -310,6 +340,8 @@ export default function HologooR3F({
   const { scene } = useThree();
   const groupRef = useRef();
   const matRef = useRef();
+  const beamMatRef = useRef();
+  const coneRef = useRef();
   const tableFoundRef = useRef(false);
 
   // Blob state — mirrors Hologoo's animate() logic. Persist across
@@ -365,6 +397,15 @@ export default function HologooR3F({
     []
   );
 
+  const beamUniforms = useMemo(
+    () => ({
+      uTime: { value: 0 },
+      uColor: { value: new THREE.Color(0x4db8ff) },
+      uBeamOpacity: { value: 1.0 },
+    }),
+    []
+  );
+
   // ── Find Table and auto-position (mirrors HoloProjector's approach) ──
   useEffect(() => {
     if (tableFoundRef.current) return;
@@ -387,7 +428,22 @@ export default function HologooR3F({
         center.z
       );
       // Scale the plane to ~sizeScale * table diameter.
-      groupRef.current.scale.setScalar(tableRadius * 2 * sizeScale);
+      const groupScale = tableRadius * 2 * sizeScale;
+      groupRef.current.scale.setScalar(groupScale);
+
+      // Position the beam cone so it matches HoloProjector exactly.
+      // HoloProjector places its cone in world space at:
+      //   Y = tableTop + 0.05 + (HOLO_HEIGHT * -0.4) * holoGroupScale
+      // where holoGroupScale = (tableRadius * 0.4) / HOLO_RADIUS.
+      // Convert that world Y into our local coordinate system.
+      if (coneRef.current) {
+        const holoGroupScale = (tableRadius * 0.4) / 0.65;
+        const coneWorldY = tableTop + 0.05 + (0.9 * -0.4) * holoGroupScale;
+        const groupWorldY = tableTop + tableRadius * heightOffset;
+        const coneLocalY = (coneWorldY - groupWorldY) / groupScale;
+        coneRef.current.position.y = coneLocalY;
+      }
+
       tableFoundRef.current = true;
       return true;
     };
@@ -566,7 +622,12 @@ export default function HologooR3F({
     const t = state.clock.getElapsedTime();
     uniforms.uTime.value = t;
     // Cycle hue over time so all blobs shift color together (full loop every ~20s)
-    uniforms.uHue.value = (t * 0.05) % 1.0;
+    const currentHue = (t * 0.05) % 1.0;
+    uniforms.uHue.value = currentHue;
+
+    // Sync beam cone color with the blob hue
+    beamUniforms.uTime.value = t;
+    beamUniforms.uColor.value.setHSL(currentHue, 0.85, 0.45);
 
     const blobs = blobsRef.current;
     const mw = mouseWorldRef.current;
@@ -674,8 +735,35 @@ export default function HologooR3F({
 
   if (!enabled) return null;
 
+  // Cone radius & height matched to HoloProjector's exact geometry:
+  // HoloProjector: coneGeo radius=0.585, height=1.08, mesh scale=0.45,
+  // groupScale = tableRadius*0.4/0.65. Our groupScale = tableRadius*0.4.
+  // Ratio = 0.6154/0.4 = 1.5385, so local dims = effective * 1.5385.
+  const CONE_RADIUS = 0.405;  // 0.585 * 0.45 * 1.5385
+  const CONE_HEIGHT = 0.748;  // 1.08  * 0.45 * 1.5385
+
   return (
     <group ref={groupRef}>
+      {/* Hologram beam cone — outside Billboard so it stays world-oriented.
+          Y position is set dynamically in findTable to match HoloProjector. */}
+      <mesh
+        ref={coneRef}
+        position={[0, 0, 0]}
+        rotation={[Math.PI, 0, 0]}
+      >
+        <coneGeometry args={[CONE_RADIUS, CONE_HEIGHT, 32, 1, true]} />
+        <shaderMaterial
+          ref={beamMatRef}
+          vertexShader={beamVert}
+          fragmentShader={beamFrag}
+          uniforms={beamUniforms}
+          transparent
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
       <Billboard>
         <mesh
           onPointerMove={handlePointerMove}

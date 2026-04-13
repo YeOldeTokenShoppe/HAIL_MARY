@@ -12,6 +12,8 @@ import {
 import HoloProjector from "./HoloProjector";
 import HologooR3F from "./HologooR3F";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
+// Uncomment to re-enable leva GUI panel in InteriorLighting:
+// import { useControls, folder, button } from "leva";
 import "../app/space/space.css";
 
 /* ── Zoom context shared between Model and CameraController ── */
@@ -478,9 +480,53 @@ function InteriorLighting() {
   const coolRimRef = useRef();
   const { gl } = useThree();
 
+  /* ── Uncomment the block below to re-enable the leva GUI panel ──
+  const interior = useControls("Interior Lighting", {
+    ambient:  { value: 3, min: 0, max: 5,  step: 0.01 },
+    exposure: { value: 0.14, min: 0, max: 2,  step: 0.01 },
+    "Warm Fill": folder({
+      warmIntensity: { value: 10, min: 0, max: 30, step: 0.1 },
+      warmColor:     { value: "#a2947b" },
+      warmDistance:   { value: 22.5, min: 1, max: 50, step: 0.5 },
+      warmDecay:     { value: 2, min: 0, max: 5, step: 0.1 },
+      warmX:         { value: 0.05, min: -10, max: 10, step: 0.05 },
+      warmY:         { value: 2.35, min: -10, max: 10, step: 0.05 },
+      warmZ:         { value: 0.8,  min: -10, max: 10, step: 0.05 },
+    }),
+    "Cool Rim": folder({
+      coolIntensity: { value: 0.9, min: 0, max: 15, step: 0.1 },
+      coolColor:     { value: "#6aa7ff" },
+      coolDistance:   { value: 10, min: 1, max: 50, step: 0.5 },
+      coolDecay:     { value: 2, min: 0, max: 5, step: 0.1 },
+      coolX:         { value: -2.5, min: -10, max: 10, step: 0.05 },
+      coolY:         { value: 1.2,  min: -10, max: 10, step: 0.05 },
+      coolZ:         { value: -2.5, min: -10, max: 10, step: 0.05 },
+    }),
+    "Copy Values": button((get) => {
+      const v = {
+        ambient: get("Interior Lighting.ambient"),
+        exposure: get("Interior Lighting.exposure"),
+        warmIntensity: get("Interior Lighting.warmIntensity"),
+        warmColor: get("Interior Lighting.warmColor"),
+        warmDistance: get("Interior Lighting.warmDistance"),
+        warmDecay: get("Interior Lighting.warmDecay"),
+        warmPos: [get("Interior Lighting.warmX"), get("Interior Lighting.warmY"), get("Interior Lighting.warmZ")],
+        coolIntensity: get("Interior Lighting.coolIntensity"),
+        coolColor: get("Interior Lighting.coolColor"),
+        coolDistance: get("Interior Lighting.coolDistance"),
+        coolDecay: get("Interior Lighting.coolDecay"),
+        coolPos: [get("Interior Lighting.coolX"), get("Interior Lighting.coolY"), get("Interior Lighting.coolZ")],
+      };
+      const text = JSON.stringify(v, null, 2);
+      navigator.clipboard.writeText(text);
+      console.log("Interior Lighting values copied:\n", text);
+    }),
+  });
+  ── end leva GUI panel ── */
+
   const PRESETS = {
     exterior: { ambient: 0.8,  warm: 0,  cool: 0,   exposure: 0.6  },
-    interior: { ambient: 0.96, warm: 10, cool: 0.9, exposure: 0.37 },
+    interior: { ambient: 3,    warm: 10, cool: 0.9,  exposure: 0.14 },
   };
   const LERP_SPEED = 2.5;
 
@@ -1412,7 +1458,7 @@ function Model({ url }) {
               setTimeout(() => {
                 if (!sequenceRunningRef.current) return;
                 captainFadeRef.current.target = 0;
-              }, 2300);
+              }, 3400);
           
 
               // Helper: build the orbit-table request that triggers the
