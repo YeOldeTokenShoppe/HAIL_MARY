@@ -529,23 +529,42 @@ function InteriorLighting() {
     interior: { ambient: 3,    warm: 10, cool: 0.9,  exposure: 0.14 },
   };
   const LERP_SPEED = 2.5;
+  const EPSILON = 0.001;
 
   useFrame((_, delta) => {
     const target = inSpaceshipRef.current ? PRESETS.interior : PRESETS.exterior;
+
+    // Skip writes when all values are already at target — avoids
+    // unnecessary uniform updates that can cause brief render artifacts.
+    const ambientDiff = ambientRef.current
+      ? Math.abs(target.ambient - ambientRef.current.intensity) : 0;
+    const warmDiff = warmFillRef.current
+      ? Math.abs(target.warm - warmFillRef.current.intensity) : 0;
+    const coolDiff = coolRimRef.current
+      ? Math.abs(target.cool - coolRimRef.current.intensity) : 0;
+    const exposureDiff = Math.abs(target.exposure - gl.toneMappingExposure);
+
+    if (ambientDiff < EPSILON && warmDiff < EPSILON &&
+        coolDiff < EPSILON && exposureDiff < EPSILON) {
+      return;
+    }
+
     const k = Math.min(1, delta * LERP_SPEED);
-    if (ambientRef.current) {
+    if (ambientRef.current && ambientDiff >= EPSILON) {
       ambientRef.current.intensity +=
         (target.ambient - ambientRef.current.intensity) * k;
     }
-    if (warmFillRef.current) {
+    if (warmFillRef.current && warmDiff >= EPSILON) {
       warmFillRef.current.intensity +=
         (target.warm - warmFillRef.current.intensity) * k;
     }
-    if (coolRimRef.current) {
+    if (coolRimRef.current && coolDiff >= EPSILON) {
       coolRimRef.current.intensity +=
         (target.cool - coolRimRef.current.intensity) * k;
     }
-    gl.toneMappingExposure += (target.exposure - gl.toneMappingExposure) * k;
+    if (exposureDiff >= EPSILON) {
+      gl.toneMappingExposure += (target.exposure - gl.toneMappingExposure) * k;
+    }
   });
 
   return (
