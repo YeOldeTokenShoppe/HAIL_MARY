@@ -1792,11 +1792,9 @@ export default function SpaceScene({ onZoomChange, antennaScreenRef } = {}) {
           <CameraController controlsRef={controlsRef} />
           {/* <CaptainSpotlight /> */}
           {/* <H80ZSpotlight /> */}
+          <InteriorLighting />
           <Suspense fallback={null}>
             <fog attach="fog" args={['#272730', 16, 30]} />
-            {/* Lights deferred until model loads so the starfield stays
-                clean during the loading phase. */}
-            <InteriorLighting />
             <spotLight
               castShadow
               intensity={2.25 * Math.PI}

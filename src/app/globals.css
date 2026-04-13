@@ -7176,7 +7176,7 @@ body .cl-profileSection__security .cl-profileSectionPrimaryButton {
    gets out of the way of the character cameo. Re-removing the class on
    zoom-out triggers the same transition in reverse. */
 .prospecting-banner--faded {
-  opacity: 0;
+  opacity: 0 !important;
   pointer-events: none;
 }
 
@@ -7489,7 +7489,6 @@ body .cl-profileSection__security .cl-profileSectionPrimaryButton {
 
 /* ── Phase 3: panels materialize (receive) ── */
 .prospecting-banner.signal-phase-receive {
-  opacity: 1 !important;
   animation: signalReceive 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
