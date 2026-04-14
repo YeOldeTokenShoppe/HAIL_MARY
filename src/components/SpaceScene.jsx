@@ -1815,11 +1815,202 @@ function Bracket({ position }) {
   );
 }
 
+/* Core sample cylinder infographic — vertical tube showing stratigraphy
+   with shaded layers, depth ticks, and callout labels. Rendered above
+   the typed body in Core Sample mode. */
+function CoreCylinder({ typedRatio = 1 }) {
+  // Layers defined as (startPct, endPct, colorStop) from top to bottom.
+  // Drill depth 0.4km total — goo occupies ~74% of the core.
+  const tubeX = 38;
+  const tubeY = 12;
+  const tubeW = 54;
+  const tubeH = 176;
+  const tubeBottom = tubeY + tubeH;
+
+  // Reveal fill based on typing progress (0..1). Layers fill top-down.
+  const fillHeight = tubeH * Math.min(1, Math.max(0, typedRatio));
+
+  return (
+    <svg
+      width="100%"
+      height="200"
+      viewBox="0 0 260 200"
+      preserveAspectRatio="xMidYMid meet"
+      style={{ display: "block", marginBottom: 8 }}
+      aria-hidden="true"
+    >
+      <defs>
+        {/* Fluid neon gradient for the goo zone — echoes the Hologoo colors */}
+        <linearGradient id="cyl-goo" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#6bc7d1" stopOpacity="0.85" />
+          <stop offset="35%" stopColor="#0055ff" stopOpacity="0.9" />
+          <stop offset="70%" stopColor="#ff00aa" stopOpacity="0.9" />
+          <stop offset="100%" stopColor="#d4a854" stopOpacity="0.75" />
+        </linearGradient>
+        {/* Soft glow filter for the anomaly marker */}
+        <filter id="cyl-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="1.6" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        <clipPath id="cyl-clip">
+          <rect x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={10} />
+        </clipPath>
+        {/* Dynamic reveal clip that grows as the text types */}
+        <clipPath id="cyl-reveal">
+          <rect x={tubeX} y={tubeY} width={tubeW} height={fillHeight} />
+        </clipPath>
+      </defs>
+
+      {/* Tube interior background */}
+      <rect
+        x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={10}
+        fill="rgba(18, 10, 22, 0.6)"
+      />
+
+      {/* Stratigraphy layers (clipped to tube shape + reveal mask) */}
+      <g clipPath="url(#cyl-clip)">
+        <g clipPath="url(#cyl-reveal)">
+          {/* Regolith — 0-10% (thin dusty top) */}
+          <rect x={tubeX} y={tubeY} width={tubeW} height={tubeH * 0.10}
+                fill="#9a8878" opacity="0.55" />
+          {/* Silicate crust — 10-16% */}
+          <rect x={tubeX} y={tubeY + tubeH * 0.10} width={tubeW} height={tubeH * 0.06}
+                fill="#d4a854" opacity="0.35" />
+          {/* Goo zone — 16-90% (main specimen layer) */}
+          <rect x={tubeX} y={tubeY + tubeH * 0.16} width={tubeW} height={tubeH * 0.74}
+                fill="url(#cyl-goo)" />
+          {/* Subtle horizontal flow lines inside the goo */}
+          <g opacity="0.25" stroke="#e8d9b8" strokeWidth="0.5" fill="none">
+            <line x1={tubeX} y1={tubeY + tubeH * 0.30} x2={tubeX + tubeW} y2={tubeY + tubeH * 0.32} />
+            <line x1={tubeX} y1={tubeY + tubeH * 0.50} x2={tubeX + tubeW} y2={tubeY + tubeH * 0.48} />
+            <line x1={tubeX} y1={tubeY + tubeH * 0.72} x2={tubeX + tubeW} y2={tubeY + tubeH * 0.74} />
+          </g>
+          {/* Deep substrate — 90-100% */}
+          <rect x={tubeX} y={tubeY + tubeH * 0.90} width={tubeW} height={tubeH * 0.10}
+                fill="#0a0512" />
+        </g>
+      </g>
+
+      {/* Tube outline — drawn on top */}
+      <rect
+        x={tubeX} y={tubeY} width={tubeW} height={tubeH} rx={10}
+        fill="none" stroke="#d4a854" strokeWidth="1" opacity="0.7"
+      />
+
+      {/* Inner highlight on tube for glass look */}
+      <rect
+        x={tubeX + 3} y={tubeY + 4} width={6} height={tubeH - 8} rx={3}
+        fill="rgba(232, 217, 184, 0.08)"
+      />
+
+      {/* Depth ticks + labels on the LEFT */}
+      <g fontFamily='"Share Tech Mono", monospace' fontSize="7"
+         fill="rgba(212, 168, 84, 0.55)" letterSpacing="0.05em">
+        {[0, 0.25, 0.5, 0.75, 1].map((f, i) => {
+          const y = tubeY + tubeH * f;
+          const label = `${(f * 0.4).toFixed(1)} km`;
+          return (
+            <g key={i}>
+              <line x1={tubeX - 5} y1={y} x2={tubeX} y2={y}
+                    stroke="rgba(212, 168, 84, 0.4)" strokeWidth="0.8" />
+              <text x={tubeX - 8} y={y + 2.5} textAnchor="end">{label}</text>
+            </g>
+          );
+        })}
+      </g>
+
+      {/* Callout labels on the RIGHT with leader lines */}
+      <g fontFamily='"Share Tech Mono", monospace' fontSize="8"
+         letterSpacing="0.08em" texttransform="uppercase">
+        {/* Regolith callout */}
+        <line x1={tubeX + tubeW} y1={tubeY + tubeH * 0.05}
+              x2={tubeX + tubeW + 14} y2={tubeY + tubeH * 0.05}
+              stroke="rgba(212, 168, 84, 0.3)" strokeWidth="0.6" />
+        <text x={tubeX + tubeW + 17} y={tubeY + tubeH * 0.05 + 2}
+              fill="#9a8878">REGOLITH</text>
+
+        {/* Silicate */}
+        <line x1={tubeX + tubeW} y1={tubeY + tubeH * 0.14}
+              x2={tubeX + tubeW + 14} y2={tubeY + tubeH * 0.14}
+              stroke="rgba(212, 168, 84, 0.35)" strokeWidth="0.6" />
+        <text x={tubeX + tubeW + 17} y={tubeY + tubeH * 0.14 + 2}
+              fill="#d4a854">SILICATE · 1.8%</text>
+
+        {/* Goo zone — highlighted */}
+        <line x1={tubeX + tubeW} y1={tubeY + tubeH * 0.50}
+              x2={tubeX + tubeW + 14} y2={tubeY + tubeH * 0.50}
+              stroke="#6bc7d1" strokeWidth="0.8" opacity="0.7" />
+        <text x={tubeX + tubeW + 17} y={tubeY + tubeH * 0.50 - 2}
+              fill="#6bc7d1" style={{ filter: "drop-shadow(0 0 2px rgba(107,199,209,0.6))" }}>
+          GOO SPECIMEN
+        </text>
+        <text x={tubeX + tubeW + 17} y={tubeY + tubeH * 0.50 + 8}
+              fill="rgba(212, 168, 84, 0.55)" fontSize="7">
+          98.2% PURE
+        </text>
+        <text x={tubeX + tubeW + 17} y={tubeY + tubeH * 0.50 + 17}
+              fill="#e87a2b" fontSize="7"
+              style={{ filter: "drop-shadow(0 0 2px rgba(232,122,43,0.5))" }}>
+          3.7 PJ/KG
+        </text>
+
+        {/* Substrate */}
+        <line x1={tubeX + tubeW} y1={tubeY + tubeH * 0.95}
+              x2={tubeX + tubeW + 14} y2={tubeY + tubeH * 0.95}
+              stroke="rgba(212, 168, 84, 0.3)" strokeWidth="0.6" />
+        <text x={tubeX + tubeW + 17} y={tubeY + tubeH * 0.95 + 2}
+              fill="#9a8878">SUBSTRATE</text>
+      </g>
+
+      {/* Anomaly marker — pulsing orange dot in the middle of the goo zone */}
+      {typedRatio > 0.55 && (
+        <g filter="url(#cyl-glow)">
+          <circle cx={tubeX + tubeW * 0.5} cy={tubeY + tubeH * 0.52}
+                  r="2.5" fill="#e87a2b">
+            <animate attributeName="opacity"
+                     values="1;0.35;1" dur="1.6s" repeatCount="indefinite" />
+            <animate attributeName="r"
+                     values="2.5;3.5;2.5" dur="1.6s" repeatCount="indefinite" />
+          </circle>
+        </g>
+      )}
+
+      {/* Tiny "ANOM" label near the marker */}
+      {typedRatio > 0.55 && (
+        <text x={tubeX + tubeW * 0.5} y={tubeY + tubeH * 0.52 + 10}
+              fontFamily='"Share Tech Mono", monospace' fontSize="6"
+              fill="#e87a2b" textAnchor="middle" letterSpacing="0.15em"
+              style={{ filter: "drop-shadow(0 0 1.5px rgba(232,122,43,0.7))" }}>
+          ANOM
+        </text>
+      )}
+    </svg>
+  );
+}
+
 function GooOverlay({ visible, onClose, statueMode = false, hologramSwapRef }) {
   const router = useRouter();
   const [charCount, setCharCount] = useState(0);
   const [opacity, setOpacity] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const startTimeRef = useRef(null);
+
+  // Mobile detection — matches BuyModal convention
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  // Reset expanded state when the overlay opens (always start collapsed on mobile)
+  useEffect(() => {
+    if (visible) setExpanded(false);
+  }, [visible]);
 
   const handleTabClick = (targetIndex, e) => {
     e.stopPropagation();
@@ -1946,10 +2137,23 @@ function GooOverlay({ visible, onClose, statueMode = false, hologramSwapRef }) {
     );
   }
 
-  return (
-    <div
-      onClick={onClose}
-      style={{
+  // Mobile bottom-sheet positioning: pinned above the nav bar (72px).
+  // Collapsed: only the compact header is visible. Expanded: slides up to show full content.
+  const outerStyle = isMobile
+    ? {
+        position: "fixed",
+        bottom: 72,
+        left: 0,
+        right: 0,
+        zIndex: 300,
+        opacity,
+        transition: "opacity 0.6s ease",
+        pointerEvents: visible ? "auto" : "none",
+        maxHeight: expanded ? "calc(100vh - 72px - 1rem)" : "auto",
+        display: "flex",
+        flexDirection: "column",
+      }
+    : {
         position: "absolute",
         bottom: 100,
         right: 40,
@@ -1959,27 +2163,102 @@ function GooOverlay({ visible, onClose, statueMode = false, hologramSwapRef }) {
         transition: "opacity 0.8s ease",
         pointerEvents: visible ? "auto" : "none",
         cursor: "pointer",
-      }}
-    >
+      };
+
+  // On mobile: outer click doesn't dismiss (handled explicitly). On desktop it dismisses.
+  const outerOnClick = isMobile ? undefined : onClose;
+
+  return (
+    <div onClick={outerOnClick} style={outerStyle}>
       {/* Panel — matches .prospecting-banner__panel */}
       <div style={{
         position: "relative",
-        padding: "0.95rem 1.1rem 0.85rem",
+        padding: isMobile ? "0.75rem 1rem 0.75rem" : "0.95rem 1.1rem 0.85rem",
         background: HUD.panelBg,
         border: `1px solid ${HUD.goldFaint}`,
+        borderBottom: isMobile ? "none" : `1px solid ${HUD.goldFaint}`,
         backdropFilter: "blur(6px) saturate(140%)",
         WebkitBackdropFilter: "blur(6px) saturate(140%)",
-        boxShadow: `0 0 0 1px rgba(0,0,0,0.4), 0 20px 40px -10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(212,168,84,0.08)`,
+        boxShadow: isMobile
+          ? `0 -8px 24px -6px rgba(0,0,0,0.6), inset 0 1px 0 rgba(212,168,84,0.08)`
+          : `0 0 0 1px rgba(0,0,0,0.4), 0 20px 40px -10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(212,168,84,0.08)`,
         // Own compositing layer — stops the canvas behind from causing backdrop-filter flicker
         transform: "translateZ(0)",
         willChange: "transform",
         isolation: "isolate",
+        overflowY: isMobile && expanded ? "auto" : "hidden",
+        maxHeight: isMobile && expanded ? "calc(100vh - 72px - 1rem)" : undefined,
       }}>
         {/* Gold corner brackets */}
         <Bracket position="tl" />
         <Bracket position="tr" />
-        <Bracket position="bl" />
-        <Bracket position="br" />
+        {/* Bottom brackets only visible when expanded on mobile (else the sheet abuts the nav bar) */}
+        {(!isMobile || expanded) && <Bracket position="bl" />}
+        {(!isMobile || expanded) && <Bracket position="br" />}
+
+        {/* Mobile: drag-handle row — pill-shaped handle (expand/collapse) + X to dismiss */}
+        {isMobile && (
+          <div
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded(v => !v);
+            }}
+            style={{
+              position: "relative",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              height: 18,
+              marginBottom: 6,
+              cursor: "pointer",
+            }}
+            aria-label={expanded ? "Collapse" : "Expand"}
+          >
+            {/* Centered pill handle */}
+            <div style={{
+              width: 42,
+              height: 4,
+              borderRadius: 2,
+              background: HUD.goldFaint,
+              boxShadow: `0 0 0 1px rgba(212,168,84,0.12)`,
+              transition: "background 0.25s ease",
+            }} />
+            {/* X close — only when expanded, positioned right without crowding LIVE below */}
+            {expanded && (
+              <div
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose?.();
+                }}
+                style={{
+                  position: "absolute",
+                  right: 0,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  width: 24,
+                  height: 24,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: HUD.goldDim,
+                  cursor: "pointer",
+                  fontSize: 13,
+                  fontFamily: '"Share Tech Mono", monospace',
+                  lineHeight: 1,
+                }}
+                aria-label="Close"
+              >
+                ✕
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* On mobile, the whole collapsed area is also a tappable expand affordance */}
+        <div
+          onClick={isMobile && !expanded ? (e) => { e.stopPropagation(); setExpanded(true); } : undefined}
+          style={{ cursor: isMobile && !expanded ? "pointer" : "inherit" }}
+        >
 
         {/* Meta row — matches .prospecting-banner__meta */}
         <div style={{
@@ -2077,6 +2356,10 @@ function GooOverlay({ visible, onClose, statueMode = false, hologramSwapRef }) {
             );
           })}
         </div>
+        </div>{/* end of collapsed-tappable header wrapper */}
+
+        {/* Everything below is hidden when collapsed on mobile */}
+        {(!isMobile || expanded) && <>
 
         {/* Divider — matches .prospecting-banner__divider */}
         <div style={{
@@ -2085,8 +2368,13 @@ function GooOverlay({ visible, onClose, statueMode = false, hologramSwapRef }) {
           margin: "0 0 0.6rem",
         }} />
 
+        {/* Core Sample infographic — only in goo mode, above the typed body */}
+        {!statueMode && (
+          <CoreCylinder typedRatio={totalChars > 0 ? charCount / totalChars : 0} />
+        )}
+
         {/* Typed body */}
-        <div style={{ minHeight: 180 }}>
+        <div style={{ minHeight: statueMode ? 180 : 140 }}>
           {renderedLines}
         </div>
 
@@ -2194,8 +2482,8 @@ function GooOverlay({ visible, onClose, statueMode = false, hologramSwapRef }) {
           </div>
         )}
 
-        {/* Dismiss hint */}
-        {charCount >= totalChars && (
+        {/* Dismiss hint — desktop only (mobile uses the X button) */}
+        {!isMobile && charCount >= totalChars && (
           <div style={{
             marginTop: "0.7rem",
             fontFamily: '"Share Tech Mono", monospace',
@@ -2209,6 +2497,8 @@ function GooOverlay({ visible, onClose, statueMode = false, hologramSwapRef }) {
             [ click panel to dismiss ]
           </div>
         )}
+
+        </>}{/* end of expanded-only wrapper */}
       </div>
     </div>
   );
