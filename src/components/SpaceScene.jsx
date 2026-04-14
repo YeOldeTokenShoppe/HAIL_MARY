@@ -2537,6 +2537,21 @@ export default function SpaceScene({ onZoomChange, antennaScreenRef } = {}) {
     onZoomChange?.(zoomed);
   }, [zoomed, onZoomChange]);
 
+  // Clear the GLB from drei's useGLTF cache on unmount. When the user
+  // navigates away, R3F disposes the WebGLRenderer and its GL context, but
+  // drei keeps the parsed GLTF (scene graph + materials) cached across route
+  // navigations. Those cached materials hold shader programs compiled
+  // against the now-disposed GL context; on remount the renderer tries to
+  // reuse them and throws "Cannot read properties of undefined (reading
+  // 'value')" inside refreshUniformsCommon. Clearing the cache forces a
+  // fresh parse (materials recompile against the new GL context) on the
+  // next mount, which eliminates the error.
+  useEffect(() => {
+    return () => {
+      useGLTF.clear("/models/Scene3.glb");
+    };
+  }, []);
+
   const defaultPos = React.useMemo(() => new THREE.Vector3(0, 0, 16), []);
   const defaultLookAt = React.useMemo(() => new THREE.Vector3(0, 0, 0), []);
 

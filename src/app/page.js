@@ -86,6 +86,16 @@ export default function HomePage() {
         // Hide on mobile
         if (vw < 769) {
           el.style.display = "none";
+          // No beam on mobile, but the panels still need to appear. Kick off
+          // the signal sequence directly — skip phases 1 & 2 (broadcast +
+          // beam extend, which require an on-screen beam) and jump straight
+          // to phase 3 so the panels materialize with the signalReceive
+          // animation, then settle into phase 4 (live).
+          if (!signalStarted.current) {
+            signalStarted.current = true;
+            setSignalPhase(3);
+            setTimeout(() => setSignalPhase(4), 800);
+          }
           raf = requestAnimationFrame(update);
           return;
         }
