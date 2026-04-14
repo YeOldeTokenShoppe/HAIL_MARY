@@ -1449,8 +1449,8 @@ export default function HoloProjector({ enabled = true }) {
         {/* <group ref={geometryGroupRef} /> */}
 
         {/* Our Lady holographic statue */}
-        {/* <group ref={ladyGroupRef} position={[0, LADY_Y, 0]} /> */}
-      {/* </group> */}
+        <group ref={ladyGroupRef} position={[0, LADY_Y, 0]} />
+  
     </group>
   );
 }

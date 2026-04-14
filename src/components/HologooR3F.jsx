@@ -65,6 +65,9 @@ const beamVert = /* glsl */ `
 const beamFrag = /* glsl */ `
   uniform float uTime;
   uniform vec3 uColor;
+  uniform vec3 uFluidC1;
+  uniform vec3 uFluidC2;
+  uniform float uFluidSpd;
   uniform float uBeamOpacity;
   varying vec2 vUv;
   varying float vY;
@@ -76,8 +79,17 @@ const beamFrag = /* glsl */ `
     scan = pow(scan, 4.0) * 0.3 + 0.7;
     float edgeFade = 1.0 - abs(vUv.x - 0.5) * 2.0;
     edgeFade = pow(edgeFade, 0.5);
+
+    // Blend fluid neon colors into the beam — swirl between the two
+    // fluid colors based on height + time for a shifting gradient
+    float mix1 = sin(vUv.y * 6.0 + uTime * uFluidSpd * 2.0) * 0.5 + 0.5;
+    float mix2 = sin(vUv.x * 4.0 - uTime * uFluidSpd * 1.5 + 1.0) * 0.5 + 0.5;
+    vec3 fluidTint = mix(uFluidC1, uFluidC2, mix1 * 0.7 + mix2 * 0.3);
+    // Blend the hue-synced base with the fluid palette
+    vec3 beamColor = mix(uColor, fluidTint, 0.6);
+
     float alpha = heightFade * scan * edgeFade * uBeamOpacity;
-    gl_FragColor = vec4(uColor, alpha * 0.35);
+    gl_FragColor = vec4(beamColor, alpha * 0.35);
   }
 `;
 
@@ -104,6 +116,14 @@ uniform float uSmooth;
 uniform float uGlow;
 uniform float uHue;
 
+// Fluid neon uniforms
+uniform vec3 uFluidColor1;
+uniform vec3 uFluidColor2;
+uniform float uFluidSpeed;
+uniform float uFluidComplexity;
+uniform float uFluidDensity;
+uniform float uFluidIntensity;
+
 varying vec2 vUv;
 
 vec3 hsl2rgb(float h, float s, float l) {
@@ -111,18 +131,117 @@ vec3 hsl2rgb(float h, float s, float l) {
   return l + s * (rgb - 0.5) * (1.0 - abs(2.0 * l - 1.0));
 }
 
+// 2D rotation for fluid neon
+mat2 fluidRot(float a) {
+  float s = sin(a), c = cos(a);
+  return mat2(c, -s, s, c);
+}
+
+// Fluid neon fractal — sample at a 3D surface point
+vec3 fluidNeon(vec3 surfPt, float time) {
+  // Project 3D point to 2D using xz + y influence for variety
+  vec2 p = surfPt.xz * 1.2 + vec2(surfPt.y * 0.4, surfPt.y * 0.3);
+
+  vec3 col = vec3(0.0);
+  float t = time * uFluidSpeed * 0.5;
+
+  p *= fluidRot(0.2);
+
+  float iterations = floor(uFluidComplexity);
+  for (float i = 1.0; i <= 12.0; i++) {
+    if (i > iterations) break;
+
+    p *= fluidRot(sin(t * 0.05) * 0.1 + 0.08);
+
+    vec2 q = p;
+    float dist = length(p);
+    q *= fluidRot(dist * uFluidDensity * 0.25 - t * 0.3);
+
+    float freq = uFluidDensity * 0.8;
+
+    q.x += sin(q.y * freq + t * 0.5 + i * 0.15) * 0.5;
+    q.y += cos(q.x * freq - t * 0.5 - i * 0.15) * 0.5;
+
+    vec2 r = q;
+    r.x += sin(q.y * freq * 2.0 - t * 0.8) * 0.25;
+    r.y += cos(q.x * freq * 2.0 + t * 0.8) * 0.25;
+
+    float wave = sin(r.x * freq * 1.5 + t) * 0.6
+               + cos(r.y * freq * 0.5 - t * 0.7) * 0.4;
+
+    float d = abs(r.y - wave);
+
+    float core = 0.005 / max(d, 0.002);
+    float soft1 = exp(-d * 8.0) * 0.6;
+    float soft2 = exp(-d * 2.0) * 0.2;
+
+    float mixFactor = sin(r.x * 3.0 + r.y * 2.0 + t + i * 1.6) * 0.5 + 0.5;
+    vec3 layerColor = mix(uFluidColor1, uFluidColor2, mixFactor);
+
+    float attenuation = 1.0 / (i * 0.6 + 1.0);
+    col += layerColor * (core + soft1 + soft2) * uFluidIntensity * attenuation * 30.0;
+
+    p = r * 1.05;
+  }
+
+  // ACES tone mapping
+  col = col * (2.51 * col + 0.03)
+      / (col * (2.43 * col + 0.59) + 0.14);
+
+  return col;
+}
+
 float smin(float a, float b, float k) {
   float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
   return mix(b, a, h) - k * h * (1.0 - h);
 }
 
+// Simple 3D noise for organic surface distortion (hash-based)
+vec3 noiseHash(vec3 p) {
+  p = vec3(dot(p, vec3(127.1, 311.7, 74.7)),
+           dot(p, vec3(269.5, 183.3, 246.1)),
+           dot(p, vec3(113.5, 271.9, 124.6)));
+  return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
+}
+
+float gradientNoise(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = fract(p);
+  vec3 u = f * f * (3.0 - 2.0 * f);
+
+  return mix(mix(mix(dot(noiseHash(i + vec3(0,0,0)), f - vec3(0,0,0)),
+                     dot(noiseHash(i + vec3(1,0,0)), f - vec3(1,0,0)), u.x),
+                 mix(dot(noiseHash(i + vec3(0,1,0)), f - vec3(0,1,0)),
+                     dot(noiseHash(i + vec3(1,1,0)), f - vec3(1,1,0)), u.x), u.y),
+             mix(mix(dot(noiseHash(i + vec3(0,0,1)), f - vec3(0,0,1)),
+                     dot(noiseHash(i + vec3(1,0,1)), f - vec3(1,0,1)), u.x),
+                 mix(dot(noiseHash(i + vec3(0,1,1)), f - vec3(0,1,1)),
+                     dot(noiseHash(i + vec3(1,1,1)), f - vec3(1,1,1)), u.x), u.y), u.z);
+}
+
+// Fractal Brownian Motion — two octaves for organic wobble
+float fbm(vec3 p) {
+  float v = 0.0;
+  v += gradientNoise(p) * 0.5;
+  v += gradientNoise(p * 2.0 + 3.17) * 0.25;
+  return v;
+}
+
 float mapBlobs(vec3 p) {
-  float d = length(p - uB0) - uR0;
-  d = smin(d, length(p - uB1) - uR1, uSmooth);
-  d = smin(d, length(p - uB2) - uR2, uSmooth);
-  d = smin(d, length(p - uB3) - uR3, uSmooth);
-  d = smin(d, length(p - uB4) - uR4, uSmooth);
-  d = smin(d, length(p - uB5) - uR5, uSmooth);
+  // Organic surface distortion: warp the sample point with slow-moving noise
+  // so the blob surfaces undulate like lava-lamp wax
+  vec3 warpP = p * 1.2 + uTime * 0.08;
+  float warp = fbm(warpP) * 0.35;
+  // Second warp layer at different scale for more complex shape variation
+  float warp2 = fbm(warpP * 0.6 + vec3(5.2, 1.3, 2.8)) * 0.2;
+  float totalWarp = warp + warp2;
+
+  float d = length(p - uB0) - uR0 + totalWarp;
+  d = smin(d, length(p - uB1) - uR1 + totalWarp, uSmooth);
+  d = smin(d, length(p - uB2) - uR2 + totalWarp, uSmooth);
+  d = smin(d, length(p - uB3) - uR3 + totalWarp, uSmooth);
+  d = smin(d, length(p - uB4) - uR4 + totalWarp, uSmooth);
+  d = smin(d, length(p - uB5) - uR5 + totalWarp, uSmooth);
   return d;
 }
 
@@ -213,7 +332,7 @@ void main() {
   // Raymarch
   float t = 0.0;
   float d = 0.0;
-  for (int i = 0; i < 56; i++) {
+  for (int i = 0; i < 40; i++) {
     d = map(ro + rd * t);
     if (d < 0.008 || t > 28.0) break;
     t += d;
@@ -228,14 +347,18 @@ void main() {
   vec3 glowCol = hsl2rgb(uHue, 0.85, 0.35);
   col += glowCol * 0.18 * exp(-length(center) * 1.8);
 
-  // Volumetric outer glow halo — sample the blob field along the ray
-  {
+  // Volumetric outer glow halo — tinted with fluid colors (cheap blend)
+  // Skipped when uGlow is near 0 (idle state) — saves ~20 mapBlobs calls per pixel
+  if (uGlow > 0.01) {
     float gt = 0.0;
     for (int i = 0; i < 20; i++) {
       vec3 gp = ro + rd * gt;
       float gd = mapBlobs(gp);
       if (gd < 2.0 && gd > 0.01) {
+        // Tint the volumetric glow toward the fluid palette
         vec3 gCol = blobColor(gp);
+        float fluidMix = sin(gp.x * 3.0 + gp.z * 2.0 + uTime * uFluidSpeed) * 0.5 + 0.5;
+        gCol = mix(gCol, mix(uFluidColor1, uFluidColor2, fluidMix), 0.5);
         float gIntensity = exp(-gd * 1.5) * 0.028;
         gIntensity *= smoothstep(-1.0, 0.2, gp.y);
         col += gCol * gIntensity;
@@ -245,18 +368,24 @@ void main() {
     }
   }
 
-  // Surface hit shading — rings are gone, so every hit is a blob.
+  // Surface hit shading — fluid neon texture on the blob surface.
   if (d < 0.008) {
     vec3 p = ro + rd * t;
     vec3 n = calcNormal(p);
 
-    vec3 baseCol = blobColor(p);
-    vec3 highlight = blobHighlight(p);
+    // Sample the fluid neon pattern at the surface point
+    vec3 fluidCol = fluidNeon(p, uTime);
+
+    // Fresnel-like edge glow using the blob's per-hue tint
     float edge = max(dot(-rd, n), 0.0);
     float edgeFade = 0.45 + 0.55 * pow(edge, 0.6);
-    float coreBright = pow(edge, 0.3) * 0.2;
-    col = baseCol * edgeFade + highlight * coreBright;
-    col += baseCol * uGlow * 0.4;
+    float fresnel = 1.0 - edge;
+    fresnel = pow(fresnel, 2.5);
+
+    // Mix fluid neon with a subtle base tint from the original blob color
+    vec3 baseTint = blobColor(p);
+    col = fluidCol * edgeFade + baseTint * fresnel * 0.5;
+    col += fluidCol * uGlow * 0.4;
     float baseFade = smoothstep(-1.0, 0.0, p.y);
     col *= baseFade;
 
@@ -336,6 +465,13 @@ export default function HologooR3F({
   // 0's hover chase so it lags behind the cursor like it's being
   // dragged through honey. 1.0 = Hologoo.jsx original feel.
   viscosity = 3.5,
+  // Fluid neon surface effect
+  fluidColor1 = "#0055ff",
+  fluidColor2 = "#ff00aa",
+  fluidSpeed = 0.3,
+  fluidComplexity = 5,
+  fluidDensity = 3.2535,
+  fluidIntensity = 0.03758,
 }) {
   const { scene } = useThree();
   const groupRef = useRef();
@@ -363,12 +499,12 @@ export default function HologooR3F({
       phaseX: Math.random() * Math.PI * 2,
       phaseY: Math.random() * Math.PI * 2,
       phaseZ: Math.random() * Math.PI * 2,
-      speedX: 0.1 + Math.random() * 0.2,
-      speedY: 0.08 + Math.random() * 0.15,
-      speedZ: 0.09 + Math.random() * 0.18,
-      ampX: 0.6 + Math.random() * 0.9,
-      ampY: 0.5 + Math.random() * 0.8,          // was 0.3 + 0.5 * r
-      ampZ: 0.6 + Math.random() * 0.9,
+      speedX: 0.05 + Math.random() * 0.1,       // slower horizontal drift
+      speedY: 0.04 + Math.random() * 0.08,      // lazy vertical rise/fall
+      speedZ: 0.05 + Math.random() * 0.1,
+      ampX: 0.4 + Math.random() * 0.6,          // tighter horizontal range
+      ampY: 0.7 + Math.random() * 1.2,          // taller vertical travel (lava rise/sink)
+      ampZ: 0.4 + Math.random() * 0.6,
     }));
   }
 
@@ -382,15 +518,21 @@ export default function HologooR3F({
       uB3: { value: new THREE.Vector3() },
       uB4: { value: new THREE.Vector3() },
       uB5: { value: new THREE.Vector3() },
-      uR0: { value: 0.65 },
-      uR1: { value: 0.55 },
-      uR2: { value: 0.58 },
-      uR3: { value: 0.48 },
-      uR4: { value: 0.60 },
-      uR5: { value: 0.45 },
-      uSmooth: { value: 0.9 },
+      uR0: { value: 0.85 },
+      uR1: { value: 0.72 },
+      uR2: { value: 0.76 },
+      uR3: { value: 0.64 },
+      uR4: { value: 0.78 },
+      uR5: { value: 0.60 },
+      uSmooth: { value: 0.4 },
       uGlow: { value: 0 },
       uHue: { value: hue / 360 },
+      uFluidColor1: { value: new THREE.Color(fluidColor1) },
+      uFluidColor2: { value: new THREE.Color(fluidColor2) },
+      uFluidSpeed: { value: fluidSpeed },
+      uFluidComplexity: { value: fluidComplexity },
+      uFluidDensity: { value: fluidDensity },
+      uFluidIntensity: { value: fluidIntensity },
     }),
     // Only create the uniforms object once; hue updates go through useFrame.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -401,8 +543,12 @@ export default function HologooR3F({
     () => ({
       uTime: { value: 0 },
       uColor: { value: new THREE.Color(0x4db8ff) },
+      uFluidC1: { value: new THREE.Color(fluidColor1) },
+      uFluidC2: { value: new THREE.Color(fluidColor2) },
+      uFluidSpd: { value: fluidSpeed },
       uBeamOpacity: { value: 1.0 },
     }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 
@@ -457,7 +603,7 @@ export default function HologooR3F({
 
   const glowRef = useRef(0);
   const uKeys = useMemo(() => ["uB0", "uB1", "uB2", "uB3", "uB4", "uB5"], []);
-  const radii = useMemo(() => [0.65, 0.55, 0.58, 0.48, 0.60, 0.45], []);
+  const radii = useMemo(() => [0.65, 0.52, 0.56, 0.44, 0.58, 0.40], []);
 
   // ── Hover interaction ──
   // Mirrors Hologoo.jsx's interactive blob 0: while the pointer is hovering
@@ -748,7 +894,7 @@ export default function HologooR3F({
           Y position is set dynamically in findTable to match HoloProjector. */}
       <mesh
         ref={coneRef}
-        position={[0, 0, 0]}
+        position={[0, -0.6, 0]}
         rotation={[Math.PI, 0, 0]}
       >
         <coneGeometry args={[CONE_RADIUS, CONE_HEIGHT, 32, 1, true]} />

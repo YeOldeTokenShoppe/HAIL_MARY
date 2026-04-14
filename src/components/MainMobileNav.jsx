@@ -196,6 +196,11 @@ export default function MainMobileNav({
           box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.5);
           position: relative;
           overflow: visible;
+          /* Force own compositing layer to prevent backdrop-filter flicker
+             when an animated canvas repaints underneath. */
+          transform: translateZ(0);
+          will-change: transform;
+          isolation: isolate;
         }
 
         /* Glow bleed — colored light that bleeds up through bar top edge on tap */

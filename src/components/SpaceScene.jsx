@@ -11,10 +11,14 @@ import {
 } from "@react-three/drei";
 import HoloProjector from "./HoloProjector";
 import HologooR3F from "./HologooR3F";
+import FluidNeonSphere from "./FluidNeonSphere";
+import { useRouter } from "next/navigation";
+import "./CyberButton.css";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
 // Uncomment to re-enable leva GUI panel in InteriorLighting:
 // import { useControls, folder, button } from "leva";
 import "../app/space/space.css";
+import HolographicStatue3 from "./HolographicStatue3";
 
 /* ── Zoom context shared between Model and CameraController ── */
 const ZoomContext = createContext();
@@ -24,7 +28,7 @@ const ZOOM_IN_WORLD_UP = new THREE.Vector3(0, 1, 0);
 const ZOOM_IN_DURATION = 3.3; // seconds — total length of the arc-path zoom
 function CameraController({ controlsRef }) {
   const { camera } = useThree();
-  const { zoomed, targetPos, targetLookAt, defaultPos, defaultLookAt, onArrivedRef, flyToRef, orbitTableRef, captainFadeRef, sequenceRunningRef, breakOutRef, inSpaceshipRef } = useContext(ZoomContext);
+  const { zoomed, targetPos, targetLookAt, defaultPos, defaultLookAt, onArrivedRef, flyToRef, orbitTableRef, captainFadeRef, sequenceRunningRef, breakOutRef, inSpaceshipRef, setShowGooOverlay } = useContext(ZoomContext);
   const lerpSpeed = 1.2; // slower for cinematic feel
   const phase = useRef("idle");
   const currentLookAt = useRef(new THREE.Vector3(0, 0, 0));
@@ -107,6 +111,8 @@ function CameraController({ controlsRef }) {
           controlsRef.current.autoRotate = false;
           controlsRef.current.update();
         }
+        // Show the goo overlay when breaking out of the animation
+        setShowGooOverlay?.(true);
       }
       breakOutRef.current = false;
     }
@@ -253,6 +259,8 @@ function CameraController({ controlsRef }) {
           onArrivedRef.current();
           onArrivedRef.current = null;
         }
+        // Show the goo analysis overlay now that the camera has settled
+        setShowGooOverlay?.(true);
       }
     }
 
@@ -344,6 +352,7 @@ function CameraController({ controlsRef }) {
 
     if (!zoomed && (phase.current === "zoomed" || phase.current === "zooming-in" || phase.current === "flying-to")) {
       phase.current = "zooming-out";
+      setShowGooOverlay?.(false);
       if (controlsRef.current) controlsRef.current.enabled = false;
     }
 
@@ -463,7 +472,7 @@ function H80ZSpotlight() {
    camera first arrives at the captain and false when the user zooms back
    out). Everything lerps per frame, so transitions are smooth and there
    are no React re-renders. Exterior preset matches the pre-existing
-   ambient (0.8) and toneMappingExposure (0.6) so the asteroid scene is
+   ambient (4.76) and toneMappingExposure (0.2) so the asteroid scene is
    visually unchanged.
 
    Tuning:
@@ -474,118 +483,9 @@ function H80ZSpotlight() {
        ship interior geometry. Current positions assume the captain / table
        is roughly at world origin. */
 function InteriorLighting() {
-  const { inSpaceshipRef } = useContext(ZoomContext);
-  const ambientRef = useRef();
-  const warmFillRef = useRef();
-  const coolRimRef = useRef();
-  const { gl } = useThree();
-
-  /* ── Uncomment the block below to re-enable the leva GUI panel ──
-  const interior = useControls("Interior Lighting", {
-    ambient:  { value: 3, min: 0, max: 5,  step: 0.01 },
-    exposure: { value: 0.14, min: 0, max: 2,  step: 0.01 },
-    "Warm Fill": folder({
-      warmIntensity: { value: 10, min: 0, max: 30, step: 0.1 },
-      warmColor:     { value: "#a2947b" },
-      warmDistance:   { value: 22.5, min: 1, max: 50, step: 0.5 },
-      warmDecay:     { value: 2, min: 0, max: 5, step: 0.1 },
-      warmX:         { value: 0.05, min: -10, max: 10, step: 0.05 },
-      warmY:         { value: 2.35, min: -10, max: 10, step: 0.05 },
-      warmZ:         { value: 0.8,  min: -10, max: 10, step: 0.05 },
-    }),
-    "Cool Rim": folder({
-      coolIntensity: { value: 0.9, min: 0, max: 15, step: 0.1 },
-      coolColor:     { value: "#6aa7ff" },
-      coolDistance:   { value: 10, min: 1, max: 50, step: 0.5 },
-      coolDecay:     { value: 2, min: 0, max: 5, step: 0.1 },
-      coolX:         { value: -2.5, min: -10, max: 10, step: 0.05 },
-      coolY:         { value: 1.2,  min: -10, max: 10, step: 0.05 },
-      coolZ:         { value: -2.5, min: -10, max: 10, step: 0.05 },
-    }),
-    "Copy Values": button((get) => {
-      const v = {
-        ambient: get("Interior Lighting.ambient"),
-        exposure: get("Interior Lighting.exposure"),
-        warmIntensity: get("Interior Lighting.warmIntensity"),
-        warmColor: get("Interior Lighting.warmColor"),
-        warmDistance: get("Interior Lighting.warmDistance"),
-        warmDecay: get("Interior Lighting.warmDecay"),
-        warmPos: [get("Interior Lighting.warmX"), get("Interior Lighting.warmY"), get("Interior Lighting.warmZ")],
-        coolIntensity: get("Interior Lighting.coolIntensity"),
-        coolColor: get("Interior Lighting.coolColor"),
-        coolDistance: get("Interior Lighting.coolDistance"),
-        coolDecay: get("Interior Lighting.coolDecay"),
-        coolPos: [get("Interior Lighting.coolX"), get("Interior Lighting.coolY"), get("Interior Lighting.coolZ")],
-      };
-      const text = JSON.stringify(v, null, 2);
-      navigator.clipboard.writeText(text);
-      console.log("Interior Lighting values copied:\n", text);
-    }),
-  });
-  ── end leva GUI panel ── */
-
-  const PRESETS = {
-    exterior: { ambient: 0.8,  warm: 0,  cool: 0,   exposure: 0.6  },
-    interior: { ambient: 3,    warm: 10, cool: 0.9,  exposure: 0.14 },
-  };
-  const LERP_SPEED = 2.5;
-  const EPSILON = 0.001;
-
-  useFrame((_, delta) => {
-    const target = inSpaceshipRef.current ? PRESETS.interior : PRESETS.exterior;
-
-    // Skip writes when all values are already at target — avoids
-    // unnecessary uniform updates that can cause brief render artifacts.
-    const ambientDiff = ambientRef.current
-      ? Math.abs(target.ambient - ambientRef.current.intensity) : 0;
-    const warmDiff = warmFillRef.current
-      ? Math.abs(target.warm - warmFillRef.current.intensity) : 0;
-    const coolDiff = coolRimRef.current
-      ? Math.abs(target.cool - coolRimRef.current.intensity) : 0;
-    const exposureDiff = Math.abs(target.exposure - gl.toneMappingExposure);
-
-    if (ambientDiff < EPSILON && warmDiff < EPSILON &&
-        coolDiff < EPSILON && exposureDiff < EPSILON) {
-      return;
-    }
-
-    const k = Math.min(1, delta * LERP_SPEED);
-    if (ambientRef.current && ambientDiff >= EPSILON) {
-      ambientRef.current.intensity +=
-        (target.ambient - ambientRef.current.intensity) * k;
-    }
-    if (warmFillRef.current && warmDiff >= EPSILON) {
-      warmFillRef.current.intensity +=
-        (target.warm - warmFillRef.current.intensity) * k;
-    }
-    if (coolRimRef.current && coolDiff >= EPSILON) {
-      coolRimRef.current.intensity +=
-        (target.cool - coolRimRef.current.intensity) * k;
-    }
-    if (exposureDiff >= EPSILON) {
-      gl.toneMappingExposure += (target.exposure - gl.toneMappingExposure) * k;
-    }
-  });
-
   return (
     <>
-      <ambientLight ref={ambientRef} intensity={0.8} />
-      <pointLight
-        ref={warmFillRef}
-        color="#a2947b"
-        intensity={0}
-        distance={22.5}
-        decay={2}
-        position={[0.05, 2.35, 0.8]}
-      />
-      <pointLight
-        ref={coolRimRef}
-        color="#6aa7ff"
-        intensity={0}
-        distance={10}
-        decay={2}
-        position={[-2.5, 1.2, -2.5]}
-      />
+      <ambientLight intensity={3.76} />
     </>
   );
 }
@@ -922,7 +822,27 @@ function Model({ url }) {
 
   const gr80HipsRef = useRef(null); // GR80's Hips bone for rotation pinning
   const gr80HipsRotRef = useRef(null); // stored quaternion
-  const { zoomed, setZoomed, setTargetPos, setTargetLookAt, onArrivedRef, flyToRef, orbitTableRef, spotTargetRef, captainFadeRef, sequenceRunningRef, breakOutRef, inSpaceshipRef } = useContext(ZoomContext);
+  const { zoomed, setZoomed, setTargetPos, setTargetLookAt, onArrivedRef, flyToRef, orbitTableRef, spotTargetRef, captainFadeRef, sequenceRunningRef, breakOutRef, inSpaceshipRef, setShowGooOverlay, toggleHologram, showStatue, hologramSwapRef } = useContext(ZoomContext);
+  const showStatueRef = useRef(showStatue);
+  useEffect(() => { showStatueRef.current = showStatue; }, [showStatue]);
+
+  // Sync HoloProjector1/2 visibility + Animation clip with statue mode.
+  // When the statue is shown: projectors visible + "Animation" clip plays.
+  // When the core sample is shown: projectors hidden + clip fades out.
+  useEffect(() => {
+    if (holoProjector1Ref.current) holoProjector1Ref.current.visible = showStatue;
+    if (holoProjector2Ref.current) holoProjector2Ref.current.visible = showStatue;
+
+    const animAction = actions?.["Animation"];
+    if (animAction) {
+      if (showStatue) {
+        animAction.setLoop(THREE.LoopRepeat, Infinity);
+        animAction.reset().fadeIn(0.3).play();
+      } else {
+        animAction.fadeOut(0.3);
+      }
+    }
+  }, [showStatue, actions]);
   const lookingTimer = useRef(null);
   const gr80Timer = useRef(null);
   const gr80HeadRef = useRef(null);
@@ -971,6 +891,12 @@ function Model({ url }) {
   // face the viewer once the camera has entered the ship (see the drone
   // tracking useFrame below).
   const droneEmptyRef = useRef(null);
+
+  // HoloProjector1 / HoloProjector2 — decorative emitters that are only
+  // thematically correct when the statue is showing (they project it).
+  // Hidden when the core sample / soul module is active.
+  const holoProjector1Ref = useRef(null);
+  const holoProjector2Ref = useRef(null);
 
   // Control panel button refs — Button01..Button20 blink independently so the
   // shared panel mesh feels alive. Materials are cloned per-button in the
@@ -1023,12 +949,25 @@ function Model({ url }) {
 
     }
 
+    // HoloProjectors — find and store refs; set initial visibility to match
+    // the statue-mode state (both projectors are only shown with the statue).
+    const hp1 = scene.getObjectByName("HoloProjector1");
+    if (hp1) {
+      holoProjector1Ref.current = hp1;
+      hp1.visible = showStatueRef.current;
+    }
+    const hp2 = scene.getObjectByName("HoloProjector2");
+    if (hp2) {
+      holoProjector2Ref.current = hp2;
+      hp2.visible = showStatueRef.current;
+    }
+
     // Find Button01..Button20, clone their materials so emissiveIntensity is
     // independent per button, and assign a random blink style + phase so they
     // never sync. baseEmissive captures whatever intensity was baked in the GLB.
     const buttons = [];
     const styles = ['pulse', 'blink', 'steady', 'flicker'];
-    for (let i = 1; i <= 20; i++) {
+    for (let i = 1; i <= 28; i++) {
       const name = `Button${String(i).padStart(2, '0')}`;
       const mesh = scene.getObjectByName(name);
       if (!mesh || !mesh.material) continue;
@@ -1067,7 +1006,7 @@ function Model({ url }) {
           side: old.side,
           alphaMap: old.alphaMap,
           alphaTest: old.alphaTest,
-          toneMapped: false, // don't let toneMappingExposure dim it either
+          toneMapped: true, // don't let toneMappingExposure dim it either
         });
         windowsFound++;
       }
@@ -1356,32 +1295,55 @@ function Model({ url }) {
     const idle = actions["idle"];
     if (!standing) return;
 
-    // GR80: alternate between idle and button_pushing
+    // GR80: alternate between idle (core sample visible) and pray (statue visible),
+    // with neckTilt firing between them to sell the transition.
     const neckTilt = actions["neckTilt"];
+    const pray = actions["pray"];
     if (idle) {
       idle.setLoop(THREE.LoopRepeat, Infinity);
-      idle.reset().fadeIn(0.3).play();
+      if (pray) pray.setLoop(THREE.LoopRepeat, Infinity);
+
+      // Pick the base pose that matches the initial hologram state.
+      const initialBase = (showStatueRef.current && pray) ? pray : idle;
+      initialBase.reset().fadeIn(0.3).play();
 
       if (neckTilt) {
         neckTilt.setLoop(THREE.LoopOnce, 1);
         neckTilt.clampWhenFinished = true;
 
-        const scheduleButtonPush = () => {
-          const delay = 5000 + Math.random() * 10000;
-          gr80Timer.current = setTimeout(() => {
-            neckTilt.reset().fadeIn(0.3).play();
-            idle.fadeOut(0.3);
+        // Track which base pose is currently playing so we can fade it out cleanly.
+        let currentBase = initialBase;
 
-            const onFinished = (e) => {
-              if (e.action === neckTilt) {
-                neckTilt.getMixer().removeEventListener("finished", onFinished);
-                idle.reset().fadeIn(0.5).play();
-                neckTilt.fadeOut(0.5);
-                scheduleButtonPush();
-              }
-            };
-            neckTilt.getMixer().addEventListener("finished", onFinished);
-          }, delay);
+        // Shared trigger — fires neckTilt, swaps the hologram 2s in, crossfades
+        // to the new base pose when tilt finishes, and reschedules the auto timer.
+        // Called both by the auto timer and by the user-facing tab toggle.
+        const fireNeckTiltSequence = () => {
+          if (neckTilt.isRunning()) return; // Don't re-trigger mid-animation
+          clearTimeout(gr80Timer.current);  // Cancel any pending auto fire
+
+          neckTilt.reset().fadeIn(0.3).play();
+          currentBase.fadeOut(0.3);
+          setTimeout(() => { if (toggleHologram) toggleHologram(); }, 2000);
+
+          const onFinished = (e) => {
+            if (e.action === neckTilt) {
+              neckTilt.getMixer().removeEventListener("finished", onFinished);
+              const nextBase = (showStatueRef.current && pray) ? pray : idle;
+              nextBase.reset().fadeIn(0.5).play();
+              neckTilt.fadeOut(0.5);
+              currentBase = nextBase;
+              scheduleButtonPush();
+            }
+          };
+          neckTilt.getMixer().addEventListener("finished", onFinished);
+        };
+
+        // Expose to the rest of the app (e.g. overlay tab toggle)
+        if (hologramSwapRef) hologramSwapRef.current = fireNeckTiltSequence;
+
+        const scheduleButtonPush = () => {
+          const delay = 30000 + Math.random() * 30000; // 30-60s auto cadence
+          gr80Timer.current = setTimeout(fireNeckTiltSequence, delay);
         };
 
         scheduleButtonPush();
@@ -1436,6 +1398,14 @@ function Model({ url }) {
     if (flagAnim) {
       flagAnim.reset().fadeIn(0.5).play();
       flagAnim.setLoop(THREE.LoopRepeat, Infinity);
+    }
+
+    // HoloGirl: play typing animation on loop
+    const typing = actions["typing"]
+      || Object.values(actions).find(a => a?.getClip?.()?.name?.toLowerCase().includes("typing"));
+    if (typing) {
+      typing.reset().fadeIn(0.5).play();
+      typing.setLoop(THREE.LoopRepeat, Infinity);
     }
 
     // Log Drone positioning info for camera/spotlight setup + stash the
@@ -1636,38 +1606,9 @@ function Model({ url }) {
       breakOutRef.current = true;
       return;
     }
-    // TableScreen click — if the user clicked one of the 4 table screens,
-    // fly the camera to frame it regardless of zoom state.
+    // TableScreen click — show the goo analysis overlay
     if (e.object && e.object.name && e.object.name.startsWith("TableScreen")) {
-      scene.updateMatrixWorld(true);
-      const screenCenter = new THREE.Vector3();
-      const box = new THREE.Box3().setFromObject(e.object);
-      box.getCenter(screenCenter);
-      // Direction from the table center outward through the screen —
-      // reliable regardless of how the mesh's local axes are oriented.
-      const table = scene.getObjectByName("Table");
-      const tableCenter = new THREE.Vector3();
-      if (table) {
-        const tBox = new THREE.Box3().setFromObject(table);
-        tBox.getCenter(tableCenter);
-      }
-      const outward = new THREE.Vector3()
-        .subVectors(screenCenter, tableCenter);
-      outward.y = 0; // keep it horizontal
-      outward.normalize();
-      // Position the camera just in front of the screen (a short hop
-      // outward from the surface) so clicking pulls the camera *toward*
-      // the screen rather than backing away.
-      const camPos = screenCenter.clone().add(outward.multiplyScalar(0.05));
-      camPos.y = screenCenter.y + 0.1;
-
-      if (zoomedRef.current) {
-        flyToRef.current = { pos: camPos, lookAt: screenCenter, speed: 0.5 };
-      } else {
-        setTargetLookAt(screenCenter);
-        setTargetPos(camPos);
-        setZoomed(true);
-      }
+      setShowGooOverlay?.(true);
       return;
     }
 
@@ -1753,8 +1694,532 @@ function AntennaProjector({ antennaScreenRef }) {
   return null;
 }
 
+/* ── Goo Analysis Overlay ──
+   Styled to match the prospecting-banner HUD on the home page:
+   gold corner brackets, Orbitron headings, Share Tech Mono body,
+   same color variables (gold, cyan, cream, muted).
+   Typewriter effect borrowed from the TableScreens pattern. */
+
+const GOO_BODY_LINES = [
+  { type: "label", text: "SAMPLE    HM-GOO-7741" },
+  { type: "label", text: "CLASS     Amorphous Polymorphic" },
+  { type: "label", text: "ORIGIN    Unknown — deep substrate" },
+  { type: "blank" },
+  { type: "data", text: "Viscosity ∞ (non-Newtonian)" },
+  { type: "data", text: "Temp      -271.3°C" },
+  { type: "data", text: "Luminance Self-emitting" },
+  { type: "data", text: "React.    EXTREME" },
+  { type: "blank" },
+  { type: "warn", text: "!! ANOMALOUS ENERGY SIGNATURE !!" },
+  { type: "blank" },
+  { type: "data", text: "Yield     3.7 PJ/kg (unrefined)" },
+  { type: "data", text: "Purity    98.2% — low silicate" },
+  { type: "data", text: "Extract.  VIABLE — mag-siphon" },
+  { type: "blank" },
+  { type: "note", text: "Exhibits autonomous motion." },
+  { type: "note", text: "Remote extraction only." },
+  { type: "note", text: "Do NOT attempt containment." },
+];
+
+const GOO_CHARS_PER_SEC = 28;
+
+// Statue-mode variant — treats the statue as a piece of crew-morale equipment.
+// Parallel structure to GOO_BODY_LINES so the typing animation feels consistent.
+const STATUE_BODY_LINES = [
+  { type: "label", text: "UNIT      SM-SOUL-01" },
+  { type: "label", text: "CLASS     Inspirational Instrument" },
+  { type: "label", text: "ORIGIN    Provenance redacted" },
+  { type: "blank" },
+  { type: "data", text: "Material  Polyresin, gilded" },
+  { type: "data", text: "Temp      Ambient" },
+  { type: "data", text: "Luminance Projected hologram" },
+  { type: "data", text: "Condition NOMINAL" },
+  { type: "blank" },
+  { type: "warn", text: "!! CREW CONFIDENCE UPTICK !!" },
+  { type: "blank" },
+  { type: "data", text: "Morale    +14.2% since install" },
+  { type: "data", text: "Incidents 0 in 142h (claimed)" },
+  { type: "data", text: "Status    ACTIVE — undisturbed" },
+  { type: "blank" },
+  { type: "note", text: "Statistically inconclusive." },
+  { type: "note", text: "Crew request: keep lit." },
+  { type: "note", text: "Ops: comply until morale dips." },
+];
+
+// Header/footer string pairs — index 0 = core sample mode, 1 = soul module mode
+const OVERLAY_COPY = {
+  metaLabel: ["SPECIMEN ANALYSIS", "SOUL MODULE DIAGNOSTIC"],
+  metaIndex: ["07/47", "14/47"],
+  subtitle: ["Field Extraction Report", "Morale Systems Report"],
+  statsTitle: [
+    "RIG ID: HM-09 HORIZON — EXTRACTION BAY",
+    "MODULE ID: SM-01 — COMMON DECK",
+  ],
+  stat1Value: ["3.7 PJ", "+14.2%"],
+  stat1Label: ["YIELD / KG", "MORALE Δ"],
+  stat2Value: ["VIABLE", "ACTIVE"],
+  stat2Label: ["EXTRACTION", "PATRONAGE"],
+  buttonText: ["Open Claim?", "Run Diagnostic?"],
+};
+
+const MODE_TABS = ["Core Sample", "Soul Module"];
+
+/* Shared HUD color palette — mirrors the CSS custom properties on
+   .prospecting-banner so the overlay is visually consistent. */
+const HUD = {
+  gold:       "#d4a854",
+  goldBright: "#e8c070",
+  goldDim:    "rgba(212, 168, 84, 0.55)",
+  goldFaint:  "rgba(212, 168, 84, 0.18)",
+  cream:      "#e8d9b8",
+  muted:      "#9a8878",
+  panelBg:    "rgba(18, 10, 22, 0.65)",
+  orange:     "#e87a2b",
+  cyan:       "#6bc7d1",
+  cyanDim:    "rgba(107, 199, 209, 0.7)",
+};
+
+/* Gold corner bracket — positioned absolutely inside the panel. */
+function Bracket({ position }) {
+  const size = 12;
+  const thickness = 2;
+  const posStyle = {
+    tl: { top: -1, left: -1 },
+    tr: { top: -1, right: -1 },
+    bl: { bottom: -1, left: -1 },
+    br: { bottom: -1, right: -1 },
+  }[position];
+
+  const isTop = position.startsWith("t");
+  const isLeft = position.endsWith("l");
+
+  return (
+    <span style={{ position: "absolute", width: size, height: size, pointerEvents: "none", ...posStyle }}>
+      {/* Horizontal bar */}
+      <span style={{
+        position: "absolute",
+        [isTop ? "top" : "bottom"]: 0,
+        [isLeft ? "left" : "right"]: 0,
+        width: size, height: thickness,
+        background: HUD.gold,
+      }} />
+      {/* Vertical bar */}
+      <span style={{
+        position: "absolute",
+        [isTop ? "top" : "bottom"]: 0,
+        [isLeft ? "left" : "right"]: 0,
+        width: thickness, height: size,
+        background: HUD.gold,
+      }} />
+    </span>
+  );
+}
+
+function GooOverlay({ visible, onClose, statueMode = false, hologramSwapRef }) {
+  const router = useRouter();
+  const [charCount, setCharCount] = useState(0);
+  const [opacity, setOpacity] = useState(0);
+  const startTimeRef = useRef(null);
+
+  const handleTabClick = (targetIndex, e) => {
+    e.stopPropagation();
+    const currentIndex = statueMode ? 1 : 0;
+    if (targetIndex === currentIndex) return;
+    hologramSwapRef?.current?.();
+  };
+
+  const modeIndex = statueMode ? 1 : 0;
+  const bodyLines = statueMode ? STATUE_BODY_LINES : GOO_BODY_LINES;
+  const hasTypedRef = useRef(false);
+
+  const totalChars = React.useMemo(
+    () => bodyLines.reduce((s, l) => s + (l.text?.length || 0), 0),
+    [bodyLines]
+  );
+
+  // Fade in/out — only reset on visibility change (not mode change)
+  useEffect(() => {
+    if (visible) {
+      setCharCount(0);
+      hasTypedRef.current = false;
+      startTimeRef.current = null;
+      const timer = setTimeout(() => setOpacity(1), 50);
+      return () => clearTimeout(timer);
+    } else {
+      setOpacity(0);
+    }
+  }, [visible]);
+
+  // Typing animation — runs once per open session. If mode flips after typing
+  // has completed, the separate effect below snaps the full content in.
+  useEffect(() => {
+    if (!visible) return;
+    if (hasTypedRef.current) return;
+    let raf;
+    const tick = (timestamp) => {
+      if (!startTimeRef.current) startTimeRef.current = timestamp;
+      const elapsed = (timestamp - startTimeRef.current) / 1000;
+      const c = Math.min(Math.floor(elapsed * GOO_CHARS_PER_SEC), totalChars);
+      setCharCount(c);
+      if (c >= totalChars) {
+        hasTypedRef.current = true;
+        return;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => { if (raf) cancelAnimationFrame(raf); };
+  }, [visible, totalChars]);
+
+  // Mode switch while overlay is already open — snap to full content.
+  useEffect(() => {
+    if (visible && hasTypedRef.current) {
+      setCharCount(totalChars);
+    }
+  }, [statueMode, totalChars, visible]);
+
+  if (!visible && opacity <= 0) return null;
+
+  // Build typed body lines
+  let charsLeft = charCount;
+  const renderedLines = [];
+  for (let i = 0; i < bodyLines.length; i++) {
+    const line = bodyLines[i];
+    if (line.type === "blank") {
+      renderedLines.push(<div key={i} style={{ height: 10 }} />);
+      continue;
+    }
+    if (!line.text) continue;
+    if (charsLeft <= 0) break;
+
+    const visibleText = line.text.slice(0, charsLeft);
+    charsLeft -= line.text.length;
+
+    let color = HUD.muted;
+    let fontWeight = "normal";
+    let textShadow = "none";
+    let fontStyle = "normal";
+
+    switch (line.type) {
+      case "label":
+        color = HUD.goldDim;
+        break;
+      case "data":
+        color = HUD.cyan;
+        textShadow = `0 0 6px ${HUD.cyanDim}`;
+        break;
+      case "warn":
+        color = HUD.orange;
+        fontWeight = "bold";
+        textShadow = `0 0 8px rgba(232, 122, 43, 0.5)`;
+        break;
+      case "note":
+        color = HUD.muted;
+        fontStyle = "italic";
+        break;
+    }
+
+    const showCursor = charsLeft <= 0 && charCount < totalChars;
+
+    renderedLines.push(
+      <div key={i} style={{
+        fontFamily: '"Share Tech Mono", monospace',
+        fontSize: "0.64rem",
+        lineHeight: "1.55",
+        letterSpacing: "0.05em",
+        whiteSpace: "pre",
+        color, fontWeight, textShadow, fontStyle,
+      }}>
+        {visibleText}
+        {showCursor && (
+          <span style={{
+            display: "inline-block",
+            width: 6, height: 12,
+            background: HUD.cyan,
+            boxShadow: `0 0 4px ${HUD.cyanDim}`,
+            marginLeft: 2,
+            verticalAlign: "middle",
+            animation: "gooCursorBlink 0.6s step-end infinite",
+          }} />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "absolute",
+        bottom: 100,
+        right: 40,
+        zIndex: 300,
+        width: 340,
+        opacity,
+        transition: "opacity 0.8s ease",
+        pointerEvents: visible ? "auto" : "none",
+        cursor: "pointer",
+      }}
+    >
+      {/* Panel — matches .prospecting-banner__panel */}
+      <div style={{
+        position: "relative",
+        padding: "0.95rem 1.1rem 0.85rem",
+        background: HUD.panelBg,
+        border: `1px solid ${HUD.goldFaint}`,
+        backdropFilter: "blur(6px) saturate(140%)",
+        WebkitBackdropFilter: "blur(6px) saturate(140%)",
+        boxShadow: `0 0 0 1px rgba(0,0,0,0.4), 0 20px 40px -10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(212,168,84,0.08)`,
+        // Own compositing layer — stops the canvas behind from causing backdrop-filter flicker
+        transform: "translateZ(0)",
+        willChange: "transform",
+        isolation: "isolate",
+      }}>
+        {/* Gold corner brackets */}
+        <Bracket position="tl" />
+        <Bracket position="tr" />
+        <Bracket position="bl" />
+        <Bracket position="br" />
+
+        {/* Meta row — matches .prospecting-banner__meta */}
+        <div style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          fontFamily: '"Share Tech Mono", monospace',
+          fontSize: "0.52rem",
+          letterSpacing: "0.18em",
+          color: HUD.goldDim,
+          textTransform: "uppercase",
+          paddingBottom: "0.55rem",
+          marginBottom: "0.7rem",
+          borderBottom: `1px solid ${HUD.goldFaint}`,
+        }}>
+          <span>
+            <span style={{ color: HUD.cyan, textShadow: `0 0 6px ${HUD.cyanDim}` }}>{OVERLAY_COPY.metaIndex[modeIndex]}</span>
+            {" // " + OVERLAY_COPY.metaLabel[modeIndex]}
+          </span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem", color: HUD.gold }}>
+            <span style={{
+              width: 6, height: 6, borderRadius: "50%",
+              background: HUD.orange,
+              boxShadow: `0 0 4px ${HUD.orange}, 0 0 8px rgba(232,122,43,0.5)`,
+              animation: "gooCursorBlink 1.6s ease-in-out infinite",
+            }} />
+            LIVE
+          </span>
+        </div>
+
+        {/* Title — matches .prospecting-banner__title */}
+        <h2 style={{
+          margin: "0 0 0.35rem",
+          fontFamily: '"Orbitron", sans-serif',
+          fontWeight: 800,
+          fontSize: "1.05rem",
+          lineHeight: 1.15,
+          letterSpacing: "0.08em",
+          color: HUD.cream,
+          textShadow: "0 0 14px rgba(212,168,84,0.2)",
+        }}>
+          HAIL MARY<br />PROSPECTING CO.
+        </h2>
+
+        {/* Subtitle */}
+        <div style={{
+          fontFamily: '"Share Tech Mono", monospace',
+          fontSize: "0.58rem",
+          letterSpacing: "0.15em",
+          color: HUD.gold,
+          textTransform: "uppercase",
+          marginBottom: "0.7rem",
+        }}>
+          {OVERLAY_COPY.subtitle[modeIndex]}
+        </div>
+
+        {/* Mode selector — Core Sample | Soul Module */}
+        <div
+          style={{
+            display: "flex",
+            marginBottom: "0.7rem",
+            border: `1px solid ${HUD.goldFaint}`,
+            fontFamily: '"Share Tech Mono", monospace',
+            fontSize: "0.58rem",
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+            userSelect: "none",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {MODE_TABS.map((label, i) => {
+            const isActive = i === modeIndex;
+            return (
+              <button
+                key={label}
+                onClick={(e) => handleTabClick(i, e)}
+                style={{
+                  flex: 1,
+                  padding: "0.4rem 0",
+                  border: "none",
+                  borderRight: i === 0 ? `1px solid ${HUD.goldFaint}` : "none",
+                  background: isActive ? "rgba(107,199,209,0.14)" : "transparent",
+                  color: isActive ? HUD.cyan : HUD.muted,
+                  textShadow: isActive ? `0 0 6px ${HUD.cyanDim}` : "none",
+                  fontFamily: 'inherit',
+                  fontSize: 'inherit',
+                  letterSpacing: 'inherit',
+                  textTransform: 'inherit',
+                  cursor: isActive ? "default" : "pointer",
+                  transition: "background 0.25s ease, color 0.25s ease, text-shadow 0.25s ease",
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Divider — matches .prospecting-banner__divider */}
+        <div style={{
+          height: 1,
+          background: `linear-gradient(to right, transparent, ${HUD.goldFaint} 15%, ${HUD.goldFaint} 85%, transparent)`,
+          margin: "0 0 0.6rem",
+        }} />
+
+        {/* Typed body */}
+        <div style={{ minHeight: 180 }}>
+          {renderedLines}
+        </div>
+
+        {/* Divider */}
+        <div style={{
+          height: 1,
+          background: `linear-gradient(to right, transparent, ${HUD.goldFaint} 15%, ${HUD.goldFaint} 85%, transparent)`,
+          margin: "0.6rem 0 0.5rem",
+        }} />
+
+        {/* Stats row — matches .prospecting-banner__stats */}
+        <div style={{
+          fontFamily: '"Share Tech Mono", monospace',
+          fontSize: "0.54rem",
+          letterSpacing: "0.2em",
+          color: HUD.goldDim,
+          textTransform: "uppercase",
+          marginBottom: "0.65rem",
+        }}>
+          {OVERLAY_COPY.statsTitle[modeIndex]}
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "0.9rem" }}>
+          <div style={{ flex: 1 }}>
+            <div style={{
+              fontFamily: '"Orbitron", sans-serif',
+              fontWeight: 700,
+              fontSize: "1rem",
+              color: HUD.cyan,
+              letterSpacing: "0.03em",
+              lineHeight: 1,
+              textShadow: `0 0 8px rgba(107,199,209,0.4)`,
+            }}>{OVERLAY_COPY.stat1Value[modeIndex]}</div>
+            <div style={{
+              fontFamily: '"Share Tech Mono", monospace',
+              fontSize: "0.5rem",
+              letterSpacing: "0.22em",
+              color: HUD.muted,
+              textTransform: "uppercase",
+              marginTop: "0.2rem",
+            }}>{OVERLAY_COPY.stat1Label[modeIndex]}</div>
+          </div>
+          <div style={{ width: 1, height: 22, background: HUD.goldFaint, flexShrink: 0 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{
+              fontFamily: '"Orbitron", sans-serif',
+              fontWeight: 700,
+              fontSize: "1rem",
+              color: charCount >= totalChars ? HUD.orange : HUD.cyan,
+              letterSpacing: "0.03em",
+              lineHeight: 1,
+              textShadow: charCount >= totalChars
+                ? `0 0 8px rgba(232,122,43,0.4)`
+                : `0 0 8px rgba(107,199,209,0.4)`,
+              transition: "color 1s ease, text-shadow 1s ease",
+            }}>{OVERLAY_COPY.stat2Value[modeIndex]}</div>
+            <div style={{
+              fontFamily: '"Share Tech Mono", monospace',
+              fontSize: "0.5rem",
+              letterSpacing: "0.22em",
+              color: HUD.muted,
+              textTransform: "uppercase",
+              marginTop: "0.2rem",
+            }}>{OVERLAY_COPY.stat2Label[modeIndex]}</div>
+          </div>
+        </div>
+
+        {/* Action button — CyberBtn style, tinted to match HUD gold palette */}
+        {charCount >= totalChars && (
+          <div
+            className="cyber-popover-root"
+            style={{
+              marginTop: "0.9rem",
+              display: "flex",
+              justifyContent: "center",
+              "--accent": HUD.gold,
+              "--shadow": HUD.orange,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="cyber-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!statueMode) router.push("/oil");
+                // statue mode: no navigation — button is flavor
+              }}
+              aria-label={OVERLAY_COPY.buttonText[modeIndex]}
+              data-action={OVERLAY_COPY.buttonText[modeIndex]}
+              style={{ minWidth: 170, fontSize: "0.85rem" }}
+            >
+              <span className="cyber-backdrop" />
+              <span className="cyber-corner" />
+              <span>{OVERLAY_COPY.buttonText[modeIndex]}</span>
+              <div className="cyber-glitch" aria-hidden="true">
+                <span className="cyber-backdrop" />
+                <span className="cyber-corner" />
+                <span className="cyber-letters">
+                  {OVERLAY_COPY.buttonText[modeIndex].split("").map((ch, i) => (
+                    <span key={i}>{ch}</span>
+                  ))}
+                </span>
+              </div>
+            </button>
+          </div>
+        )}
+
+        {/* Dismiss hint */}
+        {charCount >= totalChars && (
+          <div style={{
+            marginTop: "0.7rem",
+            fontFamily: '"Share Tech Mono", monospace',
+            fontSize: "0.48rem",
+            letterSpacing: "0.2em",
+            color: HUD.goldDim,
+            textAlign: "center",
+            textTransform: "uppercase",
+            opacity: 0.6,
+          }}>
+            [ click panel to dismiss ]
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function SpaceScene({ onZoomChange, antennaScreenRef } = {}) {
   const [zoomed, setZoomed] = useState(false);
+  const [showGooOverlay, setShowGooOverlay] = useState(false);
+  const [showStatue, setShowStatue] = useState(true);
+  const toggleHologram = useCallback(() => setShowStatue((v) => !v), []);
+  const hologramSwapRef = useRef(null);
   const [targetPos, setTargetPos] = useState(() => new THREE.Vector3(0, 0, 6));
   const [targetLookAt, setTargetLookAt] = useState(() => new THREE.Vector3(0, 0, 0));
   const onArrivedRef = useRef(null);
@@ -1800,7 +2265,11 @@ export default function SpaceScene({ onZoomChange, antennaScreenRef } = {}) {
     sequenceRunningRef,
     breakOutRef,
     inSpaceshipRef,
-  }), [zoomed, targetPos, targetLookAt, defaultPos, defaultLookAt]);
+    setShowGooOverlay,
+    toggleHologram,
+    showStatue,
+    hologramSwapRef,
+  }), [zoomed, targetPos, targetLookAt, defaultPos, defaultLookAt, toggleHologram, showStatue]);
 
   return (
     <div className="space-page">
@@ -1845,7 +2314,7 @@ export default function SpaceScene({ onZoomChange, antennaScreenRef } = {}) {
         }}
         dpr={[1.5, 2]}
         shadows
-        gl={{ toneMappingExposure: 0.6 }}
+        gl={{ toneMappingExposure: 0.2 }}
         camera={{ position: [0, 0, 16], fov: 75 }}
       >
         <ZoomContext.Provider value={zoomCtx}>
@@ -1877,7 +2346,8 @@ export default function SpaceScene({ onZoomChange, antennaScreenRef } = {}) {
                 billboarded above the Table. Additive blending — delete the
                 HoloProjector line above if you want this to replace it
                 rather than sit alongside. */}
-            <HologooR3F />
+            {/* HologooR3F removed — resource hologram now lives inside HolographicStatue3 as a banded core sample (see coreSampleMaterial in that component) */}
+            {/* <FluidNeonSphere /> */}
           </Suspense>
           <OrbitControls
             ref={controlsRef}
@@ -1898,10 +2368,26 @@ export default function SpaceScene({ onZoomChange, antennaScreenRef } = {}) {
               mipmapBlur
             />
           </EffectComposer> */}
+           <HolographicStatue3 active={showStatue} />
         </ZoomContext.Provider>
       </Canvas>
 
       <div className="layer" />
+
+      <GooOverlay
+        visible={showGooOverlay}
+        onClose={() => setShowGooOverlay(false)}
+        statueMode={showStatue}
+        hologramSwapRef={hologramSwapRef}
+      />
+
+      {/* Cursor blink keyframe for goo overlay */}
+      <style>{`
+        @keyframes gooCursorBlink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0; }
+        }
+      `}</style>
     </div>
   );
 }

@@ -4,13 +4,14 @@ import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 
-function HolographicStatue3({ 
-  onLoad, 
-  position = [0, 1, 0],  // Default position if not provided
+function HolographicStatue3({
+  onLoad,
+  position = [0.01, 1.35, 0.134],  // Default position if not provided
   rotation = [0, 0, 0],  // Default rotation if not provided
-  scale = [17, 17, 17],  // Default scale if not provided
+  scale = [0.25, 0.25, 0.25],  // Default scale if not provided
   hover = false,  // Disable hover animation by default
-  rotate = true  // Disable rotation animation by default
+  rotate = true,  // Disable rotation animation by default
+  active = true  // When false: hide scene group and skip useFrame work
 }) {
   // Detect if we're on a mobile/tablet device
   const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -23,6 +24,8 @@ function HolographicStatue3({
   const hasLoadedRef = useRef(false);
   const animatedMaterialsRef = useRef([]); // Cache materials that need animation
   const haloMasterRef = useRef(); // Track the HaloMaster object
+  const coreAnchorRef = useRef(); // Core sample alternate hologram
+  const coreMaterialRef = useRef();
 
   // Use useMemo to prevent recreating the loader on every render
   const loader = useMemo(() => {
@@ -60,7 +63,7 @@ function HolographicStatue3({
         float glitchStrength = sin(glitchTime) + sin(glitchTime * 3.45) + sin(glitchTime * 8.76) * 1.1;
         glitchStrength /= 3.0;
         glitchStrength = smoothstep(0.3, 1.0, glitchStrength);
-        glitchStrength *= 0.03; //adjust this for the vertical movement
+        glitchStrength *= 0.003; //adjust this for the vertical movement
         modelPosition.x += (random2D(modelPosition.xz + uTime).x - 0.5) * glitchStrength;
         modelPosition.z += (random2D(modelPosition.zx + uTime).x - 0.5) * glitchStrength;
 
@@ -101,102 +104,173 @@ function HolographicStatue3({
         transparent: true,
         blending: THREE.AdditiveBlending,
         depthWrite: true,
-        depthTest: true, 
+        depthTest: true,
         side: THREE.FrontSide,
       }),
     []
   );
 
-
-  // Create a special shader for heart objects with enhanced glow
-  const heartHolographicMaterial = useMemo(
+  // Core sample shader — holographic cylinder with geological strata banding.
+  // Uses vUv.y (0 at bottom, 1 at top of cylinder) to pick a color from 4 stops:
+  //   bedrock (dark) → oil-rich shale (warm amber) → water-bearing (cyan) → surface rock (tan)
+  const coreSampleMaterial = useMemo(
     () =>
       new THREE.ShaderMaterial({
         precision: "lowp",
         uniforms: {
           uTime: { value: 0.0 },
-          uColor: { value: new THREE.Color(0xff69b4) }, // Hot pink color for hearts
-          uGlowIntensity: { value: 2.5 },
+          uBandBottom: { value: new THREE.Color(0x1a1a2e) }, // near-black bedrock
+          uBandOil:    { value: new THREE.Color(0xff8c1a) }, // warm amber — oil layer (the valuable bit)
+          uBandWater:  { value: new THREE.Color(0x3ad6ff) }, // cyan — water-bearing
+          uBandTop:    { value: new THREE.Color(0xc9a97a) }, // tan — surface rock
         },
         vertexShader: `
-      uniform float uTime;
-      varying vec3 vPosition;
-      varying vec3 vNormal;
-  
-      vec2 random2D(vec2 st) {
-        st = vec2(dot(st, vec2(127.1, 311.7)),
-                 dot(st, vec2(269.5, 183.3)));
-        return -1.0 + 2.0 * fract(sin(st) * 43758.5453123);
-      }
-
-      void main() {
-        vec4 modelPosition = modelMatrix * vec4(position, 1.0);
-
-        // Match the same glitch pattern as main holographic material
-        float glitchTime = uTime - modelPosition.y;
-        float glitchStrength = sin(glitchTime) + sin(glitchTime * 3.45) + sin(glitchTime * 8.76) * 1.1;
-        glitchStrength /= 3.0;
-        glitchStrength = smoothstep(0.9, 1.0, glitchStrength);
-        glitchStrength *= 0.1; // Same as main material
-        modelPosition.x += (random2D(modelPosition.xz + uTime).x - 0.5) * glitchStrength;
-        modelPosition.z += (random2D(modelPosition.zx + uTime).x - 0.5) * glitchStrength;
-
-        gl_Position = projectionMatrix * viewMatrix * modelPosition;
-
-        vec4 modelNormal = modelMatrix * vec4(normal, 0.0);
-        vPosition = modelPosition.xyz;
-        vNormal = modelNormal.xyz;
-      }
-    `,
+          uniform float uTime;
+          varying vec3 vPosition;
+          varying vec3 vNormal;
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            vec4 modelPosition = modelMatrix * vec4(position, 1.0);
+            gl_Position = projectionMatrix * viewMatrix * modelPosition;
+            vPosition = modelPosition.xyz;
+            vNormal = (modelMatrix * vec4(normal, 0.0)).xyz;
+          }
+        `,
         fragmentShader: `
-      uniform vec3 uColor;
-      uniform float uTime;
-      uniform float uGlowIntensity;
-      varying vec3 vPosition;
-      varying vec3 vNormal;
+          uniform float uTime;
+          uniform vec3 uBandBottom;
+          uniform vec3 uBandOil;
+          uniform vec3 uBandWater;
+          uniform vec3 uBandTop;
+          varying vec3 vPosition;
+          varying vec3 vNormal;
+          varying vec2 vUv;
+          void main() {
+            vec3 normal = normalize(vNormal);
+            if (!gl_FrontFacing) normal *= -1.0;
 
-      void main() {
-        vec3 normal = normalize(vNormal);
-        if(!gl_FrontFacing)
-            normal *= -1.0;
+            // Horizontal scan-line stripes (the holographic striation also reads as sediment layers)
+            float stripes = mod((vUv.y - uTime * 0.02) * 24.0, 1.0);
+            stripes = pow(stripes, 3.0);
 
-        // Similar stripes to main material but slightly different speed
-        float stripes = mod((vPosition.y - uTime * 0.02) * 10.0, 1.0);
-        stripes = pow(stripes, 2.5);
+            vec3 viewDirection = normalize(vPosition - cameraPosition);
+            float fresnel = dot(viewDirection, normal) + 1.0;
+            fresnel = pow(fresnel, 1.4);
+            float falloff = smoothstep(0.8, 0.2, fresnel);
 
-        vec3 viewDirection = normalize(vPosition - cameraPosition);
-        float fresnel = dot(viewDirection, normal) + 1.0;
-        fresnel = pow(fresnel, 1.5);
+            // Banded strata — pick color based on vUv.y (0=bottom, 1=top)
+            float y = vUv.y;
+            vec3 c = mix(uBandBottom, uBandOil,   smoothstep(0.10, 0.35, y));
+            c = mix(c,                uBandWater, smoothstep(0.45, 0.65, y));
+            c = mix(c,                uBandTop,   smoothstep(0.75, 0.95, y));
 
-        // Base glow
-        float baseGlow = 0.3; // Minimum visibility
+            float holographic = stripes * fresnel + fresnel * 2.0;
+            holographic *= falloff;
+            holographic = max(holographic, 0.25); // base visibility so bands stay readable
 
-        float falloff = smoothstep(0.8, 0.2, fresnel);
-
-        // Pulsing glow effect
-        float pulse = sin(uTime * 3.0) * 0.2 + 0.8;
-
-        float holographic = stripes * fresnel;
-        holographic += fresnel * uGlowIntensity * pulse;
-        holographic *= falloff;
-        holographic = max(holographic, baseGlow); // Ensure minimum visibility
-
-        // Subtle color variation
-        vec3 finalColor = uColor;
-        finalColor.r += sin(vPosition.y * 3.0 + uTime * 0.5) * 0.1;
-        finalColor.b += cos(vPosition.x * 3.0 - uTime * 0.3) * 0.1;
-
-        gl_FragColor = vec4(finalColor, holographic);
-      }
-    `,
+            gl_FragColor = vec4(c, holographic);
+          }
+        `,
         transparent: true,
         blending: THREE.AdditiveBlending,
-        depthWrite: true, // Allow transparency layering
-        depthTest: false,
+        depthWrite: false,
+        depthTest: true,
         side: THREE.DoubleSide,
       }),
     []
   );
+
+  // Create a special shader for heart objects with enhanced glow
+  // COMMENTED OUT FOR DEBUGGING FLASH ISSUE
+  // const heartHolographicMaterial = useMemo(
+  //   () =>
+  //     new THREE.ShaderMaterial({
+  //       precision: "lowp",
+  //       uniforms: {
+  //         uTime: { value: 0.0 },
+  //         uColor: { value: new THREE.Color(0xff69b4) }, // Hot pink color for hearts
+  //         uGlowIntensity: { value: 2.5 },
+  //       },
+  //       vertexShader: `
+  //     uniform float uTime;
+  //     varying vec3 vPosition;
+  //     varying vec3 vNormal;
+  //
+  //     vec2 random2D(vec2 st) {
+  //       st = vec2(dot(st, vec2(127.1, 311.7)),
+  //                dot(st, vec2(269.5, 183.3)));
+  //       return -1.0 + 2.0 * fract(sin(st) * 43758.5453123);
+  //     }
+  //
+  //     void main() {
+  //       vec4 modelPosition = modelMatrix * vec4(position, 1.0);
+  //
+  //       // Match the same glitch pattern as main holographic material
+  //       float glitchTime = uTime - modelPosition.y;
+  //       float glitchStrength = sin(glitchTime) + sin(glitchTime * 3.45) + sin(glitchTime * 8.76) * 1.1;
+  //       glitchStrength /= 3.0;
+  //       glitchStrength = smoothstep(0.9, 1.0, glitchStrength);
+  //       glitchStrength *= 0.1; // Same as main material
+  //       modelPosition.x += (random2D(modelPosition.xz + uTime).x - 0.5) * glitchStrength;
+  //       modelPosition.z += (random2D(modelPosition.zx + uTime).x - 0.5) * glitchStrength;
+  //
+  //       gl_Position = projectionMatrix * viewMatrix * modelPosition;
+  //
+  //       vec4 modelNormal = modelMatrix * vec4(normal, 0.0);
+  //       vPosition = modelPosition.xyz;
+  //       vNormal = modelNormal.xyz;
+  //     }
+  //   `,
+  //       fragmentShader: `
+  //     uniform vec3 uColor;
+  //     uniform float uTime;
+  //     uniform float uGlowIntensity;
+  //     varying vec3 vPosition;
+  //     varying vec3 vNormal;
+  //
+  //     void main() {
+  //       vec3 normal = normalize(vNormal);
+  //       if(!gl_FrontFacing)
+  //           normal *= -1.0;
+  //
+  //       // Similar stripes to main material but slightly different speed
+  //       float stripes = mod((vPosition.y - uTime * 0.02) * 10.0, 1.0);
+  //       stripes = pow(stripes, 2.5);
+  //
+  //       vec3 viewDirection = normalize(vPosition - cameraPosition);
+  //       float fresnel = dot(viewDirection, normal) + 1.0;
+  //       fresnel = pow(fresnel, 1.5);
+  //
+  //       // Base glow
+  //       float baseGlow = 0.3; // Minimum visibility
+  //
+  //       float falloff = smoothstep(0.8, 0.2, fresnel);
+  //
+  //       // Pulsing glow effect
+  //       float pulse = sin(uTime * 3.0) * 0.2 + 0.8;
+  //
+  //       float holographic = stripes * fresnel;
+  //       holographic += fresnel * uGlowIntensity * pulse;
+  //       holographic *= falloff;
+  //       holographic = max(holographic, baseGlow); // Ensure minimum visibility
+  //
+  //       // Subtle color variation
+  //       vec3 finalColor = uColor;
+  //       finalColor.r += sin(vPosition.y * 3.0 + uTime * 0.5) * 0.1;
+  //       finalColor.b += cos(vPosition.x * 3.0 - uTime * 0.3) * 0.1;
+  //
+  //       gl_FragColor = vec4(finalColor, holographic);
+  //     }
+  //   `,
+  //       transparent: true,
+  //       blending: THREE.AdditiveBlending,
+  //       depthWrite: true, // Allow transparency layering
+  //       depthTest: false,
+  //       side: THREE.DoubleSide,
+  //     }),
+  //   []
+  // );
 
   // Create a flame-colored shader for heart1 objects
   // const flameHolographicMaterial = useMemo(
@@ -339,6 +413,7 @@ function HolographicStatue3({
       const anchorGroup = new THREE.Group();
       // Use position from props instead of hardcoded position
       anchorGroup.position.set(position[0], position[1], position[2]);
+      anchorGroup.visible = active;
       initialY.current = position[1];
 
       // Create a rotation group
@@ -426,31 +501,11 @@ function HolographicStatue3({
             });
             child.renderOrder = 100;
           } else if (meshName === "heart3_1" || meshName === "heart3_2") {
-            // Apply green shader to heart3 parts with enhanced visibility
-            const clonedMaterial = heartHolographicMaterial.clone();
-            clonedMaterial.uniforms = {
-              uTime: { value: 0 },
-              uColor: { value: new THREE.Color(0x00ff00) }, // Green color
-              uGlowIntensity: { value: 2.5 }
-            };
-            clonedMaterial.side = THREE.DoubleSide; // Render both sides
-            clonedMaterial.depthTest = false; // Always render on top
-            child.material = clonedMaterial;
-            child.renderOrder = 200; // Higher render order to draw last
-            animatedMaterialsRef.current.push(clonedMaterial);
+            // Heart shader commented out for debugging - hide these meshes
+            child.visible = false;
           } else if (meshName === "heart4_1" || meshName === "heart4_2" || meshName === "heart4") {
-            // Apply white shader to heart4 parts with enhanced visibility
-            const clonedMaterial = heartHolographicMaterial.clone();
-            clonedMaterial.uniforms = {
-              uTime: { value: 0 },
-              uColor: { value: new THREE.Color(0xffffff) }, // White color
-              uGlowIntensity: { value: 2.5 }
-            };
-            clonedMaterial.side = THREE.DoubleSide; // Render both sides
-            clonedMaterial.depthTest = false; // Always render on top
-            child.material = clonedMaterial;
-            child.renderOrder = 200; // Higher render order to draw last
-            animatedMaterialsRef.current.push(clonedMaterial);
+            // Heart shader commented out for debugging - hide these meshes
+            child.visible = false;
           } else if (meshName === "heart1" || meshName === "heart") {
             // Hide heart1 temporarily
             if (meshName === "heart") {
@@ -539,8 +594,137 @@ function HolographicStatue3({
       // Add depth clone as sibling inside the rotation group
       rotationGroup.add(depthClone);
 
+      // Hot pink fresnel shell — scaled-up back-face clone that brightens at silhouette edges
+      const shellMaterial = new THREE.ShaderMaterial({
+        precision: "lowp",
+        uniforms: {
+          uTime: { value: 0.0 },
+          uColor: { value: new THREE.Color(0xff1493) },
+          uIntensity: { value: 1.4 },
+        },
+        vertexShader: `
+          varying vec3 vPosition;
+          varying vec3 vNormal;
+          void main() {
+            vec4 modelPosition = modelMatrix * vec4(position, 1.0);
+            gl_Position = projectionMatrix * viewMatrix * modelPosition;
+            vPosition = modelPosition.xyz;
+            vNormal = (modelMatrix * vec4(normal, 0.0)).xyz;
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 uColor;
+          uniform float uTime;
+          uniform float uIntensity;
+          varying vec3 vPosition;
+          varying vec3 vNormal;
+          void main() {
+            vec3 normal = normalize(vNormal);
+            vec3 viewDirection = normalize(cameraPosition - vPosition);
+            float rim = 1.0 - abs(dot(viewDirection, normal));
+            rim = pow(rim, 2.5);
+            float pulse = sin(uTime * 1.5) * 0.1 + 0.9;
+            float alpha = rim * uIntensity * pulse;
+            gl_FragColor = vec4(uColor * alpha, alpha);
+          }
+        `,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        depthTest: true,
+        side: THREE.BackSide,
+      });
+      animatedMaterialsRef.current.push(shellMaterial);
+
+      const shellClone = statue.clone(true);
+      shellClone.scale.multiplyScalar(1.06);
+      shellClone.traverse((child) => {
+        if (child.isMesh) {
+          child.material = shellMaterial;
+          child.renderOrder = 2;
+        }
+      });
+      rotationGroup.add(shellClone);
+
+      // Diffuse hot pink halo — camera-facing billboard with radial falloff
+      const glowMaterial = new THREE.ShaderMaterial({
+        precision: "lowp",
+        uniforms: {
+          uTime: { value: 0.0 },
+          uColor: { value: new THREE.Color(0xff1493) }, // hot pink
+          uIntensity: { value: 0.9 },
+        },
+        vertexShader: `
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            // Billboard: strip rotation from the modelView matrix
+            mat4 mv = modelViewMatrix;
+            mv[0][0] = 1.0; mv[0][1] = 0.0; mv[0][2] = 0.0;
+            mv[1][0] = 0.0; mv[1][1] = 1.0; mv[1][2] = 0.0;
+            mv[2][0] = 0.0; mv[2][1] = 0.0; mv[2][2] = 1.0;
+            gl_Position = projectionMatrix * mv * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 uColor;
+          uniform float uTime;
+          uniform float uIntensity;
+          varying vec2 vUv;
+          void main() {
+            float d = length(vUv - 0.5) * 2.0;
+            // Soft exponential falloff — diffuse cloud, no hard edge
+            float glow = exp(-d * 2.4);
+            float pulse = sin(uTime * 1.2) * 0.08 + 0.92;
+            float alpha = glow * uIntensity * pulse;
+            gl_FragColor = vec4(uColor * alpha, alpha);
+          }
+        `,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        depthTest: true,
+      });
+      animatedMaterialsRef.current.push(glowMaterial);
+
+      // Size the billboard based on the statue's bounding box
+      const glowSize = box.getSize(new THREE.Vector3());
+      const glowRadius = Math.max(glowSize.x, glowSize.y, glowSize.z) * 1.5;
+      const glowPlane = new THREE.Mesh(
+        new THREE.PlaneGeometry(glowRadius, glowRadius),
+        glowMaterial
+      );
+      glowPlane.renderOrder = -1; // draw behind the statue
+      rotationGroup.add(glowPlane);
+
       // Add the anchor group to the scene
       scene.add(anchorGroup);
+
+      // Build the core sample hologram (alternate "resource" display).
+      // Same anchor position as the statue but lives in its own group so its
+      // visibility can be toggled opposite to the statue via the `active` prop.
+      const coreAnchor = new THREE.Group();
+      coreAnchor.position.set(position[0], position[1], position[2]);
+      coreAnchor.visible = !active;
+
+      const coreGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.75, 24, 1, true);
+      const coreMesh = new THREE.Mesh(coreGeo, coreSampleMaterial);
+      coreAnchor.add(coreMesh);
+
+      // Optional end caps so the top/bottom don't look hollow when viewed from above/below.
+      const capTop = new THREE.Mesh(new THREE.CircleGeometry(0.05, 24), coreSampleMaterial);
+      capTop.rotation.x = -Math.PI / 2;
+      capTop.position.y = 0.275;
+      const capBottom = new THREE.Mesh(new THREE.CircleGeometry(0.05, 24), coreSampleMaterial);
+      capBottom.rotation.x = Math.PI / 2;
+      capBottom.position.y = -0.275;
+      coreAnchor.add(capTop);
+      coreAnchor.add(capBottom);
+
+      coreAnchorRef.current = coreAnchor;
+      coreMaterialRef.current = coreSampleMaterial;
+      scene.add(coreAnchor);
+
       hasLoadedRef.current = true;
 
       // Notify parent that statue is loaded and ready
@@ -587,6 +771,19 @@ function HolographicStatue3({
         statueRef.current = null;
       }
 
+      // Dispose core sample
+      if (coreAnchorRef.current) {
+        coreAnchorRef.current.traverse((child) => {
+          if (child.isMesh && child.geometry) child.geometry.dispose();
+        });
+        scene.remove(coreAnchorRef.current);
+        coreAnchorRef.current = null;
+      }
+      if (coreMaterialRef.current) {
+        coreMaterialRef.current.dispose();
+        coreMaterialRef.current = null;
+      }
+
       // Reset loaded flag
       hasLoadedRef.current = false;
       
@@ -597,7 +794,29 @@ function HolographicStatue3({
 }, [scene, holographicMaterial, loader]); // Only re-load if scene or core materials change
 
 
+  // Sync scene-graph visibility with `active` so the imperatively-added
+  // anchorGroup / coreAnchor can be toggled without unmounting.
+  useEffect(() => {
+    if (groupRef.current?.anchor) {
+      groupRef.current.anchor.visible = active;
+    }
+    if (coreAnchorRef.current) {
+      coreAnchorRef.current.visible = !active;
+    }
+  }, [active]);
+
   useFrame((state, delta) => {
+    // Core sample update (only when core is visible)
+    if (!active) {
+      if (coreAnchorRef.current) {
+        coreAnchorRef.current.rotation.y += delta * 0.3;
+      }
+      if (coreMaterialRef.current?.uniforms?.uTime) {
+        coreMaterialRef.current.uniforms.uTime.value -= delta;
+      }
+      return;
+    }
+
     // Update the animation mixer
     if (mixerRef.current) {
       mixerRef.current.update(delta);
@@ -606,7 +825,7 @@ function HolographicStatue3({
     // Rotate the HaloMaster object around its own center
     if (haloMasterRef.current) {
       // Simple rotation around local Y axis (vertical)
-      haloMasterRef.current.rotation.y += delta * 0.1; // 0.5 radians per second
+      haloMasterRef.current.rotation.y += delta * 0.3; // 0.5 radians per second
       
       // Or try rotation around Z axis if preferred
       // haloMasterRef.current.rotation.z += delta * 0.5;
@@ -621,7 +840,7 @@ function HolographicStatue3({
 
       // Apply rotation to the rotation group only if rotate is enabled
       if (rotate) {
-        groupRef.current.rotation.rotation.y += delta * 0.0;
+        groupRef.current.rotation.rotation.y += delta * 0.3;
       }
 
       // Update shader uniforms using cached materials (more efficient)
