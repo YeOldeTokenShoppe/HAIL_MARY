@@ -3053,7 +3053,7 @@ export default function SpaceScene({ onZoomChange, antennaScreenRef } = {}) {
             autoRotateSpeed={0.5}
             enablePan={false}
             enableZoom={zoomed}
-            maxPolarAngle={zoomed ? Math.PI : Math.PI / 2}
+            maxPolarAngle={Math.PI / 2}
             minPolarAngle={zoomed ? 0 : Math.PI / 2}
           />
           <Stars radius={500} depth={50} count={1000} factor={10} />
