@@ -356,6 +356,84 @@
   padding: 0.65rem 0.75rem;
 }
 
+/* Title — warm gold to match the prospecting HUD palette. The underline
+   already pulls from --accent, so the heading reads as the modal's brand
+   moment rather than blank monospace. */
+.cyber-modal h2,
+.cyber-modal h2 span {
+  color: #d4a854;
+  text-shadow: 0 0 12px rgba(212, 168, 84, 0.28);
+}
+
+/* Cancel button — warm coral, distinct from the teal Proceed so the eye
+   parses the destructive action at a glance. Uses the per-button --accent
+   override flowed through the existing CSS-var system. First-of-type
+   targets the cancel slot regardless of the dynamic label string. */
+.cyber-modal__actions .cyber-btn:first-of-type {
+  --accent: #e87a2b;
+  --shadow: #b53a1a;
+}
+
+/* ── Mobile: bigger body text + paginated pager ── */
+@media screen and (max-width: 639px) {
+  .cyber-modal__text,
+  .cyber-modal__text p {
+    font-size: 1.25rem;
+    line-height: 1.5;
+  }
+}
+
+/* Pager (mobile only — controls hidden via media query above when not in
+   pagination mode). Sits between the body and the actions row. */
+.cyber-modal__pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  margin-top: 0.85rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(212, 168, 84, 0.18);
+  font-family: "Share Tech Mono", monospace;
+}
+
+.cyber-modal__pager-btn {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid rgba(212, 168, 84, 0.35);
+  color: #d4a854;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.cyber-modal__pager-btn:hover:not(:disabled),
+.cyber-modal__pager-btn:focus-visible:not(:disabled) {
+  background: rgba(212, 168, 84, 0.12);
+  border-color: #d4a854;
+  outline: none;
+}
+.cyber-modal__pager-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.cyber-modal__pager-count {
+  font-size: 0.85rem;
+  letter-spacing: 0.18em;
+  color: #6bc7d1;
+  text-shadow: 0 0 6px rgba(107, 199, 209, 0.35);
+  min-width: 70px;
+  text-align: center;
+}
+.cyber-modal__pager-sep {
+  color: rgba(212, 168, 84, 0.55);
+}
+
 /* Body / content slide-in animations */
 .cyber-modal--open .cyber-modal__body-backdrop {
   animation: cyber-backdrop-slide-in 0.26s ease-out 0.22s both;

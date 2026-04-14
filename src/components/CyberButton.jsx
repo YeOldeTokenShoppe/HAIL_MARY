@@ -67,6 +67,14 @@ export default function CyberButton({
   icon,
   modalTitle = "Craft of UI – Pro upgrade",
   modalBody,
+  /* Optional array of ReactNodes — each entry is one page. On mobile the
+     modal renders one page at a time with prev/next arrows; on desktop
+     they're concatenated for the all-at-once view. Falls back to
+     `modalBody` if not provided. */
+  modalBodyPages,
+  /* Custom labels for the action buttons. Default to Proceed/Cancel. */
+  proceedLabel = "Proceed",
+  cancelLabel = "Cancel",
   onProceed,
   onCancel,
   accent,
@@ -88,6 +96,19 @@ export default function CyberButton({
   const glitchTimer = useRef(null);
   const modalRef = useRef(null);
   const audioRef = useRef(null);
+
+  /* Pagination — only active on mobile when modalBodyPages is provided.
+     `renderedBody` is computed below the defaultBody declaration. */
+  const [page, setPage] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  /* Reset to first page each time the modal opens */
+  useEffect(() => { if (open) setPage(0); }, [open]);
 
   // Lazily create Audio objects (can't create during SSR)
   if (typeof window !== "undefined" && !audioRef.current) {
@@ -183,6 +204,12 @@ export default function CyberButton({
     </>
   );
 
+  const pages = Array.isArray(modalBodyPages) ? modalBodyPages : null;
+  const usePagination = isMobile && pages && pages.length > 1;
+  const renderedBody = pages
+    ? (usePagination ? pages[page] : pages.map((p, i) => <div key={i}>{p}</div>))
+    : (modalBody || defaultBody);
+
   return (
     <div className="cyber-popover-root" style={{ ...cssVars, ...style }}>
       {/* Trigger button (hidden when controlled externally) */}
@@ -214,8 +241,31 @@ export default function CyberButton({
                   <span>{modalTitle}</span>
                 </h2>
                 <div className="cyber-modal__text">
-                  {modalBody || defaultBody}
+                  {renderedBody}
                 </div>
+                {usePagination && (
+                  <div className="cyber-modal__pager">
+                    <button
+                      type="button"
+                      className="cyber-modal__pager-btn"
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                      disabled={page === 0}
+                      aria-label="Previous page"
+                    >‹</button>
+                    <span className="cyber-modal__pager-count">
+                      {String(page + 1).padStart(2, "0")}
+                      <span className="cyber-modal__pager-sep"> / </span>
+                      {String(pages.length).padStart(2, "0")}
+                    </span>
+                    <button
+                      type="button"
+                      className="cyber-modal__pager-btn"
+                      onClick={() => setPage((p) => Math.min(pages.length - 1, p + 1))}
+                      disabled={page === pages.length - 1}
+                      aria-label="Next page"
+                    >›</button>
+                  </div>
+                )}
                 {/* Glitch overlay on content */}
                 <div
                   className={`cyber-modal__content-glitch ${glitchActive ? "cyber-modal__content-glitch--active" : ""}`}
@@ -223,7 +273,7 @@ export default function CyberButton({
                 >
                   <h2><span>{modalTitle}</span></h2>
                   <div className="cyber-modal__text">
-                    {modalBody || defaultBody}
+                    {renderedBody}
                   </div>
                 </div>
               </div>
@@ -232,12 +282,12 @@ export default function CyberButton({
             {/* Action buttons */}
             <div className="cyber-modal__actions">
               <CyberBtn
-                label="Cancel"
+                label={cancelLabel}
                 shortcut="esc"
                 onClick={() => handleClose("Cancel")}
               />
               <CyberBtn
-                label="Proceed"
+                label={proceedLabel}
                 shortcutIcon
                 onClick={() => handleClose("Proceed")}
                 autoFocus

@@ -7348,8 +7348,32 @@ body .cl-profileSection__security .cl-profileSectionPrimaryButton {
   flex-shrink: 0;
 }
 
-/* Signal beam — hidden on mobile */
-.prospecting-banner__beam { display: none; }
+/* Hide the full desktop telemetry panel on mobile — replaced by the
+   .prospecting-marker + .prospecting-drawer pair below. */
+@media screen and (max-width: 768px) {
+  .prospecting-banner:not(.prospecting-banner--network) { display: none; }
+}
+
+/* ── Beam from the drill rig on the asteroid to its target ──
+   Position / width / rotation are set inline from JS (see HomePage()
+   in src/app/page.js); on mobile the target is .prospecting-marker, on
+   desktop it's the full .prospecting-banner panel. This rule only carries
+   the visual styling. Visible on every breakpoint. */
+.prospecting-banner__beam {
+  display: block;
+  position: fixed;
+  height: 1px;
+  background: repeating-linear-gradient(
+    to right,
+    rgba(212, 168, 84, 0.42) 0 5px,
+    transparent 5px 11px
+  );
+  transform-origin: left center;
+  pointer-events: none;
+  z-index: 299; /* just below .prospecting-banner */
+  opacity: 1;
+  transition: opacity 0.5s ease-out;
+}
 
 /* Desktop / full-screen */
 @media screen and (min-width: 769px) {
@@ -7362,83 +7386,64 @@ body .cl-profileSection__security .cl-profileSectionPrimaryButton {
     width: 320px;
   }
 
-  /* ── Beam from the drill rig on the asteroid direct to the HUD panel ──
-     Position / width / rotation are set inline from JS (see HomePage()
-     in src/app/page.js), so the endpoints track the rig and the capsule
-     across viewport sizes. This rule only carries the visual styling. */
-  .prospecting-banner__beam {
-    display: block;
-    position: fixed;
-    height: 1px;
-    background: repeating-linear-gradient(
-      to right,
-      rgba(212, 168, 84, 0.42) 0 5px,
-      transparent 5px 11px
-    );
-    transform-origin: left center;
-    pointer-events: none;
-    z-index: 299; /* just below .prospecting-banner */
-    opacity: 1;
-    transition: opacity 0.5s ease-out;
-  }
+}
 
-  /* Faded state — mirrors .prospecting-banner--faded; fires during the
-     SpaceScene zoom-in animation. */
-  .prospecting-banner__beam--faded {
-    opacity: 0;
-  }
+/* Faded state — mirrors .prospecting-banner--faded; fires during the
+   SpaceScene zoom-in animation. */
+.prospecting-banner__beam--faded {
+  opacity: 0;
+}
 
-  /* Antenna node at the rig end of the beam. The solid gold dot is the
-     transmitter; the two pseudo-elements are concentric rings that radiate
-     outward on a stagger, selling "radio broadcast" rather than "light beam."
-     Gold colour is hardcoded — this element lives outside .prospecting-banner
-     (see note in page.js) so it can't inherit --hud-gold. */
-  .prospecting-banner__beam-origin {
-    position: absolute;
-    top: -3px;
-    left: -3px;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: #d4a854;
-    box-shadow: 0 0 6px #d4a854, 0 0 12px rgba(212, 168, 84, 0.5);
-  }
-  .prospecting-banner__beam-origin::before,
-  .prospecting-banner__beam-origin::after {
-    content: "";
-    position: absolute;
-    inset: -1px;
-    border-radius: 50%;
-    border: 1px solid #d4a854;
-    opacity: 0;
-    animation: prospecting-beam-broadcast 2.4s ease-out infinite;
-    pointer-events: none;
-  }
-  .prospecting-banner__beam-origin::after {
-    animation-delay: 1.2s;
-  }
-  @keyframes prospecting-beam-broadcast {
-    0%   { transform: scale(1);   opacity: 0.85; }
-    80%  {                        opacity: 0.05; }
-    100% { transform: scale(4.2); opacity: 0;    }
-  }
+/* Antenna node at the rig end of the beam. The solid gold dot is the
+   transmitter; the two pseudo-elements are concentric rings that radiate
+   outward on a stagger, selling "radio broadcast" rather than "light beam."
+   Gold colour is hardcoded — this element lives outside .prospecting-banner
+   (see note in page.js) so it can't inherit --hud-gold. */
+.prospecting-banner__beam-origin {
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #d4a854;
+  box-shadow: 0 0 6px #d4a854, 0 0 12px rgba(212, 168, 84, 0.5);
+}
+.prospecting-banner__beam-origin::before,
+.prospecting-banner__beam-origin::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  border: 1px solid #d4a854;
+  opacity: 0;
+  animation: prospecting-beam-broadcast 2.4s ease-out infinite;
+  pointer-events: none;
+}
+.prospecting-banner__beam-origin::after {
+  animation-delay: 1.2s;
+}
+@keyframes prospecting-beam-broadcast {
+  0%   { transform: scale(1);   opacity: 0.85; }
+  80%  {                        opacity: 0.05; }
+  100% { transform: scale(4.2); opacity: 0;    }
+}
 
-  /* Pulse traveling from rig → capsule along the beam */
-  .prospecting-banner__beam-pulse {
-    position: absolute;
-    top: -1px;
-    left: 0;
-    width: 34px;
-    height: 3px;
-    background: linear-gradient(to right, transparent, #d4a854);
-    animation: prospecting-beam-flow 3.2s linear infinite;
-  }
-  @keyframes prospecting-beam-flow {
-    0%   { transform: translateX(0);                 opacity: 0; }
-    12%  { opacity: 1; }
-    88%  { opacity: 1; }
-    100% { transform: translateX(calc(100% - 34px)); opacity: 0; }
-  }
+/* Pulse traveling from rig → capsule along the beam */
+.prospecting-banner__beam-pulse {
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 34px;
+  height: 3px;
+  background: linear-gradient(to right, transparent, #d4a854);
+  animation: prospecting-beam-flow 3.2s linear infinite;
+}
+@keyframes prospecting-beam-flow {
+  0%   { transform: translateX(0);                 opacity: 0; }
+  12%  { opacity: 1; }
+  88%  { opacity: 1; }
+  100% { transform: translateX(calc(100% - 34px)); opacity: 0; }
 }
 
 /* Wide desktop */

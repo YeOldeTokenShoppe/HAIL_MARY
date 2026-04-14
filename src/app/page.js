@@ -66,9 +66,11 @@ export default function HomePage() {
   const antennaScreenRef = useRef({ x: 0, y: 0 });
   const beamRef = useRef(null);
 
-  // ── Signal entrance sequence ──
+  // ── Signal entrance sequence (desktop only) ──
   // Phases: 0 = hidden, 1 = broadcast rings, 2 = beam extends,
   //         3 = panels receive, 4 = steady state (pulse loops)
+  // Mobile has no overlay — the CLAIM (mission) FAB in MainMobileNav is
+  // the only entry point on small screens.
   const [signalPhase, setSignalPhase] = useState(0);
   const signalStarted = useRef(false);
   // Beam extension: tracks when phase 2 starts so the rAF can interpolate width
@@ -83,19 +85,9 @@ export default function HomePage() {
         const vw = window.innerWidth;
         const vh = window.innerHeight;
 
-        // Hide on mobile
+        // Mobile has no beam/overlay — skip everything.
         if (vw < 769) {
           el.style.display = "none";
-          // No beam on mobile, but the panels still need to appear. Kick off
-          // the signal sequence directly — skip phases 1 & 2 (broadcast +
-          // beam extend, which require an on-screen beam) and jump straight
-          // to phase 3 so the panels materialize with the signalReceive
-          // animation, then settle into phase 4 (live).
-          if (!signalStarted.current) {
-            signalStarted.current = true;
-            setSignalPhase(3);
-            setTimeout(() => setSignalPhase(4), 800);
-          }
           raf = requestAnimationFrame(update);
           return;
         }
@@ -103,10 +95,9 @@ export default function HomePage() {
 
         const remPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
         const isWide = vw >= 1280;
+
         const panelRight = (isWide ? 4 : 2.5) * remPx;
         const panelWidth = isWide ? 340 : 320;
-
-        // Beam terminates just outside the panel's left edge at vertical centre.
         const panelEdgeX = vw - panelRight - panelWidth - 2;
         const panelEdgeY = vh / 2;
 
@@ -139,6 +130,7 @@ export default function HomePage() {
           el.style.transform = `rotate(${angleDeg}deg)`;
 
           // Kick off the entrance sequence once we have a valid position
+          // (desktop only — the mobile branch above handles its own kickoff).
           if (!signalStarted.current) {
             signalStarted.current = true;
             // Phase 1: broadcast rings
@@ -181,19 +173,16 @@ export default function HomePage() {
         externalOpen={showMission}
         onExternalClose={() => setShowMission(false)}
         modalTitle="Mission Briefing — Sector 7G"
-        modalBody={
-          <>
-            <p>
-              Seismic readings have detected a high-density deposit
-              2.4 km beneath the surface. Estimated yield: 14,000 barrels.
-            </p>
-            <p>
-              The Hail Mary Prospecting Co. drill crew is standing by.
-              Our Lady willing, this one hits.
-            </p>
-            <p>Deploy the drill?</p>
-          </>
-        }
+        modalBodyPages={[
+          <p key="strike">
+            HM-09 INTEGR80 pinged a high-density ecrypted goo deposit at
+            2.4 km. Estimated yield: 14,000 bbl, valued at 500 USDC.
+          </p>,
+          <p key="stake">
+            Hold <strong>$20 RL80</strong> for claim eligibility. Drill crew is standing by.
+          </p>,
+          <p key="deploy">Our Lady willing, this one hits. Deploy?</p>,
+        ]}
         onProceed={() => {
           window.location.href = "/oil";
         }}
@@ -260,7 +249,7 @@ export default function HomePage() {
         </p>
       </div>
 
-      {/* ── Prospecting HUD readout ── */}
+      {/* ── Prospecting HUD readout — desktop only (hidden on mobile via CSS) ── */}
       <div className={[
         "prospecting-banner",
         sceneZoomed && "prospecting-banner--faded",

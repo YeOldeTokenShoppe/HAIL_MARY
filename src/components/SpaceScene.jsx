@@ -14,6 +14,7 @@ import HologooR3F from "./HologooR3F";
 import FluidNeonSphere from "./FluidNeonSphere";
 import { useRouter } from "next/navigation";
 import "./CyberButton.css";
+import CyberButton from "./CyberButton";
 import { EffectComposer, Bloom } from "@react-three/postprocessing";
 // Uncomment to re-enable leva GUI panel in InteriorLighting:
 // import { useControls, folder, button } from "leva";
@@ -485,7 +486,7 @@ function H80ZSpotlight() {
 function InteriorLighting() {
   return (
     <>
-      <ambientLight intensity={3.76} />
+      <ambientLight intensity={2.76} />
     </>
   );
 }
@@ -1991,6 +1992,384 @@ function CoreCylinder({ typedRatio = 1 }) {
   );
 }
 
+/* ── Mobile-only goo/statue overlay ──
+   Replaces the dense desktop panel with a small chip near the bottom of
+   the screen. Tapping the chip opens a paginated bottom-sheet modal:
+     Page 1: title + mode tabs + subtitle
+     Page 2: tighter mobile-only data lines + warn header
+     Page 3: the two key stats + the action CTA
+   Mirrors the homepage's CLAIM modal pattern so the muscle memory
+   carries over. Desktop keeps the full GooOverlay below. */
+const MOBILE_BULLETS = [
+  // Core Sample (modeIndex 0)
+  [
+    "3.7 PJ/kg yield",
+    "98.2% purity, low silicate",
+    "Exhibits autonomous motion",
+    "Remote extraction only",
+  ],
+  // Soul Module (modeIndex 1)
+  [
+    "Morale +14.2% since install",
+    "0 incidents in 142 hours",
+    "Statistically inconclusive",
+    "Crew request: keep lit",
+  ],
+];
+const MOBILE_WARN = [
+  "ANOMALOUS ENERGY SIGNATURE",
+  "CREW CONFIDENCE UPTICK",
+];
+
+function MobileGooOverlay({ visible, onClose, statueMode, hologramSwapRef }) {
+  const router = useRouter();
+  const [opacity, setOpacity] = useState(0);
+  const [modalOpen, setModalOpen] = useState(false);
+  /* Optimistic tab state — flips immediately on tap so the active tab
+     visual responds with no perceived lag. The pending tab shows a
+     scanning shimmer in its background until the parent's statueMode
+     prop catches up (model swap completes). */
+  const [pendingTab, setPendingTab] = useState(null);
+  const pendingTimerRef = useRef(null);
+  /* Tracks whether the user has opened the readout at least once. After
+     the first open the bot icon stops pulsing — it stays present and
+     tappable, but quietly, since it's no longer "calling for attention." */
+  const [hasOpened, setHasOpened] = useState(false);
+  const audioRef = useRef(null);
+
+  // Lazy-create the soft "tap" audio for tab switches. Same source as
+  // CyberButton's slide sound, just quieter so it sits under the visuals.
+  if (typeof window !== "undefined" && !audioRef.current) {
+    const tap = new Audio("https://cdn.freesound.org/previews/367/367997_6512973-lq.mp3");
+    tap.volume = 0.35;
+    audioRef.current = { tap };
+  }
+  const playTap = () => {
+    const s = audioRef.current?.tap;
+    if (!s) return;
+    try { s.currentTime = 0; s.play().catch(() => {}); } catch {}
+  };
+
+  const modeIndex = statueMode ? 1 : 0;
+  const effectiveMode = pendingTab ?? modeIndex;
+
+  useEffect(() => {
+    if (visible) {
+      setModalOpen(false);
+      setHasOpened(false); // reset pulse state each time the overlay (re-)opens
+      const t = setTimeout(() => setOpacity(1), 50);
+      return () => clearTimeout(t);
+    }
+    setOpacity(0);
+    setModalOpen(false);
+  }, [visible]);
+
+  /* Clear the pending state once the parent prop catches up. */
+  useEffect(() => {
+    if (pendingTab !== null && pendingTab === modeIndex) {
+      setPendingTab(null);
+      if (pendingTimerRef.current) {
+        clearTimeout(pendingTimerRef.current);
+        pendingTimerRef.current = null;
+      }
+    }
+  }, [modeIndex, pendingTab]);
+
+  /* Cleanup safety timer on unmount */
+  useEffect(() => () => {
+    if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current);
+  }, []);
+
+  if (!visible && opacity <= 0) return null;
+
+  const handleTabClick = (targetIndex, e) => {
+    e.stopPropagation();
+    /* No-op only if we're truly settled on this tab — allow re-tap mid-pending
+       (the swap call no-ops when the underlying neck-tilt is mid-animation,
+       but the user shouldn't see frozen tabs). */
+    if (targetIndex === modeIndex && pendingTab === null) return;
+    setPendingTab(targetIndex);
+    playTap();
+    hologramSwapRef?.current?.();
+    /* Safety fallback — if the swap is suppressed (e.g. neckTilt was
+       already running from the auto cadence), modeIndex never changes
+       and pendingTab would stick. Release after 3s so the tab visual
+       reverts to the parent's actual state and the user can try again. */
+    if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current);
+    pendingTimerRef.current = setTimeout(() => setPendingTab(null), 3000);
+  };
+
+  /* ── Paginated body for the CyberButton modal ── */
+  const Page1 = (
+    <>
+      <div style={{
+        display: "flex",
+        border: `1px solid ${HUD.goldFaint}`,
+        fontFamily: '"Share Tech Mono", monospace',
+        fontSize: "0.75rem",
+        letterSpacing: "0.18em",
+        textTransform: "uppercase",
+        userSelect: "none",
+      }}>
+        {MODE_TABS.map((label, i) => {
+          const isActive = i === effectiveMode;
+          const isPending = pendingTab === i;
+          return (
+            <button
+              key={label}
+              onClick={(e) => handleTabClick(i, e)}
+              style={{
+                position: "relative",
+                overflow: "hidden",
+                flex: 1,
+                padding: "0.65rem 0",
+                border: "none",
+                borderRight: i === 0 ? `1px solid ${HUD.goldFaint}` : "none",
+                background: isActive ? "rgba(107,199,209,0.14)" : "transparent",
+                color: isActive ? HUD.cyan : HUD.muted,
+                textShadow: isActive ? `0 0 6px ${HUD.cyanDim}` : "none",
+                fontFamily: 'inherit',
+                fontSize: 'inherit',
+                letterSpacing: 'inherit',
+                textTransform: 'inherit',
+                cursor: isActive ? "default" : "pointer",
+                transition: "background 0.18s ease, color 0.18s ease",
+              }}
+            >
+              {/* Scanning shimmer — only the pending tab. Sits behind the
+                  label and conveys "swap in progress" without blocking
+                  the optimistic active styling. */}
+              {isPending && (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    background: `linear-gradient(90deg,
+                      rgba(107,199,209,0) 0%,
+                      rgba(107,199,209,0.45) 50%,
+                      rgba(107,199,209,0) 100%)`,
+                    backgroundSize: "200% 100%",
+                    animation: "gooTabScan 1s linear infinite",
+                    pointerEvents: "none",
+                  }}
+                />
+              )}
+              <span style={{ position: "relative" }}>{label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+
+  const Page2 = (
+    <>
+      <div style={{
+        fontFamily: '"Share Tech Mono", monospace',
+        fontSize: "0.85rem",
+        fontWeight: 700,
+        letterSpacing: "0.18em",
+        color: HUD.orange,
+        textShadow: `0 0 8px rgba(232,122,43,0.45)`,
+        textAlign: "center",
+        padding: "0.6rem 0",
+        marginBottom: "0.95rem",
+        border: `1px solid rgba(232,122,43,0.4)`,
+      }}>
+        !! {MOBILE_WARN[modeIndex]} !!
+      </div>
+      <ul style={{
+        listStyle: "none",
+        padding: 0,
+        margin: 0,
+        fontFamily: '"Share Tech Mono", monospace',
+        fontSize: "1rem",
+        lineHeight: 1.55,
+        letterSpacing: "0.04em",
+        color: HUD.cream,
+      }}>
+        {MOBILE_BULLETS[modeIndex].map((line, i) => (
+          <li key={i} style={{
+            display: "flex",
+            gap: "0.55rem",
+            padding: "0.45rem 0",
+            borderBottom: i < MOBILE_BULLETS[modeIndex].length - 1 ? `1px dashed ${HUD.goldFaint}` : "none",
+          }}>
+            <span style={{ color: HUD.cyan, flexShrink: 0 }}>›</span>
+            <span>{line}</span>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+
+  const Page3 = (
+    <>
+      <div style={{
+        fontFamily: '"Share Tech Mono", monospace',
+        fontSize: "0.65rem",
+        letterSpacing: "0.2em",
+        color: HUD.goldDim,
+        textTransform: "uppercase",
+        marginBottom: "0.95rem",
+      }}>
+        {OVERLAY_COPY.statsTitle[modeIndex]}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.9rem", paddingBottom: "1.75rem" }}>
+        <div style={{ flex: 1 }}>
+          <div style={{
+            fontFamily: '"Orbitron", sans-serif',
+            fontWeight: 700,
+            fontSize: "1.55rem",
+            color: HUD.cyan,
+            letterSpacing: "0.03em",
+            lineHeight: 1,
+            textShadow: `0 0 8px rgba(107,199,209,0.4)`,
+          }}>{OVERLAY_COPY.stat1Value[modeIndex]}</div>
+          <div style={{
+            fontFamily: '"Share Tech Mono", monospace',
+            fontSize: "0.6rem",
+            letterSpacing: "0.22em",
+            color: HUD.muted,
+            textTransform: "uppercase",
+            marginTop: "0.35rem",
+          }}>{OVERLAY_COPY.stat1Label[modeIndex]}</div>
+        </div>
+        <div style={{ width: 1, height: 36, background: HUD.goldFaint, flexShrink: 0 }} />
+        <div style={{ flex: 1 }}>
+          <div style={{
+            fontFamily: '"Orbitron", sans-serif',
+            fontWeight: 700,
+            fontSize: "1.55rem",
+            color: HUD.orange,
+            letterSpacing: "0.03em",
+            lineHeight: 1,
+            textShadow: `0 0 8px rgba(232,122,43,0.4)`,
+          }}>{OVERLAY_COPY.stat2Value[modeIndex]}</div>
+          <div style={{
+            fontFamily: '"Share Tech Mono", monospace',
+            fontSize: "0.6rem",
+            letterSpacing: "0.22em",
+            color: HUD.muted,
+            textTransform: "uppercase",
+            marginTop: "0.35rem",
+          }}>{OVERLAY_COPY.stat2Label[modeIndex]}</div>
+        </div>
+      </div>
+    </>
+  );
+
+  /* Proceed → route to /oil for goo mode; statue mode is pure flavor.
+     Always close the overlay so the user lands cleanly. */
+  const handleProceed = () => {
+    if (!statueMode) router.push("/oil");
+    onClose?.();
+  };
+
+  return (
+    <>
+      {/* ── Message-bot icon — pulses in the bottom-right corner to
+          indicate the rig has new info. Tapping opens the CyberButton
+          modal with paginated readout. ── */}
+      <button
+        type="button"
+        onClick={() => { setModalOpen(true); setHasOpened(true); }}
+        aria-label="Open module readout"
+        style={{
+          position: "fixed",
+          bottom: "calc(5.5rem + env(safe-area-inset-bottom, 0px))",
+          right: "1rem",
+          width: 68, height: 68,
+          borderRadius: "50%",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: HUD.panelBg,
+          border: `1px solid rgba(107,199,209,0.5)`,
+          backdropFilter: "blur(6px) saturate(140%)",
+          WebkitBackdropFilter: "blur(6px) saturate(140%)",
+          color: HUD.cyan,
+          cursor: "pointer",
+          padding: 0,
+          opacity,
+          /* Hide while the modal is open — the modal IS the readout, so
+             the bot doesn't need to compete. Reappears as soon as the
+             modal closes. */
+          visibility: modalOpen ? "hidden" : "visible",
+          /* Above the modal overlay (z-index: 10000) so it sits on top
+             of the nav bar (also 10000). */
+          zIndex: 10001,
+          WebkitTapHighlightColor: "transparent",
+          /* Pulse only before first open — after, it stays static and quiet. */
+          animation: hasOpened ? "none" : "gooBotPulse 2s ease-in-out infinite",
+          transition: "opacity 0.45s ease",
+        }}
+      >
+        <svg
+          width="34" height="34" viewBox="0 0 24 24"
+          fill="none" stroke="currentColor"
+          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+          aria-hidden="true"
+          style={{
+            filter: "drop-shadow(0 0 6px rgba(107,199,209,0.55))",
+            animation: hasOpened ? "none" : "gooBotIcon 2s ease-in-out infinite",
+          }}
+        >
+          <path d="M12 6V2H8" />
+          <path d="M15 11v2" />
+          <path d="M2 12h2" />
+          <path d="M20 12h2" />
+          <path d="M20 16a2 2 0 0 1-2 2H8.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 4 20.286V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z" />
+          <path d="M9 11v2" />
+        </svg>
+      </button>
+
+      {/* ── CyberButton modal (controlled externally by the bot icon) ── */}
+      <CyberButton
+        hideTrigger
+        externalOpen={modalOpen}
+        onExternalClose={() => setModalOpen(false)}
+        modalTitle={OVERLAY_COPY.metaLabel[modeIndex]}
+        modalBodyPages={[Page1, Page2, Page3]}
+        proceedLabel={OVERLAY_COPY.buttonText[modeIndex]}
+        cancelLabel="Dismiss"
+        onProceed={handleProceed}
+      />
+
+      {/* Local keyframes for the bot-icon aura + icon pulse */}
+      <style>{`
+        @keyframes gooBotPulse {
+          0%, 100% {
+            box-shadow:
+              0 0 0 1px rgba(0,0,0,0.35),
+              0 8px 20px -8px rgba(0,0,0,0.6),
+              0 0 0 0 rgba(107,199,209,0),
+              inset 0 1px 0 rgba(107,199,209,0.1);
+            border-color: rgba(107,199,209,0.3);
+          }
+          50% {
+            box-shadow:
+              0 0 0 1px rgba(0,0,0,0.35),
+              0 8px 22px -8px rgba(0,0,0,0.6),
+              0 0 24px 4px rgba(107,199,209,0.55),
+              inset 0 1px 0 rgba(107,199,209,0.18);
+            border-color: rgba(107,199,209,0.7);
+          }
+        }
+        @keyframes gooBotIcon {
+          0%, 100% { transform: scale(1);    opacity: 0.85; }
+          50%      { transform: scale(1.08); opacity: 1;    }
+        }
+        @keyframes gooTabScan {
+          0%   { background-position: -100% 0; }
+          100% { background-position:  200% 0; }
+        }
+      `}</style>
+    </>
+  );
+}
+
 function GooOverlay({ visible, onClose, statueMode = false, hologramSwapRef }) {
   const router = useRouter();
   const [charCount, setCharCount] = useState(0);
@@ -2068,6 +2447,20 @@ function GooOverlay({ visible, onClose, statueMode = false, hologramSwapRef }) {
       setCharCount(totalChars);
     }
   }, [statueMode, totalChars, visible]);
+
+  // Mobile uses a totally different layout (icon + paginated modal). All
+  // hooks above this branch run on every render so React's hook order
+  // stays stable; this only affects what we render.
+  if (isMobile) {
+    return (
+      <MobileGooOverlay
+        visible={visible}
+        onClose={onClose}
+        statueMode={statueMode}
+        hologramSwapRef={hologramSwapRef}
+      />
+    );
+  }
 
   if (!visible && opacity <= 0) return null;
 
