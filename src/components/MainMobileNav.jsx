@@ -124,7 +124,8 @@ export default function MainMobileNav({
     right: {
       icon: <LoungeIcon />,
       label: "LOUNGE",
-      onClick: onLoungeClick || (() => router.push('/arcade')),
+      // onClick: onLoungeClick || (() => router.push('/arcade')),
+      onClick: onLoungeClick,
       colorClass: "mn-lounge",
     },
   };

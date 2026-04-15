@@ -28,8 +28,8 @@ const ZoomContext = createContext();
 const ZOOM_IN_WORLD_UP = new THREE.Vector3(0, 1, 0);
 const ZOOM_IN_DURATION = 3.3; // seconds — total length of the arc-path zoom
 function CameraController({ controlsRef }) {
-  const { camera } = useThree();
-  const { zoomed, targetPos, targetLookAt, defaultPos, defaultLookAt, onArrivedRef, flyToRef, orbitTableRef, captainFadeRef, sequenceRunningRef, breakOutRef, inSpaceshipRef, setShowGooOverlay } = useContext(ZoomContext);
+  const { camera, scene } = useThree();
+  const { zoomed, targetPos, targetLookAt, defaultPos, defaultLookAt, onArrivedRef, flyToRef, orbitTableRef, captainFadeRef, sequenceRunningRef, breakOutRef, inSpaceshipRef, setShowGooOverlay, lookingScheduleRef } = useContext(ZoomContext);
   const lerpSpeed = 1.2; // slower for cinematic feel
   const phase = useRef("idle");
   const currentLookAt = useRef(new THREE.Vector3(0, 0, 0));
@@ -96,14 +96,26 @@ function CameraController({ controlsRef }) {
         onArrivedRef.current = null;
         captainFadeRef.current.target = 1;
         sequenceRunningRef.current = false;
+        // Mark "entered the ship" so MobileHideController's at-rest gate
+        // flips and the MOBILE_HIDE meshes fade out on mobile.
+        inSpaceshipRef.current = true;
         phase.current = "zoomed";
         // Place the camera just past the first character along -Z, inside
         // the capsule, looking toward the scene center.
         const breakOutY = targetLookAt.y - 0.1;
         camera.position.set(targetLookAt.x, breakOutY, targetLookAt.z - 0.3);
-        // Look toward the scene center at the camera's height
-        // so we face straight ahead rather than down at the floor.
-        const breakOutTarget = new THREE.Vector3(defaultLookAt.x, breakOutY, defaultLookAt.z);
+        // Pivot OrbitControls on the hologram (Table_Center + measured
+        // delta to its bbox center) so rotation stays centered on the
+        // centerpiece even when the user bypasses the orbit animation.
+        scene.updateMatrixWorld(true);
+        const tableCenter = scene.getObjectByName("Table_Center");
+        const breakOutTarget = new THREE.Vector3();
+        if (tableCenter) {
+          tableCenter.getWorldPosition(breakOutTarget);
+          breakOutTarget.add(new THREE.Vector3(0.004, 0.316, -0.007));
+        } else {
+          breakOutTarget.set(defaultLookAt.x, breakOutY, defaultLookAt.z);
+        }
         currentLookAt.current.copy(breakOutTarget);
         camera.lookAt(currentLookAt.current);
         if (controlsRef.current) {
@@ -114,6 +126,9 @@ function CameraController({ controlsRef }) {
         }
         // Show the goo overlay when breaking out of the animation
         setShowGooOverlay?.(true);
+        // Camera is at rest — kick the Captain's idle-looking schedule so
+        // the animation alternates going forward.
+        lookingScheduleRef?.current?.();
       }
       breakOutRef.current = false;
     }
@@ -262,6 +277,8 @@ function CameraController({ controlsRef }) {
         }
         // Show the goo analysis overlay now that the camera has settled
         setShowGooOverlay?.(true);
+        // Camera at rest — start the idle-looking cadence.
+        lookingScheduleRef?.current?.();
       }
     }
 
@@ -818,12 +835,13 @@ function drawScreen(scr, t) {
 function Model({ url }) {
   const group = useRef();
   const { scene, animations } = useGLTF(url);
+  const { scene: rootScene } = useThree();
 
   const { actions } = useAnimations(animations, group);
 
   const gr80HipsRef = useRef(null); // GR80's Hips bone for rotation pinning
   const gr80HipsRotRef = useRef(null); // stored quaternion
-  const { zoomed, setZoomed, setTargetPos, setTargetLookAt, onArrivedRef, flyToRef, orbitTableRef, spotTargetRef, captainFadeRef, sequenceRunningRef, breakOutRef, inSpaceshipRef, setShowGooOverlay, toggleHologram, showStatue, hologramSwapRef } = useContext(ZoomContext);
+  const { zoomed, setZoomed, setTargetPos, setTargetLookAt, onArrivedRef, flyToRef, orbitTableRef, spotTargetRef, captainFadeRef, sequenceRunningRef, breakOutRef, inSpaceshipRef, setShowGooOverlay, toggleHologram, showStatue, hologramSwapRef, lookingScheduleRef } = useContext(ZoomContext);
   const showStatueRef = useRef(showStatue);
   useEffect(() => { showStatueRef.current = showStatue; }, [showStatue]);
 
@@ -846,9 +864,13 @@ function Model({ url }) {
   }, [showStatue, actions]);
   const lookingTimer = useRef(null);
   const gr80Timer = useRef(null);
+  // Pending hologram-toggle setTimeout id so a re-fire (e.g. user taps mid
+  // auto-sequence) can cancel the previous toggle and avoid double-toggles.
+  const gr80ToggleTimer = useRef(null);
   const gr80HeadRef = useRef(null);
   const lookingPlayRef = useRef(null);
   const captainMeshRef = useRef(null);
+  const captainHeadRef = useRef(null);
   const zoomedRef = useRef(false);
   useEffect(() => { zoomedRef.current = zoomed; }, [zoomed]);
 
@@ -856,6 +878,7 @@ function Model({ url }) {
   useEffect(() => {
     if (!zoomed) captainFadeRef.current.target = 1;
   }, [zoomed]);
+
 
   useFrame((_, delta) => {
     const fade = captainFadeRef.current;
@@ -908,16 +931,28 @@ function Model({ url }) {
   // Also find GR80's Head bone for camera flythrough
   useEffect(() => {
 
+    // Disable frustum culling across the whole GLTF scene. Skinned/parented
+    // meshes often have stale bounding boxes, so the renderer culls them
+    // when the camera rotates even though they're visible — causing
+    // interior objects (panels, levers, chair) to pop in and out. Cost is
+    // negligible for this scene's mesh count.
+    scene.traverse((child) => {
+      if (child.isMesh || child.isSkinnedMesh) child.frustumCulled = false;
+    });
 
-    // Find captain's parent mesh for hiding during fly-through
+    // Find captain's parent mesh for hiding during fly-through, plus the
+    // Head bone scoped to this subtree (there are multiple "Head" bones in
+    // the scene — GR80, Captain, etc. — so a top-level getObjectByName
+    // would return whichever is first in tree order, which shifts with
+    // GLB re-imports).
     const captainEmpty = scene.getObjectByName("Empty_Captain");
     if (captainEmpty) {
       captainMeshRef.current = captainEmpty;
-      // One-time diagnostic: log every mesh + material under Captain
+      // GLB may suffix bones on name collision (e.g., Head_1 when multiple
+      // skeletons share bone names). Accept either.
       captainEmpty.traverse((child) => {
-        if (child.isMesh && child.material) {
-          const m = child.material;
-   
+        if ((child.name === "Head" || child.name === "Head_1") && !captainHeadRef.current) {
+          captainHeadRef.current = child;
         }
       });
     }
@@ -1318,17 +1353,36 @@ function Model({ url }) {
         // Shared trigger — fires neckTilt, swaps the hologram 2s in, crossfades
         // to the new base pose when tilt finishes, and reschedules the auto timer.
         // Called both by the auto timer and by the user-facing tab toggle.
+        // Track the most recent listener so a restart can detach it cleanly
+        // (otherwise the old listener fires after the new sequence and trips
+        // the wrong base-pose crossfade).
+        let activeOnFinished = null;
         const fireNeckTiltSequence = () => {
-          if (neckTilt.isRunning()) return; // Don't re-trigger mid-animation
-          clearTimeout(gr80Timer.current);  // Cancel any pending auto fire
+          clearTimeout(gr80Timer.current);          // Cancel pending auto fire
+          clearTimeout(gr80ToggleTimer.current);    // Cancel pending toggle from any prior fire
+          if (activeOnFinished) {
+            neckTilt.getMixer().removeEventListener("finished", activeOnFinished);
+            activeOnFinished = null;
+          }
 
-          neckTilt.reset().fadeIn(0.3).play();
-          currentBase.fadeOut(0.3);
-          setTimeout(() => { if (toggleHologram) toggleHologram(); }, 2000);
+          if (neckTilt.isRunning()) {
+            // Interrupting an in-flight tilt: rewind the clock but keep the
+            // current weight so we don't drop to weight=0 and flash the
+            // bind/T-pose during the fade-in ramp.
+            neckTilt.time = 0;
+            neckTilt.paused = false;
+          } else {
+            neckTilt.reset().fadeIn(0.3).play();
+            currentBase.fadeOut(0.3);
+          }
+          gr80ToggleTimer.current = setTimeout(() => {
+            if (toggleHologram) toggleHologram();
+          }, 2000);
 
           const onFinished = (e) => {
             if (e.action === neckTilt) {
               neckTilt.getMixer().removeEventListener("finished", onFinished);
+              if (activeOnFinished === onFinished) activeOnFinished = null;
               const nextBase = (showStatueRef.current && pray) ? pray : idle;
               nextBase.reset().fadeIn(0.5).play();
               neckTilt.fadeOut(0.5);
@@ -1336,6 +1390,7 @@ function Model({ url }) {
               scheduleButtonPush();
             }
           };
+          activeOnFinished = onFinished;
           neckTilt.getMixer().addEventListener("finished", onFinished);
         };
 
@@ -1438,8 +1493,10 @@ function Model({ url }) {
             standing.reset().fadeIn(0.4).play();
             looking.fadeOut(0.4);
 
-            // If zoomed in, pause then fly camera to GR80 character
-            if (zoomedRef.current) {
+            // If the scripted sequence is running (we've just reached the
+            // captain), pause then fly camera to GR80. Otherwise this is an
+            // idle-looking fire — just reschedule.
+            if (sequenceRunningRef.current) {
               setTimeout(() => {
               // Bail out if the user clicked during the 2s pause to break
               // out of the sequence — we no longer want to fly to GR80.
@@ -1473,9 +1530,12 @@ function Model({ url }) {
                 // `laps` lands at the starting direction from the pivot;
                 // the degree offset rotates it past that to the framing
                 // you want to land on.
-                const ORBIT_END_RADIUS     = 0.55;   // final horizontal distance from pivot
+                // Tighter final framing on phones so the centerpiece fills
+                // the small screen; looser on desktop where there's room.
+                const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
+                const ORBIT_END_RADIUS     = isMobile ? 0.40 : 0.55;  // final horizontal distance from pivot
                 const ORBIT_END_HEIGHT     = 0.0;   // final Y above pivot (hit only at the very end)
-                const ORBIT_END_ANGLE_DEG  = -110;  // degrees past n laps — tune to land the framing
+                const ORBIT_END_ANGLE_DEG  = -45;  // degrees past n laps — tune to land the framing
                 const ORBIT_LAPS           = 1.0;   // full rotations
                 const ORBIT_DURATION_SEC   = 25;    // total sweep time (seconds)
                 const ORBIT_DIRECTION      = 1;     // +1 CCW from above, -1 CW
@@ -1486,18 +1546,20 @@ function Model({ url }) {
                 // out" at the start.
                 const ORBIT_RADIUS_PADDING = 0.03;
 
-                const table = scene.getObjectByName("Table");
+                // Pivot on Table_Center plus the measured delta to the
+                // hologram's bounding-box center, so OrbitControls rotates
+                // around the hologram's true visual middle.
+                const PIVOT_OFFSET = new THREE.Vector3(0.004, 0.316, -0.007);
+                scene.updateMatrixWorld(true);
+                const tableCenter = scene.getObjectByName("Table_Center");
                 const pivot = new THREE.Vector3();
-                if (table) {
-                  scene.updateMatrixWorld(true);
-                  const tableBox = new THREE.Box3().setFromObject(table);
-                  tableBox.getCenter(pivot);
-                  pivot.y = tableBox.max.y + 0.12;
-          
+                if (tableCenter) {
+                  tableCenter.getWorldPosition(pivot);
                 } else {
-                  console.warn("[orbit-table] 'Table' mesh not found — falling back to pivot near GR80");
+                  console.warn("[orbit-table] 'Table_Center' not found — falling back to pivot near GR80");
                   pivot.copy(fallbackPivot);
                 }
+                pivot.add(PIVOT_OFFSET);
                 return {
                   pivot,
                   radius: ORBIT_END_RADIUS,
@@ -1565,12 +1627,15 @@ function Model({ url }) {
 
       // Random schedule for when not zoomed
       const scheduleLooking = () => {
+        clearTimeout(lookingTimer.current);
         const delay = 7000 + Math.random() * 12000;
         lookingTimer.current = setTimeout(playLooking, delay);
       };
 
-      // Expose so handleClick can trigger it immediately
+      // Expose so handleClick can trigger it immediately, and so the
+      // zoom-state watcher can re-arm the schedule after zoom-out.
       lookingPlayRef.current = playLooking;
+      lookingScheduleRef.current = scheduleLooking;
 
       scheduleLooking();
     }
@@ -1578,6 +1643,7 @@ function Model({ url }) {
     return () => {
       clearTimeout(lookingTimer.current);
       clearTimeout(gr80Timer.current);
+      clearTimeout(gr80ToggleTimer.current);
       standing.stop();
       looking?.stop();
       idle?.stop();
@@ -1625,11 +1691,23 @@ function Model({ url }) {
     const target = windowRef.current;
     if (!target) return;
 
-    // Target the Head bone for face-level framing
-    const headBone = scene.getObjectByName("Head");
+    // Target the Captain for face-level framing. Prefer the Head bone
+    // (scoped to Empty_Captain so tree order can't pick the wrong
+    // character's Head); otherwise fall back to Empty_Captain's world
+    // position plus a Y offset to approximate face height. Last resort:
+    // Window1's bounding box center (usually in the captain's general
+    // area, but not well-framed).
+    const CAPTAIN_FACE_Y_OFFSET = 0.15; // nudge up to face when using Empty_Captain base
+    const HEAD_BONE_Y_OFFSET    = 0.0; // nudge down from crown when using Head bone
+    const headBone = captainHeadRef.current;
+    const captainEmpty = captainMeshRef.current;
     const lookAt = new THREE.Vector3();
     if (headBone) {
       headBone.getWorldPosition(lookAt);
+      lookAt.y += HEAD_BONE_Y_OFFSET;
+    } else if (captainEmpty) {
+      captainEmpty.getWorldPosition(lookAt);
+      lookAt.y += CAPTAIN_FACE_Y_OFFSET;
     } else {
       const box = new THREE.Box3().setFromObject(target);
       box.getCenter(lookAt);
@@ -1690,6 +1768,139 @@ function AntennaProjector({ antennaScreenRef }) {
     const canvas = gl.domElement;
     antennaScreenRef.current.x = (tmpVec.current.x * 0.5 + 0.5) * canvas.clientWidth;
     antennaScreenRef.current.y = (-tmpVec.current.y * 0.5 + 0.5) * canvas.clientHeight;
+  });
+
+  return null;
+}
+
+/* ── MobileHideController ──
+   Fades the `MOBILE_HIDE` Empty (and everything parented under it in
+   Scene3.glb) when the user zooms into the ship on a mobile viewport.
+   Pairs with the CSS vignette in MobileGooOverlay — vignette dims the
+   edges of the canvas, this actually stops rendering the background
+   meshes once they're invisible, clawing back GPU headroom on phones.
+   Desktop: untouched. */
+function MobileHideController() {
+  const { scene } = useGLTF("/models/Scene3.glb");
+  /* Trigger only after the camera sequence has come to rest — either the
+     full fly-to/orbit-table finished naturally, OR the user broke out of
+     the animation with a click. Both paths flip sequenceRunningRef to
+     false, so that's all we need to poll.
+     captainFadeRef is co-opted here too: on mobile we want the Captain to
+     follow the same fade rhythm as MOBILE_HIDE, so we push its target to
+     0 whenever we're in the fade-out state. */
+  const { inSpaceshipRef, sequenceRunningRef, captainFadeRef } = useContext(ZoomContext);
+
+  const groupRef = useRef(null);
+  const meshesRef = useRef([]);
+  const materialsRef = useRef([]);
+  const currentOpacityRef = useRef(1);
+  const isMobileRef = useRef(false);
+
+  // Track whether we're on a mobile viewport. Cheap polling via resize —
+  // no state, no re-renders.
+  useEffect(() => {
+    const check = () => { isMobileRef.current = window.innerWidth < 640; };
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  // Locate MOBILE_HIDE + collect meshes we'll hide and their unique materials.
+  // Skip:
+  //   - Windows (Window1..Window5 + `_Inner`): InteriorLighting rebuilds them
+  //     as MeshBasicMaterial so they stay bright; also, they're the ship's
+  //     view to space and should remain visible.
+  //   - Captain's subtree (Empty_Captain and descendants): captainFadeRef
+  //     owns the captain's opacity during the fly-through; if we also write
+  //     opacity here every frame, we clobber that fade and the captain stays
+  //     visible (which reads as "the camera is stuck").
+  useEffect(() => {
+    // Desktop short-circuit: don't collect or mark any materials transparent.
+    // Marking materials transparent even with opacity=1 puts them on the
+    // back-to-front transparent-sort path, which flickers as the camera
+    // rotates and makes interior panels pop in/out.
+    if (typeof window !== "undefined" && window.innerWidth >= 640) return;
+
+    const group = scene.getObjectByName("MOBILE_HIDE");
+    if (!group) {
+      console.warn("[MobileHideController] 'MOBILE_HIDE' not found in GLB");
+      return;
+    }
+    groupRef.current = group;
+
+    // Captain subtree: collect both node UUIDs (to skip meshes) AND material
+    // UUIDs (to skip materials). The hat, hair, etc. often share a material
+    // with other Captain meshes; if that material is ALSO used by something
+    // outside the Captain subtree under MOBILE_HIDE, a naive mesh-only skip
+    // still pulls the shared material into our fade list and drags the hat
+    // invisible along with the rest.
+    const captainNodeIds = new Set();
+    const captainMaterialIds = new Set();
+    const captainEmpty = scene.getObjectByName("Empty_Captain");
+    if (captainEmpty) {
+      captainEmpty.traverse((n) => {
+        captainNodeIds.add(n.uuid);
+        if (!n.isMesh || !n.material) return;
+        const ms = Array.isArray(n.material) ? n.material : [n.material];
+        ms.forEach((m) => m && captainMaterialIds.add(m.uuid));
+      });
+    }
+
+    const meshes = [];
+    const mats = [];
+    const isWindow = (name) => /^Window[1-5](_Inner)?$/.test(name || "");
+    group.traverse((child) => {
+      if (!child.isMesh) return;
+      if (isWindow(child.name)) return;
+      if (captainNodeIds.has(child.uuid)) return;
+      meshes.push(child);
+      if (!child.material) return;
+      const ms = Array.isArray(child.material) ? child.material : [child.material];
+      ms.forEach((m) => {
+        if (!m) return;
+        if (captainMaterialIds.has(m.uuid)) return; // shared with Captain — don't touch
+        if (mats.includes(m)) return;
+        m.transparent = true;
+        mats.push(m);
+      });
+    });
+    meshesRef.current = meshes;
+    materialsRef.current = mats;
+  }, [scene]);
+
+  useFrame((_, delta) => {
+    const meshes = meshesRef.current;
+    const mats = materialsRef.current;
+    if (meshes.length === 0 || mats.length === 0) return;
+
+    // Target opacity: hide only when on mobile AND the camera has come
+    // to rest inside the ship (scripted sequence completed OR broken out
+    // of). Resets to full visibility on zoom-out.
+    const atRest = inSpaceshipRef?.current && !sequenceRunningRef?.current;
+    const shouldHide = isMobileRef.current && atRest;
+    const target = shouldHide ? 0 : 1;
+
+    // Drive the Captain's fade target to match — so the captain follows
+    // the same rhythm as the rest of MOBILE_HIDE on mobile. On desktop
+    // (shouldHide=false), we leave captainFadeRef.current.target alone
+    // so the scripted fly-through fade + zoom-out restore still work.
+    if (shouldHide && captainFadeRef?.current && captainFadeRef.current.target !== 0) {
+      captainFadeRef.current.target = 0;
+    }
+    // Frame-rate-independent exponential ease — ~400ms to effectively land.
+    const k = 1 - Math.exp(-delta * 4);
+    currentOpacityRef.current += (target - currentOpacityRef.current) * k;
+
+    const op = currentOpacityRef.current;
+    for (let i = 0; i < mats.length; i++) mats[i].opacity = op;
+
+    // Skip rendering per-mesh when fully faded (Windows excluded at collection
+    // time, so they always render regardless of what the rest is doing).
+    const shouldRender = op > 0.02;
+    for (let i = 0; i < meshes.length; i++) {
+      if (meshes[i].visible !== shouldRender) meshes[i].visible = shouldRender;
+    }
   });
 
   return null;
@@ -2274,8 +2485,16 @@ function MobileGooOverlay({ visible, onClose, statueMode, hologramSwapRef }) {
           modal with paginated readout. ── */}
       <button
         type="button"
-        onClick={() => { setModalOpen(true); setHasOpened(true); }}
-        aria-label="Open module readout"
+        onClick={() => {
+          setHasOpened(true);
+          const targetIndex = statueMode ? 0 : 1;
+          setPendingTab(targetIndex);
+          playTap();
+          hologramSwapRef?.current?.();
+          if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current);
+          pendingTimerRef.current = setTimeout(() => setPendingTab(null), 3000);
+        }}
+        aria-label={statueMode ? "Switch to core sample" : "Switch to soul module"}
         style={{
           position: "fixed",
           bottom: "calc(5.5rem + env(safe-area-inset-bottom, 0px))",
@@ -2286,13 +2505,14 @@ function MobileGooOverlay({ visible, onClose, statueMode, hologramSwapRef }) {
           alignItems: "center",
           justifyContent: "center",
           background: HUD.panelBg,
-          border: `1px solid rgba(107,199,209,0.5)`,
+          border: `1px solid ${pendingTab !== null ? "rgba(107,199,209,0.95)" : "rgba(107,199,209,0.5)"}`,
           backdropFilter: "blur(6px) saturate(140%)",
           WebkitBackdropFilter: "blur(6px) saturate(140%)",
           color: HUD.cyan,
           cursor: "pointer",
           padding: 0,
           opacity,
+          overflow: "hidden",
           /* Hide while the modal is open — the modal IS the readout, so
              the bot doesn't need to compete. Reappears as soon as the
              modal closes. */
@@ -2301,11 +2521,34 @@ function MobileGooOverlay({ visible, onClose, statueMode, hologramSwapRef }) {
              of the nav bar (also 10000). */
           zIndex: 10001,
           WebkitTapHighlightColor: "transparent",
-          /* Pulse only before first open — after, it stays static and quiet. */
-          animation: hasOpened ? "none" : "gooBotPulse 2s ease-in-out infinite",
-          transition: "opacity 0.45s ease",
+          /* Idle: gentle pulse before first open. Processing: faster cyan
+             pulse to signal the swap is in flight. Otherwise: quiet. */
+          animation: pendingTab !== null
+            ? "gooBotProcessing 0.9s ease-in-out infinite"
+            : hasOpened
+              ? "none"
+              : "gooBotPulse 2s ease-in-out infinite",
+          transition: "opacity 0.45s ease, border-color 0.2s ease",
         }}
       >
+        {/* Rotating scan ring — only visible while a swap is in flight.
+            Sits behind the icon (pointer-events: none, low z-index) and
+            sweeps a cyan arc around the button to indicate "working." */}
+        {pendingTab !== null && (
+          <span
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              inset: -1,
+              borderRadius: "50%",
+              background: "conic-gradient(from 0deg, rgba(107,199,209,0) 0deg, rgba(107,199,209,0) 240deg, rgba(107,199,209,0.85) 320deg, rgba(107,199,209,0) 360deg)",
+              WebkitMask: "radial-gradient(circle, transparent 28px, #000 30px, #000 33px, transparent 34px)",
+              mask: "radial-gradient(circle, transparent 28px, #000 30px, #000 33px, transparent 34px)",
+              animation: "gooBotScanSpin 1.1s linear infinite",
+              pointerEvents: "none",
+            }}
+          />
+        )}
         <svg
           width="34" height="34" viewBox="0 0 24 24"
           fill="none" stroke="currentColor"
@@ -2314,14 +2557,26 @@ function MobileGooOverlay({ visible, onClose, statueMode, hologramSwapRef }) {
           style={{
             filter: "drop-shadow(0 0 6px rgba(107,199,209,0.55))",
             animation: hasOpened ? "none" : "gooBotIcon 2s ease-in-out infinite",
+            opacity: pendingTab !== null ? 0.55 : 1,
+            transition: "opacity 0.2s ease",
+            position: "relative",
+            zIndex: 1,
           }}
         >
-          <path d="M12 6V2H8" />
-          <path d="M15 11v2" />
-          <path d="M2 12h2" />
-          <path d="M20 12h2" />
-          <path d="M20 16a2 2 0 0 1-2 2H8.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 4 20.286V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z" />
-          <path d="M9 11v2" />
+          {statueMode ? (
+            <>
+              <path d="M11.264 2.205A4 4 0 0 0 6.42 4.211l-4 8a4 4 0 0 0 1.359 5.117l6 4a4 4 0 0 0 4.438 0l6-4a4 4 0 0 0 1.576-4.592l-2-6a4 4 0 0 0-2.53-2.53z" />
+              <path d="M11.99 22 14 12l7.822 3.184" />
+              <path d="M14 12 8.47 2.302" />
+            </>
+          ) : (
+            <>
+              <path d="M11 5.5a1 1 0 0 1 5 0V16a5 5 0 0 0 5 5" />
+              <path d="M16 11.5a1 1 0 0 1 5 0V16a5 5 0 0 1-5 5" />
+              <path d="M6 19V6a3 3 0 0 0-3-3h0" />
+              <path d="M6 5.5a1 1 0 0 1 5 0V19" />
+            </>
+          )}
         </svg>
       </button>
 
@@ -2364,6 +2619,26 @@ function MobileGooOverlay({ visible, onClose, statueMode, hologramSwapRef }) {
         @keyframes gooTabScan {
           0%   { background-position: -100% 0; }
           100% { background-position:  200% 0; }
+        }
+        @keyframes gooBotProcessing {
+          0%, 100% {
+            box-shadow:
+              0 0 0 1px rgba(0,0,0,0.35),
+              0 8px 22px -8px rgba(0,0,0,0.6),
+              0 0 14px 2px rgba(107,199,209,0.45),
+              inset 0 1px 0 rgba(107,199,209,0.18);
+          }
+          50% {
+            box-shadow:
+              0 0 0 1px rgba(0,0,0,0.35),
+              0 8px 24px -8px rgba(0,0,0,0.6),
+              0 0 30px 6px rgba(107,199,209,0.85),
+              inset 0 1px 0 rgba(107,199,209,0.28);
+          }
+        }
+        @keyframes gooBotScanSpin {
+          0%   { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
         }
       `}</style>
     </>
@@ -2897,7 +3172,14 @@ function GooOverlay({ visible, onClose, statueMode = false, hologramSwapRef }) {
   );
 }
 
-export default function SpaceScene({ onZoomChange, antennaScreenRef } = {}) {
+// Sits inside the Suspense boundary so it only mounts after the GLB has
+// resolved — fires onReady once, letting the page drop its loader overlay.
+function ReadySignal({ onReady }) {
+  useEffect(() => { onReady?.(); }, [onReady]);
+  return null;
+}
+
+export default function SpaceScene({ onZoomChange, antennaScreenRef, onReady } = {}) {
   const [zoomed, setZoomed] = useState(false);
   const [showGooOverlay, setShowGooOverlay] = useState(false);
   const [showStatue, setShowStatue] = useState(true);
@@ -2950,6 +3232,8 @@ export default function SpaceScene({ onZoomChange, antennaScreenRef } = {}) {
 
   const controlsRef = useRef(null);
 
+  const lookingScheduleRef = useRef(null);
+
   const zoomCtx = React.useMemo(() => ({
     zoomed, setZoomed,
     targetPos, setTargetPos,
@@ -2967,6 +3251,7 @@ export default function SpaceScene({ onZoomChange, antennaScreenRef } = {}) {
     toggleHologram,
     showStatue,
     hologramSwapRef,
+    lookingScheduleRef,
   }), [zoomed, targetPos, targetLookAt, defaultPos, defaultLookAt, toggleHologram, showStatue]);
 
   return (
@@ -3038,6 +3323,9 @@ export default function SpaceScene({ onZoomChange, antennaScreenRef } = {}) {
               shadow-bias={-0.0001}
             />
             <Model url="/models/Scene3.glb" />
+            <ReadySignal onReady={onReady} />
+            {/* Fades the MOBILE_HIDE Empty + descendants when mobile + zoomed. */}
+            <MobileHideController />
             {/* HoloProjector: existing 3D hologram (tesseract / penrose / etc.) */}
             {/* <HoloProjector /> */}
             {/* HologooR3F: in-scene port of the Hologoo metaball shader,

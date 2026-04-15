@@ -6,9 +6,9 @@ import { useFrame, useThree } from "@react-three/fiber";
 
 function HolographicStatue3({
   onLoad,
-  position = [0.01, 1.35, 0.134],  // Default position if not provided
+  position = [0.01, 1.37, 0.134],  // Default position if not provided
   rotation = [0, 0, 0],  // Default rotation if not provided
-  scale = [0.25, 0.25, 0.25],  // Default scale if not provided
+  scale = [0.3, 0.3, 0.3],  // Default scale if not provided
   hover = false,  // Disable hover animation by default
   rotate = true,  // Disable rotation animation by default
   active = true  // When false: hide scene group and skip useFrame work
@@ -105,7 +105,7 @@ function HolographicStatue3({
         blending: THREE.AdditiveBlending,
         depthWrite: true,
         depthTest: true,
-        side: THREE.FrontSide,
+        // side: THREE.FrontSide,
       }),
     []
   );
@@ -174,7 +174,7 @@ function HolographicStatue3({
         `,
         transparent: true,
         blending: THREE.AdditiveBlending,
-        depthWrite: false,
+        depthWrite: true,
         depthTest: true,
         side: THREE.DoubleSide,
       }),
@@ -411,6 +411,7 @@ function HolographicStatue3({
 
       // Create an anchor group with initial position
       const anchorGroup = new THREE.Group();
+      anchorGroup.name = "HologramAnchor";
       // Use position from props instead of hardcoded position
       anchorGroup.position.set(position[0], position[1], position[2]);
       anchorGroup.visible = active;

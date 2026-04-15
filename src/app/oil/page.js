@@ -26,7 +26,6 @@ import RogueAdminPanel from "@/components/RogueAdminPanel";
 import useCctvRecorder from "@/hooks/useCctvRecorder";
 import PumpPurchaseModal from "@/components/PumpPurchaseModal";
 import { UnifiedAccountModal } from "@/components/UnifiedAccountModal";
-import ShaderText from "@/components/ShaderText";
 
 // ── Environment presets ──────────────────────────────────────────────────────
 const ENV_PRESETS = {
@@ -3048,20 +3047,7 @@ export default function OilPage() {
             </div>
             <div>
               <h1 style={{ ...styles.title, fontSize: 12, display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}>
-                <ShaderText
-                  text="HAIL MARY"
-                  font="'Blackletter Outline', serif"
-                  fontWeight={900}
-                  width={140}
-                  height={28}
-                  colorBg={theme.bg}
-                  colorFill={theme.gold}
-                  colorOutline="#00000048"
-                  outlineWidth={2.5}
-                  density={12}
-                  speed={0.08}
-                  turbulence={0.45}
-                />
+                <span style={{ fontFamily: "'Blackletter', serif", fontWeight: 900, color: theme.accent }}>HAIL MARY</span>
                 <span>PROSPECTING CO.{modeBadge}</span>
               </h1>
               <p style={styles.subtitle}>OIL PROSPECTOR</p>
@@ -3430,21 +3416,7 @@ export default function OilPage() {
           </div>
           <div>
             <h1 style={{ ...styles.title, display: "flex", alignItems: "center", gap: 8 }}>
-              <ShaderText
-                text="HAIL MARY"
-                font="'Blackletter Outline', serif"
-                fontWeight={900}
-                width={160}
-                height={28}
-                colorBg={theme.bg}
-                colorFill={theme.gold}
-                colorOutline="#00000048"
-                outlineWidth={2.5}
-                density={12}
-                speed={0.08}
-                turbulence={0.45}
-              />
-              <span>PROSPECTING CO.{modeBadge}</span>
+              <span>HAIL MARY PROSPECTING CO.{modeBadge}</span>
             </h1>
             <p style={styles.subtitle}>OIL PROSPECTOR</p>
           </div>

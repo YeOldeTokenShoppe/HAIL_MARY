@@ -46,6 +46,9 @@ export default function HomePage() {
   const [showComms, setShowComms] = useState(false);
   const [showMission, setShowMission] = useState(false);
   const [activeCrewIndex, setActiveCrewIndex] = useState(0);
+  // Keep the CoinLoader on top until SpaceScene's GLB has actually loaded,
+  // so we don't flash the bare .bg gradient between chunk-load and GLB-load.
+  const [sceneReady, setSceneReady] = useState(false);
   // When SpaceScene enters its zoom-in animation, fade out the HUD overlays
   // (both panels + beam) so the user can focus on the character cameo.
   const [sceneZoomed, setSceneZoomed] = useState(false);
@@ -155,7 +158,15 @@ export default function HomePage() {
 
   return (
     <>
-      <SpaceScene onZoomChange={setSceneZoomed} antennaScreenRef={antennaScreenRef} />
+      <SpaceScene
+        onZoomChange={setSceneZoomed}
+        antennaScreenRef={antennaScreenRef}
+        onReady={() => setSceneReady(true)}
+      />
+
+      {/* Stays on top through both phases (chunk load, then GLB load) until
+          SpaceScene signals ready — prevents the purple-gradient flash. */}
+      <CoinLoader loading={!sceneReady} />
 
       <CommsPanel
         open={showComms}
