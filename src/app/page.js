@@ -493,7 +493,7 @@ export default function HomePage() {
             onBurnedOut={doExtinguish}
             debugRef={debugRef}
           />
-          {/* <Stats className="r3f-stats" /> */}
+          <Stats className="r3f-stats" />
         </StarfieldStatueScene>
       </div>
 
@@ -519,6 +519,9 @@ export default function HomePage() {
             <cite className="hero-pullquote-source">
               Missale Degenorum
             </cite>
+            <span className="hero-pullquote-gloss" aria-hidden="true">
+              Our Lady of Perpetual Profit, pray for us.
+            </span>
           </blockquote>
           <p className="hero-intro">
 A refuge for the rekt, a liturgy for the ledger, a confessional for your worst trades. RL80 is the token of her order. The faithful are known by their bags. </p>

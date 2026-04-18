@@ -552,6 +552,27 @@
   font-style: normal;
 }
 
+/* Touch devices don't fire `title` tooltips — surface the translation as a
+   small always-visible gloss for them. Hidden on hover-capable devices so the
+   desktop reveal-on-hover moment is preserved. */
+.shrine-page.neon .hero-pullquote-gloss {
+  display: none;
+  font-family: "IBM Plex Serif", Georgia, serif;
+  font-style: italic;
+  font-size: 0.75rem;
+  color: #8fa8b8;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+@media (hover: none) {
+  .shrine-page.neon .hero-pullquote-gloss {
+    display: block;
+  }
+}
+
 @media (max-width: 700px) {
   .shrine-page.neon .hero-pullquote-latin {
     white-space: normal;
