@@ -38,6 +38,9 @@ export default function MobileBottomNav({
   centerLabel = null,
   centerSubLabel = 'RL80',
   centerTitle = 'Buy RL80',
+  // When set (0..1), renders a depleting gold arc around the center FAB —
+  // used as the candle melt timer. `null` hides the ring entirely.
+  centerProgress = null,
   menuIcon = null,
   menuLabel = 'MENU',
 }) {
@@ -369,6 +372,32 @@ export default function MobileBottomNav({
           animation: btmFabPulse 0.6s ease;
         }
 
+        /* Sibling wrapper around the FAB so the SVG ring can sit outside
+           the button's gradient border without being clipped by its
+           padding-box/border-box background trick. */
+        .btm-buy-fab-wrap {
+          position: relative;
+          width: 60px;
+          height: 60px;
+        }
+
+        /* Melt-timer ring — overlays the FAB and depletes clockwise as the
+           candle burns. pointer-events:none so clicks still reach the FAB. */
+        .btm-buy-ring {
+          position: absolute;
+          inset: -6px;
+          width: calc(100% + 12px);
+          height: calc(100% + 12px);
+          pointer-events: none;
+          overflow: visible;
+          filter: drop-shadow(0 0 5px rgba(241, 215, 122, 0.6));
+          z-index: 3;
+        }
+
+        .btm-buy-ring circle {
+          transition: stroke-dashoffset 600ms linear;
+        }
+
         /* ---- WALLET/ACCOUNT ---- */
         .btm-wallet-avatar {
           width: 28px;
@@ -557,15 +586,50 @@ export default function MobileBottomNav({
               centerLabel/centerTitle/centerSubLabel + onBuyClick). */}
           {onBuyClick && (
             <div className="btm-buy-wrapper">
-              <button
-                className={`btm-buy-fab ${buyPulse ? 'pulse' : ''}`}
-                onClick={onBuyClick}
-                title={centerTitle}
-              >
-                <span className="btm-buy-text">
-                  {centerLabel ?? t('navControls.buy')}
-                </span>
-              </button>
+              <div className="btm-buy-fab-wrap">
+                <button
+                  className={`btm-buy-fab ${buyPulse ? 'pulse' : ''}`}
+                  onClick={onBuyClick}
+                  title={centerTitle}
+                >
+                  <span className="btm-buy-text">
+                    {centerLabel ?? t('navControls.buy')}
+                  </span>
+                </button>
+                {typeof centerProgress === 'number' && (
+                  <svg
+                    className="btm-buy-ring"
+                    viewBox="0 0 72 72"
+                    aria-hidden="true"
+                  >
+                    {/* Track — faint so only the filled arc reads. */}
+                    <circle
+                      cx="36"
+                      cy="36"
+                      r="34"
+                      fill="none"
+                      stroke="rgba(241, 215, 122, 0.15)"
+                      strokeWidth="2.5"
+                    />
+                    {/* Depleting arc — starts at 12 o'clock, goes clockwise. */}
+                    <circle
+                      cx="36"
+                      cy="36"
+                      r="34"
+                      fill="none"
+                      stroke="#f1d77a"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeDasharray={2 * Math.PI * 34}
+                      strokeDashoffset={
+                        2 * Math.PI * 34 *
+                        (1 - Math.max(0, Math.min(1, centerProgress)))
+                      }
+                      transform="rotate(-90 36 36)"
+                    />
+                  </svg>
+                )}
+              </div>
               <span className="btm-buy-label">{centerSubLabel}</span>
             </div>
           )}

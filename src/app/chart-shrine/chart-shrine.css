@@ -226,7 +226,7 @@
   width: 100%;
   max-width: 1200px;
   padding-left: 1rem;
-  margin-top: 8vh;
+  /* margin-top: 8vh; */
 }
 
 /* Full-page hologram background: the scene lives behind all page content. */
@@ -509,6 +509,56 @@
     0 0 20px rgba(217, 45, 176, 0.3);
 }
 
+.shrine-page.neon .hero-pullquote {
+  margin: 0;
+  padding: 6px 22px;
+  position: relative;
+  border-left: 2px solid rgba(42, 214, 238, 0.55);
+  border-right: 2px solid rgba(217, 45, 176, 0.45);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: center;
+  max-width: 56ch;
+}
+
+.shrine-page.neon .hero-pullquote-latin {
+  margin: 0;
+  font-family: "UnifrakturCook", "Pirata One", serif;
+  font-size: clamp(1.3rem, 2.5vw, 1.75rem);
+  line-height: 1.15;
+  color: #f1d77a;
+  letter-spacing: 0.02em;
+  text-shadow:
+    0 0 10px rgba(241, 215, 122, 0.35),
+    0 0 22px rgba(217, 45, 176, 0.25);
+  text-wrap: balance;
+  white-space: nowrap;
+}
+
+.shrine-page.neon .hero-pullquote-source {
+  font-family: "IBM Plex Serif", Georgia, serif;
+  font-style: italic;
+  font-size: 0.78rem;
+  color: #a8c8d8;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.shrine-page.neon .hero-pullquote-source::before {
+  content: "— ";
+  opacity: 0.7;
+  font-style: normal;
+}
+
+@media (max-width: 700px) {
+  .shrine-page.neon .hero-pullquote-latin {
+    white-space: normal;
+    font-size: clamp(1.15rem, 5.2vw, 1.5rem);
+  }
+}
+
 .shrine-page.neon .hero-intro {
   font-family: "IBM Plex Serif", Georgia, serif;
   color: #a8c8d8;
@@ -734,4 +784,83 @@
   .shrine-halo {
     animation: none;
   }
+}
+
+/* Post-ignition nudge — anon user just lit a candle; offer sign-in as a
+   reward ("save your flame"), not a gate. Docks above the mobile nav. */
+.flame-nudge {
+  position: fixed;
+  left: 50%;
+  bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  max-width: min(420px, calc(100vw - 32px));
+  background: linear-gradient(
+    180deg,
+    rgba(48, 26, 22, 0.55) 0%,
+    rgba(62, 32, 28, 0.58) 100%
+  );
+  backdrop-filter: blur(14px) saturate(1.25);
+  -webkit-backdrop-filter: blur(14px) saturate(1.25);
+  border: 1px solid rgba(241, 215, 122, 0.45);
+  border-radius: 4px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45),
+    0 0 24px rgba(241, 215, 122, 0.15),
+    inset 0 1px 0 rgba(255, 220, 160, 0.08);
+  animation: flameNudgeIn 280ms ease-out;
+}
+
+@keyframes flameNudgeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.flame-nudge-text {
+  margin: 0;
+  color: #e9d48d;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.flame-nudge-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.flame-nudge-cta {
+  padding: 8px 16px;
+  font-size: 12px;
+}
+
+.flame-nudge-dismiss {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid #4a3a2a;
+  border-radius: 2px;
+  color: #a89970;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease;
+}
+
+.flame-nudge-dismiss:hover {
+  color: #f1d77a;
+  border-color: #9a7a35;
 }

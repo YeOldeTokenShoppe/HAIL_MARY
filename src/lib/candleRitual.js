@@ -1,5 +1,6 @@
 "use client";
 
+import { Timestamp } from "firebase/firestore";
 import {
   db,
   doc,
@@ -32,14 +33,23 @@ export async function readCandle(userId) {
   }
 }
 
-export async function lightCandle(userId, { displayName, avatarUrl } = {}) {
+export async function lightCandle(
+  userId,
+  { displayName, avatarUrl, litAtMs } = {},
+) {
   if (!db || !userId) return;
   try {
     await setDoc(doc(db, COLLECTION, userId), {
       userId,
       displayName: displayName ?? null,
       avatarUrl: avatarUrl ?? null,
-      litAt: serverTimestamp(),
+      // Preserve a caller-supplied timestamp (e.g. when promoting an
+      // anonymous candle that was lit before sign-in) so the melt timer
+      // continues from the original ignition instead of resetting.
+      litAt:
+        typeof litAtMs === "number"
+          ? Timestamp.fromMillis(litAtMs)
+          : serverTimestamp(),
     });
   } catch (err) {
     console.warn("[candleRitual] lightCandle failed:", err);

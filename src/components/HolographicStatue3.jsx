@@ -395,16 +395,10 @@ function HolographicStatue3({
       const mixer = new THREE.AnimationMixer(statue);
       mixerRef.current = mixer;
 
-      // Find and play the HaloRotation animation
-      const haloAnimation = gltf.animations.find(
-        (anim) => anim.name === "HaloRotation"
-      );
-      if (haloAnimation) {
-        const action = mixer.clipAction(haloAnimation);
-        action.play();
-      } else {
-        // console.warn("HaloRotation animation not found in the model");
-      }
+      // HaloRotation GLTF clip intentionally not played — the manual
+      // rotation of the HaloMaster parent in useFrame spins both halo
+      // texts together. Playing the clip on top caused the two rings to
+      // drift out of sync when it targeted a child node at a different rate.
 
       // Create an anchor group with initial position
       const anchorGroup = new THREE.Group();
@@ -491,8 +485,8 @@ function HolographicStatue3({
               color: sapphire,
               emissive: sapphire,
               emissiveIntensity: 3.5,
-              metalness: 0.8,
-              roughness: 0.2,
+              metalness: 1.0,
+              roughness: 0.08,
               side: THREE.DoubleSide,
               transparent: true,
               depthWrite: false,
@@ -503,12 +497,15 @@ function HolographicStatue3({
             // ring rather than being obscured by it.
             child.renderOrder = 105;
           } else if (meshName.includes("halotext1")) {
+            // Deep amber-gold so additive blending doesn't wash the green
+            // channel up to pale yellow/white.
+            const gold = new THREE.Color(0xd4a017);
             child.material = new THREE.MeshStandardMaterial({
-              color: child.material.color,
-              emissive: child.material.color,
-              emissiveIntensity: 1.0,
-              metalness: 0.8,
-              roughness: 0.2,
+              color: gold,
+              emissive: gold,
+              emissiveIntensity: 0.8,
+              metalness: 1.0,
+              roughness: 0.08,
               side: THREE.DoubleSide,
               transparent: true,
               depthWrite: false,
@@ -609,6 +606,14 @@ function HolographicStatue3({
       animatedMaterialsRef.current.push(depthMaterial);
 
       const depthClone = statue.clone(true);
+
+      // Strip the halo subtree — the clone's HaloMaster doesn't rotate with
+      // the original, so its depth mask would stay frozen while the visual
+      // halo spins, causing depth-test artifacts along the rings.
+      const haloInDepthClone = depthClone.getObjectByName('HaloMaster')
+        || depthClone.children.find((c) => c.name?.toLowerCase() === 'halomaster');
+      if (haloInDepthClone) haloInDepthClone.parent.remove(haloInDepthClone);
+
       depthClone.traverse((child) => {
         if (child.isMesh) {
           child.material = depthMaterial;

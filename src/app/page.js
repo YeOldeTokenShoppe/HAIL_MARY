@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { useGLTF, Stats } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
@@ -14,6 +14,11 @@ import {
   lightCandle,
   extinguishCandle,
 } from "@/lib/candleRitual";
+import {
+  readLocalCandle,
+  writeLocalCandle,
+  clearLocalCandle,
+} from "@/lib/localCandle";
 import "./chart-shrine/chart-shrine.css";
 
 useGLTF.preload("/models/JustCandle.glb");
@@ -26,6 +31,19 @@ const StarfieldStatueScene = dynamic(
 // Melt window — 1 minute for testing; flip back to `24 * 60 * 60 * 1000` for prod.
 const MELT_DURATION_MS = 24 * 60 * 60 * 1000;
 
+// Compact remaining-time label for the CANDLE FAB countdown. HH:MM:SS
+// always so the ticking seconds confirm the clock is live.
+function formatRemaining(litAtMs) {
+  const remaining = Math.max(0, MELT_DURATION_MS - (Date.now() - litAtMs));
+  const totalSeconds = Math.floor(remaining / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const mm = String(minutes).padStart(2, "0");
+  const ss = String(seconds).padStart(2, "0");
+  return `${hours}:${mm}:${ss}`;
+}
+
 // useGLTF caches the scene across mounts, so we cache the ORIGINAL
 // export-time scale the first time we see each Wax mesh. Otherwise a
 // subsequent mount would read back our previously-melted scale and treat
@@ -36,7 +54,7 @@ const WAX_BASELINE_CACHE = new WeakMap();
 // position while the crane shot orbits. Single Canvas, no extra WebGL context.
 // Base intensity of the warm candle fill light — flicker and ignition
 // pulse are computed relative to this.
-const WARM_BASE_INTENSITY = 1.4;
+const WARM_BASE_INTENSITY = 0.2;
 
 function HeroAltarObject({ candleLit = false, litAt = null, onBurnedOut, debugRef }) {
   const { scene } = useGLTF("/models/JustCandle.glb");
@@ -53,8 +71,37 @@ function HeroAltarObject({ candleLit = false, litAt = null, onBurnedOut, debugRe
   // Ignition VFX: flicker/pulse on the warm light, expanding halo sphere.
   const warmLightRef = useRef(null);
   const haloRef = useRef(null);
+  const glowRef = useRef(null);
   const ignitionTimeRef = useRef(null);
   const prevLitRef = useRef(candleLit);
+
+  // Radial-gradient texture for the persistent backlight glow. Generated
+  // once on the client so we don't need to ship an asset.
+  const glowTexture = useMemo(() => {
+    if (typeof document === "undefined") return null;
+    const size = 128;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    const gradient = ctx.createRadialGradient(
+      size / 2,
+      size / 2,
+      0,
+      size / 2,
+      size / 2,
+      size / 2,
+    );
+    gradient.addColorStop(0, "rgba(255, 210, 140, 0.9)");
+    gradient.addColorStop(0.35, "rgba(255, 170, 90, 0.35)");
+    gradient.addColorStop(0.6, "rgba(180, 100, 220, 0.08)");
+    gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, size, size);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }, []);
 
   // Locate the "Wax" mesh once after the GLB loads, cache the original
   // baseline scale, and reset the mesh to that baseline so any leftover
@@ -177,6 +224,17 @@ function HeroAltarObject({ candleLit = false, litAt = null, onBurnedOut, debugRe
       }
     }
 
+    // --- Persistent backlight glow — tight, subtle outline when unlit;
+    //     warmer bloom when lit. ---
+    if (glowRef.current) {
+      const t = performance.now() / 1000;
+      const pulse = 1 + 0.04 * Math.sin(t * 1.8);
+      const baseOpacity = candleLit ? 0.35 : 0.18;
+      const baseScale = candleLit ? 1.8 : 1.4;
+      glowRef.current.material.opacity = baseOpacity * pulse;
+      glowRef.current.scale.setScalar(baseScale * pulse);
+    }
+
     // --- Expanding halo sphere on ignition — bigger, faster, brighter ---
     if (haloRef.current) {
       const live =
@@ -219,6 +277,22 @@ function HeroAltarObject({ candleLit = false, litAt = null, onBurnedOut, debugRe
 
   return (
     <group ref={groupRef}>
+      {/* Persistent backlight glow — keeps the candle readable against the
+          dark statue behind it. Additive sprite sits behind the model and
+          always faces the camera (group is camera-anchored). */}
+      {glowTexture && (
+        <mesh ref={glowRef} position={[0, 0.95, -0.25]} renderOrder={-1}>
+          <planeGeometry args={[1, 1]} />
+          <meshBasicMaterial
+            map={glowTexture}
+            transparent
+            opacity={0.6}
+            depthWrite={false}
+            depthTest={false}
+            blending={THREE.AdditiveBlending}
+          />
+        </mesh>
+      )}
       <primitive object={scene} scale={1.2} />
       {/* Warm candle-side fill — drives ignition flash + ongoing flicker. */}
       <pointLight
@@ -276,30 +350,62 @@ export default function HomePage() {
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [candleLit, setCandleLit] = useState(false);
   const [litAt, setLitAt] = useState(null);
+  // Post-ignition nudge shown only to anonymous visitors who just lit a
+  // candle — frames sign-in as "save your flame" rather than a gate.
+  const [showSignInNudge, setShowSignInNudge] = useState(false);
   const debugRef = useRef(null);
 
-  // Hydrate lit state from Firestore when a user is signed in. Anonymous
-  // visitors can't light a candle — button opens sign-in instead.
+  // Hydrate lit state. Signed-in users come from Firestore; anonymous
+  // visitors come from localStorage. If an anon user signs in while their
+  // local candle is still burning, promote it into Firestore so the flame
+  // persists across devices.
   useEffect(() => {
     let cancelled = false;
     async function hydrate() {
       if (!userId) {
-        setLitAt(null);
-        setCandleLit(false);
+        const local = readLocalCandle();
+        if (
+          local?.litAtMs &&
+          Date.now() - local.litAtMs < MELT_DURATION_MS
+        ) {
+          setLitAt(local.litAtMs);
+          setCandleLit(true);
+        } else {
+          if (local?.litAtMs) clearLocalCandle();
+          setLitAt(null);
+          setCandleLit(false);
+        }
         return;
       }
-      const candle = await readCandle(userId);
+
+      const [remote, local] = [await readCandle(userId), readLocalCandle()];
       if (cancelled) return;
-      if (
-        candle?.litAtMs &&
-        Date.now() - candle.litAtMs < MELT_DURATION_MS
-      ) {
-        setLitAt(candle.litAtMs);
+
+      const remoteLive =
+        remote?.litAtMs && Date.now() - remote.litAtMs < MELT_DURATION_MS;
+      const localLive =
+        local?.litAtMs && Date.now() - local.litAtMs < MELT_DURATION_MS;
+
+      if (remoteLive) {
+        setLitAt(remote.litAtMs);
         setCandleLit(true);
+        if (local) clearLocalCandle();
+      } else if (localLive) {
+        // Promote the anonymous candle to the signed-in ledger so it
+        // survives device changes and can join social surfaces later.
+        // Pass the original litAtMs so the melt timer doesn't reset.
+        lightCandle(userId, {
+          displayName:
+            user?.fullName || user?.username || user?.firstName || null,
+          avatarUrl: user?.imageUrl ?? null,
+          litAtMs: local.litAtMs,
+        });
+        setLitAt(local.litAtMs);
+        setCandleLit(true);
+        clearLocalCandle();
       } else {
-        // Doc is either missing or expired; clear the stale record so we
-        // don't accumulate burned-out candles in the collection.
-        if (candle?.litAtMs) extinguishCandle(userId);
+        if (remote?.litAtMs) extinguishCandle(userId);
+        if (local?.litAtMs) clearLocalCandle();
         setLitAt(null);
         setCandleLit(false);
       }
@@ -308,32 +414,65 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [userId, user]);
 
   const doExtinguish = () => {
     if (userId) extinguishCandle(userId);
+    else clearLocalCandle();
     setCandleLit(false);
     setLitAt(null);
+    setShowSignInNudge(false);
   };
 
   const toggleCandle = () => {
-    if (!userId) {
-      openSignIn();
-      return;
-    }
     if (candleLit) {
       doExtinguish();
       return;
     }
     const now = Date.now();
-    lightCandle(userId, {
-      displayName:
-        user?.fullName || user?.username || user?.firstName || null,
-      avatarUrl: user?.imageUrl ?? null,
-    });
+    if (userId) {
+      lightCandle(userId, {
+        displayName:
+          user?.fullName || user?.username || user?.firstName || null,
+        avatarUrl: user?.imageUrl ?? null,
+      });
+    } else {
+      writeLocalCandle(now);
+      setShowSignInNudge(true);
+    }
     setLitAt(now);
     setCandleLit(true);
   };
+
+  // Auto-dismiss the nudge after 12s so it doesn't linger, and close it as
+  // soon as the user signs in (migration happens in the hydrate effect).
+  useEffect(() => {
+    if (!showSignInNudge) return;
+    const timer = setTimeout(() => setShowSignInNudge(false), 12000);
+    return () => clearTimeout(timer);
+  }, [showSignInNudge]);
+
+  useEffect(() => {
+    if (userId && showSignInNudge) setShowSignInNudge(false);
+  }, [userId, showSignInNudge]);
+
+  // Tick the melt-timer ring + countdown on the CANDLE FAB. 1Hz so the
+  // MM:SS readout in the final hour reads as a live clock; the ring's
+  // CSS transition smooths the arc between ticks.
+  const [meltProgress, setMeltProgress] = useState(0);
+  useEffect(() => {
+    if (!candleLit || !litAt) {
+      setMeltProgress(0);
+      return;
+    }
+    const compute = () => {
+      const p = Math.min((Date.now() - litAt) / MELT_DURATION_MS, 1);
+      setMeltProgress(p);
+    };
+    compute();
+    const id = setInterval(compute, 1000);
+    return () => clearInterval(id);
+  }, [candleLit, litAt]);
 
   return (
     <main className="shrine-page neon" style={{ background: "#000" }}>
@@ -370,9 +509,19 @@ export default function HomePage() {
 
       <div className="hero-band">
         <div className="hero-copy">
-          <h2 className="hero-subhead">A New Ritual</h2>
+          <blockquote
+            className="hero-pullquote"
+            title="Our Lady of Perpetual Profit, pray for us."
+          >
+            <p className="hero-pullquote-latin">
+              Domina nostra perpetui lucri, ora pro nobis.
+            </p>
+            <cite className="hero-pullquote-source">
+              Missale Degenorum
+            </cite>
+          </blockquote>
           <p className="hero-intro">
-Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. </p>
+A refuge for the rekt, a liturgy for the ledger, a confessional for your worst trades. RL80 is the token of her order. The faithful are known by their bags. </p>
         </div>
 
         <div className="shrine-column">
@@ -416,6 +565,31 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor i
         </button>
       </div> */}
 
+      {showSignInNudge && (
+        <div className="flame-nudge" role="status" aria-live="polite">
+          <p className="flame-nudge-text">
+            Your flame is burning. Sign in to save it to the shrine ledger.
+          </p>
+          <div className="flame-nudge-actions">
+            <button
+              type="button"
+              className="shrine-btn primary flame-nudge-cta"
+              onClick={() => openSignIn()}
+            >
+              Save my flame
+            </button>
+            <button
+              type="button"
+              className="flame-nudge-dismiss"
+              onClick={() => setShowSignInNudge(false)}
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       <MobileBottomNav
         /* Reduced to 3 slots: LOGIN (account) | CANDLE (center FAB) | BUY
            (menu slot). Music and Wallet slots are suppressed. */
@@ -434,8 +608,36 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor i
             />
           )
         }
-        centerSubLabel="CANDLE"
+        centerSubLabel={
+          candleLit && litAt ? (
+            <span
+              style={{
+                display: "inline-flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 2,
+              }}
+            >
+              <span>CANDLE</span>
+              <span
+                style={{
+                  fontSize: 9,
+                  letterSpacing: "1.2px",
+                  color: "#f1d77a",
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                {formatRemaining(litAt)}
+              </span>
+            </span>
+          ) : (
+            "CANDLE"
+          )
+        }
         centerTitle={candleLit ? "Extinguish candle" : "Light candle"}
+        /* Filling gold arc around the FAB — 0 when just lit, 1 at
+           burnout. Only rendered while a candle is actually lit. */
+        centerProgress={candleLit ? meltProgress : null}
         /* Repurpose the menu slot as the Buy button. */
         onMenuClick={() => setShowBuyModal(true)}
         menuIcon={
