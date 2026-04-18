@@ -110,6 +110,16 @@ function createFlameMaterial(phase = 0) {
 // bloom pass — much less work and avoids the full-frame black-flash that
 // the plain <Bloom> pass produces in this stack.
 export function CandleOrbitalEffects() {
+  // Disable bloom on mobile/tablet — the EffectComposer allocates FBOs and
+  // runs an extra render pass per frame. Keeps sustained GPU load low
+  // enough that iOS Safari's watchdog doesn't kill the tab over minutes.
+  // Flame fragment shader is self-luminous at 3.5x intensity so flames
+  // still read without the halo spread.
+  const isMobileDevice =
+    typeof navigator !== 'undefined' &&
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  if (isMobileDevice) return null;
+
   return (
     <EffectComposer multisampling={0} enableNormalPass={false} stencilBuffer={false}>
       <SelectiveBloom

@@ -4,51 +4,6 @@ import React, { useRef, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
-// Generate smooth price-like data using sine waves
-// Frequencies are exact integer multiples of the base frequency so the
-// wave completes full cycles and wraps seamlessly around the loop.
-function generateChartData(pointCount, seed = 0) {
-  const data = []
-  const totalT = pointCount * 0.1
-  const baseFreq = (2 * Math.PI) / totalT
-
-  for (let i = 0; i < pointCount; i++) {
-    const t = i * 0.1 + seed
-    const value = 0.5 +
-      Math.sin(t * baseFreq * 1) * 0.2 +
-      Math.sin(t * baseFreq * 2 + 1) * 0.15 +
-      Math.sin(t * baseFreq * 3 + 2) * 0.1 +
-      Math.sin(t * baseFreq * 5) * 0.05
-
-    data.push(Math.max(0.1, Math.min(0.9, value)))
-  }
-
-  return data
-}
-
-// Generate volume-like data (varied heights per bar, like real trade volume)
-function generateVolumeData(count, seed = 0) {
-  const data = []
-  for (let i = 0; i < count; i++) {
-    // Use the bar index to create a unique hash-like offset per bar
-    // so neighboring bars get very different values
-    const hash = Math.sin(i * 127.1 + 311.7) * 43758.5453
-    const barSeed = hash - Math.floor(hash) // pseudo-random 0-1 per bar
-
-    const t = seed + barSeed * 100
-    // Mix several frequencies with the per-bar offset for variety
-    const v1 = Math.abs(Math.sin(t * 0.4 + i * 2.3)) * 0.35
-    const v2 = Math.abs(Math.sin(t * 1.1 + i * 5.7 + 1.3)) * 0.25
-    const v3 = Math.abs(Math.sin(t * 0.7 + i * 11.1 + 4.0)) * 0.2
-    // Occasional tall spikes
-    const spike = Math.pow(Math.abs(Math.sin(t * 0.3 + i * 3.9)), 6) * 0.5
-
-    const value = 0.05 + v1 + v2 + v3 + spike
-    data.push(Math.min(0.95, value))
-  }
-  return data
-}
-
 function BackgroundChart({
   position = [0, 0, 0],
   rotation = [0, 0, 0],
@@ -162,19 +117,30 @@ function BackgroundChart({
     side: THREE.DoubleSide,
   }), [barColor, barOpacity])
 
-  // Animate the chart
+  // Animate the chart — inline the chart/volume math so we don't allocate
+  // two new arrays per frame (ran at ~60fps, ~170 push() calls + array
+  // growth was constant GC pressure on mobile).
   useFrame((state, delta) => {
     timeOffset.current += delta * scrollSpeed
-
-    const data = generateChartData(pointCount, timeOffset.current)
+    const seed = timeOffset.current
+    const volumeSeed = seed * 0.7
+    const halfHeight = height / 2
 
     if (lineRef.current && glowLineRef.current) {
       const positions = lineRef.current.geometry.attributes.position.array
       const glowPositions = glowLineRef.current.geometry.attributes.position.array
+      const totalT = pointCount * 0.1
+      const baseFreq = (2 * Math.PI) / totalT
 
       for (let i = 0; i < pointCount; i++) {
-        // Map data to Y position on cylinder
-        const y = data[i] * height - height / 2
+        const t = i * 0.1 + seed
+        const raw = 0.5 +
+          Math.sin(t * baseFreq) * 0.2 +
+          Math.sin(t * baseFreq * 2 + 1) * 0.15 +
+          Math.sin(t * baseFreq * 3 + 2) * 0.1 +
+          Math.sin(t * baseFreq * 5) * 0.05
+        const clamped = raw < 0.1 ? 0.1 : raw > 0.9 ? 0.9 : raw
+        const y = clamped * height - halfHeight
         positions[i * 3 + 1] = y
         glowPositions[i * 3 + 1] = y
       }
@@ -185,19 +151,25 @@ function BackgroundChart({
 
     // Update volume bars
     if (barsRef.current) {
-      const volumeData = generateVolumeData(verticalLines, timeOffset.current * 0.7)
-
       for (let i = 0; i < verticalLines; i++) {
+        const hash = Math.sin(i * 127.1 + 311.7) * 43758.5453
+        const barSeed = hash - Math.floor(hash)
+        const tv = volumeSeed + barSeed * 100
+        const v1 = Math.abs(Math.sin(tv * 0.4 + i * 2.3)) * 0.35
+        const v2 = Math.abs(Math.sin(tv * 1.1 + i * 5.7 + 1.3)) * 0.25
+        const v3 = Math.abs(Math.sin(tv * 0.7 + i * 11.1 + 4.0)) * 0.2
+        const spike = Math.pow(Math.abs(Math.sin(tv * 0.3 + i * 3.9)), 6) * 0.5
+        const raw = 0.05 + v1 + v2 + v3 + spike
+        const value = raw > 0.95 ? 0.95 : raw
+
         const angle = (i / verticalLines) * Math.PI * 2
         const x = Math.cos(angle) * radius
         const z = Math.sin(angle) * radius
-
-        const barHeight = volumeData[i] * barMaxHeight * height
-        const barY = -height / 2 + barHeight / 2
+        const barHeight = value * barMaxHeight * height
+        const barY = -halfHeight + barHeight / 2
 
         dummy.position.set(x, barY, z)
         dummy.scale.set(1, barHeight, 1)
-        // Face outward from cylinder center
         dummy.lookAt(0, barY, 0)
         dummy.rotateY(Math.PI)
         dummy.updateMatrix()

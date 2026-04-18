@@ -201,6 +201,10 @@ function StarfieldStatueScene({
         }
       `}} />
 
+      {/* Mobile/tablet gating for GPU load — iOS Safari has a tight per-tab
+          WebGL memory budget and will kill the tab after sustained GPU work.
+          DPR=1 + antialias=false roughly quarters the backbuffer memory and
+          fill-rate cost on mobile; desktop keeps the sharper rendering. */}
       <Canvas
         camera={{
           position: cameraPosition,
@@ -214,11 +218,17 @@ function StarfieldStatueScene({
           far: 50
         }}
         gl={{
-          antialias: true,
+          antialias: typeof navigator === 'undefined'
+            ? true
+            : !/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
           alpha: false,
           powerPreference: 'high-performance',
         }}
-        dpr={typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 1}
+        dpr={(() => {
+          if (typeof window === 'undefined') return 1;
+          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          return isMobile ? 1 : Math.min(window.devicePixelRatio, 2);
+        })()}
         style={{ background: 'transparent', borderRadius: '12px' }}
       >
         <Suspense fallback={null}>
