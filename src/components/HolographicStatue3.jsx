@@ -40,7 +40,7 @@ function HolographicStatue3({
     const holographicMaterial = useMemo(
     () =>
       new THREE.ShaderMaterial({
-        precision: "lowp",
+        precision: "highp",
         uniforms: {
           uTime: { value: 0.0 },
           uColor: { value: new THREE.Color(0x00ffff) },
@@ -119,7 +119,7 @@ function HolographicStatue3({
   const coreSampleMaterial = useMemo(
     () =>
       new THREE.ShaderMaterial({
-        precision: "lowp",
+        precision: "highp",
         uniforms: {
           uTime: { value: 0.0 },
           uSubstrate:  { value: new THREE.Color(0xb52828) }, // deep red substrate (bottom)
@@ -201,7 +201,7 @@ function HolographicStatue3({
   const heartHolographicMaterial = useMemo(
     () =>
       new THREE.ShaderMaterial({
-        precision: "lowp",
+        precision: "highp",
         uniforms: {
           uTime: { value: 0.0 },
           uColor: { value: new THREE.Color(0xff69b4) },
@@ -283,7 +283,7 @@ function HolographicStatue3({
   const flameHolographicMaterial = useMemo(
     () =>
       new THREE.ShaderMaterial({
-        precision: "lowp",
+        precision: "highp",
         uniforms: {
           uTime: { value: 0.0 },
           uColor1: { value: new THREE.Color(0xff4500) },
@@ -568,7 +568,7 @@ function HolographicStatue3({
       // so the holographic visual pass depth-tests correctly.
       // Uses the same vertex shader (with glitch displacement) to stay in sync.
       const depthMaterial = new THREE.ShaderMaterial({
-        precision: "lowp",
+        precision: "highp",
         uniforms: {
           uTime: { value: 0.0 },
         },
@@ -633,7 +633,7 @@ function HolographicStatue3({
 
       // Hot pink fresnel shell — scaled-up back-face clone that brightens at silhouette edges
       const shellMaterial = new THREE.ShaderMaterial({
-        precision: "lowp",
+        precision: "highp",
         uniforms: {
           uTime: { value: 0.0 },
           uColor: { value: new THREE.Color(0xff1493) },
@@ -691,7 +691,7 @@ function HolographicStatue3({
 
       // Diffuse hot pink halo — camera-facing billboard with radial falloff
       const glowMaterial = new THREE.ShaderMaterial({
-        precision: "lowp",
+        precision: "highp",
         uniforms: {
           uTime: { value: 0.0 },
           uColor: { value: new THREE.Color(0xff1493) }, // hot pink

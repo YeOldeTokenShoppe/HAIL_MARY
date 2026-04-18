@@ -21,7 +21,7 @@ import {
 } from "@/lib/localCandle";
 import "./chart-shrine/chart-shrine.css";
 
-useGLTF.preload("/models/JustCandle.glb");
+// useGLTF.preload("/models/JustCandle.glb");
 
 const StarfieldStatueScene = dynamic(
   () => import("@/components/StarfieldStatueScene"),
@@ -277,22 +277,10 @@ function HeroAltarObject({ candleLit = false, litAt = null, onBurnedOut, debugRe
 
   return (
     <group ref={groupRef}>
-      {/* Persistent backlight glow — keeps the candle readable against the
-          dark statue behind it. Additive sprite sits behind the model and
-          always faces the camera (group is camera-anchored). */}
-      {glowTexture && (
-        <mesh ref={glowRef} position={[0, 0.95, -0.25]} renderOrder={-1}>
-          <planeGeometry args={[1, 1]} />
-          <meshBasicMaterial
-            map={glowTexture}
-            transparent
-            opacity={0.6}
-            depthWrite={false}
-            depthTest={false}
-            blending={THREE.AdditiveBlending}
-          />
-        </mesh>
-      )}
+      {/* Backlight glow plane removed — the CanvasTexture + depthTest:false
+          + additive-blended plane combo produced blocky render artifacts
+          around the statue area on iOS Safari. Candle is readable without
+          it thanks to the flame's own emissive materials. */}
       <primitive object={scene} scale={1.2} />
       {/* Warm candle-side fill — drives ignition flash + ongoing flicker. */}
       <pointLight

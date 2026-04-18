@@ -205,8 +205,13 @@ function StarfieldStatueScene({
         camera={{
           position: cameraPosition,
           fov: 50,
-          near: 0.1,
-          far: 1000
+          // Tight near/far — scene extent is ~20 units (statue at origin,
+          // cylinder at radius 4, camera at radius 2.2). The old 0.1/1000
+          // ratio (10000:1) starved mobile 16-bit depth buffers and caused
+          // visible z-fighting between the statue's depth-mask clone and
+          // the BackgroundChart cylinder behind it.
+          near: 0.5,
+          far: 50
         }}
         gl={{
           antialias: true,
