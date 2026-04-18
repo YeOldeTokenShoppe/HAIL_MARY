@@ -25,7 +25,21 @@ export default function MobileBottomNav({
   showHelpActive = false,
   hideMusicOnMobile = false,
   hideUserOnMobile = false,
-  darkMode = false
+  hideWallet = false,
+  /* When true, render the Account slot on the LEFT of the center FAB
+     (between Music and Wallet/Center) instead of the default RIGHT. */
+  accountOnLeft = false,
+  darkMode = false,
+  /* Neon hologram palette (cyan/fuchsia) for the shrine/home page. Yields
+     to 80s mode; overrides darkMode when both are set. */
+  neonMode = false,
+  // Optional overrides so callers can repurpose the center FAB + menu slot.
+  // Defaults preserve the original Buy/Menu behavior.
+  centerLabel = null,
+  centerSubLabel = 'RL80',
+  centerTitle = 'Buy RL80',
+  menuIcon = null,
+  menuLabel = 'MENU',
 }) {
   const [emoji, setEmoji] = useState("😇");
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
@@ -81,7 +95,39 @@ export default function MobileBottomNav({
   const handleMenuClick = () => { if (onMenuClick) onMenuClick(); };
 
   const m80 = is80sMode;
-  const dk = !m80 && darkMode; // dark oil-field mode (not 80s)
+  const nm = !m80 && neonMode; // cyan/fuchsia hologram mode
+  const dk = !m80 && !nm && darkMode; // dark oil-field mode (fallback)
+
+  /* Account slot — extracted so callers can place it on the LEFT of the
+     center FAB via `accountOnLeft`. When signed in the emoji is swapped
+     for the user's avatar and the label becomes ACCT. */
+  const accountSlot = !hideUserOnMobile && (
+    <button
+      className="btm-nav-item"
+      onClick={() => {
+        if (isHydrated && clerkUser) {
+          setShowUnifiedModal(true);
+        } else {
+          clerk.openSignIn();
+        }
+      }}
+    >
+      <div className="btm-nav-icon">
+        {isHydrated && clerkUser?.imageUrl ? (
+          <img
+            src={clerkUser.imageUrl}
+            alt="Avatar"
+            className="btm-wallet-avatar"
+          />
+        ) : (
+          <span className="btm-wallet-emoji">{emoji}</span>
+        )}
+      </div>
+      <span className="btm-nav-label">
+        {isHydrated && clerkUser ? 'ACCT' : 'LOGIN'}
+      </span>
+    </button>
+  );
 
   return (
     <>
@@ -95,7 +141,9 @@ export default function MobileBottomNav({
           right: 0;
           z-index: 10000;
           pointer-events: none;
-          padding-bottom: env(safe-area-inset-bottom, 0px);
+          /* safe-area inset moved into .btm-nav-bar below so the bar's
+             background reaches the viewport edge instead of leaving a
+             transparent strip above the home-indicator / chin area. */
           font-family: 'Orbitron', monospace;
         }
 
@@ -106,20 +154,24 @@ export default function MobileBottomNav({
           justify-content: space-around;
           padding: 0 4px;
           padding-top: 6px;
-          padding-bottom: 8px;
-          background: ${m80
-            ? 'rgba(15, 0, 30, 0.96)'
-            : dk
-              ? 'rgba(20, 26, 34, 0.96)'
-              : 'rgba(255, 253, 248, 0.97)'};
+          padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+          background: ${nm
+            ? 'rgba(6, 10, 18, 0.85)'
+            : m80
+              ? 'rgba(15, 0, 30, 0.96)'
+              : dk
+                ? 'rgba(20, 26, 34, 0.96)'
+                : 'rgba(255, 253, 248, 0.97)'};
           backdrop-filter: blur(20px);
           -webkit-backdrop-filter: blur(20px);
-          border-top: 1px solid ${m80 ? 'rgba(255, 0, 255, 0.3)' : dk ? 'rgba(212, 168, 84, 0.2)' : 'rgba(180, 160, 130, 0.2)'};
-          box-shadow: ${m80
-            ? '0 -2px 20px rgba(255, 0, 255, 0.12)'
-            : dk
-              ? '0 -2px 16px rgba(0, 0, 0, 0.3)'
-              : '0 -2px 16px rgba(0, 0, 0, 0.08)'};
+          border-top: 1px solid ${nm ? 'rgba(42, 214, 238, 0.35)' : m80 ? 'rgba(255, 0, 255, 0.3)' : dk ? 'rgba(212, 168, 84, 0.2)' : 'rgba(180, 160, 130, 0.2)'};
+          box-shadow: ${nm
+            ? '0 -2px 24px rgba(42, 214, 238, 0.18), 0 -1px 0 rgba(217, 45, 176, 0.2)'
+            : m80
+              ? '0 -2px 20px rgba(255, 0, 255, 0.12)'
+              : dk
+                ? '0 -2px 16px rgba(0, 0, 0, 0.3)'
+                : '0 -2px 16px rgba(0, 0, 0, 0.08)'};
           position: relative;
         }
 
@@ -169,7 +221,7 @@ export default function MobileBottomNav({
           font-weight: 700;
           letter-spacing: 0.5px;
           text-transform: uppercase;
-          color: ${m80 ? 'rgba(200, 180, 220, 0.6)' : dk ? 'rgba(200, 190, 170, 0.5)' : 'rgba(120, 105, 85, 0.6)'};
+          color: ${nm ? 'rgba(111, 168, 196, 0.9)' : m80 ? 'rgba(200, 180, 220, 0.6)' : dk ? 'rgba(200, 190, 170, 0.5)' : 'rgba(120, 105, 85, 0.6)'};
           transition: color 0.15s ease;
           line-height: 1;
           white-space: nowrap;
@@ -177,7 +229,7 @@ export default function MobileBottomNav({
 
         .btm-nav-item:active .btm-nav-label,
         .btm-nav-label.active-label {
-          color: ${m80 ? '#ff00ff' : dk ? '#d4a854' : '#8b6914'};
+          color: ${nm ? '#d6faff' : m80 ? '#ff00ff' : dk ? '#d4a854' : '#8b6914'};
         }
 
         /* ---- CYBERNAV (80s toggle) ---- */
@@ -254,13 +306,17 @@ export default function MobileBottomNav({
           align-items: center;
           justify-content: center;
           cursor: pointer;
-          border: 3px solid ${m80 ? 'rgba(255, 255, 255, 0.15)' : dk ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.9)'};
-          background: ${m80
-            ? 'linear-gradient(145deg, #d946ef, #a21caf)'
-            : 'linear-gradient(145deg, #d4a854, #b8922e)'};
-          box-shadow: ${m80
-            ? '0 4px 16px rgba(217, 70, 239, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3)'
-            : '0 4px 16px rgba(184, 146, 46, 0.4), 0 2px 6px rgba(0, 0, 0, 0.15)'};
+          border: ${nm ? '2px solid transparent' : `3px solid ${m80 ? 'rgba(255, 255, 255, 0.15)' : dk ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.9)'}`};
+          background: ${nm
+            ? 'linear-gradient(180deg, rgba(6, 10, 18, 0.92), rgba(2, 5, 9, 0.95)) padding-box, linear-gradient(135deg, #2ad6ee 0%, #d6faff 40%, #d92db0 60%, #ff7de0 100%) border-box'
+            : m80
+              ? 'linear-gradient(145deg, #d946ef, #a21caf)'
+              : 'linear-gradient(145deg, #d4a854, #b8922e)'};
+          box-shadow: ${nm
+            ? '0 4px 18px rgba(42, 214, 238, 0.45), 0 0 28px rgba(217, 45, 176, 0.3), 0 2px 6px rgba(0, 0, 0, 0.35)'
+            : m80
+              ? '0 4px 16px rgba(217, 70, 239, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3)'
+              : '0 4px 16px rgba(184, 146, 46, 0.4), 0 2px 6px rgba(0, 0, 0, 0.15)'};
           transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
           position: relative;
           -webkit-tap-highlight-color: transparent;
@@ -268,18 +324,22 @@ export default function MobileBottomNav({
 
         .btm-buy-fab:active {
           transform: scale(0.93);
-          box-shadow: ${m80
-            ? '0 2px 8px rgba(217, 70, 239, 0.6), 0 1px 3px rgba(0, 0, 0, 0.3)'
-            : '0 2px 8px rgba(184, 146, 46, 0.5), 0 1px 3px rgba(0, 0, 0, 0.15)'};
+          box-shadow: ${nm
+            ? '0 2px 10px rgba(42, 214, 238, 0.6), 0 0 18px rgba(217, 45, 176, 0.4), 0 1px 3px rgba(0, 0, 0, 0.35)'
+            : m80
+              ? '0 2px 8px rgba(217, 70, 239, 0.6), 0 1px 3px rgba(0, 0, 0, 0.3)'
+              : '0 2px 8px rgba(184, 146, 46, 0.5), 0 1px 3px rgba(0, 0, 0, 0.15)'};
         }
 
         .btm-buy-text {
-          font-family: 'Orbitron', monospace;
-          font-size: 14px;
-          font-weight: 900;
-          letter-spacing: 2px;
+          font-family: ${nm ? "'Pirata One', 'IBM Plex Serif', serif" : "'Orbitron', monospace"};
+          font-size: ${nm ? '16px' : '14px'};
+          font-weight: ${nm ? '400' : '900'};
+          letter-spacing: ${nm ? '3px' : '2px'};
           color: #ffffff;
-          text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+          text-shadow: ${nm
+            ? '0 0 8px rgba(42, 214, 238, 0.7), 0 0 14px rgba(217, 45, 176, 0.4)'
+            : '0 1px 2px rgba(0, 0, 0, 0.2)'};
         }
 
         .btm-buy-label {
@@ -287,18 +347,22 @@ export default function MobileBottomNav({
           font-weight: 700;
           letter-spacing: 0.5px;
           text-transform: uppercase;
-          color: ${m80 ? 'rgba(200, 180, 220, 0.6)' : dk ? 'rgba(200, 190, 170, 0.5)' : 'rgba(120, 105, 85, 0.6)'};
+          color: ${nm ? 'rgba(111, 168, 196, 0.9)' : m80 ? 'rgba(200, 180, 220, 0.6)' : dk ? 'rgba(200, 190, 170, 0.5)' : 'rgba(120, 105, 85, 0.6)'};
           margin-top: 4px;
           line-height: 1;
         }
 
         @keyframes btmFabPulse {
-          0%, 100% { box-shadow: ${m80
-            ? '0 4px 16px rgba(217, 70, 239, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3)'
-            : '0 4px 16px rgba(184, 146, 46, 0.4), 0 2px 6px rgba(0, 0, 0, 0.15)'}; }
-          50% { box-shadow: ${m80
-            ? '0 4px 24px rgba(217, 70, 239, 0.7), 0 2px 6px rgba(0, 0, 0, 0.3), 0 0 40px rgba(217, 70, 239, 0.2)'
-            : '0 4px 24px rgba(184, 146, 46, 0.6), 0 2px 6px rgba(0, 0, 0, 0.15), 0 0 40px rgba(184, 146, 46, 0.15)'}; }
+          0%, 100% { box-shadow: ${nm
+            ? '0 4px 18px rgba(42, 214, 238, 0.45), 0 0 28px rgba(217, 45, 176, 0.3), 0 2px 6px rgba(0, 0, 0, 0.35)'
+            : m80
+              ? '0 4px 16px rgba(217, 70, 239, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3)'
+              : '0 4px 16px rgba(184, 146, 46, 0.4), 0 2px 6px rgba(0, 0, 0, 0.15)'}; }
+          50% { box-shadow: ${nm
+            ? '0 4px 28px rgba(42, 214, 238, 0.7), 0 0 48px rgba(217, 45, 176, 0.4), 0 2px 6px rgba(0, 0, 0, 0.35)'
+            : m80
+              ? '0 4px 24px rgba(217, 70, 239, 0.7), 0 2px 6px rgba(0, 0, 0, 0.3), 0 0 40px rgba(217, 70, 239, 0.2)'
+              : '0 4px 24px rgba(184, 146, 46, 0.6), 0 2px 6px rgba(0, 0, 0, 0.15), 0 0 40px rgba(184, 146, 46, 0.15)'}; }
         }
 
         .btm-buy-fab.pulse {
@@ -439,8 +503,8 @@ export default function MobileBottomNav({
             </button>
           )}
 
-          {/* LEFT 1 — Music */}
-          {onPlayMusic && (
+          {/* LEFT 1 — Music (suppressed when hideMusicOnMobile is set) */}
+          {onPlayMusic && !hideMusicOnMobile && (
             isPlaying ? (
               <div className="btm-nav-item btm-music-playing">
                 <div className="btm-nav-icon active-state">
@@ -464,80 +528,74 @@ export default function MobileBottomNav({
             )
           )}
 
-          {/* LEFT 2 — Wallet */}
-          <button
-            className="btm-nav-item"
-            onClick={() => {
-              setShowUnifiedModal(true);
-            }}
-          >
-            <div className="btm-nav-icon" style={{ position: 'relative' }}>
-              <svg className="btm-wallet-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2.5" />
-                <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
-              </svg>
-              {isWalletConnected && <div className="btm-wallet-connected-badge" />}
-            </div>
-            <span className={`btm-nav-label ${isWalletConnected ? 'active-label' : ''}`}>
-              {isWalletConnected ? 'WALLET' : 'WALLET'}
-            </span>
-          </button>
+          {/* Account on the LEFT when requested (otherwise rendered on the
+              right after the center FAB). */}
+          {accountOnLeft && accountSlot}
 
-          {/* CENTER — BUY (big FAB) */}
+          {/* LEFT 2 — Wallet (suppressed when hideWallet is set) */}
+          {!hideWallet && (
+            <button
+              className="btm-nav-item"
+              onClick={() => {
+                setShowUnifiedModal(true);
+              }}
+            >
+              <div className="btm-nav-icon" style={{ position: 'relative' }}>
+                <svg className="btm-wallet-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2.5" />
+                  <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
+                </svg>
+                {isWalletConnected && <div className="btm-wallet-connected-badge" />}
+              </div>
+              <span className={`btm-nav-label ${isWalletConnected ? 'active-label' : ''}`}>
+                {isWalletConnected ? 'WALLET' : 'WALLET'}
+              </span>
+            </button>
+          )}
+
+          {/* CENTER — big FAB (defaults to BUY; callers can repurpose via
+              centerLabel/centerTitle/centerSubLabel + onBuyClick). */}
           {onBuyClick && (
             <div className="btm-buy-wrapper">
               <button
                 className={`btm-buy-fab ${buyPulse ? 'pulse' : ''}`}
                 onClick={onBuyClick}
-                title="Buy RL80"
+                title={centerTitle}
               >
-                <span className="btm-buy-text">{t('navControls.buy')}</span>
+                <span className="btm-buy-text">
+                  {centerLabel ?? t('navControls.buy')}
+                </span>
               </button>
-              <span className="btm-buy-label">RL80</span>
+              <span className="btm-buy-label">{centerSubLabel}</span>
             </div>
           )}
 
-          {/* RIGHT 1 — Account */}
-          <button
-            className="btm-nav-item"
-            onClick={() => {
-              if (isHydrated && clerkUser) {
-                setShowUnifiedModal(true);
-              } else {
-                clerk.openSignIn();
-              }
-            }}
-          >
-            <div className="btm-nav-icon">
-              {isHydrated && clerkUser?.imageUrl ? (
-                <img
-                  src={clerkUser.imageUrl}
-                  alt="Avatar"
-                  className="btm-wallet-avatar"
-                />
-              ) : (
-                <span className="btm-wallet-emoji">{emoji}</span>
-              )}
-            </div>
-            <span className="btm-nav-label">
-              {isHydrated && clerkUser ? 'ACCT' : 'LOGIN'}
-            </span>
-          </button>
+          {/* Default Account position: RIGHT of the center FAB. Skipped
+              when `accountOnLeft` has already rendered it on the left. */}
+          {!accountOnLeft && accountSlot}
 
-          {/* RIGHT 2 — Menu */}
+          {/* RIGHT 2 — Menu (or custom slot if menuIcon override is provided).
+              When overridden, the hamburger animation + first-run hint are
+              skipped since the slot is no longer a menu toggle. */}
           <button
             className="btm-nav-item"
             onClick={handleMenuClick}
           >
-            <div className={`btm-nav-icon ${isMenuOpen ? 'menu-open-icon' : ''}`} style={{ position: 'relative' }}>
-              {showMenuHint && <span className="btm-menu-hint" />}
-              <div className={`btm-menu-lines ${isMenuOpen ? 'btm-menu-open' : ''}`}>
-                <span className="btm-menu-line" />
-                <span className="btm-menu-line" />
-                <span className="btm-menu-line" />
-              </div>
+            <div className={`btm-nav-icon ${isMenuOpen && !menuIcon ? 'menu-open-icon' : ''}`} style={{ position: 'relative' }}>
+              {menuIcon ? (
+                menuIcon
+              ) : (
+                <>
+                  {showMenuHint && <span className="btm-menu-hint" />}
+                  <div className={`btm-menu-lines ${isMenuOpen ? 'btm-menu-open' : ''}`}>
+                    <span className="btm-menu-line" />
+                    <span className="btm-menu-line" />
+                    <span className="btm-menu-line" />
+                  </div>
+                </>
+              )}
             </div>
-            <span className={`btm-nav-label ${isMenuOpen ? 'active-label' : ''}`}>MENU</span>
+            <span className={`btm-nav-label ${isMenuOpen && !menuIcon ? 'active-label' : ''}`}>{menuLabel}</span>
           </button>
 
         </div>

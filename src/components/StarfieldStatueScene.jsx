@@ -2,6 +2,7 @@
 
 import React, { Suspense, useEffect, useRef } from 'react'
 import { Canvas, useThree, useFrame } from '@react-three/fiber'
+import { Stats } from '@react-three/drei'
 import * as THREE from 'three'
 import { useRouter } from 'next/navigation'
 import StarField from '@/components/StarField'
@@ -49,6 +50,8 @@ function StarfieldStatueScene({
   enableControls = true,
   href,
   onStatueLoad,
+  showStats = false,
+  children,
 }) {
   const router = useRouter()
 
@@ -207,7 +210,7 @@ function StarfieldStatueScene({
         }}
         gl={{
           antialias: true,
-          alpha: true,
+          alpha: false,
           powerPreference: 'high-performance',
         }}
         dpr={typeof window !== 'undefined' ? Math.min(window.devicePixelRatio, 2) : 1}
@@ -261,11 +264,15 @@ function StarfieldStatueScene({
 
           <MobileCandleOrbital />
 
-          {/* OrbitControls removed in favor of Figure8Camera */}
+          {children}
 
-          {/* Bloom postprocessing for flame glow */}
-          <CandleOrbitalEffects />
+          {/* OrbitControls removed in favor of Figure8Camera */}
         </Suspense>
+
+        {/* Bloom postprocessing — outside Suspense so a re-suspend of
+            the GLTF subtree can't unmount/remount the EffectComposer */}
+        <CandleOrbitalEffects />
+        {showStats && <Stats />}
       </Canvas>
     </div>
     </div>

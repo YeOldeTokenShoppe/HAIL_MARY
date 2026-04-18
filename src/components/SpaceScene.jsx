@@ -501,9 +501,17 @@ function H80ZSpotlight() {
        ship interior geometry. Current positions assume the captain / table
        is roughly at world origin. */
 function InteriorLighting() {
+  const { inSpaceshipRef } = useContext(ZoomContext);
+  const ambientRef = useRef();
+  useFrame((_, dt) => {
+    if (!ambientRef.current) return;
+    const target = inSpaceshipRef?.current ? 1.76 : 2.76;
+    const k = 1 - Math.exp(-dt * 3);
+    ambientRef.current.intensity += (target - ambientRef.current.intensity) * k;
+  });
   return (
     <>
-      <ambientLight intensity={2.76} />
+      <ambientLight ref={ambientRef} intensity={2.76} />
     </>
   );
 }
@@ -2052,13 +2060,6 @@ function CoreCylinder({ typedRatio = 1 }) {
       aria-hidden="true"
     >
       <defs>
-        {/* Fluid neon gradient for the goo zone — echoes the Hologoo colors */}
-        <linearGradient id="cyl-goo" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#6bc7d1" stopOpacity="0.85" />
-          <stop offset="35%" stopColor="#0055ff" stopOpacity="0.9" />
-          <stop offset="70%" stopColor="#ff00aa" stopOpacity="0.9" />
-          <stop offset="100%" stopColor="#d4a854" stopOpacity="0.75" />
-        </linearGradient>
         {/* Soft glow filter for the anomaly marker */}
         <filter id="cyl-glow" x="-50%" y="-50%" width="200%" height="200%">
           <feGaussianBlur stdDeviation="1.6" result="blur" />
@@ -2082,27 +2083,39 @@ function CoreCylinder({ typedRatio = 1 }) {
         fill="rgba(18, 10, 22, 0.6)"
       />
 
-      {/* Stratigraphy layers (clipped to tube shape + reveal mask) */}
+      {/* Stratigraphy layers — discrete bands matching the hologram shader
+         (HolographicStatue3 coreSampleMaterial). Proportions mirror the
+         shader's smoothstep transitions: thin rims at top + bottom, fat
+         cyan + blue through the middle. */}
       <g clipPath="url(#cyl-clip)">
         <g clipPath="url(#cyl-reveal)">
-          {/* Regolith — 0-10% (thin dusty top) */}
-          <rect x={tubeX} y={tubeY} width={tubeW} height={tubeH * 0.10}
-                fill="#9a8878" opacity="0.55" />
-          {/* Silicate crust — 10-16% */}
-          <rect x={tubeX} y={tubeY + tubeH * 0.10} width={tubeW} height={tubeH * 0.06}
-                fill="#d4a854" opacity="0.35" />
-          {/* Goo zone — 16-90% (main specimen layer) */}
-          <rect x={tubeX} y={tubeY + tubeH * 0.16} width={tubeW} height={tubeH * 0.74}
-                fill="url(#cyl-goo)" />
+          {/* Regolith — 0-6.5% (thin dusty top) */}
+          <rect x={tubeX} y={tubeY} width={tubeW} height={tubeH * 0.065}
+                fill="#9a8878" opacity="0.65" />
+          {/* Silicate crust — 6.5-12.5% */}
+          <rect x={tubeX} y={tubeY + tubeH * 0.065} width={tubeW} height={tubeH * 0.060}
+                fill="#d4a854" opacity="0.55" />
+          {/* Goo cyan — 12.5-46% (fattest band) */}
+          <rect x={tubeX} y={tubeY + tubeH * 0.125} width={tubeW} height={tubeH * 0.335}
+                fill="#6bc7d1" opacity="0.85" />
+          {/* Goo blue — 46-73% (fat) */}
+          <rect x={tubeX} y={tubeY + tubeH * 0.460} width={tubeW} height={tubeH * 0.270}
+                fill="#3a5b9e" opacity="0.90" />
+          {/* Goo rose — 73-89% */}
+          <rect x={tubeX} y={tubeY + tubeH * 0.730} width={tubeW} height={tubeH * 0.160}
+                fill="#b04878" opacity="0.90" />
+          {/* Goo gold floor — 89-96.5% (thin warm transition) */}
+          <rect x={tubeX} y={tubeY + tubeH * 0.890} width={tubeW} height={tubeH * 0.075}
+                fill="#d4a854" opacity="0.75" />
           {/* Subtle horizontal flow lines inside the goo */}
           <g opacity="0.25" stroke="#e8d9b8" strokeWidth="0.5" fill="none">
             <line x1={tubeX} y1={tubeY + tubeH * 0.30} x2={tubeX + tubeW} y2={tubeY + tubeH * 0.32} />
             <line x1={tubeX} y1={tubeY + tubeH * 0.50} x2={tubeX + tubeW} y2={tubeY + tubeH * 0.48} />
             <line x1={tubeX} y1={tubeY + tubeH * 0.72} x2={tubeX + tubeW} y2={tubeY + tubeH * 0.74} />
           </g>
-          {/* Deep substrate — 90-100% */}
-          <rect x={tubeX} y={tubeY + tubeH * 0.90} width={tubeW} height={tubeH * 0.10}
-                fill="#0a0512" />
+          {/* Substrate — 96.5-100% (thin red rim at very bottom) */}
+          <rect x={tubeX} y={tubeY + tubeH * 0.965} width={tubeW} height={tubeH * 0.035}
+                fill="#b52828" />
         </g>
       </g>
 
@@ -2138,17 +2151,17 @@ function CoreCylinder({ typedRatio = 1 }) {
       <g fontFamily='"Share Tech Mono", monospace' fontSize="8"
          letterSpacing="0.08em" texttransform="uppercase">
         {/* Regolith callout */}
-        <line x1={tubeX + tubeW} y1={tubeY + tubeH * 0.05}
-              x2={tubeX + tubeW + 14} y2={tubeY + tubeH * 0.05}
+        <line x1={tubeX + tubeW} y1={tubeY + tubeH * 0.032}
+              x2={tubeX + tubeW + 14} y2={tubeY + tubeH * 0.032}
               stroke="rgba(212, 168, 84, 0.3)" strokeWidth="0.6" />
-        <text x={tubeX + tubeW + 17} y={tubeY + tubeH * 0.05 + 2}
+        <text x={tubeX + tubeW + 17} y={tubeY + tubeH * 0.032 + 2}
               fill="#9a8878">REGOLITH</text>
 
         {/* Silicate */}
-        <line x1={tubeX + tubeW} y1={tubeY + tubeH * 0.14}
-              x2={tubeX + tubeW + 14} y2={tubeY + tubeH * 0.14}
+        <line x1={tubeX + tubeW} y1={tubeY + tubeH * 0.095}
+              x2={tubeX + tubeW + 14} y2={tubeY + tubeH * 0.095}
               stroke="rgba(212, 168, 84, 0.35)" strokeWidth="0.6" />
-        <text x={tubeX + tubeW + 17} y={tubeY + tubeH * 0.14 + 2}
+        <text x={tubeX + tubeW + 17} y={tubeY + tubeH * 0.095 + 2}
               fill="#d4a854">SILICATE · 1.8%</text>
 
         {/* Goo zone — highlighted */}
@@ -2169,12 +2182,12 @@ function CoreCylinder({ typedRatio = 1 }) {
           3.7 PJ/KG
         </text>
 
-        {/* Substrate */}
-        <line x1={tubeX + tubeW} y1={tubeY + tubeH * 0.95}
-              x2={tubeX + tubeW + 14} y2={tubeY + tubeH * 0.95}
-              stroke="rgba(212, 168, 84, 0.3)" strokeWidth="0.6" />
-        <text x={tubeX + tubeW + 17} y={tubeY + tubeH * 0.95 + 2}
-              fill="#9a8878">SUBSTRATE</text>
+        {/* Substrate — red rim at very bottom */}
+        <line x1={tubeX + tubeW} y1={tubeY + tubeH * 0.982}
+              x2={tubeX + tubeW + 14} y2={tubeY + tubeH * 0.982}
+              stroke="rgba(181, 40, 40, 0.55)" strokeWidth="0.6" />
+        <text x={tubeX + tubeW + 17} y={tubeY + tubeH * 0.982 + 2}
+              fill="#d46060">SUBSTRATE</text>
       </g>
 
       {/* Anomaly marker — pulsing orange dot in the middle of the goo zone */}
@@ -2231,6 +2244,196 @@ const MOBILE_WARN = [
   "ANOMALOUS ENERGY SIGNATURE",
   "CREW CONFIDENCE UPTICK",
 ];
+
+/* ── Hologram swap FAB ──
+   Circular button that flips the holographic statue / core sample display.
+   Originally mobile-only inside MobileGooOverlay; promoted to a shared
+   component so desktop users get the same one-tap swap affordance (the
+   desktop panel has inline tabs, but the FAB is faster and more discoverable).
+
+   Positioning: mobile sits above the bottom nav (bottom-right); desktop
+   sits in the bottom-right corner below the telemetry panel. */
+function HologramSwapFab({ statueMode, hologramSwapRef }) {
+  const [hasOpened, setHasOpened] = useState(false);
+  const [pendingTab, setPendingTab] = useState(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const pendingTimerRef = useRef(null);
+  const audioRef = useRef(null);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  if (typeof window !== "undefined" && !audioRef.current) {
+    const tap = new Audio("https://cdn.freesound.org/previews/367/367997_6512973-lq.mp3");
+    tap.volume = 0.35;
+    audioRef.current = { tap };
+  }
+  const playTap = () => {
+    const s = audioRef.current?.tap;
+    if (!s) return;
+    try { s.currentTime = 0; s.play().catch(() => {}); } catch {}
+  };
+
+  const modeIndex = statueMode ? 1 : 0;
+
+  // Clear pending once the parent state catches up to the requested tab
+  useEffect(() => {
+    if (pendingTab !== null && pendingTab === modeIndex) {
+      setPendingTab(null);
+      if (pendingTimerRef.current) {
+        clearTimeout(pendingTimerRef.current);
+        pendingTimerRef.current = null;
+      }
+    }
+  }, [modeIndex, pendingTab]);
+
+  useEffect(() => () => {
+    if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current);
+  }, []);
+
+  const handleClick = () => {
+    setHasOpened(true);
+    const targetIndex = statueMode ? 0 : 1;
+    setPendingTab(targetIndex);
+    playTap();
+    hologramSwapRef?.current?.();
+    if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current);
+    pendingTimerRef.current = setTimeout(() => setPendingTab(null), 3000);
+  };
+
+  // On mobile, sit above the bottom nav bar; on desktop, tuck into the
+  // bottom-right corner. Same corner either way so the affordance stays
+  // where the user expects it.
+  const posStyle = isMobile
+    ? { bottom: "calc(5.5rem + env(safe-area-inset-bottom, 0px))", right: "1rem" }
+    : { bottom: "5%", right: "1.5rem" };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={handleClick}
+        aria-label={statueMode ? "Switch to core sample" : "Switch to soul module"}
+        style={{
+          position: "fixed",
+          ...posStyle,
+          width: 68, height: 68,
+          borderRadius: "50%",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: HUD.panelBg,
+          border: `1px solid ${pendingTab !== null ? "rgba(107,199,209,0.95)" : "rgba(107,199,209,0.5)"}`,
+          backdropFilter: "blur(6px) saturate(140%)",
+          WebkitBackdropFilter: "blur(6px) saturate(140%)",
+          color: HUD.cyan,
+          cursor: "pointer",
+          padding: 0,
+          overflow: "hidden",
+          zIndex: 10001,
+          WebkitTapHighlightColor: "transparent",
+          animation: pendingTab !== null
+            ? "gooBotProcessing 0.9s ease-in-out infinite"
+            : hasOpened
+              ? "none"
+              : "gooBotPulse 2s ease-in-out infinite",
+          transition: "opacity 0.45s ease, border-color 0.2s ease",
+        }}
+      >
+        {pendingTab !== null && (
+          <span
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              inset: -1,
+              borderRadius: "50%",
+              background: "conic-gradient(from 0deg, rgba(107,199,209,0) 0deg, rgba(107,199,209,0) 240deg, rgba(107,199,209,0.85) 320deg, rgba(107,199,209,0) 360deg)",
+              WebkitMask: "radial-gradient(circle, transparent 28px, #000 30px, #000 33px, transparent 34px)",
+              mask: "radial-gradient(circle, transparent 28px, #000 30px, #000 33px, transparent 34px)",
+              animation: "gooBotScanSpin 1.1s linear infinite",
+              pointerEvents: "none",
+            }}
+          />
+        )}
+        <svg
+          width="34" height="34" viewBox="0 0 24 24"
+          fill="none" stroke="currentColor"
+          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+          aria-hidden="true"
+          style={{
+            filter: "drop-shadow(0 0 6px rgba(107,199,209,0.55))",
+            animation: hasOpened ? "none" : "gooBotIcon 2s ease-in-out infinite",
+            opacity: pendingTab !== null ? 0.55 : 1,
+            transition: "opacity 0.2s ease",
+          }}
+        >
+          {statueMode ? (
+            <>
+              <path d="M11.264 2.205A4 4 0 0 0 6.42 4.211l-4 8a4 4 0 0 0 1.359 5.117l6 4a4 4 0 0 0 4.438 0l6-4a4 4 0 0 0 1.576-4.592l-2-6a4 4 0 0 0-2.53-2.53z" />
+              <path d="M11.99 22 14 12l7.822 3.184" />
+              <path d="M14 12 8.47 2.302" />
+            </>
+          ) : (
+            <>
+              <path d="M11 5.5a1 1 0 0 1 5 0V16a5 5 0 0 0 5 5" />
+              <path d="M16 11.5a1 1 0 0 1 5 0V16a5 5 0 0 1-5 5" />
+              <path d="M6 19V6a3 3 0 0 0-3-3h0" />
+              <path d="M6 5.5a1 1 0 0 1 5 0V19" />
+            </>
+          )}
+        </svg>
+      </button>
+      <style>{`
+        @keyframes gooBotPulse {
+          0%, 100% {
+            box-shadow:
+              0 0 0 1px rgba(0,0,0,0.35),
+              0 8px 20px -8px rgba(0,0,0,0.6),
+              0 0 0 0 rgba(107,199,209,0),
+              inset 0 1px 0 rgba(107,199,209,0.1);
+            border-color: rgba(107,199,209,0.3);
+          }
+          50% {
+            box-shadow:
+              0 0 0 1px rgba(0,0,0,0.35),
+              0 8px 22px -8px rgba(0,0,0,0.6),
+              0 0 24px 4px rgba(107,199,209,0.55),
+              inset 0 1px 0 rgba(107,199,209,0.18);
+            border-color: rgba(107,199,209,0.7);
+          }
+        }
+        @keyframes gooBotIcon {
+          0%, 100% { transform: scale(1);    opacity: 0.85; }
+          50%      { transform: scale(1.08); opacity: 1;    }
+        }
+        @keyframes gooBotProcessing {
+          0%, 100% {
+            box-shadow:
+              0 0 0 1px rgba(0,0,0,0.35),
+              0 8px 22px -8px rgba(0,0,0,0.6),
+              0 0 14px 2px rgba(107,199,209,0.45),
+              inset 0 1px 0 rgba(107,199,209,0.18);
+          }
+          50% {
+            box-shadow:
+              0 0 0 1px rgba(0,0,0,0.35),
+              0 8px 24px -8px rgba(0,0,0,0.6),
+              0 0 30px 6px rgba(107,199,209,0.85),
+              inset 0 1px 0 rgba(107,199,209,0.28);
+          }
+        }
+        @keyframes gooBotScanSpin {
+          0%   { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
+    </>
+  );
+}
 
 function MobileGooOverlay({ visible, onClose, statueMode, hologramSwapRef }) {
   const router = useRouter();
@@ -2480,107 +2683,10 @@ function MobileGooOverlay({ visible, onClose, statueMode, hologramSwapRef }) {
 
   return (
     <>
-      {/* ── Message-bot icon — pulses in the bottom-right corner to
-          indicate the rig has new info. Tapping opens the CyberButton
-          modal with paginated readout. ── */}
-      <button
-        type="button"
-        onClick={() => {
-          setHasOpened(true);
-          const targetIndex = statueMode ? 0 : 1;
-          setPendingTab(targetIndex);
-          playTap();
-          hologramSwapRef?.current?.();
-          if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current);
-          pendingTimerRef.current = setTimeout(() => setPendingTab(null), 3000);
-        }}
-        aria-label={statueMode ? "Switch to core sample" : "Switch to soul module"}
-        style={{
-          position: "fixed",
-          bottom: "calc(5.5rem + env(safe-area-inset-bottom, 0px))",
-          right: "1rem",
-          width: 68, height: 68,
-          borderRadius: "50%",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: HUD.panelBg,
-          border: `1px solid ${pendingTab !== null ? "rgba(107,199,209,0.95)" : "rgba(107,199,209,0.5)"}`,
-          backdropFilter: "blur(6px) saturate(140%)",
-          WebkitBackdropFilter: "blur(6px) saturate(140%)",
-          color: HUD.cyan,
-          cursor: "pointer",
-          padding: 0,
-          opacity,
-          overflow: "hidden",
-          /* Hide while the modal is open — the modal IS the readout, so
-             the bot doesn't need to compete. Reappears as soon as the
-             modal closes. */
-          visibility: modalOpen ? "hidden" : "visible",
-          /* Above the modal overlay (z-index: 10000) so it sits on top
-             of the nav bar (also 10000). */
-          zIndex: 10001,
-          WebkitTapHighlightColor: "transparent",
-          /* Idle: gentle pulse before first open. Processing: faster cyan
-             pulse to signal the swap is in flight. Otherwise: quiet. */
-          animation: pendingTab !== null
-            ? "gooBotProcessing 0.9s ease-in-out infinite"
-            : hasOpened
-              ? "none"
-              : "gooBotPulse 2s ease-in-out infinite",
-          transition: "opacity 0.45s ease, border-color 0.2s ease",
-        }}
-      >
-        {/* Rotating scan ring — only visible while a swap is in flight.
-            Sits behind the icon (pointer-events: none, low z-index) and
-            sweeps a cyan arc around the button to indicate "working." */}
-        {pendingTab !== null && (
-          <span
-            aria-hidden="true"
-            style={{
-              position: "absolute",
-              inset: -1,
-              borderRadius: "50%",
-              background: "conic-gradient(from 0deg, rgba(107,199,209,0) 0deg, rgba(107,199,209,0) 240deg, rgba(107,199,209,0.85) 320deg, rgba(107,199,209,0) 360deg)",
-              WebkitMask: "radial-gradient(circle, transparent 28px, #000 30px, #000 33px, transparent 34px)",
-              mask: "radial-gradient(circle, transparent 28px, #000 30px, #000 33px, transparent 34px)",
-              animation: "gooBotScanSpin 1.1s linear infinite",
-              pointerEvents: "none",
-            }}
-          />
-        )}
-        <svg
-          width="34" height="34" viewBox="0 0 24 24"
-          fill="none" stroke="currentColor"
-          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-          aria-hidden="true"
-          style={{
-            filter: "drop-shadow(0 0 6px rgba(107,199,209,0.55))",
-            animation: hasOpened ? "none" : "gooBotIcon 2s ease-in-out infinite",
-            opacity: pendingTab !== null ? 0.55 : 1,
-            transition: "opacity 0.2s ease",
-            position: "relative",
-            zIndex: 1,
-          }}
-        >
-          {statueMode ? (
-            <>
-              <path d="M11.264 2.205A4 4 0 0 0 6.42 4.211l-4 8a4 4 0 0 0 1.359 5.117l6 4a4 4 0 0 0 4.438 0l6-4a4 4 0 0 0 1.576-4.592l-2-6a4 4 0 0 0-2.53-2.53z" />
-              <path d="M11.99 22 14 12l7.822 3.184" />
-              <path d="M14 12 8.47 2.302" />
-            </>
-          ) : (
-            <>
-              <path d="M11 5.5a1 1 0 0 1 5 0V16a5 5 0 0 0 5 5" />
-              <path d="M16 11.5a1 1 0 0 1 5 0V16a5 5 0 0 1-5 5" />
-              <path d="M6 19V6a3 3 0 0 0-3-3h0" />
-              <path d="M6 5.5a1 1 0 0 1 5 0V19" />
-            </>
-          )}
-        </svg>
-      </button>
-
-      {/* ── CyberButton modal (controlled externally by the bot icon) ── */}
+      {/* ── CyberButton modal (paginated readout) ──
+         The mobile swap FAB lives in the shared HologramSwapFab, rendered by
+         GooOverlay. The modal itself is currently unopened — kept for future
+         wiring of a detailed readout. */}
       <CyberButton
         hideTrigger
         externalOpen={modalOpen}
@@ -2592,53 +2698,12 @@ function MobileGooOverlay({ visible, onClose, statueMode, hologramSwapRef }) {
         onProceed={handleProceed}
       />
 
-      {/* Local keyframes for the bot-icon aura + icon pulse */}
+      {/* Keyframes used by the modal tab pending-shimmer. FAB-specific
+          keyframes live inside HologramSwapFab. */}
       <style>{`
-        @keyframes gooBotPulse {
-          0%, 100% {
-            box-shadow:
-              0 0 0 1px rgba(0,0,0,0.35),
-              0 8px 20px -8px rgba(0,0,0,0.6),
-              0 0 0 0 rgba(107,199,209,0),
-              inset 0 1px 0 rgba(107,199,209,0.1);
-            border-color: rgba(107,199,209,0.3);
-          }
-          50% {
-            box-shadow:
-              0 0 0 1px rgba(0,0,0,0.35),
-              0 8px 22px -8px rgba(0,0,0,0.6),
-              0 0 24px 4px rgba(107,199,209,0.55),
-              inset 0 1px 0 rgba(107,199,209,0.18);
-            border-color: rgba(107,199,209,0.7);
-          }
-        }
-        @keyframes gooBotIcon {
-          0%, 100% { transform: scale(1);    opacity: 0.85; }
-          50%      { transform: scale(1.08); opacity: 1;    }
-        }
         @keyframes gooTabScan {
           0%   { background-position: -100% 0; }
           100% { background-position:  200% 0; }
-        }
-        @keyframes gooBotProcessing {
-          0%, 100% {
-            box-shadow:
-              0 0 0 1px rgba(0,0,0,0.35),
-              0 8px 22px -8px rgba(0,0,0,0.6),
-              0 0 14px 2px rgba(107,199,209,0.45),
-              inset 0 1px 0 rgba(107,199,209,0.18);
-          }
-          50% {
-            box-shadow:
-              0 0 0 1px rgba(0,0,0,0.35),
-              0 8px 24px -8px rgba(0,0,0,0.6),
-              0 0 30px 6px rgba(107,199,209,0.85),
-              inset 0 1px 0 rgba(107,199,209,0.28);
-          }
-        }
-        @keyframes gooBotScanSpin {
-          0%   { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
         }
       `}</style>
     </>
@@ -3366,6 +3431,17 @@ export default function SpaceScene({ onZoomChange, antennaScreenRef, onReady } =
         statueMode={showStatue}
         hologramSwapRef={hologramSwapRef}
       />
+
+      {/* Hologram swap FAB — lives at the top level so it can be shown
+          while the user is in the spaceship but the info panel is
+          dismissed. Hidden whenever the panel is visible, so it never
+          fights with the panel or MainMobileNav for the same corner. */}
+      {zoomed && !showGooOverlay && (
+        <HologramSwapFab
+          statueMode={showStatue}
+          hologramSwapRef={hologramSwapRef}
+        />
+      )}
 
       {/* Cursor blink keyframe for goo overlay */}
       <style>{`

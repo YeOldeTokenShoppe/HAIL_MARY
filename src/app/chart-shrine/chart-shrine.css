@@ -1,0 +1,737 @@
+.shrine-page {
+  min-height: 100vh;
+  width: 100%;
+  background: radial-gradient(
+      1200px 800px at 50% 30%,
+      #1b0810 0%,
+      #0a0204 70%,
+      #050102 100%
+    );
+  color: #e9d48d;
+  font-family: "IBM Plex Serif", Georgia, serif;
+  /* Bottom padding reserves room for the fixed mobile dock (visible at all
+     viewport sizes on the /home shrine) plus ~40px of breathing room. */
+  padding: 32px 20px calc(132px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.shrine-stage {
+  width: 100%;
+  max-width: 1200px;
+  aspect-ratio: 12 / 7;
+  position: relative;
+}
+
+.shrine-wrap {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  filter: drop-shadow(0 10px 40px rgba(255, 180, 80, 0.08));
+}
+
+.shrine-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.shrine-tooltip {
+  position: absolute;
+  min-width: 180px;
+  padding: 10px 14px;
+  background: linear-gradient(180deg, #1a0f13 0%, #120709 100%);
+  border: 1px solid #9a7a35;
+  border-radius: 3px;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(241, 215, 122, 0.15) inset;
+  color: #e9d48d;
+  font-family: "IBM Plex Serif", Georgia, serif;
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 5;
+  letter-spacing: 0.4px;
+}
+
+.tt-time {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #a89970;
+  border-bottom: 1px solid rgba(154, 122, 53, 0.4);
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+}
+
+.tt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 1px 0;
+}
+
+.tt-row > span:first-child {
+  color: #7a6f55;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 10px;
+}
+
+.tt-row > span:last-child {
+  font-variant-numeric: tabular-nums;
+  color: #f1d77a;
+}
+
+.tt-change {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(154, 122, 53, 0.4);
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tt-change.up { color: #8ec89e; }
+.tt-change.down { color: #d07764; }
+
+.shrine-status {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #a89970;
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.shrine-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.shrine-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 20px;
+  border: 1px solid #9a7a35;
+  color: #e9d48d;
+  text-decoration: none;
+  font-size: 14px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  background: rgba(20, 10, 6, 0.65);
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+  border-radius: 2px;
+}
+
+.shrine-btn:hover {
+  background: rgba(241, 215, 122, 0.1);
+  color: #fff4c2;
+  border-color: #f1d77a;
+}
+
+.shrine-btn.primary {
+  background: linear-gradient(180deg, #d6b762 0%, #9a7a35 100%);
+  color: #160a06;
+  border-color: #f1d77a;
+  font-weight: 600;
+}
+
+.shrine-btn.primary:hover {
+  background: linear-gradient(180deg, #f1d77a 0%, #b58f45 100%);
+  color: #0d0604;
+}
+
+.shrine-btn.ghost {
+  border-color: #4a3a2a;
+  color: #a89970;
+}
+
+.shrine-caption {
+  color: #7a6f55;
+  font-size: 13px;
+  letter-spacing: 1px;
+  max-width: 520px;
+  text-align: center;
+  margin: 0;
+}
+
+/* flame flicker — pure opacity pulse so flames stay anchored to their wicks.
+   --flicker-amp (0–1) modulates the pulse depth. */
+@keyframes shrineFlicker {
+  0%   { opacity: calc(1 - var(--flicker-amp, 0.4) * 0.22); }
+  50%  { opacity: 1; }
+  100% { opacity: calc(1 - var(--flicker-amp, 0.4) * 0.12); }
+}
+
+.shrine-flame {
+  animation-name: shrineFlicker;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  animation-timing-function: ease-in-out;
+}
+
+@keyframes shrineHalo {
+  0%, 100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.shrine-halo {
+  animation: shrineHalo 2.4s ease-in-out infinite;
+}
+
+/* ignition on newest candle when it first mounts */
+@keyframes shrineIgnite {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* /home title header — sits top-left, full-width row above the chart band. */
+.shrine-page.neon .hero-header {
+  width: 100%;
+  max-width: 1200px;
+  display: flex;
+  justify-content: flex-start;
+  padding-left: 1rem;
+  padding-top: 1rem;
+}
+
+.shrine-page.neon .hero-header .our-lady-title {
+  margin: 0;
+}
+
+/* /home hero band — text + chart stacked on the left so the statue on the
+   right side of the background stays visible. */
+.shrine-page.neon .hero-band {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 24px;
+  width: 100%;
+  max-width: 1200px;
+  padding-left: 1rem;
+  margin-top: 8vh;
+}
+
+/* Full-page hologram background: the scene lives behind all page content. */
+.shrine-page.neon .scene-background {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Stack inline content above the fixed scene-background. Fixed-position
+   overlays (mobile dock, auth slot) are excluded so they stay pinned to
+   the viewport instead of flowing inline — this selector's specificity
+   (0,3,0) otherwise overrides their own `position: fixed`. */
+.shrine-page.neon
+  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Soft vignette / darkening over the background so overlaid content reads. */
+.shrine-page.neon::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(0, 0, 0, 0) 35%,
+      rgba(0, 0, 0, 0.55) 75%,
+      rgba(0, 0, 0, 0.85) 100%
+    );
+}
+
+.shrine-page.neon .hero-copy {
+  flex: 0 1 380px;
+  min-width: 260px;
+  width: 100%;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  text-align: center;
+}
+
+/* Chart + action buttons stacked below the text in the left column. */
+.shrine-page.neon .hero-band .hero-copy {
+  flex: 0 0 auto;
+}
+
+.shrine-page.neon .hero-band .shrine-column {
+  flex: 0 0 auto;
+  width: 720px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.shrine-page.neon .hero-band .shrine-column .shrine-stage {
+  width: 100%;
+  max-width: none;
+}
+
+.shrine-page.neon .hero-band .shrine-column .shrine-actions {
+  justify-content: center;
+}
+
+.shrine-page.neon .hero-band .shrine-column .shrine-caption {
+  align-self: flex-start;
+  text-align: left;
+}
+
+.shrine-page.neon .our-lady-title {
+  font-family: "UnifrakturCook", serif;
+  color: #d4af37;
+  font-size: clamp(2.4rem, 5vw, 3.4rem);
+  font-weight: 900;
+  line-height: 0.85;
+  margin: 0;
+  transform: rotate(-6deg) skew(-12deg);
+  transform-origin: left center;
+  text-shadow:
+    0 0 12px rgba(42, 214, 238, 0.55),
+    0 0 28px rgba(42, 214, 238, 0.35),
+    0 0 52px rgba(217, 45, 176, 0.4),
+    3px 3px 0 rgba(0, 0, 0, 0.6);
+  letter-spacing: 0.02em;
+}
+
+.shrine-page.neon .our-lady-title .title-line {
+  display: block;
+  position: relative;
+}
+
+.shrine-page.neon .our-lady-title .title-of {
+  font-size: 0.65em;
+  opacity: 0.85;
+  margin-right: 0.2em;
+}
+
+.shrine-page.neon .our-lady-title .title-line-profit {
+  margin-left: 4.2rem;
+}
+
+/* Candle melt debug readout — fixed, monospace, easy to spot while iterating. */
+.candle-debug {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 10000;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  color: #d6faff;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(42, 214, 238, 0.4);
+  padding: 6px 10px;
+  border-radius: 3px;
+  pointer-events: none;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+/* Auth slot — sign-in button or signed-in avatar, pinned to the true
+   top-right corner. Stats.js sits top-left so there's no collision. */
+.auth-slot {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 10000;
+}
+
+.auth-sign-in {
+  font-family: "Pirata One", "IBM Plex Serif", serif;
+  font-size: 13px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  padding: 8px 18px;
+  color: #d6faff;
+  cursor: pointer;
+  border: 2px solid transparent;
+  border-radius: 3px;
+  background:
+    linear-gradient(180deg, rgba(6, 10, 18, 0.85), rgba(2, 5, 9, 0.85))
+      padding-box,
+    linear-gradient(
+      135deg,
+      #2ad6ee 0%,
+      #d6faff 40%,
+      #d92db0 60%,
+      #ff7de0 100%
+    )
+      border-box;
+  box-shadow:
+    inset 0 0 0 1px rgba(214, 250, 255, 0.15),
+    0 0 14px rgba(42, 214, 238, 0.2);
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.auth-sign-in:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 0 0 1px rgba(214, 250, 255, 0.3),
+    0 0 24px rgba(255, 125, 224, 0.4);
+}
+
+/* R3F Stats monitor — keep its default top-left corner (stats.js default)
+   so the auth slot owns the top-right. */
+.r3f-stats {
+  z-index: 10000 !important;
+}
+
+/* Toggle for the personalized altar overlay — same gradient frame as the
+   swap buttons, scaled down since it's a secondary action. */
+.shrine-page.neon .altar-toggle {
+  align-self: center;
+  font-family: "Pirata One", "IBM Plex Serif", serif;
+  font-size: 13px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  padding: 8px 20px;
+  color: #d6faff;
+  cursor: pointer;
+  border: 2px solid transparent;
+  border-radius: 3px;
+  background:
+    linear-gradient(180deg, rgba(6, 10, 18, 0.8), rgba(2, 5, 9, 0.8))
+      padding-box,
+    linear-gradient(
+      135deg,
+      #2ad6ee 0%,
+      #d6faff 40%,
+      #d92db0 60%,
+      #ff7de0 100%
+    )
+      border-box;
+  box-shadow:
+    inset 0 0 0 1px rgba(214, 250, 255, 0.15),
+    0 0 14px rgba(42, 214, 238, 0.2);
+  transition:
+    background 200ms ease,
+    color 200ms ease,
+    box-shadow 200ms ease,
+    transform 200ms ease;
+}
+
+.shrine-page.neon .altar-toggle:hover {
+  color: #ffffff;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(42, 214, 238, 0.18),
+      rgba(217, 45, 176, 0.12)
+    )
+      padding-box,
+    linear-gradient(
+      135deg,
+      #6ff0ff 0%,
+      #ffffff 40%,
+      #ff9ce8 60%,
+      #ffb7ea 100%
+    )
+      border-box;
+  box-shadow:
+    inset 0 0 0 1px rgba(214, 250, 255, 0.3),
+    0 0 24px rgba(255, 125, 224, 0.4),
+    0 0 48px rgba(42, 214, 238, 0.2);
+  transform: translateY(-1px);
+}
+
+/* Active: altar is visible — fill the interior with the gradient so the
+   button reads as "pressed". */
+.shrine-page.neon .altar-toggle[aria-pressed="true"] {
+  color: #050a14;
+  font-weight: 600;
+  background:
+    linear-gradient(135deg, #2ad6ee 0%, #ff7de0 100%) padding-box,
+    linear-gradient(
+      135deg,
+      #2ad6ee 0%,
+      #d6faff 40%,
+      #d92db0 60%,
+      #ff7de0 100%
+    )
+      border-box;
+  box-shadow:
+    inset 0 0 0 1px rgba(5, 10, 20, 0.2),
+    0 0 24px rgba(42, 214, 238, 0.35);
+}
+
+.shrine-page.neon .altar-toggle[aria-pressed="true"]:hover {
+  color: #000000;
+  background:
+    linear-gradient(135deg, #6ff0ff 0%, #ff9ce8 100%) padding-box,
+    linear-gradient(
+      135deg,
+      #6ff0ff 0%,
+      #ffffff 40%,
+      #ff9ce8 60%,
+      #ffb7ea 100%
+    )
+      border-box;
+}
+
+.shrine-page.neon .hero-subhead {
+  font-family: "Pirata One", serif;
+  font-size: 1.5rem;
+  font-weight: 400;
+  color: #d6faff;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin: 0;
+  text-shadow:
+    0 0 8px rgba(42, 214, 238, 0.5),
+    0 0 20px rgba(217, 45, 176, 0.3);
+}
+
+.shrine-page.neon .hero-intro {
+  font-family: "IBM Plex Serif", Georgia, serif;
+  color: #a8c8d8;
+  font-size: 1rem;
+  line-height: 1.6;
+  letter-spacing: 0.02em;
+  margin: 0;
+  max-width: 38ch;
+}
+
+@media (max-width: 900px) {
+  .shrine-page.neon .hero-band {
+    gap: 24px;
+  }
+  .shrine-page.neon .hero-copy {
+    align-items: center;
+    text-align: center;
+    max-width: 90vw;
+  }
+  .shrine-page.neon .our-lady-title {
+    transform-origin: center;
+  }
+}
+
+/* /home offering strip — tight invitation between hero and chart */
+.shrine-page.neon .offering-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  max-width: 520px;
+  padding: 4px 20px 0;
+}
+
+.shrine-page.neon .offering-title {
+  font-family: "UnifrakturCook", serif;
+  color: #d4af37;
+  font-size: clamp(1.8rem, 3.5vw, 2.4rem);
+  margin: 0;
+  letter-spacing: 0.02em;
+  text-shadow:
+    0 0 10px rgba(42, 214, 238, 0.4),
+    0 0 20px rgba(217, 45, 176, 0.25);
+}
+
+.shrine-page.neon .offering-text {
+  font-family: "IBM Plex Serif", Georgia, serif;
+  color: #a8c8d8;
+  font-size: 14px;
+  line-height: 1.6;
+  letter-spacing: 0.02em;
+  margin: 0;
+  max-width: 38ch;
+}
+
+.shrine-page.neon .offering-cta {
+  align-self: flex-start;
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.shrine-page.neon .offering-cta:hover {
+  background: rgba(6, 18, 28, 0.7);
+  color: #d6faff;
+  border-color: #2ad6ee;
+  box-shadow: none;
+}
+
+@media (max-width: 700px) {
+  .shrine-page.neon .offering-strip {
+    gap: 8px;
+  }
+  /* Push the text + chart further down so the statue's head isn't hidden. */
+  .shrine-page.neon .hero-band {
+    margin-top: 65vh;
+  }
+  /* Translucent black backdrop behind the text for legibility. */
+  .shrine-page.neon .hero-copy {
+    background: rgba(0, 0, 0, 0.5);
+    padding: 14px 16px;
+    border-radius: 4px;
+  }
+}
+
+/* neon chrome variant — tooltip chrome to match the cyan/fuchsia chart */
+.shrine-page.neon .shrine-tooltip {
+  background: linear-gradient(180deg, #061018 0%, #030a12 100%);
+  border-color: #2ad6ee;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.75),
+    0 0 0 1px rgba(214, 250, 255, 0.15) inset,
+    0 0 14px rgba(42, 214, 238, 0.25);
+  color: #d6faff;
+}
+
+.shrine-page.neon .tt-time {
+  color: #6fa8c4;
+  border-bottom-color: rgba(42, 214, 238, 0.4);
+}
+
+.shrine-page.neon .tt-row > span:first-child {
+  color: #6fa8c4;
+}
+
+.shrine-page.neon .tt-row > span:last-child {
+  color: #d6faff;
+}
+
+.shrine-page.neon .tt-change {
+  border-top-color: rgba(42, 214, 238, 0.4);
+}
+
+/* neon chrome variant — shrine buttons styled in-register with the chart's
+   gradient frame: Pirata One, cyan→fuchsia border, dark interior, soft glow. */
+.shrine-page.neon .shrine-btn {
+  font-family: "Pirata One", "IBM Plex Serif", serif;
+  font-size: 15px;
+  letter-spacing: 0.22em;
+  padding: 10px 26px;
+  color: #d6faff;
+  border: 2px solid transparent;
+  border-radius: 3px;
+  background:
+    linear-gradient(180deg, rgba(6, 10, 18, 0.8), rgba(2, 5, 9, 0.8))
+      padding-box,
+    linear-gradient(
+      135deg,
+      #2ad6ee 0%,
+      #d6faff 40%,
+      #d92db0 60%,
+      #ff7de0 100%
+    )
+      border-box;
+  box-shadow:
+    inset 0 0 0 1px rgba(214, 250, 255, 0.15),
+    0 0 14px rgba(42, 214, 238, 0.2);
+  transition:
+    background 200ms ease,
+    color 200ms ease,
+    box-shadow 200ms ease,
+    transform 200ms ease;
+}
+
+.shrine-page.neon .shrine-btn:hover {
+  color: #ffffff;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(42, 214, 238, 0.18),
+      rgba(217, 45, 176, 0.12)
+    )
+      padding-box,
+    linear-gradient(
+      135deg,
+      #6ff0ff 0%,
+      #ffffff 40%,
+      #ff9ce8 60%,
+      #ffb7ea 100%
+    )
+      border-box;
+  box-shadow:
+    inset 0 0 0 1px rgba(214, 250, 255, 0.3),
+    0 0 24px rgba(255, 125, 224, 0.4),
+    0 0 48px rgba(42, 214, 238, 0.2);
+  transform: translateY(-1px);
+}
+
+.shrine-page.neon .shrine-btn.primary {
+  background: linear-gradient(120deg, #2ad6ee 0%, #d6faff 45%, #ff7de0 100%);
+  color: #070912;
+  border-color: #d6faff;
+  font-weight: 600;
+  box-shadow: 0 0 18px rgba(42, 214, 238, 0.35);
+}
+
+.shrine-page.neon .shrine-btn.primary:hover {
+  background: linear-gradient(120deg, #6fe8ff 0%, #ffffff 45%, #ff9ce8 100%);
+  color: #040610;
+  box-shadow: 0 0 24px rgba(255, 125, 224, 0.5);
+}
+
+.shrine-page.neon .shrine-btn.ghost {
+  border-color: #1a3a4a;
+  color: #6fa8c4;
+}
+
+.shrine-page.neon .shrine-caption {
+  color: #6fa8c4;
+}
+
+@media (max-width: 700px) {
+  .shrine-page {
+    /* Bottom padding reserves room for the fixed mobile dock (~70px tall +
+       safe-area inset on iOS) plus ~40px of breathing room so the chart
+       and CTA buttons don't butt up against the dock. */
+    padding: 16px 8px calc(132px + env(safe-area-inset-bottom, 0px));
+  }
+  /* ChartShrine swaps to a 600×720 viewBox under 700px so its text/candles
+     stay readable — let the stage match or it'll letterbox. */
+  .shrine-stage {
+    aspect-ratio: 5 / 6;
+  }
+  .shrine-btn {
+    padding: 8px 14px;
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+  .shrine-caption {
+    font-size: 12px;
+  }
+  /* Mobile dock owns account + light-candle; hide the desktop placements. */
+  .auth-slot {
+    display: none;
+  }
+  .shrine-page.neon .altar-toggle {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shrine-flame,
+  .shrine-halo {
+    animation: none;
+  }
+}

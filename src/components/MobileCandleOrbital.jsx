@@ -1,11 +1,16 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useGLTF } from '@react-three/drei';
-import { EffectComposer, Bloom } from '@react-three/postprocessing';
+import { EffectComposer, SelectiveBloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 
 // Preload the candle model
 useGLTF.preload('/models/tinyJapCanOnly.glb');
+
+// Layer dedicated to bloom-selected flame meshes. Both the default layer (0)
+// and this one are enabled on each flame so the main pass still draws them
+// normally while SelectiveBloom's masked pass isolates them.
+export const FLAME_BLOOM_LAYER = 10;
 
 // Shared time uniform for flame animation
 const flameUniforms = {
@@ -99,16 +104,21 @@ function createFlameMaterial(phase = 0) {
   });
 }
 
-// Postprocessing component to be used alongside MobileCandleOrbital
+// Postprocessing component to be used alongside MobileCandleOrbital.
+// Uses SelectiveBloom keyed off FLAME_BLOOM_LAYER so the composer only
+// has to render a small subset of the scene (the flame meshes) into its
+// bloom pass — much less work and avoids the full-frame black-flash that
+// the plain <Bloom> pass produces in this stack.
 export function CandleOrbitalEffects() {
   return (
-    <EffectComposer>
-      <Bloom
-        intensity={1}
+    <EffectComposer multisampling={0} enableNormalPass={false} stencilBuffer={false}>
+      <SelectiveBloom
+        selectionLayer={FLAME_BLOOM_LAYER}
+        intensity={1.2}
         luminanceThreshold={0.2}
         luminanceSmoothing={0.9}
-        mipmapBlur
-        radius={0.4}
+        radius={0.5}
+        resolutionScale={0.5}
       />
     </EffectComposer>
   );
@@ -149,6 +159,7 @@ function OrbitalCandle({ angle, radius, candleObject, index, onClick, transition
         createdMaterialsRef.current.push(flameMaterial);
         child.material = flameMaterial;
         child.renderOrder = 10;
+        child.layers.enable(FLAME_BLOOM_LAYER);
       }
     });
 

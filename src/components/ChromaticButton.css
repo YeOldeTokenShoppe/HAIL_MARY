@@ -1,0 +1,160 @@
+/* ChromaticButton — glowing white default; pink/blue chromatic aberration on hover/active */
+
+.chroma-btn {
+  --chroma-icon-size: 42px;
+  --chroma-offset: 5px;
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  flex-direction: column;
+  font-family: "PT Sans Narrow", "Helvetica Neue", sans-serif;
+  font-weight: 400;
+  margin: 0;
+  padding: 0;
+  position: relative;
+  text-decoration: none;
+}
+
+.chroma-btn:focus-visible {
+  outline: 2px solid #fc51c9;
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.chroma-btn__icon {
+  font-size: var(--chroma-icon-size);
+  width: var(--chroma-icon-size);
+  height: var(--chroma-icon-size);
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chroma-btn__icon > svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Base (white) icon — visible by default; fades out on hover/active so the
+   pink/cyan split reads cleanly without a white core between them. */
+.chroma-btn__icon--base {
+  color: #ffffff;
+  text-shadow:
+    0 0 6px rgba(255, 255, 255, 0.95),
+    0 0 14px rgba(255, 255, 255, 0.85),
+    0 0 24px rgba(255, 255, 255, 0.55);
+  transition: opacity 180ms ease-in-out;
+}
+
+/* Chromatic aberration layers — permanently visible at their offset, so
+   the RGB split reads as the default look (the tapped-then-navigated
+   flow on mobile never showed the activation animation). On activation
+   they elastically converge to the center over the base icon; on
+   deactivation they snap back out via the transition below. */
+.chroma-btn__icon--pink,
+.chroma-btn__icon--blue {
+  opacity: 1;
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  transition: transform 220ms ease-out;
+}
+
+.chroma-btn__icon--pink {
+  color: #fc51c9;
+  text-shadow: 0 0 12px #e707f7;
+  transform: translateX(calc(-1 * var(--chroma-offset)));
+  animation: chromaticDriftPink 2.2s ease-in-out infinite alternate;
+}
+
+.chroma-btn__icon--blue {
+  color: #05ddfa;
+  mix-blend-mode: color-dodge;
+  transform: translateX(var(--chroma-offset));
+  animation: chromaticDriftBlue 2.2s ease-in-out -0.5s infinite alternate;
+}
+
+/* Idle drift — gently expand/contract the RGB split so the aberration
+   reads as alive without requiring interaction. Both channels breathe
+   outward together; the blue channel starts slightly out of phase so
+   the motion doesn't feel mechanically symmetric. */
+@keyframes chromaticDriftPink {
+  0%   { transform: translateX(calc(-1 * var(--chroma-offset))); }
+  100% { transform: translateX(calc(-1 * var(--chroma-offset) - 2px)); }
+}
+
+@keyframes chromaticDriftBlue {
+  0%   { transform: translateX(var(--chroma-offset)); }
+  100% { transform: translateX(calc(var(--chroma-offset) + 2px)); }
+}
+
+.chroma-btn__label {
+  color: #ffffff;
+  text-shadow:
+    0 0 4px rgba(255, 255, 255, 0.9),
+    0 0 10px rgba(255, 255, 255, 0.6);
+  transition: color 150ms ease-in-out, text-shadow 180ms ease-in-out;
+  margin-top: 2px;
+}
+
+/* Activation state — hover, active, or .is-active class */
+/* Elastic bounce-in — approximation of GSAP elastic.out(1.4, 0.1). The
+   final keyframe with `forwards` fill-mode keeps the centered split
+   visible after the bounce settles. When `.is-active` is removed the
+   animation stops and the transition above smoothly retracts the layers. */
+.chroma-btn:hover .chroma-btn__icon--pink,
+.chroma-btn:focus-visible .chroma-btn__icon--pink,
+.chroma-btn.is-active .chroma-btn__icon--pink {
+  animation: chromaElasticPink 1.2s ease-out forwards;
+}
+
+.chroma-btn:hover .chroma-btn__icon--blue,
+.chroma-btn:focus-visible .chroma-btn__icon--blue,
+.chroma-btn.is-active .chroma-btn__icon--blue {
+  animation: chromaElasticBlue 1.2s ease-out forwards;
+}
+
+@keyframes chromaElasticPink {
+  0%   { transform: translateX(-3px); }
+  30%  { transform: translateX(4px); }
+  48%  { transform: translateX(-1.8px); }
+  65%  { transform: translateX(0.9px); }
+  80%  { transform: translateX(-0.35px); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes chromaElasticBlue {
+  0%   { transform: translateX(3px); }
+  30%  { transform: translateX(-4px); }
+  48%  { transform: translateX(1.8px); }
+  65%  { transform: translateX(-0.9px); }
+  80%  { transform: translateX(0.35px); }
+  100% { transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chroma-btn__icon--pink,
+  .chroma-btn__icon--blue {
+    animation: none;
+  }
+  .chroma-btn:hover .chroma-btn__icon--pink,
+  .chroma-btn:focus-visible .chroma-btn__icon--pink,
+  .chroma-btn.is-active .chroma-btn__icon--pink,
+  .chroma-btn:hover .chroma-btn__icon--blue,
+  .chroma-btn:focus-visible .chroma-btn__icon--blue,
+  .chroma-btn.is-active .chroma-btn__icon--blue {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.chroma-btn:hover .chroma-btn__icon--base,
+.chroma-btn:focus-visible .chroma-btn__icon--base,
+.chroma-btn.is-active .chroma-btn__icon--base {
+  opacity: 0;
+}

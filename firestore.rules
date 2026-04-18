@@ -343,6 +343,20 @@
         allow update, delete: if false;
       }
 
+      // =========================================================================
+      // HOME PAGE SHRINE CANDLES — one lit candle per user (doc ID = Clerk userId)
+      // =========================================================================
+      match /shrineCandles/{userId} {
+        allow read: if true;
+        allow create: if true
+          && request.resource.data.keys().hasAll(['userId', 'litAt'])
+          && request.resource.data.userId is string
+          && request.resource.data.userId == userId;
+        allow update: if true
+          && request.resource.data.userId == resource.data.userId;
+        allow delete: if true;
+      }
+
       // Default rules - SECURE by default
       match /{document=**} {
         allow read: if true;
