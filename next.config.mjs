@@ -67,6 +67,12 @@ const nextConfig = {
         destination: 'https://api.farcaster.xyz/miniapps/hosted-manifest/019c489b-42ae-437f-33ca-3afe37fd6073',
         permanent: false, // 307 temporary redirect
       },
+      {
+        // /home is now the root page; preserve old links by redirecting.
+        source: '/home',
+        destination: '/',
+        permanent: true, // 308 permanent redirect
+      },
     ];
   },
   async headers() {
