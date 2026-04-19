@@ -268,7 +268,7 @@
   flex: 0 1 380px;
   min-width: 260px;
   width: 100%;
-  max-width: 720px;
+  max-width: 580px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -283,7 +283,7 @@
 
 .shrine-page.neon .hero-band .shrine-column {
   flex: 0 0 auto;
-  width: 720px;
+  width: 580px;
   max-width: 100%;
   display: flex;
   flex-direction: column;
@@ -657,11 +657,40 @@
   .shrine-page.neon .hero-band {
     margin-top: 65vh;
   }
-  /* Translucent black backdrop behind the text for legibility. */
+  /* Translucent backdrop sits just inside the chart's ornate frame so
+     the text box and chart share the same visual left edge. The SVG's
+     FRAME_PAD (26 of 600 viewBox) puts the visible frame ~2.17% in
+     from the SVG's edge on each side. */
   .shrine-page.neon .hero-copy {
     background: rgba(0, 0, 0, 0.5);
     padding: 14px 16px;
     border-radius: 4px;
+    box-sizing: border-box;
+    width: 95.67%;
+    margin-left: 2.17%;
+    align-self: flex-start;
+  }
+}
+
+/* Tablet portrait — push the hero + chart toward the bottom so they don't
+   compete with the statue's face in the upper half of the viewport. */
+@media (min-width: 701px) and (max-width: 1024px) and (orientation: portrait) {
+  .shrine-page.neon .hero-band {
+    margin-top: 35vh;
+  }
+  /* Chart column is capped at 580px and left-aligned. FRAME_PAD (40 of
+     1200 viewBox) puts the ornate frame at ~10px inset on each side,
+     so a 10px margin + 560px cap makes the backdrop sit flush inside
+     the visible frame. */
+  .shrine-page.neon .hero-copy {
+    background: rgba(0, 0, 0, 0.5);
+    padding: 14px 16px;
+    border-radius: 4px;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 560px;
+    margin-left: 10px;
+    align-self: flex-start;
   }
 }
 

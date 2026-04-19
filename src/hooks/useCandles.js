@@ -53,6 +53,7 @@ export function useCandles({
   const [candles, setCandles] = useState([]);
   const [latestPrice, setLatestPrice] = useState(null);
   const [priceChange24h, setPriceChange24h] = useState(0);
+  const [marketCap, setMarketCap] = useState(null);
   const [resolvedTimeframe, setResolvedTimeframe] = useState(null);
   const [updatedAt, setUpdatedAt] = useState(null);
   const [error, setError] = useState(null);
@@ -76,6 +77,7 @@ export function useCandles({
         setCandles(bucketed.slice(-count));
         setLatestPrice(data.price ?? null);
         setPriceChange24h(data.priceChange24h ?? 0);
+        setMarketCap(data.fdv ?? null);
         setResolvedTimeframe(data.timeframe ?? null);
         setUpdatedAt(data.timestamp ?? null);
         setError(data.error ?? null);
@@ -102,6 +104,7 @@ export function useCandles({
     candles,
     latestPrice,
     priceChange24h,
+    marketCap,
     timeframe: resolvedTimeframe,
     updatedAt,
     volatility,

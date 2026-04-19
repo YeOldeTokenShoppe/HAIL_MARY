@@ -129,11 +129,11 @@ const DIMS_DESKTOP = {
   CHART_PAD_LEFT: 70,
   CHART_PAD_RIGHT: 110,
   candleCount: 18,
-  titleFont: 22,
-  subtitleFont: 13,
-  priceFont: 22,
-  changeFont: 13,
-  axisFont: 14,
+  titleFont: 28,
+  subtitleFont: 16,
+  priceFont: 28,
+  changeFont: 16,
+  axisFont: 18,
 };
 
 const DIMS_MOBILE = {
@@ -145,11 +145,11 @@ const DIMS_MOBILE = {
   CHART_PAD_LEFT: 38,
   CHART_PAD_RIGHT: 110,
   candleCount: 12,
-  titleFont: 26,
-  subtitleFont: 17,
-  priceFont: 30,
-  changeFont: 17,
-  axisFont: 15,
+  titleFont: 32,
+  subtitleFont: 20,
+  priceFont: 36,
+  changeFont: 20,
+  axisFont: 19,
 };
 
 // `aggregate` multiplies the native CG granularity: days=14 returns 4h candles,
@@ -161,13 +161,34 @@ export const TIMEFRAME_OPTIONS = [
   { key: "1d", days: 14, aggregate: 6, label: "1 Day" },
 ];
 
+const SUB_DIGITS = ["₀", "₁", "₂", "₃", "₄", "₅", "₆", "₇", "₈", "₉"];
+const toSubscript = (n) =>
+  String(n)
+    .split("")
+    .map((d) => SUB_DIGITS[+d])
+    .join("");
+
+// Crypto-style compact notation for sub-cent prices: the subscript counts
+// leading zeros after the decimal, e.g. 0.00000003352 → $0.0₇3352.
 function formatPrice(p) {
   if (p == null || !Number.isFinite(p)) return "—";
   if (p >= 1) return `$${p.toFixed(4)}`;
   if (p >= 0.001) return `$${p.toFixed(5)}`;
-  // tiny values — show 4 significant digits in scientific form
-  const str = p.toPrecision(4);
-  return `$${str}`;
+  if (p <= 0) return `$${p.toFixed(4)}`;
+
+  const frac = p.toFixed(20).split(".")[1];
+  let zeros = 0;
+  while (zeros < frac.length && frac[zeros] === "0") zeros++;
+  const sig = frac.slice(zeros, zeros + 4).replace(/0+$/, "") || "0";
+  return `$0.0${toSubscript(zeros)}${sig}`;
+}
+
+function formatMarketCap(v) {
+  if (v == null || !Number.isFinite(v) || v <= 0) return "—";
+  if (v >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
+  if (v >= 1e6) return `$${(v / 1e6).toFixed(2)}M`;
+  if (v >= 1e3) return `$${(v / 1e3).toFixed(1)}K`;
+  return `$${Math.round(v)}`;
 }
 
 function niceTicks(min, max, count = 5) {
@@ -348,6 +369,7 @@ export default function ChartShrine({
   candles,
   latestPrice,
   priceChange24h,
+  marketCap,
   volatility,
   timeframe,
   updatedAt,
@@ -356,7 +378,6 @@ export default function ChartShrine({
   palette = "classic",
   timeframeKey,
   onTimeframeChange,
-  intentionCount = 0,
 }) {
   const p = PALETTES[palette] || PALETTES.classic;
   const [hoverIdx, setHoverIdx] = useState(null);
@@ -447,17 +468,6 @@ export default function ChartShrine({
   const activeTimeframeLabel =
     TIMEFRAME_OPTIONS.find((o) => o.key === timeframeKey)?.label ||
     formatTimeframe(timeframe);
-      function liturgicalHour() {
-  const h = new Date().getHours();
-  if (h < 3) return "vigilia";
-  if (h < 6) return "matutina";
-  if (h < 9) return "prima";
-  if (h < 12) return "tertia";
-  if (h < 15) return "sexta";
-  if (h < 18) return "nona";
-  if (h < 21) return "vespera";
-  return "completorium";
-}
 
   return (
     <div className="shrine-wrap">
@@ -774,7 +784,8 @@ export default function ChartShrine({
               letterSpacing="2"
               textAnchor="middle"
             >
-              RL80 · {activeTimeframeLabel} · chart shrine
+              RL80 · {activeTimeframeLabel}
+              {marketCap != null && ` · MCAP ${formatMarketCap(marketCap)}`}
             </text>
             <text
               x={VIEW_W / 2}
@@ -818,6 +829,7 @@ export default function ChartShrine({
               letterSpacing="2"
             >
               RL80 · {activeTimeframeLabel}
+              {marketCap != null && ` · MCAP ${formatMarketCap(marketCap)}`}
             </text>
             <text
               x={VIEW_W - CHART_PAD_RIGHT + 90}
@@ -842,21 +854,6 @@ export default function ChartShrine({
           </g>
         )}
 
-        {/* footer cartouche */}
-
-<g>
-  <text
-    x={CHART_PAD_LEFT}
-    y={VIEW_H - FRAME_PAD / 2 - 44}
-    fill={p.accentSoft}
-    fontSize={isMobile ? 13 : 12}
-    fontFamily="IBM Plex Serif, serif"
-    letterSpacing="3"
-    opacity="0.75"
-  >
-    {liturgicalHour()} · {intentionCount} intentions offered
-  </text>
-</g>
       </svg>
 
       {hoverIdx != null && displayCandles[hoverIdx] && svgBox && (() => {
