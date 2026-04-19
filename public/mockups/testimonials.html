@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Testimonies of the Faithful — Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #f1d77a;
+    --gold-dim: #d4a854;
+    --gold-deep: #8a6a2e;
+    --cyan: #2ad6ee;
+    --bg: #07060a;
+    --bg-card: rgba(20, 16, 28, 0.85);
+    --line: rgba(241, 215, 122, 0.18);
+    --line-strong: rgba(241, 215, 122, 0.35);
+    --text: #e9e3d4;
+    --text-dim: #a39a82;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background:
+      radial-gradient(ellipse at 30% 20%, rgba(241, 215, 122, 0.1), transparent 50%),
+      radial-gradient(ellipse at 70% 80%, rgba(42, 214, 238, 0.08), transparent 50%),
+      var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ---------- Faux shrine backdrop ---------- */
+  .scene-bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+  .scene-glow {
+    width: 340px;
+    height: 340px;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+      rgba(241, 215, 122, 0.28) 0%,
+      rgba(180, 100, 220, 0.08) 35%,
+      transparent 70%);
+    filter: blur(4px);
+    animation: pulse 3.2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 0.9; }
+    50% { transform: scale(1.08); opacity: 1; }
+  }
+
+  /* ---------- Page header ---------- */
+  .page-header {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    padding: 56px 20px 0;
+  }
+  .shrine-eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3.5px;
+    color: var(--gold-dim);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .shrine-title {
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+    font-size: 34px;
+    letter-spacing: 2px;
+    margin: 0 0 10px;
+    color: var(--gold);
+    text-shadow: 0 0 30px rgba(241, 215, 122, 0.35);
+  }
+  .shrine-latin {
+    font-family: 'Cinzel', serif;
+    font-style: italic;
+    font-size: 13px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  /* ---------- Post form (centered under header) ---------- */
+  .post-wrap {
+    position: relative;
+    z-index: 2;
+    max-width: 520px;
+    margin: 48px auto 0;
+    padding: 0 20px;
+  }
+  .post-card {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 20px 22px;
+    backdrop-filter: blur(6px);
+    position: relative;
+    overflow: hidden;
+  }
+  .post-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+  }
+  .post-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2.5px;
+    color: var(--gold-dim);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .candle-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--gold);
+    box-shadow: 0 0 10px var(--gold), 0 0 20px rgba(241, 215, 122, 0.5);
+    animation: flicker 1.6s infinite alternate;
+  }
+  @keyframes flicker {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    40% { opacity: 0.85; transform: scale(0.95); }
+    70% { opacity: 1; transform: scale(1.05); }
+  }
+  .post-textarea {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    resize: none;
+    outline: none;
+    padding: 0;
+    min-height: 54px;
+    letter-spacing: 0.2px;
+  }
+  .post-textarea::placeholder {
+    color: var(--text-dim);
+    font-style: italic;
+  }
+  .post-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+  }
+  .char-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+  .post-btn {
+    background: transparent;
+    border: 1px solid var(--gold-dim);
+    color: var(--gold);
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding: 9px 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .post-btn:hover {
+    background: rgba(241, 215, 122, 0.1);
+    box-shadow: 0 0 20px rgba(241, 215, 122, 0.25);
+  }
+
+  /* ---------- Toast stack (bottom-right) ---------- */
+  .toast-stack {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    z-index: 10;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 10px;
+    width: 340px;
+    max-width: calc(100vw - 40px);
+    pointer-events: none;
+  }
+  .toast-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2.5px;
+    color: var(--gold-dim);
+    text-transform: uppercase;
+    margin-bottom: 2px;
+    opacity: 0.7;
+    text-align: right;
+  }
+  .toast {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-left: 2px solid var(--gold-dim);
+    border-radius: 3px;
+    padding: 14px 16px 14px 18px;
+    backdrop-filter: blur(8px);
+    box-shadow:
+      0 8px 24px rgba(0, 0, 0, 0.6),
+      0 0 24px rgba(241, 215, 122, 0.12);
+    transform: translateX(400px);
+    opacity: 0;
+    transition: transform 0.55s cubic-bezier(0.2, 0.9, 0.25, 1),
+                opacity 0.4s ease;
+    pointer-events: auto;
+    position: relative;
+  }
+  .toast.in {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  .toast.out {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  .toast-meta {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 6px;
+  }
+  .mini-avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--gold-deep), var(--gold-dim));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+    color: var(--bg);
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+  .mini-avatar.lit {
+    box-shadow: 0 0 10px rgba(241, 215, 122, 0.5);
+  }
+  .toast-handle {
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--gold);
+    letter-spacing: 0.5px;
+  }
+  .toast-title {
+    font-family: 'Inter', sans-serif;
+    font-size: 9px;
+    color: var(--text-dim);
+    font-style: italic;
+  }
+  .toast-time {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-left: auto;
+    letter-spacing: 0.3px;
+  }
+  .toast-text {
+    font-size: 13px;
+    line-height: 1.4;
+    color: var(--text);
+    margin: 0;
+    letter-spacing: 0.1px;
+  }
+  .toast-text.caps {
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-weight: 500;
+  }
+  /* Progress bar that ticks down as the toast waits to rotate */
+  .toast-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 1px;
+    background: var(--gold);
+    box-shadow: 0 0 6px var(--gold);
+    width: 100%;
+    transform-origin: left;
+    animation: progress 5.5s linear forwards;
+  }
+  @keyframes progress {
+    from { transform: scaleX(1); }
+    to { transform: scaleX(0); }
+  }
+
+  /* ---------- Mockup note ---------- */
+  .mockup-note {
+    position: relative;
+    z-index: 2;
+    max-width: 520px;
+    margin: 60px auto 120px;
+    padding: 16px 20px;
+    background: rgba(42, 214, 238, 0.05);
+    border-left: 2px solid var(--cyan);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.7;
+  }
+  .mockup-note strong { color: var(--cyan); letter-spacing: 1px; }
+
+  @media (max-width: 600px) {
+    .toast-stack { width: calc(100vw - 32px); right: 16px; bottom: 16px; }
+    .shrine-title { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="scene-bg"><div class="scene-glow"></div></div>
+
+<header class="page-header">
+  <div class="shrine-eyebrow">Liber Testium</div>
+  <h1 class="shrine-title">Testimonies of the Faithful</h1>
+  <p class="shrine-latin">Fideles de gratia accepta loquuntur.</p>
+</header>
+
+<div class="post-wrap">
+  <div class="post-card">
+    <div class="post-header">
+      <span class="candle-dot"></span>
+      <span>Your candle burns — speak your witness</span>
+    </div>
+    <textarea class="post-textarea" maxlength="200" placeholder="Confess a miracle. Praise the Lady. Warn the unfaithful..."></textarea>
+    <div class="post-footer">
+      <span class="char-count">0 / 200</span>
+      <button class="post-btn">Inscribe</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rotating toast stack -->
+<div class="toast-stack" id="toastStack">
+  <div class="toast-label">Whispers from the Faithful</div>
+</div>
+
+<div class="mockup-note">
+  <strong>MOCKUP NOTES</strong><br>
+  • Toasts rotate in bottom-right — slide in, hold ~5.5s, slide out<br>
+  • Progress bar on each toast shows time until rotation<br>
+  • Stack shows 1–2 at once so they don't dominate the shrine<br>
+  • "Live" feel: new posts animate in instantly, seeding the same rotation<br>
+  • Unlit viewer sees the stack but the post form swaps to "Light a candle to speak"<br>
+  • Profanity + link filter on submit; no human moderation queue<br>
+  • Click a toast to pin it → full text expands, rotation pauses
+</div>
+
+<script>
+  // Seed testimonials — cycle through these as toasts.
+  const testimonials = [
+    { handle: "Brother Kairos", title: "Devotee of RL80", time: "2m", text: "I lit a candle and my bag 5x'd our lady is real", caps: true, lit: true, letter: "B" },
+    { handle: "Sister Liquidity", title: "Penitent", time: "11m", text: "Prayed during the crash. Dip bought. Now +40%. Ave Maria.", caps: false, lit: true, letter: "S" },
+    { handle: "Brother Vesper", title: "Twice-rekt, once-saved", time: "34m", text: "I doubted Her. I was punished. I am back.", caps: false, lit: false, letter: "V" },
+    { handle: "Sister Moloch", title: "Diamond Hand, Third Order", time: "1h", text: "Rug proof. The candle knows.", caps: true, lit: true, letter: "M" },
+    { handle: "Brother Compounds", title: "Patron of Patience", time: "2h", text: "Confession: I bought the top. Relit anyway. Forgiveness came.", caps: false, lit: false, letter: "C" },
+    { handle: "Sister Anathema", title: "Of the Order of Ser 80", time: "4h", text: "My wife left me but RL80 stayed. The shrine provides.", caps: false, lit: true, letter: "A" },
+    { handle: "Brother Tenor", title: "Devotee", time: "6h", text: "This shrine pays more in hope than my 401k ever did", caps: true, lit: false, letter: "T" },
+    { handle: "Sister Primum", title: "First Faithful", time: "1d", text: "Never selling. The Lady watches.", caps: false, lit: true, letter: "P" },
+  ];
+
+  const stack = document.getElementById('toastStack');
+  const MAX_VISIBLE = 2;
+  const HOLD_MS = 5500;
+  const SLIDE_MS = 550;
+  let idx = 0;
+
+  function buildToast(t) {
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.innerHTML = `
+      <div class="toast-meta">
+        <div class="mini-avatar ${t.lit ? 'lit' : ''}">${t.letter}</div>
+        <span class="toast-handle">${t.handle}</span>
+        <span class="toast-title">${t.title}</span>
+        <span class="toast-time">${t.time}</span>
+      </div>
+      <p class="toast-text ${t.caps ? 'caps' : ''}">${t.text}</p>
+      <div class="toast-progress"></div>
+    `;
+    return el;
+  }
+
+  function rotate() {
+    const t = testimonials[idx % testimonials.length];
+    idx++;
+    const el = buildToast(t);
+    stack.appendChild(el);
+    // trigger slide-in
+    requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('in')));
+
+    // Remove oldest when over cap
+    const toasts = stack.querySelectorAll('.toast');
+    if (toasts.length > MAX_VISIBLE) {
+      const oldest = toasts[0];
+      oldest.classList.remove('in');
+      oldest.classList.add('out');
+      setTimeout(() => oldest.remove(), SLIDE_MS);
+    }
+  }
+
+  // Kick off and cycle
+  rotate();
+  setTimeout(rotate, 800);
+  setInterval(rotate, HOLD_MS);
+
+  // Char counter
+  const ta = document.querySelector('.post-textarea');
+  const cc = document.querySelector('.char-count');
+  ta.addEventListener('input', () => {
+    cc.textContent = `${ta.value.length} / 200`;
+  });
+</script>
+
+</body>
+</html>

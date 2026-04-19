@@ -8,6 +8,8 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import ChartShrine, { TIMEFRAME_OPTIONS } from "@/components/ChartShrine";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import BuyModal from "@/components/BuyModal";
+import TestimonialToasts from "@/components/TestimonialToasts";
+import InscribeModal from "@/components/InscribeModal";
 import { useCandles } from "@/hooks/useCandles";
 import {
   readCandle,
@@ -21,7 +23,7 @@ import {
 } from "@/lib/localCandle";
 import "./chart-shrine/chart-shrine.css";
 
-// useGLTF.preload("/models/JustCandle.glb");
+useGLTF.preload("/models/JustCandle.glb");
 
 const StarfieldStatueScene = dynamic(
   () => import("@/components/StarfieldStatueScene"),
@@ -29,7 +31,7 @@ const StarfieldStatueScene = dynamic(
 );
 
 // Melt window — 1 minute for testing; flip back to `24 * 60 * 60 * 1000` for prod.
-const MELT_DURATION_MS = 24 * 60 * 60 * 1000;
+const MELT_DURATION_MS = 60 * 1000;
 
 // Compact remaining-time label for the CANDLE FAB countdown. HH:MM:SS
 // always so the ticking seconds confirm the clock is live.
@@ -49,6 +51,7 @@ function formatRemaining(litAtMs) {
 // subsequent mount would read back our previously-melted scale and treat
 // it as baseline, leaving the candle stuck in a burned state.
 const WAX_BASELINE_CACHE = new WeakMap();
+const DRIP_BASELINE_CACHE = new WeakMap();
 
 // Personalized altar overlay — camera-anchored so it stays in a fixed screen
 // position while the crane shot orbits. Single Canvas, no extra WebGL context.
@@ -64,6 +67,10 @@ function HeroAltarObject({ candleLit = false, litAt = null, onBurnedOut, debugRe
   // shrinking the wax shrinks the whole candle column together.
   const waxRef = useRef(null);
   const baseWaxScaleYRef = useRef(1);
+  // Drip wax: hidden at lit-start, grows down (local Z, same axis as wax
+  // melt) and fades in as the candle burns toward fully-melted.
+  const dripWaxRef = useRef(null);
+  const baseDripScaleRef = useRef({ x: 1, y: 1, z: 1 });
   // Guard so we only fire onBurnedOut once per lit cycle.
   const burnedOutFiredRef = useRef(false);
   // Throttle the debug readout updates.
@@ -134,6 +141,20 @@ function HeroAltarObject({ candleLit = false, litAt = null, onBurnedOut, debugRe
         obj.scale.set(base, base, base);
         obj.matrixAutoUpdate = true;
       }
+      if (obj.name && obj.name.toUpperCase() === "DRIPWAX") {
+        dripWaxRef.current = obj;
+        if (!DRIP_BASELINE_CACHE.has(obj)) {
+          DRIP_BASELINE_CACHE.set(obj, {
+            x: obj.scale.x,
+            y: obj.scale.y,
+            z: obj.scale.z,
+          });
+        }
+        const base = DRIP_BASELINE_CACHE.get(obj);
+        baseDripScaleRef.current = base;
+        obj.scale.set(base.x * 0.35, base.y * 0.35, base.z * 0.35);
+        obj.matrixAutoUpdate = true;
+      }
     });
   }, [scene]);
 
@@ -156,6 +177,10 @@ function HeroAltarObject({ candleLit = false, litAt = null, onBurnedOut, debugRe
     if (!candleLit && waxRef.current) {
       const base = baseWaxScaleYRef.current;
       waxRef.current.scale.set(base, base, base);
+    }
+    if (!candleLit && dripWaxRef.current) {
+      const base = baseDripScaleRef.current;
+      dripWaxRef.current.scale.set(base.x * 0.35, base.y * 0.35, base.z * 0.35);
     }
   }, [candleLit]);
 
@@ -205,6 +230,15 @@ function HeroAltarObject({ candleLit = false, litAt = null, onBurnedOut, debugRe
       const progress = Math.min(elapsed / MELT_DURATION_MS, 1.0);
       const shrink = Math.max(base * 0.01, base * (1 - progress));
       waxRef.current.scale.set(base, base, shrink);
+
+      // Drips ooze out from the top origin — uniform scale from ~0 to
+      // authored baseline as the candle melts.
+      if (dripWaxRef.current) {
+        const dripBase = baseDripScaleRef.current;
+        dripWaxRef.current.visible = true;
+        const k = Math.max(0.35, progress);
+        dripWaxRef.current.scale.set(dripBase.x * k, dripBase.y * k, dripBase.z * k);
+      }
 
       // Fully melted — burn out once, let parent clear state.
       if (progress >= 1 && !burnedOutFiredRef.current) {
@@ -352,6 +386,7 @@ export default function HomePage() {
   const { openSignIn } = useClerk();
   const userId = user?.id ?? null;
   const [showBuyModal, setShowBuyModal] = useState(false);
+  const [showInscribeModal, setShowInscribeModal] = useState(false);
   const [candleLit, setCandleLit] = useState(false);
   const [litAt, setLitAt] = useState(null);
   // Post-ignition nudge shown only to anonymous visitors who just lit a
@@ -497,7 +532,7 @@ export default function HomePage() {
             onBurnedOut={doExtinguish}
             debugRef={debugRef}
           />
-          <Stats className="r3f-stats" />
+          {/* <Stats className="r3f-stats" /> */}
         </StarfieldStatueScene>
       </div>
 
@@ -638,7 +673,7 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
               </span>
             </span>
           ) : (
-            "CANDLE"
+            "VOTIVE"
           )
         }
         centerTitle={candleLit ? "Extinguish candle" : "Light candle"}
@@ -662,6 +697,14 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
       />
 
       <BuyModal isOpen={showBuyModal} onClose={() => setShowBuyModal(false)} />
+
+      <TestimonialToasts onInscribeClick={() => setShowInscribeModal(true)} />
+
+      <InscribeModal
+        isOpen={showInscribeModal}
+        onClose={() => setShowInscribeModal(false)}
+        candleLit={candleLit}
+      />
 
       {/* <div ref={debugRef} className="candle-debug" /> */}
     </main>
