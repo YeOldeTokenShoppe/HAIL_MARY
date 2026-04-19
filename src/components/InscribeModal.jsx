@@ -41,7 +41,7 @@ function relativeTime(ms) {
 
 export default function InscribeModal({ isOpen, onClose, candleLit }) {
   const { user, isSignedIn } = useUser();
-  const { openSignIn } = useClerk();
+  const { openSignIn, signOut } = useClerk();
   const [text, setText] = useState("");
   const [handle, setHandle] = useState("");
   const [busy, setBusy] = useState(false);
@@ -183,6 +183,47 @@ export default function InscribeModal({ isOpen, onClose, candleLit }) {
         <h2 className="tst-modal-title">
           {editingId ? "Revise Your Witness" : "Speak Your Witness"}
         </h2>
+
+        {isSignedIn && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              marginTop: -6,
+              marginBottom: 14,
+              fontSize: 12,
+              color: "rgba(214, 250, 255, 0.7)",
+              fontFamily: "'Pirata One', serif",
+              letterSpacing: 1.5,
+            }}
+          >
+            <span>
+              Signed in as{" "}
+              <strong style={{ color: "#f1d77a", fontWeight: 400 }}>
+                {user?.username || user?.firstName || user?.fullName || "—"}
+              </strong>
+            </span>
+            <button
+              type="button"
+              onClick={() => signOut({ redirectUrl: "/" })}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "rgba(42, 214, 238, 0.9)",
+                textDecoration: "underline",
+                cursor: "pointer",
+                fontFamily: "'Pirata One', serif",
+                fontSize: 12,
+                letterSpacing: 1.5,
+                padding: 0,
+              }}
+            >
+              Sign out
+            </button>
+          </div>
+        )}
 
         {canPost ? (
           <>

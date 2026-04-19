@@ -43,6 +43,12 @@ export default function MobileBottomNav({
   centerProgress = null,
   menuIcon = null,
   menuLabel = 'MENU',
+  // Book overlay trigger — when provided, replaces the Account/LOGIN slot
+  // (same physical position) with a book button. Callers that want both
+  // the book and the account affordance should surface sign-in/out from
+  // another modal (e.g. InscribeModal) per the root-page flow.
+  onBookClick = null,
+  bookLabel = 'BOOK',
 }) {
   const [emoji, setEmoji] = useState("😇");
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
@@ -101,10 +107,37 @@ export default function MobileBottomNav({
   const nm = !m80 && neonMode; // cyan/fuchsia hologram mode
   const dk = !m80 && !nm && darkMode; // dark oil-field mode (fallback)
 
+  /* Book slot — takes the Account/LOGIN position when onBookClick is
+     provided. Placed via the same accountSlot insertion points so the
+     LEFT/RIGHT positioning logic stays unchanged. */
+  const bookSlot = onBookClick ? (
+    <button
+      className="btm-nav-item"
+      onClick={onBookClick}
+      title="Open the little book"
+    >
+      <div className="btm-nav-icon">
+        <svg
+          className="btm-book-icon-svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+        </svg>
+      </div>
+      <span className="btm-nav-label">{bookLabel}</span>
+    </button>
+  ) : null;
+
   /* Account slot — extracted so callers can place it on the LEFT of the
      center FAB via `accountOnLeft`. When signed in the emoji is swapped
      for the user's avatar and the label becomes ACCT. */
-  const accountSlot = !hideUserOnMobile && (
+  const accountSlot = !hideUserOnMobile && !onBookClick && (
     <button
       className="btm-nav-item"
       onClick={() => {
@@ -435,6 +468,15 @@ export default function MobileBottomNav({
           transition: color 0.15s ease;
         }
 
+        /* ---- BOOK OVERLAY TRIGGER ---- */
+        .btm-book-icon-svg {
+          width: 24px;
+          height: 24px;
+          color: ${nm ? '#2ad6ee' : m80 ? '#ff00ff' : dk ? '#d4a854' : '#b8922e'};
+          transition: color 0.15s ease;
+          filter: ${nm ? 'drop-shadow(0 0 6px rgba(42, 214, 238, 0.5))' : 'none'};
+        }
+
         .btm-wallet-connected-badge {
           position: absolute;
           top: 2px;
@@ -557,9 +599,10 @@ export default function MobileBottomNav({
             )
           )}
 
-          {/* Account on the LEFT when requested (otherwise rendered on the
-              right after the center FAB). */}
-          {accountOnLeft && accountSlot}
+          {/* Account (or Book, when onBookClick replaces it) on the LEFT
+              when requested — otherwise rendered on the right after the
+              center FAB. */}
+          {accountOnLeft && (bookSlot || accountSlot)}
 
           {/* LEFT 2 — Wallet (suppressed when hideWallet is set) */}
           {!hideWallet && (
@@ -636,7 +679,7 @@ export default function MobileBottomNav({
 
           {/* Default Account position: RIGHT of the center FAB. Skipped
               when `accountOnLeft` has already rendered it on the left. */}
-          {!accountOnLeft && accountSlot}
+          {!accountOnLeft && (bookSlot || accountSlot)}
 
           {/* RIGHT 2 — Menu (or custom slot if menuIcon override is provided).
               When overridden, the hamburger animation + first-run hint are

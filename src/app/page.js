@@ -10,6 +10,7 @@ import MobileBottomNav from "@/components/MobileBottomNav";
 import BuyModal from "@/components/BuyModal";
 import TestimonialToasts from "@/components/TestimonialToasts";
 import InscribeModal from "@/components/InscribeModal";
+import LittleBookOverlay from "@/components/LittleBookOverlay";
 import { useCandles } from "@/hooks/useCandles";
 import {
   readCandle,
@@ -387,6 +388,7 @@ export default function HomePage() {
   const userId = user?.id ?? null;
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [showInscribeModal, setShowInscribeModal] = useState(false);
+  const [showBook, setShowBook] = useState(false);
   const [candleLit, setCandleLit] = useState(false);
   const [litAt, setLitAt] = useState(null);
   // Post-ignition nudge shown only to anonymous visitors who just lit a
@@ -694,9 +696,18 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
         show80sButton={false}
         isMobile
         neonMode
+        /* Replace LOGIN slot with BOOK — sign-in/out is surfaced in the
+           candle inscribe modal instead. */
+        onBookClick={() => setShowBook(true)}
+        bookLabel="BOOK OF RL80"
       />
 
       <BuyModal isOpen={showBuyModal} onClose={() => setShowBuyModal(false)} />
+
+      <LittleBookOverlay
+        isOpen={showBook}
+        onClose={() => setShowBook(false)}
+      />
 
       <TestimonialToasts onInscribeClick={() => setShowInscribeModal(true)} />
 
