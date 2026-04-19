@@ -564,130 +564,70 @@ function HolographicStatue3({
         }
       });
 
-      // Create depth mask clone — renders first to fill depth buffer,
-      // so the holographic visual pass depth-tests correctly.
-      // Uses the same vertex shader (with glitch displacement) to stay in sync.
-      const depthMaterial = new THREE.ShaderMaterial({
-        precision: "highp",
-        uniforms: {
-          uTime: { value: 0.0 },
-        },
-        vertexShader: holographicMaterial.vertexShader,
-        fragmentShader: `
-          uniform float uTime;
-          varying vec3 vPosition;
-          varying vec3 vNormal;
-          void main() {
-            // Holographic scan-line stripes (matches the visual shader pattern)
-            float stripes = mod((vPosition.y - uTime * 0.02) * 14.0, 1.0);
-            stripes = pow(stripes, 3.0);
+      // Depth mask clone removed — was an extra full-statue-geometry pass
+      // that gave the halo rings a "peek through the holographic gaps"
+      // look, but was a notable fill-rate cost on mobile. The plain
+      // transparent statue + halo rings still look fine without it.
 
-            // Fresnel — edges are more transparent
-            vec3 normal = normalize(vNormal);
-            if (!gl_FrontFacing) normal *= -1.0;
-            vec3 viewDirection = normalize(vPosition - cameraPosition);
-            float fresnel = dot(viewDirection, normal) + 1.0;
-            fresnel = pow(fresnel, 1.6);
+      {
+        // Hot pink fresnel shell — scaled-up back-face clone that brightens at silhouette edges
+        const shellMaterial = new THREE.ShaderMaterial({
+          precision: "highp",
+          uniforms: {
+            uTime: { value: 0.0 },
+            uColor: { value: new THREE.Color(0xff1493) },
+            uIntensity: { value: 1.4 },
+          },
+          vertexShader: `
+            varying vec3 vPosition;
+            varying vec3 vNormal;
+            void main() {
+              vec4 modelPosition = modelMatrix * vec4(position, 1.0);
+              gl_Position = projectionMatrix * viewMatrix * modelPosition;
+              vPosition = modelPosition.xyz;
+              vNormal = (modelMatrix * vec4(normal, 0.0)).xyz;
+            }
+          `,
+          fragmentShader: `
+            uniform vec3 uColor;
+            uniform float uTime;
+            uniform float uIntensity;
+            varying vec3 vPosition;
+            varying vec3 vNormal;
+            void main() {
+              vec3 normal = normalize(vNormal);
+              vec3 viewDirection = normalize(cameraPosition - vPosition);
+              float rim = 1.0 - abs(dot(viewDirection, normal));
+              rim = pow(rim, 2.5);
+              float pulse = sin(uTime * 1.5) * 0.1 + 0.9;
+              float alpha = rim * uIntensity * pulse;
+              gl_FragColor = vec4(uColor * alpha, alpha);
+            }
+          `,
+          transparent: true,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          depthTest: true,
+          side: THREE.BackSide,
+        });
+        animatedMaterialsRef.current.push(shellMaterial);
 
-            // Discard where the holographic effect is strongest
-            // (stripe peaks + edges), letting words show through
-            float mask = stripes * fresnel + fresnel * 0.3;
-            if (mask > 0.01) discard;
+        const shellClone = statue.clone(true);
+        shellClone.scale.multiplyScalar(1.06);
 
-            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+        // Strip the halo subtree so the pink rim doesn't get applied to it
+        const haloInClone = shellClone.getObjectByName('HaloMaster')
+          || shellClone.children.find((c) => c.name?.toLowerCase() === 'halomaster');
+        if (haloInClone) haloInClone.parent.remove(haloInClone);
+
+        shellClone.traverse((child) => {
+          if (child.isMesh) {
+            child.material = shellMaterial;
+            child.renderOrder = 2;
           }
-        `,
-        colorWrite: false,
-        depthWrite: true,
-        depthTest: true,
-        side: THREE.FrontSide,
-      });
-      // Track for uTime updates in the animation loop
-      animatedMaterialsRef.current.push(depthMaterial);
-
-      const depthClone = statue.clone(true);
-
-      // Strip the halo subtree — the clone's HaloMaster doesn't rotate with
-      // the original, so its depth mask would stay frozen while the visual
-      // halo spins, causing depth-test artifacts along the rings.
-      const haloInDepthClone = depthClone.getObjectByName('HaloMaster')
-        || depthClone.children.find((c) => c.name?.toLowerCase() === 'halomaster');
-      if (haloInDepthClone) haloInDepthClone.parent.remove(haloInDepthClone);
-
-      depthClone.traverse((child) => {
-        if (child.isMesh) {
-          child.material = depthMaterial;
-          child.renderOrder = 0;
-        }
-      });
-
-      // Set visual statue renderOrder to 1 so it draws after depth mask
-      statue.traverse((child) => {
-        if (child.isMesh && child.renderOrder < 1) {
-          child.renderOrder = 1;
-        }
-      });
-
-      // Add depth clone as sibling inside the rotation group
-      rotationGroup.add(depthClone);
-
-      // Hot pink fresnel shell — scaled-up back-face clone that brightens at silhouette edges
-      const shellMaterial = new THREE.ShaderMaterial({
-        precision: "highp",
-        uniforms: {
-          uTime: { value: 0.0 },
-          uColor: { value: new THREE.Color(0xff1493) },
-          uIntensity: { value: 1.4 },
-        },
-        vertexShader: `
-          varying vec3 vPosition;
-          varying vec3 vNormal;
-          void main() {
-            vec4 modelPosition = modelMatrix * vec4(position, 1.0);
-            gl_Position = projectionMatrix * viewMatrix * modelPosition;
-            vPosition = modelPosition.xyz;
-            vNormal = (modelMatrix * vec4(normal, 0.0)).xyz;
-          }
-        `,
-        fragmentShader: `
-          uniform vec3 uColor;
-          uniform float uTime;
-          uniform float uIntensity;
-          varying vec3 vPosition;
-          varying vec3 vNormal;
-          void main() {
-            vec3 normal = normalize(vNormal);
-            vec3 viewDirection = normalize(cameraPosition - vPosition);
-            float rim = 1.0 - abs(dot(viewDirection, normal));
-            rim = pow(rim, 2.5);
-            float pulse = sin(uTime * 1.5) * 0.1 + 0.9;
-            float alpha = rim * uIntensity * pulse;
-            gl_FragColor = vec4(uColor * alpha, alpha);
-          }
-        `,
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        depthTest: true,
-        side: THREE.BackSide,
-      });
-      animatedMaterialsRef.current.push(shellMaterial);
-
-      const shellClone = statue.clone(true);
-      shellClone.scale.multiplyScalar(1.06);
-
-      // Strip the halo subtree so the pink rim doesn't get applied to it
-      const haloInClone = shellClone.getObjectByName('HaloMaster')
-        || shellClone.children.find((c) => c.name?.toLowerCase() === 'halomaster');
-      if (haloInClone) haloInClone.parent.remove(haloInClone);
-
-      shellClone.traverse((child) => {
-        if (child.isMesh) {
-          child.material = shellMaterial;
-          child.renderOrder = 2;
-        }
-      });
-      rotationGroup.add(shellClone);
+        });
+        rotationGroup.add(shellClone);
+      }
 
       // Diffuse hot pink halo — camera-facing billboard with radial falloff
       const glowMaterial = new THREE.ShaderMaterial({
