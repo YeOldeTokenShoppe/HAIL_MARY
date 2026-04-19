@@ -116,86 +116,86 @@ function HolographicStatue3({
   // (gold→magenta→blue→cyan) → silicate crust → regolith. Band thicknesses
   // vary on purpose: substrate/silicate/regolith are thin rims, the goo
   // zone dominates the middle with fat magenta/blue/cyan layers.
-  const coreSampleMaterial = useMemo(
-    () =>
-      new THREE.ShaderMaterial({
-        precision: "highp",
-        uniforms: {
-          uTime: { value: 0.0 },
-          uSubstrate:  { value: new THREE.Color(0xb52828) }, // deep red substrate (bottom)
-          uGooGold:    { value: new THREE.Color(0xd4a854) }, // warm gold — goo floor
-          uGooRose:    { value: new THREE.Color(0xb04878) }, // muted rose — lower goo
-          uGooBlue:    { value: new THREE.Color(0x3a5b9e) }, // slate blue — mid goo
-          uGooCyan:    { value: new THREE.Color(0x6bc7d1) }, // cyan — upper goo
-          uSilicate:   { value: new THREE.Color(0xd4a854) }, // silicate crust
-          uRegolith:   { value: new THREE.Color(0x9a8878) }, // regolith (top)
-        },
-        vertexShader: `
-          uniform float uTime;
-          varying vec3 vPosition;
-          varying vec3 vNormal;
-          varying vec2 vUv;
-          void main() {
-            vUv = uv;
-            vec4 modelPosition = modelMatrix * vec4(position, 1.0);
-            gl_Position = projectionMatrix * viewMatrix * modelPosition;
-            vPosition = modelPosition.xyz;
-            vNormal = (modelMatrix * vec4(normal, 0.0)).xyz;
-          }
-        `,
-        fragmentShader: `
-          uniform float uTime;
-          uniform vec3 uSubstrate;
-          uniform vec3 uGooGold;
-          uniform vec3 uGooRose;
-          uniform vec3 uGooBlue;
-          uniform vec3 uGooCyan;
-          uniform vec3 uSilicate;
-          uniform vec3 uRegolith;
-          varying vec3 vPosition;
-          varying vec3 vNormal;
-          varying vec2 vUv;
-          void main() {
-            vec3 normal = normalize(vNormal);
-            if (!gl_FrontFacing) normal *= -1.0;
+  // const coreSampleMaterial = useMemo(
+  //   () =>
+  //     new THREE.ShaderMaterial({
+  //       precision: "highp",
+  //       uniforms: {
+  //         uTime: { value: 0.0 },
+  //         uSubstrate:  { value: new THREE.Color(0xb52828) }, // deep red substrate (bottom)
+  //         uGooGold:    { value: new THREE.Color(0xd4a854) }, // warm gold — goo floor
+  //         uGooRose:    { value: new THREE.Color(0xb04878) }, // muted rose — lower goo
+  //         uGooBlue:    { value: new THREE.Color(0x3a5b9e) }, // slate blue — mid goo
+  //         uGooCyan:    { value: new THREE.Color(0x6bc7d1) }, // cyan — upper goo
+  //         uSilicate:   { value: new THREE.Color(0xd4a854) }, // silicate crust
+  //         uRegolith:   { value: new THREE.Color(0x9a8878) }, // regolith (top)
+  //       },
+  //       vertexShader: `
+  //         uniform float uTime;
+  //         varying vec3 vPosition;
+  //         varying vec3 vNormal;
+  //         varying vec2 vUv;
+  //         void main() {
+  //           vUv = uv;
+  //           vec4 modelPosition = modelMatrix * vec4(position, 1.0);
+  //           gl_Position = projectionMatrix * viewMatrix * modelPosition;
+  //           vPosition = modelPosition.xyz;
+  //           vNormal = (modelMatrix * vec4(normal, 0.0)).xyz;
+  //         }
+  //       `,
+  //       fragmentShader: `
+  //         uniform float uTime;
+  //         uniform vec3 uSubstrate;
+  //         uniform vec3 uGooGold;
+  //         uniform vec3 uGooRose;
+  //         uniform vec3 uGooBlue;
+  //         uniform vec3 uGooCyan;
+  //         uniform vec3 uSilicate;
+  //         uniform vec3 uRegolith;
+  //         varying vec3 vPosition;
+  //         varying vec3 vNormal;
+  //         varying vec2 vUv;
+  //         void main() {
+  //           vec3 normal = normalize(vNormal);
+  //           if (!gl_FrontFacing) normal *= -1.0;
 
-            // Horizontal scan-line stripes (the holographic striation also reads as sediment layers)
-            float stripes = mod((vUv.y - uTime * 0.02) * 24.0, 1.0);
-            stripes = pow(stripes, 3.0);
+  //           // Horizontal scan-line stripes (the holographic striation also reads as sediment layers)
+  //           float stripes = mod((vUv.y - uTime * 0.02) * 24.0, 1.0);
+  //           stripes = pow(stripes, 3.0);
 
-            vec3 viewDirection = normalize(vPosition - cameraPosition);
-            float fresnel = dot(viewDirection, normal) + 1.0;
-            fresnel = pow(fresnel, 1.4);
-            float falloff = smoothstep(0.8, 0.2, fresnel);
+  //           vec3 viewDirection = normalize(vPosition - cameraPosition);
+  //           float fresnel = dot(viewDirection, normal) + 1.0;
+  //           fresnel = pow(fresnel, 1.4);
+  //           float falloff = smoothstep(0.8, 0.2, fresnel);
 
-            // Banded strata — pick color based on vUv.y (0=bottom, 1=top).
-            // Thin rims at both ends (substrate, silicate, regolith) and fat
-            // blue + cyan through the middle echo the core cylinder
-            // infographic: goo dominates, crusts are narrow bookends.
-            float y = vUv.y;
-            vec3 c = uSubstrate;
-            c = mix(c, uGooGold,  smoothstep(0.02, 0.05, y)); // very thin substrate → thin gold floor
-            c = mix(c, uGooRose,  smoothstep(0.08, 0.14, y)); // thin rose transition
-            c = mix(c, uGooBlue,  smoothstep(0.20, 0.34, y)); // rose band ends; blue starts
-            c = mix(c, uGooCyan,  smoothstep(0.48, 0.60, y)); // fat blue → fat cyan
-            c = mix(c, uSilicate, smoothstep(0.86, 0.89, y)); // sharp cyan→silicate cap
-            c = mix(c, uRegolith, smoothstep(0.92, 0.95, y)); // thin regolith on top
+  //           // Banded strata — pick color based on vUv.y (0=bottom, 1=top).
+  //           // Thin rims at both ends (substrate, silicate, regolith) and fat
+  //           // blue + cyan through the middle echo the core cylinder
+  //           // infographic: goo dominates, crusts are narrow bookends.
+  //           float y = vUv.y;
+  //           vec3 c = uSubstrate;
+  //           c = mix(c, uGooGold,  smoothstep(0.02, 0.05, y)); // very thin substrate → thin gold floor
+  //           c = mix(c, uGooRose,  smoothstep(0.08, 0.14, y)); // thin rose transition
+  //           c = mix(c, uGooBlue,  smoothstep(0.20, 0.34, y)); // rose band ends; blue starts
+  //           c = mix(c, uGooCyan,  smoothstep(0.48, 0.60, y)); // fat blue → fat cyan
+  //           c = mix(c, uSilicate, smoothstep(0.86, 0.89, y)); // sharp cyan→silicate cap
+  //           c = mix(c, uRegolith, smoothstep(0.92, 0.95, y)); // thin regolith on top
 
-            float holographic = stripes * fresnel + fresnel * 2.0;
-            holographic *= falloff;
-            holographic = max(holographic, 0.25); // base visibility so bands stay readable
+  //           float holographic = stripes * fresnel + fresnel * 2.0;
+  //           holographic *= falloff;
+  //           holographic = max(holographic, 0.25); // base visibility so bands stay readable
 
-            gl_FragColor = vec4(c, holographic);
-          }
-        `,
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: true,
-        depthTest: true,
-        side: THREE.DoubleSide,
-      }),
-    []
-  );
+  //           gl_FragColor = vec4(c, holographic);
+  //         }
+  //       `,
+  //       transparent: true,
+  //       blending: THREE.AdditiveBlending,
+  //       depthWrite: true,
+  //       depthTest: true,
+  //       side: THREE.DoubleSide,
+  //     }),
+  //   []
+  // );
 
   // Hot-pink holographic shader for heart meshes (heart, heart3_*, heart4_*)
   const heartHolographicMaterial = useMemo(
@@ -489,7 +489,7 @@ function HolographicStatue3({
               roughness: 0.08,
               side: THREE.DoubleSide,
               transparent: true,
-              depthWrite: false,
+              depthWrite: true,
               depthTest: true,
               blending: THREE.AdditiveBlending,
             });
@@ -513,7 +513,7 @@ function HolographicStatue3({
               blending: THREE.AdditiveBlending,
             });
             child.renderOrder = 100;
-          } else if (meshName === "heart3_1" || meshName === "heart3_2") {
+          } else if (/^heart3([._]?\d+)?$/.test(meshName)) {
             child.visible = true;
             const clonedMaterial = heartHolographicMaterial.clone();
             clonedMaterial.uniforms = {
@@ -686,27 +686,27 @@ function HolographicStatue3({
       // Build the core sample hologram (alternate "resource" display).
       // Same anchor position as the statue but lives in its own group so its
       // visibility can be toggled opposite to the statue via the `active` prop.
-      const coreAnchor = new THREE.Group();
-      coreAnchor.position.set(position[0], position[1], position[2]);
-      coreAnchor.visible = !active;
+      // const coreAnchor = new THREE.Group();
+      // coreAnchor.position.set(position[0], position[1], position[2]);
+      // coreAnchor.visible = !active;
 
-      const coreGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.75, 24, 1, true);
-      const coreMesh = new THREE.Mesh(coreGeo, coreSampleMaterial);
-      coreAnchor.add(coreMesh);
+      // const coreGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.75, 24, 1, true);
+      // const coreMesh = new THREE.Mesh(coreGeo, coreSampleMaterial);
+      // coreAnchor.add(coreMesh);
 
-      // Optional end caps so the top/bottom don't look hollow when viewed from above/below.
-      const capTop = new THREE.Mesh(new THREE.CircleGeometry(0.05, 24), coreSampleMaterial);
-      capTop.rotation.x = -Math.PI / 2;
-      capTop.position.y = 0.275;
-      const capBottom = new THREE.Mesh(new THREE.CircleGeometry(0.05, 24), coreSampleMaterial);
-      capBottom.rotation.x = Math.PI / 2;
-      capBottom.position.y = -0.275;
-      coreAnchor.add(capTop);
-      coreAnchor.add(capBottom);
+      // // Optional end caps so the top/bottom don't look hollow when viewed from above/below.
+      // const capTop = new THREE.Mesh(new THREE.CircleGeometry(0.05, 24), coreSampleMaterial);
+      // capTop.rotation.x = -Math.PI / 2;
+      // capTop.position.y = 0.275;
+      // const capBottom = new THREE.Mesh(new THREE.CircleGeometry(0.05, 24), coreSampleMaterial);
+      // capBottom.rotation.x = Math.PI / 2;
+      // capBottom.position.y = -0.275;
+      // coreAnchor.add(capTop);
+      // coreAnchor.add(capBottom);
 
-      coreAnchorRef.current = coreAnchor;
-      coreMaterialRef.current = coreSampleMaterial;
-      scene.add(coreAnchor);
+      // coreAnchorRef.current = coreAnchor;
+      // coreMaterialRef.current = coreSampleMaterial;
+      // scene.add(coreAnchor);
 
       hasLoadedRef.current = true;
 

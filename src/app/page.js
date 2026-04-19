@@ -105,9 +105,25 @@ function HeroAltarObject({ candleLit = false, litAt = null, onBurnedOut, debugRe
 
   // Locate the "Wax" mesh once after the GLB loads, cache the original
   // baseline scale, and reset the mesh to that baseline so any leftover
-  // melt state from the previous mount doesn't leak through.
+  // melt state from the previous mount doesn't leak through. Also force
+  // every candle mesh into the transparent-render bucket with a high
+  // renderOrder so it draws AFTER the statue's additive heart shaders
+  // (renderOrder 150) — candle pixels paint over heart glow on overlap.
+  // Three.js always renders opaque before transparent, so without
+  // `transparent:true` on the candle, hearts (which are transparent)
+  // would always draw last regardless of renderOrder.
   useEffect(() => {
     scene.traverse((obj) => {
+      if (obj.isMesh) {
+        obj.renderOrder = 200;
+        if (obj.material) {
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          mats.forEach((m) => {
+            m.transparent = true;
+            m.depthWrite = true;
+          });
+        }
+      }
       if (obj.name && obj.name.toUpperCase() === "WAX") {
         waxRef.current = obj;
         if (!WAX_BASELINE_CACHE.has(obj)) {
