@@ -55,6 +55,7 @@ export function useCandles({
   const [priceChange24h, setPriceChange24h] = useState(0);
   const [marketCap, setMarketCap] = useState(null);
   const [resolvedTimeframe, setResolvedTimeframe] = useState(null);
+  const [source, setSource] = useState(null);
   const [updatedAt, setUpdatedAt] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -79,6 +80,7 @@ export function useCandles({
         setPriceChange24h(data.priceChange24h ?? 0);
         setMarketCap(data.fdv ?? null);
         setResolvedTimeframe(data.timeframe ?? null);
+        setSource(data.source ?? null);
         setUpdatedAt(data.timestamp ?? null);
         setError(data.error ?? null);
       } catch (err) {
@@ -106,6 +108,7 @@ export function useCandles({
     priceChange24h,
     marketCap,
     timeframe: resolvedTimeframe,
+    source,
     updatedAt,
     volatility,
     error,

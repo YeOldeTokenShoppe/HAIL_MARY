@@ -14,14 +14,14 @@ const MOBILE_BP = 700;
 // has whispers rotating. Same copy as the mockup — swap in your own at
 // will. `id` namespace "seed-*" keeps them out of live-jump detection.
 const SEEDS = [
-  { id: "seed-1", displayName: "Kairos", text: "I lit a candle and my bag 5x'd our lady is real", lit: true },
-  { id: "seed-2", displayName: "Sister Liquidity", text: "Prayed during the crash. Dip bought. Now +40%. Ave Maria.", lit: true },
-  { id: "seed-3", displayName: "Vesper the Investor", text: "I doubted Her. I shouldn't have.", lit: false },
-  { id: "seed-4", displayName: "Moloch", text: "Rug proof. The candle knows.", lit: true },
-  { id: "seed-5", displayName: "Compounded", text: "Confession: I bought the top. Relit anyway. Forgiveness came.", lit: false },
-  { id: "seed-6", displayName: "Anathema", text: "My wife left me but RL80 stayed. The Lady provides.", lit: true },
-  { id: "seed-7", displayName: "Brother Tenor", text: "This token pays more in hope than my 401k ever did", lit: false },
-  { id: "seed-8", displayName: "Primum", text: "Never selling. The Lady watches.", lit: true },
+  { id: "seed-1", displayName: "Kairos", text: "I lit a candle and my bag 5x'd our lady is real", lit: true, isExample: true },
+  { id: "seed-2", displayName: "Sister Liquidity", text: "Prayed during the crash. Dip bought. Now +40%. Ave Maria.", lit: true, isExample: true },
+  { id: "seed-3", displayName: "Vesper the Investor", text: "I doubted Her. I shouldn't have.", lit: false, isExample: true },
+  { id: "seed-4", displayName: "Moloch", text: "Rug proof. The candle knows.", lit: true, isExample: true },
+  { id: "seed-5", displayName: "Compounded", text: "Confession: I bought the top. Relit anyway. Forgiveness came.", lit: false, isExample: true },
+  { id: "seed-6", displayName: "Anathema", text: "My wife left me but RL80 stayed. The Lady provides.", lit: true, isExample: true },
+  { id: "seed-7", displayName: "Brother Tenor", text: "This token pays more in hope than my 401k ever did", lit: false, isExample: true },
+  { id: "seed-8", displayName: "Primum", text: "Never selling. The Lady watches.", lit: true, isExample: true },
 ];
 
 function relativeTime(ms) {
@@ -207,6 +207,11 @@ function Toast({ item, isLive }) {
           )}
         </div>
         <span className="tst-handle">{item.displayName ?? "Anonymous"}</span>
+        {item.isExample && (
+          <span className="tst-example-mark" title="Developer example — not a real user testimonial">
+            demo
+          </span>
+        )}
         <span className="tst-time">{relativeTime(item.createdAtMs)}</span>
       </div>
       <p className={`tst-text ${caps ? "caps" : ""}`}>{item.text}</p>
@@ -247,6 +252,11 @@ function TickerView({ pool, onInscribeClick }) {
           >
             <span className={`tst-ticker-dot ${current.lit ? "lit" : ""}`} />
             <span className="tst-ticker-handle">{current.displayName ?? "Anonymous"}</span>
+            {current.isExample && (
+              <span className="tst-example-mark" title="Developer example — not a real user testimonial">
+                demo
+              </span>
+            )}
             <span className="tst-ticker-sep">·</span>
             <span className="tst-ticker-text">{current.text}</span>
           </div>

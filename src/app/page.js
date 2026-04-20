@@ -73,6 +73,12 @@ const CANDLE_VARIANTS = {
     meltAxis: "z",
     dripMeshName: null,
     scale: 1.2,
+    // Wick material — lives on XBase as a second material slot. Given
+    // a small emissive boost so it stays visible when the candle is
+    // unlit (no flame light = dark material vanishes against the black
+    // page background). Matched case-insensitively with dots/underscores
+    // stripped so "Mat15.001", "Mat15_001", and "Mat15001" all hit.
+    wickMaterialName: "Mat15.001",
   },
 };
 
@@ -216,6 +222,54 @@ function HeroAltarObject({
         baseMeltScaleRef.current = base;
         obj.scale.set(base.x, base.y, base.z);
         obj.matrixAutoUpdate = true;
+
+        // Wick handling on the melt mesh. Two problems stack on the
+        // votive specifically:
+        //   1. Dark material goes invisible against the black page
+        //      background when unlit (no flame light), so give it a
+        //      small warm emissive so it reads without direct light.
+        //   2. The wick sits INSIDE the glass cylinder. Because my
+        //      universal mesh loop marks every candle material
+        //      transparent + depthWrite:true, the glass writes depth
+        //      and the wick's pixels (behind it in z) fail the depth
+        //      test and get culled — which is why the wick only
+        //      showed when the flame was visible (the additive flame
+        //      sort order happened to let the wick slip through).
+        //      Fix: disable depthTest on the wick material and bump
+        //      the owning mesh's renderOrder above the 200 baseline
+        //      so it paints over the glass.
+        // obj.traverse handles both GLTF layouts — single Mesh with a
+        // material array, or a Group with child Meshes per primitive.
+        if (variantConfig.wickMaterialName) {
+          const target = variantConfig.wickMaterialName
+            .replace(/[._]/g, "")
+            .toLowerCase();
+          obj.traverse((desc) => {
+            const mats = Array.isArray(desc.material)
+              ? desc.material
+              : desc.material
+                ? [desc.material]
+                : [];
+            mats.forEach((m) => {
+              if (!m || !m.name || !m.emissive) return;
+              const matName = m.name.replace(/[._]/g, "").toLowerCase();
+              if (matName === target) {
+                m.emissive.setHex(0x8a5a3a);
+                m.emissiveIntensity = 0.9;
+                // On the votive the wick sits INSIDE the glass
+                // cylinder. My universal mesh loop marks every candle
+                // material transparent + depthWrite:true, so the glass
+                // writes depth and pixels behind it (the wick) get
+                // culled. Disabling depthTest on the wick material +
+                // bumping the mesh's renderOrder above the baseline
+                // 200 lets the wick paint on top of the glass in both
+                // lit and unlit states.
+                m.depthTest = false;
+                desc.renderOrder = 220;
+              }
+            });
+          });
+        }
       }
       if (
         variantConfig.dripMeshName &&

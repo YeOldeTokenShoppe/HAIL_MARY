@@ -15,15 +15,70 @@ if (typeof window !== "undefined") {
  * are documented in LittleBookPages.jsx. Receives the face's own page
  * number for the printed corner. Empty entries render a blank paper.
  */
-function PageFace({ entry, pageNumber }) {
+function PageFace({ entry, pageNumber, zoomed = false }) {
   if (!entry) {
     return <div className="lbo-page__number">{pageNumber}</div>;
   }
   if (entry.type === "text") {
+    /* Illuminated-manuscript mode: when the entry includes an `image`
+       (and/or a `dropCap`), swap the centered flex layout for a block
+       layout with a floated miniature on the left and the body text
+       flowing around it. dropCap drops the first glyph of the body
+       into a large initial that also floats left. Both features work
+       independently or together. */
+    const hasImage = !!entry.image;
+    const hasVideo = !!entry.video;
+    const wantsDropCap = !!entry.dropCap;
+    const isIllum = hasImage || hasVideo || wantsDropCap;
+
+    // Derive the drop-cap glyph — explicit string wins, otherwise peel
+    // the first character off a string body. Non-string bodies skip it.
+    let dropCapChar = null;
+    let renderedBody = entry.body;
+    if (wantsDropCap) {
+      if (typeof entry.dropCap === "string") {
+        dropCapChar = entry.dropCap;
+      } else if (typeof entry.body === "string" && entry.body.length) {
+        dropCapChar = entry.body[0];
+        renderedBody = entry.body.slice(1);
+      }
+    }
+
     return (
-      <div className="lbo-face lbo-face--text">
+      <div
+        className={`lbo-face lbo-face--text${isIllum ? " lbo-face--illum" : ""}`}
+      >
         {entry.title && <h3 className="lbo-face__title">{entry.title}</h3>}
-        <div className="lbo-face__body">{entry.body}</div>
+        <div className="lbo-face__body">
+          {hasVideo ? (
+            /* Floated video miniature. In the book view it autoplays
+               muted (required for iOS autoplay) and loops silently. In
+               zoom it renders with native controls + unmuted so the
+               reader can hear it — autoplay with audio may be blocked
+               by the browser, but the controls give a one-tap start. */
+            <video
+              className="lbo-face__illum-media"
+              src={entry.video.src}
+              poster={entry.video.poster}
+              muted={!zoomed}
+              loop
+              playsInline
+              autoPlay
+              controls={zoomed}
+              preload="metadata"
+            />
+          ) : hasImage ? (
+            <img
+              className="lbo-face__illum-media"
+              src={entry.image.src}
+              alt={entry.image.alt || ""}
+            />
+          ) : null}
+          {dropCapChar && (
+            <span className="lbo-face__dropcap">{dropCapChar}</span>
+          )}
+          {renderedBody}
+        </div>
         {entry.footer && (
           <div className="lbo-face__footer">{entry.footer}</div>
         )}
@@ -58,9 +113,11 @@ function PageFace({ entry, pageNumber }) {
           src={entry.src}
           poster={entry.poster}
           className="lbo-face__media"
-          muted
+          muted={!zoomed}
           loop
           playsInline
+          controls={zoomed}
+          autoPlay={zoomed}
           preload="metadata"
         />
         {entry.caption && (
@@ -229,9 +286,11 @@ export default function LittleBookOverlay({
           else video.pause();
         },
       });
-      // onToggle fires only on transitions, so kick off playback for any
-      // video that is already in range at mount time.
+      // onToggle fires only on transitions, so reconcile the initial
+      // state manually: play in-range videos, and pause any that the
+      // `autoPlay` attribute may have kicked off while out of range.
       if (trigger.isActive) video.play().catch(() => {});
+      else video.pause();
       triggers.push(trigger);
     });
 
@@ -532,6 +591,62 @@ export default function LittleBookOverlay({
           gap: 0.7em;
           text-align: center;
         }
+
+        /* ---------- ILLUMINATED MANUSCRIPT MODE ---------- */
+        /* Opt out of the centered flex layout so floats flow inside the
+           body block. Title stays centered above; body is justified to
+           mimic a manuscript column. */
+        .lbo-face--illum {
+          display: block;
+          padding: 9% 8%;
+          text-align: left;
+        }
+        .lbo-face--illum .lbo-face__title {
+          text-align: center;
+          margin-bottom: 0.6em;
+        }
+        .lbo-face--illum .lbo-face__body {
+          text-align: justify;
+          hyphens: auto;
+          -webkit-hyphens: auto;
+        }
+        /* Self-clearing body so the floats don't bleed past the footer. */
+        .lbo-face--illum .lbo-face__body::after {
+          content: "";
+          display: block;
+          clear: both;
+        }
+        .lbo-face__illum-media {
+          float: left;
+          width: 46%;
+          aspect-ratio: 1 / 1;
+          object-fit: cover;
+          margin: 0.15em 0.9em 0.4em 0;
+          border-radius: 3px;
+          border: 1.5px solid rgba(160, 120, 60, 0.55);
+          box-shadow:
+            0 2px 6px rgba(60, 40, 20, 0.35),
+            0 0 0 3px rgba(241, 215, 122, 0.15);
+          /* Let the justified text nestle closer to the illumination. */
+          shape-outside: inset(0);
+          display: block;
+          background: #0a0610;
+        }
+        /* Drop cap — large crimson initial in the manuscript tradition.
+           Floats alongside the illumination when both are present; when
+           the image is alone the cap is simply skipped. */
+        .lbo-face__dropcap {
+          float: left;
+          font-family: 'Pirata One', 'IBM Plex Serif', serif;
+          font-size: 3.4em;
+          line-height: 0.82;
+          padding: 0.05em 0.08em 0 0;
+          margin: 0;
+          color: #8b2626;
+          text-shadow:
+            0 0 6px rgba(241, 215, 122, 0.35),
+            1px 1px 0 rgba(0, 0, 0, 0.08);
+        }
         .lbo-face__title {
           margin: 0;
           font-size: 2.6vmin;
@@ -782,6 +897,7 @@ export default function LittleBookOverlay({
               <PageFace
                 entry={pages[zoomedFaceIdx]}
                 pageNumber={zoomedFaceIdx + 1}
+                zoomed
               />
             </div>
             <div className="lbo-zoom__hint">Tap to return</div>

@@ -140,6 +140,20 @@
   margin-left: auto;
   letter-spacing: 0.3px;
 }
+.tst-example-mark {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--tst-text-dim);
+  border: 1px solid var(--tst-line);
+  border-radius: 2px;
+  padding: 1px 5px;
+  line-height: 1;
+  opacity: 0.75;
+  cursor: help;
+  flex-shrink: 0;
+}
 .tst-text {
   font-size: 13px;
   line-height: 1.4;

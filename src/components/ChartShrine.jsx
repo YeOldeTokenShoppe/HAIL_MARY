@@ -372,6 +372,7 @@ export default function ChartShrine({
   marketCap,
   volatility,
   timeframe,
+  source,
   updatedAt,
   loading,
   error,
@@ -703,8 +704,46 @@ export default function ChartShrine({
           const btnY =
             priceRange.chartBottom +
             (scallopDip - priceRange.chartBottom - btnH) / 2;
+          const logoSize = isMobile ? 64 : 256;
+          const logoX = FRAME_PAD + (isMobile ? 8 : 12);
+          const logoY = btnY + (btnH - logoSize) / 2;
           return (
             <g>
+              <a
+                href="https://www.geckoterminal.com/base/pools/0x40d827acdbefd8ef46953e2b1ac87b8697b82203"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ cursor: "pointer" }}
+              >
+                <image
+                  href={isMobile ? "/coinGeckoTerminalLogo_mini.webp" : "/coinGeckoTerminalLogo.webp"}
+                  x={logoX}
+                  y={logoY}
+                  width={logoSize}
+                  height={logoSize}
+                  opacity="0.85"
+                >
+                  <title>View RL80 on GeckoTerminal</title>
+                </image>
+              </a>
+              {source === "eth-scaled" && (
+                <text
+                  x={VIEW_W - FRAME_PAD - (isMobile ? 8 : 12)}
+                  y={btnY + btnH / 2 + (isMobile ? 5 : 4)}
+                  fill={p.accent}
+                  fontSize={isMobile ? 14 : 13}
+                  fontFamily="IBM Plex Mono, ui-monospace, monospace"
+                  textAnchor="end"
+                  letterSpacing="2"
+                  opacity="0.85"
+                  style={{ cursor: "help" }}
+                >
+                  ETH-INDEXED
+                  <title>
+                    RL80's pool is too illiquid for a dense native candle history, so the chart silhouette is ETH's OHLC scaled by the current RL80/ETH ratio. It will switch to real RL80 candles automatically once the pool accumulates enough trades.
+                  </title>
+                </text>
+              )}
               {TIMEFRAME_OPTIONS.map((opt, i) => {
                 const x = startX + i * (btnW + gap);
                 const active = opt.key === timeframeKey;

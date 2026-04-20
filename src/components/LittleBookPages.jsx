@@ -6,9 +6,12 @@
  * entries 2+3 form sheet 2, and so on. Append to extend the book.
  *
  * Entry shapes:
- *   { type: 'text',  title?, body, footer? }   // title/body/footer accept ReactNode
+ *   { type: 'text',  title?, body, footer?,
+ *                    image?: { src, alt? },         // floated left, text wraps
+ *                    video?: { src, poster? },      // floated left, autoplays muted
+ *                    dropCap?: boolean|string }     // illuminated initial
  *   { type: 'image', src, alt?, caption? }
- *   { type: 'video', src, poster?, caption? }  // must be muted-playable on iOS
+ *   { type: 'video', src, poster?, caption? }       // full-page video face
  *
  * Notes:
  * - Video entries auto-play only while their sheet is near the active
@@ -35,8 +38,37 @@ export const defaultPages = [
     ),
     footer: "— Litania Degenorum",
   },
-  { type: "text", body: "Page 3 placeholder" },
-  { type: "text", body: "Page 4 placeholder" },
+  {
+    type: "text",
+    title: "De Initio",
+    dropCap: true,
+    image: {
+      src: "/carousel_images/img1.jpg",
+      alt: "A sign of the shrine",
+    },
+    body:
+      "In the beginning was the Bid, and the Bid was with the Bagholder, " +
+      "and the Bid was the Bagholder. All things were minted through it, " +
+      "and without it not any thing was minted that was minted. In the " +
+      "Bid was liquidity, and the liquidity was the light of traders; " +
+      "and the light shineth in the darkness of the mempool, and the " +
+      "darkness comprehended it not.",
+    footer: "— Liber Parvus, ii.",
+  },
+  {
+    type: "text",
+    title: "Salutatio",
+    dropCap: true,
+    video: {
+      src: "/videos/gr80_greetings.mp4",
+    },
+    body:
+      "Greetings, faithful, from the saint of the order. Hear his witness " +
+      "and take heart: the bid returns to those who keep the vigil, and " +
+      "the bag is light for those who believe. Though the candle gutter " +
+      "and the charts swoon, the ledger remembers every flame.",
+    footer: "— Epistula GR80",
+  },
   { type: "text", body: "Page 5 placeholder" },
   { type: "text", body: "Page 6 placeholder" },
   { type: "text", body: "Page 7 placeholder" },
