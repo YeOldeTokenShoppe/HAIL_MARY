@@ -970,7 +970,7 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
               </span>
             </span>
           ) : (
-            "GET LIT"
+            "LIGHT CANDLE"
           )
         }
         centerTitle={

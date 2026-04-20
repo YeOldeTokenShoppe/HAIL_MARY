@@ -181,7 +181,7 @@ export default function InscribeModal({ isOpen, onClose, candleLit }) {
         </button>
         <div className="tst-modal-eyebrow">Liber Testium</div>
         <h2 className="tst-modal-title">
-          {editingId ? "Edit" : "Add Your Annunciation"}
+          {editingId ? "Edit Your Toast" : "OFFER A TOAST"}
         </h2>
 
         {isSignedIn && (
@@ -340,7 +340,7 @@ export default function InscribeModal({ isOpen, onClose, candleLit }) {
           </>
         ) : !isSignedIn ? (
           <div className="tst-modal-gate">
-            <p>Sign in to inscribe your comment to the shrine.</p>
+            <p>Sign in to inscribe your comment.</p>
             <button
               type="button"
               className="tst-modal-btn"

@@ -175,7 +175,7 @@ function StackView({ pool, onInscribeClick, newLiveIdsRef }) {
           onClick={onInscribeClick}
           title="Add your witness"
         >
-          + GET LIT FOR RL80
+          + OFFER A TOAST
         </button>
       </div>
       {visible.map(({ key, item, isLive }) => (
