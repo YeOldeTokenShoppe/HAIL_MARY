@@ -356,6 +356,38 @@ export default function LittleBookOverlay({
           transition: opacity 0.6s ease;
         }
 
+        /* ---------- BOOK GLOW ---------- */
+        .lbo-book-glow {
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          width: 90vmin;
+          height: 70vmin;
+          transform: translate(-50%, -50%);
+          background: radial-gradient(
+            ellipse at center,
+            rgba(241, 215, 122, 0.38) 0%,
+            rgba(217, 45, 176, 0.22) 30%,
+            rgba(42, 214, 238, 0.12) 55%,
+            transparent 80%
+          );
+          filter: blur(24px);
+          pointer-events: none;
+          /* Book itself has z-index:1, so 0 keeps the glow behind it. */
+          z-index: 0;
+          animation: lboGlowPulse 4.5s ease-in-out infinite;
+        }
+        @keyframes lboGlowPulse {
+          0%, 100% {
+            opacity: 0.85;
+            transform: translate(-50%, -50%) scale(1);
+          }
+          50% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1.06);
+          }
+        }
+
         /* ---------- BOOK ---------- */
         .lbo-book {
           height: 52vmin;
@@ -394,6 +426,13 @@ export default function LittleBookOverlay({
           z-index: calc((${sheetCount + 2} - var(--page-index)) * 2);
           transform-origin: 0% 50%;
           transform-style: preserve-3d;
+          /* Neon edge glow — warm core with a fuchsia halo and a wide
+             cyan bloom. Applies to covers and interior sheets alike so
+             whatever page is on top reads lit against the backdrop. */
+          box-shadow:
+            0 0 12px rgba(241, 215, 122, 0.35),
+            0 0 28px rgba(217, 45, 176, 0.2),
+            0 0 56px rgba(42, 214, 238, 0.1);
         }
 
         .lbo-book__cover {
@@ -678,6 +717,12 @@ export default function LittleBookOverlay({
 
         <div className="lbo-scroller" ref={scrollerRef}>
           <div className="lbo-spacer">
+            {/* Static backlight centered at viewport center. Both the
+                closed book (container centered) and the open spread
+                (spine at viewport center) share this center point, so a
+                single fixed glow reads correctly in both states without
+                needing to track the book's GSAP shift. */}
+            <div className="lbo-book-glow" aria-hidden="true" />
             <div className="lbo-book" onClick={handleBookTap}>
               <div className="lbo-book__spine" />
 
