@@ -181,7 +181,7 @@ export default function InscribeModal({ isOpen, onClose, candleLit }) {
         </button>
         <div className="tst-modal-eyebrow">Liber Testium</div>
         <h2 className="tst-modal-title">
-          {editingId ? "Edit" : "Shine Your Light"}
+          {editingId ? "Edit" : "Add Your Annunciation"}
         </h2>
 
         {isSignedIn && (
@@ -259,7 +259,7 @@ export default function InscribeModal({ isOpen, onClose, candleLit }) {
               ref={taRef}
               className="tst-modal-textarea"
               maxLength={MAX_LEN}
-              placeholder="Confess a miracle. Praise the Lady. Warn the unfaithful…"
+              placeholder="Pray tell...did Our Lady guide your hand to a bag purchase? Did Her light reveal a hidden gem? Or did the darkness of the bear market lead you astray, only for Her mercy to save you from ruin?"
               value={text}
               onChange={(e) => setText(e.target.value)}
               disabled={busy}

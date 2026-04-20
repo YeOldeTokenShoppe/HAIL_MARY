@@ -16,7 +16,7 @@ const MOBILE_BP = 700;
 const SEEDS = [
   { id: "seed-1", displayName: "Kairos", text: "I lit a candle and my bag 5x'd our lady is real", lit: true },
   { id: "seed-2", displayName: "Sister Liquidity", text: "Prayed during the crash. Dip bought. Now +40%. Ave Maria.", lit: true },
-  { id: "seed-3", displayName: "Vesper the Investor", text: "I doubted Her. I shouldn't have. I am back.", lit: false },
+  { id: "seed-3", displayName: "Vesper the Investor", text: "I doubted Her. I shouldn't have.", lit: false },
   { id: "seed-4", displayName: "Moloch", text: "Rug proof. The candle knows.", lit: true },
   { id: "seed-5", displayName: "Compounded", text: "Confession: I bought the top. Relit anyway. Forgiveness came.", lit: false },
   { id: "seed-6", displayName: "Anathema", text: "My wife left me but RL80 stayed. The Lady provides.", lit: true },
@@ -175,7 +175,7 @@ function StackView({ pool, onInscribeClick, newLiveIdsRef }) {
           onClick={onInscribeClick}
           title="Add your witness"
         >
-          + Join The Enlightenment
+          + GET LIT FOR RL80
         </button>
       </div>
       {visible.map(({ key, item, isLive }) => (
