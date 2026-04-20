@@ -239,11 +239,12 @@
 }
 
 /* Stack inline content above the fixed scene-background. Fixed-position
-   overlays (mobile dock, auth slot) are excluded so they stay pinned to
-   the viewport instead of flowing inline — this selector's specificity
-   (0,3,0) otherwise overrides their own `position: fixed`. */
+   overlays (mobile dock, auth slot, sign-in nudge, candle picker) are
+   excluded so they stay pinned to the viewport instead of flowing
+   inline — this selector's specificity otherwise overrides their own
+   `position: fixed`. */
 .shrine-page.neon
-  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot) {
+  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge) {
   position: relative;
   z-index: 1;
 }
@@ -836,6 +837,20 @@
   }
 }
 
+/* While the sign-in nudge or candle picker is open, quiet down the
+   hero text + chart so the overlay has room to breathe. Page branding
+   (title) and the 3D candle scene stay visible as anchors. Transition
+   is gentle enough to feel like a focus shift, not a modal blackout. */
+.shrine-page.neon.has-overlay .hero-band {
+  opacity: 0.12;
+  pointer-events: none;
+  transition: opacity 220ms ease;
+}
+
+.shrine-page.neon .hero-band {
+  transition: opacity 220ms ease;
+}
+
 /* Post-ignition nudge + candle picker. Matches the right-rail
    testimonial card's palette + type so the popup reads as a sibling,
    not a stray element: purple-black backdrop (tst-bg-card), gold
@@ -1000,10 +1015,26 @@
   color: #f1d77a;
 }
 
-/* Picker variant — same frame, higher anchor so the two-tile layout
-   clears the FAB and mobile nav. */
+/* Picker variant — same frame, but centered in the viewport rather
+   than docked at the bottom. Bottom-anchored was easy to miss since
+   the user's eye is already on the candle (also near the bottom) when
+   they tap the FAB; center-of-screen forces the focus. */
 .flame-nudge.candle-picker-popup {
-  bottom: calc(200px + env(safe-area-inset-bottom, 0px));
+  top: 50%;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+  animation-name: candlePickerIn;
+}
+
+@keyframes candlePickerIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 10px));
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
 }
 
 /* Two-up variant tiles. Each tile is its own small testimonial-style
@@ -1065,8 +1096,11 @@
   opacity: 0.85;
 }
 
-.candle-picker-signout {
-  margin-top: 4px;
+/* Secondary actions stacked beneath the picker tiles — currently
+   "Extinguish candle" (only while lit) and "Sign out". Styled as
+   subtle monospace links so the primary eye-path stays on the tiles. */
+.candle-picker-secondary {
+  margin-top: 2px;
   padding: 4px 10px;
   background: transparent;
   border: none;
@@ -1080,43 +1114,79 @@
   align-self: center;
 }
 
-.candle-picker-signout:hover {
+.candle-picker-secondary:hover {
   color: #f1d77a;
 }
 
-/* Small pill above the candle FAB. Signed-in users tap it to open the
-   picker without touching lit state. Cinzel + gold keeps it in the
-   same typographic family as the testimonial's inscribe button. */
-.candle-change-pill {
-  position: fixed;
-  left: 50%;
-  bottom: calc(104px + env(safe-area-inset-bottom, 0px));
-  transform: translateX(-50%);
-  z-index: 35;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 16px;
-  background: rgba(20, 16, 28, 0.88);
-  backdrop-filter: blur(10px) saturate(1.2);
-  -webkit-backdrop-filter: blur(10px) saturate(1.2);
-  border: 1px solid rgba(241, 215, 122, 0.25);
-  border-radius: 999px;
-  color: #f1d77a;
-  font-family: "Cinzel", serif;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 2.2px;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: color 160ms ease, border-color 160ms ease,
-    background 160ms ease, box-shadow 160ms ease;
-  animation: flameNudgeIn 280ms ease-out;
-}
+/* Mobile: the default flame-nudge + pill layouts are tuned for desktop
+   breathing room. On narrow viewports the full benefit-list card can
+   overflow the viewport, and the centered pill collides with the
+   centered price chart. Compact both. */
+@media (max-width: 700px) {
+  /* Sign-in nudge on mobile keeps the full pitch (title + eyebrow +
+     benefits + CTA) but with tighter rhythm so it fits above the FAB
+     without cropping. max-height + overflow keeps it honest on very
+     short devices. */
+  .flame-nudge {
+    gap: 10px;
+    padding: 14px 34px 14px 18px;
+    width: min(calc(100vw - 20px), 360px);
+    bottom: calc(128px + env(safe-area-inset-bottom, 0px));
+    max-height: calc(100dvh - 200px);
+    overflow-y: auto;
+  }
 
-.candle-change-pill:hover {
-  color: #fff4c2;
-  border-color: rgba(241, 215, 122, 0.55);
-  background: rgba(30, 22, 36, 0.92);
-  box-shadow: 0 0 18px rgba(241, 215, 122, 0.22);
+  .flame-nudge-title {
+    font-size: 13px;
+    letter-spacing: 1.2px;
+  }
+
+  .flame-nudge-sub {
+    font-size: 9px;
+    letter-spacing: 2.2px;
+  }
+
+  .flame-nudge-benefits {
+    gap: 5px;
+  }
+
+  .flame-nudge-benefits li {
+    font-size: 11.5px;
+    line-height: 1.4;
+  }
+
+  .flame-nudge-cta {
+    padding: 8px 18px;
+    font-size: 10px;
+    letter-spacing: 2px;
+  }
+
+  /* Picker is an exception — it still needs the two-tile column layout
+     to be usable. Override the row-flex from above so tiles stack and
+     the title centers again. */
+  .flame-nudge.candle-picker-popup {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: 16px 20px 14px;
+    /* Explicit re-assertion of the centered position. The desktop
+       .flame-nudge.candle-picker-popup rule already sets these, but
+       re-declaring here inside the media query makes the cascade
+       unambiguous — some browsers can get confused when the
+       higher-specificity selector lives outside the media query and
+       the base .flame-nudge (lower specificity, inside the media
+       query) sets a conflicting bottom. */
+    top: 50%;
+    bottom: auto;
+    transform: translate(-50%, -50%);
+    width: min(calc(100vw - 32px), 360px);
+    max-height: calc(100dvh - 48px);
+  }
+
+  .flame-nudge.candle-picker-popup .flame-nudge-title {
+    text-align: center;
+    flex: none;
+    font-size: 14px;
+  }
+
 }

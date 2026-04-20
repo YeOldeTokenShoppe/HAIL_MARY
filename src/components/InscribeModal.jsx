@@ -181,7 +181,7 @@ export default function InscribeModal({ isOpen, onClose, candleLit }) {
         </button>
         <div className="tst-modal-eyebrow">Liber Testium</div>
         <h2 className="tst-modal-title">
-          {editingId ? "Edit" : "Light Up the Timeline"}
+          {editingId ? "Edit" : "Shine Your Light"}
         </h2>
 
         {isSignedIn && (
@@ -299,7 +299,7 @@ export default function InscribeModal({ isOpen, onClose, candleLit }) {
 
             {userItems.length > 0 && (
               <div className="tst-mine">
-                <div className="tst-mine-head">Say Something</div>
+                <div className="tst-mine-head">Pray tell:</div>
                 <ul className="tst-mine-list">
                   {userItems.map((item) => (
                     <li
@@ -340,7 +340,7 @@ export default function InscribeModal({ isOpen, onClose, candleLit }) {
           </>
         ) : !isSignedIn ? (
           <div className="tst-modal-gate">
-            <p>Sign in to inscribe your witness to the shrine ledger.</p>
+            <p>Sign in to inscribe your comment to the shrine.</p>
             <button
               type="button"
               className="tst-modal-btn"

@@ -527,10 +527,11 @@ export default function HomePage() {
   // Keyed off userId (not isSignedIn) to match the hydrate branching and
   // avoid a flicker on Clerk's initial load.
   const meltDuration = userId ? MELT_DURATION_SIGNED_IN_MS : MELT_DURATION_ANON_MS;
-  // Candle variant — anon visitors are locked to the pillar; signed-in
-  // users get their persisted choice from localStorage (default votive
-  // on first sign-in). The picker below lets them change it.
-  const [candleVariantChoice, setCandleVariantChoice] = useState("votive");
+  // Candle variant — everyone starts on the pillar. Signed-in users
+  // can discover the votive (and future variants) through the picker;
+  // their choice persists in localStorage. Starting on the pillar makes
+  // the upgrade feel earned rather than auto-granted.
+  const [candleVariantChoice, setCandleVariantChoice] = useState("pillar");
   const [showCandlePicker, setShowCandlePicker] = useState(false);
   useEffect(() => {
     if (!userId) return;
@@ -538,7 +539,7 @@ export default function HomePage() {
     if (saved && CANDLE_VARIANTS[saved]) {
       setCandleVariantChoice(saved);
     } else {
-      setCandleVariantChoice("votive");
+      setCandleVariantChoice("pillar");
     }
   }, [userId]);
   const candleVariant = userId ? candleVariantChoice : "pillar";
@@ -643,12 +644,19 @@ export default function HomePage() {
     setCandleLit(true);
   };
 
-  // FAB click is a simple toggle for all users — tap to light (with the
-  // user's saved variant for signed-in, pillar for anon), tap again to
-  // extinguish. Changing variants is handled out-of-band via the
-  // "Change candle" pill, so the FAB's job stays focused on ignition.
+  // FAB click routing:
+  // - Unlit: light the candle (any auth state).
+  // - Lit + anon: extinguish (anon users have nothing else to do with
+  //   a lit candle).
+  // - Lit + signed-in: open the picker so they can change variant.
+  //   Extinguish is demoted to a secondary action inside the picker —
+  //   it's rarely used since candles burn out naturally over 8 hours.
   const toggleCandle = () => {
     if (candleLit) {
+      if (userId) {
+        setShowCandlePicker(true);
+        return;
+      }
       doExtinguish();
       return;
     }
@@ -698,7 +706,12 @@ export default function HomePage() {
   }, [candleLit, litAt, meltDuration]);
 
   return (
-    <main className="shrine-page neon" style={{ background: "#000" }}>
+    <main
+      className={`shrine-page neon${
+        showSignInNudge || showCandlePicker ? " has-overlay" : ""
+      }`}
+      style={{ background: "#000" }}
+    >
       <div className="scene-background">
         <StarfieldStatueScene
           style={{
@@ -749,7 +762,7 @@ export default function HomePage() {
             </span>
           </blockquote>
           <p className="hero-intro">
-A refuge for the rekt, a liturgy for the ledger, a confessional for your worst trades. RL80 is the token of her order. The faithful are known by their bags. </p>
+A refuge for the rekt, a liturgy for the ledger, a confessional for your worst trades. RL80 is the token of her order. Mater ex machina. </p>
         </div>
 
         <div className="shrine-column">
@@ -822,30 +835,6 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
         </div>
       )}
 
-      {userId && !showCandlePicker && (
-        <button
-          type="button"
-          className="candle-change-pill"
-          onClick={() => setShowCandlePicker(true)}
-          title="Change candle"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{ width: 12, height: 12, display: "block" }}
-            aria-hidden="true"
-          >
-            <rect x="3" y="4" width="8" height="16" rx="1" />
-            <rect x="13" y="4" width="8" height="16" rx="1" />
-          </svg>
-          Change candle
-        </button>
-      )}
-
       {showCandlePicker && (
         <div
           className="flame-nudge candle-picker-popup"
@@ -879,9 +868,21 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
               </span>
             </button>
           </div>
+          {candleLit && (
+            <button
+              type="button"
+              className="candle-picker-secondary"
+              onClick={() => {
+                setShowCandlePicker(false);
+                doExtinguish();
+              }}
+            >
+              Extinguish candle
+            </button>
+          )}
           <button
             type="button"
-            className="candle-picker-signout"
+            className="candle-picker-secondary"
             onClick={() => {
               setShowCandlePicker(false);
               signOut();
@@ -909,7 +910,35 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
         onBuyClick={toggleCandle}
         centerLabel={
           candleLit ? (
-            "LIT"
+            userId ? (
+              /* Signed-in + lit: the FAB's job pivots from "extinguish"
+                 (rare) to "change your candle" (the more valuable
+                 action for the faithful). Lucide settings-2 glyph —
+                 two sliders — reads as "adjust". Extinguish lives
+                 inside the picker as a secondary action. */
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{
+                  width: 28,
+                  height: 28,
+                  display: "block",
+                  color: "#f1d77a",
+                }}
+                aria-hidden="true"
+              >
+                <path d="M14 17H5" />
+                <path d="M19 7h-9" />
+                <circle cx="17" cy="17" r="3" />
+                <circle cx="7" cy="7" r="3" />
+              </svg>
+            ) : (
+              "LIT"
+            )
           ) : (
             <img
               src="/images/flame.svg"
@@ -944,7 +973,13 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
             "GET LIT"
           )
         }
-        centerTitle={candleLit ? "Extinguish candle" : "Light candle"}
+        centerTitle={
+          candleLit
+            ? userId
+              ? "Change candle"
+              : "Extinguish candle"
+            : "Light candle"
+        }
         /* Filling gold arc around the FAB — 0 when just lit, 1 at
            burnout. Only rendered while a candle is actually lit. */
         centerProgress={candleLit ? meltProgress : null}
