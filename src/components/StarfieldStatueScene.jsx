@@ -54,6 +54,11 @@ function StarfieldStatueScene({
   children,
 }) {
   const router = useRouter()
+  // Shared with CandleOrbitalEffects so SelectiveBloom has a light to
+  // enable on its selection layer — without this it warns and produces
+  // a no-op bloom pass. Stable array identity prevents remount churn.
+  const dirLightRef = useRef()
+  const bloomLights = React.useMemo(() => [dirLightRef], [])
 
   return (
     <div
@@ -284,9 +289,15 @@ function StarfieldStatueScene({
           {/* OrbitControls removed in favor of Figure8Camera */}
         </Suspense>
 
+        {/* Zero-intensity helper light whose lifetime matches the composer's.
+            Kept outside Suspense so `dirLightRef.current` is always defined
+            when SelectiveBloom's mount/unmount effects run — otherwise a
+            re-suspend during GLTF load throws on `light.layers.disable`. */}
+        <pointLight ref={dirLightRef} intensity={0} position={[0, 0, 0]} />
+
         {/* Bloom postprocessing — outside Suspense so a re-suspend of
             the GLTF subtree can't unmount/remount the EffectComposer */}
-        <CandleOrbitalEffects />
+        <CandleOrbitalEffects lights={bloomLights} />
         {showStats && <Stats />}
       </Canvas>
     </div>

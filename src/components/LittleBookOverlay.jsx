@@ -83,11 +83,46 @@ export default function LittleBookOverlay({
   const scrollerRef = useRef(null);
   const [mounted, setMounted] = useState(false);
   const [hintVisible, setHintVisible] = useState(true);
+  // Face index currently zoomed, or null when the book is in spread view.
+  const [zoomedFaceIdx, setZoomedFaceIdx] = useState(null);
+  /* Ref (not state) so the click handler can read the latest scroll
+     unit without the component having to re-render on every scroll tick. */
+  const scrollUnitRef = useRef(0);
 
   /* One paper sheet holds two faces (front + back). Round up so an odd
      page count still gets a sheet — its back face renders blank. Floor
      at 1 so the book always has at least one interior sheet. */
   const sheetCount = Math.max(1, Math.ceil(pages.length / 2));
+
+  /* Given the current scroll unit, derive which page faces are showing
+     on the left and right. Rounds to the nearest resting spread so a
+     tap mid-flip still snaps to the nearest readable pair.
+     At scroll unit N (>= 2), left=2N-5, right=2N-4. Returns null if the
+     cover is showing or we're past the last content page. */
+  const getCurrentSpread = () => {
+    const rounded = Math.round(scrollUnitRef.current);
+    if (rounded < 2 || rounded > sheetCount + 1) return null;
+    const left = 2 * rounded - 5;
+    const right = 2 * rounded - 4;
+    return {
+      left: left >= 0 && left < pages.length ? left : null,
+      right: right >= 0 && right < pages.length ? right : null,
+    };
+  };
+
+  /* Tap on the book: figure out the current spread, use x-position to
+     pick left vs right face, open the zoom. stopPropagation so the
+     overlay's own "tap to close" doesn't fire. Taps that don't land on
+     a readable face (cover view, empty side) bubble up and close. */
+  const handleBookTap = (e) => {
+    const spread = getCurrentSpread();
+    if (!spread) return;
+    const spineX = window.innerWidth / 2;
+    const face = e.clientX < spineX ? spread.left : spread.right;
+    if (face === null) return;
+    e.stopPropagation();
+    setZoomedFaceIdx(face);
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -105,6 +140,8 @@ export default function LittleBookOverlay({
 
     const onScroll = () => {
       if (scroller.scrollTop > 5) setHintVisible(false);
+      scrollUnitRef.current =
+        scroller.scrollTop / (window.innerHeight * 0.25);
     };
     scroller.addEventListener("scroll", onScroll, { passive: true });
 
@@ -206,20 +243,28 @@ export default function LittleBookOverlay({
     };
   }, [isOpen, pages]);
 
-  // Escape to close + lock page scroll behind the overlay.
+  // Escape closes zoom first (if open), then the whole book. Also lock
+  // page scroll behind the overlay while it's open.
   useEffect(() => {
     if (!isOpen) return;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (e) => {
-      if (e.key === "Escape") onClose();
+      if (e.key !== "Escape") return;
+      if (zoomedFaceIdx !== null) setZoomedFaceIdx(null);
+      else onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, zoomedFaceIdx]);
+
+  // Drop any stale zoom when the book closes.
+  useEffect(() => {
+    if (!isOpen) setZoomedFaceIdx(null);
+  }, [isOpen]);
 
   if (!isOpen || !mounted) return null;
 
@@ -491,6 +536,87 @@ export default function LittleBookOverlay({
           padding: 0 1rem;
         }
 
+        /* Give the book a tap affordance on pointer devices without
+           breaking scroll-to-flip on touch. */
+        .lbo-book { cursor: zoom-in; }
+
+        /* ---------- ZOOM OVERLAY ---------- */
+        .lbo-zoom {
+          position: fixed;
+          inset: 0;
+          z-index: 10060;
+          background: radial-gradient(
+            ellipse at center,
+            rgba(10, 6, 20, 0.88) 0%,
+            rgba(2, 3, 8, 0.97) 100%
+          );
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-sizing: border-box;
+          cursor: zoom-out;
+          animation: lboZoomIn 0.22s ease-out;
+        }
+        @keyframes lboZoomIn {
+          from { opacity: 0; transform: scale(0.96); }
+          to   { opacity: 1; transform: scale(1); }
+        }
+        /* Lock to the same aspect as a book page (~38:52 portrait) so
+           assets designed for the book look identical when zoomed — no
+           letterboxing, no cropping delta between the two views. The
+           browser preserves the ratio while honoring the max-width and
+           max-height caps, shrinking whichever dimension hits first. */
+        .lbo-zoom__panel {
+          position: relative;
+          aspect-ratio: 38 / 52;
+          max-width: min(92vw, 560px);
+          max-height: 85vh;
+          width: 100%;
+          height: auto;
+          background: #f2ecdb;
+          border-radius: 8px;
+          box-shadow:
+            0 20px 60px rgba(0, 0, 0, 0.6),
+            0 0 40px rgba(42, 214, 238, 0.2);
+          overflow: hidden;
+        }
+        /* Bump type sizes inside the zoom — book-scale vmin values are
+           tiny on phones. Override with absolute units for readability. */
+        .lbo-zoom__panel .lbo-face { overflow-y: auto; }
+        .lbo-zoom__panel .lbo-face--text { padding: 8% 7%; }
+        .lbo-zoom__panel .lbo-face__title {
+          font-size: clamp(1.6rem, 5vw, 2.4rem);
+          letter-spacing: 3px;
+        }
+        .lbo-zoom__panel .lbo-face__body {
+          font-size: clamp(1rem, 3.5vw, 1.3rem);
+          line-height: 1.6;
+        }
+        .lbo-zoom__panel .lbo-face__footer {
+          font-size: clamp(0.85rem, 2.8vw, 1rem);
+          margin-top: 0.6em;
+        }
+        .lbo-zoom__panel .lbo-face__caption {
+          font-size: clamp(0.85rem, 2.5vw, 1rem);
+          bottom: 1.5rem;
+        }
+        .lbo-zoom__panel .lbo-page__number { font-size: 0.9rem; }
+        /* Panel matches the page aspect, so keep object-fit: cover (the
+           base rule) in both views — media crops identically in each. */
+        .lbo-zoom__hint {
+          position: absolute;
+          bottom: 2.5vh;
+          left: 50%;
+          transform: translateX(-50%);
+          color: rgba(214, 250, 255, 0.7);
+          font-family: 'Pirata One', serif;
+          font-size: 0.9rem;
+          letter-spacing: 3px;
+          text-transform: uppercase;
+          pointer-events: none;
+          text-shadow: 0 0 8px rgba(42, 214, 238, 0.4);
+        }
+
         /* ---------- COVER FACE ---------- */
         .lbo-cover-content {
           text-align: center;
@@ -552,7 +678,7 @@ export default function LittleBookOverlay({
 
         <div className="lbo-scroller" ref={scrollerRef}>
           <div className="lbo-spacer">
-            <div className="lbo-book">
+            <div className="lbo-book" onClick={handleBookTap}>
               <div className="lbo-book__spine" />
 
               {/* Front cover */}
@@ -593,6 +719,29 @@ export default function LittleBookOverlay({
             </div>
           </div>
         </div>
+
+        {zoomedFaceIdx !== null && (
+          <div
+            className="lbo-zoom"
+            onClick={(e) => {
+              /* Stop propagation so tapping the zoom doesn't also hit
+                 the book overlay's close handler. Tap anywhere on the
+                 zoom (backdrop OR panel) closes the zoom only. */
+              e.stopPropagation();
+              setZoomedFaceIdx(null);
+            }}
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="lbo-zoom__panel">
+              <PageFace
+                entry={pages[zoomedFaceIdx]}
+                pageNumber={zoomedFaceIdx + 1}
+              />
+            </div>
+            <div className="lbo-zoom__hint">Tap to return</div>
+          </div>
+        )}
       </div>
     </>,
     document.body,

@@ -24,20 +24,74 @@ import {
 } from "@/lib/localCandle";
 import "./chart-shrine/chart-shrine.css";
 
+// Preload only the anon-default pillar candle. The votive GLB is
+// lazy-loaded on first mount of a signed-in user's HeroAltarObject so
+// anonymous visitors don't pay the download for an asset they won't see.
 useGLTF.preload("/models/JustCandle.glb");
+
+// Per-user candle variant preference persists across reloads but is
+// scoped to the device — kept in localStorage rather than Firestore to
+// avoid touching the ritual schema for a cosmetic choice. Keyed by
+// userId so each signed-in user on a shared device gets their own pick.
+const CANDLE_VARIANT_STORAGE_PREFIX = "rl80:candleVariant:";
+function readCandleVariant(userId) {
+  if (!userId || typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(CANDLE_VARIANT_STORAGE_PREFIX + userId);
+  } catch {
+    return null;
+  }
+}
+function writeCandleVariant(userId, variant) {
+  if (!userId || typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      CANDLE_VARIANT_STORAGE_PREFIX + userId,
+      variant,
+    );
+  } catch {}
+}
+
+// Candle variant registry. Each entry fully describes a model's melt
+// behavior so HeroAltarObject stays variant-agnostic — adding a new
+// saint or color means appending a config entry, not forking logic.
+// - meltMeshName: name (case-insensitive) of the mesh that shrinks
+// - meltAxis: which local scale axis shortens as the candle burns
+// - dripMeshName: optional secondary mesh that oozes out; null to skip
+// - scale: render-scale on the outer <primitive>
+const CANDLE_VARIANTS = {
+  pillar: {
+    modelPath: "/models/JustCandle.glb",
+    meltMeshName: "WAX",
+    meltAxis: "z",
+    dripMeshName: "DRIPWAX",
+    scale: 1.2,
+  },
+  votive: {
+    modelPath: "/models/tinyVotiveOnly.glb",
+    meltMeshName: "XBASE",
+    meltAxis: "z",
+    dripMeshName: null,
+    scale: 1.2,
+  },
+};
 
 const StarfieldStatueScene = dynamic(
   () => import("@/components/StarfieldStatueScene"),
   { ssr: false }
 );
 
-// Melt window — 1 minute for testing; flip back to `24 * 60 * 60 * 1000` for prod.
-const MELT_DURATION_MS = 60 * 1000;
+// Melt windows — anonymous visitors get a 1-minute preview to sample the
+// ritual; signed-in faithful get 8 hours so the flame lasts across a
+// session or work day. The duration is selected at render time based on
+// auth state and threaded through the melt timer + countdown UI.
+const MELT_DURATION_ANON_MS = 60 * 1000;
+const MELT_DURATION_SIGNED_IN_MS = 8 * 60 * 60 * 1000;
 
 // Compact remaining-time label for the CANDLE FAB countdown. HH:MM:SS
 // always so the ticking seconds confirm the clock is live.
-function formatRemaining(litAtMs) {
-  const remaining = Math.max(0, MELT_DURATION_MS - (Date.now() - litAtMs));
+function formatRemaining(litAtMs, meltDuration) {
+  const remaining = Math.max(0, meltDuration - (Date.now() - litAtMs));
   const totalSeconds = Math.floor(remaining / 1000);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -51,8 +105,9 @@ function formatRemaining(litAtMs) {
 // export-time scale the first time we see each Wax mesh. Otherwise a
 // subsequent mount would read back our previously-melted scale and treat
 // it as baseline, leaving the candle stuck in a burned state.
-const WAX_BASELINE_CACHE = new WeakMap();
+const MELT_BASELINE_CACHE = new WeakMap();
 const DRIP_BASELINE_CACHE = new WeakMap();
+const FLAME_LIGHT_BASELINE_CACHE = new WeakMap();
 
 // Personalized altar overlay — camera-anchored so it stays in a fixed screen
 // position while the crane shot orbits. Single Canvas, no extra WebGL context.
@@ -60,18 +115,31 @@ const DRIP_BASELINE_CACHE = new WeakMap();
 // pulse are computed relative to this.
 const WARM_BASE_INTENSITY = 0.2;
 
-function HeroAltarObject({ candleLit = false, litAt = null, onBurnedOut, debugRef }) {
-  const { scene } = useGLTF("/models/JustCandle.glb");
+function HeroAltarObject({
+  candleLit = false,
+  litAt = null,
+  meltDuration,
+  variant = "pillar",
+  onBurnedOut,
+  debugRef,
+}) {
+  const variantConfig = CANDLE_VARIANTS[variant] ?? CANDLE_VARIANTS.pillar;
+  const { scene } = useGLTF(variantConfig.modelPath);
   const groupRef = useRef();
   const isMobileRef = useRef(false);
-  // Wax mesh + its baseline scale.y — flame/wick are parented to it, so
-  // shrinking the wax shrinks the whole candle column together.
-  const waxRef = useRef(null);
-  const baseWaxScaleYRef = useRef(1);
+  // The melt mesh (WAX on the pillar, XBASE on the votive) + its
+  // baseline scale vector — flame/wick are parented to it, so shrinking
+  // one axis shrinks the whole candle column together.
+  const meltMeshRef = useRef(null);
+  const baseMeltScaleRef = useRef({ x: 1, y: 1, z: 1 });
   // Drip wax: hidden at lit-start, grows down (local Z, same axis as wax
   // melt) and fades in as the candle burns toward fully-melted.
   const dripWaxRef = useRef(null);
   const baseDripScaleRef = useRef({ x: 1, y: 1, z: 1 });
+  // Flame-parented pointLight authored inside the GLB. Dimmed over the
+  // melt window so the cast light fades with the shrinking candle.
+  const flameLightRef = useRef(null);
+  const baseFlameLightIntensityRef = useRef(1);
   // Guard so we only fire onBurnedOut once per lit cycle.
   const burnedOutFiredRef = useRef(false);
   // Throttle the debug readout updates.
@@ -132,17 +200,28 @@ function HeroAltarObject({ candleLit = false, litAt = null, onBurnedOut, debugRe
           });
         }
       }
-      if (obj.name && obj.name.toUpperCase() === "WAX") {
-        waxRef.current = obj;
-        if (!WAX_BASELINE_CACHE.has(obj)) {
-          WAX_BASELINE_CACHE.set(obj, obj.scale.y);
+      if (
+        obj.name &&
+        obj.name.toUpperCase() === variantConfig.meltMeshName.toUpperCase()
+      ) {
+        meltMeshRef.current = obj;
+        if (!MELT_BASELINE_CACHE.has(obj)) {
+          MELT_BASELINE_CACHE.set(obj, {
+            x: obj.scale.x,
+            y: obj.scale.y,
+            z: obj.scale.z,
+          });
         }
-        const base = WAX_BASELINE_CACHE.get(obj);
-        baseWaxScaleYRef.current = base;
-        obj.scale.set(base, base, base);
+        const base = MELT_BASELINE_CACHE.get(obj);
+        baseMeltScaleRef.current = base;
+        obj.scale.set(base.x, base.y, base.z);
         obj.matrixAutoUpdate = true;
       }
-      if (obj.name && obj.name.toUpperCase() === "DRIPWAX") {
+      if (
+        variantConfig.dripMeshName &&
+        obj.name &&
+        obj.name.toUpperCase() === variantConfig.dripMeshName.toUpperCase()
+      ) {
         dripWaxRef.current = obj;
         if (!DRIP_BASELINE_CACHE.has(obj)) {
           DRIP_BASELINE_CACHE.set(obj, {
@@ -156,34 +235,70 @@ function HeroAltarObject({ candleLit = false, litAt = null, onBurnedOut, debugRe
         obj.scale.set(base.x * 0.35, base.y * 0.35, base.z * 0.35);
         obj.matrixAutoUpdate = true;
       }
+      // First light found in the GLB is the authored candle-flame
+      // pointLight. We don't require a FLAME ancestor because variants
+      // place the light differently: the pillar parents it under Flame,
+      // the votive makes it a sibling of Flame (both children of XBase).
+      // Visibility is handled explicitly below — here we just capture
+      // the ref + cache the export-time intensity so the melt fade
+      // always starts from the original authored value even after
+      // useGLTF returns a scene that's already been dimmed.
+      if (obj.isLight && !flameLightRef.current) {
+        flameLightRef.current = obj;
+        if (!FLAME_LIGHT_BASELINE_CACHE.has(obj)) {
+          FLAME_LIGHT_BASELINE_CACHE.set(obj, obj.intensity);
+        }
+        baseFlameLightIntensityRef.current =
+          FLAME_LIGHT_BASELINE_CACHE.get(obj);
+        obj.intensity = baseFlameLightIntensityRef.current;
+      }
     });
   }, [scene]);
 
-  // The GLB ships with FLAME hidden; toggle it + all descendants based on
-  // whether the user has lit the candle.
+  // The GLB ships with FLAME hidden; toggle the Flame node + all of its
+  // descendants based on whether the user has lit the candle. We match
+  // names that START with "FLAME" (so Blender-auto-renamed variants like
+  // "Flame.001" or "Flame_0" still match) but EXCLUDE anything
+  // containing "WICK" — GLTFLoader may split a multi-material primitive
+  // into sub-meshes named "Flame_Wick" that we don't want to hide with
+  // the flame. The inner traverse covers every child of Flame (pillar
+  // layout); for the votive, where the pointLight is a sibling of Flame,
+  // we toggle the captured flameLightRef explicitly below.
   useEffect(() => {
     scene.traverse((obj) => {
-      if (obj.name && obj.name.toUpperCase().includes("FLAME")) {
+      const upper = obj.name?.toUpperCase() ?? "";
+      if (upper.startsWith("FLAME") && !upper.includes("WICK")) {
         obj.visible = candleLit;
         obj.traverse((child) => {
           child.visible = candleLit;
         });
       }
     });
+    if (flameLightRef.current) {
+      flameLightRef.current.visible = candleLit;
+    }
   }, [scene, candleLit]);
 
-  // When the candle is extinguished, reset the wax to its full baseline.
-  // Use set() to trigger the matrix-dirty onChange hook.
+  // Reset the model to its authored baselines on every lit/unlit
+  // transition AND on every fresh light cycle (new litAt). The litAt
+  // dep catches a race where rapid burnout → relight gets batched by
+  // React into a single candleLit=true render: the candleLit value
+  // doesn't change, but litAt does, so this dep still fires and resets
+  // the melted state from the previous cycle. useFrame re-applies the
+  // correct shrunk scale on the next frame for the lit case.
   useEffect(() => {
-    if (!candleLit && waxRef.current) {
-      const base = baseWaxScaleYRef.current;
-      waxRef.current.scale.set(base, base, base);
+    if (meltMeshRef.current) {
+      const base = baseMeltScaleRef.current;
+      meltMeshRef.current.scale.set(base.x, base.y, base.z);
     }
-    if (!candleLit && dripWaxRef.current) {
+    if (dripWaxRef.current) {
       const base = baseDripScaleRef.current;
-      dripWaxRef.current.scale.set(base.x * 0.35, base.y * 0.35, base.z * 0.35);
+      dripWaxRef.current.scale.set(base.x * 0.0, base.y * 0.0, base.z * 0.0);
     }
-  }, [candleLit]);
+    if (flameLightRef.current) {
+      flameLightRef.current.intensity = baseFlameLightIntensityRef.current;
+    }
+  }, [candleLit, litAt]);
 
   // Reset the burn-out guard whenever a fresh lit timestamp starts.
   useEffect(() => {
@@ -218,19 +333,22 @@ function HeroAltarObject({ candleLit = false, litAt = null, onBurnedOut, debugRe
     groupRef.current.translateY(-1.0);
     groupRef.current.translateZ(-1.1);
 
-    // Melt the wax over the lit window. Flame + wick are parented to Wax,
-    // so they follow automatically. The floor is 1% of baseline so the
-    // candle leaves a sliver at full burn. Use scale.set() rather than
-    // scale.y = X — direct property assignment bypasses the onChange hook
-    // that flags the matrix dirty, so the visible mesh wouldn't update.
-    // NOTE: melting along the Z axis because the Wax mesh appears to be
-    // oriented with its height along local Z (Blender rotation).
-    if (candleLit && litAt && waxRef.current) {
-      const base = baseWaxScaleYRef.current;
+    // Melt the candle over the lit window. Flame + wick are parented to
+    // the melt mesh, so they follow automatically. The floor is 1% of
+    // baseline so the candle leaves a sliver at full burn. Use
+    // scale.set() rather than scale.y = X — direct property assignment
+    // bypasses the onChange hook that flags the matrix dirty, so the
+    // visible mesh wouldn't update. The melt axis is per-variant: the
+    // authored Blender rotation dictates which local axis is vertical.
+    if (candleLit && litAt && meltMeshRef.current) {
+      const base = baseMeltScaleRef.current;
+      const axis = variantConfig.meltAxis;
+      const axisBase = base[axis];
       const elapsed = Date.now() - litAt;
-      const progress = Math.min(elapsed / MELT_DURATION_MS, 1.0);
-      const shrink = Math.max(base * 0.01, base * (1 - progress));
-      waxRef.current.scale.set(base, base, shrink);
+      const progress = Math.min(elapsed / meltDuration, 1.0);
+      const shrink = Math.max(axisBase * 0.01, axisBase * (1 - progress));
+      meltMeshRef.current.scale.set(base.x, base.y, base.z);
+      meltMeshRef.current.scale[axis] = shrink;
 
       // Drips ooze out from the top origin — uniform scale from ~0 to
       // authored baseline as the candle melts.
@@ -239,6 +357,15 @@ function HeroAltarObject({ candleLit = false, litAt = null, onBurnedOut, debugRe
         dripWaxRef.current.visible = true;
         const k = Math.max(0.35, progress);
         dripWaxRef.current.scale.set(dripBase.x * k, dripBase.y * k, dripBase.z * k);
+      }
+
+      // Dim the GLB flame pointLight linearly with melt progress. Floor
+      // at 10% so the cast light doesn't fully vanish before burnout;
+      // visibility toggles off when the candle is extinguished.
+      if (flameLightRef.current) {
+        const baseI = baseFlameLightIntensityRef.current;
+        flameLightRef.current.intensity = baseI * Math.max(0.0, Math.pow(1 -
+   progress, 2));
       }
 
       // Fully melted — burn out once, let parent clear state.
@@ -314,14 +441,17 @@ function HeroAltarObject({ candleLit = false, litAt = null, onBurnedOut, debugRe
       const nowPerf = performance.now();
       if (nowPerf - lastDebugUpdateRef.current > 250) {
         lastDebugUpdateRef.current = nowPerf;
-        const base = baseWaxScaleYRef.current;
+        const axis = variantConfig.meltAxis;
+        const axisBase = baseMeltScaleRef.current[axis];
         const elapsed = candleLit && litAt ? Date.now() - litAt : 0;
-        const progress = Math.min(elapsed / MELT_DURATION_MS, 1.0);
-        const scaleY = waxRef.current?.scale.y ?? base;
+        const progress = Math.min(elapsed / meltDuration, 1.0);
+        const scaleOnAxis = meltMeshRef.current?.scale[axis] ?? axisBase;
         debugRef.current.textContent =
-          `lit: ${candleLit} | elapsed: ${(elapsed / 1000).toFixed(1)}s ` +
+          `variant: ${variant} | lit: ${candleLit} ` +
+          `| elapsed: ${(elapsed / 1000).toFixed(1)}s ` +
           `| progress: ${progress.toFixed(3)} ` +
-          `| base: ${base.toFixed(5)} | scale.y: ${scaleY.toFixed(6)}`;
+          `| base.${axis}: ${axisBase.toFixed(5)} ` +
+          `| scale.${axis}: ${scaleOnAxis.toFixed(6)}`;
       }
     }
   });
@@ -332,7 +462,13 @@ function HeroAltarObject({ candleLit = false, litAt = null, onBurnedOut, debugRe
           + additive-blended plane combo produced blocky render artifacts
           around the statue area on iOS Safari. Candle is readable without
           it thanks to the flame's own emissive materials. */}
-      <primitive object={scene} scale={1.2} />
+      <primitive object={scene} scale={variantConfig.scale} />
+      {/* Low ambient so dark materials (e.g. the votive's wick) stay
+          readable when the candle is unlit — without this, the only
+          lights are warmLight (intensity 0 when unlit) and the GLB
+          pointLight (hidden when unlit), and black-material geometry
+          disappears against the black page background. */}
+      <ambientLight intensity={0.25} color="#ffffff" />
       {/* Warm candle-side fill — drives ignition flash + ongoing flicker. */}
       <pointLight
         ref={warmLightRef}
@@ -342,12 +478,12 @@ function HeroAltarObject({ candleLit = false, litAt = null, onBurnedOut, debugRe
         distance={2}
       />
       {/* Subtle cool accent for the neon frame. */}
-      <pointLight
+      {/* <pointLight
         position={[0, 0.5, 0.1]}
         intensity={0.5}
         color="#2ad6ee"
         distance={1.5}
-      />
+      /> */}
       {/* Ignition halo — additive sphere that expands + fades on light-up. */}
       <mesh
         ref={haloRef}
@@ -384,8 +520,28 @@ export default function HomePage() {
     aggregate: tfOpt.aggregate,
   });
   const { user, isSignedIn } = useUser();
-  const { openSignIn } = useClerk();
+  const { openSignIn, signOut } = useClerk();
   const userId = user?.id ?? null;
+  // Signed-in "faithful" get the full 8-hour vigil; anonymous visitors
+  // get a 1-minute preview that nudges them to sign in to extend it.
+  // Keyed off userId (not isSignedIn) to match the hydrate branching and
+  // avoid a flicker on Clerk's initial load.
+  const meltDuration = userId ? MELT_DURATION_SIGNED_IN_MS : MELT_DURATION_ANON_MS;
+  // Candle variant — anon visitors are locked to the pillar; signed-in
+  // users get their persisted choice from localStorage (default votive
+  // on first sign-in). The picker below lets them change it.
+  const [candleVariantChoice, setCandleVariantChoice] = useState("votive");
+  const [showCandlePicker, setShowCandlePicker] = useState(false);
+  useEffect(() => {
+    if (!userId) return;
+    const saved = readCandleVariant(userId);
+    if (saved && CANDLE_VARIANTS[saved]) {
+      setCandleVariantChoice(saved);
+    } else {
+      setCandleVariantChoice("votive");
+    }
+  }, [userId]);
+  const candleVariant = userId ? candleVariantChoice : "pillar";
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [showInscribeModal, setShowInscribeModal] = useState(false);
   const [showBook, setShowBook] = useState(false);
@@ -407,7 +563,7 @@ export default function HomePage() {
         const local = readLocalCandle();
         if (
           local?.litAtMs &&
-          Date.now() - local.litAtMs < MELT_DURATION_MS
+          Date.now() - local.litAtMs < MELT_DURATION_ANON_MS
         ) {
           setLitAt(local.litAtMs);
           setCandleLit(true);
@@ -422,10 +578,16 @@ export default function HomePage() {
       const [remote, local] = [await readCandle(userId), readLocalCandle()];
       if (cancelled) return;
 
+      // Signed-in branch: evaluate both candles against the 8-hour
+      // window. If the user lit anonymously (1 min) and then signed in,
+      // their local candle gets promoted on the longer timer — "sign in
+      // to extend your flame" rather than having it expire mid-ritual.
       const remoteLive =
-        remote?.litAtMs && Date.now() - remote.litAtMs < MELT_DURATION_MS;
+        remote?.litAtMs &&
+        Date.now() - remote.litAtMs < MELT_DURATION_SIGNED_IN_MS;
       const localLive =
-        local?.litAtMs && Date.now() - local.litAtMs < MELT_DURATION_MS;
+        local?.litAtMs &&
+        Date.now() - local.litAtMs < MELT_DURATION_SIGNED_IN_MS;
 
       if (remoteLive) {
         setLitAt(remote.litAtMs);
@@ -465,11 +627,7 @@ export default function HomePage() {
     setShowSignInNudge(false);
   };
 
-  const toggleCandle = () => {
-    if (candleLit) {
-      doExtinguish();
-      return;
-    }
+  const doLight = () => {
     const now = Date.now();
     if (userId) {
       lightCandle(userId, {
@@ -483,6 +641,30 @@ export default function HomePage() {
     }
     setLitAt(now);
     setCandleLit(true);
+  };
+
+  // FAB click is a simple toggle for all users — tap to light (with the
+  // user's saved variant for signed-in, pillar for anon), tap again to
+  // extinguish. Changing variants is handled out-of-band via the
+  // "Change candle" pill, so the FAB's job stays focused on ignition.
+  const toggleCandle = () => {
+    if (candleLit) {
+      doExtinguish();
+      return;
+    }
+    doLight();
+  };
+
+  const handlePickVariant = (variant) => {
+    if (!CANDLE_VARIANTS[variant]) return;
+    writeCandleVariant(userId, variant);
+    setCandleVariantChoice(variant);
+    setShowCandlePicker(false);
+    // Only auto-light when the user was unlit at pick-time — tapping
+    // the picker mid-burn should swap the model without resetting the
+    // litAt timer. The model swap happens automatically when the
+    // variant prop changes on HeroAltarObject.
+    if (!candleLit) doLight();
   };
 
   // Auto-dismiss the nudge after 12s so it doesn't linger, and close it as
@@ -507,13 +689,13 @@ export default function HomePage() {
       return;
     }
     const compute = () => {
-      const p = Math.min((Date.now() - litAt) / MELT_DURATION_MS, 1);
+      const p = Math.min((Date.now() - litAt) / meltDuration, 1);
       setMeltProgress(p);
     };
     compute();
     const id = setInterval(compute, 1000);
     return () => clearInterval(id);
-  }, [candleLit, litAt]);
+  }, [candleLit, litAt, meltDuration]);
 
   return (
     <main className="shrine-page neon" style={{ background: "#000" }}>
@@ -531,6 +713,8 @@ export default function HomePage() {
           <HeroAltarObject
             candleLit={candleLit}
             litAt={litAt}
+            meltDuration={meltDuration}
+            variant={candleVariant}
             onBurnedOut={doExtinguish}
             debugRef={debugRef}
           />
@@ -611,9 +795,13 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
 
       {showSignInNudge && (
         <div className="flame-nudge" role="status" aria-live="polite">
-          <p className="flame-nudge-text">
-            Your flame is burning. Sign in to save it to the shrine ledger.
-          </p>
+          <p className="flame-nudge-title">Your flame is burning.</p>
+          <p className="flame-nudge-sub">Sign in and your votive:</p>
+          <ul className="flame-nudge-benefits">
+            <li>Burns 8 hours, not 1 minute</li>
+            <li>Follows you across every device</li>
+            <li>Unlocks more candle options</li>
+          </ul>
           <div className="flame-nudge-actions">
             <button
               type="button"
@@ -631,6 +819,84 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
               ×
             </button>
           </div>
+        </div>
+      )}
+
+      {userId && !showCandlePicker && (
+        <button
+          type="button"
+          className="candle-change-pill"
+          onClick={() => setShowCandlePicker(true)}
+          title="Change candle"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ width: 12, height: 12, display: "block" }}
+            aria-hidden="true"
+          >
+            <rect x="3" y="4" width="8" height="16" rx="1" />
+            <rect x="13" y="4" width="8" height="16" rx="1" />
+          </svg>
+          Change candle
+        </button>
+      )}
+
+      {showCandlePicker && (
+        <div
+          className="flame-nudge candle-picker-popup"
+          role="dialog"
+          aria-label="Choose your candle"
+        >
+          <p className="flame-nudge-title">Choose your candle</p>
+          <div className="candle-picker-tiles">
+            <button
+              type="button"
+              className={`candle-picker-tile${
+                candleVariantChoice === "pillar" ? " is-active" : ""
+              }`}
+              onClick={() => handlePickVariant("pillar")}
+            >
+              <span className="candle-picker-tile-label">Pillar</span>
+              <span className="candle-picker-tile-desc">
+                Plain green taper
+              </span>
+            </button>
+            <button
+              type="button"
+              className={`candle-picker-tile${
+                candleVariantChoice === "votive" ? " is-active" : ""
+              }`}
+              onClick={() => handlePickVariant("votive")}
+            >
+              <span className="candle-picker-tile-label">Votive</span>
+              <span className="candle-picker-tile-desc">
+                Our Lady of Guadalupe
+              </span>
+            </button>
+          </div>
+          <button
+            type="button"
+            className="candle-picker-signout"
+            onClick={() => {
+              setShowCandlePicker(false);
+              signOut();
+            }}
+          >
+            Sign out
+          </button>
+          <button
+            type="button"
+            className="flame-nudge-dismiss"
+            onClick={() => setShowCandlePicker(false)}
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
         </div>
       )}
 
@@ -671,11 +937,11 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
                   fontVariantNumeric: "tabular-nums",
                 }}
               >
-                {formatRemaining(litAt)}
+                {formatRemaining(litAt, meltDuration)}
               </span>
             </span>
           ) : (
-            "VOTIVE"
+            "GET LIT"
           )
         }
         centerTitle={candleLit ? "Extinguish candle" : "Light candle"}

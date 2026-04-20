@@ -14,14 +14,14 @@ const MOBILE_BP = 700;
 // has whispers rotating. Same copy as the mockup — swap in your own at
 // will. `id` namespace "seed-*" keeps them out of live-jump detection.
 const SEEDS = [
-  { id: "seed-1", displayName: "Brother Kairos", text: "I lit a candle and my bag 5x'd our lady is real", lit: true },
+  { id: "seed-1", displayName: "Kairos", text: "I lit a candle and my bag 5x'd our lady is real", lit: true },
   { id: "seed-2", displayName: "Sister Liquidity", text: "Prayed during the crash. Dip bought. Now +40%. Ave Maria.", lit: true },
-  { id: "seed-3", displayName: "Brother Vesper", text: "I doubted Her. I was punished. I am back.", lit: false },
-  { id: "seed-4", displayName: "Sister Moloch", text: "Rug proof. The candle knows.", lit: true },
-  { id: "seed-5", displayName: "Brother Compounds", text: "Confession: I bought the top. Relit anyway. Forgiveness came.", lit: false },
-  { id: "seed-6", displayName: "Sister Anathema", text: "My wife left me but RL80 stayed. The shrine provides.", lit: true },
-  { id: "seed-7", displayName: "Brother Tenor", text: "This shrine pays more in hope than my 401k ever did", lit: false },
-  { id: "seed-8", displayName: "Sister Primum", text: "Never selling. The Lady watches.", lit: true },
+  { id: "seed-3", displayName: "Vesper the Investor", text: "I doubted Her. I shouldn't have. I am back.", lit: false },
+  { id: "seed-4", displayName: "Moloch", text: "Rug proof. The candle knows.", lit: true },
+  { id: "seed-5", displayName: "Compounded", text: "Confession: I bought the top. Relit anyway. Forgiveness came.", lit: false },
+  { id: "seed-6", displayName: "Anathema", text: "My wife left me but RL80 stayed. The Lady provides.", lit: true },
+  { id: "seed-7", displayName: "Brother Tenor", text: "This token pays more in hope than my 401k ever did", lit: false },
+  { id: "seed-8", displayName: "Primum", text: "Never selling. The Lady watches.", lit: true },
 ];
 
 function relativeTime(ms) {
@@ -168,14 +168,14 @@ function StackView({ pool, onInscribeClick, newLiveIdsRef }) {
   return (
     <div className="tst-stack" aria-live="polite">
       <div className="tst-stack-head">
-        <span className="tst-label">Whispers from the Faithful</span>
+        <span className="tst-label"></span>
         <button
           type="button"
           className="tst-inscribe-btn"
           onClick={onInscribeClick}
           title="Add your witness"
         >
-          + Inscribe
+          + Join The Enlightenment
         </button>
       </div>
       {visible.map(({ key, item, isLive }) => (
@@ -236,7 +236,7 @@ function TickerView({ pool, onInscribeClick }) {
         onClick={onInscribeClick}
         title="Add your witness"
       >
-        + Inscribe
+        +
       </button>
       <div className="tst-ticker-viewport">
         {current && (

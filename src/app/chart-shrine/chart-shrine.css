@@ -836,39 +836,58 @@
   }
 }
 
-/* Post-ignition nudge — anon user just lit a candle; offer sign-in as a
-   reward ("save your flame"), not a gate. Docks above the mobile nav. */
+/* Post-ignition nudge + candle picker. Matches the right-rail
+   testimonial card's palette + type so the popup reads as a sibling,
+   not a stray element: purple-black backdrop (tst-bg-card), gold
+   border-left accent, a top gold hairline, Cinzel for headings,
+   JetBrains Mono for eyebrow/meta, Inter for body. */
 .flame-nudge {
   position: fixed;
   left: 50%;
-  bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(15rem + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
   z-index: 40;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 18px;
-  max-width: min(420px, calc(100vw - 32px));
+  align-items: stretch;
+  gap: 12px;
+  padding: 18px 22px 16px;
+  width: min(340px, calc(100vw - 32px));
+  background: rgba(20, 16, 28, 0.88);
+  backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  border: 1px solid rgba(241, 215, 122, 0.18);
+  border-left: 2px solid #d4a854;
+  border-radius: 3px;
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.6),
+    0 0 28px rgba(241, 215, 122, 0.12);
+  animation: flameNudgeIn 280ms cubic-bezier(0.2, 0.9, 0.25, 1);
+  overflow: hidden;
+}
+
+/* Gold gradient hairline across the top — same accent the testimonial
+   modal uses, ties the two panels together visually. */
+.flame-nudge::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
   background: linear-gradient(
-    180deg,
-    rgba(48, 26, 22, 0.55) 0%,
-    rgba(62, 32, 28, 0.58) 100%
+    90deg,
+    transparent,
+    rgba(241, 215, 122, 0.9),
+    transparent
   );
-  backdrop-filter: blur(14px) saturate(1.25);
-  -webkit-backdrop-filter: blur(14px) saturate(1.25);
-  border: 1px solid rgba(241, 215, 122, 0.45);
-  border-radius: 4px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45),
-    0 0 24px rgba(241, 215, 122, 0.15),
-    inset 0 1px 0 rgba(255, 220, 160, 0.08);
-  animation: flameNudgeIn 280ms ease-out;
+  pointer-events: none;
 }
 
 @keyframes flameNudgeIn {
   from {
     opacity: 0;
-    transform: translate(-50%, 8px);
+    transform: translate(-50%, 10px);
   }
   to {
     opacity: 1;
@@ -876,41 +895,228 @@
   }
 }
 
+.flame-nudge-title {
+  margin: 0;
+  color: #f1d77a;
+  font-family: "Cinzel", serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  text-align: center;
+  text-shadow: 0 0 18px rgba(241, 215, 122, 0.25);
+}
+
+.flame-nudge-sub {
+  margin: -2px 0 2px;
+  color: #d4a854;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  text-align: center;
+}
+
+/* Legacy single-line text from the pre-structured nudge copy — kept so
+   any surface still using it renders cleanly. */
 .flame-nudge-text {
   margin: 0;
-  color: #e9d48d;
+  color: #e9e3d4;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 13px;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.2px;
   text-align: center;
-  line-height: 1.4;
+  line-height: 1.5;
+}
+
+.flame-nudge-benefits {
+  margin: 2px 0 4px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  width: 100%;
+}
+
+.flame-nudge-benefits li {
+  position: relative;
+  padding-left: 18px;
+  color: #e9e3d4;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 12.5px;
+  letter-spacing: 0.2px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.flame-nudge-benefits li::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 8px;
+  width: 5px;
+  height: 5px;
+  background: #d4a854;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(241, 215, 122, 0.4);
 }
 
 .flame-nudge-actions {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
+  margin-top: 2px;
 }
 
 .flame-nudge-cta {
-  padding: 8px 16px;
-  font-size: 12px;
+  padding: 9px 22px;
+  font-family: "Cinzel", serif;
+  font-size: 11px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
 }
 
+/* Close × lives in the corner now, not in the action row — frees
+   the action row for CTAs and matches the testimonial modal pattern. */
 .flame-nudge-dismiss {
-  width: 28px;
-  height: 28px;
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   background: transparent;
-  border: 1px solid #4a3a2a;
-  border-radius: 2px;
-  color: #a89970;
+  border: none;
+  color: #a39a82;
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
-  transition: color 160ms ease, border-color 160ms ease;
+  transition: color 160ms ease;
+  z-index: 1;
 }
 
 .flame-nudge-dismiss:hover {
   color: #f1d77a;
-  border-color: #9a7a35;
+}
+
+/* Picker variant — same frame, higher anchor so the two-tile layout
+   clears the FAB and mobile nav. */
+.flame-nudge.candle-picker-popup {
+  bottom: calc(200px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Two-up variant tiles. Each tile is its own small testimonial-style
+   card: dark wash, gold left-accent, Cinzel label + Inter desc. */
+.candle-picker-tiles {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.candle-picker-tile {
+  flex: 1 1 0;
+  padding: 12px 12px 11px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(241, 215, 122, 0.18);
+  border-left: 2px solid #8a6a2e;
+  border-radius: 3px;
+  color: #a39a82;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease,
+    background 160ms ease, box-shadow 160ms ease;
+}
+
+.candle-picker-tile:hover {
+  color: #e9e3d4;
+  border-color: rgba(241, 215, 122, 0.35);
+  border-left-color: #d4a854;
+  background: rgba(241, 215, 122, 0.05);
+}
+
+.candle-picker-tile.is-active {
+  color: #e9e3d4;
+  border-color: rgba(241, 215, 122, 0.35);
+  border-left-color: #f1d77a;
+  background: rgba(241, 215, 122, 0.08);
+  box-shadow: 0 0 16px rgba(241, 215, 122, 0.12);
+}
+
+.candle-picker-tile-label {
+  display: block;
+  color: #f1d77a;
+  font-family: "Cinzel", serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.candle-picker-tile-desc {
+  display: block;
+  margin-top: 4px;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.2px;
+  line-height: 1.35;
+  opacity: 0.85;
+}
+
+.candle-picker-signout {
+  margin-top: 4px;
+  padding: 4px 10px;
+  background: transparent;
+  border: none;
+  color: #8a7a5a;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 160ms ease;
+  align-self: center;
+}
+
+.candle-picker-signout:hover {
+  color: #f1d77a;
+}
+
+/* Small pill above the candle FAB. Signed-in users tap it to open the
+   picker without touching lit state. Cinzel + gold keeps it in the
+   same typographic family as the testimonial's inscribe button. */
+.candle-change-pill {
+  position: fixed;
+  left: 50%;
+  bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 35;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 16px;
+  background: rgba(20, 16, 28, 0.88);
+  backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  border: 1px solid rgba(241, 215, 122, 0.25);
+  border-radius: 999px;
+  color: #f1d77a;
+  font-family: "Cinzel", serif;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 2.2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease,
+    background 160ms ease, box-shadow 160ms ease;
+  animation: flameNudgeIn 280ms ease-out;
+}
+
+.candle-change-pill:hover {
+  color: #fff4c2;
+  border-color: rgba(241, 215, 122, 0.55);
+  background: rgba(30, 22, 36, 0.92);
+  box-shadow: 0 0 18px rgba(241, 215, 122, 0.22);
 }

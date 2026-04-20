@@ -109,11 +109,17 @@ function createFlameMaterial(phase = 0) {
 // has to render a small subset of the scene (the flame meshes) into its
 // bloom pass — much less work and avoids the full-frame black-flash that
 // the plain <Bloom> pass produces in this stack.
-export function CandleOrbitalEffects() {
+//
+// React.memo because SelectiveBloom's internal useMemo depends on a
+// spread `...props` object and recreates the effect on every render —
+// each recreation increments postprocessing's Selection idManager and
+// after ~30 remounts it overflows layer 31 and logs "Layer out of range".
+export const CandleOrbitalEffects = React.memo(function CandleOrbitalEffects({ lights }) {
   return (
     <EffectComposer multisampling={0} enableNormalPass={false} stencilBuffer={false}>
       <SelectiveBloom
         selectionLayer={FLAME_BLOOM_LAYER}
+        lights={lights}
         intensity={1.2}
         luminanceThreshold={0.2}
         luminanceSmoothing={0.9}
@@ -122,7 +128,7 @@ export function CandleOrbitalEffects() {
       />
     </EffectComposer>
   );
-}
+});
 
 // Global cache to prevent duplicate candle extraction across remounts
 const globalCandleCache = {
