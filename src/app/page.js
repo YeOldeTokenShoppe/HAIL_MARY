@@ -52,6 +52,25 @@ function writeCandleVariant(userId, variant) {
   } catch {}
 }
 
+// One-shot "sign in to save your flame" nudge. Shown on the first anon
+// light only; relights skip it so the nudge doesn't become noise. Keyed
+// globally rather than per-user because anon visitors have no userId.
+const SIGN_IN_NUDGE_SHOWN_KEY = "rl80:signInNudgeShown";
+function readSignInNudgeShown() {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(SIGN_IN_NUDGE_SHOWN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function markSignInNudgeShown() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(SIGN_IN_NUDGE_SHOWN_KEY, "1");
+  } catch {}
+}
+
 // Candle variant registry. Each entry fully describes a model's melt
 // behavior so HeroAltarObject stays variant-agnostic — adding a new
 // saint or color means appending a config entry, not forking logic.
@@ -94,6 +113,14 @@ const StarfieldStatueScene = dynamic(
 const MELT_DURATION_ANON_MS = 60 * 1000;
 const MELT_DURATION_SIGNED_IN_MS = 8 * 60 * 60 * 1000;
 
+// Reconstitution sequence — after a candle fully burns out, hold the
+// empty pedestal briefly, then swirl particles inward and re-form the
+// wax. Without this the wax mesh snap-resets to baseline the instant
+// `candleLit` flips false, which reads as a jarring pop.
+const RECONSTITUTE_EMPTY_BEAT_MS = 1000;
+const RECONSTITUTE_REFORM_MS = 1900;
+const RECONSTITUTE_PARTICLE_COUNT = 160;
+
 // Compact remaining-time label for the CANDLE FAB countdown. HH:MM:SS
 // always so the ticking seconds confirm the clock is live.
 function formatRemaining(litAtMs, meltDuration) {
@@ -105,6 +132,28 @@ function formatRemaining(litAtMs, meltDuration) {
   const mm = String(minutes).padStart(2, "0");
   const ss = String(seconds).padStart(2, "0");
   return `${hours}:${mm}:${ss}`;
+}
+
+// Hash-based 1D value noise for flame flicker. Sines give rhythmically
+// repeating motion that reads as "dancing"; interpolated random samples
+// give genuine aperiodic variation. Offset the input per channel (scale /
+// stretch / rotX / rotZ) so the four streams don't correlate.
+function flameHash1D(n) {
+  n = (n * 2654435761) | 0;
+  n = ((n >>> 16) ^ n) * 0x45d9f3b;
+  n = ((n >>> 16) ^ n) * 0x45d9f3b;
+  n = (n >>> 16) ^ n;
+  return ((n >>> 0) / 4294967295) * 2 - 1;
+}
+function flameNoise1D(t) {
+  const i = Math.floor(t);
+  const f = t - i;
+  const sf = f * f * (3 - 2 * f); // smoothstep between integer samples
+  return flameHash1D(i) * (1 - sf) + flameHash1D(i + 1) * sf;
+}
+// Two-octave fBm — base variation plus fast jitter, feels like a real flame.
+function flameFbm1D(t) {
+  return flameNoise1D(t) * 0.65 + flameNoise1D(t * 2.3 + 17.1) * 0.35;
 }
 
 // useGLTF caches the scene across mounts, so we cache the ORIGINAL
@@ -146,6 +195,18 @@ function HeroAltarObject({
   // melt window so the cast light fades with the shrinking candle.
   const flameLightRef = useRef(null);
   const baseFlameLightIntensityRef = useRef(1);
+  // Flame mesh node — captured so we can animate it (flicker/sway) while
+  // the candle is lit. Baseline scale + rotation are cached so flicker
+  // composes on top of the authored GLB transform rather than replacing it.
+  const flameNodeRef = useRef(null);
+  const flameBaseScaleRef = useRef({ x: 1, y: 1, z: 1 });
+  const flameBaseRotationRef = useRef({ x: 0, y: 0, z: 0 });
+  // Amber radial glow sprite — additive, billboarded, breathes with the
+  // flame's noise-driven flicker. Makes the flame feel volumetric rather
+  // than a flat authored mesh.
+  const flameGlowOuterRef = useRef(null);
+  // Scratch vector for flame→group-local position conversion in useFrame.
+  const flameGlowTmpVec = useMemo(() => new THREE.Vector3(), []);
   // Guard so we only fire onBurnedOut once per lit cycle.
   const burnedOutFiredRef = useRef(false);
   // Throttle the debug readout updates.
@@ -156,6 +217,187 @@ function HeroAltarObject({
   const glowRef = useRef(null);
   const ignitionTimeRef = useRef(null);
   const prevLitRef = useRef(candleLit);
+  // Reconstitution VFX: phase timeline + particle swirl that coalesces
+  // back into a fresh candle after burnout. Kept in refs so animation
+  // reads every frame without triggering re-renders.
+  const reconstPhaseRef = useRef("idle"); // 'idle' | 'empty' | 'reforming'
+  const reconstStartRef = useRef(0);
+  const reconstParticlesRef = useRef(null);
+  const reconstParticleDataRef = useRef([]);
+  const reconstWarnedRef = useRef(false);
+  // Wick landing target in group-local coords — recomputed on each spawn
+  // from the current melt mesh's world position. Shared between spawn
+  // (for start positions) and update (for landing interpolation).
+  const reconstWickCenterRef = useRef(new THREE.Vector3(0, 0.15, 0));
+  // Memoize the particle buffers so they persist across re-renders.
+  // Passing `array={new Float32Array(...)}` inline would allocate a fresh
+  // zero-filled array on every render, which R3F would push to the GPU and
+  // wipe any in-flight animation writes. We use only standard attribute
+  // names (`position`, `color`) so Three.js's pointsMaterial binds them
+  // automatically — custom attributes weren't linking in this canvas.
+  const reconstBuffers = useMemo(() => ({
+    position: new Float32Array(RECONSTITUTE_PARTICLE_COUNT * 3),
+    color: new Float32Array(RECONSTITUTE_PARTICLE_COUNT * 3),
+  }), []);
+
+  // Soft radial-gradient texture used as the `map` on pointsMaterial.
+  // Opaque black-to-white — with additive blending the black edges add
+  // zero to the framebuffer, yielding a soft circular sparkle without
+  // relying on the canvas's alpha channel (which was breaking rendering
+  // in this particular canvas/postprocessing pipeline).
+  const reconstParticleTexture = useMemo(() => {
+    if (typeof document === "undefined") return null;
+    const size = 64;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, size, size);
+    const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    grad.addColorStop(0, "rgb(255,255,255)");
+    grad.addColorStop(0.5, "rgb(80,80,80)");
+    grad.addColorStop(1, "rgb(0,0,0)");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.needsUpdate = true;
+    return tex;
+  }, []);
+
+  // Reconstitution particle helpers. Particles spawn on a sphere around
+  // the wick and migrate inward with a light orbital swirl, fading + shrinking
+  // as they land. Kept as plain functions so refs stay stable and avoid
+  // re-allocating Float32Arrays every frame.
+  const spawnReconstituteParticles = () => {
+    const data = [];
+    // Query the wax mesh's actual position (in group-local space) rather
+    // than hardcoding a wick offset — the scene's internal transforms
+    // + scale=1.2 put the visible candle higher than the group origin.
+    const wickCenter = new THREE.Vector3(0, 0.15, 0);
+    if (meltMeshRef.current && groupRef.current) {
+      const worldPos = new THREE.Vector3();
+      meltMeshRef.current.getWorldPosition(worldPos);
+      groupRef.current.worldToLocal(worldPos);
+      wickCenter.copy(worldPos);
+      wickCenter.y += 0.2; // nudge up from mesh base toward the candle body
+    }
+    reconstWickCenterRef.current.copy(wickCenter);
+    for (let i = 0; i < RECONSTITUTE_PARTICLE_COUNT; i++) {
+      // Reverse-emission pattern: each particle starts on a small shell
+      // around the wick and accelerates inward (cubic ease-in) like it's
+      // being sucked into a black hole. Continuous respawn via modulo on
+      // `life` keeps the stream dense throughout the reform window.
+      // Two color families mirror the reference image (warm gold + cool
+      // violet) for harmonic contrast as they accumulate at the core.
+      const colorRoll = Math.random();
+      let baseR, baseG, baseB;
+      if (colorRoll < 0.55) {
+        // Warm gold — HDR values (>1.0) for bloom pickup.
+        baseR = 2.4; baseG = 1.9; baseB = 0.8;
+      } else {
+        // Cool violet — HDR values (>1.0) for bloom pickup.
+        baseR = 1.5; baseG = 1.1; baseB = 2.6;
+      }
+      // Uniformly distributed direction on a sphere (rejection-free form).
+      const u = Math.random() * 2 - 1;   // cos(phi) ∈ [-1, 1]
+      const ang = Math.random() * Math.PI * 2;
+      const sxyLen = Math.sqrt(1 - u * u);
+      data.push({
+        dirX: Math.cos(ang) * sxyLen,
+        dirY: u * 0.8,                    // squash vertical spread a little
+        dirZ: Math.sin(ang) * sxyLen,
+        startR: 0.22 + Math.random() * 0.22,
+        birthOffset: Math.random() * 0.45, // seconds of stagger
+        life: 0.45 + Math.random() * 0.5,  // seconds per inward trip
+        swirl: (Math.random() - 0.5) * 3.0, // tangential drift while falling in
+        baseR, baseG, baseB,
+      });
+    }
+    reconstParticleDataRef.current = data;
+  };
+
+  const hideReconstituteParticles = () => {
+    const pts = reconstParticlesRef.current;
+    if (!pts) return;
+    const colors = pts.geometry.attributes.color;
+    for (let i = 0; i < RECONSTITUTE_PARTICLE_COUNT; i++) {
+      colors.setXYZ(i, 0, 0, 0); // zero color → zero additive contribution
+    }
+    colors.needsUpdate = true;
+  };
+
+  const updateReconstituteParticles = (t) => {
+    const pts = reconstParticlesRef.current;
+    const data = reconstParticleDataRef.current;
+    if (!pts || data.length === 0) {
+      // Log once per reform cycle if we can't update — helps diagnose
+      // ref-not-attached or spawn-never-called cases.
+      if (!reconstWarnedRef.current) {
+        reconstWarnedRef.current = true;
+        console.warn("[reconstitute] cannot update particles", {
+          hasPts: !!pts,
+          dataLen: data.length,
+        });
+      }
+      return;
+    }
+    reconstWarnedRef.current = false;
+    const positions = pts.geometry.attributes.position;
+    const colors = pts.geometry.attributes.color;
+    const wick = reconstWickCenterRef.current;
+    const elapsedSec = (performance.now() - reconstStartRef.current) / 1000;
+    // Global ramp: fade in quickly at start, hold, fade out at the end so
+    // the effect doesn't pop on/off with the reform window edges.
+    const rampIn = Math.min(1, t * 4);
+    const rampOut = t > 0.88 ? Math.max(0, 1 - (t - 0.88) / 0.12) : 1;
+    const globalFade = rampIn * rampOut;
+    for (let i = 0; i < RECONSTITUTE_PARTICLE_COUNT; i++) {
+      const d = data[i];
+      if (!d) {
+        positions.setXYZ(i, 0, -1000, 0);
+        colors.setXYZ(i, 0, 0, 0);
+        continue;
+      }
+      const localTime = elapsedSec - d.birthOffset;
+      if (localTime < 0) {
+        // Not yet born — park off-screen and invisible.
+        positions.setXYZ(i, 0, -1000, 0);
+        colors.setXYZ(i, 0, 0, 0);
+        continue;
+      }
+      // Cycle through lifetimes so the shell is continuously seeded.
+      const cycleTime = localTime % d.life;
+      const p = cycleTime / d.life; // 0..1 within one inward trip
+      // Cubic ease-in on the radius → slow drift outward at first, then
+      // a sharp acceleration inward. That's the "black hole" feel.
+      const eased = Math.pow(p, 2.8);
+      const r = (1 - eased) * d.startR;
+      // Tangential swirl so particles spiral in rather than heading
+      // straight — adds motion interest without changing the silhouette.
+      const swirlAng = d.swirl * p;
+      const cx = Math.cos(swirlAng);
+      const sx = Math.sin(swirlAng);
+      const rotDirX = d.dirX * cx - d.dirZ * sx;
+      const rotDirZ = d.dirX * sx + d.dirZ * cx;
+      const x = wick.x + rotDirX * r;
+      const y = wick.y + d.dirY * r;
+      const z = wick.z + rotDirZ * r;
+      positions.setXYZ(i, x, y, z);
+      // Brightness ramps up as the particle falls toward the core and
+      // FLARES near it (the `coreBoost` cranks output >3× in the final
+      // stretch, which with toneMapped=false feeds the scene's bloom).
+      // Snuff in the last 8% hides the respawn-teleport at cycle wrap.
+      const ramp = Math.pow(p, 0.55);
+      const coreBoost = 1 + Math.pow(p, 4) * 2.8;
+      const snuff = p < 0.92 ? 1 : 1 - (p - 0.92) / 0.08;
+      const intensity = ramp * coreBoost * snuff;
+      const fade = intensity * globalFade;
+      colors.setXYZ(i, d.baseR * fade, d.baseG * fade, d.baseB * fade);
+    }
+    positions.needsUpdate = true;
+    colors.needsUpdate = true;
+  };
 
   // Radial-gradient texture for the persistent backlight glow. Generated
   // once on the client so we don't need to ship an asset.
@@ -195,6 +437,40 @@ function HeroAltarObject({
   // `transparent:true` on the candle, hearts (which are transparent)
   // would always draw last regardless of renderOrder.
   useEffect(() => {
+    // Reset capture state so variant swaps (pillar ↔ votive) pick up the
+    // new scene's flame rather than keeping a stale ref to the old one.
+    flameNodeRef.current = null;
+    // Shared upgrade helper used on the wax + drip meshes. Swaps the flat
+    // authored material for a lit MeshStandardMaterial so it responds to
+    // scene lights. Preserves the authored color / base-color map / normal
+    // map / vertex colors so textures stay intact, and nudges color +0.2×
+    // above authored so the green reads a touch more vividly.
+    const upgradeWaxMaterial = (oldMat) => {
+      if (!oldMat) return oldMat;
+      if (oldMat.userData?.isWaxUpgraded) return oldMat;
+      const color = oldMat.color?.clone() ?? new THREE.Color("#ffffff");
+      color.multiplyScalar(1.2);
+      const mat = new THREE.MeshStandardMaterial({
+        color,
+        map: oldMat.map ?? null,
+        normalMap: oldMat.normalMap ?? null,
+        roughnessMap: oldMat.roughnessMap ?? null,
+        metalnessMap: oldMat.metalnessMap ?? null,
+        aoMap: oldMat.aoMap ?? null,
+        emissiveMap: oldMat.emissiveMap ?? null,
+        alphaMap: oldMat.alphaMap ?? null,
+        vertexColors: oldMat.vertexColors ?? false,
+        side: oldMat.side ?? THREE.FrontSide,
+        roughness: 0.5,
+        metalness: 0.0,
+        emissive: color.clone().multiplyScalar(0.15),
+        emissiveIntensity: 1.0,
+        transparent: true,
+        depthWrite: true,
+      });
+      mat.userData.isWaxUpgraded = true;
+      return mat;
+    };
     scene.traverse((obj) => {
       if (obj.isMesh) {
         obj.renderOrder = 200;
@@ -222,6 +498,47 @@ function HeroAltarObject({
         baseMeltScaleRef.current = base;
         obj.scale.set(base.x, base.y, base.z);
         obj.matrixAutoUpdate = true;
+
+        // Upgrade the authored wax material so it actually responds to
+        // scene lights — the GLB ships with a flat-looking material that
+        // reads as plastic. MeshStandardMaterial picks up the warm flame
+        // light, ambient fill, and the statue's directional light, giving
+        // proper shading, highlights, and depth. Color is preserved from
+        // the authored material. Skips the wick material slot so the
+        // votive's wick tweaks downstream still apply to the original.
+        const wickMatName = variantConfig.wickMaterialName;
+        const wickTarget = wickMatName
+          ? wickMatName.replace(/[._]/g, "").toLowerCase()
+          : null;
+        const isWickMat = (m) => {
+          if (!wickTarget || !m?.name) return false;
+          return m.name.replace(/[._]/g, "").toLowerCase() === wickTarget;
+        };
+        // Flame + wick are parented to the melt mesh (so they shrink
+        // with it), which means `obj.traverse` walks into the flame
+        // subtree too. Skip anything in a FLAME* ancestor — the flame
+        // uses its own authored emissive/additive material and shouldn't
+        // be replaced with a lit Standard material.
+        const isInFlameSubtree = (node) => {
+          let cur = node;
+          while (cur && cur !== obj) {
+            const upper = cur.name?.toUpperCase() ?? "";
+            if (upper.startsWith("FLAME") && !upper.includes("WICK")) return true;
+            cur = cur.parent;
+          }
+          return false;
+        };
+        obj.traverse((descendant) => {
+          if (!descendant.isMesh || !descendant.material) return;
+          if (isInFlameSubtree(descendant)) return;
+          if (Array.isArray(descendant.material)) {
+            descendant.material = descendant.material.map((m) =>
+              isWickMat(m) ? m : upgradeWaxMaterial(m),
+            );
+          } else if (!isWickMat(descendant.material)) {
+            descendant.material = upgradeWaxMaterial(descendant.material);
+          }
+        });
 
         // Wick handling on the melt mesh. Two problems stack on the
         // votive specifically:
@@ -288,6 +605,18 @@ function HeroAltarObject({
         baseDripScaleRef.current = base;
         obj.scale.set(base.x * 0.35, base.y * 0.35, base.z * 0.35);
         obj.matrixAutoUpdate = true;
+        // Apply the same lit material upgrade to the drip so it matches
+        // the wax's shading and brightened color tone.
+        obj.traverse((descendant) => {
+          if (!descendant.isMesh || !descendant.material) return;
+          if (Array.isArray(descendant.material)) {
+            descendant.material = descendant.material.map((m) =>
+              upgradeWaxMaterial(m),
+            );
+          } else {
+            descendant.material = upgradeWaxMaterial(descendant.material);
+          }
+        });
       }
       // First light found in the GLB is the authored candle-flame
       // pointLight. We don't require a FLAME ancestor because variants
@@ -305,6 +634,25 @@ function HeroAltarObject({
         baseFlameLightIntensityRef.current =
           FLAME_LIGHT_BASELINE_CACHE.get(obj);
         obj.intensity = baseFlameLightIntensityRef.current;
+      }
+      // Capture the flame parent node (starts with "FLAME", excludes WICK
+      // so we don't latch onto a sub-mesh like "Flame_Wick"). First match
+      // wins so sub-children don't overwrite.
+      if (obj.name && !flameNodeRef.current) {
+        const upperName = obj.name.toUpperCase();
+        if (upperName.startsWith("FLAME") && !upperName.includes("WICK")) {
+          flameNodeRef.current = obj;
+          flameBaseScaleRef.current = {
+            x: obj.scale.x,
+            y: obj.scale.y,
+            z: obj.scale.z,
+          };
+          flameBaseRotationRef.current = {
+            x: obj.rotation.x,
+            y: obj.rotation.y,
+            z: obj.rotation.z,
+          };
+        }
       }
     });
   }, [scene]);
@@ -379,6 +727,27 @@ function HeroAltarObject({
     return () => window.removeEventListener("resize", update);
   }, []);
 
+  // Dev hook: `window.__triggerReconstitute()` forces the reconstitution
+  // sequence without waiting for a real burnout. Handy while tuning the
+  // animation since the natural trigger takes 60s (anon) or 8h (signed in).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.__triggerReconstitute = () => {
+      burnedOutFiredRef.current = true;
+      reconstPhaseRef.current = "empty";
+      reconstStartRef.current = performance.now();
+      spawnReconstituteParticles();
+      console.log("[reconstitute] triggered", {
+        particlesRef: !!reconstParticlesRef.current,
+        dataCount: reconstParticleDataRef.current.length,
+        variant,
+      });
+    };
+    return () => {
+      delete window.__triggerReconstitute;
+    };
+  }, [variant]);
+
   useFrame(({ camera }) => {
     if (!groupRef.current) return;
     groupRef.current.position.copy(camera.position);
@@ -388,8 +757,9 @@ function HeroAltarObject({
     groupRef.current.translateZ(-1.1);
 
     // Melt the candle over the lit window. Flame + wick are parented to
-    // the melt mesh, so they follow automatically. The floor is 1% of
-    // baseline so the candle leaves a sliver at full burn. Use
+    // the melt mesh, so they follow automatically. The floor is 10% of
+    // baseline so a visible stub remains at full burn — the reconstitution
+    // sequence then rebuilds the candle from that stub back to 100%. Use
     // scale.set() rather than scale.y = X — direct property assignment
     // bypasses the onChange hook that flags the matrix dirty, so the
     // visible mesh wouldn't update. The melt axis is per-variant: the
@@ -400,7 +770,7 @@ function HeroAltarObject({
       const axisBase = base[axis];
       const elapsed = Date.now() - litAt;
       const progress = Math.min(elapsed / meltDuration, 1.0);
-      const shrink = Math.max(axisBase * 0.01, axisBase * (1 - progress));
+      const shrink = Math.max(axisBase * 0.10, axisBase * (1 - progress));
       meltMeshRef.current.scale.set(base.x, base.y, base.z);
       meltMeshRef.current.scale[axis] = shrink;
 
@@ -422,10 +792,126 @@ function HeroAltarObject({
    progress, 2));
       }
 
-      // Fully melted — burn out once, let parent clear state.
+      // Fully melted — burn out once, let parent clear state. Kick off
+      // the local reconstitution timeline on the same tick so the empty
+      // beat + reform animation take over as `candleLit` flips false.
       if (progress >= 1 && !burnedOutFiredRef.current) {
         burnedOutFiredRef.current = true;
+        reconstPhaseRef.current = "empty";
+        reconstStartRef.current = performance.now();
+        spawnReconstituteParticles();
         onBurnedOut?.();
+      }
+    }
+
+    // --- Flame flicker + sway ---
+    // Composed on top of the authored GLB transform. Each channel reads
+    // a different offset into the 1D noise so flicker, stretch, and the
+    // two sway axes decorrelate — no rhythmic "dancing" the way sines
+    // produce. Only animates while lit; when unlit the flame is hidden.
+    if (candleLit && flameNodeRef.current) {
+      const baseScale = flameBaseScaleRef.current;
+      const baseRot = flameBaseRotationRef.current;
+      const ft = performance.now() / 1000;
+      const flicker = 1 + flameFbm1D(ft * 3.5) * 0.09;
+      const stretch = 1 + flameFbm1D(ft * 3.0 + 100) * 0.06;
+      flameNodeRef.current.scale.set(
+        baseScale.x * flicker,
+        baseScale.y * flicker * stretch,
+        baseScale.z * flicker,
+      );
+      flameNodeRef.current.rotation.x =
+        baseRot.x + flameFbm1D(ft * 1.9 + 200) * 0.03;
+      flameNodeRef.current.rotation.z =
+        baseRot.z + flameFbm1D(ft * 2.2 + 300) * 0.045;
+      // Drive the radial glow off the same flicker so outer and inner
+      // halos breathe in sync with the flame. Reuse the scale flicker
+      // value and sample a second noise stream for opacity variation.
+      const glowBreath = flicker; // already 1 ± 0.09
+      const glowAlphaNoise = flameFbm1D(ft * 2.8 + 400) * 0.1;
+      // Position the glow at the flame's actual world location, converted
+      // into groupRef-local space so the sprites (children of groupRef)
+      // track wherever the flame is — the hardcoded [0, 0.15, 0.35] spot
+      // sits below the visible candle in this scene's transform chain.
+      if (groupRef.current) {
+        flameNodeRef.current.getWorldPosition(flameGlowTmpVec);
+        groupRef.current.worldToLocal(flameGlowTmpVec);
+      }
+      // Melt factor — glow shrinks and dims as the candle burns down so
+      // a short flame doesn't cast a disproportionately large halo.
+      const meltP = litAt
+        ? Math.min((Date.now() - litAt) / meltDuration, 1.0)
+        : 0;
+      const meltFactor = 1 - meltP; // 1 when fresh, 0 at burnout
+      if (flameGlowOuterRef.current) {
+        flameGlowOuterRef.current.visible = true;
+        flameGlowOuterRef.current.position.copy(flameGlowTmpVec);
+        const glowScale = 0.7 * glowBreath * meltFactor;
+        flameGlowOuterRef.current.scale.set(glowScale, glowScale, 1);
+        flameGlowOuterRef.current.material.opacity =
+          (0.05 + glowAlphaNoise) * meltFactor;
+      }
+    } else {
+      // Hide the glow sprite when the candle is unlit.
+      if (flameGlowOuterRef.current) flameGlowOuterRef.current.visible = false;
+    }
+
+    // --- Reconstitution: empty pedestal beat → particle swirl → wax re-forms ---
+    // Runs after the lit block so that mid-burn reignite (candleLit true)
+    // takes priority and the reset useEffect snaps state cleanly.
+    if (reconstPhaseRef.current !== "idle" && meltMeshRef.current) {
+      const base = baseMeltScaleRef.current;
+      const axis = variantConfig.meltAxis;
+      const axisBase = base[axis];
+      const nowMs = performance.now();
+      const elapsedMs = nowMs - reconstStartRef.current;
+
+      // If the user re-lit during the sequence, abort and let the normal
+      // reset/melt path take over — don't fight the lit state.
+      // NOTE: on the trigger tick candleLit is still true (React hasn't
+      // processed the parent's setCandleLit(false) yet), but
+      // burnedOutFiredRef is also true on that same tick. It only resets
+      // to false on the litAt→null effect flush. So "candleLit true AND
+      // burnedOutFiredRef false" uniquely identifies a real re-light.
+      if (candleLit && !burnedOutFiredRef.current) {
+        reconstPhaseRef.current = "idle";
+        hideReconstituteParticles();
+      } else if (reconstPhaseRef.current === "empty") {
+        // Hold the burned-down silhouette: full baseline on the other
+        // two axes, 10% on the melt axis (matches the natural burn floor).
+        meltMeshRef.current.scale.set(base.x, base.y, base.z);
+        meltMeshRef.current.scale[axis] = axisBase * 0.10;
+        if (dripWaxRef.current) {
+          const dripBase = baseDripScaleRef.current;
+          dripWaxRef.current.visible = true;
+          dripWaxRef.current.scale.set(dripBase.x, dripBase.y, dripBase.z);
+        }
+        hideReconstituteParticles();
+        if (elapsedMs >= RECONSTITUTE_EMPTY_BEAT_MS) {
+          reconstPhaseRef.current = "reforming";
+          reconstStartRef.current = nowMs;
+        }
+      } else if (reconstPhaseRef.current === "reforming") {
+        const t = Math.min(elapsedMs / RECONSTITUTE_REFORM_MS, 1);
+        // Wax grows 10% → 100%, slightly back-loaded so particles converge
+        // before the pillar shoots up. Starting floor matches the empty-
+        // beat hold and the natural 10% burn floor.
+        const waxT = Math.max(0, (t - 0.35) / 0.65);
+        const waxEased = 1 - Math.pow(1 - waxT, 3); // easeOutCubic
+        meltMeshRef.current.scale.set(base.x, base.y, base.z);
+        meltMeshRef.current.scale[axis] = axisBase * (0.10 + waxEased * 0.90);
+        if (dripWaxRef.current) {
+          const dripBase = baseDripScaleRef.current;
+          const dk = Math.max(0, 1 - t);
+          dripWaxRef.current.scale.set(dripBase.x * dk, dripBase.y * dk, dripBase.z * dk);
+        }
+        updateReconstituteParticles(t);
+        if (t >= 1) {
+          reconstPhaseRef.current = "idle";
+          meltMeshRef.current.scale.set(base.x, base.y, base.z);
+          if (dripWaxRef.current) dripWaxRef.current.scale.set(0, 0, 0);
+          hideReconstituteParticles();
+        }
       }
     }
 
@@ -524,13 +1010,13 @@ function HeroAltarObject({
           disappears against the black page background. */}
       <ambientLight intensity={0.25} color="#ffffff" />
       {/* Warm candle-side fill — drives ignition flash + ongoing flicker. */}
-      <pointLight
+      {/* <pointLight
         ref={warmLightRef}
         position={[0, 0.15, 0.35]}
         intensity={WARM_BASE_INTENSITY}
         color="#ffb36b"
         distance={2}
-      />
+      /> */}
       {/* Subtle cool accent for the neon frame. */}
       {/* <pointLight
         position={[0, 0.5, 0.1]}
@@ -538,6 +1024,29 @@ function HeroAltarObject({
         color="#2ad6ee"
         distance={1.5}
       /> */}
+      {/* Radial glow around the flame — two additive sprites (billboarded
+          to always face the camera) layered for depth. Outer is soft amber,
+          inner is a bright warm-white core. Scale + opacity are driven by
+          the flame flicker noise so they breathe with the flame. Reuses
+          the particle radial-gradient texture. */}
+      <sprite
+        ref={flameGlowOuterRef}
+        position={[0, 0.15, 0.35]}
+        scale={[0.7, 0.7, 1]}
+        visible={false}
+        renderOrder={240}
+      >
+        <spriteMaterial
+          map={reconstParticleTexture}
+          color="#ffaa55"
+          transparent
+          opacity={0}
+          depthTest={false}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+        />
+      </sprite>
       {/* Ignition halo — additive sphere that expands + fades on light-up. */}
       <mesh
         ref={haloRef}
@@ -554,6 +1063,42 @@ function HeroAltarObject({
           blending={THREE.AdditiveBlending}
         />
       </mesh>
+      {/* Reconstitution particles — swirl inward after burnout. Hidden by
+          default (opacity attribute=0); the reform phase drives them.
+          renderOrder sits above the candle meshes (which are bumped to 200
+          in the mesh traversal above) so additive particles paint on top. */}
+      <points
+        ref={reconstParticlesRef}
+        renderOrder={260}
+        frustumCulled={false}
+        position={[0, 0, 0]}
+      >
+        <bufferGeometry>
+          <bufferAttribute
+            attach="attributes-position"
+            count={RECONSTITUTE_PARTICLE_COUNT}
+            array={reconstBuffers.position}
+            itemSize={3}
+          />
+          <bufferAttribute
+            attach="attributes-color"
+            count={RECONSTITUTE_PARTICLE_COUNT}
+            array={reconstBuffers.color}
+            itemSize={3}
+          />
+        </bufferGeometry>
+        <pointsMaterial
+          size={16}
+          sizeAttenuation={false}
+          map={reconstParticleTexture}
+          vertexColors={true}
+          transparent={true}
+          depthTest={false}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+        />
+      </points>
     </group>
   );
 }
@@ -692,7 +1237,10 @@ export default function HomePage() {
       });
     } else {
       writeLocalCandle(now);
-      setShowSignInNudge(true);
+      if (!readSignInNudgeShown()) {
+        setShowSignInNudge(true);
+        markSignInNudgeShown();
+      }
     }
     setLitAt(now);
     setCandleLit(true);

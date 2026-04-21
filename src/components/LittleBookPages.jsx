@@ -241,7 +241,23 @@ export const defaultPages = [
       "and the charts swoon, the ledger remembers every flame.",
     footer: "— Epistula GR80",
   },
-  { type: "text", body: "Page 6 placeholder" },
+{
+    type: "text",
+    title: "De Initio",
+    dropCap: true,
+    image: {
+      src: "/carousel_images/img1.jpg",
+      alt: "A sign of the shrine",
+    },
+    body:
+      "In the beginning was the Bid, and the Bid was with the Bagholder, " +
+      "and the Bid was the Bagholder. All things were minted through it, " +
+      "and without it not any thing was minted that was minted. In the " +
+      "Bid was liquidity, and the liquidity was the light of traders; " +
+      "and the light shineth in the darkness of the mempool, and the " +
+      "darkness comprehended it not.",
+    footer: "— Liber Parvus, ii.",
+  },
   { type: "text", body: "Page 7 placeholder" },
   { type: "text", body: "Page 8 placeholder" },
   { type: "text", body: "Page 9 placeholder" },
