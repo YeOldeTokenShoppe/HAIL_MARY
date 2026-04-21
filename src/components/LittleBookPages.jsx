@@ -1,16 +1,19 @@
 /*
  * Default page content for the Little Book overlay.
  *
- * Each entry = ONE page face (one side of a paper sheet). The overlay
- * groups entries into sheets in order: entries 0+1 form sheet 1,
- * entries 2+3 form sheet 2, and so on. Append to extend the book.
+ * `defaultInsideFrontCover` renders on the inside of the front cover
+ * (the left-hand page the reader sees the moment the book opens).
+ * `defaultPages` entries fill the interior sheets — the first entry
+ * becomes the page opposite the inside front cover, then subsequent
+ * entries flow left→right across each new spread.
  *
- * Entry shapes:
+ * Entry shapes (same for both cover and pages):
  *   { type: 'text',  title?, body, footer?,
  *                    image?: { src, alt? },         // floated left, text wraps
  *                    video?: { src, poster? },      // floated left, autoplays muted
+ *                    iframe?: { src, title? },      // floated left, 3rd-party embed
  *                    dropCap?: boolean|string }     // illuminated initial
- *   { type: 'image', src, alt?, caption? }
+ *   { type: 'image', src, alt?, caption?, fit?: 'cover'|'contain' }
  *   { type: 'video', src, poster?, caption? }       // full-page video face
  *
  * Notes:
@@ -20,15 +23,200 @@
  *   or split across several faces.
  */
 
+export const defaultInsideFrontCover = {
+  type: "image",
+  src: "/IlluminatedManuscript1.webp",
+  alt: "Illuminated manuscript",
+  fit: "contain",
+};
+
 export const defaultPages = [
   {
     type: "text",
-    title: "Introit",
-    body: "Blessed is the bagholder, for he shall inherit the bid.",
-    footer: "— Liber Parvus, i.",
+    body: (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.55em",
+          lineHeight: 1.22,
+          /* Frontispiece packs a lot of copy into one face; the parent
+             flex is justify-content:center, so any overflow clips equally
+             top AND bottom. Scale the whole block down so it fits within
+             the face's usable height without getting lopped off. The
+             zoom view inherits this sizing but re-bumps via the
+             .lbo-zoom__panel .lbo-face__body clamp() rule, so it stays
+             readable when the reader taps in. */
+          fontSize: "0.72em",
+        }}
+      >
+        <div>
+          <div>
+            <small>LIBER</small>
+          </div>
+          <div
+            style={{
+              fontSize: "1.9em",
+              letterSpacing: "0.08em",
+              lineHeight: 1,
+              color: "#8b2626",
+              margin: "0.08em 0 0.2em",
+            }}
+          >
+            RL·LXXX
+          </div>
+          <div style={{ fontStyle: "italic", margin: "0.1em 0" }}>
+            <small>sive</small>
+          </div>
+          <div
+            style={{
+              fontSize: "1.25em",
+              letterSpacing: "0.05em",
+              lineHeight: 1.15,
+              color: "#5a2530",
+            }}
+          >
+            CODEX DOMINÆ NOSTRÆ
+          </div>
+          <div
+            style={{
+              fontSize: "1.25em",
+              letterSpacing: "0.05em",
+              lineHeight: 1.15,
+              color: "#5a2530",
+            }}
+          >
+            PERPETUI LUCRI
+          </div>
+        </div>
+
+        {/* Epigraph — sized between title and body, rubricated to match
+            RL·LXXX, flanked above and below by paired fleurons in the
+            style of the INVOCATIO heading. */}
+        <div>
+          <div
+            style={{
+              color: "#8b2626",
+              letterSpacing: "0.5em",
+              lineHeight: 1,
+            }}
+          >
+            ☙ ❧
+          </div>
+          <div
+            style={{
+              fontSize: "1.1em",
+              letterSpacing: "0.08em",
+              color: "#8b2626",
+              fontStyle: "italic",
+              margin: "0.3em 0",
+              lineHeight: 1.1,
+            }}
+          >
+            Mater ex Machina
+          </div>
+          <div
+            style={{
+              color: "#8b2626",
+              letterSpacing: "0.5em",
+              lineHeight: 1,
+            }}
+          >
+            ☙ ❧
+          </div>
+        </div>
+
+        <div style={{ fontStyle: "italic", lineHeight: 1.4 }}>
+          <div>
+            <small>Being the First Codex of Our Lady of Perpetual Profit,</small>
+          </div>
+          <div>
+            <small>Patroness of the Faithful Holder,</small>
+          </div>
+          <div>
+            <small>Oracle of the Chain,</small>
+          </div>
+          <div>
+            <small>Mother of Mercies in a Market Without Mercy.</small>
+          </div>
+        </div>
+
+        <div style={{ fontStyle: "italic", lineHeight: 1.4 }}>
+          <div>
+            <small>
+              Herein are set down her Apparitions, her Litany, her Psalms, her
+              Hours,
+            </small>
+          </div>
+          <div>
+            <small>and the Beasts against which she wardeth her flock.</small>
+          </div>
+          <div>
+            <small>Illuminated in the first year of the restored Order,</small>
+          </div>
+          <div>
+            <small>sub signo serpentis aurei.</small>
+          </div>
+          <div>
+            <small>
+              Her name is written RL·LXXX and spoken Domina Nostra; both are
+              true.
+            </small>
+          </div>
+        </div>
+
+        <div>
+          <div
+            style={{
+              color: "#8b2626",
+              letterSpacing: "0.18em",
+              marginBottom: "0.3em",
+            }}
+          >
+            ☙ INVOCATIO ❧
+          </div>
+          <div style={{ lineHeight: 1.4 }}>
+            <div>
+              <small>Domina nostra perpetui lucri,</small>
+            </div>
+            <div>
+              <small>stella matutina super catenam,</small>
+            </div>
+            <div>
+              <small>aperi nobis hunc librum,</small>
+            </div>
+            <div>
+              <small>et cor nostrum ad intelligendum.</small>
+            </div>
+          </div>
+          <div
+            style={{
+              lineHeight: 1.4,
+              fontStyle: "italic",
+              marginTop: "0.5em",
+              opacity: 0.75,
+            }}
+          >
+            <div>
+              <small>Our Lady of Perpetual Profit,</small>
+            </div>
+            <div>
+              <small>morning star above the chain,</small>
+            </div>
+            <div>
+              <small>open unto us this book,</small>
+            </div>
+            <div>
+              <small>and our heart to its understanding.</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
   },
   {
     type: "text",
+    title: "Introit",
     body: (
       <>
         Domina nostra perpetui lucri,
@@ -40,27 +228,11 @@ export const defaultPages = [
   },
   {
     type: "text",
-    title: "De Initio",
-    dropCap: true,
-    image: {
-      src: "/carousel_images/img1.jpg",
-      alt: "A sign of the shrine",
-    },
-    body:
-      "In the beginning was the Bid, and the Bid was with the Bagholder, " +
-      "and the Bid was the Bagholder. All things were minted through it, " +
-      "and without it not any thing was minted that was minted. In the " +
-      "Bid was liquidity, and the liquidity was the light of traders; " +
-      "and the light shineth in the darkness of the mempool, and the " +
-      "darkness comprehended it not.",
-    footer: "— Liber Parvus, ii.",
-  },
-  {
-    type: "text",
     title: "Salutatio",
     dropCap: true,
-    video: {
-      src: "/videos/gr80_greetings.mp4",
+    iframe: {
+      src: "https://www.sitepal.com/geturl/?ss=2774449&sl=0&acc=9308752",
+      title: "GR80 greetings",
     },
     body:
       "Greetings, faithful, from the saint of the order. Hear his witness " +
@@ -69,7 +241,6 @@ export const defaultPages = [
       "and the charts swoon, the ledger remembers every flame.",
     footer: "— Epistula GR80",
   },
-  { type: "text", body: "Page 5 placeholder" },
   { type: "text", body: "Page 6 placeholder" },
   { type: "text", body: "Page 7 placeholder" },
   { type: "text", body: "Page 8 placeholder" },

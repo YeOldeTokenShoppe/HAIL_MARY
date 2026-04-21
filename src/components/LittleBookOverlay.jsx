@@ -4,11 +4,35 @@ import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { defaultPages } from "./LittleBookPages";
+import { defaultPages, defaultInsideFrontCover } from "./LittleBookPages";
 
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
 }
+
+/* Candlestick-chart glyph — used on the front cover in place of the
+   ornamental ❦. Stroke is currentColor so the cover palette drives its
+   hue, and the size is governed by CSS on the parent ornament wrapper. */
+const CandlestickOrnament = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M9 5v4" />
+    <rect width="4" height="6" x="7" y="9" rx="1" />
+    <path d="M9 15v2" />
+    <path d="M17 3v2" />
+    <rect width="4" height="8" x="15" y="5" rx="1" />
+    <path d="M17 13v3" />
+    <path d="M3 3v16a2 2 0 0 0 2 2h16" />
+  </svg>
+);
 
 /**
  * Renders one face of a page based on its entry's `type`. Entry shapes
@@ -17,7 +41,9 @@ if (typeof window !== "undefined") {
  */
 function PageFace({ entry, pageNumber, zoomed = false }) {
   if (!entry) {
-    return <div className="lbo-page__number">{pageNumber}</div>;
+    return pageNumber ? (
+      <div className="lbo-page__number">{pageNumber}</div>
+    ) : null;
   }
   if (entry.type === "text") {
     /* Illuminated-manuscript mode: when the entry includes an `image`
@@ -28,8 +54,9 @@ function PageFace({ entry, pageNumber, zoomed = false }) {
        independently or together. */
     const hasImage = !!entry.image;
     const hasVideo = !!entry.video;
+    const hasIframe = !!entry.iframe;
     const wantsDropCap = !!entry.dropCap;
-    const isIllum = hasImage || hasVideo || wantsDropCap;
+    const isIllum = hasImage || hasVideo || hasIframe || wantsDropCap;
 
     // Derive the drop-cap glyph — explicit string wins, otherwise peel
     // the first character off a string body. Non-string bodies skip it.
@@ -50,7 +77,21 @@ function PageFace({ entry, pageNumber, zoomed = false }) {
       >
         {entry.title && <h3 className="lbo-face__title">{entry.title}</h3>}
         <div className="lbo-face__body">
-          {hasVideo ? (
+          {hasIframe ? (
+            /* Floated embed — for third-party players that provide an
+               iframe URL (e.g. a SitePal / Oddcast avatar). The iframe
+               handles its own playback + interaction; object-fit rules
+               are ignored on iframes, so the fixed width/aspect-ratio
+               on .lbo-face__illum-media defines the box. */
+            <iframe
+              className="lbo-face__illum-media lbo-face__illum-iframe"
+              src={entry.iframe.src}
+              title={entry.iframe.title || "Embedded content"}
+              allow="autoplay; encrypted-media; fullscreen"
+              allowFullScreen
+              frameBorder="0"
+            />
+          ) : hasVideo ? (
             /* Floated video miniature. In the book view it autoplays
                muted (required for iOS autoplay) and loops silently. In
                zoom it renders with native controls + unmuted so the
@@ -82,13 +123,22 @@ function PageFace({ entry, pageNumber, zoomed = false }) {
         {entry.footer && (
           <div className="lbo-face__footer">{entry.footer}</div>
         )}
-        <div className="lbo-page__number">{pageNumber}</div>
+        {pageNumber && (
+          <div className="lbo-page__number">{pageNumber}</div>
+        )}
       </div>
     );
   }
   if (entry.type === "image") {
+    /* fit:'contain' shows the whole image with parchment padding
+       around it (no cropping). Default is the usual page-filling cover. */
+    const isContain = entry.fit === "contain";
     return (
-      <div className="lbo-face lbo-face--media">
+      <div
+        className={`lbo-face lbo-face--media${
+          isContain ? " lbo-face--media-contain" : ""
+        }`}
+      >
         <img
           src={entry.src}
           alt={entry.alt || ""}
@@ -97,9 +147,15 @@ function PageFace({ entry, pageNumber, zoomed = false }) {
         {entry.caption && (
           <div className="lbo-face__caption">{entry.caption}</div>
         )}
-        <div className="lbo-page__number lbo-page__number--light">
-          {pageNumber}
-        </div>
+        {pageNumber && (
+          <div
+            className={`lbo-page__number${
+              isContain ? "" : " lbo-page__number--light"
+            }`}
+          >
+            {pageNumber}
+          </div>
+        )}
       </div>
     );
   }
@@ -123,9 +179,11 @@ function PageFace({ entry, pageNumber, zoomed = false }) {
         {entry.caption && (
           <div className="lbo-face__caption">{entry.caption}</div>
         )}
-        <div className="lbo-page__number lbo-page__number--light">
-          {pageNumber}
-        </div>
+        {pageNumber && (
+          <div className="lbo-page__number lbo-page__number--light">
+            {pageNumber}
+          </div>
+        )}
       </div>
     );
   }
@@ -136,8 +194,14 @@ export default function LittleBookOverlay({
   isOpen,
   onClose,
   pages = defaultPages,
+  /* Entry rendered on the inside of the front cover — the left-hand
+     page the reader sees the moment the cover flips open. Uses the
+     same entry schema as `pages`. Pass null to leave it blank (the
+     default parchment insert). */
+  insideFrontCover = defaultInsideFrontCover,
 }) {
   const scrollerRef = useRef(null);
+  const bookRef = useRef(null);
   const [mounted, setMounted] = useState(false);
   const [hintVisible, setHintVisible] = useState(true);
   // Face index currently zoomed, or null when the book is in spread view.
@@ -167,14 +231,35 @@ export default function LittleBookOverlay({
     };
   };
 
-  /* Tap on the book: figure out the current spread, use x-position to
-     pick left vs right face, open the zoom. stopPropagation so the
-     overlay's own "tap to close" doesn't fire. Taps that don't land on
-     a readable face (cover view, empty side) bubble up and close. */
+  /* Tap on the book:
+     - In cover view (scroll unit < 2): zoom the front cover itself,
+       using -1 as a sentinel so the zoom render knows to paint the
+       cover instead of a PageFace.
+     - In a readable spread: pick left vs right face by x-position and
+       zoom that face.
+     - Otherwise (past the last content page): let the tap bubble up
+       to the overlay and close the book, consistent with "tap empty
+       space to dismiss".
+     stopPropagation for the zoom cases so the overlay's own
+     "tap to close" doesn't also fire. */
   const handleBookTap = (e) => {
+    const rounded = Math.round(scrollUnitRef.current);
+    if (rounded < 2) {
+      e.stopPropagation();
+      setZoomedFaceIdx(-1);
+      return;
+    }
     const spread = getCurrentSpread();
     if (!spread) return;
     const spineX = window.innerWidth / 2;
+    /* On the first spread, the left page IS the inside of the front
+       cover — route taps there to the insideFrontCover zoom instead of
+       the non-existent "face -1" that the spread math would yield. */
+    if (rounded === 2 && e.clientX < spineX && insideFrontCover) {
+      e.stopPropagation();
+      setZoomedFaceIdx(-2);
+      return;
+    }
     const face = e.clientX < spineX ? spread.left : spread.right;
     if (face === null) return;
     e.stopPropagation();
@@ -323,6 +408,53 @@ export default function LittleBookOverlay({
   // Drop any stale zoom when the book closes.
   useEffect(() => {
     if (!isOpen) setZoomedFaceIdx(null);
+  }, [isOpen]);
+
+  /* Forward wheel + touch drags on the book itself into the scroller.
+     Native propagation from a position:fixed descendant to an ancestor
+     scroll container is unreliable (especially iOS Safari), so this
+     makes "scroll anywhere, even on the book, to turn pages" actually
+     work. `passive:false` is required so `preventDefault` can suppress
+     the browser's default handling while we drive the scroll ourselves. */
+  useEffect(() => {
+    if (!isOpen) return;
+    const book = bookRef.current;
+    const scroller = scrollerRef.current;
+    if (!book || !scroller) return;
+
+    let lastTouchY = null;
+
+    const onWheel = (e) => {
+      e.preventDefault();
+      scroller.scrollTop += e.deltaY;
+    };
+    const onTouchStart = (e) => {
+      lastTouchY = e.touches[0].clientY;
+    };
+    const onTouchMove = (e) => {
+      if (lastTouchY == null) return;
+      const y = e.touches[0].clientY;
+      scroller.scrollTop += lastTouchY - y;
+      lastTouchY = y;
+      e.preventDefault();
+    };
+    const onTouchEnd = () => {
+      lastTouchY = null;
+    };
+
+    book.addEventListener("wheel", onWheel, { passive: false });
+    book.addEventListener("touchstart", onTouchStart, { passive: true });
+    book.addEventListener("touchmove", onTouchMove, { passive: false });
+    book.addEventListener("touchend", onTouchEnd);
+    book.addEventListener("touchcancel", onTouchEnd);
+
+    return () => {
+      book.removeEventListener("wheel", onWheel);
+      book.removeEventListener("touchstart", onTouchStart);
+      book.removeEventListener("touchmove", onTouchMove);
+      book.removeEventListener("touchend", onTouchEnd);
+      book.removeEventListener("touchcancel", onTouchEnd);
+    };
   }, [isOpen]);
 
   if (!isOpen || !mounted) return null;
@@ -526,6 +658,13 @@ export default function LittleBookOverlay({
           transform: translate(0, -50%);
           border-radius: 5% 0 0 5%;
         }
+        /* When the insert carries a rendered PageFace (inside front
+           cover), clip overflow so long bodies don't bleed outside the
+           parchment shape, and match the interior parchment tone. */
+        .lbo-book__insert--page {
+          overflow: hidden;
+          background: #f2ecdb;
+        }
 
         .lbo-page__half {
           display: flex;
@@ -632,6 +771,11 @@ export default function LittleBookOverlay({
           display: block;
           background: #0a0610;
         }
+        /* iframes ignore object-fit and come with a UA border in some
+           browsers; make the box behave like the img/video siblings. */
+        .lbo-face__illum-iframe {
+          background: transparent;
+        }
         /* Drop cap — large crimson initial in the manuscript tradition.
            Floats alongside the illumination when both are present; when
            the image is alone the cap is simply skipped. */
@@ -677,6 +821,19 @@ export default function LittleBookOverlay({
           object-fit: cover;
           display: block;
         }
+        /* fit:contain variant — show the whole image inside a parchment
+           frame with a soft margin. No cropping; letterboxed areas pick
+           up the same paper tone as interior sheets. */
+        .lbo-face--media-contain {
+          background: #f2ecdb;
+          padding: 8%;
+          box-sizing: border-box;
+        }
+        .lbo-face--media-contain .lbo-face__media {
+          object-fit: contain;
+          width: 100%;
+          height: 100%;
+        }
         .lbo-face__caption {
           position: absolute;
           bottom: 1.2rem;
@@ -691,8 +848,15 @@ export default function LittleBookOverlay({
         }
 
         /* Give the book a tap affordance on pointer devices without
-           breaking scroll-to-flip on touch. */
-        .lbo-book { cursor: zoom-in; }
+           breaking scroll-to-flip on touch. touch-action: pan-y lets
+           the browser natively forward vertical drag gestures on the
+           book up to the scroller; the JS forwarder in the component
+           is a belt-and-suspenders backup for when native propagation
+           fails (iOS position:fixed inside -webkit-overflow-scrolling). */
+        .lbo-book {
+          cursor: zoom-in;
+          touch-action: pan-y;
+        }
 
         /* ---------- ZOOM OVERLAY ---------- */
         .lbo-zoom {
@@ -757,6 +921,25 @@ export default function LittleBookOverlay({
         .lbo-zoom__panel .lbo-page__number { font-size: 0.9rem; }
         /* Panel matches the page aspect, so keep object-fit: cover (the
            base rule) in both views — media crops identically in each. */
+
+        /* Cover-zoom variant: match the book's leather gradient instead
+           of the parchment, and scale the ornamental type up so the
+           title reads at arm's length. */
+        .lbo-zoom__panel--cover {
+          background: linear-gradient(145deg, #5a2e38, #2a121c);
+        }
+        .lbo-zoom__panel--cover .lbo-cover-eyebrow {
+          font-size: clamp(1rem, 3vw, 1.4rem);
+        }
+        .lbo-zoom__panel--cover .lbo-cover-title {
+          font-size: clamp(2rem, 7vw, 3.2rem);
+        }
+        .lbo-zoom__panel--cover .lbo-cover-ornament svg {
+          width: clamp(2.4rem, 6vw, 3.2rem);
+          height: clamp(2.4rem, 6vw, 3.2rem);
+          min-width: 0;
+          min-height: 0;
+        }
         .lbo-zoom__hint {
           position: absolute;
           bottom: 2.5vh;
@@ -804,9 +987,19 @@ export default function LittleBookOverlay({
             0 0 32px rgba(217, 45, 176, 0.35);
         }
         .lbo-cover-ornament {
-          font-size: 4.5vmin;
           color: rgba(217, 45, 176, 0.85);
-          text-shadow: 0 0 12px rgba(217, 45, 176, 0.55);
+          /* drop-shadow follows the SVG's alpha, so the glow traces the
+             candlestick glyph's strokes instead of a rectangular halo. */
+          filter: drop-shadow(0 0 12px rgba(217, 45, 176, 0.55));
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .lbo-cover-ornament svg {
+          width: 5.2vmin;
+          height: 5.2vmin;
+          min-width: 28px;
+          min-height: 28px;
         }
 
         .lbo-book__colophon {
@@ -838,7 +1031,11 @@ export default function LittleBookOverlay({
                 single fixed glow reads correctly in both states without
                 needing to track the book's GSAP shift. */}
             <div className="lbo-book-glow" aria-hidden="true" />
-            <div className="lbo-book" onClick={handleBookTap}>
+            <div
+              className="lbo-book"
+              ref={bookRef}
+              onClick={handleBookTap}
+            >
               <div className="lbo-book__spine" />
 
               {/* Front cover */}
@@ -850,15 +1047,24 @@ export default function LittleBookOverlay({
                   <div className="lbo-cover-content">
                     <div className="lbo-cover-eyebrow">Liber Parvus</div>
                     <h2 className="lbo-cover-title">
-                      The Little Book
+                      The Book
                       <br />
                       of RL80
                     </h2>
-                    <div className="lbo-cover-ornament">❦</div>
+                    <div className="lbo-cover-ornament">
+                    <CandlestickOrnament />
+                  </div>
                   </div>
                 </div>
-                <div className="lbo-page__half lbo-page__half--back">
-                  <div className="lbo-book__insert" />
+                <div
+                  className="lbo-page__half lbo-page__half--back"
+                  data-lbo-face="inside-front"
+                >
+                  <div className="lbo-book__insert lbo-book__insert--page">
+                    {insideFrontCover ? (
+                      <PageFace entry={insideFrontCover} />
+                    ) : null}
+                  </div>
                 </div>
               </div>
 
@@ -893,12 +1099,32 @@ export default function LittleBookOverlay({
             role="dialog"
             aria-modal="true"
           >
-            <div className="lbo-zoom__panel">
-              <PageFace
-                entry={pages[zoomedFaceIdx]}
-                pageNumber={zoomedFaceIdx + 1}
-                zoomed
-              />
+            <div
+              className={`lbo-zoom__panel${
+                zoomedFaceIdx === -1 ? " lbo-zoom__panel--cover" : ""
+              }`}
+            >
+              {zoomedFaceIdx === -1 ? (
+                <div className="lbo-cover-content">
+                  <div className="lbo-cover-eyebrow">Liber Parvus</div>
+                  <h2 className="lbo-cover-title">
+                    The Book
+                    <br />
+                    of RL80
+                  </h2>
+                  <div className="lbo-cover-ornament">
+                    <CandlestickOrnament />
+                  </div>
+                </div>
+              ) : zoomedFaceIdx === -2 ? (
+                <PageFace entry={insideFrontCover} zoomed />
+              ) : (
+                <PageFace
+                  entry={pages[zoomedFaceIdx]}
+                  pageNumber={zoomedFaceIdx + 1}
+                  zoomed
+                />
+              )}
             </div>
             <div className="lbo-zoom__hint">Tap to return</div>
           </div>

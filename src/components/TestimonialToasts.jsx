@@ -9,6 +9,8 @@ const ROTATE_MS = 5500;
 const LIVE_JUMP_MIN_GAP_MS = 30_000;
 const MAX_VISIBLE_DESKTOP = 2;
 const MOBILE_BP = 700;
+const INSCRIBE_WORDS = ["TOAST", "BOAST", "PRAYER", "POST"];
+const INSCRIBE_WORD_MS = 2500;
 
 // Seed testimonials so a fresh shrine (or one with no writes yet) still
 // has whispers rotating. Same copy as the mockup — swap in your own at
@@ -120,10 +122,18 @@ export default function TestimonialToasts({ onInscribeClick }) {
 
 function StackView({ pool, onInscribeClick, newLiveIdsRef }) {
   const [visible, setVisible] = useState([]);
+  const [wordIdx, setWordIdx] = useState(0);
   const idxRef = useRef(0);
   const lastLiveJumpRef = useRef(0);
   const poolRef = useRef(pool);
   useEffect(() => { poolRef.current = pool; }, [pool]);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setWordIdx((i) => (i + 1) % INSCRIBE_WORDS.length);
+    }, INSCRIBE_WORD_MS);
+    return () => clearInterval(id);
+  }, []);
 
   const showItem = (item, isLive) => {
     setVisible((prev) => {
@@ -175,7 +185,10 @@ function StackView({ pool, onInscribeClick, newLiveIdsRef }) {
           onClick={onInscribeClick}
           title="Add your witness"
         >
-          + OFFER A TOAST
+          + OFFER A{" "}
+          <span key={wordIdx} className="tst-inscribe-word">
+            {INSCRIBE_WORDS[wordIdx]}
+          </span>
         </button>
       </div>
       {visible.map(({ key, item, isLive }) => (
