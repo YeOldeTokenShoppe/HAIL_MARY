@@ -177,7 +177,30 @@
     "loading": "LOADING...",
     "tradeOnUniswap": "TRADE ON UNISWAP",
     "uniswapDescription": "Already have ETH? Swap directly for RL80 on Uniswap.",
+    "swapDescription": "Already have ETH or USDC? Swap directly for RL80.",
     "orDivider": "OR"
+  },
+  "swapForm": {
+    "from": "FROM",
+    "to": "TO",
+    "slippage": "SLIPPAGE",
+    "connectWallet": "CONNECT WALLET",
+    "enterAmount": "ENTER AMOUNT",
+    "loadingQuote": "FETCHING QUOTE...",
+    "noQuote": "NO QUOTE",
+    "swap": "SWAP FOR RL80",
+    "approving": "APPROVING...",
+    "swapping": "SWAPPING...",
+    "success": "SUCCESS",
+    "viewTx": "VIEW ON BASESCAN",
+    "connected": "CONNECTED",
+    "disconnect": "DISCONNECT",
+    "connectToSwap": "CONNECT WALLET TO SWAP",
+    "wrongNetwork": "WRONG NETWORK — RL80 IS ON BASE",
+    "switchToBase": "SWITCH TO BASE",
+    "switching": "SWITCHING TO BASE...",
+    "insufficientBalance": "INSUFFICIENT",
+    "balance": "BAL"
   },
   "chatRoom": {
     "placeholders": {

@@ -1603,7 +1603,7 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
         /* Replace LOGIN slot with BOOK — sign-in/out is surfaced in the
            candle inscribe modal instead. */
         onBookClick={() => setShowBook(true)}
-        bookLabel="BOOK OF RL80"
+        bookLabel="THE BOOK"
         extraLeft={[
           {
             key: 'tcg',

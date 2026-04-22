@@ -103,3 +103,7 @@ env:
       - RUNTIME
   - variable: CRON_SECRET
     secret: CRON_SECRET
+  - variable: CDP_API_KEY_NAME
+    secret: CDP_API_KEY_NAME
+  - variable: CDP_API_KEY_PRIVATE_KEY
+    secret: CDP_API_KEY_PRIVATE_KEY

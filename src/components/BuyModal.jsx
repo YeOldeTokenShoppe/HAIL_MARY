@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useLanguage } from './LanguageProvider';
 import { useWalletAuth } from '@/components/WalletAuthProvider';
+import SwapForm from './SwapForm';
 
 const BuyModal = ({ isOpen, onClose }) => {
   const [glitchActive, setGlitchActive] = useState(false);
@@ -532,7 +533,7 @@ const BuyModal = ({ isOpen, onClose }) => {
                 <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(253, 237, 0, 0.4), transparent)' }} />
               </div>
 
-              {/* Uniswap Trade Section */}
+              {/* In-app Swap Section */}
               <p style={{
                 fontFamily: 'monospace',
                 fontSize: isSmallPhone ? '11px' : '13px',
@@ -542,42 +543,10 @@ const BuyModal = ({ isOpen, onClose }) => {
                 letterSpacing: '0.5px',
                 maxWidth: '320px',
               }}>
-                {t('buyModal.uniswapDescription') || 'Already have ETH? Swap directly for RL80 on Uniswap.'}
+                {t('buyModal.swapDescription') || 'Already have ETH or USDC? Swap directly for RL80.'}
               </p>
 
-              <a
-                href="https://app.uniswap.org/swap?outputCurrency=0x30D01555d88c76500a82754A1D53cAc082A6CB75&chain=base"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  fontFamily: 'monospace',
-                  fontSize: isSmallPhone ? '14px' : '16px',
-                  fontWeight: '900',
-                  textTransform: 'uppercase',
-                  letterSpacing: '3px',
-                  color: '#000',
-                  background: 'linear-gradient(135deg, #ff184c, #8B00FF)',
-                  border: 'none',
-                  padding: isSmallPhone ? '14px 28px' : '16px 40px',
-                  cursor: 'pointer',
-                  clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))',
-                  transition: 'all 0.3s ease',
-                  textDecoration: 'none',
-                  display: 'inline-block',
-                  textAlign: 'center',
-                  minWidth: isSmallPhone ? '200px' : '240px',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'scale(1.05)';
-                  e.currentTarget.style.boxShadow = '0 0 30px rgba(255, 24, 76, 0.6)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.boxShadow = '';
-                }}
-              >
-                {t('buyModal.tradeOnUniswap') || 'TRADE ON UNISWAP'}
-              </a>
+              <SwapForm isSmallPhone={isSmallPhone} isMobile={isMobile} />
             </div>
           </div>
 
