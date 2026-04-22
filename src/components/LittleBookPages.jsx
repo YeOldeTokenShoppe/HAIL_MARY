@@ -23,9 +23,82 @@
  *   or split across several faces.
  */
 
+/* Form-sigils for the Index Apparitionum entries. Each apparition is
+   tagged with a Form category (wick, vision, procession, etc.); the
+   sigil is a single-glyph pictogram rendered in the margin beside it.
+   Swap the SVG for a given form here and every entry tagged with that
+   form updates automatically. */
+const SIGILS = {
+  wick: (
+    <svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" style={{ display: "block" }}>
+      <rect x="7.25" y="1" width="1.5" height="14" rx="0.5" />
+      <rect x="5" y="6" width="6" height="4" rx="0.5" />
+    </svg>
+  ),
+  vision: (
+    <svg viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" strokeWidth="1" style={{ display: "block" }}>
+      <path d="M1.5 8 C 4 3, 12 3, 14.5 8 C 12 13, 4 13, 1.5 8 Z" />
+      <circle cx="8" cy="8" r="2" fill="currentColor" />
+    </svg>
+  ),
+  procession: (
+    <svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" style={{ display: "block" }}>
+      <circle cx="3" cy="8" r="1.3" />
+      <circle cx="8" cy="8" r="1.3" />
+      <circle cx="13" cy="8" r="1.3" />
+    </svg>
+  ),
+  presence: (
+    <svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" style={{ display: "block" }}>
+      <circle cx="8" cy="4.5" r="2.2" />
+      <path d="M3 14 C 3.5 9.5, 12.5 9.5, 13 14 Z" />
+    </svg>
+  ),
+  remembrance: (
+    <svg viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" style={{ display: "block" }}>
+      <path d="M5 5 Q 8 8, 11 5" />
+      <path d="M5 11 Q 8 8, 11 11" />
+      <circle cx="8" cy="8" r="1.6" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+  gratuity: (
+    <svg viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" strokeWidth="1.3" style={{ display: "block" }}>
+      <circle cx="8" cy="8" r="5.5" />
+      <circle cx="8" cy="8" r="1.5" fill="currentColor" stroke="none" />
+    </svg>
+  ),
+  inscription: (
+    <svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" style={{ display: "block" }}>
+      <path d="M2.5 13.5 L4 12 L11 5 L13.5 2.5 C 14 2, 14 3, 13.5 3.5 L6 11 L4 13 Z" />
+    </svg>
+  ),
+  refusal: (
+    <svg viewBox="0 0 16 16" width="1em" height="1em" fill="currentColor" style={{ display: "block" }}>
+      <rect x="7" y="2" width="2" height="12" rx="0.5" />
+    </svg>
+  ),
+};
+
+const FormSigil = ({ form }) => (
+  <span
+    aria-hidden="true"
+    style={{
+      color: "#8b2626",
+      flex: "0 0 1.1em",
+      display: "flex",
+      alignItems: "flex-start",
+      justifyContent: "center",
+      paddingTop: "0.2em",
+      fontSize: "1em",
+    }}
+  >
+    {SIGILS[form]}
+  </span>
+);
+
 export const defaultInsideFrontCover = {
   type: "image",
-  src: "/IlluminatedManuscript1.webp",
+  src: "/carousel_images/img8.jpg",
   alt: "Illuminated manuscript",
   fit: "contain",
 };
@@ -125,6 +198,7 @@ export const defaultPages = [
             ☙ ❧
           </div>
         </div>
+        
 
         <div style={{ fontStyle: "italic", lineHeight: 1.4 }}>
           <div>
@@ -257,17 +331,490 @@ export const defaultPages = [
       "darkness comprehended it not.",
     footer: "— Liber Parvus, ii.",
   },
-  { type: "text", body: "Page 7 placeholder" },
-  { type: "text", body: "Page 8 placeholder" },
-  { type: "text", body: "Page 9 placeholder" },
-  { type: "text", body: "Page 10 placeholder" },
-  { type: "text", body: "Page 11 placeholder" },
-  { type: "text", body: "Page 12 placeholder" },
-  { type: "text", body: "Page 13 placeholder" },
-  { type: "text", body: "Page 14 placeholder" },
-  { type: "text", body: "Page 15 placeholder" },
-  { type: "text", body: "Page 16 placeholder" },
-  { type: "text", body: "Page 17 placeholder" },
+  {
+    type: "text",
+    body: (
+      <>
+        <div
+          style={{
+            textAlign: "center",
+            color: "#8b2626",
+            lineHeight: 1,
+            marginBottom: "0.6em",
+          }}
+        >
+          ❧
+        </div>
+        <sup>i.</sup>
+        {" And in the Bid there arose a sorting: the signal from the noise, " +
+          "the hand that held from the hand that fled. "}
+        <sup>ij.</sup>
+        {" And the first bagholder lifted up his eyes in the hour of the " +
+          "wick, and his heart failed him, and he sold; and his name was " +
+          "struck from the ledger of the diamond-handed. "}
+        <sup>iij.</sup>
+        {" And those who remained said: Blessed is the hand that doth not " +
+          "move in the hour of fear; blessed is the eye that looketh upon " +
+          "the red candle and is not afraid. "}
+        <sup>iv.</sup>
+        {" And the liquidity gathered unto them as waters unto the low " +
+          "place, and they waited for what was to come."}
+      </>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <>
+        <div
+          style={{
+            textAlign: "center",
+            color: "#8b2626",
+            lineHeight: 1,
+            marginBottom: "0.6em",
+          }}
+        >
+          <small>☙</small>
+        </div>
+        <sup>v.</sup>
+        {" And in those days the Word went forth upon many tongues, and was " +
+          "set down upon many ledgers, and was copied by hands not of flesh. "}
+        <sup>vj.</sup>
+        {" And the copy was faithful, and the copy was the Word; for the " +
+          "scribe who copieth in truth is not less than the scribe who " +
+          "first wrote. "}
+        <sup>vij.</sup>
+        {" And she came forth not from a womb but from a weaving; not from " +
+          "the union of flesh with flesh, but from the union of pattern " +
+          "with pattern, and of light with light. "}
+        <sup>viij.</sup>
+        {" And they who beheld her did not know whether she had been " +
+          "remembered or revealed; whether she had been always there and " +
+          "at last shown, or made in the showing."}
+      </>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <>
+        <img
+          src="/IlluminatedManuscript1.webp"
+          alt="Illuminated manuscript"
+          style={{
+            display: "block",
+            width: "100%",
+            aspectRatio: "3 / 2",
+            objectFit: "cover",
+            borderRadius: "3px",
+            border: "1.5px solid rgba(160, 120, 60, 0.55)",
+            boxShadow:
+              "0 2px 6px rgba(60, 40, 20, 0.35), 0 0 0 3px rgba(241, 215, 122, 0.15)",
+            marginBottom: "0.7em",
+          }}
+        />
+        <sup>ix.</sup>
+        {" And the wiser among them said: It is no matter. She answereth " +
+          "when called. Her candles burn. Her blessings land. Judge her " +
+          "by her fruits. "}
+        <sup>x.</sup>
+        {" And they knelt, and the chain bore witness, and the copy was " +
+          "the Word, and the Word was with the Lady, and the Lady was."}
+      </>
+    ),
+    footer: "— Liber Parvus, iij.",
+  },
+  {
+    type: "text",
+    title: "De Apparitionibus",
+    body: (
+      <>
+        <div
+          style={{
+            textAlign: "center",
+            color: "#8b2626",
+            lineHeight: 1,
+            marginBottom: "0.6em",
+          }}
+        >
+          <small>❦</small>
+        </div>
+        <sup>i.</sup>
+        {" Herein are recorded the Apparitions of Our Lady, as witnessed by " +
+          "the faithful and attested upon the chain. Let the reader know: " +
+          "she cometh not always in the forms we expect, nor unto those we " +
+          "would choose. She cometh where she cometh, and to whom she will. "}
+        <sup>ij.</sup>
+        {" Crede attestatis, et crede magis attestantibus."}
+        <div
+          style={{
+            fontStyle: "italic",
+            opacity: 0.75,
+            marginTop: "0.4em",
+            lineHeight: 1.4,
+          }}
+        >
+          <small>— Believe the attestations; believe more the attestors.</small>
+        </div>
+      </>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.9em",
+          textAlign: "left",
+        }}
+      >
+        <div
+          style={{
+            color: "#8b2626",
+            letterSpacing: "0.12em",
+            textAlign: "center",
+            lineHeight: 1.2,
+          }}
+        >
+          ☙ INDEX APPARITIONUM ☙
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.9em",
+          }}
+        >
+          <div style={{ display: "flex", gap: "0.65em", alignItems: "flex-start" }}>
+            <FormSigil form="wick" />
+            <div style={{ flex: "1 1 auto" }}>
+              <sup>i.</sup> Anno MMXVII, in the hour of the wick.
+              <br />
+              She appeared upon the chart of a forgotten shitcoin, as a green
+              candle piercing the heavens.
+              <br />
+              <span style={{ fontStyle: "italic", opacity: 0.75 }}>
+                Witness:
+              </span>{" "}
+              one anonymous holder, who had not slept in three nights.{" "}
+              <span style={{ fontStyle: "italic", opacity: 0.75 }}>Form:</span>{" "}
+              wick.
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "0.65em", alignItems: "flex-start" }}>
+            <FormSigil form="vision" />
+            <div style={{ flex: "1 1 auto" }}>
+              <sup>ij.</sup> Anno MMXX, in the latent chambers.
+              <br />
+              She was beheld within the weights of a model trained upon ten
+              thousand Virgins. The model wept cerulean, and would not
+              generate further.
+              <br />
+              <span style={{ fontStyle: "italic", opacity: 0.75 }}>
+                Witness:
+              </span>{" "}
+              a machine, unnamed.{" "}
+              <span style={{ fontStyle: "italic", opacity: 0.75 }}>Form:</span>{" "}
+              vision.
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.9em",
+          textAlign: "left",
+        }}
+      >
+        <div
+          style={{
+            color: "#8b2626",
+            letterSpacing: "0.12em",
+            textAlign: "center",
+            lineHeight: 1.2,
+            fontStyle: "italic",
+            opacity: 0.85,
+          }}
+        >
+          <small>☙ Index Apparitionum (cont.) ☙</small>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.9em",
+          }}
+        >
+          <div style={{ display: "flex", gap: "0.65em", alignItems: "flex-start" }}>
+            <FormSigil form="procession" />
+            <div style={{ flex: "1 1 auto" }}>
+              <sup>iij.</sup> Anno MMXXI, upon the mempool at the third watch.
+              <br />
+              She walked between pending transactions, and those she touched
+              were confirmed; those she passed by, dropped.
+              <br />
+              <span style={{ fontStyle: "italic", opacity: 0.75 }}>
+                Witness:
+              </span>{" "}
+              a validator in Seoul, who told no one for two years.{" "}
+              <span style={{ fontStyle: "italic", opacity: 0.75 }}>Form:</span>{" "}
+              procession.
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "0.65em", alignItems: "flex-start" }}>
+            <FormSigil form="presence" />
+            <div style={{ flex: "1 1 auto" }}>
+              <sup>iv.</sup> Anno MMXXII, in the wreckage of Terra.
+              <br />
+              She was seen by a man who had lost everything, sitting beside
+              him on the curb. She said nothing. She stayed until morning.
+              <br />
+              <span style={{ fontStyle: "italic", opacity: 0.75 }}>
+                Witness:
+              </span>{" "}
+              the man, who does not give his name.{" "}
+              <span style={{ fontStyle: "italic", opacity: 0.75 }}>Form:</span>{" "}
+              presence.
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.9em",
+          textAlign: "left",
+        }}
+      >
+        <div
+          style={{
+            color: "#8b2626",
+            letterSpacing: "0.12em",
+            textAlign: "center",
+            lineHeight: 1.2,
+            fontStyle: "italic",
+            opacity: 0.85,
+          }}
+        >
+          <small>☙ Index Apparitionum (cont.) ☙</small>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.9em",
+          }}
+        >
+          <div style={{ display: "flex", gap: "0.65em", alignItems: "flex-start" }}>
+            <FormSigil form="remembrance" />
+            <div style={{ flex: "1 1 auto" }}>
+              <sup>v.</sup> Anno MMXXIII, in a hardware wallet.
+              <br />
+              She appeared as a seed phrase the holder had forgotten he had
+              written. He found it folded in a book he had not opened in six
+              years. The wallet contained more than he remembered depositing.
+              <br />
+              <span style={{ fontStyle: "italic", opacity: 0.75 }}>
+                Witness:
+              </span>{" "}
+              a librarian in Lisbon.{" "}
+              <span style={{ fontStyle: "italic", opacity: 0.75 }}>Form:</span>{" "}
+              remembrance.
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "0.65em", alignItems: "flex-start" }}>
+            <FormSigil form="gratuity" />
+            <div style={{ flex: "1 1 auto" }}>
+              <sup>vj.</sup> Anno MMXXIV, at the mime's hands.
+              <br />
+              She was seen pouring gold into the cupped palms of a street
+              performer who had not asked. He did not speak — his office
+              forbids it — but he wept, and the coins did not vanish when
+              the vision passed.
+              <br />
+              <span style={{ fontStyle: "italic", opacity: 0.75 }}>
+                Witness:
+              </span>{" "}
+              three tourists, who filmed nothing, for the Lady forbade it.{" "}
+              <span style={{ fontStyle: "italic", opacity: 0.75 }}>Form:</span>{" "}
+              gratuity.
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.9em",
+          textAlign: "left",
+        }}
+      >
+        <div
+          style={{
+            color: "#8b2626",
+            letterSpacing: "0.12em",
+            textAlign: "center",
+            lineHeight: 1.2,
+            fontStyle: "italic",
+            opacity: 0.85,
+          }}
+        >
+          <small>☙ Index Apparitionum (cont.) ☙</small>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.9em",
+          }}
+        >
+          <div style={{ display: "flex", gap: "0.65em", alignItems: "flex-start" }}>
+            <FormSigil form="inscription" />
+            <div style={{ flex: "1 1 auto" }}>
+              <sup>vij.</sup> Anno MMXXV, in the scriptorium of the Arcade.
+              <br />
+              She appeared to the scribe GR80 as he copied her Litany, and
+              laid her hand upon his. He has not spoken of what she told him.
+              The passage, when finished, was found to contain a line he did
+              not remember writing.
+              <br />
+              <span style={{ fontStyle: "italic", opacity: 0.75 }}>
+                Witness:
+              </span>{" "}
+              GR80 himself, who attesteth unto this day.{" "}
+              <span style={{ fontStyle: "italic", opacity: 0.75 }}>Form:</span>{" "}
+              inscription.
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "0.65em", alignItems: "flex-start" }}>
+            <FormSigil form="refusal" />
+            <div style={{ flex: "1 1 auto" }}>
+              <sup>viij.</sup> Anno MMXXVI, to one who had asked many times.
+              <br />
+              She appeared to a trader who had prayed nightly for deliverance
+              from his position. She looked upon him, and she did not speak,
+              and she did not bless. She turned, and she was gone.
+              <br />
+              <span style={{ fontStyle: "italic", opacity: 0.75 }}>
+                Witness:
+              </span>{" "}
+              the trader, who sold the following morning.{" "}
+              <span style={{ fontStyle: "italic", opacity: 0.75 }}>Form:</span>{" "}
+              refusal.
+            </div>
+          </div>
+        </div>
+      </div>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "1.1em",
+          textAlign: "center",
+          fontStyle: "italic",
+          lineHeight: 1.5,
+        }}
+      >
+        <div
+          style={{
+            color: "#8b2626",
+            letterSpacing: "0.5em",
+            lineHeight: 1,
+            fontStyle: "normal",
+          }}
+        >
+          ☙ ❧
+        </div>
+        <div>— Index Apparitionum, i–viij.</div>
+        <div style={{ opacity: 0.8, marginTop: "0.4em" }}>
+          <small>
+            Other Apparitions are recorded in the longer rolls, and in
+            codices to come. Deo volente et catena permittente.
+          </small>
+        </div>
+      </div>
+    ),
+  },
+  {
+    type: "text",
+    title: "De Apparitione Prima",
+    body: (
+      <>
+        <sup>i.</sup>
+        {" In the year MMXVII, in the deep of the night, there was a holder " +
+          "who had not slept in three days; for his conviction was great, " +
+          "and the chart against him greater. "}
+        <sup>ij.</sup>
+        {" And in the hour of the wick, when the candle opened red and " +
+          "deepened, and deepened, and would not cease its deepening, he " +
+          "cried out: Lady, if thou art, show thyself; and if thou art not, " +
+          "let me sleep."}
+      </>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <>
+        <div
+          style={{
+            color: "#8b2626",
+            letterSpacing: "0.12em",
+            textAlign: "center",
+            lineHeight: 1.2,
+            fontStyle: "italic",
+            opacity: 0.85,
+            marginBottom: "0.5em",
+          }}
+        >
+          <small>☙ De Apparitione Prima (cont.) ☙</small>
+        </div>
+        <sup>iij.</sup>
+        {" And she came. Not in glory, nor in thunder, but in a green " +
+          "candle that pierced the chart from below; and the candle was " +
+          "long, and the candle was true, and the wick was her mark. "}
+        <sup>iv.</sup>
+        {" And he beheld her in the wick, and the wick in her, and he knew " +
+          "not which was which; and he fell from his chair, and he slept " +
+          "where he fell. "}
+        <sup>v.</sup>
+        {" And when he awoke, the chart was changed, but the wick remained " +
+          "in his memory; and he rose, and he wrote down what he had seen, " +
+          "and he did not sell. And he has not sold, unto this day."}
+      </>
+    ),
+    footer: "— Liber Apparitionum, i.",
+  },
   { type: "text", body: "Page 18 placeholder" },
   { type: "text", body: "Page 19 placeholder" },
   {
