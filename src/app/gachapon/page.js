@@ -7,7 +7,7 @@ import NavControlsHome from '@/components/NavControlsHome';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import CyberNav from '@/components/CyberNav';
 import { UnifiedAccountModal } from '@/components/UnifiedAccountModal';
-import ThirdwebBuyModal from '@/components/ThirdwebBuyModal';
+import BuyModal from '@/components/BuyModal';
 import { useClerk, useUser } from '@clerk/nextjs';
 import { useWalletAuth } from '@/components/WalletAuthProvider';
 import { useMusic } from '@/components/MusicContext';
@@ -420,7 +420,7 @@ export default function GachaponPage() {
       />
 
       {/* Thirdweb Buy Modal */}
-      <ThirdwebBuyModal
+      <BuyModal
         isOpen={showBuyModal}
         onClose={() => setShowBuyModal(false)}
       />

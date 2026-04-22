@@ -9,7 +9,7 @@ import CyberNav from '@/components/CyberNav';
 import CompactCandleModal from '@/components/CompactCandleModal';
 import NavControlsHome from '@/components/NavControlsHome';
 import MobileBottomNav from '@/components/MobileBottomNav';
-import ThirdwebBuyModal from '@/components/ThirdwebBuyModal';
+import BuyModal from '@/components/BuyModal';
 
 const Philosophy = dynamic(() => import('@/components/Philosophy'), {
   ssr: false,
@@ -173,7 +173,7 @@ export default function ModelViewerPage() {
           />
 
           {/* Thirdweb Buy Modal */}
-          <ThirdwebBuyModal
+          <BuyModal
             isOpen={showBuyModal}
             onClose={() => setShowBuyModal(false)}
           />

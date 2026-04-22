@@ -9,7 +9,7 @@ import MobileBottomNav from '@/components/MobileBottomNav';
 import SkewedHeading from '@/components/SkewedHeading';
 import { useUser } from '@clerk/nextjs';
 import Link from "next/link";
-import ThirdwebBuyModal from '@/components/ThirdwebBuyModal';
+import BuyModal from '@/components/BuyModal';
 
 
 const OldsCoolTunnel = dynamic(() => import('@/components/OldsCoolTunnel'), {
@@ -303,7 +303,7 @@ export default function PortalPage() {
       />
 
       {/* Thirdweb Buy Modal */}
-      <ThirdwebBuyModal
+      <BuyModal
         isOpen={showBuyModal}
         onClose={() => setShowBuyModal(false)}
       />

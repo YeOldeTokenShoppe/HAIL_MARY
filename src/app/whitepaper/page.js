@@ -7,7 +7,7 @@ import { useMusic } from "@/components/MusicContext";
 import CoinLoader from "@/components/CoinLoader";
 import CyberNav from "@/components/CyberNav";
 import NavControlsHome from "@/components/NavControlsHome";
-import ThirdwebBuyModal from "@/components/ThirdwebBuyModal";
+import BuyModal from "@/components/BuyModal";
 import { useLanguage } from "@/components/LanguageProvider";
 
 export default function WhitepaperPage() {
@@ -289,7 +289,7 @@ export default function WhitepaperPage() {
       />
 
       {/* Thirdweb Buy Modal */}
-      <ThirdwebBuyModal
+      <BuyModal
         isOpen={showBuyModal}
         onClose={() => setShowBuyModal(false)}
       />

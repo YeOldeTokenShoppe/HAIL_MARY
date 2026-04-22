@@ -7,7 +7,7 @@ import MobileBottomNav from '@/components/MobileBottomNav'
 import Link from 'next/link'
 import { useUser } from '@clerk/nextjs'
 import { useMusic } from '@/components/MusicContext'
-import ThirdwebBuyModal from '@/components/ThirdwebBuyModal'
+import BuyModal from '@/components/BuyModal'
 import CyberGlitchButton from '@/components/carousel/CyberGlitchButton'
 import CoinLoader from '@/components/CoinLoader'
 import { useRouter, usePathname } from 'next/navigation'
@@ -481,7 +481,7 @@ export default function CarouselPage() {
       />
       
       {/* Thirdweb Buy Modal */}
-      <ThirdwebBuyModal 
+      <BuyModal 
         isOpen={showBuyModal} 
         onClose={() => setShowBuyModal(false)}
       />

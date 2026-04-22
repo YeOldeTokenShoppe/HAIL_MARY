@@ -6,7 +6,7 @@ import { useUser } from '@clerk/nextjs';
 import { useWalletAuth } from './WalletAuthProvider';
 import { db, collection, addDoc, doc, serverTimestamp, query, where, getDocs, deleteDoc, setDoc, increment } from '@/lib/firebaseClient';
 import { generateCandlePosition, generateCandleRotation, generateCandleScale } from '@/utils/candlePositions';
-import ThirdwebBuyModal from './ThirdwebBuyModal';
+import BuyModal from './BuyModal';
 import NoTokensPrompt from './NoTokensPrompt';
 import { useWriteContract } from 'wagmi';
 import { erc20Abi } from 'viem';
@@ -2074,9 +2074,9 @@ const LightCandleModal = ({ isOpen, onClose, onLightCandle, skipFirestore = fals
         </div>
       )}
 
-      {/* ThirdwebBuyModal */}
+      {/* BuyModal */}
       {showBuyModal && (
-        <ThirdwebBuyModal 
+        <BuyModal 
           isOpen={showBuyModal} 
           onClose={() => {
             setShowBuyModal(false);

@@ -5,7 +5,7 @@ import { useUser } from '@clerk/nextjs';
 import { useWalletAuth } from './WalletAuthProvider';
 import { useLanguage } from './LanguageProvider';
 import { db, collection, addDoc, serverTimestamp } from '@/lib/firebaseClient';
-import ThirdwebBuyModal from './ThirdwebBuyModal';
+import BuyModal from './BuyModal';
 import NoTokensPrompt from './NoTokensPrompt';
 import { useWriteContract } from 'wagmi';
 import { erc20Abi, parseEther } from 'viem';
@@ -1351,9 +1351,9 @@ const StakeModal = ({ isOpen, onClose, onStake, currentPhase = 1 }) => {
         )}
       </div>
 
-      {/* ThirdwebBuyModal */}
+      {/* BuyModal */}
       {showBuyModal && (
-        <ThirdwebBuyModal
+        <BuyModal
           isOpen={showBuyModal}
           onClose={() => {
             setShowBuyModal(false);

@@ -6,7 +6,7 @@ import CyberNav from '@/components/CyberNav'
 import { useUser, SignInButton } from '@clerk/nextjs'
 import { useMusic } from '@/components/MusicContext'
 import { useWalletAuth } from '@/components/WalletAuthProvider'
-import ThirdwebBuyModal from '@/components/ThirdwebBuyModal'
+import BuyModal from '@/components/BuyModal'
 import LightCandleModal from '@/components/LightCandleModal'
 import { WalletConnectionModal } from '@/components/WalletConnectionModal'
 import { useRouter, usePathname } from 'next/navigation'
@@ -1409,7 +1409,7 @@ useEffect(() => {
       />
       
       {/* Thirdweb Buy Modal */}
-      <ThirdwebBuyModal 
+      <BuyModal 
         isOpen={showBuyModal} 
         onClose={() => setShowBuyModal(false)}
       />

@@ -9,7 +9,7 @@ import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import { easing } from 'maath';
 import DarkClouds from "./Clouds";
 import BreathSmoke from "./BreathSmoke";
-import ThirdwebBuyModal from './ThirdwebBuyModal';
+import BuyModal from './BuyModal';
 import { useLanguage } from './LanguageProvider';
 // import { useControls, folder } from 'leva';
 
@@ -1581,7 +1581,7 @@ export default function HolyGrailPortal({ isMobile = false, isTabletPortrait = f
       </Canvas>
 
       {/* Buy Modal */}
-      <ThirdwebBuyModal
+      <BuyModal
         isOpen={showBuyModal}
         onClose={() => {
           setShowBuyModal(false);

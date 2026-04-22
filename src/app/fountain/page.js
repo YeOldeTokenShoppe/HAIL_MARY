@@ -9,7 +9,7 @@ import CyberNav from '@/components/CyberNav';
 import NavControlsHome from '@/components/NavControlsHome';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import FountainDonationModal from '@/components/FountainDonationModal';
-import ThirdwebBuyModal from '@/components/ThirdwebBuyModal';
+import BuyModal from '@/components/BuyModal';
 import { useUser, SignInButton, UserButton } from '@clerk/nextjs';
 
 // Dynamic import for the FountainFrame component
@@ -385,7 +385,7 @@ export default function FountainPage() {
       />
 
       {/* Thirdweb Buy Modal */}
-      <ThirdwebBuyModal
+      <BuyModal
         isOpen={showBuyModal}
         onClose={() => setShowBuyModal(false)}
       />

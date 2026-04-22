@@ -14,7 +14,7 @@ import MobileBottomNav from '@/components/MobileBottomNav';
 import CyberNav from '@/components/CyberNav';
 import Link from 'next/link';
 import Footer from '@/components/Footer';
-import ThirdwebBuyModal from '@/components/ThirdwebBuyModal';
+import BuyModal from '@/components/BuyModal';
 
 
 export default function TokenomicsPage() {
@@ -855,7 +855,7 @@ export default function TokenomicsPage() {
       />
 
       {/* Thirdweb Buy Modal */}
-      <ThirdwebBuyModal
+      <BuyModal
         isOpen={showBuyModal}
         onClose={() => setShowBuyModal(false)}
       />

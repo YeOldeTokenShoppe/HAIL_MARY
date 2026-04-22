@@ -10,7 +10,7 @@ import { useUser } from "@clerk/nextjs";
 import { useMusic, gangstasParadiseTrack } from "@/components/MusicContext";
 import CyberNav from "@/components/CyberNav";
 import { useLanguage } from "@/components/LanguageProvider";
-import ThirdwebBuyModal from "@/components/ThirdwebBuyModal";
+import BuyModal from "@/components/BuyModal";
 
 const NavControlsHome = dynamic(() => import("@/components/NavControlsHome"), {
   ssr: false,
@@ -386,7 +386,7 @@ export default function CommunionPage() {
       />
 
       {/* Thirdweb Buy Modal */}
-      <ThirdwebBuyModal
+      <BuyModal
         isOpen={showBuyModal}
         onClose={() => setShowBuyModal(false)}
       />

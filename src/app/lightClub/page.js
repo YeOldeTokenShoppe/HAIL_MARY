@@ -37,7 +37,7 @@ import CoinLoader from '@/components/CoinLoader';
 // import CarouselWrapper from '@/components/CarouselWrapper';
 import BreathSmoke from "@/components/BreathSmoke";
 // import SlidingNav from "@/components/SlidingNav";
-import ThirdwebBuyModal from '@/components/ThirdwebBuyModal';
+import BuyModal from '@/components/BuyModal';
 // import CircularCTA from "@/components/CircularCTA";
 // import FeatureCarousel from "@/components/FeatureCarousel";
 // import { WatchlistSlide, Illumin80Slide, TradingDeskSlide, TokenomicsSlide } from "@/components/FeatureSlides";
@@ -3807,7 +3807,7 @@ export default function Home() {
       <CoinLoader loading={isSceneLoading} />
       
       {/* Thirdweb Buy Modal */}
-      <ThirdwebBuyModal 
+      <BuyModal 
         isOpen={showBuyModal} 
         onClose={() => setShowBuyModal(false)} 
       />
