@@ -616,6 +616,7 @@ export default function SwapForm({ isSmallPhone, isMobile }) {
             border: '1px solid rgba(255, 24, 76, 0.4)',
             background: 'rgba(255, 24, 76, 0.08)',
             wordBreak: 'break-word',
+            overflowWrap: 'anywhere',
           }}
         >
           {(txError || quoteError).slice(0, 400)}

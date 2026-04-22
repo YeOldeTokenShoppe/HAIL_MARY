@@ -34,6 +34,42 @@ const BuyModal = ({ isOpen, onClose }) => {
     }
   }, [isOpen]);
 
+  // Lock page scroll (iOS-safe) while modal is open
+  useEffect(() => {
+    if (!isOpen) return;
+    const scrollY = window.scrollY;
+    const { body, documentElement: html } = document;
+    const prev = {
+      bodyPosition: body.style.position,
+      bodyTop: body.style.top,
+      bodyLeft: body.style.left,
+      bodyRight: body.style.right,
+      bodyWidth: body.style.width,
+      bodyOverflow: body.style.overflow,
+      htmlOverflow: html.style.overflow,
+      htmlOverscroll: html.style.overscrollBehavior,
+    };
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.left = '0';
+    body.style.right = '0';
+    body.style.width = '100%';
+    body.style.overflow = 'hidden';
+    html.style.overflow = 'hidden';
+    html.style.overscrollBehavior = 'none';
+    return () => {
+      body.style.position = prev.bodyPosition;
+      body.style.top = prev.bodyTop;
+      body.style.left = prev.bodyLeft;
+      body.style.right = prev.bodyRight;
+      body.style.width = prev.bodyWidth;
+      body.style.overflow = prev.bodyOverflow;
+      html.style.overflow = prev.htmlOverflow;
+      html.style.overscrollBehavior = prev.htmlOverscroll;
+      window.scrollTo(0, scrollY);
+    };
+  }, [isOpen]);
+
   // Initialize Coinbase Onramp when modal opens
   useEffect(() => {
     if (!isOpen) return;
@@ -227,6 +263,8 @@ const BuyModal = ({ isOpen, onClose }) => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          overflow: 'hidden',
+          overscrollBehavior: 'contain',
         }}
         onClick={onClose}
       >
@@ -260,6 +298,9 @@ const BuyModal = ({ isOpen, onClose }) => {
             width: isSmallPhone ? '95%' : '90%',
             maxHeight: isSmallPhone ? '90dvh' : isMobile ? '85dvh' : '90dvh',
             overflowY: 'auto',
+            overflowX: 'hidden',
+            overscrollBehavior: 'contain',
+            boxSizing: 'border-box',
             boxShadow: glitchActive
               ? '5px 5px 0 #ff184c, -5px -5px 0 #00e572, 0 0 50px rgba(139, 0, 255, 0.5)'
               : '3px 3px 0 #fded00, -3px -3px 0 #00e572, 0 0 30px rgba(255, 24, 76, 0.5)',
@@ -267,7 +308,18 @@ const BuyModal = ({ isOpen, onClose }) => {
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Close Button */}
+          {/* Close Button — sticky so it stays reachable as modal scrolls */}
+          <div
+            style={{
+              position: 'sticky',
+              top: 0,
+              display: 'flex',
+              justifyContent: 'flex-end',
+              marginBottom: isSmallPhone ? '-28px' : '-32px',
+              pointerEvents: 'none',
+              zIndex: 100,
+            }}
+          >
           <button
             className="close-btn"
             onClick={(e) => {
@@ -275,9 +327,7 @@ const BuyModal = ({ isOpen, onClose }) => {
               onClose();
             }}
             style={{
-              position: 'fixed',
-              top: isSmallPhone ? 'calc(env(safe-area-inset-top, 0px) + 12px)' : isMobile ? 'calc(env(safe-area-inset-top, 0px) + 18px)' : '20px',
-              right: isSmallPhone ? '12px' : isMobile ? '18px' : '20px',
+              position: 'relative',
               background: '#000',
               border: 'none',
               color: '#000',
@@ -289,9 +339,9 @@ const BuyModal = ({ isOpen, onClose }) => {
               alignItems: 'center',
               justifyContent: 'center',
               transition: 'transform 0.3s ease',
-              zIndex: 10001,
               fontWeight: 'bold',
               fontFamily: 'monospace',
+              pointerEvents: 'auto',
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'scale(1.1)';
@@ -304,6 +354,7 @@ const BuyModal = ({ isOpen, onClose }) => {
           >
             ✕
           </button>
+          </div>
 
           {/* Cyber Frame Borders */}
           <div style={{
