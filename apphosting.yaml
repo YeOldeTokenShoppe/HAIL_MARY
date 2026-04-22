@@ -107,3 +107,7 @@ env:
     secret: CDP_API_KEY_NAME
   - variable: CDP_API_KEY_PRIVATE_KEY
     secret: CDP_API_KEY_PRIVATE_KEY
+  - variable: ONRAMP_AUTH_SECRET
+    secret: ONRAMP_AUTH_SECRET
+    availability:
+      - RUNTIME

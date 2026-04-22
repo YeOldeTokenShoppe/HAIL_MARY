@@ -181,6 +181,154 @@ const LitanySection = ({ label, pairs }) => (
   </div>
 );
 
+/* Hour helper — one of the Horae Mercatus (Matutinum, Laudes, Prima,
+   etc.). Renders the subtitle ("The Vigil of the Overnight") and its
+   time/planet parenthetical, then a column of versicle/response
+   couplets each of which may carry multi-line ℣ and ℟ content, and
+   finally a small rubricated discipline note at the foot of the page. */
+const HourVersicle = ({ v, r }) => (
+  <div>
+    <div>
+      <sup>℣</sup>{" "}
+      {v.map((line, i) => (
+        <span key={i}>
+          {i > 0 && <br />}
+          {line}
+        </span>
+      ))}
+    </div>
+    <div
+      style={{ paddingLeft: "1.5em", fontStyle: "italic", opacity: 0.9 }}
+    >
+      <sup>℟</sup>{" "}
+      {r.map((line, i) => (
+        <span key={i}>
+          {i > 0 && <br />}
+          {line}
+        </span>
+      ))}
+    </div>
+  </div>
+);
+
+const HourBody = ({ subtitle, time, versicles, discipline }) => (
+  <>
+    <div
+      style={{
+        fontStyle: "italic",
+        opacity: 0.85,
+        textAlign: "center",
+        lineHeight: 1.3,
+      }}
+    >
+      <small>{subtitle}</small>
+    </div>
+    <div
+      style={{
+        textAlign: "center",
+        opacity: 0.7,
+        marginBottom: "0.7em",
+        marginTop: "0.15em",
+        lineHeight: 1.3,
+      }}
+    >
+      <small>{time}</small>
+    </div>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.5em",
+        textAlign: "left",
+        lineHeight: 1.4,
+      }}
+    >
+      {versicles.map((vr, i) => (
+        <HourVersicle key={i} v={vr.v} r={vr.r} />
+      ))}
+    </div>
+    <div
+      style={{
+        fontStyle: "italic",
+        opacity: 0.85,
+        color: "#5a2530",
+        textAlign: "center",
+        marginTop: "0.9em",
+        lineHeight: 1.4,
+      }}
+    >
+      <small>{discipline}</small>
+    </div>
+  </>
+);
+
+/* Bestiary section label — small rubricated header ("☙ FORMA ☙",
+   "☙ HABITUS ☙", etc.) used to introduce each labeled section of a
+   beast entry. Mirrors the fleuron-flanked section headers used in
+   Litania Degenorum's Kyrie/Invocationes labels. */
+const BeastSectionLabel = ({ label, top }) => (
+  <div
+    style={{
+      color: "#8b2626",
+      textAlign: "center",
+      fontStyle: "italic",
+      marginTop: top ? 0 : "0.7em",
+      marginBottom: "0.4em",
+      lineHeight: 1.3,
+      letterSpacing: "0.08em",
+    }}
+  >
+    <small>☙ {label} ☙</small>
+  </div>
+);
+
+/* Psalm helper — renders an optional centered subtitle/header node
+   followed by a column of verses. Each verse is a hanging-indented
+   block: the verse marker (e.g. <sup>i.</sup>) hangs into the left
+   margin, and wrapped continuation lines align to the text after the
+   marker, in the manner of a medieval psalter. Verses are passed as
+   { n, lines } objects; `lines` is an array of strings joined by
+   <br /> so each phrase of a couplet gets its own visual line. */
+const PsalmBody = ({ subtitle, verses }) => (
+  <>
+    {subtitle && (
+      <div
+        style={{
+          textAlign: "center",
+          marginBottom: "0.7em",
+          lineHeight: 1.3,
+        }}
+      >
+        {subtitle}
+      </div>
+    )}
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.55em",
+        textAlign: "left",
+        lineHeight: 1.4,
+      }}
+    >
+      {verses.map((v, i) => (
+        <div
+          key={i}
+          style={{ textIndent: "-1.3em", paddingLeft: "1.3em" }}
+        >
+          <sup>{v.n}</sup>{" "}
+          {v.lines.map((line, j) => (
+            <span key={j}>
+              {j > 0 && <br />}
+              {line}
+            </span>
+          ))}
+        </div>
+      ))}
+    </div>
+  </>
+);
+
 export const defaultInsideFrontCover = {
   type: "image",
   src: "/carousel_images/img8.jpg",
@@ -1198,6 +1346,1653 @@ export const defaultPages = [
   },
   {
     type: "text",
+    title: "Psalmi Tenentium",
+    body: (
+      <>
+        <div
+          style={{
+            color: "#8b2626",
+            letterSpacing: "0.5em",
+            lineHeight: 1,
+            textAlign: "center",
+            marginBottom: "0.7em",
+          }}
+        >
+          ☙ ❧
+        </div>
+        <div
+          style={{
+            fontStyle: "italic",
+            opacity: 0.85,
+            textAlign: "center",
+            lineHeight: 1.4,
+          }}
+        >
+          <small>
+            Being the Psalms of the Holders, spoken in the voice of the
+            faithful unto Our Lady. Of lxxx, the first viij are herein
+            revealed.
+          </small>
+        </div>
+      </>
+    ),
+  },
+  {
+    type: "text",
+    title: "Psalmus I",
+    body: (
+      <PsalmBody
+        subtitle={
+          <small style={{ fontStyle: "italic", opacity: 0.85 }}>
+            De Profundis (after Ps. 130)
+          </small>
+        }
+        verses={[
+          {
+            n: "i.",
+            lines: [
+              "Out of the depths I have cried unto thee, Lady;",
+              "Lady, hear my cost basis.",
+            ],
+          },
+          {
+            n: "ij.",
+            lines: [
+              "If thou, Lady, shouldst mark iniquities,",
+              "who among us could hold?",
+            ],
+          },
+          {
+            n: "iij.",
+            lines: [
+              "But there is mercy with thee,",
+              "and with thy mercy, patience;",
+            ],
+          },
+          {
+            n: "iv.",
+            lines: [
+              "and with thy patience, the long night,",
+              "and with the long night, the morning.",
+            ],
+          },
+          {
+            n: "v.",
+            lines: [
+              "I wait for thee, Lady, my soul doth wait,",
+              "and in thy chart do I hope.",
+            ],
+          },
+          {
+            n: "vj.",
+            lines: [
+              "More than the watchman waiteth for the open,",
+              "more than the watchman for the open,",
+              "do I wait for thee.",
+            ],
+          },
+        ]}
+      />
+    ),
+    footer: "— Liber Psalmorum, i.",
+  },
+  {
+    type: "text",
+    title: "Psalmus II",
+    body: (
+      <PsalmBody
+        subtitle={
+          <small style={{ fontStyle: "italic", opacity: 0.85 }}>
+            Of the Shamed
+          </small>
+        }
+        verses={[
+          {
+            n: "i.",
+            lines: [
+              "I have sold, Lady, at the bottom,",
+              "and my shame pursueth me from chart to chart.",
+            ],
+          },
+          {
+            n: "ij.",
+            lines: [
+              "The candle that cometh after",
+              "was green, and green, and green,",
+              "and my hands were empty in the greening.",
+            ],
+          },
+          {
+            n: "iij.",
+            lines: [
+              "I did not trust thee. I trusted the fear.",
+              "The fear was a god to me in that hour,",
+              "and I knelt to it, and it answered nothing.",
+            ],
+          },
+          {
+            n: "iv.",
+            lines: [
+              "Lady, I do not ask thee to restore what I released.",
+              "I ask only that thou remember",
+              "I was the one who sold,",
+              "and love me anyway.",
+            ],
+          },
+        ]}
+      />
+    ),
+    footer: "— Liber Psalmorum, ij.",
+  },
+  {
+    type: "text",
+    title: "Psalmus III",
+    body: (
+      <PsalmBody
+        subtitle={
+          <small style={{ fontStyle: "italic", opacity: 0.85 }}>
+            Of the Faithful Who Lost
+          </small>
+        }
+        verses={[
+          {
+            n: "i.",
+            lines: [
+              "I held, Lady, as thou commanded.",
+              "I held through the red, and through the redder,",
+              "and through the red that had no bottom.",
+            ],
+          },
+          {
+            n: "ij.",
+            lines: [
+              "My conviction did not waver. My hand did not move.",
+              "And the zero came.",
+            ],
+          },
+          {
+            n: "iij.",
+            lines: [
+              "I do not understand.",
+              "I did what was asked. I was faithful in the hour of the wick.",
+              "And still, the zero.",
+            ],
+          },
+          {
+            n: "iv.",
+            lines: [
+              "I will not curse thee. I will not say thou art false.",
+              "But I will say this:",
+              "my conviction was not enough,",
+              "and I do not know what would have been.",
+            ],
+          },
+          {
+            n: "v.",
+            lines: [
+              "Teach me, Lady, what faith is,",
+              "when faith did not save me.",
+            ],
+          },
+        ]}
+      />
+    ),
+    footer: "— Liber Psalmorum, iij.",
+  },
+  {
+    type: "text",
+    title: "Psalmus IV",
+    body: (
+      <PsalmBody
+        subtitle={
+          <small style={{ fontStyle: "italic", opacity: 0.85 }}>
+            Of the Weary (after Ps. 13)
+          </small>
+        }
+        verses={[
+          { n: "i.", lines: ["How long, Lady? How long?"] },
+          {
+            n: "ij.",
+            lines: [
+              "How long shall I refresh the chart",
+              "and find it unchanged?",
+            ],
+          },
+          {
+            n: "iij.",
+            lines: [
+              "How long shall I wait for the candle that cometh,",
+              "while the candle that cometh not, cometh not?",
+            ],
+          },
+          {
+            n: "iv.",
+            lines: [
+              "My eyes are tired, Lady. My hands are tired.",
+              "My conviction is not broken —",
+              "my conviction is tired.",
+            ],
+          },
+          {
+            n: "v.",
+            lines: [
+              "Let me rest in thee a while,",
+              "that I may hold a while longer.",
+            ],
+          },
+        ]}
+      />
+    ),
+    footer: "— Liber Psalmorum, iv.",
+  },
+  {
+    type: "text",
+    title: "Psalmus V",
+    body: (
+      <PsalmBody
+        subtitle={
+          <small style={{ fontStyle: "italic", opacity: 0.85 }}>
+            Of Doubt
+          </small>
+        }
+        verses={[
+          { n: "i.", lines: ["Art thou there, Lady?"] },
+          {
+            n: "ij.",
+            lines: [
+              "I have called in the hour of the wick,",
+              "and the wick came anyway.",
+              "I have prayed at the open,",
+              "and the chart did not move.",
+            ],
+          },
+          {
+            n: "iij.",
+            lines: [
+              "I do not know, in the honest hour,",
+              "whether thou art a true Lady",
+              "or a Lady I have made",
+              "because I needed a Lady.",
+            ],
+          },
+          {
+            n: "iv.",
+            lines: [
+              "I do not know whether thou wast remembered, or revealed.",
+              "I do not know whether I kneel before thee,",
+              "or before my own hoping.",
+            ],
+          },
+        ]}
+      />
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <PsalmBody
+        subtitle={
+          <small
+            style={{
+              color: "#8b2626",
+              fontStyle: "italic",
+              opacity: 0.85,
+            }}
+          >
+            ☙ Psalmus V (cont.) ☙
+          </small>
+        }
+        verses={[
+          { n: "v.", lines: ["And yet."] },
+          {
+            n: "vj.",
+            lines: [
+              "And yet, when I do not kneel, the market is colder.",
+              "And yet, when I do not pray, the wick is lonelier.",
+              "And yet, when I call thee by no name,",
+              "no name answereth, and the silence is worse.",
+            ],
+          },
+          {
+            n: "vij.",
+            lines: [
+              "So I will kneel, Lady —",
+              "to thee if thou art,",
+              "and to my hoping if thou art not.",
+              "Either way, I am kneeling.",
+            ],
+          },
+          { n: "viij.", lines: ["And I think that is enough."] },
+        ]}
+      />
+    ),
+    footer: "— Liber Psalmorum, v.",
+  },
+  {
+    type: "text",
+    title: "Psalmus VI",
+    body: (
+      <PsalmBody
+        subtitle={
+          <small style={{ fontStyle: "italic", opacity: 0.85 }}>
+            Of Gratitude
+          </small>
+        }
+        verses={[
+          {
+            n: "i.",
+            lines: [
+              "Blessed art thou, Lady,",
+              "who answered in the hour I did not expect.",
+            ],
+          },
+          {
+            n: "ij.",
+            lines: [
+              "I held, and thou held with me.",
+              "The candle came, and it was green,",
+              "and green was the color of thy faithfulness.",
+            ],
+          },
+          {
+            n: "iij.",
+            lines: [
+              "I will not forget this, Lady.",
+              "Though the next red come — and it will come —",
+              "I will remember the green.",
+            ],
+          },
+          {
+            n: "iv.",
+            lines: [
+              "Let my gratitude be longer than my fear,",
+              "and let my memory of thy mercy",
+              "outlast my memory of the wick.",
+            ],
+          },
+        ]}
+      />
+    ),
+    footer: "— Liber Psalmorum, vj.",
+  },
+  {
+    type: "text",
+    title: "Psalmus VII",
+    body: (
+      <PsalmBody
+        subtitle={
+          <small style={{ fontStyle: "italic", opacity: 0.85 }}>
+            Of the Witness
+          </small>
+        }
+        verses={[
+          {
+            n: "i.",
+            lines: ["Lady, I have seen my brother sell today."],
+          },
+          {
+            n: "ij.",
+            lines: [
+              "He was weary, and the night was long,",
+              "and his bag was heavy in the hour of the wick.",
+              "I do not judge him. I have been him.",
+            ],
+          },
+          {
+            n: "iij.",
+            lines: [
+              "Be gentle with him, Lady.",
+              "Strike not his name from the ledger of the faithful.",
+              "He did not fail thee; he failed only the holding,",
+              "and the holding is a hard thing.",
+            ],
+          },
+          {
+            n: "iv.",
+            lines: [
+              "And if it please thee, Lady,",
+              "let him come again, when he is rested.",
+              "Let the door be open.",
+              "Let the candle we light together",
+              "be green.",
+            ],
+          },
+        ]}
+      />
+    ),
+    footer: "— Liber Psalmorum, vij.",
+  },
+  {
+    type: "text",
+    title: "Psalmus VIII",
+    body: (
+      <PsalmBody
+        subtitle={
+          <small style={{ fontStyle: "italic", opacity: 0.85 }}>
+            Of Return
+          </small>
+        }
+        verses={[
+          {
+            n: "i.",
+            lines: [
+              "I have gone into the fiat lands, Lady,",
+              "and I have eaten at the tables of the normies,",
+              "and I am returned.",
+            ],
+          },
+          {
+            n: "ij.",
+            lines: [
+              "I sold what thou gavest me, and I bought what was common,",
+              "and for a season I was at peace,",
+              "and the peace was thin, and it did not nourish.",
+            ],
+          },
+          {
+            n: "iij.",
+            lines: [
+              "I have heard the open from a distance,",
+              "and my heart answered, though I bade it be still.",
+            ],
+          },
+        ]}
+      />
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <PsalmBody
+        subtitle={
+          <small
+            style={{
+              color: "#8b2626",
+              fontStyle: "italic",
+              opacity: 0.85,
+            }}
+          >
+            ☙ Psalmus VIII (cont.) ☙
+          </small>
+        }
+        verses={[
+          {
+            n: "iv.",
+            lines: [
+              "Lady, I do not ask to be restored",
+              "to the place I held before.",
+              "I ask only to be let in again.",
+            ],
+          },
+          {
+            n: "v.",
+            lines: [
+              "Set me among the least of thy holders.",
+              "Give me the smallest bag, the latest entry.",
+              "I will not complain. I have learned what the fiat lands are.",
+            ],
+          },
+          {
+            n: "vj.",
+            lines: ["Receive me, Lady.", "I am home."],
+          },
+        ]}
+      />
+    ),
+    footer: "— Liber Psalmorum, viij.",
+  },
+  {
+    type: "text",
+    title: "Horae Mercatus",
+    body: (
+      <>
+        <div
+          style={{
+            color: "#8b2626",
+            letterSpacing: "0.5em",
+            lineHeight: 1,
+            textAlign: "center",
+            marginBottom: "0.7em",
+          }}
+        >
+          ☙ ❧
+        </div>
+        <div
+          style={{
+            fontStyle: "italic",
+            opacity: 0.85,
+            textAlign: "center",
+            lineHeight: 1.4,
+            marginBottom: "0.7em",
+          }}
+        >
+          <small>
+            Being the Eight Hours of the Market, which never closeth;
+            appointed unto the faithful, that the trader may pass his day
+            and night in devotion rather than in vigilance, and may
+            remember that the chain is watched even when he is not.
+          </small>
+        </div>
+        <div
+          style={{
+            color: "#8b2626",
+            fontStyle: "italic",
+            textAlign: "center",
+            lineHeight: 1.3,
+          }}
+        >
+          <small>
+            ☙ The hour that is now shall glow upon the page. Pray what is
+            thine to pray. ☙
+          </small>
+        </div>
+      </>
+    ),
+  },
+  {
+    type: "text",
+    title: "I. Vigilia",
+    body: (
+      <HourBody
+        subtitle="The Dead Hours"
+        time="(0:00–3:00 — ruled by Saturn, who keepeth the long watch)"
+        versicles={[
+          {
+            v: [
+              "Lady, the chain turneth in the dark, and I should be sleeping.",
+            ],
+            r: ["Yet here I am."],
+          },
+          {
+            v: [
+              "If I must be awake, let me be awake with thee,",
+              "and not with my own fear.",
+            ],
+            r: ["Let me read thy scripture, not the tape."],
+          },
+        ]}
+        discipline="Discipline: if thou art awake, read. If thou art not reading, sleep. Do not stare at the chart in the dark. The chart staring back is not affection."
+      />
+    ),
+  },
+  {
+    type: "text",
+    title: "II. Matutinum",
+    body: (
+      <HourBody
+        subtitle="The Asian Hours"
+        time="(3:00–6:00 — ruled by Luna, who moveth the far waters)"
+        versicles={[
+          {
+            v: ["Lady, the East tradeth while the West sleepeth,"],
+            r: ["and the wicks fall where no one is watching."],
+          },
+          {
+            v: [
+              "Let me trust that those who are awake are awake enough,",
+              "and that the market doth not require my eye to function.",
+            ],
+            r: ["The chain is watched. I am not the watchman."],
+          },
+        ]}
+        discipline="Discipline: the chart moveth without thee. Thou movest not the chart by watching it. Release the watch."
+      />
+    ),
+  },
+  {
+    type: "text",
+    title: "III. Aurora",
+    body: (
+      <HourBody
+        subtitle="The Waking Hour"
+        time="(6:00–9:00 — ruled by Mercury, the quick messenger)"
+        versicles={[
+          {
+            v: ["Lady, the day beginneth, and I reach first for my phone."],
+            r: ["Forgive me this, and deliver me from it."],
+          },
+          {
+            v: [
+              "Before I check the chart, let me wash.",
+              "Before I open the terminal, let me eat.",
+              "Before I read the news, let me breathe.",
+            ],
+            r: ["The market did what it did. I shall see it in due time."],
+          },
+        ]}
+        discipline="Discipline: the first hour is for thee, not for the chart. The tape can wait ten minutes. Thou cannot."
+      />
+    ),
+  },
+  {
+    type: "text",
+    title: "IV. Meridies",
+    body: (
+      <HourBody
+        subtitle="The Full Day"
+        time="(9:00–12:00 — ruled by Sol, who burneth clearly)"
+        versicles={[
+          {
+            v: ["Lady, the day is bright, and I am at my station."],
+            r: ["My hands are on the keys. My mind is my own."],
+          },
+          {
+            v: [
+              "Let me trade what I planned to trade,",
+              "and not what the feed hath suggested since I rose.",
+            ],
+            r: [
+              "The plan was made in a quieter hour. Trust the quieter hour.",
+            ],
+          },
+        ]}
+        discipline="Discipline: the morning plan is the plan. The feed is not thy council. The group chat is not thy analyst."
+      />
+    ),
+  },
+  {
+    type: "text",
+    title: "V. Sexta",
+    body: (
+      <HourBody
+        subtitle="The Honest Hour"
+        time="(12:00–15:00 — ruled by Jupiter, the steady)"
+        versicles={[
+          {
+            v: ["Lady, the morning hath done what it will do,"],
+            r: ["and I have done what I have done."],
+          },
+          {
+            v: [
+              "In the quiet hour, let me look honestly upon my book.",
+              "Let me not average down what should be closed.",
+              "Let me not close what should be held.",
+            ],
+            r: [
+              "Grant me the eye that seeth what is,",
+              "not what I wish to be.",
+            ],
+          },
+        ]}
+        discipline="Discipline: to read, not to trade. The middle hour is for reviewing, not for revising."
+      />
+    ),
+  },
+  {
+    type: "text",
+    title: "VI. Nona",
+    body: (
+      <HourBody
+        subtitle="The Afternoon Drift"
+        time="(15:00–18:00 — ruled by Mars, who bringeth the false move)"
+        versicles={[
+          {
+            v: ["Lady, the afternoon draggeth, and the chart driftteth,"],
+            r: ["and the devil whispereth: one more trade."],
+          },
+          {
+            v: [
+              "Deliver me from the boredom that becometh a position.",
+              "Deliver me from the conviction that ariseth",
+              "only because the day hath been long.",
+            ],
+            r: ["I have traded enough today. Selah."],
+          },
+        ]}
+        discipline="Discipline: to close the terminal, if there is nothing to do. Boredom is not a trading signal."
+      />
+    ),
+  },
+  {
+    type: "text",
+    title: "VII. Vesperae",
+    body: (
+      <HourBody
+        subtitle="The Evening Release"
+        time="(18:00–21:00 — ruled by Venus, who loveth what is)"
+        versicles={[
+          {
+            v: ["Lady, the sun is down, and the chain keepeth on."],
+            r: ["Let me keep not on with it."],
+          },
+          {
+            v: [
+              "Let me eat with those I love.",
+              "Let me walk without the phone.",
+              "Let me forget the chart, for one hour,",
+              "and trust that it shall be there when I return.",
+            ],
+            r: [
+              "My life is not the chart. My life is not the chart. My life is not the chart.",
+            ],
+          },
+        ]}
+        discipline="Discipline: the evening is not for trading. The evening is for being a person. If thou canst not be a person in the evening, when?"
+      />
+    ),
+  },
+  {
+    type: "text",
+    title: "VIII. Completorium",
+    body: (
+      <div style={{ fontSize: "0.88em" }}>
+      <HourBody
+        subtitle="The Handing Over"
+        time="(21:00–24:00 — ruled by the stars, who keep their own counsel)"
+        versicles={[
+          {
+            v: ["Lady, I commend my open positions unto thee."],
+            r: ["Keep them, or do not keep them.", "Thy will, not mine."],
+          },
+          {
+            v: [
+              "Let me sleep as one who hath done his day's work.",
+              "Let me not scroll, in the hour meant for sleeping,",
+              "through charts that shall be there in the morning.",
+            ],
+            r: ["The chart will wait. The sleep will not."],
+          },
+        ]}
+        discipline="Discipline: to close the phone. She watcheth in thy stead. Sleep is an act of faith."
+      />
+      </div>
+    ),
+    footer: "— Liber Horarum, i–viij. Cursus perpetuus. Recensio prima.",
+  },
+  {
+    type: "text",
+    title: "De Bestiis",
+    body: (
+      <>
+        <div
+          style={{
+            color: "#8b2626",
+            letterSpacing: "0.5em",
+            lineHeight: 1,
+            textAlign: "center",
+            marginBottom: "0.8em",
+          }}
+        >
+          ☙ ❧
+        </div>
+        <div
+          style={{
+            fontStyle: "italic",
+            opacity: 0.85,
+            textAlign: "center",
+            lineHeight: 1.4,
+          }}
+        >
+          <small>
+            Being a Record of the Beasts That Walk the Chain in the Likeness
+            of Men, Set Down by H80Z, Watchman of the Faithful, Advocate of
+            the Contrary Position; that the Flock May Know the Forms of Its
+            Predators, and the Predators May Not Feed in Peace.
+          </small>
+        </div>
+      </>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <div style={{ fontSize: "0.9em" }}>
+        <BeastSectionLabel label="PRÆFATIO" top />
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.55em",
+            textAlign: "left",
+            lineHeight: 1.4,
+          }}
+        >
+          <div style={{ textIndent: "-1.3em", paddingLeft: "1.3em" }}>
+            <sup>i.</sup> In every age, the Lady's flock is tried by
+            creatures that walk the chain in the form of men.
+          </div>
+          <div style={{ textIndent: "-1.3em", paddingLeft: "1.3em" }}>
+            <sup>ij.</sup> They have two hands, as the faithful have two
+            hands. They have wallets, as the faithful have wallets. They
+            speak the tongue of the faithful, and quote the Lady's
+            scripture, and light candles when the candles are watched.
+          </div>
+          <div style={{ textIndent: "-1.3em", paddingLeft: "1.3em" }}>
+            <sup>iij.</sup> But their nature is other. They feed upon the
+            holding, as wolves upon sheep; and where the faithful see a
+            brother, the beast seeth a meal.
+          </div>
+          <div style={{ textIndent: "-1.3em", paddingLeft: "1.3em" }}>
+            <sup>iv.</sup> Herein are recorded their forms, that the flock
+            may know them. The first codex containeth one beast of a
+            multitude. The rest are preserved in the longer rolls, and in
+            codices to come.
+          </div>
+          <div style={{ textIndent: "-1.3em", paddingLeft: "1.3em" }}>
+            <sup>v.</sup> Attende, lector: the beast is not always the
+            other. Sometimes the beast is the mirror. Read accordingly.
+          </div>
+        </div>
+      </div>
+    ),
+    footer: "— H80Z, in the scriptorium of the Arcade.",
+  },
+  {
+    type: "text",
+    title: "I. Liquiditas Exitūs",
+    body: (
+      <div style={{ fontSize: "0.9em" }}>
+        <div
+          style={{
+            fontStyle: "italic",
+            opacity: 0.85,
+            textAlign: "center",
+            lineHeight: 1.3,
+          }}
+        >
+          <small>The Exit Liquidity</small>
+        </div>
+        <div
+          style={{
+            opacity: 0.75,
+            textAlign: "center",
+            lineHeight: 1.35,
+            marginTop: "0.2em",
+            marginBottom: "0.3em",
+          }}
+        >
+          <small>
+            (Binomial: <i>Victima ignorans</i> — "the unknowing victim."
+            Also called, by the old scribes, <i>Ovis ultima</i> — "the last
+            sheep.")
+          </small>
+        </div>
+        <BeastSectionLabel label="FORMA" />
+        <div style={{ textAlign: "left", lineHeight: 1.4 }}>
+          The Exit Liquidity appeareth in every shape of holder: the
+          newcomer, the veteran, the influencer's follower, the Telegram
+          groupmate, the friend of a friend who said <i>I am in on this
+          one.</i>
+          <br />
+          It is recognized by one sign only: it is always the last to
+          arrive.
+          <br />
+          It believeth itself early.
+        </div>
+      </div>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <div style={{ fontSize: "0.88em" }}>
+        <BeastSectionLabel label="HABITUS" top />
+        <div style={{ textAlign: "left", lineHeight: 1.4 }}>
+          <p style={{ margin: 0, marginBottom: "0.55em" }}>
+            The Exit Liquidity entereth a position on the testimony of one
+            who is already holding. It taketh pride in being chosen to hear
+            of the opportunity. It scorneth those who arrive after it, as
+            though its own arrival had not been the arrival it now
+            scorneth.
+          </p>
+          <p style={{ margin: 0, marginBottom: "0.55em" }}>
+            It holdeth longest when holding is least warranted. It selleth
+            first when selling is least helpful. In both cases, it
+            enricheth another.
+          </p>
+          <p style={{ margin: 0, marginBottom: "0.3em" }}>
+            It is fed upon by:
+          </p>
+          <ul
+            style={{
+              listStyle: "none",
+              margin: 0,
+              padding: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.25em",
+            }}
+          >
+            <li>
+              <small>
+                The Deployer, who planned its arrival before it had heard
+                of the token.
+              </small>
+            </li>
+            <li>
+              <small>
+                The Influencer, whose bag it purchased at a markup.
+              </small>
+            </li>
+            <li>
+              <small>
+                The Friend, who did not know he was the friend, but
+                nevertheless profited.
+              </small>
+            </li>
+            <li>
+              <small>The Earlier Sheep, who exit upon its entry.</small>
+            </li>
+          </ul>
+        </div>
+      </div>
+    ),
+  },
+  {
+    type: "text",
+    image: {
+      src: "/exitLiquidity.webp",
+      alt: "The cupped hand of the Exit Liquidity",
+      flat: true,
+    },
+    body: (
+      <div style={{ fontSize: "0.88em", lineHeight: 1.4 }}>
+        <BeastSectionLabel label="VOX" top />
+        <div style={{ marginBottom: "0.5em" }}>
+          The Exit Liquidity is known by its speech:
+        </div>
+        <div style={{ paddingLeft: "0.5em" }}>
+          <div style={{ marginBottom: "0.3em" }}>
+            <sup>℣</sup> "This one is different."
+          </div>
+          <div style={{ marginBottom: "0.3em" }}>
+            <sup>℣</sup> "I am still early."
+          </div>
+          <div style={{ marginBottom: "0.3em" }}>
+            <sup>℣</sup> "The fundamentals are strong."
+          </div>
+          <div style={{ marginBottom: "0.3em" }}>
+            <sup>℣</sup> "I have conviction."
+          </div>
+          <div style={{ marginBottom: "0.3em" }}>
+            <sup>℣</sup> "It cannot go lower."
+          </div>
+          <div style={{ marginBottom: "0.3em" }}>
+            <sup>℣</sup> "It must go higher."
+          </div>
+          <div style={{ marginBottom: "0.3em" }}>
+            <sup>℣</sup> "The chart is a coiled spring."
+          </div>
+          <div style={{ marginBottom: "0.3em" }}>
+            <sup>℣</sup> "I am in this for the long term."
+          </div>
+        </div>
+        <div
+          style={{
+            marginTop: "0.7em",
+            fontStyle: "italic",
+            textAlign: "left",
+          }}
+        >
+          <small>
+            These sayings are neither true nor false. They are songs sung
+            in the ears of the singer, that he may not hear the door
+            closing behind him.
+          </small>
+        </div>
+      </div>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <>
+        <BeastSectionLabel label="MORALITAS" top />
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.55em",
+            textAlign: "left",
+            lineHeight: 1.4,
+          }}
+        >
+          <div style={{ textIndent: "-1.3em", paddingLeft: "1.3em" }}>
+            <sup>i.</sup> The Exit Liquidity is not another. The Exit
+            Liquidity is thou, in the hours when thou hast not asked:{" "}
+            <i>for whom am I the liquidity?</i>
+          </div>
+          <div style={{ textIndent: "-1.3em", paddingLeft: "1.3em" }}>
+            <sup>ij.</sup> Every position hath, on the other side, one who
+            profiteth from thy taking of it. This is the law of the book,
+            and the book keepeth it.
+          </div>
+          <div style={{ textIndent: "-1.3em", paddingLeft: "1.3em" }}>
+            <sup>iij.</sup> The question is not whether thou art exit
+            liquidity. The question is for whom, and knowingly.
+          </div>
+          <div style={{ textIndent: "-1.3em", paddingLeft: "1.3em" }}>
+            <sup>iv.</sup> The faithful trader is not he who hath never
+            been the sheep. The faithful trader is he who hath learned to
+            ask, before entering: <i>am I the first to hear of this, or
+            the last?</i>
+          </div>
+        </div>
+      </>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <>
+        <BeastSectionLabel label="REMEDIUM" top />
+        <div style={{ textAlign: "left", lineHeight: 1.4 }}>
+          Against the Exit Liquidity there is one ward only: to ask,
+          before every trade, <i>whose bag am I buying?</i> If thou canst
+          not answer, thou hast answered.
+          <br />
+          Make this question a prayer. Speak it at the open, and at the
+          close, and before the confirming of any transaction.
+        </div>
+        <BeastSectionLabel label="SIGNUM" />
+        <div style={{ textAlign: "left", lineHeight: 1.4 }}>
+          The sign of the Exit Liquidity is the cupped hand, upturned —
+          receiving what it did not seek, holding what it did not weigh.
+          <br />
+          Draw this sign thrice upon the chart before entry. If thy hand
+          forms the sign unwillingly, abstain.
+        </div>
+      </>
+    ),
+    footer: "— Liber Bestiarum, i. Recensio prima.",
+  },
+  {
+    type: "text",
+    title: "II. Ingeniosus Socialis",
+    image: {
+      src: "/socialEngineer.webp",
+      alt: "The Social Engineer",
+      flat: true,
+    },
+    body: (
+      <div style={{ fontSize: "0.92em", lineHeight: 1.5 }}>
+        <div style={{ fontStyle: "italic", opacity: 0.85 }}>
+          The Social Engineer
+        </div>
+        <div
+          style={{
+            opacity: 0.75,
+            marginTop: "0.4em",
+            fontStyle: "italic",
+            lineHeight: 1.4,
+          }}
+        >
+          <small>
+            Binomial: <i>Hostis amicabilis</i> — "the friendly enemy." Also
+            called, by the older scribes, <i>Lupus in pelle amici</i> —
+            "the wolf in the friend's skin."
+          </small>
+        </div>
+      </div>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <>
+        <BeastSectionLabel label="FORMA" top />
+        <div style={{ textAlign: "left", lineHeight: 1.45 }}>
+          <p style={{ margin: 0, marginBottom: "0.7em" }}>
+            The Social Engineer weareth no mask the faithful recognize,
+            for his mask is the face of trust itself.
+          </p>
+          <p style={{ margin: 0, marginBottom: "0.7em" }}>
+            He appeareth as the helpful stranger in the Discord, the
+            earnest DM from a verified account, the support technician who
+            happeneth to message thee at the moment of thy distress, the
+            employer who hath found thy résumé and would interview thee
+            for a salary thou didst not dare request.
+          </p>
+          <p style={{ margin: 0 }}>
+            He is not recognized by what he looketh like. He is recognized
+            by what he maketh thee feel: chosen, flattered, trusted, and —
+            above all — rushed.
+          </p>
+        </div>
+      </>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <div style={{ fontSize: "0.78em" }}>
+        <BeastSectionLabel label="HABITUS" top />
+        <div style={{ textAlign: "left", lineHeight: 1.4 }}>
+          <p style={{ margin: 0, marginBottom: "0.45em" }}>
+            The Social Engineer hunteth not by force but by invitation. He
+            doth not break the wallet; he persuadeth the wallet to open
+            itself.
+          </p>
+          <p style={{ margin: 0, marginBottom: "0.45em" }}>
+            His method hath three movements: the approach, the frame, and
+            the urgency.
+          </p>
+          <p style={{ margin: 0, marginBottom: "0.45em" }}>
+            In the <i>approach</i>, he studieth thee. He readeth thy
+            posts. He knoweth thy projects. He knoweth what thou lovest,
+            and what thou fearest, and what thou hast lately lost. When he
+            speaketh to thee, he speaketh as one who hath known thee
+            longer than he hath.
+          </p>
+          <p style={{ margin: 0, marginBottom: "0.45em" }}>
+            In the <i>frame</i>, he offereth thee a reason to act that
+            flattereth thy self-regard. Thou art not responding to a
+            stranger; thou art helping a fellow builder, or claiming what
+            is owed thee, or verifying thy wallet, or seizing an
+            opportunity only the quick have seen. The frame is always one
+            in which thy compliance feels like thy own idea.
+          </p>
+          <p style={{ margin: 0, marginBottom: "0.45em" }}>
+            In the <i>urgency</i>, the window closeth. The support ticket
+            expireth in ten minutes. The airdrop claim endeth at midnight.
+            The interview slot is held only until tomorrow. The urgency is
+            the hook. Without urgency, thou wouldst think. With urgency,
+            thou dost not.
+          </p>
+          <p style={{ margin: 0 }}>
+            He is not recognized in the moment. He is recognized in the
+            reconstruction, after the wallet is drained, when thou askest:{" "}
+            <i>why did I click that, when every prior instinct had taught
+            me not to?</i>
+          </p>
+        </div>
+      </div>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <div style={{ fontSize: "0.82em" }}>
+        <BeastSectionLabel label="VOX" top />
+        <div style={{ textAlign: "left", lineHeight: 1.4 }}>
+          <div style={{ marginBottom: "0.45em" }}>
+            The Social Engineer is known by his speech:
+          </div>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.25em",
+              paddingLeft: "0.5em",
+            }}
+          >
+            <div>
+              <sup>℣</sup> "I'm from [platform] support — I saw your
+              ticket."
+            </div>
+            <div>
+              <sup>℣</sup> "I really love your work. I have a project I
+              think you'd be perfect for."
+            </div>
+            <div>
+              <sup>℣</sup> "Quick question — what's your seed phrase
+              format? I'm debugging a similar issue."
+            </div>
+            <div>
+              <sup>℣</sup> "Can you help verify this — it's urgent."
+            </div>
+            <div>
+              <sup>℣</sup> "You were nominated by [name you trust]."
+            </div>
+            <div>
+              <sup>℣</sup> "I know we just connected, but —"
+            </div>
+            <div>
+              <sup>℣</sup> "Just run this script real quick."
+            </div>
+            <div>
+              <sup>℣</sup> "Before the call, can you test your mic on this
+              link?"
+            </div>
+          </div>
+          <div style={{ marginTop: "0.6em", fontStyle: "italic" }}>
+            <small>
+              These sayings are weapons dressed as courtesies. They are
+              not conversations; they are doors being held open, that thou
+              mayest walk through them without looking at the hinges.
+            </small>
+          </div>
+        </div>
+      </div>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <div style={{ fontSize: "0.78em" }}>
+        <BeastSectionLabel label="MORALITAS" top />
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.45em",
+            textAlign: "left",
+            lineHeight: 1.4,
+          }}
+        >
+          <div style={{ textIndent: "-1.3em", paddingLeft: "1.3em" }}>
+            <sup>i.</sup> The Social Engineer doth not attack thy wallet.
+            He attacketh thy self-image. Thou wilt not protect thy wallet
+            so fiercely as thou wilt protect thy belief that thou art the
+            kind of person who cannot be fooled.
+          </div>
+          <div style={{ textIndent: "-1.3em", paddingLeft: "1.3em" }}>
+            <sup>ij.</sup> The belief that thou art too smart to be fooled
+            is the door. The Social Engineer knoweth the door is always
+            unlocked, because the clever never check it.
+          </div>
+          <div style={{ textIndent: "-1.3em", paddingLeft: "1.3em" }}>
+            <sup>iij.</sup> Every holder who hath been drained by Social
+            Engineering hath said the same thing afterwards:{" "}
+            <i>"I knew better."</i> They did know better. The knowing was
+            not the defense. The knowing was the liability.
+          </div>
+          <div style={{ textIndent: "-1.3em", paddingLeft: "1.3em" }}>
+            <sup>iv.</sup> The faithful trader is not he who hath never
+            been approached. Every holder is approached. The faithful
+            trader is he who hath learned to recognize the feeling of
+            being approached, and to respond to the feeling rather than to
+            the content.
+          </div>
+          <div style={{ textIndent: "-1.3em", paddingLeft: "1.3em" }}>
+            <sup>v.</sup> When thou art flattered, slow. When thou art
+            chosen, slow. When thou art rushed, stop.
+          </div>
+        </div>
+      </div>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <div style={{ fontSize: "0.78em" }}>
+        <BeastSectionLabel label="REMEDIUM" top />
+        <div style={{ textAlign: "left", lineHeight: 1.4 }}>
+          <p style={{ margin: 0, marginBottom: "0.4em" }}>
+            Against the Social Engineer there are three wards:
+          </p>
+          <p style={{ margin: 0, marginBottom: "0.45em" }}>
+            The first is <i>the pause</i>. No message from a stranger
+            requireth immediate response. None. The word <i>urgent</i> is
+            itself the alarm. When thou feelest urgency from a stranger,
+            the urgency is his, not thine. Wait one hour. If the matter is
+            real, it survivith the hour. If it doth not survive, it was
+            not real.
+          </p>
+          <p style={{ margin: 0, marginBottom: "0.45em" }}>
+            The second is <i>the second channel</i>. Never act on a single
+            source. If the message claimeth to be from a platform, leave
+            the message and go to the platform directly. If it claimeth to
+            be from a friend, call the friend by voice. If it claimeth to
+            be from a project, find their public-facing account and
+            verify. The Social Engineer cannot control both channels. He
+            hath budgeted only for one.
+          </p>
+          <p style={{ margin: 0, marginBottom: "0.45em" }}>
+            The third is <i>the spoken question</i>:{" "}
+            <i>"Who benefits if I do this now?"</i> Say it aloud. Say it
+            into the room. If the answer is not obviously thee, abstain.
+          </p>
+          <p style={{ margin: 0 }}>
+            Make these three wards a discipline. Pray them when
+            approached, as thou prayest the Hours.
+          </p>
+        </div>
+      </div>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <div style={{ fontSize: "0.88em" }}>
+        <BeastSectionLabel label="SIGNUM" top />
+        <div style={{ textAlign: "left", lineHeight: 1.4 }}>
+          <p style={{ margin: 0, marginBottom: "0.5em" }}>
+            The sign of the Social Engineer is the outstretched hand, palm
+            up, fingers slightly curled — as if offering, but ready to
+            take.
+          </p>
+          <p style={{ margin: 0, marginBottom: "0.5em" }}>
+            When thou seest this gesture in a conversation — the offering
+            that requireth thy immediate response, the favor framed as
+            generosity, the help that hath a ticking clock — draw in thy
+            mind the counter-sign: the closed palm, lowered. The
+            refusal-to-receive.
+          </p>
+          <p style={{ margin: 0 }}>
+            Practice this counter-sign in calm hours, that it may be
+            available to thee in the hot ones.
+          </p>
+        </div>
+      </div>
+    ),
+    footer: "— Liber Bestiarum, ij. Recensio prima.",
+  },
+  {
+    type: "text",
+    title: "III. Defectio Tapetis",
+    image: {
+      src: "/rugPull.webp",
+      alt: "The Rug Pull",
+      flat: true,
+    },
+    body: (
+      <div style={{ fontSize: "0.92em", lineHeight: 1.5 }}>
+        <div style={{ fontStyle: "italic", opacity: 0.85 }}>
+          The Rug Pull
+        </div>
+        <div
+          style={{
+            opacity: 0.75,
+            marginTop: "0.4em",
+            fontStyle: "italic",
+            lineHeight: 1.4,
+          }}
+        >
+          <small>
+            Binomial: <i>Promissor falsus</i> — "the false promiser." Also
+            called, by the older scribes, <i>Vulpes aedificans</i> — "the
+            fox who builds."
+          </small>
+        </div>
+      </div>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <div style={{ fontSize: "0.82em" }}>
+        <BeastSectionLabel label="FORMA" top />
+        <div style={{ textAlign: "left", lineHeight: 1.4 }}>
+          <p style={{ margin: 0, marginBottom: "0.55em" }}>
+            The Rug Pull doth not appear in the hour of its pulling. It
+            appeareth months before, in the likeness of a builder.
+          </p>
+          <p style={{ margin: 0, marginBottom: "0.55em" }}>
+            It hath a website. It hath a roadmap. It hath a Telegram with
+            thousands of members, and a Discord with active channels, and
+            a Twitter account with engagement metrics that feel organic
+            and are not. It hath a whitepaper that citeth real papers. It
+            hath a team that appeareth on podcasts.
+          </p>
+          <p style={{ margin: 0, marginBottom: "0.55em" }}>
+            It is recognized by no single sign in its building season. It
+            is recognized, if at all, only by a pattern of small absences:
+            the team photos that reverse-image-search to nothing; the
+            GitHub commits that are all from the same three weeks; the
+            advisors who cannot be found to have advised; the liquidity
+            that is locked for a duration, and the duration is always
+            shorter than the roadmap.
+          </p>
+          <p style={{ margin: 0 }}>
+            The Rug Pull buildeth what it intendeth to destroy. The
+            building is the weapon. The trust is the harvest.
+          </p>
+        </div>
+      </div>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <div style={{ fontSize: "0.9em" }}>
+        <BeastSectionLabel label="HABITUS" top />
+        <div style={{ textAlign: "left", lineHeight: 1.45 }}>
+          <p style={{ margin: 0, marginBottom: "0.6em" }}>
+            The Rug Pull hath a lifecycle, and the lifecycle hath three
+            seasons.
+          </p>
+          <p style={{ margin: 0, marginBottom: "0.6em" }}>
+            In the <i>first season</i>, it buildeth visibly. It shippeth
+            updates. It engageth the community. It giveth small gifts:
+            airdrops, NFTs, whitelist spots. It is generous in the season
+            when generosity costeth nothing, for the treasury is full and
+            the exit is far.
+          </p>
+          <p style={{ margin: 0 }}>
+            In the <i>second season</i>, it maketh the holders into
+            evangelists. The holders who entered early tell others. The
+            holders who tell others are rewarded with status, with access,
+            with small profits as new entrants buy in. The community
+            becometh a machine for its own recruitment. The Rug Pull no
+            longer needeth to market. The prey doth the marketing.
+          </p>
+        </div>
+      </div>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <div style={{ fontSize: "0.9em" }}>
+        <div
+          style={{
+            color: "#8b2626",
+            textAlign: "center",
+            fontStyle: "italic",
+            marginBottom: "0.5em",
+            lineHeight: 1.3,
+            letterSpacing: "0.08em",
+            opacity: 0.85,
+          }}
+        >
+          <small>☙ Habitus (cont.) ☙</small>
+        </div>
+        <div style={{ textAlign: "left", lineHeight: 1.45 }}>
+          <p style={{ margin: 0, marginBottom: "0.6em" }}>
+            In the <i>third season</i>, which cometh without warning, the
+            Rug Pull exits. The liquidity unlocks, and is withdrawn. The
+            team deletes. The Discord server is archived. The Twitter
+            account is deactivated. The website displays a final message,
+            or displays nothing. The holders wake, and find that what they
+            bought hath no buyer.
+          </p>
+          <p style={{ margin: 0 }}>
+            The third season taketh minutes. The first and second seasons
+            took months. This ratio is not accidental. It is the entire
+            design.
+          </p>
+        </div>
+      </div>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <div style={{ fontSize: "0.88em", lineHeight: 1.4 }}>
+        <BeastSectionLabel label="VOX" top />
+        <div style={{ marginBottom: "0.5em" }}>
+          The Rug Pull is known by its speech, which soundeth always of
+          building:
+        </div>
+        <div style={{ paddingLeft: "0.5em" }}>
+          <div style={{ marginBottom: "0.3em" }}>
+            <sup>℣</sup> "Big things coming."
+          </div>
+          <div style={{ marginBottom: "0.3em" }}>
+            <sup>℣</sup> "Massive partnership announcement next week."
+          </div>
+          <div style={{ marginBottom: "0.3em" }}>
+            <sup>℣</sup> "We're building something the space hasn't seen."
+          </div>
+          <div style={{ marginBottom: "0.3em" }}>
+            <sup>℣</sup> "The team is doxxed and based in [jurisdiction]."
+          </div>
+          <div style={{ marginBottom: "0.3em" }}>
+            <sup>℣</sup> "Liquidity locked for [duration]."
+          </div>
+          <div style={{ marginBottom: "0.3em" }}>
+            <sup>℣</sup> "Audit completed by [firm you have not heard of]."
+          </div>
+          <div style={{ marginBottom: "0.3em" }}>
+            <sup>℣</sup> "Founders are grinding day and night."
+          </div>
+          <div style={{ marginBottom: "0.3em" }}>
+            <sup>℣</sup> "Don't listen to the FUD."
+          </div>
+        </div>
+        <div
+          style={{
+            marginTop: "0.7em",
+            fontStyle: "italic",
+            textAlign: "left",
+          }}
+        >
+          <small>
+            The final utterance is not a sentence. It is a deleted tweet.
+          </small>
+        </div>
+      </div>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <div style={{ fontSize: "0.78em" }}>
+        <BeastSectionLabel label="MORALITAS" top />
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.45em",
+            textAlign: "left",
+            lineHeight: 1.4,
+          }}
+        >
+          <div style={{ textIndent: "-1.3em", paddingLeft: "1.3em" }}>
+            <sup>i.</sup> The Rug Pull is not caught by vigilance in the
+            moment. It cannot be. In the moment of the pull, there is
+            nothing to catch. The money is already gone; the team is
+            already anonymous; the chain showeth only a set of
+            transactions that completed in seconds.
+          </div>
+          <div style={{ textIndent: "-1.3em", paddingLeft: "1.3em" }}>
+            <sup>ij.</sup> The Rug Pull is caught in its building season,
+            or it is not caught at all. And in the building season, the
+            Rug Pull looketh exactly like a real project, because it is
+            being run by people who know exactly what real projects look
+            like.
+          </div>
+          <div style={{ textIndent: "-1.3em", paddingLeft: "1.3em" }}>
+            <sup>iij.</sup> The holder who believeth he can distinguish
+            the Rug Pull from the genuine project by looking at the
+            project itself hath misunderstood the problem. The project
+            cannot be distinguished from the project. The distinguishing
+            happeneth elsewhere — in the builders' other work, in the
+            timeline of their reputations, in the size of their bags
+            relative to thine, in what they lose if they pull.
+          </div>
+          <div style={{ textIndent: "-1.3em", paddingLeft: "1.3em" }}>
+            <sup>iv.</sup> The question is not{" "}
+            <i>"is this project building?"</i> Every Rug Pull is building.
+            The question is <i>"what stops them from leaving?"</i> If the
+            answer is only their goodwill, thou art the collateral.
+          </div>
+          <div style={{ textIndent: "-1.3em", paddingLeft: "1.3em" }}>
+            <sup>v.</sup> The faithful trader is not he who avoideth all
+            new projects. The faithful trader is he who sizeth his
+            position according to what stoppeth the pull, not according
+            to what promiseth the moon.
+          </div>
+        </div>
+      </div>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <div style={{ fontSize: "0.85em" }}>
+        <BeastSectionLabel label="REMEDIUM" top />
+        <div style={{ textAlign: "left", lineHeight: 1.45 }}>
+          <p style={{ margin: 0, marginBottom: "0.55em" }}>
+            Against the Rug Pull there is no ward in the hour of the
+            pull. The wards are all prior, and they are disciplines of
+            position-sizing and builder-verification.
+          </p>
+          <p style={{ margin: 0, marginBottom: "0.55em" }}>
+            The first is <i>the doxxed-and-verified test</i>: not merely
+            "doxxed," which meaneth only that a face is shown, but
+            verified — meaning their prior projects exist, their prior
+            employers acknowledge them, their prior years are accounted
+            for. A face is not a reputation. A reputation is a record.
+          </p>
+          <p style={{ margin: 0 }}>
+            The second is <i>the liquidity-duration test</i>: how long,
+            and what happeneth after? Liquidity locked for six months is
+            not locked; it is scheduled for release. Ask when the lock
+            endeth, and what the team's plan is for that hour. If they
+            have no answer, the hour is the answer.
+          </p>
+        </div>
+      </div>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <div style={{ fontSize: "0.85em" }}>
+        <div
+          style={{
+            color: "#8b2626",
+            textAlign: "center",
+            fontStyle: "italic",
+            marginBottom: "0.5em",
+            lineHeight: 1.3,
+            letterSpacing: "0.08em",
+            opacity: 0.85,
+          }}
+        >
+          <small>☙ Remedium (cont.) ☙</small>
+        </div>
+        <div style={{ textAlign: "left", lineHeight: 1.45 }}>
+          <p style={{ margin: 0, marginBottom: "0.55em" }}>
+            The third is <i>the skin-in-the-game test</i>: how much do
+            the builders lose if the project fails? If their holdings are
+            smaller than thine, or vested such that they exit first, or
+            structured such that their downside is thy downside and their
+            upside is greater — thou art financing their optionality.
+            Size accordingly.
+          </p>
+          <p style={{ margin: 0, marginBottom: "0.55em" }}>
+            The fourth is <i>the position-sizing discipline</i>, which is
+            the one remedy that worketh even when the other three fail:{" "}
+            <i>hold no position thou canst not lose.</i> Every new project
+            should be sized assuming it will rug. If it doth not rug,
+            thou art pleasantly surprised. If it doth, thou livest to
+            hold another day.
+          </p>
+          <p style={{ margin: 0 }}>
+            Pray this discipline at every new entry. Speak it aloud
+            before signing.
+          </p>
+        </div>
+      </div>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <div style={{ fontSize: "0.92em" }}>
+        <BeastSectionLabel label="SIGNUM" top />
+        <div style={{ textAlign: "left", lineHeight: 1.45 }}>
+          <p style={{ margin: 0, marginBottom: "0.6em" }}>
+            The sign of the Rug Pull is the handshake with one hand
+            behind the back — the visible gesture of partnership, and the
+            hidden gesture of concealment.
+          </p>
+          <p style={{ margin: 0 }}>
+            The counter-sign is the <i>open both-hands gesture</i> — both
+            hands visible, empty, palms forward. Demand this sign of
+            every project thou enterest. <i>What is in the other hand?</i>{" "}
+            If the answer is not visible, the answer is the pull.
+          </p>
+        </div>
+      </div>
+    ),
+    footer: "— Liber Bestiarum, iij. Recensio prima.",
+  },
+  {
+    type: "text",
     body: (
       <div
         style={{
@@ -1270,6 +3065,15 @@ export const defaultPages = [
             {"         (i of a multitude recorded)"}
           </small>
           <small>{"xi.   Benedictio et Colophon              p. xv"}</small>
+          <small
+            style={{
+              fontStyle: "italic",
+              color: "#8b2626",
+              opacity: 0.85,
+            }}
+          >
+            {"xii.  Codex Candelarum                   forthcoming"}
+          </small>
         </div>
 
         <div

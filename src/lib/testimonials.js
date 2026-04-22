@@ -8,28 +8,19 @@ import {
   orderBy,
   limit,
   onSnapshot,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  serverTimestamp,
 } from "./firebaseClient";
 
 const COLLECTION = "shrineTestimonials";
 const MAX_LEN = 200;
 
-// Client-side profanity list. Not exhaustive — just the common stuff that
-// would embarrass the shrine if it appeared in a rotating toast. Expand as
-// needed; true safety requires server-side enforcement via Firestore rules
-// or a Cloud Function.
+// Mirrors the server validator in /api/testimonials. Kept client-side so
+// we can give instant feedback in the modal; the server re-validates
+// (plus runs AI moderation + rate limits) and is the real gate.
 const BAD_WORDS = [
   "nigger", "nigga", "faggot", "fag", "tranny", "retard", "retarded",
   "kike", "spic", "chink", "gook", "wetback", "cunt", "cock",
   "rape", "raping", "kys", "kill yourself",
 ];
-
-// Rejects bare links, TLDs, and common crypto-shill domains so we don't
-// end up rotating "0xDEAD...scam.xyz" across the shrine.
 const URL_RE =
   /\b(?:https?:\/\/|www\.)\S+|\b[a-z0-9-]+\.(?:com|net|org|io|xyz|co|link|app|finance|fun|lol|cash|gift|money|ai|gg|club|shop|to|me)\b/i;
 
@@ -48,30 +39,70 @@ export function validateTestimonial(text) {
   return { ok: true, text: trimmed };
 }
 
+async function callApi(method, body, getToken) {
+  if (typeof getToken !== "function")
+    return { ok: false, reason: "Sign in to speak." };
+  let token;
+  try {
+    token = await getToken();
+  } catch {
+    token = null;
+  }
+  if (!token) return { ok: false, reason: "Sign in to speak." };
+  try {
+    const res = await fetch("/api/testimonials", {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok)
+      return { ok: false, reason: data?.reason || "Your witness was lost in transit." };
+    return { ok: true, ...data };
+  } catch (err) {
+    console.warn("[testimonials] api call failed:", err);
+    return { ok: false, reason: "Your witness was lost in transit." };
+  }
+}
+
 export async function postTestimonial({
-  userId,
   displayName,
   avatarUrl,
   text,
   lit,
+  getToken,
 }) {
-  if (!db) return { ok: false, reason: "The shrine is unreachable." };
   const v = validateTestimonial(text);
   if (!v.ok) return v;
-  try {
-    await addDoc(collection(db, COLLECTION), {
-      userId: userId ?? null,
-      displayName: displayName ?? null,
-      avatarUrl: avatarUrl ?? null,
-      text: v.text,
-      lit: !!lit,
-      createdAt: serverTimestamp(),
-    });
-    return { ok: true };
-  } catch (err) {
-    console.warn("[testimonials] postTestimonial failed:", err);
-    return { ok: false, reason: "Your witness was lost in transit." };
+  return callApi(
+    "POST",
+    { text: v.text, displayName, avatarUrl, lit: !!lit },
+    getToken,
+  );
+}
+
+export async function updateTestimonial(id, { text, displayName, avatarUrl, getToken }) {
+  if (!id) return { ok: false, reason: "Nothing to update." };
+  const patch = { id };
+  if (typeof text === "string") {
+    const v = validateTestimonial(text);
+    if (!v.ok) return v;
+    patch.text = v.text;
   }
+  if (typeof displayName === "string") patch.displayName = displayName;
+  if (typeof avatarUrl === "string" || avatarUrl === null)
+    patch.avatarUrl = avatarUrl;
+  if (Object.keys(patch).length <= 1)
+    return { ok: false, reason: "Nothing to update." };
+  return callApi("PATCH", patch, getToken);
+}
+
+export async function deleteTestimonial(id, { getToken } = {}) {
+  if (!id) return { ok: false, reason: "Nothing to delete." };
+  return callApi("DELETE", { id }, getToken);
 }
 
 // Realtime feed, newest first. Returns unsubscribe fn.
@@ -121,37 +152,4 @@ export function subscribeUserTestimonials(userId, onChange, max = 20) {
       .sort((a, b) => b.createdAtMs - a.createdAtMs);
     onChange(items);
   });
-}
-
-export async function updateTestimonial(id, { text, displayName, avatarUrl }) {
-  if (!db || !id) return { ok: false, reason: "Nothing to update." };
-  const patch = {};
-  if (typeof text === "string") {
-    const v = validateTestimonial(text);
-    if (!v.ok) return v;
-    patch.text = v.text;
-  }
-  if (typeof displayName === "string") patch.displayName = displayName;
-  if (typeof avatarUrl === "string" || avatarUrl === null)
-    patch.avatarUrl = avatarUrl;
-  if (!Object.keys(patch).length)
-    return { ok: false, reason: "Nothing to update." };
-  try {
-    await updateDoc(doc(db, COLLECTION, id), patch);
-    return { ok: true };
-  } catch (err) {
-    console.warn("[testimonials] updateTestimonial failed:", err);
-    return { ok: false, reason: "Your edit was struck down." };
-  }
-}
-
-export async function deleteTestimonial(id) {
-  if (!db || !id) return { ok: false, reason: "Nothing to delete." };
-  try {
-    await deleteDoc(doc(db, COLLECTION, id));
-    return { ok: true };
-  } catch (err) {
-    console.warn("[testimonials] deleteTestimonial failed:", err);
-    return { ok: false, reason: "Could not retract your witness." };
-  }
 }

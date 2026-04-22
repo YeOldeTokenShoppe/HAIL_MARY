@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useUser, useClerk } from "@clerk/nextjs";
+import { useUser, useClerk, useAuth } from "@clerk/nextjs";
 import {
   postTestimonial,
   subscribeUserTestimonials,
@@ -42,6 +42,7 @@ function relativeTime(ms) {
 export default function InscribeModal({ isOpen, onClose, candleLit }) {
   const { user, isSignedIn } = useUser();
   const { openSignIn, signOut } = useClerk();
+  const { getToken } = useAuth();
   const [text, setText] = useState("");
   const [handle, setHandle] = useState("");
   const [busy, setBusy] = useState(false);
@@ -113,13 +114,14 @@ export default function InscribeModal({ isOpen, onClose, candleLit }) {
       ? await updateTestimonial(editingId, {
           text: trimmedText,
           displayName: trimmedHandle,
+          getToken,
         })
       : await postTestimonial({
-          userId: user?.id,
           displayName: trimmedHandle,
           avatarUrl: user?.imageUrl ?? null,
           text: trimmedText,
           lit: !!candleLit,
+          getToken,
         });
     setBusy(false);
     if (res.ok) {
@@ -153,7 +155,7 @@ export default function InscribeModal({ isOpen, onClose, candleLit }) {
     if (!ok) return;
     setBusy(true);
     setError(null);
-    const res = await deleteTestimonial(item.id);
+    const res = await deleteTestimonial(item.id, { getToken });
     setBusy(false);
     if (!res.ok) setError(res.reason || "Could not retract.");
     // If we were editing the one we just deleted, clear the form.

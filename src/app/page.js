@@ -1151,6 +1151,37 @@ export default function HomePage() {
   // candle — frames sign-in as "save your flame" rather than a gate.
   const [showSignInNudge, setShowSignInNudge] = useState(false);
   const debugRef = useRef(null);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobileDevice(window.innerWidth <= 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  // On mobile the social stack sits over the chart once the user scrolls
+  // into the hero-band. Fade it out past a short threshold so it doesn't
+  // cover the candles. iOS Safari sometimes scrolls the body/html rather
+  // than the window, so capture events at the document level and read
+  // from whichever source actually has the offset.
+  const [isScrolled, setIsScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => {
+      const y =
+        window.scrollY ||
+        document.documentElement.scrollTop ||
+        document.body.scrollTop ||
+        0;
+      setIsScrolled(y > 80);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true, capture: true });
+    document.addEventListener("scroll", onScroll, { passive: true, capture: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll, { capture: true });
+      document.removeEventListener("scroll", onScroll, { capture: true });
+    };
+  }, []);
+  const hideSocials = isMobileDevice && isScrolled;
 
   // Hydrate lit state. Signed-in users come from Firestore; anonymous
   // visitors come from localStorage. If an anon user signs in while their
@@ -1655,6 +1686,118 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
       />
 
       {/* <div ref={debugRef} className="candle-debug" /> */}
+
+      {/* Social Links - Bottom Right */}
+      <div
+        style={{
+          position: "fixed",
+          bottom: "5rem",
+          right: "2rem",
+          left: "auto",
+          transform: isMobileDevice ? "translateY(-50%)" : "none",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "12px",
+          zIndex: 1001,
+          pointerEvents: hideSocials ? "none" : "auto",
+          opacity: hideSocials ? 0 : 1,
+          transition: "opacity 0.3s ease",
+        }}
+      >
+        <a
+          href="https://x.com/rl80token"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="X (Twitter)"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "44px",
+            height: "44px",
+            borderRadius: "50%",
+            border: "1px solid rgba(255, 255, 255, 0.3)",
+            background: "rgba(0, 0, 0, 0.5)",
+            transition: "all 0.3s ease",
+            cursor: "pointer",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+            e.currentTarget.style.boxShadow = "0 0 15px rgba(255, 255, 255, 0.3)";
+            e.currentTarget.style.transform = "scale(1.1)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+            e.currentTarget.style.boxShadow = "none";
+            e.currentTarget.style.transform = "scale(1)";
+          }}
+        >
+          <img src="/x_logo_white.webp" alt="X (Twitter)" style={{ width: "18px", height: "18px" }} />
+        </a>
+
+        <a
+          href="https://t.me/rl80token"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Telegram"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "44px",
+            height: "44px",
+            borderRadius: "50%",
+            border: "1px solid rgba(255, 255, 255, 0.3)",
+            background: "rgba(0, 0, 0, 0.5)",
+            transition: "all 0.3s ease",
+            cursor: "pointer",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+            e.currentTarget.style.boxShadow = "0 0 15px rgba(255, 255, 255, 0.3)";
+            e.currentTarget.style.transform = "scale(1.1)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+            e.currentTarget.style.boxShadow = "none";
+            e.currentTarget.style.transform = "scale(1)";
+          }}
+        >
+          <img src="/telegram_logo_white.webp" alt="Telegram" style={{ width: "20px", height: "20px" }} />
+        </a>
+
+        <a
+          href="https://farcaster.xyz/rl80"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Farcaster"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "44px",
+            height: "44px",
+            borderRadius: "50%",
+            border: "1px solid rgba(255, 255, 255, 0.3)",
+            background: "rgba(0, 0, 0, 0.5)",
+            transition: "all 0.3s ease",
+            cursor: "pointer",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+            e.currentTarget.style.boxShadow = "0 0 15px rgba(255, 255, 255, 0.3)";
+            e.currentTarget.style.transform = "scale(1.1)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+            e.currentTarget.style.boxShadow = "none";
+            e.currentTarget.style.transform = "scale(1)";
+          }}
+        >
+          <img src="/farcaster_logo.webp" alt="Farcaster" style={{ width: "20px", height: "20px" }} />
+        </a>
+      </div>
     </main>
   );
 }

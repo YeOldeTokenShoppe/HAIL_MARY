@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useSignMessage } from 'wagmi';
 import { useLanguage } from './LanguageProvider';
 import { useWalletAuth } from '@/components/WalletAuthProvider';
 import SwapForm from './SwapForm';
@@ -9,9 +10,11 @@ const BuyModal = ({ isOpen, onClose }) => {
   const [glitchActive, setGlitchActive] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isSmallPhone, setIsSmallPhone] = useState(false);
-  const [onrampInstance, setOnrampInstance] = useState(null);
+  const [isAuthorizing, setIsAuthorizing] = useState(false);
+  const [authError, setAuthError] = useState(null);
   const { t } = useLanguage();
-  const { walletAddress } = useWalletAuth();
+  const { walletAddress, connectWallet } = useWalletAuth();
+  const { signMessageAsync } = useSignMessage();
   const instanceRef = useRef(null);
 
   useEffect(() => {
@@ -70,76 +73,111 @@ const BuyModal = ({ isOpen, onClose }) => {
     };
   }, [isOpen]);
 
-  // Initialize Coinbase Onramp when modal opens
+  // Cleanup any onramp instance on modal close.
   useEffect(() => {
-    if (!isOpen) return;
+    if (isOpen) return;
+    if (instanceRef.current) {
+      instanceRef.current.destroy();
+      instanceRef.current = null;
+    }
+    setIsAuthorizing(false);
+    setAuthError(null);
+  }, [isOpen]);
 
-    let destroyed = false;
+  const handleBuy = useCallback(async () => {
+    if (!walletAddress) {
+      connectWallet('coinbaseWallet');
+      return;
+    }
+    if (isAuthorizing) return;
 
-    const initCoinbaseOnramp = async () => {
-      try {
-        // Use connected wallet address or fallback placeholder (Coinbase handles it)
-        const userAddress = walletAddress || '0x0000000000000000000000000000000000000001';
-        const tokenRes = await fetch('/api/onramp-session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ address: userAddress }),
-        });
-        const tokenData = await tokenRes.json();
-
-        if (!tokenRes.ok || !tokenData.token) {
-          console.error('Failed to get session token:', tokenData.error);
-          return;
-        }
-
-        const { initOnRamp } = await import('@coinbase/cbpay-js');
-        initOnRamp({
-          appId: process.env.NEXT_PUBLIC_CDP_PROJECT_ID,
-          widgetParameters: {
-            sessionToken: tokenData.token,
-            addresses: { [userAddress]: ['base'] },
-            assets: ['ETH', 'USDC'],
-            defaultNetwork: 'base',
-            defaultExperience: 'buy',
-          },
-          onSuccess: () => {
-            onClose();
-          },
-          onExit: () => {
-            onClose();
-          },
-          experienceLoggedIn: 'popup',
-          experienceLoggedOut: 'popup',
-          closeOnExit: true,
-          closeOnSuccess: true,
-        }, (error, instance) => {
-          if (!destroyed && instance) {
-            instanceRef.current = instance;
-            setOnrampInstance(instance);
-          }
-        });
-      } catch (err) {
-        console.error('Failed to initialize Coinbase Onramp:', err);
+    setAuthError(null);
+    setIsAuthorizing(true);
+    try {
+      // 1) Ask the server for a nonce + canonical message + HMAC envelope.
+      const nonceRes = await fetch('/api/onramp-nonce', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address: walletAddress }),
+      });
+      const nonceData = await nonceRes.json();
+      if (!nonceRes.ok || !nonceData.message || !nonceData.envelope) {
+        throw new Error(nonceData.error || 'Failed to get authorization nonce');
       }
-    };
 
-    initCoinbaseOnramp();
+      // 2) Wallet signs the message (proves ownership of the destination address).
+      const signature = await signMessageAsync({ message: nonceData.message });
 
-    return () => {
-      destroyed = true;
+      // 3) Exchange for a CDP Onramp session token.
+      const sessionRes = await fetch('/api/onramp-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          address: walletAddress,
+          message: nonceData.message,
+          envelope: nonceData.envelope,
+          signature,
+        }),
+      });
+      const sessionData = await sessionRes.json();
+      if (!sessionRes.ok || !sessionData.token) {
+        throw new Error(sessionData.error || 'Failed to get session token');
+      }
+
+      // 4) Init and open the Coinbase Onramp widget.
+      const { initOnRamp } = await import('@coinbase/cbpay-js');
       if (instanceRef.current) {
         instanceRef.current.destroy();
         instanceRef.current = null;
-        setOnrampInstance(null);
       }
-    };
-  }, [isOpen, onClose]);
-
-  const handleBuy = useCallback(() => {
-    if (onrampInstance) {
-      onrampInstance.open();
+      initOnRamp({
+        appId: process.env.NEXT_PUBLIC_CDP_PROJECT_ID,
+        widgetParameters: {
+          sessionToken: sessionData.token,
+          addresses: { [walletAddress]: ['base'] },
+          assets: ['ETH', 'USDC'],
+          defaultNetwork: 'base',
+          defaultExperience: 'buy',
+        },
+        onSuccess: () => onClose(),
+        onExit: () => onClose(),
+        experienceLoggedIn: 'popup',
+        experienceLoggedOut: 'popup',
+        closeOnExit: true,
+        closeOnSuccess: true,
+      }, (error, instance) => {
+        if (error) {
+          console.error('initOnRamp error:', error);
+          setAuthError('Unable to open Coinbase');
+          return;
+        }
+        if (instance) {
+          instanceRef.current = instance;
+          instance.open();
+        }
+      });
+    } catch (err) {
+      console.error('Onramp authorization failed:', err);
+      const userRejected = /reject|denied|user.*cancel/i.test(err?.message || '');
+      setAuthError(userRejected ? null : (err?.message || 'Authorization failed'));
+    } finally {
+      setIsAuthorizing(false);
     }
-  }, [onrampInstance]);
+  }, [walletAddress, isAuthorizing, connectWallet, signMessageAsync, onClose]);
+
+  const buyStage = !walletAddress
+    ? 'connectWallet'
+    : isAuthorizing
+    ? 'authorizing'
+    : 'ready';
+  const buyLabel =
+    buyStage === 'connectWallet'
+      ? (t('buyModal.connectWallet') || 'CONNECT WALLET')
+      : buyStage === 'authorizing'
+      ? (t('buyModal.authorizing') || 'AUTHORIZING...')
+      : (t('buyModal.buyWithCoinbase') || 'BUY WITH COINBASE');
+  const buyDisabled = buyStage === 'authorizing';
+  const buyClickable = !buyDisabled;
 
   if (!isOpen) return null;
 
@@ -500,7 +538,7 @@ const BuyModal = ({ isOpen, onClose }) => {
               {/* Buy Button */}
               <button
                 onClick={handleBuy}
-                disabled={!onrampInstance}
+                disabled={buyDisabled}
                 style={{
                   fontFamily: 'monospace',
                   fontSize: isSmallPhone ? '14px' : '16px',
@@ -508,20 +546,20 @@ const BuyModal = ({ isOpen, onClose }) => {
                   textTransform: 'uppercase',
                   letterSpacing: '3px',
                   color: '#000',
-                  background: onrampInstance
+                  background: buyClickable
                     ? 'linear-gradient(135deg, #00e572, #00c85d)'
                     : 'rgba(100, 100, 100, 0.5)',
                   border: 'none',
                   padding: isSmallPhone ? '14px 28px' : '16px 40px',
-                  cursor: onrampInstance ? 'pointer' : 'wait',
+                  cursor: buyClickable ? 'pointer' : 'wait',
                   clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))',
                   transition: 'all 0.3s ease',
-                  animation: onrampInstance ? 'pulse-glow 2s infinite' : 'none',
+                  animation: buyStage === 'ready' ? 'pulse-glow 2s infinite' : 'none',
                   position: 'relative',
                   minWidth: isSmallPhone ? '200px' : '240px',
                 }}
                 onMouseEnter={(e) => {
-                  if (onrampInstance) {
+                  if (buyClickable) {
                     e.currentTarget.style.transform = 'scale(1.05)';
                     e.currentTarget.style.boxShadow = '0 0 30px rgba(0, 229, 114, 0.6)';
                   }
@@ -531,8 +569,22 @@ const BuyModal = ({ isOpen, onClose }) => {
                   e.currentTarget.style.boxShadow = '';
                 }}
               >
-                {onrampInstance ? (t('buyModal.buyWithCoinbase') || 'BUY WITH COINBASE') : (t('buyModal.loading') || 'LOADING...')}
+                {buyLabel}
               </button>
+
+              {authError && (
+                <p style={{
+                  fontFamily: 'monospace',
+                  fontSize: '11px',
+                  color: '#ff4d4d',
+                  textAlign: 'center',
+                  letterSpacing: '1px',
+                  margin: 0,
+                  maxWidth: '320px',
+                }}>
+                  {authError}
+                </p>
+              )}
 
               {/* Asset Info */}
               <div style={{
