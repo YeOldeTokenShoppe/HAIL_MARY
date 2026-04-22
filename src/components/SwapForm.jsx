@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useAccount, useBalance, useReadContract, useSendTransaction, useSignTypedData, useSwitchChain, useWriteContract } from 'wagmi';
+import { useAccount, useBalance, useConnect, useReadContract, useSendTransaction, useSignTypedData, useSwitchChain, useWriteContract } from 'wagmi';
 import { base } from 'wagmi/chains';
 import { parseUnits, formatUnits, erc20Abi, maxUint256, concat, numberToHex, size } from 'viem';
 import { publicClient } from '@/lib/viemClient';
@@ -33,8 +33,9 @@ const CONNECTORS = [
 
 export default function SwapForm({ isSmallPhone, isMobile }) {
   const { t } = useLanguage();
-  const { walletAddress, isWalletConnected, connectWallet, disconnectWallet } = useWalletAuth();
+  const { walletAddress, isWalletConnected, disconnectWallet } = useWalletAuth();
   const { chainId } = useAccount();
+  const { connectAsync, connectors: wagmiConnectors, isPending: isConnecting } = useConnect();
   const { switchChainAsync } = useSwitchChain();
   const { sendTransactionAsync } = useSendTransaction();
   const { signTypedDataAsync } = useSignTypedData();
@@ -84,6 +85,24 @@ export default function SwapForm({ isSmallPhone, isMobile }) {
     else if (usdcZero && !ethZero) setFromSymbol('ETH');
     hasAutoSelectedRef.current = true;
   }, [ethBalance, usdcBalance]);
+
+  useEffect(() => {
+    if (isSwitchingChain && isOnBase) {
+      setIsSwitchingChain(false);
+      setTxError(null);
+    }
+  }, [isSwitchingChain, isOnBase]);
+
+  useEffect(() => {
+    if (!isSwitchingChain) return;
+    const timeout = setTimeout(() => {
+      setIsSwitchingChain(false);
+      if (!isOnBase) {
+        setTxError('chain_switch_timed_out');
+      }
+    }, 30000);
+    return () => clearTimeout(timeout);
+  }, [isSwitchingChain, isOnBase]);
 
   const fromAmountAtomic = useMemo(() => {
     if (!amountInput || !/^\d*\.?\d*$/.test(amountInput)) return null;
@@ -173,14 +192,33 @@ export default function SwapForm({ isSmallPhone, isMobile }) {
     }
   }, [quote]);
 
+  const [pendingConnectorId, setPendingConnectorId] = useState(null);
+  const [hasInjectedProvider, setHasInjectedProvider] = useState(false);
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.ethereum) {
+      setHasInjectedProvider(true);
+    }
+  }, []);
+  const visibleConnectors = useMemo(
+    () => CONNECTORS.filter((c) => c.id !== 'injected' || hasInjectedProvider),
+    [hasInjectedProvider],
+  );
   const handleConnect = useCallback(async (connectorId) => {
     setConnectError(null);
-    try {
-      await connectWallet(connectorId);
-    } catch (e) {
-      setConnectError(e?.message || 'wallet_connect_failed');
+    const connector = wagmiConnectors.find((c) => c.id === connectorId);
+    if (!connector) {
+      setConnectError(`Connector ${connectorId} not available on this device`);
+      return;
     }
-  }, [connectWallet]);
+    setPendingConnectorId(connectorId);
+    try {
+      await connectAsync({ connector });
+    } catch (e) {
+      setConnectError(e?.shortMessage || e?.message || 'wallet_connect_failed');
+    } finally {
+      setPendingConnectorId(null);
+    }
+  }, [connectAsync, wagmiConnectors]);
 
   const handleSwitchToBase = useCallback(async () => {
     setTxError(null);
@@ -197,21 +235,10 @@ export default function SwapForm({ isSmallPhone, isMobile }) {
   const handleSwap = useCallback(async () => {
     if (!isWalletConnected) return;
     if (!fromAmountAtomic) return;
+    if (!isOnBase) return;
 
     setTxError(null);
     setTxHash(null);
-
-    if (!isOnBase) {
-      try {
-        setIsSwitchingChain(true);
-        await switchChainAsync({ chainId: base.id });
-      } catch (e) {
-        setTxError(e?.shortMessage || e?.message || 'chain_switch_failed');
-        setIsSwitchingChain(false);
-        return;
-      }
-      setIsSwitchingChain(false);
-    }
 
     try {
       if (!isNative(fromToken.address)) {
@@ -295,7 +322,6 @@ export default function SwapForm({ isSmallPhone, isMobile }) {
     signTypedDataAsync,
     writeContractAsync,
     isOnBase,
-    switchChainAsync,
   ]);
 
   const buttonLabel = useMemo(() => {
@@ -392,26 +418,31 @@ export default function SwapForm({ isSmallPhone, isMobile }) {
             {t('swapForm.connectToSwap') || 'CONNECT WALLET TO SWAP'}
           </span>
           <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-            {CONNECTORS.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => handleConnect(c.id)}
-                style={{
-                  fontFamily: 'monospace',
-                  fontSize: '10px',
-                  fontWeight: '700',
-                  letterSpacing: '1px',
-                  padding: '6px 10px',
-                  border: '1px solid rgba(253, 237, 0, 0.5)',
-                  background: 'rgba(0, 0, 0, 0.4)',
-                  color: '#fded00',
-                  cursor: 'pointer',
-                  flex: 1,
-                }}
-              >
-                {c.label}
-              </button>
-            ))}
+            {visibleConnectors.map((c) => {
+              const isPending = pendingConnectorId === c.id;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => handleConnect(c.id)}
+                  disabled={isConnecting}
+                  style={{
+                    fontFamily: 'monospace',
+                    fontSize: '10px',
+                    fontWeight: '700',
+                    letterSpacing: '1px',
+                    padding: '6px 10px',
+                    border: '1px solid rgba(253, 237, 0, 0.5)',
+                    background: isPending ? 'rgba(253, 237, 0, 0.2)' : 'rgba(0, 0, 0, 0.4)',
+                    color: '#fded00',
+                    cursor: isConnecting ? 'wait' : 'pointer',
+                    flex: 1,
+                    opacity: isConnecting && !isPending ? 0.4 : 1,
+                  }}
+                >
+                  {isPending ? '…' : c.label}
+                </button>
+              );
+            })}
           </div>
           {connectError && (
             <span
@@ -612,7 +643,7 @@ export default function SwapForm({ isSmallPhone, isMobile }) {
 
       {/* Swap button */}
       <button
-        onClick={handleSwap}
+        onClick={isWalletConnected && !isOnBase ? handleSwitchToBase : handleSwap}
         disabled={!canSubmit}
         style={{
           fontFamily: 'monospace',

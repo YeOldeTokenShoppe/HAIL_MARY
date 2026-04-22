@@ -258,7 +258,7 @@ const BuyModal = ({ isOpen, onClose }) => {
             padding: isSmallPhone ? '2.5rem 1rem 1rem' : isMobile ? '3.5rem 1.5rem 2rem' : '3rem',
             maxWidth: '500px',
             width: isSmallPhone ? '95%' : '90%',
-            maxHeight: isSmallPhone ? '95vh' : isMobile ? '85vh' : '90vh',
+            maxHeight: isSmallPhone ? '90dvh' : isMobile ? '85dvh' : '90dvh',
             overflowY: 'auto',
             boxShadow: glitchActive
               ? '5px 5px 0 #ff184c, -5px -5px 0 #00e572, 0 0 50px rgba(139, 0, 255, 0.5)'
@@ -275,9 +275,9 @@ const BuyModal = ({ isOpen, onClose }) => {
               onClose();
             }}
             style={{
-              position: 'absolute',
-              top: isSmallPhone ? '8px' : isMobile ? '15px' : '10px',
-              right: isSmallPhone ? '8px' : isMobile ? '15px' : '10px',
+              position: 'fixed',
+              top: isSmallPhone ? 'calc(env(safe-area-inset-top, 0px) + 12px)' : isMobile ? 'calc(env(safe-area-inset-top, 0px) + 18px)' : '20px',
+              right: isSmallPhone ? '12px' : isMobile ? '18px' : '20px',
               background: '#000',
               border: 'none',
               color: '#000',
@@ -289,7 +289,7 @@ const BuyModal = ({ isOpen, onClose }) => {
               alignItems: 'center',
               justifyContent: 'center',
               transition: 'transform 0.3s ease',
-              zIndex: 100,
+              zIndex: 10001,
               fontWeight: 'bold',
               fontFamily: 'monospace',
             }}
