@@ -195,7 +195,7 @@ function PageFace({ entry, pageNumber, zoomed = false }) {
    horizontal swipe advance the face; closing snaps the book scroller to
    the matching spread so the underlying book is coherent on exit. */
 const ZOOM_MIN = 1;
-const ZOOM_MAX = 4;
+const ZOOM_MAX = 2.5;
 const DOUBLE_TAP_MS = 300;
 const SWIPE_PX = 40;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -1333,11 +1333,13 @@ export default function LittleBookOverlay({
            base rule) in both views — media crops identically in each. */
 
         /* Transform target for pinch/wheel zoom. Wraps the face content
-           so scaling doesn't fight the panel's aspect-ratio sizing. */
+           so scaling doesn't fight the panel's aspect-ratio sizing.
+           No will-change: on iOS permanent layer promotion at high
+           scale triggers large composite-layer textures that can OOM
+           the tab — let Safari composite on demand instead. */
         .lbo-zoom__scaler {
           width: 100%;
           height: 100%;
-          will-change: transform;
           transform-origin: 50% 50%;
         }
         .lbo-zoom__panel--scaled { cursor: grab; }
@@ -1387,7 +1389,7 @@ export default function LittleBookOverlay({
           height: 3rem;
           border: 1px solid rgba(214, 250, 255, 0.2);
           border-radius: 50%;
-          background: rgba(10, 6, 20, 0.55);
+          background: rgba(10, 6, 20, 0.8);
           color: rgba(214, 250, 255, 0.85);
           font-family: 'Pirata One', serif;
           font-size: 2rem;
@@ -1398,7 +1400,6 @@ export default function LittleBookOverlay({
           cursor: pointer;
           z-index: 2;
           padding: 0;
-          backdrop-filter: blur(4px);
           transition: background 0.2s ease, color 0.2s ease,
             transform 0.2s ease;
         }
@@ -1418,7 +1419,7 @@ export default function LittleBookOverlay({
           height: 2.5rem;
           border: 1px solid rgba(214, 250, 255, 0.2);
           border-radius: 50%;
-          background: rgba(10, 6, 20, 0.55);
+          background: rgba(10, 6, 20, 0.8);
           color: rgba(214, 250, 255, 0.85);
           font-family: 'Pirata One', serif;
           font-size: 1.6rem;
@@ -1429,7 +1430,6 @@ export default function LittleBookOverlay({
           cursor: pointer;
           z-index: 2;
           padding: 0;
-          backdrop-filter: blur(4px);
           transition: background 0.2s ease, color 0.2s ease;
         }
         .lbo-zoom__close:hover {
@@ -1518,6 +1518,13 @@ export default function LittleBookOverlay({
               className="lbo-book"
               ref={bookRef}
               onClick={handleBookTap}
+              style={{
+                /* Hide the book while zoom is active. It's fully
+                   obscured by the zoom backdrop anyway, and collapsing
+                   its composite layers here frees GPU texture memory
+                   so the zoomed scaler has room to breathe on iOS. */
+                visibility: zoomedFaceIdx !== null ? "hidden" : "visible",
+              }}
             >
               <div className="lbo-book__spine" />
 

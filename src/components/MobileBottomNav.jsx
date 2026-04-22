@@ -49,6 +49,11 @@ export default function MobileBottomNav({
   // another modal (e.g. InscribeModal) per the root-page flow.
   onBookClick = null,
   bookLabel = 'BOOK',
+  // Extra placeholder slots rendered to the left or right of the center
+  // FAB. Each slot: { label, iconSrc?, icon?, onClick?, comingSoon? }.
+  // When `comingSoon` is set the slot renders dimmed with a SOON badge.
+  extraLeft = [],
+  extraRight = [],
 }) {
   const [emoji, setEmoji] = useState("😇");
   const [showUnifiedModal, setShowUnifiedModal] = useState(false);
@@ -106,6 +111,33 @@ export default function MobileBottomNav({
   const m80 = is80sMode;
   const nm = !m80 && neonMode; // cyan/fuchsia hologram mode
   const dk = !m80 && !nm && darkMode; // dark oil-field mode (fallback)
+
+  /* Renders a generic extra slot (placeholder / "coming soon" affordance).
+     iconSrc renders as <img> (preserves color for multi-color SVGs like
+     /tcg.svg); icon is used as-is for inline JSX. */
+  const renderExtraSlot = (slot, idx) => (
+    <button
+      key={slot.key ?? `${slot.label}-${idx}`}
+      className={`btm-nav-item ${slot.comingSoon ? 'btm-coming-soon' : ''}`}
+      onClick={slot.onClick}
+      title={slot.title ?? (slot.comingSoon ? `${slot.label} — coming soon` : slot.label)}
+    >
+      <div className="btm-nav-icon" style={{ position: 'relative' }}>
+        {slot.iconSrc ? (
+          <img
+            src={slot.iconSrc}
+            alt=""
+            aria-hidden="true"
+            className="btm-extra-icon-img"
+          />
+        ) : (
+          slot.icon
+        )}
+        {slot.comingSoon && <span className="btm-nav-soon-badge">SOON</span>}
+      </div>
+      <span className="btm-nav-label">{slot.label}</span>
+    </button>
+  );
 
   /* Book slot — takes the Account/LOGIN position when onBookClick is
      provided. Placed via the same accountSlot insertion points so the
@@ -225,8 +257,41 @@ export default function MobileBottomNav({
           -webkit-tap-highlight-color: transparent;
           background: transparent;
           border: none;
-          min-width: 60px;
+          min-width: 56px;
           position: relative;
+        }
+
+        /* Coming-soon placeholder — dimmed, still tappable so callers can
+           wire a toast/tooltip. */
+        .btm-nav-item.btm-coming-soon {
+          opacity: 0.55;
+        }
+        .btm-nav-item.btm-coming-soon:active {
+          transform: scale(0.95);
+        }
+
+        .btm-extra-icon-img {
+          width: 26px;
+          height: 26px;
+          object-fit: contain;
+          display: block;
+          filter: ${nm ? 'drop-shadow(0 0 4px rgba(42, 214, 238, 0.4))' : 'none'};
+        }
+
+        .btm-nav-soon-badge {
+          position: absolute;
+          top: -4px;
+          right: -6px;
+          font-size: 6.5px;
+          font-weight: 800;
+          letter-spacing: 0.3px;
+          padding: 1px 4px;
+          border-radius: 6px;
+          color: ${nm ? '#061018' : '#1a1408'};
+          background: ${nm ? '#2ad6ee' : m80 ? '#ff00ff' : dk ? '#d4a854' : '#d4a854'};
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+          line-height: 1;
+          pointer-events: none;
         }
 
         .btm-nav-item:active {
@@ -604,6 +669,9 @@ export default function MobileBottomNav({
               center FAB. */}
           {accountOnLeft && (bookSlot || accountSlot)}
 
+          {/* Extra placeholder slots to the LEFT of the center FAB. */}
+          {extraLeft.map(renderExtraSlot)}
+
           {/* LEFT 2 — Wallet (suppressed when hideWallet is set) */}
           {!hideWallet && (
             <button
@@ -680,6 +748,9 @@ export default function MobileBottomNav({
           {/* Default Account position: RIGHT of the center FAB. Skipped
               when `accountOnLeft` has already rendered it on the left. */}
           {!accountOnLeft && (bookSlot || accountSlot)}
+
+          {/* Extra placeholder slots to the RIGHT of the center FAB. */}
+          {extraRight.map(renderExtraSlot)}
 
           {/* RIGHT 2 — Menu (or custom slot if menuIcon override is provided).
               When overridden, the hamburger animation + first-run hint are
