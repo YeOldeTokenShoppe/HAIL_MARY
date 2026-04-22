@@ -1324,6 +1324,7 @@ export default function HomePage() {
           }}
           statueProps={{ scale: [3, 3, 3] }}
           cameraRadius={2.2}
+          paused={showBook}
         >
           <HeroAltarObject
             candleLit={candleLit}

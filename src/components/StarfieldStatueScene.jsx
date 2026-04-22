@@ -51,6 +51,7 @@ function StarfieldStatueScene({
   href,
   onStatueLoad,
   showStats = false,
+  paused = false,
   children,
 }) {
   const router = useRouter()
@@ -234,7 +235,12 @@ function StarfieldStatueScene({
           const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
           return isMobile ? 1 : Math.min(window.devicePixelRatio, 2);
         })()}
-        style={{ background: 'transparent', borderRadius: '12px' }}
+        frameloop={paused ? 'never' : 'always'}
+        style={{
+          background: 'transparent',
+          borderRadius: '12px',
+          visibility: paused ? 'hidden' : 'visible',
+        }}
       >
         <Suspense fallback={null}>
           {/* Crane shot loop camera */}

@@ -583,7 +583,7 @@ function MobileCandleOrbital({ candleData = [], onCandleClick, onPaginationChang
           <OrbitalCandle
             key={item.originalName || index}
             angle={angle}
-            radius={1}
+            radius={1.5}
             candleObject={item.candleObject}
             index={index}
             onClick={onCandleClick}

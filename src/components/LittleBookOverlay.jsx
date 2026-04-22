@@ -190,6 +190,349 @@ function PageFace({ entry, pageNumber, zoomed = false }) {
   return null;
 }
 
+/* Fullscreen zoom of a single face. Paging is decoupled from the book's
+   flip animation (cheap on mobile): left/right chevrons, arrow keys, and
+   horizontal swipe advance the face; closing snaps the book scroller to
+   the matching spread so the underlying book is coherent on exit. */
+const ZOOM_MIN = 1;
+const ZOOM_MAX = 4;
+const DOUBLE_TAP_MS = 300;
+const SWIPE_PX = 40;
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+/* Max offset at a given scale so content can't be panned outside the
+   panel. Scaled content extends (s-1)/2 of each dimension beyond the
+   panel edges, which is the hard pan limit. */
+const clampOffset = (off, scale, panel) => {
+  if (!panel || scale <= 1) return { x: 0, y: 0 };
+  const rect = panel.getBoundingClientRect();
+  const maxX = ((scale - 1) * rect.width) / 2;
+  const maxY = ((scale - 1) * rect.height) / 2;
+  return {
+    x: clamp(off.x, -maxX, maxX),
+    y: clamp(off.y, -maxY, maxY),
+  };
+};
+
+function ZoomLayer({
+  zoomedFaceIdx,
+  pages,
+  insideFrontCover,
+  hasPrev,
+  hasNext,
+  onClose,
+  onPrev,
+  onNext,
+}) {
+  const panelRef = useRef(null);
+  const pointersRef = useRef(new Map());
+  const gestureRef = useRef(null);
+  const lastTapRef = useRef(0);
+  const [scale, setScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [gesturing, setGesturing] = useState(false);
+
+  /* Reset zoom state whenever the face changes so each new page starts
+     at 1x. Also fires on open because zoomedFaceIdx goes null → value. */
+  useEffect(() => {
+    setScale(1);
+    setOffset({ x: 0, y: 0 });
+    pointersRef.current.clear();
+    gestureRef.current = null;
+    setGesturing(false);
+  }, [zoomedFaceIdx]);
+
+  /* Wheel-to-zoom on desktop. Native listener with passive:false so we
+     can preventDefault and suppress page-scroll / browser-zoom. */
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    const onWheel = (e) => {
+      e.preventDefault();
+      const rect = panel.getBoundingClientRect();
+      const cx = e.clientX - rect.left - rect.width / 2;
+      const cy = e.clientY - rect.top - rect.height / 2;
+      setScale((prev) => {
+        const factor = Math.exp(-e.deltaY * 0.0015);
+        const next = clamp(prev * factor, ZOOM_MIN, ZOOM_MAX);
+        const ratio = next / prev;
+        /* Zoom toward the cursor: keep the point under the cursor fixed
+           as the scaler grows. */
+        setOffset((off) =>
+          clampOffset(
+            {
+              x: cx - ratio * (cx - off.x),
+              y: cy - ratio * (cy - off.y),
+            },
+            next,
+            panel,
+          ),
+        );
+        if (next <= 1.001) {
+          setOffset({ x: 0, y: 0 });
+          return 1;
+        }
+        return next;
+      });
+    };
+    panel.addEventListener("wheel", onWheel, { passive: false });
+    return () => panel.removeEventListener("wheel", onWheel);
+  }, []);
+
+  const onPointerDown = (e) => {
+    panelRef.current?.setPointerCapture?.(e.pointerId);
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const count = pointersRef.current.size;
+    if (count === 2) {
+      const [p1, p2] = [...pointersRef.current.values()];
+      const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      const cx = (p1.x + p2.x) / 2;
+      const cy = (p1.y + p2.y) / 2;
+      gestureRef.current = {
+        type: "pinch",
+        startDist: dist,
+        startScale: scale,
+        startOffset: offset,
+        startCx: cx,
+        startCy: cy,
+      };
+      setGesturing(true);
+    } else if (count === 1) {
+      gestureRef.current = {
+        type: "drag",
+        startX: e.clientX,
+        startY: e.clientY,
+        startOffset: offset,
+        startScale: scale,
+      };
+      setGesturing(true);
+    }
+  };
+
+  const onPointerMove = (e) => {
+    if (!pointersRef.current.has(e.pointerId)) return;
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const g = gestureRef.current;
+    if (!g) return;
+    if (g.type === "pinch" && pointersRef.current.size === 2) {
+      const [p1, p2] = [...pointersRef.current.values()];
+      const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      const next = clamp(
+        g.startScale * (dist / g.startDist),
+        ZOOM_MIN,
+        ZOOM_MAX,
+      );
+      const cx = (p1.x + p2.x) / 2;
+      const cy = (p1.y + p2.y) / 2;
+      /* Two-finger pan: translate by the midpoint drift so the content
+         tracks the fingers' center while scaling. */
+      const panDx = cx - g.startCx;
+      const panDy = cy - g.startCy;
+      const ratio = next / g.startScale;
+      setScale(next);
+      setOffset(
+        clampOffset(
+          {
+            x: g.startOffset.x * ratio + panDx,
+            y: g.startOffset.y * ratio + panDy,
+          },
+          next,
+          panelRef.current,
+        ),
+      );
+    } else if (g.type === "drag" && pointersRef.current.size === 1) {
+      if (g.startScale > 1) {
+        const dx = e.clientX - g.startX;
+        const dy = e.clientY - g.startY;
+        setOffset(
+          clampOffset(
+            { x: g.startOffset.x + dx, y: g.startOffset.y + dy },
+            g.startScale,
+            panelRef.current,
+          ),
+        );
+      }
+    }
+  };
+
+  const onPointerUp = (e) => {
+    pointersRef.current.delete(e.pointerId);
+    const g = gestureRef.current;
+    if (pointersRef.current.size === 0) {
+      /* Single-finger drag that ended at scale 1: treat as swipe paging
+         if it was dominantly horizontal past the threshold. */
+      if (g?.type === "drag" && g.startScale <= 1) {
+        const dx = e.clientX - g.startX;
+        const dy = e.clientY - g.startY;
+        if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(dy) * 1.3) {
+          if (dx < 0) onNext();
+          else onPrev();
+        } else if (
+          e.pointerType === "touch" &&
+          Math.abs(dx) < 8 &&
+          Math.abs(dy) < 8
+        ) {
+          /* Tap (not a drag) — manual double-tap. Only for touch; mouse
+             dbl-click goes through onDoubleClickMouse. */
+          const now = performance.now();
+          if (now - lastTapRef.current < DOUBLE_TAP_MS) {
+            lastTapRef.current = 0;
+            if (scale > 1) {
+              setScale(1);
+              setOffset({ x: 0, y: 0 });
+            } else {
+              const rect = panelRef.current.getBoundingClientRect();
+              const cx = e.clientX - rect.left - rect.width / 2;
+              const cy = e.clientY - rect.top - rect.height / 2;
+              setScale(2);
+              setOffset({ x: -cx, y: -cy });
+            }
+          } else {
+            lastTapRef.current = now;
+          }
+        }
+      }
+      gestureRef.current = null;
+      setGesturing(false);
+      /* Snap back to centered if scale fell to 1 via pinch-out. */
+      if (scale <= 1.001) {
+        setOffset({ x: 0, y: 0 });
+      }
+    } else if (pointersRef.current.size === 1 && g?.type === "pinch") {
+      /* Pinch released to one finger — continue as pan-drag. */
+      const [remaining] = pointersRef.current.values();
+      gestureRef.current = {
+        type: "drag",
+        startX: remaining.x,
+        startY: remaining.y,
+        startOffset: offset,
+        startScale: scale,
+      };
+    }
+  };
+
+  const onDoubleClickMouse = (e) => {
+    e.stopPropagation();
+    if (scale > 1) {
+      setScale(1);
+      setOffset({ x: 0, y: 0 });
+    } else {
+      const rect = panelRef.current.getBoundingClientRect();
+      const cx = e.clientX - rect.left - rect.width / 2;
+      const cy = e.clientY - rect.top - rect.height / 2;
+      setScale(2);
+      setOffset({ x: -cx, y: -cy });
+    }
+  };
+
+  let content;
+  if (zoomedFaceIdx === -1) {
+    content = (
+      <div className="lbo-cover-content">
+        <div className="lbo-cover-eyebrow">Liber Parvus</div>
+        <h2 className="lbo-cover-title">
+          The Book
+          <br />
+          of RL80
+        </h2>
+        <div className="lbo-cover-ornament">
+          <CandlestickOrnament />
+        </div>
+      </div>
+    );
+  } else if (zoomedFaceIdx === -2) {
+    content = <PageFace entry={insideFrontCover} zoomed />;
+  } else {
+    content = (
+      <PageFace
+        entry={pages[zoomedFaceIdx]}
+        pageNumber={zoomedFaceIdx + 1}
+        zoomed
+      />
+    );
+  }
+
+  return (
+    <div
+      className="lbo-zoom"
+      onClick={(e) => {
+        /* Backdrop-only close: tapping the panel or a nav button does
+           nothing here because those children stopPropagation. */
+        if (e.target !== e.currentTarget) return;
+        e.stopPropagation();
+        onClose();
+      }}
+      role="dialog"
+      aria-modal="true"
+    >
+      {hasPrev && (
+        <button
+          type="button"
+          className="lbo-zoom__nav lbo-zoom__nav--prev"
+          onClick={(e) => {
+            e.stopPropagation();
+            onPrev();
+          }}
+          aria-label="Previous page"
+        >
+          ‹
+        </button>
+      )}
+      <div
+        ref={panelRef}
+        className={`lbo-zoom__panel${
+          zoomedFaceIdx === -1 ? " lbo-zoom__panel--cover" : ""
+        }${scale > 1 ? " lbo-zoom__panel--scaled" : ""}`}
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onDoubleClick={onDoubleClickMouse}
+      >
+        <div
+          className="lbo-zoom__scaler"
+          style={{
+            transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+            transition: gesturing ? "none" : "transform 0.22s ease-out",
+          }}
+        >
+          {content}
+        </div>
+      </div>
+      {hasNext && (
+        <button
+          type="button"
+          className="lbo-zoom__nav lbo-zoom__nav--next"
+          onClick={(e) => {
+            e.stopPropagation();
+            onNext();
+          }}
+          aria-label="Next page"
+        >
+          ›
+        </button>
+      )}
+      <button
+        type="button"
+        className="lbo-zoom__close"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+        aria-label="Close zoom"
+      >
+        ×
+      </button>
+      <div className="lbo-zoom__hint">
+        {scale > 1
+          ? "Drag to pan · double-tap to reset"
+          : "Pinch / double-tap to zoom · ← → to page"}
+      </div>
+    </div>
+  );
+}
+
 export default function LittleBookOverlay({
   isOpen,
   onClose,
@@ -215,6 +558,55 @@ export default function LittleBookOverlay({
      at 1 so the book always has at least one interior sheet. */
   const sheetCount = Math.max(1, Math.ceil(pages.length / 2));
 
+  /* Zoom paging order: -1 (cover) → -2 (inside cover, if any) → 0 → 1 → …
+     → pages.length-1. Returns the neighbor or null at the edges, which
+     hides the corresponding nav affordance. */
+  const nextZoomIdx = (cur) => {
+    if (cur === -1) return insideFrontCover ? -2 : pages.length ? 0 : null;
+    if (cur === -2) return pages.length ? 0 : null;
+    if (cur >= 0 && cur < pages.length - 1) return cur + 1;
+    return null;
+  };
+  const prevZoomIdx = (cur) => {
+    if (cur === -1) return null;
+    if (cur === -2) return -1;
+    if (cur === 0) return insideFrontCover ? -2 : -1;
+    if (cur > 0) return cur - 1;
+    return null;
+  };
+
+  /* Spread the book should be parked on when zoom closes, so exiting
+     zoom snaps the underlying page-turn state to match the face the
+     reader was last looking at. Mirrors the inverse of getCurrentSpread. */
+  const zoomIdxToScrollUnit = (idx) => {
+    if (idx === -1) return 0; // cover, book closed
+    if (idx === -2) return 2; // inside cover | pages[0]
+    if (idx >= 0) return Math.floor((idx + 1) / 2) + 2;
+    return null;
+  };
+
+  const closeZoom = () => {
+    setZoomedFaceIdx((cur) => {
+      if (cur === null) return null;
+      const scroller = scrollerRef.current;
+      const unit = zoomIdxToScrollUnit(cur);
+      if (scroller && unit !== null) {
+        const target = unit * window.innerHeight * 0.25;
+        scroller.scrollTop = target;
+        scrollUnitRef.current = unit;
+      }
+      return null;
+    });
+  };
+
+  const pageZoom = (dir) => {
+    setZoomedFaceIdx((cur) => {
+      if (cur === null) return cur;
+      const nxt = dir > 0 ? nextZoomIdx(cur) : prevZoomIdx(cur);
+      return nxt === null ? cur : nxt;
+    });
+  };
+
   /* Given the current scroll unit, derive which page faces are showing
      on the left and right. Rounds to the nearest resting spread so a
      tap mid-flip still snaps to the nearest readable pair.
@@ -222,7 +614,7 @@ export default function LittleBookOverlay({
      cover is showing or we're past the last content page. */
   const getCurrentSpread = () => {
     const rounded = Math.round(scrollUnitRef.current);
-    if (rounded < 2 || rounded > sheetCount + 1) return null;
+    if (rounded < 2 || rounded > sheetCount + 2) return null;
     const left = 2 * rounded - 5;
     const right = 2 * rounded - 4;
     return {
@@ -394,9 +786,19 @@ export default function LittleBookOverlay({
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (e) => {
-      if (e.key !== "Escape") return;
-      if (zoomedFaceIdx !== null) setZoomedFaceIdx(null);
-      else onClose();
+      if (e.key === "Escape") {
+        if (zoomedFaceIdx !== null) closeZoom();
+        else onClose();
+        return;
+      }
+      if (zoomedFaceIdx === null) return;
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        pageZoom(1);
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        pageZoom(-1);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => {
@@ -515,7 +917,7 @@ export default function LittleBookOverlay({
            page count, matching the original's body height trick. */
         .lbo-spacer {
           width: 100%;
-          height: calc(${sheetCount + 2} * 25vh);
+          height: calc(${sheetCount + 6} * 25vh);
           position: relative;
         }
 
@@ -891,6 +1293,14 @@ export default function LittleBookOverlay({
           max-height: 85vh;
           width: 100%;
           height: auto;
+          cursor: default;
+          /* Suppress native pinch/pan so our pointer-event handlers own
+             the gesture — iOS would otherwise eat two-finger touches for
+             browser-level zoom. */
+          touch-action: none;
+          user-select: none;
+          -webkit-user-select: none;
+          -webkit-touch-callout: none;
           background: #f2ecdb;
           border-radius: 8px;
           box-shadow:
@@ -922,6 +1332,17 @@ export default function LittleBookOverlay({
         /* Panel matches the page aspect, so keep object-fit: cover (the
            base rule) in both views — media crops identically in each. */
 
+        /* Transform target for pinch/wheel zoom. Wraps the face content
+           so scaling doesn't fight the panel's aspect-ratio sizing. */
+        .lbo-zoom__scaler {
+          width: 100%;
+          height: 100%;
+          will-change: transform;
+          transform-origin: 50% 50%;
+        }
+        .lbo-zoom__panel--scaled { cursor: grab; }
+        .lbo-zoom__panel--scaled:active { cursor: grabbing; }
+
         /* Cover-zoom variant: match the book's leather gradient instead
            of the parchment, and scale the ornamental type up so the
            title reads at arm's length. */
@@ -952,6 +1373,68 @@ export default function LittleBookOverlay({
           text-transform: uppercase;
           pointer-events: none;
           text-shadow: 0 0 8px rgba(42, 214, 238, 0.4);
+        }
+
+        /* Chevron paging buttons flanking the panel. Positioned relative
+           to the viewport so they sit at the screen edges on mobile
+           (overlapping the panel margins) and just outside the panel on
+           desktop. Large hit targets for thumbs. */
+        .lbo-zoom__nav {
+          position: absolute;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 3rem;
+          height: 3rem;
+          border: 1px solid rgba(214, 250, 255, 0.2);
+          border-radius: 50%;
+          background: rgba(10, 6, 20, 0.55);
+          color: rgba(214, 250, 255, 0.85);
+          font-family: 'Pirata One', serif;
+          font-size: 2rem;
+          line-height: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          z-index: 2;
+          padding: 0;
+          backdrop-filter: blur(4px);
+          transition: background 0.2s ease, color 0.2s ease,
+            transform 0.2s ease;
+        }
+        .lbo-zoom__nav:hover {
+          background: rgba(42, 214, 238, 0.2);
+          color: #fff;
+          transform: translateY(-50%) scale(1.05);
+        }
+        .lbo-zoom__nav--prev { left: max(2vw, 0.5rem); }
+        .lbo-zoom__nav--next { right: max(2vw, 0.5rem); }
+
+        .lbo-zoom__close {
+          position: absolute;
+          top: max(2vh, 0.75rem);
+          right: max(2vw, 0.75rem);
+          width: 2.5rem;
+          height: 2.5rem;
+          border: 1px solid rgba(214, 250, 255, 0.2);
+          border-radius: 50%;
+          background: rgba(10, 6, 20, 0.55);
+          color: rgba(214, 250, 255, 0.85);
+          font-family: 'Pirata One', serif;
+          font-size: 1.6rem;
+          line-height: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          z-index: 2;
+          padding: 0;
+          backdrop-filter: blur(4px);
+          transition: background 0.2s ease, color 0.2s ease;
+        }
+        .lbo-zoom__close:hover {
+          background: rgba(242, 100, 100, 0.25);
+          color: #fff;
         }
 
         /* ---------- COVER FACE ---------- */
@@ -1087,47 +1570,16 @@ export default function LittleBookOverlay({
         </div>
 
         {zoomedFaceIdx !== null && (
-          <div
-            className="lbo-zoom"
-            onClick={(e) => {
-              /* Stop propagation so tapping the zoom doesn't also hit
-                 the book overlay's close handler. Tap anywhere on the
-                 zoom (backdrop OR panel) closes the zoom only. */
-              e.stopPropagation();
-              setZoomedFaceIdx(null);
-            }}
-            role="dialog"
-            aria-modal="true"
-          >
-            <div
-              className={`lbo-zoom__panel${
-                zoomedFaceIdx === -1 ? " lbo-zoom__panel--cover" : ""
-              }`}
-            >
-              {zoomedFaceIdx === -1 ? (
-                <div className="lbo-cover-content">
-                  <div className="lbo-cover-eyebrow">Liber Parvus</div>
-                  <h2 className="lbo-cover-title">
-                    The Book
-                    <br />
-                    of RL80
-                  </h2>
-                  <div className="lbo-cover-ornament">
-                    <CandlestickOrnament />
-                  </div>
-                </div>
-              ) : zoomedFaceIdx === -2 ? (
-                <PageFace entry={insideFrontCover} zoomed />
-              ) : (
-                <PageFace
-                  entry={pages[zoomedFaceIdx]}
-                  pageNumber={zoomedFaceIdx + 1}
-                  zoomed
-                />
-              )}
-            </div>
-            <div className="lbo-zoom__hint">Tap to return</div>
-          </div>
+          <ZoomLayer
+            zoomedFaceIdx={zoomedFaceIdx}
+            pages={pages}
+            insideFrontCover={insideFrontCover}
+            hasPrev={prevZoomIdx(zoomedFaceIdx) !== null}
+            hasNext={nextZoomIdx(zoomedFaceIdx) !== null}
+            onClose={closeZoom}
+            onPrev={() => pageZoom(-1)}
+            onNext={() => pageZoom(1)}
+          />
         )}
       </div>
     </>,

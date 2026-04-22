@@ -230,9 +230,8 @@ export const defaultPages = [
     type: "text",
     title: "Salutatio",
     dropCap: true,
-    iframe: {
-      src: "https://www.sitepal.com/geturl/?ss=2774449&sl=0&acc=9308752",
-      title: "GR80 greetings",
+    video: {
+      src: "/videos/gr80_greetings.mp4",
     },
     body:
       "Greetings, faithful, from the saint of the order. Hear his witness " +
@@ -271,5 +270,97 @@ export const defaultPages = [
   { type: "text", body: "Page 17 placeholder" },
   { type: "text", body: "Page 18 placeholder" },
   { type: "text", body: "Page 19 placeholder" },
-  { type: "text", body: "Page 20 placeholder" },
+  {
+    type: "text",
+    body: (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.55em",
+          lineHeight: 1.3,
+          fontSize: "0.72em",
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontSize: "1.25em",
+              letterSpacing: "0.08em",
+              color: "#8b2626",
+              lineHeight: 1.1,
+            }}
+          >
+            INDEX CAPITULORUM
+          </div>
+          <div
+            style={{
+              fontStyle: "italic",
+              marginTop: "0.3em",
+              lineHeight: 1.3,
+            }}
+          >
+            <small>
+              Being the Sections of this First Codex, and the Promise of Those
+              to Come.
+            </small>
+          </div>
+        </div>
+
+        <div
+          style={{
+            color: "#8b2626",
+            letterSpacing: "0.5em",
+            lineHeight: 1,
+          }}
+        >
+          ☙ ❧
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.15em",
+            fontFamily: "inherit",
+            whiteSpace: "pre",
+            lineHeight: 1.35,
+          }}
+        >
+          <small>{"i.    Frontispicium                                   p. —"}</small>
+          <small>{"ii.   Titulus et Invocatio                          p. i"}</small>
+          <small>{"iii.  Introitus                                           p. ii"}</small>
+          <small>{"iv.   Epistula GR80                                 p. iii"}</small>
+          <small>{"v.    De Initio                                          p. iv"}</small>
+          <small>{"vi.   De Apparitionibus                          p. vi"}</small>
+          <small>{"vii.  Litania Degenorum                       p. viii"}</small>
+          <small>{"viii. Psalmi Tenentium                           p. x"}</small>
+          <small style={{ fontStyle: "italic", opacity: 0.75 }}>
+            {"         (viij of lxxx revealed)"}
+          </small>
+          <small>{"ix.   Horae Mercatus                              p. xii"}</small>
+          <small>{"x.    De Bestiis                                       p. xiv"}</small>
+          <small style={{ fontStyle: "italic", opacity: 0.75 }}>
+            {"         (i of a multitude recorded)"}
+          </small>
+          <small>{"xi.   Benedictio et Colophon              p. xv"}</small>
+        </div>
+
+        <div
+          style={{
+            fontStyle: "italic",
+            marginTop: "0.3em",
+            lineHeight: 1.4,
+            opacity: 0.85,
+          }}
+        >
+          <small>
+            Other matters — the Calendarium Degenorum, the Office of the
+            Rugged, the Regula Ordinis, and the remainder of the Psalter — are
+            preserved for codices to come, Deo volente et catena permittente.
+          </small>
+        </div>
+      </div>
+    ),
+  },
 ];
