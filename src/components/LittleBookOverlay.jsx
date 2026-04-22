@@ -92,23 +92,30 @@ function PageFace({ entry, pageNumber, zoomed = false }) {
               frameBorder="0"
             />
           ) : hasVideo ? (
-            /* Floated video miniature. Book view autoplays muted + loops
-               (required for iOS autoplay). Zoom view does NOT autoplay
-               and uses preload="none" so iOS doesn't allocate a video
-               decode buffer while the user is pinch-scaling the element
-               — scaling a live video texture on iOS is a known OOM
-               trigger. The native controls give a one-tap start if the
-               reader wants to hear the greeting. */
+            /* Floated video miniature. Book view autoplays muted +
+               loops (required for iOS autoplay). Zoom view does NOT
+               autoplay — the native controls give a one-tap start if
+               the reader wants to hear the greeting. In zoom mode we
+               append a `#t=0.1` media fragment so iOS paints the
+               first frame as a poster; without this, Safari shows a
+               black rectangle until the user taps play. preload
+               stays at "metadata" in both modes so iOS only fetches
+               enough data to display that frame — no full decode
+               buffer unless playback begins. */
             <video
               className="lbo-face__illum-media"
-              src={entry.video.src}
+              src={
+                zoomed && !entry.video.poster
+                  ? `${entry.video.src}#t=0.1`
+                  : entry.video.src
+              }
               poster={entry.video.poster}
               muted={!zoomed}
               loop
               playsInline
               autoPlay={!zoomed}
               controls={zoomed}
-              preload={zoomed ? "none" : "metadata"}
+              preload="metadata"
             />
           ) : hasImage ? (
             <img
@@ -168,7 +175,9 @@ function PageFace({ entry, pageNumber, zoomed = false }) {
             the autoPlay attribute — the overlay's ScrollTrigger starts
             playback only when the sheet enters its active range. */}
         <video
-          src={entry.src}
+          src={
+            zoomed && !entry.poster ? `${entry.src}#t=0.1` : entry.src
+          }
           poster={entry.poster}
           className="lbo-face__media"
           muted={!zoomed}
@@ -196,27 +205,16 @@ function PageFace({ entry, pageNumber, zoomed = false }) {
    flip animation (cheap on mobile): left/right chevrons, arrow keys, and
    horizontal swipe advance the face; closing snaps the book scroller to
    the matching spread so the underlying book is coherent on exit. */
-const ZOOM_MIN = 1;
-const ZOOM_MAX = 2;
-const DOUBLE_TAP_MS = 350;
-const DOUBLE_TAP_SLOP_PX = 14;
 const SWIPE_PX = 40;
-const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
-/* Max offset at a given scale so content can't be panned outside the
-   panel. Scaled content extends (s-1)/2 of each dimension beyond the
-   panel edges, which is the hard pan limit. */
-const clampOffset = (off, scale, panel) => {
-  if (!panel || scale <= 1) return { x: 0, y: 0 };
-  const rect = panel.getBoundingClientRect();
-  const maxX = ((scale - 1) * rect.width) / 2;
-  const maxY = ((scale - 1) * rect.height) / 2;
-  return {
-    x: clamp(off.x, -maxX, maxX),
-    y: clamp(off.y, -maxY, maxY),
-  };
-};
-
+/* Reader view over a single face. Rather than scaling a book-face
+   bitmap (which blows iOS' composite-layer memory on high-DPR phones),
+   this renders the same entry at reader-friendly type size inside a
+   near-fullscreen panel that scrolls natively when content overflows.
+   No CSS transforms, no scale state, no pinch handling — just a plain
+   scrollable document. Paging keeps the decoupled model: arrow keys,
+   chevrons, and horizontal swipe navigate entry-to-entry, and closing
+   snaps the book scroller to the matching spread. */
 function ZoomLayer({
   zoomedFaceIdx,
   pages,
@@ -227,227 +225,36 @@ function ZoomLayer({
   onPrev,
   onNext,
 }) {
+  const touchRef = useRef(null);
   const panelRef = useRef(null);
-  const pointersRef = useRef(new Map());
-  const gestureRef = useRef(null);
-  const lastTapRef = useRef(0);
-  const rafRef = useRef(null);
-  const [scale, setScale] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [gesturing, setGesturing] = useState(false);
 
-  /* Coalesce pointer-move updates to one per animation frame. iOS fires
-     pointer events up to 120Hz on ProMotion; setting state that often
-     causes React + compositor thrash and, empirically, crashes during
-     extended pinch gestures. The pointer map itself stays live via ref
-     so the rAF callback always reads the freshest positions. */
-  const scheduleUpdate = (fn) => {
-    if (rafRef.current != null) return;
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = null;
-      fn();
-    });
-  };
-  useEffect(
-    () => () => {
-      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
-    },
-    [],
-  );
-
-  /* Reset zoom state whenever the face changes so each new page starts
-     at 1x. Also fires on open because zoomedFaceIdx goes null → value. */
+  /* Reset the panel's scroll position when paging to a new face so the
+     reader always starts at the top of each page. */
   useEffect(() => {
-    setScale(1);
-    setOffset({ x: 0, y: 0 });
-    pointersRef.current.clear();
-    gestureRef.current = null;
-    setGesturing(false);
+    if (panelRef.current) panelRef.current.scrollTop = 0;
   }, [zoomedFaceIdx]);
 
-  /* Wheel-to-zoom on desktop. Native listener with passive:false so we
-     can preventDefault and suppress page-scroll / browser-zoom. */
-  useEffect(() => {
-    const panel = panelRef.current;
-    if (!panel) return;
-    const onWheel = (e) => {
-      e.preventDefault();
-      const rect = panel.getBoundingClientRect();
-      const cx = e.clientX - rect.left - rect.width / 2;
-      const cy = e.clientY - rect.top - rect.height / 2;
-      setScale((prev) => {
-        const factor = Math.exp(-e.deltaY * 0.0015);
-        const next = clamp(prev * factor, ZOOM_MIN, ZOOM_MAX);
-        const ratio = next / prev;
-        /* Zoom toward the cursor: keep the point under the cursor fixed
-           as the scaler grows. */
-        setOffset((off) =>
-          clampOffset(
-            {
-              x: cx - ratio * (cx - off.x),
-              y: cy - ratio * (cy - off.y),
-            },
-            next,
-            panel,
-          ),
-        );
-        if (next <= 1.001) {
-          setOffset({ x: 0, y: 0 });
-          return 1;
-        }
-        return next;
-      });
-    };
-    panel.addEventListener("wheel", onWheel, { passive: false });
-    return () => panel.removeEventListener("wheel", onWheel);
-  }, []);
-
-  const onPointerDown = (e) => {
-    panelRef.current?.setPointerCapture?.(e.pointerId);
-    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    const count = pointersRef.current.size;
-    if (count === 2) {
-      const [p1, p2] = [...pointersRef.current.values()];
-      const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-      const cx = (p1.x + p2.x) / 2;
-      const cy = (p1.y + p2.y) / 2;
-      gestureRef.current = {
-        type: "pinch",
-        startDist: dist,
-        startScale: scale,
-        startOffset: offset,
-        startCx: cx,
-        startCy: cy,
-      };
-      setGesturing(true);
-    } else if (count === 1) {
-      gestureRef.current = {
-        type: "drag",
-        startX: e.clientX,
-        startY: e.clientY,
-        startOffset: offset,
-        startScale: scale,
-      };
-      setGesturing(true);
+  const onTouchStart = (e) => {
+    if (e.touches.length !== 1) {
+      touchRef.current = null;
+      return;
     }
+    const t = e.touches[0];
+    touchRef.current = { x: t.clientX, y: t.clientY };
   };
-
-  const onPointerMove = (e) => {
-    if (!pointersRef.current.has(e.pointerId)) return;
-    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    const g = gestureRef.current;
-    if (!g) return;
-    scheduleUpdate(() => {
-      const gg = gestureRef.current;
-      if (!gg) return;
-      if (gg.type === "pinch" && pointersRef.current.size === 2) {
-        const [p1, p2] = [...pointersRef.current.values()];
-        const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-        const next = clamp(
-          gg.startScale * (dist / gg.startDist),
-          ZOOM_MIN,
-          ZOOM_MAX,
-        );
-        const cx = (p1.x + p2.x) / 2;
-        const cy = (p1.y + p2.y) / 2;
-        const panDx = cx - gg.startCx;
-        const panDy = cy - gg.startCy;
-        const ratio = next / gg.startScale;
-        setScale(next);
-        setOffset(
-          clampOffset(
-            {
-              x: gg.startOffset.x * ratio + panDx,
-              y: gg.startOffset.y * ratio + panDy,
-            },
-            next,
-            panelRef.current,
-          ),
-        );
-      } else if (gg.type === "drag" && pointersRef.current.size === 1) {
-        if (gg.startScale > 1) {
-          const [p] = pointersRef.current.values();
-          const dx = p.x - gg.startX;
-          const dy = p.y - gg.startY;
-          setOffset(
-            clampOffset(
-              { x: gg.startOffset.x + dx, y: gg.startOffset.y + dy },
-              gg.startScale,
-              panelRef.current,
-            ),
-          );
-        }
-      }
-    });
-  };
-
-  const onPointerUp = (e) => {
-    pointersRef.current.delete(e.pointerId);
-    const g = gestureRef.current;
-    if (pointersRef.current.size === 0) {
-      /* Single-finger drag that ended at scale 1: treat as swipe paging
-         if it was dominantly horizontal past the threshold. */
-      if (g?.type === "drag" && g.startScale <= 1) {
-        const dx = e.clientX - g.startX;
-        const dy = e.clientY - g.startY;
-        if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(dy) * 1.3) {
-          if (dx < 0) onNext();
-          else onPrev();
-        } else if (
-          e.pointerType === "touch" &&
-          Math.abs(dx) < DOUBLE_TAP_SLOP_PX &&
-          Math.abs(dy) < DOUBLE_TAP_SLOP_PX
-        ) {
-          /* Tap (not a drag) — manual double-tap. Only for touch; mouse
-             dbl-click goes through onDoubleClickMouse. */
-          const now = performance.now();
-          if (now - lastTapRef.current < DOUBLE_TAP_MS) {
-            lastTapRef.current = 0;
-            if (scale > 1) {
-              setScale(1);
-              setOffset({ x: 0, y: 0 });
-            } else {
-              const rect = panelRef.current.getBoundingClientRect();
-              const cx = e.clientX - rect.left - rect.width / 2;
-              const cy = e.clientY - rect.top - rect.height / 2;
-              setScale(2);
-              setOffset({ x: -cx, y: -cy });
-            }
-          } else {
-            lastTapRef.current = now;
-          }
-        }
-      }
-      gestureRef.current = null;
-      setGesturing(false);
-      /* Snap back to centered if scale fell to 1 via pinch-out. */
-      if (scale <= 1.001) {
-        setOffset({ x: 0, y: 0 });
-      }
-    } else if (pointersRef.current.size === 1 && g?.type === "pinch") {
-      /* Pinch released to one finger — continue as pan-drag. */
-      const [remaining] = pointersRef.current.values();
-      gestureRef.current = {
-        type: "drag",
-        startX: remaining.x,
-        startY: remaining.y,
-        startOffset: offset,
-        startScale: scale,
-      };
-    }
-  };
-
-  const onDoubleClickMouse = (e) => {
-    e.stopPropagation();
-    if (scale > 1) {
-      setScale(1);
-      setOffset({ x: 0, y: 0 });
-    } else {
-      const rect = panelRef.current.getBoundingClientRect();
-      const cx = e.clientX - rect.left - rect.width / 2;
-      const cy = e.clientY - rect.top - rect.height / 2;
-      setScale(2);
-      setOffset({ x: -cx, y: -cy });
+  const onTouchEnd = (e) => {
+    const start = touchRef.current;
+    touchRef.current = null;
+    if (!start) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    /* Require a dominantly-horizontal swipe past the threshold; keep
+     the vertical-dominance factor high so native scroll of long text
+     bodies isn't mistaken for paging. */
+    if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx < 0) onNext();
+      else onPrev();
     }
   };
 
@@ -508,23 +315,12 @@ function ZoomLayer({
         ref={panelRef}
         className={`lbo-zoom__panel${
           zoomedFaceIdx === -1 ? " lbo-zoom__panel--cover" : ""
-        }${scale > 1 ? " lbo-zoom__panel--scaled" : ""}`}
+        }`}
         onClick={(e) => e.stopPropagation()}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        onDoubleClick={onDoubleClickMouse}
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
       >
-        <div
-          className="lbo-zoom__scaler"
-          style={{
-            transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-            transition: gesturing ? "none" : "transform 0.22s ease-out",
-          }}
-        >
-          {content}
-        </div>
+        {content}
       </div>
       {hasNext && (
         <button
@@ -550,11 +346,7 @@ function ZoomLayer({
       >
         ×
       </button>
-      <div className="lbo-zoom__hint">
-        {scale > 1
-          ? "Drag to pan · double-tap to reset"
-          : "Pinch / double-tap to zoom · ← → to page"}
-      </div>
+      <div className="lbo-zoom__hint">← → to page · tap outside to close</div>
     </div>
   );
 }
@@ -662,6 +454,9 @@ export default function LittleBookOverlay({
      "tap to close" doesn't also fire. */
   const handleBookTap = (e) => {
     const rounded = Math.round(scrollUnitRef.current);
+    /* Dismiss the hint on first zoom-open so it stops pulsing once the
+       reader has discovered the tap-to-enlarge affordance. */
+    setHintVisible(false);
     if (rounded < 2) {
       e.stopPropagation();
       setZoomedFaceIdx(-1);
@@ -811,6 +606,24 @@ export default function LittleBookOverlay({
     if (!isOpen) return;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+
+    /* Block native iOS Safari pinch-zoom of the viewport while the
+       book overlay is open. When the reader tries a two-finger gesture
+       on a shader-heavy page, Safari's viewport zoom + re-raster has
+       been observed to OOM-reload the tab. Force a non-scalable
+       viewport here and restore the original on close. Approach:
+       patch the existing <meta name="viewport"> content; on iOS the
+       user agent reads this live. */
+    const viewportMeta =
+      typeof document !== "undefined"
+        ? document.querySelector('meta[name="viewport"]')
+        : null;
+    const prevViewport = viewportMeta ? viewportMeta.content : null;
+    if (viewportMeta) {
+      viewportMeta.content =
+        "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover";
+    }
+
     const onKey = (e) => {
       if (e.key === "Escape") {
         if (zoomedFaceIdx !== null) closeZoom();
@@ -830,6 +643,9 @@ export default function LittleBookOverlay({
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
+      if (viewportMeta && prevViewport !== null) {
+        viewportMeta.content = prevViewport;
+      }
     };
   }, [isOpen, onClose, zoomedFaceIdx]);
 
@@ -1291,11 +1107,13 @@ export default function LittleBookOverlay({
           position: fixed;
           inset: 0;
           z-index: 10060;
-          /* Flat near-opaque color instead of a radial gradient —
-             gradients force a new paint region on every composite
-             frame of the scaled panel above, which multiplies GPU
-             work (and on iOS, memory) during pinch. */
+          /* Flat near-opaque color instead of a radial gradient. */
           background: rgba(4, 3, 10, 0.97);
+          /* Block Safari's native pinch-zoom on the overlay. With
+             shader-heavy content behind it, a user-level zoom would
+             OOM-reload the tab. The viewport <meta> change on mount
+             is the primary defense; this is a belt-and-suspenders. */
+          touch-action: pan-y;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -1307,51 +1125,60 @@ export default function LittleBookOverlay({
           from { opacity: 0; transform: scale(0.96); }
           to   { opacity: 1; transform: scale(1); }
         }
-        /* Lock to the same aspect as a book page (~38:52 portrait) so
-           assets designed for the book look identical when zoomed — no
-           letterboxing, no cropping delta between the two views. The
-           browser preserves the ratio while honoring the max-width and
-           max-height caps, shrinking whichever dimension hits first. */
+        /* Reader-view panel: a near-fullscreen document that scrolls
+           natively when the entry's content overflows. No transform
+           scaling happens here — larger type is the only "zoom". This
+           keeps GPU memory low on iOS even for long text pages. */
         .lbo-zoom__panel {
           position: relative;
+          /* Preferred book-portrait aspect — matches a page face. When
+             content is short (e.g. the cover), this gives the panel a
+             real portrait canvas instead of collapsing to a landscape
+             strip. When content is long (e.g. the frontispiece), the
+             content overflows vertically and the panel scrolls via
+             overflow-y: auto. aspect-ratio is advisory, so the panel
+             still respects max-height on short viewports. */
           aspect-ratio: 38 / 52;
-          max-width: min(92vw, 560px);
-          max-height: 85vh;
+          max-width: min(94vw, 560px);
+          max-height: 92vh;
           width: 100%;
           height: auto;
+          overflow-y: auto;
+          overflow-x: hidden;
+          -webkit-overflow-scrolling: touch;
           cursor: default;
-          /* Suppress native pinch/pan so our pointer-event handlers own
-             the gesture — iOS would otherwise eat two-finger touches for
-             browser-level zoom. */
-          touch-action: none;
-          user-select: none;
-          -webkit-user-select: none;
-          -webkit-touch-callout: none;
-          /* Isolate paint/layout so the compositor doesn't have to
-             invalidate surrounding regions when the inner scaler's
-             transform changes during pinch. */
-          contain: layout paint style;
+          /* pan-y allows vertical scroll of long entries but suppresses
+             pinch on the panel itself. */
+          touch-action: pan-y;
           background: #f2ecdb;
           border-radius: 8px;
           box-shadow:
             0 20px 60px rgba(0, 0, 0, 0.6),
             0 0 40px rgba(42, 214, 238, 0.2);
-          overflow: hidden;
         }
         /* Bump type sizes inside the zoom — book-scale vmin values are
            tiny on phones. Override with absolute units for readability. */
-        .lbo-zoom__panel .lbo-face { overflow-y: auto; }
         .lbo-zoom__panel .lbo-face--text { padding: 8% 7%; }
         .lbo-zoom__panel .lbo-face__title {
-          font-size: clamp(1.6rem, 5vw, 2.4rem);
+          font-size: clamp(1.8rem, 6vw, 2.8rem);
           letter-spacing: 3px;
         }
         .lbo-zoom__panel .lbo-face__body {
-          font-size: clamp(1rem, 3.5vw, 1.3rem);
-          line-height: 1.6;
+          font-size: clamp(1.15rem, 4.5vw, 1.5rem);
+          line-height: 1.55;
+        }
+        /* Several entries (e.g. the frontispiece) wrap their content in
+           an inline fontSize:0.72em to compress it for the book-face
+           view. That inline style outranks the stylesheet's cascade, so
+           override it with !important here — the reader doesn't need
+           the compression and the text otherwise renders too small to
+           comfortably read on a phone. Nested descendants of the body
+           inherit the body's size normally. */
+        .lbo-zoom__panel .lbo-face__body > div[style*="font-size"] {
+          font-size: 1em !important;
         }
         .lbo-zoom__panel .lbo-face__footer {
-          font-size: clamp(0.85rem, 2.8vw, 1rem);
+          font-size: clamp(0.95rem, 3.2vw, 1.1rem);
           margin-top: 0.6em;
         }
         .lbo-zoom__panel .lbo-face__caption {
@@ -1359,21 +1186,15 @@ export default function LittleBookOverlay({
           bottom: 1.5rem;
         }
         .lbo-zoom__panel .lbo-page__number { font-size: 0.9rem; }
-        /* Panel matches the page aspect, so keep object-fit: cover (the
-           base rule) in both views — media crops identically in each. */
-
-        /* Transform target for pinch/wheel zoom. Wraps the face content
-           so scaling doesn't fight the panel's aspect-ratio sizing.
-           No will-change: on iOS permanent layer promotion at high
-           scale triggers large composite-layer textures that can OOM
-           the tab — let Safari composite on demand instead. */
-        .lbo-zoom__scaler {
-          width: 100%;
-          height: 100%;
-          transform-origin: 50% 50%;
+        /* In reader view the inner .lbo-face no longer needs its own
+           scroll — the panel scrolls as one document. Face fills the
+           portrait panel so flex-centered content sits at the middle
+           of the page; long content pushes past and the panel scrolls. */
+        .lbo-zoom__panel .lbo-face {
+          overflow: visible;
+          height: auto;
+          min-height: 100%;
         }
-        .lbo-zoom__panel--scaled { cursor: grab; }
-        .lbo-zoom__panel--scaled:active { cursor: grabbing; }
 
         /* Cover-zoom variant: match the book's leather gradient instead
            of the parchment, and scale the ornamental type up so the
@@ -1433,10 +1254,20 @@ export default function LittleBookOverlay({
           transition: background 0.2s ease, color 0.2s ease,
             transform 0.2s ease;
         }
-        .lbo-zoom__nav:hover {
+        /* Gate the hover tint to devices with a real pointer. On touch
+           screens :hover sticks after a tap, which left whichever
+           chevron was last used looking a different color from its
+           partner until something else got tapped. */
+        @media (hover: hover) {
+          .lbo-zoom__nav:hover {
+            background: rgba(42, 214, 238, 0.2);
+            color: #fff;
+            transform: translateY(-50%) scale(1.05);
+          }
+        }
+        .lbo-zoom__nav:active {
           background: rgba(42, 214, 238, 0.2);
           color: #fff;
-          transform: translateY(-50%) scale(1.05);
         }
         .lbo-zoom__nav--prev { left: max(2vw, 0.5rem); }
         .lbo-zoom__nav--next { right: max(2vw, 0.5rem); }
@@ -1462,7 +1293,13 @@ export default function LittleBookOverlay({
           padding: 0;
           transition: background 0.2s ease, color 0.2s ease;
         }
-        .lbo-zoom__close:hover {
+        @media (hover: hover) {
+          .lbo-zoom__close:hover {
+            background: rgba(242, 100, 100, 0.25);
+            color: #fff;
+          }
+        }
+        .lbo-zoom__close:active {
           background: rgba(242, 100, 100, 0.25);
           color: #fff;
         }
@@ -1533,7 +1370,7 @@ export default function LittleBookOverlay({
           does not. Escape still closes for keyboard users. */}
       <div className="lbo-overlay" onClick={onClose}>
         <div className={`lbo-hint ${hintVisible ? "" : "lbo-hint--hidden"}`}>
-          Scroll to turn the pages · tap to close
+          Scroll to turn · tap a page to enlarge
         </div>
 
         <div className="lbo-scroller" ref={scrollerRef}>
