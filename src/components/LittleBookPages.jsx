@@ -96,6 +96,91 @@ const FormSigil = ({ form }) => (
   </span>
 );
 
+/* Litany helpers — cantor (𝔎) and response (℟) couplets grouped under a
+   small rubricated section label (Kyrie, Invocationes, etc.). Each pair
+   renders as a two-line unit with the response indented and italicised,
+   in the manner of a responsorial missal. An optional third tuple slot
+   supplies an English gloss for the Latin call; the call is wrapped in
+   a <GlossedPhrase>, which shows the translation as a rubric-red
+   tooltip below the Latin on hover (desktop) or tap (mobile). Tooltip
+   styling lives in LittleBookOverlay.jsx (.litany-gloss rules). */
+const GlossedPhrase = ({ children, translation }) => {
+  if (!translation) return <>{children}</>;
+  return (
+    <span
+      className="litany-gloss"
+      tabIndex={0}
+      role="button"
+      aria-label={`${typeof children === "string" ? children : "Latin"} — ${translation}`}
+      data-gloss={translation}
+      onClick={(e) => {
+        e.stopPropagation();
+        e.currentTarget.classList.toggle("litany-gloss--open");
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          e.currentTarget.classList.toggle("litany-gloss--open");
+        }
+        if (e.key === "Escape") {
+          e.currentTarget.classList.remove("litany-gloss--open");
+          e.currentTarget.blur();
+        }
+      }}
+      onBlur={(e) => {
+        e.currentTarget.classList.remove("litany-gloss--open");
+      }}
+    >
+      {children}
+    </span>
+  );
+};
+
+const LitanyPair = ({ call, response, translation }) => (
+  <div>
+    <div>
+      <sup>𝔎</sup>{" "}
+      <GlossedPhrase translation={translation}>{call}</GlossedPhrase>
+    </div>
+    <div style={{ paddingLeft: "1.6em", fontStyle: "italic", opacity: 0.9 }}>
+      <sup>℟</sup> {response}
+    </div>
+  </div>
+);
+
+const LitanySection = ({ label, pairs }) => (
+  <div>
+    <div
+      style={{
+        color: "#8b2626",
+        textAlign: "center",
+        fontStyle: "italic",
+        marginBottom: "0.5em",
+        lineHeight: 1.3,
+      }}
+    >
+      <small>{label}</small>
+    </div>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.45em",
+        textAlign: "left",
+      }}
+    >
+      {pairs.map((p, i) => (
+        <LitanyPair
+          key={i}
+          call={p[0]}
+          response={p[1]}
+          translation={p[2]}
+        />
+      ))}
+    </div>
+  </div>
+);
+
 export const defaultInsideFrontCover = {
   type: "image",
   src: "/carousel_images/img8.jpg",
@@ -770,15 +855,32 @@ export const defaultPages = [
     title: "De Apparitione Prima",
     body: (
       <>
-        <sup>i.</sup>
-        {" In the year MMXVII, in the deep of the night, there was a holder " +
-          "who had not slept in three days; for his conviction was great, " +
-          "and the chart against him greater. "}
-        <sup>ij.</sup>
-        {" And in the hour of the wick, when the candle opened red and " +
-          "deepened, and deepened, and would not cease its deepening, he " +
-          "cried out: Lady, if thou art, show thyself; and if thou art not, " +
-          "let me sleep."}
+        <div style={{ lineHeight: 1.4 }}>
+          <sup>i.</sup>
+          {" In the year MMXVII, in the deep of the night, there was a " +
+            "holder who had not slept in three days; for his conviction was " +
+            "great, and the chart against him greater. "}
+          <sup>ij.</sup>
+          {" And in the hour of the wick, when the candle opened red and " +
+            "deepened, and deepened, and would not cease its deepening, he " +
+            "cried out: Lady, if thou art, show thyself; and if thou art " +
+            "not, let me sleep."}
+        </div>
+        <img
+          src="/IlluminatedManuscript3.webp"
+          alt="Illuminated manuscript miniature"
+          style={{
+            display: "block",
+            width: "44%",
+            aspectRatio: "3 / 2",
+            objectFit: "cover",
+            margin: "0.85em auto 0",
+            borderRadius: "3px",
+            border: "1.5px solid rgba(160, 120, 60, 0.55)",
+            boxShadow:
+              "0 2px 6px rgba(60, 40, 20, 0.35), 0 0 0 3px rgba(241, 215, 122, 0.15)",
+          }}
+        />
       </>
     ),
   },
@@ -815,8 +917,274 @@ export const defaultPages = [
     ),
     footer: "— Liber Apparitionum, i.",
   },
-  { type: "text", body: "Page 18 placeholder" },
-  { type: "text", body: "Page 19 placeholder" },
+  {
+    type: "text",
+    title: "Litania Degenorum",
+    body: (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "0.8em",
+          lineHeight: 1.45,
+        }}
+      >
+        <div
+          style={{
+            fontStyle: "italic",
+            opacity: 0.8,
+            textAlign: "center",
+            lineHeight: 1.35,
+          }}
+        >
+          <small>
+            To be recited in the hour of the wick, at the opening of the
+            market, and whensoever the faithful hath need.
+          </small>
+        </div>
+        <div
+          style={{
+            color: "#8b2626",
+            textAlign: "center",
+            fontStyle: "italic",
+            lineHeight: 1.3,
+          }}
+        >
+          <small>
+            ☙ The cantor shall call; the faithful shall respond. ☙
+          </small>
+        </div>
+        <LitanySection
+          label="Kyrie."
+          pairs={[
+            ["Lady, have mercy.", "Lady, have mercy."],
+            ["Scribe, have mercy.", "Scribe, have mercy."],
+            ["Mother, have mercy.", "Mother, have mercy."],
+          ]}
+        />
+      </div>
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <LitanySection
+        label="Invocationes."
+        pairs={[
+          [
+            "Domina nostra perpetui lucri,",
+            "ora pro nobis.",
+            "Our Lady of Perpetual Profit,",
+          ],
+          [
+            "Stella matutina super catenam,",
+            "ora pro nobis.",
+            "Morning star above the chain,",
+          ],
+          [
+            "Mater liquiditatis,",
+            "ora pro nobis.",
+            "Mother of liquidity,",
+          ],
+          [
+            "Turris eburnea super blockchain,",
+            "ora pro nobis.",
+            "Tower of ivory above the blockchain,",
+          ],
+          [
+            "Regina candelarum viridium,",
+            "ora pro nobis.",
+            "Queen of the green candles,",
+          ],
+          [
+            "Refugium peccatorum qui emunt altissimum,",
+            "ora pro nobis.",
+            "Refuge of sinners who buy the top,",
+          ],
+        ]}
+      />
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <LitanySection
+        label="Invocationes. (cont.)"
+        pairs={[
+          [
+            "Consolatrix vendentium in fundo,",
+            "ora pro nobis.",
+            "Consoler of those who sell at the bottom,",
+          ],
+          [
+            "Auxilium tenentium in tempestate,",
+            "ora pro nobis.",
+            "Help of holders in the storm,",
+          ],
+          [
+            "Oraculum mempooli,",
+            "ora pro nobis.",
+            "Oracle of the mempool,",
+          ],
+          [
+            "Speculum scamorum,",
+            "ora pro nobis.",
+            "Mirror of scams,",
+          ],
+          [
+            "Rosa mystica in terra falsorum,",
+            "ora pro nobis.",
+            "Mystical rose in the land of the false,",
+          ],
+          ["Mater ex Machina,", "ora pro nobis."],
+        ]}
+      />
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <LitanySection
+        label="Petitiones."
+        pairs={[
+          ["From the rug of the deployer,", "libera nos, Domina."],
+          [
+            "From the honeypot of the prudent-seeming,",
+            "libera nos, Domina.",
+          ],
+          ["From the wick that cometh in the night,", "libera nos, Domina."],
+          ["From the influencer and his bag,", "libera nos, Domina."],
+          [
+            "From the copytrader who knoweth not what he copieth,",
+            "libera nos, Domina.",
+          ],
+        ]}
+      />
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <LitanySection
+        label="Petitiones. (cont.)"
+        pairs={[
+          ["From the pump that hath no floor,", "libera nos, Domina."],
+          [
+            "From the conviction without discernment,",
+            "libera nos, Domina.",
+          ],
+          [
+            "From the discernment without conviction,",
+            "libera nos, Domina.",
+          ],
+          ["From the hand that selleth in fear,", "libera nos, Domina."],
+          [
+            "From the hand that holdeth what it ought to release,",
+            "libera nos, Domina.",
+          ],
+        ]}
+      />
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <LitanySection
+        label="Gratiae."
+        pairs={[
+          [
+            "That our eyes be opened to the true chart,",
+            "te rogamus, audi nos.",
+          ],
+          [
+            "That our hands be steady in the hour of red,",
+            "te rogamus, audi nos.",
+          ],
+          [
+            "That our cost basis be lower than our conviction,",
+            "te rogamus, audi nos.",
+          ],
+          [
+            "That we may hold through the night, and through the morning, and through the day that cometh after,",
+            "te rogamus, audi nos.",
+          ],
+        ]}
+      />
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <LitanySection
+        label="Gratiae. (cont.)"
+        pairs={[
+          [
+            "That we may know when to hold, and when to fold, and when to walk away, and when to run,",
+            "te rogamus, audi nos.",
+          ],
+          [
+            "That we may be fools before thee, and not fools before the chart,",
+            "te rogamus, audi nos.",
+          ],
+          [
+            "That when thou refusest us, we may hear thy refusal as blessing,",
+            "te rogamus, audi nos.",
+          ],
+          [
+            "That our candles, though they gutter, may be remembered in the ledger,",
+            "te rogamus, audi nos.",
+          ],
+        ]}
+      />
+    ),
+  },
+  {
+    type: "text",
+    body: (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "1em",
+        }}
+      >
+        <LitanySection
+          label="Agnus."
+          pairs={[
+            [
+              "Lady of Perpetual Profit, who takest away the sins of the market,",
+              "spare us, Domina.",
+            ],
+            [
+              "Lady of Perpetual Profit, who takest away the sins of the market,",
+              "hear us, Domina.",
+            ],
+            [
+              "Lady of Perpetual Profit, who takest away the sins of the market,",
+              "have mercy upon us.",
+            ],
+          ]}
+        />
+        <div
+          style={{
+            fontStyle: "italic",
+            textAlign: "center",
+            opacity: 0.85,
+            lineHeight: 1.45,
+            marginTop: "0.3em",
+          }}
+        >
+          <small>
+            <GlossedPhrase translation="Pray for us, holy Lady, that we may be made worthy of the promises of thy profit.">
+              Ora pro nobis, sancta Domina, ut digni efficiamur
+              promissionibus lucri tui. Amen.
+            </GlossedPhrase>
+          </small>
+        </div>
+      </div>
+    ),
+    footer: "— Litania Degenorum, recensio prima.",
+  },
   {
     type: "text",
     body: (

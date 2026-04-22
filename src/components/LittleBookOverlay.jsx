@@ -791,6 +791,66 @@ export default function LittleBookOverlay({
           transition: opacity 0.6s ease;
         }
 
+        /* ---------- LATIN GLOSS TOOLTIP ----------
+           Selected Latin phrases in the Litany are wrapped in a
+           <GlossedPhrase> (see LittleBookPages.jsx) that exposes an
+           English translation via data-gloss. On hover (desktop) or tap
+           (mobile — the span is focusable and toggles an --open class on
+           click), a small rubric-red tooltip appears *below* the Latin
+           so the reader's eye continues downward into the response. The
+           tooltip is styled as a liturgical rubric on parchment rather
+           than a modern UI bubble, so it feels part of the Book. */
+        .litany-gloss {
+          position: relative;
+          cursor: help;
+          border-bottom: 1px dotted rgba(139, 38, 38, 0.45);
+          -webkit-tap-highlight-color: transparent;
+          outline: none;
+        }
+        .litany-gloss:focus-visible {
+          background: rgba(139, 38, 38, 0.08);
+        }
+        .litany-gloss::after {
+          content: attr(data-gloss);
+          position: absolute;
+          top: 100%;
+          left: 0;
+          margin-top: 0.35em;
+          max-width: min(90vw, 22em);
+          padding: 0.3em 0.7em;
+          background: rgba(250, 244, 224, 0.98);
+          color: #8b2626;
+          border: 1px solid rgba(139, 38, 38, 0.35);
+          border-radius: 2px;
+          font-style: italic;
+          font-variant: small-caps;
+          font-size: 0.82em;
+          letter-spacing: 0.05em;
+          line-height: 1.3;
+          text-align: left;
+          white-space: normal;
+          opacity: 0;
+          pointer-events: none;
+          transform: translateY(-3px);
+          transition:
+            opacity 0.25s ease 0.25s,
+            transform 0.25s ease 0.25s;
+          box-shadow:
+            0 2px 6px rgba(60, 40, 20, 0.22),
+            0 0 0 2px rgba(241, 215, 122, 0.08);
+          z-index: 20;
+        }
+        .litany-gloss:hover::after,
+        .litany-gloss:focus::after,
+        .litany-gloss--open::after {
+          opacity: 1;
+          transform: translateY(0);
+          transition-delay: 0.3s;
+        }
+        .litany-gloss:not(:hover):not(:focus):not(.litany-gloss--open)::after {
+          transition-delay: 0s;
+        }
+
         /* ---------- BOOK GLOW ---------- */
         .lbo-book-glow {
           position: fixed;
