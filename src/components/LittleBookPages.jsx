@@ -404,8 +404,9 @@ export const defaultPages = [
     title: "De Initio",
     dropCap: true,
     image: {
-      src: "/carousel_images/img1.jpg",
+      src: "/descension.webp",
       alt: "A sign of the shrine",
+      flat: true,
     },
     body:
       "In the beginning was the Bid, and the Bid was with the Bagholder, " +
@@ -484,7 +485,7 @@ export const defaultPages = [
     body: (
       <>
         <img
-          src="/IlluminatedManuscript1.webp"
+          src="/carousel_images/img9.jpg"
           alt="Illuminated manuscript"
           style={{
             display: "block",
@@ -847,6 +848,16 @@ export const defaultPages = [
             codices to come. Deo volente et catena permittente.
           </small>
         </div>
+        <img
+          src="/images/toast.webp"
+          alt="Colophon illumination"
+          style={{
+            display: "block",
+            width: "50%",
+            margin: "0.6em auto 0",
+            objectFit: "contain",
+          }}
+        />
       </div>
     ),
   },

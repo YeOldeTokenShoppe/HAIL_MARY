@@ -119,7 +119,7 @@ function PageFace({ entry, pageNumber, zoomed = false }) {
             />
           ) : hasImage ? (
             <img
-              className="lbo-face__illum-media"
+              className={`lbo-face__illum-media${entry.image.flat ? " lbo-face__illum-media--flat" : ""}`}
               src={entry.image.src}
               alt={entry.image.alt || ""}
             />
@@ -1073,7 +1073,23 @@ export default function LittleBookOverlay({
           /* Let the justified text nestle closer to the illumination. */
           shape-outside: inset(0);
           display: block;
-          background: #0a0610;
+          /* Transparent so illumination WebPs with cut-out backgrounds
+             show the parchment page through them. Opaque JPGs cover the
+             full aspect-ratio box via object-fit:cover, so the exposed
+             background never affected them. */
+          background: transparent;
+        }
+        /* "Flat" variant — illuminations that should read as painted
+           directly on the parchment rather than mounted miniatures.
+           Drops the border, shadow, and rounded corners so the art's
+           own silhouette (via transparent WebP) is what the reader
+           sees. Fit switches to contain so tall compositions aren't
+           cropped by the 1:1 aspect box. */
+        .lbo-face__illum-media--flat {
+          object-fit: contain;
+          border: none;
+          border-radius: 0;
+          box-shadow: none;
         }
         /* iframes ignore object-fit and come with a UA border in some
            browsers; make the box behave like the img/video siblings. */
@@ -1117,7 +1133,10 @@ export default function LittleBookOverlay({
         }
         .lbo-face--media {
           padding: 0;
-          background: #0a0610;
+          /* Transparent so full-page illumination WebPs with cut-out
+             backgrounds show the parchment through them. Cover/contain
+             full-bleed photos still fill the box opaquely. */
+          background: transparent;
         }
         .lbo-face__media {
           width: 100%;
