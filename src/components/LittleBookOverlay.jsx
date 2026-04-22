@@ -92,11 +92,13 @@ function PageFace({ entry, pageNumber, zoomed = false }) {
               frameBorder="0"
             />
           ) : hasVideo ? (
-            /* Floated video miniature. In the book view it autoplays
-               muted (required for iOS autoplay) and loops silently. In
-               zoom it renders with native controls + unmuted so the
-               reader can hear it — autoplay with audio may be blocked
-               by the browser, but the controls give a one-tap start. */
+            /* Floated video miniature. Book view autoplays muted + loops
+               (required for iOS autoplay). Zoom view does NOT autoplay
+               and uses preload="none" so iOS doesn't allocate a video
+               decode buffer while the user is pinch-scaling the element
+               — scaling a live video texture on iOS is a known OOM
+               trigger. The native controls give a one-tap start if the
+               reader wants to hear the greeting. */
             <video
               className="lbo-face__illum-media"
               src={entry.video.src}
@@ -104,9 +106,9 @@ function PageFace({ entry, pageNumber, zoomed = false }) {
               muted={!zoomed}
               loop
               playsInline
-              autoPlay
+              autoPlay={!zoomed}
               controls={zoomed}
-              preload="metadata"
+              preload={zoomed ? "none" : "metadata"}
             />
           ) : hasImage ? (
             <img
@@ -195,8 +197,9 @@ function PageFace({ entry, pageNumber, zoomed = false }) {
    horizontal swipe advance the face; closing snaps the book scroller to
    the matching spread so the underlying book is coherent on exit. */
 const ZOOM_MIN = 1;
-const ZOOM_MAX = 2.5;
-const DOUBLE_TAP_MS = 300;
+const ZOOM_MAX = 2;
+const DOUBLE_TAP_MS = 350;
+const DOUBLE_TAP_SLOP_PX = 14;
 const SWIPE_PX = 40;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -228,9 +231,29 @@ function ZoomLayer({
   const pointersRef = useRef(new Map());
   const gestureRef = useRef(null);
   const lastTapRef = useRef(0);
+  const rafRef = useRef(null);
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [gesturing, setGesturing] = useState(false);
+
+  /* Coalesce pointer-move updates to one per animation frame. iOS fires
+     pointer events up to 120Hz on ProMotion; setting state that often
+     causes React + compositor thrash and, empirically, crashes during
+     extended pinch gestures. The pointer map itself stays live via ref
+     so the rAF callback always reads the freshest positions. */
+  const scheduleUpdate = (fn) => {
+    if (rafRef.current != null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      fn();
+    });
+  };
+  useEffect(
+    () => () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    },
+    [],
+  );
 
   /* Reset zoom state whenever the face changes so each new page starts
      at 1x. Also fires on open because zoomedFaceIdx goes null → value. */
@@ -314,45 +337,48 @@ function ZoomLayer({
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const g = gestureRef.current;
     if (!g) return;
-    if (g.type === "pinch" && pointersRef.current.size === 2) {
-      const [p1, p2] = [...pointersRef.current.values()];
-      const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-      const next = clamp(
-        g.startScale * (dist / g.startDist),
-        ZOOM_MIN,
-        ZOOM_MAX,
-      );
-      const cx = (p1.x + p2.x) / 2;
-      const cy = (p1.y + p2.y) / 2;
-      /* Two-finger pan: translate by the midpoint drift so the content
-         tracks the fingers' center while scaling. */
-      const panDx = cx - g.startCx;
-      const panDy = cy - g.startCy;
-      const ratio = next / g.startScale;
-      setScale(next);
-      setOffset(
-        clampOffset(
-          {
-            x: g.startOffset.x * ratio + panDx,
-            y: g.startOffset.y * ratio + panDy,
-          },
-          next,
-          panelRef.current,
-        ),
-      );
-    } else if (g.type === "drag" && pointersRef.current.size === 1) {
-      if (g.startScale > 1) {
-        const dx = e.clientX - g.startX;
-        const dy = e.clientY - g.startY;
+    scheduleUpdate(() => {
+      const gg = gestureRef.current;
+      if (!gg) return;
+      if (gg.type === "pinch" && pointersRef.current.size === 2) {
+        const [p1, p2] = [...pointersRef.current.values()];
+        const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+        const next = clamp(
+          gg.startScale * (dist / gg.startDist),
+          ZOOM_MIN,
+          ZOOM_MAX,
+        );
+        const cx = (p1.x + p2.x) / 2;
+        const cy = (p1.y + p2.y) / 2;
+        const panDx = cx - gg.startCx;
+        const panDy = cy - gg.startCy;
+        const ratio = next / gg.startScale;
+        setScale(next);
         setOffset(
           clampOffset(
-            { x: g.startOffset.x + dx, y: g.startOffset.y + dy },
-            g.startScale,
+            {
+              x: gg.startOffset.x * ratio + panDx,
+              y: gg.startOffset.y * ratio + panDy,
+            },
+            next,
             panelRef.current,
           ),
         );
+      } else if (gg.type === "drag" && pointersRef.current.size === 1) {
+        if (gg.startScale > 1) {
+          const [p] = pointersRef.current.values();
+          const dx = p.x - gg.startX;
+          const dy = p.y - gg.startY;
+          setOffset(
+            clampOffset(
+              { x: gg.startOffset.x + dx, y: gg.startOffset.y + dy },
+              gg.startScale,
+              panelRef.current,
+            ),
+          );
+        }
       }
-    }
+    });
   };
 
   const onPointerUp = (e) => {
@@ -369,8 +395,8 @@ function ZoomLayer({
           else onPrev();
         } else if (
           e.pointerType === "touch" &&
-          Math.abs(dx) < 8 &&
-          Math.abs(dy) < 8
+          Math.abs(dx) < DOUBLE_TAP_SLOP_PX &&
+          Math.abs(dy) < DOUBLE_TAP_SLOP_PX
         ) {
           /* Tap (not a drag) — manual double-tap. Only for touch; mouse
              dbl-click goes through onDoubleClickMouse. */
@@ -1265,11 +1291,11 @@ export default function LittleBookOverlay({
           position: fixed;
           inset: 0;
           z-index: 10060;
-          background: radial-gradient(
-            ellipse at center,
-            rgba(10, 6, 20, 0.88) 0%,
-            rgba(2, 3, 8, 0.97) 100%
-          );
+          /* Flat near-opaque color instead of a radial gradient —
+             gradients force a new paint region on every composite
+             frame of the scaled panel above, which multiplies GPU
+             work (and on iOS, memory) during pinch. */
+          background: rgba(4, 3, 10, 0.97);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -1301,6 +1327,10 @@ export default function LittleBookOverlay({
           user-select: none;
           -webkit-user-select: none;
           -webkit-touch-callout: none;
+          /* Isolate paint/layout so the compositor doesn't have to
+             invalidate surrounding regions when the inner scaler's
+             transform changes during pinch. */
+          contain: layout paint style;
           background: #f2ecdb;
           border-radius: 8px;
           box-shadow:
@@ -1519,11 +1549,15 @@ export default function LittleBookOverlay({
               ref={bookRef}
               onClick={handleBookTap}
               style={{
-                /* Hide the book while zoom is active. It's fully
-                   obscured by the zoom backdrop anyway, and collapsing
-                   its composite layers here frees GPU texture memory
-                   so the zoomed scaler has room to breathe on iOS. */
-                visibility: zoomedFaceIdx !== null ? "hidden" : "visible",
+                /* display:none (not visibility:hidden) while zoom is
+                   active — iOS keeps composite-layer textures for
+                   visibility:hidden elements, and the book's nested
+                   preserve-3d sheets are ~10 layers' worth of backing
+                   stores. Fully unmounting the paint tree releases
+                   them so the zoomed scaler has headroom. The book
+                   remounts when zoom closes; users don't see the flash
+                   because the zoom backdrop is covering it. */
+                display: zoomedFaceIdx !== null ? "none" : "block",
               }}
             >
               <div className="lbo-book__spine" />
