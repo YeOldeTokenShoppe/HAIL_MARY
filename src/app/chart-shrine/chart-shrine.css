@@ -230,12 +230,31 @@
 }
 
 /* Full-page hologram background: the scene lives behind all page content. */
+/* pointer-events: auto so the R3F canvas can receive drag events on the
+   hero candle (drag-to-spin). All page UI sits at z-index >= 1 above this
+   layer, so their own handlers still win for their regions — only empty
+   background areas route into the canvas, where R3F's raycaster only
+   "hits" the 3D geometry that was there to be clicked anyway. */
 .shrine-page.neon .scene-background {
   position: fixed;
   inset: 0;
   z-index: 0;
-  pointer-events: none;
+  pointer-events: auto;
   overflow: hidden;
+  /* Hint that the candle is draggable. Touch devices ignore cursor;
+     they'll discover the affordance on first try. The descendant
+     selectors are required because the R3F <canvas> is the actual
+     hover target inside this wrapper and `cursor: inherit` on
+     <canvas> was not picking up the parent value in all browsers —
+     set `grab` explicitly on descendants. */
+  cursor: grab;
+}
+.shrine-page.neon .scene-background * {
+  cursor: grab;
+}
+.shrine-page.neon .scene-background.is-grabbing,
+.shrine-page.neon .scene-background.is-grabbing * {
+  cursor: grabbing;
 }
 
 /* Stack inline content above the fixed scene-background. Fixed-position
@@ -247,6 +266,20 @@
   > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge) {
   position: relative;
   z-index: 1;
+  /* Don't eat pointer events over the canvas — these are decorative
+     text bands. Interactive children (buttons, links) opt back in with
+     their own `pointer-events: auto`. Without this, dragging across
+     the candle in a region where hero-band (or another of these
+     wrappers) overlays the canvas gets blocked at the DOM level before
+     R3F's raycaster runs. */
+  pointer-events: none;
+}
+/* Safety net: keep any interactive descendant of those wrappers
+   clickable even though the parent is pointer-events:none. */
+.shrine-page.neon
+  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge)
+  :is(a, button, input, select, textarea, label, [role="button"], [tabindex]) {
+  pointer-events: auto;
 }
 
 /* Soft vignette / darkening over the background so overlaid content reads. */

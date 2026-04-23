@@ -166,7 +166,26 @@ const CANDLE_VARIANTS = {
   votive: {
     modelPath: "/models/tinyVotiveOnly.glb",
     meltMeshName: "XBASE",
-    meltAxis: "z",
+    // Blender export quirk: the votive GLB was exported with the
+    // default Y-up conversion (no pre-rotation baked in), so its local
+    // vertical is Y — unlike the pillar, which was authored to keep Z
+    // as vertical after export. Using the wrong axis made the "melt"
+    // shrink the depth (invisible from the front camera) instead of
+    // the height.
+    meltAxis: "y",
+    // Votive wax is tapered (wider at the bottom), so pure vertical
+    // shrink looks off — the remaining stub keeps its full original
+    // girth. Shrink the two non-melt axes at a fraction of the melt
+    // rate so the column also slims a touch as it burns. 0 = disabled
+    // (matches pillar behavior); 1 = same rate as the melt axis.
+    meltSecondaryRate: 0.1,
+    // How much of the parent candle's vertical shrink the flame
+    // inherits. 0 = flame stays at authored height for the whole
+    // burn; 1 = flame shrinks 1:1 with the candle (prior behavior).
+    // 0.3 lands the flame at ~70% base at full burn and ~85% at
+    // half burn — reads as a flame gently lowering rather than
+    // collapsing to a pinprick over the glass rim.
+    flameMeltShrinkRate: 0.3,
     dripMeshName: null,
     scale: 1.2,
     // Wick material — lives on XBase as a second material slot. Given
@@ -269,6 +288,17 @@ function HeroAltarObject({
   const variantConfig = CANDLE_VARIANTS[variant] ?? CANDLE_VARIANTS.pillar;
   const { scene } = useGLTF(variantConfig.modelPath);
   const groupRef = useRef();
+  // Inner group wrapping the candle primitive — user drags spin this
+  // around Y so they can see the flame from angles the saint decal
+  // would otherwise occlude. Kept separate from `groupRef` so the
+  // outer camera-follow transform stays clean.
+  const candleSpinRef = useRef(null);
+  const spinStateRef = useRef({ active: false, lastX: 0, yaw: 0, pointerId: null });
+  // Saint-decal materials. Collected once per scene load so useFrame
+  // can animate a warm emissive bleed through the label as the flame
+  // drops behind it. Baseline emissive color/intensity are stashed on
+  // each material's userData the first time we touch it.
+  const senoraMaterialsRef = useRef([]);
   const isMobileRef = useRef(false);
   // The melt mesh (WAX on the pillar, XBASE on the votive) + its
   // baseline scale vector — flame/wick are parented to it, so shrinking
@@ -528,6 +558,7 @@ function HeroAltarObject({
     // Reset capture state so variant swaps (pillar ↔ votive) pick up the
     // new scene's flame rather than keeping a stale ref to the old one.
     flameNodeRef.current = null;
+    senoraMaterialsRef.current = [];
     // Shared upgrade helper used on the wax + drip meshes. Swaps the flat
     // authored material for a lit MeshStandardMaterial so it responds to
     // scene lights. Preserves the authored color / base-color map / normal
@@ -567,9 +598,16 @@ function HeroAltarObject({
         obj.renderOrder = 200;
         if (obj.material) {
           const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          // The votive's glass cylinder is transparent — writing depth
+          // makes it occlude everything behind it (wick, flame, etc.)
+          // regardless of alpha. Skip depthWrite on glass so contents
+          // of the container render through. The opaque saint decal
+          // (`senora`) is a separate mesh and still writes depth, so
+          // it correctly occludes the flame when it drops behind.
+          const isGlass = obj.name?.toLowerCase() === "glass";
           mats.forEach((m) => {
             m.transparent = true;
-            m.depthWrite = true;
+            m.depthWrite = !isGlass;
           });
         }
       }
@@ -728,7 +766,10 @@ function HeroAltarObject({
       }
       // Capture the flame parent node (starts with "FLAME", excludes WICK
       // so we don't latch onto a sub-mesh like "Flame_Wick"). First match
-      // wins so sub-children don't overwrite.
+      // wins so sub-children don't overwrite. Authored duplicates (e.g.
+      // tinyVotiveOnly.glb ships both FLAME and a slightly larger
+      // FLAME.001 sharing geometry) are kept permanently hidden by the
+      // lit/unlit flame-visibility effect further below.
       if (obj.name && !flameNodeRef.current) {
         const upperName = obj.name.toUpperCase();
         if (upperName.startsWith("FLAME") && !upperName.includes("WICK")) {
@@ -743,10 +784,105 @@ function HeroAltarObject({
             y: obj.rotation.y,
             z: obj.rotation.z,
           };
+          // Flame materials: additive blending so the near-black
+          // alpha pixels of the cross-billboard quads add nothing to
+          // the framebuffer (invisible) while the bright flame pixels
+          // blaze through. This eliminates the ghost rectangles that
+          // alphaMode: BLEND leaves behind from low-alpha texels. Also
+          // depthWrite:false — additive/emissive materials shouldn't
+          // write depth or they'd self-occlude adjacent pixels and
+          // punch holes into things rendered after. Depth-test stays
+          // ON so the opaque saint decal properly occludes the flame
+          // when it drops behind the label. renderOrder 240 keeps
+          // flame painting after the glass (200) and wick (220).
+          obj.traverse((desc) => {
+            if (!desc.isMesh || !desc.material) return;
+            const mats = Array.isArray(desc.material) ? desc.material : [desc.material];
+            mats.forEach((m) => {
+              if (!m) return;
+              m.blending = THREE.AdditiveBlending;
+              m.depthWrite = false;
+              m.transparent = true;
+            });
+            desc.renderOrder = 240;
+          });
         }
+      }
+      // Saint-decal (senora) — collect materials so useFrame can boost
+      // their emissive to warm as the flame burns below the label, so
+      // the occluded flame reads as a warmth bleed-through rather than
+      // just disappearing. Baseline emissive color + intensity are
+      // stashed on userData so we can always restore cleanly on
+      // extinguish.
+      const imageMeshName = variantConfig.imageMeshName?.toLowerCase();
+      if (imageMeshName && obj.name?.toLowerCase() === imageMeshName) {
+        obj.traverse((desc) => {
+          if (!desc.isMesh || !desc.material) return;
+          const mats = Array.isArray(desc.material) ? desc.material : [desc.material];
+          mats.forEach((m) => {
+            if (!m || !m.emissive) return;
+            if (m.userData.baseEmissiveIntensity == null) {
+              m.userData.baseEmissiveIntensity = m.emissiveIntensity ?? 1;
+              m.userData.baseEmissiveR = m.emissive.r;
+              m.userData.baseEmissiveG = m.emissive.g;
+              m.userData.baseEmissiveB = m.emissive.b;
+            }
+            senoraMaterialsRef.current.push(m);
+          });
+        });
       }
     });
   }, [scene]);
+
+  // Drag-to-spin for the hero candle. Attaches at the window level so
+  // one continuous drag = one continuous rotation — we don't rely on
+  // R3F's raycast-limited pointer events, which stop firing on a mesh
+  // the moment the cursor leaves its silhouette. Scoped to pointerdowns
+  // that start on the scene-background so clicks on UI buttons/links
+  // elsewhere on the page aren't hijacked.
+  useEffect(() => {
+    const onDown = (e) => {
+      const bg = e.target?.closest?.(".scene-background");
+      if (!bg) return;
+      if (e.button != null && e.button !== 0) return; // left-mouse / touch only
+      bg.classList.add("is-grabbing");
+      const startX = e.clientX;
+      const startYaw = spinStateRef.current.yaw;
+      const SENSITIVITY = 0.015; // rad/px
+      const onMove = (me) => {
+        const dx = me.clientX - startX;
+        spinStateRef.current.yaw = startYaw + dx * SENSITIVITY;
+        if (candleSpinRef.current) {
+          candleSpinRef.current.rotation.y = spinStateRef.current.yaw;
+        }
+      };
+      const onEnd = () => {
+        bg.classList.remove("is-grabbing");
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onEnd);
+        window.removeEventListener("pointercancel", onEnd);
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onEnd);
+      window.addEventListener("pointercancel", onEnd);
+    };
+    window.addEventListener("pointerdown", onDown);
+    return () => window.removeEventListener("pointerdown", onDown);
+  }, []);
+
+  // PillarProp visibility — some unified GLBs (e.g. tinyVotiveOnly2.glb)
+  // ship both the votive geometry and a pillar-candle prop named
+  // "PillarProp" in the same file. Only show it when the pillar variant
+  // is active. No-op if the node isn't in the current scene, so this
+  // stays safe for GLBs that don't carry the prop.
+  useEffect(() => {
+    if (!scene) return;
+    scene.traverse((obj) => {
+      if (obj.name === "PillarProp") {
+        obj.visible = variant === "pillar";
+      }
+    });
+  }, [scene, variant]);
 
   // User-customizable votive surfaces. Swaps the Senora decal texture and
   // tints the wax color. Runs separately from the heavy material-upgrade
@@ -1049,7 +1185,17 @@ function HeroAltarObject({
       const elapsed = Date.now() - litAt;
       const progress = Math.min(elapsed / meltDuration, 1.0);
       const shrink = Math.max(axisBase * 0.10, axisBase * (1 - progress));
-      meltMeshRef.current.scale.set(base.x, base.y, base.z);
+      // Non-melt (radial) axes shrink at a reduced rate for tapered
+      // shapes like the votive — 0 leaves them at baseline (pillar).
+      const secondaryRate = variantConfig.meltSecondaryRate ?? 0;
+      const sideFactor = secondaryRate > 0
+        ? Math.max(0.10, 1 - progress * secondaryRate)
+        : 1;
+      meltMeshRef.current.scale.set(
+        base.x * sideFactor,
+        base.y * sideFactor,
+        base.z * sideFactor,
+      );
       meltMeshRef.current.scale[axis] = shrink;
 
       // Drips ooze out from the top origin — uniform scale from ~0 to
@@ -1082,6 +1228,39 @@ function HeroAltarObject({
       }
     }
 
+    // Saint-decal warm bleed-through. When the flame drops behind the
+    // opaque label (~1/3 burn onward) it's fully occluded, which reads
+    // as "the candle just turned off" unless something else signals
+    // warmth. Push emissive toward warm orange on the decal materials
+    // so the label glows with the flame's heat through the paper/paint.
+    // Intensity ramps from 0 at 30% burn to full at 100%, gated on the
+    // lit state so an unlit candle's decal stays authored-neutral.
+    if (senoraMaterialsRef.current.length > 0) {
+      let bleed = 0;
+      if (candleLit && litAt) {
+        const elapsed = Date.now() - litAt;
+        const progress = Math.min(elapsed / meltDuration, 1.0);
+        // Hold silent until the flame has dropped to the top of the
+        // label, then ramp up. Subtle flicker so the glow feels alive
+        // rather than a flat DC offset.
+        const ramp = Math.max(0, (progress - 0.3) / 0.7);
+        const flicker = 1 + flameFbm1D(performance.now() / 1000 * 3.0 + 500) * 0.15;
+        bleed = ramp * flicker;
+      }
+      senoraMaterialsRef.current.forEach((m) => {
+        if (m.userData.baseEmissiveIntensity == null) return;
+        m.emissiveIntensity = m.userData.baseEmissiveIntensity + bleed * 1.2;
+        // Warm orange tint (roughly 0xff7a33 split), additive on top of
+        // the authored emissive color so colored decals aren't washed
+        // out — the tint pushes toward candlelight without replacing it.
+        m.emissive.setRGB(
+          m.userData.baseEmissiveR + bleed * 0.55,
+          m.userData.baseEmissiveG + bleed * 0.22,
+          m.userData.baseEmissiveB + bleed * 0.04,
+        );
+      });
+    }
+
     // --- Flame flicker + sway ---
     // Composed on top of the authored GLB transform. Each channel reads
     // a different offset into the 1D noise so flicker, stretch, and the
@@ -1093,10 +1272,40 @@ function HeroAltarObject({
       const ft = performance.now() / 1000;
       const flicker = 1 + flameFbm1D(ft * 3.5) * 0.09;
       const stretch = 1 + flameFbm1D(ft * 3.0 + 100) * 0.06;
+      // Counter-scale against the parent wax mesh:
+      //   - non-melt axes: undo the radial squeeze from meltSecondaryRate
+      //     so the flame keeps its authored girth
+      //   - melt axis: partially undo the vertical shrink so the flame
+      //     doesn't collapse too early. flameMeltShrinkRate is 0..1:
+      //     0 keeps the flame at full authored height for the whole
+      //     burn; 1 lets it shrink 1:1 with the candle (pre-existing
+      //     behavior). Default is 1 for backward compat — opt in per
+      //     variant.
+      let compX = 1, compY = 1, compZ = 1;
+      if (litAt) {
+        const elapsed = Date.now() - litAt;
+        const progress = Math.min(elapsed / meltDuration, 1.0);
+        const axis = variantConfig.meltAxis;
+
+        const secondaryRate = variantConfig.meltSecondaryRate ?? 0;
+        const sideFactor = secondaryRate > 0
+          ? Math.max(0.10, 1 - progress * secondaryRate)
+          : 1;
+        const sideComp = 1 / sideFactor;
+
+        const meltShrinkRate = variantConfig.flameMeltShrinkRate ?? 1;
+        const parentMeltScale = Math.max(0.10, 1 - progress);
+        const flameTargetMelt = Math.max(0.10, 1 - progress * meltShrinkRate);
+        const meltComp = flameTargetMelt / parentMeltScale;
+
+        compX = axis === "x" ? meltComp : sideComp;
+        compY = axis === "y" ? meltComp : sideComp;
+        compZ = axis === "z" ? meltComp : sideComp;
+      }
       flameNodeRef.current.scale.set(
-        baseScale.x * flicker,
-        baseScale.y * flicker * stretch,
-        baseScale.z * flicker,
+        baseScale.x * flicker * compX,
+        baseScale.y * flicker * stretch * compY,
+        baseScale.z * flicker * compZ,
       );
       flameNodeRef.current.rotation.x =
         baseRot.x + flameFbm1D(ft * 1.9 + 200) * 0.03;
@@ -1280,13 +1489,23 @@ function HeroAltarObject({
           + additive-blended plane combo produced blocky render artifacts
           around the statue area on iOS Safari. Candle is readable without
           it thanks to the flame's own emissive materials. */}
-      <primitive object={scene} scale={variantConfig.scale} />
-      {/* Low ambient so dark materials (e.g. the votive's wick) stay
-          readable when the candle is unlit — without this, the only
-          lights are warmLight (intensity 0 when unlit) and the GLB
-          pointLight (hidden when unlit), and black-material geometry
-          disappears against the black page background. */}
-      <ambientLight intensity={0.25} color="#ffffff" />
+      {/* Drag-to-spin: the opaque saint decal occludes the flame once
+          the wax drops behind it (~1/3 burn), which kills the vibe. The
+          inner group lets users rotate the candle around Y to peek at
+          the flame from the sides. X rotation is intentionally ignored
+          so the candle can't be tilted off vertical. */}
+      <group ref={candleSpinRef}>
+        <primitive object={scene} scale={variantConfig.scale} />
+      </group>
+      {/* Ambient + hemi fill so the candle has a strong omnidirectional
+          base illumination. The parent StarfieldStatueScene has a fixed
+          directional light that makes wax/wick look lit-from-one-side
+          as the user drag-spins the candle; a healthy ambient floor
+          flattens the rotation-dependent variance. Hemi adds a gentle
+          warm-from-above / cool-from-below gradient so it doesn't read
+          as a flat-lit plastic. */}
+      <ambientLight intensity={0.6} color="#ffffff" />
+      <hemisphereLight intensity={0.35} color="#ffd8b0" groundColor="#18202c" />
       {/* Warm candle-side fill — drives ignition flash + ongoing flicker. */}
       {/* <pointLight
         ref={warmLightRef}
