@@ -204,6 +204,7 @@ export default function ModelViewerPage() {
            this icon routes back to the root page instead. */
         onBookClick={() => router.push('/')}
         bookLabel="HOME"
+        bookTitle="Return to the shrine"
         bookIcon={
           <svg
             className="btm-book-icon-svg"

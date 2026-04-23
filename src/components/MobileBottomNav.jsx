@@ -54,6 +54,10 @@ export default function MobileBottomNav({
   // is repurposed (e.g. on /exlibris the slot returns to the root page,
   // so a home glyph reads more accurately than the book icon).
   bookIcon = null,
+  // Tooltip text for the book slot. Defaults to the library framing
+  // that fits the root-page usage; override per-page when the slot does
+  // something else (e.g. "Return to the shrine" on /exlibris).
+  bookTitle = 'Visit the monastic library',
   // Extra placeholder slots rendered to the left or right of the center
   // FAB. Each slot: { label, iconSrc?, icon?, onClick?, comingSoon? }.
   // When `comingSoon` is set the slot renders dimmed with a SOON badge.
@@ -151,7 +155,7 @@ export default function MobileBottomNav({
     <button
       className="btm-nav-item"
       onClick={onBookClick}
-      title="Open the little book"
+      title={bookTitle}
     >
       <div className="btm-nav-icon">
         {bookIcon ? (
