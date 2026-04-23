@@ -216,11 +216,13 @@ export default function ModelViewerPage() {
             strokeLinejoin="round"
             aria-hidden="true"
           >
-            <path d="M10 9h4" />
-            <path d="M12 7v5" />
-            <path d="M14 21v-3a2 2 0 0 0-4 0v3" />
-            <path d="m18 9 3.52 2.147a1 1 0 0 1 .48.854V19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6.999a1 1 0 0 1 .48-.854L6 9" />
-            <path d="M6 21V7a1 1 0 0 1 .376-.782l5-3.999a1 1 0 0 1 1.249.001l5 4A1 1 0 0 1 18 7v14" />
+            <path d="M9 5v4" />
+            <rect width="4" height="6" x="7" y="9" rx="1" />
+            <path d="M9 15v2" />
+            <path d="M17 3v2" />
+            <rect width="4" height="8" x="15" y="5" rx="1" />
+            <path d="M17 13v3" />
+            <path d="M3 3v16a2 2 0 0 0 2 2h16" />
           </svg>
         }
         extraLeft={[

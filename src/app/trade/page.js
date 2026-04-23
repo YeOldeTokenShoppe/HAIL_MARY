@@ -1256,7 +1256,7 @@ export default function CyborgTemple() {
                   transition: 'opacity 0.3s ease',
                 }}
               >
-                <NavControls
+                {/* <NavControls
                   auroraOn={useAurora}
                   setAuroraOn={setUseAurora}
                   is80s={context80sMode}
@@ -1268,12 +1268,12 @@ export default function CyborgTemple() {
                   onMenuClick={() => setShowCyberNav(!showCyberNav)}
                   isUserSignedIn={isSignedIn}
                   isMenuOpen={showCyberNav}
-                />
+                /> */}
               </div>
             )}
 
             {/* Mobile Bottom Nav */}
-            {isMobileView && (
+            {/* {isMobileView && (
               <MobileBottomNav
                 isPlaying={contextIsPlaying}
                 onPlayMusic={() => play()}
@@ -1290,7 +1290,7 @@ export default function CyborgTemple() {
                 show80sButton={false}
                 darkMode
               />
-            )}
+            )} */}
 
             {/* Telegram Feature Box - Desktop only */}
             {!isMobileView && !focusedAgent?.startsWith('Screen') && (
@@ -1300,7 +1300,7 @@ export default function CyborgTemple() {
                 rel="noopener noreferrer"
                 style={{
                   position: 'fixed',
-                  top: '7.5rem',
+                  top: '1.5rem',
                   right: '1rem',
                   zIndex: 1001,
                   width: '200px',
@@ -1380,13 +1380,13 @@ export default function CyborgTemple() {
             )} */}
 
             {/* CyberNav Menu - Show when toggled */}
-            <CyberNav
+            {/* <CyberNav
               is80sMode={context80sMode} 
               position="fixed"
               isOpen={showCyberNav}
               onClose={() => setShowCyberNav(false)}
               showButton={false}
-            />
+            /> */}
             
 
           </>
