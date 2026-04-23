@@ -358,6 +358,24 @@
       }
 
       // =========================================================================
+      // SHRINE CANDLE PREFS — cosmetic customization (variant, votive image
+      // data URL, wax tint) that persists independently of lit/unlit state
+      // so prefs cross devices and outlive extinguish. Doc ID = Clerk userId.
+      // Follows the shrineCandles pattern: open reads, body's userId must
+      // match the doc id. Server-side enforcement of image size happens
+      // in lib/candleRitual.js via PREFS_IMAGE_MAX_BYTES.
+      // =========================================================================
+      match /shrineCandlePrefs/{userId} {
+        allow read: if true;
+        allow create: if true
+          && request.resource.data.userId is string
+          && request.resource.data.userId == userId;
+        allow update: if true
+          && request.resource.data.userId == resource.data.userId;
+        allow delete: if true;
+      }
+
+      // =========================================================================
       // SHRINE TESTIMONIALS — short "witness" posts rotated as toasts on /home.
       // All writes go through /api/testimonials (Clerk auth + OpenAI
       // moderation + rate limits) using firebase-admin, which bypasses

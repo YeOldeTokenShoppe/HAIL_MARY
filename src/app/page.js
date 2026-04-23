@@ -16,6 +16,9 @@ import {
   readCandle,
   lightCandle,
   extinguishCandle,
+  readCandlePrefs,
+  writeCandlePrefs,
+  PREFS_IMAGE_MAX_BYTES,
 } from "@/lib/candleRitual";
 import {
   readLocalCandle,
@@ -29,11 +32,44 @@ import "./chart-shrine/chart-shrine.css";
 // anonymous visitors don't pay the download for an asset they won't see.
 useGLTF.preload("/models/JustCandle.glb");
 
-// Per-user candle variant preference persists across reloads but is
-// scoped to the device — kept in localStorage rather than Firestore to
-// avoid touching the ritual schema for a cosmetic choice. Keyed by
-// userId so each signed-in user on a shared device gets their own pick.
+// Per-user candle customization. localStorage gives an instant paint on
+// reload (and is the only store for anonymous users); Firestore carries
+// the same fields across devices once a user signs in. On sign-in we
+// hydrate local first, then reconcile with Firestore when it returns.
+// Keyed by userId so each signed-in user on a shared device gets their
+// own prefs.
 const CANDLE_VARIANT_STORAGE_PREFIX = "rl80:candleVariant:";
+const VOTIVE_IMAGE_STORAGE_PREFIX = "rl80:votiveImage:";
+const VOTIVE_TINT_STORAGE_PREFIX = "rl80:votiveTint:";
+// Preset list for the votive image picker. `src: null` means "restore the
+// baked-in texture that ships with the GLB". Anything else is a URL that
+// the TextureLoader can resolve, including data: URLs from uploads.
+const VOTIVE_IMAGE_PRESETS = [
+  // `src: null` restores the GLB's baked-in decal; `thumbnail` is used
+  // only for the picker tile so we can show a preview that matches the
+  // baked texture without having to load the full-resolution version
+  // as the actual decal.
+  {
+    key: "default",
+    src: null,
+    thumbnail: "/images/nuestraSenora.webp",
+    label: "Guadalupe",
+  },
+  { key: "queenOfHearts", src: "/queenOfHearts1.jpg", label: "Queen of Hearts" },
+  { key: "heart", src: "/images/sacreCoeur.webp", thumbnail: "/images/sacreCoeur.webp", label: "Heart" },
+];
+// A small curated palette for the wax tint, plus a "default" entry that
+// restores the baked color. Users can also enter any hex via the color
+// input. Values are multiplied, not replaced, so the wax keeps its
+// authored shading; picking white = no visible tint.
+const VOTIVE_TINT_PRESETS = [
+  { key: "default", hex: null, label: "Natural" },
+  { key: "crimson", hex: "#b83b3b", label: "Crimson" },
+  { key: "amber", hex: "#d49f3a", label: "Amber" },
+  { key: "rose", hex: "#e57aa7", label: "Rose" },
+  { key: "violet", hex: "#8b5fbf", label: "Violet" },
+  { key: "jade", hex: "#4aa876", label: "Jade" },
+];
 function readCandleVariant(userId) {
   if (!userId || typeof window === "undefined") return null;
   try {
@@ -49,6 +85,47 @@ function writeCandleVariant(userId, variant) {
       CANDLE_VARIANT_STORAGE_PREFIX + userId,
       variant,
     );
+  } catch {}
+}
+
+function readVotiveImage(userId) {
+  if (!userId || typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(VOTIVE_IMAGE_STORAGE_PREFIX + userId);
+  } catch {
+    return null;
+  }
+}
+function writeVotiveImage(userId, src) {
+  if (!userId || typeof window === "undefined") return;
+  try {
+    // setItem throws QuotaExceeded when a large data: URL overflows the
+    // 5MB bucket; swallow and let the picker UI surface the failure.
+    // Null clears the preference (restores the baked-in texture).
+    if (src == null) {
+      window.localStorage.removeItem(VOTIVE_IMAGE_STORAGE_PREFIX + userId);
+    } else {
+      window.localStorage.setItem(VOTIVE_IMAGE_STORAGE_PREFIX + userId, src);
+    }
+  } catch {}
+}
+
+function readVotiveTint(userId) {
+  if (!userId || typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(VOTIVE_TINT_STORAGE_PREFIX + userId);
+  } catch {
+    return null;
+  }
+}
+function writeVotiveTint(userId, hex) {
+  if (!userId || typeof window === "undefined") return;
+  try {
+    if (hex == null) {
+      window.localStorage.removeItem(VOTIVE_TINT_STORAGE_PREFIX + userId);
+    } else {
+      window.localStorage.setItem(VOTIVE_TINT_STORAGE_PREFIX + userId, hex);
+    }
   } catch {}
 }
 
@@ -98,6 +175,15 @@ const CANDLE_VARIANTS = {
     // page background). Matched case-insensitively with dots/underscores
     // stripped so "Mat15.001", "Mat15_001", and "Mat15001" all hit.
     wickMaterialName: "Mat15.001",
+    // User-customizable mesh hooks. `imageMeshName` wears the saint decal
+    // (child of `glass`, which is a child of `XCandle01`); swapping its
+    // texture lets the faithful personalize who they're lighting for.
+    // `tintMeshName` is the wax column — we scope the hue change to the
+    // named `waxMaterialName` slot on that mesh so the other material on
+    // the same primitive (the wick) isn't also recolored.
+    imageMeshName: "senora",
+    tintMeshName: "XBase",
+    waxMaterialName: "Mat9.001",
   },
 };
 
@@ -177,6 +263,8 @@ function HeroAltarObject({
   variant = "pillar",
   onBurnedOut,
   debugRef,
+  votiveImage = null,
+  votiveTint = null,
 }) {
   const variantConfig = CANDLE_VARIANTS[variant] ?? CANDLE_VARIANTS.pillar;
   const { scene } = useGLTF(variantConfig.modelPath);
@@ -468,6 +556,9 @@ function HeroAltarObject({
         transparent: true,
         depthWrite: true,
       });
+      // Carry the authored name forward so downstream effects (e.g. the
+      // votive wax-tint apply) can still target this slot by name.
+      if (oldMat.name) mat.name = oldMat.name;
       mat.userData.isWaxUpgraded = true;
       return mat;
     };
@@ -656,6 +747,193 @@ function HeroAltarObject({
       }
     });
   }, [scene]);
+
+  // User-customizable votive surfaces. Swaps the Senora decal texture and
+  // tints the wax color. Runs separately from the heavy material-upgrade
+  // traverse so we don't re-upgrade materials every time the user picks
+  // a new color. Variants other than votive skip the whole effect.
+  useEffect(() => {
+    if (!scene) return;
+    if (variant !== "votive") return;
+    const imageMeshName = variantConfig.imageMeshName?.toLowerCase();
+    const tintMeshName = variantConfig.tintMeshName?.toLowerCase();
+    // The XBase primitive has two material slots (wax + wick). Match the
+    // wax slot by name so the tint doesn't bleed onto the wick. Case and
+    // separator-tolerant so "Mat9.001", "Mat9_001", and "Mat9001" all hit
+    // — GLTFLoader has been observed to mangle these subtly.
+    const waxTarget = variantConfig.waxMaterialName
+      ? variantConfig.waxMaterialName.replace(/[._]/g, "").toLowerCase()
+      : null;
+    const isWaxMat = (m) => {
+      if (!waxTarget || !m?.name) return false;
+      return m.name.replace(/[._]/g, "").toLowerCase() === waxTarget;
+    };
+
+    let disposedTex = null;
+
+    // XBase and senora may be authored as Groups (XCandle01 > glass >
+    // senora is clearly nested), so we can't filter by `obj.isMesh` at
+    // the outer traverse. Instead, when the named node matches, walk
+    // *its* subtree and apply the mutation to any mesh-with-material
+    // descendants. This mirrors the melt-mesh traverse pattern above.
+    const applyToDescendantMats = (root, fn) => {
+      root.traverse((descendant) => {
+        if (!descendant.isMesh || !descendant.material) return;
+        const mats = Array.isArray(descendant.material)
+          ? descendant.material
+          : [descendant.material];
+        mats.forEach((m) => m && fn(m, descendant));
+      });
+    };
+
+    scene.traverse((obj) => {
+      const nameLower = obj.name?.toLowerCase() ?? "";
+      if (!nameLower) return;
+
+      // Senora decal — swap the material's base-color map. Cache the
+      // baked-in map on userData the first time we touch this mesh so we
+      // can restore it when the user picks "Guadalupe (default)".
+      if (imageMeshName && nameLower === imageMeshName) {
+        applyToDescendantMats(obj, (m) => {
+          // Cache the baked-in texture from both slots the senora
+          // material uses in Blender: base color (.map) AND emissive
+          // (.emissiveMap), which is how the decal glows from within.
+          // Swapping only .map leaves the old image visible as an
+          // emissive ghost on top of the new one, so we have to swap
+          // both slots in lockstep.
+          if (!("bakedMap" in m.userData)) {
+            m.userData.bakedMap = m.map ?? null;
+          }
+          if (!("bakedEmissiveMap" in m.userData)) {
+            m.userData.bakedEmissiveMap = m.emissiveMap ?? null;
+          }
+          const assignUserTexture = (tex) => {
+            // Drop previously-applied user textures so fast successive
+            // picks don't leak GPU memory. Never dispose the baked
+            // textures — the GLB owns those.
+            if (m.map && m.map !== m.userData.bakedMap) {
+              m.map.dispose();
+            }
+            if (
+              m.emissiveMap &&
+              m.emissiveMap !== m.userData.bakedEmissiveMap &&
+              m.emissiveMap !== m.map
+            ) {
+              m.emissiveMap.dispose();
+            }
+            m.map = tex;
+            // Only assign to emissiveMap if the material originally used
+            // one — otherwise we'd accidentally turn a non-glowing
+            // material into a glowing one.
+            if (m.userData.bakedEmissiveMap) {
+              m.emissiveMap = tex;
+            }
+            m.needsUpdate = true;
+          };
+          const restoreBaked = () => {
+            if (m.map && m.map !== m.userData.bakedMap) {
+              m.map.dispose();
+            }
+            if (
+              m.emissiveMap &&
+              m.emissiveMap !== m.userData.bakedEmissiveMap &&
+              m.emissiveMap !== m.map
+            ) {
+              m.emissiveMap.dispose();
+            }
+            m.map = m.userData.bakedMap;
+            m.emissiveMap = m.userData.bakedEmissiveMap;
+            m.needsUpdate = true;
+          };
+          if (votiveImage) {
+            const loader = new THREE.TextureLoader();
+            loader.load(
+              votiveImage,
+              (tex) => {
+                // Match GLTFLoader conventions so UV orientation and
+                // color space line up with the baked texture this
+                // replaces.
+                tex.flipY = false;
+                tex.colorSpace = THREE.SRGBColorSpace;
+                tex.wrapS = THREE.ClampToEdgeWrapping;
+                tex.wrapT = THREE.ClampToEdgeWrapping;
+                // Anisotropic filtering dramatically sharpens the decal
+                // at the grazing angles that the curved votive glass
+                // presents — without it the image softens along the
+                // sides of the cylinder even when the source texture is
+                // high-resolution. 16 is typical max; Three clamps to
+                // whatever the GPU supports.
+                tex.anisotropy = 16;
+                tex.generateMipmaps = true;
+                tex.minFilter = THREE.LinearMipmapLinearFilter;
+                tex.magFilter = THREE.LinearFilter;
+                assignUserTexture(tex);
+              },
+              undefined,
+              () => {
+                // Load failure: fall back to the baked maps instead of
+                // leaving the decal stuck on the previous (possibly
+                // also-broken) URL.
+                restoreBaked();
+              },
+            );
+          } else {
+            restoreBaked();
+          }
+        });
+      }
+
+      // XBase wax tint. Multiplicative: captures the authored/upgraded
+      // color once, then applies `authored * userTint`. Picking null or
+      // pure white restores the authored color exactly. Skips the wick
+      // material so the warm wick glow isn't recolored along with the wax.
+      // XBase in the GLB is a Group, not a mesh — walk descendants so we
+      // reach the actual wax submesh(es).
+      if (tintMeshName && nameLower === tintMeshName) {
+        applyToDescendantMats(obj, (m) => {
+          if (!m.color) return;
+          if (!isWaxMat(m)) return;
+          // Cache the authored diffuse *and* emissive so a reset (null
+          // tint) restores both exactly.
+          if (!m.userData.authoredColor) {
+            m.userData.authoredColor = m.color.clone();
+          }
+          if (m.emissive && !m.userData.authoredEmissive) {
+            m.userData.authoredEmissive = m.emissive.clone();
+          }
+          const baseColor = m.userData.authoredColor;
+          const baseEmissive = m.userData.authoredEmissive;
+          if (votiveTint) {
+            // Replace, don't multiply. The authored wax is a saturated
+            // green with a matching emissive; multiplicative tinting
+            // (authored * tint) muddies anything off-green into near-
+            // black. Replacing yields the hue the user actually picked.
+            // Emissive is derived from the tint at the same proportional
+            // intensity the authored emissive had vs. its diffuse, so
+            // the inner glow follows the surface color naturally.
+            const tint = new THREE.Color(votiveTint);
+            m.color.copy(tint);
+            if (m.emissive) {
+              m.emissive.copy(tint).multiplyScalar(0.18);
+            }
+          } else {
+            m.color.copy(baseColor);
+            if (baseEmissive && m.emissive) {
+              m.emissive.copy(baseEmissive);
+            }
+          }
+          m.needsUpdate = true;
+        });
+      }
+    });
+
+    return () => {
+      // Nothing cleanup-sensitive here; load callbacks race with unmount
+      // but set properties on materials that persist in the cached GLTF
+      // scene, which is fine — next mount will re-apply the latest state.
+      if (disposedTex) disposedTex.dispose();
+    };
+  }, [scene, variant, variantConfig, votiveImage, votiveTint]);
 
   // The GLB ships with FLAME hidden; toggle the Flame node + all of its
   // descendants based on whether the user has lit the candle. We match
@@ -1132,14 +1410,75 @@ export default function HomePage() {
   // the upgrade feel earned rather than auto-granted.
   const [candleVariantChoice, setCandleVariantChoice] = useState("pillar");
   const [showCandlePicker, setShowCandlePicker] = useState(false);
+  // Per-user votive customization. `null` on both = use the baked-in
+  // texture and authored wax color. Anon visitors never see the picker
+  // so these stay null for them.
+  const [votiveImage, setVotiveImage] = useState(null);
+  const [votiveTint, setVotiveTint] = useState(null);
+  // Quota error surface for the upload flow — "your image is too large
+  // to save on this device" reads better than a silent no-op.
+  const [votiveUploadError, setVotiveUploadError] = useState(null);
   useEffect(() => {
     if (!userId) return;
-    const saved = readCandleVariant(userId);
-    if (saved && CANDLE_VARIANTS[saved]) {
-      setCandleVariantChoice(saved);
+    let cancelled = false;
+    // 1) Local-first paint — reads are synchronous and keyed by userId,
+    //    so a returning user sees their prior candle without waiting on
+    //    the Firestore round-trip.
+    const localVariant = readCandleVariant(userId);
+    const localImage = readVotiveImage(userId);
+    const localTint = readVotiveTint(userId);
+    if (localVariant && CANDLE_VARIANTS[localVariant]) {
+      setCandleVariantChoice(localVariant);
     } else {
       setCandleVariantChoice("pillar");
     }
+    setVotiveImage(localImage);
+    setVotiveTint(localTint);
+
+    // 2) Remote reconciliation. Remote wins per-field when present;
+    //    local-only fields (e.g. prefs picked pre-sign-in on this device)
+    //    get mirrored up so other devices inherit them. A field set to
+    //    `null` remotely is treated as "not set", not as an explicit
+    //    clear — callers that want to reset always write the preset key
+    //    (e.g. null image, null tint) explicitly.
+    (async () => {
+      const remote = await readCandlePrefs(userId);
+      if (cancelled) return;
+      const upstreamPatch = {};
+
+      if (remote?.candleVariant && CANDLE_VARIANTS[remote.candleVariant]) {
+        setCandleVariantChoice(remote.candleVariant);
+      } else if (localVariant && CANDLE_VARIANTS[localVariant]) {
+        upstreamPatch.candleVariant = localVariant;
+      }
+
+      if (typeof remote?.votiveImage !== "undefined") {
+        setVotiveImage(remote.votiveImage);
+        // Mirror remote down into local so subsequent reloads stay fast.
+        writeVotiveImage(userId, remote.votiveImage);
+      } else if (localImage) {
+        upstreamPatch.votiveImage = localImage;
+      }
+
+      if (typeof remote?.votiveTint !== "undefined") {
+        setVotiveTint(remote.votiveTint);
+        writeVotiveTint(userId, remote.votiveTint);
+      } else if (localTint) {
+        upstreamPatch.votiveTint = localTint;
+      }
+
+      // Push any local-only prefs up to Firestore so this device's state
+      // is the seed for future devices. Fire-and-forget — if the image
+      // is oversize, writeCandlePrefs returns { ok: false }, which just
+      // means Firestore won't carry the image; local continues working.
+      if (Object.keys(upstreamPatch).length > 0) {
+        writeCandlePrefs(userId, upstreamPatch);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [userId]);
   const candleVariant = userId ? candleVariantChoice : "pillar";
   const router = useRouter();
@@ -1300,12 +1639,119 @@ export default function HomePage() {
     if (!CANDLE_VARIANTS[variant]) return;
     writeCandleVariant(userId, variant);
     setCandleVariantChoice(variant);
+    // Mirror to Firestore so other devices see the same pick. Anon users
+    // are a no-op inside writeCandlePrefs because it guards on userId.
+    writeCandlePrefs(userId, { candleVariant: variant });
     setShowCandlePicker(false);
     // Only auto-light when the user was unlit at pick-time — tapping
     // the picker mid-burn should swap the model without resetting the
     // litAt timer. The model swap happens automatically when the
     // variant prop changes on HeroAltarObject.
     if (!candleLit) doLight();
+  };
+
+  // Commit a votive image choice. `src == null` clears the preference
+  // (restores the baked-in Guadalupe texture). Picker stays open so the
+  // user can tweak tint + image together without re-opening.
+  const handlePickVotiveImage = (src) => {
+    setVotiveUploadError(null);
+    setVotiveImage(src ?? null);
+    writeVotiveImage(userId, src ?? null);
+    // Preset images are plain URLs well under the size cap — fire-and-
+    // forget. A `null` src clears both local and remote.
+    writeCandlePrefs(userId, { votiveImage: src ?? null });
+  };
+
+  // Upload a user-supplied image. Three transforms applied before it
+  // hits localStorage:
+  //   1. Center-crop to the senora decal's ~2:3 portrait aspect so a
+  //      square selfie doesn't get UV-squished onto the candle.
+  //   2. Downscale to max 1024px on the long edge — enough resolution
+  //      to read cleanly on the curved glass even when the user zooms
+  //      in via OrbitControls. Typical 1024px JPEG @ 0.88 is ~200-500KB,
+  //      which sits safely under the Firestore doc cap (900KB).
+  //   3. Re-encode as JPEG at 0.88 with high-quality smoothing so the
+  //      downsample doesn't introduce the soft blur that lower
+  //      quality / default canvas smoothing produced before.
+  const handleUploadVotiveImage = async (file) => {
+    if (!file) return;
+    setVotiveUploadError(null);
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      const img = await new Promise((resolve, reject) => {
+        const el = new Image();
+        el.onload = () => resolve(el);
+        el.onerror = () => reject(new Error("image decode failed"));
+        el.src = dataUrl;
+      });
+      // Center-crop source rect to target aspect. If the image is wider
+      // than the target ratio we trim width; if taller, we trim height.
+      const TARGET_ASPECT = 2 / 3; // width / height — portrait
+      const imgAspect = img.width / img.height;
+      let srcX = 0, srcY = 0, srcW = img.width, srcH = img.height;
+      if (imgAspect > TARGET_ASPECT) {
+        srcW = Math.round(img.height * TARGET_ASPECT);
+        srcX = Math.round((img.width - srcW) / 2);
+      } else if (imgAspect < TARGET_ASPECT) {
+        srcH = Math.round(img.width / TARGET_ASPECT);
+        srcY = Math.round((img.height - srcH) / 2);
+      }
+      const MAX = 1024;
+      const scale = Math.min(1, MAX / Math.max(srcW, srcH));
+      const w = Math.max(1, Math.round(srcW * scale));
+      const h = Math.max(1, Math.round(srcH * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      // Without these, Chrome/Safari use a cheap box filter that softens
+      // edges noticeably on portrait crops. High-quality smoothing is a
+      // single-pass lanczos-ish resample — worth the minor CPU cost for
+      // a one-shot upload.
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, w, h);
+      const compressed = canvas.toDataURL("image/jpeg", 0.88);
+      // Round-trip through writeVotiveImage so QuotaExceeded surfaces here.
+      try {
+        window.localStorage.setItem(
+          VOTIVE_IMAGE_STORAGE_PREFIX + userId,
+          compressed,
+        );
+      } catch {
+        setVotiveUploadError(
+          "Image too large to save on this device — try a smaller one.",
+        );
+        return;
+      }
+      setVotiveImage(compressed);
+      // Sync to Firestore so the upload follows the user across devices.
+      // writeCandlePrefs guards oversize payloads and returns a reason
+      // when it can't write them; in that case the image still lives on
+      // this device but we warn so the expectation matches reality.
+      const result = await writeCandlePrefs(userId, {
+        votiveImage: compressed,
+      });
+      if (result && !result.ok && result.reason === "image-too-large") {
+        setVotiveUploadError(
+          "Image saved on this device, but it's too large to sync to your other devices.",
+        );
+      }
+    } catch {
+      setVotiveUploadError("Couldn't read that image.");
+    }
+  };
+
+  // Commit a wax tint. `hex == null` clears the preference.
+  const handlePickVotiveTint = (hex) => {
+    setVotiveTint(hex ?? null);
+    writeVotiveTint(userId, hex ?? null);
+    writeCandlePrefs(userId, { votiveTint: hex ?? null });
   };
 
   // Auto-dismiss the nudge after 12s so it doesn't linger, and close it as
@@ -1363,6 +1809,8 @@ export default function HomePage() {
             variant={candleVariant}
             onBurnedOut={doExtinguish}
             debugRef={debugRef}
+            votiveImage={votiveImage}
+            votiveTint={votiveTint}
           />
           {/* <Stats className="r3f-stats" /> */}
         </StarfieldStatueScene>
@@ -1446,7 +1894,7 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
           <ul className="flame-nudge-benefits">
             <li>Burns 8 hours, not 1 minute</li>
             <li>Follows you across every device</li>
-            <li>Unlocks more candle options</li>
+            <li>Unlocks the votive — pick your saint &amp; wax color</li>
           </ul>
           <div className="flame-nudge-actions">
             <button
@@ -1501,6 +1949,157 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
               </span>
             </button>
           </div>
+
+          {/* Votive-only personalization. Only reached when the user has
+              picked (or is currently on) the votive variant; otherwise the
+              pillar-only flow skips this block entirely. */}
+          {candleVariantChoice === "votive" && (
+            <div className="votive-customize">
+              <p className="votive-customize-heading">Image</p>
+              <div className="votive-image-presets">
+                {VOTIVE_IMAGE_PRESETS.map((preset) => {
+                  const isActive =
+                    (preset.src == null && !votiveImage) ||
+                    (preset.src != null && votiveImage === preset.src);
+                  return (
+                    <button
+                      key={preset.key}
+                      type="button"
+                      className={`votive-image-tile${isActive ? " is-active" : ""}`}
+                      onClick={() => handlePickVotiveImage(preset.src)}
+                      title={preset.label}
+                      aria-label={preset.label}
+                    >
+                      {preset.thumbnail || preset.src ? (
+                        <img src={preset.thumbnail ?? preset.src} alt="" />
+                      ) : (
+                        <span className="votive-image-tile-default">✨</span>
+                      )}
+                      <span className="votive-image-tile-label">
+                        {preset.label}
+                      </span>
+                    </button>
+                  );
+                })}
+                {(() => {
+                  const hasCustomUpload =
+                    votiveImage &&
+                    !VOTIVE_IMAGE_PRESETS.some((p) => p.src === votiveImage);
+                  return (
+                    <label
+                      className={`votive-image-tile votive-image-upload${
+                        hasCustomUpload ? " is-active" : ""
+                      }`}
+                      title="Upload your own"
+                    >
+                      {hasCustomUpload ? (
+                        <img src={votiveImage} alt="" />
+                      ) : (
+                        <span className="votive-image-tile-default">+</span>
+                      )}
+                      <span className="votive-image-tile-label">Upload</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleUploadVotiveImage(file);
+                          // Reset so re-selecting the same file fires change again.
+                          e.target.value = "";
+                        }}
+                        style={{ display: "none" }}
+                      />
+                      {hasCustomUpload && (
+                        /* Clear the custom upload without triggering the
+                           file picker. stopPropagation + preventDefault
+                           keep the wrapping <label> from forwarding the
+                           click to its hidden <input>. */
+                        <button
+                          type="button"
+                          className="votive-image-clear"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handlePickVotiveImage(null);
+                          }}
+                          aria-label="Clear uploaded image"
+                          title="Clear uploaded image"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </label>
+                  );
+                })()}
+              </div>
+              <p className="votive-upload-hint">
+                Portrait images (~2:3) look best. Uploads are resized and
+                saved only on this device.
+              </p>
+              {votiveUploadError && (
+                <p className="votive-upload-error">{votiveUploadError}</p>
+              )}
+
+              <p className="votive-customize-heading">Wax color</p>
+              <div className="votive-tint-swatches">
+                {VOTIVE_TINT_PRESETS.map((preset) => {
+                  const isActive =
+                    (preset.hex == null && !votiveTint) ||
+                    (preset.hex != null &&
+                      votiveTint?.toLowerCase() === preset.hex.toLowerCase());
+                  return (
+                    <button
+                      key={preset.key}
+                      type="button"
+                      className={`votive-tint-swatch${
+                        preset.hex == null ? " votive-tint-swatch--natural" : ""
+                      }${isActive ? " is-active" : ""}`}
+                      onClick={() => handlePickVotiveTint(preset.hex)}
+                      title={preset.label}
+                      aria-label={preset.label}
+                      style={
+                        preset.hex
+                          ? { background: preset.hex }
+                          : undefined
+                      }
+                    >
+                      {preset.hex == null && (
+                        /* Flame glyph — reads as "the candle's own color"
+                           so the reset swatch looks native to the shrine
+                           rather than a "no-access" slash. */
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                          style={{ width: 14, height: 14 }}
+                        >
+                          <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z" />
+                        </svg>
+                      )}
+                    </button>
+                  );
+                })}
+                {/* Free-form hex picker. Syncs back to votiveTint so the
+                    active-swatch highlight updates if the user happens to
+                    land on a preset value. */}
+                <label
+                  className="votive-tint-swatch votive-tint-custom"
+                  title="Custom color"
+                >
+                  <input
+                    type="color"
+                    value={votiveTint ?? "#ffffff"}
+                    onChange={(e) => handlePickVotiveTint(e.target.value)}
+                  />
+                </label>
+              </div>
+            </div>
+          )}
+
           {candleLit && (
             <button
               type="button"
