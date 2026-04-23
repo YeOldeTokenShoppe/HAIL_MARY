@@ -1114,27 +1114,22 @@ export default function LittleBookOverlay({
             0 0 6px rgba(241, 215, 122, 0.35),
             1px 1px 0 rgba(0, 0, 0, 0.08);
         }
-        /* Face-level type uses vmin so it scales with the book on desktop,
-           but vmin bottoms out around 5-10px on phone viewports where the
-           book hits its 220×300 min-size floor. max() adds a px floor so
-           the teaser spread stays legible on mobile; zoom-panel overrides
-           still win for the reader modal (higher specificity). */
         .lbo-face__title {
           margin: 0;
-          font-size: max(13px, 2.6vmin);
+          font-size: 2.6vmin;
           font-weight: 400;
           letter-spacing: 2px;
           color: #5a2530;
           text-transform: uppercase;
         }
         .lbo-face__body {
-          font-size: max(10px, 1.9vmin);
+          font-size: 1.9vmin;
           line-height: 1.55;
           color: rgba(60, 40, 30, 0.82);
           max-width: 100%;
         }
         .lbo-face__footer {
-          font-size: max(9px, 1.5vmin);
+          font-size: 1.5vmin;
           font-style: italic;
           color: rgba(100, 70, 50, 0.6);
           margin-top: 0.4em;
@@ -1171,7 +1166,7 @@ export default function LittleBookOverlay({
           left: 0;
           right: 0;
           text-align: center;
-          font-size: max(9px, 1.5vmin);
+          font-size: 1.5vmin;
           letter-spacing: 1.5px;
           color: #f1d77a;
           text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
@@ -1406,7 +1401,7 @@ export default function LittleBookOverlay({
         }
         .lbo-cover-eyebrow {
           font-family: 'Pirata One', serif;
-          font-size: max(10px, 2vmin);
+          font-size: 2vmin;
           letter-spacing: 5px;
           text-transform: uppercase;
           color: rgba(42, 214, 238, 0.85);
@@ -1415,7 +1410,7 @@ export default function LittleBookOverlay({
         .lbo-cover-title {
           margin: 0;
           font-family: 'Pirata One', 'IBM Plex Serif', serif;
-          font-size: max(20px, 5vmin);
+          font-size: 5vmin;
           font-weight: 400;
           letter-spacing: 2px;
           line-height: 1.1;
@@ -1446,7 +1441,7 @@ export default function LittleBookOverlay({
           left: 50%;
           transform: translate(-50%, -50%);
           font-family: 'Pirata One', serif;
-          font-size: max(11px, 2vmin);
+          font-size: 2vmin;
           color: rgba(80, 60, 40, 0.55);
           letter-spacing: 4px;
           text-transform: uppercase;

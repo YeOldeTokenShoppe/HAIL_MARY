@@ -58,7 +58,13 @@ function StarfieldStatueScene({
   // Shared with CandleOrbitalEffects so SelectiveBloom has a light to
   // enable on its selection layer — without this it warns and produces
   // a no-op bloom pass. Stable array identity prevents remount churn.
-  const dirLightRef = useRef()
+  //
+  // Back the ref with a persistent THREE.PointLight so `.current` is
+  // *never* null — not even on route unmount, when React detaches the
+  // <primitive> before SelectiveBloom's passive cleanup runs. Without
+  // this, navigating away crashes in SelectiveBloom at `light.layers`.
+  const bloomLightObject = React.useMemo(() => new THREE.PointLight(0xffffff, 0), [])
+  const dirLightRef = useRef(bloomLightObject)
   const bloomLights = React.useMemo(() => [dirLightRef], [])
 
   return (
@@ -296,10 +302,12 @@ function StarfieldStatueScene({
         </Suspense>
 
         {/* Zero-intensity helper light whose lifetime matches the composer's.
-            Kept outside Suspense so `dirLightRef.current` is always defined
-            when SelectiveBloom's mount/unmount effects run — otherwise a
-            re-suspend during GLTF load throws on `light.layers.disable`. */}
-        <pointLight ref={dirLightRef} intensity={0} position={[0, 0, 0]} />
+            Using <primitive object={...}> instead of <pointLight ref={...}>
+            so the light instance is owned by us, not R3F — the ref stays
+            pointed at a live THREE.PointLight even after React unmounts
+            this node during route transitions, so SelectiveBloom's
+            passive cleanup can still read `light.layers` safely. */}
+        <primitive object={bloomLightObject} position={[0, 0, 0]} />
 
         {/* Bloom postprocessing — outside Suspense so a re-suspend of
             the GLTF subtree can't unmount/remount the EffectComposer */}

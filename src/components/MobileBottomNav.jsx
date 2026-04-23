@@ -49,6 +49,11 @@ export default function MobileBottomNav({
   // another modal (e.g. InscribeModal) per the root-page flow.
   onBookClick = null,
   bookLabel = 'BOOK',
+  // Optional custom icon for the book slot — when provided, renders in
+  // place of the default open-book SVG. Use this when the slot's action
+  // is repurposed (e.g. on /exlibris the slot returns to the root page,
+  // so a home glyph reads more accurately than the book icon).
+  bookIcon = null,
   // Extra placeholder slots rendered to the left or right of the center
   // FAB. Each slot: { label, iconSrc?, icon?, onClick?, comingSoon? }.
   // When `comingSoon` is set the slot renders dimmed with a SOON badge.
@@ -149,18 +154,22 @@ export default function MobileBottomNav({
       title="Open the little book"
     >
       <div className="btm-nav-icon">
-        <svg
-          className="btm-book-icon-svg"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-        </svg>
+        {bookIcon ? (
+          bookIcon
+        ) : (
+          <svg
+            className="btm-book-icon-svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+          </svg>
+        )}
       </div>
       <span className="btm-nav-label">{bookLabel}</span>
     </button>

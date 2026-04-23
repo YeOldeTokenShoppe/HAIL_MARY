@@ -393,7 +393,11 @@ export default function ChartShrine({
   useEffect(() => {
     if (!svgRef.current) return;
     const update = () => {
-      const r = svgRef.current.getBoundingClientRect();
+      // ResizeObserver can fire once more after the SVG node has been
+      // detached during route unmount; skip when the ref is already null.
+      const el = svgRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
       setSvgBox({ width: r.width, height: r.height });
     };
     update();

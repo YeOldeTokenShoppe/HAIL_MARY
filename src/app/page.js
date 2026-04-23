@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { useGLTF, Stats } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
@@ -10,7 +11,6 @@ import MobileBottomNav from "@/components/MobileBottomNav";
 import BuyModal from "@/components/BuyModal";
 import TestimonialToasts from "@/components/TestimonialToasts";
 import InscribeModal from "@/components/InscribeModal";
-import LittleBookOverlay from "@/components/LittleBookOverlay";
 import { useCandles } from "@/hooks/useCandles";
 import {
   readCandle,
@@ -1142,9 +1142,9 @@ export default function HomePage() {
     }
   }, [userId]);
   const candleVariant = userId ? candleVariantChoice : "pillar";
+  const router = useRouter();
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [showInscribeModal, setShowInscribeModal] = useState(false);
-  const [showBook, setShowBook] = useState(false);
   const [candleLit, setCandleLit] = useState(false);
   const [litAt, setLitAt] = useState(null);
   // Post-ignition nudge shown only to anonymous visitors who just lit a
@@ -1355,7 +1355,6 @@ export default function HomePage() {
           }}
           statueProps={{ scale: [3, 3, 3] }}
           cameraRadius={2.2}
-          paused={showBook}
         >
           <HeroAltarObject
             candleLit={candleLit}
@@ -1632,9 +1631,29 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
         isMobile
         neonMode
         /* Replace LOGIN slot with BOOK — sign-in/out is surfaced in the
-           candle inscribe modal instead. */
-        onBookClick={() => setShowBook(true)}
-        bookLabel="THE BOOK"
+           candle inscribe modal instead. The icon is a scroll glyph and
+           routes to the dedicated /exlibris scene rather than opening
+           the inline overlay. */
+        onBookClick={() => router.push('/exlibris')}
+        bookLabel="EX LIBRIS"
+        bookIcon={
+          <svg
+            className="btm-book-icon-svg"
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M15 12h-5" />
+            <path d="M15 8h-5" />
+            <path d="M19 17V5a2 2 0 0 0-2-2H4" />
+            <path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3" />
+          </svg>
+        }
         extraLeft={[
           {
             key: 'tcg',
@@ -1671,11 +1690,6 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
       />
 
       <BuyModal isOpen={showBuyModal} onClose={() => setShowBuyModal(false)} />
-
-      <LittleBookOverlay
-        isOpen={showBook}
-        onClose={() => setShowBook(false)}
-      />
 
       <TestimonialToasts onInscribeClick={() => setShowInscribeModal(true)} />
 

@@ -387,7 +387,7 @@ function FloatingChart({ position, chartData, chartType = 'line', chartLabel = '
   );
 }
 
-function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onPyramidClick }) {
+function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onPyramidClick, onBookClick, onBookHoverChange }) {
   const group = useRef();
   const { scene, animations } = useGLTF(modelPath);
   const { actions } = useAnimations(animations, group);
@@ -400,6 +400,8 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
   const ballMeshRef = useRef(null);
   const pyramidMeshRef = useRef(null);
   const pyramidMaterialRef = useRef(null);
+  const bookMeshRef = useRef(null);
+  const bookMaterialsRef = useRef([]);
   const [userRotation, setUserRotation] = useState(0); // User-controlled rotation offset
   const [isDragging, setIsDragging] = useState(false);
   const [lastMouseX, setLastMouseX] = useState(0);
@@ -454,7 +456,7 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
   // Add glow effects to scroll objects and make them clickable
   useEffect(() => {
     if (scene) {
-      const scrollObjects = ['Scroll1', 'Scroll2', 'Scroll3', 'Scroll4'];
+      const scrollObjects = ['Scroll1', 'Scroll2', 'Scroll3', 'Scroll4', 'Scroll5'];
       scrollMaterialsRef.current = []; // Reset materials array
       scrollMeshesRef.current = {}; // Reset meshes object
       
@@ -592,7 +594,43 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
       }
     }
   }, [scene, onBallClick]);
-  
+
+  // Make the Book mesh clickable with a subtle gold glow (opens LittleBookOverlay on exlibris page)
+  useEffect(() => {
+    if (!scene) return;
+    const bookMesh = scene.getObjectByName('Book');
+    if (!bookMesh) return;
+
+    bookMeshRef.current = bookMesh;
+    bookMaterialsRef.current = [];
+
+    const handleBookClick = (event) => {
+      event.stopPropagation();
+      if (onBookClick) onBookClick();
+    };
+
+    bookMesh.traverse((child) => {
+      if (child.isMesh) {
+        child.userData.clickable = true;
+        child.userData.bookObject = true;
+        child.userData.onClick = handleBookClick;
+
+        if (child.material) {
+          const glowMaterial = child.material.clone();
+          glowMaterial.userData.originalEmissive = glowMaterial.emissive
+            ? glowMaterial.emissive.clone()
+            : new THREE.Color(0x000000);
+          glowMaterial.userData.originalEmissiveIntensity =
+            glowMaterial.emissiveIntensity || 0;
+          glowMaterial.emissive = new THREE.Color(0xd4af37);
+          glowMaterial.emissiveIntensity = 0.12;
+          child.material = glowMaterial;
+          bookMaterialsRef.current.push(glowMaterial);
+        }
+      }
+    });
+  }, [scene, onBookClick]);
+
   // Add interaction to Pyramid object
   useEffect(() => {
     if (scene) {
@@ -765,6 +803,18 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
       const pyramidPulseIntensity = 0.5 + Math.sin(time * 1) * 0.15; // Slower pulse for pyramid
       pyramidMaterialRef.current.emissiveIntensity = pyramidPulseIntensity;
     }
+
+    // Book pulsing animation — subtle when idle, brighter while hovered
+    if (bookMaterialsRef.current.length > 0) {
+      const time = clock.getElapsedTime();
+      const isHovered = currentHoverRef.current === 'book';
+      const base = isHovered ? 0.45 : 0.12;
+      const amp = isHovered ? 0.15 : 0.05;
+      const pulse = base + Math.sin(time * 1.6) * amp;
+      bookMaterialsRef.current.forEach((m) => {
+        m.emissiveIntensity = pulse;
+      });
+    }
   });
   
   // Track current hover state
@@ -815,6 +865,11 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
         currentHoverRef.current = 'pyramid';
         setHoveredObject('pyramid');
         document.body.style.cursor = 'pointer';
+      } else if (hoveredObject.userData.bookObject && currentHoverRef.current !== 'book') {
+        currentHoverRef.current = 'book';
+        setHoveredObject('book');
+        document.body.style.cursor = 'pointer';
+        if (onBookHoverChange) onBookHoverChange(true);
       }
     }
   };
@@ -846,6 +901,9 @@ function Model({ modelPath, onLoaded, is80sMode, onScrollClick, onBallClick, onP
       }
     }
     
+    if (currentHoverRef.current === 'book' && onBookHoverChange) {
+      onBookHoverChange(false);
+    }
     currentHoverRef.current = null;
     setHoveredObject(null);
     document.body.style.cursor = 'auto';
@@ -1204,7 +1262,7 @@ function PyramidModel() {
 // Preload the pyramid model
 useGLTF.preload('/models/pyramid.glb');
 
-export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onLoadingChange, is80sMode = false, isMiniApp = false }) {
+export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onLoadingChange, is80sMode = false, isMiniApp = false, onBookClick, onBookHoverChange }) {
   const { locale } = useLanguage();
   const [selectedChart, setSelectedChart] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -1346,6 +1404,11 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
   const [showMagnifiedScroll, setShowMagnifiedScroll] = useState(false);
   const [examinedObject, setExaminedObject] = useState(null); // For examining the pyramid
   const [showIntroText, setShowIntroText] = useState(true); // Control intro text visibility
+  // Mobile only: the heading + intro overlay covers the bottom scroll-viewer
+  // area until the reader taps their first scroll, at which point the
+  // overlay hides and the viewer takes over. Desktop is unaffected — the
+  // heading sits top-right and doesn't compete with the 3D scrolls.
+  const [hasOpenedScroll, setHasOpenedScroll] = useState(false);
   const [magnifiedZoom, setMagnifiedZoom] = useState(1.25); // Track zoom level for magnified view
   const [showPlainText, setShowPlainText] = useState(false); // Toggle plain text view
   const scrollIframeRef = useRef(null);
@@ -1516,91 +1579,10 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
         </div>
       )}
       
-      {/* Mobile Heading + Intro Text - Show only after loading is complete */}
-      {windowWidth < 768 && !isLoading && (
-        <div style={{
-          position: 'absolute',
-          top: isMiniApp ? '0.5rem' : '2rem',
-          left: '1rem',
+      {/* Mobile heading + intro text moved to the bottom overlay; see the
+          block rendered alongside the scroll viewer in the mobile overlays
+          section below. Keeps the top clear so the 3D scrolls are tappable. */}
 
-          zIndex: 100,
-          textAlign: 'left',
-          pointerEvents: 'none',
-          borderRadius: '10px',
-          padding: '1rem',
-          maxWidth: '75%'
-        }}>
-          <h1 style={{
-            color: '#8e662b',
-            fontFamily: 'UnifrakturCook, serif',
-            textShadow: '3px 3px 5px #000, -1px -1px 5px pink',
-            fontSize: windowWidth <= 480 ? '2.5rem' : '3rem',
-            fontWeight: 700,
-            lineHeight: 0.8,
-            transform: 'rotate(-8deg) skew(-15deg)',
-            margin: 0,
-            opacity: 1,
-            visibility: 'visible'
-          }}>The <br/>Scrolls <span style={{fontSize: '1.5rem', position: 'relative', top: '-0.5rem', left: '-0.5rem'}}>of</span><br/>St. GR80</h1>
-
-          {/* Mobile intro text - only in non-miniapp version */}
-          {!isMiniApp && showIntroText && (
-            <div style={{
-              marginTop: '1rem',
-              padding: '0.4rem',
-              background: 'linear-gradient(135deg, rgba(194, 154, 77, 0.2) 0%, rgba(142, 102, 43, 0.15) 50%, rgba(194, 154, 77, 0.2) 100%)',
-              border: '2px double #8e662b',
-              maxWidth: '220px',
-              position: 'relative',
-              pointerEvents: 'none',
-              boxShadow: 'inset 0 0 20px rgba(142, 102, 43, 0.3), 0 3px 6px rgba(0, 0, 0, 0.5)',
-              clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%)',
-              transform: 'rotate(0deg) skew(0deg)',
-            }}>
-              <p style={{
-                color: '#d4af37',
-                fontSize: '0.72rem',
-                fontWeight: 500,
-                letterSpacing: '0.02em',
-                lineHeight: 1.2,
-                margin: 0,
-                textAlign: 'center',
-                textShadow: '2px 2px 4px rgba(0, 0, 0, 0.9), 0 0 15px rgba(212, 175, 55, 0.3)',
-                fontStyle: 'italic',
-                pointerEvents: 'none'
-              }}>
-                Here you can find the works of devout RL80 devotee, Saint GR80, the anachronistic android, mystic and medieval scholar.
-              </p>
-              <button
-                onClick={() => setShowIntroText(false)}
-                style={{
-                  position: 'absolute',
-                  bottom: '-6px',
-                  right: '-6px',
-                  background: 'rgba(142, 102, 43, 0.4)',
-                  border: '1px solid #8e662b',
-                  color: '#8e662b',
-                  width: '1rem',
-                  height: '1rem',
-                  cursor: 'pointer',
-                  fontSize: '0.7rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: 0,
-                  opacity: 0.6,
-                  pointerEvents: 'auto'
-                }}
-                aria-label="Hide introduction"
-                title="Hide this message"
-              >
-                ×
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-      
       {/* Main content - hidden while loading */}
       <div style={{
         width: '100%',
@@ -1876,7 +1858,11 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
             onScrollClick={(scrollPath) => {
               // Don't transition if already transitioning
               if (isTransitioning) return;
-              
+
+              // First tap on any scroll dismisses the mobile heading/intro
+              // overlay so the viewer becomes fully visible.
+              setHasOpenedScroll(true);
+
               // Store next scroll with device parameter
               setNextScrollSrc(`${scrollPath}?device=${deviceType}&lang=${locale}`);
               setIsTransitioning(true);
@@ -1890,6 +1876,8 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
             }}
             onBallClick={() => setShowNumerology(true)}
             onPyramidClick={() => {}} // Disabled for now
+            onBookClick={onBookClick}
+            onBookHoverChange={onBookHoverChange}
           />
           <Environment preset="night" />
           {/* <FlatCharts onChartClick={setSelectedChart} /> */}
@@ -2101,6 +2089,77 @@ export default function Philosophy({ modelPath = '/models/saint_robot2.glb', onL
                 }}
                 title="Scroll Overlay"
               />
+
+              {/* Mobile heading + intro overlay — occupies the same bottom
+                  strip as the scroll viewer and covers it until the reader
+                  taps their first 3D scroll (hasOpenedScroll). This keeps
+                  the top half of the screen clear so the glowing scrolls
+                  are fully tappable, which was the core bug: the old
+                  top-left heading was intercepting tap targets on mobile. */}
+              {!isMiniApp && !hasOpenedScroll && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    zIndex: 11,
+                    padding: '0.9rem 1rem',
+                    borderRadius: '8px',
+                    background:
+                      'linear-gradient(135deg, rgba(194, 154, 77, 0.28) 0%, rgba(28, 18, 10, 0.92) 35%, rgba(28, 18, 10, 0.94) 65%, rgba(194, 154, 77, 0.28) 100%)',
+                    border: '2px double #8e662b',
+                    boxShadow:
+                      'inset 0 0 24px rgba(142, 102, 43, 0.35), 0 3px 10px rgba(0, 0, 0, 0.55)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.7rem',
+                    pointerEvents: 'none',
+                    textAlign: 'center',
+                  }}
+                >
+                  <h1
+                    style={{
+                      color: '#8e662b',
+                      fontFamily: 'UnifrakturCook, serif',
+                      textShadow: '3px 3px 5px #000, -1px -1px 5px pink',
+                      fontSize: windowWidth <= 480 ? '2.1rem' : '2.6rem',
+                      fontWeight: 700,
+                      lineHeight: 0.9,
+                      margin: 0,
+                    }}
+                  >
+                    The Scrolls of St. GR80
+                  </h1>
+                  <p
+                    style={{
+                      color: '#d4af37',
+                      fontSize: '0.78rem',
+                      fontWeight: 500,
+                      letterSpacing: '0.02em',
+                      lineHeight: 1.3,
+                      margin: 0,
+                      maxWidth: '30ch',
+                      textShadow:
+                        '2px 2px 4px rgba(0, 0, 0, 0.9), 0 0 15px rgba(212, 175, 55, 0.3)',
+                      fontStyle: 'italic',
+                    }}
+                  >
+                    Here you can find the works of devout RL80 devotee, Saint GR80, the anachronistic android, mystic and medieval scholar.
+                  </p>
+                  <p
+                    style={{
+                      color: '#8e662b',
+                      fontSize: '0.72rem',
+                      margin: 0,
+                      letterSpacing: '0.05em',
+                      textShadow: '1px 1px 3px rgba(0, 0, 0, 0.8)',
+                    }}
+                  >
+                    Tap a glowing scroll above to read.
+                  </p>
+                </div>
+              )}
             </div>
           </>
         )}
