@@ -480,7 +480,7 @@ export default function CarouselPage() {
         showButton={false}
       />
       
-      {/* Thirdweb Buy Modal */}
+      {/* Buy Modal */}
       <BuyModal 
         isOpen={showBuyModal} 
         onClose={() => setShowBuyModal(false)}

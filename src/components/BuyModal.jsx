@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useSignMessage } from 'wagmi';
 import { useLanguage } from './LanguageProvider';
 import { useWalletAuth } from '@/components/WalletAuthProvider';
@@ -12,6 +13,11 @@ const BuyModal = ({ isOpen, onClose }) => {
   const [isSmallPhone, setIsSmallPhone] = useState(false);
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [authError, setAuthError] = useState(null);
+  // Portal so the modal escapes .shrine-page.neon's forced position: relative
+  // rule and the 3D Canvas stacking context — otherwise iPad Safari can
+  // composite the WebGL canvas over the backdrop between frames.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const { t } = useLanguage();
   const { walletAddress, connectWallet } = useWalletAuth();
   const { signMessageAsync } = useSignMessage();
@@ -179,9 +185,9 @@ const BuyModal = ({ isOpen, onClose }) => {
   const buyDisabled = buyStage === 'authorizing';
   const buyClickable = !buyDisabled;
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
-  return (
+  return createPortal(
     <>
       <style jsx>{`
         @keyframes modalGlitch {
@@ -302,6 +308,14 @@ const BuyModal = ({ isOpen, onClose }) => {
           justifyContent: 'center',
           overflow: 'hidden',
           overscrollBehavior: 'contain',
+          // Force own stacking context + GPU layer so iOS/iPad Safari doesn't
+          // composite the 3D WebGL canvas over the modal between frames.
+          // No `will-change` — browsers sometimes demote/repromote the layer
+          // during transitions, which reveals layers behind for a frame.
+          isolation: 'isolate',
+          contain: 'layout style paint',
+          transform: 'translateZ(0)',
+          WebkitTransform: 'translateZ(0)',
         }}
         onClick={onClose}
       >
@@ -330,7 +344,7 @@ const BuyModal = ({ isOpen, onClose }) => {
             position: 'relative',
             background: 'linear-gradient(135deg, #93276a, #3434a7)',
             clipPath: isSmallPhone ? 'none' : 'polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))',
-            padding: isSmallPhone ? '2.5rem 1rem 1rem' : isMobile ? '3.5rem 1.5rem 2rem' : '3rem',
+            padding: isSmallPhone ? '1rem 1rem 1rem' : isMobile ? '3.5rem 1.5rem 2rem' : '3rem',
             maxWidth: '500px',
             width: isSmallPhone ? '95%' : '90%',
             maxHeight: isSmallPhone ? '90dvh' : isMobile ? '85dvh' : '90dvh',
@@ -345,54 +359,6 @@ const BuyModal = ({ isOpen, onClose }) => {
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Close Button — sticky so it stays reachable as modal scrolls */}
-          <div
-            style={{
-              position: 'sticky',
-              top: 0,
-              display: 'flex',
-              justifyContent: 'flex-end',
-              marginBottom: isSmallPhone ? '-28px' : '-32px',
-              pointerEvents: 'none',
-              zIndex: 100,
-            }}
-          >
-          <button
-            className="close-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            style={{
-              position: 'relative',
-              background: '#000',
-              border: 'none',
-              color: '#000',
-              fontSize: isSmallPhone ? '20px' : isMobile ? '28px' : '24px',
-              width: isSmallPhone ? '36px' : isMobile ? '50px' : '40px',
-              height: isSmallPhone ? '36px' : isMobile ? '50px' : '40px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              transition: 'transform 0.3s ease',
-              fontWeight: 'bold',
-              fontFamily: 'monospace',
-              pointerEvents: 'auto',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'scale(1.1)';
-              e.currentTarget.style.color = '#ff184c';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)';
-              e.currentTarget.style.color = '#000';
-            }}
-          >
-            ✕
-          </button>
-          </div>
-
           {/* Cyber Frame Borders */}
           <div style={{
             position: 'absolute',
@@ -409,62 +375,8 @@ const BuyModal = ({ isOpen, onClose }) => {
               width: '100%',
               height: '2px',
               background: 'linear-gradient(90deg, transparent, #ff184c, transparent)',
-              animation: 'scan 3s linear infinite',
-            }} />
-            <div style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              width: '100%',
-              height: '2px',
-              background: 'linear-gradient(90deg, transparent, #00e572, transparent)',
-              animation: 'scan 3s linear infinite reverse',
             }} />
           </div>
-
-
-          {/* Title with Glitch Effect */}
-          <h2 className="title-glitch" style={{
-            color: '#fff',
-            textAlign: 'center',
-            marginBottom: isSmallPhone ? '0.75rem' : isMobile ? '1.5rem' : '2rem',
-            fontSize: isSmallPhone ? '1.2rem' : isMobile ? '1.5rem' : '2rem',
-            fontFamily: 'monospace',
-            textTransform: 'uppercase',
-            letterSpacing: isSmallPhone ? '2px' : '4px',
-            fontWeight: '900',
-            position: 'relative',
-          }}>
-            <span style={{ position: 'relative', zIndex: 2 }}>
-              {t('buyModal.title') || 'BUY_RL80_'}
-            </span>
-            {glitchActive && (
-              <>
-                <span style={{
-                  position: 'absolute',
-                  top: '2px',
-                  left: '2px',
-                  color: '#ff184c',
-                  zIndex: 1,
-                  width: '100%',
-                  textAlign: 'center',
-                }}>
-                  {t('buyModal.title') || 'BUY_RL80_'}
-                </span>
-                <span style={{
-                  position: 'absolute',
-                  top: '-2px',
-                  left: '-2px',
-                  color: '#00e572',
-                  zIndex: 0,
-                  width: '100%',
-                  textAlign: 'center',
-                }}>
-                  {t('buyModal.title') || 'BUY_RL80_'}
-                </span>
-              </>
-            )}
-          </h2>
 
           {/* Buy Content */}
           <div style={{
@@ -513,6 +425,55 @@ const BuyModal = ({ isOpen, onClose }) => {
               borderRight: '2px solid #00e572',
             }} />
 
+            {/* Close Button — sticky so it stays reachable as modal scrolls */}
+            <div
+              style={{
+                position: 'sticky',
+                top: 0,
+                alignSelf: 'stretch',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                marginBottom: isSmallPhone ? '-36px' : isMobile ? '-50px' : '-40px',
+                pointerEvents: 'none',
+                zIndex: 100,
+              }}
+            >
+              <button
+                className="close-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose();
+                }}
+                style={{
+                  position: 'relative',
+                  background: '#000',
+                  border: 'none',
+                  color: '#000',
+                  fontSize: isSmallPhone ? '20px' : isMobile ? '28px' : '24px',
+                  width: isSmallPhone ? '36px' : isMobile ? '50px' : '40px',
+                  height: isSmallPhone ? '36px' : isMobile ? '50px' : '40px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'transform 0.3s ease',
+                  fontWeight: 'bold',
+                  fontFamily: 'monospace',
+                  pointerEvents: 'auto',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.1)';
+                  e.currentTarget.style.color = '#ff184c';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.color = '#000';
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
             <div style={{
               display: 'flex',
               flexDirection: 'column',
@@ -521,6 +482,49 @@ const BuyModal = ({ isOpen, onClose }) => {
               padding: isSmallPhone ? '20px 10px' : '30px 20px',
               width: '100%',
             }}>
+              {/* Title with Glitch Effect */}
+              <h2 className="title-glitch" style={{
+                color: '#fff',
+                textAlign: 'center',
+                margin: 0,
+                fontSize: isSmallPhone ? '1.2rem' : isMobile ? '1.5rem' : '2rem',
+                fontFamily: 'monospace',
+                textTransform: 'uppercase',
+                letterSpacing: isSmallPhone ? '2px' : '4px',
+                fontWeight: '900',
+                position: 'relative',
+              }}>
+                <span style={{ position: 'relative', zIndex: 2 }}>
+                  {t('buyModal.title') || 'BUY_RL80_'}
+                </span>
+                {glitchActive && (
+                  <>
+                    <span style={{
+                      position: 'absolute',
+                      top: '2px',
+                      left: '2px',
+                      color: '#ff184c',
+                      zIndex: 1,
+                      width: '100%',
+                      textAlign: 'center',
+                    }}>
+                      {t('buyModal.title') || 'BUY_RL80_'}
+                    </span>
+                    <span style={{
+                      position: 'absolute',
+                      top: '-2px',
+                      left: '-2px',
+                      color: '#00e572',
+                      zIndex: 0,
+                      width: '100%',
+                      textAlign: 'center',
+                    }}>
+                      {t('buyModal.title') || 'BUY_RL80_'}
+                    </span>
+                  </>
+                )}
+              </h2>
+
               {/* Description */}
               <p style={{
                 fontFamily: 'monospace',
@@ -678,8 +682,13 @@ const BuyModal = ({ isOpen, onClose }) => {
           }
         }
       `}</style>
-    </>
+    </>,
+    document.body,
   );
 };
 
-export default BuyModal;
+// Only re-render when isOpen changes. Parent pages re-render on timers
+// (e.g. meltProgress every 1s) and pass a fresh `onClose` closure each time;
+// without this, the modal's styled-jsx and heavy JSX tree would rebuild on
+// every parent tick, contributing to visible flicker on iOS/iPad.
+export default React.memo(BuyModal, (prev, next) => prev.isOpen === next.isOpen);

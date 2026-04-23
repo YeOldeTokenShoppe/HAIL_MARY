@@ -31,11 +31,6 @@ env:
     secret: CLERK_SECRET_KEY
     availability:
       - RUNTIME
-  - variable: NEXT_PUBLIC_THIRDWEB_CLIENT_ID
-    secret: NEXT_PUBLIC_THIRDWEB_CLIENT_ID
-    availability:
-      - BUILD
-      - RUNTIME
   - variable: NEXT_PUBLIC_LIGHTER_BASE_URL
     secret: NEXT_PUBLIC_LIGHTER_BASE_URL
     availability:

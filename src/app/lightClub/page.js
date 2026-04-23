@@ -3806,7 +3806,7 @@ export default function Home() {
       {/* Loading Screen */}
       <CoinLoader loading={isSceneLoading} />
       
-      {/* Thirdweb Buy Modal */}
+      {/* Buy Modal */}
       <BuyModal 
         isOpen={showBuyModal} 
         onClose={() => setShowBuyModal(false)} 

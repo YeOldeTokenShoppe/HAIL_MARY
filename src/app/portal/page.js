@@ -302,7 +302,7 @@ export default function PortalPage() {
         showButton={false}
       />
 
-      {/* Thirdweb Buy Modal */}
+      {/* Buy Modal */}
       <BuyModal
         isOpen={showBuyModal}
         onClose={() => setShowBuyModal(false)}

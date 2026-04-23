@@ -854,7 +854,7 @@ export default function TokenomicsPage() {
         showButton={false}
       />
 
-      {/* Thirdweb Buy Modal */}
+      {/* Buy Modal */}
       <BuyModal
         isOpen={showBuyModal}
         onClose={() => setShowBuyModal(false)}

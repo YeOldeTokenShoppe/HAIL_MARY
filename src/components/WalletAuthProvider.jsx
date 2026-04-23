@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { erc20Abi, formatUnits } from 'viem';
@@ -135,7 +135,15 @@ export function WalletAuthProvider({ children }) {
     return () => clearInterval(interval);
   }, [address, fetchTokenBalance]);
 
-  const value = {
+  const refreshBalance = useCallback(
+    () => fetchTokenBalance(address),
+    [fetchTokenBalance, address]
+  );
+
+  // Memoize the context value so consumers don't re-render on every wagmi
+  // block tick / Clerk session ping. Dep list is the set of primitive values
+  // that actually change meaningfully.
+  const value = useMemo(() => ({
     // Clerk user data
     user,
     isSignedIn: !!user,
@@ -163,7 +171,7 @@ export function WalletAuthProvider({ children }) {
     disconnectWallet,
     switchToTestWallet: () => {},
     switchToOwnWallet: () => {},
-    refreshBalance: () => fetchTokenBalance(address),
+    refreshBalance,
 
     // Wagmi-specific: expose connectors for wallet selection UIs
     connectors,
@@ -172,7 +180,15 @@ export function WalletAuthProvider({ children }) {
     isFullyAuthenticated: !!user && isConnected,
     displayName: user?.firstName || user?.username ||
       (address ? address.slice(0, 6) + '...' + address.slice(-4) : 'Anonymous'),
-  };
+  // Deps are primitive values — prevents Clerk/wagmi re-issuing a new object
+  // with identical content from invalidating the memo and re-rendering every
+  // consumer.
+  }), [
+    user?.id, user?.firstName, user?.username,
+    clerkLoaded, address, tokenBalance, isConnected,
+    isConnecting, isLoadingBalance, isSyncing,
+    connectWallet, disconnectWallet, refreshBalance,
+  ]);
 
   return (
     <WalletAuthContext.Provider value={value}>

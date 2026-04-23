@@ -1408,7 +1408,7 @@ useEffect(() => {
         showButton={false}
       />
       
-      {/* Thirdweb Buy Modal */}
+      {/* Buy Modal */}
       <BuyModal 
         isOpen={showBuyModal} 
         onClose={() => setShowBuyModal(false)}

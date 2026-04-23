@@ -76,7 +76,6 @@ const TEST_SCENARIO = 'available'; // 'available' | 'claimed' | 'sold_out' | 'no
 
 /**
  * Farcaster-adapted hook for managing weekly prize claims.
- * Replaces Clerk/Thirdweb auth with Farcaster identity + wagmi.
  *
  * @param {Object} params
  * @param {string} params.farcasterFid - Farcaster user FID
@@ -95,7 +94,7 @@ export function useWeeklyPrizeFarcaster({ farcasterFid, farcasterUsername, walle
   // NFT claim via wagmi
   const { writeContractAsync } = useWriteContract();
 
-  // Read RL80 balance via wagmi (works without Thirdweb)
+  // Read RL80 balance via wagmi
   const { data: tokenBalanceRaw } = useReadContract({
     address: RL80_ADDRESS,
     abi: erc20Abi,

@@ -288,7 +288,7 @@ export default function WhitepaperPage() {
         showButton={false}
       />
 
-      {/* Thirdweb Buy Modal */}
+      {/* Buy Modal */}
       <BuyModal
         isOpen={showBuyModal}
         onClose={() => setShowBuyModal(false)}

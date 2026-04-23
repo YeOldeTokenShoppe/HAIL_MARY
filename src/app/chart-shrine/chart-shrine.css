@@ -861,7 +861,7 @@
   left: 50%;
   bottom: calc(15rem + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
-  z-index: 40;
+  z-index: 1002;
   display: flex;
   flex-direction: column;
   align-items: stretch;

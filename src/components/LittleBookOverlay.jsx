@@ -1181,6 +1181,7 @@ export default function LittleBookOverlay({
           touch-action: pan-y;
         }
 
+
         /* ---------- ZOOM OVERLAY ---------- */
         .lbo-zoom {
           position: fixed;
