@@ -237,7 +237,7 @@ export default function ModelViewerPage() {
           {
             key: 'lode',
             label: 'LODE',
-            title: 'Lode — coming soon',
+            title: 'Mother Lode — coming soon',
             comingSoon: true,
             icon: (
               <svg

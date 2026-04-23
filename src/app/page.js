@@ -1666,7 +1666,7 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
           {
             key: 'lode',
             label: 'LODE',
-            title: 'Lode — coming soon',
+            title: 'Mother Lode — coming soon',
             comingSoon: true,
             icon: (
               <svg

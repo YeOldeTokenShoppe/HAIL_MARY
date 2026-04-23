@@ -1826,7 +1826,7 @@ export default function Philosophy({ modelPath = '/models/saint_robot3.glb', onL
           style={{ position: 'relative', zIndex: 1, pointerEvents: 'auto' }}
           camera={{ 
             position: isDesktop
-              ? [-7, 1, 6.5]
+              ? [-7, 0.5, 6.5]
               : isTablet
               ? [-6, 1.5, 6]
               : [4, 1, 5],
