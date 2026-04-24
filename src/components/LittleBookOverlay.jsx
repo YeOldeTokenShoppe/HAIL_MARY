@@ -493,10 +493,19 @@ export default function LittleBookOverlay({
     scroller.scrollTop = 0;
     setHintVisible(true);
 
+    /* pageEls[k] reveal logic — defined now, bound below once pageEls
+       is queried. Each interior page becomes visible when scrollUnit
+       reaches k (the point at which the previous sheet starts flipping
+       and this sheet is the new backdrop). Keeping distant pages out
+       of the render tree prevents their auto-promoted GPU layers
+       (chiefly videos) from leaking over the closed cover on Safari. */
+    let updatePageOcclusion = () => {};
+
     const onScroll = () => {
       if (scroller.scrollTop > 5) setHintVisible(false);
       scrollUnitRef.current =
         scroller.scrollTop / (window.innerHeight * 0.25);
+      updatePageOcclusion();
     };
     scroller.addEventListener("scroll", onScroll, { passive: true });
 
@@ -535,6 +544,16 @@ export default function LittleBookOverlay({
     );
 
     const pageEls = scroller.querySelectorAll(".lbo-book__page");
+    updatePageOcclusion = () => {
+      const unit = scrollUnitRef.current;
+      pageEls.forEach((page, k) => {
+        if (k === 0 || k === pageEls.length - 1) return;
+        if (unit >= k) page.classList.remove("lbo-book__page--occluded");
+        else page.classList.add("lbo-book__page--occluded");
+      });
+    };
+    updatePageOcclusion();
+
     pageEls.forEach((page, index) => {
       gsap.set(page, { z: index === 0 ? 13 : -index * 1 });
       if (index === pageEls.length - 1) return;
@@ -710,7 +729,11 @@ export default function LittleBookOverlay({
     interior.push(
       <div
         key={s}
-        className="lbo-book__page"
+        /* Hidden at mount so the first paint (before GSAP applies the
+           3D z offsets) can't expose interior pages behind the closed
+           cover. The scroll handler toggles this off as the reader
+           enters each page's range. See the JS note in the effect. */
+        className="lbo-book__page lbo-book__page--occluded"
         style={{ "--page-index": s + 2 }}
       >
         <div
@@ -910,6 +933,18 @@ export default function LittleBookOverlay({
           box-shadow: 0 0 18px rgba(0, 0, 0, 0.7);
         }
 
+        /* Interior sheets render hidden until the scroll handler brings
+           them into range. <video> (and occasionally filtered/large
+           media) in interior pages auto-promote to their own GPU layer
+           that, in Safari, can escape the book's preserve-3d z-order
+           and render on top of the closed cover — most visibly during
+           the scroll scale-up (scrollUnit 0→1) when no other tweens are
+           masking the stack. display:none disposes of the layer
+           entirely, so the ordering bug has nothing to latch onto. */
+        .lbo-book__page--occluded {
+          display: none;
+        }
+
         .lbo-book__page {
           position: absolute;
           left: 2%;
@@ -993,6 +1028,12 @@ export default function LittleBookOverlay({
         .lbo-page__half--back {
           --rotation: 180;
           --coefficient: 2;
+          /* Match --front: hide the mirror backside so the inside-cover
+             art / page content isn't rendered as a reversed ghost before
+             the page flips. Without this, the back half's backside was
+             flashing over the front cover during the scroll scale-up +
+             flip as the 3D layers re-ordered (z goes 13 → -13). */
+          backface-visibility: hidden;
           border-radius: 5% 0 0 5%;
         }
         .lbo-book__page:not(.lbo-book__cover) .lbo-page__half {
