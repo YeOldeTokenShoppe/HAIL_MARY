@@ -92,7 +92,14 @@ const BuyModal = ({ isOpen, onClose }) => {
 
   const handleBuy = useCallback(async () => {
     if (!walletAddress) {
-      connectWallet('coinbaseWallet');
+      setAuthError(null);
+      try {
+        await connectWallet('coinbaseWallet');
+      } catch (err) {
+        console.error('Wallet connect failed:', err);
+        const userRejected = /reject|denied|user.*cancel/i.test(err?.message || '');
+        setAuthError(userRejected ? null : (err?.message || 'Unable to open wallet'));
+      }
       return;
     }
     if (isAuthorizing) return;

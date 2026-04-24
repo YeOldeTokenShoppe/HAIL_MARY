@@ -755,6 +755,9 @@ export default function ChartShrine({
                   <g
                     key={opt.key}
                     onClick={() => onTimeframeChange(opt.key)}
+                    role="button"
+                    aria-label={`Show ${opt.label} candles`}
+                    aria-pressed={active}
                     style={{ cursor: "pointer" }}
                   >
                     <rect

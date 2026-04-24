@@ -84,11 +84,22 @@ export function WalletAuthProvider({ children }) {
     }
   }, [user, fetchTokenBalance]);
 
-  // Connect wallet by connector id
+  // Connect wallet by connector id. Accepts legacy/friendly aliases because
+  // wagmi v3 renamed connector ids (e.g. coinbaseWallet → coinbaseWalletSDK).
   const connectWallet = useCallback(async (connectorId = 'coinbaseWallet') => {
     try {
       setManuallyDisconnected(false);
-      const connector = connectors.find((c) => c.id === connectorId || c.name === connectorId);
+      const aliases = {
+        coinbaseWallet: ['coinbaseWalletSDK', 'coinbaseWallet', 'com.coinbase.wallet', 'Coinbase Wallet'],
+        coinbaseWalletSDK: ['coinbaseWalletSDK', 'coinbaseWallet', 'com.coinbase.wallet', 'Coinbase Wallet'],
+        metamask: ['metaMaskSDK', 'metaMask', 'io.metamask', 'MetaMask'],
+        metaMask: ['metaMaskSDK', 'metaMask', 'io.metamask', 'MetaMask'],
+        walletConnect: ['walletConnect', 'WalletConnect'],
+      };
+      const candidates = aliases[connectorId] || [connectorId];
+      const connector = connectors.find(
+        (c) => candidates.includes(c.id) || candidates.includes(c.name)
+      );
       if (!connector) {
         console.error('Connector not found:', connectorId, 'Available:', connectors.map(c => c.id));
         throw new Error(`Connector ${connectorId} not found`);
