@@ -164,7 +164,7 @@ const CANDLE_VARIANTS = {
     scale: 1.2,
   },
   votive: {
-    modelPath: "/models/tinyVotiveOnly.glb",
+    modelPath: "/models/tinyVotiveOnly2.glb",
     meltMeshName: "XBASE",
     // Blender export quirk: the votive GLB was exported with the
     // default Y-up conversion (no pre-rotation baked in), so its local
@@ -784,17 +784,15 @@ function HeroAltarObject({
             y: obj.rotation.y,
             z: obj.rotation.z,
           };
-          // Flame materials: additive blending so the near-black
-          // alpha pixels of the cross-billboard quads add nothing to
-          // the framebuffer (invisible) while the bright flame pixels
-          // blaze through. This eliminates the ghost rectangles that
-          // alphaMode: BLEND leaves behind from low-alpha texels. Also
-          // depthWrite:false — additive/emissive materials shouldn't
-          // write depth or they'd self-occlude adjacent pixels and
-          // punch holes into things rendered after. Depth-test stays
-          // ON so the opaque saint decal properly occludes the flame
-          // when it drops behind the label. renderOrder 240 keeps
-          // flame painting after the glass (200) and wick (220).
+          // Flame materials: additive blending so the near-black alpha
+          // texels of the cross-billboard quads add ~0 to the
+          // framebuffer (invisible), while the bright flame pixels blaze
+          // through. Eliminates the ghost rectangles that alphaMode:
+          // BLEND leaves behind. depthWrite:false so additive/emissive
+          // fragments don't self-occlude. depthTest stays ON so the
+          // opaque saint decal still occludes the flame when it drops
+          // behind the label. renderOrder 240 keeps flame painting
+          // after the glass (200) and wick (220).
           obj.traverse((desc) => {
             if (!desc.isMesh || !desc.material) return;
             const mats = Array.isArray(desc.material) ? desc.material : [desc.material];
