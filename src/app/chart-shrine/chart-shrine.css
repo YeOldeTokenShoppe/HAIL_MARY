@@ -241,19 +241,19 @@
   z-index: 0;
   pointer-events: auto;
   overflow: hidden;
-  /* Hint that the candle is draggable. Touch devices ignore cursor;
-     they'll discover the affordance on first try. The descendant
-     selectors are required because the R3F <canvas> is the actual
-     hover target inside this wrapper and `cursor: inherit` on
-     <canvas> was not picking up the parent value in all browsers —
-     set `grab` explicitly on descendants. */
+}
+/* Grab cursor only when the active candle variant is drag-rotatable
+   (currently votive). Pillar leaves the cursor at the browser default
+   so users aren't promised an interaction the variant doesn't offer.
+   Descendant selectors required because the R3F <canvas> is the
+   actual hover target inside this wrapper and `cursor` does not
+   reliably inherit to <canvas> across browsers. */
+.shrine-page.neon .scene-background.is-rotatable,
+.shrine-page.neon .scene-background.is-rotatable * {
   cursor: grab;
 }
-.shrine-page.neon .scene-background * {
-  cursor: grab;
-}
-.shrine-page.neon .scene-background.is-grabbing,
-.shrine-page.neon .scene-background.is-grabbing * {
+.shrine-page.neon .scene-background.is-rotatable.is-grabbing,
+.shrine-page.neon .scene-background.is-rotatable.is-grabbing * {
   cursor: grabbing;
 }
 

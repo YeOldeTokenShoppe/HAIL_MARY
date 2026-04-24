@@ -162,6 +162,11 @@ const CANDLE_VARIANTS = {
     meltAxis: "z",
     dripMeshName: "DRIPWAX",
     scale: 1.2,
+    // Partial flame counter-scale on the melt axis so the flame
+    // doesn't collapse to a pinprick long before the candle burns
+    // out. See `flameMeltShrinkRate` on the votive for the full
+    // explanation — same value keeps the two variants consistent.
+    flameMeltShrinkRate: 0.4,
   },
   votive: {
     modelPath: "/models/tinyVotiveOnly2.glb",
@@ -838,7 +843,13 @@ function HeroAltarObject({
   // the moment the cursor leaves its silhouette. Scoped to pointerdowns
   // that start on the scene-background so clicks on UI buttons/links
   // elsewhere on the page aren't hijacked.
+  // Drag-to-spin only on variants whose flat the user wants to peek
+  // around — the votive's saint decal occludes the flame, so spinning
+  // is the relief valve. The pillar has nothing on its sides worth
+  // hiding, so we don't enable drag (and the grab cursor is also
+  // suppressed via the .is-rotatable class below).
   useEffect(() => {
+    if (variant !== "votive") return;
     const onDown = (e) => {
       const bg = e.target?.closest?.(".scene-background");
       if (!bg) return;
@@ -866,7 +877,21 @@ function HeroAltarObject({
     };
     window.addEventListener("pointerdown", onDown);
     return () => window.removeEventListener("pointerdown", onDown);
-  }, []);
+  }, [variant]);
+
+  // Toggle .is-rotatable on the scene-background so the grab cursor
+  // only shows for variants that are actually draggable. Cleared on
+  // unmount and on variant swap so the pillar never inherits a stale
+  // grab cursor from a prior votive session.
+  useEffect(() => {
+    const bg = typeof document !== "undefined"
+      ? document.querySelector(".scene-background")
+      : null;
+    if (!bg) return;
+    if (variant === "votive") bg.classList.add("is-rotatable");
+    else bg.classList.remove("is-rotatable");
+    return () => bg.classList.remove("is-rotatable");
+  }, [variant]);
 
   // PillarProp visibility — some unified GLBs (e.g. tinyVotiveOnly2.glb)
   // ship both the votive geometry and a pillar-candle prop named
