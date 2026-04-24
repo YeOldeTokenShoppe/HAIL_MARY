@@ -124,7 +124,6 @@ const CyborgTempleScene = ({
   onAnnotationClick = null, // Callback when annotation is clicked
   onAgentClick = null, // Callback when an agent is clicked
   isMobile = false, // Pass this prop to determine device type
-  followerWords = [], // Display names from X followers
   onSwapCoinsReady = null, // Callback that receives a function to trigger coin swap
   onCoinFaceTap = null, // Callback when a CoinFace is tapped in agents mode (coinIndex)
   templeCandles = [], // Array of claimed candle objects from Firestore templeCandles collection
@@ -171,7 +170,6 @@ const CyborgTempleScene = ({
   const coinFaceRefs = useRef([null, null, null, null]) // CoinFace1-4
   const coinFaceTexturesRef = useRef([null, null, null, null])
   const coinBackTexturesRef = useRef([null, null, null, null]) // Character textures for flip back
-  const coinFaceNameTexturesRef = useRef([null, null, null, null]) // Supporter name textures for flip back
   const coinAgentNameTexturesRef = useRef([null, null, null, null]) // Agent name textures for flip back
   const coinColoredBackTexturesRef = useRef([null, null, null, null]) // Colored back textures for flip
   const coinFaceFlipState = useRef({
@@ -193,7 +191,6 @@ const CyborgTempleScene = ({
     coinAngles: [0, 0, 0, 0],
     coinStartAngles: [0, 0, 0, 0],
   })
-  const topEngagersRef = useRef([]) // Top 4 xPost authors
   const topSupporterBannerRefs = useRef([]) // TopText and x_logo meshes
 
   // Click animation state for coins
@@ -394,128 +391,6 @@ const CyborgTempleScene = ({
       })
     }
   }, [onSwapCoinsReady])
-
-  // ===========================================
-  // TOP ENGAGER AVATARS ON COIN FACES — disabled, using original GLB materials
-  // ===========================================
-
-  // Create a circular avatar CanvasTexture from an image URL
-  const createAvatarTexture = (imageUrl, index) => {
-    const size = 256
-    const canvas = document.createElement('canvas')
-    canvas.width = size
-    canvas.height = size
-    const ctx = canvas.getContext('2d')
-
-    // Dark placeholder while loading
-    ctx.fillStyle = '#1a1a1a'
-    ctx.beginPath()
-    ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2)
-    ctx.fill()
-
-    const texture = new THREE.CanvasTexture(canvas)
-    texture.flipY = false
-    texture.colorSpace = THREE.SRGBColorSpace
-    // Rotate texture ~20 degrees CCW
-    texture.center.set(0.5, 0.5)
-    texture.rotation = -40 * (Math.PI / 180)
-
-    if (!imageUrl) return texture
-
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.onload = () => {
-      // Clear and draw circular clipped avatar
-      ctx.clearRect(0, 0, size, size)
-
-      // Gold ring border
-      ctx.beginPath()
-      ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2)
-      ctx.fillStyle = '#ffd700'
-      ctx.fill()
-
-      // Clip to inner circle for avatar
-      ctx.save()
-      ctx.beginPath()
-      ctx.arc(size / 2, size / 2, size / 2 - 6, 0, Math.PI * 2)
-      ctx.clip()
-
-      // Draw avatar filling the circle
-      const imgAspect = img.width / img.height
-      let drawW, drawH, drawX, drawY
-      if (imgAspect > 1) {
-        drawH = size
-        drawW = size * imgAspect
-        drawX = (size - drawW) / 2
-        drawY = 0
-      } else {
-        drawW = size
-        drawH = size / imgAspect
-        drawX = 0
-        drawY = (size - drawH) / 2
-      }
-      ctx.drawImage(img, drawX, drawY, drawW, drawH)
-      ctx.restore()
-
-      texture.needsUpdate = true
-    }
-    img.onerror = () => {
-      // Draw initial letter as fallback
-      ctx.clearRect(0, 0, size, size)
-      ctx.fillStyle = '#2f3336'
-      ctx.beginPath()
-      ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2)
-      ctx.fill()
-
-      ctx.fillStyle = '#71767b'
-      ctx.font = `bold ${size * 0.4}px -apple-system, sans-serif`
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      const initial = topEngagersRef.current[index]?.username?.charAt(0).toUpperCase() || '?'
-      ctx.fillText(initial, size / 2, size / 2)
-      texture.needsUpdate = true
-    }
-    img.src = imageUrl
-
-    return texture
-  }
-
-  // Apply avatar textures to CoinFace meshes
-  const applyTopEngagerAvatars = () => {
-    const engagers = topEngagersRef.current
-
-    coinFaceRefs.current.forEach((mesh, i) => {
-      if (!mesh) return
-
-      if (!engagers[i]) {
-        // No engager for this slot — hide the mesh
-        mesh.visible = false
-        return
-      }
-
-      mesh.visible = true
-
-      // Create texture for this engager
-      const tex = createAvatarTexture(engagers[i].imageUrl, i)
-      coinFaceTexturesRef.current[i] = tex
-
-      // Apply to mesh material — use character texture if starting in agents mode
-      const backTex = coinBackTexturesRef.current[i]
-      const showTex = (carouselState.current.showingCharacters && backTex) ? backTex : tex
-      mesh.material = new THREE.MeshBasicMaterial({
-        map: showTex,
-        side: THREE.FrontSide,
-        transparent: false,
-        toneMapped: false,
-      })
-      mesh.material.needsUpdate = true
-
-      mesh.userData.engagerIndex = i
-
-      // Create name texture for back of coin (shown on individual flip)
-      coinFaceNameTexturesRef.current[i] = createNameBackTexture(engagers[i].username, engagers[i].handle)
-    })
-  }
 
   // Create a circular coin-back texture with username + @handle
   const createNameBackTexture = (username, handle) => {
@@ -880,9 +755,10 @@ const CyborgTempleScene = ({
     dracoLoader.setDecoderPath(dracoPath);
     gltfLoader.setDRACOLoader(dracoLoader);
 
-    // Determine which model to load based on device type
-    let modelPath = isOnMobile ? "/models/MOBILE3.glb" : "/models/RL80_4anims.glb";
-    const fallbackModelPath = "/models/RL80_4anims.glb"; // Desktop model as fallback
+    // Using the same desktop model on both mobile and desktop until a trimmed
+    // mobile scene is ready.
+    let modelPath = "/models/RL80_4anims.glb";
+    const fallbackModelPath = "/models/RL80_4anims.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -937,20 +813,12 @@ const CyborgTempleScene = ({
       // Store the loaded model in state for external access
       setLoadedModel(templeScene);
       
-      // Create an anchor group for positioning
+      // Create an anchor group for positioning — same desktop model on both
+      // mobile and desktop for now.
       const anchorGroup = new THREE.Group();
-      // Apply different positioning for MOBILE.glb vs RL80_4anims.glb
-      if (isOnMobile) {
-        // Custom position for MOBILE.glb - adjust these values as needed
-        anchorGroup.position.set(-0.1, -2.3, -1); // Lower the mobile model
-        anchorGroup.rotation.set(0, 0, 0);
-        anchorGroup.scale.set(1.2, 1.2, 1.2); // Slightly larger scale for mobile
-      } else {
-        // Keep original positioning for RL80_4anims.glb
-        anchorGroup.position.set(0, 0, 0);
-        anchorGroup.rotation.set(0, 0, 0);
-        anchorGroup.scale.set(1, 1, 1);
-      }
+      anchorGroup.position.set(0, 0, 0);
+      anchorGroup.rotation.set(0, 0, 0);
+      anchorGroup.scale.set(1, 1, 1);
       
       // Add the temple scene to the anchor group
       anchorGroup.add(templeScene);
@@ -1211,7 +1079,7 @@ const CyborgTempleScene = ({
       const gridHelper = new THREE.GridHelper(50, 50, 0x00ff41, 0x00ff41);
       gridHelper.material.opacity = 0.3;
       gridHelper.material.transparent = true;
-      gridHelper.position.y = isOnMobile ? -6.5 : -0.06; // Lower grid on mobile
+      gridHelper.position.y = -0.06;
       anchorGroup.add(gridHelper);
       
       // Add the anchor group to our captured group ref
@@ -3700,7 +3568,6 @@ const CyborgTempleScene = ({
   return (
     <group ref={groupRef} visible={true} position={position} scale={scale} rotation={rotation}>
       {/* The 3D model is added dynamically in useEffect */}
-      {/* <FloatingWordCluster words={followerWords.length > 0 ? followerWords : WORD_CLUSTER_WORDS} center={[0, 2.8, 0]} clusterScale={0.22}/> */}
     </group>
   );
 };

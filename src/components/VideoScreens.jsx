@@ -13,8 +13,9 @@ import PriceChartScreen from './PriceChartScreen';
 import VolumeAnalysisScreen from './VolumeAnalysisScreen';
 import RiskMetricsScreen from './RiskMetricsScreen';
 import PortfolioScreen from './PortfolioScreen';
+import LiminalTeaserScreen from './LiminalTeaserScreen';
 
-function VideoScreens({ is80sMode = false }) {
+function VideoScreens({ is80sMode = false, previewMode = false }) {
   const { scene } = useThree();
   const video1Ref = useRef();
   const video2Ref = useRef();
@@ -388,10 +389,28 @@ function VideoScreens({ is80sMode = false }) {
           // console.log('[VideoScreens] Screen1_RScreen canvas setup complete');
         }
         
-        // Screen2 - Keep original GLB image texture
+        // Screen2 - Keep original GLB image texture (or canvas in preview mode)
         if (child.isMesh && child.name === 'Screen2' && !screen2Found) {
           screen2Found = true;
-          // Using the image texture already applied in the GLB
+          if (previewMode) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 320;
+            const canvasTexture = new THREE.CanvasTexture(canvas);
+            canvasTexture.minFilter = THREE.LinearFilter;
+            canvasTexture.magFilter = THREE.LinearFilter;
+            canvasTexture.flipY = false;
+            canvasTexture.center.set(0.5, 0.5);
+            child.material = new THREE.MeshBasicMaterial({
+              map: canvasTexture,
+              side: THREE.FrontSide,
+              toneMapped: false,
+            });
+            window['__screen2Canvas'] = canvas;
+            window['__screen2Texture'] = canvasTexture;
+            window['__screen2Mesh'] = child;
+          }
+          // Otherwise using the image texture already applied in the GLB
         }
         
         // Screen2_small - Apply video texture
@@ -636,10 +655,28 @@ function VideoScreens({ is80sMode = false }) {
           }
         }
         
-        // Screen4 - Keep original GLB image texture
+        // Screen4 - Keep original GLB image texture (or canvas in preview mode)
         if (child.isMesh && child.name === 'Screen4' && !screen4Found) {
           screen4Found = true;
-          // Using the image texture already applied in the GLB
+          if (previewMode) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 320;
+            const canvasTexture = new THREE.CanvasTexture(canvas);
+            canvasTexture.minFilter = THREE.LinearFilter;
+            canvasTexture.magFilter = THREE.LinearFilter;
+            canvasTexture.flipY = false;
+            canvasTexture.center.set(0.5, 0.5);
+            child.material = new THREE.MeshBasicMaterial({
+              map: canvasTexture,
+              side: THREE.FrontSide,
+              toneMapped: false,
+            });
+            window['__screen4Canvas'] = canvas;
+            window['__screen4Texture'] = canvasTexture;
+            window['__screen4Mesh'] = child;
+          }
+          // Otherwise using the image texture already applied in the GLB
         }
         
         // Screen4_small - Apply video texture
@@ -821,7 +858,7 @@ function VideoScreens({ is80sMode = false }) {
       if (texture5Ref.current) texture5Ref.current.dispose();
       if (texture6Ref.current) texture6Ref.current.dispose();
     };
-  }, [scene, is80sMode, showRegularContent]);
+  }, [scene, is80sMode, showRegularContent, previewMode]);
 
   // Find Screen2 position and render MacroAgentScreen there
   const [screen2Position, setScreen2Position] = useState(null);
@@ -946,6 +983,92 @@ function VideoScreens({ is80sMode = false }) {
       }
     };
   }, []);
+
+  if (previewMode) {
+    // Liminal Terminal preview — each screen paints a cryptic teaser instead
+    // of the live trading content. Four big center screens map to the four
+    // agents; surrounding panels cycle generic glyph/countdown/scanline art
+    // to build a "coming soon" atmosphere.
+    return (
+      <>
+        {/* Center big screens — one per agent */}
+        <LiminalTeaserScreen
+          canvasGlobal="__screen1Canvas"
+          textureGlobal="__screen1Texture"
+          variant="agent"
+          agent="OUR LADY"
+          tagline="PATRON SAINT OF PORTFOLIOS"
+        />
+        <LiminalTeaserScreen
+          canvasGlobal="__screen2Canvas"
+          textureGlobal="__screen2Texture"
+          variant="agent"
+          agent="ST. GR80"
+          tagline="PHILOSOPHER / ETHICIST"
+        />
+        <LiminalTeaserScreen
+          canvasGlobal="__screen3Canvas"
+          textureGlobal="__screen3Texture"
+          variant="agent"
+          agent="H80Z"
+          tagline="DEVILS ADVOCATE"
+        />
+        <LiminalTeaserScreen
+          canvasGlobal="__screen4Canvas"
+          textureGlobal="__screen4Texture"
+          variant="agent"
+          agent="VIRGIL"
+          tagline="GUIDE / GUARDIAN"
+        />
+
+        {/* Side panels — countdown + scanline + glyph fields for atmosphere */}
+        <LiminalTeaserScreen
+          canvasGlobal="__screen1LCanvas"
+          textureGlobal="__screen1LTexture"
+          variant="countdown"
+        />
+        <LiminalTeaserScreen
+          canvasGlobal="__screen1RCanvas"
+          textureGlobal="__screen1RTexture"
+          variant="glyph"
+          tagline="SCROLL · I"
+        />
+        <LiminalTeaserScreen
+          canvasGlobal="__screen2LCanvas"
+          textureGlobal="__screen2LTexture"
+          variant="scanlines"
+        />
+        <LiminalTeaserScreen
+          canvasGlobal="__screen2RCanvas"
+          textureGlobal="__screen2RTexture"
+          variant="glyph"
+          tagline="SCROLL · II"
+        />
+        <LiminalTeaserScreen
+          canvasGlobal="__screen3LCanvas"
+          textureGlobal="__screen3LTexture"
+          variant="scanlines"
+        />
+        <LiminalTeaserScreen
+          canvasGlobal="__screen3RCanvas"
+          textureGlobal="__screen3RTexture"
+          variant="glyph"
+          tagline="SCROLL · III"
+        />
+        <LiminalTeaserScreen
+          canvasGlobal="__screen4LCanvas"
+          textureGlobal="__screen4LTexture"
+          variant="countdown"
+        />
+        <LiminalTeaserScreen
+          canvasGlobal="__screen4RCanvas"
+          textureGlobal="__screen4RTexture"
+          variant="glyph"
+          tagline="SCROLL · IV"
+        />
+      </>
+    );
+  }
 
   return (
     <>

@@ -1,6 +1,10 @@
 import { useEffect, useState, useRef } from 'react'
 import { db, collection, query, orderBy, limit, onSnapshot, getDocs } from '@/lib/firebaseClient'
 
+// Temporarily disables all data fetching (Firestore subscriptions + remote avatar loads)
+// while /trade is being restructured. Flip to true to re-enable.
+const FETCH_ENABLED = false
+
 // ===========================================
 // CONFIGURATION (landscape 512×320)
 // ===========================================
@@ -164,7 +168,7 @@ const RL80Screen = () => {
         console.warn('[RL80Screen] Failed to fetch Illumin80 leaderboard:', err)
       }
     }
-    fetchIllumin80()
+    if (FETCH_ENABLED) fetchIllumin80()
   }, [])
 
   // ===========================================
@@ -172,7 +176,7 @@ const RL80Screen = () => {
   // ===========================================
 
   useEffect(() => {
-    if (!db) return
+    if (!db || !FETCH_ENABLED) return
 
     // Offerings
     const offeringsQ = query(collection(db, 'offerings'), orderBy('createdAt', 'desc'), limit(30))
@@ -236,6 +240,7 @@ const RL80Screen = () => {
   // ===========================================
 
   useEffect(() => {
+    if (!FETCH_ENABLED) return
     activities.forEach(activity => {
       if (!activity.userImageUrl || activityAvatarsRef.current.hasOwnProperty(activity.id)) return
       activityAvatarsRef.current[activity.id] = 'loading'

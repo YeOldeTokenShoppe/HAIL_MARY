@@ -18,9 +18,11 @@ import CyberNav from '@/components/CyberNav';
 import NavControls from '@/components/NavControls';
 import NavControlsMobile from '@/components/NavControlsMobile';
 import MobileBottomNav from '@/components/MobileBottomNav';
-import SimpleTextLoader from '@/components/SimpleTextLoader';
+import CoinLoader from '@/components/CoinLoader';
 import SynthSunset from '@/components/SynthSunset';
 import LightCandleModal from '@/components/LightCandleModal';
+import BuyModal from '@/components/BuyModal';
+import { useRouter } from 'next/navigation';
 import { db, collection, getDocs, addDoc, query, orderBy } from '@/lib/firebaseClient';
 
 
@@ -47,8 +49,9 @@ export default function CyborgTemple() {
   const [userHasInteracted, setUserHasInteracted] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [showCyberNav, setShowCyberNav] = useState(false);
-  const [followerWords, setFollowerWords] = useState([]);
   const [showLightModal, setShowLightModal] = useState(false);
+  const [showBuyModal, setShowBuyModal] = useState(false);
+  const router = useRouter();
   const [templeCandles, setTempleCandles] = useState([]);
   const [inspectedCandleData, setInspectedCandleData] = useState(null); // candle data for inspector
   
@@ -79,18 +82,6 @@ export default function CyborgTemple() {
       window.addEventListener('xCandleClicked', handler);
       return () => window.removeEventListener('xCandleClicked', handler);
     }, [templeCandles]);
-
-    // Fetch follower display names for word cluster
-    useEffect(() => {
-      fetch('/api/followers')
-        .then(res => res.ok ? res.json() : null)
-        .then(data => {
-          if (data?.displayNames?.length > 0) {
-            setFollowerWords(data.displayNames);
-          }
-        })
-        .catch(() => {}); // Silently fall back to default words
-    }, []);
 
     // Fetch claimed temple candles from Firestore + always include developer candle
     const DEV_CANDLE = {
@@ -185,7 +176,7 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-      const modelToPreload = isMobile ? '/models/MOBILE.glb' : '/models/RL80_4anims.glb';
+      const modelToPreload = '/models/RL80_4anims.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
           const link = document.createElement('link');
@@ -284,12 +275,10 @@ export default function CyborgTemple() {
     setModelLoaded(true);
     setLoadingProgress(70);
     setLoadingMessage("Finalizing...");
-    
-    // Only enable TickerDisplay3 on desktop
-    if (!isMobileView) {
-      // console.log('🎯 Enabling TickerDisplay3 rendering');
-      setTickerReady(true);
-    }
+
+    // Mobile and desktop now share the same model, so the ticker mesh exists
+    // in both. Enable rendering unconditionally.
+    setTickerReady(true);
   };
 
   // Handle ticker loading completion
@@ -370,7 +359,7 @@ export default function CyborgTemple() {
 
   // Don't render on server-side
   if (!mounted) {
-    return <SimpleTextLoader loading={true} progress={0} message="Loading" />;
+    return <CoinLoader loading={true} />;
   }
 
   // Handle lighting a candle in the temple — save to templeCandles collection
@@ -405,11 +394,7 @@ export default function CyborgTemple() {
   return (
     <>
       {/* Loading Screen */}
-      <SimpleTextLoader 
-        loading={isSceneLoading} 
-        progress={loadingProgress}
-        message={loadingMessage}
-      />
+      <CoinLoader loading={isSceneLoading} />
           
       <div 
         style={{ 
@@ -488,6 +473,23 @@ export default function CyborgTemple() {
           left: 100px !important;
           right: auto !important;
         }
+
+        @keyframes liminalComingSoonPulse {
+          0%, 100% {
+            opacity: 0.85;
+            text-shadow:
+              0 0 6px rgba(57, 255, 20, 0.75),
+              0 0 14px rgba(57, 255, 20, 0.45),
+              0 0 24px rgba(57, 255, 20, 0.2);
+          }
+          50% {
+            opacity: 1;
+            text-shadow:
+              0 0 10px rgba(57, 255, 20, 0.95),
+              0 0 22px rgba(57, 255, 20, 0.65),
+              0 0 40px rgba(57, 255, 20, 0.35);
+          }
+        }
       `}</style>
       
       <div style={{
@@ -554,7 +556,7 @@ export default function CyborgTemple() {
               style={{
                 position: "relative",
                 left: "2rem",
-                top: "-1.5rem",
+                top: "1.5rem",
                 color: "#f6f5f1ff",
                 fontFamily: "UnifrakturCook, serif",
                 textShadow: "0 0 10px rgba(212, 175, 55, 0.8), 0 0 20px rgba(212, 175, 55, 0.6), 0 0 30px rgba(212, 175, 55, 0.8), 6px 6px 16px rgba(0, 0, 0, 1), -2px -2px 8px rgba(255, 192, 203, 0.7), 0 0 100px rgba(212, 175, 55, 0.1)",
@@ -569,14 +571,43 @@ export default function CyborgTemple() {
                 pointerEvents: "auto",
               }}
             >
-            <span className="title-line" style={{ display: 'block', position: 'relative' }}>Our Lady</span>
-            <span className="title-line" style={{ display: 'block', position: 'relative' }}>
-              <span style={{ fontSize: "2rem" }}>of    </span>
-              Perpetual
+            <span className="title-line" style={{ display: 'block', position: 'relative' }}>The</span>
+            <span className="title-line" style={{ display: 'block', marginLeft: "2rem",position: 'relative' }}>
+              <span style={{ fontSize: "2rem" }}></span>
+                Liminal
             </span>
-            <span className="title-line" style={{ display: 'block', marginLeft: "4rem", position: 'relative' }}>Profit</span>
+            <span className="title-line" style={{ display: 'block', marginLeft: "4rem", position: 'relative' }}>Terminal</span>
           </h1>
-        
+
+          {/* Neon "COMING SOON" subheading — sits under the gothic title to
+              telegraph that the Liminal Terminal is a preview. */}
+          <div
+            style={{
+              position: 'relative',
+              left: '2.5rem',
+              top: '1.75rem',
+              marginTop: '1.5rem',
+              display: 'inline-block',
+              fontFamily: "'Orbitron', 'Courier New', monospace",
+              fontSize: isMobileView ? '0.65rem' : '0.8rem',
+              fontWeight: 900,
+              letterSpacing: '0.45em',
+              color: '#39ff14',
+              padding: '0.35rem 0.9rem',
+              border: '1px solid rgba(57, 255, 20, 0.55)',
+              borderRadius: '3px',
+              background: 'rgba(6, 20, 8, 0.55)',
+              backdropFilter: 'blur(2px)',
+              animation: 'liminalComingSoonPulse 2.4s ease-in-out infinite',
+              zIndex: 1000,
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+              textTransform: 'uppercase',
+            }}
+          >
+            · Coming Soon ·
+          </div>
+
         {/* Temple Description Panel - Separate from RL80 logo */}
         <div 
           onClick={() => {
@@ -625,9 +656,12 @@ export default function CyborgTemple() {
         {canvasReady && !isCandleModalOpen && (
         <CleanCanvas
           key="temple-canvas"
-          camera={{ 
-            position: isMobileView ? [0, 0, 2] : [0, 0.5, 6.5], 
-            fov: isMobileView ? 35 : 50 
+          camera={{
+            // Mobile was framed for the old compact MOBILE3.glb — now that it loads
+            // the full desktop scene, pull back + widen FOV so the whole tableau
+            // fits on portrait aspect. Tune z/fov further if it still reads tight.
+            position: isMobileView ? [0, 0.5, 9] : [0, 0.5, 6.5],
+            fov: isMobileView ? 55 : 50
           }}
           gl={{ 
             antialias: !isMobileView,
@@ -832,7 +866,7 @@ export default function CyborgTemple() {
             
             {/* CyborgTempleScene with the RL80 model */}
             <CyborgTempleScene
-              position={isMobileView ? [0, -1.2, 0] : [0, -1.5, 0]}
+              position={[0, -1.5, 0]}
               scale={[1.2, 1.2, 1.2]}
               rotation={[0, 0, 0]}
               isPlaying={false}
@@ -840,7 +874,6 @@ export default function CyborgTemple() {
               showAnnotations={true}
               is80sMode={context80sMode}
               isMobile={isMobileView}
-              followerWords={followerWords}
               templeCandles={templeCandles}
               onSwapCoinsReady={(fn) => { swapCoinsRef.current = fn }}
               onCoinFaceTap={(coinIndex, isCharacters) => {
@@ -874,8 +907,9 @@ export default function CyborgTemple() {
               }}
             />
 
-            {/* TickerDisplay3 - Only load on desktop with RL80_4anims.glb model */}
-            {!isMobileView && tickerReady && !isCandleModalOpen && (
+            {/* TickerDisplay3 — now rendered on both mobile and desktop since
+                they share the same GLB model. */}
+            {tickerReady && !isCandleModalOpen && (
               <TickerDisplay3 modelRef={null} onLoad={handleTickerLoad} />
             )}
 
@@ -887,8 +921,8 @@ export default function CyborgTemple() {
               isVisible={true} 
             />
 
-            {/* Using optimized version with single video texture */}
-            <VideoScreens is80sMode={context80sMode} />
+            {/* Liminal Terminal preview — screens render cryptic teasers */}
+            <VideoScreens is80sMode={context80sMode} previewMode={true} />
 
               {/* <NeuralNetworkR3F 
               theme={2}
@@ -902,22 +936,21 @@ export default function CyborgTemple() {
               nodeSize={0.06}  
             /> */}
             
-            {/* OrbitControls - Disabled on mobile */}
-            {!isMobileView && (
-              <OrbitControls
-                makeDefault
-                enablePan={true}
-                enableZoom={true}
-                zoomSpeed={0.2}
-                enableDamping={true}
-                dampingFactor={0.1}
-                minDistance={0.1}
-                maxDistance={10}
-                // zoomToCursor={true}
-                autoRotate={!focusedAgent}
-                autoRotateSpeed={0.2}
-              />
-            )}
+            {/* OrbitControls — enabled on both mobile and desktop. Drei's
+                controls handle touch (orbit/pinch/pan) natively. */}
+            <OrbitControls
+              makeDefault
+              enablePan={true}
+              enableZoom={true}
+              zoomSpeed={0.2}
+              enableDamping={true}
+              dampingFactor={0.1}
+              minDistance={0.1}
+              maxDistance={10}
+              // zoomToCursor={true}
+              autoRotate={!focusedAgent}
+              autoRotateSpeed={0.2}
+            />
           </Suspense>
           {/* <Stats className="stats-monitor" /> */}
         </CleanCanvas>
@@ -1272,28 +1305,65 @@ export default function CyborgTemple() {
               </div>
             )}
 
-            {/* Mobile Bottom Nav */}
-            {/* {isMobileView && (
-              <MobileBottomNav
-                isPlaying={contextIsPlaying}
-                onPlayMusic={() => play()}
-                onStopMusic={() => pause()}
-                onSkipTrack={() => nextTrack()}
-                onMenuClick={() => setShowCyberNav(!showCyberNav)}
-                onUserClick={() => {}}
-                isUserSignedIn={isSignedIn}
-                isMenuOpen={showCyberNav}
-                is80sMode={context80sMode}
-                userImage={user?.imageUrl}
+            {/* Bottom Nav — rendered on both mobile and desktop, mirrors
+                /exlibris: 3 slots (LOGIN | CHAT teaser FAB | HOME + BUY). */}
+            <MobileBottomNav
+                hideWallet
+                accountOnLeft
+                /* Center FAB teases the upcoming Liminal Terminal chat —
+                   rendered disabled until the broadcast goes live. */
                 onBuyClick={() => {}}
-                isMobile
+                centerDisabled
+                centerLabel="CHAT"
+                centerSubLabel="COMING SOON"
+                centerTitle="Chat with the agents — coming soon"
+                onMenuClick={() => setShowBuyModal(true)}
+                menuIcon={
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: '#d4a854' }}>
+                    <line x1="12" y1="1" x2="12" y2="23" />
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                }
+                menuLabel="BUY"
+                isUserSignedIn={isSignedIn}
+                userImage={user?.imageUrl}
                 show80sButton={false}
-                darkMode
+                isMobile
+                neonMode
+                onBookClick={() => router.push('/')}
+                bookLabel="HOME"
+                bookTitle="Return to the shrine"
+                bookIcon={
+                  <svg
+                    className="btm-book-icon-svg"
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M9 5v4" />
+                    <rect width="4" height="6" x="7" y="9" rx="1" />
+                    <path d="M9 15v2" />
+                    <path d="M17 3v2" />
+                    <rect width="4" height="8" x="15" y="5" rx="1" />
+                    <path d="M17 13v3" />
+                    <path d="M3 3v16a2 2 0 0 0 2 2h16" />
+                  </svg>
+                }
               />
-            )} */}
+
+            {/* Buy Modal — triggered from the repurposed menu slot */}
+            <BuyModal
+              isOpen={showBuyModal}
+              onClose={() => setShowBuyModal(false)}
+            />
 
             {/* Telegram Feature Box - Desktop only */}
-            {!isMobileView && !focusedAgent?.startsWith('Screen') && (
+            {/* {!isMobileView && !focusedAgent?.startsWith('Screen') && (
               <a
                 href="https://t.me/rl80_chat"
                 target="_blank"
@@ -1341,7 +1411,7 @@ export default function CyborgTemple() {
                   </span>
                 </div>
               </a>
-            )}
+            )} */}
 
             {/* Light a Candle Button - Desktop only */}
             {/* {!isMobileView && !focusedAgent?.startsWith('Screen') && (

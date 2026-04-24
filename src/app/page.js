@@ -2497,10 +2497,36 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
         }
         extraLeft={[
           {
-            key: 'tcg',
-            label: 'TCG',
-            iconSrc: '/tcg.svg',
+            key: 'terminal',
+            label: 'TLT',
+            title: 'The Liminal Terminal — preview',
             comingSoon: true,
+            onClick: () => { window.location.href = '/trade'; },
+            icon: (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#39ff14"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{
+                  width: 24,
+                  height: 24,
+                  display: 'block',
+                  filter: 'drop-shadow(0 0 4px rgba(57, 255, 20, 0.7))',
+                }}
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path d="m4.93 4.93 4.24 4.24" />
+                <path d="m14.83 9.17 4.24-4.24" />
+                <path d="m14.83 14.83 4.24 4.24" />
+                <path d="m9.17 14.83-4.24 4.24" />
+                <circle cx="12" cy="12" r="4" />
+              </svg>
+            ),
           },
         ]}
         extraRight={[

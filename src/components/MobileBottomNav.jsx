@@ -38,6 +38,9 @@ export default function MobileBottomNav({
   centerLabel = null,
   centerSubLabel = 'RL80',
   centerTitle = 'Buy RL80',
+  // When true the center FAB is rendered dimmed + non-interactive. Used for
+  // "coming soon" affordances (e.g. a CHAT FAB that teases a future feature).
+  centerDisabled = false,
   // When set (0..1), renders a depleting gold arc around the center FAB —
   // used as the candle melt timer. `null` hides the ring entirely.
   centerProgress = null,
@@ -483,6 +486,22 @@ export default function MobileBottomNav({
           animation: btmFabPulse 0.6s ease;
         }
 
+        /* Disabled center FAB — used for "coming soon" teasers (CHAT etc).
+           Replace the gradient with a flat solid panel so the label reads
+           cleanly against the bar, and kill pointer events. */
+        .btm-buy-fab.btm-disabled {
+          background: #1a1a2e !important;
+          border: 2px solid rgba(111, 168, 196, 0.35) !important;
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45) !important;
+          color: rgba(214, 250, 255, 0.75);
+          pointer-events: none;
+          animation: none !important;
+        }
+        .btm-buy-fab.btm-disabled .btm-buy-text {
+          text-shadow: none;
+          color: rgba(214, 250, 255, 0.85);
+        }
+
         /* Sibling wrapper around the FAB so the SVG ring can sit outside
            the button's gradient border without being clipped by its
            padding-box/border-box background trick. */
@@ -712,8 +731,10 @@ export default function MobileBottomNav({
             <div className="btm-buy-wrapper">
               <div className="btm-buy-fab-wrap">
                 <button
-                  className={`btm-buy-fab ${buyPulse ? 'pulse' : ''}`}
-                  onClick={onBuyClick}
+                  className={`btm-buy-fab ${buyPulse ? 'pulse' : ''} ${centerDisabled ? 'btm-disabled' : ''}`}
+                  onClick={centerDisabled ? undefined : onBuyClick}
+                  disabled={centerDisabled}
+                  aria-disabled={centerDisabled || undefined}
                   title={centerTitle}
                 >
                   <span className="btm-buy-text">
