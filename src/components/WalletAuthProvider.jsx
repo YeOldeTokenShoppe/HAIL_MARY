@@ -12,7 +12,7 @@ const WalletAuthContext = createContext({});
 export function WalletAuthProvider({ children }) {
   const { user, isLoaded: clerkLoaded } = useUser();
   const { address, isConnected } = useAccount();
-  const { connect, connectors, isPending: isConnecting } = useConnect();
+  const { connectAsync, connectors, isPending: isConnecting } = useConnect();
   const { disconnect } = useDisconnect();
 
   const [tokenBalance, setTokenBalance] = useState(null);
@@ -104,12 +104,12 @@ export function WalletAuthProvider({ children }) {
         console.error('Connector not found:', connectorId, 'Available:', connectors.map(c => c.id));
         throw new Error(`Connector ${connectorId} not found`);
       }
-      connect({ connector });
+      await connectAsync({ connector });
     } catch (error) {
       console.error('Error connecting wallet:', error);
       throw error;
     }
-  }, [connect, connectors]);
+  }, [connectAsync, connectors]);
 
   // Disconnect wallet
   const disconnectWallet = useCallback(async () => {
