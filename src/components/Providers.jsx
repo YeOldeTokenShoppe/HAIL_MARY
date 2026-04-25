@@ -221,21 +221,37 @@ const clerkAppearance = {
 };
 
 export default function Providers({ children }) {
+  // If projectId is missing (env var not set in this build), skip CDPReactProvider
+  // so the rest of the site still works. The Embedded Wallet sign-up will be
+  // unavailable but external wallets keep functioning.
+  const hasCdpProjectId = !!cdpEmbeddedWalletConfig.projectId;
+
+  const inner = (
+    <WagmiProvider config={wagmiConfig}>
+      <QueryClientProvider client={queryClient}>
+        <ClerkProvider appearance={clerkAppearance}>
+          <WalletAuthProvider>
+            <LanguageProvider>
+              <MusicProvider>
+                {children}
+              </MusicProvider>
+            </LanguageProvider>
+          </WalletAuthProvider>
+        </ClerkProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
+  );
+
+  if (!hasCdpProjectId) {
+    if (typeof window !== 'undefined') {
+      console.warn('[Providers] NEXT_PUBLIC_CDP_PROJECT_ID is not set — CDP Embedded Wallet disabled.');
+    }
+    return inner;
+  }
+
   return (
     <CDPReactProvider config={cdpEmbeddedWalletConfig} theme={cdpTheme}>
-      <WagmiProvider config={wagmiConfig}>
-        <QueryClientProvider client={queryClient}>
-          <ClerkProvider appearance={clerkAppearance}>
-            <WalletAuthProvider>
-              <LanguageProvider>
-                <MusicProvider>
-                  {children}
-                </MusicProvider>
-              </LanguageProvider>
-            </WalletAuthProvider>
-          </ClerkProvider>
-        </QueryClientProvider>
-      </WagmiProvider>
+      {inner}
     </CDPReactProvider>
   );
 }
