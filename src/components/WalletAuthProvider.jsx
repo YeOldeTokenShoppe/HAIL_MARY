@@ -11,18 +11,9 @@ const WalletAuthContext = createContext({});
 
 export function WalletAuthProvider({ children }) {
   const { user, isLoaded: clerkLoaded } = useUser();
-  const { address, isConnected, connector } = useAccount();
+  const { address, isConnected } = useAccount();
   const { connectAsync, connectors, isPending: isConnecting } = useConnect();
   const { disconnect } = useDisconnect();
-
-  // TEMP DIAGNOSTIC: trace wagmi connection state. Connector id reveals which
-  // path connected (cdpEmbeddedWallet = email/social signed in via bridge).
-  useEffect(() => {
-    console.log('[WalletAuth:diag] wagmiConnected=', isConnected,
-      'wagmiAddress=', address,
-      'wagmiConnectorId=', connector?.id || null,
-    );
-  }, [isConnected, address, connector]);
 
   const [tokenBalance, setTokenBalance] = useState(null);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);

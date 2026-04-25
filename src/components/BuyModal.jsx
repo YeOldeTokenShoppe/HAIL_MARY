@@ -758,36 +758,6 @@ const BuyModal = ({ isOpen, onClose }) => {
                 </p>
               )}
 
-              {/* Asset Info */}
-              <div style={{
-                display: 'flex',
-                gap: '12px',
-                justifyContent: 'center',
-              }}>
-                {['ETH', 'USDC'].map((asset) => (
-                  <span key={asset} style={{
-                    fontFamily: 'monospace',
-                    fontSize: '10px',
-                    color: '#fded00',
-                    padding: '4px 10px',
-                    border: '1px solid rgba(253, 237, 0, 0.3)',
-                    letterSpacing: '2px',
-                  }}>
-                    {asset}
-                  </span>
-                ))}
-                <span style={{
-                  fontFamily: 'monospace',
-                  fontSize: '10px',
-                  color: '#00e572',
-                  padding: '4px 10px',
-                  border: '1px solid rgba(0, 229, 114, 0.3)',
-                  letterSpacing: '2px',
-                }}>
-                  BASE
-                </span>
-              </div>
-
               {/* Divider */}
               <div style={{
                 display: 'flex',
