@@ -1023,7 +1023,7 @@ function VideoScreens({ is80sMode = false, previewMode = false }) {
         <CRTScreen
           canvasGlobal="__screen2Canvas"
           textureGlobal="__screen2Texture"
-          variant="ticker"
+          variant="scope"
         />
         <CRTScreen
           canvasGlobal="__screen3Canvas"

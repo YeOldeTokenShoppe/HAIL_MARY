@@ -36,11 +36,23 @@ const CRTScreen = ({ canvasGlobal, textureGlobal, variant = 'terminal' }) => {
     let tickerScroll = 0
     let lastTickerTick = 0
 
-    // Scope: fixed-length ring of samples.
-    const SCOPE_W = 256
-    const scopeBuf = new Float32Array(SCOPE_W)
-    let scopeIdx = 0
-    let nextScopePeak = 0
+    // Scope (now a multi-row data table + bar chart). Generate a stable list
+    // of rows with mutating values so the table reads as live but doesn't
+    // reshuffle every frame.
+    const scopeRows = [
+      'RL80', 'BTC', 'ETH', 'SOL', 'BASE', 'GR80', 'H80Z', 'USDC', 'WETH'
+    ].map(sym => ({
+      sym,
+      price: Math.random() * 1000,
+      change: (Math.random() - 0.5) * 5,
+      vol: Math.random() * 9999,
+      flashUntil: 0,
+    }))
+    let lastScopeTick = 0
+    // Bar chart bars — historical "volume" values that scroll left.
+    const SCOPE_BARS = 36
+    const scopeBars = new Float32Array(SCOPE_BARS).map(() => 0.3 + Math.random() * 0.7)
+    let lastBarTick = 0
 
     // Terminal: list of lines; oldest scroll off the top.
     const terminalLines = []
@@ -105,14 +117,14 @@ const CRTScreen = ({ canvasGlobal, textureGlobal, variant = 'terminal' }) => {
 
     // ---- variant draws ----
     const drawTicker = (ctx, W, H, t) => {
-      // Background — deep amber CRT
-      ctx.fillStyle = '#0a0500'
+      // Background — deep phosphor green CRT
+      ctx.fillStyle = '#001005'
       ctx.fillRect(0, 0, W, H)
 
       // Header bar
-      ctx.fillStyle = 'rgba(255,140,40,0.12)'
+      ctx.fillStyle = 'rgba(0,255,140,0.12)'
       ctx.fillRect(0, 0, W, 28)
-      ctx.fillStyle = 'rgba(255,180,80,0.95)'
+      ctx.fillStyle = 'rgba(120,255,160,0.95)'
       ctx.font = 'bold 13px monospace'
       ctx.textBaseline = 'middle'
       ctx.textAlign = 'left'
@@ -144,25 +156,25 @@ const CRTScreen = ({ canvasGlobal, textureGlobal, variant = 'terminal' }) => {
       const text = marquee + marquee + marquee
       const textW = ctx.measureText(text).width
       const offset = -(tickerScroll % textW)
-      ctx.fillStyle = 'rgba(255,180,80,0.9)'
+      ctx.fillStyle = 'rgba(120,255,160,0.9)'
       ctx.fillText(text, offset, H / 2)
 
       // Per-symbol gain/loss colored dots above marquee for vibe
       ctx.font = '10px monospace'
       tickerSymbols.forEach((s, i) => {
         const x = 16 + i * 60
-        ctx.fillStyle = s.drift >= 0 ? 'rgba(120,255,140,0.8)' : 'rgba(255,90,90,0.85)'
+        ctx.fillStyle = s.drift >= 0 ? 'rgba(180,255,180,0.95)' : 'rgba(255,90,90,0.85)'
         ctx.beginPath()
         ctx.arc(x, H - 30, 3, 0, Math.PI * 2)
         ctx.fill()
-        ctx.fillStyle = 'rgba(255,200,120,0.7)'
+        ctx.fillStyle = 'rgba(120,255,160,0.7)'
         ctx.fillText(s.sym, x + 8, H - 28)
       })
 
       // Bottom status line
-      ctx.fillStyle = 'rgba(255,140,40,0.6)'
+      ctx.fillStyle = 'rgba(0,255,140,0.6)'
       ctx.fillRect(0, H - 14, W, 1)
-      ctx.fillStyle = 'rgba(255,200,120,0.65)'
+      ctx.fillStyle = 'rgba(120,255,160,0.65)'
       ctx.font = '10px monospace'
       ctx.textAlign = 'left'
       ctx.fillText('FEED · LIVE · DELAY 50ms', 14, H - 7)
@@ -173,69 +185,157 @@ const CRTScreen = ({ canvasGlobal, textureGlobal, variant = 'terminal' }) => {
       ctx.fillStyle = '#001005'
       ctx.fillRect(0, 0, W, H)
 
-      // Grid
-      ctx.strokeStyle = 'rgba(0,255,140,0.12)'
+      const now = performance.now()
+      // Tick row data ~3x/sec — small drifts on a couple of random rows so
+      // the table reads as live without churning everything at once.
+      if (now - lastScopeTick > 320) {
+        lastScopeTick = now
+        const hits = 1 + Math.floor(Math.random() * 3)
+        for (let i = 0; i < hits; i++) {
+          const r = scopeRows[Math.floor(Math.random() * scopeRows.length)]
+          r.change += (Math.random() - 0.5) * 0.6
+          r.change = Math.max(-9.9, Math.min(9.9, r.change))
+          r.price = Math.max(0.01, r.price * (1 + r.change / 1000))
+          r.vol = Math.max(1, r.vol + (Math.random() - 0.5) * 200)
+          r.flashUntil = now + 350
+        }
+      }
+      // Bar chart shifts left ~10x/sec.
+      if (now - lastBarTick > 100) {
+        lastBarTick = now
+        for (let i = 0; i < SCOPE_BARS - 1; i++) scopeBars[i] = scopeBars[i + 1]
+        scopeBars[SCOPE_BARS - 1] = 0.2 + Math.random() * 0.8
+      }
+
+      // ---- Header strip ----
+      ctx.fillStyle = 'rgba(0,255,140,0.12)'
+      ctx.fillRect(0, 0, W, 22)
+      ctx.fillStyle = 'rgba(120,255,160,0.95)'
+      ctx.font = 'bold 11px monospace'
+      ctx.textBaseline = 'middle'
+      ctx.textAlign = 'left'
+      ctx.fillText('LIMINAL · SCREENER', 12, 11)
+      ctx.textAlign = 'right'
+      ctx.fillText(new Date().toISOString().slice(11, 19), W - 12, 11)
+
+      // ---- Bar chart (top quarter, right column) ----
+      const chartX = Math.floor(W * 0.55)
+      const chartY = 28
+      const chartW = W - chartX - 12
+      const chartH = 70
+      // Frame
+      ctx.strokeStyle = 'rgba(0,255,140,0.3)'
       ctx.lineWidth = 1
+      ctx.strokeRect(chartX + 0.5, chartY + 0.5, chartW - 1, chartH - 1)
+      // Faint grid
+      ctx.strokeStyle = 'rgba(0,255,140,0.1)'
       ctx.beginPath()
-      for (let x = 0; x < W; x += 32) {
-        ctx.moveTo(x, 0); ctx.lineTo(x, H)
-      }
-      for (let y = 0; y < H; y += 32) {
-        ctx.moveTo(0, y); ctx.lineTo(W, y)
-      }
-      ctx.stroke()
-
-      // Center reference line
-      ctx.strokeStyle = 'rgba(0,255,140,0.25)'
-      ctx.beginPath()
-      ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2)
-      ctx.stroke()
-
-      // Push a new sample. Layer two sines + occasional spike.
-      const baseT = t * 1.7
-      const sample = Math.sin(baseT * 2.0) * 0.45
-        + Math.sin(baseT * 6.3 + 0.6) * 0.18
-        + Math.sin(baseT * 13.1) * 0.06
-      const spike = (t > nextScopePeak) ? (Math.random() - 0.5) * 0.9 : 0
-      if (t > nextScopePeak) nextScopePeak = t + 0.6 + Math.random() * 1.4
-      scopeBuf[scopeIdx] = sample + spike
-      scopeIdx = (scopeIdx + 1) % SCOPE_W
-
-      // Trace
-      ctx.strokeStyle = 'rgba(120,255,160,0.95)'
-      ctx.lineWidth = 1.6
-      ctx.beginPath()
-      const stepX = W / SCOPE_W
-      for (let i = 0; i < SCOPE_W; i++) {
-        const idx = (scopeIdx + i) % SCOPE_W
-        const v = scopeBuf[idx]
-        const x = i * stepX
-        const y = H / 2 - v * (H * 0.38)
-        if (i === 0) ctx.moveTo(x, y)
-        else ctx.lineTo(x, y)
+      for (let g = 1; g < 4; g++) {
+        const gy = chartY + (chartH * g) / 4
+        ctx.moveTo(chartX, gy); ctx.lineTo(chartX + chartW, gy)
       }
       ctx.stroke()
-
-      // Glow pass — re-stroke wider with low alpha for phosphor bloom
-      ctx.strokeStyle = 'rgba(120,255,160,0.18)'
-      ctx.lineWidth = 4
-      ctx.stroke()
-
-      // Readout overlay
-      ctx.fillStyle = 'rgba(0,255,140,0.85)'
-      ctx.font = 'bold 12px monospace'
+      // Bars
+      const barW = chartW / SCOPE_BARS
+      for (let i = 0; i < SCOPE_BARS; i++) {
+        const v = scopeBars[i]
+        const bh = v * (chartH - 4)
+        const bx = chartX + i * barW + 1
+        const by = chartY + chartH - bh - 2
+        ctx.fillStyle = i === SCOPE_BARS - 1
+          ? 'rgba(180,255,200,0.95)'
+          : `rgba(120,255,160,${0.35 + v * 0.5})`
+        ctx.fillRect(bx, by, Math.max(1, barW - 2), bh)
+      }
+      ctx.fillStyle = 'rgba(0,255,140,0.55)'
+      ctx.font = '9px monospace'
       ctx.textAlign = 'left'
       ctx.textBaseline = 'top'
-      ctx.fillText('CH1 · 50mV/div · 200ms/div', 14, 12)
-      ctx.textAlign = 'right'
-      const lastV = scopeBuf[(scopeIdx + SCOPE_W - 1) % SCOPE_W]
-      ctx.fillText(`${(lastV * 50).toFixed(1)}mV`, W - 14, 12)
-      ctx.textAlign = 'left'
+      ctx.fillText('VOL · 1m', chartX + 4, chartY + 4)
+
+      // ---- Mini sparkline panel (top quarter, left column) ----
+      const sparkX = 12
+      const sparkY = 28
+      const sparkW = chartX - sparkX - 12
+      const sparkH = 70
+      ctx.strokeStyle = 'rgba(0,255,140,0.3)'
+      ctx.strokeRect(sparkX + 0.5, sparkY + 0.5, sparkW - 1, sparkH - 1)
+      // Three layered sparklines from sin combos (deterministic so they're
+      // smooth, not jittery).
+      const lines = [
+        { phase: 0, freq: 1.6, amp: 0.42, alpha: 0.85 },
+        { phase: 1.5, freq: 2.3, amp: 0.28, alpha: 0.55 },
+        { phase: 0.7, freq: 0.8, amp: 0.18, alpha: 0.4 },
+      ]
+      lines.forEach((l) => {
+        ctx.strokeStyle = `rgba(120,255,160,${l.alpha})`
+        ctx.lineWidth = 1.3
+        ctx.beginPath()
+        const N = 60
+        for (let i = 0; i < N; i++) {
+          const u = i / (N - 1)
+          const v = Math.sin(t * l.freq + l.phase + u * 6) * l.amp
+            + Math.sin(t * (l.freq * 2.7) + l.phase * 2 + u * 12) * (l.amp * 0.3)
+          const px = sparkX + 4 + u * (sparkW - 8)
+          const py = sparkY + sparkH / 2 - v * (sparkH * 0.42)
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py)
+        }
+        ctx.stroke()
+      })
       ctx.fillStyle = 'rgba(0,255,140,0.55)'
-      ctx.font = '10px monospace'
-      ctx.fillText('TRIG · AUTO', 14, H - 18)
+      ctx.font = '9px monospace'
+      ctx.textAlign = 'left'
+      ctx.fillText('PULSE · 3CH', sparkX + 4, sparkY + 4)
+
+      // ---- Data table (lower 2/3) ----
+      const tableY = 110
+      // Column headers
+      ctx.fillStyle = 'rgba(0,255,140,0.18)'
+      ctx.fillRect(0, tableY, W, 16)
+      ctx.fillStyle = 'rgba(120,255,160,0.85)'
+      ctx.font = 'bold 10px monospace'
+      ctx.textBaseline = 'middle'
+      const cols = [
+        { label: 'SYMBOL', x: 14, align: 'left' },
+        { label: 'PRICE',  x: Math.floor(W * 0.42), align: 'right' },
+        { label: 'Δ%',     x: Math.floor(W * 0.62), align: 'right' },
+        { label: 'VOL',    x: W - 14,               align: 'right' },
+      ]
+      cols.forEach(c => { ctx.textAlign = c.align; ctx.fillText(c.label, c.x, tableY + 8) })
+
+      // Body rows
+      ctx.font = '12px monospace'
+      const rowH = 18
+      scopeRows.forEach((r, i) => {
+        const y = tableY + 22 + i * rowH
+        // Row flash background when value just updated
+        if (now < r.flashUntil) {
+          const k = (r.flashUntil - now) / 350
+          ctx.fillStyle = `rgba(120,255,160,${0.12 * k})`
+          ctx.fillRect(0, y - 9, W, rowH)
+        }
+        ctx.textBaseline = 'middle'
+        ctx.fillStyle = 'rgba(120,255,160,0.92)'
+        ctx.textAlign = 'left'
+        ctx.fillText(r.sym, 14, y)
+        ctx.textAlign = 'right'
+        ctx.fillStyle = 'rgba(180,255,200,0.92)'
+        ctx.fillText(r.price < 1 ? r.price.toFixed(4) : r.price.toFixed(2), Math.floor(W * 0.42), y)
+        ctx.fillStyle = r.change >= 0 ? 'rgba(180,255,200,0.95)' : 'rgba(255,120,120,0.92)'
+        const sign = r.change >= 0 ? '+' : ''
+        ctx.fillText(`${sign}${r.change.toFixed(2)}`, Math.floor(W * 0.62), y)
+        ctx.fillStyle = 'rgba(120,255,160,0.7)'
+        ctx.fillText(Math.round(r.vol).toLocaleString(), W - 14, y)
+      })
+
+      // ---- Footer ----
+      ctx.fillStyle = 'rgba(0,255,140,0.55)'
+      ctx.font = '9px monospace'
+      ctx.textBaseline = 'middle'
+      ctx.textAlign = 'left'
+      ctx.fillText('FEED · LIVE · DELAY 50ms', 14, H - 9)
       ctx.textAlign = 'right'
-      ctx.fillText('SIG · LOCKED', W - 14, H - 18)
+      ctx.fillText(`ROWS ${scopeRows.length} · BARS ${SCOPE_BARS}`, W - 14, H - 9)
     }
 
     const drawTerminal = (ctx, W, H, t) => {
@@ -303,7 +403,7 @@ const CRTScreen = ({ canvasGlobal, textureGlobal, variant = 'terminal' }) => {
 
       // Shared CRT chrome
       const scanlineColor = variant === 'ticker'
-        ? 'rgba(255,180,80,0.06)'
+        ? 'rgba(120,255,160,0.07)'
         : variant === 'scope'
         ? 'rgba(0,255,140,0.07)'
         : 'rgba(120,255,180,0.07)'
