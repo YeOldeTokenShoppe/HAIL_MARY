@@ -116,7 +116,7 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-      const modelToPreload = '/models/RL80_4anims_v2.glb';
+      const modelToPreload = '/models/RL80_4anims_v2_opt.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
           const link = document.createElement('link');
@@ -466,44 +466,70 @@ export default function CyborgTemple() {
                 whiteSpace: "nowrap",
                 cursor: "pointer",
                 marginTop: "0",
-                pointerEvents: "auto",
+                // Fade out the title while a character/screen is focused so
+                // the close-up has the visual stage to itself.
+                opacity: focusedAgent ? 0 : 1,
+                pointerEvents: focusedAgent ? "none" : "auto",
+                transition: "opacity 0.4s ease",
               }}
             >
             <span className="title-line" style={{ display: 'block', position: 'relative' }}>The</span>
             <span className="title-line" style={{ display: 'block', marginLeft: "2rem",position: 'relative' }}>
+
               <span style={{ fontSize: "2rem" }}></span>
                 Liminal
             </span>
             <span className="title-line" style={{ display: 'block', marginLeft: "4rem", position: 'relative' }}>Terminal</span>
           </h1>
 
-          {/* Neon "COMING SOON" subheading — sits under the gothic title to
-              telegraph that the Liminal Terminal is a preview. */}
+          {/* Diagonal "COMING SOON" corner ribbon — cyber-styled, neon green
+              on a dark glass plate, clipped by the parent's overflow:hidden
+              so it reads as a corner-pinned banner. */}
           <div
             style={{
-              position: 'relative',
-              left: '2.5rem',
-              top: '3.0rem',
-              marginTop: '1.5rem',
-              display: 'inline-block',
-              fontFamily: "'Orbitron', 'Courier New', monospace",
-              fontSize: isMobileView ? '0.65rem' : '0.8rem',
-              fontWeight: 900,
-              letterSpacing: '0.45em',
+              position: 'absolute',
+              top: isMobileView ? '4em' : '4.5em',
+              left: isMobileView ? '-4em' : '-5em',
+              width: isMobileView ? '28em' : '32em',
+              transform: 'rotate(-35deg)',
+              transformOrigin: 'center',
+              textAlign: 'center',
+              padding: '0.55em 0',
+              background: 'linear-gradient(135deg, rgba(6, 20, 8, 0.9) 0%, rgba(20, 60, 30, 0.9) 50%, rgba(6, 20, 8, 0.9) 100%)',
+              border: '2px solid rgba(57, 255, 20, 0.85)',
+              boxShadow:
+                '0 0 18px rgba(57, 255, 20, 0.55), ' +
+                '0 0 36px rgba(57, 255, 20, 0.25), ' +
+                'inset 0 0 14px rgba(57, 255, 20, 0.18), ' +
+                '2px 2px 6px rgba(0, 0, 0, 0.7)',
               color: '#39ff14',
-              padding: '0.35rem 0.9rem',
-              border: '1px solid rgba(57, 255, 20, 0.55)',
-              borderRadius: '3px',
-              background: 'rgba(6, 20, 8, 0.55)',
-              backdropFilter: 'blur(2px)',
+              fontFamily: "'Orbitron', 'Courier New', monospace",
+              fontWeight: 900,
+              letterSpacing: '0.3em',
+              textTransform: 'uppercase',
+              textShadow:
+                '0 0 8px rgba(57, 255, 20, 0.9), ' +
+                '0 0 16px rgba(57, 255, 20, 0.5)',
+              fontSize: isMobileView ? '0.65rem' : '0.8rem',
+              lineHeight: 1.05,
               animation: 'liminalComingSoonPulse 2.4s ease-in-out infinite',
               zIndex: 1000,
               whiteSpace: 'nowrap',
               pointerEvents: 'none',
-              textTransform: 'uppercase',
+              // Fade with the title on close-up.
+              opacity: focusedAgent ? 0 : 1,
+              transition: 'opacity 0.4s ease',
             }}
           >
-            · Coming Soon ·
+            Coming
+            <span style={{
+              display: 'block',
+              fontSize: '1.45em',
+              letterSpacing: '0.4em',
+              marginTop: '0.1em',
+            }}>
+              Soon!
+            </span>
           </div>
 
         {/* Temple Description Panel - Separate from RL80 logo */}
@@ -773,6 +799,7 @@ export default function CyborgTemple() {
               is80sMode={context80sMode}
               isMobile={isMobileView}
               disableCandleInteraction
+              jackpotOnlyFistPump
               onSwapCoinsReady={(fn) => { swapCoinsRef.current = fn }}
               onCoinFaceTap={(coinIndex, isCharacters) => {
                 if (isCharacters) {
@@ -863,37 +890,60 @@ export default function CyborgTemple() {
           Fluffy: { name: 'Virgil', tagline: 'The guardian and guide. Nine lives, one mission.' },
           };
           const info = focusedAgent && agentInfo[focusedAgent];
+          // On mobile, place the label as a bottom banner above the bottom
+          // nav so it doesn't overlap the focused character. On desktop,
+          // keep the right-side floating card.
+          const baseStyle = isMobileView ? {
+            position: 'fixed',
+            left: '0.75rem',
+            right: '0.75rem',
+            // Bottom nav is ~5.5rem; sit above it with a gap.
+            bottom: '6.5rem',
+            opacity: info ? 1 : 0,
+            transition: 'opacity 0.4s ease',
+            pointerEvents: 'none',
+            zIndex: 20,
+            background: 'rgba(0, 0, 0, 0.78)',
+            border: '1px solid rgba(218, 165, 32, 0.55)',
+            borderRadius: '10px',
+            padding: '0.7rem 1rem',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            textAlign: 'center',
+            boxShadow: '0 0 24px rgba(218, 165, 32, 0.18)',
+          } : {
+            position: 'fixed',
+            right: '25%',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            opacity: info ? 1 : 0,
+            transition: 'opacity 0.4s ease',
+            pointerEvents: 'none',
+            zIndex: 20,
+            background: 'rgba(0, 0, 0, 0.7)',
+            border: '1px solid rgba(218, 165, 32, 0.5)',
+            borderRadius: '8px',
+            padding: '1rem 1.5rem',
+            maxWidth: '260px',
+            backdropFilter: 'blur(8px)',
+          };
           return (
-            <div style={{
-              position: 'fixed',
-              right: isMobileView ? '2rem' : '25%',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              opacity: info ? 1 : 0,
-              transition: 'opacity 0.4s ease',
-              pointerEvents: 'none',
-              zIndex: 20,
-              background: 'rgba(0, 0, 0, 0.7)',
-              border: '1px solid rgba(218, 165, 32, 0.5)',
-              borderRadius: '8px',
-              padding: '1rem 1.5rem',
-              maxWidth: '260px',
-              backdropFilter: 'blur(8px)',
-            }}>
+            <div style={baseStyle}>
               <div style={{
                 fontFamily: "'UnifrakturMaguntia', cursive",
-                fontSize: '1.4rem',
+                fontSize: isMobileView ? '1.6rem' : '1.4rem',
                 color: '#daa520',
-                marginBottom: '0.35rem',
+                marginBottom: '0.25rem',
                 letterSpacing: '0.5px',
+                lineHeight: 1.1,
               }}>
                 {info?.name}
               </div>
               <div style={{
-                fontSize: '0.85rem',
-                color: 'rgba(255, 255, 255, 0.7)',
+                fontSize: isMobileView ? '0.78rem' : '0.85rem',
+                color: 'rgba(255, 255, 255, 0.78)',
                 fontStyle: 'italic',
-                lineHeight: 1.4,
+                lineHeight: 1.35,
               }}>
                 {info?.tagline}
               </div>
@@ -1086,33 +1136,49 @@ export default function CyborgTemple() {
             <MobileBottomNav
                 hideWallet
                 accountOnLeft
-                /* Center FAB teases the upcoming Liminal Terminal chat —
-                   rendered disabled until the broadcast goes live. */
+                /* Trade-style center: three side-by-side actions (BUY / HOLD /
+                   SELL). BUY opens the existing BuyModal; HOLD and SELL are
+                   placeholders for now. */
                 onBuyClick={() => {}}
-                centerDisabled
-                centerLabel={
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
+                centerSlot={
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 6,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
                   >
-                    <rect width="12" height="12" x="2" y="10" rx="2" ry="2" />
-                    <path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6" />
-                    <path d="M6 18h.01" />
-                    <path d="M10 14h.01" />
-                    <path d="M15 6h.01" />
-                    <path d="M18 9h.01" />
-                  </svg>
+                    {[
+                      { label: 'A',  bg: 'rgba(40,180,90,0.85)',  border: 'rgba(120,255,160,0.9)', onClick: () => {} },
+                      { label: '?', bg: 'rgba(80,80,90,0.85)',   border: 'rgba(200,200,210,0.7)', onClick: () => {} },
+                      { label: 'B', bg: 'rgba(200,55,55,0.85)',  border: 'rgba(255,140,140,0.9)', onClick: () => {} },
+                    ].map(({ label, bg, border, onClick }) => (
+                      <button
+                        key={label}
+                        onClick={onClick}
+                        style={{
+                          minWidth: 70,
+                          height: 60,
+                          padding: '10px 10px',
+                          borderRadius: 10,
+                          background: bg,
+                          border: `1px solid ${border}`,
+                          color: '#fff',
+                          fontFamily: "'Orbitron', monospace",
+                          fontSize: 11,
+                          fontWeight: 800,
+                          letterSpacing: '0.12em',
+                          cursor: 'pointer',
+                          textShadow: '0 1px 0 rgba(0,0,0,0.4)',
+                          boxShadow: `0 0 8px ${border}, inset 0 1px 0 rgba(255,255,255,0.15)`,
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 }
-                centerSubLabel="COMING SOON"
-                centerTitle="Chat with the agents — coming soon"
                 onMenuClick={() => setShowBuyModal(true)}
                 menuIcon={
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: '#d4a854' }}>

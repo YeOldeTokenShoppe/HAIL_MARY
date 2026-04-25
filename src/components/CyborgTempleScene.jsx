@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+import { MeshoptDecoder } from "three/examples/jsm/libs/meshopt_decoder.module.js";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader";
 import * as THREE from "three";
 import { useThree, useFrame } from "@react-three/fiber";
@@ -128,6 +129,7 @@ const CyborgTempleScene = ({
   onCoinFaceTap = null, // Callback when a CoinFace is tapped in agents mode (coinIndex)
   templeCandles = [], // Array of claimed candle objects from Firestore templeCandles collection
   disableCandleInteraction = false, // When true, XCandle nodes are not made clickable (no zoom-to-candle, no inspector)
+  jackpotOnlyFistPump = false, // When true, FistPump only fires from slotMachineJackpot — removed from Demon's random alternation and the price-poll trigger
 }) => {
   const groupRef = useRef();
   const { scene, camera, gl } = useThree();
@@ -352,8 +354,9 @@ const CyborgTempleScene = ({
         const prevPrice = lastPriceRef.current;
         lastPriceRef.current = currentPrice;
 
-        // If we have a previous price and new price is higher → buy detected
-        if (prevPrice !== null && currentPrice > prevPrice) {
+        // If we have a previous price and new price is higher → buy detected.
+        // Skipped when FistPump is reserved for slot-machine jackpots only.
+        if (prevPrice !== null && currentPrice > prevPrice && !jackpotOnlyFistPump) {
           triggerH80ZFistPump();
         }
       } catch {
@@ -761,10 +764,15 @@ const CyborgTempleScene = ({
    
     dracoLoader.setDecoderPath(dracoPath);
     gltfLoader.setDRACOLoader(dracoLoader);
+    // Required for the optimized V2 model — gltf-transform re-encodes its
+    // meshes with EXT_meshopt_compression instead of Draco.
+    gltfLoader.setMeshoptDecoder(MeshoptDecoder);
 
-    // Using the same desktop model on both mobile and desktop until a trimmed
-    // mobile scene is ready.
-    let modelPath = "/models/RL80_4anims_v2.glb";
+    // V2 model further optimized via gltf-transform (Meshopt + WebP textures
+    // + dedup/weld) — ~3 MB instead of ~5 MB so mobile cellular completes the
+    // download before iOS Safari times out. Falls back to the un-optimized
+    // V2 if the opt build is missing on the deploy.
+    let modelPath = "/models/RL80_4anims_v2_opt.glb";
     const fallbackModelPath = "/models/RL80_4anims_v2.glb";
     let usingFallback = false;
     const startTime = performance.now();
@@ -2214,6 +2222,9 @@ const CyborgTempleScene = ({
               setFocusTarget({
                 position: originalCameraPosition.current.clone(),
                 lookAt: new THREE.Vector3(0, 0, 0),
+                // Restore the default FOV on un-focus (mobile widens during
+                // focus; this lerps it back).
+                fov: isMobile ? 55 : 50,
                 agentId: null,
                 agentName: 'Reset'
               });
@@ -2249,7 +2260,7 @@ const CyborgTempleScene = ({
               // Demon at (-1.554, -1.719, -1.351)
               // Camera positioned on opposite side (toward center)
               cameraPos: new THREE.Vector3(-0.9, -0.5, -0.7),  // Positioned toward center, looking outward
-              lookAtPos: new THREE.Vector3(-1.3, -0.6,  -1.351)  // Look at upper body
+              lookAtPos: new THREE.Vector3(-1.3, -0.6,  -1.1)  // Look at upper body
             },
             'Monk': {
               // Monk at (-1.315, -1.672, 1.636)
@@ -2324,10 +2335,16 @@ const CyborgTempleScene = ({
               agentName: object.userData.agentName
             });
           } else {
-            // Use absolute positions for known agents
+            // Use absolute positions for known agents. On mobile we widen the
+            // FOV during focus instead of moving the camera — the desktop
+            // camera positions sit between the center console and the
+            // characters, so pulling further along that vector punches through
+            // the console mesh. Wider FOV makes the subject read smaller in
+            // the portrait viewport without changing camera position.
             setFocusTarget({
               position: settings.cameraPos.clone(),
               lookAt: settings.lookAtPos.clone(),
+              fov: isMobile ? 75 : undefined,
               agentId: object.userData.agentId,
               agentName: object.userData.agentName
             });
@@ -2631,11 +2648,16 @@ const CyborgTempleScene = ({
         const demonActions = actionsRef.current['Demon'];
         const availableAnimations = Object.keys(demonActions);
 
-        // Demon animations use Root.001|* prefix — classify by suffix
+        // Demon animations use Root.001|* prefix — classify by suffix.
+        // When `jackpotOnlyFistPump` is on, FistPump is reserved for
+        // slot-machine jackpots and excluded from the random rotation.
         const loopAnimations = availableAnimations.filter(a =>
           /typing|idle|laughing/i.test(a));
+        const specialPattern = jackpotOnlyFistPump
+          ? /disbelief|clap/i
+          : /fistpump|disbelief|clap/i;
         const specialAnimations = availableAnimations.filter(a =>
-          /fistpump|disbelief|clap/i.test(a));
+          specialPattern.test(a));
 
         if (availableAnimations.length === 0) return;
 
@@ -3408,6 +3430,14 @@ const CyborgTempleScene = ({
 
     // Camera focus animation
     if (focusTarget) {
+      // Lerp camera FOV toward focusTarget.fov when set — used on mobile so
+      // the subject reads smaller in portrait without moving the camera
+      // through the center console.
+      if (typeof focusTarget.fov === 'number' && Math.abs(camera.fov - focusTarget.fov) > 0.05) {
+        camera.fov += (focusTarget.fov - camera.fov) * 0.08;
+        camera.updateProjectionMatrix();
+      }
+
       // For XCandle focus: lerp to position then release control to OrbitControls
       if (focusTarget.agentId === 'XCandle') {
         if (!focusTarget._arrived) {

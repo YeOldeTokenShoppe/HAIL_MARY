@@ -126,13 +126,13 @@ const SlotMachineScreen = ({ canvasGlobal, textureGlobal, onWin }) => {
           const isWin = spriteIndexes.every(i => i === spriteIndexes[0])
           // Calibration log — quietly prints every settle so we can compare
           // computed icon names against what's actually on screen.
-          console.log(
-            '[SlotMachineScreen]',
-            'positions:', state.positions.map(p => Math.round(p)),
-            'spriteIdx:', spriteIndexes,
-            'icons:', spriteIndexes.map(i => SLOT_ICON_MAP[i]),
-            isWin ? '🎰 WIN' : ''
-          )
+          // console.log(
+          //   '[SlotMachineScreen]',
+          //   'positions:', state.positions.map(p => Math.round(p)),
+          //   'spriteIdx:', spriteIndexes,
+          //   'icons:', spriteIndexes.map(i => SLOT_ICON_MAP[i]),
+          //   isWin ? '🎰 WIN' : ''
+          // )
           if (isWin) {
             const detail = {
               icon: SLOT_ICON_MAP[spriteIndexes[0]],

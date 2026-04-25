@@ -90,7 +90,9 @@ const LiminalTeaserScreen = ({
       const texture = window[textureGlobal]
       if (!canvas || !texture) return
 
-      const ctx = canvas.getContext('2d')
+      // willReadFrequently hints the browser to keep this canvas backed by a
+      // CPU-side buffer — drawStatic does getImageData every ~120ms.
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })
       const W = canvas.width
       const H = canvas.height
       const t = (Date.now() - startRef.current) / 1000

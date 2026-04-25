@@ -38,6 +38,10 @@ export default function MobileBottomNav({
   centerLabel = null,
   centerSubLabel = 'RL80',
   centerTitle = 'Buy RL80',
+  // When provided, this replaces the entire default center-FAB wrapper —
+  // useful for callers that want a multi-button center (e.g. /trade's
+  // BUY/HOLD/SELL trio) instead of the single round FAB.
+  centerSlot = null,
   // When true the center FAB is rendered dimmed + non-interactive. Used for
   // "coming soon" affordances (e.g. a CHAT FAB that teases a future feature).
   centerDisabled = false,
@@ -725,9 +729,11 @@ export default function MobileBottomNav({
             </button>
           )}
 
-          {/* CENTER — big FAB (defaults to BUY; callers can repurpose via
-              centerLabel/centerTitle/centerSubLabel + onBuyClick). */}
-          {onBuyClick && (
+          {/* CENTER — either a custom slot (e.g. /trade's BUY/HOLD/SELL trio)
+              or the default round FAB (defaults to BUY). */}
+          {centerSlot ? (
+            <div className="btm-buy-wrapper">{centerSlot}</div>
+          ) : onBuyClick && (
             <div className="btm-buy-wrapper">
               <div className="btm-buy-fab-wrap">
                 <button
