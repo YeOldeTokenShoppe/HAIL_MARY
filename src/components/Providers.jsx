@@ -1,11 +1,20 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ClerkProvider } from '@clerk/nextjs';
 import { dark } from '@clerk/themes';
-import { CDPReactProvider } from '@coinbase/cdp-react';
+import dynamic from 'next/dynamic';
 import { wagmiConfig, cdpEmbeddedWalletConfig } from '@/lib/wagmiConfig';
+
+// Load CDPReactProvider client-only — its SDK reads localStorage on import,
+// which throws ReferenceError during SSR/static prerender and pollutes the
+// build output with stack traces. ssr:false makes Next skip it on the server.
+const CDPReactProvider = dynamic(
+  () => import('@coinbase/cdp-react').then((mod) => ({ default: mod.CDPReactProvider })),
+  { ssr: false },
+);
 
 // Theme matched to BuyModal: purple/magenta bg, yellow accents, green CTA.
 const cdpTheme = {
