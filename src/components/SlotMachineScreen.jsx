@@ -19,6 +19,12 @@ const SlotMachineScreen = ({ canvasGlobal, textureGlobal }) => {
     const TIME_PER_ICON = 100
     const STAGGER_MS = 150
     const REST_BETWEEN_SPINS = 2500
+    // Throttle to ~30fps and skip canvas work entirely while reels are at rest
+    // so we're not re-uploading a static texture to the GPU every frame.
+    const FRAME_INTERVAL = 1000 / 30
+    let lastFrameTime = 0
+    let prevAnySpinning = false
+    let needsInitialDraw = true
 
     const state = {
       positions: new Array(REEL_COUNT).fill(0),
@@ -60,13 +66,50 @@ const SlotMachineScreen = ({ canvasGlobal, textureGlobal }) => {
       return Math.min(1, ease + overshoot)
     }
 
-    const draw = () => {
+    const draw = (ts) => {
+      rafRef.current = requestAnimationFrame(draw)
+
       const canvas = window[canvasGlobal]
       const texture = window[textureGlobal]
-      if (!canvas || !texture) {
-        rafRef.current = requestAnimationFrame(draw)
-        return
+      if (!canvas || !texture) return
+
+      // 30fps throttle — enough for a convincing reel scroll, half the GPU
+      // uploads of a 60fps RAF.
+      if (ts - lastFrameTime < FRAME_INTERVAL) return
+      lastFrameTime = ts
+
+      // Advance reel state using wall-clock time (independent of throttle).
+      const now = performance.now()
+      for (let i = 0; i < REEL_COUNT; i++) {
+        if (state.spinning[i]) {
+          const elapsed = now - state.startTimes[i]
+          if (elapsed < 0) continue
+          const t = Math.min(1, elapsed / state.durations[i])
+          const eased = easeReel(t)
+          state.positions[i] =
+            state.startPositions[i] +
+            (state.targets[i] - state.startPositions[i]) * eased
+          if (t >= 1) {
+            state.positions[i] = state.targets[i] % SPRITE_H
+            state.spinning[i] = false
+          }
+        }
       }
+
+      const anySpinning = state.spinning.some(s => s)
+
+      // Once all reels have settled, queue the next spin
+      if (!anySpinning && !state.nextScheduled) {
+        state.nextScheduled = true
+        nextSpinRef.current = setTimeout(startSpin, REST_BETWEEN_SPINS)
+      }
+
+      // Skip repaint entirely while at rest. We still paint one "final" frame
+      // after reels stop so the resting pose is shown, then go quiet until
+      // the next spin flips anySpinning back to true.
+      if (!anySpinning && !prevAnySpinning && !needsInitialDraw) return
+      prevAnySpinning = anySpinning
+      needsInitialDraw = false
 
       const ctx = canvas.getContext('2d')
       const W = canvas.width
@@ -94,32 +137,6 @@ const SlotMachineScreen = ({ canvasGlobal, textureGlobal }) => {
       const totalW = REEL_COUNT * reelW + (REEL_COUNT - 1) * gap
       const startX = (W - totalW) / 2
       const startY = (H - reelH) / 2
-
-      // Advance reels toward their targets
-      const now = performance.now()
-      let allStopped = true
-      for (let i = 0; i < REEL_COUNT; i++) {
-        if (state.spinning[i]) {
-          allStopped = false
-          const elapsed = now - state.startTimes[i]
-          if (elapsed < 0) continue
-          const t = Math.min(1, elapsed / state.durations[i])
-          const eased = easeReel(t)
-          state.positions[i] =
-            state.startPositions[i] +
-            (state.targets[i] - state.startPositions[i]) * eased
-          if (t >= 1) {
-            state.positions[i] = state.targets[i] % SPRITE_H
-            state.spinning[i] = false
-          }
-        }
-      }
-
-      // Once all reels have settled, queue the next spin
-      if (allStopped && !state.nextScheduled) {
-        state.nextScheduled = true
-        nextSpinRef.current = setTimeout(startSpin, REST_BETWEEN_SPINS)
-      }
 
       // Draw each reel
       const scale = reelW / ICON_SIZE
@@ -180,7 +197,6 @@ const SlotMachineScreen = ({ canvasGlobal, textureGlobal }) => {
       ctx.stroke()
 
       texture.needsUpdate = true
-      rafRef.current = requestAnimationFrame(draw)
     }
 
     rafRef.current = requestAnimationFrame(draw)

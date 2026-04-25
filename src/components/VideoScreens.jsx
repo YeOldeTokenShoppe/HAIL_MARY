@@ -24,6 +24,12 @@ function VideoScreens({ is80sMode = false, previewMode = false }) {
   const video4Ref = useRef();
   const video5Ref = useRef();
   const video6Ref = useRef(); // For 80s80s80s video
+  const stockChartVideoRef = useRef(); // For Screen4 preview — stock chart loop
+  const stockChartTextureRef = useRef();
+  const synthosaurVideoRef = useRef(); // For Screen3 preview — synthosaur loop
+  const synthosaurTextureRef = useRef();
+  const wavesVideoRef = useRef(); // For Screen2 preview — waves loop
+  const wavesTextureRef = useRef();
   const texture1Ref = useRef();
   const texture2Ref = useRef();
   const texture3Ref = useRef();
@@ -127,6 +133,33 @@ function VideoScreens({ is80sMode = false, previewMode = false }) {
     video5.crossOrigin = 'anonymous';
     video5Ref.current = video5;
 
+    // Create stock chart video for Screen4 in preview mode
+    const stockChartVideo = document.createElement('video');
+    stockChartVideo.src = '/videos/stockChart.mp4';
+    stockChartVideo.loop = true;
+    stockChartVideo.muted = true;
+    stockChartVideo.playsInline = true;
+    stockChartVideo.crossOrigin = 'anonymous';
+    stockChartVideoRef.current = stockChartVideo;
+
+    // Create synthosaur video for Screen3 in preview mode
+    const synthosaurVideo = document.createElement('video');
+    synthosaurVideo.src = '/videos/synthosaur2.mp4';
+    synthosaurVideo.loop = true;
+    synthosaurVideo.muted = true;
+    synthosaurVideo.playsInline = true;
+    synthosaurVideo.crossOrigin = 'anonymous';
+    synthosaurVideoRef.current = synthosaurVideo;
+
+    // Create waves video for Screen2 in preview mode
+    const wavesVideo = document.createElement('video');
+    wavesVideo.src = '/videos/waves.mp4';
+    wavesVideo.loop = true;
+    wavesVideo.muted = true;
+    wavesVideo.playsInline = true;
+    wavesVideo.crossOrigin = 'anonymous';
+    wavesVideoRef.current = wavesVideo;
+
     // Create video6 for 80s80s80s video (small screens and L/R screens)
     const video6 = document.createElement('video');
     video6.src = eightySource; // Small screens and L/R screens use 80s80s80s in 80s mode
@@ -182,6 +215,36 @@ function VideoScreens({ is80sMode = false, previewMode = false }) {
     texture5.repeat.x = -1; // Flip X-axis
     texture5.center.set(0.5, 0.5); // Set center for proper flipping
     texture5Ref.current = texture5;
+
+    // Stock chart texture for Screen4 preview
+    const stockChartTexture = new THREE.VideoTexture(stockChartVideo);
+    stockChartTexture.minFilter = THREE.LinearFilter;
+    stockChartTexture.magFilter = THREE.LinearFilter;
+    stockChartTexture.format = THREE.RGBFormat;
+    stockChartTexture.flipY = false;
+    // stockChartTexture.repeat.x = -1;
+    stockChartTexture.center.set(0.5, 0.5);
+    stockChartTextureRef.current = stockChartTexture;
+
+    // Synthosaur texture for Screen3 preview
+    const synthosaurTexture = new THREE.VideoTexture(synthosaurVideo);
+    synthosaurTexture.minFilter = THREE.LinearFilter;
+    synthosaurTexture.magFilter = THREE.LinearFilter;
+    synthosaurTexture.format = THREE.RGBFormat;
+    synthosaurTexture.flipY = false;
+    synthosaurTexture.repeat.x = -1;
+    synthosaurTexture.center.set(0.5, 0.5);
+    synthosaurTextureRef.current = synthosaurTexture;
+
+    // Waves texture for Screen2 preview
+    const wavesTexture = new THREE.VideoTexture(wavesVideo);
+    wavesTexture.minFilter = THREE.LinearFilter;
+    wavesTexture.magFilter = THREE.LinearFilter;
+    wavesTexture.format = THREE.RGBFormat;
+    wavesTexture.flipY = false;
+    wavesTexture.repeat.x = -1;
+    wavesTexture.center.set(0.5, 0.5);
+    wavesTextureRef.current = wavesTexture;
 
     // Create texture6 for 80s80s80s video
     const texture6 = new THREE.VideoTexture(video6);
@@ -390,26 +453,16 @@ function VideoScreens({ is80sMode = false, previewMode = false }) {
           // console.log('[VideoScreens] Screen1_RScreen canvas setup complete');
         }
         
-        // Screen2 - Keep original GLB image texture (or canvas in preview mode)
+        // Screen2 - Keep original GLB image texture (or waves video in preview mode)
         if (child.isMesh && child.name === 'Screen2' && !screen2Found) {
           screen2Found = true;
           if (previewMode) {
-            const canvas = document.createElement('canvas');
-            canvas.width = 512;
-            canvas.height = 320;
-            const canvasTexture = new THREE.CanvasTexture(canvas);
-            canvasTexture.minFilter = THREE.LinearFilter;
-            canvasTexture.magFilter = THREE.LinearFilter;
-            canvasTexture.flipY = false;
-            canvasTexture.center.set(0.5, 0.5);
             child.material = new THREE.MeshBasicMaterial({
-              map: canvasTexture,
+              map: wavesTexture,
               side: THREE.FrontSide,
               toneMapped: false,
             });
-            window['__screen2Canvas'] = canvas;
-            window['__screen2Texture'] = canvasTexture;
-            window['__screen2Mesh'] = child;
+            wavesVideo.play().catch(() => {});
           }
           // Otherwise using the image texture already applied in the GLB
         }
@@ -514,7 +567,16 @@ function VideoScreens({ is80sMode = false, previewMode = false }) {
         if (child.isMesh && child.name === 'Screen3' && !screen3Found) {
           // console.log('[VideoScreens] Found Screen3');
           screen3Found = true;
-          
+
+          if (previewMode) {
+            // Preview mode → loop synthosaur video
+            child.material = new THREE.MeshBasicMaterial({
+              map: synthosaurTexture,
+              side: THREE.FrontSide,
+              toneMapped: false,
+            });
+            synthosaurVideo.play().catch(() => {});
+          } else
           // Show video if in 80s mode AND not toggled to regular content
           if (is80sMode && !showRegularContent.Screen3) {
             // Apply video texture in 80s mode
@@ -656,26 +718,16 @@ function VideoScreens({ is80sMode = false, previewMode = false }) {
           }
         }
         
-        // Screen4 - Keep original GLB image texture (or canvas in preview mode)
+        // Screen4 - Keep original GLB image texture (or stock chart video in preview mode)
         if (child.isMesh && child.name === 'Screen4' && !screen4Found) {
           screen4Found = true;
           if (previewMode) {
-            const canvas = document.createElement('canvas');
-            canvas.width = 512;
-            canvas.height = 320;
-            const canvasTexture = new THREE.CanvasTexture(canvas);
-            canvasTexture.minFilter = THREE.LinearFilter;
-            canvasTexture.magFilter = THREE.LinearFilter;
-            canvasTexture.flipY = false;
-            canvasTexture.center.set(0.5, 0.5);
             child.material = new THREE.MeshBasicMaterial({
-              map: canvasTexture,
+              map: stockChartTexture,
               side: THREE.FrontSide,
               toneMapped: false,
             });
-            window['__screen4Canvas'] = canvas;
-            window['__screen4Texture'] = canvasTexture;
-            window['__screen4Mesh'] = child;
+            stockChartVideo.play().catch(() => {});
           }
           // Otherwise using the image texture already applied in the GLB
         }
@@ -814,6 +866,9 @@ function VideoScreens({ is80sMode = false, previewMode = false }) {
           video4.play().catch(() => {});
           video5.play().catch(() => {});
           video6.play().catch(() => {});
+          stockChartVideo.play().catch(() => {});
+          synthosaurVideo.play().catch(() => {});
+          wavesVideo.play().catch(() => {});
           document.removeEventListener('click', handleInteraction);
           document.removeEventListener('touchstart', handleInteraction);
         };
@@ -823,10 +878,27 @@ function VideoScreens({ is80sMode = false, previewMode = false }) {
       }
     };
 
+    // Pause the three preview-mode videos when the tab is hidden — they're
+    // decorative on /trade and chew GPU/CPU decoding in the background
+    // otherwise. Resume on return.
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stockChartVideo.pause();
+        synthosaurVideo.pause();
+        wavesVideo.pause();
+      } else {
+        stockChartVideo.play().catch(() => {});
+        synthosaurVideo.play().catch(() => {});
+        wavesVideo.play().catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     findAndSetupScreens();
 
     // Cleanup
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (video1Ref.current) {
         video1Ref.current.pause();
         video1Ref.current.src = '';
@@ -852,6 +924,21 @@ function VideoScreens({ is80sMode = false, previewMode = false }) {
         video6Ref.current.pause();
         video6Ref.current.src = '';
       }
+      if (stockChartVideoRef.current) {
+        stockChartVideoRef.current.pause();
+        stockChartVideoRef.current.src = '';
+      }
+      if (stockChartTextureRef.current) stockChartTextureRef.current.dispose();
+      if (synthosaurVideoRef.current) {
+        synthosaurVideoRef.current.pause();
+        synthosaurVideoRef.current.src = '';
+      }
+      if (synthosaurTextureRef.current) synthosaurTextureRef.current.dispose();
+      if (wavesVideoRef.current) {
+        wavesVideoRef.current.pause();
+        wavesVideoRef.current.src = '';
+      }
+      if (wavesTextureRef.current) wavesTextureRef.current.dispose();
       if (texture1Ref.current) texture1Ref.current.dispose();
       // if (texture2Ref.current) texture2Ref.current.dispose();
       if (texture3Ref.current) texture3Ref.current.dispose();
@@ -997,27 +1084,9 @@ function VideoScreens({ is80sMode = false, previewMode = false }) {
           canvasGlobal="__screen1Canvas"
           textureGlobal="__screen1Texture"
         />
-        <LiminalTeaserScreen
-          canvasGlobal="__screen2Canvas"
-          textureGlobal="__screen2Texture"
-          variant="agent"
-          agent="ST. GR80"
-          tagline="PHILOSOPHER / ETHICIST"
-        />
-        <LiminalTeaserScreen
-          canvasGlobal="__screen3Canvas"
-          textureGlobal="__screen3Texture"
-          variant="agent"
-          agent="H80Z"
-          tagline="DEVILS ADVOCATE"
-        />
-        <LiminalTeaserScreen
-          canvasGlobal="__screen4Canvas"
-          textureGlobal="__screen4Texture"
-          variant="agent"
-          agent="VIRGIL"
-          tagline="GUIDE / GUARDIAN"
-        />
+        {/* Screen2 → waves video (wired directly in findAndSetupScreens) */}
+        {/* Screen3 → synthosaur video (wired directly in findAndSetupScreens) */}
+        {/* Screen4 → stock chart video (wired directly in findAndSetupScreens) */}
 
         {/* Side panels — countdown + scanline + glyph fields for atmosphere */}
         <LiminalTeaserScreen

@@ -556,7 +556,7 @@ export default function CyborgTemple() {
               style={{
                 position: "relative",
                 left: "2rem",
-                top: "1.5rem",
+                // top: "1.5rem",
                 color: "#f6f5f1ff",
                 fontFamily: "UnifrakturCook, serif",
                 textShadow: "0 0 10px rgba(212, 175, 55, 0.8), 0 0 20px rgba(212, 175, 55, 0.6), 0 0 30px rgba(212, 175, 55, 0.8), 6px 6px 16px rgba(0, 0, 0, 1), -2px -2px 8px rgba(255, 192, 203, 0.7), 0 0 100px rgba(212, 175, 55, 0.1)",
@@ -1314,7 +1314,27 @@ export default function CyborgTemple() {
                    rendered disabled until the broadcast goes live. */
                 onBuyClick={() => {}}
                 centerDisabled
-                centerLabel="CHAT"
+                centerLabel={
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <rect width="12" height="12" x="2" y="10" rx="2" ry="2" />
+                    <path d="m17.92 14 3.5-3.5a2.24 2.24 0 0 0 0-3l-5-4.92a2.24 2.24 0 0 0-3 0L10 6" />
+                    <path d="M6 18h.01" />
+                    <path d="M10 14h.01" />
+                    <path d="M15 6h.01" />
+                    <path d="M18 9h.01" />
+                  </svg>
+                }
                 centerSubLabel="COMING SOON"
                 centerTitle="Chat with the agents — coming soon"
                 onMenuClick={() => setShowBuyModal(true)}
