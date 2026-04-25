@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
+import { useIsSignedIn, useEvmAddress } from '@coinbase/cdp-hooks';
 import { erc20Abi, formatUnits } from 'viem';
 import { publicClient } from '@/lib/viemClient';
 import { RL80_ADDRESS } from '@/lib/contracts';
@@ -11,9 +12,23 @@ const WalletAuthContext = createContext({});
 
 export function WalletAuthProvider({ children }) {
   const { user, isLoaded: clerkLoaded } = useUser();
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, connector } = useAccount();
   const { connectAsync, connectors, isPending: isConnecting } = useConnect();
   const { disconnect } = useDisconnect();
+  const { isSignedIn: cdpSignedIn } = useIsSignedIn();
+  const { evmAddress: cdpEvmAddress } = useEvmAddress();
+
+  // TEMP DIAGNOSTIC: trace embedded-wallet → wagmi bridge handoff so we can
+  // verify the CDP sign-in actually populates `walletAddress` for the buy flow.
+  useEffect(() => {
+    console.log('[WalletAuth:diag] state',
+      'cdpSignedIn=', cdpSignedIn,
+      'cdpEvmAddress=', cdpEvmAddress,
+      'wagmiConnected=', isConnected,
+      'wagmiAddress=', address,
+      'wagmiConnectorId=', connector?.id || null,
+    );
+  }, [cdpSignedIn, cdpEvmAddress, isConnected, address, connector]);
 
   const [tokenBalance, setTokenBalance] = useState(null);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);

@@ -7661,3 +7661,14 @@ body .cl-profileSection__security .cl-profileSectionPrimaryButton {
   }
 }
 
+
+/* CDP SignIn modal: gold border on OAuth (Apple/Google/X) buttons.
+   Targets the hashed CSS Modules class name via attribute substring match
+   so it survives minor library version bumps. */
+button[class*="SignInAuthMethodButtons-module__auth-btn"] {
+  border: 1px solid #fded00 !important;
+}
+button[class*="SignInAuthMethodButtons-module__auth-btn"]:hover {
+  border-color: #ffb700 !important;
+  background-color: rgba(253, 237, 0, 0.08) !important;
+}

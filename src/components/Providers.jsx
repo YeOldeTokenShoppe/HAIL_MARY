@@ -4,7 +4,40 @@ import { WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ClerkProvider } from '@clerk/nextjs';
 import { dark } from '@clerk/themes';
-import { wagmiConfig } from '@/lib/wagmiConfig';
+import { CDPReactProvider } from '@coinbase/cdp-react';
+import { wagmiConfig, cdpEmbeddedWalletConfig } from '@/lib/wagmiConfig';
+
+// Theme matched to BuyModal: purple/magenta bg, yellow accents, green CTA.
+const cdpTheme = {
+  'colors-bg-default': '#4a1f6a',
+  'colors-bg-alternate': '#5e2a82',
+  'colors-bg-primary': '#00e572',
+  'colors-bg-secondary': '#5e2a82',
+  'colors-fg-default': '#ffffff',
+  'colors-fg-muted': 'rgba(255, 255, 255, 0.6)',
+  'colors-fg-primary': '#fded00',
+  'colors-fg-onPrimary': '#000000',
+  'colors-fg-onSecondary': '#ffffff',
+  'colors-fg-positive': '#00e572',
+  'colors-fg-negative': '#ff184c',
+  'colors-fg-warning': '#ffb700',
+  'colors-line-default': 'rgba(253, 237, 0, 0.3)',
+  'colors-line-heavy': 'rgba(253, 237, 0, 0.5)',
+  // OAuth buttons (Google/Apple/X) use the secondary variant — dark bg + gold text + gold border (border via globals.css).
+  'colors-cta-secondary-bg-default': '#2a1240',
+  'colors-cta-secondary-text-default': '#fded00',
+  'colors-cta-secondary-text-hover': '#fded00',
+  'borderRadius-banner': 'var(--cdp-web-borderRadius-xl)',
+  'borderRadius-cta': 'var(--cdp-web-borderRadius-full)',
+  'borderRadius-link': 'var(--cdp-web-borderRadius-full)',
+  'borderRadius-input': 'var(--cdp-web-borderRadius-lg)',
+  'borderRadius-select-trigger': 'var(--cdp-web-borderRadius-lg)',
+  'borderRadius-select-list': 'var(--cdp-web-borderRadius-lg)',
+  'borderRadius-modal': 'var(--cdp-web-borderRadius-xl)',
+  // BuyModal sits at z-index 10000; CDP modal must sit above it.
+  'zIndex-modal-overlay': '10010',
+  'zIndex-modal-dialog': '10011',
+};
 import { WalletAuthProvider } from '@/components/WalletAuthProvider';
 import { LanguageProvider } from '@/components/LanguageProvider';
 import { MusicProvider } from '@/components/MusicContext';
@@ -180,18 +213,20 @@ const clerkAppearance = {
 
 export default function Providers({ children }) {
   return (
-    <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>
-        <ClerkProvider appearance={clerkAppearance}>
-          <WalletAuthProvider>
-            <LanguageProvider>
-              <MusicProvider>
-                {children}
-              </MusicProvider>
-            </LanguageProvider>
-          </WalletAuthProvider>
-        </ClerkProvider>
-      </QueryClientProvider>
-    </WagmiProvider>
+    <CDPReactProvider config={cdpEmbeddedWalletConfig} theme={cdpTheme}>
+      <WagmiProvider config={wagmiConfig}>
+        <QueryClientProvider client={queryClient}>
+          <ClerkProvider appearance={clerkAppearance}>
+            <WalletAuthProvider>
+              <LanguageProvider>
+                <MusicProvider>
+                  {children}
+                </MusicProvider>
+              </LanguageProvider>
+            </WalletAuthProvider>
+          </ClerkProvider>
+        </QueryClientProvider>
+      </WagmiProvider>
+    </CDPReactProvider>
   );
 }

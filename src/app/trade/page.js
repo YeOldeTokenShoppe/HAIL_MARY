@@ -585,7 +585,7 @@ export default function CyborgTemple() {
             style={{
               position: 'relative',
               left: '2.5rem',
-              top: '1.75rem',
+              top: '3.0rem',
               marginTop: '1.5rem',
               display: 'inline-block',
               fontFamily: "'Orbitron', 'Courier New', monospace",

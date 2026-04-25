@@ -14,6 +14,7 @@ import VolumeAnalysisScreen from './VolumeAnalysisScreen';
 import RiskMetricsScreen from './RiskMetricsScreen';
 import PortfolioScreen from './PortfolioScreen';
 import LiminalTeaserScreen from './LiminalTeaserScreen';
+import SlotMachineScreen from './SlotMachineScreen';
 
 function VideoScreens({ is80sMode = false, previewMode = false }) {
   const { scene } = useThree();
@@ -991,13 +992,10 @@ function VideoScreens({ is80sMode = false, previewMode = false }) {
     // to build a "coming soon" atmosphere.
     return (
       <>
-        {/* Center big screens — one per agent */}
-        <LiminalTeaserScreen
+        {/* Screen1 → looping slot machine (purely decorative, no text/interactivity) */}
+        <SlotMachineScreen
           canvasGlobal="__screen1Canvas"
           textureGlobal="__screen1Texture"
-          variant="agent"
-          agent="OUR LADY"
-          tagline="PATRON SAINT OF PORTFOLIOS"
         />
         <LiminalTeaserScreen
           canvasGlobal="__screen2Canvas"

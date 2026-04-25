@@ -1,11 +1,18 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { useSignMessage } from 'wagmi';
+import { useConnect, useSignMessage } from 'wagmi';
+import { AuthButton, SignInModal, SignInModalTrigger } from '@coinbase/cdp-react';
 import { useLanguage } from './LanguageProvider';
 import { useWalletAuth } from '@/components/WalletAuthProvider';
 import SwapForm from './SwapForm';
+
+const CONNECTORS = [
+  { id: 'coinbaseWalletSDK', label: 'COINBASE' },
+  { id: 'metaMaskSDK', label: 'METAMASK' },
+  { id: 'injected', label: 'BROWSER' },
+];
 
 const BuyModal = ({ isOpen, onClose }) => {
   const [glitchActive, setGlitchActive] = useState(false);
@@ -19,9 +26,41 @@ const BuyModal = ({ isOpen, onClose }) => {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
   const { t } = useLanguage();
-  const { walletAddress, connectWallet } = useWalletAuth();
+  const { walletAddress } = useWalletAuth();
+  const { connectAsync, connectors: wagmiConnectors } = useConnect();
   const { signMessageAsync } = useSignMessage();
   const instanceRef = useRef(null);
+  const [pendingConnectorId, setPendingConnectorId] = useState(null);
+  const [hasInjectedProvider, setHasInjectedProvider] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.ethereum) {
+      setHasInjectedProvider(true);
+    }
+  }, []);
+
+  const visibleConnectors = useMemo(
+    () => CONNECTORS.filter((c) => c.id !== 'injected' || hasInjectedProvider),
+    [hasInjectedProvider],
+  );
+
+  const handleConnect = useCallback(async (connectorId) => {
+    setAuthError(null);
+    const connector = wagmiConnectors.find((c) => c.id === connectorId);
+    if (!connector) {
+      setAuthError(`Connector ${connectorId} not available on this device`);
+      return;
+    }
+    setPendingConnectorId(connectorId);
+    try {
+      await connectAsync({ connector });
+    } catch (err) {
+      const userRejected = /reject|denied|user.*cancel/i.test(err?.message || '');
+      setAuthError(userRejected ? null : (err?.shortMessage || err?.message || 'Wallet connect failed'));
+    } finally {
+      setPendingConnectorId(null);
+    }
+  }, [connectAsync, wagmiConnectors]);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -91,18 +130,7 @@ const BuyModal = ({ isOpen, onClose }) => {
   }, [isOpen]);
 
   const handleBuy = useCallback(async () => {
-    if (!walletAddress) {
-      setAuthError(null);
-      try {
-        await connectWallet('coinbaseWallet');
-      } catch (err) {
-        console.error('Wallet connect failed:', err);
-        const userRejected = /reject|denied|user.*cancel/i.test(err?.message || '');
-        setAuthError(userRejected ? null : (err?.message || 'Unable to open wallet'));
-      }
-      return;
-    }
-    if (isAuthorizing) return;
+    if (!walletAddress || isAuthorizing) return;
 
     setAuthError(null);
     setIsAuthorizing(true);
@@ -121,8 +149,8 @@ const BuyModal = ({ isOpen, onClose }) => {
       // 2) Wallet signs the message (proves ownership of the destination address).
       const signature = await signMessageAsync({ message: nonceData.message });
 
-      // 3) Exchange for a CDP Onramp session token.
-      const sessionRes = await fetch('/api/onramp-session', {
+      // 3) Exchange the wallet signature for a short-lived session JWT.
+      const authRes = await fetch('/api/onramp-auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -132,12 +160,25 @@ const BuyModal = ({ isOpen, onClose }) => {
           signature,
         }),
       });
+      const authData = await authRes.json();
+      if (!authRes.ok || !authData.token) {
+        throw new Error(authData.error || 'Failed to authenticate');
+      }
+
+      // 4) Use the JWT to mint a CDP Onramp session token.
+      const sessionRes = await fetch('/api/onramp-session', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authData.token}`,
+        },
+      });
       const sessionData = await sessionRes.json();
       if (!sessionRes.ok || !sessionData.token) {
         throw new Error(sessionData.error || 'Failed to get session token');
       }
 
-      // 4) Init and open the Coinbase Onramp widget.
+      // 5) Init and open the Coinbase Onramp widget.
       const { initOnRamp } = await import('@coinbase/cbpay-js');
       if (instanceRef.current) {
         instanceRef.current.destroy();
@@ -176,7 +217,7 @@ const BuyModal = ({ isOpen, onClose }) => {
     } finally {
       setIsAuthorizing(false);
     }
-  }, [walletAddress, isAuthorizing, connectWallet, signMessageAsync, onClose]);
+  }, [walletAddress, isAuthorizing, signMessageAsync, onClose]);
 
   const buyStage = !walletAddress
     ? 'connectWallet'
@@ -532,55 +573,176 @@ const BuyModal = ({ isOpen, onClose }) => {
                 )}
               </h2>
 
-              {/* Description */}
-              <p style={{
-                fontFamily: 'monospace',
-                fontSize: isSmallPhone ? '11px' : '13px',
-                color: 'rgba(255, 255, 255, 0.7)',
-                textAlign: 'center',
-                lineHeight: '1.6',
-                letterSpacing: '0.5px',
-                maxWidth: '320px',
-              }}>
-                {t('buyModal.coinbaseDescription') || 'Purchase ETH or USDC on Base via Coinbase.'}
-              </p>
-
-              {/* Buy Button */}
-              <button
-                onClick={handleBuy}
-                disabled={buyDisabled}
-                style={{
+              {/* Description (hidden when not connected — replaced with onboarding copy) */}
+              {walletAddress && (
+                <p style={{
                   fontFamily: 'monospace',
-                  fontSize: isSmallPhone ? '14px' : '16px',
-                  fontWeight: '900',
-                  textTransform: 'uppercase',
-                  letterSpacing: '3px',
-                  color: '#000',
-                  background: buyClickable
-                    ? 'linear-gradient(135deg, #00e572, #00c85d)'
-                    : 'rgba(100, 100, 100, 0.5)',
-                  border: 'none',
-                  padding: isSmallPhone ? '14px 28px' : '16px 40px',
-                  cursor: buyClickable ? 'pointer' : 'wait',
-                  clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))',
-                  transition: 'all 0.3s ease',
-                  animation: buyStage === 'ready' ? 'pulse-glow 2s infinite' : 'none',
-                  position: 'relative',
-                  minWidth: isSmallPhone ? '200px' : '240px',
-                }}
-                onMouseEnter={(e) => {
-                  if (buyClickable) {
-                    e.currentTarget.style.transform = 'scale(1.05)';
-                    e.currentTarget.style.boxShadow = '0 0 30px rgba(0, 229, 114, 0.6)';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.boxShadow = '';
-                }}
-              >
-                {buyLabel}
-              </button>
+                  fontSize: isSmallPhone ? '11px' : '13px',
+                  color: 'rgba(255, 255, 255, 0.7)',
+                  textAlign: 'center',
+                  lineHeight: '1.6',
+                  letterSpacing: '0.5px',
+                  maxWidth: '320px',
+                }}>
+                  {t('buyModal.coinbaseDescription') || 'Purchase ETH or USDC on Base via Coinbase.'}
+                </p>
+              )}
+
+              {/* Buy / Connect Section */}
+              {!walletAddress ? (
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '14px',
+                  width: '100%',
+                  maxWidth: '320px',
+                }}>
+                  {/* New-to-crypto onboarding section — visually prominent */}
+                  <div style={{
+                    width: '100%',
+                    padding: isSmallPhone ? '14px 12px' : '18px 16px',
+                    background: 'rgba(0, 0, 0, 0.35)',
+                    border: '1px solid rgba(253, 237, 0, 0.4)',
+                    borderRadius: '4px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '10px',
+                  }}>
+                    <p style={{
+                      fontFamily: 'monospace',
+                      fontSize: isSmallPhone ? '11px' : '12px',
+                      fontWeight: '900',
+                      letterSpacing: '2px',
+                      color: '#fded00',
+                      textAlign: 'center',
+                      margin: 0,
+                      textTransform: 'uppercase',
+                    }}>
+                      {'>>'} NEW TO CRYPTO?
+                    </p>
+                    <p style={{
+                      fontFamily: 'monospace',
+                      fontSize: isSmallPhone ? '10px' : '11px',
+                      color: 'rgba(255, 255, 255, 0.85)',
+                      textAlign: 'center',
+                      lineHeight: '1.5',
+                      margin: 0,
+                    }}>
+                      Sign up with email or social — we&apos;ll create a wallet for you. No downloads, no seed phrases.
+                    </p>
+                    <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                      <AuthButton
+                        signInModal={({ open, setIsOpen, onSuccess }) => (
+                          <SignInModal open={open} setIsOpen={setIsOpen} onSuccess={onSuccess}>
+                            <SignInModalTrigger>
+                              <button
+                                style={{
+                                  fontFamily: 'monospace',
+                                  fontSize: isSmallPhone ? '13px' : '14px',
+                                  fontWeight: '900',
+                                  letterSpacing: '2px',
+                                  color: '#000',
+                                  background: 'linear-gradient(135deg, #fded00, #ffb700)',
+                                  border: 'none',
+                                  padding: isSmallPhone ? '12px 22px' : '14px 28px',
+                                  cursor: 'pointer',
+                                  clipPath: 'polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px))',
+                                  transition: 'all 0.2s ease',
+                                  width: '100%',
+                                  textTransform: 'uppercase',
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.02)'; }}
+                                onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                              >
+                                Sign Up / Sign In
+                              </button>
+                            </SignInModalTrigger>
+                          </SignInModal>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
+                    <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.15)' }} />
+                    <span style={{ fontFamily: 'monospace', fontSize: '9px', color: 'rgba(255,255,255,0.5)', letterSpacing: '2px' }}>OR CONNECT EXISTING WALLET</span>
+                    <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.15)' }} />
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    gap: '8px',
+                    flexWrap: 'wrap',
+                    justifyContent: 'center',
+                    width: '100%',
+                  }}>
+                        {visibleConnectors.map(({ id, label }) => {
+                          const pending = pendingConnectorId === id;
+                          return (
+                            <button
+                              key={id}
+                              onClick={() => handleConnect(id)}
+                              disabled={!!pendingConnectorId}
+                              style={{
+                                fontFamily: 'monospace',
+                                fontSize: isSmallPhone ? '11px' : '12px',
+                                fontWeight: '900',
+                                letterSpacing: '2px',
+                                color: '#000',
+                                background: pending
+                                  ? 'rgba(100, 100, 100, 0.5)'
+                                  : 'linear-gradient(135deg, #00e572, #00c85d)',
+                                border: 'none',
+                                padding: isSmallPhone ? '10px 14px' : '12px 18px',
+                                cursor: pendingConnectorId ? 'wait' : 'pointer',
+                                clipPath: 'polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px))',
+                                transition: 'all 0.2s ease',
+                              }}
+                            >
+                              {pending ? '...' : label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                </div>
+              ) : (
+                <button
+                  onClick={handleBuy}
+                  disabled={buyDisabled}
+                  style={{
+                    fontFamily: 'monospace',
+                    fontSize: isSmallPhone ? '14px' : '16px',
+                    fontWeight: '900',
+                    textTransform: 'uppercase',
+                    letterSpacing: '3px',
+                    color: '#000',
+                    background: buyClickable
+                      ? 'linear-gradient(135deg, #00e572, #00c85d)'
+                      : 'rgba(100, 100, 100, 0.5)',
+                    border: 'none',
+                    padding: isSmallPhone ? '14px 28px' : '16px 40px',
+                    cursor: buyClickable ? 'pointer' : 'wait',
+                    clipPath: 'polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px))',
+                    transition: 'all 0.3s ease',
+                    animation: buyStage === 'ready' ? 'pulse-glow 2s infinite' : 'none',
+                    position: 'relative',
+                    minWidth: isSmallPhone ? '200px' : '240px',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (buyClickable) {
+                      e.currentTarget.style.transform = 'scale(1.05)';
+                      e.currentTarget.style.boxShadow = '0 0 30px rgba(0, 229, 114, 0.6)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.boxShadow = '';
+                  }}
+                >
+                  {buyLabel}
+                </button>
+              )}
 
               {authError && (
                 <p style={{
