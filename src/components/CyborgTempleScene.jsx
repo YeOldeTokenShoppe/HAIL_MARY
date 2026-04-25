@@ -127,6 +127,7 @@ const CyborgTempleScene = ({
   onSwapCoinsReady = null, // Callback that receives a function to trigger coin swap
   onCoinFaceTap = null, // Callback when a CoinFace is tapped in agents mode (coinIndex)
   templeCandles = [], // Array of claimed candle objects from Firestore templeCandles collection
+  disableCandleInteraction = false, // When true, XCandle nodes are not made clickable (no zoom-to-candle, no inspector)
 }) => {
   const groupRef = useRef();
   const { scene, camera, gl } = useThree();
@@ -365,10 +366,16 @@ const CyborgTempleScene = ({
     // Poll every 15 seconds
     priceCheckIntervalRef.current = setInterval(checkPrice, 15000);
 
+    // Slot machine 3-of-a-kind on /trade also triggers the same fist pump —
+    // SlotMachineScreen dispatches this window event on a win.
+    const onJackpot = () => triggerH80ZFistPump();
+    window.addEventListener('slotMachineJackpot', onJackpot);
+
     return () => {
       if (priceCheckIntervalRef.current) {
         clearInterval(priceCheckIntervalRef.current);
       }
+      window.removeEventListener('slotMachineJackpot', onJackpot);
     };
   }, []);
 
@@ -757,8 +764,8 @@ const CyborgTempleScene = ({
 
     // Using the same desktop model on both mobile and desktop until a trimmed
     // mobile scene is ready.
-    let modelPath = "/models/RL80_4anims.glb";
-    const fallbackModelPath = "/models/RL80_4anims.glb";
+    let modelPath = "/models/RL80_4anims_v2.glb";
+    const fallbackModelPath = "/models/RL80_4anims_v2.glb";
     let usingFallback = false;
     const startTime = performance.now();
     
@@ -828,14 +835,30 @@ const CyborgTempleScene = ({
       
       // Find all animated objects in the scene
       templeScene.traverse((child) => {
-        if (child.name === 'RL80_Empty') {
+        if (child.name === 'RL80_Empty' || child.name === 'Unicorn_Empty') {
           animatedCharacters['RL80'] = child;
-          // Find head bone in RL80 skeleton for look-at-camera
+          // Find head bone in skeleton for look-at-camera (works for both
+          // the original RL80 rig and the unicorn rig).
           child.traverse((bone) => {
             if (bone.isBone && /head/i.test(bone.name) && !rl80HeadBoneRef.current) {
               rl80HeadBoneRef.current = bone;
             }
           });
+          // V2 model: the unicorn's mesh sits under Unicorn_Empty but its
+          // Mixamo armature (Root_1, with mixamorig* bones) is a SIBLING in
+          // the scene root — so we wire its descendant meshes to the click
+          // pipeline as RL80 here, and the mixer is anchored at the scene
+          // root below so it can reach the bones.
+          if (child.name === 'Unicorn_Empty') {
+            child.traverse((obj) => {
+              if (obj.isMesh) {
+                obj.userData.clickable = true;
+                obj.userData.agentId = 'RL80';
+                obj.userData.agentName = 'RL80';
+                if (!ourLadyRef.current) ourLadyRef.current = obj;
+              }
+            });
+          }
         }
         else if (child.name === 'Demon_empty') {
           animatedCharacters['Demon'] = child;
@@ -869,9 +892,13 @@ const CyborgTempleScene = ({
         }
       });
       
-      // Create separate mixers for each character
+      // Create separate mixers for each character. For the V2 unicorn rig the
+      // bones (mixamorigHips and friends) live under a sibling Armature
+      // (Root_1) — not under Unicorn_Empty — so anchor that mixer at the
+      // scene root to keep PropertyBinding's name lookup working.
       Object.entries(animatedCharacters).forEach(([charName, charObject]) => {
-        const mixer = new THREE.AnimationMixer(charObject);
+        const mixerRoot = (charObject.name === 'Unicorn_Empty') ? templeScene : charObject;
+        const mixer = new THREE.AnimationMixer(mixerRoot);
         mixersRef.current[charName] = mixer;
         actionsRef.current[charName] = {};
       });
@@ -964,6 +991,12 @@ const CyborgTempleScene = ({
           else if (animName === 'sit_idle' || animName.endsWith('_fluffy')) {
             targetCharacters = ['Fluffy'];
           }
+          // V2 model: unicorn rig clips (Typing_Unicorn, Unicorn_Idle, etc.)
+          // → RL80 slot. Accept "unicorn" anywhere in the clip name or first
+          // track bone, regardless of naming order.
+          else if (/unicorn/i.test(animName) || /unicorn/i.test(firstTrackBone)) {
+            targetCharacters = ['RL80'];
+          }
           else if (firstTrackBone === 'Root' ||
                    animName === 'Typing' || animName === 'Idle' ||
                    animName === 'Disbelief' || animName === 'FistPump' ||
@@ -971,14 +1004,20 @@ const CyborgTempleScene = ({
             targetCharacters = ['RL80', 'Tekno'];
           }
 
+
           
           // Apply animation to target characters with track cleaning
           targetCharacters.forEach(charName => {
             if (animatedCharacters[charName] && mixersRef.current[charName]) {
               const mixer = mixersRef.current[charName];
-              
+
+              // For unicorn (mixer rooted at the scene), check the scene's
+              // bone universe so legitimate Mixamo tracks aren't stripped.
+              const cleanRoot = (animatedCharacters[charName].name === 'Unicorn_Empty')
+                ? templeScene
+                : animatedCharacters[charName];
               // Clean animation tracks to remove references to non-existent bones
-              const cleanedAnimation = cleanAnimationTracks(animation, animatedCharacters[charName]);
+              const cleanedAnimation = cleanAnimationTracks(animation, cleanRoot);
               
               const action = mixer.clipAction(cleanedAnimation);
               
@@ -1007,7 +1046,16 @@ const CyborgTempleScene = ({
           let defaultAnim = null;
           
           if (charName === 'RL80') {
-            if (charActions['Typing']) {
+            // Prefer any unicorn typing/idle (V2 rig — handles both
+            // Typing_Unicorn and Unicorn_Typing naming), then the original
+            // Typing/Idle clips, then anything available.
+            const unicornTyping = availableAnims.find(a => /unicorn/i.test(a) && /typing/i.test(a));
+            const unicornIdle = availableAnims.find(a => /unicorn/i.test(a) && /idle/i.test(a));
+            if (unicornTyping) {
+              defaultAnimName = unicornTyping;
+            } else if (unicornIdle) {
+              defaultAnimName = unicornIdle;
+            } else if (charActions['Typing']) {
               defaultAnimName = 'Typing';
             } else if (charActions['Idle']) {
               defaultAnimName = 'Idle';
@@ -1268,24 +1316,30 @@ const CyborgTempleScene = ({
           setScreenClickableData(child);
         }
         
-        // Collect and make XCandle objects clickable
+        // Collect and make XCandle objects clickable (skip click wiring when
+        // candle interaction is disabled — e.g. on /trade)
         if (child.name && child.name.startsWith('XCandle01')) {
           // Large candles (XCandle01.009–013) have scale ~0.078 vs ~0.070 for small ones
           const isLarge = child.scale && child.scale.x > 0.075;
           // Store in collection array (will sort after traversal)
           xCandleNodesRef.current.push(child);
-          const setCandleClickable = (obj) => {
-            obj.userData.clickable = true;
-            obj.userData.agentId = 'XCandle';
-            obj.userData.agentName = 'XCandle';
-            obj.userData.isLargeCandle = isLarge;
-            if (obj.children && obj.children.length > 0) {
-              obj.children.forEach(setCandleClickable);
-            }
-          };
-          setCandleClickable(child);
-          // Hide by default — claimed candles get shown by the templeCandles useEffect
-          child.visible = false;
+          if (!disableCandleInteraction) {
+            const setCandleClickable = (obj) => {
+              obj.userData.clickable = true;
+              obj.userData.agentId = 'XCandle';
+              obj.userData.agentName = 'XCandle';
+              obj.userData.isLargeCandle = isLarge;
+              if (obj.children && obj.children.length > 0) {
+                obj.children.forEach(setCandleClickable);
+              }
+            };
+            setCandleClickable(child);
+          }
+          // On the main shrine, candles start hidden and the templeCandles
+          // useEffect lights up claimed ones. When candle interaction is
+          // disabled (e.g. /trade) there's no claim/light pipeline at all, so
+          // just show every candle.
+          child.visible = disableCandleInteraction;
         }
 
         // Find angel and coin objects for MOBILE.glb animations
@@ -1703,14 +1757,18 @@ const CyborgTempleScene = ({
       const rl80State = rl80AnimStateRef.current;
       const loopAnims = Object.keys(rl80Actions).filter(a => /typing|idle/i.test(a) && a !== 'sit_idle');
       const returnAnim = loopAnims.length > 0 ? loopAnims[0] : Object.keys(rl80Actions)[0];
-      if (rl80Actions[rl80State.currentAnimation]) {
-        rl80Actions[rl80State.currentAnimation].fadeOut(0.5);
-      }
-      if (rl80Actions[returnAnim]) {
-        const returnAction = rl80Actions[returnAnim];
+      const prevAction = rl80Actions[rl80State.currentAnimation];
+      const returnAction = rl80Actions[returnAnim];
+
+      // No-op if already on the target clip — avoids a bind-pose flash.
+      if (returnAction && returnAction !== prevAction) {
+        if (prevAction) prevAction.fadeOut(0.5);
+        // Skip the bind-pose first frame so the cross-fade doesn't pop the
+        // unicorn through neutral on un-zoom.
+        const clipDur = returnAction.getClip().duration;
         returnAction.reset();
+        returnAction.time = clipDur * 0.1;
         returnAction.setLoop(THREE.LoopRepeat);
-        returnAction.setEffectiveWeight(1);
         returnAction.fadeIn(0.5);
         returnAction.play();
         rl80State.currentAnimation = returnAnim;
@@ -2328,25 +2386,35 @@ const CyborgTempleScene = ({
             rl80FocusedRef.current = true;
             const rl80Actions = actionsRef.current['RL80'];
             if (rl80Actions) {
-              // Use 'Idle' animation for RL80 focus (sit_idle belongs to Fluffy's skeleton)
-              const idleKey = Object.keys(rl80Actions).find(a => a === 'Idle');
-              if (idleKey) {
-                const rl80State = rl80AnimStateRef.current;
-                if (rl80Actions[rl80State.currentAnimation]) {
-                  rl80Actions[rl80State.currentAnimation].fadeOut(0.5);
-                }
-                const idleAction = rl80Actions[idleKey];
+              const rl80State = rl80AnimStateRef.current;
+              const animKeys = Object.keys(rl80Actions);
+              // Prefer an Idle animation; fall back to Typing. Match the
+              // keyword at start or after an underscore so both Typing_Unicorn
+              // and Unicorn_Typing-style names resolve.
+              const idleKey = animKeys.find(a => /(?:^|_)idle/i.test(a))
+                || animKeys.find(a => /(?:^|_)typing/i.test(a));
+              const prevAction = rl80Actions[rl80State.currentAnimation];
+              const idleAction = idleKey ? rl80Actions[idleKey] : null;
+
+              // No-op if we'd be transitioning to the same clip (avoids a
+              // bind-pose flash from reset()).
+              if (idleAction && idleAction !== prevAction) {
+                if (prevAction) prevAction.fadeOut(0.5);
+                // Skip the bind-pose first frame so the cross-fade doesn't
+                // jump the unicorn through neutral.
+                const clipDur = idleAction.getClip().duration;
                 idleAction.reset();
+                idleAction.time = clipDur * 0.1;
                 idleAction.setLoop(THREE.LoopRepeat);
-                idleAction.setEffectiveWeight(1);
                 idleAction.fadeIn(0.5);
                 idleAction.play();
                 rl80State.currentAnimation = idleKey;
-                rl80State.isPlayingSpecial = true;
-                rl80State.nextSwitchDelay = 999999;
-                rl80State.lastSwitchTime = Date.now();
-              } else {
-                console.warn('[RL80] Idle animation not found. Available:', Object.keys(rl80Actions));
+              }
+              rl80State.isPlayingSpecial = true;
+              rl80State.nextSwitchDelay = 999999;
+              rl80State.lastSwitchTime = Date.now();
+              if (!idleAction) {
+                console.warn('[RL80] Idle animation not found. Available:', animKeys);
               }
             }
           } else if (object.userData.agentId === 'Fluffy') {
@@ -2660,17 +2728,29 @@ const CyborgTempleScene = ({
 
         // Get available animations for RL80
         const availableAnimations = Object.keys(rl80Actions);
-        
-        // Filter animations based on what's actually available
-        // RL80 has Idle, Typing, Clap, and prayer animations
-        const loopAnimations = availableAnimations.filter(anim => 
-          anim === 'Typing' || anim === 'Idle' || anim === 'Clap');
-        const specialAnimations = availableAnimations.filter(anim => 
-          anim === '' || anim === 'FistPump');
-        
+
+        // Filter animations based on what's actually available.
+        // Original RL80 rig: Idle, Typing, Clap, Disbelief, FistPump.
+        // Unicorn rig (V2): supports both Typing_Unicorn and Unicorn_Typing
+        // naming styles. Match the keyword at the start or after an
+        // underscore so all conventions resolve correctly.
+        const isLoopAnim = (anim) => /(?:^|_)(typing|idle|clap)/i.test(anim);
+        const isSpecialAnim = (anim) => /(?:^|_)(disbelief|fistpump)/i.test(anim);
+        const loopAnimations = availableAnimations.filter(isLoopAnim);
+        const specialAnimations = availableAnimations.filter(isSpecialAnim);
+
         // If we don't have any animations, skip
         if (availableAnimations.length === 0) {
           console.warn('[RL80] No animations available, skipping switch');
+          return;
+        }
+
+        // Nothing to alternate to (e.g. unicorn rig only ships Typing_Unicorn).
+        // Fading the same clip out and in causes a momentary T-pose between
+        // weight=0 and the fade-in — bail before that happens.
+        if (loopAnimations.length <= 1 && specialAnimations.length === 0) {
+          rl80State.lastSwitchTime = currentTime;
+          rl80State.nextSwitchDelay = 60000;
           return;
         }
         
@@ -2722,69 +2802,79 @@ const CyborgTempleScene = ({
         }
         
         
-        // Fade out current animation
-        if (rl80Actions[rl80State.currentAnimation]) {
-          rl80Actions[rl80State.currentAnimation].fadeOut(0.5);
+        const prevAction = rl80Actions[rl80State.currentAnimation];
+        const action = rl80Actions[nextAnimation];
+
+        // Skip the swap entirely if we'd be transitioning to the same clip —
+        // a fadeOut+fadeIn on one action drops weight to zero in between.
+        if (prevAction && action === prevAction) {
+          rl80State.currentAnimation = nextAnimation;
+          rl80State.lastSwitchTime = currentTime;
+          return;
         }
-        
+
         // Play the next animation
-        if (rl80Actions[nextAnimation]) {
-          const action = rl80Actions[nextAnimation];
-          action.reset();
-          action.fadeIn(0.5);
-          
-          // Check if this is a special (one-shot) animation
-          const isSpecialAnimation = ['Disbelief', 'FistPump'].includes(nextAnimation);
-          
+        if (action) {
+          const isSpecialAnimation = isSpecialAnim(nextAnimation);
+
+          // Fade the outgoing clip — both branches do this.
+          if (prevAction) prevAction.fadeOut(0.5);
+
+          if (isSpecialAnimation) {
+            action.reset();
+            action.fadeIn(0.5);
+          } else {
+            // Loop → loop crossfade. Skip the first ~10% of the incoming clip
+            // because Mixamo clips frequently start at near-bind-pose, which
+            // would briefly leak through during the 0.5s blend.
+            const clipDur = action.getClip().duration;
+            action.reset();
+            action.time = clipDur * 0.1;
+            action.setLoop(THREE.LoopRepeat);
+            action.fadeIn(0.5);
+            action.play();
+          }
+
           if (isSpecialAnimation) {
             action.setLoop(THREE.LoopOnce, 1);
             action.clampWhenFinished = true;
-            
+            action.play();
+
             // Calculate when to start transitioning back
             const animDuration = action.getClip().duration * 1000;
             const transitionStartTime = Math.max(100, animDuration - 500);
-            
-            // Start transition back to a loop animation
+
+            // Start transition back to a loop animation — same crossFadeTo
+            // approach so we don't pop into bind pose on the way back.
             setTimeout(() => {
-              // Use the actual available loop animations
-              const availableLoops = Object.keys(rl80Actions).filter(anim => 
-                anim === 'Typing' || anim === 'Idle' || anim === 'Clap');
-              const returnAnimation = availableLoops.length > 0 ? 
-                availableLoops[Math.floor(Math.random() * availableLoops.length)] : 
-                Object.keys(rl80Actions)[0]; // Fallback to first available animation
-              
-              if (returnAnimation && rl80Actions[returnAnimation]) {
-                const loopAction = rl80Actions[returnAnimation];
-                loopAction.stop();
+              const availableLoops = Object.keys(rl80Actions).filter(isLoopAnim);
+              const returnAnimation = availableLoops.length > 0
+                ? availableLoops[Math.floor(Math.random() * availableLoops.length)]
+                : Object.keys(rl80Actions)[0];
+              const loopAction = rl80Actions[returnAnimation];
+              if (loopAction) {
+                action.fadeOut(0.5);
+                const clipDur = loopAction.getClip().duration;
                 loopAction.reset();
+                loopAction.time = clipDur * 0.1;
                 loopAction.setLoop(THREE.LoopRepeat);
-                loopAction.setEffectiveWeight(1);
+                loopAction.fadeIn(0.5);
                 loopAction.play();
               }
-              
-              // Fade out the special animation
-              if (rl80Actions[rl80State.currentAnimation]) {
-                rl80Actions[rl80State.currentAnimation].fadeOut(0.5);
-              }
-              
+
               rl80State.currentAnimation = returnAnimation;
               rl80State.nextSwitchDelay = Math.random() * 8000 + 12000;
               rl80State.lastSwitchTime = Date.now();
             }, transitionStartTime);
-          } else {
-            // For loop animations (Typing, Idle)
-            action.setLoop(THREE.LoopRepeat);
           }
-          
-          action.play();
         }
         
         rl80State.currentAnimation = nextAnimation;
         
         // Set appropriate delay based on animation type
-        if (nextAnimation === 'Typing') {
+        if (/(?:^|_)typing/i.test(nextAnimation)) {
           rl80State.nextSwitchDelay = Math.random() * 8000 + 12000; // 12-20 seconds for typing
-        } else if (nextAnimation === 'Idle' || nextAnimation === 'Clap') {
+        } else if (/(?:^|_)(idle|clap)/i.test(nextAnimation)) {
           // For other loop animations, set reasonable delays
           rl80State.nextSwitchDelay = Math.random() * 5000 + 5000; // 5-10 seconds
         } else {

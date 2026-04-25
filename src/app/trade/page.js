@@ -20,10 +20,8 @@ import NavControlsMobile from '@/components/NavControlsMobile';
 import MobileBottomNav from '@/components/MobileBottomNav';
 import CoinLoader from '@/components/CoinLoader';
 import SynthSunset from '@/components/SynthSunset';
-import LightCandleModal from '@/components/LightCandleModal';
 import BuyModal from '@/components/BuyModal';
 import { useRouter } from 'next/navigation';
-import { db, collection, getDocs, addDoc, query, orderBy } from '@/lib/firebaseClient';
 
 
 export default function CyborgTemple() {
@@ -39,21 +37,16 @@ export default function CyborgTemple() {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState("Initializing");
   const [modelLoadStartTime] = useState(Date.now());
-  const [isCandleModalOpen, setIsCandleModalOpen] = useState(false);
   const [focusedAgent, setFocusedAgent] = useState(null);
   const [useAurora, setUseAurora] = useState(false);
   const swapCoinsRef = useRef(null);
   const [coinMode, setCoinMode] = useState('agents'); // 'supporters' or 'agents'
   const [coinVideo, setCoinVideo] = useState(null); // { src, label } when a coin video is playing
-  const [showCandleInspector, setShowCandleInspector] = useState(false);
   const [userHasInteracted, setUserHasInteracted] = useState(false);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [showCyberNav, setShowCyberNav] = useState(false);
-  const [showLightModal, setShowLightModal] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
   const router = useRouter();
-  const [templeCandles, setTempleCandles] = useState([]);
-  const [inspectedCandleData, setInspectedCandleData] = useState(null); // candle data for inspector
   
   // Get music context
   const { 
@@ -66,59 +59,6 @@ export default function CyborgTemple() {
     setIs80sMode: setContext80sMode
   } = useMusic();
     
-
-    // Listen for XCandle click events (second click while zoomed in)
-    useEffect(() => {
-      const handler = (e) => {
-        const candleIndex = e.detail?.candleIndex ?? -1;
-        const claimed = templeCandles.find(c => c.candleIndex === candleIndex);
-        if (claimed) {
-          setInspectedCandleData(claimed);
-        } else {
-          setInspectedCandleData({ _unclaimed: true });
-        }
-        setShowCandleInspector(true);
-      };
-      window.addEventListener('xCandleClicked', handler);
-      return () => window.removeEventListener('xCandleClicked', handler);
-    }, [templeCandles]);
-
-    // Fetch claimed temple candles from Firestore + always include developer candle
-    const DEV_CANDLE = {
-      id: '_dev',
-      candleIndex: 0,
-      userId: 'developer',
-      username: 'the developer',
-      userImageUrl: null,
-      message: 'First light in the temple. Build something worth believing in.',
-      type: 'appreciation',
-      tokensBurned: 0,
-      walletAddress: '',
-      litAt: 1739980800000, // Fixed timestamp
-    };
-    useEffect(() => {
-      const fetchTempleCandles = async () => {
-        try {
-          const q = query(collection(db, 'templeCandles'), orderBy('candleIndex'));
-          const snapshot = await getDocs(q);
-          const candles = [DEV_CANDLE]; // Always start with the developer candle
-          snapshot.forEach(doc => {
-            const data = doc.data();
-            // Skip if someone claimed index 0 (replace the dev candle)
-            if (data.candleIndex === 0) {
-              candles[0] = { id: doc.id, ...data };
-            } else {
-              candles.push({ id: doc.id, ...data });
-            }
-          });
-
-          setTempleCandles(candles);
-        } catch (err) {
-          console.error('[Temple] Failed to fetch templeCandles:', err);
-        }
-      };
-      fetchTempleCandles();
-    }, []);
 
     // Check if mobile view and device
     useEffect(() => {
@@ -176,7 +116,7 @@ export default function CyborgTemple() {
         setIsMobileView(isMobile);
         
         // Preload the appropriate model
-      const modelToPreload = '/models/RL80_4anims.glb';
+      const modelToPreload = '/models/RL80_4anims_v2.glb';
         
         if (!document.querySelector(`link[href="${modelToPreload}"]`)) {
           const link = document.createElement('link');
@@ -212,19 +152,6 @@ export default function CyborgTemple() {
     checkMobile();
     if (typeof window !== 'undefined') {
       window.addEventListener('resize', checkMobile);
-      
-      // Suppress WebGL context lost errors when intentionally unmounting
-      const handleContextLost = (e) => {
-        if (isCandleModalOpen) {
-          e.preventDefault();
-          console.log('WebGL context disposed for memory optimization');
-        }
-      };
-      
-      const canvas = document.querySelector('canvas');
-      if (canvas) {
-        canvas.addEventListener('webglcontextlost', handleContextLost);
-      }
     }
     setMounted(true);
     setLoadingProgress(10);
@@ -361,35 +288,6 @@ export default function CyborgTemple() {
   if (!mounted) {
     return <CoinLoader loading={true} />;
   }
-
-  // Handle lighting a candle in the temple — save to templeCandles collection
-  const handleLightCandle = async (offering) => {
-    // Determine the next available candleIndex
-    const usedIndices = new Set(templeCandles.map(c => c.candleIndex));
-    let nextIndex = 0;
-    while (usedIndices.has(nextIndex)) nextIndex++;
-
-    const candleDoc = {
-      candleIndex: nextIndex,
-      userId: offering.userId,
-      username: offering.name || 'Anonymous',
-      userImageUrl: offering.userImageUrl || null,
-      message: offering.message || '',
-      type: offering.type || 'petition',
-      tokensBurned: offering.tokensBurned || 0,
-      walletAddress: offering.walletAddress || '',
-      litAt: Date.now(),
-    };
-
-    try {
-      const docRef = await addDoc(collection(db, 'templeCandles'), candleDoc);
-      setTempleCandles(prev => [...prev, { id: docRef.id, ...candleDoc }]);
-    } catch (err) {
-      console.error('[Temple] Failed to save temple candle:', err);
-    }
-
-    setShowLightModal(false);
-  };
 
   return (
     <>
@@ -642,7 +540,7 @@ export default function CyborgTemple() {
         }}>
         </div>
         {/* Aurora Background - Only render when Aurora is selected AND (not in 80s mode OR on mobile) */}
-        {canvasReady && useAurora && !isCandleModalOpen && (!context80sMode || isMobileView) && (
+        {canvasReady && useAurora && (!context80sMode || isMobileView) && (
           <div style={{ 
             position: 'absolute', 
             inset: 0, 
@@ -652,8 +550,8 @@ export default function CyborgTemple() {
           </div>
         )}
 
-        {/* Main Canvas - Unmounted when modal is open for memory optimization */}
-        {canvasReady && !isCandleModalOpen && (
+        {/* Main Canvas */}
+        {canvasReady && (
         <CleanCanvas
           key="temple-canvas"
           camera={{
@@ -874,7 +772,7 @@ export default function CyborgTemple() {
               showAnnotations={true}
               is80sMode={context80sMode}
               isMobile={isMobileView}
-              templeCandles={templeCandles}
+              disableCandleInteraction
               onSwapCoinsReady={(fn) => { swapCoinsRef.current = fn }}
               onCoinFaceTap={(coinIndex, isCharacters) => {
                 if (isCharacters) {
@@ -909,7 +807,7 @@ export default function CyborgTemple() {
 
             {/* TickerDisplay3 — now rendered on both mobile and desktop since
                 they share the same GLB model. */}
-            {tickerReady && !isCandleModalOpen && (
+            {tickerReady && (
               <TickerDisplay3 modelRef={null} onLoad={handleTickerLoad} />
             )}
 
@@ -959,7 +857,7 @@ export default function CyborgTemple() {
         {/* Floating Character Label on Focus */}
         {(() => {
           const agentInfo = {
-            RL80: { name: 'Our Lady', tagline: 'Patron Saint of Portfolios' },
+            RL80: { name: 'Eugene', tagline: 'Unicorn Investor' },
             Demon: { name: 'H80Z', tagline: 'Devil\'s advocate. Short-seller.' },
             Monk: { name: 'St. GR80', tagline: 'The philosopher and ethical adviser.' },
           Fluffy: { name: 'Virgil', tagline: 'The guardian and guide. Nine lives, one mission.' },
@@ -1151,128 +1049,6 @@ export default function CyborgTemple() {
           </div>
         )}
 
-        {/* XCandle Info Overlay — shown while zoomed in */}
-        {showCandleInspector && (
-          <div style={{
-            position: 'fixed',
-            bottom: '2rem',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 2000,
-            background: 'rgba(0, 0, 0, 0.8)',
-            border: '1px solid rgba(255, 215, 0, 0.4)',
-            borderRadius: 12,
-            padding: '12px 20px',
-            backdropFilter: 'blur(12px)',
-            maxWidth: 340,
-            minWidth: 200,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
-          }}>
-            {inspectedCandleData && !inspectedCandleData._unclaimed ? (
-              <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  {inspectedCandleData.userImageUrl && (
-                    <img
-                      src={inspectedCandleData.userImageUrl}
-                      alt=""
-                      style={{
-                        width: 32, height: 32, borderRadius: '50%',
-                        border: '1px solid rgba(255, 215, 0, 0.5)',
-                      }}
-                    />
-                  )}
-                  <span style={{
-                    color: 'rgba(255, 215, 0, 0.95)',
-                    fontFamily: 'monospace',
-                    fontSize: 14,
-                    fontWeight: 700,
-                  }}>
-                    {inspectedCandleData.username || 'Anonymous'}
-                  </span>
-                </div>
-                {inspectedCandleData.message && (
-                  <p style={{
-                    color: 'rgba(255, 255, 255, 0.75)',
-                    fontFamily: 'monospace',
-                    fontSize: 12,
-                    margin: 0,
-                    fontStyle: 'italic',
-                    lineHeight: 1.4,
-                  }}>
-                    &ldquo;{inspectedCandleData.message}&rdquo;
-                  </p>
-                )}
-                {inspectedCandleData.tokensBurned > 0 && (
-                  <span style={{
-                    color: 'rgba(255, 165, 0, 0.7)',
-                    fontFamily: 'monospace',
-                    fontSize: 11,
-                  }}>
-                    {inspectedCandleData.tokensBurned.toLocaleString()} RL80 burned
-                  </span>
-                )}
-              </>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{
-                  color: 'rgba(255, 215, 0, 0.9)',
-                  fontFamily: 'monospace',
-                  fontSize: 13,
-                }}>
-                  This candle is available
-                </span>
-                <button
-                  onClick={() => {
-                    setShowCandleInspector(false);
-                    setShowLightModal(true);
-                  }}
-                  style={{
-                    background: 'rgba(255, 215, 0, 0.15)',
-                    border: '1px solid rgba(255, 215, 0, 0.5)',
-                    borderRadius: 8,
-                    color: 'rgba(255, 215, 0, 0.95)',
-                    fontSize: 12,
-                    fontFamily: 'monospace',
-                    fontWeight: 700,
-                    padding: '5px 14px',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Light it
-                </button>
-              </div>
-            )}
-            <button
-              onClick={() => {
-                setShowCandleInspector(false);
-                setInspectedCandleData(null);
-              }}
-              style={{
-                alignSelf: 'flex-end',
-                background: 'none',
-                border: 'none',
-                color: 'rgba(255, 255, 255, 0.4)',
-                fontSize: 11,
-                fontFamily: 'monospace',
-                cursor: 'pointer',
-                padding: '2px 0',
-              }}
-            >
-              close
-            </button>
-          </div>
-        )}
-
-        {/* Light a Candle Modal */}
-        <LightCandleModal
-          isOpen={showLightModal}
-          onClose={() => setShowLightModal(false)}
-          onLightCandle={handleLightCandle}
-          skipFirestore={true}
-        />
-
         {/* Top Controls Container - Music, User, and Nav */}
         {mounted && (
           <>
@@ -1431,42 +1207,6 @@ export default function CyborgTemple() {
                   </span>
                 </div>
               </a>
-            )} */}
-
-            {/* Light a Candle Button - Desktop only */}
-            {/* {!isMobileView && !focusedAgent?.startsWith('Screen') && (
-              <button
-                onClick={() => setShowLightModal(true)}
-                style={{
-                  position: 'fixed',
-                  top: '18rem',
-                  right: '1rem',
-                  zIndex: 1001,
-                  width: '200px',
-                  background: 'rgba(0, 0, 0, 0.7)',
-                  border: '1px solid rgba(255, 215, 0, 0.4)',
-                  borderRadius: '8px',
-                  padding: '10px 14px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  backdropFilter: 'blur(8px)',
-                  transition: 'border-color 0.3s ease',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = 'rgba(255, 215, 0, 0.8)'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(255, 215, 0, 0.4)'}
-              >
-                <span style={{ fontSize: '20px' }}>&#x1F56F;</span>
-                <span style={{
-                  color: 'rgba(255, 215, 0, 0.9)',
-                  fontSize: '12px',
-                  fontFamily: 'monospace',
-                  fontWeight: 700,
-                }}>
-                  Light a Candle
-                </span>
-              </button>
             )} */}
 
             {/* CyberNav Menu - Show when toggled */}

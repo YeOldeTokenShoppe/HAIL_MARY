@@ -6,10 +6,16 @@ import { useEffect, useRef } from 'react'
 // pattern. Visuals mirror Jos Fabre's CodePen (josfabre/abReBvP) — three
 // reels spin with a light overshoot easing, then pause a few seconds and
 // spin again.
-const SlotMachineScreen = ({ canvasGlobal, textureGlobal }) => {
+// Icons in vertical order on the codepen sprite (assets.codepen.io/.../slotreel.webp).
+const SLOT_ICON_MAP = ['banana', 'seven', 'cherry', 'plum', 'orange', 'bell', 'bar', 'lemon', 'melon']
+
+const SlotMachineScreen = ({ canvasGlobal, textureGlobal, onWin }) => {
   const rafRef = useRef(0)
   const kickoffRef = useRef(null)
   const nextSpinRef = useRef(null)
+  // Keep a ref so the draw closure always sees the latest callback.
+  const onWinRef = useRef(onWin)
+  useEffect(() => { onWinRef.current = onWin }, [onWin])
 
   useEffect(() => {
     const REEL_COUNT = 3
@@ -98,10 +104,53 @@ const SlotMachineScreen = ({ canvasGlobal, textureGlobal }) => {
 
       const anySpinning = state.spinning.some(s => s)
 
-      // Once all reels have settled, queue the next spin
+      // Once all reels have settled, queue the next spin and check for a win.
       if (!anySpinning && !state.nextScheduled) {
         state.nextScheduled = true
         nextSpinRef.current = setTimeout(startSpin, REST_BETWEEN_SPINS)
+
+        // Detect a 3-of-a-kind on the center payline. The icon at the payline
+        // is deterministic from `state.positions[i]` (a multiple of ICON_SIZE
+        // after settle). Runs unconditionally so the window event fires for
+        // any listener (CyborgTempleScene's FistPump trigger), with the
+        // optional onWin callback as a parallel hook.
+        if (prevAnySpinning) {
+          const reelH_ = canvas.height - 18 * 2 - 16
+          const scale_ = 100 / ICON_SIZE
+          const centerOffsetSrc = reelH_ / (2 * scale_)
+          const indexAt = (pos) => {
+            const spriteY = (((centerOffsetSrc - pos) % SPRITE_H) + SPRITE_H) % SPRITE_H
+            return Math.floor(spriteY / ICON_SIZE) % NUM_ICONS
+          }
+          const spriteIndexes = state.positions.map(indexAt)
+          const isWin = spriteIndexes.every(i => i === spriteIndexes[0])
+          // Calibration log — quietly prints every settle so we can compare
+          // computed icon names against what's actually on screen.
+          console.log(
+            '[SlotMachineScreen]',
+            'positions:', state.positions.map(p => Math.round(p)),
+            'spriteIdx:', spriteIndexes,
+            'icons:', spriteIndexes.map(i => SLOT_ICON_MAP[i]),
+            isWin ? '🎰 WIN' : ''
+          )
+          if (isWin) {
+            const detail = {
+              icon: SLOT_ICON_MAP[spriteIndexes[0]],
+              iconIndex: spriteIndexes[0],
+              indexes: spriteIndexes,
+            }
+            try {
+              window.dispatchEvent(new CustomEvent('slotMachineJackpot', { detail }))
+            } catch {}
+            if (onWinRef.current) {
+              try {
+                onWinRef.current(detail)
+              } catch (e) {
+                console.error('[SlotMachineScreen] onWin handler threw:', e)
+              }
+            }
+          }
+        }
       }
 
       // Skip repaint entirely while at rest. We still paint one "final" frame
@@ -211,4 +260,5 @@ const SlotMachineScreen = ({ canvasGlobal, textureGlobal }) => {
   return null
 }
 
+export { SLOT_ICON_MAP }
 export default SlotMachineScreen
