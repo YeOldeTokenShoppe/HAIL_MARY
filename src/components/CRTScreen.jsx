@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react'
 
 // Mock CRT screens — paints faux-terminal content onto one of the temple
-// screen canvases (set up by VideoScreens.jsx). Three variants so the three
-// monitors don't look identical:
-//   - "ticker"   : scrolling market ticker (Screen2)
-//   - "scope"    : oscilloscope / waveform readout (Screen3)
-//   - "terminal" : scrolling code/log lines (Screen4)
+// screen canvases (set up by VideoScreens.jsx). Variants so the monitors
+// don't look identical:
+//   - "ticker"      : scrolling market ticker
+//   - "scope"       : market screener data table + bar chart
+//   - "leaderboard" : FR80's arcade standings (his branded surface)
+//   - "terminal"    : scrolling code/log lines
 // Visual treatment for all variants: scanlines, phosphor glow, vignette,
 // occasional flicker. Throttled to 30fps and paused when the tab is hidden
 // to keep mobile GPU costs in check.
@@ -53,6 +54,23 @@ const CRTScreen = ({ canvasGlobal, textureGlobal, variant = 'terminal' }) => {
     const SCOPE_BARS = 36
     const scopeBars = new Float32Array(SCOPE_BARS).map(() => 0.3 + Math.random() * 0.7)
     let lastBarTick = 0
+
+    // Leaderboard — FR80's arcade standings. Branded in the header so this
+    // reads as his domain (every other surface in the scene is character-
+    // coded; an undecorated table would feel out of place). Mock data;
+    // values drift slightly and rows flash on update so it feels live.
+    const leaderboardRows = [
+      { rank: 1, handle: 'unicornGreg',     score: 0.18, accuracy: 0.78, flashUntil: 0 },
+      { rank: 2, handle: 'saintly_skeptic', score: 0.21, accuracy: 0.74, flashUntil: 0 },
+      { rank: 3, handle: '0xCYBR_R0NIN',    score: 0.23, accuracy: 0.72, flashUntil: 0 },
+      { rank: 4, handle: 'OMEGAPRIME',      score: 0.25, accuracy: 0.69, flashUntil: 0 },
+      { rank: 5, handle: 'RAVEN.eth',       score: 0.27, accuracy: 0.67, flashUntil: 0 },
+      { rank: 6, handle: 'venus_flytrap',   score: 0.28, accuracy: 0.65, flashUntil: 0 },
+      { rank: 7, handle: 'h0sannna',        score: 0.29, accuracy: 0.63, flashUntil: 0 },
+      { rank: 8, handle: 'lazarus.eth',     score: 0.31, accuracy: 0.61, flashUntil: 0 },
+      { rank: 9, handle: 'phoenix_rose',    score: 0.33, accuracy: 0.59, flashUntil: 0 },
+    ]
+    let lastLeaderboardTick = 0
 
     // Terminal: list of lines; oldest scroll off the top.
     const terminalLines = []
@@ -338,6 +356,117 @@ const CRTScreen = ({ canvasGlobal, textureGlobal, variant = 'terminal' }) => {
       ctx.fillText(`ROWS ${scopeRows.length} · BARS ${SCOPE_BARS}`, W - 14, H - 9)
     }
 
+    const drawLeaderboard = (ctx, W, H, t) => {
+      // Background — phosphor green CRT
+      ctx.fillStyle = '#001005'
+      ctx.fillRect(0, 0, W, H)
+
+      const now = performance.now()
+      // Drift a couple of scores periodically so the board reads as live
+      // without churning every frame.
+      if (now - lastLeaderboardTick > 800) {
+        lastLeaderboardTick = now
+        const hits = 1 + Math.floor(Math.random() * 2)
+        for (let i = 0; i < hits; i++) {
+          const r = leaderboardRows[Math.floor(Math.random() * leaderboardRows.length)]
+          const delta = (Math.random() - 0.5) * 0.02
+          r.score = Math.max(0.10, Math.min(0.50, r.score + delta))
+          // Accuracy moves opposite to Brier (better calibration ↔ more
+          // correct calls) — small inverse drift keeps the column readable.
+          r.accuracy = Math.max(0.5, Math.min(0.95, r.accuracy - delta * 0.5))
+          r.flashUntil = now + 400
+        }
+      }
+
+      // ---- Header strip — FR80 callsign so this reads as his station ----
+      ctx.fillStyle = 'rgba(0,255,140,0.18)'
+      ctx.fillRect(0, 0, W, 28)
+      ctx.fillStyle = 'rgba(180,255,200,0.95)'
+      ctx.font = 'bold 13px monospace'
+      ctx.textBaseline = 'middle'
+      ctx.textAlign = 'left'
+      ctx.fillText('// LEADERBOARD', 14, 14)
+      ctx.textAlign = 'right'
+      ctx.fillStyle = 'rgba(120,255,160,0.85)'
+      ctx.font = 'bold 10px monospace'
+      ctx.fillText(`● LIVE · ${new Date().toISOString().slice(11, 19)}`, W - 14, 14)
+
+      // ---- Column headers ----
+      const headerY = 40
+      ctx.fillStyle = 'rgba(0,255,140,0.55)'
+      ctx.font = 'bold 9px monospace'
+      ctx.textBaseline = 'middle'
+      const cols = [
+        { label: '#',      x: 14,                    align: 'left'  },
+        { label: 'NAME',   x: 38,                    align: 'left'  },
+        { label: 'BRIER',  x: Math.floor(W * 0.62),  align: 'right' },
+        { label: 'ACC',    x: W - 14,                align: 'right' },
+      ]
+      cols.forEach(c => { ctx.textAlign = c.align; ctx.fillText(c.label, c.x, headerY) })
+      // Divider
+      ctx.strokeStyle = 'rgba(0,255,140,0.3)'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(0, headerY + 8)
+      ctx.lineTo(W, headerY + 8)
+      ctx.stroke()
+
+      // ---- Body rows ----
+      const baseY = 58
+      const rowH = (H - baseY - 22) / leaderboardRows.length
+      const rankColors = [
+        'rgba(255,215,80,0.95)',  // gold
+        'rgba(220,220,235,0.92)', // silver
+        'rgba(220,160,120,0.92)', // bronze
+      ]
+      leaderboardRows.forEach((r, i) => {
+        const yMid = baseY + i * rowH + rowH / 2
+
+        // Row flash on update
+        if (r.flashUntil && now < r.flashUntil) {
+          const k = (r.flashUntil - now) / 400
+          ctx.fillStyle = `rgba(120,255,160,${0.18 * k})`
+          ctx.fillRect(0, yMid - rowH / 2, W, rowH)
+        }
+
+        const isTop3 = r.rank <= 3
+        const rankColor = isTop3 ? rankColors[r.rank - 1] : 'rgba(120,255,160,0.85)'
+
+        ctx.textBaseline = 'middle'
+
+        // Rank
+        ctx.textAlign = 'left'
+        ctx.fillStyle = rankColor
+        ctx.font = isTop3 ? 'bold 13px monospace' : '12px monospace'
+        ctx.fillText(`#${r.rank}`, 14, yMid)
+
+        // Handle
+        ctx.fillStyle = isTop3 ? rankColor : 'rgba(180,255,200,0.92)'
+        ctx.fillText(r.handle, 38, yMid)
+
+        // Brier (lower is better — color slightly stronger when sub-0.20)
+        ctx.textAlign = 'right'
+        ctx.font = '12px monospace'
+        ctx.fillStyle = r.score < 0.2
+          ? 'rgba(180,255,200,0.95)'
+          : 'rgba(120,255,160,0.78)'
+        ctx.fillText(r.score.toFixed(2), Math.floor(W * 0.62), yMid)
+
+        // Accuracy as percent
+        ctx.fillStyle = 'rgba(180,255,200,0.92)'
+        ctx.fillText(`${Math.round(r.accuracy * 100)}%`, W - 14, yMid)
+      })
+
+      // ---- Footer ----
+      ctx.fillStyle = 'rgba(0,255,140,0.55)'
+      ctx.font = '9px monospace'
+      ctx.textBaseline = 'middle'
+      ctx.textAlign = 'left'
+      ctx.fillText('WINDOW · 24H · TIER · DIAMOND', 14, H - 11)
+      ctx.textAlign = 'right'
+      ctx.fillText('FR80 · CYCLE 0x0c4f', W - 14, H - 11)
+    }
+
     const drawTerminal = (ctx, W, H, t) => {
       // Background — deep blue/black
       ctx.fillStyle = '#020a08'
@@ -397,15 +526,18 @@ const CRTScreen = ({ canvasGlobal, textureGlobal, variant = 'terminal' }) => {
       const H = canvas.height
       const t = (performance.now() - startedAt.current) / 1000
 
-      if (variant === 'ticker')        drawTicker(ctx, W, H, t)
-      else if (variant === 'scope')    drawScope(ctx, W, H, t)
-      else                             drawTerminal(ctx, W, H, t)
+      if (variant === 'ticker')           drawTicker(ctx, W, H, t)
+      else if (variant === 'scope')       drawScope(ctx, W, H, t)
+      else if (variant === 'leaderboard') drawLeaderboard(ctx, W, H, t)
+      else                                drawTerminal(ctx, W, H, t)
 
       // Shared CRT chrome
       const scanlineColor = variant === 'ticker'
         ? 'rgba(120,255,160,0.07)'
         : variant === 'scope'
         ? 'rgba(0,255,140,0.07)'
+        : variant === 'leaderboard'
+        ? 'rgba(120,255,160,0.07)'
         : 'rgba(120,255,180,0.07)'
       drawScanlines(ctx, W, H, scanlineColor)
       drawVignette(ctx, W, H)
