@@ -7,16 +7,6 @@ import { useThree, useFrame } from "@react-three/fiber";
 import AnnotationSystem from "@/components/AnnotationSystem";
 import { db, collection, query, orderBy, limit, getDocs } from '@/lib/firebaseClient';
 
-// Per-agent camera presets used by both tap-to-focus and external (e.g.
-// mobile swipe) focus. Module-scoped so the swipe-focus useEffect can read
-// the same values the click raycaster uses.
-const AGENT_SETTINGS = {
-  RL80:   { cameraPos: new THREE.Vector3(1, -0.4, 0.7),     lookAtPos: new THREE.Vector3(1.804, -0.7, 2),     orbitCenter: new THREE.Vector3(1.704, -0.5, 1.476) },
-  Demon:  { cameraPos: new THREE.Vector3(-0.9, -0.5, -0.7), lookAtPos: new THREE.Vector3(-1.3, -0.6, -1.1),   orbitCenter: new THREE.Vector3(-1.554, -0.75, -1.351) },
-  Monk:   { cameraPos: new THREE.Vector3(-0.5, -0.5, 1.3),  lookAtPos: new THREE.Vector3(-1.515, -0.7, 1.636) },
-  Fluffy: { cameraPos: new THREE.Vector3(0.55, -0.6, -1.65),lookAtPos: new THREE.Vector3(1.615, -1.2, -1.736) },
-};
-
 // --- Word cluster configuration ---
 const WORD_CLUSTER_WORDS = [
   '✨ blessed', '🕯️ light', '🔥 fire', '💫 cosmic', '🌟 shine',
@@ -140,7 +130,6 @@ const CyborgTempleScene = ({
   templeCandles = [], // Array of claimed candle objects from Firestore templeCandles collection
   disableCandleInteraction = false, // When true, XCandle nodes are not made clickable (no zoom-to-candle, no inspector)
   jackpotOnlyFistPump = false, // When true, FistPump only fires from slotMachineJackpot — removed from Demon's random alternation and the price-poll trigger
-  externalFocusAgent = undefined, // When set (RL80|Demon|Monk|Fluffy|null), drives camera focus from outside (e.g. mobile swipe). null = unfocus.
 }) => {
   const groupRef = useRef();
   const { scene, camera, gl } = useThree();
@@ -166,26 +155,9 @@ const CyborgTempleScene = ({
 
   // Camera focus state
   const [focusTarget, setFocusTarget] = useState(null);
-  // Mirror of focusTarget read by `focusAgentInternal` so it can see the
-  // latest value regardless of which useEffect created its closure. Assigned
-  // in render body so it's always in sync before effects fire.
-  const focusTargetRef = useRef(null);
-  focusTargetRef.current = focusTarget;
   const ourLadyRef = useRef(); // Reference to RL80 (OurLady) mesh
   const originalCameraPosition = useRef(null); // Store original camera position
-
-  // External focus driver (e.g. mobile swipe in trade/page.js). The actual
-  // work — camera move + per-character animation/head-tracking switches —
-  // lives in `focusAgentInternal`, defined inside the click-handler useEffect
-  // so it can share the restore* helpers + animation refs with that path.
-  // We expose it via a ref so this effect can invoke it.
-  const focusAgentInternalRef = useRef(null);
-  useEffect(() => {
-    if (externalFocusAgent === undefined) return;
-    focusAgentInternalRef.current?.(externalFocusAgent);
-  }, [externalFocusAgent]);
-
-
+  
   // Hover state for coins
   const [hoveredCoin, setHoveredCoin] = useState(null);
   const coin1OriginalScale = useRef(null);
@@ -1834,132 +1806,6 @@ const CyborgTempleScene = ({
       restoreRL80FromFocus();
       restoreFluffyFromFocus();
     };
-
-    // Apply focus the way a click would: camera move + per-character idle
-    // pose + focusedRef flag (which enables head tracking in the per-char
-    // useFrame). Used by the externalFocusAgent prop (mobile swipe).
-    // Re-defined whenever this useEffect re-runs so it sees the latest
-    // focusTarget; exposed via ref so the external-focus useEffect can call it.
-    const focusAgentInternal = (agentId) => {
-      const ft = focusTargetRef.current;
-      if (agentId === null) {
-        if (!ft) return;
-        restoreAllFromFocus();
-        if (originalCameraPosition.current) {
-          setFocusTarget({
-            position: originalCameraPosition.current.clone(),
-            lookAt: new THREE.Vector3(0, 0, 0),
-            fov: isMobile ? 55 : 50,
-            agentId: null,
-            agentName: 'Reset',
-          });
-          setTimeout(() => {
-            setFocusTarget(null);
-            originalCameraPosition.current = null;
-          }, 1000);
-        } else {
-          setFocusTarget(null);
-        }
-        return;
-      }
-      if (ft?.agentId === agentId) return;
-      // Switching characters: clear the previous one's focus state first so
-      // its idle anim resumes and head tracking stops before the next one
-      // takes over.
-      if (ft) restoreAllFromFocus();
-      const settings = AGENT_SETTINGS[agentId];
-      if (!settings) return;
-      if (!ft) {
-        originalCameraPosition.current = camera.position.clone();
-      }
-      setFocusTarget({
-        position: settings.cameraPos.clone(),
-        lookAt: settings.lookAtPos.clone(),
-        orbitCenter: settings.orbitCenter ? settings.orbitCenter.clone() : null,
-        fov: isMobile ? 75 : undefined,
-        agentId,
-        agentName: agentId,
-      });
-      if (agentId === 'Demon') {
-        demonFocusedRef.current = true;
-        const demonActions = actionsRef.current['Demon'];
-        if (demonActions) {
-          const idleKey = Object.keys(demonActions).find(a => /sit_idle_demon/i.test(a));
-          if (idleKey) {
-            const demonState = demonAnimStateRef.current;
-            if (demonActions[demonState.currentAnimation]) {
-              demonActions[demonState.currentAnimation].fadeOut(0.5);
-            }
-            const idleAction = demonActions[idleKey];
-            idleAction.reset();
-            idleAction.setLoop(THREE.LoopRepeat);
-            idleAction.setEffectiveWeight(1);
-            idleAction.fadeIn(0.5);
-            idleAction.play();
-            demonState.currentAnimation = idleKey;
-            demonState.isPlayingSpecial = true;
-            demonState.nextSwitchDelay = 999999;
-            demonState.lastSwitchTime = Date.now();
-          }
-        }
-      } else if (agentId === 'Monk') {
-        monkFocusedRef.current = true;
-        const monkActions = actionsRef.current['Monk'];
-        if (monkActions) {
-          const idleKey = Object.keys(monkActions).find(a => /idle_monk/i.test(a));
-          if (idleKey) {
-            const monkState = monkAnimStateRef.current;
-            if (monkActions[monkState.currentAnimation]) {
-              monkActions[monkState.currentAnimation].fadeOut(0.5);
-            }
-            const idleAction = monkActions[idleKey];
-            idleAction.reset();
-            idleAction.setLoop(THREE.LoopRepeat);
-            idleAction.setEffectiveWeight(1);
-            idleAction.fadeIn(0.5);
-            idleAction.play();
-            monkState.currentAnimation = idleKey;
-            monkState.isPlayingSpecial = true;
-            monkState.nextSwitchDelay = 999999;
-            monkState.lastSwitchTime = Date.now();
-          }
-        }
-      } else if (agentId === 'RL80') {
-        rl80FocusedRef.current = true;
-        const rl80Actions = actionsRef.current['RL80'];
-        if (rl80Actions) {
-          const rl80State = rl80AnimStateRef.current;
-          const animKeys = Object.keys(rl80Actions);
-          const idleKey = animKeys.find(a => /(?:^|_)idle/i.test(a))
-            || animKeys.find(a => /(?:^|_)typing/i.test(a));
-          const prevAction = rl80Actions[rl80State.currentAnimation];
-          const idleAction = idleKey ? rl80Actions[idleKey] : null;
-          if (idleAction && idleAction !== prevAction) {
-            if (prevAction) prevAction.fadeOut(0.5);
-            const clipDur = idleAction.getClip().duration;
-            idleAction.reset();
-            idleAction.time = clipDur * 0.1;
-            idleAction.setLoop(THREE.LoopRepeat);
-            idleAction.fadeIn(0.5);
-            idleAction.play();
-            rl80State.currentAnimation = idleKey;
-          }
-          rl80State.isPlayingSpecial = true;
-          rl80State.nextSwitchDelay = 999999;
-          rl80State.lastSwitchTime = Date.now();
-        }
-      } else if (agentId === 'Fluffy') {
-        fluffyFocusedRef.current = true;
-        const fluffyActions = actionsRef.current['Fluffy'];
-        if (fluffyActions) {
-          Object.values(fluffyActions).forEach(action => {
-            action.paused = true;
-          });
-        }
-      }
-      if (onAgentClick) onAgentClick(agentId);
-    };
-    focusAgentInternalRef.current = focusAgentInternal;
 
     // Handle escape key to reset camera
     const handleKeyDown = (event) => {

@@ -80,43 +80,6 @@ export default function CyborgTemple() {
       return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
-    // Mobile: horizontal swipes on the canvas cycle character focus.
-    // Vertical motions pass through (page scroll / nothing). Two-finger
-    // touches are ignored so pinch-zoom still works through OrbitControls.
-    useEffect(() => {
-      if (!isMobileView || !mounted) return;
-      const AGENTS = ['RL80', 'Demon', 'Monk', 'Fluffy'];
-      let start = null;
-      const onTouchStart = (e) => {
-        if (e.touches.length !== 1) { start = null; return; }
-        if (!(e.target instanceof HTMLCanvasElement)) return;
-        start = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
-      };
-      const onTouchEnd = (e) => {
-        if (!start) return;
-        const t = e.changedTouches[0];
-        const dx = t.clientX - start.x;
-        const dy = t.clientY - start.y;
-        const dt = Date.now() - start.t;
-        start = null;
-        if (Math.abs(dx) < 60) return;            // not far enough
-        if (Math.abs(dx) < Math.abs(dy) * 1.2) return; // mostly vertical
-        if (dt > 600) return;                     // too slow, treat as orbit drag
-        const dir = dx > 0 ? -1 : 1;              // swipe right → previous, left → next
-        setFocusedAgent((prev) => {
-          if (!prev || !AGENTS.includes(prev)) return AGENTS[dir > 0 ? 0 : AGENTS.length - 1];
-          const idx = AGENTS.indexOf(prev);
-          return AGENTS[(idx + dir + AGENTS.length) % AGENTS.length];
-        });
-      };
-      document.addEventListener('touchstart', onTouchStart, { passive: true });
-      document.addEventListener('touchend', onTouchEnd, { passive: true });
-      return () => {
-        document.removeEventListener('touchstart', onTouchStart);
-        document.removeEventListener('touchend', onTouchEnd);
-      };
-    }, [isMobileView, mounted]);
-  
   // Get user context and auth functions
   const { isSignedIn, user } = useUser();
   const { openSignIn, openUserProfile } = useClerk();
@@ -674,7 +637,7 @@ export default function CyborgTemple() {
             // Mobile was framed for the old compact MOBILE3.glb — now that it loads
             // the full desktop scene, pull back + widen FOV so the whole tableau
             // fits on portrait aspect. Tune z/fov further if it still reads tight.
-            position: isMobileView ? [0, 0.5, 9] : [0, 0.5, 6.5],
+            position: isMobileView ? [0, 0.5, 7] : [0, 0.5, 6.5],
             fov: isMobileView ? 55 : 50
           }}
           gl={{ 
@@ -890,7 +853,6 @@ export default function CyborgTemple() {
               isMobile={isMobileView}
               disableCandleInteraction
               jackpotOnlyFistPump
-              externalFocusAgent={focusedAgent}
               onSwapCoinsReady={(fn) => { swapCoinsRef.current = fn }}
               onCoinFaceTap={(coinIndex, isCharacters) => {
                 if (isCharacters) {
@@ -966,10 +928,6 @@ export default function CyborgTemple() {
               // zoomToCursor={true}
               autoRotate={!focusedAgent}
               autoRotateSpeed={0.2}
-              // On mobile, disable single-finger rotate so horizontal swipes
-              // are free to cycle character focus without the camera also
-              // orbiting. Two-finger pinch (DOLLY_PAN) still works.
-              touches={isMobileView ? { ONE: null, TWO: THREE.TOUCH.DOLLY_PAN } : undefined}
             />
           </Suspense>
           {/* <Stats className="stats-monitor" /> */}
