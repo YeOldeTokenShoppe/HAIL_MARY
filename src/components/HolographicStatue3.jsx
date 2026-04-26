@@ -3,6 +3,16 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader";
 import * as THREE from "three";
 import { useFrame, useThree } from "@react-three/fiber";
+import { getCandleIgnitionMs } from "@/utils/candleIgnitionPulse";
+
+// Candle-ignition response — when the altar lights, briefly amplify the
+// pink rim shell + halo glow so the statue acknowledges the moment. Decay
+// constant matches the candle's halo flash so both reactions feel like one
+// event. Capped at +1.0 over base so it stays clearly an "amp", not a
+// re-color.
+const STATUE_PULSE_WINDOW_MS = 700;
+const STATUE_PULSE_DECAY_MS = 180;
+const STATUE_PULSE_PEAK_BOOST = 1.0;
 
 function HolographicStatue3({
   onLoad,
@@ -825,10 +835,34 @@ function HolographicStatue3({
         groupRef.current.rotation.rotation.y += delta * 0.3;
       }
 
-      // Update shader uniforms using cached materials (more efficient)
+      // Compute the candle-ignition pulse boost once per frame. Decays
+      // exponentially over STATUE_PULSE_WINDOW_MS, then sits at zero for
+      // the rest of the candle's burn so this costs ~nothing when idle.
+      const ignitionMs = getCandleIgnitionMs();
+      let pulseBoost = 0;
+      if (ignitionMs > 0) {
+        const sinceIgnition = performance.now() - ignitionMs;
+        if (sinceIgnition < STATUE_PULSE_WINDOW_MS) {
+          pulseBoost =
+            STATUE_PULSE_PEAK_BOOST *
+            Math.exp(-sinceIgnition / STATUE_PULSE_DECAY_MS);
+        }
+      }
+
+      // Update shader uniforms using cached materials (more efficient).
+      // Caches each material's authored uIntensity on userData the first
+      // time we see it so the per-frame multiplier doesn't compound (the
+      // alternative — reading the live uniform — would chase its own tail).
       for (const material of animatedMaterialsRef.current) {
         if (material.uniforms?.uTime) {
           material.uniforms.uTime.value -= delta;
+        }
+        if (material.uniforms?.uIntensity) {
+          if (material.userData.baseUIntensity == null) {
+            material.userData.baseUIntensity = material.uniforms.uIntensity.value;
+          }
+          material.uniforms.uIntensity.value =
+            material.userData.baseUIntensity * (1 + pulseBoost);
         }
       }
     }

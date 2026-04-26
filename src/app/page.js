@@ -25,6 +25,7 @@ import {
   writeLocalCandle,
   clearLocalCandle,
 } from "@/lib/localCandle";
+import { fireCandleIgnitionPulse } from "@/utils/candleIgnitionPulse";
 import "./chart-shrine/chart-shrine.css";
 
 // Preload only the anon-default pillar candle. The votive GLB is
@@ -231,6 +232,13 @@ const RECONSTITUTE_EMPTY_BEAT_MS = 1000;
 const RECONSTITUTE_REFORM_MS = 1900;
 const RECONSTITUTE_PARTICLE_COUNT = 160;
 
+// Ignition spark burst — outward radial puff from the wick when the
+// flame catches. Window is sized to outlast the longest individual
+// spark (life up to 0.80s + birth stagger up to 0.12s); after that the
+// per-frame updater short-circuits and zeroes the buffer once.
+const IGNITION_SPARK_COUNT = 80;
+const IGNITION_SPARK_WINDOW_MS = 1000;
+
 // Compact remaining-time label for the CANDLE FAB countdown. HH:MM:SS
 // always so the ticking seconds confirm the clock is live.
 function formatRemaining(litAtMs, meltDuration) {
@@ -362,6 +370,26 @@ function HeroAltarObject({
     position: new Float32Array(RECONSTITUTE_PARTICLE_COUNT * 3),
     color: new Float32Array(RECONSTITUTE_PARTICLE_COUNT * 3),
   }), []);
+
+  // Ignition sparks — outward puff fired in the existing ignition useEffect
+  // and animated below in useFrame off `ignitionTimeRef`. Refs/data parallel
+  // the reconstitution ones; reuses the same radial-gradient texture and the
+  // additive HDR color treatment so both bursts share visual language.
+  const ignitionSparksRef = useRef(null);
+  const ignitionSparkDataRef = useRef([]);
+  const ignitionSparkOriginRef = useRef(new THREE.Vector3(0, 0.15, 0.35));
+  const ignitionBuffers = useMemo(() => ({
+    position: new Float32Array(IGNITION_SPARK_COUNT * 3),
+    color: new Float32Array(IGNITION_SPARK_COUNT * 3),
+  }), []);
+
+  // Ignition audio — short choir hit fired alongside the spark burst.
+  // Preloaded on mount so first-light has zero latency (the file is ~48KB
+  // and lighting is the page's whole purpose, so preloading is cheap).
+  // Audio plays gated by the user click on the FAB, satisfying autoplay
+  // policy; the .catch swallow handles edge cases (tab backgrounded,
+  // permissions changed mid-session) without throwing.
+  const ignitionAudioRef = useRef(null);
 
   // Soft radial-gradient texture used as the `map` on pointsMaterial.
   // Opaque black-to-white — with additive blending the black edges add
@@ -517,6 +545,106 @@ function HeroAltarObject({
       const intensity = ramp * coreBoost * snuff;
       const fade = intensity * globalFade;
       colors.setXYZ(i, d.baseR * fade, d.baseG * fade, d.baseB * fade);
+    }
+    positions.needsUpdate = true;
+    colors.needsUpdate = true;
+  };
+
+  // Ignition sparks spawn — anchor the burst origin to the FLAME's current
+  // world position (group-local) so sparks emit from the visible wick rather
+  // than the group origin. Falls back to the wax mesh if the flame node
+  // hasn't been captured yet on first ignition.
+  const spawnIgnitionSparks = () => {
+    const data = [];
+    const origin = new THREE.Vector3(0, 0.15, 0.35);
+    if (groupRef.current) {
+      const worldPos = new THREE.Vector3();
+      if (flameNodeRef.current) {
+        flameNodeRef.current.getWorldPosition(worldPos);
+        groupRef.current.worldToLocal(worldPos);
+        origin.copy(worldPos);
+      } else if (meltMeshRef.current) {
+        meltMeshRef.current.getWorldPosition(worldPos);
+        groupRef.current.worldToLocal(worldPos);
+        origin.copy(worldPos);
+        origin.y += 0.2;
+      }
+    }
+    ignitionSparkOriginRef.current.copy(origin);
+    for (let i = 0; i < IGNITION_SPARK_COUNT; i++) {
+      // Hemispherical-up burst: random azimuth + biased upward Y component
+      // so the sparks rise like heat shedding rather than spraying in every
+      // direction. upBias∈[0.3,1.0] with sxyLen = sqrt(1 - upBias²) keeps
+      // the speed magnitude consistent across the cone.
+      const ang = Math.random() * Math.PI * 2;
+      const upBias = 0.3 + Math.random() * 0.7;
+      const sxyLen = Math.sqrt(Math.max(0, 1 - upBias * upBias));
+      const speed = 0.9 + Math.random() * 1.3;
+      // Two color families mirror the reconstitution palette so both bursts
+      // feel like they belong to the same world. Heavier weighting on warm
+      // gold reads as fire, with violet accents for visual interest.
+      const colorRoll = Math.random();
+      let baseR, baseG, baseB;
+      if (colorRoll < 0.7) {
+        baseR = 2.6; baseG = 1.6; baseB = 0.5;
+      } else {
+        baseR = 1.7; baseG = 1.0; baseB = 2.4;
+      }
+      data.push({
+        vx: Math.cos(ang) * sxyLen * speed,
+        vy: upBias * speed,
+        vz: Math.sin(ang) * sxyLen * speed,
+        birthOffset: Math.random() * 0.12,
+        life: 0.45 + Math.random() * 0.35,
+        baseR, baseG, baseB,
+      });
+    }
+    ignitionSparkDataRef.current = data;
+  };
+
+  const hideIgnitionSparks = () => {
+    const pts = ignitionSparksRef.current;
+    if (!pts) return;
+    const colors = pts.geometry.attributes.color;
+    for (let i = 0; i < IGNITION_SPARK_COUNT; i++) {
+      colors.setXYZ(i, 0, 0, 0);
+    }
+    colors.needsUpdate = true;
+  };
+
+  const updateIgnitionSparks = (ignitionElapsedMs) => {
+    const pts = ignitionSparksRef.current;
+    const data = ignitionSparkDataRef.current;
+    if (!pts || data.length === 0) return;
+    const positions = pts.geometry.attributes.position;
+    const colors = pts.geometry.attributes.color;
+    const origin = ignitionSparkOriginRef.current;
+    const elapsedSec = ignitionElapsedMs / 1000;
+    // Weak gravity so the burst arcs back down rather than scattering
+    // forever. Tuned soft (~-1.5) — most sparks die before re-entry, but
+    // the top few visibly fall, which sells the ballistic feel.
+    const g = -1.5;
+    for (let i = 0; i < IGNITION_SPARK_COUNT; i++) {
+      const d = data[i];
+      if (!d) {
+        positions.setXYZ(i, 0, -1000, 0);
+        colors.setXYZ(i, 0, 0, 0);
+        continue;
+      }
+      const localT = elapsedSec - d.birthOffset;
+      if (localT < 0 || localT > d.life) {
+        positions.setXYZ(i, 0, -1000, 0);
+        colors.setXYZ(i, 0, 0, 0);
+        continue;
+      }
+      const x = origin.x + d.vx * localT;
+      const y = origin.y + d.vy * localT + 0.5 * g * localT * localT;
+      const z = origin.z + d.vz * localT;
+      positions.setXYZ(i, x, y, z);
+      // Cubic-ish fade so sparks die clean rather than lingering as dim dots.
+      const lifeFrac = localT / d.life;
+      const intensity = Math.pow(1 - lifeFrac, 1.8);
+      colors.setXYZ(i, d.baseR * intensity, d.baseG * intensity, d.baseB * intensity);
     }
     positions.needsUpdate = true;
     colors.needsUpdate = true;
@@ -1144,11 +1272,37 @@ function HeroAltarObject({
     burnedOutFiredRef.current = false;
   }, [litAt]);
 
+  // Preload the ignition audio once per mount so first-light has zero
+  // playback latency. Cleanup pauses + drops the ref on unmount so a
+  // variant swap doesn't leave an orphan element decoding in the bg.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const audio = new Audio("/audio/sparkle.mp3");
+    audio.preload = "auto";
+    audio.volume = 0.6;
+    ignitionAudioRef.current = audio;
+    return () => {
+      audio.pause();
+      ignitionAudioRef.current = null;
+    };
+  }, []);
+
   // Detect an ignition (unlit → lit) and stamp the time so useFrame can
-  // drive the flash/halo animation.
+  // drive the flash/halo animation. Also seed the outward spark burst,
+  // fire the choir hit, and broadcast the pulse to the holographic statue
+  // so its rim shell + halo glow flash in sync with the candle's halo.
   useEffect(() => {
     if (candleLit && !prevLitRef.current) {
       ignitionTimeRef.current = performance.now();
+      spawnIgnitionSparks();
+      fireCandleIgnitionPulse();
+      const audio = ignitionAudioRef.current;
+      if (audio) {
+        // Reset playhead so a rapid relight retriggers from the top
+        // rather than picking up where the previous play left off.
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+      }
     }
     prevLitRef.current = candleLit;
   }, [candleLit]);
@@ -1293,8 +1447,22 @@ function HeroAltarObject({
       const baseScale = flameBaseScaleRef.current;
       const baseRot = flameBaseRotationRef.current;
       const ft = performance.now() / 1000;
-      const flicker = 1 + flameFbm1D(ft * 3.5) * 0.09;
-      const stretch = 1 + flameFbm1D(ft * 3.0 + 100) * 0.06;
+      // Catch-and-settle: first ~280ms after ignition the flame surges to
+      // ~1.5× authored size then eases back to baseline (quadratic decay),
+      // with extra flicker amplitude during the settle. Reads as the wick
+      // catching rather than blinking on at full size.
+      let catchScale = 1;
+      let catchFlickerBoost = 0;
+      if (ignitionTimeRef.current != null) {
+        const ie = performance.now() - ignitionTimeRef.current;
+        if (ie < 280) {
+          const decay = 1 - ie / 280;
+          catchScale = 1 + decay * decay * 0.5;
+          catchFlickerBoost = decay * 0.18;
+        }
+      }
+      const flicker = 1 + flameFbm1D(ft * 3.5) * (0.09 + catchFlickerBoost);
+      const stretch = 1 + flameFbm1D(ft * 3.0 + 100) * (0.06 + catchFlickerBoost * 0.5);
       // Counter-scale against the parent wax mesh:
       //   - non-melt axes: undo the radial squeeze from meltSecondaryRate
       //     so the flame keeps its authored girth
@@ -1326,14 +1494,14 @@ function HeroAltarObject({
         compZ = axis === "z" ? meltComp : sideComp;
       }
       flameNodeRef.current.scale.set(
-        baseScale.x * flicker * compX,
-        baseScale.y * flicker * stretch * compY,
-        baseScale.z * flicker * compZ,
+        baseScale.x * flicker * compX * catchScale,
+        baseScale.y * flicker * stretch * compY * catchScale,
+        baseScale.z * flicker * compZ * catchScale,
       );
       flameNodeRef.current.rotation.x =
-        baseRot.x + flameFbm1D(ft * 1.9 + 200) * 0.03;
+        baseRot.x + flameFbm1D(ft * 1.9 + 200) * (0.03 + catchFlickerBoost * 0.5);
       flameNodeRef.current.rotation.z =
-        baseRot.z + flameFbm1D(ft * 2.2 + 300) * 0.045;
+        baseRot.z + flameFbm1D(ft * 2.2 + 300) * (0.045 + catchFlickerBoost * 0.5);
       // Drive the radial glow off the same flicker so outer and inner
       // halos breathe in sync with the flame. Reuse the scale flicker
       // value and sample a second noise stream for opacity variation.
@@ -1485,6 +1653,20 @@ function HeroAltarObject({
       }
     }
 
+    // --- Ignition sparks — outward burst from the wick on light-up ---
+    // Window is sized to outlast every spark's lifetime; once it closes we
+    // zero the buffer ONCE rather than every frame, so the rest of the
+    // candle's life pays no cost for this effect.
+    if (ignitionSparksRef.current && ignitionTimeRef.current != null) {
+      const elapsed = performance.now() - ignitionTimeRef.current;
+      if (elapsed < IGNITION_SPARK_WINDOW_MS) {
+        updateIgnitionSparks(elapsed);
+      } else if (ignitionSparkDataRef.current.length > 0) {
+        hideIgnitionSparks();
+        ignitionSparkDataRef.current = [];
+      }
+    }
+
     // Debug readout — update at ~4Hz via direct DOM write so we don't
     // trigger React re-renders.
     if (debugRef?.current) {
@@ -1609,6 +1791,43 @@ function HeroAltarObject({
         </bufferGeometry>
         <pointsMaterial
           size={16}
+          sizeAttenuation={false}
+          map={reconstParticleTexture}
+          vertexColors={true}
+          transparent={true}
+          depthTest={false}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          toneMapped={false}
+        />
+      </points>
+      {/* Ignition sparks — outward radial puff fired in the unlit→lit
+          useEffect; the per-frame updater drives positions/colors off the
+          ignition timestamp. Slightly higher renderOrder than the
+          reconstitution swirl since ignition can fire while the reform
+          tail is still painting (rapid relight after burnout). */}
+      <points
+        ref={ignitionSparksRef}
+        renderOrder={262}
+        frustumCulled={false}
+        position={[0, 0, 0]}
+      >
+        <bufferGeometry>
+          <bufferAttribute
+            attach="attributes-position"
+            count={IGNITION_SPARK_COUNT}
+            array={ignitionBuffers.position}
+            itemSize={3}
+          />
+          <bufferAttribute
+            attach="attributes-color"
+            count={IGNITION_SPARK_COUNT}
+            array={ignitionBuffers.color}
+            itemSize={3}
+          />
+        </bufferGeometry>
+        <pointsMaterial
+          size={14}
           sizeAttenuation={false}
           map={reconstParticleTexture}
           vertexColors={true}
