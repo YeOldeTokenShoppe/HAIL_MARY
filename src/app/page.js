@@ -2136,7 +2136,7 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
           <ul className="flame-nudge-benefits">
             <li>Burns 8 hours, not 1 minute</li>
             <li>Follows you across every device</li>
-            <li>Unlocks the votive — pick your saint &amp; wax color</li>
+            <li>Unlocks the votive — customize image &amp; wax color</li>
           </ul>
           <div className="flame-nudge-actions">
             <button
