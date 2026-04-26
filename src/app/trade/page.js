@@ -46,6 +46,14 @@ export default function CyborgTemple() {
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   const [showCyberNav, setShowCyberNav] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
+  // First-visit hint: tells the user characters are clickable. Hides when
+  // they click any character (focusedAgent flips truthy) or after a timer.
+  const [showCharacterHint, setShowCharacterHint] = useState(false);
+  // One-shot hint shown on the user's first character zoom-in: explains how
+  // to leave the close-up. Stays dismissed for the rest of the session once
+  // shown (zoomHintSeenRef).
+  const [showZoomOutHint, setShowZoomOutHint] = useState(false);
+  const zoomHintSeenRef = useRef(false);
   const router = useRouter();
   
   // Get music context
@@ -284,6 +292,36 @@ export default function CyborgTemple() {
     return () => clearTimeout(fallbackTimer);
   }, [isSceneLoading, isMobileView, modelLoaded]);
 
+  // Show the "tap a character" hint once the scene is visible. Auto-fade
+  // after 6s; if the user clicks a character before then, hide immediately.
+  useEffect(() => {
+    if (!sceneReady) return;
+    if (focusedAgent) {
+      setShowCharacterHint(false);
+      return;
+    }
+    setShowCharacterHint(true);
+    const t = setTimeout(() => setShowCharacterHint(false), 6000);
+    return () => clearTimeout(t);
+  }, [sceneReady, focusedAgent]);
+
+  // First-zoom hint: on the user's first character focus this session, after
+  // a brief beat (camera has flown in) surface a tip explaining how to leave
+  // the close-up. Stays visible for the entire focused view; hides as soon
+  // as the user un-focuses. Doesn't reappear on subsequent focuses.
+  useEffect(() => {
+    if (!focusedAgent) {
+      setShowZoomOutHint(false);
+      return;
+    }
+    if (zoomHintSeenRef.current) return;
+    const showTimer = setTimeout(() => {
+      zoomHintSeenRef.current = true;
+      setShowZoomOutHint(true);
+    }, 1200);
+    return () => clearTimeout(showTimer);
+  }, [focusedAgent]);
+
   // Don't render on server-side
   if (!mounted) {
     return <CoinLoader loading={true} />;
@@ -386,6 +424,21 @@ export default function CyborgTemple() {
               0 0 10px rgba(57, 255, 20, 0.95),
               0 0 22px rgba(57, 255, 20, 0.65),
               0 0 40px rgba(57, 255, 20, 0.35);
+          }
+        }
+
+        @keyframes characterHintPulse {
+          0%, 100% {
+            opacity: 0.85;
+            box-shadow:
+              0 0 12px rgba(218, 165, 32, 0.4),
+              0 0 24px rgba(218, 165, 32, 0.18);
+          }
+          50% {
+            opacity: 1;
+            box-shadow:
+              0 0 18px rgba(218, 165, 32, 0.65),
+              0 0 36px rgba(218, 165, 32, 0.32);
           }
         }
       `}</style>
@@ -881,6 +934,37 @@ export default function CyborgTemple() {
         </CleanCanvas>
         )}
 
+        {/* First-visit hint chip — bottom, only when NOT focused on anyone. */}
+        {showCharacterHint && !focusedAgent && (
+          <div
+            style={{
+              position: 'fixed',
+              left: '50%',
+              bottom: isMobileView ? '6.5rem' : '7rem',
+              transform: 'translateX(-50%)',
+              zIndex: 19,
+              pointerEvents: 'none',
+              background: 'rgba(0, 0, 0, 0.72)',
+              color: '#daa520',
+              border: '1px solid rgba(218, 165, 32, 0.55)',
+              borderRadius: '999px',
+              padding: '0.55rem 1.1rem',
+              fontFamily: "'Orbitron', 'Courier New', monospace",
+              fontSize: isMobileView ? '0.7rem' : '0.78rem',
+              fontWeight: 700,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              whiteSpace: 'nowrap',
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+              animation: 'characterHintPulse 2.4s ease-in-out infinite',
+            }}
+          >
+            ✦ Tap a character to meet them ✦
+          </div>
+        )}
+
+
         {/* Floating Character Label on Focus */}
         {(() => {
           const agentInfo = {
@@ -926,6 +1010,7 @@ export default function CyborgTemple() {
             padding: '1rem 1.5rem',
             maxWidth: '260px',
             backdropFilter: 'blur(8px)',
+            textAlign: 'center',
           };
           return (
             <div style={baseStyle}>
@@ -947,6 +1032,23 @@ export default function CyborgTemple() {
               }}>
                 {info?.tagline}
               </div>
+              {showZoomOutHint && (
+                <div style={{
+                  marginTop: '0.5rem',
+                  paddingTop: '0.4rem',
+                  borderTop: '1px solid rgba(218, 165, 32, 0.25)',
+                  fontFamily: "'Orbitron', 'Courier New', monospace",
+                  fontSize: isMobileView ? '0.4rem' : '0.45rem',
+                  fontWeight: 700,
+                  textAlign: 'center',
+                  letterSpacing: '0.18em',
+                  textTransform: 'uppercase',
+                  color: 'rgba(218, 165, 32, 0.85)',
+                  // animation: 'characterHintPulse 2.4s ease-in-out infinite',
+                }}>
+                  ✦ Tap the character to return ✦
+                </div>
+              )}
             </div>
           );
         })()}

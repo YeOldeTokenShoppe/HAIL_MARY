@@ -2250,17 +2250,25 @@ const CyborgTempleScene = ({
           targetObject.getWorldPosition(objectWorldPos);
           
           const agentSettings = {
-            'RL80': { 
+            'RL80': {
               // RL80 at (1.704, -1.652, 1.476)
               // Camera should be closer to center (opposite side)
               cameraPos: new THREE.Vector3(1, -0.4, 0.7),  // Positioned toward center, looking outward
-              lookAtPos: new THREE.Vector3(1.804, -0.7, 2)  // Look at upper body
+              lookAtPos: new THREE.Vector3(1.804, -0.7, 2),  // Look at upper body
+              // Orbit around the unicorn's chest so dragging revolves the
+              // camera around the body instead of around a point off to the
+              // side of him. lookAtPos is kept for the fly-in composition.
+              orbitCenter: new THREE.Vector3(1.704, -0.5, 1.476)
             },
             'Demon': {
               // Demon at (-1.554, -1.719, -1.351)
               // Camera positioned on opposite side (toward center)
               cameraPos: new THREE.Vector3(-0.9, -0.5, -0.7),  // Positioned toward center, looking outward
-              lookAtPos: new THREE.Vector3(-1.3, -0.6,  -1.1)  // Look at upper body
+              lookAtPos: new THREE.Vector3(-1.3, -0.6,  -1.1),  // Look at upper body
+              // Orbit around the demon's actual chest so dragging revolves
+              // the camera around him instead of around a point in front of
+              // his body. lookAtPos is kept for the fly-in composition.
+              orbitCenter: new THREE.Vector3(-1.554, -0.75, -1.351)
             },
             'Monk': {
               // Monk at (-1.315, -1.672, 1.636)
@@ -2283,7 +2291,7 @@ const CyborgTempleScene = ({
             'Fluffy': {
               // Fluffy - opposite side of Monk
               cameraPos: new THREE.Vector3(0.55, -0.6, -1.65),
-              lookAtPos: new THREE.Vector3(1.615, -0.7, -1.736)
+              lookAtPos: new THREE.Vector3(1.615, -1.2, -1.736)
             },
             'Angel': {
               // Angel at top of scene, above the screens
@@ -2344,6 +2352,9 @@ const CyborgTempleScene = ({
             setFocusTarget({
               position: settings.cameraPos.clone(),
               lookAt: settings.lookAtPos.clone(),
+              // Optional override: where OrbitControls revolves around after
+              // the fly-in arrives. Defaults to lookAt when not provided.
+              orbitCenter: settings.orbitCenter ? settings.orbitCenter.clone() : null,
               fov: isMobile ? 75 : undefined,
               agentId: object.userData.agentId,
               agentName: object.userData.agentName
@@ -3470,14 +3481,31 @@ const CyborgTempleScene = ({
           const dist = camera.position.distanceTo(focusTarget.position);
           if (dist < 0.1) {
             focusTarget._arrived = true;
-            // Set orbit target once, then OrbitControls owns it
+            // Initial orbit target = fly-in lookAt so there's no snap when
+            // OrbitControls takes over (its update() calls camera.lookAt on
+            // its target, which would otherwise jump the view).
             if (state.controls && state.controls.target) {
               state.controls.target.copy(focusTarget.lookAt);
               state.controls.update();
             }
           }
+        } else if (!focusTarget._orbitSettled && focusTarget.orbitCenter) {
+          // After arrival, smoothly slide the orbit pivot from the fly-in
+          // lookAt to the explicit orbitCenter (e.g. Demon's chest). Done as
+          // a lerp so the camera doesn't snap and the user can start dragging
+          // immediately — their input just orbits a slowly-moving pivot for
+          // ~0.5s until it settles.
+          if (state.controls && state.controls.target) {
+            state.controls.target.lerp(focusTarget.orbitCenter, 0.08);
+            state.controls.update();
+            if (state.controls.target.distanceTo(focusTarget.orbitCenter) < 0.02) {
+              state.controls.target.copy(focusTarget.orbitCenter);
+              state.controls.update();
+              focusTarget._orbitSettled = true;
+            }
+          }
         }
-        // Once _arrived, do nothing — OrbitControls take over
+        // Once arrived AND orbit settled, OrbitControls fully owns the view
       }
     }
     
