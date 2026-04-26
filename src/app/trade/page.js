@@ -79,6 +79,43 @@ export default function CyborgTemple() {
       window.addEventListener('resize', checkMobile);
       return () => window.removeEventListener('resize', checkMobile);
     }, []);
+
+    // Mobile: horizontal swipes on the canvas cycle character focus.
+    // Vertical motions pass through (page scroll / nothing). Two-finger
+    // touches are ignored so pinch-zoom still works through OrbitControls.
+    useEffect(() => {
+      if (!isMobileView || !mounted) return;
+      const AGENTS = ['RL80', 'Demon', 'Monk', 'Fluffy'];
+      let start = null;
+      const onTouchStart = (e) => {
+        if (e.touches.length !== 1) { start = null; return; }
+        if (!(e.target instanceof HTMLCanvasElement)) return;
+        start = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+      };
+      const onTouchEnd = (e) => {
+        if (!start) return;
+        const t = e.changedTouches[0];
+        const dx = t.clientX - start.x;
+        const dy = t.clientY - start.y;
+        const dt = Date.now() - start.t;
+        start = null;
+        if (Math.abs(dx) < 60) return;            // not far enough
+        if (Math.abs(dx) < Math.abs(dy) * 1.2) return; // mostly vertical
+        if (dt > 600) return;                     // too slow, treat as orbit drag
+        const dir = dx > 0 ? -1 : 1;              // swipe right → previous, left → next
+        setFocusedAgent((prev) => {
+          if (!prev || !AGENTS.includes(prev)) return AGENTS[dir > 0 ? 0 : AGENTS.length - 1];
+          const idx = AGENTS.indexOf(prev);
+          return AGENTS[(idx + dir + AGENTS.length) % AGENTS.length];
+        });
+      };
+      document.addEventListener('touchstart', onTouchStart, { passive: true });
+      document.addEventListener('touchend', onTouchEnd, { passive: true });
+      return () => {
+        document.removeEventListener('touchstart', onTouchStart);
+        document.removeEventListener('touchend', onTouchEnd);
+      };
+    }, [isMobileView, mounted]);
   
   // Get user context and auth functions
   const { isSignedIn, user } = useUser();
@@ -853,6 +890,7 @@ export default function CyborgTemple() {
               isMobile={isMobileView}
               disableCandleInteraction
               jackpotOnlyFistPump
+              externalFocusAgent={focusedAgent}
               onSwapCoinsReady={(fn) => { swapCoinsRef.current = fn }}
               onCoinFaceTap={(coinIndex, isCharacters) => {
                 if (isCharacters) {
@@ -928,6 +966,10 @@ export default function CyborgTemple() {
               // zoomToCursor={true}
               autoRotate={!focusedAgent}
               autoRotateSpeed={0.2}
+              // On mobile, disable single-finger rotate so horizontal swipes
+              // are free to cycle character focus without the camera also
+              // orbiting. Two-finger pinch (DOLLY_PAN) still works.
+              touches={isMobileView ? { ONE: null, TWO: THREE.TOUCH.DOLLY_PAN } : undefined}
             />
           </Suspense>
           {/* <Stats className="stats-monitor" /> */}
@@ -968,10 +1010,10 @@ export default function CyborgTemple() {
         {/* Floating Character Label on Focus */}
         {(() => {
           const agentInfo = {
-            RL80: { name: 'Eugene', tagline: 'Unicorn Investor' },
-            Demon: { name: 'H8ØZ', tagline: 'Devil\'s advocate. Short-seller.' },
-            Monk: { name: 'St. GR80', tagline: 'Android eschatologist hell-bent on saving humanity from itself.' },
-          Fluffy: { name: 'Virgil', tagline: 'Vigilant watch-cat and underworld guide.' },
+            RL80: { name: 'Eugene', pronunciation: 'yoo-JEEN', tagline: 'Unicorn Investor' },
+            Demon: { name: 'H8ØZ', pronunciation: 'HAY-deez', tagline: 'Devil\'s advocate. Short-seller.' },
+            Monk: { name: 'St. GR80', pronunciation: 'saint GREAT-ee', tagline: 'Android eschatologist hell-bent on saving humanity from itself.' },
+            Fluffy: { name: 'Virgil', pronunciation: 'VUR-jil', tagline: 'Vigilant watch-cat and underworld guide.' },
           };
           const info = focusedAgent && agentInfo[focusedAgent];
           // On mobile, place the label as a bottom banner above the bottom
@@ -1018,12 +1060,25 @@ export default function CyborgTemple() {
                 fontFamily: "'Pirata One', serif",
                 fontSize: isMobileView ? '1.6rem' : '1.4rem',
                 color: '#daa520',
-                marginBottom: '0.25rem',
+                marginBottom: '0.15rem',
                 letterSpacing: '0.5px',
                 lineHeight: 1.1,
               }}>
                 {info?.name}
               </div>
+              {info?.pronunciation && (
+                <div style={{
+                  fontFamily: "'Orbitron', 'Courier New', monospace",
+                  fontSize: isMobileView ? '0.6rem' : '0.65rem',
+                  color: 'rgba(218, 165, 32, 0.7)',
+                  fontStyle: 'italic',
+                  letterSpacing: '0.08em',
+                  marginBottom: '0.4rem',
+                  lineHeight: 1.2,
+                }}>
+                  /{info.pronunciation}/
+                </div>
+              )}
               <div style={{
                 fontSize: isMobileView ? '0.78rem' : '0.85rem',
                 color: 'rgba(255, 255, 255, 0.78)',
