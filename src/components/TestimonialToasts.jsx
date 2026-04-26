@@ -10,6 +10,7 @@ const LIVE_JUMP_MIN_GAP_MS = 30_000;
 const MAX_VISIBLE_DESKTOP = 2;
 const MOBILE_BP = 700;
 const INSCRIBE_WORDS = ["TOAST", "TESTIMONIAL", "PRAYER", "CONFESSION"];
+const INSCRIBE_VERBS = { TOAST: "OFFER", TESTIMONIAL: "GIVE", PRAYER: "SAY", CONFESSION: "MAKE" };
 const INSCRIBE_WORD_MS = 2500;
 
 // Seed testimonials so a fresh shrine (or one with no writes yet) still
@@ -185,7 +186,7 @@ function StackView({ pool, onInscribeClick, newLiveIdsRef }) {
           onClick={onInscribeClick}
           title="Add your witness"
         >
-          + {INSCRIBE_WORDS[wordIdx] === "CONFESSION" ? "MAKE" : "OFFER"} A{" "}
+          + {INSCRIBE_VERBS[INSCRIBE_WORDS[wordIdx]]} A{" "}
           <span key={wordIdx} className="tst-inscribe-word">
             {INSCRIBE_WORDS[wordIdx]}
           </span>

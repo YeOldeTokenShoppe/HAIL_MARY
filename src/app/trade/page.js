@@ -969,9 +969,9 @@ export default function CyborgTemple() {
         {(() => {
           const agentInfo = {
             RL80: { name: 'Eugene', tagline: 'Unicorn Investor' },
-            Demon: { name: 'H80Z', tagline: 'Devil\'s advocate. Short-seller.' },
-            Monk: { name: 'St. GR80', tagline: 'The philosopher and ethical adviser.' },
-          Fluffy: { name: 'Virgil', tagline: 'The guardian and guide. Nine lives, one mission.' },
+            Demon: { name: 'H8ØZ', tagline: 'Devil\'s advocate. Short-seller.' },
+            Monk: { name: 'St. GR80', tagline: 'Android eschatologist hell-bent on saving humanity from itself.' },
+          Fluffy: { name: 'Virgil', tagline: 'Vigilant watch-cat and underworld guide.' },
           };
           const info = focusedAgent && agentInfo[focusedAgent];
           // On mobile, place the label as a bottom banner above the bottom
@@ -1015,7 +1015,7 @@ export default function CyborgTemple() {
           return (
             <div style={baseStyle}>
               <div style={{
-                fontFamily: "'UnifrakturMaguntia', cursive",
+                fontFamily: "'Pirata One', serif",
                 fontSize: isMobileView ? '1.6rem' : '1.4rem',
                 color: '#daa520',
                 marginBottom: '0.25rem',
