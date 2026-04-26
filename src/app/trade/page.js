@@ -1252,9 +1252,9 @@ export default function CyborgTemple() {
                     }}
                   >
                     {[
-                      { label: 'A',  bg: 'rgba(40,180,90,0.85)',  border: 'rgba(120,255,160,0.9)', onClick: () => {} },
-                      { label: '?', bg: 'rgba(80,80,90,0.85)',   border: 'rgba(200,200,210,0.7)', onClick: () => {} },
-                      { label: 'B', bg: 'rgba(200,55,55,0.85)',  border: 'rgba(255,140,140,0.9)', onClick: () => {} },
+                      { label: 'Believe',  bg: 'rgba(40,180,90,0.85)',  border: 'rgba(120,255,160,0.9)', onClick: () => {} },
+                      { label: 'Abstain', bg: 'rgba(80,80,90,0.85)',   border: 'rgba(200,200,210,0.7)', onClick: () => {} },
+                      { label: 'Doubt', bg: 'rgba(200,55,55,0.85)',  border: 'rgba(255,140,140,0.9)', onClick: () => {} },
                     ].map(({ label, bg, border, onClick }) => (
                       <button
                         key={label}
