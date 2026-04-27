@@ -31,8 +31,20 @@ const BuyModal = ({ isOpen, onClose }) => {
   const { signMessageAsync } = useSignMessage();
   const instanceRef = useRef(null);
   const [pendingConnectorId, setPendingConnectorId] = useState(null);
-
-  const visibleConnectors = CONNECTORS;
+  // Hide the METAMASK button when no browser wallet extension is
+  // present. With `extensionOnly: true` on the connector, clicking it
+  // without an extension just throws — better to never show it. Users
+  // without a wallet extension still have CDP signup + WalletConnect.
+  const [hasInjectedProvider, setHasInjectedProvider] = useState(false);
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.ethereum) {
+      setHasInjectedProvider(true);
+    }
+  }, []);
+  const visibleConnectors = useMemo(
+    () => CONNECTORS.filter((c) => c.id !== 'metaMaskSDK' || hasInjectedProvider),
+    [hasInjectedProvider],
+  );
 
   const handleConnect = useCallback(async (connectorId) => {
     setAuthError(null);

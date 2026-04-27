@@ -7,7 +7,17 @@ import { useWalletAuth } from './WalletAuthProvider';
 
 // Custom wallet connect UI using wagmi connectors
 function WalletConnectOptions({ connectExternal, connectingMethod, isMobile, theme = 'cyber' }) {
-  const walletOptions = isMobile
+  // Hide MetaMask when no browser wallet extension is detected — the
+  // connector is in extensionOnly mode and would just throw without
+  // one. WalletConnect remains the path for mobile MetaMask users.
+  const [hasInjectedProvider, setHasInjectedProvider] = useState(false);
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.ethereum) {
+      setHasInjectedProvider(true);
+    }
+  }, []);
+
+  const allOptions = isMobile
     ? [
         { id: 'walletConnect', label: 'WalletConnect' },
         { id: 'io.metamask', label: 'MetaMask' },
@@ -18,6 +28,9 @@ function WalletConnectOptions({ connectExternal, connectingMethod, isMobile, the
         { id: 'com.coinbase.wallet', label: 'Coinbase' },
         { id: 'walletConnect', label: 'WalletConnect' },
       ];
+  const walletOptions = allOptions.filter(
+    (o) => o.id !== 'io.metamask' || hasInjectedProvider,
+  );
 
   const ind = theme === 'industrial';
   const accent = ind ? '212, 168, 84' : '0, 245, 212';

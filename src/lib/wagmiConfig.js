@@ -26,7 +26,18 @@ const connectors = [
     appName: 'RL80',
     preference: 'eoaOnly',
   }),
-  metaMask(),
+  metaMask({
+    // Only attempt the browser extension flow. Without this the SDK
+    // falls back to its own unstyled QR modal when no MetaMask
+    // extension is detected — redundant since WalletConnect already
+    // covers MetaMask mobile with a polished QR flow.
+    extensionOnly: true,
+    dappMetadata: {
+      name: 'RL80',
+      url: 'https://rl80.com',
+      iconUrl: 'https://rl80.com/favicon.svg',
+    },
+  }),
   // WalletConnect (id: 'walletConnect') — desktop QR + mobile deep-link
   // for Phantom mobile, Rainbow, Trust, Rabby, Argent, Zerion, Uniswap
   // Wallet, etc. Only registered when a project ID is present so a

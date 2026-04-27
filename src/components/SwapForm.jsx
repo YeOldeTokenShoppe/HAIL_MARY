@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useAccount, useBalance, useConnect, useReadContract, useSendTransaction, useSignTypedData, useSwitchChain, useWriteContract } from 'wagmi';
+import { useAccount, useBalance, useReadContract, useSendTransaction, useSignTypedData, useSwitchChain, useWriteContract } from 'wagmi';
 import { base } from 'wagmi/chains';
 import { parseUnits, formatUnits, erc20Abi, maxUint256, concat, numberToHex, size } from 'viem';
 import { publicClient } from '@/lib/viemClient';
@@ -25,22 +25,14 @@ const SLIPPAGE_OPTIONS = [
 
 const isNative = (addr) => addr.toLowerCase() === NATIVE_TOKEN.toLowerCase();
 
-const CONNECTORS = [
-  { id: 'coinbaseWalletSDK', label: 'COINBASE' },
-  { id: 'metaMaskSDK', label: 'METAMASK' },
-  { id: 'walletConnect', label: 'WALLETCONNECT' },
-];
-
 export default function SwapForm({ isSmallPhone, isMobile }) {
   const { t } = useLanguage();
   const { walletAddress, isWalletConnected, disconnectWallet } = useWalletAuth();
   const { chainId } = useAccount();
-  const { connectAsync, connectors: wagmiConnectors, isPending: isConnecting } = useConnect();
   const { switchChainAsync } = useSwitchChain();
   const { sendTransactionAsync } = useSendTransaction();
   const { signTypedDataAsync } = useSignTypedData();
   const { writeContractAsync } = useWriteContract();
-  const [connectError, setConnectError] = useState(null);
 
   const [fromSymbol, setFromSymbol] = useState('ETH');
   const [amountInput, setAmountInput] = useState('');
@@ -192,24 +184,6 @@ export default function SwapForm({ isSmallPhone, isMobile }) {
     }
   }, [quote]);
 
-  const [pendingConnectorId, setPendingConnectorId] = useState(null);
-  const visibleConnectors = CONNECTORS;
-  const handleConnect = useCallback(async (connectorId) => {
-    setConnectError(null);
-    const connector = wagmiConnectors.find((c) => c.id === connectorId);
-    if (!connector) {
-      setConnectError(`Connector ${connectorId} not available on this device`);
-      return;
-    }
-    setPendingConnectorId(connectorId);
-    try {
-      await connectAsync({ connector });
-    } catch (e) {
-      setConnectError(e?.shortMessage || e?.message || 'wallet_connect_failed');
-    } finally {
-      setPendingConnectorId(null);
-    }
-  }, [connectAsync, wagmiConnectors]);
 
   const handleSwitchToBase = useCallback(async () => {
     setTxError(null);
@@ -360,8 +334,11 @@ export default function SwapForm({ isSmallPhone, isMobile }) {
 
   return (
     <div style={{ width: '100%', maxWidth: '360px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      {/* Wallet status / connect */}
-      {isWalletConnected ? (
+      {/* Wallet status — connect prompt lives upstream in BuyModal so we
+          don't duplicate the same trio of buttons. When unconnected the
+          swap fields below render inert until the parent's connect
+          surface flips wagmi state to connected. */}
+      {isWalletConnected && (
         <div
           style={{
             display: 'flex',
@@ -393,60 +370,6 @@ export default function SwapForm({ isSmallPhone, isMobile }) {
           >
             {t('swapForm.disconnect') || 'DISCONNECT'}
           </button>
-        </div>
-      ) : (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '6px',
-            padding: '10px',
-            border: '1px solid rgba(253, 237, 0, 0.3)',
-            background: 'rgba(253, 237, 0, 0.05)',
-          }}
-        >
-          <span style={{ ...fieldLabelStyle, textAlign: 'center' }}>
-            {t('swapForm.connectToSwap') || 'CONNECT WALLET TO SWAP'}
-          </span>
-          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
-            {visibleConnectors.map((c) => {
-              const isPending = pendingConnectorId === c.id;
-              return (
-                <button
-                  key={c.id}
-                  onClick={() => handleConnect(c.id)}
-                  disabled={isConnecting}
-                  style={{
-                    fontFamily: 'monospace',
-                    fontSize: '10px',
-                    fontWeight: '700',
-                    letterSpacing: '1px',
-                    padding: '6px 10px',
-                    border: '1px solid rgba(253, 237, 0, 0.5)',
-                    background: isPending ? 'rgba(253, 237, 0, 0.2)' : 'rgba(0, 0, 0, 0.4)',
-                    color: '#fded00',
-                    cursor: isConnecting ? 'wait' : 'pointer',
-                    flex: 1,
-                    opacity: isConnecting && !isPending ? 0.4 : 1,
-                  }}
-                >
-                  {isPending ? '…' : c.label}
-                </button>
-              );
-            })}
-          </div>
-          {connectError && (
-            <span
-              style={{
-                fontFamily: 'monospace',
-                fontSize: '9px',
-                color: '#ff184c',
-                textAlign: 'center',
-              }}
-            >
-              {connectError.slice(0, 120)}
-            </span>
-          )}
         </div>
       )}
 
