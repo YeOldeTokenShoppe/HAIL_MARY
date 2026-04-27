@@ -1294,23 +1294,10 @@ export default function CyborgTemple() {
                     ))}
                   </div>
                 }
-                onMenuClick={() => setShowBuyModal(true)}
+                /* Menu slot (right) routes home; book slot (left) is BUY,
+                   matching the root page's positioning. */
+                onMenuClick={() => router.push('/')}
                 menuIcon={
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: '#d4a854' }}>
-                    <line x1="12" y1="1" x2="12" y2="23" />
-                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                  </svg>
-                }
-                menuLabel="BUY"
-                isUserSignedIn={isSignedIn}
-                userImage={user?.imageUrl}
-                show80sButton={false}
-                isMobile
-                neonMode
-                onBookClick={() => router.push('/')}
-                bookLabel="HOME"
-                bookTitle="Return to the shrine"
-                bookIcon={
                   <svg
                     className="btm-book-icon-svg"
                     xmlns="http://www.w3.org/2000/svg"
@@ -1329,6 +1316,21 @@ export default function CyborgTemple() {
                     <rect width="4" height="8" x="15" y="5" rx="1" />
                     <path d="M17 13v3" />
                     <path d="M3 3v16a2 2 0 0 0 2 2h16" />
+                  </svg>
+                }
+                menuLabel="HOME"
+                isUserSignedIn={isSignedIn}
+                userImage={user?.imageUrl}
+                show80sButton={false}
+                isMobile
+                neonMode
+                onBookClick={() => setShowBuyModal(true)}
+                bookLabel="BUY"
+                bookTitle="Buy RL80"
+                bookIcon={
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: '#d4a854' }}>
+                    <line x1="12" y1="1" x2="12" y2="23" />
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                   </svg>
                 }
               />

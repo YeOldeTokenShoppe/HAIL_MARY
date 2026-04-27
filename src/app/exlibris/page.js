@@ -185,27 +185,10 @@ export default function ModelViewerPage() {
         /* Filling gold arc around the FAB — 0 when just lit, 1 at
            burnout. Only rendered while a candle is actually lit. */
         // centerProgress={candleLit ? meltProgress : null}
-        /* Repurpose the menu slot as the Buy button. */
-        onMenuClick={() => setShowBuyModal(true)}
+        /* Menu slot (right) routes home — the 3D Book mesh already
+           opens the overlay, so the slot returns to the root page. */
+        onMenuClick={() => router.push('/')}
         menuIcon={
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: "#d4a854" }}>
-            <line x1="12" y1="1" x2="12" y2="23" />
-            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-          </svg>
-        }
-        menuLabel="BUY"
-        isUserSignedIn={isSignedIn}
-        userImage={user?.imageUrl}
-        show80sButton={false}
-        isMobile
-        neonMode
-        /* Book slot is repurposed on /exlibris as a "return home"
-           affordance — the 3D Book mesh already opens the overlay, so
-           this icon routes back to the root page instead. */
-        onBookClick={() => router.push('/')}
-        bookLabel="HOME"
-        bookTitle="Return to the shrine"
-        bookIcon={
           <svg
             className="btm-book-icon-svg"
             xmlns="http://www.w3.org/2000/svg"
@@ -224,6 +207,24 @@ export default function ModelViewerPage() {
             <rect width="4" height="8" x="15" y="5" rx="1" />
             <path d="M17 13v3" />
             <path d="M3 3v16a2 2 0 0 0 2 2h16" />
+          </svg>
+        }
+        menuLabel="HOME"
+        isUserSignedIn={isSignedIn}
+        userImage={user?.imageUrl}
+        show80sButton={false}
+        isMobile
+        neonMode
+        /* Book slot (left) is the BUY button — kept in the same position
+           as the root page so the BUY affordance is consistent across
+           the app. */
+        onBookClick={() => setShowBuyModal(true)}
+        bookLabel="BUY"
+        bookTitle="Buy RL80"
+        bookIcon={
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: "#d4a854" }}>
+            <line x1="12" y1="1" x2="12" y2="23" />
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
           </svg>
         }
         extraLeft={[
