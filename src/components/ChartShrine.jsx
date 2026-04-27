@@ -886,16 +886,13 @@ export default function ChartShrine({
               textAnchor="end"
             >
               {formatPrice(latestPrice)}
-            </text>
-            <text
-              x={VIEW_W - CHART_PAD_RIGHT + 90}
-              y={84}
-              fill={priceColor}
-              fontSize={dims.changeFont}
-              fontFamily="IBM Plex Serif, serif"
-              textAnchor="end"
-            >
-              {arrow} {Math.abs(priceChange24h).toFixed(2)}% · 24h
+              <tspan
+                dx={14}
+                fontSize={dims.changeFont}
+                fill={priceColor}
+              >
+                {arrow} {Math.abs(priceChange24h).toFixed(2)}%
+              </tspan>
             </text>
           </g>
         )}
