@@ -68,7 +68,7 @@ export default function MobileBottomNav({
   // Tooltip text for the book slot. Defaults to the library framing
   // that fits the root-page usage; override per-page when the slot does
   // something else (e.g. "Return to the shrine" on /exlibris).
-  bookTitle = 'Visit the monastic library',
+  bookTitle = '',
   // When true, pulse + brighten the book slot. Used by the root page to
   // call attention to the BUY button while the user is hovering the chart.
   bookHighlight = false,
@@ -167,7 +167,7 @@ export default function MobileBottomNav({
      LEFT/RIGHT positioning logic stays unchanged. */
   const bookSlot = onBookClick ? (
     <button
-      className={`btm-nav-item ${bookHighlight ? 'btm-nav-highlight' : ''}`}
+      className={`btm-nav-item btm-nav-book ${bookHighlight ? 'btm-nav-highlight' : ''}`}
       onClick={onBookClick}
       title={bookTitle}
     >
@@ -392,14 +392,24 @@ export default function MobileBottomNav({
           .btm-nav-item .btm-nav-icon svg {
             transition: stroke 0.3s ease, filter 0.3s ease;
           }
-          /* Lift the slot above the bar — translateY doesn't affect layout. */
-          .btm-nav-item.btm-nav-highlight {
+          /* Lift the slot above the bar — translateY doesn't affect layout.
+             Triggered by:
+             - chart hover (.btm-nav-highlight prop-class on the BUY slot)
+             - hovering the BUY icon directly (.btm-nav-book:hover)
+             - hovering the EX LIBRIS / menu icon (.btm-nav-menu:hover, scoped
+               to slots that have an SVG override so hamburger pages stay
+               unaffected). */
+          .btm-nav-item.btm-nav-highlight,
+          .btm-nav-item.btm-nav-book:hover,
+          .btm-nav-item.btm-nav-menu:has(.btm-nav-icon svg):hover {
             transform: translateY(-18px);
             z-index: 5;
           }
           /* Morph the icon: scale up + round + glow. Using transform: scale
              instead of width/height so the nav row's height stays fixed. */
-          .btm-nav-item.btm-nav-highlight .btm-nav-icon {
+          .btm-nav-item.btm-nav-highlight .btm-nav-icon,
+          .btm-nav-item.btm-nav-book:hover .btm-nav-icon,
+          .btm-nav-item.btm-nav-menu:has(.btm-nav-icon svg):hover .btm-nav-icon {
             transform: scale(1.85);
             border-radius: 50%;
             border: ${nm ? '1.5px solid transparent' : '1.6px solid rgba(255, 255, 255, 0.9)'};
@@ -408,16 +418,23 @@ export default function MobileBottomNav({
               : 'linear-gradient(145deg, #d4a854, #b8922e)'};
             animation: btmNavHighlightPulse 1.8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
           }
-          /* Brighten the dollar glyph (parent transform handles size growth). */
-          .btm-nav-item.btm-nav-highlight .btm-nav-icon svg {
+          /* Brighten the inner glyph (parent transform handles size growth). */
+          .btm-nav-item.btm-nav-highlight .btm-nav-icon svg,
+          .btm-nav-item.btm-nav-book:hover .btm-nav-icon svg,
+          .btm-nav-item.btm-nav-menu:has(.btm-nav-icon svg):hover .btm-nav-icon svg {
             stroke: ${nm ? '#ffd97a' : '#ffffff'};
             filter: drop-shadow(0 0 4px rgba(255, 215, 120, 0.8));
           }
-          /* Brighten the label. */
-          .btm-nav-item.btm-nav-highlight .btm-nav-label {
-            color: ${nm ? '#ffd97a' : '#e6b85a'};
-            text-shadow: 0 0 10px rgba(255, 215, 120, 0.85),
-                         0 0 20px rgba(212, 168, 84, 0.5);
+          /* Fade the label out — the scaled icon overlaps the label
+             text, so hiding it during the morph reads cleaner than
+             trying to peek the label out underneath. */
+          .btm-nav-item .btm-nav-label {
+            transition: opacity 0.3s ease;
+          }
+          .btm-nav-item.btm-nav-highlight .btm-nav-label,
+          .btm-nav-item.btm-nav-book:hover .btm-nav-label,
+          .btm-nav-item.btm-nav-menu:has(.btm-nav-icon svg):hover .btm-nav-label {
+            opacity: 0;
           }
         }
 
@@ -915,7 +932,7 @@ export default function MobileBottomNav({
               When overridden, the hamburger animation + first-run hint are
               skipped since the slot is no longer a menu toggle. */}
           <button
-            className="btm-nav-item"
+            className="btm-nav-item btm-nav-menu"
             onClick={handleMenuClick}
           >
             <div className={`btm-nav-icon ${isMenuOpen && !menuIcon ? 'menu-open-icon' : ''}`} style={{ position: 'relative' }}>
