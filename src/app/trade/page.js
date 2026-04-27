@@ -960,7 +960,7 @@ export default function CyborgTemple() {
               animation: 'characterHintPulse 2.4s ease-in-out infinite',
             }}
           >
-            ✦ Tap a character to meet them ✦
+            ✦ Tap an agent to meet them ✦
           </div>
         )}
 
