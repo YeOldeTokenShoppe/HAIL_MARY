@@ -11,7 +11,7 @@ import SwapForm from './SwapForm';
 const CONNECTORS = [
   { id: 'coinbaseWalletSDK', label: 'COINBASE' },
   { id: 'metaMaskSDK', label: 'METAMASK' },
-  { id: 'injected', label: 'BROWSER' },
+  { id: 'walletConnect', label: 'WALLETCONNECT' },
 ];
 
 const BuyModal = ({ isOpen, onClose }) => {
@@ -31,18 +31,8 @@ const BuyModal = ({ isOpen, onClose }) => {
   const { signMessageAsync } = useSignMessage();
   const instanceRef = useRef(null);
   const [pendingConnectorId, setPendingConnectorId] = useState(null);
-  const [hasInjectedProvider, setHasInjectedProvider] = useState(false);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.ethereum) {
-      setHasInjectedProvider(true);
-    }
-  }, []);
-
-  const visibleConnectors = useMemo(
-    () => CONNECTORS.filter((c) => c.id !== 'injected' || hasInjectedProvider),
-    [hasInjectedProvider],
-  );
+  const visibleConnectors = CONNECTORS;
 
   const handleConnect = useCallback(async (connectorId) => {
     setAuthError(null);
@@ -392,8 +382,8 @@ const BuyModal = ({ isOpen, onClose }) => {
             position: 'relative',
             background: 'linear-gradient(135deg, #93276a, #3434a7)',
             clipPath: isSmallPhone ? 'none' : 'polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 20px 100%, 0 calc(100% - 20px))',
-            padding: isSmallPhone ? '1rem 1rem 1rem' : isMobile ? '3.5rem 1.5rem 2rem' : '3rem',
-            maxWidth: '500px',
+            padding: isSmallPhone ? '0.75rem 0.75rem 0.75rem' : isMobile ? '2.5rem 1.25rem 1.5rem' : '1.75rem 2rem',
+            maxWidth: '460px',
             width: isSmallPhone ? '95%' : '90%',
             maxHeight: isSmallPhone ? '90dvh' : isMobile ? '85dvh' : '90dvh',
             overflowY: 'auto',
@@ -526,8 +516,8 @@ const BuyModal = ({ isOpen, onClose }) => {
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: isSmallPhone ? '12px' : '20px',
-              padding: isSmallPhone ? '20px 10px' : '30px 20px',
+              gap: isSmallPhone ? '10px' : '14px',
+              padding: isSmallPhone ? '14px 8px' : '18px 12px',
               width: '100%',
             }}>
               {/* Title with Glitch Effect */}
@@ -535,10 +525,10 @@ const BuyModal = ({ isOpen, onClose }) => {
                 color: '#fff',
                 textAlign: 'center',
                 margin: 0,
-                fontSize: isSmallPhone ? '1.2rem' : isMobile ? '1.5rem' : '2rem',
+                fontSize: isSmallPhone ? '1rem' : isMobile ? '1.25rem' : '1.5rem',
                 fontFamily: 'monospace',
                 textTransform: 'uppercase',
-                letterSpacing: isSmallPhone ? '2px' : '4px',
+                letterSpacing: isSmallPhone ? '2px' : '3px',
                 fontWeight: '900',
                 position: 'relative',
               }}>
@@ -601,18 +591,18 @@ const BuyModal = ({ isOpen, onClose }) => {
                   {/* New-to-crypto onboarding section — visually prominent */}
                   <div style={{
                     width: '100%',
-                    padding: isSmallPhone ? '14px 12px' : '18px 16px',
+                    padding: isSmallPhone ? '10px 10px' : '12px 14px',
                     background: 'rgba(0, 0, 0, 0.35)',
                     border: '1px solid rgba(253, 237, 0, 0.4)',
                     borderRadius: '4px',
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    gap: '10px',
+                    gap: '8px',
                   }}>
                     <p style={{
                       fontFamily: 'monospace',
-                      fontSize: isSmallPhone ? '11px' : '12px',
+                      fontSize: isSmallPhone ? '10px' : '11px',
                       fontWeight: '900',
                       letterSpacing: '2px',
                       color: '#fded00',
@@ -624,10 +614,10 @@ const BuyModal = ({ isOpen, onClose }) => {
                     </p>
                     <p style={{
                       fontFamily: 'monospace',
-                      fontSize: isSmallPhone ? '10px' : '11px',
+                      fontSize: isSmallPhone ? '10px' : '10.5px',
                       color: 'rgba(255, 255, 255, 0.85)',
                       textAlign: 'center',
-                      lineHeight: '1.5',
+                      lineHeight: '1.4',
                       margin: 0,
                     }}>
                       Sign up with email or social — we&apos;ll create a wallet for you. No downloads, no seed phrases.
@@ -640,13 +630,13 @@ const BuyModal = ({ isOpen, onClose }) => {
                               <button
                                 style={{
                                   fontFamily: 'monospace',
-                                  fontSize: isSmallPhone ? '13px' : '14px',
+                                  fontSize: isSmallPhone ? '12px' : '13px',
                                   fontWeight: '900',
                                   letterSpacing: '2px',
                                   color: '#000',
                                   background: 'linear-gradient(135deg, #fded00, #ffb700)',
                                   border: 'none',
-                                  padding: isSmallPhone ? '12px 22px' : '14px 28px',
+                                  padding: isSmallPhone ? '9px 18px' : '10px 22px',
                                   cursor: 'pointer',
                                   clipPath: 'polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px))',
                                   transition: 'all 0.2s ease',
@@ -686,15 +676,15 @@ const BuyModal = ({ isOpen, onClose }) => {
                               disabled={!!pendingConnectorId}
                               style={{
                                 fontFamily: 'monospace',
-                                fontSize: isSmallPhone ? '11px' : '12px',
+                                fontSize: isSmallPhone ? '10px' : '11px',
                                 fontWeight: '900',
-                                letterSpacing: '2px',
+                                letterSpacing: '1.5px',
                                 color: '#000',
                                 background: pending
                                   ? 'rgba(100, 100, 100, 0.5)'
                                   : 'linear-gradient(135deg, #00e572, #00c85d)',
                                 border: 'none',
-                                padding: isSmallPhone ? '10px 14px' : '12px 18px',
+                                padding: isSmallPhone ? '8px 12px' : '9px 14px',
                                 cursor: pendingConnectorId ? 'wait' : 'pointer',
                                 clipPath: 'polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px))',
                                 transition: 'all 0.2s ease',

@@ -51,6 +51,11 @@ env:
     availability:
       - BUILD
       - RUNTIME
+  - variable: NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
+    secret: NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
+    availability:
+      - BUILD
+      - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
     secret: NEXT_PUBLIC_FIREBASE_API_KEY
     availability:

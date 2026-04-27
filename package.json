@@ -30,6 +30,7 @@
     "@tailwindcss/postcss": "^4.1.18",
     "@tanstack/react-query": "^5.90.20",
     "@wagmi/core": "^3.4.3",
+    "@walletconnect/ethereum-provider": "^2.23.9",
     "chart.js": "^4.5.1",
     "clsx": "^2.1.1",
     "dotenv": "^16.4.5",

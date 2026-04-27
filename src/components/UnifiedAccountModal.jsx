@@ -162,8 +162,15 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
     'walletConnect': 'walletConnect',
   };
 
-  // Connect external wallet (MetaMask, Coinbase, WalletConnect) via wagmi
+  // Connect external wallet (MetaMask, Coinbase, WalletConnect) via wagmi.
+  // For WalletConnect specifically, close this modal first so its QR
+  // modal has a clean canvas — on iPad Safari the WC modal can render
+  // behind UnifiedAccountModal even at a higher z-index due to stacking
+  // context quirks, leaving the user with a "stuck pending" button.
   const connectExternal = useCallback(async (walletId) => {
+    if (walletId === 'walletConnect') {
+      onClose();
+    }
     setConnectingMethod(walletId);
     try {
       const connectorId = walletIdToConnectorId[walletId] || walletId;
@@ -174,7 +181,7 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
     } finally {
       setConnectingMethod(null);
     }
-  }, [connectWallet]);
+  }, [connectWallet, onClose]);
 
   // Polaroid fetching removed
   /* Removed useEffect for fetching polaroids

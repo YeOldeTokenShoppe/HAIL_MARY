@@ -28,7 +28,7 @@ const isNative = (addr) => addr.toLowerCase() === NATIVE_TOKEN.toLowerCase();
 const CONNECTORS = [
   { id: 'coinbaseWalletSDK', label: 'COINBASE' },
   { id: 'metaMaskSDK', label: 'METAMASK' },
-  { id: 'injected', label: 'BROWSER' },
+  { id: 'walletConnect', label: 'WALLETCONNECT' },
 ];
 
 export default function SwapForm({ isSmallPhone, isMobile }) {
@@ -193,16 +193,7 @@ export default function SwapForm({ isSmallPhone, isMobile }) {
   }, [quote]);
 
   const [pendingConnectorId, setPendingConnectorId] = useState(null);
-  const [hasInjectedProvider, setHasInjectedProvider] = useState(false);
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.ethereum) {
-      setHasInjectedProvider(true);
-    }
-  }, []);
-  const visibleConnectors = useMemo(
-    () => CONNECTORS.filter((c) => c.id !== 'injected' || hasInjectedProvider),
-    [hasInjectedProvider],
-  );
+  const visibleConnectors = CONNECTORS;
   const handleConnect = useCallback(async (connectorId) => {
     setConnectError(null);
     const connector = wagmiConnectors.find((c) => c.id === connectorId);
