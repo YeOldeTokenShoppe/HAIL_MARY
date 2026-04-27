@@ -222,7 +222,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 24px;
+  gap: 16px;
   width: 100%;
   max-width: 1200px;
   padding-left: 1rem;
@@ -242,14 +242,14 @@
   pointer-events: auto;
   overflow: hidden;
 }
-/* Grab cursor only when the active candle variant is drag-rotatable
-   (currently votive). Pillar leaves the cursor at the browser default
-   so users aren't promised an interaction the variant doesn't offer.
-   Descendant selectors required because the R3F <canvas> is the
-   actual hover target inside this wrapper and `cursor` does not
-   reliably inherit to <canvas> across browsers. */
-.shrine-page.neon .scene-background.is-rotatable,
-.shrine-page.neon .scene-background.is-rotatable * {
+/* Grab cursor only when the pointer is actually over the candle
+   geometry (R3F's onPointerOver toggles `candle-hover` on the bg).
+   Without the candle-hover gate, the grab cursor would blanket the
+   entire viewport — over the text, the chart, the toaster strip —
+   even though only the candle responds to drag. The is-rotatable
+   gate keeps the pillar variant cursor-free since drag is votive-only. */
+.shrine-page.neon .scene-background.is-rotatable.candle-hover,
+.shrine-page.neon .scene-background.is-rotatable.candle-hover * {
   cursor: grab;
 }
 .shrine-page.neon .scene-background.is-rotatable.is-grabbing,
@@ -308,6 +308,17 @@
   align-items: center;
   gap: 24px;
   text-align: center;
+  /* Re-enable pointer interactions on the text block so users can
+     select the copy and hover the Latin pullquote for its title
+     tooltip. The shrine-page > * rule blanket-disables pointer events
+     to keep drag-spin reachable through decorative wrappers; we opt
+     this column back in because it has no candle behind it. */
+  pointer-events: auto;
+}
+
+.shrine-page.neon .hero-copy,
+.shrine-page.neon .hero-copy * {
+  cursor: auto;
 }
 
 /* Chart + action buttons stacked below the text in the left column. */
@@ -617,11 +628,11 @@
 .shrine-page.neon .hero-intro {
   font-family: "IBM Plex Serif", Georgia, serif;
   color: #a8c8d8;
-  font-size: 1rem;
-  line-height: 1.6;
+  font-size: 0.95rem;
+  line-height: 1.45;
   letter-spacing: 0.02em;
   margin: 0;
-  max-width: 38ch;
+  max-width: 42ch;
 }
 
 @media (max-width: 900px) {

@@ -48,6 +48,10 @@ export default function MobileBottomNav({
   // When set (0..1), renders a depleting gold arc around the center FAB —
   // used as the candle melt timer. `null` hides the ring entirely.
   centerProgress = null,
+  // When true, force the FAB hover treatment on (used by the root page
+  // to mirror the FAB's hover state when the user hovers the actual
+  // 3D candle object on the canvas).
+  centerHighlight = false,
   menuIcon = null,
   menuLabel = 'MENU',
   // Book overlay trigger — when provided, replaces the Account/LOGIN slot
@@ -65,6 +69,9 @@ export default function MobileBottomNav({
   // that fits the root-page usage; override per-page when the slot does
   // something else (e.g. "Return to the shrine" on /exlibris).
   bookTitle = 'Visit the monastic library',
+  // When true, pulse + brighten the book slot. Used by the root page to
+  // call attention to the BUY button while the user is hovering the chart.
+  bookHighlight = false,
   // Extra placeholder slots rendered to the left or right of the center
   // FAB. Each slot: { label, iconSrc?, icon?, onClick?, comingSoon? }.
   // When `comingSoon` is set the slot renders dimmed with a SOON badge.
@@ -160,7 +167,7 @@ export default function MobileBottomNav({
      LEFT/RIGHT positioning logic stays unchanged. */
   const bookSlot = onBookClick ? (
     <button
-      className="btm-nav-item"
+      className={`btm-nav-item ${bookHighlight ? 'btm-nav-highlight' : ''}`}
       onClick={onBookClick}
       title={bookTitle}
     >
@@ -353,6 +360,67 @@ export default function MobileBottomNav({
           color: ${nm ? '#d6faff' : m80 ? '#ff00ff' : dk ? '#d4a854' : '#8b6914'};
         }
 
+        /* Chart-hover highlight on the BUY (book) slot — the icon morphs
+           into an encircled FAB (matching the center candle button) and
+           lifts above the nav bar. Implemented with transforms only (no
+           width/height changes) so the nav row's layout stays static.
+           Desktop-only. */
+        @media (hover: hover) {
+          @keyframes btmNavHighlightPulse {
+            0%, 100% {
+              box-shadow: 0 4px 12px rgba(212, 168, 84, 0.5),
+                          0 0 18px rgba(255, 200, 90, 0.35),
+                          0 1px 3px rgba(0, 0, 0, 0.4);
+            }
+            50% {
+              box-shadow: 0 4px 18px rgba(255, 215, 120, 0.85),
+                          0 0 30px rgba(255, 200, 90, 0.65),
+                          0 1px 3px rgba(0, 0, 0, 0.4);
+            }
+          }
+          .btm-nav-item {
+            transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+          }
+          .btm-nav-item .btm-nav-icon {
+            transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+                        border-radius 0.5s ease,
+                        background 0.5s ease,
+                        border 0.5s ease,
+                        box-shadow 0.5s ease;
+            transform-origin: center;
+          }
+          .btm-nav-item .btm-nav-icon svg {
+            transition: stroke 0.3s ease, filter 0.3s ease;
+          }
+          /* Lift the slot above the bar — translateY doesn't affect layout. */
+          .btm-nav-item.btm-nav-highlight {
+            transform: translateY(-18px);
+            z-index: 5;
+          }
+          /* Morph the icon: scale up + round + glow. Using transform: scale
+             instead of width/height so the nav row's height stays fixed. */
+          .btm-nav-item.btm-nav-highlight .btm-nav-icon {
+            transform: scale(1.85);
+            border-radius: 50%;
+            border: ${nm ? '1.5px solid transparent' : '1.6px solid rgba(255, 255, 255, 0.9)'};
+            background: ${nm
+              ? 'linear-gradient(180deg, rgba(20, 14, 4, 0.92), rgba(8, 5, 2, 0.95)) padding-box, linear-gradient(135deg, #d4a854 0%, #ffd97a 40%, #ffb347 60%, #d4a854 100%) border-box'
+              : 'linear-gradient(145deg, #d4a854, #b8922e)'};
+            animation: btmNavHighlightPulse 1.8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+          }
+          /* Brighten the dollar glyph (parent transform handles size growth). */
+          .btm-nav-item.btm-nav-highlight .btm-nav-icon svg {
+            stroke: ${nm ? '#ffd97a' : '#ffffff'};
+            filter: drop-shadow(0 0 4px rgba(255, 215, 120, 0.8));
+          }
+          /* Brighten the label. */
+          .btm-nav-item.btm-nav-highlight .btm-nav-label {
+            color: ${nm ? '#ffd97a' : '#e6b85a'};
+            text-shadow: 0 0 10px rgba(255, 215, 120, 0.85),
+                         0 0 20px rgba(212, 168, 84, 0.5);
+          }
+        }
+
         /* ---- CYBERNAV (80s toggle) ---- */
         .btm-cyber-icon {
           color: ${m80 ? '#00ff41' : dk ? '#7aaa5a' : '#5a8a3a'};
@@ -488,6 +556,57 @@ export default function MobileBottomNav({
 
         .btm-buy-fab.pulse {
           animation: btmFabPulse 0.6s ease;
+        }
+
+        /* Hover treatment for the center FAB. The flame img inside can't
+           be styled with stroke/fill (loaded via <img>), so we shift it
+           via CSS filters: brighten + saturate + drop-shadow glow. The
+           FAB itself gets a subtle scale and intensified box-shadow halo.
+           Triggered by mouse hover OR by .btm-buy-fab-hovered (forced from
+           page.js when the user hovers the 3D candle object on canvas). */
+        .btm-buy-fab:not(.btm-disabled) {
+          transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+                      box-shadow 0.4s ease;
+        }
+        .btm-buy-fab:not(.btm-disabled) img,
+        .btm-buy-fab:not(.btm-disabled) svg {
+          transition: filter 0.35s ease, transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .btm-buy-fab.btm-buy-fab-hovered:not(.btm-disabled) {
+          transform: scale(1.06);
+          box-shadow: ${nm
+            ? '0 6px 26px rgba(42, 214, 238, 0.7), 0 0 48px rgba(217, 45, 176, 0.55), 0 0 80px rgba(255, 200, 90, 0.25), 0 2px 6px rgba(0, 0, 0, 0.4)'
+            : m80
+              ? '0 6px 24px rgba(217, 70, 239, 0.75), 0 0 48px rgba(217, 70, 239, 0.4), 0 2px 6px rgba(0, 0, 0, 0.35)'
+              : '0 6px 24px rgba(255, 215, 120, 0.85), 0 0 48px rgba(255, 200, 90, 0.5), 0 2px 6px rgba(0, 0, 0, 0.2)'};
+        }
+        .btm-buy-fab.btm-buy-fab-hovered:not(.btm-disabled) img {
+          filter: brightness(1.45) saturate(1.4)
+                  drop-shadow(0 0 8px rgba(255, 200, 90, 0.95))
+                  drop-shadow(0 0 16px rgba(255, 150, 50, 0.55));
+          transform: scale(1.08);
+        }
+        .btm-buy-fab.btm-buy-fab-hovered:not(.btm-disabled) svg {
+          filter: brightness(1.35) drop-shadow(0 0 6px rgba(255, 215, 120, 0.85));
+        }
+        @media (hover: hover) {
+          .btm-buy-fab:not(.btm-disabled):hover {
+            transform: scale(1.06);
+            box-shadow: ${nm
+              ? '0 6px 26px rgba(42, 214, 238, 0.7), 0 0 48px rgba(217, 45, 176, 0.55), 0 0 80px rgba(255, 200, 90, 0.25), 0 2px 6px rgba(0, 0, 0, 0.4)'
+              : m80
+                ? '0 6px 24px rgba(217, 70, 239, 0.75), 0 0 48px rgba(217, 70, 239, 0.4), 0 2px 6px rgba(0, 0, 0, 0.35)'
+                : '0 6px 24px rgba(255, 215, 120, 0.85), 0 0 48px rgba(255, 200, 90, 0.5), 0 2px 6px rgba(0, 0, 0, 0.2)'};
+          }
+          .btm-buy-fab:not(.btm-disabled):hover img {
+            filter: brightness(1.45) saturate(1.4)
+                    drop-shadow(0 0 8px rgba(255, 200, 90, 0.95))
+                    drop-shadow(0 0 16px rgba(255, 150, 50, 0.55));
+            transform: scale(1.08);
+          }
+          .btm-buy-fab:not(.btm-disabled):hover svg {
+            filter: brightness(1.35) drop-shadow(0 0 6px rgba(255, 215, 120, 0.85));
+          }
         }
 
         /* Disabled center FAB — used for "coming soon" teasers (CHAT etc).
@@ -737,7 +856,7 @@ export default function MobileBottomNav({
             <div className="btm-buy-wrapper">
               <div className="btm-buy-fab-wrap">
                 <button
-                  className={`btm-buy-fab ${buyPulse ? 'pulse' : ''} ${centerDisabled ? 'btm-disabled' : ''}`}
+                  className={`btm-buy-fab ${buyPulse ? 'pulse' : ''} ${centerDisabled ? 'btm-disabled' : ''} ${centerHighlight ? 'btm-buy-fab-hovered' : ''}`}
                   onClick={centerDisabled ? undefined : onBuyClick}
                   disabled={centerDisabled}
                   aria-disabled={centerDisabled || undefined}

@@ -165,17 +165,18 @@ const CANDLE_VARIANTS = {
     meltAxis: "y",
     // Votive wax is tapered (wider at the bottom), so pure vertical
     // shrink looks off — the remaining stub keeps its full original
-    // girth. Shrink the two non-melt axes at a fraction of the melt
-    // rate so the column also slims a touch as it burns. 0 = disabled
-    // (matches pillar behavior); 1 = same rate as the melt axis.
-    meltSecondaryRate: 0.1,
+    // girth and the wider base pokes through the glass cylinder.
+    // Shrink the two non-melt axes at a fraction of the melt rate so
+    // the column also slims as it burns. 0 = disabled (matches pillar
+    // behavior); 1 = same rate as the melt axis.
+    meltSecondaryRate: 0.15,
     // How much of the parent candle's vertical shrink the flame
     // inherits. 0 = flame stays at authored height for the whole
     // burn; 1 = flame shrinks 1:1 with the candle (prior behavior).
-    // 0.3 lands the flame at ~70% base at full burn and ~85% at
+    // 0.6 lands the flame at ~40% base at full burn and ~70% at
     // half burn — reads as a flame gently lowering rather than
     // collapsing to a pinprick over the glass rim.
-    flameMeltShrinkRate: 0.3,
+    flameMeltShrinkRate: 0.6,
     dripMeshName: null,
     scale: 1.2,
     // Wick material — lives on XBase as a second material slot. Given
@@ -207,6 +208,7 @@ const StarfieldStatueScene = dynamic(
 // auth state and threaded through the melt timer + countdown UI.
 const MELT_DURATION_ANON_MS = 60 * 1000;
 const MELT_DURATION_SIGNED_IN_MS = 8 * 60 * 60 * 1000;
+// const MELT_DURATION_SIGNED_IN_MS = 60 * 1000;
 
 // Reconstitution sequence — after a candle fully burns out, hold the
 // empty pedestal briefly, then swirl particles inward and re-form the
@@ -281,6 +283,7 @@ function HeroAltarObject({
   debugRef,
   votiveImage = null,
   votiveTint = null,
+  onHoverChange = null,
 }) {
   const variantConfig = CANDLE_VARIANTS[variant] ?? CANDLE_VARIANTS.pillar;
   const { scene } = useGLTF(variantConfig.modelPath);
@@ -316,6 +319,15 @@ function HeroAltarObject({
   const flameNodeRef = useRef(null);
   const flameBaseScaleRef = useRef({ x: 1, y: 1, z: 1 });
   const flameBaseRotationRef = useRef({ x: 0, y: 0, z: 0 });
+  // Which of the FLAME node's local axes (x|y|z) actually points along
+  // the wax's melt-axis direction in world space. Detected at load time
+  // because Blender export-orientation quirks can rotate the FLAME node
+  // independently of its WAX parent — e.g., the pillar's wax was authored
+  // Z-up but the FLAME inside it can have a different baked rotation, so
+  // scaling flame.scale.z late in the burn stretched it horizontally
+  // instead of vertically. Picking the axis from the actual world matrices
+  // self-corrects for any GLB without per-variant config.
+  const flameMeltAxisRef = useRef(null);
   // Amber radial glow sprite — additive, billboarded, breathes with the
   // flame's noise-driven flicker. Makes the flame feel volumetric rather
   // than a flat authored mesh.
@@ -675,6 +687,7 @@ function HeroAltarObject({
     // Reset capture state so variant swaps (pillar ↔ votive) pick up the
     // new scene's flame rather than keeping a stale ref to the old one.
     flameNodeRef.current = null;
+    flameMeltAxisRef.current = null;
     senoraMaterialsRef.current = [];
     // Shared upgrade helper used on the wax + drip meshes. Swaps the flat
     // authored material for a lit MeshStandardMaterial so it responds to
@@ -942,11 +955,58 @@ function HeroAltarObject({
               m.userData.baseEmissiveG = m.emissive.g;
               m.userData.baseEmissiveB = m.emissive.b;
             }
+            // The decal PNG has transparent regions around the heart
+            // artwork. The global mesh setup above sets transparent:true +
+            // depthWrite:true, which makes those transparent texels still
+            // write depth — so the flame behind the label was getting
+            // occluded by the empty PNG corners. alphaTest discards low-
+            // alpha fragments before depth is written, so only the
+            // actually-painted pixels of the heart occlude the flame.
+            m.alphaTest = 0.5;
+            m.needsUpdate = true;
             senoraMaterialsRef.current.push(m);
           });
         });
       }
     });
+
+    // Determine which flame-local axis aligns with the wax's melt axis
+    // in world space. We scale flame.scale[axis] to counter the wax's
+    // shrink, but the flame's local frame can be rotated relative to
+    // the wax's by the GLB authoring/export, so naming the axis from
+    // the wax config alone isn't reliable — late in the burn this
+    // misalignment stretched the flame sideways into a flat line.
+    if (meltMeshRef.current && flameNodeRef.current) {
+      meltMeshRef.current.updateMatrixWorld(true);
+      flameNodeRef.current.updateMatrixWorld(true);
+      const waxQuat = new THREE.Quaternion();
+      meltMeshRef.current.getWorldQuaternion(waxQuat);
+      const flameQuat = new THREE.Quaternion();
+      flameNodeRef.current.getWorldQuaternion(flameQuat);
+      // Wax's melt axis as a world-space direction.
+      const waxDir = new THREE.Vector3(
+        variantConfig.meltAxis === "x" ? 1 : 0,
+        variantConfig.meltAxis === "y" ? 1 : 0,
+        variantConfig.meltAxis === "z" ? 1 : 0,
+      ).applyQuaternion(waxQuat).normalize();
+      // Each flame-local axis as a world-space direction; pick whichever
+      // is most parallel to waxDir (largest |dot|).
+      const candidates = ["x", "y", "z"];
+      let bestAxis = variantConfig.meltAxis;
+      let bestDot = -Infinity;
+      const tmp = new THREE.Vector3();
+      for (const ax of candidates) {
+        tmp.set(ax === "x" ? 1 : 0, ax === "y" ? 1 : 0, ax === "z" ? 1 : 0)
+          .applyQuaternion(flameQuat)
+          .normalize();
+        const d = Math.abs(tmp.dot(waxDir));
+        if (d > bestDot) {
+          bestDot = d;
+          bestAxis = ax;
+        }
+      }
+      flameMeltAxisRef.current = bestAxis;
+    }
   }, [scene]);
 
   // Drag-to-spin for the hero candle. Attaches at the window level so
@@ -1492,7 +1552,10 @@ function HeroAltarObject({
       if (litAt) {
         const elapsed = Date.now() - litAt;
         const progress = Math.min(elapsed / meltDuration, 1.0);
-        const axis = variantConfig.meltAxis;
+        // Use the flame-local axis that was detected to align with the
+        // wax's melt direction in world space. Falls back to the wax
+        // config if detection hasn't run yet (first frame on load).
+        const flameAxis = flameMeltAxisRef.current ?? variantConfig.meltAxis;
 
         const secondaryRate = variantConfig.meltSecondaryRate ?? 0;
         const sideFactor = secondaryRate > 0
@@ -1505,9 +1568,9 @@ function HeroAltarObject({
         const flameTargetMelt = Math.max(0.10, 1 - progress * meltShrinkRate);
         const meltComp = flameTargetMelt / parentMeltScale;
 
-        compX = axis === "x" ? meltComp : sideComp;
-        compY = axis === "y" ? meltComp : sideComp;
-        compZ = axis === "z" ? meltComp : sideComp;
+        compX = flameAxis === "x" ? meltComp : sideComp;
+        compY = flameAxis === "y" ? meltComp : sideComp;
+        compZ = flameAxis === "z" ? meltComp : sideComp;
       }
       flameNodeRef.current.scale.set(
         baseScale.x * flicker * compX * catchScale,
@@ -1571,9 +1634,19 @@ function HeroAltarObject({
         reconstPhaseRef.current = "idle";
         hideReconstituteParticles();
       } else if (reconstPhaseRef.current === "empty") {
-        // Hold the burned-down silhouette: full baseline on the other
-        // two axes, 10% on the melt axis (matches the natural burn floor).
-        meltMeshRef.current.scale.set(base.x, base.y, base.z);
+        // Hold the burned-down silhouette: radial axes match the squeezed
+        // state from end-of-burn (sideFactor at progress=1) so we don't
+        // pop from squeezed-girth back to full-girth the instant burnout
+        // fires. 10% on the melt axis matches the natural burn floor.
+        const secondaryRate = variantConfig.meltSecondaryRate ?? 0;
+        const burnEndSideFactor = secondaryRate > 0
+          ? Math.max(0.10, 1 - secondaryRate)
+          : 1;
+        meltMeshRef.current.scale.set(
+          base.x * burnEndSideFactor,
+          base.y * burnEndSideFactor,
+          base.z * burnEndSideFactor,
+        );
         meltMeshRef.current.scale[axis] = axisBase * 0.10;
         if (dripWaxRef.current) {
           const dripBase = baseDripScaleRef.current;
@@ -1589,10 +1662,22 @@ function HeroAltarObject({
         const t = Math.min(elapsedMs / RECONSTITUTE_REFORM_MS, 1);
         // Wax grows 10% → 100%, slightly back-loaded so particles converge
         // before the pillar shoots up. Starting floor matches the empty-
-        // beat hold and the natural 10% burn floor.
+        // beat hold and the natural 10% burn floor. Radial axes grow back
+        // from their burn-end squeeze to full baseline on the same eased
+        // curve so the column thickens in lockstep with the vertical
+        // re-grow rather than popping wider than the glass at t=0.
         const waxT = Math.max(0, (t - 0.35) / 0.65);
         const waxEased = 1 - Math.pow(1 - waxT, 3); // easeOutCubic
-        meltMeshRef.current.scale.set(base.x, base.y, base.z);
+        const secondaryRate = variantConfig.meltSecondaryRate ?? 0;
+        const burnEndSideFactor = secondaryRate > 0
+          ? Math.max(0.10, 1 - secondaryRate)
+          : 1;
+        const sideFactor = burnEndSideFactor + (1 - burnEndSideFactor) * waxEased;
+        meltMeshRef.current.scale.set(
+          base.x * sideFactor,
+          base.y * sideFactor,
+          base.z * sideFactor,
+        );
         meltMeshRef.current.scale[axis] = axisBase * (0.10 + waxEased * 0.90);
         if (dripWaxRef.current) {
           const dripBase = baseDripScaleRef.current;
@@ -1715,7 +1800,25 @@ function HeroAltarObject({
           inner group lets users rotate the candle around Y to peek at
           the flame from the sides. X rotation is intentionally ignored
           so the candle can't be tilted off vertical. */}
-      <group ref={candleSpinRef}>
+      <group
+        ref={candleSpinRef}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          if (onHoverChange) onHoverChange(true);
+          if (typeof document !== "undefined") {
+            const bg = document.querySelector(".scene-background");
+            if (bg) bg.classList.add("candle-hover");
+          }
+        }}
+        onPointerOut={(e) => {
+          e.stopPropagation();
+          if (onHoverChange) onHoverChange(false);
+          if (typeof document !== "undefined") {
+            const bg = document.querySelector(".scene-background");
+            if (bg) bg.classList.remove("candle-hover");
+          }
+        }}
+      >
         <primitive object={scene} scale={variantConfig.scale} />
       </group>
       {/* Ambient + hemi fill so the candle has a strong omnidirectional
@@ -1979,6 +2082,8 @@ export default function HomePage() {
   const router = useRouter();
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [showInscribeModal, setShowInscribeModal] = useState(false);
+  const [chartHovered, setChartHovered] = useState(false);
+  const [candleObjectHovered, setCandleObjectHovered] = useState(false);
   const [candleLit, setCandleLit] = useState(false);
   const [litAt, setLitAt] = useState(null);
   // Post-ignition nudge shown only to anonymous visitors who just lit a
@@ -2328,6 +2433,7 @@ export default function HomePage() {
             debugRef={debugRef}
             votiveImage={votiveImage}
             votiveTint={votiveTint}
+            onHoverChange={setCandleObjectHovered}
           />
           {/* <Stats className="r3f-stats" /> */}
         </StarfieldStatueScene>
@@ -2360,11 +2466,15 @@ export default function HomePage() {
             </span>
           </blockquote>
           <p className="hero-intro">
-A refuge for the rekt, a liturgy for the ledger, a confessional for your worst trades. RL80 is the token of her order. Mater ex machina. </p>
+Sharpen your discernment against scams in the liminal terminal. Submit your trade history for absolution. Scan any token for multidimensional review — spiritual verdict included. RL80 is the utility token of her order. Mater ex machina. </p>
         </div>
 
         <div className="shrine-column">
-          <div className="shrine-stage">
+          <div
+            className="shrine-stage"
+            onMouseEnter={() => setChartHovered(true)}
+            onMouseLeave={() => setChartHovered(false)}
+          >
             <ChartShrine
               {...data}
               palette="chrome"
@@ -2686,6 +2796,7 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
         accountOnLeft
         /* Repurpose the center FAB as the candle light toggle. */
         onBuyClick={toggleCandle}
+        centerHighlight={candleObjectHovered}
         centerLabel={
           candleLit ? (
             userId ? (
@@ -2761,26 +2872,9 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
         /* Filling gold arc around the FAB — 0 when just lit, 1 at
            burnout. Only rendered while a candle is actually lit. */
         centerProgress={candleLit ? meltProgress : null}
-        /* Repurpose the menu slot as the Buy button. */
-        onMenuClick={() => setShowBuyModal(true)}
+        /* Menu slot routes to /exlibris. */
+        onMenuClick={() => router.push('/exlibris')}
         menuIcon={
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: "#d4a854" }}>
-            <line x1="12" y1="1" x2="12" y2="23" />
-            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-          </svg>
-        }
-        menuLabel="BUY"
-        isUserSignedIn={isConnected}
-        show80sButton={false}
-        isMobile
-        neonMode
-        /* Replace LOGIN slot with BOOK — sign-in/out is surfaced in the
-           candle inscribe modal instead. The icon is a scroll glyph and
-           routes to the dedicated /exlibris scene rather than opening
-           the inline overlay. */
-        onBookClick={() => router.push('/exlibris')}
-        bookLabel="EX LIBRIS"
-        bookIcon={
           <svg
             className="btm-book-icon-svg"
             xmlns="http://www.w3.org/2000/svg"
@@ -2796,6 +2890,23 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
             <path d="M15 8h-5" />
             <path d="M19 17V5a2 2 0 0 0-2-2H4" />
             <path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3" />
+          </svg>
+        }
+        menuLabel="EX LIBRIS"
+        isUserSignedIn={isConnected}
+        show80sButton={false}
+        isMobile
+        neonMode
+        /* Book slot (left of center) is the BUY button — placed nearer
+           to the chart so buying intent and action sit in the same zone.
+           Pulses while the chart is hovered to tie intent to action. */
+        onBookClick={() => setShowBuyModal(true)}
+        bookHighlight={chartHovered}
+        bookLabel="BUY"
+        bookIcon={
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 22, height: 22, color: "#d4a854" }}>
+            <line x1="12" y1="1" x2="12" y2="23" />
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
           </svg>
         }
         extraLeft={[

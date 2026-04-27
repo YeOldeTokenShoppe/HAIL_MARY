@@ -129,10 +129,10 @@ const DIMS_DESKTOP = {
   CHART_PAD_LEFT: 70,
   CHART_PAD_RIGHT: 110,
   candleCount: 18,
-  titleFont: 28,
-  subtitleFont: 16,
-  priceFont: 28,
-  changeFont: 16,
+  titleFont: 38,
+  subtitleFont: 22,
+  priceFont: 38,
+  changeFont: 22,
   axisFont: 18,
 };
 
@@ -858,7 +858,7 @@ export default function ChartShrine({
           <g>
             <text
               x={CHART_PAD_LEFT}
-              y={52}
+              y={56}
               fill={p.accent}
               fontSize={dims.titleFont}
               fontFamily="Pirata One, serif"
@@ -868,7 +868,7 @@ export default function ChartShrine({
             </text>
             <text
               x={CHART_PAD_LEFT}
-              y={74}
+              y={84}
               fill={p.accentSoft}
               fontSize={dims.subtitleFont}
               fontFamily="IBM Plex Serif, serif"
@@ -879,7 +879,7 @@ export default function ChartShrine({
             </text>
             <text
               x={VIEW_W - CHART_PAD_RIGHT + 90}
-              y={52}
+              y={56}
               fill={p.accent}
               fontSize={dims.priceFont}
               fontFamily="IBM Plex Serif, serif"
@@ -889,7 +889,7 @@ export default function ChartShrine({
             </text>
             <text
               x={VIEW_W - CHART_PAD_RIGHT + 90}
-              y={72}
+              y={84}
               fill={priceColor}
               fontSize={dims.changeFont}
               fontFamily="IBM Plex Serif, serif"
