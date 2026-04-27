@@ -263,7 +263,7 @@
    inline — this selector's specificity otherwise overrides their own
    `position: fixed`. */
 .shrine-page.neon
-  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge) {
+  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge):not(.modal-overlay) {
   position: relative;
   z-index: 1;
   /* Don't eat pointer events over the canvas — these are decorative
@@ -277,7 +277,7 @@
 /* Safety net: keep any interactive descendant of those wrappers
    clickable even though the parent is pointer-events:none. */
 .shrine-page.neon
-  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge)
+  > *:not(.scene-background):not(.mnc-dock):not(.btm-nav-dock):not(.auth-slot):not(.flame-nudge):not(.modal-overlay)
   :is(a, button, input, select, textarea, label, [role="button"], [tabindex]) {
   pointer-events: auto;
 }
@@ -1149,6 +1149,80 @@
 
 .candle-picker-secondary:hover {
   color: #f1d77a;
+}
+
+/* ---------- LOCK STATE ----------
+   When a connected wallet holds zero RL80, the picker renders a banner
+   explaining the gate and a CTA to BuyModal. Tiles still render (so the
+   user can see what they'd unlock) but are disabled and visually dimmed. */
+.candle-picker-lock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 4px 14px;
+  margin-top: 2px;
+  border-top: 1px dashed rgba(241, 215, 122, 0.18);
+  border-bottom: 1px dashed rgba(241, 215, 122, 0.18);
+}
+
+.candle-picker-lock-text {
+  margin: 0;
+  text-align: center;
+  color: #c8b994;
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 12px;
+  line-height: 1.45;
+  letter-spacing: 0.2px;
+  font-style: italic;
+}
+
+.candle-picker-lock-cta {
+  /* Inherits .shrine-btn.primary's gold gradient + dark text — match
+     .flame-nudge-cta's tighter Cinzel typography so the CTA reads as a
+     sibling of "Save my flame" rather than a generic shrine button. */
+  padding: 8px 22px;
+  font-family: "Cinzel", serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+.candle-picker-popup.is-locked .candle-picker-tiles {
+  opacity: 0.55;
+  filter: saturate(0.6);
+  transition: opacity 200ms ease, filter 200ms ease;
+}
+
+.candle-picker-tile:disabled {
+  cursor: not-allowed;
+  color: #6e6650;
+  border-color: rgba(241, 215, 122, 0.1);
+  border-left-color: #4a3a2a;
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: none;
+}
+
+.candle-picker-tile:disabled:hover {
+  /* Override the enabled :hover above — disabled tiles must not light up
+     on hover, otherwise the gate reads as flaky. */
+  color: #6e6650;
+  border-color: rgba(241, 215, 122, 0.1);
+  border-left-color: #4a3a2a;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.candle-picker-tile.is-active:disabled {
+  /* Keep a hint of the active gold so the user can still see which
+     variant they have — just muted to read as "selected but locked". */
+  color: #8a8068;
+  border-left-color: #8a6a2e;
+  background: rgba(241, 215, 122, 0.04);
+}
+
+.candle-picker-tile:disabled .candle-picker-tile-label {
+  color: #8a7a5a;
 }
 
 /* ---------- VOTIVE PERSONALIZATION ----------

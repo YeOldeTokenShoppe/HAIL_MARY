@@ -59,22 +59,25 @@ export function WalletAuthProvider({ children }) {
     }
   }, []);
 
-  // Store wallet address locally (Clerk frontend doesn't allow metadata updates)
+  // Fetch the RL80 balance on every wallet connect, and mirror to a
+  // Clerk-keyed localStorage entry when a Clerk user is present. The
+  // balance fetch must run regardless of Clerk state so wallet-only
+  // surfaces (e.g. the candle gate on the home page) see a live balance
+  // immediately rather than waiting on the 60s refresh interval.
   const syncWalletWithClerk = useCallback(async (addr) => {
-    if (!user || !addr) return;
+    if (!addr) return;
 
     try {
       setIsSyncing(true);
-      const walletData = {
-        walletAddress: addr,
-        lastWalletSync: new Date().toISOString(),
-        userId: user.id,
-      };
-      localStorage.setItem(`wallet_${user.id}`, JSON.stringify(walletData));
-
       const balance = await fetchTokenBalance(addr);
-      if (balance !== null) {
-        walletData.tokenBalance = balance;
+
+      if (user) {
+        const walletData = {
+          walletAddress: addr,
+          lastWalletSync: new Date().toISOString(),
+          userId: user.id,
+          ...(balance !== null ? { tokenBalance: balance } : {}),
+        };
         localStorage.setItem(`wallet_${user.id}`, JSON.stringify(walletData));
       }
     } catch (error) {

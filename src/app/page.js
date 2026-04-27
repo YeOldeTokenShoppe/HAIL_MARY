@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { useGLTF, Stats } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { useUser, useClerk } from "@clerk/nextjs";
+import { useAccount, useDisconnect, useReadContract } from "wagmi";
+import { erc20Abi } from "viem";
+import { RL80_ADDRESS } from "@/lib/contracts";
+import { UnifiedAccountModal } from "@/components/UnifiedAccountModal";
 import ChartShrine, { TIMEFRAME_OPTIONS } from "@/components/ChartShrine";
 import MobileBottomNav from "@/components/MobileBottomNav";
 import BuyModal from "@/components/BuyModal";
@@ -127,25 +130,6 @@ function writeVotiveTint(userId, hex) {
     } else {
       window.localStorage.setItem(VOTIVE_TINT_STORAGE_PREFIX + userId, hex);
     }
-  } catch {}
-}
-
-// One-shot "sign in to save your flame" nudge. Shown on the first anon
-// light only; relights skip it so the nudge doesn't become noise. Keyed
-// globally rather than per-user because anon visitors have no userId.
-const SIGN_IN_NUDGE_SHOWN_KEY = "rl80:signInNudgeShown";
-function readSignInNudgeShown() {
-  if (typeof window === "undefined") return false;
-  try {
-    return window.localStorage.getItem(SIGN_IN_NUDGE_SHOWN_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-function markSignInNudgeShown() {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(SIGN_IN_NUDGE_SHOWN_KEY, "1");
   } catch {}
 }
 
@@ -1272,18 +1256,39 @@ function HeroAltarObject({
     burnedOutFiredRef.current = false;
   }, [litAt]);
 
-  // Preload the ignition audio once per mount so first-light has zero
-  // playback latency. Cleanup pauses + drops the ref on unmount so a
-  // variant swap doesn't leave an orphan element decoding in the bg.
+  // Preload the ignition sparkle via Web Audio API rather than
+  // HTMLAudioElement. On iOS, an <audio> element claims the "playback"
+  // audio session, which pauses anything else the user has playing
+  // (Spotify, YouTube, a podcast). AudioContext defaults to the
+  // "ambient" session, which mixes with other audio instead — so a
+  // listener can light a candle without their music cutting out.
+  //
+  // The context is created up-front but stays suspended until the
+  // first ignition resumes it inside the user-gesture handler, which
+  // is what iOS Safari requires.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const audio = new Audio("/audio/sparkle.mp3");
-    audio.preload = "auto";
-    audio.volume = 0.6;
-    ignitionAudioRef.current = audio;
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return; // very old browser — skip the sparkle silently
+    let cancelled = false;
+    const ctx = new Ctx();
+    let buffer = null;
+    (async () => {
+      try {
+        const res = await fetch("/audio/sparkle.mp3");
+        const arrayBuf = await res.arrayBuffer();
+        buffer = await ctx.decodeAudioData(arrayBuf);
+        if (cancelled) return;
+        ignitionAudioRef.current = { ctx, buffer };
+      } catch {
+        // Decode/fetch failed — drop the sparkle rather than blocking
+        // ignition. The visual flash + spark burst still play.
+      }
+    })();
     return () => {
-      audio.pause();
+      cancelled = true;
       ignitionAudioRef.current = null;
+      ctx.close().catch(() => {});
     };
   }, []);
 
@@ -1296,12 +1301,23 @@ function HeroAltarObject({
       ignitionTimeRef.current = performance.now();
       spawnIgnitionSparks();
       fireCandleIgnitionPulse();
-      const audio = ignitionAudioRef.current;
-      if (audio) {
-        // Reset playhead so a rapid relight retriggers from the top
-        // rather than picking up where the previous play left off.
-        audio.currentTime = 0;
-        audio.play().catch(() => {});
+      const sparkle = ignitionAudioRef.current;
+      if (sparkle?.ctx && sparkle?.buffer) {
+        const { ctx, buffer } = sparkle;
+        // iOS keeps the AudioContext suspended until a user gesture
+        // resumes it. Ignition is itself a user gesture (FAB tap), so
+        // resuming here is allowed. Subsequent relights find the ctx
+        // already running — the resume call is a cheap no-op.
+        if (ctx.state === "suspended") ctx.resume().catch(() => {});
+        const src = ctx.createBufferSource();
+        src.buffer = buffer;
+        const gain = ctx.createGain();
+        gain.gain.value = 0.6;
+        src.connect(gain).connect(ctx.destination);
+        // Each ignition gets a fresh source node — no need to reset a
+        // playhead since BufferSourceNodes are single-use; they GC
+        // themselves once playback finishes.
+        try { src.start(0); } catch {}
       }
     }
     prevLitRef.current = candleLit;
@@ -1857,13 +1873,31 @@ export default function HomePage() {
     days: tfOpt.days,
     aggregate: tfOpt.aggregate,
   });
-  const { user, isSignedIn } = useUser();
-  const { openSignIn, signOut } = useClerk();
-  const userId = user?.id ?? null;
+  const { address, isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
+  const userId = isConnected && address ? address.toLowerCase() : null;
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  // RL80 holding gates the customization picker. Connected wallets with
+  // zero balance still load+save their existing prefs (so a user who
+  // sold their RL80 doesn't lose a previously-customized candle), but
+  // the picker UI greys out until they hold RL80 again.
+  const { data: rl80BalanceRaw } = useReadContract({
+    address: RL80_ADDRESS,
+    abi: erc20Abi,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+  const hasRL80 = typeof rl80BalanceRaw === "bigint" && rl80BalanceRaw > 0n;
+  const canCustomize = !!userId && hasRL80;
+  const shortAddress = address
+    ? `${address.slice(0, 6)}…${address.slice(-4)}`
+    : null;
   // Signed-in "faithful" get the full 8-hour vigil; anonymous visitors
   // get a 1-minute preview that nudges them to sign in to extend it.
-  // Keyed off userId (not isSignedIn) to match the hydrate branching and
-  // avoid a flicker on Clerk's initial load.
+  // Keyed off userId (not isConnected directly) so the value is null
+  // until both isConnected and address resolve — avoids a one-frame
+  // flicker between wagmi state hydration and address availability.
   const meltDuration = userId ? MELT_DURATION_SIGNED_IN_MS : MELT_DURATION_ANON_MS;
   // Candle variant — everyone starts on the pillar. Signed-in users
   // can discover the votive (and future variants) through the picker;
@@ -1951,6 +1985,13 @@ export default function HomePage() {
   // candle — frames sign-in as "save your flame" rather than a gate.
   const [showSignInNudge, setShowSignInNudge] = useState(false);
   const debugRef = useRef(null);
+  // Holds the pending sign-in nudge timer so we can cancel it if the
+  // user extinguishes before the delay elapses, or unmounts the page.
+  // Without this the nudge could pop on a candle that's no longer lit.
+  const nudgeTimerRef = useRef(null);
+  useEffect(() => () => {
+    if (nudgeTimerRef.current) clearTimeout(nudgeTimerRef.current);
+  }, []);
   const [isMobileDevice, setIsMobileDevice] = useState(false);
   useEffect(() => {
     const check = () => setIsMobileDevice(window.innerWidth <= 768);
@@ -2029,9 +2070,8 @@ export default function HomePage() {
         // survives device changes and can join social surfaces later.
         // Pass the original litAtMs so the melt timer doesn't reset.
         lightCandle(userId, {
-          displayName:
-            user?.fullName || user?.username || user?.firstName || null,
-          avatarUrl: user?.imageUrl ?? null,
+          displayName: shortAddress,
+          avatarUrl: null,
           litAtMs: local.litAtMs,
         });
         setLitAt(local.litAtMs);
@@ -2048,7 +2088,7 @@ export default function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [userId, user]);
+  }, [userId, shortAddress]);
 
   const doExtinguish = () => {
     if (userId) extinguishCandle(userId);
@@ -2056,22 +2096,36 @@ export default function HomePage() {
     setCandleLit(false);
     setLitAt(null);
     setShowSignInNudge(false);
+    // Cancel a pending nudge so it doesn't fire on a now-dark candle.
+    if (nudgeTimerRef.current) {
+      clearTimeout(nudgeTimerRef.current);
+      nudgeTimerRef.current = null;
+    }
   };
 
   const doLight = () => {
     const now = Date.now();
     if (userId) {
       lightCandle(userId, {
-        displayName:
-          user?.fullName || user?.username || user?.firstName || null,
-        avatarUrl: user?.imageUrl ?? null,
+        displayName: shortAddress,
+        avatarUrl: null,
       });
     } else {
       writeLocalCandle(now);
-      if (!readSignInNudgeShown()) {
+      // Fire the nudge on every anon light. The once-per-device gate
+      // we used to have here stranded users who dismissed it: with no
+      // visible "connect wallet" surface elsewhere on the page, lighting
+      // the candle again is their natural retry path. The 12s auto-dismiss
+      // (plus the × button) keeps repeated lights from being noisy.
+      //
+      // Delay so the candle ignition FX have room to play uninterrupted
+      // on small screens — without this the nudge slides in over the
+      // flame burst and obscures the moment the user just triggered.
+      if (nudgeTimerRef.current) clearTimeout(nudgeTimerRef.current);
+      nudgeTimerRef.current = setTimeout(() => {
         setShowSignInNudge(true);
-        markSignInNudgeShown();
-      }
+        nudgeTimerRef.current = null;
+      }, 3500);
     }
     setLitAt(now);
     setCandleLit(true);
@@ -2098,10 +2152,9 @@ export default function HomePage() {
 
   const handlePickVariant = (variant) => {
     if (!CANDLE_VARIANTS[variant]) return;
+    if (!canCustomize) return;
     writeCandleVariant(userId, variant);
     setCandleVariantChoice(variant);
-    // Mirror to Firestore so other devices see the same pick. Anon users
-    // are a no-op inside writeCandlePrefs because it guards on userId.
     writeCandlePrefs(userId, { candleVariant: variant });
     setShowCandlePicker(false);
     // Only auto-light when the user was unlit at pick-time — tapping
@@ -2115,6 +2168,7 @@ export default function HomePage() {
   // (restores the baked-in Guadalupe texture). Picker stays open so the
   // user can tweak tint + image together without re-opening.
   const handlePickVotiveImage = (src) => {
+    if (!canCustomize) return;
     setVotiveUploadError(null);
     setVotiveImage(src ?? null);
     writeVotiveImage(userId, src ?? null);
@@ -2136,6 +2190,7 @@ export default function HomePage() {
   //      quality / default canvas smoothing produced before.
   const handleUploadVotiveImage = async (file) => {
     if (!file) return;
+    if (!canCustomize) return;
     setVotiveUploadError(null);
     try {
       const dataUrl = await new Promise((resolve, reject) => {
@@ -2210,6 +2265,7 @@ export default function HomePage() {
 
   // Commit a wax tint. `hex == null` clears the preference.
   const handlePickVotiveTint = (hex) => {
+    if (!canCustomize) return;
     setVotiveTint(hex ?? null);
     writeVotiveTint(userId, hex ?? null);
     writeCandlePrefs(userId, { votiveTint: hex ?? null });
@@ -2351,7 +2407,7 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
       {showSignInNudge && (
         <div className="flame-nudge" role="status" aria-live="polite">
           <p className="flame-nudge-title">Your flame is burning.</p>
-          <p className="flame-nudge-sub">Sign in and your votive:</p>
+          <p className="flame-nudge-sub">Connect a wallet and your votive:</p>
           <ul className="flame-nudge-benefits">
             <li>Burns 8 hours, not 1 minute</li>
             <li>Follows you across every device</li>
@@ -2361,7 +2417,10 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
             <button
               type="button"
               className="shrine-btn primary flame-nudge-cta"
-              onClick={() => openSignIn()}
+              onClick={() => {
+                setShowSignInNudge(false);
+                setShowAccountModal(true);
+              }}
             >
               Save my flame
             </button>
@@ -2379,14 +2438,34 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
 
       {showCandlePicker && (
         <div
-          className="flame-nudge candle-picker-popup"
+          className={`flame-nudge candle-picker-popup${
+            canCustomize ? "" : " is-locked"
+          }`}
           role="dialog"
           aria-label="Choose your candle"
         >
           <p className="flame-nudge-title">Choose your candle</p>
+          {!canCustomize && (
+            <div className="candle-picker-lock">
+              <p className="candle-picker-lock-text">
+                Hold any RL80 to customize your candle.
+              </p>
+              <button
+                type="button"
+                className="shrine-btn primary candle-picker-lock-cta"
+                onClick={() => {
+                  setShowCandlePicker(false);
+                  setShowBuyModal(true);
+                }}
+              >
+                Buy RL80
+              </button>
+            </div>
+          )}
           <div className="candle-picker-tiles">
             <button
               type="button"
+              disabled={!canCustomize}
               className={`candle-picker-tile${
                 candleVariantChoice === "pillar" ? " is-active" : ""
               }`}
@@ -2399,6 +2478,7 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
             </button>
             <button
               type="button"
+              disabled={!canCustomize}
               className={`candle-picker-tile${
                 candleVariantChoice === "votive" ? " is-active" : ""
               }`}
@@ -2578,10 +2658,15 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
             className="candle-picker-secondary"
             onClick={() => {
               setShowCandlePicker(false);
-              signOut();
+              disconnect();
+              // Re-open the wallet modal so the user can reconnect a
+              // different wallet right away — common path when someone
+              // disconnects to switch to one that holds RL80. Without
+              // this they'd be stranded with no visible re-connect surface.
+              setShowAccountModal(true);
             }}
           >
-            Sign out
+            Disconnect wallet
           </button>
           <button
             type="button"
@@ -2685,8 +2770,7 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
           </svg>
         }
         menuLabel="BUY"
-        isUserSignedIn={isSignedIn}
-        userImage={user?.imageUrl}
+        isUserSignedIn={isConnected}
         show80sButton={false}
         isMobile
         neonMode
@@ -2773,6 +2857,12 @@ A refuge for the rekt, a liturgy for the ledger, a confessional for your worst t
       />
 
       <BuyModal isOpen={showBuyModal} onClose={() => setShowBuyModal(false)} />
+
+      <UnifiedAccountModal
+        isOpen={showAccountModal}
+        onClose={() => setShowAccountModal(false)}
+        initialTab="wallet"
+      />
 
       <TestimonialToasts onInscribeClick={() => setShowInscribeModal(true)} />
 

@@ -4,10 +4,6 @@ import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useUser, useClerk, UserButton } from '@clerk/nextjs';
 import { usePathname } from 'next/navigation';
 import { useWalletAuth } from './WalletAuthProvider';
-import { WalletDetailsModal } from './WalletDetailsModal';
-import { collection, query, where, orderBy, getDocs, db } from '@/lib/firebaseClient';
-import { useWeeklyPrize } from '@/hooks/useWeeklyPrize';
-import CapsuleCollectible from './CapsuleCollectible';
 
 // Custom wallet connect UI using wagmi connectors
 function WalletConnectOptions({ connectExternal, connectingMethod, isMobile, theme = 'cyber' }) {
@@ -125,7 +121,7 @@ function WalletConnectOptions({ connectExternal, connectingMethod, isMobile, the
 
 export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', theme = 'cyber' }) {
   const { user } = useUser();
-  const { signOut } = useClerk();
+  const { signOut, openSignIn } = useClerk();
   const pathname = usePathname();
   const {
     walletAddress,
@@ -145,15 +141,9 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
       setActiveTab(initialTab);
     }
   }, [isOpen, initialTab]);
-  const [showWalletDetails, setShowWalletDetails] = useState(false);
   const [showClerkDropdown, setShowClerkDropdown] = useState(false);
 
-  // Collection tab state
-  const [collectedPrizes, setCollectedPrizes] = useState([]);
-  const [loadingPrizes, setLoadingPrizes] = useState(false);
-  const [selectedPrize, setSelectedPrize] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
-  const { fetchUserPrizes } = useWeeklyPrize();
 
   // Detect mobile device
   useEffect(() => {
@@ -186,35 +176,6 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
     }
   }, [connectWallet]);
 
-  // Listen for external wallet details event
-  useEffect(() => {
-    const handleOpenWalletDetails = () => {
-      setShowWalletDetails(true);
-    };
-
-    window.addEventListener('openWalletDetails', handleOpenWalletDetails);
-    return () => window.removeEventListener('openWalletDetails', handleOpenWalletDetails);
-  }, []);
-
-  // Fetch collected prizes when Collection tab is active
-  useEffect(() => {
-    const loadPrizes = async () => {
-      if (!isOpen || activeTab !== 'collection' || !walletAddress) return;
-
-      setLoadingPrizes(true);
-      try {
-        const prizes = await fetchUserPrizes();
-        setCollectedPrizes(prizes);
-      } catch (error) {
-        console.error('Failed to fetch collected prizes:', error);
-      } finally {
-        setLoadingPrizes(false);
-      }
-    };
-
-    loadPrizes();
-  }, [isOpen, activeTab, walletAddress, fetchUserPrizes]);
-  
   // Polaroid fetching removed
   /* Removed useEffect for fetching polaroids
   useEffect(() => {
@@ -385,68 +346,88 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
             >
               Wallet
             </button>
-            <button
-              className={`modal-tab ${activeTab === 'collection' ? 'active' : ''}`}
-              onClick={() => setActiveTab('collection')}
-            >
-              Collection
-            </button>
           </div>
 
           {/* Tab Content */}
           <div className="modal-content">
             {activeTab === 'account' ? (
               <div className="account-content">
-                <div className="user-info">
-                  <div className="user-avatar">
-                    {user?.imageUrl ? (
-                      <img src={user.imageUrl} alt="Avatar" />
-                    ) : (
-                      <span>{user?.firstName?.[0] || '?'}</span>
-                    )}
-                  </div>
-                  <div className="user-details">
-                    <h3>{user?.firstName} {user?.lastName}</h3>
-                    <p>{user?.primaryEmailAddress?.emailAddress}</p>
-                  </div>
-                </div>
-                
-                <div className="account-actions">
-                  {/* Hidden UserButton that we'll trigger programmatically */}
-                  <div style={{ position: 'absolute', visibility: 'hidden', pointerEvents: 'none' }}>
-                    <UserButton afterSignOutUrl={pathname || window.location.pathname} />
-                  </div>
-                  
-                  <button 
-                    className="action-button"
-                    onClick={() => {
-                      setShowClerkDropdown(true);
-                      // Find and click the hidden UserButton to open its dropdown
-                      const userButtonTrigger = document.querySelector('.cl-userButtonTrigger');
-                      if (userButtonTrigger) {
-                        userButtonTrigger.click();
-                      }
-                      // Listen for when the dropdown closes
-                      setTimeout(() => {
-                        const checkInterval = setInterval(() => {
-                          const dropdown = document.querySelector('.cl-userButtonPopoverCard');
-                          if (!dropdown) {
-                            setShowClerkDropdown(false);
-                            clearInterval(checkInterval);
+                {user ? (
+                  <>
+                    <div className="user-info">
+                      <div className="user-avatar">
+                        {user.imageUrl ? (
+                          <img src={user.imageUrl} alt="Avatar" />
+                        ) : (
+                          <span>{user.firstName?.[0] || '?'}</span>
+                        )}
+                      </div>
+                      <div className="user-details">
+                        <h3>{user.firstName} {user.lastName}</h3>
+                        <p>{user.primaryEmailAddress?.emailAddress}</p>
+                      </div>
+                    </div>
+
+                    <div className="account-actions">
+                      {/* Hidden UserButton that we'll trigger programmatically */}
+                      <div style={{ position: 'absolute', visibility: 'hidden', pointerEvents: 'none' }}>
+                        <UserButton afterSignOutUrl={pathname || window.location.pathname} />
+                      </div>
+
+                      <button
+                        className="action-button"
+                        onClick={() => {
+                          setShowClerkDropdown(true);
+                          const userButtonTrigger = document.querySelector('.cl-userButtonTrigger');
+                          if (userButtonTrigger) {
+                            userButtonTrigger.click();
                           }
-                        }, 100);
-                      }, 500);
-                    }}
-                  >
-                    Manage Account
-                  </button>
-                  <button 
-                    className="action-button signout"
-                    onClick={handleSignOut}
-                  >
-                    Sign Out
-                  </button>
-                </div>
+                          setTimeout(() => {
+                            const checkInterval = setInterval(() => {
+                              const dropdown = document.querySelector('.cl-userButtonPopoverCard');
+                              if (!dropdown) {
+                                setShowClerkDropdown(false);
+                                clearInterval(checkInterval);
+                              }
+                            }, 100);
+                          }, 500);
+                        }}
+                      >
+                        Manage Account
+                      </button>
+                      <button
+                        className="action-button signout"
+                        onClick={handleSignOut}
+                      >
+                        Sign Out
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="account-signed-out">
+                    <div className="account-signed-out-glyph" aria-hidden="true">
+                      {/* Quill — visually anchors the "inscribe a testimonial" copy */}
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 4 9 15l-3 3-3-3 11-11h6Z" />
+                        <path d="m14 5 5 5" />
+                        <path d="M9 15h2.5L14 12.5" />
+                      </svg>
+                    </div>
+                    <p className="account-signed-out-eyebrow">Testimonial access</p>
+                    <p className="account-signed-out-body">
+                      Sign in to inscribe a testimonial and follow your account across devices.
+                    </p>
+                    <button
+                      className="action-button account-signed-out-cta"
+                      onClick={() => {
+                        onClose();
+                        openSignIn();
+                      }}
+                    >
+                      Sign In
+                    </button>
+                  </div>
+                )}
               </div>
             ) : activeTab === 'wallet' ? (
               <div className="wallet-content">
@@ -480,15 +461,7 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
                     </div>
                     
                     <div className="wallet-actions">
-                      <button 
-                        className="action-button"
-                        onClick={() => {
-                          setShowWalletDetails(true);
-                        }}
-                      >
-                        View Details
-                      </button>
-                      <button 
+                      <button
                         className="action-button disconnect"
                         onClick={async () => {
                           await disconnectWallet();
@@ -512,87 +485,13 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
                   />
                 )}
               </div>
-            ) : activeTab === 'collection' ? (
-              <div className="collection-content">
-                {!walletAddress ? (
-                  <WalletConnectOptions
-                    connectExternal={connectExternal}
-                    connectingMethod={connectingMethod}
-                    isMobile={isMobile}
-                    theme={theme}
-                  />
-                ) : loadingPrizes ? (
-                  <div className="collection-loading">
-                    <div className="loading-spinner" />
-                    <p>Loading your collection...</p>
-                  </div>
-                ) : collectedPrizes.length === 0 ? (
-                  <div className="collection-empty">
-                    <div className="empty-icon">🎁</div>
-                    <h3>No prizes collected yet</h3>
-                    <p>Visit the Gachapon to claim weekly prizes!</p>
-                  </div>
-                ) : (
-                  <>
-                    <p className="collection-hint">Tap a thumbnail to view</p>
-                    <div className="capsule-grid">
-                      {collectedPrizes.map((prize) => (
-                      <CapsuleCollectible
-                        key={prize.id}
-                        prizeName={prize.prizeName}
-                        prizeModelPath={prize.prizeModelPath}
-                        prizeCapsuleModelPath={prize.prizeCapsuleModelPath}
-                        prizeImage={prize.prizeIcon}
-                        editionNumber={prize.claimNumber || 1}
-                        maxEditions={prize.maxClaims || 80}
-                        mintedAt={prize.claimedAt}
-                        weekIdentifier={prize.weekIdentifier}
-                        accentColor={prize.prizeAccentColor || '#00f5d4'}
-                        onClick={() => setSelectedPrize(prize)}
-                      />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
             ) : null}
           </div>
         </div>
       </div>
 
 
-      {/* Full-size Capsule Preview Modal */}
-      {selectedPrize && (
-        <div className="capsule-preview-overlay" onClick={() => setSelectedPrize(null)}>
-          <div className="capsule-preview-container" onClick={(e) => e.stopPropagation()}>
-            <button className="capsule-preview-close" onClick={() => setSelectedPrize(null)}>×</button>
-            <CapsuleCollectible
-              prizeName={selectedPrize.prizeName}
-              prizeModelPath={selectedPrize.prizeModelPath}
-              prizeCapsuleModelPath={selectedPrize.prizeCapsuleModelPath}
-              prizeImage={selectedPrize.prizeIcon}
-              editionNumber={selectedPrize.claimNumber || 1}
-              maxEditions={selectedPrize.maxClaims || 80}
-              mintedAt={selectedPrize.claimedAt}
-              weekIdentifier={selectedPrize.weekIdentifier}
-              accentColor={selectedPrize.prizeAccentColor || '#00f5d4'}
-              isPreview={true}
-            />
-            <p className="capsule-preview-hint">
-              {isMobile ? 'Tap to view capsule, then tap again to open' : 'Tap capsule to reveal your collectible inside'}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Wallet Details Modal */}
-      {showWalletDetails && (
-        <WalletDetailsModal 
-          onClose={() => setShowWalletDetails(false)} 
-        />
-      )}
-      
-      {/* Blurred backdrop when Clerk dropdown is open */}
+{/* Blurred backdrop when Clerk dropdown is open */}
       {showClerkDropdown && (
         <div 
           style={{
@@ -774,8 +673,7 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
         }
         
         .account-content,
-        .wallet-content,
-        .collection-content {
+        .wallet-content {
           animation: simpleFadeIn 0.3s ease-out;
           display: flex;
           flex-direction: column;
@@ -783,303 +681,63 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
           width: 100%;
         }
 
-        .collection-content {
-          min-height: 250px;
-        }
-
-        .collection-empty {
+        /* Signed-out empty state. Centered column with a soft cyan glyph,
+           monospace eyebrow, body copy, and a non-full-width pill CTA so
+           the modal doesn't feel like a single-action funnel. Matches the
+           wallet tab's vertical rhythm and the modal's cyan accent. */
+        .account-signed-out {
           display: flex;
           flex-direction: column;
           align-items: center;
-          justify-content: center;
-          padding: 2rem;
+          gap: 12px;
+          padding: 18px 12px 8px;
           text-align: center;
-          color: rgba(255, 255, 255, 0.6);
         }
 
-        .collection-empty .empty-icon {
-          font-size: 3rem;
-          margin-bottom: 1rem;
-          opacity: 0.5;
-        }
-
-        .collection-empty h3 {
-          color: #fff;
-          margin: 0 0 0.5rem 0;
-          font-size: 1.1rem;
-        }
-
-        .collection-empty p {
-          margin: 0 0 1.5rem 0;
-          font-size: 0.9rem;
-        }
-
-        .collection-loading {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          padding: 2rem;
-          gap: 1rem;
-          color: rgba(255, 255, 255, 0.6);
-        }
-
-        .loading-spinner {
-          width: 32px;
-          height: 32px;
-          border: 3px solid rgba(0, 245, 212, 0.2);
-          border-top-color: #00f5d4;
+        .account-signed-out-glyph {
+          width: 56px;
+          height: 56px;
           border-radius: 50%;
-          animation: spin 1s linear infinite;
-        }
-
-        .collection-hint {
-          text-align: center;
-          font-size: 0.75rem;
-          color: rgba(255, 255, 255, 0.4);
-          margin: 0 0 0.75rem 0;
-          font-family: 'Orbitron', monospace;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        }
-
-        .capsule-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-          gap: 1rem;
-          padding: 0.5rem;
-        }
-
-        .capsule-preview-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.92);
-          backdrop-filter: blur(10px);
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          z-index: 1002;
-          animation: simpleFadeIn 0.3s ease-out;
-        }
-
-        .capsule-preview-container {
-          position: relative;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 1rem;
-          width: 320px;
-          max-width: 90vw;
-        }
-
-        .capsule-preview-close {
-          position: absolute;
-          top: -50px;
-          right: 0;
-          background: rgba(0, 0, 0, 0.5);
-          border: 1px solid rgba(255, 255, 255, 0.2);
-          color: #fff;
-          width: 40px;
-          height: 40px;
-          border-radius: 50%;
-          font-size: 1.5rem;
-          cursor: pointer;
-          transition: all 0.2s;
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 10;
-        }
-
-        .capsule-preview-close:hover {
-          background: rgba(255, 255, 255, 0.1);
-          border-color: #00f5d4;
           color: #00f5d4;
+          background: rgba(0, 245, 212, 0.08);
+          border: 1px solid rgba(0, 245, 212, 0.35);
+          box-shadow: 0 0 24px rgba(0, 245, 212, 0.18);
+          margin-bottom: 4px;
         }
 
-        .capsule-preview-hint {
-          color: rgba(255, 255, 255, 0.5);
-          font-size: 0.8rem;
+        .account-signed-out-glyph svg {
+          width: 26px;
+          height: 26px;
+        }
+
+        .account-signed-out-eyebrow {
           margin: 0;
-          font-style: italic;
-          text-align: center;
-        }
-
-        .prizes-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-          gap: 1rem;
-          padding: 0.5rem;
-        }
-
-        .prize-card {
-          background: rgba(0, 0, 0, 0.3);
-          border: 2px solid rgba(0, 245, 212, 0.3);
-          border-radius: 12px;
-          padding: 1rem;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 0.5rem;
-          cursor: pointer;
-          transition: all 0.3s ease;
-        }
-
-        .prize-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 8px 20px rgba(0, 245, 212, 0.2);
-          border-color: #00f5d4;
-        }
-
-        .prize-icon {
-          width: 50px;
-          height: 50px;
-          border-radius: 50%;
-          object-fit: cover;
-        }
-
-        .prize-icon-placeholder {
-          width: 50px;
-          height: 50px;
-          border-radius: 50%;
-          background: rgba(0, 245, 212, 0.1);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 1.5rem;
-        }
-
-        .prize-name {
-          color: #fff;
-          font-size: 0.75rem;
-          font-weight: 600;
-          text-align: center;
           font-family: 'Orbitron', monospace;
-        }
-
-        .prize-date {
-          color: rgba(255, 255, 255, 0.4);
           font-size: 0.65rem;
-        }
-
-        .prize-preview-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background: rgba(0, 0, 0, 0.9);
-          backdrop-filter: blur(10px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 100;
-          animation: simpleFadeIn 0.3s ease-out;
-        }
-
-        .prize-preview-modal {
-          background: rgba(20, 20, 30, 0.98);
-          border: 2px solid #00f5d4;
-          border-radius: 20px;
-          padding: 2rem;
-          max-width: 400px;
-          width: 90%;
-          position: relative;
-          box-shadow: 0 20px 60px rgba(0, 245, 212, 0.3);
-        }
-
-        .preview-close-btn {
-          position: absolute;
-          top: 0.75rem;
-          right: 0.75rem;
-          background: transparent;
-          border: none;
-          color: #00f5d4;
-          font-size: 1.5rem;
-          cursor: pointer;
-          width: 32px;
-          height: 32px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .preview-content {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-        }
-
-        .preview-image {
-          width: 120px;
-          height: 120px;
-          border-radius: 50%;
-          object-fit: cover;
-          border: 3px solid #00f5d4;
-          box-shadow: 0 0 30px rgba(0, 245, 212, 0.4);
-          margin-bottom: 1.5rem;
-        }
-
-        .preview-placeholder {
-          width: 120px;
-          height: 120px;
-          border-radius: 50%;
-          background: rgba(0, 245, 212, 0.1);
-          border: 3px solid #00f5d4;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 3rem;
-          margin-bottom: 1.5rem;
-        }
-
-        .preview-title {
-          color: #00f5d4;
-          font-family: 'Orbitron', monospace;
-          font-size: 1.3rem;
-          margin: 0 0 0.5rem 0;
-        }
-
-        .preview-description {
-          color: rgba(255, 255, 255, 0.7);
-          font-size: 0.9rem;
-          margin: 0 0 1.5rem 0;
-        }
-
-        .preview-details {
-          width: 100%;
-          background: rgba(0, 0, 0, 0.3);
-          border-radius: 10px;
-          padding: 1rem;
-        }
-
-        .detail-row {
-          display: flex;
-          justify-content: space-between;
-          padding: 0.5rem 0;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .detail-row:last-child {
-          border-bottom: none;
-        }
-
-        .detail-label {
-          color: rgba(255, 255, 255, 0.5);
-          font-size: 0.8rem;
+          font-weight: 600;
+          letter-spacing: 3px;
           text-transform: uppercase;
-          letter-spacing: 0.5px;
+          color: rgba(0, 245, 212, 0.75);
         }
 
-        .detail-value {
-          color: #fff;
-          font-size: 0.85rem;
-          font-weight: 500;
+        .account-signed-out-body {
+          margin: 0;
+          max-width: 280px;
+          color: rgba(255, 255, 255, 0.7);
+          font-size: 0.88rem;
+          line-height: 1.45;
+        }
+
+        .account-signed-out-cta {
+          /* Override the base .action-button width:100% so the CTA reads
+             as an invitation, not a wall. Min-width keeps it tappable. */
+          width: auto;
+          min-width: 160px;
+          padding: 0.7rem 1.6rem;
+          margin-top: 6px;
         }
 
         .user-info {
@@ -1395,11 +1053,6 @@ export function UnifiedAccountModal({ isOpen, onClose, initialTab = 'account', t
           color: #d4a854 !important;
           font-family: 'Share Tech Mono', monospace;
           text-shadow: none;
-        }
-
-        .theme-industrial .loading-spinner {
-          border-color: rgba(212, 168, 84, 0.2);
-          border-top-color: #d4a854;
         }
 
         .theme-industrial .wallet-connect p {
